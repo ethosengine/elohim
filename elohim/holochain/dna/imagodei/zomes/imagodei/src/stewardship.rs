@@ -251,30 +251,30 @@ fn get_my_steward_tier(subject_id: &str) -> ExternResult<String> {
 /// Merge two policies (child adds restrictions to parent)
 fn merge_policies(parent: &DevicePolicy, child: &DevicePolicy) -> DevicePolicy {
     // Parse JSON arrays
-    let mut blocked_categories: Vec<String> = serde_json::from_str(&parent.blocked_categories_json)
-        .unwrap_or_default();
-    let child_categories: Vec<String> = serde_json::from_str(&child.blocked_categories_json)
-        .unwrap_or_default();
+    let mut blocked_categories: Vec<String> =
+        serde_json::from_str(&parent.blocked_categories_json).unwrap_or_default();
+    let child_categories: Vec<String> =
+        serde_json::from_str(&child.blocked_categories_json).unwrap_or_default();
     for cat in child_categories {
         if !blocked_categories.contains(&cat) {
             blocked_categories.push(cat);
         }
     }
 
-    let mut blocked_hashes: Vec<String> = serde_json::from_str(&parent.blocked_hashes_json)
-        .unwrap_or_default();
-    let child_hashes: Vec<String> = serde_json::from_str(&child.blocked_hashes_json)
-        .unwrap_or_default();
+    let mut blocked_hashes: Vec<String> =
+        serde_json::from_str(&parent.blocked_hashes_json).unwrap_or_default();
+    let child_hashes: Vec<String> =
+        serde_json::from_str(&child.blocked_hashes_json).unwrap_or_default();
     for hash in child_hashes {
         if !blocked_hashes.contains(&hash) {
             blocked_hashes.push(hash);
         }
     }
 
-    let mut disabled_features: Vec<String> = serde_json::from_str(&child.disabled_features_json)
-        .unwrap_or_default();
-    let parent_features: Vec<String> = serde_json::from_str(&parent.disabled_features_json)
-        .unwrap_or_default();
+    let mut disabled_features: Vec<String> =
+        serde_json::from_str(&child.disabled_features_json).unwrap_or_default();
+    let parent_features: Vec<String> =
+        serde_json::from_str(&parent.disabled_features_json).unwrap_or_default();
     for feat in parent_features {
         if !disabled_features.contains(&feat) {
             disabled_features.push(feat);
@@ -322,7 +322,8 @@ fn merge_policies(parent: &DevicePolicy, child: &DevicePolicy) -> DevicePolicy {
         reach_level_max: parent.reach_level_max.or(child.reach_level_max),
         session_max_minutes: session_max,
         daily_max_minutes: daily_max,
-        time_windows_json: if child.time_windows_json.is_empty() || child.time_windows_json == "[]" {
+        time_windows_json: if child.time_windows_json.is_empty() || child.time_windows_json == "[]"
+        {
             parent.time_windows_json.clone()
         } else {
             child.time_windows_json.clone()
@@ -361,11 +362,23 @@ pub fn create_stewardship_grant(input: CreateGrantInput) -> ExternResult<Steward
     let expires_ms = input.expires_in_days as u64 * 24 * 60 * 60 * 1000 * 1000;
     let review_ms = input.review_in_days as u64 * 24 * 60 * 60 * 1000 * 1000;
 
-    let expires_at = format!("{:?}", now.checked_add(&std::time::Duration::from_micros(expires_ms)).unwrap_or(now));
-    let review_at = format!("{:?}", now.checked_add(&std::time::Duration::from_micros(review_ms)).unwrap_or(now));
+    let expires_at = format!(
+        "{:?}",
+        now.checked_add(&std::time::Duration::from_micros(expires_ms))
+            .unwrap_or(now)
+    );
+    let review_at = format!(
+        "{:?}",
+        now.checked_add(&std::time::Duration::from_micros(review_ms))
+            .unwrap_or(now)
+    );
 
-    let grant_id = format!("grant-{}-{}-{}", my_human.human.id, input.subject_id,
-        timestamp.replace([':', ' ', '(', ')'], "-"));
+    let grant_id = format!(
+        "grant-{}-{}-{}",
+        my_human.human.id,
+        input.subject_id,
+        timestamp.replace([':', ' ', '(', ')'], "-")
+    );
 
     let grant = StewardshipGrant {
         id: grant_id.clone(),
@@ -396,19 +409,39 @@ pub fn create_stewardship_grant(input: CreateGrantInput) -> ExternResult<Steward
     // Create lookup links
     let id_anchor = StringAnchor::new("stewardship_grant_id", &grant_id);
     let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
-    create_link(id_anchor_hash, action_hash.clone(), LinkTypes::IdToStewardshipGrant, ())?;
+    create_link(
+        id_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::IdToStewardshipGrant,
+        (),
+    )?;
 
     let steward_anchor = StringAnchor::new("steward_grants", &my_human.human.id);
     let steward_anchor_hash = hash_entry(&EntryTypes::StringAnchor(steward_anchor))?;
-    create_link(steward_anchor_hash, action_hash.clone(), LinkTypes::StewardToGrant, ())?;
+    create_link(
+        steward_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::StewardToGrant,
+        (),
+    )?;
 
     let subject_anchor = StringAnchor::new("subject_grants", &input.subject_id);
     let subject_anchor_hash = hash_entry(&EntryTypes::StringAnchor(subject_anchor))?;
-    create_link(subject_anchor_hash, action_hash.clone(), LinkTypes::SubjectToGrant, ())?;
+    create_link(
+        subject_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::SubjectToGrant,
+        (),
+    )?;
 
     let status_anchor = StringAnchor::new("grant_status", "active");
     let status_anchor_hash = hash_entry(&EntryTypes::StringAnchor(status_anchor))?;
-    create_link(status_anchor_hash, action_hash.clone(), LinkTypes::GrantByStatus, ())?;
+    create_link(
+        status_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::GrantByStatus,
+        (),
+    )?;
 
     // Emit signal
     emit_signal(StewardshipSignal::GrantCreated {
@@ -454,10 +487,18 @@ pub fn delegate_grant(input: DelegateGrantInput) -> ExternResult<StewardshipGran
     let timestamp = format!("{:?}", now);
 
     let expires_ms = input.expires_in_days as u64 * 24 * 60 * 60 * 1000 * 1000;
-    let expires_at = format!("{:?}", now.checked_add(&std::time::Duration::from_micros(expires_ms)).unwrap_or(now));
+    let expires_at = format!(
+        "{:?}",
+        now.checked_add(&std::time::Duration::from_micros(expires_ms))
+            .unwrap_or(now)
+    );
 
-    let grant_id = format!("grant-{}-{}-{}", input.new_steward_id, parent.grant.subject_id,
-        timestamp.replace([':', ' ', '(', ')'], "-"));
+    let grant_id = format!(
+        "grant-{}-{}-{}",
+        input.new_steward_id,
+        parent.grant.subject_id,
+        timestamp.replace([':', ' ', '(', ')'], "-")
+    );
 
     // Delegated grants can only have equal or fewer capabilities than parent
     let grant = StewardshipGrant {
@@ -467,11 +508,22 @@ pub fn delegate_grant(input: DelegateGrantInput) -> ExternResult<StewardshipGran
         authority_basis: parent.grant.authority_basis.clone(),
         evidence_hash: parent.grant.evidence_hash.clone(),
         verified_by: my_human.human.id.clone(), // Delegating steward verifies
-        content_filtering: input.content_filtering.unwrap_or(parent.grant.content_filtering) && parent.grant.content_filtering,
-        time_limits: input.time_limits.unwrap_or(parent.grant.time_limits) && parent.grant.time_limits,
-        feature_restrictions: input.feature_restrictions.unwrap_or(parent.grant.feature_restrictions) && parent.grant.feature_restrictions,
-        activity_monitoring: input.activity_monitoring.unwrap_or(parent.grant.activity_monitoring) && parent.grant.activity_monitoring,
-        policy_delegation: input.policy_delegation.unwrap_or(false) && parent.grant.policy_delegation,
+        content_filtering: input
+            .content_filtering
+            .unwrap_or(parent.grant.content_filtering)
+            && parent.grant.content_filtering,
+        time_limits: input.time_limits.unwrap_or(parent.grant.time_limits)
+            && parent.grant.time_limits,
+        feature_restrictions: input
+            .feature_restrictions
+            .unwrap_or(parent.grant.feature_restrictions)
+            && parent.grant.feature_restrictions,
+        activity_monitoring: input
+            .activity_monitoring
+            .unwrap_or(parent.grant.activity_monitoring)
+            && parent.grant.activity_monitoring,
+        policy_delegation: input.policy_delegation.unwrap_or(false)
+            && parent.grant.policy_delegation,
         delegatable: false, // Delegated grants cannot be further delegated by default
         delegated_from: Some(input.parent_grant_id),
         delegation_depth: parent.grant.delegation_depth + 1,
@@ -489,20 +541,40 @@ pub fn delegate_grant(input: DelegateGrantInput) -> ExternResult<StewardshipGran
     // Create lookup links
     let id_anchor = StringAnchor::new("stewardship_grant_id", &grant_id);
     let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
-    create_link(id_anchor_hash, action_hash.clone(), LinkTypes::IdToStewardshipGrant, ())?;
+    create_link(
+        id_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::IdToStewardshipGrant,
+        (),
+    )?;
 
     let steward_anchor = StringAnchor::new("steward_grants", &input.new_steward_id);
     let steward_anchor_hash = hash_entry(&EntryTypes::StringAnchor(steward_anchor))?;
-    create_link(steward_anchor_hash, action_hash.clone(), LinkTypes::StewardToGrant, ())?;
+    create_link(
+        steward_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::StewardToGrant,
+        (),
+    )?;
 
     let subject_anchor = StringAnchor::new("subject_grants", &parent.grant.subject_id);
     let subject_anchor_hash = hash_entry(&EntryTypes::StringAnchor(subject_anchor))?;
-    create_link(subject_anchor_hash, action_hash.clone(), LinkTypes::SubjectToGrant, ())?;
+    create_link(
+        subject_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::SubjectToGrant,
+        (),
+    )?;
 
     // Link to parent grant for delegation chain
     let delegation_anchor = StringAnchor::new("delegated_from", &parent.grant.id);
     let delegation_anchor_hash = hash_entry(&EntryTypes::StringAnchor(delegation_anchor))?;
-    create_link(delegation_anchor_hash, action_hash.clone(), LinkTypes::DelegatedFromGrant, ())?;
+    create_link(
+        delegation_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::DelegatedFromGrant,
+        (),
+    )?;
 
     emit_signal(StewardshipSignal::GrantCreated {
         action_hash: action_hash.clone(),
@@ -522,7 +594,9 @@ pub fn revoke_grant(grant_id: String) -> ExternResult<StewardshipGrantOutput> {
         .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Grant not found".to_string())))?;
 
     // Only steward or subject can revoke (subject can always revoke consent)
-    if existing.grant.steward_id != my_human.human.id && existing.grant.subject_id != my_human.human.id {
+    if existing.grant.steward_id != my_human.human.id
+        && existing.grant.subject_id != my_human.human.id
+    {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Only steward or subject can revoke a grant".to_string()
         )));
@@ -547,7 +621,12 @@ pub fn revoke_grant(grant_id: String) -> ExternResult<StewardshipGrantOutput> {
     for link in old_links {
         delete_link(link.create_link_hash, GetOptions::default())?;
     }
-    create_link(id_anchor_hash, action_hash.clone(), LinkTypes::IdToStewardshipGrant, ())?;
+    create_link(
+        id_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::IdToStewardshipGrant,
+        (),
+    )?;
 
     // Update status links
     let old_status_anchor = StringAnchor::new("grant_status", &existing.grant.status);
@@ -567,7 +646,10 @@ pub fn revoke_grant(grant_id: String) -> ExternResult<StewardshipGrantOutput> {
         reason: "Revoked by steward or subject".to_string(),
     })?;
 
-    Ok(StewardshipGrantOutput { action_hash, grant: updated })
+    Ok(StewardshipGrantOutput {
+        action_hash,
+        grant: updated,
+    })
 }
 
 /// Get grant by ID
@@ -582,7 +664,12 @@ pub fn get_grant_by_id(id: String) -> ExternResult<Option<StewardshipGrantOutput
     if let Some(link) = links.first() {
         if let Some(action_hash) = link.target.clone().into_action_hash() {
             if let Some(record) = get(action_hash.clone(), GetOptions::default())? {
-                if let Some(grant) = record.entry().to_app_option::<StewardshipGrant>().ok().flatten() {
+                if let Some(grant) = record
+                    .entry()
+                    .to_app_option::<StewardshipGrant>()
+                    .ok()
+                    .flatten()
+                {
                     return Ok(Some(StewardshipGrantOutput { action_hash, grant }));
                 }
             }
@@ -605,7 +692,12 @@ pub fn get_grants_as_steward(steward_id: String) -> ExternResult<Vec<Stewardship
     for link in links {
         if let Some(action_hash) = link.target.clone().into_action_hash() {
             if let Some(record) = get(action_hash.clone(), GetOptions::default())? {
-                if let Some(grant) = record.entry().to_app_option::<StewardshipGrant>().ok().flatten() {
+                if let Some(grant) = record
+                    .entry()
+                    .to_app_option::<StewardshipGrant>()
+                    .ok()
+                    .flatten()
+                {
                     results.push(StewardshipGrantOutput { action_hash, grant });
                 }
             }
@@ -628,7 +720,12 @@ pub fn get_grants_for_subject(subject_id: String) -> ExternResult<Vec<Stewardshi
     for link in links {
         if let Some(action_hash) = link.target.clone().into_action_hash() {
             if let Some(record) = get(action_hash.clone(), GetOptions::default())? {
-                if let Some(grant) = record.entry().to_app_option::<StewardshipGrant>().ok().flatten() {
+                if let Some(grant) = record
+                    .entry()
+                    .to_app_option::<StewardshipGrant>()
+                    .ok()
+                    .flatten()
+                {
                     results.push(StewardshipGrantOutput { action_hash, grant });
                 }
             }
@@ -679,10 +776,12 @@ pub fn upsert_policy(input: UpsertPolicyInput) -> ExternResult<DevicePolicyOutpu
     let now = sys_time()?;
     let timestamp = format!("{:?}", now);
 
-    let policy_id = format!("policy-{}-{}-{}",
+    let policy_id = format!(
+        "policy-{}-{}-{}",
         input.subject_id,
         input.device_id.clone().unwrap_or_else(|| "all".to_string()),
-        my_human.human.id);
+        my_human.human.id
+    );
 
     // Check if policy exists
     let existing = get_policy_by_id(policy_id.clone())?;
@@ -695,7 +794,8 @@ pub fn upsert_policy(input: UpsertPolicyInput) -> ExternResult<DevicePolicyOutpu
         author_id: my_human.human.id.clone(),
         author_tier: tier,
         inherits_from: None, // Will be set by compute_policy_inheritance
-        blocked_categories_json: serde_json::to_string(&input.blocked_categories).unwrap_or_default(),
+        blocked_categories_json: serde_json::to_string(&input.blocked_categories)
+            .unwrap_or_default(),
         blocked_hashes_json: serde_json::to_string(&input.blocked_hashes).unwrap_or_default(),
         age_rating_max: input.age_rating_max,
         reach_level_max: input.reach_level_max,
@@ -714,7 +814,11 @@ pub fn upsert_policy(input: UpsertPolicyInput) -> ExternResult<DevicePolicyOutpu
         effective_from: timestamp.clone(),
         effective_until: None,
         version,
-        created_at: if existing.is_some() { existing.unwrap().policy.created_at } else { timestamp.clone() },
+        created_at: if existing.is_some() {
+            existing.unwrap().policy.created_at
+        } else {
+            timestamp.clone()
+        },
         updated_at: timestamp,
     };
 
@@ -732,18 +836,31 @@ pub fn upsert_policy(input: UpsertPolicyInput) -> ExternResult<DevicePolicyOutpu
     for link in old_links {
         delete_link(link.create_link_hash, GetOptions::default())?;
     }
-    create_link(id_anchor_hash, action_hash.clone(), LinkTypes::IdToDevicePolicy, ())?;
+    create_link(
+        id_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::IdToDevicePolicy,
+        (),
+    )?;
 
     let subject_anchor = StringAnchor::new("subject_policies", &input.subject_id);
     let subject_anchor_hash = hash_entry(&EntryTypes::StringAnchor(subject_anchor))?;
-    create_link(subject_anchor_hash, action_hash.clone(), LinkTypes::SubjectToPolicy, ())?;
+    create_link(
+        subject_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::SubjectToPolicy,
+        (),
+    )?;
 
     emit_signal(StewardshipSignal::PolicyUpdated {
         action_hash: action_hash.clone(),
         policy: policy.clone(),
     })?;
 
-    Ok(DevicePolicyOutput { action_hash, policy })
+    Ok(DevicePolicyOutput {
+        action_hash,
+        policy,
+    })
 }
 
 /// Get policy by ID
@@ -758,8 +875,16 @@ pub fn get_policy_by_id(id: String) -> ExternResult<Option<DevicePolicyOutput>> 
     if let Some(link) = links.first() {
         if let Some(action_hash) = link.target.clone().into_action_hash() {
             if let Some(record) = get(action_hash.clone(), GetOptions::default())? {
-                if let Some(policy) = record.entry().to_app_option::<DevicePolicy>().ok().flatten() {
-                    return Ok(Some(DevicePolicyOutput { action_hash, policy }));
+                if let Some(policy) = record
+                    .entry()
+                    .to_app_option::<DevicePolicy>()
+                    .ok()
+                    .flatten()
+                {
+                    return Ok(Some(DevicePolicyOutput {
+                        action_hash,
+                        policy,
+                    }));
                 }
             }
         }
@@ -781,8 +906,16 @@ pub fn get_policies_for_subject(subject_id: String) -> ExternResult<Vec<DevicePo
     for link in links {
         if let Some(action_hash) = link.target.clone().into_action_hash() {
             if let Some(record) = get(action_hash.clone(), GetOptions::default())? {
-                if let Some(policy) = record.entry().to_app_option::<DevicePolicy>().ok().flatten() {
-                    results.push(DevicePolicyOutput { action_hash, policy });
+                if let Some(policy) = record
+                    .entry()
+                    .to_app_option::<DevicePolicy>()
+                    .ok()
+                    .flatten()
+                {
+                    results.push(DevicePolicyOutput {
+                        action_hash,
+                        policy,
+                    });
                 }
             }
         }
@@ -813,12 +946,21 @@ pub fn compute_policy_for_subject(subject_id: String) -> ExternResult<ComputedPo
     let tier_order = ["coordinator", "guardian", "constitutional", "self"];
     let mut sorted_policies: Vec<_> = policies
         .iter()
-        .filter(|p| p.policy.effective_until.is_none() || p.policy.effective_until.as_ref().unwrap() > &timestamp)
+        .filter(|p| {
+            p.policy.effective_until.is_none()
+                || p.policy.effective_until.as_ref().unwrap() > &timestamp
+        })
         .collect();
 
     sorted_policies.sort_by(|a, b| {
-        let a_idx = tier_order.iter().position(|&t| t == a.policy.author_tier).unwrap_or(99);
-        let b_idx = tier_order.iter().position(|&t| t == b.policy.author_tier).unwrap_or(99);
+        let a_idx = tier_order
+            .iter()
+            .position(|&t| t == a.policy.author_tier)
+            .unwrap_or(99);
+        let b_idx = tier_order
+            .iter()
+            .position(|&t| t == b.policy.author_tier)
+            .unwrap_or(99);
         a_idx.cmp(&b_idx)
     });
 
@@ -844,7 +986,8 @@ pub fn compute_policy_for_subject(subject_id: String) -> ExternResult<ComputedPo
         let p = &policy_output.policy;
 
         // Merge blocked categories
-        let cats: Vec<String> = serde_json::from_str(&p.blocked_categories_json).unwrap_or_default();
+        let cats: Vec<String> =
+            serde_json::from_str(&p.blocked_categories_json).unwrap_or_default();
         for cat in cats {
             if !blocked_categories.contains(&cat) {
                 blocked_categories.push(cat);
@@ -860,7 +1003,8 @@ pub fn compute_policy_for_subject(subject_id: String) -> ExternResult<ComputedPo
         }
 
         // Merge disabled features
-        let feats: Vec<String> = serde_json::from_str(&p.disabled_features_json).unwrap_or_default();
+        let feats: Vec<String> =
+            serde_json::from_str(&p.disabled_features_json).unwrap_or_default();
         for feat in feats {
             if !disabled_features.contains(&feat) {
                 disabled_features.push(feat);
@@ -876,7 +1020,8 @@ pub fn compute_policy_for_subject(subject_id: String) -> ExternResult<ComputedPo
         }
 
         // Merge approval requirements
-        let approvals: Vec<String> = serde_json::from_str(&p.require_approval_json).unwrap_or_default();
+        let approvals: Vec<String> =
+            serde_json::from_str(&p.require_approval_json).unwrap_or_default();
         for approval in approvals {
             if !require_approval.contains(&approval) {
                 require_approval.push(approval);
@@ -968,14 +1113,16 @@ pub fn check_content_access(input: ContentCheckInput) -> ExternResult<PolicyDeci
 
     // Check blocked hashes
     if policy.blocked_hashes.contains(&input.content_hash) {
-        return Ok(PolicyDecision::Block { reason: "Content is blocked".to_string() });
+        return Ok(PolicyDecision::Block {
+            reason: "Content is blocked".to_string(),
+        });
     }
 
     // Check blocked categories
     for cat in &input.categories {
         if policy.blocked_categories.contains(cat) {
             return Ok(PolicyDecision::Block {
-                reason: format!("Category '{}' is blocked", cat)
+                reason: format!("Category '{}' is blocked", cat),
             });
         }
     }
@@ -984,10 +1131,16 @@ pub fn check_content_access(input: ContentCheckInput) -> ExternResult<PolicyDeci
     if let (Some(max), Some(content_rating)) = (&policy.age_rating_max, &input.age_rating) {
         let age_order = ["G", "PG", "PG-13", "R", "NC-17"];
         let max_idx = age_order.iter().position(|&r| r == max).unwrap_or(4);
-        let content_idx = age_order.iter().position(|&r| r == content_rating).unwrap_or(4);
+        let content_idx = age_order
+            .iter()
+            .position(|&r| r == content_rating)
+            .unwrap_or(4);
         if content_idx > max_idx {
             return Ok(PolicyDecision::Block {
-                reason: format!("Content rating '{}' exceeds allowed '{}'", content_rating, max)
+                reason: format!(
+                    "Content rating '{}' exceeds allowed '{}'",
+                    content_rating, max
+                ),
             });
         }
     }
@@ -996,7 +1149,7 @@ pub fn check_content_access(input: ContentCheckInput) -> ExternResult<PolicyDeci
     if let (Some(max), Some(reach)) = (policy.reach_level_max, input.reach_level) {
         if reach > max {
             return Ok(PolicyDecision::Block {
-                reason: format!("Content reach level {} exceeds allowed {}", reach, max)
+                reason: format!("Content reach level {} exceeds allowed {}", reach, max),
             });
         }
     }
@@ -1028,12 +1181,19 @@ pub fn file_appeal(input: FileAppealInput) -> ExternResult<StewardshipAppealOutp
         )));
     }
 
-    let appeal_id = format!("appeal-{}-{}", input.grant_id,
-        timestamp.replace([':', ' ', '(', ')'], "-"));
+    let appeal_id = format!(
+        "appeal-{}-{}",
+        input.grant_id,
+        timestamp.replace([':', ' ', '(', ')'], "-")
+    );
 
     // Calculate expiry (appeals must be decided within 30 days)
     let expires_ms = 30u64 * 24 * 60 * 60 * 1000 * 1000;
-    let expires_at = format!("{:?}", now.checked_add(&std::time::Duration::from_micros(expires_ms)).unwrap_or(now));
+    let expires_at = format!(
+        "{:?}",
+        now.checked_add(&std::time::Duration::from_micros(expires_ms))
+            .unwrap_or(now)
+    );
 
     let appeal = StewardshipAppeal {
         id: appeal_id.clone(),
@@ -1067,26 +1227,49 @@ pub fn file_appeal(input: FileAppealInput) -> ExternResult<StewardshipAppealOutp
     // Create lookup links
     let id_anchor = StringAnchor::new("stewardship_appeal_id", &appeal_id);
     let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
-    create_link(id_anchor_hash, action_hash.clone(), LinkTypes::IdToStewardshipAppeal, ())?;
+    create_link(
+        id_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::IdToStewardshipAppeal,
+        (),
+    )?;
 
     let appellant_anchor = StringAnchor::new("appellant_appeals", &appeal.appellant_id);
     let appellant_anchor_hash = hash_entry(&EntryTypes::StringAnchor(appellant_anchor))?;
-    create_link(appellant_anchor_hash, action_hash.clone(), LinkTypes::AppellantToAppeal, ())?;
+    create_link(
+        appellant_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::AppellantToAppeal,
+        (),
+    )?;
 
     let grant_anchor = StringAnchor::new("grant_appeals", &appeal.grant_id);
     let grant_anchor_hash = hash_entry(&EntryTypes::StringAnchor(grant_anchor))?;
-    create_link(grant_anchor_hash, action_hash.clone(), LinkTypes::GrantToAppeal, ())?;
+    create_link(
+        grant_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::GrantToAppeal,
+        (),
+    )?;
 
     let status_anchor = StringAnchor::new("appeal_status", "filed");
     let status_anchor_hash = hash_entry(&EntryTypes::StringAnchor(status_anchor))?;
-    create_link(status_anchor_hash, action_hash.clone(), LinkTypes::AppealByStatus, ())?;
+    create_link(
+        status_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::AppealByStatus,
+        (),
+    )?;
 
     emit_signal(StewardshipSignal::AppealFiled {
         action_hash: action_hash.clone(),
         appeal: appeal.clone(),
     })?;
 
-    Ok(StewardshipAppealOutput { action_hash, appeal })
+    Ok(StewardshipAppealOutput {
+        action_hash,
+        appeal,
+    })
 }
 
 /// Get appeal by ID
@@ -1101,8 +1284,16 @@ pub fn get_appeal_by_id(id: String) -> ExternResult<Option<StewardshipAppealOutp
     if let Some(link) = links.first() {
         if let Some(action_hash) = link.target.clone().into_action_hash() {
             if let Some(record) = get(action_hash.clone(), GetOptions::default())? {
-                if let Some(appeal) = record.entry().to_app_option::<StewardshipAppeal>().ok().flatten() {
-                    return Ok(Some(StewardshipAppealOutput { action_hash, appeal }));
+                if let Some(appeal) = record
+                    .entry()
+                    .to_app_option::<StewardshipAppeal>()
+                    .ok()
+                    .flatten()
+                {
+                    return Ok(Some(StewardshipAppealOutput {
+                        action_hash,
+                        appeal,
+                    }));
                 }
             }
         }
@@ -1127,8 +1318,16 @@ pub fn get_my_appeals(_: ()) -> ExternResult<Vec<StewardshipAppealOutput>> {
     for link in links {
         if let Some(action_hash) = link.target.clone().into_action_hash() {
             if let Some(record) = get(action_hash.clone(), GetOptions::default())? {
-                if let Some(appeal) = record.entry().to_app_option::<StewardshipAppeal>().ok().flatten() {
-                    results.push(StewardshipAppealOutput { action_hash, appeal });
+                if let Some(appeal) = record
+                    .entry()
+                    .to_app_option::<StewardshipAppeal>()
+                    .ok()
+                    .flatten()
+                {
+                    results.push(StewardshipAppealOutput {
+                        action_hash,
+                        appeal,
+                    });
                 }
             }
         }
@@ -1162,10 +1361,17 @@ pub fn log_activity(input: LogActivityInput) -> ExternResult<ActivityLogOutput> 
 
     // Calculate retention expiry
     let retention_ms = policy.retention_days as u64 * 24 * 60 * 60 * 1000 * 1000;
-    let retention_expires_at = format!("{:?}", now.checked_add(&std::time::Duration::from_micros(retention_ms)).unwrap_or(now));
+    let retention_expires_at = format!(
+        "{:?}",
+        now.checked_add(&std::time::Duration::from_micros(retention_ms))
+            .unwrap_or(now)
+    );
 
-    let log_id = format!("log-{}-{}", my_human.human.id,
-        timestamp.replace([':', ' ', '(', ')'], "-"));
+    let log_id = format!(
+        "log-{}-{}",
+        my_human.human.id,
+        timestamp.replace([':', ' ', '(', ')'], "-")
+    );
 
     let log = ActivityLog {
         id: log_id.clone(),
@@ -1193,15 +1399,30 @@ pub fn log_activity(input: LogActivityInput) -> ExternResult<ActivityLogOutput> 
     // Create lookup links
     let id_anchor = StringAnchor::new("activity_log_id", &log_id);
     let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
-    create_link(id_anchor_hash, action_hash.clone(), LinkTypes::IdToActivityLog, ())?;
+    create_link(
+        id_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::IdToActivityLog,
+        (),
+    )?;
 
     let subject_anchor = StringAnchor::new("subject_activity_logs", &my_human.human.id);
     let subject_anchor_hash = hash_entry(&EntryTypes::StringAnchor(subject_anchor))?;
-    create_link(subject_anchor_hash, action_hash.clone(), LinkTypes::SubjectToActivityLog, ())?;
+    create_link(
+        subject_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::SubjectToActivityLog,
+        (),
+    )?;
 
     let session_anchor = StringAnchor::new("session_logs", &input.session_id);
     let session_anchor_hash = hash_entry(&EntryTypes::StringAnchor(session_anchor))?;
-    create_link(session_anchor_hash, action_hash.clone(), LinkTypes::SessionToActivityLog, ())?;
+    create_link(
+        session_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::SessionToActivityLog,
+        (),
+    )?;
 
     Ok(ActivityLogOutput { action_hash, log })
 }

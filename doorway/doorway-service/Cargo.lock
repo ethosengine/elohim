@@ -1085,7 +1085,7 @@ dependencies = [
  "futures-util",
  "getrandom 0.3.4",
  "hex",
- "holo_hash",
+ "holo_hash 0.7.0-dev.3",
  "holochain_client",
  "holochain_conductor_api",
  "holochain_serialized_bytes",
@@ -1096,6 +1096,7 @@ dependencies = [
  "hyper",
  "hyper-tungstenite",
  "hyper-util",
+ "imagodei-types",
  "ipld-core",
  "jsonwebtoken",
  "mongodb",
@@ -1658,6 +1659,24 @@ dependencies = [
 
 [[package]]
 name = "holo_hash"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8d4d7ada0089a52dc48498e4deab38c056b665a666b5f8717161c8d0248fd31e"
+dependencies = [
+ "base64",
+ "blake2b_simd",
+ "derive_more",
+ "holochain_serialized_bytes",
+ "holochain_util 0.6.0",
+ "holochain_wasmer_common",
+ "serde",
+ "serde_bytes",
+ "sha2",
+ "thiserror 2.0.17",
+]
+
+[[package]]
+name = "holo_hash"
 version = "0.7.0-dev.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d36c4e3f378c453360851a8db26e66a008bb0108e8c85371350204e0d60b2048"
@@ -1668,7 +1687,7 @@ dependencies = [
  "fixt",
  "futures",
  "holochain_serialized_bytes",
- "holochain_util",
+ "holochain_util 0.7.0-dev.0",
  "holochain_wasmer_common",
  "must_future",
  "rand 0.9.2",
@@ -1690,7 +1709,7 @@ dependencies = [
  "async-trait",
  "ed25519-dalek",
  "event-emitter-rs",
- "holo_hash",
+ "holo_hash 0.7.0-dev.3",
  "holochain_conductor_api",
  "holochain_nonce",
  "holochain_types",
@@ -1711,12 +1730,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "433373b56399339bbb33dfbf124c3cc59b9f42c46fc59173f51aa5331a850c80"
 dependencies = [
  "derive_more",
- "holo_hash",
+ "holo_hash 0.7.0-dev.3",
  "holochain_keystore",
  "holochain_serialized_bytes",
  "holochain_state_types",
  "holochain_types",
- "holochain_util",
+ "holochain_util 0.7.0-dev.0",
  "holochain_zome_types",
  "indexmap 2.11.1",
  "kitsune2_api",
@@ -1739,11 +1758,11 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7894780e10cddca13821c7a5f6846b44d76d7020945229582afae53c32604b91"
 dependencies = [
  "derive_builder",
- "holo_hash",
+ "holo_hash 0.7.0-dev.3",
  "holochain_secure_primitive",
  "holochain_serialized_bytes",
  "holochain_timestamp",
- "holochain_util",
+ "holochain_util 0.7.0-dev.0",
  "schemars 0.9.0",
  "serde",
  "serde_bytes",
@@ -1761,10 +1780,10 @@ dependencies = [
  "base64",
  "derive_more",
  "futures",
- "holo_hash",
+ "holo_hash 0.7.0-dev.3",
  "holochain_secure_primitive",
  "holochain_serialized_bytes",
- "holochain_util",
+ "holochain_util 0.7.0-dev.0",
  "holochain_zome_types",
  "lair_keystore",
  "must_future",
@@ -1842,11 +1861,11 @@ dependencies = [
  "fallible-iterator",
  "futures",
  "getrandom 0.3.4",
- "holo_hash",
+ "holo_hash 0.7.0-dev.3",
  "holochain_nonce",
  "holochain_serialized_bytes",
  "holochain_timestamp",
- "holochain_util",
+ "holochain_util 0.7.0-dev.0",
  "holochain_zome_types",
  "kitsune2_api",
  "nanoid",
@@ -1876,7 +1895,7 @@ version = "0.7.0-dev.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ab351cd90e9ddd076f877ed02519776a16aedbbc293fad59d2b7927636caa7b7"
 dependencies = [
- "holo_hash",
+ "holo_hash 0.7.0-dev.3",
  "holochain_integrity_types",
  "serde",
 ]
@@ -1923,14 +1942,14 @@ dependencies = [
  "derive_builder",
  "derive_more",
  "futures",
- "holo_hash",
+ "holo_hash 0.7.0-dev.3",
  "holochain_keystore",
  "holochain_nonce",
  "holochain_serialized_bytes",
  "holochain_sqlite",
  "holochain_timestamp",
  "holochain_trace",
- "holochain_util",
+ "holochain_util 0.7.0-dev.0",
  "holochain_zome_types",
  "indexmap 2.11.1",
  "itertools 0.14.0",
@@ -1955,6 +1974,19 @@ dependencies = [
  "thiserror 2.0.17",
  "tokio",
  "tracing",
+]
+
+[[package]]
+name = "holochain_util"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3d10cf3ca40b04f1e180817d9b059d1fe11b3e05e3127c0a5f0ad4651ddad6cb"
+dependencies = [
+ "cfg-if",
+ "colored",
+ "dunce",
+ "futures",
+ "once_cell",
 ]
 
 [[package]]
@@ -2014,7 +2046,7 @@ checksum = "d35c3ccfef22cff7077f64fe26abcd36458a0361f923c91b7e299f6690a228fe"
 dependencies = [
  "derive_builder",
  "derive_more",
- "holo_hash",
+ "holo_hash 0.7.0-dev.3",
  "holochain_integrity_types",
  "holochain_nonce",
  "holochain_serialized_bytes",
@@ -2304,6 +2336,14 @@ checksum = "3acae9609540aa318d1bc588455225fb2085b9ed0c4f6bd0d9d5bcd86f1a0344"
 dependencies = [
  "icu_normalizer",
  "icu_properties",
+]
+
+[[package]]
+name = "imagodei-types"
+version = "0.1.0"
+dependencies = [
+ "holo_hash 0.6.0",
+ "serde",
 ]
 
 [[package]]
@@ -2930,7 +2970,7 @@ dependencies = [
  "dunce",
  "flate2",
  "futures",
- "holochain_util",
+ "holochain_util 0.7.0-dev.0",
  "rmp-serde",
  "serde",
  "serde_yaml",

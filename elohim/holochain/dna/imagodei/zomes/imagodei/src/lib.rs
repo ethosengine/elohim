@@ -169,7 +169,8 @@ pub fn post_commit(committed_actions: Vec<SignedActionHashed>) -> ExternResult<(
                 relationship,
                 author,
             })?;
-        } else if let Some(attestation) = record.entry().to_app_option::<Attestation>().ok().flatten()
+        } else if let Some(attestation) =
+            record.entry().to_app_option::<Attestation>().ok().flatten()
         {
             emit_signal(ImagodeiSignal::AttestationCommitted {
                 action_hash,
@@ -218,7 +219,12 @@ pub fn create_human(input: CreateHumanInput) -> ExternResult<HumanOutput> {
     // Create ID lookup link
     let id_anchor = StringAnchor::new("human_id", &input.id);
     let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
-    create_link(id_anchor_hash, action_hash.clone(), LinkTypes::IdToHuman, ())?;
+    create_link(
+        id_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::IdToHuman,
+        (),
+    )?;
 
     // Bind to agent key (one-to-one)
     create_link(
@@ -377,8 +383,11 @@ pub fn create_relationship(input: CreateRelationshipInput) -> ExternResult<Relat
     let timestamp = format!("{:?}", now);
 
     // Get my Human profile
-    let my_human = get_my_human(())?
-        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Must have Human profile first".to_string())))?;
+    let my_human = get_my_human(())?.ok_or_else(|| {
+        wasm_error!(WasmErrorInner::Guest(
+            "Must have Human profile first".to_string()
+        ))
+    })?;
 
     let relationship_id = format!("{}-{}-{}", my_human.human.id, input.party_b_id, timestamp);
 
@@ -497,7 +506,10 @@ pub fn issue_attestation(input: IssueAttestationInput) -> ExternResult<Attestati
     let now = sys_time()?;
     let timestamp = format!("{:?}", now);
 
-    let attestation_id = format!("{}-{}-{}", input.agent_id, input.attestation_type, timestamp);
+    let attestation_id = format!(
+        "{}-{}-{}",
+        input.agent_id, input.attestation_type, timestamp
+    );
 
     let attestation = Attestation {
         id: attestation_id.clone(),
@@ -566,7 +578,8 @@ pub fn get_agent_attestations(agent_id: String) -> ExternResult<Vec<AttestationO
     for link in links {
         if let Some(action_hash) = link.target.clone().into_action_hash() {
             if let Some(record) = get(action_hash.clone(), GetOptions::default())? {
-                if let Some(attestation) = record.entry().to_app_option::<Attestation>().ok().flatten()
+                if let Some(attestation) =
+                    record.entry().to_app_option::<Attestation>().ok().flatten()
                 {
                     results.push(AttestationOutput {
                         action_hash,
@@ -645,7 +658,12 @@ pub fn create_agent(input: CreateAgentInput) -> ExternResult<AgentOutput> {
     // Create ID lookup link
     let id_anchor = StringAnchor::new("agent_id", &input.id);
     let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
-    create_link(id_anchor_hash, action_hash.clone(), LinkTypes::IdToAgent, ())?;
+    create_link(
+        id_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::IdToAgent,
+        (),
+    )?;
 
     // Bind to agent key
     create_link(
@@ -698,7 +716,9 @@ pub fn get_agent_by_id(id: String) -> ExternResult<Option<AgentOutput>> {
 
 /// Create or get agent progress for a path
 #[hdk_extern]
-pub fn get_or_create_agent_progress(input: CreateAgentProgressInput) -> ExternResult<AgentProgressOutput> {
+pub fn get_or_create_agent_progress(
+    input: CreateAgentProgressInput,
+) -> ExternResult<AgentProgressOutput> {
     let progress_id = format!("{}-{}", input.agent_id, input.path_id);
     let progress_anchor = StringAnchor::new("agent_progress", &progress_id);
     let progress_anchor_hash = hash_entry(&EntryTypes::StringAnchor(progress_anchor))?;
@@ -710,8 +730,16 @@ pub fn get_or_create_agent_progress(input: CreateAgentProgressInput) -> ExternRe
     if let Some(link) = links.first() {
         if let Some(action_hash) = link.target.clone().into_action_hash() {
             if let Some(record) = get(action_hash.clone(), GetOptions::default())? {
-                if let Some(progress) = record.entry().to_app_option::<AgentProgress>().ok().flatten() {
-                    return Ok(AgentProgressOutput { action_hash, progress });
+                if let Some(progress) = record
+                    .entry()
+                    .to_app_option::<AgentProgress>()
+                    .ok()
+                    .flatten()
+                {
+                    return Ok(AgentProgressOutput {
+                        action_hash,
+                        progress,
+                    });
                 }
             }
         }
@@ -738,9 +766,17 @@ pub fn get_or_create_agent_progress(input: CreateAgentProgressInput) -> ExternRe
     };
 
     let action_hash = create_entry(&EntryTypes::AgentProgress(progress.clone()))?;
-    create_link(progress_anchor_hash, action_hash.clone(), LinkTypes::AgentToProgress, ())?;
+    create_link(
+        progress_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::AgentToProgress,
+        (),
+    )?;
 
-    Ok(AgentProgressOutput { action_hash, progress })
+    Ok(AgentProgressOutput {
+        action_hash,
+        progress,
+    })
 }
 
 /// Update agent progress
@@ -757,11 +793,17 @@ pub fn update_agent_progress(input: UpdateAgentProgressInput) -> ExternResult<Ag
         "Progress not found. Create it first.".to_string()
     )))?;
 
-    let action_hash = link.target.clone().into_action_hash()
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid progress hash".to_string())))?;
+    let action_hash =
+        link.target
+            .clone()
+            .into_action_hash()
+            .ok_or(wasm_error!(WasmErrorInner::Guest(
+                "Invalid progress hash".to_string()
+            )))?;
 
-    let record = get(action_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Progress record not found".to_string())))?;
+    let record = get(action_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Progress record not found".to_string())
+    ))?;
 
     let mut progress: AgentProgress = record
         .entry()
@@ -796,7 +838,12 @@ pub fn update_agent_progress(input: UpdateAgentProgressInput) -> ExternResult<Ag
 
     // Update link
     delete_link(link.create_link_hash.clone(), GetOptions::default())?;
-    create_link(progress_anchor_hash, new_action_hash.clone(), LinkTypes::AgentToProgress, ())?;
+    create_link(
+        progress_anchor_hash,
+        new_action_hash.clone(),
+        LinkTypes::AgentToProgress,
+        (),
+    )?;
 
     Ok(AgentProgressOutput {
         action_hash: new_action_hash,
@@ -854,54 +901,57 @@ pub fn upsert_mastery(input: UpsertMasteryInput) -> ExternResult<ContentMasteryO
     let query = LinkQuery::try_new(mastery_anchor_hash.clone(), LinkTypes::HumanToMastery)?;
     let links = get_links(query, GetStrategy::default())?;
 
-    let mastery = if let Some(link) = links.first() {
-        // Update existing
-        let action_hash = link.target.clone().into_action_hash()
-            .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid mastery hash".to_string())))?;
+    let mastery =
+        if let Some(link) = links.first() {
+            // Update existing
+            let action_hash = link.target.clone().into_action_hash().ok_or(wasm_error!(
+                WasmErrorInner::Guest("Invalid mastery hash".to_string())
+            ))?;
 
-        let record = get(action_hash, GetOptions::default())?
-            .ok_or(wasm_error!(WasmErrorInner::Guest("Mastery record not found".to_string())))?;
+            let record = get(action_hash, GetOptions::default())?.ok_or(wasm_error!(
+                WasmErrorInner::Guest("Mastery record not found".to_string())
+            ))?;
 
-        let mut existing: ContentMastery = record
-            .entry()
-            .to_app_option()
-            .map_err(|e| wasm_error!(e))?
-            .ok_or(wasm_error!(WasmErrorInner::Guest(
-                "Could not deserialize mastery".to_string()
-            )))?;
+            let mut existing: ContentMastery = record
+                .entry()
+                .to_app_option()
+                .map_err(|e| wasm_error!(e))?
+                .ok_or(wasm_error!(WasmErrorInner::Guest(
+                    "Could not deserialize mastery".to_string()
+                )))?;
 
-        // Update fields
-        existing.mastery_level = input.mastery_level;
-        existing.mastery_level_index = level_index;
-        existing.engagement_count += 1;
-        existing.last_engagement_type = input.engagement_type;
-        existing.last_engagement_at = timestamp.clone();
-        existing.updated_at = timestamp;
+            // Update fields
+            existing.mastery_level = input.mastery_level;
+            existing.mastery_level_index = level_index;
+            existing.engagement_count += 1;
+            existing.last_engagement_type = input.engagement_type;
+            existing.last_engagement_at = timestamp.clone();
+            existing.updated_at = timestamp;
 
-        existing
-    } else {
-        // Create new
-        ContentMastery {
-            id: mastery_id,
-            human_id: input.human_id.clone(),
-            content_id: input.content_id.clone(),
-            mastery_level: input.mastery_level,
-            mastery_level_index: level_index,
-            freshness_score: 1.0,
-            needs_refresh: false,
-            engagement_count: 1,
-            last_engagement_type: input.engagement_type,
-            last_engagement_at: timestamp.clone(),
-            level_achieved_at: timestamp.clone(),
-            content_version_at_mastery: None,
-            assessment_evidence_json: "[]".to_string(),
-            privileges_json: "[]".to_string(),
-            created_at: timestamp.clone(),
-            updated_at: timestamp,
-            schema_version: 1,
-            validation_status: "valid".to_string(),
-        }
-    };
+            existing
+        } else {
+            // Create new
+            ContentMastery {
+                id: mastery_id,
+                human_id: input.human_id.clone(),
+                content_id: input.content_id.clone(),
+                mastery_level: input.mastery_level,
+                mastery_level_index: level_index,
+                freshness_score: 1.0,
+                needs_refresh: false,
+                engagement_count: 1,
+                last_engagement_type: input.engagement_type,
+                last_engagement_at: timestamp.clone(),
+                level_achieved_at: timestamp.clone(),
+                content_version_at_mastery: None,
+                assessment_evidence_json: "[]".to_string(),
+                privileges_json: "[]".to_string(),
+                created_at: timestamp.clone(),
+                updated_at: timestamp,
+                schema_version: 1,
+                validation_status: "valid".to_string(),
+            }
+        };
 
     let action_hash = create_entry(&EntryTypes::ContentMastery(mastery.clone()))?;
 
@@ -909,9 +959,17 @@ pub fn upsert_mastery(input: UpsertMasteryInput) -> ExternResult<ContentMasteryO
     if let Some(link) = links.first() {
         delete_link(link.create_link_hash.clone(), GetOptions::default())?;
     }
-    create_link(mastery_anchor_hash, action_hash.clone(), LinkTypes::HumanToMastery, ())?;
+    create_link(
+        mastery_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::HumanToMastery,
+        (),
+    )?;
 
-    Ok(ContentMasteryOutput { action_hash, mastery })
+    Ok(ContentMasteryOutput {
+        action_hash,
+        mastery,
+    })
 }
 
 /// Get mastery for a specific content
@@ -927,8 +985,16 @@ pub fn get_mastery(input: UpsertMasteryInput) -> ExternResult<Option<ContentMast
     if let Some(link) = links.first() {
         if let Some(action_hash) = link.target.clone().into_action_hash() {
             if let Some(record) = get(action_hash.clone(), GetOptions::default())? {
-                if let Some(mastery) = record.entry().to_app_option::<ContentMastery>().ok().flatten() {
-                    return Ok(Some(ContentMasteryOutput { action_hash, mastery }));
+                if let Some(mastery) = record
+                    .entry()
+                    .to_app_option::<ContentMastery>()
+                    .ok()
+                    .flatten()
+                {
+                    return Ok(Some(ContentMasteryOutput {
+                        action_hash,
+                        mastery,
+                    }));
                 }
             }
         }
@@ -967,8 +1033,16 @@ pub fn get_my_all_mastery(_: ()) -> ExternResult<Vec<ContentMasteryOutput>> {
     for link in links {
         if let Some(action_hash) = link.target.clone().into_action_hash() {
             if let Some(record) = get(action_hash.clone(), GetOptions::default())? {
-                if let Some(mastery) = record.entry().to_app_option::<ContentMastery>().ok().flatten() {
-                    results.push(ContentMasteryOutput { action_hash, mastery });
+                if let Some(mastery) = record
+                    .entry()
+                    .to_app_option::<ContentMastery>()
+                    .ok()
+                    .flatten()
+                {
+                    results.push(ContentMasteryOutput {
+                        action_hash,
+                        mastery,
+                    });
                 }
             }
         }
@@ -1028,8 +1102,12 @@ pub fn create_contributor_presence(input: CreatePresenceInput) -> ExternResult<P
         id: presence_id.clone(),
         display_name: input.display_name,
         presence_state: "unclaimed".to_string(),
-        external_identifiers_json: input.external_identifiers_json.unwrap_or_else(|| "[]".to_string()),
-        establishing_content_ids_json: input.establishing_content_ids_json.unwrap_or_else(|| "[]".to_string()),
+        external_identifiers_json: input
+            .external_identifiers_json
+            .unwrap_or_else(|| "[]".to_string()),
+        establishing_content_ids_json: input
+            .establishing_content_ids_json
+            .unwrap_or_else(|| "[]".to_string()),
         established_at: timestamp.clone(),
         affinity_total: 0,
         unique_engagers: 0,
@@ -1064,14 +1142,27 @@ pub fn create_contributor_presence(input: CreatePresenceInput) -> ExternResult<P
     // Create ID lookup link
     let id_anchor = StringAnchor::new("presence_id", &presence_id);
     let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
-    create_link(id_anchor_hash, action_hash.clone(), LinkTypes::IdToPresence, ())?;
+    create_link(
+        id_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::IdToPresence,
+        (),
+    )?;
 
     // Create state link
     let state_anchor = StringAnchor::new("presence_state", "unclaimed");
     let state_anchor_hash = hash_entry(&EntryTypes::StringAnchor(state_anchor))?;
-    create_link(state_anchor_hash, action_hash.clone(), LinkTypes::PresenceByState, ())?;
+    create_link(
+        state_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::PresenceByState,
+        (),
+    )?;
 
-    Ok(PresenceOutput { action_hash, presence })
+    Ok(PresenceOutput {
+        action_hash,
+        presence,
+    })
 }
 
 /// Begin stewardship of an unclaimed presence
@@ -1112,7 +1203,12 @@ pub fn begin_stewardship(input: BeginStewardshipInput) -> ExternResult<PresenceO
     for link in old_links {
         delete_link(link.create_link_hash, GetOptions::default())?;
     }
-    create_link(id_anchor_hash, action_hash.clone(), LinkTypes::IdToPresence, ())?;
+    create_link(
+        id_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::IdToPresence,
+        (),
+    )?;
 
     // Update state links
     let old_state_anchor = StringAnchor::new("presence_state", "unclaimed");
@@ -1129,14 +1225,27 @@ pub fn begin_stewardship(input: BeginStewardshipInput) -> ExternResult<PresenceO
 
     let new_state_anchor = StringAnchor::new("presence_state", "stewarded");
     let new_state_anchor_hash = hash_entry(&EntryTypes::StringAnchor(new_state_anchor))?;
-    create_link(new_state_anchor_hash, action_hash.clone(), LinkTypes::PresenceByState, ())?;
+    create_link(
+        new_state_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::PresenceByState,
+        (),
+    )?;
 
     // Create steward link
     let steward_anchor = StringAnchor::new("steward_presences", &input.steward_agent_id);
     let steward_anchor_hash = hash_entry(&EntryTypes::StringAnchor(steward_anchor))?;
-    create_link(steward_anchor_hash, action_hash.clone(), LinkTypes::StewardToPresence, ())?;
+    create_link(
+        steward_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::StewardToPresence,
+        (),
+    )?;
 
-    Ok(PresenceOutput { action_hash, presence: updated })
+    Ok(PresenceOutput {
+        action_hash,
+        presence: updated,
+    })
 }
 
 /// Get presences by steward ID
@@ -1152,8 +1261,16 @@ pub fn get_presences_by_steward(steward_agent_id: String) -> ExternResult<Vec<Pr
     for link in links {
         if let Some(action_hash) = link.target.clone().into_action_hash() {
             if let Some(record) = get(action_hash.clone(), GetOptions::default())? {
-                if let Some(presence) = record.entry().to_app_option::<ContributorPresence>().ok().flatten() {
-                    results.push(PresenceOutput { action_hash, presence });
+                if let Some(presence) = record
+                    .entry()
+                    .to_app_option::<ContributorPresence>()
+                    .ok()
+                    .flatten()
+                {
+                    results.push(PresenceOutput {
+                        action_hash,
+                        presence,
+                    });
                 }
             }
         }
@@ -1200,9 +1317,17 @@ pub fn initiate_claim(input: InitiateClaimInput) -> ExternResult<PresenceOutput>
     for link in old_links {
         delete_link(link.create_link_hash, GetOptions::default())?;
     }
-    create_link(id_anchor_hash, action_hash.clone(), LinkTypes::IdToPresence, ())?;
+    create_link(
+        id_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::IdToPresence,
+        (),
+    )?;
 
-    Ok(PresenceOutput { action_hash, presence: updated })
+    Ok(PresenceOutput {
+        action_hash,
+        presence: updated,
+    })
 }
 
 /// Verify and complete a claim
@@ -1250,7 +1375,12 @@ pub fn verify_claim(presence_id: String) -> ExternResult<PresenceOutput> {
     for link in old_links {
         delete_link(link.create_link_hash, GetOptions::default())?;
     }
-    create_link(id_anchor_hash, action_hash.clone(), LinkTypes::IdToPresence, ())?;
+    create_link(
+        id_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::IdToPresence,
+        (),
+    )?;
 
     // Update state links
     let old_state_anchor = StringAnchor::new("presence_state", &old_state);
@@ -1267,16 +1397,29 @@ pub fn verify_claim(presence_id: String) -> ExternResult<PresenceOutput> {
 
     let new_state_anchor = StringAnchor::new("presence_state", "claimed");
     let new_state_anchor_hash = hash_entry(&EntryTypes::StringAnchor(new_state_anchor))?;
-    create_link(new_state_anchor_hash, action_hash.clone(), LinkTypes::PresenceByState, ())?;
+    create_link(
+        new_state_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::PresenceByState,
+        (),
+    )?;
 
     // Create claimed agent link
     if let Some(ref claimed_agent) = updated.claimed_agent_id {
         let agent_anchor = StringAnchor::new("claimed_agent_presence", claimed_agent);
         let agent_anchor_hash = hash_entry(&EntryTypes::StringAnchor(agent_anchor))?;
-        create_link(agent_anchor_hash, action_hash.clone(), LinkTypes::ClaimedAgentToPresence, ())?;
+        create_link(
+            agent_anchor_hash,
+            action_hash.clone(),
+            LinkTypes::ClaimedAgentToPresence,
+            (),
+        )?;
     }
 
-    Ok(PresenceOutput { action_hash, presence: updated })
+    Ok(PresenceOutput {
+        action_hash,
+        presence: updated,
+    })
 }
 
 /// Get contributor presence by ID
@@ -1291,8 +1434,16 @@ pub fn get_contributor_presence_by_id(id: String) -> ExternResult<Option<Presenc
     if let Some(link) = links.first() {
         if let Some(action_hash) = link.target.clone().into_action_hash() {
             if let Some(record) = get(action_hash.clone(), GetOptions::default())? {
-                if let Some(presence) = record.entry().to_app_option::<ContributorPresence>().ok().flatten() {
-                    return Ok(Some(PresenceOutput { action_hash, presence }));
+                if let Some(presence) = record
+                    .entry()
+                    .to_app_option::<ContributorPresence>()
+                    .ok()
+                    .flatten()
+                {
+                    return Ok(Some(PresenceOutput {
+                        action_hash,
+                        presence,
+                    }));
                 }
             }
         }
@@ -1314,8 +1465,16 @@ pub fn get_presences_by_state(state: String) -> ExternResult<Vec<PresenceOutput>
     for link in links {
         if let Some(action_hash) = link.target.clone().into_action_hash() {
             if let Some(record) = get(action_hash.clone(), GetOptions::default())? {
-                if let Some(presence) = record.entry().to_app_option::<ContributorPresence>().ok().flatten() {
-                    results.push(PresenceOutput { action_hash, presence });
+                if let Some(presence) = record
+                    .entry()
+                    .to_app_option::<ContributorPresence>()
+                    .ok()
+                    .flatten()
+                {
+                    results.push(PresenceOutput {
+                        action_hash,
+                        presence,
+                    });
                 }
             }
         }
@@ -1417,9 +1576,9 @@ pub enum RecoverySignal {
 /// Helper to calculate confidence weight based on intimacy level
 fn get_intimacy_weight(intimacy_level: &str) -> f64 {
     match intimacy_level {
-        "intimate" => 0.25,   // Family counts 25% each
-        "trusted" => 0.20,   // Close friends 20%
-        "familiar" => 0.15,  // Acquaintances 15%
+        "intimate" => 0.25, // Family counts 25% each
+        "trusted" => 0.20,  // Close friends 20%
+        "familiar" => 0.15, // Acquaintances 15%
         "acquainted" => 0.10,
         "public" => 0.05,
         _ => 0.05,
@@ -1446,20 +1605,30 @@ fn calculate_required_approvals(relationships: &[HumanRelationship]) -> u32 {
 
 /// Create a recovery request
 #[hdk_extern]
-pub fn create_recovery_request(input: CreateRecoveryRequestInput) -> ExternResult<RecoveryRequestOutput> {
+pub fn create_recovery_request(
+    input: CreateRecoveryRequestInput,
+) -> ExternResult<RecoveryRequestOutput> {
     let now = sys_time()?;
     let timestamp = format!("{:?}", now);
 
     // Calculate expiry (default 48 hours)
     let hours = input.expires_in_hours.unwrap_or(48);
     let expiry_ms = hours as u64 * 60 * 60 * 1000 * 1000; // microseconds
-    let expires_at = format!("{:?}", now.checked_add(&Duration::from_micros(expiry_ms)).unwrap_or(now));
+    let expires_at = format!(
+        "{:?}",
+        now.checked_add(&Duration::from_micros(expiry_ms))
+            .unwrap_or(now)
+    );
 
     // Get relationships with emergency_access_enabled to determine M
     let relationships = get_emergency_access_relationships(&input.human_id)?;
     let required_approvals = calculate_required_approvals(&relationships);
 
-    let request_id = format!("recovery-{}-{}", input.human_id, timestamp.replace([':', ' ', '(', ')'], "-"));
+    let request_id = format!(
+        "recovery-{}-{}",
+        input.human_id,
+        timestamp.replace([':', ' ', '(', ')'], "-")
+    );
 
     let request = RecoveryRequest {
         id: request_id.clone(),
@@ -1484,17 +1653,32 @@ pub fn create_recovery_request(input: CreateRecoveryRequestInput) -> ExternResul
     // Create ID lookup link
     let id_anchor = StringAnchor::new("recovery_request_id", &request_id);
     let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
-    create_link(id_anchor_hash, action_hash.clone(), LinkTypes::IdToRecoveryRequest, ())?;
+    create_link(
+        id_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::IdToRecoveryRequest,
+        (),
+    )?;
 
     // Create human lookup link
     let human_anchor = StringAnchor::new("human_recovery_requests", &input.human_id);
     let human_anchor_hash = hash_entry(&EntryTypes::StringAnchor(human_anchor))?;
-    create_link(human_anchor_hash, action_hash.clone(), LinkTypes::HumanToRecoveryRequest, ())?;
+    create_link(
+        human_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::HumanToRecoveryRequest,
+        (),
+    )?;
 
     // Create status link
     let status_anchor = StringAnchor::new("recovery_status", "pending");
     let status_anchor_hash = hash_entry(&EntryTypes::StringAnchor(status_anchor))?;
-    create_link(status_anchor_hash, action_hash.clone(), LinkTypes::RecoveryRequestByStatus, ())?;
+    create_link(
+        status_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::RecoveryRequestByStatus,
+        (),
+    )?;
 
     // Create pending vote links for each eligible voter
     let eligible_voters: Vec<String> = relationships
@@ -1527,7 +1711,10 @@ pub fn create_recovery_request(input: CreateRecoveryRequestInput) -> ExternResul
         eligible_voters,
     })?;
 
-    Ok(RecoveryRequestOutput { action_hash, request })
+    Ok(RecoveryRequestOutput {
+        action_hash,
+        request,
+    })
 }
 
 /// Helper to get relationships with emergency_access_enabled for a human
@@ -1566,12 +1753,19 @@ pub fn vote_on_recovery(input: VoteOnRecoveryInput) -> ExternResult<RecoveryVote
     let timestamp = format!("{:?}", now);
 
     // Get my human profile
-    let my_human = get_my_human(())?
-        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Must have Human profile to vote".to_string())))?;
+    let my_human = get_my_human(())?.ok_or_else(|| {
+        wasm_error!(WasmErrorInner::Guest(
+            "Must have Human profile to vote".to_string()
+        ))
+    })?;
 
     // Get the recovery request
-    let request_output = get_recovery_request_by_id(input.request_id.clone())?
-        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Recovery request not found".to_string())))?;
+    let request_output =
+        get_recovery_request_by_id(input.request_id.clone())?.ok_or_else(|| {
+            wasm_error!(WasmErrorInner::Guest(
+                "Recovery request not found".to_string()
+            ))
+        })?;
 
     if request_output.request.status != "pending" {
         return Err(wasm_error!(WasmErrorInner::Guest(
@@ -1585,10 +1779,11 @@ pub fn vote_on_recovery(input: VoteOnRecoveryInput) -> ExternResult<RecoveryVote
         .iter()
         .find(|r| r.party_a_id == my_human.human.id || r.party_b_id == my_human.human.id);
 
-    let relationship = voter_relationship
-        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest(
+    let relationship = voter_relationship.ok_or_else(|| {
+        wasm_error!(WasmErrorInner::Guest(
             "You do not have emergency access enabled with this human".to_string()
-        )))?;
+        ))
+    })?;
 
     let confidence_weight = get_intimacy_weight(&relationship.intimacy_level);
 
@@ -1673,7 +1868,12 @@ pub fn vote_on_recovery(input: VoteOnRecoveryInput) -> ExternResult<RecoveryVote
 
         let new_status_anchor = StringAnchor::new("recovery_status", "approved");
         let new_status_anchor_hash = hash_entry(&EntryTypes::StringAnchor(new_status_anchor))?;
-        create_link(new_status_anchor_hash, new_request_hash.clone(), LinkTypes::RecoveryRequestByStatus, ())?;
+        create_link(
+            new_status_anchor_hash,
+            new_request_hash.clone(),
+            LinkTypes::RecoveryRequestByStatus,
+            (),
+        )?;
 
         // Emit approval signal
         emit_signal(RecoverySignal::RecoveryApproved {
@@ -1697,8 +1897,16 @@ pub fn get_recovery_request_by_id(id: String) -> ExternResult<Option<RecoveryReq
     if let Some(link) = links.first() {
         if let Some(action_hash) = link.target.clone().into_action_hash() {
             if let Some(record) = get(action_hash.clone(), GetOptions::default())? {
-                if let Some(request) = record.entry().to_app_option::<RecoveryRequest>().ok().flatten() {
-                    return Ok(Some(RecoveryRequestOutput { action_hash, request }));
+                if let Some(request) = record
+                    .entry()
+                    .to_app_option::<RecoveryRequest>()
+                    .ok()
+                    .flatten()
+                {
+                    return Ok(Some(RecoveryRequestOutput {
+                        action_hash,
+                        request,
+                    }));
                 }
             }
         }
@@ -1710,8 +1918,11 @@ pub fn get_recovery_request_by_id(id: String) -> ExternResult<Option<RecoveryReq
 /// Get votes for a recovery request
 #[hdk_extern]
 pub fn get_recovery_votes(request_id: String) -> ExternResult<Vec<RecoveryVoteOutput>> {
-    let request_output = get_recovery_request_by_id(request_id)?
-        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Recovery request not found".to_string())))?;
+    let request_output = get_recovery_request_by_id(request_id)?.ok_or_else(|| {
+        wasm_error!(WasmErrorInner::Guest(
+            "Recovery request not found".to_string()
+        ))
+    })?;
 
     let query = LinkQuery::try_new(request_output.action_hash, LinkTypes::RecoveryVoteToRequest)?;
     let links = get_links(query, GetStrategy::default())?;
@@ -1720,7 +1931,12 @@ pub fn get_recovery_votes(request_id: String) -> ExternResult<Vec<RecoveryVoteOu
     for link in links {
         if let Some(action_hash) = link.target.clone().into_action_hash() {
             if let Some(record) = get(action_hash.clone(), GetOptions::default())? {
-                if let Some(vote) = record.entry().to_app_option::<RecoveryVote>().ok().flatten() {
+                if let Some(vote) = record
+                    .entry()
+                    .to_app_option::<RecoveryVote>()
+                    .ok()
+                    .flatten()
+                {
                     results.push(RecoveryVoteOutput { action_hash, vote });
                 }
             }
@@ -1746,8 +1962,16 @@ pub fn get_my_pending_recovery_votes(_: ()) -> ExternResult<Vec<RecoveryRequestO
     for link in links {
         if let Some(action_hash) = link.target.clone().into_action_hash() {
             if let Some(record) = get(action_hash.clone(), GetOptions::default())? {
-                if let Some(request) = record.entry().to_app_option::<RecoveryRequest>().ok().flatten() {
-                    results.push(RecoveryRequestOutput { action_hash, request });
+                if let Some(request) = record
+                    .entry()
+                    .to_app_option::<RecoveryRequest>()
+                    .ok()
+                    .flatten()
+                {
+                    results.push(RecoveryRequestOutput {
+                        action_hash,
+                        request,
+                    });
                 }
             }
         }
@@ -1759,8 +1983,12 @@ pub fn get_my_pending_recovery_votes(_: ()) -> ExternResult<Vec<RecoveryRequestO
 /// Update recovery request with Elohim verification score
 #[hdk_extern]
 pub fn update_elohim_score(input: UpdateElohimScoreInput) -> ExternResult<RecoveryRequestOutput> {
-    let request_output = get_recovery_request_by_id(input.request_id.clone())?
-        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Recovery request not found".to_string())))?;
+    let request_output =
+        get_recovery_request_by_id(input.request_id.clone())?.ok_or_else(|| {
+            wasm_error!(WasmErrorInner::Guest(
+                "Recovery request not found".to_string()
+            ))
+        })?;
 
     if request_output.request.status != "pending" {
         return Err(wasm_error!(WasmErrorInner::Guest(
@@ -1778,7 +2006,8 @@ pub fn update_elohim_score(input: UpdateElohimScoreInput) -> ExternResult<Recove
 
     // Add Elohim score to confidence (max 60% from Elohim)
     let elohim_confidence = input.score * 0.6;
-    updated_request.confidence_score = (updated_request.confidence_score + elohim_confidence).min(1.0);
+    updated_request.confidence_score =
+        (updated_request.confidence_score + elohim_confidence).min(1.0);
 
     // Check if confidence threshold reached (80%)
     if updated_request.confidence_score >= 0.8 {
@@ -1798,7 +2027,12 @@ pub fn update_elohim_score(input: UpdateElohimScoreInput) -> ExternResult<Recove
     for link in old_links {
         delete_link(link.create_link_hash, GetOptions::default())?;
     }
-    create_link(id_anchor_hash, action_hash.clone(), LinkTypes::IdToRecoveryRequest, ())?;
+    create_link(
+        id_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::IdToRecoveryRequest,
+        (),
+    )?;
 
     if updated_request.status == "approved" {
         emit_signal(RecoverySignal::RecoveryApproved {
@@ -1807,7 +2041,10 @@ pub fn update_elohim_score(input: UpdateElohimScoreInput) -> ExternResult<Recove
         })?;
     }
 
-    Ok(RecoveryRequestOutput { action_hash, request: updated_request })
+    Ok(RecoveryRequestOutput {
+        action_hash,
+        request: updated_request,
+    })
 }
 
 /// Create or update a recovery hint for the calling agent
@@ -1831,7 +2068,12 @@ pub fn upsert_recovery_hint(input: UpsertRecoveryHintInput) -> ExternResult<Reco
         // Get existing version
         if let Some(action_hash) = link.target.clone().into_action_hash() {
             if let Some(record) = get(action_hash, GetOptions::default())? {
-                if let Some(existing) = record.entry().to_app_option::<RecoveryHint>().ok().flatten() {
+                if let Some(existing) = record
+                    .entry()
+                    .to_app_option::<RecoveryHint>()
+                    .ok()
+                    .flatten()
+                {
                     existing.version + 1
                 } else {
                     1
@@ -1853,7 +2095,11 @@ pub fn upsert_recovery_hint(input: UpsertRecoveryHintInput) -> ExternResult<Reco
         encrypted_data: input.encrypted_data,
         encryption_nonce: input.encryption_nonce,
         version,
-        created_at: if version == 1 { timestamp.clone() } else { "".to_string() },
+        created_at: if version == 1 {
+            timestamp.clone()
+        } else {
+            "".to_string()
+        },
         updated_at: timestamp,
     };
 
@@ -1863,12 +2109,22 @@ pub fn upsert_recovery_hint(input: UpsertRecoveryHintInput) -> ExternResult<Reco
     for link in links {
         delete_link(link.create_link_hash, GetOptions::default())?;
     }
-    create_link(hint_anchor_hash, action_hash.clone(), LinkTypes::HumanToRecoveryHint, ())?;
+    create_link(
+        hint_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::HumanToRecoveryHint,
+        (),
+    )?;
 
     // Create type lookup link
     let type_anchor = StringAnchor::new("recovery_hint_type", &input.hint_type);
     let type_anchor_hash = hash_entry(&EntryTypes::StringAnchor(type_anchor))?;
-    create_link(type_anchor_hash, action_hash.clone(), LinkTypes::RecoveryHintByType, ())?;
+    create_link(
+        type_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::RecoveryHintByType,
+        (),
+    )?;
 
     Ok(RecoveryHintOutput { action_hash, hint })
 }
@@ -1882,7 +2138,12 @@ pub fn get_my_recovery_hints(_: ()) -> ExternResult<Vec<RecoveryHintOutput>> {
     let mut results = Vec::new();
 
     // Check each hint type
-    for hint_type in &["password_hint", "security_qa", "trusted_doorways", "trusted_contacts"] {
+    for hint_type in &[
+        "password_hint",
+        "security_qa",
+        "trusted_doorways",
+        "trusted_contacts",
+    ] {
         let hint_id = format!("{}-{}", my_human.human.id, hint_type);
         let hint_anchor = StringAnchor::new("recovery_hint", &hint_id);
         let hint_anchor_hash = hash_entry(&EntryTypes::StringAnchor(hint_anchor))?;
@@ -1893,7 +2154,12 @@ pub fn get_my_recovery_hints(_: ()) -> ExternResult<Vec<RecoveryHintOutput>> {
         if let Some(link) = links.first() {
             if let Some(action_hash) = link.target.clone().into_action_hash() {
                 if let Some(record) = get(action_hash.clone(), GetOptions::default())? {
-                    if let Some(hint) = record.entry().to_app_option::<RecoveryHint>().ok().flatten() {
+                    if let Some(hint) = record
+                        .entry()
+                        .to_app_option::<RecoveryHint>()
+                        .ok()
+                        .flatten()
+                    {
                         results.push(RecoveryHintOutput { action_hash, hint });
                     }
                 }
@@ -1907,8 +2173,11 @@ pub fn get_my_recovery_hints(_: ()) -> ExternResult<Vec<RecoveryHintOutput>> {
 /// Mark recovery as completed (called by doorway after successful re-custody)
 #[hdk_extern]
 pub fn complete_recovery(request_id: String) -> ExternResult<RecoveryRequestOutput> {
-    let request_output = get_recovery_request_by_id(request_id.clone())?
-        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Recovery request not found".to_string())))?;
+    let request_output = get_recovery_request_by_id(request_id.clone())?.ok_or_else(|| {
+        wasm_error!(WasmErrorInner::Guest(
+            "Recovery request not found".to_string()
+        ))
+    })?;
 
     if request_output.request.status != "approved" {
         return Err(wasm_error!(WasmErrorInner::Guest(
@@ -1935,7 +2204,12 @@ pub fn complete_recovery(request_id: String) -> ExternResult<RecoveryRequestOutp
     for link in old_links {
         delete_link(link.create_link_hash, GetOptions::default())?;
     }
-    create_link(id_anchor_hash, action_hash.clone(), LinkTypes::IdToRecoveryRequest, ())?;
+    create_link(
+        id_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::IdToRecoveryRequest,
+        (),
+    )?;
 
     // Update status link
     let old_status_anchor = StringAnchor::new("recovery_status", "approved");
@@ -1952,9 +2226,17 @@ pub fn complete_recovery(request_id: String) -> ExternResult<RecoveryRequestOutp
 
     let new_status_anchor = StringAnchor::new("recovery_status", "completed");
     let new_status_anchor_hash = hash_entry(&EntryTypes::StringAnchor(new_status_anchor))?;
-    create_link(new_status_anchor_hash, action_hash.clone(), LinkTypes::RecoveryRequestByStatus, ())?;
+    create_link(
+        new_status_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::RecoveryRequestByStatus,
+        (),
+    )?;
 
-    Ok(RecoveryRequestOutput { action_hash, request: updated_request })
+    Ok(RecoveryRequestOutput {
+        action_hash,
+        request: updated_request,
+    })
 }
 
 // =============================================================================
@@ -2025,15 +2307,25 @@ pub struct CreateRelationshipRenewalInput {
 
 /// Create a renewal attestation (initiates the social witness ceremony)
 #[hdk_extern]
-pub fn create_renewal_attestation(input: CreateRenewalAttestationInput) -> ExternResult<RenewalAttestationOutput> {
+pub fn create_renewal_attestation(
+    input: CreateRenewalAttestationInput,
+) -> ExternResult<RenewalAttestationOutput> {
     let now = sys_time()?;
     let timestamp = format!("{:?}", now);
 
     let hours = input.expires_in_hours.unwrap_or(72);
     let expiry_ms = hours as u64 * 60 * 60 * 1000 * 1000;
-    let expires_at = format!("{:?}", now.checked_add(&Duration::from_micros(expiry_ms)).unwrap_or(now));
+    let expires_at = format!(
+        "{:?}",
+        now.checked_add(&Duration::from_micros(expiry_ms))
+            .unwrap_or(now)
+    );
 
-    let attestation_id = format!("renewal-{}-{}", input.human_id, timestamp.replace([':', ' ', '(', ')'], "-"));
+    let attestation_id = format!(
+        "renewal-{}-{}",
+        input.human_id,
+        timestamp.replace([':', ' ', '(', ')'], "-")
+    );
 
     let attestation = RenewalAttestation {
         id: attestation_id.clone(),
@@ -2058,19 +2350,37 @@ pub fn create_renewal_attestation(input: CreateRenewalAttestationInput) -> Exter
     // Create ID lookup link
     let id_anchor = StringAnchor::new("renewal_id", &attestation_id);
     let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
-    create_link(id_anchor_hash, action_hash.clone(), LinkTypes::IdToRenewalAttestation, ())?;
+    create_link(
+        id_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::IdToRenewalAttestation,
+        (),
+    )?;
 
     // Create human lookup link
     let human_anchor = StringAnchor::new("human_renewals", &input.human_id);
     let human_anchor_hash = hash_entry(&EntryTypes::StringAnchor(human_anchor))?;
-    create_link(human_anchor_hash, action_hash.clone(), LinkTypes::HumanToRenewalAttestation, ())?;
+    create_link(
+        human_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::HumanToRenewalAttestation,
+        (),
+    )?;
 
     // Create status link
     let status_anchor = StringAnchor::new("renewal_status", "pending");
     let status_anchor_hash = hash_entry(&EntryTypes::StringAnchor(status_anchor))?;
-    create_link(status_anchor_hash, action_hash.clone(), LinkTypes::RenewalAttestationByStatus, ())?;
+    create_link(
+        status_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::RenewalAttestationByStatus,
+        (),
+    )?;
 
-    Ok(RenewalAttestationOutput { action_hash, entry: attestation })
+    Ok(RenewalAttestationOutput {
+        action_hash,
+        entry: attestation,
+    })
 }
 
 /// Get a renewal attestation by ID
@@ -2085,7 +2395,12 @@ pub fn get_renewal_attestation_by_id(id: String) -> ExternResult<Option<RenewalA
     if let Some(link) = links.first() {
         if let Some(action_hash) = link.target.clone().into_action_hash() {
             if let Some(record) = get(action_hash.clone(), GetOptions::default())? {
-                if let Some(entry) = record.entry().to_app_option::<RenewalAttestation>().ok().flatten() {
+                if let Some(entry) = record
+                    .entry()
+                    .to_app_option::<RenewalAttestation>()
+                    .ok()
+                    .flatten()
+                {
                     return Ok(Some(RenewalAttestationOutput { action_hash, entry }));
                 }
             }
@@ -2097,7 +2412,9 @@ pub fn get_renewal_attestation_by_id(id: String) -> ExternResult<Option<RenewalA
 
 /// Get all renewal attestations for a human
 #[hdk_extern]
-pub fn get_renewal_attestations_for_human(human_id: String) -> ExternResult<Vec<RenewalAttestationOutput>> {
+pub fn get_renewal_attestations_for_human(
+    human_id: String,
+) -> ExternResult<Vec<RenewalAttestationOutput>> {
     let human_anchor = StringAnchor::new("human_renewals", &human_id);
     let human_anchor_hash = hash_entry(&EntryTypes::StringAnchor(human_anchor))?;
 
@@ -2108,7 +2425,12 @@ pub fn get_renewal_attestations_for_human(human_id: String) -> ExternResult<Vec<
     for link in links {
         if let Some(action_hash) = link.target.clone().into_action_hash() {
             if let Some(record) = get(action_hash.clone(), GetOptions::default())? {
-                if let Some(entry) = record.entry().to_app_option::<RenewalAttestation>().ok().flatten() {
+                if let Some(entry) = record
+                    .entry()
+                    .to_app_option::<RenewalAttestation>()
+                    .ok()
+                    .flatten()
+                {
                     results.push(RenewalAttestationOutput { action_hash, entry });
                 }
             }
@@ -2120,12 +2442,17 @@ pub fn get_renewal_attestations_for_human(human_id: String) -> ExternResult<Vec<
 
 /// Create an agent retirement (marks old key as superseded)
 #[hdk_extern]
-pub fn create_agent_retirement(input: CreateAgentRetirementInput) -> ExternResult<AgentRetirementOutput> {
+pub fn create_agent_retirement(
+    input: CreateAgentRetirementInput,
+) -> ExternResult<AgentRetirementOutput> {
     let now = sys_time()?;
     let timestamp = format!("{:?}", now);
 
-    let retirement_id = format!("retirement-{}-{}", input.retired_agent_key.chars().take(8).collect::<String>(),
-        timestamp.replace([':', ' ', '(', ')'], "-"));
+    let retirement_id = format!(
+        "retirement-{}-{}",
+        input.retired_agent_key.chars().take(8).collect::<String>(),
+        timestamp.replace([':', ' ', '(', ')'], "-")
+    );
 
     let retirement = AgentRetirement {
         id: retirement_id.clone(),
@@ -2143,19 +2470,37 @@ pub fn create_agent_retirement(input: CreateAgentRetirementInput) -> ExternResul
     // Create ID lookup link
     let id_anchor = StringAnchor::new("retirement_id", &retirement_id);
     let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
-    create_link(id_anchor_hash, action_hash.clone(), LinkTypes::IdToAgentRetirement, ())?;
+    create_link(
+        id_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::IdToAgentRetirement,
+        (),
+    )?;
 
     // Create old agent → retirement link (for "who is this agent now?" queries)
     let old_agent_anchor = StringAnchor::new("retired_agent", &input.retired_agent_key);
     let old_agent_anchor_hash = hash_entry(&EntryTypes::StringAnchor(old_agent_anchor))?;
-    create_link(old_agent_anchor_hash, action_hash.clone(), LinkTypes::OldAgentToRetirement, ())?;
+    create_link(
+        old_agent_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::OldAgentToRetirement,
+        (),
+    )?;
 
     // Create new agent ← retirement link (for "where did this agent come from?" queries)
     let new_agent_anchor = StringAnchor::new("renewed_from", &input.renewed_into_agent_key);
     let new_agent_anchor_hash = hash_entry(&EntryTypes::StringAnchor(new_agent_anchor))?;
-    create_link(new_agent_anchor_hash, action_hash.clone(), LinkTypes::NewAgentFromRetirement, ())?;
+    create_link(
+        new_agent_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::NewAgentFromRetirement,
+        (),
+    )?;
 
-    Ok(AgentRetirementOutput { action_hash, entry: retirement })
+    Ok(AgentRetirementOutput {
+        action_hash,
+        entry: retirement,
+    })
 }
 
 /// Get retirement record for a specific agent key
@@ -2170,7 +2515,12 @@ pub fn get_retirement_for_agent(agent_key: String) -> ExternResult<Option<AgentR
     if let Some(link) = links.first() {
         if let Some(action_hash) = link.target.clone().into_action_hash() {
             if let Some(record) = get(action_hash.clone(), GetOptions::default())? {
-                if let Some(entry) = record.entry().to_app_option::<AgentRetirement>().ok().flatten() {
+                if let Some(entry) = record
+                    .entry()
+                    .to_app_option::<AgentRetirement>()
+                    .ok()
+                    .flatten()
+                {
                     return Ok(Some(AgentRetirementOutput { action_hash, entry }));
                 }
             }
@@ -2203,12 +2553,17 @@ pub fn get_retirement_chain(agent_key: String) -> ExternResult<Vec<AgentRetireme
 
 /// Create a relationship renewal (initiated by the renewed human)
 #[hdk_extern]
-pub fn create_relationship_renewal(input: CreateRelationshipRenewalInput) -> ExternResult<RelationshipRenewalOutput> {
+pub fn create_relationship_renewal(
+    input: CreateRelationshipRenewalInput,
+) -> ExternResult<RelationshipRenewalOutput> {
     let now = sys_time()?;
     let timestamp = format!("{:?}", now);
 
-    let renewal_id = format!("rel-renewal-{}-{}", input.original_relationship_id,
-        timestamp.replace([':', ' ', '(', ')'], "-"));
+    let renewal_id = format!(
+        "rel-renewal-{}-{}",
+        input.original_relationship_id,
+        timestamp.replace([':', ' ', '(', ')'], "-")
+    );
 
     let renewal = RelationshipRenewal {
         id: renewal_id.clone(),
@@ -2231,19 +2586,34 @@ pub fn create_relationship_renewal(input: CreateRelationshipRenewalInput) -> Ext
     // Create ID lookup link
     let id_anchor = StringAnchor::new("rel_renewal_id", &renewal_id);
     let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
-    create_link(id_anchor_hash, action_hash.clone(), LinkTypes::IdToRelationshipRenewal, ())?;
+    create_link(
+        id_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::IdToRelationshipRenewal,
+        (),
+    )?;
 
     // Create original relationship → renewal link
     let rel_anchor = StringAnchor::new("original_rel", &input.original_relationship_id);
     let rel_anchor_hash = hash_entry(&EntryTypes::StringAnchor(rel_anchor))?;
-    create_link(rel_anchor_hash, action_hash.clone(), LinkTypes::OriginalRelToRenewal, ())?;
+    create_link(
+        rel_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::OriginalRelToRenewal,
+        (),
+    )?;
 
-    Ok(RelationshipRenewalOutput { action_hash, entry: renewal })
+    Ok(RelationshipRenewalOutput {
+        action_hash,
+        entry: renewal,
+    })
 }
 
 /// Get all renewals for a specific original relationship
 #[hdk_extern]
-pub fn get_renewals_for_relationship(original_rel_id: String) -> ExternResult<Vec<RelationshipRenewalOutput>> {
+pub fn get_renewals_for_relationship(
+    original_rel_id: String,
+) -> ExternResult<Vec<RelationshipRenewalOutput>> {
     let rel_anchor = StringAnchor::new("original_rel", &original_rel_id);
     let rel_anchor_hash = hash_entry(&EntryTypes::StringAnchor(rel_anchor))?;
 
@@ -2254,7 +2624,12 @@ pub fn get_renewals_for_relationship(original_rel_id: String) -> ExternResult<Ve
     for link in links {
         if let Some(action_hash) = link.target.clone().into_action_hash() {
             if let Some(record) = get(action_hash.clone(), GetOptions::default())? {
-                if let Some(entry) = record.entry().to_app_option::<RelationshipRenewal>().ok().flatten() {
+                if let Some(entry) = record
+                    .entry()
+                    .to_app_option::<RelationshipRenewal>()
+                    .ok()
+                    .flatten()
+                {
                     results.push(RelationshipRenewalOutput { action_hash, entry });
                 }
             }
@@ -2266,7 +2641,9 @@ pub fn get_renewals_for_relationship(original_rel_id: String) -> ExternResult<Ve
 
 /// Counterparty reaffirms a relationship renewal (co-signs)
 #[hdk_extern]
-pub fn reaffirm_relationship_renewal(renewal_id: String) -> ExternResult<RelationshipRenewalOutput> {
+pub fn reaffirm_relationship_renewal(
+    renewal_id: String,
+) -> ExternResult<RelationshipRenewalOutput> {
     let now = sys_time()?;
     let timestamp = format!("{:?}", now);
 
@@ -2281,11 +2658,17 @@ pub fn reaffirm_relationship_renewal(renewal_id: String) -> ExternResult<Relatio
         "RelationshipRenewal not found".to_string()
     )))?;
 
-    let old_action_hash = link.target.clone().into_action_hash()
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid renewal hash".to_string())))?;
+    let old_action_hash =
+        link.target
+            .clone()
+            .into_action_hash()
+            .ok_or(wasm_error!(WasmErrorInner::Guest(
+                "Invalid renewal hash".to_string()
+            )))?;
 
-    let record = get(old_action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Renewal record not found".to_string())))?;
+    let record = get(old_action_hash, GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Renewal record not found".to_string())
+    ))?;
 
     let mut renewal: RelationshipRenewal = record
         .entry()
@@ -2314,9 +2697,17 @@ pub fn reaffirm_relationship_renewal(renewal_id: String) -> ExternResult<Relatio
     for link in old_links {
         delete_link(link.create_link_hash, GetOptions::default())?;
     }
-    create_link(id_anchor_hash, action_hash.clone(), LinkTypes::IdToRelationshipRenewal, ())?;
+    create_link(
+        id_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::IdToRelationshipRenewal,
+        (),
+    )?;
 
-    Ok(RelationshipRenewalOutput { action_hash, entry: renewal })
+    Ok(RelationshipRenewalOutput {
+        action_hash,
+        entry: renewal,
+    })
 }
 
 // =============================================================================
