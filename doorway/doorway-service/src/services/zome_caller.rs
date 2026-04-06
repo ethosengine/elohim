@@ -11,9 +11,11 @@
 //! 3. Discover cell_id for role_name via list_apps
 //! 4. Build CallZome envelope (MessagePack), send, parse response
 
+use holochain_conductor_api::AppResponse;
+use holochain_serialized_bytes::prelude::*;
+use holochain_websocket::WireMessage;
 use rmpv::Value;
 use serde::{de::DeserializeOwned, Serialize};
-use std::io::Cursor;
 use std::sync::Arc;
 use tokio::sync::{Mutex, RwLock};
 use tracing::{debug, info, warn};
@@ -149,8 +151,8 @@ impl ZomeCaller {
         fn_name: &str,
         input: &I,
     ) -> Result<O, String> {
-        let payload =
-            rmp_serde::to_vec(input).map_err(|e| format!("Failed to serialize input: {e}"))?;
+        let payload = rmp_serde::to_vec_named(input)
+            .map_err(|e| format!("Failed to serialize input: {e}"))?;
 
         let response_bytes = self
             .call_zome(role_name, zome_name, fn_name, payload)
@@ -235,127 +237,78 @@ fn build_request_envelope(id: u64, inner_data: &[u8]) -> Vec<u8> {
     buf
 }
 
-/// Parse zome call response, extracting the inner result bytes
+/// Parse zome call response using official Holochain types.
+///
+/// The conductor WebSocket response has three layers:
+/// 1. `WireMessage::Response { id, data }` — the outer envelope
+/// 2. `AppResponse::ZomeCalled(Box<ExternIO>)` — the app-level response
+/// 3. `ExternIO(Vec<u8>)` — the raw msgpack bytes of the zome return value
 fn parse_zome_response(data: &[u8]) -> Result<Vec<u8>, String> {
-    let mut cursor = Cursor::new(data);
-    let value = rmpv::decode::read_value(&mut cursor)
-        .map_err(|e| format!("Failed to decode response: {e}"))?;
+    // Layer 1: Deserialize WireMessage envelope
+    let sb = SerializedBytes::from(UnsafeBytes::from(data.to_vec()));
+    let wire_msg: WireMessage = sb
+        .try_into()
+        .map_err(|e: SerializedBytesError| format!("Failed to decode WireMessage: {e}"))?;
 
-    if let Value::Map(ref map) = value {
-        // Check for error response
-        // Error envelopes use "value" field: { type: "error", value: { type: "...", value: "..." } }
-        if let Some(response_type) = get_string_field(map, "type") {
-            if response_type == "error" {
-                if let Some(Value::Map(ref err_data)) = get_field(map, "value") {
-                    if let Some(msg) = get_string_field(err_data, "value") {
-                        return Err(format!("Zome call error: {msg}"));
-                    }
-                    if let Some(msg) = get_string_field(err_data, "message") {
-                        return Err(format!("Zome call error: {msg}"));
-                    }
-                }
-                return Err("Unknown zome call error".to_string());
-            }
-        }
+    match wire_msg {
+        WireMessage::Response { id: _, data } => {
+            let response_bytes =
+                data.ok_or_else(|| "Conductor returned empty response (None)".to_string())?;
 
-        // Parse success response
-        // Response format: { id, type: "response", data: <bytes> }
-        if let Some(Value::Binary(inner_bytes)) = get_field(map, "data") {
-            // Inner response is the zome call result (also MessagePack)
-            let mut inner_cursor = Cursor::new(inner_bytes.as_slice());
-            let inner = rmpv::decode::read_value(&mut inner_cursor)
-                .map_err(|e| format!("Failed to decode inner response: {e}"))?;
+            // Layer 2: Deserialize AppResponse
+            let sb = SerializedBytes::from(UnsafeBytes::from(response_bytes));
+            let app_response: AppResponse = sb
+                .try_into()
+                .map_err(|e: SerializedBytesError| format!("Failed to decode AppResponse: {e}"))?;
 
-            // The zome call result is wrapped in { type: "...", value: <result bytes> }
-            if let Value::Map(ref inner_map) = inner {
-                let inner_type =
-                    get_string_field(inner_map, "type").unwrap_or_else(|| "<no type>".to_string());
-
-                if let Some(value_field) = get_field(inner_map, "value") {
-                    match value_field {
-                        Value::Binary(result_bytes) => {
-                            debug!(
-                                inner_type = %inner_type,
-                                result_len = result_bytes.len(),
-                                "parse_zome_response: extracted Binary value"
-                            );
-                            return Ok(result_bytes.clone());
-                        }
-                        Value::Map(ref result_map) => {
-                            debug!(
-                                inner_type = %inner_type,
-                                fields = result_map.len(),
-                                "parse_zome_response: re-encoding Map value"
-                            );
-                            let mut buf = Vec::new();
-                            rmpv::encode::write_value(&mut buf, &Value::Map(result_map.clone()))
-                                .map_err(|e| format!("Failed to re-encode result: {e}"))?;
-                            return Ok(buf);
-                        }
-                        other => {
-                            warn!(
-                                inner_type = %inner_type,
-                                value_type = %other.to_string().chars().take(200).collect::<String>(),
-                                "parse_zome_response: unexpected value type (not Binary or Map), falling through"
-                            );
-                        }
-                    }
-                } else {
-                    warn!(
-                        inner_type = %inner_type,
-                        inner_keys = ?inner_map.iter().map(|(k, _)| format!("{k}")).collect::<Vec<_>>(),
-                        "parse_zome_response: inner map has no 'value' field"
+            match app_response {
+                AppResponse::ZomeCalled(extern_io) => {
+                    // Layer 3: ExternIO contains the raw bytes of the zome return value
+                    debug!(
+                        bytes_len = extern_io.as_bytes().len(),
+                        "parse_zome_response: extracted ExternIO from ZomeCalled"
                     );
+                    Ok(extern_io.into_vec())
                 }
-            } else {
-                warn!(
-                    inner_kind = "not-a-map",
-                    inner_debug = %format!("{inner:?}").chars().take(300).collect::<String>(),
-                    "parse_zome_response: inner is not a Map"
-                );
-            }
-
-            // Fallthrough: return inner_bytes directly (may cause downstream deserialization errors)
-            warn!(
-                inner_bytes_len = inner_bytes.len(),
-                "parse_zome_response: falling through to raw inner_bytes — this likely means the response envelope has an unexpected format"
-            );
-            return Ok(inner_bytes.clone());
-        }
-    }
-
-    Err("Unexpected zome call response format".to_string())
-}
-
-/// Get a string field from a MessagePack map
-fn get_string_field(map: &[(Value, Value)], key: &str) -> Option<String> {
-    for (k, v) in map {
-        if let Value::String(k_str) = k {
-            if k_str.as_str() == Some(key) {
-                if let Value::String(v_str) = v {
-                    return v_str.as_str().map(|s| s.to_string());
-                }
+                AppResponse::Error(e) => Err(format!("Conductor AppResponse error: {e:?}")),
+                other => Err(format!("Unexpected AppResponse variant: {other:?}")),
             }
         }
+        WireMessage::Signal { .. } => Err("Received Signal instead of Response".to_string()),
+        other => Err(format!("Unexpected WireMessage type: {other:?}")),
     }
-    None
-}
-
-/// Get a field from a MessagePack map
-fn get_field<'a>(map: &'a [(Value, Value)], key: &str) -> Option<&'a Value> {
-    for (k, v) in map {
-        if let Value::String(k_str) = k {
-            if k_str.as_str() == Some(key) {
-                return Some(v);
-            }
-        }
-    }
-    None
 }
 
 #[cfg(test)]
 mod tests {
+    /// Get a string field from a MessagePack map
+    fn get_string_field(map: &[(Value, Value)], key: &str) -> Option<String> {
+        for (k, v) in map {
+            if let Value::String(k_str) = k {
+                if k_str.as_str() == Some(key) {
+                    if let Value::String(v_str) = v {
+                        return v_str.as_str().map(|s| s.to_string());
+                    }
+                }
+            }
+        }
+        None
+    }
+
+    /// Get a field from a MessagePack map
+    fn get_field<'a>(map: &'a [(Value, Value)], key: &str) -> Option<&'a Value> {
+        for (k, v) in map {
+            if let Value::String(k_str) = k {
+                if k_str.as_str() == Some(key) {
+                    return Some(v);
+                }
+            }
+        }
+        None
+    }
+
     use super::*;
+    use std::io::Cursor;
 
     #[test]
     fn test_build_call_zome_request() {
@@ -396,5 +349,65 @@ mod tests {
         } else {
             panic!("Expected map");
         }
+    }
+
+    #[test]
+    fn test_parse_zome_response_roundtrip() {
+        use holochain_zome_types::prelude::ExternIO;
+
+        // Build mock zome return data (what the zome function would return)
+        let action_hash_bytes: Vec<u8> = vec![0u8; 39];
+        let test_data = rmp_serde::to_vec_named(&serde_json::json!({
+            "action_hash": action_hash_bytes,
+            "human": {
+                "id": "test-123",
+                "display_name": "Test",
+                "bio": null,
+                "affinities": [],
+                "profile_reach": "public",
+                "location": null,
+                "created_at": "2024-01-01T00:00:00Z",
+                "updated_at": "2024-01-01T00:00:00Z"
+            }
+        }))
+        .unwrap();
+
+        // Layer 3: Wrap in ExternIO
+        let extern_io = ExternIO::from(test_data.clone());
+
+        // Layer 2: Wrap in AppResponse::ZomeCalled
+        let app_response = AppResponse::ZomeCalled(Box::new(extern_io));
+        let app_sb: SerializedBytes = app_response.try_into().unwrap();
+
+        // Layer 1: Wrap in WireMessage::Response
+        let wire_msg = WireMessage::Response {
+            id: 1,
+            data: Some(UnsafeBytes::from(app_sb).into()),
+        };
+        let wire_sb: SerializedBytes = wire_msg.try_into().unwrap();
+
+        // Parse using our function
+        let result = parse_zome_response(wire_sb.bytes()).unwrap();
+        assert_eq!(result, test_data);
+    }
+
+    #[test]
+    fn test_parse_zome_response_error() {
+        use holochain_conductor_api::ExternalApiWireError;
+
+        // Build an error response
+        let app_response =
+            AppResponse::Error(ExternalApiWireError::InternalError("test error".into()));
+        let app_sb: SerializedBytes = app_response.try_into().unwrap();
+
+        let wire_msg = WireMessage::Response {
+            id: 1,
+            data: Some(UnsafeBytes::from(app_sb).into()),
+        };
+        let wire_sb: SerializedBytes = wire_msg.try_into().unwrap();
+
+        let result = parse_zome_response(wire_sb.bytes());
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Conductor AppResponse error"));
     }
 }
