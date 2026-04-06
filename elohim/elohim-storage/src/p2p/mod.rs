@@ -1452,13 +1452,76 @@ impl P2PNode {
                     }
                 }
             }
-            ShardRequest::ListContent { .. } => {
-                // TODO: implement content inventory listing for replication
-                ShardResponse::Error("ListContent not yet implemented".to_string())
+            ShardRequest::ListContent { reach_filter, offset, limit } => {
+                let pool = match self.db_pool.as_ref() {
+                    Some(p) => p,
+                    None => return ShardResponse::Error("No database pool".to_string()),
+                };
+                let mut conn = match pool.get() {
+                    Ok(c) => c,
+                    Err(e) => return ShardResponse::Error(format!("DB connection failed: {}", e)),
+                };
+                let app_ctx = crate::db::AppContext::default_lamad();
+                let query = crate::db::content_diesel::ContentQuery {
+                    reach: reach_filter,
+                    limit: limit as i64,
+                    offset: offset as i64,
+                    ..Default::default()
+                };
+                match crate::db::content_diesel::list_content(&mut conn, &app_ctx, &query) {
+                    Ok(items) => {
+                        let total = crate::db::content_diesel::count_content(&mut conn, &app_ctx, &query)
+                            .unwrap_or(items.len() as i64) as u64;
+                        let inventory: Vec<shard_protocol::ContentInventoryItem> = items.iter().map(|cwt| {
+                            shard_protocol::ContentInventoryItem {
+                                id: cwt.content.id.clone(),
+                                title: cwt.content.title.clone(),
+                                content_type: cwt.content.content_type.clone(),
+                                content_format: cwt.content.content_format.clone(),
+                                reach: cwt.content.reach.clone(),
+                                blob_cid: cwt.content.blob_cid.clone(),
+                                updated_at: cwt.content.updated_at.clone(),
+                            }
+                        }).collect();
+                        let has_more = (offset as u64 + inventory.len() as u64) < total;
+                        info!(count = inventory.len(), total = total, "Serving content inventory");
+                        ShardResponse::ContentList { items: inventory, total, has_more }
+                    }
+                    Err(e) => ShardResponse::Error(format!("Content query failed: {}", e)),
+                }
             }
-            ShardRequest::GetContent { .. } => {
-                // TODO: implement full content record fetch for replication
-                ShardResponse::Error("GetContent not yet implemented".to_string())
+            ShardRequest::GetContent { id } => {
+                let pool = match self.db_pool.as_ref() {
+                    Some(p) => p,
+                    None => return ShardResponse::Error("No database pool".to_string()),
+                };
+                let mut conn = match pool.get() {
+                    Ok(c) => c,
+                    Err(e) => return ShardResponse::Error(format!("DB connection failed: {}", e)),
+                };
+                let app_ctx = crate::db::AppContext::default_lamad();
+                match crate::db::content_diesel::get_content_with_tags(&mut conn, &app_ctx, &id) {
+                    Ok(Some(cwt)) => {
+                        debug!(id = %id, "Serving content record to peer");
+                        ShardResponse::Content(shard_protocol::ContentRecord {
+                            id: cwt.content.id,
+                            title: cwt.content.title,
+                            description: cwt.content.description,
+                            content_type: cwt.content.content_type,
+                            content_format: cwt.content.content_format,
+                            blob_hash: cwt.content.blob_hash,
+                            blob_cid: cwt.content.blob_cid,
+                            content_size_bytes: cwt.content.content_size_bytes,
+                            metadata_json: cwt.content.metadata_json,
+                            reach: cwt.content.reach,
+                            created_by: cwt.content.created_by,
+                            tags: cwt.tags,
+                            content_body: cwt.content.content_body,
+                        })
+                    }
+                    Ok(None) => ShardResponse::ContentNotFound,
+                    Err(e) => ShardResponse::Error(format!("Content fetch failed: {}", e)),
+                }
             }
         }
     }

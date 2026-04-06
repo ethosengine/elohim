@@ -103,6 +103,8 @@ pub struct ContentQuery {
     pub tags: Vec<String>,
     #[serde(default)]
     pub search: Option<String>,
+    #[serde(default)]
+    pub reach: Option<String>,
     #[serde(default = "default_limit")]
     pub limit: i64,
     #[serde(default)]
@@ -210,6 +212,10 @@ pub fn list_content(
                 .like(pattern)
                 .or(content::description.like(pattern)),
         );
+    }
+
+    if let Some(ref reach) = query.reach {
+        base_query = base_query.filter(content::reach.eq(reach));
     }
 
     // Execute query
@@ -518,6 +524,42 @@ pub fn get_content_by_tag(
 pub fn content_count(conn: &mut SqliteConnection, ctx: &AppContext) -> Result<i64, StorageError> {
     content::table
         .filter(content::h_app_id.eq(&ctx.h_app_id))
+        .count()
+        .get_result(conn)
+        .map_err(|e| StorageError::Internal(format!("Count query failed: {}", e)))
+}
+
+/// Count content matching a query (respects filters, ignores limit/offset).
+/// Used for pagination total counts.
+pub fn count_content(
+    conn: &mut SqliteConnection,
+    ctx: &AppContext,
+    query: &ContentQuery,
+) -> Result<i64, StorageError> {
+    let search_pattern = query.search.as_ref().map(|s| format!("%{}%", s));
+
+    let mut base_query = content::table
+        .filter(content::h_app_id.eq(&ctx.h_app_id))
+        .into_boxed();
+
+    if let Some(ref ct) = query.content_type {
+        base_query = base_query.filter(content::content_type.eq(ct));
+    }
+    if let Some(ref cf) = query.content_format {
+        base_query = base_query.filter(content::content_format.eq(cf));
+    }
+    if let Some(ref pattern) = search_pattern {
+        base_query = base_query.filter(
+            content::title
+                .like(pattern)
+                .or(content::description.like(pattern)),
+        );
+    }
+    if let Some(ref reach) = query.reach {
+        base_query = base_query.filter(content::reach.eq(reach));
+    }
+
+    base_query
         .count()
         .get_result(conn)
         .map_err(|e| StorageError::Internal(format!("Count query failed: {}", e)))
