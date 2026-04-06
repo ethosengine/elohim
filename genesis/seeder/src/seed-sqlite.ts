@@ -1057,19 +1057,26 @@ async function main() {
     console.log(`   Transformed ${formatCount(contentInputs.length)} items`);
 
     console.log(`\nSeeding content to database...`);
-    const BATCH_SIZE = 500;
+    const BATCH_SIZE = 100;
+    const BATCH_DELAY_MS = 200; // Let SQLite breathe between batches
+    const totalBatches = Math.ceil(contentInputs.length / BATCH_SIZE);
     for (let i = 0; i < contentInputs.length; i += BATCH_SIZE) {
       const batch = contentInputs.slice(i, i + BATCH_SIZE);
+      const batchNum = Math.floor(i / BATCH_SIZE) + 1;
       try {
         const result = await seedContent(batch);
         totalInserted += result.inserted;
         totalSkipped += result.skipped;
         totalErrors.push(...result.errors);
 
-        console.log(`   Batch ${Math.floor(i / BATCH_SIZE) + 1}: ${result.inserted} inserted, ${result.skipped} skipped`);
+        console.log(`   Batch ${batchNum}/${totalBatches}: ${result.inserted} inserted, ${result.skipped} skipped`);
       } catch (err) {
-        console.error(`   Batch ${Math.floor(i / BATCH_SIZE) + 1} failed: ${err}`);
-        totalErrors.push(`Batch ${Math.floor(i / BATCH_SIZE) + 1}: ${err}`);
+        console.error(`   Batch ${batchNum}/${totalBatches} failed: ${err}`);
+        totalErrors.push(`Batch ${batchNum}: ${err}`);
+      }
+      // Brief pause between batches to avoid SQLite "database is locked" errors
+      if (i + BATCH_SIZE < contentInputs.length) {
+        await new Promise(resolve => setTimeout(resolve, BATCH_DELAY_MS));
       }
     }
 
