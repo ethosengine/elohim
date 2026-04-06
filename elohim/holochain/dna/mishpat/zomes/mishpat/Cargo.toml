@@ -13,3 +13,4 @@ holochain_serialized_bytes.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 mishpat_integrity = { path = "../mishpat_integrity" }
+qahal-types = { path = "../../../../../sdk/domains/qahal/types" }
