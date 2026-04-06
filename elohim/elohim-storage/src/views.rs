@@ -3280,6 +3280,21 @@ pub struct GovernanceStateView {
     pub created_at: String,
     pub updated_at: String,
     pub dht_anchor_hash: Option<String>,
+    // --- Wire-type fields from qahal-types::GovernanceState ---
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub status: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub status_basis: Option<JsonVal>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub active_challenges: Option<JsonVal>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub active_proposals: Option<JsonVal>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub precedent_ids: Option<JsonVal>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_updated: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<JsonVal>,
 }
 
 impl From<GovernanceState> for GovernanceStateView {
@@ -3295,6 +3310,13 @@ impl From<GovernanceState> for GovernanceStateView {
             created_at: g.created_at,
             updated_at: g.updated_at,
             dht_anchor_hash: g.dht_anchor_hash,
+            status: None,
+            status_basis: None,
+            active_challenges: None,
+            active_proposals: None,
+            precedent_ids: None,
+            last_updated: None,
+            metadata: None,
         }
     }
 }
@@ -3326,6 +3348,29 @@ pub struct ChallengeView {
     pub created_at: String,
     pub sla_status: String,
     pub dht_anchor_hash: Option<String>,
+    // --- Wire-type fields from qahal-types::Challenge ---
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub challenger_name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub challenger_standing: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub grounds: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub status: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub priority: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sla_deadline: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub assigned_elohim: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub resolution: Option<JsonVal>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub updated_at: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<JsonVal>,
 }
 
 impl From<Challenge> for ChallengeView {
@@ -3354,6 +3399,17 @@ impl From<Challenge> for ChallengeView {
             created_at: c.created_at,
             sla_status: String::new(),
             dht_anchor_hash: c.dht_anchor_hash,
+            challenger_name: None,
+            challenger_standing: None,
+            grounds: None,
+            description: None,
+            status: None,
+            priority: None,
+            sla_deadline: None,
+            assigned_elohim: None,
+            resolution: None,
+            updated_at: None,
+            metadata: None,
         }
     }
 }
@@ -3454,6 +3510,31 @@ pub struct ProposalView {
     pub quorum_percentage: Option<f64>,
     pub passage_threshold: Option<f64>,
     pub dht_anchor_hash: Option<String>,
+    // --- Wire-type fields from qahal-types::Proposal ---
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub proposer_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub proposer_name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rationale: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub phase: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub amendments: Option<JsonVal>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub voting_config: Option<JsonVal>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub current_votes: Option<JsonVal>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub outcome: Option<JsonVal>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub related_entity_type: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub related_entity_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<JsonVal>,
 }
 
 impl From<Proposal> for ProposalView {
@@ -3478,6 +3559,18 @@ impl From<Proposal> for ProposalView {
             quorum_percentage: p.quorum_percentage,
             passage_threshold: p.passage_threshold,
             dht_anchor_hash: p.dht_anchor_hash,
+            description: None,
+            proposer_id: None,
+            proposer_name: None,
+            rationale: None,
+            phase: None,
+            amendments: None,
+            voting_config: None,
+            current_votes: None,
+            outcome: None,
+            related_entity_type: None,
+            related_entity_id: None,
+            metadata: None,
         }
     }
 }
@@ -3493,6 +3586,29 @@ pub struct PrecedentView {
     pub established_by: String,
     pub created_at: String,
     pub dht_anchor_hash: Option<String>,
+    // --- Wire-type fields from qahal-types::Precedent ---
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub summary: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub full_reasoning: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub binding: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub scope: Option<JsonVal>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub citations: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub status: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub established_at: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub superseded_by: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub updated_at: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<JsonVal>,
 }
 
 impl From<Precedent> for PrecedentView {
@@ -3505,6 +3621,17 @@ impl From<Precedent> for PrecedentView {
             established_by: p.established_by,
             created_at: p.created_at,
             dht_anchor_hash: p.dht_anchor_hash,
+            title: None,
+            summary: None,
+            full_reasoning: None,
+            binding: None,
+            scope: None,
+            citations: None,
+            status: None,
+            established_at: None,
+            superseded_by: None,
+            updated_at: None,
+            metadata: None,
         }
     }
 }
@@ -3520,6 +3647,25 @@ pub struct DiscussionView {
     pub parent_id: Option<String>,
     pub created_at: String,
     pub updated_at: String,
+    // --- Wire-type fields from qahal-types::Discussion ---
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub entity_type: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub entity_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub category: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub messages: Option<JsonVal>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub status: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub message_count: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_activity_at: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<JsonVal>,
 }
 
 impl From<Discussion> for DiscussionView {
@@ -3532,6 +3678,15 @@ impl From<Discussion> for DiscussionView {
             parent_id: d.parent_id,
             created_at: d.created_at,
             updated_at: d.updated_at,
+            entity_type: None,
+            entity_id: None,
+            category: None,
+            title: None,
+            messages: None,
+            status: None,
+            message_count: None,
+            last_activity_at: None,
+            metadata: None,
         }
     }
 }
@@ -3549,6 +3704,19 @@ pub struct VoteView {
     pub created_at: String,
     pub updated_at: String,
     pub dht_anchor_hash: Option<String>,
+    // --- Wire-type fields from qahal-types::ProposalVote ---
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub voter_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub voter_name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reasoning: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub version: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub previous_position: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<JsonVal>,
 }
 
 impl VoteView {
@@ -3566,6 +3734,12 @@ impl VoteView {
             created_at: v.created_at,
             updated_at: v.updated_at,
             dht_anchor_hash: v.dht_anchor_hash,
+            voter_id: None,
+            voter_name: None,
+            reasoning: None,
+            version: None,
+            previous_position: None,
+            metadata: None,
         }
     }
 }
@@ -3878,6 +4052,59 @@ pub struct PostMessageInputView {
     pub id: String,
     pub author_presence_id: String,
     pub body: String,
+}
+
+// ============================================================================
+// Governance Reaction Views (from qahal-types::GovernanceReaction)
+// ============================================================================
+
+/// Governance reaction — API response
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct GovernanceReactionView {
+    pub id: String,
+    pub content_id: String,
+    pub content_type: String,
+    pub reactor_id: String,
+    pub reaction: String,
+    pub intensity: u8,
+    pub mediated: bool,
+    pub mediation_accepted: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub context: Option<JsonVal>,
+    pub created_at: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub updated_at: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<JsonVal>,
+}
+
+// ============================================================================
+// Graduated Feedback Views (from qahal-types::GraduatedFeedback)
+// ============================================================================
+
+/// Graduated feedback — API response
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct GraduatedFeedbackView {
+    pub id: String,
+    pub content_id: String,
+    pub content_type: String,
+    pub responder_id: String,
+    pub feedback_context: String,
+    pub position: i8,
+    pub intensity: u8,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reasoning: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub updated_count: Option<u32>,
+    pub created_at: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub updated_at: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<JsonVal>,
 }
 
 // ============================================================================
@@ -4701,6 +4928,23 @@ pub struct StatementView {
     pub is_bridging: bool,
     pub created_at: String,
     pub dht_anchor_hash: Option<String>,
+    // --- Wire-type fields from qahal-types::OpinionStatement ---
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub context_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub author_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub status: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub vote_count: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub consensus_score: Option<i32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cluster: Option<JsonVal>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub updated_at: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<JsonVal>,
 }
 
 impl From<Statement> for StatementView {
@@ -4718,6 +4962,14 @@ impl From<Statement> for StatementView {
             is_bridging: s.is_bridging != 0,
             created_at: s.created_at,
             dht_anchor_hash: s.dht_anchor_hash,
+            context_id: None,
+            author_id: None,
+            status: None,
+            vote_count: None,
+            consensus_score: None,
+            cluster: None,
+            updated_at: None,
+            metadata: None,
         }
     }
 }
@@ -4733,6 +4985,11 @@ pub struct StatementVoteView {
     pub vote: String,
     pub created_at: String,
     pub dht_anchor_hash: Option<String>,
+    // --- Wire-type fields from qahal-types::StatementVote ---
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub voter_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<JsonVal>,
 }
 
 impl From<StatementVote> for StatementVoteView {
@@ -4744,6 +5001,8 @@ impl From<StatementVote> for StatementVoteView {
             vote: v.vote,
             created_at: v.created_at,
             dht_anchor_hash: v.dht_anchor_hash,
+            voter_id: None,
+            metadata: None,
         }
     }
 }
