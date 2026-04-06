@@ -27,6 +27,8 @@
       "@elohim/service/*": ["../elohim-library/projects/elohim-service/src/*"],
       "@elohim/storage-client": ["node_modules/@elohim/storage-client/dist/index"],
       "@elohim/storage-client/generated": ["node_modules/@elohim/storage-client/dist/generated/index"],
+      "@elohim/storage-client/wire-types": ["node_modules/@elohim/storage-client/dist/wire-types/index"],
+      "@elohim/storage-client/wire-types/*": ["node_modules/@elohim/storage-client/dist/wire-types/*/index"],
       "@holochain/client": ["node_modules/@holochain/client"],
       "@holochain/client/*": ["node_modules/@holochain/client/*"]
     },

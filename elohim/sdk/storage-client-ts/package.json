@@ -12,6 +12,14 @@
     "./generated": {
       "types": "./dist/generated/index.d.ts",
       "default": "./dist/generated/index.js"
+    },
+    "./wire-types": {
+      "types": "./dist/wire-types/index.d.ts",
+      "default": "./dist/wire-types/index.js"
+    },
+    "./wire-types/*": {
+      "types": "./dist/wire-types/*/index.d.ts",
+      "default": "./dist/wire-types/*/index.js"
     }
   },
   "files": [
