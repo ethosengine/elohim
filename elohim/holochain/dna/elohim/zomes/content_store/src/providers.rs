@@ -7,11 +7,11 @@
 //! - ReferenceResolver: check if referenced entries exist
 //! - DegradationHandler: policy for handling healing failures
 
+use content_store_integrity::{CONTENT_TYPES, MASTERY_LEVELS, REACH_LEVELS};
 use hc_rna::{
-    Validator, Transcriber, ReferenceResolver, DegradationHandler, DegradationDecision,
-    EntryTypeProvider,
+    DegradationDecision, DegradationHandler, EntryTypeProvider, ReferenceResolver, Transcriber,
+    Validator,
 };
-use content_store_integrity::{CONTENT_TYPES, REACH_LEVELS, MASTERY_LEVELS};
 use serde_json::Value;
 
 // ============================================================================
@@ -24,31 +24,40 @@ pub struct ContentValidator;
 impl Validator for ContentValidator {
     fn validate_json(&self, data: &Value) -> Result<(), String> {
         // Required fields
-        let id = data["id"].as_str().ok_or("Content id is required and must be string")?;
+        let id = data["id"]
+            .as_str()
+            .ok_or("Content id is required and must be string")?;
         if id.is_empty() {
             return Err("Content id cannot be empty".to_string());
         }
 
-        let title = data["title"].as_str().ok_or("Content title is required and must be string")?;
+        let title = data["title"]
+            .as_str()
+            .ok_or("Content title is required and must be string")?;
         if title.is_empty() {
             return Err("Content title cannot be empty".to_string());
         }
 
-        let content_type = data["content_type"].as_str()
+        let content_type = data["content_type"]
+            .as_str()
             .ok_or("Content content_type is required and must be string")?;
 
         // Validate against allowed values (CONTENT_TYPES from integrity crate)
         if !CONTENT_TYPES.contains(&content_type) {
-            return Err(format!("Invalid content_type '{}'. Must be one of: {:?}",
-                content_type, CONTENT_TYPES));
+            return Err(format!(
+                "Invalid content_type '{}'. Must be one of: {:?}",
+                content_type, CONTENT_TYPES
+            ));
         }
 
         // Reach must be valid if present
         if let Some(reach) = data["reach"].as_str() {
             // REACH_LEVELS from integrity crate
             if !REACH_LEVELS.contains(&reach) {
-                return Err(format!("Invalid reach '{}'. Must be one of: {:?}",
-                    reach, REACH_LEVELS));
+                return Err(format!(
+                    "Invalid reach '{}'. Must be one of: {:?}",
+                    reach, REACH_LEVELS
+                ));
             }
         }
 
@@ -131,23 +140,30 @@ impl Validator for ContentMasteryValidator {
             return Err("Mastery id cannot be empty".to_string());
         }
 
-        let human_id = data["human_id"].as_str().ok_or("Mastery human_id is required")?;
+        let human_id = data["human_id"]
+            .as_str()
+            .ok_or("Mastery human_id is required")?;
         if human_id.is_empty() {
             return Err("Mastery human_id cannot be empty".to_string());
         }
 
-        let content_id = data["content_id"].as_str().ok_or("Mastery content_id is required")?;
+        let content_id = data["content_id"]
+            .as_str()
+            .ok_or("Mastery content_id is required")?;
         if content_id.is_empty() {
             return Err("Mastery content_id cannot be empty".to_string());
         }
 
-        let mastery_level = data["mastery_level"].as_str()
+        let mastery_level = data["mastery_level"]
+            .as_str()
             .ok_or("Mastery mastery_level is required")?;
 
         // MASTERY_LEVELS from integrity crate
         if !MASTERY_LEVELS.contains(&mastery_level) {
-            return Err(format!("Invalid mastery_level '{}'. Must be one of: {:?}",
-                mastery_level, MASTERY_LEVELS));
+            return Err(format!(
+                "Invalid mastery_level '{}'. Must be one of: {:?}",
+                mastery_level, MASTERY_LEVELS
+            ));
         }
 
         let schema_version = data["schema_version"].as_u64().unwrap_or(0);
@@ -170,19 +186,29 @@ impl Transcriber for ContentTranscriber {
     fn transcribe_from_prev(&self, v1_data: &Value) -> Result<Value, String> {
         // Extract v1 fields
         let id = v1_data["id"].as_str().ok_or("v1 Content missing id")?;
-        let title = v1_data["title"].as_str().ok_or("v1 Content missing title")?;
+        let title = v1_data["title"]
+            .as_str()
+            .ok_or("v1 Content missing title")?;
         let description = v1_data["description"].as_str().unwrap_or("");
         let content = v1_data["content"].as_str().unwrap_or("");
         let content_format = v1_data["content_format"].as_str().unwrap_or("markdown");
         let content_type = v1_data["content_type"].as_str().unwrap_or("lesson");
         let tags: Vec<String> = v1_data["tags"]
             .as_array()
-            .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| v.as_str().map(String::from))
+                    .collect()
+            })
             .unwrap_or_default();
         let reach = v1_data["reach"].as_str().unwrap_or("community");
         let related_node_ids: Vec<String> = v1_data["related_node_ids"]
             .as_array()
-            .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| v.as_str().map(String::from))
+                    .collect()
+            })
             .unwrap_or_default();
 
         // Build v2 entry with current schema
@@ -212,12 +238,18 @@ pub struct LearningPathTranscriber;
 impl Transcriber for LearningPathTranscriber {
     fn transcribe_from_prev(&self, v1_data: &Value) -> Result<Value, String> {
         let id = v1_data["id"].as_str().ok_or("v1 LearningPath missing id")?;
-        let title = v1_data["title"].as_str().ok_or("v1 LearningPath missing title")?;
+        let title = v1_data["title"]
+            .as_str()
+            .ok_or("v1 LearningPath missing title")?;
         let description = v1_data["description"].as_str().unwrap_or("");
         let difficulty = v1_data["difficulty"].as_str().unwrap_or("intermediate");
         let tags: Vec<String> = v1_data["tags"]
             .as_array()
-            .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| v.as_str().map(String::from))
+                    .collect()
+            })
             .unwrap_or_default();
 
         Ok(serde_json::json!({
@@ -242,7 +274,9 @@ pub struct PathStepTranscriber;
 impl Transcriber for PathStepTranscriber {
     fn transcribe_from_prev(&self, v1_data: &Value) -> Result<Value, String> {
         let id = v1_data["id"].as_str().ok_or("v1 PathStep missing id")?;
-        let path_id = v1_data["path_id"].as_str().ok_or("v1 PathStep missing path_id")?;
+        let path_id = v1_data["path_id"]
+            .as_str()
+            .ok_or("v1 PathStep missing path_id")?;
         let content_id = v1_data["content_id"].as_str().unwrap_or("");
         let step_type = v1_data["step_type"].as_str().unwrap_or("content");
         let order = v1_data["order"].as_u64().unwrap_or(0);
@@ -268,9 +302,15 @@ pub struct ContentMasteryTranscriber;
 
 impl Transcriber for ContentMasteryTranscriber {
     fn transcribe_from_prev(&self, v1_data: &Value) -> Result<Value, String> {
-        let id = v1_data["id"].as_str().ok_or("v1 ContentMastery missing id")?;
-        let human_id = v1_data["human_id"].as_str().ok_or("v1 ContentMastery missing human_id")?;
-        let content_id = v1_data["content_id"].as_str().ok_or("v1 ContentMastery missing content_id")?;
+        let id = v1_data["id"]
+            .as_str()
+            .ok_or("v1 ContentMastery missing id")?;
+        let human_id = v1_data["human_id"]
+            .as_str()
+            .ok_or("v1 ContentMastery missing human_id")?;
+        let content_id = v1_data["content_id"]
+            .as_str()
+            .ok_or("v1 ContentMastery missing content_id")?;
         let mastery_level = v1_data["mastery_level"].as_str().unwrap_or("not_started");
         let mastery_level_index = v1_data["mastery_level_index"].as_u64().unwrap_or(0);
         let freshness_score = v1_data["freshness_score"].as_f64().unwrap_or(0.0);
@@ -619,7 +659,7 @@ mod tests {
         let decision = content_handler.handle_validation_failure("content", "error", false);
 
         match decision {
-            DegradationDecision::Degrade => {},
+            DegradationDecision::Degrade => {}
             _ => panic!("Expected Degrade decision"),
         }
     }

@@ -9,9 +9,9 @@
 //! - Healing orchestrator setup
 //! - Healing initialization and signals
 
-use hdk::prelude::*;
 use content_store_integrity::*;
 use hc_rna::{HealingOrchestrator, HealingSignal};
+use hdk::prelude::*;
 
 // ============================================================================
 // V1 → V2 Transformation Functions
@@ -60,7 +60,7 @@ pub fn transform_content_v1_to_v2(v1: ContentV1Export) -> Content {
         metadata_json: v1.metadata_json,
         created_at: v1.created_at,
         updated_at: v1.updated_at,
-        schema_version: 2,  // Current version
+        schema_version: 2, // Current version
         validation_status: "Migrated".to_string(),
         // V1 content has body in content field, no blob storage
         blob_cid: None,
@@ -213,8 +213,8 @@ pub fn transform_content_mastery_v1_to_v2(v1: ContentMasteryV1Export) -> Content
 
 pub fn create_healing_orchestrator() -> HealingOrchestrator {
     HealingOrchestrator::new(
-        "lamad-v1",  // Previous DNA role name
-        "lamad-v2",  // Current DNA role name
+        "lamad-v1", // Previous DNA role name
+        "lamad-v2", // Current DNA role name
     )
 }
 

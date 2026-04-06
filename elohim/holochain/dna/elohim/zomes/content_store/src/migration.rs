@@ -29,8 +29,11 @@
 //
 // See: holochain/rna/ for the reusable RNA toolkit
 
+use crate::{
+    create_content, AgentProgress, Content, ContentMastery, CreateContentInput, LearningPath,
+    PathStep,
+};
 use hdk::prelude::*;
-use crate::{Content, LearningPath, PathStep, ContentMastery, AgentProgress, create_content, CreateContentInput};
 
 /// Migration report tracking success/failure of migrated items
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -63,7 +66,10 @@ pub struct MigrationVerification {
 
 impl MigrationReport {
     pub fn new(source_version: String, target_version: String) -> Self {
-        let now = sys_time().ok().map(|t| format!("{:?}", t)).unwrap_or_else(|| "unknown".to_string());
+        let now = sys_time()
+            .ok()
+            .map(|t| format!("{:?}", t))
+            .unwrap_or_else(|| "unknown".to_string());
         Self {
             source_version,
             target_version,
@@ -87,7 +93,10 @@ impl MigrationReport {
     }
 
     pub fn complete(&mut self) {
-        let now = sys_time().ok().map(|t| format!("{:?}", t)).unwrap_or_else(|| "unknown".to_string());
+        let now = sys_time()
+            .ok()
+            .map(|t| format!("{:?}", t))
+            .unwrap_or_else(|| "unknown".to_string());
         self.completed_at = Some(now);
     }
 }
@@ -200,7 +209,8 @@ pub fn migrate_from_previous_version(input: MigrationInput) -> ExternResult<Migr
 
     report.add_error(
         "Direct zome-to-zome bridge migration not yet implemented. \
-         Use migrate.ts CLI tool instead.".to_string()
+         Use migrate.ts CLI tool instead."
+            .to_string(),
     );
 
     report.complete();
@@ -211,7 +221,8 @@ pub fn migrate_from_previous_version(input: MigrationInput) -> ExternResult<Migr
 /// Called by migrate.ts after exporting from v1
 #[hdk_extern]
 pub fn import_migrated_content(content_list: Vec<Content>) -> ExternResult<MigrationReport> {
-    let mut report = MigrationReport::new("external".to_string(), crate::SCHEMA_VERSION.to_string());
+    let mut report =
+        MigrationReport::new("external".to_string(), crate::SCHEMA_VERSION.to_string());
 
     for content in content_list {
         let transformed = transform_content_v1_to_current(content.clone());
@@ -241,7 +252,10 @@ pub fn import_migrated_content(content_list: Vec<Content>) -> ExternResult<Migra
             Ok(_) => report.content_migrated += 1,
             Err(e) => {
                 report.content_failed += 1;
-                report.add_error(format!("Failed to import content '{}': {:?}", transformed.id, e));
+                report.add_error(format!(
+                    "Failed to import content '{}': {:?}",
+                    transformed.id, e
+                ));
             }
         }
     }
@@ -267,16 +281,14 @@ pub fn verify_migration(expected_counts: MigrationCounts) -> ExternResult<Migrat
     if !verification.content_count_match {
         verification.notes.push(format!(
             "Content count mismatch: expected {}, got {}",
-            expected_counts.content_count,
-            content_stats.total_count
+            expected_counts.content_count, content_stats.total_count
         ));
     }
 
     if !verification.path_count_match {
         verification.notes.push(format!(
             "Path count mismatch: expected {}, got {}",
-            expected_counts.path_count,
-            path_index.total_count
+            expected_counts.path_count, path_index.total_count
         ));
     }
 

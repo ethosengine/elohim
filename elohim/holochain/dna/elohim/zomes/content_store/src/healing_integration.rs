@@ -3,10 +3,10 @@
 //! This module provides the glue between coordinator zome functions and the healing_impl module.
 //! It's kept separate for clarity, but these implementations should be merged into lib.rs.
 
-use hdk::prelude::*;
+use crate::healing_impl;
 use content_store_integrity::*;
 use hc_rna::SelfHealingEntry;
-use crate::healing_impl;
+use hdk::prelude::*;
 
 // ============================================================================
 // READ PATH INTEGRATION - Content
@@ -34,7 +34,7 @@ pub fn get_content_by_id_with_healing(id: &str) -> ExternResult<Option<Content>>
                             entry_id: id.to_string(),
                             entry_type: "Content".to_string(),
                             reason: validation_err,
-                        }
+                        },
                     );
 
                     // Still return the degraded entry so app doesn't crash
@@ -64,8 +64,11 @@ fn get_content_by_id_v2(id: &str) -> ExternResult<Option<Content>> {
     let links = get_links(query, GetStrategy::default())?;
 
     if let Some(link) = links.first() {
-        let action_hash = ActionHash::try_from(link.target.clone())
-            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid action hash in link".to_string())))?;
+        let action_hash = ActionHash::try_from(link.target.clone()).map_err(|_| {
+            wasm_error!(WasmErrorInner::Guest(
+                "Invalid action hash in link".to_string()
+            ))
+        })?;
         get_content_from_hash(&action_hash)
     } else {
         Ok(None)
@@ -112,12 +115,10 @@ fn heal_content_from_v1(id: &str) -> ExternResult<Option<Content>> {
     };
 
     // Emit signal: healing started
-    let _ = healing_impl::emit_healing_signal(
-        hc_rna::HealingSignal::HealingStarted {
-            entry_id: id.to_string(),
-            attempt: 1,
-        }
-    );
+    let _ = healing_impl::emit_healing_signal(hc_rna::HealingSignal::HealingStarted {
+        entry_id: id.to_string(),
+        attempt: 1,
+    });
 
     // Transform v1 to v2
     let mut healed = healing_impl::transform_content_v1_to_v2(v1_entry);
@@ -137,25 +138,21 @@ fn heal_content_from_v1(id: &str) -> ExternResult<Option<Content>> {
             let _ = crate::create_id_to_content_link(&healed.id, &action_hash);
 
             // Emit success signal
-            let _ = healing_impl::emit_healing_signal(
-                hc_rna::HealingSignal::HealingSucceeded {
-                    entry_id: id.to_string(),
-                    entry_type: "Content".to_string(),
-                    was_migrated_from_v1: true,
-                }
-            );
+            let _ = healing_impl::emit_healing_signal(hc_rna::HealingSignal::HealingSucceeded {
+                entry_id: id.to_string(),
+                entry_type: "Content".to_string(),
+                was_migrated_from_v1: true,
+            });
 
             Ok(Some(healed))
         }
         Err(validation_err) => {
             // Healing failed validation
-            let _ = healing_impl::emit_healing_signal(
-                hc_rna::HealingSignal::HealingFailed {
-                    entry_id: id.to_string(),
-                    entry_type: "Content".to_string(),
-                    final_error: validation_err,
-                }
-            );
+            let _ = healing_impl::emit_healing_signal(hc_rna::HealingSignal::HealingFailed {
+                entry_id: id.to_string(),
+                entry_type: "Content".to_string(),
+                final_error: validation_err,
+            });
 
             // Return None - can't heal this entry
             Ok(None)
@@ -169,15 +166,13 @@ fn heal_content_from_v1(id: &str) -> ExternResult<Option<Content>> {
 
 pub fn get_path_by_id_with_healing(id: &str) -> ExternResult<Option<LearningPath>> {
     match get_path_by_id_v2(id) {
-        Ok(Some(mut entry)) => {
-            match entry.validate() {
-                Ok(_) => Ok(Some(entry)),
-                Err(_) => {
-                    entry.set_validation_status(hc_rna::ValidationStatus::Degraded);
-                    Ok(Some(entry))
-                }
+        Ok(Some(mut entry)) => match entry.validate() {
+            Ok(_) => Ok(Some(entry)),
+            Err(_) => {
+                entry.set_validation_status(hc_rna::ValidationStatus::Degraded);
+                Ok(Some(entry))
             }
-        }
+        },
         Ok(None) => heal_path_from_v1(id),
         Err(e) => Err(e),
     }
@@ -191,8 +186,11 @@ fn get_path_by_id_v2(id: &str) -> ExternResult<Option<LearningPath>> {
     let links = get_links(query, GetStrategy::default())?;
 
     if let Some(link) = links.first() {
-        let action_hash = ActionHash::try_from(link.target.clone())
-            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid action hash in link".to_string())))?;
+        let action_hash = ActionHash::try_from(link.target.clone()).map_err(|_| {
+            wasm_error!(WasmErrorInner::Guest(
+                "Invalid action hash in link".to_string()
+            ))
+        })?;
 
         let record = get(action_hash, GetOptions::default())?;
         match record {
@@ -245,15 +243,13 @@ fn heal_path_from_v1(id: &str) -> ExternResult<Option<LearningPath>> {
 
 pub fn get_step_by_id_with_healing(id: &str) -> ExternResult<Option<PathStep>> {
     match get_step_by_id_v2(id) {
-        Ok(Some(mut entry)) => {
-            match entry.validate() {
-                Ok(_) => Ok(Some(entry)),
-                Err(_) => {
-                    entry.set_validation_status(hc_rna::ValidationStatus::Degraded);
-                    Ok(Some(entry))
-                }
+        Ok(Some(mut entry)) => match entry.validate() {
+            Ok(_) => Ok(Some(entry)),
+            Err(_) => {
+                entry.set_validation_status(hc_rna::ValidationStatus::Degraded);
+                Ok(Some(entry))
             }
-        }
+        },
         Ok(None) => heal_step_from_v1(id),
         Err(e) => Err(e),
     }
@@ -267,8 +263,11 @@ fn get_step_by_id_v2(id: &str) -> ExternResult<Option<PathStep>> {
     let links = get_links(query, GetStrategy::default())?;
 
     if let Some(link) = links.first() {
-        let action_hash = ActionHash::try_from(link.target.clone())
-            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid action hash in link".to_string())))?;
+        let action_hash = ActionHash::try_from(link.target.clone()).map_err(|_| {
+            wasm_error!(WasmErrorInner::Guest(
+                "Invalid action hash in link".to_string()
+            ))
+        })?;
 
         let record = get(action_hash, GetOptions::default())?;
         match record {
@@ -321,15 +320,13 @@ fn heal_step_from_v1(id: &str) -> ExternResult<Option<PathStep>> {
 
 pub fn get_mastery_by_id_with_healing(id: &str) -> ExternResult<Option<ContentMastery>> {
     match get_mastery_by_id_v2(id) {
-        Ok(Some(mut entry)) => {
-            match entry.validate() {
-                Ok(_) => Ok(Some(entry)),
-                Err(_) => {
-                    entry.set_validation_status(hc_rna::ValidationStatus::Degraded);
-                    Ok(Some(entry))
-                }
+        Ok(Some(mut entry)) => match entry.validate() {
+            Ok(_) => Ok(Some(entry)),
+            Err(_) => {
+                entry.set_validation_status(hc_rna::ValidationStatus::Degraded);
+                Ok(Some(entry))
             }
-        }
+        },
         Ok(None) => heal_mastery_from_v1(id),
         Err(e) => Err(e),
     }
@@ -343,8 +340,11 @@ fn get_mastery_by_id_v2(id: &str) -> ExternResult<Option<ContentMastery>> {
     let links = get_links(query, GetStrategy::default())?;
 
     if let Some(link) = links.first() {
-        let action_hash = ActionHash::try_from(link.target.clone())
-            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid action hash in link".to_string())))?;
+        let action_hash = ActionHash::try_from(link.target.clone()).map_err(|_| {
+            wasm_error!(WasmErrorInner::Guest(
+                "Invalid action hash in link".to_string()
+            ))
+        })?;
 
         let record = get(action_hash, GetOptions::default())?;
         match record {
@@ -402,7 +402,8 @@ pub fn prepare_content_for_storage(mut content: Content) -> ExternResult<Content
     content.validation_status = "Valid".to_string();
 
     // Validate before storing
-    content.validate()
+    content
+        .validate()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e)))?;
 
     Ok(content)
@@ -435,7 +436,8 @@ pub fn prepare_mastery_for_storage(mut mastery: ContentMastery) -> ExternResult<
     mastery.schema_version = 2;
     mastery.validation_status = "Valid".to_string();
 
-    mastery.validate()
+    mastery
+        .validate()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e)))?;
 
     Ok(mastery)

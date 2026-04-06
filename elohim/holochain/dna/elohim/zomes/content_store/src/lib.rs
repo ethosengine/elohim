@@ -6,10 +6,288 @@
 //! Self-healing DNA support: Entry types automatically migrate from v1 to v2
 //! when schema changes occur. No external migration tools needed.
 
-use hdk::prelude::*;
 use content_store_integrity::*;
-use doorway_client::{CacheRule, CacheRuleBuilder, CacheSignal, CacheSignalType, DoorwaySignal, Cacheable};
+use doorway_client::{CacheRule, CacheRuleBuilder, CacheSignal, CacheSignalType, DoorwaySignal};
+use hdk::prelude::*;
 use std::collections::HashMap;
+
+// Re-export lamad wire types from shared crate
+pub use lamad_types::{
+    AddPathStepInput,
+    BatchAddPathStepsInput,
+    BatchGetContentInput,
+    BatchGetContentOutput,
+    BulkCreateContentInput,
+    BulkCreateContentOutput,
+    CheckAttestationInput,
+    CheckIdsExistInput,
+    CheckIdsExistOutput,
+    CompleteStepInput,
+    ContentStats,
+    // Chapters
+    CreateChapterInput,
+    // Content CRUD
+    CreateContentInput,
+    // Knowledge Maps
+    CreateKnowledgeMapInput,
+    // Path Extensions
+    CreatePathExtensionInput,
+    // Learning Paths
+    CreatePathInput,
+    // Content Relationships
+    CreateRelationshipInput,
+    GetRelationshipsInput,
+    GrantAttestationInput,
+    ImportChunkInput,
+    ImportStatusOutput,
+    PaginatedByTagInput,
+    PaginatedByTypeInput,
+    PaginatedContentOutput,
+    PathImportInput,
+    PathImportStepInput,
+    PathStepOutput,
+    QueryByIdInput,
+    QueryByTypeInput,
+    QueryKnowledgeMapInput,
+    QueryPathExtensionInput,
+    QueryProgressInput,
+    QueryRelatedContentInput,
+    // Import
+    QueueImportInput,
+    // Progress & Mastery
+    StartPathProgressInput,
+    UpdateChapterInput,
+    UpdatePathInput,
+};
+
+// Aliases to disambiguate wire types from integrity entry types
+use lamad_types::Chapter as WireChapter;
+use lamad_types::ChapterOutput;
+use lamad_types::Content as WireContent;
+use lamad_types::ContentGraph;
+use lamad_types::ContentGraphNode;
+use lamad_types::ContentOutput;
+use lamad_types::KnowledgeMap as WireKnowledgeMap;
+use lamad_types::KnowledgeMapOutput;
+use lamad_types::LearningPath as WireLearningPath;
+use lamad_types::PathExtension as WirePathExtension;
+use lamad_types::PathExtensionOutput;
+pub use lamad_types::PathOverviewOutput as PathOverview;
+use lamad_types::PathStep as WirePathStep;
+pub use lamad_types::PathWithStepsOutput as PathWithSteps;
+use lamad_types::Relationship as WireRelationship;
+use lamad_types::RelationshipOutput;
+
+// =============================================================================
+// Conversion helpers: integrity entry types -> wire types
+// =============================================================================
+
+/// Reverse conversion: wire Content back to integrity Content (for Cacheable signals)
+fn wire_to_integrity_content(w: &WireContent) -> content_store_integrity::Content {
+    content_store_integrity::Content {
+        id: w.id.clone(),
+        content_type: w.content_type.clone(),
+        title: w.title.clone(),
+        description: w.description.clone(),
+        summary: w.summary.clone(),
+        content: w.content.clone(),
+        content_format: w.content_format.clone(),
+        tags: w.tags.clone(),
+        source_path: w.source_path.clone(),
+        related_node_ids: w.related_node_ids.clone(),
+        author_id: w.author_id.clone(),
+        reach: w.reach.clone(),
+        trust_score: w.trust_score,
+        estimated_minutes: w.estimated_minutes,
+        thumbnail_url: w.thumbnail_url.clone(),
+        metadata_json: w.metadata_json.clone(),
+        created_at: w.created_at.clone(),
+        updated_at: w.updated_at.clone(),
+        schema_version: w.schema_version,
+        validation_status: w.validation_status.clone(),
+        blob_cid: w.blob_cid.clone(),
+        content_size_bytes: w.content_size_bytes,
+        content_hash: w.content_hash.clone(),
+    }
+}
+
+/// Reverse conversion: wire LearningPath back to integrity LearningPath (for Cacheable signals)
+fn wire_to_integrity_path(w: &WireLearningPath) -> content_store_integrity::LearningPath {
+    content_store_integrity::LearningPath {
+        id: w.id.clone(),
+        version: w.version.clone(),
+        title: w.title.clone(),
+        description: w.description.clone(),
+        purpose: w.purpose.clone(),
+        created_by: w.created_by.clone(),
+        difficulty: w.difficulty.clone(),
+        estimated_duration: w.estimated_duration.clone(),
+        visibility: w.visibility.clone(),
+        path_type: w.path_type.clone(),
+        tags: w.tags.clone(),
+        metadata_json: w.metadata_json.clone(),
+        created_at: w.created_at.clone(),
+        updated_at: w.updated_at.clone(),
+        schema_version: w.schema_version,
+        validation_status: w.validation_status.clone(),
+    }
+}
+
+fn content_to_wire(c: &content_store_integrity::Content) -> WireContent {
+    WireContent {
+        id: c.id.clone(),
+        content_type: c.content_type.clone(),
+        title: c.title.clone(),
+        description: c.description.clone(),
+        summary: c.summary.clone(),
+        content: c.content.clone(),
+        content_format: c.content_format.clone(),
+        tags: c.tags.clone(),
+        source_path: c.source_path.clone(),
+        related_node_ids: c.related_node_ids.clone(),
+        author_id: c.author_id.clone(),
+        reach: c.reach.clone(),
+        trust_score: c.trust_score,
+        estimated_minutes: c.estimated_minutes,
+        thumbnail_url: c.thumbnail_url.clone(),
+        metadata_json: c.metadata_json.clone(),
+        created_at: c.created_at.clone(),
+        updated_at: c.updated_at.clone(),
+        schema_version: c.schema_version,
+        validation_status: c.validation_status.clone(),
+        blob_cid: c.blob_cid.clone(),
+        content_size_bytes: c.content_size_bytes,
+        content_hash: c.content_hash.clone(),
+    }
+}
+
+fn relationship_to_wire(r: &content_store_integrity::Relationship) -> WireRelationship {
+    WireRelationship {
+        id: r.id.clone(),
+        source_id: r.source_id.clone(),
+        target_id: r.target_id.clone(),
+        relationship_type: r.relationship_type.clone(),
+        confidence: r.confidence,
+        inference_source: r.inference_source.clone(),
+        metadata_json: r.metadata_json.clone(),
+        created_at: r.created_at.clone(),
+    }
+}
+
+fn learning_path_to_wire(p: &content_store_integrity::LearningPath) -> WireLearningPath {
+    WireLearningPath {
+        id: p.id.clone(),
+        version: p.version.clone(),
+        title: p.title.clone(),
+        description: p.description.clone(),
+        purpose: p.purpose.clone(),
+        created_by: p.created_by.clone(),
+        difficulty: p.difficulty.clone(),
+        estimated_duration: p.estimated_duration.clone(),
+        visibility: p.visibility.clone(),
+        path_type: p.path_type.clone(),
+        tags: p.tags.clone(),
+        metadata_json: p.metadata_json.clone(),
+        created_at: p.created_at.clone(),
+        updated_at: p.updated_at.clone(),
+        schema_version: p.schema_version,
+        validation_status: p.validation_status.clone(),
+    }
+}
+
+fn path_step_to_wire(s: &content_store_integrity::PathStep) -> WirePathStep {
+    WirePathStep {
+        id: s.id.clone(),
+        path_id: s.path_id.clone(),
+        chapter_id: s.chapter_id.clone(),
+        module_id: s.module_id.clone(),
+        section_id: s.section_id.clone(),
+        order_index: s.order_index,
+        step_type: s.step_type.clone(),
+        resource_id: s.resource_id.clone(),
+        step_title: s.step_title.clone(),
+        step_narrative: s.step_narrative.clone(),
+        is_optional: s.is_optional,
+        learning_objectives_json: s.learning_objectives_json.clone(),
+        reflection_prompts_json: s.reflection_prompts_json.clone(),
+        practice_exercises_json: s.practice_exercises_json.clone(),
+        estimated_minutes: s.estimated_minutes,
+        completion_criteria: s.completion_criteria.clone(),
+        attestation_required: s.attestation_required.clone(),
+        attestation_granted: s.attestation_granted.clone(),
+        mastery_threshold: s.mastery_threshold,
+        metadata_json: s.metadata_json.clone(),
+        created_at: s.created_at.clone(),
+        updated_at: s.updated_at.clone(),
+        schema_version: s.schema_version,
+        validation_status: s.validation_status.clone(),
+    }
+}
+
+fn chapter_to_wire(c: &content_store_integrity::PathChapter) -> WireChapter {
+    WireChapter {
+        id: c.id.clone(),
+        path_id: c.path_id.clone(),
+        order_index: c.order_index,
+        title: c.title.clone(),
+        description: c.description.clone(),
+        learning_objectives_json: c.learning_objectives_json.clone(),
+        estimated_minutes: c.estimated_minutes,
+        is_optional: c.is_optional,
+        attestation_granted: c.attestation_granted.clone(),
+        mastery_threshold: c.mastery_threshold,
+        metadata_json: c.metadata_json.clone(),
+        created_at: c.created_at.clone(),
+        updated_at: c.updated_at.clone(),
+    }
+}
+
+fn knowledge_map_to_wire(km: &content_store_integrity::KnowledgeMap) -> WireKnowledgeMap {
+    WireKnowledgeMap {
+        id: km.id.clone(),
+        map_type: km.map_type.clone(),
+        owner_id: km.owner_id.clone(),
+        title: km.title.clone(),
+        description: km.description.clone(),
+        subject_type: km.subject_type.clone(),
+        subject_id: km.subject_id.clone(),
+        subject_name: km.subject_name.clone(),
+        visibility: km.visibility.clone(),
+        shared_with_json: km.shared_with_json.clone(),
+        nodes_json: km.nodes_json.clone(),
+        path_ids_json: km.path_ids_json.clone(),
+        overall_affinity: km.overall_affinity,
+        content_graph_id: km.content_graph_id.clone(),
+        mastery_levels_json: km.mastery_levels_json.clone(),
+        goals_json: km.goals_json.clone(),
+        created_at: km.created_at.clone(),
+        updated_at: km.updated_at.clone(),
+        metadata_json: km.metadata_json.clone(),
+    }
+}
+
+fn path_extension_to_wire(pe: &content_store_integrity::PathExtension) -> WirePathExtension {
+    WirePathExtension {
+        id: pe.id.clone(),
+        base_path_id: pe.base_path_id.clone(),
+        base_path_version: pe.base_path_version.clone(),
+        extended_by: pe.extended_by.clone(),
+        title: pe.title.clone(),
+        description: pe.description.clone(),
+        insertions_json: pe.insertions_json.clone(),
+        annotations_json: pe.annotations_json.clone(),
+        reorderings_json: pe.reorderings_json.clone(),
+        exclusions_json: pe.exclusions_json.clone(),
+        visibility: pe.visibility.clone(),
+        shared_with_json: pe.shared_with_json.clone(),
+        forked_from: pe.forked_from.clone(),
+        forks_json: pe.forks_json.clone(),
+        upstream_proposal_json: pe.upstream_proposal_json.clone(),
+        stats_json: pe.stats_json.clone(),
+        created_at: pe.created_at.clone(),
+        updated_at: pe.updated_at.clone(),
+    }
+}
 
 // Migration module for DNA version upgrades
 pub mod migration;
@@ -77,22 +355,27 @@ fn get_my_mastery(content_id: String) -> ExternResult<Option<ContentMasteryOutpu
 
     match response {
         ZomeCallResponse::Ok(result) => {
-            let output: Option<ContentMasteryOutput> = result.decode()
-                .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Failed to decode mastery: {:?}", e))))?;
+            let output: Option<ContentMasteryOutput> = result.decode().map_err(|e| {
+                wasm_error!(WasmErrorInner::Guest(format!(
+                    "Failed to decode mastery: {:?}",
+                    e
+                )))
+            })?;
             Ok(output)
         }
-        ZomeCallResponse::Unauthorized(_, _, _, _) => {
-            Err(wasm_error!(WasmErrorInner::Guest("Unauthorized call to imagodei".to_string())))
-        }
-        ZomeCallResponse::NetworkError(err) => {
-            Err(wasm_error!(WasmErrorInner::Guest(format!("Network error calling imagodei: {}", err))))
-        }
-        ZomeCallResponse::CountersigningSession(err) => {
-            Err(wasm_error!(WasmErrorInner::Guest(format!("Countersigning error: {}", err))))
-        }
-        ZomeCallResponse::AuthenticationFailed(_, _) => {
-            Err(wasm_error!(WasmErrorInner::Guest("Authentication failed calling imagodei".to_string())))
-        }
+        ZomeCallResponse::Unauthorized(_, _, _, _) => Err(wasm_error!(WasmErrorInner::Guest(
+            "Unauthorized call to imagodei".to_string()
+        ))),
+        ZomeCallResponse::NetworkError(err) => Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Network error calling imagodei: {}",
+            err
+        )))),
+        ZomeCallResponse::CountersigningSession(err) => Err(wasm_error!(WasmErrorInner::Guest(
+            format!("Countersigning error: {}", err)
+        ))),
+        ZomeCallResponse::AuthenticationFailed(_, _) => Err(wasm_error!(WasmErrorInner::Guest(
+            "Authentication failed calling imagodei".to_string()
+        ))),
     }
 }
 
@@ -108,22 +391,27 @@ fn get_my_all_mastery(_: ()) -> ExternResult<Vec<ContentMasteryOutput>> {
 
     match response {
         ZomeCallResponse::Ok(result) => {
-            let output: Vec<ContentMasteryOutput> = result.decode()
-                .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Failed to decode mastery list: {:?}", e))))?;
+            let output: Vec<ContentMasteryOutput> = result.decode().map_err(|e| {
+                wasm_error!(WasmErrorInner::Guest(format!(
+                    "Failed to decode mastery list: {:?}",
+                    e
+                )))
+            })?;
             Ok(output)
         }
-        ZomeCallResponse::Unauthorized(_, _, _, _) => {
-            Err(wasm_error!(WasmErrorInner::Guest("Unauthorized call to imagodei".to_string())))
-        }
-        ZomeCallResponse::NetworkError(err) => {
-            Err(wasm_error!(WasmErrorInner::Guest(format!("Network error calling imagodei: {}", err))))
-        }
-        ZomeCallResponse::CountersigningSession(err) => {
-            Err(wasm_error!(WasmErrorInner::Guest(format!("Countersigning error: {}", err))))
-        }
-        ZomeCallResponse::AuthenticationFailed(_, _) => {
-            Err(wasm_error!(WasmErrorInner::Guest("Authentication failed calling imagodei".to_string())))
-        }
+        ZomeCallResponse::Unauthorized(_, _, _, _) => Err(wasm_error!(WasmErrorInner::Guest(
+            "Unauthorized call to imagodei".to_string()
+        ))),
+        ZomeCallResponse::NetworkError(err) => Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Network error calling imagodei: {}",
+            err
+        )))),
+        ZomeCallResponse::CountersigningSession(err) => Err(wasm_error!(WasmErrorInner::Guest(
+            format!("Countersigning error: {}", err)
+        ))),
+        ZomeCallResponse::AuthenticationFailed(_, _) => Err(wasm_error!(WasmErrorInner::Guest(
+            "Authentication failed calling imagodei".to_string()
+        ))),
     }
 }
 
@@ -139,27 +427,34 @@ fn upsert_mastery(input: UpsertMasteryInput) -> ExternResult<ContentMasteryOutpu
 
     match response {
         ZomeCallResponse::Ok(result) => {
-            let output: ContentMasteryOutput = result.decode()
-                .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Failed to decode mastery: {:?}", e))))?;
+            let output: ContentMasteryOutput = result.decode().map_err(|e| {
+                wasm_error!(WasmErrorInner::Guest(format!(
+                    "Failed to decode mastery: {:?}",
+                    e
+                )))
+            })?;
             Ok(output)
         }
-        ZomeCallResponse::Unauthorized(_, _, _, _) => {
-            Err(wasm_error!(WasmErrorInner::Guest("Unauthorized call to imagodei".to_string())))
-        }
-        ZomeCallResponse::NetworkError(err) => {
-            Err(wasm_error!(WasmErrorInner::Guest(format!("Network error calling imagodei: {}", err))))
-        }
-        ZomeCallResponse::CountersigningSession(err) => {
-            Err(wasm_error!(WasmErrorInner::Guest(format!("Countersigning error: {}", err))))
-        }
-        ZomeCallResponse::AuthenticationFailed(_, _) => {
-            Err(wasm_error!(WasmErrorInner::Guest("Authentication failed calling imagodei".to_string())))
-        }
+        ZomeCallResponse::Unauthorized(_, _, _, _) => Err(wasm_error!(WasmErrorInner::Guest(
+            "Unauthorized call to imagodei".to_string()
+        ))),
+        ZomeCallResponse::NetworkError(err) => Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Network error calling imagodei: {}",
+            err
+        )))),
+        ZomeCallResponse::CountersigningSession(err) => Err(wasm_error!(WasmErrorInner::Guest(
+            format!("Countersigning error: {}", err)
+        ))),
+        ZomeCallResponse::AuthenticationFailed(_, _) => Err(wasm_error!(WasmErrorInner::Guest(
+            "Authentication failed calling imagodei".to_string()
+        ))),
     }
 }
 
 /// Bridge call to issue attestation via imagodei DNA
-fn issue_attestation_via_imagodei(input: IssueAttestationBridgeInput) -> ExternResult<AttestationOutput> {
+fn issue_attestation_via_imagodei(
+    input: IssueAttestationBridgeInput,
+) -> ExternResult<AttestationOutput> {
     let response = call(
         CallTargetCell::OtherRole(IMAGODEI_ROLE.into()),
         IMAGODEI_ZOME,
@@ -170,22 +465,27 @@ fn issue_attestation_via_imagodei(input: IssueAttestationBridgeInput) -> ExternR
 
     match response {
         ZomeCallResponse::Ok(result) => {
-            let output: AttestationOutput = result.decode()
-                .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Failed to decode attestation: {:?}", e))))?;
+            let output: AttestationOutput = result.decode().map_err(|e| {
+                wasm_error!(WasmErrorInner::Guest(format!(
+                    "Failed to decode attestation: {:?}",
+                    e
+                )))
+            })?;
             Ok(output)
         }
-        ZomeCallResponse::Unauthorized(_, _, _, _) => {
-            Err(wasm_error!(WasmErrorInner::Guest("Unauthorized call to imagodei".to_string())))
-        }
-        ZomeCallResponse::NetworkError(err) => {
-            Err(wasm_error!(WasmErrorInner::Guest(format!("Network error calling imagodei: {}", err))))
-        }
-        ZomeCallResponse::CountersigningSession(err) => {
-            Err(wasm_error!(WasmErrorInner::Guest(format!("Countersigning error: {}", err))))
-        }
-        ZomeCallResponse::AuthenticationFailed(_, _) => {
-            Err(wasm_error!(WasmErrorInner::Guest("Authentication failed calling imagodei".to_string())))
-        }
+        ZomeCallResponse::Unauthorized(_, _, _, _) => Err(wasm_error!(WasmErrorInner::Guest(
+            "Unauthorized call to imagodei".to_string()
+        ))),
+        ZomeCallResponse::NetworkError(err) => Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Network error calling imagodei: {}",
+            err
+        )))),
+        ZomeCallResponse::CountersigningSession(err) => Err(wasm_error!(WasmErrorInner::Guest(
+            format!("Countersigning error: {}", err)
+        ))),
+        ZomeCallResponse::AuthenticationFailed(_, _) => Err(wasm_error!(WasmErrorInner::Guest(
+            "Authentication failed calling imagodei".to_string()
+        ))),
     }
 }
 
@@ -229,23 +529,49 @@ pub fn init() -> ExternResult<InitCallbackResult> {
 
 /// Initialize the flexible orchestrator with all Lamad entry type providers
 fn init_flexible_orchestrator() -> ExternResult<()> {
-    use hc_rna::{EntryTypeRegistry, FlexibleOrchestrator, FlexibleOrchestratorConfig, BridgeFirstStrategy};
+    use hc_rna::{
+        BridgeFirstStrategy, EntryTypeRegistry, FlexibleOrchestrator, FlexibleOrchestratorConfig,
+    };
     use std::sync::Arc;
 
     // Create registry and register all Lamad entry types
     let mut registry = EntryTypeRegistry::new();
 
-    registry.register(Arc::new(providers::ContentProvider))
-        .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Failed to register ContentProvider: {}", e))))?;
+    registry
+        .register(Arc::new(providers::ContentProvider))
+        .map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Failed to register ContentProvider: {}",
+                e
+            )))
+        })?;
 
-    registry.register(Arc::new(providers::LearningPathProvider))
-        .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Failed to register LearningPathProvider: {}", e))))?;
+    registry
+        .register(Arc::new(providers::LearningPathProvider))
+        .map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Failed to register LearningPathProvider: {}",
+                e
+            )))
+        })?;
 
-    registry.register(Arc::new(providers::PathStepProvider))
-        .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Failed to register PathStepProvider: {}", e))))?;
+    registry
+        .register(Arc::new(providers::PathStepProvider))
+        .map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Failed to register PathStepProvider: {}",
+                e
+            )))
+        })?;
 
-    registry.register(Arc::new(providers::ContentMasteryProvider))
-        .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Failed to register ContentMasteryProvider: {}", e))))?;
+    registry
+        .register(Arc::new(providers::ContentMasteryProvider))
+        .map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Failed to register ContentMasteryProvider: {}",
+                e
+            )))
+        })?;
 
     // Create orchestrator config
     let config = FlexibleOrchestratorConfig {
@@ -330,7 +656,6 @@ pub fn __doorway_cache_rules(_: ()) -> ExternResult<Vec<CacheRule>> {
             .reach_based("root.content.reach", "commons")
             .invalidated_by(vec!["create_content", "create_relationship"])
             .build(),
-
         // =====================================================================
         // LEARNING PATHS (public read, private write)
         // =====================================================================
@@ -342,17 +667,38 @@ pub fn __doorway_cache_rules(_: ()) -> ExternResult<Vec<CacheRule>> {
         CacheRuleBuilder::new("get_path_overview")
             .ttl_15m()
             .public()
-            .invalidated_by(vec!["create_path", "update_path", "delete_path", "add_path_step", "batch_add_path_steps"])
+            .invalidated_by(vec![
+                "create_path",
+                "update_path",
+                "delete_path",
+                "add_path_step",
+                "batch_add_path_steps",
+            ])
             .build(),
         CacheRuleBuilder::new("get_path_with_steps")
             .ttl_15m()
             .public()
-            .invalidated_by(vec!["create_path", "update_path", "delete_path", "add_path_step", "update_step", "batch_add_path_steps"])
+            .invalidated_by(vec![
+                "create_path",
+                "update_path",
+                "delete_path",
+                "add_path_step",
+                "update_step",
+                "batch_add_path_steps",
+            ])
             .build(),
         CacheRuleBuilder::new("get_path_full")
             .ttl_15m()
             .public()
-            .invalidated_by(vec!["create_path", "update_path", "delete_path", "add_path_step", "create_chapter", "update_chapter", "update_step"])
+            .invalidated_by(vec![
+                "create_path",
+                "update_path",
+                "delete_path",
+                "add_path_step",
+                "create_chapter",
+                "update_chapter",
+                "update_step",
+            ])
             .build(),
         CacheRuleBuilder::new("get_step_by_id")
             .ttl_15m()
@@ -369,7 +715,6 @@ pub fn __doorway_cache_rules(_: ()) -> ExternResult<Vec<CacheRule>> {
             .public()
             .invalidated_by(vec!["create_chapter", "update_chapter"])
             .build(),
-
         // =====================================================================
         // RELATIONSHIPS
         // =====================================================================
@@ -383,7 +728,6 @@ pub fn __doorway_cache_rules(_: ()) -> ExternResult<Vec<CacheRule>> {
             .public()
             .invalidated_by(vec!["create_relationship", "create_content"])
             .build(),
-
         // =====================================================================
         // HUMANS & AGENTS (public profiles, private session)
         // =====================================================================
@@ -400,38 +744,55 @@ pub fn __doorway_cache_rules(_: ()) -> ExternResult<Vec<CacheRule>> {
         CacheRuleBuilder::new("query_agents")
             .ttl_5m()
             .reach_based("agent.visibility", "public")
-            .invalidated_by(vec!["create_agent", "update_agent_state", "register_elohim"])
+            .invalidated_by(vec![
+                "create_agent",
+                "update_agent_state",
+                "register_elohim",
+            ])
             .build(),
         CacheRuleBuilder::new("get_elohim_by_scope")
             .ttl_5m()
             .public()
             .invalidated_by(vec!["register_elohim", "update_agent_state"])
             .build(),
-
         // =====================================================================
         // CONTRIBUTOR PRESENCE (public discovery)
         // =====================================================================
         CacheRuleBuilder::new("get_contributor_presence_by_id")
             .ttl_5m()
             .public()
-            .invalidated_by(vec!["create_contributor_presence", "begin_stewardship", "initiate_claim", "verify_claim"])
+            .invalidated_by(vec![
+                "create_contributor_presence",
+                "begin_stewardship",
+                "initiate_claim",
+                "verify_claim",
+            ])
             .build(),
         CacheRuleBuilder::new("query_contributor_presences")
             .ttl_5m()
             .public()
-            .invalidated_by(vec!["create_contributor_presence", "begin_stewardship", "initiate_claim", "verify_claim"])
+            .invalidated_by(vec![
+                "create_contributor_presence",
+                "begin_stewardship",
+                "initiate_claim",
+                "verify_claim",
+            ])
             .build(),
         CacheRuleBuilder::new("get_presences_by_state")
             .ttl_5m()
             .public()
-            .invalidated_by(vec!["create_contributor_presence", "begin_stewardship", "initiate_claim", "verify_claim"])
+            .invalidated_by(vec![
+                "create_contributor_presence",
+                "begin_stewardship",
+                "initiate_claim",
+                "verify_claim",
+            ])
             .build(),
         CacheRuleBuilder::new("get_presences_by_steward")
             .ttl_5m()
             .public()
             .invalidated_by(vec!["begin_stewardship", "initiate_claim", "verify_claim"])
             .build(),
-
         // =====================================================================
         // GOVERNANCE (public proposals, precedents, discussions)
         // =====================================================================
@@ -475,7 +836,6 @@ pub fn __doorway_cache_rules(_: ()) -> ExternResult<Vec<CacheRule>> {
             .public()
             .invalidated_by(vec!["set_governance_state"])
             .build(),
-
         // =====================================================================
         // KNOWLEDGE MAPS & EXTENSIONS (public discovery)
         // =====================================================================
@@ -509,7 +869,6 @@ pub fn __doorway_cache_rules(_: ()) -> ExternResult<Vec<CacheRule>> {
             .public()
             .invalidated_by(vec!["create_challenge"])
             .build(),
-
         // =====================================================================
         // PREMIUM GATES (public discovery, private access)
         // =====================================================================
@@ -538,7 +897,6 @@ pub fn __doorway_cache_rules(_: ()) -> ExternResult<Vec<CacheRule>> {
             .public()
             .invalidated_by(vec!["grant_access"])
             .build(),
-
         // =====================================================================
         // BLOBS (Media Distribution - hash-based and reach-aware)
         // =====================================================================
@@ -562,7 +920,6 @@ pub fn __doorway_cache_rules(_: ()) -> ExternResult<Vec<CacheRule>> {
             .reach_based("captions.reach", "commons")
             .invalidated_by(vec!["create_content"])
             .build(),
-
         // =====================================================================
         // EXPORTS (admin/migration endpoints - longer TTL)
         // =====================================================================
@@ -586,7 +943,6 @@ pub fn __doorway_cache_rules(_: ()) -> ExternResult<Vec<CacheRule>> {
             .private()
             .invalidated_by(vec!["create_content", "create_path"])
             .build(),
-
         // =====================================================================
         // SHEFA: INSURANCE MUTUAL (member-specific, requires auth)
         // =====================================================================
@@ -610,7 +966,6 @@ pub fn __doorway_cache_rules(_: ()) -> ExternResult<Vec<CacheRule>> {
             .private()
             .invalidated_by(vec!["create_adjustment_reasoning"])
             .build(),
-
         // =====================================================================
         // SHEFA: REQUESTS & OFFERS (public discovery, member-specific details)
         // =====================================================================
@@ -629,7 +984,6 @@ pub fn __doorway_cache_rules(_: ()) -> ExternResult<Vec<CacheRule>> {
             .private()
             .invalidated_by(vec!["create_service_match"])
             .build(),
-
         // =====================================================================
         // USER-SPECIFIC DATA (short TTL, auth required)
         // These use default behavior - 5 min TTL, auth required
@@ -788,37 +1142,37 @@ pub fn __doorway_import_config(_: ()) -> ExternResult<ImportConfig> {
         .batch_type(
             ImportBatchTypeBuilder::new("content")
                 .max_items(5000)
-                .chunk_size(50)          // 50 items per chunk
-                .chunk_interval_ms(100)  // 100ms between chunks
+                .chunk_size(50) // 50 items per chunk
+                .chunk_interval_ms(100) // 100ms between chunks
                 .schema_version(1)
-                .build()
+                .build(),
         )
         // Path batch (learning paths with steps)
         .batch_type(
             ImportBatchTypeBuilder::new("paths")
                 .max_items(1000)
-                .chunk_size(20)          // Paths are heavier, smaller chunks
+                .chunk_size(20) // Paths are heavier, smaller chunks
                 .chunk_interval_ms(200)
                 .schema_version(1)
-                .build()
+                .build(),
         )
         // Steps batch (path steps, can be large)
         .batch_type(
             ImportBatchTypeBuilder::new("steps")
                 .max_items(10000)
-                .chunk_size(100)         // Steps are lightweight
+                .chunk_size(100) // Steps are lightweight
                 .chunk_interval_ms(50)
                 .schema_version(1)
-                .build()
+                .build(),
         )
         // Relationships batch (content links)
         .batch_type(
             ImportBatchTypeBuilder::new("relationships")
                 .max_items(20000)
-                .chunk_size(200)         // Links are very lightweight
+                .chunk_size(200) // Links are very lightweight
                 .chunk_interval_ms(25)
                 .schema_version(1)
-                .build()
+                .build(),
         )
         .build())
 }
@@ -837,74 +1191,10 @@ pub fn __doorway_import_config(_: ()) -> ExternResult<ImportConfig> {
 /// - `content_size_bytes`: Size of the content body
 /// - `content`: Empty string or the hash (for backwards compatibility)
 ///
-/// The Angular app/seeder should:
-/// 1. Upload content body to elohim-storage: `PUT /blob/{hash}` -> returns CID
-/// 2. Create entry with blob_cid pointing to stored content
-/// 3. On read: check blob_cid, fetch from elohim-storage if present
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct CreateContentInput {
-    pub id: String,
-    pub content_type: String,
-    pub title: String,
-    pub description: String,
-    pub summary: Option<String>,          // Short preview text for cards/lists
-    pub content: String,                  // Legacy: full body. Manifest mode: empty or hash
-    pub content_format: String,
-    pub tags: Vec<String>,
-    pub source_path: Option<String>,
-    pub related_node_ids: Vec<String>,
-    pub reach: String,
-    pub estimated_minutes: Option<u32>,   // Reading/viewing time
-    pub thumbnail_url: Option<String>,    // Preview image for visual cards
-    pub metadata_json: String,
-    // Content manifest fields (Phase 0 refactor)
-    /// CID pointing to content body in elohim-storage (set for manifest mode)
-    #[serde(default)]
-    pub blob_cid: Option<String>,
-    /// Size of content body in bytes
-    #[serde(default)]
-    pub content_size_bytes: Option<u64>,
-    /// SHA256 hash of content body (for integrity verification)
-    #[serde(default)]
-    pub content_hash: Option<String>,
-}
+// CreateContentInput re-exported from lamad_types
 
-/// Output when retrieving content
-#[derive(Serialize, Deserialize, Debug)]
-pub struct ContentOutput {
-    pub action_hash: ActionHash,
-    pub entry_hash: EntryHash,
-    pub content: Content,
-}
-
-/// Input for bulk content creation
-#[derive(Serialize, Deserialize, Debug)]
-pub struct BulkCreateContentInput {
-    pub import_id: String,
-    pub contents: Vec<CreateContentInput>,
-}
-
-/// Output from bulk content creation
-#[derive(Serialize, Deserialize, Debug)]
-pub struct BulkCreateContentOutput {
-    pub import_id: String,
-    pub created_count: u32,
-    pub action_hashes: Vec<ActionHash>,
-    pub errors: Vec<String>,
-}
-
-/// Input for querying content by type
-#[derive(Serialize, Deserialize, Debug)]
-pub struct QueryByTypeInput {
-    pub content_type: String,
-    pub limit: Option<u32>,
-}
-
-/// Input for querying content by ID
-#[derive(Serialize, Deserialize, Debug)]
-pub struct QueryByIdInput {
-    pub id: String,
-}
+// ContentOutput, BulkCreateContentInput, BulkCreateContentOutput,
+// QueryByTypeInput, QueryByIdInput re-exported from lamad_types
 
 // =============================================================================
 // Input/Output Types for Blobs (Media Distribution)
@@ -955,55 +1245,8 @@ pub struct QueryBlobVariantsInput {
 // Input/Output Types for Relationships
 // =============================================================================
 
-/// Input for creating a relationship
-#[derive(Serialize, Deserialize, Debug)]
-pub struct CreateRelationshipInput {
-    pub source_id: String,
-    pub target_id: String,
-    pub relationship_type: String,  // RELATES_TO, CONTAINS, DEPENDS_ON, IMPLEMENTS, REFERENCES, DERIVED_FROM
-    pub confidence: f64,            // 0.0 - 1.0
-    pub inference_source: String,   // explicit, path, tag, semantic
-    pub metadata_json: Option<String>,
-}
-
-/// Output for relationship
-#[derive(Serialize, Deserialize, Debug)]
-pub struct RelationshipOutput {
-    pub action_hash: ActionHash,
-    pub relationship: Relationship,
-}
-
-/// Input for querying relationships
-#[derive(Serialize, Deserialize, Debug)]
-pub struct GetRelationshipsInput {
-    pub content_id: String,
-    pub direction: String,  // outgoing, incoming, both
-}
-
-/// Input for querying related content
-#[derive(Serialize, Deserialize, Debug)]
-pub struct QueryRelatedContentInput {
-    pub content_id: String,
-    pub relationship_types: Option<Vec<String>>,
-    pub depth: Option<u32>,
-}
-
-/// Content graph node for tree traversal
-#[derive(Serialize, Deserialize, Debug)]
-pub struct ContentGraphNode {
-    pub content: ContentOutput,
-    pub relationship_type: String,
-    pub confidence: f64,
-    pub children: Vec<ContentGraphNode>,
-}
-
-/// Content graph output
-#[derive(Serialize, Deserialize, Debug)]
-pub struct ContentGraph {
-    pub root: Option<ContentOutput>,
-    pub related: Vec<ContentGraphNode>,
-    pub total_nodes: u32,
-}
+// CreateRelationshipInput, RelationshipOutput, GetRelationshipsInput,
+// QueryRelatedContentInput, ContentGraphNode, ContentGraph re-exported from lamad_types
 
 // =============================================================================
 // Input/Output Types for Humans
@@ -1042,12 +1285,7 @@ pub struct RecordCompletionInput {
     pub content_id: String,
 }
 
-/// Content statistics output
-#[derive(Serialize, Deserialize, Debug)]
-pub struct ContentStats {
-    pub total_count: u32,
-    pub by_type: HashMap<String, u32>,
-}
+// ContentStats re-exported from lamad_types
 
 // =============================================================================
 // Input/Output Types for Agent (Expanded Identity Model)
@@ -1057,12 +1295,12 @@ pub struct ContentStats {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct CreateAgentInput {
     pub id: String,
-    pub agent_type: String,           // human, organization, ai-agent, elohim
+    pub agent_type: String, // human, organization, ai-agent, elohim
     pub display_name: String,
     pub bio: Option<String>,
     pub avatar: Option<String>,
     pub affinities: Vec<String>,
-    pub visibility: String,           // public, connections, private
+    pub visibility: String, // public, connections, private
     pub location: Option<String>,
     pub did: Option<String>,
     pub activity_pub_type: Option<String>,
@@ -1109,8 +1347,8 @@ pub struct UpdateAgentProgressInput {
     pub current_step_index: Option<u32>,
     pub completed_step_index: Option<u32>,
     pub completed_content_id: Option<String>,
-    pub step_affinity: Option<(u32, f64)>,  // (step_index, affinity_score)
-    pub step_note: Option<(u32, String)>,   // (step_index, note)
+    pub step_affinity: Option<(u32, f64)>, // (step_index, affinity_score)
+    pub step_note: Option<(u32, String)>,  // (step_index, note)
 }
 
 // =============================================================================
@@ -1171,141 +1409,19 @@ pub struct RevokeContentAttestationInput {
 // Input/Output Types for Learning Paths
 // =============================================================================
 
-/// Input for bulk path import (from seeder)
-/// Includes embedded steps to create in one batch
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct PathImportInput {
-    pub id: String,
-    pub version: String,
-    pub title: String,
-    pub description: String,
-    pub purpose: Option<String>,
-    pub difficulty: String,
-    pub estimated_duration: Option<String>,
-    pub visibility: String,
-    pub path_type: String,
-    pub tags: Vec<String>,
-    pub metadata_json: Option<String>,
-    /// Embedded steps to create with the path
-    #[serde(default)]
-    pub steps: Vec<PathImportStepInput>,
-}
+// PathImportInput, PathImportStepInput, CreatePathInput, AddPathStepInput
+// re-exported from lamad_types
 
-/// Step input embedded in PathImportInput
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct PathImportStepInput {
-    pub step_type: String,
-    pub resource_id: String,
-    pub order_index: u32,
-    #[serde(default)]
-    pub step_title: Option<String>,
-    #[serde(default)]
-    pub step_narrative: Option<String>,
-    #[serde(default)]
-    pub is_optional: bool,
-    /// Module association metadata for UI filtering
-    #[serde(default)]
-    pub module_id: Option<String>,
-    #[serde(default)]
-    pub chapter_id: Option<String>,
-    #[serde(default)]
-    pub section_id: Option<String>,
-}
+// PathWithStepsOutput (was PathWithSteps), PathOverviewOutput (was PathOverview),
+// PathStepOutput re-exported from lamad_types
 
-/// Input for creating a learning path
-#[derive(Serialize, Deserialize, Debug)]
-pub struct CreatePathInput {
-    pub id: String,
-    pub version: String,
-    pub title: String,
-    pub description: String,
-    pub purpose: Option<String>,
-    pub difficulty: String,
-    pub estimated_duration: Option<String>,
-    pub visibility: String,
-    pub path_type: String,
-    pub tags: Vec<String>,
-    /// Extensible metadata JSON (stores chapters for hierarchical paths)
-    pub metadata_json: Option<String>,
-}
-
-/// Input for adding a step to a path
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct AddPathStepInput {
-    pub path_id: String,
-    pub chapter_id: Option<String>,      // If part of a chapter
-    pub module_id: Option<String>,       // If part of a module (for UI filtering)
-    pub section_id: Option<String>,      // If part of a section (for fine-grained tracking)
-    pub order_index: u32,
-    pub step_type: String,               // content, path, external, checkpoint, reflection
-    pub resource_id: String,
-    pub step_title: Option<String>,
-    pub step_narrative: Option<String>,
-    pub is_optional: bool,
-    // Learning objectives and engagement
-    pub learning_objectives: Option<Vec<String>>,
-    pub reflection_prompts: Option<Vec<String>>,
-    pub practice_exercises: Option<Vec<String>>,
-    // Completion and gating
-    pub estimated_minutes: Option<u32>,
-    pub completion_criteria: Option<String>,
-    pub attestation_required: Option<String>,
-    pub attestation_granted: Option<String>,
-    pub mastery_threshold: Option<u32>,
-    pub metadata_json: Option<String>,
-}
-
-/// Output for learning path with steps
-#[derive(Serialize, Deserialize, Debug)]
-pub struct PathWithSteps {
-    pub action_hash: ActionHash,
-    pub path: LearningPath,
-    pub steps: Vec<PathStepOutput>,
-}
-
-/// Lightweight path overview (no step content, just counts)
-/// Use this for path listings and initial load - much faster than get_path_with_steps
-#[derive(Serialize, Deserialize, Debug)]
-pub struct PathOverview {
-    pub action_hash: ActionHash,
-    pub path: LearningPath,
-    pub step_count: usize,
-}
-
-/// Output for a path step
-#[derive(Serialize, Deserialize, Debug)]
-pub struct PathStepOutput {
-    pub action_hash: ActionHash,
-    pub step: PathStep,
-}
-
-/// Input for creating a chapter
-#[derive(Serialize, Deserialize, Debug)]
-pub struct CreateChapterInput {
-    pub path_id: String,
-    pub order_index: u32,
-    pub title: String,
-    pub description: Option<String>,
-    pub learning_objectives: Vec<String>,
-    pub estimated_minutes: Option<u32>,
-    pub is_optional: bool,
-    pub attestation_granted: Option<String>,
-    pub mastery_threshold: Option<u32>,
-    pub metadata_json: Option<String>,
-}
-
-/// Output for a chapter
-#[derive(Serialize, Deserialize, Debug)]
-pub struct ChapterOutput {
-    pub action_hash: ActionHash,
-    pub chapter: PathChapter,
-}
+// CreateChapterInput, ChapterOutput re-exported from lamad_types
 
 /// Output for a chapter with its steps
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ChapterWithSteps {
     pub action_hash: ActionHash,
-    pub chapter: PathChapter,
+    pub chapter: WireChapter,
     pub steps: Vec<PathStepOutput>,
 }
 
@@ -1313,37 +1429,12 @@ pub struct ChapterWithSteps {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct PathWithChaptersAndSteps {
     pub action_hash: ActionHash,
-    pub path: LearningPath,
+    pub path: WireLearningPath,
     pub chapters: Vec<ChapterWithSteps>,
-    pub ungrouped_steps: Vec<PathStepOutput>,  // Steps not in any chapter
+    pub ungrouped_steps: Vec<PathStepOutput>, // Steps not in any chapter
 }
 
-/// Input for updating a path
-#[derive(Serialize, Deserialize, Debug)]
-pub struct UpdatePathInput {
-    pub path_id: String,
-    pub title: Option<String>,
-    pub description: Option<String>,
-    pub purpose: Option<String>,
-    pub difficulty: Option<String>,
-    pub estimated_duration: Option<String>,
-    pub visibility: Option<String>,
-    pub tags: Option<Vec<String>>,
-}
-
-/// Input for updating a chapter
-#[derive(Serialize, Deserialize, Debug)]
-pub struct UpdateChapterInput {
-    pub chapter_id: String,
-    pub title: Option<String>,
-    pub description: Option<String>,
-    pub learning_objectives: Option<Vec<String>>,
-    pub estimated_minutes: Option<u32>,
-    pub is_optional: Option<bool>,
-    pub order_index: Option<u32>,
-    pub attestation_granted: Option<String>,
-    pub mastery_threshold: Option<u32>,
-}
+// UpdatePathInput, UpdateChapterInput re-exported from lamad_types
 
 /// Input for updating a step
 #[derive(Serialize, Deserialize, Debug)]
@@ -1368,32 +1459,7 @@ pub struct UpdateStepInput {
 // Input/Output Types for Progress Tracking
 // =============================================================================
 
-/// Input for starting path progress
-#[derive(Serialize, Deserialize, Debug)]
-pub struct StartPathProgressInput {
-    pub path_id: String,
-}
-
-// Note: AgentProgressOutput is defined earlier in the file (line ~212)
-
-/// Input for completing a step
-#[derive(Serialize, Deserialize, Debug)]
-pub struct CompleteStepInput {
-    pub path_id: String,
-    pub step_index: u32,
-    pub content_id: Option<String>,
-    pub affinity_score: Option<u32>,  // 0-10: How much did the learner enjoy this content?
-    pub notes: Option<String>,
-    pub reflection_responses: Option<Vec<String>>,
-}
-
-/// Input for querying progress
-#[derive(Serialize, Deserialize, Debug)]
-pub struct QueryProgressInput {
-    pub status: Option<String>,  // in_progress, completed, abandoned
-    pub path_id: Option<String>,
-    pub limit: Option<u32>,
-}
+// StartPathProgressInput, CompleteStepInput, QueryProgressInput re-exported from lamad_types
 
 /// Summary of a learner's progress
 #[derive(Serialize, Deserialize, Debug)]
@@ -1419,14 +1485,14 @@ pub struct ProgressSummary {
 pub struct CreateCustodianCommitmentInput {
     pub custodian_agent_id: String,
     pub beneficiary_agent_id: String,
-    pub commitment_type: String,        // relationship|category|community|steward
-    pub basis: String,                  // intimate_relationship|trusted_relationship|etc.
+    pub commitment_type: String, // relationship|category|community|steward
+    pub basis: String,           // intimate_relationship|trusted_relationship|etc.
     pub relationship_id: Option<String>,
     pub category_override_json: String,
     pub content_filters_json: String,
     pub estimated_content_count: u32,
     pub estimated_size_mb: f64,
-    pub shard_strategy: String,         // full_replica|threshold_split|erasure_coded
+    pub shard_strategy: String, // full_replica|threshold_split|erasure_coded
     pub redundancy_factor: u32,
     pub shard_assignments_json: String, // Empty initially, filled when shards created
     pub emergency_triggers_json: String,
@@ -1468,7 +1534,7 @@ pub struct AcceptCommitmentInput {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ActivateEmergencyInput {
     pub commitment_id: String,
-    pub trigger_type: String,   // manual_signal|trusted_party|m_of_n_consensus|dead_mans_switch|beneficiary_incapacity
+    pub trigger_type: String, // manual_signal|trusted_party|m_of_n_consensus|dead_mans_switch|beneficiary_incapacity
     pub activation_proof: String, // Passphrase, signature, consensus votes, etc.
     pub reason: String,
 }
@@ -1481,9 +1547,9 @@ pub struct ActivateEmergencyInput {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct GenerateShardsInput {
     pub content_id: String,
-    pub content_data: String,     // The actual content to shard
-    pub shard_strategy: String,   // full_replica|threshold_split|erasure_coded
-    pub redundancy_factor: u32,   // M (threshold) for Shamir or Reed-Solomon
+    pub content_data: String,      // The actual content to shard
+    pub shard_strategy: String,    // full_replica|threshold_split|erasure_coded
+    pub redundancy_factor: u32,    // M (threshold) for Shamir or Reed-Solomon
     pub total_shards: Option<u32>, // N (total shards) - defaults to 2*redundancy_factor
 }
 
@@ -1553,12 +1619,12 @@ pub struct GetShardOutput {
 /// Emergency trigger types for activation
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct EmergencyTriggerSpec {
-    pub trigger_type: String,           // manual_signal|trusted_party|m_of_n_consensus
+    pub trigger_type: String, // manual_signal|trusted_party|m_of_n_consensus
     pub enabled: bool,
     pub passphrase_hash: Option<String>, // For manual_signal
     pub trusted_agent_ids: Option<Vec<String>>, // For trusted_party
-    pub consensus_m: Option<u32>,       // M-of-N: M custodians needed
-    pub consensus_n: Option<u32>,       // M-of-N: N total custodians
+    pub consensus_m: Option<u32>,        // M-of-N: M custodians needed
+    pub consensus_n: Option<u32>,        // M-of-N: N total custodians
 }
 
 /// Manual signal activation (passphrase-based immediate activation)
@@ -1566,8 +1632,8 @@ pub struct EmergencyTriggerSpec {
 pub struct ActivateEmergencyManualInput {
     pub commitment_id: String,
     pub beneficiary_id: String,
-    pub passphrase: String,             // Plain passphrase, will be hashed for verification
-    pub reason: String,                 // Narrative: "Account compromised", "Disaster recovery", etc.
+    pub passphrase: String, // Plain passphrase, will be hashed for verification
+    pub reason: String,     // Narrative: "Account compromised", "Disaster recovery", etc.
 }
 
 /// Trusted party activation (agent signature-based)
@@ -1575,8 +1641,8 @@ pub struct ActivateEmergencyManualInput {
 pub struct ActivateEmergencyTrustedPartyInput {
     pub commitment_id: String,
     pub beneficiary_id: String,
-    pub trusted_agent_id: String,       // Which trusted party is activating
-    pub signature: String,              // Agent's signature over commitment_id + beneficiary_id
+    pub trusted_agent_id: String, // Which trusted party is activating
+    pub signature: String,        // Agent's signature over commitment_id + beneficiary_id
     pub reason: String,
 }
 
@@ -1584,9 +1650,9 @@ pub struct ActivateEmergencyTrustedPartyInput {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct SubmitConsensusVoteInput {
     pub commitment_id: String,
-    pub custodian_id: String,           // Which custodian is voting
-    pub vote_approve: bool,             // true = approve recovery, false = reject
-    pub reason: String,                 // Optional reason for vote
+    pub custodian_id: String, // Which custodian is voting
+    pub vote_approve: bool,   // true = approve recovery, false = reject
+    pub reason: String,       // Optional reason for vote
 }
 
 /// Check consensus status (are we at M-of-N threshold?)
@@ -1603,7 +1669,7 @@ pub struct ConsensusVoteStatus {
     pub rejects: u32,
     pub threshold_m: u32,
     pub threshold_reached: bool,
-    pub activation_status: String,      // pending|approved|rejected
+    pub activation_status: String, // pending|approved|rejected
 }
 
 /// Shard reconstruction for emergency recovery
@@ -1616,11 +1682,11 @@ pub struct ReconstructContentInput {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ReconstructContentOutput {
     pub content_id: String,
-    pub content: String,                // Reconstructed content
+    pub content: String, // Reconstructed content
     pub shards_gathered: u32,
     pub shards_required: u32,
-    pub reconstruction_method: String,  // full_replica|threshold_split|erasure_coded
-    pub verification_status: String,    // verified|unverified|partial
+    pub reconstruction_method: String, // full_replica|threshold_split|erasure_coded
+    pub verification_status: String,   // verified|unverified|partial
     pub error_message: Option<String>,
 }
 
@@ -1631,23 +1697,23 @@ pub struct ReconstructContentOutput {
 /// Category override allows specialists to custody content outside relationship reach
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct CategoryOverrideSpec {
-    pub category_type: String,        // medical|emergency|disaster_relief|high_bandwidth|archive
-    pub access_level: String,         // professional|trusted|verified|emergency_only
+    pub category_type: String, // medical|emergency|disaster_relief|high_bandwidth|archive
+    pub access_level: String,  // professional|trusted|verified|emergency_only
     pub allowed_reach_levels: Vec<String>, // Which reach levels this specialist can custody
     pub content_filters: Vec<String>, // Content types this specialist handles (empty = all)
-    pub credentials: Option<String>,  // Professional credential/license identifier
+    pub credentials: Option<String>, // Professional credential/license identifier
     pub emergency_contact: Option<String>, // Contact info if emergency_only access
 }
 
 /// Create category override commitment (specialist custody)
 #[derive(Serialize, Deserialize, Debug)]
 pub struct CreateCategoryOverrideInput {
-    pub commitment_id: String,        // Link to existing commitment or create new
-    pub beneficiary_id: String,       // Content owner
-    pub specialist_agent_id: String,  // Healthcare provider, firefighter, etc.
+    pub commitment_id: String,  // Link to existing commitment or create new
+    pub beneficiary_id: String, // Content owner
+    pub specialist_agent_id: String, // Healthcare provider, firefighter, etc.
     pub category: CategoryOverrideSpec,
-    pub reason: String,              // Why this override is needed
-    pub expires_at: Option<String>,   // Expiration date for access
+    pub reason: String,             // Why this override is needed
+    pub expires_at: Option<String>, // Expiration date for access
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -1655,16 +1721,16 @@ pub struct CategoryOverrideOutput {
     pub action_hash: ActionHash,
     pub entry_hash: EntryHash,
     pub commitment_id: String,
-    pub override_status: String,      // pending|approved|active|expired|revoked
+    pub override_status: String, // pending|approved|active|expired|revoked
 }
 
 /// Query commitments by category override
 #[derive(Serialize, Deserialize, Debug)]
 pub struct QueryCategoryOverridesInput {
     pub beneficiary_id: Option<String>, // Filter by beneficiary
-    pub category_type: Option<String>, // Filter by category (medical, emergency, etc.)
-    pub specialist_id: Option<String>, // Filter by specialist agent
-    pub active_only: bool,             // Only show active overrides
+    pub category_type: Option<String>,  // Filter by category (medical, emergency, etc.)
+    pub specialist_id: Option<String>,  // Filter by specialist agent
+    pub active_only: bool,              // Only show active overrides
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -1694,15 +1760,7 @@ pub struct ValidateCategoryAccessOutput {
     pub reason: String,
 }
 
-/// Input for granting attestation
-#[derive(Serialize, Deserialize, Debug)]
-pub struct GrantAttestationInput {
-    pub path_id: String,
-    pub attestation_id: String,       // The attestation type being granted
-    pub reason: String,               // e.g., "Completed Chapter 1", "Passed mastery quiz"
-    pub source_type: String,          // "step", "chapter", "path"
-    pub source_id: String,            // step_id, chapter_id, or path_id
-}
+// GrantAttestationInput re-exported from lamad_types
 
 // =============================================================================
 // Input/Output Types for Content Mastery
@@ -1720,7 +1778,7 @@ pub struct InitializeMasteryInput {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct RecordEngagementInput {
     pub content_id: String,
-    pub engagement_type: String,      // view, quiz, practice, etc.
+    pub engagement_type: String, // view, quiz, practice, etc.
     pub duration_seconds: Option<u32>,
     pub metadata_json: Option<String>,
 }
@@ -1729,9 +1787,9 @@ pub struct RecordEngagementInput {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct RecordAssessmentInput {
     pub content_id: String,
-    pub assessment_type: String,      // recall, comprehension, application, analysis
-    pub score: f64,                   // 0.0-1.0
-    pub passing_threshold: f64,       // Usually 0.7
+    pub assessment_type: String, // recall, comprehension, application, analysis
+    pub score: f64,              // 0.0-1.0
+    pub passing_threshold: f64,  // Usually 0.7
     pub time_spent_seconds: u32,
     pub question_count: u32,
     pub correct_count: u32,
@@ -1742,9 +1800,9 @@ pub struct RecordAssessmentInput {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct LevelUpMasteryInput {
     pub content_id: String,
-    pub target_level: String,         // The level to advance to
-    pub evidence_type: String,        // assessment, peer_review, contribution
-    pub evidence_json: String,        // Proof of level achievement
+    pub target_level: String,  // The level to advance to
+    pub evidence_type: String, // assessment, peer_review, contribution
+    pub evidence_json: String, // Proof of level achievement
 }
 
 /// Mastery statistics for dashboard
@@ -1752,7 +1810,7 @@ pub struct LevelUpMasteryInput {
 pub struct MasteryStats {
     pub total_tracked: u32,
     pub level_distribution: HashMap<String, u32>,
-    pub above_gate_count: u32,        // >= apply level
+    pub above_gate_count: u32, // >= apply level
     pub fresh_count: u32,
     pub stale_count: u32,
     pub needs_refresh_count: u32,
@@ -1771,7 +1829,7 @@ pub struct MasteryByLevelQueryInput {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct CheckPrivilegeInput {
     pub content_id: String,
-    pub privilege: String,            // comment, suggest_edit, peer_review, contribute, etc.
+    pub privilege: String, // comment, suggest_edit, peer_review, contribute, etc.
 }
 
 /// Privilege check result
@@ -1830,8 +1888,8 @@ fn create_content_unchecked(input: CreateContentInput) -> ExternResult<ContentOu
         metadata_json: input.metadata_json,
         created_at: timestamp.clone(),
         updated_at: timestamp,
-        schema_version: 2,  // Always current version
-        validation_status: String::new(),  // Will be set by prepare_
+        schema_version: 2,                // Always current version
+        validation_status: String::new(), // Will be set by prepare_
         // Content manifest fields (Phase 0 refactor)
         blob_cid: input.blob_cid,
         content_size_bytes: input.content_size_bytes,
@@ -1859,7 +1917,7 @@ fn create_content_unchecked(input: CreateContentInput) -> ExternResult<ContentOu
     Ok(ContentOutput {
         action_hash,
         entry_hash,
-        content,
+        content: content_to_wire(&content),
     })
 }
 
@@ -1911,25 +1969,7 @@ pub fn bulk_create_content(input: BulkCreateContentInput) -> ExternResult<BulkCr
 // 7. Zome emits ImportBatchCompleted when done
 // 8. Store/Doorway relay signals back to client
 
-/// Input for queuing an import batch (called by elohim-store after blob write)
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct QueueImportInput {
-    /// Unique batch identifier (e.g., "import-2024-12-29-001")
-    pub id: String,
-
-    /// Type of items: "content", "paths", "steps", "full"
-    pub batch_type: String,
-
-    /// Hash of the blob in elohim-store containing the items JSON
-    /// Format: "sha256-xxxx" or store-specific hash
-    pub blob_hash: String,
-
-    /// Total number of items in the blob (from manifest)
-    pub total_items: u32,
-
-    /// Schema version for the items
-    pub schema_version: u32,
-}
+// QueueImportInput re-exported from lamad_types
 
 /// Output from queuing an import batch
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1985,7 +2025,12 @@ pub fn queue_import(input: QueueImportInput) -> ExternResult<QueueImportOutput> 
     let action_hash = create_entry(&EntryTypes::ImportBatch(batch.clone()))?;
 
     // Create index links
-    create_import_batch_index_links(&input.id, &action_hash, &batch.status, &agent_info.agent_initial_pubkey.to_string())?;
+    create_import_batch_index_links(
+        &input.id,
+        &action_hash,
+        &batch.status,
+        &agent_info.agent_initial_pubkey.to_string(),
+    )?;
 
     // Emit signal so elohim-store knows to start sending chunks
     emit_signal(ProjectionSignal::ImportBatchQueued {
@@ -2003,21 +2048,8 @@ pub fn queue_import(input: QueueImportInput) -> ExternResult<QueueImportOutput> 
     })
 }
 
-/// Input for processing a chunk of import data
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ProcessImportChunkInput {
-    /// Batch ID this chunk belongs to
-    pub batch_id: String,
-
-    /// Chunk index (0-based, for ordering)
-    pub chunk_index: u32,
-
-    /// Whether this is the last chunk
-    pub is_final: bool,
-
-    /// JSON array of items to process (partial batch)
-    pub items_json: String,
-}
+/// ProcessImportChunkInput is a type alias for lamad_types::ImportChunkInput
+pub type ProcessImportChunkInput = ImportChunkInput;
 
 /// Output from processing a chunk
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -2055,7 +2087,9 @@ pub struct ProcessImportChunkOutput {
 /// Called by elohim-store with blob data in chunks. Processes items,
 /// updates the ImportBatch entry, and emits progress signals.
 #[hdk_extern]
-pub fn process_import_chunk(input: ProcessImportChunkInput) -> ExternResult<ProcessImportChunkOutput> {
+pub fn process_import_chunk(
+    input: ProcessImportChunkInput,
+) -> ExternResult<ProcessImportChunkOutput> {
     let now = sys_time()?;
     let timestamp = format!("{:?}", now);
 
@@ -2067,20 +2101,33 @@ pub fn process_import_chunk(input: ProcessImportChunkInput) -> ExternResult<Proc
     let links = get_links(query, GetStrategy::default())?;
 
     if links.is_empty() {
-        return Err(wasm_error!(WasmErrorInner::Guest(
-            format!("Batch '{}' not found", input.batch_id)
-        )));
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Batch '{}' not found",
+            input.batch_id
+        ))));
     }
 
-    let batch_action_hash = links.last().unwrap().target.clone().into_action_hash()
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid link target".to_string())))?;
+    let batch_action_hash = links
+        .last()
+        .unwrap()
+        .target
+        .clone()
+        .into_action_hash()
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid link target".to_string()
+        )))?;
 
-    let record = get(batch_action_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Batch record not found".to_string())))?;
+    let record = get(batch_action_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Batch record not found".to_string())
+    ))?;
 
-    let mut batch: ImportBatch = record.entry().to_app_option()
+    let mut batch: ImportBatch = record
+        .entry()
+        .to_app_option()
         .map_err(|e| wasm_error!(e))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not deserialize ImportBatch".to_string())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Could not deserialize ImportBatch".to_string()
+        )))?;
 
     // Update status to processing if this is the first chunk
     if batch.status == "queued" {
@@ -2111,15 +2158,19 @@ pub fn process_import_chunk(input: ProcessImportChunkInput) -> ExternResult<Proc
         "paths" | "path" => {
             // DEPRECATED: Path import via LearningPath entries. Will fail with deprecation error.
             // Paths should now be imported as Content entries with content_type "path".
-            let items: Vec<PathImportInput> = serde_json::from_str(&input.items_json)
-                .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!(
-                    "Failed to parse paths items_json: {}", e
-                ))))?;
+            let items: Vec<PathImportInput> =
+                serde_json::from_str(&input.items_json).map_err(|e| {
+                    wasm_error!(WasmErrorInner::Guest(format!(
+                        "Failed to parse paths items_json: {}",
+                        e
+                    )))
+                })?;
 
             // Batch existence check for paths
             let all_ids: Vec<String> = items.iter().map(|item| item.id.clone()).collect();
             let existing_check = check_path_ids_exist(CheckIdsExistInput { ids: all_ids })?;
-            let existing_set: std::collections::HashSet<_> = existing_check.existing_ids.into_iter().collect();
+            let existing_set: std::collections::HashSet<_> =
+                existing_check.existing_ids.into_iter().collect();
 
             // Process paths
             for path_input in items {
@@ -2176,7 +2227,10 @@ pub fn process_import_chunk(input: ProcessImportChunkInput) -> ExternResult<Proc
                             };
                             if let Err(e) = add_path_step(step_input) {
                                 // Log step error but don't fail the path
-                                debug!("Warning: Failed to add step to path '{}': {:?}", path_input.id, e);
+                                debug!(
+                                    "Warning: Failed to add step to path '{}': {:?}",
+                                    path_input.id, e
+                                );
                             }
                         }
                     }
@@ -2184,7 +2238,8 @@ pub fn process_import_chunk(input: ProcessImportChunkInput) -> ExternResult<Proc
                         chunk_errors += 1;
                         let error_msg = format!("{:?}", e);
                         failed_ids.push((path_input.id.clone(), error_msg.clone()));
-                        let error_msg = format!("Failed to create path '{}': {:?}", path_input.id, e);
+                        let error_msg =
+                            format!("Failed to create path '{}': {:?}", path_input.id, e);
                         if errors.len() < 100 {
                             errors.push(error_msg);
                         }
@@ -2201,15 +2256,19 @@ pub fn process_import_chunk(input: ProcessImportChunkInput) -> ExternResult<Proc
                     batch.batch_type, batch.id
                 );
             }
-            let items: Vec<CreateContentInput> = serde_json::from_str(&input.items_json)
-                .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!(
-                    "Failed to parse items_json (batch_type='{}'): {}", batch.batch_type, e
-                ))))?;
+            let items: Vec<CreateContentInput> =
+                serde_json::from_str(&input.items_json).map_err(|e| {
+                    wasm_error!(WasmErrorInner::Guest(format!(
+                        "Failed to parse items_json (batch_type='{}'): {}",
+                        batch.batch_type, e
+                    )))
+                })?;
 
             // OPTIMIZATION: Batch existence check - do ONE query for all IDs instead of per-item
             let all_ids: Vec<String> = items.iter().map(|item| item.id.clone()).collect();
             let existing_check = check_content_ids_exist(CheckIdsExistInput { ids: all_ids })?;
-            let existing_set: std::collections::HashSet<_> = existing_check.existing_ids.into_iter().collect();
+            let existing_set: std::collections::HashSet<_> =
+                existing_check.existing_ids.into_iter().collect();
 
             // Process only NEW items (skip existing)
             for content_input in items {
@@ -2271,7 +2330,10 @@ pub fn process_import_chunk(input: ProcessImportChunkInput) -> ExternResult<Proc
     }
 
     // Update the batch entry
-    update_entry(batch_action_hash.clone(), &EntryTypes::ImportBatch(batch.clone()))?;
+    update_entry(
+        batch_action_hash.clone(),
+        &EntryTypes::ImportBatch(batch.clone()),
+    )?;
 
     // Emit progress signal
     if input.is_final {
@@ -2314,17 +2376,32 @@ fn create_import_batch_index_links(
     // IdToImportBatch
     let id_anchor = StringAnchor::new("import_batch", batch_id);
     let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
-    create_link(id_anchor_hash, action_hash.clone(), LinkTypes::IdToImportBatch, ())?;
+    create_link(
+        id_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::IdToImportBatch,
+        (),
+    )?;
 
     // AuthorToImportBatches
     let author_anchor = StringAnchor::new("import_batch_author", author_id);
     let author_anchor_hash = hash_entry(&EntryTypes::StringAnchor(author_anchor))?;
-    create_link(author_anchor_hash, action_hash.clone(), LinkTypes::AuthorToImportBatches, ())?;
+    create_link(
+        author_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::AuthorToImportBatches,
+        (),
+    )?;
 
     // ImportBatchByStatus
     let status_anchor = StringAnchor::new("import_batch_status", status);
     let status_anchor_hash = hash_entry(&EntryTypes::StringAnchor(status_anchor))?;
-    create_link(status_anchor_hash, action_hash.clone(), LinkTypes::ImportBatchByStatus, ())?;
+    create_link(
+        status_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::ImportBatchByStatus,
+        (),
+    )?;
 
     Ok(())
 }
@@ -2344,15 +2421,26 @@ pub fn get_import_status(batch_id: String) -> ExternResult<Option<ImportBatch>> 
     }
 
     // Get the most recent batch (by creation order)
-    let action_hash = links.last().unwrap().target.clone().into_action_hash()
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid link target".to_string())))?;
+    let action_hash = links
+        .last()
+        .unwrap()
+        .target
+        .clone()
+        .into_action_hash()
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid link target".to_string()
+        )))?;
 
     let record = get(action_hash, GetOptions::default())?;
     match record {
         Some(record) => {
-            let batch: ImportBatch = record.entry().to_app_option()
+            let batch: ImportBatch = record
+                .entry()
+                .to_app_option()
                 .map_err(|e| wasm_error!(e))?
-                .ok_or(wasm_error!(WasmErrorInner::Guest("Could not deserialize ImportBatch".to_string())))?;
+                .ok_or(wasm_error!(WasmErrorInner::Guest(
+                    "Could not deserialize ImportBatch".to_string()
+                )))?;
             Ok(Some(batch))
         }
         None => Ok(None),
@@ -2365,7 +2453,10 @@ pub fn list_import_batches(_: ()) -> ExternResult<Vec<ImportBatch>> {
     let agent_info = agent_info()?;
 
     // Get batches by this author
-    let author_anchor = StringAnchor::new("import_batch_author", &agent_info.agent_initial_pubkey.to_string());
+    let author_anchor = StringAnchor::new(
+        "import_batch_author",
+        &agent_info.agent_initial_pubkey.to_string(),
+    );
     let author_anchor_hash = hash_entry(&EntryTypes::StringAnchor(author_anchor))?;
 
     let query = LinkQuery::try_new(author_anchor_hash, LinkTypes::AuthorToImportBatches)?;
@@ -2414,7 +2505,7 @@ pub fn get_content(action_hash: ActionHash) -> ExternResult<Option<ContentOutput
             Ok(Some(ContentOutput {
                 action_hash,
                 entry_hash,
-                content,
+                content: content_to_wire(&content),
             }))
         }
         None => Ok(None),
@@ -2439,8 +2530,11 @@ pub fn get_content_by_id(input: QueryByIdInput) -> ExternResult<Option<ContentOu
             let links = get_links(query, GetStrategy::default())?;
 
             let action_hash = if let Some(link) = links.first() {
-                ActionHash::try_from(link.target.clone())
-                    .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid action hash in link".to_string())))?
+                ActionHash::try_from(link.target.clone()).map_err(|_| {
+                    wasm_error!(WasmErrorInner::Guest(
+                        "Invalid action hash in link".to_string()
+                    ))
+                })?
             } else {
                 // Newly healed entry, cache it with a new link
                 let new_hash = create_entry(&EntryTypes::Content(content.clone()))?;
@@ -2451,24 +2545,14 @@ pub fn get_content_by_id(input: QueryByIdInput) -> ExternResult<Option<ContentOu
             Ok(Some(ContentOutput {
                 action_hash,
                 entry_hash,
-                content,
+                content: content_to_wire(&content),
             }))
         }
         None => Ok(None),
     }
 }
 
-/// Input for batch ID existence check
-#[derive(Serialize, Deserialize, Debug)]
-pub struct CheckIdsExistInput {
-    pub ids: Vec<String>,
-}
-
-/// Output for batch ID existence check - returns only the IDs that exist
-#[derive(Serialize, Deserialize, Debug)]
-pub struct CheckIdsExistOutput {
-    pub existing_ids: Vec<String>,
-}
+// CheckIdsExistInput, CheckIdsExistOutput re-exported from lamad_types
 
 /// Batch check which content IDs already exist (for efficient seeding)
 /// Returns only the IDs that already exist
@@ -2491,23 +2575,14 @@ pub fn check_content_ids_exist(input: CheckIdsExistInput) -> ExternResult<CheckI
     Ok(CheckIdsExistOutput { existing_ids })
 }
 
-/// Input for batch content retrieval by IDs
-#[derive(Serialize, Deserialize, Debug)]
-pub struct BatchGetContentInput {
-    pub ids: Vec<String>,
-}
-
-/// Output for batch content retrieval
-#[derive(Serialize, Deserialize, Debug)]
-pub struct BatchGetContentOutput {
-    pub found: Vec<ContentOutput>,
-    pub not_found: Vec<String>,
-}
+// BatchGetContentInput, BatchGetContentOutput re-exported from lamad_types
 
 /// Batch get content by multiple IDs in a single call (optimized for UI loading)
 /// Returns found content and list of IDs that were not found
 #[hdk_extern]
-pub fn batch_get_content_by_ids(input: BatchGetContentInput) -> ExternResult<BatchGetContentOutput> {
+pub fn batch_get_content_by_ids(
+    input: BatchGetContentInput,
+) -> ExternResult<BatchGetContentOutput> {
     let mut found = Vec::new();
     let mut not_found = Vec::new();
 
@@ -2534,8 +2609,11 @@ pub fn get_content_by_type(input: QueryByTypeInput) -> ExternResult<Vec<ContentO
     let mut results = Vec::new();
 
     for link in links.iter().take(limit) {
-        let action_hash = ActionHash::try_from(link.target.clone())
-            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid action hash in link".to_string())))?;
+        let action_hash = ActionHash::try_from(link.target.clone()).map_err(|_| {
+            wasm_error!(WasmErrorInner::Guest(
+                "Invalid action hash in link".to_string()
+            ))
+        })?;
 
         if let Some(output) = get_content(action_hash)? {
             results.push(output);
@@ -2557,8 +2635,11 @@ pub fn get_content_by_tag(tag: String) -> ExternResult<Vec<ContentOutput>> {
     let mut results = Vec::new();
 
     for link in links.iter().take(100) {
-        let action_hash = ActionHash::try_from(link.target.clone())
-            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid action hash in link".to_string())))?;
+        let action_hash = ActionHash::try_from(link.target.clone()).map_err(|_| {
+            wasm_error!(WasmErrorInner::Guest(
+                "Invalid action hash in link".to_string()
+            ))
+        })?;
 
         if let Some(output) = get_content(action_hash)? {
             results.push(output);
@@ -2568,27 +2649,14 @@ pub fn get_content_by_tag(tag: String) -> ExternResult<Vec<ContentOutput>> {
     Ok(results)
 }
 
-/// Input for paginated content query by type
-#[derive(Serialize, Deserialize, Debug)]
-pub struct PaginatedByTypeInput {
-    pub content_type: String,          // Filter by type
-    pub page_size: u32,                // Number of items per page (max 100)
-    pub offset: u32,                   // Number of items to skip
-}
-
-/// Output for paginated content query
-#[derive(Serialize, Deserialize, Debug)]
-pub struct PaginatedContentOutput {
-    pub items: Vec<ContentOutput>,
-    pub total_count: u32,              // Total matching items
-    pub offset: u32,                   // Current offset
-    pub has_more: bool,
-}
+// PaginatedByTypeInput, PaginatedContentOutput re-exported from lamad_types
 
 /// Get content by type with pagination support
 /// More efficient than loading all content at once for large datasets
 #[hdk_extern]
-pub fn get_content_by_type_paginated(input: PaginatedByTypeInput) -> ExternResult<PaginatedContentOutput> {
+pub fn get_content_by_type_paginated(
+    input: PaginatedByTypeInput,
+) -> ExternResult<PaginatedContentOutput> {
     let anchor = StringAnchor::new("content_type", &input.content_type);
     let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor))?;
 
@@ -2601,8 +2669,11 @@ pub fn get_content_by_type_paginated(input: PaginatedByTypeInput) -> ExternResul
 
     let mut items = Vec::new();
     for link in links.iter().skip(offset).take(page_size) {
-        let action_hash = ActionHash::try_from(link.target.clone())
-            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid action hash in link".to_string())))?;
+        let action_hash = ActionHash::try_from(link.target.clone()).map_err(|_| {
+            wasm_error!(WasmErrorInner::Guest(
+                "Invalid action hash in link".to_string()
+            ))
+        })?;
 
         if let Some(output) = get_content(action_hash)? {
             items.push(output);
@@ -2619,17 +2690,13 @@ pub fn get_content_by_type_paginated(input: PaginatedByTypeInput) -> ExternResul
     })
 }
 
-/// Input for paginated content query by tag
-#[derive(Serialize, Deserialize, Debug)]
-pub struct PaginatedByTagInput {
-    pub tag: String,                   // Filter by tag
-    pub page_size: u32,                // Number of items per page (max 100)
-    pub offset: u32,                   // Number of items to skip
-}
+// PaginatedByTagInput re-exported from lamad_types
 
 /// Get content by tag with pagination support
 #[hdk_extern]
-pub fn get_content_by_tag_paginated(input: PaginatedByTagInput) -> ExternResult<PaginatedContentOutput> {
+pub fn get_content_by_tag_paginated(
+    input: PaginatedByTagInput,
+) -> ExternResult<PaginatedContentOutput> {
     let anchor = StringAnchor::new("tag", &input.tag);
     let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor))?;
 
@@ -2642,8 +2709,11 @@ pub fn get_content_by_tag_paginated(input: PaginatedByTagInput) -> ExternResult<
 
     let mut items = Vec::new();
     for link in links.iter().skip(offset).take(page_size) {
-        let action_hash = ActionHash::try_from(link.target.clone())
-            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid action hash in link".to_string())))?;
+        let action_hash = ActionHash::try_from(link.target.clone()).map_err(|_| {
+            wasm_error!(WasmErrorInner::Guest(
+                "Invalid action hash in link".to_string()
+            ))
+        })?;
 
         if let Some(output) = get_content(action_hash)? {
             items.push(output);
@@ -2671,8 +2741,11 @@ pub fn get_my_content(_: ()) -> ExternResult<Vec<ContentOutput>> {
     let mut results = Vec::new();
 
     for link in links {
-        let action_hash = ActionHash::try_from(link.target)
-            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid action hash in link".to_string())))?;
+        let action_hash = ActionHash::try_from(link.target).map_err(|_| {
+            wasm_error!(WasmErrorInner::Guest(
+                "Invalid action hash in link".to_string()
+            ))
+        })?;
 
         if let Some(output) = get_content(action_hash)? {
             results.push(output);
@@ -2685,20 +2758,14 @@ pub fn get_my_content(_: ()) -> ExternResult<Vec<ContentOutput>> {
 /// Get content statistics (counts by type)
 #[hdk_extern]
 pub fn get_content_stats(_: ()) -> ExternResult<ContentStats> {
-    let filter = ChainQueryFilter::new()
-        .entry_type(UnitEntryTypes::Content.try_into()?);
+    let filter = ChainQueryFilter::new().entry_type(UnitEntryTypes::Content.try_into()?);
 
     let records = query(filter)?;
 
     let mut by_type: HashMap<String, u32> = HashMap::new();
 
     for record in &records {
-        if let Some(content) = record
-            .entry()
-            .to_app_option::<Content>()
-            .ok()
-            .flatten()
-        {
+        if let Some(content) = record.entry().to_app_option::<Content>().ok().flatten() {
             *by_type.entry(content.content_type).or_insert(0) += 1;
         }
     }
@@ -2716,7 +2783,9 @@ pub fn get_content_stats(_: ()) -> ExternResult<ContentStats> {
 /// Get all blobs associated with a content ID.
 /// Returns metadata for all blobs attached to content for download/playback.
 #[hdk_extern]
-pub fn get_blobs_by_content_id(input: QueryBlobsByContentIdInput) -> ExternResult<Vec<BlobMetadataOutput>> {
+pub fn get_blobs_by_content_id(
+    input: QueryBlobsByContentIdInput,
+) -> ExternResult<Vec<BlobMetadataOutput>> {
     // First, find content by ID
     let anchor = StringAnchor::new("content_id", &input.content_id);
     let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor))?;
@@ -2729,17 +2798,23 @@ pub fn get_blobs_by_content_id(input: QueryBlobsByContentIdInput) -> ExternResul
     }
 
     // Get the content record
-    let action_hash = ActionHash::try_from(links[0].target.clone())
-        .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid action hash in link".to_string())))?;
+    let action_hash = ActionHash::try_from(links[0].target.clone()).map_err(|_| {
+        wasm_error!(WasmErrorInner::Guest(
+            "Invalid action hash in link".to_string()
+        ))
+    })?;
 
-    let record = get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Content not found".to_string())))?;
+    let record = get(action_hash, GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Content not found".to_string())
+    ))?;
 
     let content: Content = record
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(e))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not deserialize content".to_string())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Could not deserialize content".to_string()
+        )))?;
 
     let content_hash = links[0].target.clone();
 
@@ -2755,8 +2830,11 @@ pub fn get_blobs_by_content_id(input: QueryBlobsByContentIdInput) -> ExternResul
     let mut results = Vec::new();
 
     for link in blob_links {
-        let blob_action_hash = ActionHash::try_from(link.target)
-            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid action hash in blob link".to_string())))?;
+        let blob_action_hash = ActionHash::try_from(link.target).map_err(|_| {
+            wasm_error!(WasmErrorInner::Guest(
+                "Invalid action hash in blob link".to_string()
+            ))
+        })?;
 
         if let Some(record) = get(blob_action_hash, GetOptions::default())? {
             if let Ok(Some(blob)) = record.entry().to_app_option::<BlobEntry>() {
@@ -2781,7 +2859,9 @@ pub fn get_blobs_by_content_id(input: QueryBlobsByContentIdInput) -> ExternResul
 /// Verify that a blob hash is valid and matches expected content.
 /// Used during download to detect corruption.
 #[hdk_extern]
-pub fn verify_blob_integrity(input: VerifyBlobIntegrityInput) -> ExternResult<BlobIntegrityCheckOutput> {
+pub fn verify_blob_integrity(
+    input: VerifyBlobIntegrityInput,
+) -> ExternResult<BlobIntegrityCheckOutput> {
     let start_time = std::time::SystemTime::now();
 
     // In Phase 1, we store the expected hash in the content metadata
@@ -2876,11 +2956,7 @@ pub fn add_path_step(_input: AddPathStepInput) -> ExternResult<ActionHash> {
     )))
 }
 
-/// DEPRECATED: Use create_content with content_type "path" instead.
-#[derive(Serialize, Deserialize, Debug)]
-pub struct BatchAddPathStepsInput {
-    pub steps: Vec<AddPathStepInput>,
-}
+// BatchAddPathStepsInput re-exported from lamad_types
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct BatchAddPathStepsOutput {
@@ -2892,7 +2968,9 @@ pub struct BatchAddPathStepsOutput {
 /// DEPRECATED: Use create_content with content_type "path" instead.
 /// Retained in HDK dispatch table but returns error on invocation.
 #[hdk_extern]
-pub fn batch_add_path_steps(_input: BatchAddPathStepsInput) -> ExternResult<BatchAddPathStepsOutput> {
+pub fn batch_add_path_steps(
+    _input: BatchAddPathStepsInput,
+) -> ExternResult<BatchAddPathStepsOutput> {
     Err(wasm_error!(WasmErrorInner::Guest(
         "batch_add_path_steps is deprecated. Use Content with content_type 'path' and Relationship entries instead.".to_string()
     )))
@@ -2952,8 +3030,11 @@ pub fn get_all_paths(_: ()) -> ExternResult<PathIndex> {
     let mut paths = Vec::new();
 
     for link in links {
-        let action_hash = ActionHash::try_from(link.target)
-            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid action hash in link".to_string())))?;
+        let action_hash = ActionHash::try_from(link.target).map_err(|_| {
+            wasm_error!(WasmErrorInner::Guest(
+                "Invalid action hash in link".to_string()
+            ))
+        })?;
 
         let record = get(action_hash.clone(), GetOptions::default())?;
         if let Some(record) = record {
@@ -3005,8 +3086,11 @@ pub fn delete_path(path_id: String) -> ExternResult<bool> {
         None => return Ok(false), // Path not found
     };
 
-    let path_action_hash = ActionHash::try_from(path_link.target.clone())
-        .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid path action hash".to_string())))?;
+    let path_action_hash = ActionHash::try_from(path_link.target.clone()).map_err(|_| {
+        wasm_error!(WasmErrorInner::Guest(
+            "Invalid path action hash".to_string()
+        ))
+    })?;
 
     // Delete path-to-step links and step entries
     let step_query = LinkQuery::try_new(path_action_hash.clone(), LinkTypes::PathToStep)?;
@@ -3051,8 +3135,11 @@ pub fn get_path_with_steps(path_id: String) -> ExternResult<Option<PathWithSteps
         None => return Ok(None),
     };
 
-    let path_action_hash = ActionHash::try_from(path_link.target.clone())
-        .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid path action hash".to_string())))?;
+    let path_action_hash = ActionHash::try_from(path_link.target.clone()).map_err(|_| {
+        wasm_error!(WasmErrorInner::Guest(
+            "Invalid path action hash".to_string()
+        ))
+    })?;
 
     let path_record = get(path_action_hash.clone(), GetOptions::default())?;
     let path_record = match path_record {
@@ -3074,20 +3161,18 @@ pub fn get_path_with_steps(path_id: String) -> ExternResult<Option<PathWithSteps
 
     let mut steps = Vec::new();
     for link in step_links {
-        let step_action_hash = ActionHash::try_from(link.target)
-            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid step action hash".to_string())))?;
+        let step_action_hash = ActionHash::try_from(link.target).map_err(|_| {
+            wasm_error!(WasmErrorInner::Guest(
+                "Invalid step action hash".to_string()
+            ))
+        })?;
 
         let step_record = get(step_action_hash.clone(), GetOptions::default())?;
         if let Some(record) = step_record {
-            if let Some(step) = record
-                .entry()
-                .to_app_option::<PathStep>()
-                .ok()
-                .flatten()
-            {
+            if let Some(step) = record.entry().to_app_option::<PathStep>().ok().flatten() {
                 steps.push(PathStepOutput {
                     action_hash: step_action_hash,
-                    step,
+                    step: path_step_to_wire(&step),
                 });
             }
         }
@@ -3098,7 +3183,7 @@ pub fn get_path_with_steps(path_id: String) -> ExternResult<Option<PathWithSteps
 
     Ok(Some(PathWithSteps {
         action_hash: path_action_hash,
-        path,
+        path: learning_path_to_wire(&path),
         steps,
     }))
 }
@@ -3120,8 +3205,11 @@ pub fn get_path_overview(path_id: String) -> ExternResult<Option<PathOverview>> 
         None => return Ok(None),
     };
 
-    let path_action_hash = ActionHash::try_from(path_link.target.clone())
-        .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid path action hash".to_string())))?;
+    let path_action_hash = ActionHash::try_from(path_link.target.clone()).map_err(|_| {
+        wasm_error!(WasmErrorInner::Guest(
+            "Invalid path action hash".to_string()
+        ))
+    })?;
 
     let path_record = get(path_action_hash.clone(), GetOptions::default())?;
     let path_record = match path_record {
@@ -3144,7 +3232,7 @@ pub fn get_path_overview(path_id: String) -> ExternResult<Option<PathOverview>> 
 
     Ok(Some(PathOverview {
         action_hash: path_action_hash,
-        path,
+        path: learning_path_to_wire(&path),
         step_count,
     }))
 }
@@ -3179,8 +3267,11 @@ pub fn get_chapter_by_id(chapter_id: String) -> ExternResult<Option<ChapterOutpu
         None => return Ok(None),
     };
 
-    let action_hash = ActionHash::try_from(link.target.clone())
-        .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid chapter action hash".to_string())))?;
+    let action_hash = ActionHash::try_from(link.target.clone()).map_err(|_| {
+        wasm_error!(WasmErrorInner::Guest(
+            "Invalid chapter action hash".to_string()
+        ))
+    })?;
 
     let record = get(action_hash.clone(), GetOptions::default())?;
     let record = match record {
@@ -3198,7 +3289,7 @@ pub fn get_chapter_by_id(chapter_id: String) -> ExternResult<Option<ChapterOutpu
 
     Ok(Some(ChapterOutput {
         action_hash,
-        chapter,
+        chapter: chapter_to_wire(&chapter),
     }))
 }
 
@@ -3217,8 +3308,11 @@ pub fn get_chapters_for_path(path_id: String) -> ExternResult<Vec<ChapterWithSte
         None => return Ok(Vec::new()),
     };
 
-    let path_action_hash = ActionHash::try_from(path_link.target.clone())
-        .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid path action hash".to_string())))?;
+    let path_action_hash = ActionHash::try_from(path_link.target.clone()).map_err(|_| {
+        wasm_error!(WasmErrorInner::Guest(
+            "Invalid path action hash".to_string()
+        ))
+    })?;
 
     // Get chapters linked to path
     let chapter_query = LinkQuery::try_new(path_action_hash, LinkTypes::PathToChapter)?;
@@ -3226,37 +3320,40 @@ pub fn get_chapters_for_path(path_id: String) -> ExternResult<Vec<ChapterWithSte
 
     let mut chapters = Vec::new();
     for link in chapter_links {
-        let chapter_action_hash = ActionHash::try_from(link.target)
-            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid chapter action hash".to_string())))?;
+        let chapter_action_hash = ActionHash::try_from(link.target).map_err(|_| {
+            wasm_error!(WasmErrorInner::Guest(
+                "Invalid chapter action hash".to_string()
+            ))
+        })?;
 
         let chapter_record = get(chapter_action_hash.clone(), GetOptions::default())?;
         if let Some(record) = chapter_record {
-            if let Some(chapter) = record
-                .entry()
-                .to_app_option::<PathChapter>()
-                .ok()
-                .flatten()
-            {
+            if let Some(chapter) = record.entry().to_app_option::<PathChapter>().ok().flatten() {
                 // Get steps for this chapter
-                let step_query = LinkQuery::try_new(chapter_action_hash.clone(), LinkTypes::ChapterToStep)?;
+                let step_query =
+                    LinkQuery::try_new(chapter_action_hash.clone(), LinkTypes::ChapterToStep)?;
                 let step_links = get_links(step_query, GetStrategy::default())?;
 
                 let mut steps = Vec::new();
                 for step_link in step_links {
-                    let step_action_hash = ActionHash::try_from(step_link.target)
-                        .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid step action hash".to_string())))?;
+                    let step_action_hash =
+                        ActionHash::try_from(step_link.target).map_err(|_| {
+                            wasm_error!(WasmErrorInner::Guest(
+                                "Invalid step action hash".to_string()
+                            ))
+                        })?;
 
                     let step_record = get(step_action_hash.clone(), GetOptions::default())?;
                     if let Some(step_rec) = step_record {
                         if let Some(step) = step_rec
                             .entry()
-                            .to_app_option::<PathStep>()
+                            .to_app_option::<content_store_integrity::PathStep>()
                             .ok()
                             .flatten()
                         {
                             steps.push(PathStepOutput {
                                 action_hash: step_action_hash,
-                                step,
+                                step: path_step_to_wire(&step),
                             });
                         }
                     }
@@ -3267,7 +3364,7 @@ pub fn get_chapters_for_path(path_id: String) -> ExternResult<Vec<ChapterWithSte
 
                 chapters.push(ChapterWithSteps {
                     action_hash: chapter_action_hash,
-                    chapter,
+                    chapter: chapter_to_wire(&chapter),
                     steps,
                 });
             }
@@ -3295,8 +3392,11 @@ pub fn get_path_full(path_id: String) -> ExternResult<Option<PathWithChaptersAnd
         None => return Ok(None),
     };
 
-    let path_action_hash = ActionHash::try_from(path_link.target.clone())
-        .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid path action hash".to_string())))?;
+    let path_action_hash = ActionHash::try_from(path_link.target.clone()).map_err(|_| {
+        wasm_error!(WasmErrorInner::Guest(
+            "Invalid path action hash".to_string()
+        ))
+    })?;
 
     let path_record = get(path_action_hash.clone(), GetOptions::default())?;
     let path_record = match path_record {
@@ -3321,22 +3421,20 @@ pub fn get_path_full(path_id: String) -> ExternResult<Option<PathWithChaptersAnd
 
     let mut ungrouped_steps = Vec::new();
     for link in step_links {
-        let step_action_hash = ActionHash::try_from(link.target)
-            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid step action hash".to_string())))?;
+        let step_action_hash = ActionHash::try_from(link.target).map_err(|_| {
+            wasm_error!(WasmErrorInner::Guest(
+                "Invalid step action hash".to_string()
+            ))
+        })?;
 
         let step_record = get(step_action_hash.clone(), GetOptions::default())?;
         if let Some(record) = step_record {
-            if let Some(step) = record
-                .entry()
-                .to_app_option::<PathStep>()
-                .ok()
-                .flatten()
-            {
+            if let Some(step) = record.entry().to_app_option::<PathStep>().ok().flatten() {
                 // Only include steps that are NOT in a chapter
                 if step.chapter_id.is_none() {
                     ungrouped_steps.push(PathStepOutput {
                         action_hash: step_action_hash,
-                        step,
+                        step: path_step_to_wire(&step),
                     });
                 }
             }
@@ -3348,7 +3446,7 @@ pub fn get_path_full(path_id: String) -> ExternResult<Option<PathWithChaptersAnd
 
     Ok(Some(PathWithChaptersAndSteps {
         action_hash: path_action_hash,
-        path,
+        path: learning_path_to_wire(&path),
         chapters,
         ungrouped_steps,
     }))
@@ -3399,8 +3497,11 @@ pub fn get_step_by_id(step_id: String) -> ExternResult<Option<PathStepOutput>> {
         None => return Ok(None),
     };
 
-    let action_hash = ActionHash::try_from(link.target.clone())
-        .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid step action hash".to_string())))?;
+    let action_hash = ActionHash::try_from(link.target.clone()).map_err(|_| {
+        wasm_error!(WasmErrorInner::Guest(
+            "Invalid step action hash".to_string()
+        ))
+    })?;
 
     let record = get(action_hash.clone(), GetOptions::default())?;
     let record = match record {
@@ -3418,7 +3519,7 @@ pub fn get_step_by_id(step_id: String) -> ExternResult<Option<PathStepOutput>> {
 
     Ok(Some(PathStepOutput {
         action_hash,
-        step,
+        step: path_step_to_wire(&step),
     }))
 }
 
@@ -3433,7 +3534,10 @@ pub fn create_relationship(input: CreateRelationshipInput) -> ExternResult<Relat
     let timestamp = format!("{:?}", now);
 
     // Generate relationship ID
-    let rel_id = format!("{}-{}-{}", input.source_id, input.relationship_type, input.target_id);
+    let rel_id = format!(
+        "{}-{}-{}",
+        input.source_id, input.relationship_type, input.target_id
+    );
 
     let relationship = Relationship {
         id: rel_id.clone(),
@@ -3452,21 +3556,36 @@ pub fn create_relationship(input: CreateRelationshipInput) -> ExternResult<Relat
     // By source
     let source_anchor = StringAnchor::new("rel_source", &input.source_id);
     let source_anchor_hash = hash_entry(&EntryTypes::StringAnchor(source_anchor))?;
-    create_link(source_anchor_hash, action_hash.clone(), LinkTypes::RelationshipBySource, ())?;
+    create_link(
+        source_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::RelationshipBySource,
+        (),
+    )?;
 
     // By target
     let target_anchor = StringAnchor::new("rel_target", &input.target_id);
     let target_anchor_hash = hash_entry(&EntryTypes::StringAnchor(target_anchor))?;
-    create_link(target_anchor_hash, action_hash.clone(), LinkTypes::RelationshipByTarget, ())?;
+    create_link(
+        target_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::RelationshipByTarget,
+        (),
+    )?;
 
     // By type
     let type_anchor = StringAnchor::new("rel_type", &input.relationship_type);
     let type_anchor_hash = hash_entry(&EntryTypes::StringAnchor(type_anchor))?;
-    create_link(type_anchor_hash, action_hash.clone(), LinkTypes::ContentRelationshipByType, ())?;
+    create_link(
+        type_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::ContentRelationshipByType,
+        (),
+    )?;
 
     Ok(RelationshipOutput {
         action_hash,
-        relationship,
+        relationship: relationship_to_wire(&relationship),
     })
 }
 
@@ -3483,8 +3602,11 @@ pub fn get_relationships(input: GetRelationshipsInput) -> ExternResult<Vec<Relat
         let links = get_links(query, GetStrategy::default())?;
 
         for link in links {
-            let action_hash = ActionHash::try_from(link.target)
-                .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid relationship hash".to_string())))?;
+            let action_hash = ActionHash::try_from(link.target).map_err(|_| {
+                wasm_error!(WasmErrorInner::Guest(
+                    "Invalid relationship hash".to_string()
+                ))
+            })?;
             if let Some(output) = get_relationship(action_hash)? {
                 results.push(output);
             }
@@ -3499,11 +3621,17 @@ pub fn get_relationships(input: GetRelationshipsInput) -> ExternResult<Vec<Relat
         let links = get_links(query, GetStrategy::default())?;
 
         for link in links {
-            let action_hash = ActionHash::try_from(link.target)
-                .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid relationship hash".to_string())))?;
+            let action_hash = ActionHash::try_from(link.target).map_err(|_| {
+                wasm_error!(WasmErrorInner::Guest(
+                    "Invalid relationship hash".to_string()
+                ))
+            })?;
             if let Some(output) = get_relationship(action_hash)? {
                 // Avoid duplicates if direction is "both"
-                if !results.iter().any(|r| r.relationship.id == output.relationship.id) {
+                if !results
+                    .iter()
+                    .any(|r| r.relationship.id == output.relationship.id)
+                {
                     results.push(output);
                 }
             }
@@ -3529,7 +3657,7 @@ fn get_relationship(action_hash: ActionHash) -> ExternResult<Option<Relationship
 
             Ok(Some(RelationshipOutput {
                 action_hash,
-                relationship,
+                relationship: relationship_to_wire(&relationship),
             }))
         }
         None => Ok(None),
@@ -3667,7 +3795,12 @@ fn create_author_to_content_link(target: &ActionHash) -> ExternResult<()> {
 fn create_import_batch_link(import_id: &str, target: &ActionHash) -> ExternResult<()> {
     let anchor = StringAnchor::new("import_batch", import_id);
     let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor))?;
-    create_link(anchor_hash, target.clone(), LinkTypes::ImportBatchToContent, ())?;
+    create_link(
+        anchor_hash,
+        target.clone(),
+        LinkTypes::ImportBatchToContent,
+        (),
+    )?;
     Ok(())
 }
 
@@ -3708,21 +3841,31 @@ pub fn start_path_progress(input: StartPathProgressInput) -> ExternResult<AgentP
     let progress_anchor = StringAnchor::new("progress_id", &progress_id);
     let progress_anchor_hash = hash_entry(&EntryTypes::StringAnchor(progress_anchor.clone()))?;
 
-    let existing_query = LinkQuery::try_new(progress_anchor_hash.clone(), LinkTypes::AgentToPathProgress)?;
+    let existing_query =
+        LinkQuery::try_new(progress_anchor_hash.clone(), LinkTypes::AgentToPathProgress)?;
     let existing_links = get_links(existing_query, GetStrategy::default())?;
 
     if let Some(link) = existing_links.first() {
         // Progress already exists, return it
-        let action_hash = ActionHash::try_from(link.target.clone())
-            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid progress action hash".to_string())))?;
-        let record = get(action_hash.clone(), GetOptions::default())?
-            .ok_or(wasm_error!(WasmErrorInner::Guest("Progress record not found".to_string())))?;
+        let action_hash = ActionHash::try_from(link.target.clone()).map_err(|_| {
+            wasm_error!(WasmErrorInner::Guest(
+                "Invalid progress action hash".to_string()
+            ))
+        })?;
+        let record = get(action_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+            WasmErrorInner::Guest("Progress record not found".to_string())
+        ))?;
         let progress: AgentProgress = record
             .entry()
             .to_app_option()
             .map_err(|e| wasm_error!(e))?
-            .ok_or(wasm_error!(WasmErrorInner::Guest("Could not deserialize progress".to_string())))?;
-        return Ok(AgentProgressOutput { action_hash, progress });
+            .ok_or(wasm_error!(WasmErrorInner::Guest(
+                "Could not deserialize progress".to_string()
+            )))?;
+        return Ok(AgentProgressOutput {
+            action_hash,
+            progress,
+        });
     }
 
     // Create new progress
@@ -3745,24 +3888,47 @@ pub fn start_path_progress(input: StartPathProgressInput) -> ExternResult<AgentP
     let action_hash = create_entry(&EntryTypes::AgentProgress(progress.clone()))?;
 
     // Create ID lookup link
-    create_link(progress_anchor_hash, action_hash.clone(), LinkTypes::AgentToPathProgress, ())?;
+    create_link(
+        progress_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::AgentToPathProgress,
+        (),
+    )?;
 
     // Create agent-to-progress link
     let agent_anchor = StringAnchor::new("agent_progress", &agent_id);
     let agent_anchor_hash = hash_entry(&EntryTypes::StringAnchor(agent_anchor))?;
-    create_link(agent_anchor_hash, action_hash.clone(), LinkTypes::AgentToPathProgress, ())?;
+    create_link(
+        agent_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::AgentToPathProgress,
+        (),
+    )?;
 
     // Create path-to-progress link
     let path_progress_anchor = StringAnchor::new("path_progress", &input.path_id);
     let path_progress_anchor_hash = hash_entry(&EntryTypes::StringAnchor(path_progress_anchor))?;
-    create_link(path_progress_anchor_hash, action_hash.clone(), LinkTypes::PathToProgress, ())?;
+    create_link(
+        path_progress_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::PathToProgress,
+        (),
+    )?;
 
     // Create status link (in_progress)
     let status_anchor = StringAnchor::new("progress_status", "in_progress");
     let status_anchor_hash = hash_entry(&EntryTypes::StringAnchor(status_anchor))?;
-    create_link(status_anchor_hash, action_hash.clone(), LinkTypes::ProgressByStatus, ())?;
+    create_link(
+        status_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::ProgressByStatus,
+        (),
+    )?;
 
-    Ok(AgentProgressOutput { action_hash, progress })
+    Ok(AgentProgressOutput {
+        action_hash,
+        progress,
+    })
 }
 
 /// Complete a step in a learning path
@@ -3781,30 +3947,38 @@ pub fn complete_step(input: CompleteStepInput) -> ExternResult<AgentProgressOutp
     let query = LinkQuery::try_new(progress_anchor_hash.clone(), LinkTypes::AgentToPathProgress)?;
     let links = get_links(query, GetStrategy::default())?;
 
-    let link = links.first()
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            format!("No progress found for path: {}", input.path_id)
-        )))?;
+    let link = links
+        .first()
+        .ok_or(wasm_error!(WasmErrorInner::Guest(format!(
+            "No progress found for path: {}",
+            input.path_id
+        ))))?;
 
-    let existing_action_hash = ActionHash::try_from(link.target.clone())
-        .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid progress action hash".to_string())))?;
+    let existing_action_hash = ActionHash::try_from(link.target.clone()).map_err(|_| {
+        wasm_error!(WasmErrorInner::Guest(
+            "Invalid progress action hash".to_string()
+        ))
+    })?;
 
-    let record = get(existing_action_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Progress record not found".to_string())))?;
+    let record = get(existing_action_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Progress record not found".to_string())
+    ))?;
 
     let existing: AgentProgress = record
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(e))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not deserialize progress".to_string())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Could not deserialize progress".to_string()
+        )))?;
 
     // Parse existing JSON data
-    let mut step_affinity: HashMap<String, u32> = serde_json::from_str(&existing.step_affinity_json)
-        .unwrap_or_default();
-    let mut step_notes: HashMap<String, String> = serde_json::from_str(&existing.step_notes_json)
-        .unwrap_or_default();
-    let mut reflection_responses: HashMap<String, Vec<String>> = serde_json::from_str(&existing.reflection_responses_json)
-        .unwrap_or_default();
+    let mut step_affinity: HashMap<String, u32> =
+        serde_json::from_str(&existing.step_affinity_json).unwrap_or_default();
+    let mut step_notes: HashMap<String, String> =
+        serde_json::from_str(&existing.step_notes_json).unwrap_or_default();
+    let mut reflection_responses: HashMap<String, Vec<String>> =
+        serde_json::from_str(&existing.reflection_responses_json).unwrap_or_default();
 
     // Update with new data
     let step_key = input.step_index.to_string();
@@ -3838,12 +4012,14 @@ pub fn complete_step(input: CompleteStepInput) -> ExternResult<AgentProgressOutp
         id: existing.id,
         agent_id: existing.agent_id,
         path_id: existing.path_id.clone(),
-        current_step_index: input.step_index + 1,  // Advance to next step
+        current_step_index: input.step_index + 1, // Advance to next step
         completed_step_indices,
         completed_content_ids,
-        step_affinity_json: serde_json::to_string(&step_affinity).unwrap_or_else(|_| "{}".to_string()),
+        step_affinity_json: serde_json::to_string(&step_affinity)
+            .unwrap_or_else(|_| "{}".to_string()),
         step_notes_json: serde_json::to_string(&step_notes).unwrap_or_else(|_| "{}".to_string()),
-        reflection_responses_json: serde_json::to_string(&reflection_responses).unwrap_or_else(|_| "{}".to_string()),
+        reflection_responses_json: serde_json::to_string(&reflection_responses)
+            .unwrap_or_else(|_| "{}".to_string()),
         attestations_earned: existing.attestations_earned,
         started_at: existing.started_at,
         last_activity_at: timestamp,
@@ -3854,9 +4030,17 @@ pub fn complete_step(input: CompleteStepInput) -> ExternResult<AgentProgressOutp
 
     // Update ID lookup link
     delete_link(link.create_link_hash.clone(), GetOptions::default())?;
-    create_link(progress_anchor_hash, action_hash.clone(), LinkTypes::AgentToPathProgress, ())?;
+    create_link(
+        progress_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::AgentToPathProgress,
+        (),
+    )?;
 
-    Ok(AgentProgressOutput { action_hash, progress: updated_progress })
+    Ok(AgentProgressOutput {
+        action_hash,
+        progress: updated_progress,
+    })
 }
 
 /// Mark a path as completed
@@ -3875,22 +4059,30 @@ pub fn complete_path(path_id: String) -> ExternResult<AgentProgressOutput> {
     let query = LinkQuery::try_new(progress_anchor_hash.clone(), LinkTypes::AgentToPathProgress)?;
     let links = get_links(query, GetStrategy::default())?;
 
-    let link = links.first()
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            format!("No progress found for path: {}", path_id)
-        )))?;
+    let link = links
+        .first()
+        .ok_or(wasm_error!(WasmErrorInner::Guest(format!(
+            "No progress found for path: {}",
+            path_id
+        ))))?;
 
-    let existing_action_hash = ActionHash::try_from(link.target.clone())
-        .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid progress action hash".to_string())))?;
+    let existing_action_hash = ActionHash::try_from(link.target.clone()).map_err(|_| {
+        wasm_error!(WasmErrorInner::Guest(
+            "Invalid progress action hash".to_string()
+        ))
+    })?;
 
-    let record = get(existing_action_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Progress record not found".to_string())))?;
+    let record = get(existing_action_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Progress record not found".to_string())
+    ))?;
 
     let existing: AgentProgress = record
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(e))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not deserialize progress".to_string())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Could not deserialize progress".to_string()
+        )))?;
 
     // Create completed progress
     let completed_progress = AgentProgress {
@@ -3913,7 +4105,12 @@ pub fn complete_path(path_id: String) -> ExternResult<AgentProgressOutput> {
 
     // Update ID lookup link
     delete_link(link.create_link_hash.clone(), GetOptions::default())?;
-    create_link(progress_anchor_hash, action_hash.clone(), LinkTypes::AgentToPathProgress, ())?;
+    create_link(
+        progress_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::AgentToPathProgress,
+        (),
+    )?;
 
     // Update status link (in_progress -> completed)
     let old_status_anchor = StringAnchor::new("progress_status", "in_progress");
@@ -3929,9 +4126,17 @@ pub fn complete_path(path_id: String) -> ExternResult<AgentProgressOutput> {
 
     let new_status_anchor = StringAnchor::new("progress_status", "completed");
     let new_status_anchor_hash = hash_entry(&EntryTypes::StringAnchor(new_status_anchor))?;
-    create_link(new_status_anchor_hash, action_hash.clone(), LinkTypes::ProgressByStatus, ())?;
+    create_link(
+        new_status_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::ProgressByStatus,
+        (),
+    )?;
 
-    Ok(AgentProgressOutput { action_hash, progress: completed_progress })
+    Ok(AgentProgressOutput {
+        action_hash,
+        progress: completed_progress,
+    })
 }
 
 /// Get current agent's progress on a path
@@ -3952,8 +4157,11 @@ pub fn get_my_path_progress(path_id: String) -> ExternResult<Option<AgentProgres
         None => return Ok(None),
     };
 
-    let action_hash = ActionHash::try_from(link.target.clone())
-        .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid progress action hash".to_string())))?;
+    let action_hash = ActionHash::try_from(link.target.clone()).map_err(|_| {
+        wasm_error!(WasmErrorInner::Guest(
+            "Invalid progress action hash".to_string()
+        ))
+    })?;
 
     let record = get(action_hash.clone(), GetOptions::default())?;
     let record = match record {
@@ -3965,9 +4173,14 @@ pub fn get_my_path_progress(path_id: String) -> ExternResult<Option<AgentProgres
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(e))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not deserialize progress".to_string())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Could not deserialize progress".to_string()
+        )))?;
 
-    Ok(Some(AgentProgressOutput { action_hash, progress }))
+    Ok(Some(AgentProgressOutput {
+        action_hash,
+        progress,
+    }))
 }
 
 /// Get all progress for current agent
@@ -3984,13 +4197,19 @@ pub fn get_my_all_progress(_: ()) -> ExternResult<Vec<AgentProgressOutput>> {
 
     let mut results = Vec::new();
     for link in links {
-        let action_hash = ActionHash::try_from(link.target)
-            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid progress action hash".to_string())))?;
+        let action_hash = ActionHash::try_from(link.target).map_err(|_| {
+            wasm_error!(WasmErrorInner::Guest(
+                "Invalid progress action hash".to_string()
+            ))
+        })?;
 
         let record = get(action_hash.clone(), GetOptions::default())?;
         if let Some(rec) = record {
             if let Some(progress) = rec.entry().to_app_option::<AgentProgress>().ok().flatten() {
-                results.push(AgentProgressOutput { action_hash, progress });
+                results.push(AgentProgressOutput {
+                    action_hash,
+                    progress,
+                });
             }
         }
     }
@@ -4009,13 +4228,19 @@ pub fn get_progress_by_status(status: String) -> ExternResult<Vec<AgentProgressO
 
     let mut results = Vec::new();
     for link in links {
-        let action_hash = ActionHash::try_from(link.target)
-            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid progress action hash".to_string())))?;
+        let action_hash = ActionHash::try_from(link.target).map_err(|_| {
+            wasm_error!(WasmErrorInner::Guest(
+                "Invalid progress action hash".to_string()
+            ))
+        })?;
 
         let record = get(action_hash.clone(), GetOptions::default())?;
         if let Some(rec) = record {
             if let Some(progress) = rec.entry().to_app_option::<AgentProgress>().ok().flatten() {
-                results.push(AgentProgressOutput { action_hash, progress });
+                results.push(AgentProgressOutput {
+                    action_hash,
+                    progress,
+                });
             }
         }
     }
@@ -4076,22 +4301,30 @@ pub fn grant_attestation(input: GrantAttestationInput) -> ExternResult<AgentProg
     let query = LinkQuery::try_new(progress_anchor_hash.clone(), LinkTypes::AgentToPathProgress)?;
     let links = get_links(query, GetStrategy::default())?;
 
-    let link = links.first()
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            format!("No progress found for path: {}", input.path_id)
-        )))?;
+    let link = links
+        .first()
+        .ok_or(wasm_error!(WasmErrorInner::Guest(format!(
+            "No progress found for path: {}",
+            input.path_id
+        ))))?;
 
-    let existing_action_hash = ActionHash::try_from(link.target.clone())
-        .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid progress action hash".to_string())))?;
+    let existing_action_hash = ActionHash::try_from(link.target.clone()).map_err(|_| {
+        wasm_error!(WasmErrorInner::Guest(
+            "Invalid progress action hash".to_string()
+        ))
+    })?;
 
-    let record = get(existing_action_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Progress record not found".to_string())))?;
+    let record = get(existing_action_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Progress record not found".to_string())
+    ))?;
 
     let existing: AgentProgress = record
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(e))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not deserialize progress".to_string())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Could not deserialize progress".to_string()
+        )))?;
 
     // Add attestation if not already earned
     let mut attestations_earned = existing.attestations_earned.clone();
@@ -4120,12 +4353,17 @@ pub fn grant_attestation(input: GrantAttestationInput) -> ExternResult<AgentProg
 
     // Update ID lookup link
     delete_link(link.create_link_hash.clone(), GetOptions::default())?;
-    create_link(progress_anchor_hash, action_hash.clone(), LinkTypes::AgentToPathProgress, ())?;
+    create_link(
+        progress_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::AgentToPathProgress,
+        (),
+    )?;
 
     // Issue attestation via imagodei DNA (attestations live in identity layer)
     let _attestation_result = issue_attestation_via_imagodei(IssueAttestationBridgeInput {
         agent_id: agent_id.clone(),
-        category: input.source_type.clone(),  // "step", "chapter", "path"
+        category: input.source_type.clone(), // "step", "chapter", "path"
         attestation_type: input.attestation_id,
         display_name: format!("Completed: {}", input.reason),
         description: input.reason,
@@ -4135,16 +4373,22 @@ pub fn grant_attestation(input: GrantAttestationInput) -> ExternResult<AgentProg
             "source_type": input.source_type,
             "source_id": input.source_id,
             "path_id": input.path_id
-        }).to_string(),
+        })
+        .to_string(),
         expires_at: None,
     })?;
 
-    Ok(AgentProgressOutput { action_hash, progress: updated_progress })
+    Ok(AgentProgressOutput {
+        action_hash,
+        progress: updated_progress,
+    })
 }
 
 /// Check if learner has required attestation to access a step
 #[hdk_extern]
-pub fn check_attestation_access(input: CheckAttestationAccessInput) -> ExternResult<AttestationAccessResult> {
+pub fn check_attestation_access(
+    input: CheckAttestationAccessInput,
+) -> ExternResult<AttestationAccessResult> {
     let agent_info = agent_info()?;
     let agent_id = agent_info.agent_initial_pubkey.to_string();
 
@@ -4157,8 +4401,11 @@ pub fn check_attestation_access(input: CheckAttestationAccessInput) -> ExternRes
     let links = get_links(query, GetStrategy::default())?;
 
     let attestations_earned: Vec<String> = if let Some(link) = links.first() {
-        let action_hash = ActionHash::try_from(link.target.clone())
-            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid progress action hash".to_string())))?;
+        let action_hash = ActionHash::try_from(link.target.clone()).map_err(|_| {
+            wasm_error!(WasmErrorInner::Guest(
+                "Invalid progress action hash".to_string()
+            ))
+        })?;
         let record = get(action_hash, GetOptions::default())?;
         if let Some(rec) = record {
             if let Some(progress) = rec.entry().to_app_option::<AgentProgress>().ok().flatten() {
@@ -4182,12 +4429,8 @@ pub fn check_attestation_access(input: CheckAttestationAccessInput) -> ExternRes
     })
 }
 
-/// Input for checking attestation access
-#[derive(Serialize, Deserialize, Debug)]
-pub struct CheckAttestationAccessInput {
-    pub path_id: String,
-    pub required_attestation: String,
-}
+/// CheckAttestationAccessInput is a type alias for lamad_types::CheckAttestationInput
+pub type CheckAttestationAccessInput = CheckAttestationInput;
 
 /// Result of attestation access check
 #[derive(Serialize, Deserialize, Debug)]
@@ -4290,37 +4533,45 @@ pub fn get_assessment_history(content_id: String) -> ExternResult<AssessmentHist
     match mastery {
         Some(m) => {
             // Parse assessment evidence JSON
-            let evidence_array: Vec<serde_json::Value> = serde_json::from_str(&m.mastery.assessment_evidence_json)
-                .unwrap_or_default();
+            let evidence_array: Vec<serde_json::Value> =
+                serde_json::from_str(&m.mastery.assessment_evidence_json).unwrap_or_default();
 
             let mut entries = Vec::new();
             let mut pass_count = 0u32;
             let mut best_score = 0.0f64;
 
             for evidence in &evidence_array {
-                let assessment_type = evidence.get("type")
+                let assessment_type = evidence
+                    .get("type")
                     .and_then(|v| v.as_str())
                     .unwrap_or("unknown")
                     .to_string();
-                let score = evidence.get("score")
+                let score = evidence
+                    .get("score")
                     .and_then(|v| v.as_f64())
                     .unwrap_or(0.0);
-                let passed = evidence.get("passed")
+                let passed = evidence
+                    .get("passed")
                     .and_then(|v| v.as_bool())
                     .unwrap_or(false);
-                let threshold = evidence.get("threshold")
+                let threshold = evidence
+                    .get("threshold")
                     .and_then(|v| v.as_f64())
                     .unwrap_or(0.7);
-                let question_count = evidence.get("questions")
+                let question_count = evidence
+                    .get("questions")
                     .and_then(|v| v.as_u64())
                     .unwrap_or(0) as u32;
-                let correct_count = evidence.get("correct")
+                let correct_count = evidence
+                    .get("correct")
                     .and_then(|v| v.as_u64())
                     .unwrap_or(0) as u32;
-                let time_seconds = evidence.get("time_seconds")
+                let time_seconds = evidence
+                    .get("time_seconds")
                     .and_then(|v| v.as_u64())
                     .unwrap_or(0) as u32;
-                let timestamp = evidence.get("timestamp")
+                let timestamp = evidence
+                    .get("timestamp")
                     .and_then(|v| v.as_str())
                     .unwrap_or("")
                     .to_string();
@@ -4341,7 +4592,11 @@ pub fn get_assessment_history(content_id: String) -> ExternResult<AssessmentHist
                     correct_count,
                     time_seconds,
                     timestamp,
-                    level_achieved: if passed { Some(m.mastery.mastery_level.clone()) } else { None },
+                    level_achieved: if passed {
+                        Some(m.mastery.mastery_level.clone())
+                    } else {
+                        None
+                    },
                 });
             }
 
@@ -4361,13 +4616,15 @@ pub fn get_assessment_history(content_id: String) -> ExternResult<AssessmentHist
             pass_count: 0,
             best_score: 0.0,
             current_level: "not_started".to_string(),
-        })
+        }),
     }
 }
 
 /// Check if current agent is eligible for an attestation based on mastery requirements
 #[hdk_extern]
-pub fn check_attestation_eligibility(input: CheckAttestationEligibilityInput) -> ExternResult<AttestationEligibilityResult> {
+pub fn check_attestation_eligibility(
+    input: CheckAttestationEligibilityInput,
+) -> ExternResult<AttestationEligibilityResult> {
     let required_level_index = get_mastery_level_index(&input.required_mastery_level);
 
     let mut content_requirements = Vec::new();
@@ -4415,7 +4672,9 @@ pub fn check_attestation_eligibility(input: CheckAttestationEligibilityInput) ->
 
 /// Grant attestation only if mastery requirements are met
 #[hdk_extern]
-pub fn grant_attestation_with_mastery_check(input: GrantAttestationWithMasteryInput) -> ExternResult<AgentProgressOutput> {
+pub fn grant_attestation_with_mastery_check(
+    input: GrantAttestationWithMasteryInput,
+) -> ExternResult<AgentProgressOutput> {
     // First check eligibility
     let eligibility = check_attestation_eligibility(CheckAttestationEligibilityInput {
         path_id: input.path_id.clone(),
@@ -4425,13 +4684,10 @@ pub fn grant_attestation_with_mastery_check(input: GrantAttestationWithMasteryIn
     })?;
 
     if !eligibility.eligible {
-        return Err(wasm_error!(WasmErrorInner::Guest(
-            format!(
-                "Mastery requirements not met for attestation '{}'. Missing: {:?}",
-                input.attestation_id,
-                eligibility.missing_requirements
-            )
-        )));
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Mastery requirements not met for attestation '{}'. Missing: {:?}",
+            input.attestation_id, eligibility.missing_requirements
+        ))));
     }
 
     // If eligible, grant the attestation using existing function
@@ -4448,8 +4704,9 @@ pub fn grant_attestation_with_mastery_check(input: GrantAttestationWithMasteryIn
 #[hdk_extern]
 pub fn check_step_access(step_id: String) -> ExternResult<StepAccessResult> {
     // Get the step
-    let step_output = get_step_by_id(step_id.clone())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(format!("Step not found: {}", step_id))))?;
+    let step_output = get_step_by_id(step_id.clone())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest(format!("Step not found: {}", step_id))
+    ))?;
 
     let step = step_output.step;
     let mut access_granted = true;
@@ -4480,10 +4737,12 @@ pub fn check_step_access(step_id: String) -> ExternResult<StepAccessResult> {
 
         if current_level_index < mastery_threshold {
             access_granted = false;
-            let required_level = MASTERY_LEVELS.get(mastery_threshold as usize)
+            let required_level = MASTERY_LEVELS
+                .get(mastery_threshold as usize)
                 .unwrap_or(&"apply")
                 .to_string();
-            let current_level = MASTERY_LEVELS.get(current_level_index as usize)
+            let current_level = MASTERY_LEVELS
+                .get(current_level_index as usize)
                 .unwrap_or(&"not_started")
                 .to_string();
             blockers.push(format!(
@@ -4505,15 +4764,16 @@ pub fn check_step_access(step_id: String) -> ExternResult<StepAccessResult> {
 /// Batch check multiple steps for access (efficient for path overview)
 #[hdk_extern]
 pub fn check_path_step_access(path_id: String) -> ExternResult<Vec<StepAccessResult>> {
-    let path_with_steps = get_path_with_steps(path_id)?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Path not found".to_string())))?;
+    let path_with_steps = get_path_with_steps(path_id)?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Path not found".to_string())
+    ))?;
 
     let mut results = Vec::new();
     for step_output in path_with_steps.steps {
         let step_id = step_output.step.id.clone();
         match check_step_access(step_id) {
             Ok(result) => results.push(result),
-            Err(_) => continue,  // Skip steps that error
+            Err(_) => continue, // Skip steps that error
         }
     }
 
@@ -4537,7 +4797,7 @@ pub struct DiscoveryCandidate {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ContentMixEntry {
     pub content_id: String,
-    pub source: String,  // "path_active", "refresh_queue", "graph_neighbor", "serendipity"
+    pub source: String, // "path_active", "refresh_queue", "graph_neighbor", "serendipity"
     pub question_count: u32,
 }
 
@@ -4569,7 +4829,7 @@ pub struct LevelChange {
     pub to_level: String,
     pub from_index: u32,
     pub to_index: u32,
-    pub change: String,  // "up", "down", "same"
+    pub change: String, // "up", "down", "same"
 }
 
 /// Discovery made from challenge
@@ -4645,9 +4905,9 @@ pub struct CooldownCheckResult {
 /// Pool recommendations for what to practice
 #[derive(Serialize, Deserialize, Debug)]
 pub struct PoolRecommendations {
-    pub priority_refresh: Vec<String>,     // Mastered but need refresh
-    pub active_practice: Vec<String>,      // In active rotation
-    pub discovery_suggestions: Vec<DiscoveryCandidate>,  // Serendipity options
+    pub priority_refresh: Vec<String>, // Mastered but need refresh
+    pub active_practice: Vec<String>,  // In active rotation
+    pub discovery_suggestions: Vec<DiscoveryCandidate>, // Serendipity options
     pub total_pool_size: u32,
 }
 
@@ -4675,14 +4935,17 @@ pub fn get_or_create_practice_pool(input: CreatePoolInput) -> ExternResult<Pract
         let action_hash = ActionHash::try_from(link.target.clone())
             .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid pool hash".to_string())))?;
 
-        let record = get(action_hash.clone(), GetOptions::default())?
-            .ok_or(wasm_error!(WasmErrorInner::Guest("Pool record not found".to_string())))?;
+        let record = get(action_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+            WasmErrorInner::Guest("Pool record not found".to_string())
+        ))?;
 
         let pool: PracticePool = record
             .entry()
             .to_app_option()
             .map_err(|e| wasm_error!(e))?
-            .ok_or(wasm_error!(WasmErrorInner::Guest("Could not deserialize pool".to_string())))?;
+            .ok_or(wasm_error!(WasmErrorInner::Guest(
+                "Could not deserialize pool".to_string()
+            )))?;
 
         return Ok(PracticePoolOutput { action_hash, pool });
     }
@@ -4717,7 +4980,12 @@ pub fn get_or_create_practice_pool(input: CreatePoolInput) -> ExternResult<Pract
 
     // Create anchor and link
     create_entry(&EntryTypes::StringAnchor(pool_anchor))?;
-    create_link(pool_anchor_hash, action_hash.clone(), LinkTypes::AgentToPool, ())?;
+    create_link(
+        pool_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::AgentToPool,
+        (),
+    )?;
 
     Ok(PracticePoolOutput { action_hash, pool })
 }
@@ -4743,8 +5011,8 @@ pub fn refresh_practice_pool(_: ()) -> ExternResult<PracticePoolOutput> {
     let existing_pool = pool_output.pool;
 
     // Gather active content from contributing paths
-    let contributing_paths: Vec<String> = serde_json::from_str(&existing_pool.contributing_path_ids_json)
-        .unwrap_or_default();
+    let contributing_paths: Vec<String> =
+        serde_json::from_str(&existing_pool.contributing_path_ids_json).unwrap_or_default();
 
     let mut active_content: Vec<String> = Vec::new();
     let mut _refresh_queue: Vec<String> = Vec::new();
@@ -4760,7 +5028,9 @@ pub fn refresh_practice_pool(_: ()) -> ExternResult<PracticePoolOutput> {
 
                     // If not yet mastered (below apply level), add to active
                     if mastery.mastery_level_index < 4 {
-                        if !active_content.contains(&content_id) && active_content.len() < existing_pool.max_active_size as usize {
+                        if !active_content.contains(&content_id)
+                            && active_content.len() < existing_pool.max_active_size as usize
+                        {
                             active_content.push(content_id);
                         }
                     }
@@ -4772,7 +5042,9 @@ pub fn refresh_practice_pool(_: ()) -> ExternResult<PracticePoolOutput> {
                     }
                 } else {
                     // No mastery record - add to active
-                    if !active_content.contains(&content_id) && active_content.len() < existing_pool.max_active_size as usize {
+                    if !active_content.contains(&content_id)
+                        && active_content.len() < existing_pool.max_active_size as usize
+                    {
                         active_content.push(content_id);
                     }
                 }
@@ -4803,12 +5075,18 @@ pub fn refresh_practice_pool(_: ()) -> ExternResult<PracticePoolOutput> {
             // Check if this related content is not already in our pool
             if !active_content.contains(&related_id) && !_refresh_queue.contains(&related_id) {
                 // Check we haven't already added this as a discovery candidate
-                if !discovery_candidates.iter().any(|d| d.content_id == related_id) {
+                if !discovery_candidates
+                    .iter()
+                    .any(|d| d.content_id == related_id)
+                {
                     discovery_candidates.push(DiscoveryCandidate {
                         content_id: related_id,
                         source_content_id: content_id.clone(),
                         relationship_type: rel.relationship_type.clone(),
-                        discovery_reason: format!("Related via {} to content you're learning", rel.relationship_type),
+                        discovery_reason: format!(
+                            "Related via {} to content you're learning",
+                            rel.relationship_type
+                        ),
                     });
                 }
             }
@@ -4822,9 +5100,12 @@ pub fn refresh_practice_pool(_: ()) -> ExternResult<PracticePoolOutput> {
     let updated_pool = PracticePool {
         id: existing_pool.id,
         agent_id: existing_pool.agent_id,
-        active_content_ids_json: serde_json::to_string(&active_content).unwrap_or_else(|_| "[]".to_string()),
-        refresh_queue_ids_json: serde_json::to_string(&_refresh_queue).unwrap_or_else(|_| "[]".to_string()),
-        discovery_candidates_json: serde_json::to_string(&discovery_candidates).unwrap_or_else(|_| "[]".to_string()),
+        active_content_ids_json: serde_json::to_string(&active_content)
+            .unwrap_or_else(|_| "[]".to_string()),
+        refresh_queue_ids_json: serde_json::to_string(&_refresh_queue)
+            .unwrap_or_else(|_| "[]".to_string()),
+        discovery_candidates_json: serde_json::to_string(&discovery_candidates)
+            .unwrap_or_else(|_| "[]".to_string()),
         contributing_path_ids_json: existing_pool.contributing_path_ids_json,
         max_active_size: existing_pool.max_active_size,
         refresh_threshold: existing_pool.refresh_threshold,
@@ -4852,9 +5133,17 @@ pub fn refresh_practice_pool(_: ()) -> ExternResult<PracticePoolOutput> {
     if let Some(old_link) = links.first() {
         delete_link(old_link.create_link_hash.clone(), GetOptions::default())?;
     }
-    create_link(pool_anchor_hash, action_hash.clone(), LinkTypes::AgentToPool, ())?;
+    create_link(
+        pool_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::AgentToPool,
+        (),
+    )?;
 
-    Ok(PracticePoolOutput { action_hash, pool: updated_pool })
+    Ok(PracticePoolOutput {
+        action_hash,
+        pool: updated_pool,
+    })
 }
 
 /// Add a path to the practice pool
@@ -4869,8 +5158,8 @@ pub fn add_path_to_pool(path_id: String) -> ExternResult<PracticePoolOutput> {
         challenge_cooldown_hours: None,
     })?;
 
-    let mut contributing: Vec<String> = serde_json::from_str(&pool_output.pool.contributing_path_ids_json)
-        .unwrap_or_default();
+    let mut contributing: Vec<String> =
+        serde_json::from_str(&pool_output.pool.contributing_path_ids_json).unwrap_or_default();
 
     if !contributing.contains(&path_id) {
         contributing.push(path_id);
@@ -4883,7 +5172,8 @@ pub fn add_path_to_pool(path_id: String) -> ExternResult<PracticePoolOutput> {
     let timestamp = format!("{:?}", now);
 
     let updated_pool = PracticePool {
-        contributing_path_ids_json: serde_json::to_string(&contributing).unwrap_or_else(|_| "[]".to_string()),
+        contributing_path_ids_json: serde_json::to_string(&contributing)
+            .unwrap_or_else(|_| "[]".to_string()),
         updated_at: timestamp,
         ..pool_output.pool
     };
@@ -4899,7 +5189,12 @@ pub fn add_path_to_pool(path_id: String) -> ExternResult<PracticePoolOutput> {
     if let Some(old_link) = links.first() {
         delete_link(old_link.create_link_hash.clone(), GetOptions::default())?;
     }
-    create_link(pool_anchor_hash, action_hash.clone(), LinkTypes::AgentToPool, ())?;
+    create_link(
+        pool_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::AgentToPool,
+        (),
+    )?;
 
     // Refresh to populate with content
     refresh_practice_pool(())
@@ -4911,9 +5206,12 @@ pub fn get_pool_recommendations(_: ()) -> ExternResult<PoolRecommendations> {
     let pool_output = refresh_practice_pool(())?;
     let pool = pool_output.pool;
 
-    let active: Vec<String> = serde_json::from_str(&pool.active_content_ids_json).unwrap_or_default();
-    let refresh: Vec<String> = serde_json::from_str(&pool.refresh_queue_ids_json).unwrap_or_default();
-    let discoveries: Vec<DiscoveryCandidate> = serde_json::from_str(&pool.discovery_candidates_json).unwrap_or_default();
+    let active: Vec<String> =
+        serde_json::from_str(&pool.active_content_ids_json).unwrap_or_default();
+    let refresh: Vec<String> =
+        serde_json::from_str(&pool.refresh_queue_ids_json).unwrap_or_default();
+    let discoveries: Vec<DiscoveryCandidate> =
+        serde_json::from_str(&pool.discovery_candidates_json).unwrap_or_default();
 
     Ok(PoolRecommendations {
         priority_refresh: refresh,
@@ -4978,9 +5276,12 @@ pub fn start_mastery_challenge(input: StartChallengeInput) -> ExternResult<Maste
     let pool = pool_output.pool.clone();
 
     // Build content mix from pool
-    let active: Vec<String> = serde_json::from_str(&pool.active_content_ids_json).unwrap_or_default();
-    let refresh: Vec<String> = serde_json::from_str(&pool.refresh_queue_ids_json).unwrap_or_default();
-    let discoveries: Vec<DiscoveryCandidate> = serde_json::from_str(&pool.discovery_candidates_json).unwrap_or_default();
+    let active: Vec<String> =
+        serde_json::from_str(&pool.active_content_ids_json).unwrap_or_default();
+    let refresh: Vec<String> =
+        serde_json::from_str(&pool.refresh_queue_ids_json).unwrap_or_default();
+    let discoveries: Vec<DiscoveryCandidate> =
+        serde_json::from_str(&pool.discovery_candidates_json).unwrap_or_default();
 
     let mut content_mix: Vec<ContentMixEntry> = Vec::new();
     let mut questions_needed = input.question_count;
@@ -5010,7 +5311,10 @@ pub fn start_mastery_challenge(input: StartChallengeInput) -> ExternResult<Maste
     if input.include_discoveries && !discoveries.is_empty() {
         // Use discovery_probability to decide
         let discovery_slots = (input.question_count as f64 * pool.discovery_probability) as usize;
-        for discovery in discoveries.iter().take(discovery_slots.min(questions_needed as usize)) {
+        for discovery in discoveries
+            .iter()
+            .take(discovery_slots.min(questions_needed as usize))
+        {
             content_mix.push(ContentMixEntry {
                 content_id: discovery.content_id.clone(),
                 source: "serendipity".to_string(),
@@ -5064,9 +5368,17 @@ pub fn start_mastery_challenge(input: StartChallengeInput) -> ExternResult<Maste
     let challenge_anchor = StringAnchor::new("agent_challenges", &agent_id);
     let challenge_anchor_hash = hash_entry(&EntryTypes::StringAnchor(challenge_anchor.clone()))?;
     create_entry(&EntryTypes::StringAnchor(challenge_anchor))?;
-    create_link(challenge_anchor_hash, action_hash.clone(), LinkTypes::AgentToChallenge, ())?;
+    create_link(
+        challenge_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::AgentToChallenge,
+        (),
+    )?;
 
-    Ok(MasteryChallengeOutput { action_hash, challenge })
+    Ok(MasteryChallengeOutput {
+        action_hash,
+        challenge,
+    })
 }
 
 /// Submit challenge responses and apply level changes
@@ -5084,26 +5396,32 @@ pub fn submit_mastery_challenge(input: SubmitChallengeInput) -> ExternResult<Cha
     let query = LinkQuery::try_new(challenge_anchor_hash, LinkTypes::AgentToChallenge)?;
     let links = get_links(query, GetStrategy::default())?;
 
-    let link = links.first()
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Challenge not found".to_string())))?;
+    let link = links.first().ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Challenge not found".to_string()
+    )))?;
 
     let action_hash = ActionHash::try_from(link.target.clone())
         .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid challenge hash".to_string())))?;
 
-    let record = get(action_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Challenge record not found".to_string())))?;
+    let record = get(action_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Challenge record not found".to_string())
+    ))?;
 
     let existing_challenge: MasteryChallenge = record
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(e))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not deserialize challenge".to_string())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Could not deserialize challenge".to_string()
+        )))?;
 
     // Calculate scores per content
     let mut correct_by_content: HashMap<String, (u32, u32)> = HashMap::new(); // (correct, total)
 
     for response in &input.responses {
-        let entry = correct_by_content.entry(response.content_id.clone()).or_insert((0, 0));
+        let entry = correct_by_content
+            .entry(response.content_id.clone())
+            .or_insert((0, 0));
         entry.1 += 1;
         if response.correct {
             entry.0 += 1;
@@ -5142,7 +5460,10 @@ pub fn submit_mastery_challenge(input: SubmitChallengeInput) -> ExternResult<Cha
         // Get current mastery
         let current_mastery = get_my_mastery(content_id.clone())?;
         let (current_level, current_index) = match &current_mastery {
-            Some(m) => (m.mastery.mastery_level.clone(), m.mastery.mastery_level_index),
+            Some(m) => (
+                m.mastery.mastery_level.clone(),
+                m.mastery.mastery_level_index,
+            ),
             None => ("not_started".to_string(), 0),
         };
 
@@ -5152,12 +5473,17 @@ pub fn submit_mastery_challenge(input: SubmitChallengeInput) -> ExternResult<Cha
             (current_index + 1).min(7)
         } else if content_score < 0.4 && regression_enabled {
             // Level down if scored below 40% and regression enabled
-            if current_index > 0 { current_index - 1 } else { 0 }
+            if current_index > 0 {
+                current_index - 1
+            } else {
+                0
+            }
         } else {
             current_index
         };
 
-        let new_level = MASTERY_LEVELS.get(new_index as usize)
+        let new_level = MASTERY_LEVELS
+            .get(new_index as usize)
             .unwrap_or(&"not_started")
             .to_string();
 
@@ -5192,8 +5518,8 @@ pub fn submit_mastery_challenge(input: SubmitChallengeInput) -> ExternResult<Cha
     }
 
     // Check for discoveries (serendipity content that was answered correctly)
-    let content_mix: Vec<ContentMixEntry> = serde_json::from_str(&existing_challenge.content_mix_json)
-        .unwrap_or_default();
+    let content_mix: Vec<ContentMixEntry> =
+        serde_json::from_str(&existing_challenge.content_mix_json).unwrap_or_default();
 
     for mix_entry in &content_mix {
         if mix_entry.source == "serendipity" {
@@ -5224,10 +5550,13 @@ pub fn submit_mastery_challenge(input: SubmitChallengeInput) -> ExternResult<Cha
         time_limit_seconds: existing_challenge.time_limit_seconds,
         actual_time_seconds: Some(input.actual_time_seconds),
         questions_json: existing_challenge.questions_json,
-        responses_json: serde_json::to_string(&input.responses).unwrap_or_else(|_| "[]".to_string()),
+        responses_json: serde_json::to_string(&input.responses)
+            .unwrap_or_else(|_| "[]".to_string()),
         score: Some(overall_score),
-        score_by_content_json: serde_json::to_string(&correct_by_content).unwrap_or_else(|_| "{}".to_string()),
-        level_changes_json: serde_json::to_string(&level_changes).unwrap_or_else(|_| "[]".to_string()),
+        score_by_content_json: serde_json::to_string(&correct_by_content)
+            .unwrap_or_else(|_| "{}".to_string()),
+        level_changes_json: serde_json::to_string(&level_changes)
+            .unwrap_or_else(|_| "[]".to_string()),
         net_level_change,
         discoveries_json: serde_json::to_string(&discoveries).unwrap_or_else(|_| "[]".to_string()),
         created_at: existing_challenge.created_at,
@@ -5261,7 +5590,12 @@ pub fn submit_mastery_challenge(input: SubmitChallengeInput) -> ExternResult<Cha
     if let Some(old_link) = pool_links.first() {
         delete_link(old_link.create_link_hash.clone(), GetOptions::default())?;
     }
-    create_link(pool_anchor_hash, pool_action_hash, LinkTypes::AgentToPool, ())?;
+    create_link(
+        pool_anchor_hash,
+        pool_action_hash,
+        LinkTypes::AgentToPool,
+        (),
+    )?;
 
     // Calculate next available time
     let cooldown_hours = pool.challenge_cooldown_hours;
@@ -5294,13 +5628,22 @@ pub fn get_challenge_history(_: ()) -> ExternResult<Vec<MasteryChallengeOutput>>
 
     let mut results = Vec::new();
     for link in links {
-        let action_hash = ActionHash::try_from(link.target)
-            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid challenge hash".to_string())))?;
+        let action_hash = ActionHash::try_from(link.target).map_err(|_| {
+            wasm_error!(WasmErrorInner::Guest("Invalid challenge hash".to_string()))
+        })?;
 
         let record = get(action_hash.clone(), GetOptions::default())?;
         if let Some(rec) = record {
-            if let Some(challenge) = rec.entry().to_app_option::<MasteryChallenge>().ok().flatten() {
-                results.push(MasteryChallengeOutput { action_hash, challenge });
+            if let Some(challenge) = rec
+                .entry()
+                .to_app_option::<MasteryChallenge>()
+                .ok()
+                .flatten()
+            {
+                results.push(MasteryChallengeOutput {
+                    action_hash,
+                    challenge,
+                });
             }
         }
     }
@@ -5432,7 +5775,12 @@ fn get_or_create_content_presence(
             .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid presence hash".to_string())))?;
 
         if let Some(record) = get(action_hash, GetOptions::default())? {
-            if let Some(presence) = record.entry().to_app_option::<ContributorPresence>().ok().flatten() {
+            if let Some(presence) = record
+                .entry()
+                .to_app_option::<ContributorPresence>()
+                .ok()
+                .flatten()
+            {
                 return Ok(presence.id);
             }
         }
@@ -5462,8 +5810,10 @@ fn get_or_create_content_presence(
         id: presence_id.clone(),
         display_name,
         presence_state: "unclaimed".to_string(),
-        external_identifiers_json: serde_json::to_string(&external_ids).unwrap_or_else(|_| "{}".to_string()),
-        establishing_content_ids_json: serde_json::to_string(&establishing_content).unwrap_or_else(|_| "[]".to_string()),
+        external_identifiers_json: serde_json::to_string(&external_ids)
+            .unwrap_or_else(|_| "{}".to_string()),
+        establishing_content_ids_json: serde_json::to_string(&establishing_content)
+            .unwrap_or_else(|_| "[]".to_string()),
         established_at: timestamp.to_string(),
         // Recognition starts at zero
         affinity_total: 0.0,
@@ -5500,18 +5850,33 @@ fn get_or_create_content_presence(
 
     // Create content-to-presence link so we find this presence next time
     create_entry(&EntryTypes::StringAnchor(content_anchor))?;
-    create_link(content_anchor_hash, action_hash.clone(), LinkTypes::ContentToPresence, ())?;
+    create_link(
+        content_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::ContentToPresence,
+        (),
+    )?;
 
     // Create ID lookup link
     let id_anchor = StringAnchor::new("presence_id", &presence_id);
     let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor.clone()))?;
     create_entry(&EntryTypes::StringAnchor(id_anchor))?;
-    create_link(id_anchor_hash, action_hash.clone(), LinkTypes::IdToPresence, ())?;
+    create_link(
+        id_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::IdToPresence,
+        (),
+    )?;
 
     // Create state lookup link (unclaimed)
     let state_anchor = StringAnchor::new("presence_state", "unclaimed");
     let state_anchor_hash = hash_entry(&EntryTypes::StringAnchor(state_anchor))?;
-    create_link(state_anchor_hash, action_hash, LinkTypes::PresenceByState, ())?;
+    create_link(
+        state_anchor_hash,
+        action_hash,
+        LinkTypes::PresenceByState,
+        (),
+    )?;
 
     Ok(presence_id)
 }
@@ -5532,7 +5897,11 @@ pub fn earn_points(input: EarnPointsInput) -> ExternResult<EarnPointsResult> {
     let point_event = PointEvent {
         id: event_id.clone(),
         agent_id: agent_id.clone(),
-        action: if points >= 0 { "produce".to_string() } else { "consume".to_string() },
+        action: if points >= 0 {
+            "produce".to_string()
+        } else {
+            "consume".to_string()
+        },
         trigger: input.trigger.clone(),
         points,
         content_id: input.content_id.clone(),
@@ -5548,19 +5917,32 @@ pub fn earn_points(input: EarnPointsInput) -> ExternResult<EarnPointsResult> {
 
     // Create links for the event
     let agent_events_anchor = StringAnchor::new("agent_points", &agent_id);
-    let agent_events_anchor_hash = hash_entry(&EntryTypes::StringAnchor(agent_events_anchor.clone()))?;
+    let agent_events_anchor_hash =
+        hash_entry(&EntryTypes::StringAnchor(agent_events_anchor.clone()))?;
     create_entry(&EntryTypes::StringAnchor(agent_events_anchor))?;
-    create_link(agent_events_anchor_hash, event_action_hash.clone(), LinkTypes::AgentToPointEvents, ())?;
+    create_link(
+        agent_events_anchor_hash,
+        event_action_hash.clone(),
+        LinkTypes::AgentToPointEvents,
+        (),
+    )?;
 
     if let Some(ref content_id) = input.content_id {
         let content_events_anchor = StringAnchor::new("content_points", content_id);
-        let content_events_anchor_hash = hash_entry(&EntryTypes::StringAnchor(content_events_anchor.clone()))?;
+        let content_events_anchor_hash =
+            hash_entry(&EntryTypes::StringAnchor(content_events_anchor.clone()))?;
         create_entry(&EntryTypes::StringAnchor(content_events_anchor))?;
-        create_link(content_events_anchor_hash, event_action_hash.clone(), LinkTypes::ContentToPointEvents, ())?;
+        create_link(
+            content_events_anchor_hash,
+            event_action_hash.clone(),
+            LinkTypes::ContentToPointEvents,
+            (),
+        )?;
     }
 
     // Update or create point balance (hREA EconomicResource)
-    let balance_output = update_point_balance(&agent_id, points, &input.trigger, &event_id, &timestamp)?;
+    let balance_output =
+        update_point_balance(&agent_id, points, &input.trigger, &event_id, &timestamp)?;
 
     // Flow recognition to contributors (hREA Appreciation)
     // Recognition ALWAYS flows - ContributorPresence exists for all content,
@@ -5570,7 +5952,9 @@ pub fn earn_points(input: EarnPointsInput) -> ExternResult<EarnPointsResult> {
     let mut recognition_sent = Vec::new();
     if let Some(ref content_id) = input.content_id {
         // Get content to find title and author info
-        if let Some(content_output) = get_content_by_id(QueryByIdInput { id: content_id.clone() })? {
+        if let Some(content_output) = get_content_by_id(QueryByIdInput {
+            id: content_id.clone(),
+        })? {
             let content = content_output.content;
 
             // Get or create the ContributorPresence for this content
@@ -5629,8 +6013,16 @@ fn update_point_balance(
 
         let record = get(action_hash.clone(), GetOptions::default())?;
         if let Some(rec) = record {
-            if let Some(balance) = rec.entry().to_app_option::<LearnerPointBalance>().ok().flatten() {
-                (Some(balance), Some((action_hash, link.create_link_hash.clone())))
+            if let Some(balance) = rec
+                .entry()
+                .to_app_option::<LearnerPointBalance>()
+                .ok()
+                .flatten()
+            {
+                (
+                    Some(balance),
+                    Some((action_hash, link.create_link_hash.clone())),
+                )
             } else {
                 (None, None)
             }
@@ -5651,13 +6043,29 @@ fn update_point_balance(
     let updated_balance = LearnerPointBalance {
         id: format!("balance-{}", agent_id),
         agent_id: agent_id.to_string(),
-        total_points: existing_balance.as_ref().map(|b| b.total_points).unwrap_or(0) + points as i64,
-        points_by_trigger_json: serde_json::to_string(&points_by_trigger).unwrap_or_else(|_| "{}".to_string()),
-        total_earned: existing_balance.as_ref().map(|b| b.total_earned).unwrap_or(0) + if points > 0 { points as i64 } else { 0 },
-        total_spent: existing_balance.as_ref().map(|b| b.total_spent).unwrap_or(0) + if points < 0 { points.abs() as i64 } else { 0 },
+        total_points: existing_balance
+            .as_ref()
+            .map(|b| b.total_points)
+            .unwrap_or(0)
+            + points as i64,
+        points_by_trigger_json: serde_json::to_string(&points_by_trigger)
+            .unwrap_or_else(|_| "{}".to_string()),
+        total_earned: existing_balance
+            .as_ref()
+            .map(|b| b.total_earned)
+            .unwrap_or(0)
+            + if points > 0 { points as i64 } else { 0 },
+        total_spent: existing_balance
+            .as_ref()
+            .map(|b| b.total_spent)
+            .unwrap_or(0)
+            + if points < 0 { points.abs() as i64 } else { 0 },
         last_point_event_id: Some(event_id.to_string()),
         last_point_event_at: Some(timestamp.to_string()),
-        created_at: existing_balance.as_ref().map(|b| b.created_at.clone()).unwrap_or_else(|| timestamp.to_string()),
+        created_at: existing_balance
+            .as_ref()
+            .map(|b| b.created_at.clone())
+            .unwrap_or_else(|| timestamp.to_string()),
         updated_at: timestamp.to_string(),
     };
 
@@ -5669,7 +6077,12 @@ fn update_point_balance(
     } else {
         create_entry(&EntryTypes::StringAnchor(balance_anchor))?;
     }
-    create_link(balance_anchor_hash, action_hash.clone(), LinkTypes::AgentToPointBalance, ())?;
+    create_link(
+        balance_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::AgentToPointBalance,
+        (),
+    )?;
 
     Ok(LearnerPointBalanceOutput {
         action_hash,
@@ -5721,17 +6134,34 @@ fn flow_recognition_to_contributor(
 
     // Create links
     let contributor_anchor = StringAnchor::new("contributor_recognition", contributor_id);
-    let contributor_anchor_hash = hash_entry(&EntryTypes::StringAnchor(contributor_anchor.clone()))?;
+    let contributor_anchor_hash =
+        hash_entry(&EntryTypes::StringAnchor(contributor_anchor.clone()))?;
     create_entry(&EntryTypes::StringAnchor(contributor_anchor))?;
-    create_link(contributor_anchor_hash, action_hash.clone(), LinkTypes::ContributorToRecognition, ())?;
+    create_link(
+        contributor_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::ContributorToRecognition,
+        (),
+    )?;
 
     let content_anchor = StringAnchor::new("content_recognition", content_id);
     let content_anchor_hash = hash_entry(&EntryTypes::StringAnchor(content_anchor.clone()))?;
     create_entry(&EntryTypes::StringAnchor(content_anchor))?;
-    create_link(content_anchor_hash, action_hash.clone(), LinkTypes::ContentToRecognition, ())?;
+    create_link(
+        content_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::ContentToRecognition,
+        (),
+    )?;
 
     // Update contributor impact summary
-    update_contributor_impact(contributor_id, recognition_points, content_id, flow_type, timestamp)?;
+    update_contributor_impact(
+        contributor_id,
+        recognition_points,
+        content_id,
+        flow_type,
+        timestamp,
+    )?;
 
     Ok(ContributorRecognitionOutput {
         action_hash,
@@ -5759,7 +6189,10 @@ fn update_contributor_impact(
 
         let record = get(action_hash, GetOptions::default())?;
         if let Some(rec) = record {
-            rec.entry().to_app_option::<ContributorImpact>().ok().flatten()
+            rec.entry()
+                .to_app_option::<ContributorImpact>()
+                .ok()
+                .flatten()
         } else {
             None
         }
@@ -5772,14 +6205,20 @@ fn update_contributor_impact(
         Some(i) => serde_json::from_str(&i.impact_by_content_json).unwrap_or_default(),
         None => HashMap::new(),
     };
-    let content_impact = impact_by_content.entry(content_id.to_string()).or_insert(serde_json::json!({
-        "points": 0,
-        "learners": 0,
-        "mastered": 0
-    }));
+    let content_impact =
+        impact_by_content
+            .entry(content_id.to_string())
+            .or_insert(serde_json::json!({
+                "points": 0,
+                "learners": 0,
+                "mastered": 0
+            }));
     if let Some(obj) = content_impact.as_object_mut() {
         let current_points = obj.get("points").and_then(|v| v.as_i64()).unwrap_or(0);
-        obj.insert("points".to_string(), serde_json::json!(current_points + recognition_points as i64));
+        obj.insert(
+            "points".to_string(),
+            serde_json::json!(current_points + recognition_points as i64),
+        );
     }
 
     // Update impact by flow type
@@ -5795,14 +6234,35 @@ fn update_contributor_impact(
     let updated_impact = ContributorImpact {
         id: format!("impact-{}", contributor_id),
         contributor_id: contributor_id.to_string(),
-        total_recognition_points: existing.as_ref().map(|i| i.total_recognition_points).unwrap_or(0) + recognition_points as i64,
-        total_learners_reached: existing.as_ref().map(|i| i.total_learners_reached).unwrap_or(0) + 1,
-        total_content_mastered: existing.as_ref().map(|i| i.total_content_mastered).unwrap_or(0) + if is_mastery { 1 } else { 0 },
-        total_discoveries_sparked: existing.as_ref().map(|i| i.total_discoveries_sparked).unwrap_or(0) + if is_discovery { 1 } else { 0 },
-        impact_by_content_json: serde_json::to_string(&impact_by_content).unwrap_or_else(|_| "{}".to_string()),
-        impact_by_flow_type_json: serde_json::to_string(&impact_by_flow).unwrap_or_else(|_| "{}".to_string()),
+        total_recognition_points: existing
+            .as_ref()
+            .map(|i| i.total_recognition_points)
+            .unwrap_or(0)
+            + recognition_points as i64,
+        total_learners_reached: existing
+            .as_ref()
+            .map(|i| i.total_learners_reached)
+            .unwrap_or(0)
+            + 1,
+        total_content_mastered: existing
+            .as_ref()
+            .map(|i| i.total_content_mastered)
+            .unwrap_or(0)
+            + if is_mastery { 1 } else { 0 },
+        total_discoveries_sparked: existing
+            .as_ref()
+            .map(|i| i.total_discoveries_sparked)
+            .unwrap_or(0)
+            + if is_discovery { 1 } else { 0 },
+        impact_by_content_json: serde_json::to_string(&impact_by_content)
+            .unwrap_or_else(|_| "{}".to_string()),
+        impact_by_flow_type_json: serde_json::to_string(&impact_by_flow)
+            .unwrap_or_else(|_| "{}".to_string()),
         recent_events_json: "[]".to_string(), // Would append recent events
-        created_at: existing.as_ref().map(|i| i.created_at.clone()).unwrap_or_else(|| timestamp.to_string()),
+        created_at: existing
+            .as_ref()
+            .map(|i| i.created_at.clone())
+            .unwrap_or_else(|| timestamp.to_string()),
         updated_at: timestamp.to_string(),
     };
 
@@ -5816,7 +6276,12 @@ fn update_contributor_impact(
     } else {
         create_entry(&EntryTypes::StringAnchor(impact_anchor))?;
     }
-    create_link(impact_anchor_hash, action_hash.clone(), LinkTypes::ContributorToImpact, ())?;
+    create_link(
+        impact_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::ContributorToImpact,
+        (),
+    )?;
 
     Ok(ContributorImpactOutput {
         action_hash,
@@ -5842,8 +6307,16 @@ pub fn get_my_point_balance(_: ()) -> ExternResult<Option<LearnerPointBalanceOut
 
         let record = get(action_hash.clone(), GetOptions::default())?;
         if let Some(rec) = record {
-            if let Some(balance) = rec.entry().to_app_option::<LearnerPointBalance>().ok().flatten() {
-                return Ok(Some(LearnerPointBalanceOutput { action_hash, balance }));
+            if let Some(balance) = rec
+                .entry()
+                .to_app_option::<LearnerPointBalance>()
+                .ok()
+                .flatten()
+            {
+                return Ok(Some(LearnerPointBalanceOutput {
+                    action_hash,
+                    balance,
+                }));
             }
         }
     }
@@ -5895,8 +6368,14 @@ pub fn get_contributor_dashboard(contributor_id: String) -> ExternResult<Contrib
 
         let record = get(action_hash.clone(), GetOptions::default())?;
         if let Some(rec) = record {
-            rec.entry().to_app_option::<ContributorImpact>().ok().flatten()
-                .map(|impact| ContributorImpactOutput { action_hash, impact })
+            rec.entry()
+                .to_app_option::<ContributorImpact>()
+                .ok()
+                .flatten()
+                .map(|impact| ContributorImpactOutput {
+                    action_hash,
+                    impact,
+                })
         } else {
             None
         }
@@ -5907,16 +6386,17 @@ pub fn get_contributor_dashboard(contributor_id: String) -> ExternResult<Contrib
     // Parse impact by content for the summary
     let impact_by_content: Vec<ContentImpactSummary> = match &impact {
         Some(i) => {
-            let map: HashMap<String, serde_json::Value> = serde_json::from_str(&i.impact.impact_by_content_json)
-                .unwrap_or_default();
-            map.into_iter().map(|(content_id, v)| {
-                ContentImpactSummary {
+            let map: HashMap<String, serde_json::Value> =
+                serde_json::from_str(&i.impact.impact_by_content_json).unwrap_or_default();
+            map.into_iter()
+                .map(|(content_id, v)| ContentImpactSummary {
                     content_id,
                     recognition_points: v.get("points").and_then(|p| p.as_i64()).unwrap_or(0),
-                    learners_reached: v.get("learners").and_then(|l| l.as_u64()).unwrap_or(0) as u32,
+                    learners_reached: v.get("learners").and_then(|l| l.as_u64()).unwrap_or(0)
+                        as u32,
                     mastery_count: v.get("mastered").and_then(|m| m.as_u64()).unwrap_or(0) as u32,
-                }
-            }).collect()
+                })
+                .collect()
         }
         None => Vec::new(),
     };
@@ -5925,17 +6405,26 @@ pub fn get_contributor_dashboard(contributor_id: String) -> ExternResult<Contrib
     let recognition_anchor = StringAnchor::new("contributor_recognition", &contributor_id);
     let recognition_anchor_hash = hash_entry(&EntryTypes::StringAnchor(recognition_anchor))?;
 
-    let recog_query = LinkQuery::try_new(recognition_anchor_hash, LinkTypes::ContributorToRecognition)?;
+    let recog_query =
+        LinkQuery::try_new(recognition_anchor_hash, LinkTypes::ContributorToRecognition)?;
     let recog_links = get_links(recog_query, GetStrategy::default())?;
 
     let mut recent_events = Vec::new();
     for link in recog_links.iter().take(10) {
-        let action_hash = ActionHash::try_from(link.target.clone())
-            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid recognition hash".to_string())))?;
+        let action_hash = ActionHash::try_from(link.target.clone()).map_err(|_| {
+            wasm_error!(WasmErrorInner::Guest(
+                "Invalid recognition hash".to_string()
+            ))
+        })?;
 
         let record = get(action_hash, GetOptions::default())?;
         if let Some(rec) = record {
-            if let Some(recognition) = rec.entry().to_app_option::<ContributorRecognition>().ok().flatten() {
+            if let Some(recognition) = rec
+                .entry()
+                .to_app_option::<ContributorRecognition>()
+                .ok()
+                .flatten()
+            {
                 recent_events.push(RecognitionEventSummary {
                     learner_id: recognition.learner_id,
                     content_id: recognition.content_id,
@@ -5949,10 +6438,22 @@ pub fn get_contributor_dashboard(contributor_id: String) -> ExternResult<Contrib
 
     Ok(ContributorDashboard {
         contributor_id: contributor_id.clone(),
-        total_recognition_points: impact.as_ref().map(|i| i.impact.total_recognition_points).unwrap_or(0),
-        total_learners_reached: impact.as_ref().map(|i| i.impact.total_learners_reached).unwrap_or(0),
-        total_content_mastered: impact.as_ref().map(|i| i.impact.total_content_mastered).unwrap_or(0),
-        total_discoveries_sparked: impact.as_ref().map(|i| i.impact.total_discoveries_sparked).unwrap_or(0),
+        total_recognition_points: impact
+            .as_ref()
+            .map(|i| i.impact.total_recognition_points)
+            .unwrap_or(0),
+        total_learners_reached: impact
+            .as_ref()
+            .map(|i| i.impact.total_learners_reached)
+            .unwrap_or(0),
+        total_content_mastered: impact
+            .as_ref()
+            .map(|i| i.impact.total_content_mastered)
+            .unwrap_or(0),
+        total_discoveries_sparked: impact
+            .as_ref()
+            .map(|i| i.impact.total_discoveries_sparked)
+            .unwrap_or(0),
         impact_by_content,
         recent_events,
         impact,
@@ -6088,16 +6589,19 @@ pub struct GrantAccessInput {
 
 /// Create a steward credential
 #[hdk_extern]
-pub fn create_steward_credential(input: CreateStewardCredentialInput) -> ExternResult<StewardCredentialOutput> {
+pub fn create_steward_credential(
+    input: CreateStewardCredentialInput,
+) -> ExternResult<StewardCredentialOutput> {
     let agent_info = agent_info()?;
     let now = sys_time()?;
     let timestamp = format!("{:?}", now);
 
     // Validate steward tier
     if !STEWARD_TIERS.contains(&input.tier.as_str()) {
-        return Err(wasm_error!(WasmErrorInner::Guest(
-            format!("Invalid steward tier: {}. Must be one of: {:?}", input.tier, STEWARD_TIERS)
-        )));
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Invalid steward tier: {}. Must be one of: {:?}",
+            input.tier, STEWARD_TIERS
+        ))));
     }
 
     let credential_id = format!("steward-cred-{}-{}", input.steward_presence_id, timestamp);
@@ -6107,19 +6611,25 @@ pub fn create_steward_credential(input: CreateStewardCredentialInput) -> ExternR
         steward_presence_id: input.steward_presence_id.clone(),
         agent_id: agent_info.agent_initial_pubkey.to_string(),
         tier: input.tier.clone(),
-        stewarded_presence_ids_json: serde_json::to_string(&input.stewarded_presence_ids).unwrap_or_else(|_| "[]".to_string()),
-        stewarded_content_ids_json: serde_json::to_string(&input.stewarded_content_ids).unwrap_or_else(|_| "[]".to_string()),
-        stewarded_path_ids_json: serde_json::to_string(&input.stewarded_path_ids).unwrap_or_else(|_| "[]".to_string()),
-        mastery_content_ids_json: serde_json::to_string(&input.mastery_content_ids).unwrap_or_else(|_| "[]".to_string()),
+        stewarded_presence_ids_json: serde_json::to_string(&input.stewarded_presence_ids)
+            .unwrap_or_else(|_| "[]".to_string()),
+        stewarded_content_ids_json: serde_json::to_string(&input.stewarded_content_ids)
+            .unwrap_or_else(|_| "[]".to_string()),
+        stewarded_path_ids_json: serde_json::to_string(&input.stewarded_path_ids)
+            .unwrap_or_else(|_| "[]".to_string()),
+        mastery_content_ids_json: serde_json::to_string(&input.mastery_content_ids)
+            .unwrap_or_else(|_| "[]".to_string()),
         mastery_level_achieved: input.mastery_level_achieved.clone(),
         qualification_verified_at: timestamp.clone(),
-        peer_attestation_ids_json: serde_json::to_string(&input.peer_attestation_ids).unwrap_or_else(|_| "[]".to_string()),
+        peer_attestation_ids_json: serde_json::to_string(&input.peer_attestation_ids)
+            .unwrap_or_else(|_| "[]".to_string()),
         unique_attester_count: input.peer_attestation_ids.len() as u32,
         attester_reputation_sum: 0.0,
         stewardship_quality_score: 0.0,
         total_learners_served: 0,
         total_content_improvements: 0,
-        domain_tags_json: serde_json::to_string(&input.domain_tags).unwrap_or_else(|_| "[]".to_string()),
+        domain_tags_json: serde_json::to_string(&input.domain_tags)
+            .unwrap_or_else(|_| "[]".to_string()),
         is_active: true,
         deactivation_reason: None,
         note: input.note,
@@ -6134,26 +6644,46 @@ pub fn create_steward_credential(input: CreateStewardCredentialInput) -> ExternR
     let id_anchor = StringAnchor::new("steward_credential_id", &credential_id);
     let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor.clone()))?;
     create_entry(&EntryTypes::StringAnchor(id_anchor))?;
-    create_link(id_anchor_hash, action_hash.clone(), LinkTypes::IdToStewardCredential, ())?;
+    create_link(
+        id_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::IdToStewardCredential,
+        (),
+    )?;
 
     // Create steward presence link
     let human_anchor = StringAnchor::new("human_credential", &input.steward_presence_id);
     let human_anchor_hash = hash_entry(&EntryTypes::StringAnchor(human_anchor.clone()))?;
     create_entry(&EntryTypes::StringAnchor(human_anchor))?;
-    create_link(human_anchor_hash, action_hash.clone(), LinkTypes::HumanToCredential, ())?;
+    create_link(
+        human_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::HumanToCredential,
+        (),
+    )?;
 
     // Create tier lookup link
     let tier_anchor = StringAnchor::new("credential_tier", &input.tier);
     let tier_anchor_hash = hash_entry(&EntryTypes::StringAnchor(tier_anchor.clone()))?;
     create_entry(&EntryTypes::StringAnchor(tier_anchor))?;
-    create_link(tier_anchor_hash, action_hash.clone(), LinkTypes::CredentialByTier, ())?;
+    create_link(
+        tier_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::CredentialByTier,
+        (),
+    )?;
 
     // Create domain scope links
     for domain in &input.domain_tags {
         let domain_anchor = StringAnchor::new("credential_domain", domain);
         let domain_anchor_hash = hash_entry(&EntryTypes::StringAnchor(domain_anchor.clone()))?;
         create_entry(&EntryTypes::StringAnchor(domain_anchor))?;
-        create_link(domain_anchor_hash, action_hash.clone(), LinkTypes::CredentialByDomain, ())?;
+        create_link(
+            domain_anchor_hash,
+            action_hash.clone(),
+            LinkTypes::CredentialByDomain,
+            (),
+        )?;
     }
 
     Ok(StewardCredentialOutput {
@@ -6164,7 +6694,9 @@ pub fn create_steward_credential(input: CreateStewardCredentialInput) -> ExternR
 
 /// Get steward credential by ID
 #[hdk_extern]
-pub fn get_steward_credential(credential_id: String) -> ExternResult<Option<StewardCredentialOutput>> {
+pub fn get_steward_credential(
+    credential_id: String,
+) -> ExternResult<Option<StewardCredentialOutput>> {
     let id_anchor = StringAnchor::new("steward_credential_id", &credential_id);
     let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
 
@@ -6172,13 +6704,22 @@ pub fn get_steward_credential(credential_id: String) -> ExternResult<Option<Stew
     let links = get_links(query, GetStrategy::default())?;
 
     if let Some(link) = links.first() {
-        let action_hash = ActionHash::try_from(link.target.clone())
-            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid credential hash".to_string())))?;
+        let action_hash = ActionHash::try_from(link.target.clone()).map_err(|_| {
+            wasm_error!(WasmErrorInner::Guest("Invalid credential hash".to_string()))
+        })?;
 
         let record = get(action_hash.clone(), GetOptions::default())?;
         if let Some(rec) = record {
-            if let Some(credential) = rec.entry().to_app_option::<StewardCredential>().ok().flatten() {
-                return Ok(Some(StewardCredentialOutput { action_hash, credential }));
+            if let Some(credential) = rec
+                .entry()
+                .to_app_option::<StewardCredential>()
+                .ok()
+                .flatten()
+            {
+                return Ok(Some(StewardCredentialOutput {
+                    action_hash,
+                    credential,
+                }));
             }
         }
     }
@@ -6188,7 +6729,9 @@ pub fn get_steward_credential(credential_id: String) -> ExternResult<Option<Stew
 
 /// Get steward credentials for a human presence
 #[hdk_extern]
-pub fn get_credentials_for_human(human_presence_id: String) -> ExternResult<Vec<StewardCredentialOutput>> {
+pub fn get_credentials_for_human(
+    human_presence_id: String,
+) -> ExternResult<Vec<StewardCredentialOutput>> {
     let human_anchor = StringAnchor::new("human_credential", &human_presence_id);
     let human_anchor_hash = hash_entry(&EntryTypes::StringAnchor(human_anchor))?;
 
@@ -6197,14 +6740,23 @@ pub fn get_credentials_for_human(human_presence_id: String) -> ExternResult<Vec<
 
     let mut results = Vec::new();
     for link in links {
-        let action_hash = ActionHash::try_from(link.target)
-            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid credential hash".to_string())))?;
+        let action_hash = ActionHash::try_from(link.target).map_err(|_| {
+            wasm_error!(WasmErrorInner::Guest("Invalid credential hash".to_string()))
+        })?;
 
         let record = get(action_hash.clone(), GetOptions::default())?;
         if let Some(rec) = record {
-            if let Some(credential) = rec.entry().to_app_option::<StewardCredential>().ok().flatten() {
+            if let Some(credential) = rec
+                .entry()
+                .to_app_option::<StewardCredential>()
+                .ok()
+                .flatten()
+            {
                 if credential.is_active {
-                    results.push(StewardCredentialOutput { action_hash, credential });
+                    results.push(StewardCredentialOutput {
+                        action_hash,
+                        credential,
+                    });
                 }
             }
         }
@@ -6221,23 +6773,28 @@ pub fn create_premium_gate(input: CreatePremiumGateInput) -> ExternResult<Premiu
 
     // Validate pricing model
     if !PRICING_MODELS.contains(&input.pricing_model.as_str()) {
-        return Err(wasm_error!(WasmErrorInner::Guest(
-            format!("Invalid pricing model: {}. Must be one of: {:?}", input.pricing_model, PRICING_MODELS)
-        )));
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Invalid pricing model: {}. Must be one of: {:?}",
+            input.pricing_model, PRICING_MODELS
+        ))));
     }
 
     // Validate revenue shares sum to 100%
     let contributor_share = input.contributor_share_percent.unwrap_or(0.0);
     let total_share = input.steward_share_percent + contributor_share + input.commons_share_percent;
     if (total_share - 100.0).abs() > 0.01 {
-        return Err(wasm_error!(WasmErrorInner::Guest(
-            format!("Revenue shares must sum to 100%, got {}", total_share)
-        )));
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Revenue shares must sum to 100%, got {}",
+            total_share
+        ))));
     }
 
     // Get first resource ID for the gate ID
-    let first_resource = input.gated_resource_ids.first()
-        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("At least one gated resource ID required".to_string())))?;
+    let first_resource = input.gated_resource_ids.first().ok_or_else(|| {
+        wasm_error!(WasmErrorInner::Guest(
+            "At least one gated resource ID required".to_string()
+        ))
+    })?;
 
     let gate_id = format!("gate-{}-{}", first_resource, timestamp);
 
@@ -6247,13 +6804,17 @@ pub fn create_premium_gate(input: CreatePremiumGateInput) -> ExternResult<Premiu
         steward_presence_id: input.steward_presence_id.clone(),
         contributor_presence_id: input.contributor_presence_id.clone(),
         gated_resource_type: input.gated_resource_type,
-        gated_resource_ids_json: serde_json::to_string(&input.gated_resource_ids).unwrap_or_else(|_| "[]".to_string()),
+        gated_resource_ids_json: serde_json::to_string(&input.gated_resource_ids)
+            .unwrap_or_else(|_| "[]".to_string()),
         gate_title: input.gate_title,
         gate_description: input.gate_description,
         gate_image: input.gate_image,
-        required_attestations_json: serde_json::to_string(&input.required_attestations).unwrap_or_else(|_| "[]".to_string()),
-        required_mastery_json: serde_json::to_string(&input.required_mastery).unwrap_or_else(|_| "[]".to_string()),
-        required_vouches_json: serde_json::to_string(&input.required_vouches).unwrap_or_else(|_| "{}".to_string()),
+        required_attestations_json: serde_json::to_string(&input.required_attestations)
+            .unwrap_or_else(|_| "[]".to_string()),
+        required_mastery_json: serde_json::to_string(&input.required_mastery)
+            .unwrap_or_else(|_| "[]".to_string()),
+        required_vouches_json: serde_json::to_string(&input.required_vouches)
+            .unwrap_or_else(|_| "{}".to_string()),
         pricing_model: input.pricing_model.clone(),
         price_amount: input.price_amount,
         price_unit: input.price_unit,
@@ -6292,33 +6853,51 @@ pub fn create_premium_gate(input: CreatePremiumGateInput) -> ExternResult<Premiu
         let resource_anchor = StringAnchor::new("resource_gate", resource_id);
         let resource_anchor_hash = hash_entry(&EntryTypes::StringAnchor(resource_anchor.clone()))?;
         create_entry(&EntryTypes::StringAnchor(resource_anchor))?;
-        create_link(resource_anchor_hash, action_hash.clone(), LinkTypes::ResourceToGate, ())?;
+        create_link(
+            resource_anchor_hash,
+            action_hash.clone(),
+            LinkTypes::ResourceToGate,
+            (),
+        )?;
     }
 
     // Create pricing model link
     let pricing_anchor = StringAnchor::new("gate_pricing", &input.pricing_model);
     let pricing_anchor_hash = hash_entry(&EntryTypes::StringAnchor(pricing_anchor.clone()))?;
     create_entry(&EntryTypes::StringAnchor(pricing_anchor))?;
-    create_link(pricing_anchor_hash, action_hash.clone(), LinkTypes::GateByPricingModel, ())?;
+    create_link(
+        pricing_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::GateByPricingModel,
+        (),
+    )?;
 
     // Create steward lookup link
     let steward_anchor = StringAnchor::new("steward_gates", &input.steward_credential_id);
     let steward_anchor_hash = hash_entry(&EntryTypes::StringAnchor(steward_anchor.clone()))?;
     create_entry(&EntryTypes::StringAnchor(steward_anchor))?;
-    create_link(steward_anchor_hash, action_hash.clone(), LinkTypes::GateBySteward, ())?;
+    create_link(
+        steward_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::GateBySteward,
+        (),
+    )?;
 
     // Create contributor lookup link if different from steward
     if let Some(ref contributor_id) = input.contributor_presence_id {
         let contributor_anchor = StringAnchor::new("contributor_gates", contributor_id);
-        let contributor_anchor_hash = hash_entry(&EntryTypes::StringAnchor(contributor_anchor.clone()))?;
+        let contributor_anchor_hash =
+            hash_entry(&EntryTypes::StringAnchor(contributor_anchor.clone()))?;
         create_entry(&EntryTypes::StringAnchor(contributor_anchor))?;
-        create_link(contributor_anchor_hash, action_hash.clone(), LinkTypes::GateByContributor, ())?;
+        create_link(
+            contributor_anchor_hash,
+            action_hash.clone(),
+            LinkTypes::GateByContributor,
+            (),
+        )?;
     }
 
-    Ok(PremiumGateOutput {
-        action_hash,
-        gate,
-    })
+    Ok(PremiumGateOutput { action_hash, gate })
 }
 
 /// Get premium gate by ID
@@ -6386,9 +6965,10 @@ pub fn grant_access(input: GrantAccessInput) -> ExternResult<AccessGrantOutput> 
 
     // Validate access type
     if !ACCESS_GRANT_TYPES.contains(&input.grant_type.as_str()) {
-        return Err(wasm_error!(WasmErrorInner::Guest(
-            format!("Invalid grant type: {}. Must be one of: {:?}", input.grant_type, ACCESS_GRANT_TYPES)
-        )));
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Invalid grant type: {}. Must be one of: {:?}",
+            input.grant_type, ACCESS_GRANT_TYPES
+        ))));
     }
 
     let grant_id = format!("grant-{}-{}-{}", input.gate_id, learner_id, timestamp);
@@ -6429,37 +7009,61 @@ pub fn grant_access(input: GrantAccessInput) -> ExternResult<AccessGrantOutput> 
     let id_anchor = StringAnchor::new("grant_id", &grant_id);
     let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor.clone()))?;
     create_entry(&EntryTypes::StringAnchor(id_anchor))?;
-    create_link(id_anchor_hash, action_hash.clone(), LinkTypes::IdToAccessGrant, ())?;
+    create_link(
+        id_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::IdToAccessGrant,
+        (),
+    )?;
 
     // Create learner lookup link
     let learner_anchor = StringAnchor::new("learner_grants", &learner_id);
     let learner_anchor_hash = hash_entry(&EntryTypes::StringAnchor(learner_anchor.clone()))?;
     create_entry(&EntryTypes::StringAnchor(learner_anchor))?;
-    create_link(learner_anchor_hash, action_hash.clone(), LinkTypes::LearnerToGrant, ())?;
+    create_link(
+        learner_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::LearnerToGrant,
+        (),
+    )?;
 
     // Create gate lookup link
     let gate_anchor = StringAnchor::new("gate_grants", &input.gate_id);
     let gate_anchor_hash = hash_entry(&EntryTypes::StringAnchor(gate_anchor.clone()))?;
     create_entry(&EntryTypes::StringAnchor(gate_anchor))?;
-    create_link(gate_anchor_hash, action_hash.clone(), LinkTypes::GateToGrant, ())?;
+    create_link(
+        gate_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::GateToGrant,
+        (),
+    )?;
 
     // Create grant type link
     let type_anchor = StringAnchor::new("grant_type", &input.grant_type);
     let type_anchor_hash = hash_entry(&EntryTypes::StringAnchor(type_anchor.clone()))?;
     create_entry(&EntryTypes::StringAnchor(type_anchor))?;
-    create_link(type_anchor_hash, action_hash.clone(), LinkTypes::GrantByType, ())?;
+    create_link(
+        type_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::GrantByType,
+        (),
+    )?;
 
     // If there was payment, create revenue record
     if let Some(amount) = input.payment_amount {
         if amount > 0.0 {
-            create_steward_revenue(&gate.gate, &grant_id, &learner_id, amount, input.payment_unit.as_deref(), &timestamp)?;
+            create_steward_revenue(
+                &gate.gate,
+                &grant_id,
+                &learner_id,
+                amount,
+                input.payment_unit.as_deref(),
+                &timestamp,
+            )?;
         }
     }
 
-    Ok(AccessGrantOutput {
-        action_hash,
-        grant,
-    })
+    Ok(AccessGrantOutput { action_hash, grant })
 }
 
 /// Create steward revenue record (internal function)
@@ -6482,11 +7086,12 @@ fn create_steward_revenue(
 
     // Create placeholder economic event IDs (would be linked to actual Shefa events)
     let steward_economic_event_id = format!("econ-steward-{}", revenue_id);
-    let contributor_economic_event_id = if gate.contributor_presence_id.is_some() && contributor_amount > 0.0 {
-        Some(format!("econ-contributor-{}", revenue_id))
-    } else {
-        None
-    };
+    let contributor_economic_event_id =
+        if gate.contributor_presence_id.is_some() && contributor_amount > 0.0 {
+            Some(format!("econ-contributor-{}", revenue_id))
+        } else {
+            None
+        };
     let commons_economic_event_id = format!("econ-commons-{}", revenue_id);
 
     let revenue = StewardRevenue {
@@ -6518,20 +7123,36 @@ fn create_steward_revenue(
     let id_anchor = StringAnchor::new("revenue_id", &revenue_id);
     let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor.clone()))?;
     create_entry(&EntryTypes::StringAnchor(id_anchor))?;
-    create_link(id_anchor_hash, action_hash.clone(), LinkTypes::IdToStewardRevenue, ())?;
+    create_link(
+        id_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::IdToStewardRevenue,
+        (),
+    )?;
 
     // Create steward revenue link (using steward_presence_id for lookup)
     let steward_anchor = StringAnchor::new("steward_revenue", &gate.steward_presence_id);
     let steward_anchor_hash = hash_entry(&EntryTypes::StringAnchor(steward_anchor.clone()))?;
     create_entry(&EntryTypes::StringAnchor(steward_anchor))?;
-    create_link(steward_anchor_hash, action_hash.clone(), LinkTypes::StewardToRevenue, ())?;
+    create_link(
+        steward_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::StewardToRevenue,
+        (),
+    )?;
 
     // Create contributor revenue link if applicable
     if let Some(ref contributor_id) = gate.contributor_presence_id {
         let contributor_anchor = StringAnchor::new("contributor_revenue", contributor_id);
-        let contributor_anchor_hash = hash_entry(&EntryTypes::StringAnchor(contributor_anchor.clone()))?;
+        let contributor_anchor_hash =
+            hash_entry(&EntryTypes::StringAnchor(contributor_anchor.clone()))?;
         create_entry(&EntryTypes::StringAnchor(contributor_anchor))?;
-        create_link(contributor_anchor_hash, action_hash.clone(), LinkTypes::ContributorToRevenue, ())?;
+        create_link(
+            contributor_anchor_hash,
+            action_hash.clone(),
+            LinkTypes::ContributorToRevenue,
+            (),
+        )?;
     }
 
     Ok(StewardRevenueOutput {
@@ -6620,7 +7241,9 @@ pub struct GateRevenueSummary {
 
 /// Get steward revenue summary
 #[hdk_extern]
-pub fn get_steward_revenue_summary(steward_presence_id: String) -> ExternResult<StewardRevenueSummary> {
+pub fn get_steward_revenue_summary(
+    steward_presence_id: String,
+) -> ExternResult<StewardRevenueSummary> {
     let steward_anchor = StringAnchor::new("steward_revenue", &steward_presence_id);
     let steward_anchor_hash = hash_entry(&EntryTypes::StringAnchor(steward_anchor))?;
 
@@ -6639,15 +7262,19 @@ pub fn get_steward_revenue_summary(steward_presence_id: String) -> ExternResult<
             if let Some(revenue) = rec.entry().to_app_option::<StewardRevenue>().ok().flatten() {
                 total_revenue += revenue.steward_amount;
 
-                let entry = revenue_by_gate.entry(revenue.gate_id.clone())
-                    .or_insert((revenue.gate_id.clone(), 0.0, 0));
+                let entry = revenue_by_gate.entry(revenue.gate_id.clone()).or_insert((
+                    revenue.gate_id.clone(),
+                    0.0,
+                    0,
+                ));
                 entry.1 += revenue.steward_amount;
                 entry.2 += 1;
             }
         }
     }
 
-    let revenue_summaries: Vec<GateRevenueSummary> = revenue_by_gate.into_iter()
+    let revenue_summaries: Vec<GateRevenueSummary> = revenue_by_gate
+        .into_iter()
         .map(|(gate_id, (_, total, count))| GateRevenueSummary {
             gate_id: gate_id.clone(),
             gate_title: gate_id, // Would look up actual name
@@ -6684,8 +7311,7 @@ pub fn export_schema_version(_: ()) -> ExternResult<String> {
 /// Uses chain query to get all Content entries created by any agent on this node
 #[hdk_extern]
 pub fn export_all_content(_: ()) -> ExternResult<Vec<ContentOutput>> {
-    let filter = ChainQueryFilter::new()
-        .entry_type(UnitEntryTypes::Content.try_into()?);
+    let filter = ChainQueryFilter::new().entry_type(UnitEntryTypes::Content.try_into()?);
 
     let records = query(filter)?;
     let mut results = Vec::new();
@@ -6694,16 +7320,11 @@ pub fn export_all_content(_: ()) -> ExternResult<Vec<ContentOutput>> {
         let action_hash = record.action_hashed().hash.clone();
 
         if let Some(entry_hash) = record.action().entry_hash() {
-            if let Some(content) = record
-                .entry()
-                .to_app_option::<Content>()
-                .ok()
-                .flatten()
-            {
+            if let Some(content) = record.entry().to_app_option::<Content>().ok().flatten() {
                 results.push(ContentOutput {
                     action_hash,
                     entry_hash: entry_hash.clone(),
-                    content,
+                    content: content_to_wire(&content),
                 });
             }
         }
@@ -6715,7 +7336,7 @@ pub fn export_all_content(_: ()) -> ExternResult<Vec<ContentOutput>> {
 /// Path with all its steps for migration
 #[derive(Serialize, Deserialize, Debug)]
 pub struct PathWithStepsExport {
-    pub path: LearningPath,
+    pub path: WireLearningPath,
     pub path_action_hash: ActionHash,
     pub steps: Vec<PathStepExport>,
 }
@@ -6723,7 +7344,7 @@ pub struct PathWithStepsExport {
 /// Path step for migration export
 #[derive(Serialize, Deserialize, Debug)]
 pub struct PathStepExport {
-    pub step: PathStep,
+    pub step: WirePathStep,
     pub action_hash: ActionHash,
 }
 
@@ -6740,8 +7361,11 @@ pub fn export_all_paths_with_steps(_: ()) -> ExternResult<Vec<PathWithStepsExpor
     let mut results = Vec::new();
 
     for link in links {
-        let path_action_hash = ActionHash::try_from(link.target)
-            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid path action hash".to_string())))?;
+        let path_action_hash = ActionHash::try_from(link.target).map_err(|_| {
+            wasm_error!(WasmErrorInner::Guest(
+                "Invalid path action hash".to_string()
+            ))
+        })?;
 
         let record = get(path_action_hash.clone(), GetOptions::default())?;
         if let Some(record) = record {
@@ -6752,24 +7376,26 @@ pub fn export_all_paths_with_steps(_: ()) -> ExternResult<Vec<PathWithStepsExpor
                 .flatten()
             {
                 // Get all steps for this path
-                let step_query = LinkQuery::try_new(path_action_hash.clone(), LinkTypes::PathToStep)?;
+                let step_query =
+                    LinkQuery::try_new(path_action_hash.clone(), LinkTypes::PathToStep)?;
                 let step_links = get_links(step_query, GetStrategy::default())?;
 
                 let mut steps = Vec::new();
                 for step_link in step_links {
-                    let step_action_hash = ActionHash::try_from(step_link.target)
-                        .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid step action hash".to_string())))?;
+                    let step_action_hash =
+                        ActionHash::try_from(step_link.target).map_err(|_| {
+                            wasm_error!(WasmErrorInner::Guest(
+                                "Invalid step action hash".to_string()
+                            ))
+                        })?;
 
                     let step_record = get(step_action_hash.clone(), GetOptions::default())?;
                     if let Some(step_rec) = step_record {
-                        if let Some(step) = step_rec
-                            .entry()
-                            .to_app_option::<PathStep>()
-                            .ok()
-                            .flatten()
+                        if let Some(step) =
+                            step_rec.entry().to_app_option::<PathStep>().ok().flatten()
                         {
                             steps.push(PathStepExport {
-                                step,
+                                step: path_step_to_wire(&step),
                                 action_hash: step_action_hash,
                             });
                         }
@@ -6780,7 +7406,7 @@ pub fn export_all_paths_with_steps(_: ()) -> ExternResult<Vec<PathWithStepsExpor
                 steps.sort_by_key(|s| s.step.order_index);
 
                 results.push(PathWithStepsExport {
-                    path,
+                    path: learning_path_to_wire(&path),
                     path_action_hash,
                     steps,
                 });
@@ -6835,34 +7461,7 @@ pub fn export_for_migration(_: ()) -> ExternResult<MigrationExport> {
 // KnowledgeMap Operations
 // =============================================================================
 
-/// Input for creating a knowledge map
-#[derive(Serialize, Deserialize, Debug)]
-pub struct CreateKnowledgeMapInput {
-    pub id: Option<String>,
-    pub map_type: String,           // domain, self, person, collective
-    pub owner_id: String,
-    pub title: String,
-    pub description: Option<String>,
-    pub subject_type: String,
-    pub subject_id: String,
-    pub subject_name: String,
-    pub visibility: String,
-    pub shared_with_json: String,
-    pub nodes_json: String,
-    pub path_ids_json: String,
-    pub overall_affinity: f64,
-    pub content_graph_id: Option<String>,
-    pub mastery_levels_json: String,
-    pub goals_json: String,
-    pub metadata_json: String,
-}
-
-/// Output for knowledge map
-#[derive(Serialize, Deserialize, Debug)]
-pub struct KnowledgeMapOutput {
-    pub action_hash: ActionHash,
-    pub knowledge_map: KnowledgeMap,
-}
+// CreateKnowledgeMapInput, KnowledgeMapOutput re-exported from lamad_types
 
 /// Create a knowledge map
 #[hdk_extern]
@@ -6870,9 +7469,9 @@ pub fn create_knowledge_map(input: CreateKnowledgeMapInput) -> ExternResult<Know
     let now = sys_time()?;
     let timestamp = format!("{:?}", now);
 
-    let knowledge_map_id = input.id.unwrap_or_else(|| {
-        format!("km-{}-{}", input.owner_id, timestamp)
-    });
+    let knowledge_map_id = input
+        .id
+        .unwrap_or_else(|| format!("km-{}-{}", input.owner_id, timestamp));
 
     let knowledge_map = KnowledgeMap {
         id: knowledge_map_id.clone(),
@@ -6901,21 +7500,36 @@ pub fn create_knowledge_map(input: CreateKnowledgeMapInput) -> ExternResult<Know
     // Link by ID
     let id_anchor = StringAnchor::new("knowledge_map_id", &knowledge_map_id);
     let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
-    create_link(id_anchor_hash, action_hash.clone(), LinkTypes::IdToKnowledgeMap, ())?;
+    create_link(
+        id_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::IdToKnowledgeMap,
+        (),
+    )?;
 
     // Link by owner
     let owner_anchor = StringAnchor::new("knowledge_map_owner", &input.owner_id);
     let owner_anchor_hash = hash_entry(&EntryTypes::StringAnchor(owner_anchor))?;
-    create_link(owner_anchor_hash, action_hash.clone(), LinkTypes::OwnerToKnowledgeMap, ())?;
+    create_link(
+        owner_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::OwnerToKnowledgeMap,
+        (),
+    )?;
 
     // Link by type
     let type_anchor = StringAnchor::new("knowledge_map_type", &input.map_type);
     let type_anchor_hash = hash_entry(&EntryTypes::StringAnchor(type_anchor))?;
-    create_link(type_anchor_hash, action_hash.clone(), LinkTypes::KnowledgeMapByType, ())?;
+    create_link(
+        type_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::KnowledgeMapByType,
+        (),
+    )?;
 
     Ok(KnowledgeMapOutput {
         action_hash,
-        knowledge_map,
+        knowledge_map: knowledge_map_to_wire(&knowledge_map),
     })
 }
 
@@ -6929,13 +7543,24 @@ pub fn get_knowledge_map_by_id(id: String) -> ExternResult<Option<KnowledgeMapOu
     let links = get_links(query, GetStrategy::default())?;
 
     if let Some(link) = links.first() {
-        let action_hash = ActionHash::try_from(link.target.clone())
-            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid knowledge map hash".to_string())))?;
+        let action_hash = ActionHash::try_from(link.target.clone()).map_err(|_| {
+            wasm_error!(WasmErrorInner::Guest(
+                "Invalid knowledge map hash".to_string()
+            ))
+        })?;
 
         let record = get(action_hash.clone(), GetOptions::default())?;
         if let Some(record) = record {
-            if let Some(knowledge_map) = record.entry().to_app_option::<KnowledgeMap>().ok().flatten() {
-                return Ok(Some(KnowledgeMapOutput { action_hash, knowledge_map }));
+            if let Some(knowledge_map) = record
+                .entry()
+                .to_app_option::<KnowledgeMap>()
+                .ok()
+                .flatten()
+            {
+                return Ok(Some(KnowledgeMapOutput {
+                    action_hash,
+                    knowledge_map: knowledge_map_to_wire(&knowledge_map),
+                }));
             }
         }
     }
@@ -6943,17 +7568,14 @@ pub fn get_knowledge_map_by_id(id: String) -> ExternResult<Option<KnowledgeMapOu
     Ok(None)
 }
 
-/// Input for querying knowledge maps
-#[derive(Serialize, Deserialize, Debug)]
-pub struct QueryKnowledgeMapsInput {
-    pub owner_id: Option<String>,
-    pub map_type: Option<String>,
-    pub limit: Option<u32>,
-}
+/// QueryKnowledgeMapsInput is a type alias for lamad_types::QueryKnowledgeMapInput
+pub type QueryKnowledgeMapsInput = QueryKnowledgeMapInput;
 
 /// Query knowledge maps
 #[hdk_extern]
-pub fn query_knowledge_maps(input: QueryKnowledgeMapsInput) -> ExternResult<Vec<KnowledgeMapOutput>> {
+pub fn query_knowledge_maps(
+    input: QueryKnowledgeMapsInput,
+) -> ExternResult<Vec<KnowledgeMapOutput>> {
     let mut results = Vec::new();
     let limit = input.limit.unwrap_or(100) as usize;
 
@@ -6965,19 +7587,30 @@ pub fn query_knowledge_maps(input: QueryKnowledgeMapsInput) -> ExternResult<Vec<
         let links = get_links(query, GetStrategy::default())?;
 
         for link in links.iter().take(limit) {
-            let action_hash = ActionHash::try_from(link.target.clone())
-                .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid knowledge map hash".to_string())))?;
+            let action_hash = ActionHash::try_from(link.target.clone()).map_err(|_| {
+                wasm_error!(WasmErrorInner::Guest(
+                    "Invalid knowledge map hash".to_string()
+                ))
+            })?;
 
             let record = get(action_hash.clone(), GetOptions::default())?;
             if let Some(record) = record {
-                if let Some(knowledge_map) = record.entry().to_app_option::<KnowledgeMap>().ok().flatten() {
+                if let Some(knowledge_map) = record
+                    .entry()
+                    .to_app_option::<KnowledgeMap>()
+                    .ok()
+                    .flatten()
+                {
                     // Filter by map_type if specified
                     if let Some(ref map_type) = input.map_type {
                         if &knowledge_map.map_type != map_type {
                             continue;
                         }
                     }
-                    results.push(KnowledgeMapOutput { action_hash, knowledge_map });
+                    results.push(KnowledgeMapOutput {
+                        action_hash,
+                        knowledge_map: knowledge_map_to_wire(&knowledge_map),
+                    });
                 }
             }
         }
@@ -6989,13 +7622,24 @@ pub fn query_knowledge_maps(input: QueryKnowledgeMapsInput) -> ExternResult<Vec<
         let links = get_links(query, GetStrategy::default())?;
 
         for link in links.iter().take(limit) {
-            let action_hash = ActionHash::try_from(link.target.clone())
-                .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid knowledge map hash".to_string())))?;
+            let action_hash = ActionHash::try_from(link.target.clone()).map_err(|_| {
+                wasm_error!(WasmErrorInner::Guest(
+                    "Invalid knowledge map hash".to_string()
+                ))
+            })?;
 
             let record = get(action_hash.clone(), GetOptions::default())?;
             if let Some(record) = record {
-                if let Some(knowledge_map) = record.entry().to_app_option::<KnowledgeMap>().ok().flatten() {
-                    results.push(KnowledgeMapOutput { action_hash, knowledge_map });
+                if let Some(knowledge_map) = record
+                    .entry()
+                    .to_app_option::<KnowledgeMap>()
+                    .ok()
+                    .flatten()
+                {
+                    results.push(KnowledgeMapOutput {
+                        action_hash,
+                        knowledge_map: knowledge_map_to_wire(&knowledge_map),
+                    });
                 }
             }
         }
@@ -7008,33 +7652,7 @@ pub fn query_knowledge_maps(input: QueryKnowledgeMapsInput) -> ExternResult<Vec<
 // PathExtension Operations
 // =============================================================================
 
-/// Input for creating a path extension
-#[derive(Serialize, Deserialize, Debug)]
-pub struct CreatePathExtensionInput {
-    pub id: Option<String>,
-    pub base_path_id: String,
-    pub base_path_version: String,
-    pub extended_by: String,
-    pub title: String,
-    pub description: Option<String>,
-    pub insertions_json: String,
-    pub annotations_json: String,
-    pub reorderings_json: String,
-    pub exclusions_json: String,
-    pub visibility: String,
-    pub shared_with_json: String,
-    pub forked_from: Option<String>,
-    pub forks_json: String,
-    pub upstream_proposal_json: Option<String>,
-    pub stats_json: String,
-}
-
-/// Output for path extension
-#[derive(Serialize, Deserialize, Debug)]
-pub struct PathExtensionOutput {
-    pub action_hash: ActionHash,
-    pub path_extension: PathExtension,
-}
+// CreatePathExtensionInput, PathExtensionOutput re-exported from lamad_types
 
 /// Create a path extension
 #[hdk_extern]
@@ -7042,9 +7660,9 @@ pub fn create_path_extension(input: CreatePathExtensionInput) -> ExternResult<Pa
     let now = sys_time()?;
     let timestamp = format!("{:?}", now);
 
-    let extension_id = input.id.unwrap_or_else(|| {
-        format!("ext-{}-{}", input.base_path_id, timestamp)
-    });
+    let extension_id = input
+        .id
+        .unwrap_or_else(|| format!("ext-{}-{}", input.base_path_id, timestamp));
 
     let path_extension = PathExtension {
         id: extension_id.clone(),
@@ -7072,21 +7690,36 @@ pub fn create_path_extension(input: CreatePathExtensionInput) -> ExternResult<Pa
     // Link by ID
     let id_anchor = StringAnchor::new("path_extension_id", &extension_id);
     let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
-    create_link(id_anchor_hash, action_hash.clone(), LinkTypes::IdToPathExtension, ())?;
+    create_link(
+        id_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::IdToPathExtension,
+        (),
+    )?;
 
     // Link by extender
     let extender_anchor = StringAnchor::new("path_extension_extender", &input.extended_by);
     let extender_anchor_hash = hash_entry(&EntryTypes::StringAnchor(extender_anchor))?;
-    create_link(extender_anchor_hash, action_hash.clone(), LinkTypes::ExtenderToExtension, ())?;
+    create_link(
+        extender_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::ExtenderToExtension,
+        (),
+    )?;
 
     // Link by base path
     let base_anchor = StringAnchor::new("path_extension_base", &input.base_path_id);
     let base_anchor_hash = hash_entry(&EntryTypes::StringAnchor(base_anchor))?;
-    create_link(base_anchor_hash, action_hash.clone(), LinkTypes::BasePathToExtension, ())?;
+    create_link(
+        base_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::BasePathToExtension,
+        (),
+    )?;
 
     Ok(PathExtensionOutput {
         action_hash,
-        path_extension,
+        path_extension: path_extension_to_wire(&path_extension),
     })
 }
 
@@ -7100,13 +7733,24 @@ pub fn get_path_extension_by_id(id: String) -> ExternResult<Option<PathExtension
     let links = get_links(query, GetStrategy::default())?;
 
     if let Some(link) = links.first() {
-        let action_hash = ActionHash::try_from(link.target.clone())
-            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid path extension hash".to_string())))?;
+        let action_hash = ActionHash::try_from(link.target.clone()).map_err(|_| {
+            wasm_error!(WasmErrorInner::Guest(
+                "Invalid path extension hash".to_string()
+            ))
+        })?;
 
         let record = get(action_hash.clone(), GetOptions::default())?;
         if let Some(record) = record {
-            if let Some(path_extension) = record.entry().to_app_option::<PathExtension>().ok().flatten() {
-                return Ok(Some(PathExtensionOutput { action_hash, path_extension }));
+            if let Some(path_extension) = record
+                .entry()
+                .to_app_option::<PathExtension>()
+                .ok()
+                .flatten()
+            {
+                return Ok(Some(PathExtensionOutput {
+                    action_hash,
+                    path_extension: path_extension_to_wire(&path_extension),
+                }));
             }
         }
     }
@@ -7114,17 +7758,14 @@ pub fn get_path_extension_by_id(id: String) -> ExternResult<Option<PathExtension
     Ok(None)
 }
 
-/// Input for querying path extensions
-#[derive(Serialize, Deserialize, Debug)]
-pub struct QueryPathExtensionsInput {
-    pub base_path_id: Option<String>,
-    pub extended_by: Option<String>,
-    pub limit: Option<u32>,
-}
+/// QueryPathExtensionsInput is a type alias for lamad_types::QueryPathExtensionInput
+pub type QueryPathExtensionsInput = QueryPathExtensionInput;
 
 /// Query path extensions
 #[hdk_extern]
-pub fn query_path_extensions(input: QueryPathExtensionsInput) -> ExternResult<Vec<PathExtensionOutput>> {
+pub fn query_path_extensions(
+    input: QueryPathExtensionsInput,
+) -> ExternResult<Vec<PathExtensionOutput>> {
     let mut results = Vec::new();
     let limit = input.limit.unwrap_or(100) as usize;
 
@@ -7136,19 +7777,30 @@ pub fn query_path_extensions(input: QueryPathExtensionsInput) -> ExternResult<Ve
         let links = get_links(query, GetStrategy::default())?;
 
         for link in links.iter().take(limit) {
-            let action_hash = ActionHash::try_from(link.target.clone())
-                .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid path extension hash".to_string())))?;
+            let action_hash = ActionHash::try_from(link.target.clone()).map_err(|_| {
+                wasm_error!(WasmErrorInner::Guest(
+                    "Invalid path extension hash".to_string()
+                ))
+            })?;
 
             let record = get(action_hash.clone(), GetOptions::default())?;
             if let Some(record) = record {
-                if let Some(path_extension) = record.entry().to_app_option::<PathExtension>().ok().flatten() {
+                if let Some(path_extension) = record
+                    .entry()
+                    .to_app_option::<PathExtension>()
+                    .ok()
+                    .flatten()
+                {
                     // Filter by extender if specified
                     if let Some(ref extended_by) = input.extended_by {
                         if &path_extension.extended_by != extended_by {
                             continue;
                         }
                     }
-                    results.push(PathExtensionOutput { action_hash, path_extension });
+                    results.push(PathExtensionOutput {
+                        action_hash,
+                        path_extension: path_extension_to_wire(&path_extension),
+                    });
                 }
             }
         }
@@ -7160,13 +7812,24 @@ pub fn query_path_extensions(input: QueryPathExtensionsInput) -> ExternResult<Ve
         let links = get_links(query, GetStrategy::default())?;
 
         for link in links.iter().take(limit) {
-            let action_hash = ActionHash::try_from(link.target.clone())
-                .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid path extension hash".to_string())))?;
+            let action_hash = ActionHash::try_from(link.target.clone()).map_err(|_| {
+                wasm_error!(WasmErrorInner::Guest(
+                    "Invalid path extension hash".to_string()
+                ))
+            })?;
 
             let record = get(action_hash.clone(), GetOptions::default())?;
             if let Some(record) = record {
-                if let Some(path_extension) = record.entry().to_app_option::<PathExtension>().ok().flatten() {
-                    results.push(PathExtensionOutput { action_hash, path_extension });
+                if let Some(path_extension) = record
+                    .entry()
+                    .to_app_option::<PathExtension>()
+                    .ok()
+                    .flatten()
+                {
+                    results.push(PathExtensionOutput {
+                        action_hash,
+                        path_extension: path_extension_to_wire(&path_extension),
+                    });
                 }
             }
         }
@@ -7181,13 +7844,18 @@ pub fn query_path_extensions(input: QueryPathExtensionsInput) -> ExternResult<Ve
 
 /// Create a custodian commitment
 #[hdk_extern]
-pub fn create_custodian_commitment(input: CreateCustodianCommitmentInput) -> ExternResult<CustodianCommitmentOutput> {
+pub fn create_custodian_commitment(
+    input: CreateCustodianCommitmentInput,
+) -> ExternResult<CustodianCommitmentOutput> {
     let agent_info = agent_info()?;
     let now = sys_time()?;
     let timestamp = format!("{:?}", now);
 
     let commitment = CustodianCommitment {
-        id: format!("{}-{}", input.beneficiary_agent_id, input.custodian_agent_id),
+        id: format!(
+            "{}-{}",
+            input.beneficiary_agent_id, input.custodian_agent_id
+        ),
         custodian_agent_id: input.custodian_agent_id.clone(),
         beneficiary_agent_id: input.beneficiary_agent_id.clone(),
         commitment_type: input.commitment_type.clone(),
@@ -7204,7 +7872,9 @@ pub fn create_custodian_commitment(input: CreateCustodianCommitmentInput) -> Ext
         emergency_contacts_json: input.emergency_contacts_json,
         recovery_instructions_json: input.recovery_instructions_json,
         cache_priority: input.cache_priority.unwrap_or(50),
-        bandwidth_class: input.bandwidth_class.unwrap_or_else(|| "medium".to_string()),
+        bandwidth_class: input
+            .bandwidth_class
+            .unwrap_or_else(|| "medium".to_string()),
         geographic_affinity: input.geographic_affinity,
         state: "proposed".to_string(),
         proposed_at: timestamp.clone(),
@@ -7263,7 +7933,9 @@ pub fn create_custodian_commitment(input: CreateCustodianCommitmentInput) -> Ext
 
 /// Accept a custodian commitment (proposed → accepted)
 #[hdk_extern]
-pub fn accept_custodian_commitment(input: AcceptCommitmentInput) -> ExternResult<CustodianCommitmentOutput> {
+pub fn accept_custodian_commitment(
+    input: AcceptCommitmentInput,
+) -> ExternResult<CustodianCommitmentOutput> {
     // Get the commitment by ID
     let id_anchor = StringAnchor::new("custodian_commitment_id", &input.commitment_id);
     let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
@@ -7272,20 +7944,33 @@ pub fn accept_custodian_commitment(input: AcceptCommitmentInput) -> ExternResult
     let links = get_links(query, GetStrategy::default())?;
 
     if links.is_empty() {
-        return Err(wasm_error!(WasmErrorInner::Guest("Commitment not found".to_string())));
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Commitment not found".to_string()
+        )));
     }
 
     let action_hash = ActionHash::try_from(links[0].target.clone())
         .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid commitment hash".to_string())))?;
 
-    let record = get(action_hash.clone(), GetOptions::default())?
-        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Commitment record not found".to_string())))?;
+    let record = get(action_hash.clone(), GetOptions::default())?.ok_or_else(|| {
+        wasm_error!(WasmErrorInner::Guest(
+            "Commitment record not found".to_string()
+        ))
+    })?;
 
     let mut commitment = record
         .entry()
         .to_app_option::<CustodianCommitment>()
-        .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid commitment entry type".to_string())))?
-        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Invalid commitment entry".to_string())))?;
+        .map_err(|_| {
+            wasm_error!(WasmErrorInner::Guest(
+                "Invalid commitment entry type".to_string()
+            ))
+        })?
+        .ok_or_else(|| {
+            wasm_error!(WasmErrorInner::Guest(
+                "Invalid commitment entry".to_string()
+            ))
+        })?;
 
     let now = sys_time()?;
     let timestamp = format!("{:?}", now);
@@ -7296,7 +7981,10 @@ pub fn accept_custodian_commitment(input: AcceptCommitmentInput) -> ExternResult
     commitment.updated_at = timestamp;
 
     // Create a new version with update
-    let updated_action_hash = update_entry(action_hash.clone(), &EntryTypes::CustodianCommitment(commitment.clone()))?;
+    let updated_action_hash = update_entry(
+        action_hash.clone(),
+        &EntryTypes::CustodianCommitment(commitment.clone()),
+    )?;
 
     let entry_hash = hash_entry(&EntryTypes::CustodianCommitment(commitment.clone()))?;
 
@@ -7309,7 +7997,9 @@ pub fn accept_custodian_commitment(input: AcceptCommitmentInput) -> ExternResult
 
 /// Query custodian commitments by various criteria
 #[hdk_extern]
-pub fn query_custodian_commitments(input: QueryCommitmentsInput) -> ExternResult<Vec<CustodianCommitmentOutput>> {
+pub fn query_custodian_commitments(
+    input: QueryCommitmentsInput,
+) -> ExternResult<Vec<CustodianCommitmentOutput>> {
     let mut results = Vec::new();
     let limit = input.limit.unwrap_or(100) as usize;
 
@@ -7322,19 +8012,26 @@ pub fn query_custodian_commitments(input: QueryCommitmentsInput) -> ExternResult
         let links = get_links(query, GetStrategy::default())?;
 
         for link in links.iter().take(limit) {
-            let action_hash = ActionHash::try_from(link.target.clone())
-                .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid commitment hash".to_string())))?;
+            let action_hash = ActionHash::try_from(link.target.clone()).map_err(|_| {
+                wasm_error!(WasmErrorInner::Guest("Invalid commitment hash".to_string()))
+            })?;
 
             let record = get(action_hash.clone(), GetOptions::default())?;
             if let Some(record) = record {
-                if let Some(commitment) = record.entry().to_app_option::<CustodianCommitment>().ok().flatten() {
+                if let Some(commitment) = record
+                    .entry()
+                    .to_app_option::<CustodianCommitment>()
+                    .ok()
+                    .flatten()
+                {
                     // Filter by state if specified
                     if let Some(ref state) = input.state {
                         if commitment.state != *state {
                             continue;
                         }
                     }
-                    let entry_hash = hash_entry(&EntryTypes::CustodianCommitment(commitment.clone()))?;
+                    let entry_hash =
+                        hash_entry(&EntryTypes::CustodianCommitment(commitment.clone()))?;
                     results.push(CustodianCommitmentOutput {
                         action_hash,
                         entry_hash,
@@ -7349,25 +8046,34 @@ pub fn query_custodian_commitments(input: QueryCommitmentsInput) -> ExternResult
     if let Some(beneficiary_id) = &input.beneficiary_agent_id {
         if input.custodian_agent_id.is_none() {
             let beneficiary_anchor = StringAnchor::new("beneficiary_id", beneficiary_id);
-            let beneficiary_anchor_hash = hash_entry(&EntryTypes::StringAnchor(beneficiary_anchor))?;
+            let beneficiary_anchor_hash =
+                hash_entry(&EntryTypes::StringAnchor(beneficiary_anchor))?;
 
-            let query = LinkQuery::try_new(beneficiary_anchor_hash, LinkTypes::BeneficiaryToCommitment)?;
+            let query =
+                LinkQuery::try_new(beneficiary_anchor_hash, LinkTypes::BeneficiaryToCommitment)?;
             let links = get_links(query, GetStrategy::default())?;
 
             for link in links.iter().take(limit) {
-                let action_hash = ActionHash::try_from(link.target.clone())
-                    .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid commitment hash".to_string())))?;
+                let action_hash = ActionHash::try_from(link.target.clone()).map_err(|_| {
+                    wasm_error!(WasmErrorInner::Guest("Invalid commitment hash".to_string()))
+                })?;
 
                 let record = get(action_hash.clone(), GetOptions::default())?;
                 if let Some(record) = record {
-                    if let Some(commitment) = record.entry().to_app_option::<CustodianCommitment>().ok().flatten() {
+                    if let Some(commitment) = record
+                        .entry()
+                        .to_app_option::<CustodianCommitment>()
+                        .ok()
+                        .flatten()
+                    {
                         // Filter by state if specified
                         if let Some(ref state) = input.state {
                             if commitment.state != *state {
                                 continue;
                             }
                         }
-                        let entry_hash = hash_entry(&EntryTypes::CustodianCommitment(commitment.clone()))?;
+                        let entry_hash =
+                            hash_entry(&EntryTypes::CustodianCommitment(commitment.clone()))?;
                         results.push(CustodianCommitmentOutput {
                             action_hash,
                             entry_hash,
@@ -7412,7 +8118,10 @@ pub fn generate_shards(input: GenerateShardsInput) -> ExternResult<GenerateShard
     // In production, would use actual Shamir or Reed-Solomon libraries
     let mut shard_hashes = Vec::new();
     for shard_index in 0..total_shards {
-        let shard_seed = format!("{}-{}-{}", input.content_id, shard_index, input.shard_strategy);
+        let shard_seed = format!(
+            "{}-{}-{}",
+            input.content_id, shard_index, input.shard_strategy
+        );
         let shard_hash = calculate_sha256(&shard_seed);
         shard_hashes.push(shard_hash);
     }
@@ -7454,7 +8163,10 @@ fn generate_watermark(
 
     // Sign watermark with custodian's agent key (would use actual cryptographic signature)
     // For now, create deterministic HMAC-like proof
-    let signature = calculate_sha256(&format!("{}|{}", watermark_data, agent_info.agent_initial_pubkey));
+    let signature = calculate_sha256(&format!(
+        "{}|{}",
+        watermark_data, agent_info.agent_initial_pubkey
+    ));
 
     Ok(signature)
 }
@@ -7573,7 +8285,10 @@ pub fn verify_shard(input: VerifyShardInput) -> ExternResult<bool> {
     let commitment_anchor = StringAnchor::new("custodian_commitment_id", &input.commitment_id);
     let commitment_anchor_hash = hash_entry(&EntryTypes::StringAnchor(commitment_anchor))?;
 
-    let query = LinkQuery::try_new(commitment_anchor_hash, LinkTypes::ContentToCommitmentCustodian)?;
+    let query = LinkQuery::try_new(
+        commitment_anchor_hash,
+        LinkTypes::ContentToCommitmentCustodian,
+    )?;
     let links = get_links(query, GetStrategy::default())?;
 
     if links.is_empty() {
@@ -7716,8 +8431,14 @@ fn on_relationship_updated(relationship: Relationship) -> ExternResult<()> {
         cache_priority: Some(80),
         bandwidth_class: Some("medium".to_string()),
         geographic_affinity: None,
-        note: Some(format!("{} relationship custody auto-commitment", intimacy_level)),
-        metadata_json: Some(format!(r#"{{"relationship_type":"{}","auto_created":true}}"#, relationship.relationship_type)),
+        note: Some(format!(
+            "{} relationship custody auto-commitment",
+            intimacy_level
+        )),
+        metadata_json: Some(format!(
+            r#"{{"relationship_type":"{}","auto_created":true}}"#,
+            relationship.relationship_type
+        )),
     };
 
     // Create source → target commitment
@@ -7775,8 +8496,14 @@ fn on_relationship_updated(relationship: Relationship) -> ExternResult<()> {
         cache_priority: Some(80),
         bandwidth_class: Some("medium".to_string()),
         geographic_affinity: None,
-        note: Some(format!("{} relationship custody auto-commitment", intimacy_level)),
-        metadata_json: Some(format!(r#"{{"relationship_type":"{}","auto_created":true}}"#, relationship.relationship_type)),
+        note: Some(format!(
+            "{} relationship custody auto-commitment",
+            intimacy_level
+        )),
+        metadata_json: Some(format!(
+            r#"{{"relationship_type":"{}","auto_created":true}}"#,
+            relationship.relationship_type
+        )),
     };
 
     // Create target → source commitment
@@ -7812,14 +8539,15 @@ fn get_commitment_by_id(commitment_id: &str) -> ExternResult<Option<CustodianCom
 
     if let Some(link) = links.first() {
         // Convert link.target to ActionHash
-        let action_hash = ActionHash::try_from(link.target.clone())
-            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid action hash in link".to_string())))?;
+        let action_hash = ActionHash::try_from(link.target.clone()).map_err(|_| {
+            wasm_error!(WasmErrorInner::Guest(
+                "Invalid action hash in link".to_string()
+            ))
+        })?;
 
         // Get the commitment entry
         if let Some(record) = get(action_hash, GetOptions::default())? {
-            if let Ok(Some(commitment)) =
-                record.entry().to_app_option::<CustodianCommitment>()
-            {
+            if let Ok(Some(commitment)) = record.entry().to_app_option::<CustodianCommitment>() {
                 return Ok(Some(commitment));
             }
         }
@@ -7833,10 +8561,13 @@ fn get_commitment_by_id(commitment_id: &str) -> ExternResult<Option<CustodianCom
 /// Beneficiary provides passphrase → immediate activation → notify emergency contacts
 /// Enables immediate recovery if account is compromised or in crisis
 #[hdk_extern]
-pub fn activate_emergency_manual(input: ActivateEmergencyManualInput) -> ExternResult<CustodianCommitmentOutput> {
+pub fn activate_emergency_manual(
+    input: ActivateEmergencyManualInput,
+) -> ExternResult<CustodianCommitmentOutput> {
     // Get commitment
-    let mut commitment = get_commitment_by_id(&input.commitment_id)?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Commitment not found".to_string())))?;
+    let mut commitment = get_commitment_by_id(&input.commitment_id)?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Commitment not found".to_string())
+    ))?;
 
     // Verify this is beneficiary making the request
     let current_agent = agent_info()?.agent_initial_pubkey;
@@ -7847,8 +8578,8 @@ pub fn activate_emergency_manual(input: ActivateEmergencyManualInput) -> ExternR
     }
 
     // Extract manual_signal trigger config
-    let triggers: Vec<EmergencyTriggerSpec> = serde_json::from_str(&commitment.emergency_triggers_json)
-        .unwrap_or_default();
+    let triggers: Vec<EmergencyTriggerSpec> =
+        serde_json::from_str(&commitment.emergency_triggers_json).unwrap_or_default();
 
     let manual_trigger = triggers
         .iter()
@@ -7900,12 +8631,13 @@ pub fn activate_emergency_trusted_party(
     input: ActivateEmergencyTrustedPartyInput,
 ) -> ExternResult<CustodianCommitmentOutput> {
     // Get commitment
-    let mut commitment = get_commitment_by_id(&input.commitment_id)?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Commitment not found".to_string())))?;
+    let mut commitment = get_commitment_by_id(&input.commitment_id)?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Commitment not found".to_string())
+    ))?;
 
     // Extract trusted_party trigger config
-    let triggers: Vec<EmergencyTriggerSpec> = serde_json::from_str(&commitment.emergency_triggers_json)
-        .unwrap_or_default();
+    let triggers: Vec<EmergencyTriggerSpec> =
+        serde_json::from_str(&commitment.emergency_triggers_json).unwrap_or_default();
 
     let trusted_trigger = triggers
         .iter()
@@ -7915,7 +8647,9 @@ pub fn activate_emergency_trusted_party(
         )))?;
 
     // Verify trusted_agent_id is in the list
-    let trusted_ids = trusted_trigger.trusted_agent_ids.as_ref()
+    let trusted_ids = trusted_trigger
+        .trusted_agent_ids
+        .as_ref()
         .ok_or(wasm_error!(WasmErrorInner::Guest(
             "No trusted parties configured".to_string()
         )))?;
@@ -7965,12 +8699,13 @@ pub fn activate_emergency_trusted_party(
 #[hdk_extern]
 pub fn submit_consensus_vote(input: SubmitConsensusVoteInput) -> ExternResult<ConsensusVoteStatus> {
     // Get commitment
-    let commitment = get_commitment_by_id(&input.commitment_id)?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Commitment not found".to_string())))?;
+    let commitment = get_commitment_by_id(&input.commitment_id)?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Commitment not found".to_string())
+    ))?;
 
     // Extract consensus trigger
-    let triggers: Vec<EmergencyTriggerSpec> = serde_json::from_str(&commitment.emergency_triggers_json)
-        .unwrap_or_default();
+    let triggers: Vec<EmergencyTriggerSpec> =
+        serde_json::from_str(&commitment.emergency_triggers_json).unwrap_or_default();
 
     let consensus_trigger = triggers
         .iter()
@@ -7979,12 +8714,14 @@ pub fn submit_consensus_vote(input: SubmitConsensusVoteInput) -> ExternResult<Co
             "M-of-N consensus trigger not enabled".to_string()
         )))?;
 
-    let threshold_m = consensus_trigger.consensus_m
+    let threshold_m = consensus_trigger
+        .consensus_m
         .ok_or(wasm_error!(WasmErrorInner::Guest(
             "Consensus threshold M not configured".to_string()
         )))?;
 
-    let threshold_n = consensus_trigger.consensus_n
+    let threshold_n = consensus_trigger
+        .consensus_n
         .ok_or(wasm_error!(WasmErrorInner::Guest(
             "Consensus total N not configured".to_string()
         )))?;
@@ -8013,14 +8750,17 @@ pub fn submit_consensus_vote(input: SubmitConsensusVoteInput) -> ExternResult<Co
 ///
 /// Returns current vote counts and whether threshold is reached
 #[hdk_extern]
-pub fn check_consensus_status(input: CheckConsensusStatusInput) -> ExternResult<ConsensusVoteStatus> {
+pub fn check_consensus_status(
+    input: CheckConsensusStatusInput,
+) -> ExternResult<ConsensusVoteStatus> {
     // Get commitment
-    let commitment = get_commitment_by_id(&input.commitment_id)?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Commitment not found".to_string())))?;
+    let commitment = get_commitment_by_id(&input.commitment_id)?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Commitment not found".to_string())
+    ))?;
 
     // Extract consensus trigger
-    let triggers: Vec<EmergencyTriggerSpec> = serde_json::from_str(&commitment.emergency_triggers_json)
-        .unwrap_or_default();
+    let triggers: Vec<EmergencyTriggerSpec> =
+        serde_json::from_str(&commitment.emergency_triggers_json).unwrap_or_default();
 
     let consensus_trigger = triggers
         .iter()
@@ -8056,8 +8796,9 @@ pub fn reconstruct_content_from_shards(
     input: ReconstructContentInput,
 ) -> ExternResult<ReconstructContentOutput> {
     // Get commitment
-    let commitment = get_commitment_by_id(&input.commitment_id)?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Commitment not found".to_string())))?;
+    let commitment = get_commitment_by_id(&input.commitment_id)?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Commitment not found".to_string())
+    ))?;
 
     // Only beneficiary can reconstruct
     let current_agent = agent_info()?.agent_initial_pubkey;
@@ -8085,7 +8826,10 @@ pub fn reconstruct_content_from_shards(
             // Placeholder: return reconstructed content
             Ok(ReconstructContentOutput {
                 content_id: input.content_id.clone(),
-                content: format!("Reconstructed content from full_replica strategy for {}", input.content_id),
+                content: format!(
+                    "Reconstructed content from full_replica strategy for {}",
+                    input.content_id
+                ),
                 shards_gathered: 1,
                 shards_required: 1,
                 reconstruction_method: "full_replica".to_string(),
@@ -8098,7 +8842,10 @@ pub fn reconstruct_content_from_shards(
             // Placeholder: requires Shamir library integration
             Ok(ReconstructContentOutput {
                 content_id: input.content_id.clone(),
-                content: format!("Reconstructed content via Shamir's Secret Sharing for {}", input.content_id),
+                content: format!(
+                    "Reconstructed content via Shamir's Secret Sharing for {}",
+                    input.content_id
+                ),
                 shards_gathered: commitment.redundancy_factor,
                 shards_required: commitment.redundancy_factor,
                 reconstruction_method: "threshold_split".to_string(),
@@ -8111,7 +8858,10 @@ pub fn reconstruct_content_from_shards(
             // Placeholder: requires Reed-Solomon library integration
             Ok(ReconstructContentOutput {
                 content_id: input.content_id.clone(),
-                content: format!("Reconstructed content via Reed-Solomon for {}", input.content_id),
+                content: format!(
+                    "Reconstructed content via Reed-Solomon for {}",
+                    input.content_id
+                ),
                 shards_gathered: commitment.redundancy_factor,
                 shards_required: commitment.redundancy_factor,
                 reconstruction_method: "erasure_coded".to_string(),
@@ -8161,24 +8911,26 @@ pub fn create_category_override(
 ) -> ExternResult<CategoryOverrideOutput> {
     // Validate category type
     if !CATEGORY_OVERRIDE_TYPES.contains(&input.category.category_type.as_str()) {
-        return Err(wasm_error!(WasmErrorInner::Guest(
-            format!("Unknown category type: {}", input.category.category_type)
-        )));
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Unknown category type: {}",
+            input.category.category_type
+        ))));
     }
 
     // Validate access level
     if !CATEGORY_ACCESS_LEVELS.contains(&input.category.access_level.as_str()) {
-        return Err(wasm_error!(WasmErrorInner::Guest(
-            format!("Unknown access level: {}", input.category.access_level)
-        )));
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Unknown access level: {}",
+            input.category.access_level
+        ))));
     }
 
     // Get current time outside the closure
     let now = format!("{:?}", sys_time()?);
 
     // Get existing commitment or create new one
-    let mut commitment = get_commitment_by_id(&input.commitment_id)?
-        .unwrap_or_else(|| CustodianCommitment {
+    let mut commitment =
+        get_commitment_by_id(&input.commitment_id)?.unwrap_or_else(|| CustodianCommitment {
             id: input.commitment_id.clone(),
             custodian_agent_id: input.specialist_agent_id.clone(),
             beneficiary_agent_id: input.beneficiary_id.clone(),
@@ -8210,7 +8962,10 @@ pub fn create_category_override(
             last_shard_update_at: None,
             total_restores_performed: 0,
             shefa_commitment_id: None,
-            note: Some(format!("Category override: {} - {}", input.category.category_type, input.reason)),
+            note: Some(format!(
+                "Category override: {} - {}",
+                input.category.category_type, input.reason
+            )),
             metadata_json: serde_json::to_string(&serde_json::json!({
                 "category_type": input.category.category_type,
                 "access_level": input.category.access_level,
@@ -8224,8 +8979,8 @@ pub fn create_category_override(
         });
 
     // Update commitment with category override info
-    commitment.category_override_json = serde_json::to_string(&input.category)
-        .unwrap_or_else(|_| "{}".to_string());
+    commitment.category_override_json =
+        serde_json::to_string(&input.category).unwrap_or_else(|_| "{}".to_string());
 
     // Store the updated commitment
     let entry_hash = hash_entry(&EntryTypes::CustodianCommitment(commitment.clone()))?;
@@ -8273,12 +9028,11 @@ pub fn validate_category_access(
 
 /// Revoke a category override (beneficiary can revoke access)
 #[hdk_extern]
-pub fn revoke_category_override(
-    commitment_id: String,
-) -> ExternResult<CustodianCommitmentOutput> {
+pub fn revoke_category_override(commitment_id: String) -> ExternResult<CustodianCommitmentOutput> {
     // Get commitment
-    let mut commitment = get_commitment_by_id(&commitment_id)?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Commitment not found".to_string())))?;
+    let mut commitment = get_commitment_by_id(&commitment_id)?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Commitment not found".to_string())
+    ))?;
 
     // Verify beneficiary is revoking
     let current_agent = agent_info()?.agent_initial_pubkey;
@@ -8375,7 +9129,10 @@ pub fn batch_accept_commitments(
                     }
                 } else {
                     failed += 1;
-                    errors.push(format!("Commitment {} not in proposed state", commitment_id));
+                    errors.push(format!(
+                        "Commitment {} not in proposed state",
+                        commitment_id
+                    ));
                 }
             }
             Ok(None) => {
@@ -8384,7 +9141,10 @@ pub fn batch_accept_commitments(
             }
             Err(e) => {
                 failed += 1;
-                errors.push(format!("Error loading commitment {}: {:?}", commitment_id, e));
+                errors.push(format!(
+                    "Error loading commitment {}: {:?}",
+                    commitment_id, e
+                ));
             }
         }
     }
@@ -8438,7 +9198,10 @@ pub fn batch_update_commitments(
             }
             Err(e) => {
                 failed += 1;
-                errors.push(format!("Error loading commitment {}: {:?}", commitment_id, e));
+                errors.push(format!(
+                    "Error loading commitment {}: {:?}",
+                    commitment_id, e
+                ));
             }
         }
     }
@@ -8486,19 +9249,31 @@ pub fn get_shard_metadata_only(
 
 /// Create a member risk profile entry
 #[hdk_extern]
-pub fn create_member_risk_profile(input: MemberRiskProfile) -> ExternResult<(ActionHash, EntryHash)> {
+pub fn create_member_risk_profile(
+    input: MemberRiskProfile,
+) -> ExternResult<(ActionHash, EntryHash)> {
     let action_hash = create_entry(&EntryTypes::MemberRiskProfile(input.clone()))?;
     let entry_hash = hash_entry(&EntryTypes::MemberRiskProfile(input.clone()))?;
 
     // Create ID lookup link
     let id_anchor = StringAnchor::new("member_risk_profile", &input.id);
     let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
-    create_link(id_anchor_hash, action_hash.clone(), LinkTypes::IdToMemberRiskProfile, ())?;
+    create_link(
+        id_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::IdToMemberRiskProfile,
+        (),
+    )?;
 
     // Create member lookup link
     let member_anchor = StringAnchor::new("member_profiles", &input.member_id);
     let member_anchor_hash = hash_entry(&EntryTypes::StringAnchor(member_anchor))?;
-    create_link(member_anchor_hash, action_hash.clone(), LinkTypes::MemberToRiskProfile, ())?;
+    create_link(
+        member_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::MemberToRiskProfile,
+        (),
+    )?;
 
     // RiskProfileByTier link removed - query via projection instead
 
@@ -8507,7 +9282,9 @@ pub fn create_member_risk_profile(input: MemberRiskProfile) -> ExternResult<(Act
 
 /// Get a member risk profile by ID
 #[hdk_extern]
-pub fn get_member_risk_profile(profile_id: String) -> ExternResult<Option<(ActionHash, MemberRiskProfile)>> {
+pub fn get_member_risk_profile(
+    profile_id: String,
+) -> ExternResult<Option<(ActionHash, MemberRiskProfile)>> {
     let id_anchor = StringAnchor::new("member_risk_profile", &profile_id);
     let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
 
@@ -8523,7 +9300,12 @@ pub fn get_member_risk_profile(profile_id: String) -> ExternResult<Option<(Actio
 
     let record = get(action_hash.clone(), GetOptions::default())?;
     if let Some(record) = record {
-        if let Some(profile) = record.entry().to_app_option::<MemberRiskProfile>().ok().flatten() {
+        if let Some(profile) = record
+            .entry()
+            .to_app_option::<MemberRiskProfile>()
+            .ok()
+            .flatten()
+        {
             return Ok(Some((action_hash, profile)));
         }
     }
@@ -8540,12 +9322,22 @@ pub fn create_coverage_policy(input: CoveragePolicy) -> ExternResult<(ActionHash
     // Create ID lookup link
     let id_anchor = StringAnchor::new("coverage_policy", &input.id);
     let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
-    create_link(id_anchor_hash, action_hash.clone(), LinkTypes::IdToCoveragePolicy, ())?;
+    create_link(
+        id_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::IdToCoveragePolicy,
+        (),
+    )?;
 
     // Create member lookup link
     let member_anchor = StringAnchor::new("member_policies", &input.member_id);
     let member_anchor_hash = hash_entry(&EntryTypes::StringAnchor(member_anchor))?;
-    create_link(member_anchor_hash, action_hash.clone(), LinkTypes::MemberToCoveragePolicy, ())?;
+    create_link(
+        member_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::MemberToCoveragePolicy,
+        (),
+    )?;
 
     // CoveragePolicyByLevel link removed - query via projection instead
 
@@ -8554,7 +9346,9 @@ pub fn create_coverage_policy(input: CoveragePolicy) -> ExternResult<(ActionHash
 
 /// Get a coverage policy by ID
 #[hdk_extern]
-pub fn get_coverage_policy(policy_id: String) -> ExternResult<Option<(ActionHash, CoveragePolicy)>> {
+pub fn get_coverage_policy(
+    policy_id: String,
+) -> ExternResult<Option<(ActionHash, CoveragePolicy)>> {
     let id_anchor = StringAnchor::new("coverage_policy", &policy_id);
     let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
 
@@ -8570,7 +9364,12 @@ pub fn get_coverage_policy(policy_id: String) -> ExternResult<Option<(ActionHash
 
     let record = get(action_hash.clone(), GetOptions::default())?;
     if let Some(record) = record {
-        if let Some(policy) = record.entry().to_app_option::<CoveragePolicy>().ok().flatten() {
+        if let Some(policy) = record
+            .entry()
+            .to_app_option::<CoveragePolicy>()
+            .ok()
+            .flatten()
+        {
             return Ok(Some((action_hash, policy)));
         }
     }
@@ -8587,17 +9386,32 @@ pub fn create_insurance_claim(input: InsuranceClaim) -> ExternResult<(ActionHash
     // Create ID lookup link
     let id_anchor = StringAnchor::new("insurance_claim", &input.id);
     let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
-    create_link(id_anchor_hash, action_hash.clone(), LinkTypes::IdToInsuranceClaim, ())?;
+    create_link(
+        id_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::IdToInsuranceClaim,
+        (),
+    )?;
 
     // Create member lookup link
     let member_anchor = StringAnchor::new("member_claims", &input.member_id);
     let member_anchor_hash = hash_entry(&EntryTypes::StringAnchor(member_anchor))?;
-    create_link(member_anchor_hash, action_hash.clone(), LinkTypes::MemberToClaim, ())?;
+    create_link(
+        member_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::MemberToClaim,
+        (),
+    )?;
 
     // Create status lookup link
     let status_anchor = StringAnchor::new("claims_by_status", &input.status);
     let status_anchor_hash = hash_entry(&EntryTypes::StringAnchor(status_anchor))?;
-    create_link(status_anchor_hash, action_hash.clone(), LinkTypes::ClaimByStatus, ())?;
+    create_link(
+        status_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::ClaimByStatus,
+        (),
+    )?;
 
     Ok((action_hash, entry_hash))
 }
@@ -8620,7 +9434,12 @@ pub fn get_insurance_claim(claim_id: String) -> ExternResult<Option<(ActionHash,
 
     let record = get(action_hash.clone(), GetOptions::default())?;
     if let Some(record) = record {
-        if let Some(claim) = record.entry().to_app_option::<InsuranceClaim>().ok().flatten() {
+        if let Some(claim) = record
+            .entry()
+            .to_app_option::<InsuranceClaim>()
+            .ok()
+            .flatten()
+        {
             return Ok(Some((action_hash, claim)));
         }
     }
@@ -8630,26 +9449,40 @@ pub fn get_insurance_claim(claim_id: String) -> ExternResult<Option<(ActionHash,
 
 /// Create an adjustment reasoning entry
 #[hdk_extern]
-pub fn create_adjustment_reasoning(input: AdjustmentReasoning) -> ExternResult<(ActionHash, EntryHash)> {
+pub fn create_adjustment_reasoning(
+    input: AdjustmentReasoning,
+) -> ExternResult<(ActionHash, EntryHash)> {
     let action_hash = create_entry(&EntryTypes::AdjustmentReasoning(input.clone()))?;
     let entry_hash = hash_entry(&EntryTypes::AdjustmentReasoning(input.clone()))?;
 
     // Create ID lookup link
     let id_anchor = StringAnchor::new("adjustment_reasoning", &input.id);
     let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
-    create_link(id_anchor_hash, action_hash.clone(), LinkTypes::IdToAdjustmentReasoning, ())?;
+    create_link(
+        id_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::IdToAdjustmentReasoning,
+        (),
+    )?;
 
     // Create claim lookup link
     let claim_anchor = StringAnchor::new("claim_adjustments", &input.claim_id);
     let claim_anchor_hash = hash_entry(&EntryTypes::StringAnchor(claim_anchor))?;
-    create_link(claim_anchor_hash, action_hash.clone(), LinkTypes::ClaimToAdjustment, ())?;
+    create_link(
+        claim_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::ClaimToAdjustment,
+        (),
+    )?;
 
     Ok((action_hash, entry_hash))
 }
 
 /// Get an adjustment reasoning by ID
 #[hdk_extern]
-pub fn get_adjustment_reasoning(reasoning_id: String) -> ExternResult<Option<(ActionHash, AdjustmentReasoning)>> {
+pub fn get_adjustment_reasoning(
+    reasoning_id: String,
+) -> ExternResult<Option<(ActionHash, AdjustmentReasoning)>> {
     let id_anchor = StringAnchor::new("adjustment_reasoning", &reasoning_id);
     let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
 
@@ -8665,7 +9498,12 @@ pub fn get_adjustment_reasoning(reasoning_id: String) -> ExternResult<Option<(Ac
 
     let record = get(action_hash.clone(), GetOptions::default())?;
     if let Some(record) = record {
-        if let Some(reasoning) = record.entry().to_app_option::<AdjustmentReasoning>().ok().flatten() {
+        if let Some(reasoning) = record
+            .entry()
+            .to_app_option::<AdjustmentReasoning>()
+            .ok()
+            .flatten()
+        {
             return Ok(Some((action_hash, reasoning)));
         }
     }
@@ -8686,24 +9524,41 @@ pub fn create_service_request(input: ServiceRequest) -> ExternResult<(ActionHash
     // Create ID lookup link
     let id_anchor = StringAnchor::new("service_request", &input.id);
     let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
-    create_link(id_anchor_hash, action_hash.clone(), LinkTypes::IdToServiceRequest, ())?;
+    create_link(
+        id_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::IdToServiceRequest,
+        (),
+    )?;
 
     // Create requester lookup link
     let requester_anchor = StringAnchor::new("user_requests", &input.requester_id);
     let requester_anchor_hash = hash_entry(&EntryTypes::StringAnchor(requester_anchor))?;
-    create_link(requester_anchor_hash, action_hash.clone(), LinkTypes::RequesterToRequest, ())?;
+    create_link(
+        requester_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::RequesterToRequest,
+        (),
+    )?;
 
     // Create status lookup link
     let status_anchor = StringAnchor::new("requests_by_status", &input.status);
     let status_anchor_hash = hash_entry(&EntryTypes::StringAnchor(status_anchor))?;
-    create_link(status_anchor_hash, action_hash.clone(), LinkTypes::RequestByStatus, ())?;
+    create_link(
+        status_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::RequestByStatus,
+        (),
+    )?;
 
     Ok((action_hash, entry_hash))
 }
 
 /// Get a service request by ID
 #[hdk_extern]
-pub fn get_service_request(request_id: String) -> ExternResult<Option<(ActionHash, ServiceRequest)>> {
+pub fn get_service_request(
+    request_id: String,
+) -> ExternResult<Option<(ActionHash, ServiceRequest)>> {
     let id_anchor = StringAnchor::new("service_request", &request_id);
     let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
 
@@ -8719,7 +9574,12 @@ pub fn get_service_request(request_id: String) -> ExternResult<Option<(ActionHas
 
     let record = get(action_hash.clone(), GetOptions::default())?;
     if let Some(record) = record {
-        if let Some(request) = record.entry().to_app_option::<ServiceRequest>().ok().flatten() {
+        if let Some(request) = record
+            .entry()
+            .to_app_option::<ServiceRequest>()
+            .ok()
+            .flatten()
+        {
             return Ok(Some((action_hash, request)));
         }
     }
@@ -8736,17 +9596,32 @@ pub fn create_service_offer(input: ServiceOffer) -> ExternResult<(ActionHash, En
     // Create ID lookup link
     let id_anchor = StringAnchor::new("service_offer", &input.id);
     let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
-    create_link(id_anchor_hash, action_hash.clone(), LinkTypes::IdToServiceOffer, ())?;
+    create_link(
+        id_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::IdToServiceOffer,
+        (),
+    )?;
 
     // Create offeror lookup link
     let offeror_anchor = StringAnchor::new("user_offers", &input.offeror_id);
     let offeror_anchor_hash = hash_entry(&EntryTypes::StringAnchor(offeror_anchor))?;
-    create_link(offeror_anchor_hash, action_hash.clone(), LinkTypes::OfferorToOffer, ())?;
+    create_link(
+        offeror_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::OfferorToOffer,
+        (),
+    )?;
 
     // Create status lookup link
     let status_anchor = StringAnchor::new("offers_by_status", &input.status);
     let status_anchor_hash = hash_entry(&EntryTypes::StringAnchor(status_anchor))?;
-    create_link(status_anchor_hash, action_hash.clone(), LinkTypes::OfferByStatus, ())?;
+    create_link(
+        status_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::OfferByStatus,
+        (),
+    )?;
 
     Ok((action_hash, entry_hash))
 }
@@ -8769,7 +9644,12 @@ pub fn get_service_offer(offer_id: String) -> ExternResult<Option<(ActionHash, S
 
     let record = get(action_hash.clone(), GetOptions::default())?;
     if let Some(record) = record {
-        if let Some(offer) = record.entry().to_app_option::<ServiceOffer>().ok().flatten() {
+        if let Some(offer) = record
+            .entry()
+            .to_app_option::<ServiceOffer>()
+            .ok()
+            .flatten()
+        {
             return Ok(Some((action_hash, offer)));
         }
     }
@@ -8786,22 +9666,42 @@ pub fn create_service_match(input: ServiceMatch) -> ExternResult<(ActionHash, En
     // Create ID lookup link
     let id_anchor = StringAnchor::new("service_match", &input.id);
     let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
-    create_link(id_anchor_hash, action_hash.clone(), LinkTypes::IdToServiceMatch, ())?;
+    create_link(
+        id_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::IdToServiceMatch,
+        (),
+    )?;
 
     // Create request lookup link
     let request_anchor = StringAnchor::new("request_matches", &input.request_id);
     let request_anchor_hash = hash_entry(&EntryTypes::StringAnchor(request_anchor))?;
-    create_link(request_anchor_hash, action_hash.clone(), LinkTypes::RequestToMatch, ())?;
+    create_link(
+        request_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::RequestToMatch,
+        (),
+    )?;
 
     // Create offer lookup link
     let offer_anchor = StringAnchor::new("offer_matches", &input.offer_id);
     let offer_anchor_hash = hash_entry(&EntryTypes::StringAnchor(offer_anchor))?;
-    create_link(offer_anchor_hash, action_hash.clone(), LinkTypes::OfferToMatch, ())?;
+    create_link(
+        offer_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::OfferToMatch,
+        (),
+    )?;
 
     // Create status lookup link
     let status_anchor = StringAnchor::new("matches_by_status", &input.status);
     let status_anchor_hash = hash_entry(&EntryTypes::StringAnchor(status_anchor))?;
-    create_link(status_anchor_hash, action_hash.clone(), LinkTypes::MatchByStatus, ())?;
+    create_link(
+        status_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::MatchByStatus,
+        (),
+    )?;
 
     Ok((action_hash, entry_hash))
 }
@@ -8824,7 +9724,12 @@ pub fn get_service_match(match_id: String) -> ExternResult<Option<(ActionHash, S
 
     let record = get(action_hash.clone(), GetOptions::default())?;
     if let Some(record) = record {
-        if let Some(service_match) = record.entry().to_app_option::<ServiceMatch>().ok().flatten() {
+        if let Some(service_match) = record
+            .entry()
+            .to_app_option::<ServiceMatch>()
+            .ok()
+            .flatten()
+        {
             return Ok(Some((action_hash, service_match)));
         }
     }
@@ -9009,7 +9914,6 @@ pub enum ProjectionSignal {
     // =========================================================================
     // Import Batch Signals - for Elohim-Store orchestration
     // =========================================================================
-
     /// ImportBatch was queued (store can start processing)
     ImportBatchQueued {
         batch_id: String,
@@ -9082,7 +9986,12 @@ pub fn post_commit(committed_actions: Vec<SignedActionHashed>) -> ExternResult<(
             })?;
             // Emit cache signal (for Doorway)
             emit_signal(DoorwaySignal::new(CacheSignal::upsert(&content)))?;
-        } else if let Some(path) = record.entry().to_app_option::<LearningPath>().ok().flatten() {
+        } else if let Some(path) = record
+            .entry()
+            .to_app_option::<LearningPath>()
+            .ok()
+            .flatten()
+        {
             // Emit projection signal (for MongoDB)
             emit_signal(ProjectionSignal::PathCommitted {
                 action_hash,
@@ -9106,7 +10015,12 @@ pub fn post_commit(committed_actions: Vec<SignedActionHashed>) -> ExternResult<(
                 chapter,
                 author,
             })?;
-        } else if let Some(relationship) = record.entry().to_app_option::<Relationship>().ok().flatten() {
+        } else if let Some(relationship) = record
+            .entry()
+            .to_app_option::<Relationship>()
+            .ok()
+            .flatten()
+        {
             // Auto-create custodian commitments when relationship reaches trusted/intimate
             let _ = on_relationship_updated(relationship.clone());
 
@@ -9133,84 +10047,144 @@ pub fn post_commit(committed_actions: Vec<SignedActionHashed>) -> ExternResult<(
                 agent,
                 author,
             })?;
-        } else if let Some(presence) = record.entry().to_app_option::<ContributorPresence>().ok().flatten() {
+        } else if let Some(presence) = record
+            .entry()
+            .to_app_option::<ContributorPresence>()
+            .ok()
+            .flatten()
+        {
             emit_signal(ProjectionSignal::PresenceCommitted {
                 action_hash,
                 entry_hash,
                 presence,
                 author,
             })?;
-        } else if let Some(commitment) = record.entry().to_app_option::<CustodianCommitment>().ok().flatten() {
+        } else if let Some(commitment) = record
+            .entry()
+            .to_app_option::<CustodianCommitment>()
+            .ok()
+            .flatten()
+        {
             emit_signal(ProjectionSignal::CustodianCommitmentCommitted {
                 action_hash,
                 entry_hash,
                 commitment,
                 author,
             })?;
-        } else if let Some(profile) = record.entry().to_app_option::<MemberRiskProfile>().ok().flatten() {
+        } else if let Some(profile) = record
+            .entry()
+            .to_app_option::<MemberRiskProfile>()
+            .ok()
+            .flatten()
+        {
             emit_signal(ProjectionSignal::MemberRiskProfileCommitted {
                 action_hash,
                 entry_hash,
                 profile,
                 author,
             })?;
-        } else if let Some(policy) = record.entry().to_app_option::<CoveragePolicy>().ok().flatten() {
+        } else if let Some(policy) = record
+            .entry()
+            .to_app_option::<CoveragePolicy>()
+            .ok()
+            .flatten()
+        {
             emit_signal(ProjectionSignal::CoveragePolicyCommitted {
                 action_hash,
                 entry_hash,
                 policy,
                 author,
             })?;
-        } else if let Some(claim) = record.entry().to_app_option::<InsuranceClaim>().ok().flatten() {
+        } else if let Some(claim) = record
+            .entry()
+            .to_app_option::<InsuranceClaim>()
+            .ok()
+            .flatten()
+        {
             emit_signal(ProjectionSignal::InsuranceClaimCommitted {
                 action_hash,
                 entry_hash,
                 claim,
                 author,
             })?;
-        } else if let Some(reasoning) = record.entry().to_app_option::<AdjustmentReasoning>().ok().flatten() {
+        } else if let Some(reasoning) = record
+            .entry()
+            .to_app_option::<AdjustmentReasoning>()
+            .ok()
+            .flatten()
+        {
             emit_signal(ProjectionSignal::AdjustmentReasoningCommitted {
                 action_hash,
                 entry_hash,
                 reasoning,
                 author,
             })?;
-        } else if let Some(request) = record.entry().to_app_option::<ServiceRequest>().ok().flatten() {
+        } else if let Some(request) = record
+            .entry()
+            .to_app_option::<ServiceRequest>()
+            .ok()
+            .flatten()
+        {
             emit_signal(ProjectionSignal::ServiceRequestCommitted {
                 action_hash,
                 entry_hash,
                 request,
                 author,
             })?;
-        } else if let Some(offer) = record.entry().to_app_option::<ServiceOffer>().ok().flatten() {
+        } else if let Some(offer) = record
+            .entry()
+            .to_app_option::<ServiceOffer>()
+            .ok()
+            .flatten()
+        {
             emit_signal(ProjectionSignal::ServiceOfferCommitted {
                 action_hash,
                 entry_hash,
                 offer,
                 author,
             })?;
-        } else if let Some(service_match) = record.entry().to_app_option::<ServiceMatch>().ok().flatten() {
+        } else if let Some(service_match) = record
+            .entry()
+            .to_app_option::<ServiceMatch>()
+            .ok()
+            .flatten()
+        {
             emit_signal(ProjectionSignal::ServiceMatchCommitted {
                 action_hash,
                 entry_hash,
                 service_match,
                 author,
             })?;
-        } else if let Some(doorway) = record.entry().to_app_option::<DoorwayRegistration>().ok().flatten() {
+        } else if let Some(doorway) = record
+            .entry()
+            .to_app_option::<DoorwayRegistration>()
+            .ok()
+            .flatten()
+        {
             emit_signal(ProjectionSignal::DoorwayCommitted {
                 action_hash,
                 entry_hash,
                 doorway,
                 author,
             })?;
-        } else if let Some(heartbeat) = record.entry().to_app_option::<DoorwayHeartbeat>().ok().flatten() {
+        } else if let Some(heartbeat) = record
+            .entry()
+            .to_app_option::<DoorwayHeartbeat>()
+            .ok()
+            .flatten()
+        {
             emit_signal(ProjectionSignal::DoorwayHeartbeatCommitted {
                 action_hash,
                 entry_hash,
                 heartbeat,
                 author,
             })?;
-        } else if let Some(summary) = record.entry().to_app_option::<DoorwayHeartbeatSummary>().ok().flatten() {
+        } else if let Some(summary) = record
+            .entry()
+            .to_app_option::<DoorwayHeartbeatSummary>()
+            .ok()
+            .flatten()
+        {
             emit_signal(ProjectionSignal::DoorwaySummaryCommitted {
                 action_hash,
                 entry_hash,
@@ -9224,14 +10198,20 @@ pub fn post_commit(committed_actions: Vec<SignedActionHashed>) -> ExternResult<(
                 agreement,
                 author,
             })?;
-        } else if let Some(commitment) = record.entry().to_app_option::<Commitment>().ok().flatten() {
+        } else if let Some(commitment) = record.entry().to_app_option::<Commitment>().ok().flatten()
+        {
             emit_signal(ProjectionSignal::ReaCommitmentCommitted {
                 action_hash,
                 entry_hash,
                 commitment,
                 author,
             })?;
-        } else if let Some(event) = record.entry().to_app_option::<EconomicEvent>().ok().flatten() {
+        } else if let Some(event) = record
+            .entry()
+            .to_app_option::<EconomicEvent>()
+            .ok()
+            .flatten()
+        {
             emit_signal(ProjectionSignal::ReaEconomicEventCommitted {
                 action_hash,
                 entry_hash,
@@ -9255,10 +10235,9 @@ pub fn post_commit(committed_actions: Vec<SignedActionHashed>) -> ExternResult<(
 #[hdk_extern]
 pub fn create_flow_plan(flow_plan: FlowPlan) -> ExternResult<Record> {
     let action_hash = create_entry(&EntryTypes::FlowPlan(flow_plan.clone()))?;
-    let record = get(action_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Created entry not found".to_string()
-        )))?;
+    let record = get(action_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Created entry not found".to_string())
+    ))?;
 
     // Link from steward to plan
     create_link(
@@ -9299,10 +10278,9 @@ pub fn get_plans_for_steward(steward_id: AgentPubKey) -> ExternResult<Vec<Record
 #[hdk_extern]
 pub fn create_flow_budget(flow_budget: FlowBudget) -> ExternResult<Record> {
     let action_hash = create_entry(&EntryTypes::FlowBudget(flow_budget.clone()))?;
-    let record = get(action_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Created budget not found".to_string()
-        )))?;
+    let record = get(action_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Created budget not found".to_string())
+    ))?;
 
     Ok(record)
 }
@@ -9311,10 +10289,9 @@ pub fn create_flow_budget(flow_budget: FlowBudget) -> ExternResult<Record> {
 #[hdk_extern]
 pub fn create_flow_goal(flow_goal: FlowGoal) -> ExternResult<Record> {
     let action_hash = create_entry(&EntryTypes::FlowGoal(flow_goal.clone()))?;
-    let record = get(action_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Created goal not found".to_string()
-        )))?;
+    let record = get(action_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Created goal not found".to_string())
+    ))?;
 
     Ok(record)
 }
@@ -9323,10 +10300,9 @@ pub fn create_flow_goal(flow_goal: FlowGoal) -> ExternResult<Record> {
 #[hdk_extern]
 pub fn create_flow_milestone(flow_milestone: FlowMilestone) -> ExternResult<Record> {
     let action_hash = create_entry(&EntryTypes::FlowMilestone(flow_milestone.clone()))?;
-    let record = get(action_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Created milestone not found".to_string()
-        )))?;
+    let record = get(action_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Created milestone not found".to_string())
+    ))?;
 
     Ok(record)
 }
@@ -9335,10 +10311,9 @@ pub fn create_flow_milestone(flow_milestone: FlowMilestone) -> ExternResult<Reco
 #[hdk_extern]
 pub fn create_flow_scenario(flow_scenario: FlowScenario) -> ExternResult<Record> {
     let action_hash = create_entry(&EntryTypes::FlowScenario(flow_scenario.clone()))?;
-    let record = get(action_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Created scenario not found".to_string()
-        )))?;
+    let record = get(action_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Created scenario not found".to_string())
+    ))?;
 
     Ok(record)
 }
@@ -9347,10 +10322,9 @@ pub fn create_flow_scenario(flow_scenario: FlowScenario) -> ExternResult<Record>
 #[hdk_extern]
 pub fn create_flow_projection(flow_projection: FlowProjection) -> ExternResult<Record> {
     let action_hash = create_entry(&EntryTypes::FlowProjection(flow_projection.clone()))?;
-    let record = get(action_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Created projection not found".to_string()
-        )))?;
+    let record = get(action_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Created projection not found".to_string())
+    ))?;
 
     Ok(record)
 }
@@ -9359,10 +10333,9 @@ pub fn create_flow_projection(flow_projection: FlowProjection) -> ExternResult<R
 #[hdk_extern]
 pub fn create_recurring_pattern(recurring_pattern: RecurringPattern) -> ExternResult<Record> {
     let action_hash = create_entry(&EntryTypes::RecurringPattern(recurring_pattern.clone()))?;
-    let record = get(action_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Created pattern not found".to_string()
-        )))?;
+    let record = get(action_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Created pattern not found".to_string())
+    ))?;
 
     // Link from steward to pattern
     create_link(
@@ -9416,8 +10389,11 @@ pub fn warm_cache(input: WarmCacheInput) -> ExternResult<WarmCacheOutput> {
     for id in &input.content_ids {
         match get_content_by_id(QueryByIdInput { id: id.clone() }) {
             Ok(Some(output)) => {
-                // Emit cache signal - doorway's SignalSubscriber picks this up
-                if let Err(e) = emit_signal(DoorwaySignal::new(CacheSignal::upsert(&output.content))) {
+                // Emit cache signal - reconstruct integrity Content for Cacheable trait
+                let integrity_content = wire_to_integrity_content(&output.content);
+                if let Err(e) =
+                    emit_signal(DoorwaySignal::new(CacheSignal::upsert(&integrity_content)))
+                {
                     errors.push(format!("{}: signal error: {:?}", id, e));
                 } else {
                     content_warmed += 1;
@@ -9452,8 +10428,11 @@ pub fn warm_cache(input: WarmCacheInput) -> ExternResult<WarmCacheOutput> {
         // Use get_path_overview for efficiency (doesn't load all steps)
         match get_path_overview(id.clone()) {
             Ok(Some(overview)) => {
-                // Emit cache signal for the path
-                if let Err(e) = emit_signal(DoorwaySignal::new(CacheSignal::upsert(&overview.path))) {
+                // Emit cache signal for the path - reconstruct integrity type for Cacheable
+                let integrity_path = wire_to_integrity_path(&overview.path);
+                if let Err(e) =
+                    emit_signal(DoorwaySignal::new(CacheSignal::upsert(&integrity_path)))
+                {
                     errors.push(format!("path/{}: signal error: {:?}", id, e));
                 } else {
                     paths_warmed += 1;
@@ -9529,20 +10508,24 @@ pub struct RegisterShardManifestOutput {
 /// - Anchor(blob_hash) -> ShardManifest (for lookup by blob hash)
 /// - Anchor(author_id) -> ShardManifest (for author's manifests)
 #[hdk_extern]
-pub fn register_shard_manifest(input: RegisterShardManifestInput) -> ExternResult<RegisterShardManifestOutput> {
+pub fn register_shard_manifest(
+    input: RegisterShardManifestInput,
+) -> ExternResult<RegisterShardManifestOutput> {
     // Validate encoding type
     if !SHARD_ENCODINGS.contains(&input.encoding.as_str()) {
-        return Err(wasm_error!(WasmErrorInner::Guest(
-            format!("Invalid encoding type: {}. Valid: {:?}", input.encoding, SHARD_ENCODINGS)
-        )));
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Invalid encoding type: {}. Valid: {:?}",
+            input.encoding, SHARD_ENCODINGS
+        ))));
     }
 
     // Validate shard counts
     if input.shard_hashes.len() != input.total_shards as usize {
-        return Err(wasm_error!(WasmErrorInner::Guest(
-            format!("Shard hash count ({}) must match total_shards ({})",
-                    input.shard_hashes.len(), input.total_shards)
-        )));
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Shard hash count ({}) must match total_shards ({})",
+            input.shard_hashes.len(),
+            input.total_shards
+        ))));
     }
 
     let now = format!("{:?}", sys_time()?);
@@ -9599,7 +10582,10 @@ pub fn register_shard_manifest(input: RegisterShardManifestInput) -> ExternResul
         reach: Some(manifest.reach.clone()),
     }));
 
-    Ok(RegisterShardManifestOutput { action_hash, manifest })
+    Ok(RegisterShardManifestOutput {
+        action_hash,
+        manifest,
+    })
 }
 
 /// Get shard manifest by blob hash
@@ -9623,10 +10609,20 @@ pub fn get_shard_manifest(blob_hash: String) -> ExternResult<Option<ShardManifes
 
     match record {
         Some(r) => {
-            let manifest: ShardManifest = r.entry()
+            let manifest: ShardManifest = r
+                .entry()
                 .to_app_option()
-                .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Failed to decode manifest: {:?}", e))))?
-                .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Manifest entry not found".to_string())))?;
+                .map_err(|e| {
+                    wasm_error!(WasmErrorInner::Guest(format!(
+                        "Failed to decode manifest: {:?}",
+                        e
+                    )))
+                })?
+                .ok_or_else(|| {
+                    wasm_error!(WasmErrorInner::Guest(
+                        "Manifest entry not found".to_string()
+                    ))
+                })?;
             Ok(Some(manifest))
         }
         None => Ok(None),
@@ -9662,7 +10658,9 @@ pub struct RegisterShardLocationOutput {
 /// - Anchor(holder) -> ShardLocation (find shards by holder)
 /// - Anchor(holder_did) -> ShardLocation (find locations by DID)
 #[hdk_extern]
-pub fn register_shard_location(input: RegisterShardLocationInput) -> ExternResult<RegisterShardLocationOutput> {
+pub fn register_shard_location(
+    input: RegisterShardLocationInput,
+) -> ExternResult<RegisterShardLocationOutput> {
     let now = format!("{:?}", sys_time()?);
 
     let location = ShardLocation {
@@ -9714,7 +10712,10 @@ pub fn register_shard_location(input: RegisterShardLocationInput) -> ExternResul
         )?;
     }
 
-    Ok(RegisterShardLocationOutput { action_hash, location })
+    Ok(RegisterShardLocationOutput {
+        action_hash,
+        location,
+    })
 }
 
 /// Get all locations for a shard
@@ -9772,13 +10773,26 @@ pub fn get_holder_shards(holder: String) -> ExternResult<Vec<ShardLocation>> {
 /// Mark a shard location as inactive (shard no longer available)
 #[hdk_extern]
 pub fn deactivate_shard_location(action_hash: ActionHash) -> ExternResult<()> {
-    let record = get(action_hash.clone(), GetOptions::default())?
-        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Shard location not found".to_string())))?;
+    let record = get(action_hash.clone(), GetOptions::default())?.ok_or_else(|| {
+        wasm_error!(WasmErrorInner::Guest(
+            "Shard location not found".to_string()
+        ))
+    })?;
 
-    let mut location: ShardLocation = record.entry()
+    let mut location: ShardLocation = record
+        .entry()
         .to_app_option()
-        .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Failed to decode location: {:?}", e))))?
-        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Location entry not found".to_string())))?;
+        .map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Failed to decode location: {:?}",
+                e
+            )))
+        })?
+        .ok_or_else(|| {
+            wasm_error!(WasmErrorInner::Guest(
+                "Location entry not found".to_string()
+            ))
+        })?;
 
     location.is_active = false;
     location.verified_at = format!("{:?}", sys_time()?);
@@ -9852,13 +10866,26 @@ pub struct AddStorageDIDInput {
 /// advertise itself as an additional source.
 #[hdk_extern]
 pub fn add_storage_did_to_shard(input: AddStorageDIDInput) -> ExternResult<ShardLocation> {
-    let record = get(input.action_hash.clone(), GetOptions::default())?
-        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Shard location not found".to_string())))?;
+    let record = get(input.action_hash.clone(), GetOptions::default())?.ok_or_else(|| {
+        wasm_error!(WasmErrorInner::Guest(
+            "Shard location not found".to_string()
+        ))
+    })?;
 
-    let mut location: ShardLocation = record.entry()
+    let mut location: ShardLocation = record
+        .entry()
         .to_app_option()
-        .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Failed to decode location: {:?}", e))))?
-        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Location entry not found".to_string())))?;
+        .map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Failed to decode location: {:?}",
+                e
+            )))
+        })?
+        .ok_or_else(|| {
+            wasm_error!(WasmErrorInner::Guest(
+                "Location entry not found".to_string()
+            ))
+        })?;
 
     // Add DID if not already present
     if !location.storage_dids.contains(&input.storage_did) {
@@ -9982,7 +11009,9 @@ pub struct CreateContentSuccessionInput {
 
 /// Create a content succession record — re-attributes content to renewed identity
 #[hdk_extern]
-pub fn create_content_succession(input: CreateContentSuccessionInput) -> ExternResult<ContentSuccessionOutput> {
+pub fn create_content_succession(
+    input: CreateContentSuccessionInput,
+) -> ExternResult<ContentSuccessionOutput> {
     let now = sys_time()?;
     let timestamp = format!("{:?}", now);
 
@@ -10004,19 +11033,34 @@ pub fn create_content_succession(input: CreateContentSuccessionInput) -> ExternR
     let id_anchor = StringAnchor::new("succession_id", &input.id);
     let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor.clone()))?;
     create_entry(&EntryTypes::StringAnchor(id_anchor))?;
-    create_link(id_anchor_hash, action_hash.clone(), LinkTypes::IdToContentSuccession, ())?;
+    create_link(
+        id_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::IdToContentSuccession,
+        (),
+    )?;
 
     // Link: Content → Succession (find all successions for a piece of content)
     let content_anchor = StringAnchor::new("content_id", &input.original_content_id);
     let content_anchor_hash = hash_entry(&EntryTypes::StringAnchor(content_anchor.clone()))?;
     create_entry(&EntryTypes::StringAnchor(content_anchor))?;
-    create_link(content_anchor_hash, action_hash.clone(), LinkTypes::ContentToSuccession, ())?;
+    create_link(
+        content_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::ContentToSuccession,
+        (),
+    )?;
 
     // Link: Successor author → Succession (find all content inherited by new key)
     let successor_anchor = StringAnchor::new("successor_author", &succession.successor_author_key);
     let successor_anchor_hash = hash_entry(&EntryTypes::StringAnchor(successor_anchor.clone()))?;
     create_entry(&EntryTypes::StringAnchor(successor_anchor))?;
-    create_link(successor_anchor_hash, action_hash.clone(), LinkTypes::SuccessorAuthorToSuccession, ())?;
+    create_link(
+        successor_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::SuccessorAuthorToSuccession,
+        (),
+    )?;
 
     Ok(ContentSuccessionOutput {
         action_hash,
@@ -10026,7 +11070,9 @@ pub fn create_content_succession(input: CreateContentSuccessionInput) -> ExternR
 
 /// Get all successions for a given content ID
 #[hdk_extern]
-pub fn get_successions_for_content(content_id: String) -> ExternResult<Vec<ContentSuccessionOutput>> {
+pub fn get_successions_for_content(
+    content_id: String,
+) -> ExternResult<Vec<ContentSuccessionOutput>> {
     let content_anchor = StringAnchor::new("content_id", &content_id);
     let content_anchor_hash = hash_entry(&EntryTypes::StringAnchor(content_anchor))?;
 
@@ -10035,8 +11081,9 @@ pub fn get_successions_for_content(content_id: String) -> ExternResult<Vec<Conte
 
     let mut results = Vec::new();
     for link in links {
-        let action_hash = ActionHash::try_from(link.target)
-            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid succession hash".to_string())))?;
+        let action_hash = ActionHash::try_from(link.target).map_err(|_| {
+            wasm_error!(WasmErrorInner::Guest("Invalid succession hash".to_string()))
+        })?;
 
         if let Some(record) = get(action_hash.clone(), GetOptions::default())? {
             if let Ok(Some(succession)) = record.entry().to_app_option::<ContentSuccession>() {
@@ -10112,7 +11159,11 @@ pub fn create_agreement(input: CreateAgreementInput) -> ExternResult<AgreementOu
         (),
     )?;
 
-    Ok(AgreementOutput { action_hash, entry_hash, agreement })
+    Ok(AgreementOutput {
+        action_hash,
+        entry_hash,
+        agreement,
+    })
 }
 
 #[hdk_extern]
@@ -10126,13 +11177,20 @@ pub fn get_agreement(id: String) -> ExternResult<Option<AgreementOutput>> {
     if let Some(link) = links.first() {
         let action_hash = ActionHash::try_from(link.target.clone())
             .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid action hash".into())))?;
-        let record = get(action_hash.clone(), GetOptions::default())?
-            .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Agreement record not found".into())))?;
-        let agreement: Agreement = record.entry().to_app_option()
+        let record = get(action_hash.clone(), GetOptions::default())?.ok_or_else(|| {
+            wasm_error!(WasmErrorInner::Guest("Agreement record not found".into()))
+        })?;
+        let agreement: Agreement = record
+            .entry()
+            .to_app_option()
             .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Deserialize error: {e}"))))?
             .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("No entry in record".into())))?;
         let entry_hash = hash_entry(&EntryTypes::Agreement(agreement.clone()))?;
-        Ok(Some(AgreementOutput { action_hash, entry_hash, agreement }))
+        Ok(Some(AgreementOutput {
+            action_hash,
+            entry_hash,
+            agreement,
+        }))
     } else {
         Ok(None)
     }
@@ -10176,10 +11234,10 @@ pub fn create_rea_commitment(input: CreateReaCommitmentInput) -> ExternResult<Re
     let now = sys_time()?;
     let timestamp = format!("{:?}", now);
 
-    let resource_classified_as_json = serde_json::to_string(&input.resource_classified_as)
-        .unwrap_or_else(|_| "[]".to_string());
-    let in_scope_of_json = serde_json::to_string(&input.in_scope_of)
-        .unwrap_or_else(|_| "[]".to_string());
+    let resource_classified_as_json =
+        serde_json::to_string(&input.resource_classified_as).unwrap_or_else(|_| "[]".to_string());
+    let in_scope_of_json =
+        serde_json::to_string(&input.in_scope_of).unwrap_or_else(|_| "[]".to_string());
 
     let commitment = Commitment {
         id: input.id.clone(),
@@ -10256,7 +11314,11 @@ pub fn create_rea_commitment(input: CreateReaCommitmentInput) -> ExternResult<Re
         )?;
     }
 
-    Ok(ReaCommitmentOutput { action_hash, entry_hash, commitment })
+    Ok(ReaCommitmentOutput {
+        action_hash,
+        entry_hash,
+        commitment,
+    })
 }
 
 #[hdk_extern]
@@ -10270,20 +11332,29 @@ pub fn get_rea_commitment(id: String) -> ExternResult<Option<ReaCommitmentOutput
     if let Some(link) = links.first() {
         let action_hash = ActionHash::try_from(link.target.clone())
             .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid action hash".into())))?;
-        let record = get(action_hash.clone(), GetOptions::default())?
-            .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Commitment record not found".into())))?;
-        let commitment: Commitment = record.entry().to_app_option()
+        let record = get(action_hash.clone(), GetOptions::default())?.ok_or_else(|| {
+            wasm_error!(WasmErrorInner::Guest("Commitment record not found".into()))
+        })?;
+        let commitment: Commitment = record
+            .entry()
+            .to_app_option()
             .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Deserialize error: {e}"))))?
             .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("No entry in record".into())))?;
         let entry_hash = hash_entry(&EntryTypes::Commitment(commitment.clone()))?;
-        Ok(Some(ReaCommitmentOutput { action_hash, entry_hash, commitment }))
+        Ok(Some(ReaCommitmentOutput {
+            action_hash,
+            entry_hash,
+            commitment,
+        }))
     } else {
         Ok(None)
     }
 }
 
 #[hdk_extern]
-pub fn get_commitments_by_agreement(agreement_id: String) -> ExternResult<Vec<ReaCommitmentOutput>> {
+pub fn get_commitments_by_agreement(
+    agreement_id: String,
+) -> ExternResult<Vec<ReaCommitmentOutput>> {
     let agreement_anchor = StringAnchor::new("agreement_id", &agreement_id);
     let agreement_anchor_hash = hash_entry(&EntryTypes::StringAnchor(agreement_anchor))?;
 
@@ -10297,7 +11368,11 @@ pub fn get_commitments_by_agreement(agreement_id: String) -> ExternResult<Vec<Re
         if let Some(record) = get(action_hash.clone(), GetOptions::default())? {
             if let Some(commitment) = record.entry().to_app_option::<Commitment>().ok().flatten() {
                 let entry_hash = hash_entry(&EntryTypes::Commitment(commitment.clone()))?;
-                results.push(ReaCommitmentOutput { action_hash, entry_hash, commitment });
+                results.push(ReaCommitmentOutput {
+                    action_hash,
+                    entry_hash,
+                    commitment,
+                });
             }
         }
     }
@@ -10339,14 +11414,15 @@ pub struct ReaEconomicEventOutput {
 }
 
 #[hdk_extern]
-pub fn create_rea_economic_event(input: CreateReaEconomicEventInput) -> ExternResult<ReaEconomicEventOutput> {
+pub fn create_rea_economic_event(
+    input: CreateReaEconomicEventInput,
+) -> ExternResult<ReaEconomicEventOutput> {
     let now = sys_time()?;
     let timestamp = format!("{:?}", now);
 
-    let resource_classified_as_json = serde_json::to_string(&input.resource_classified_as)
-        .unwrap_or_else(|_| "[]".to_string());
-    let fulfills_json = serde_json::to_string(&input.fulfills)
-        .unwrap_or_else(|_| "[]".to_string());
+    let resource_classified_as_json =
+        serde_json::to_string(&input.resource_classified_as).unwrap_or_else(|_| "[]".to_string());
+    let fulfills_json = serde_json::to_string(&input.fulfills).unwrap_or_else(|_| "[]".to_string());
 
     let event = EconomicEvent {
         id: input.id.clone(),
@@ -10412,8 +11488,10 @@ pub fn create_rea_economic_event(input: CreateReaEconomicEventInput) -> ExternRe
         let links = get_links(query, GetStrategy::default())?;
 
         if let Some(link) = links.first() {
-            let commitment_action_hash = ActionHash::try_from(link.target.clone())
-                .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid commitment hash".into())))?;
+            let commitment_action_hash =
+                ActionHash::try_from(link.target.clone()).map_err(|_| {
+                    wasm_error!(WasmErrorInner::Guest("Invalid commitment hash".into()))
+                })?;
             create_link(
                 action_hash.clone(),
                 commitment_action_hash.clone(),
@@ -10436,7 +11514,12 @@ pub fn create_rea_economic_event(input: CreateReaEconomicEventInput) -> ExternRe
         )?;
     }
 
-    Ok(ReaEconomicEventOutput { action_hash, entry_hash, event, fulfillment_links })
+    Ok(ReaEconomicEventOutput {
+        action_hash,
+        entry_hash,
+        event,
+        fulfillment_links,
+    })
 }
 
 #[hdk_extern]
@@ -10452,19 +11535,28 @@ pub fn get_rea_economic_event(id: String) -> ExternResult<Option<ReaEconomicEven
             .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid action hash".into())))?;
         let record = get(action_hash.clone(), GetOptions::default())?
             .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Event record not found".into())))?;
-        let event: EconomicEvent = record.entry().to_app_option()
+        let event: EconomicEvent = record
+            .entry()
+            .to_app_option()
             .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Deserialize error: {e}"))))?
             .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("No entry in record".into())))?;
         let entry_hash = hash_entry(&EntryTypes::EconomicEvent(event.clone()))?;
 
         // Fetch fulfillment links
-        let fulfills_query = LinkQuery::try_new(action_hash.clone(), LinkTypes::EventFulfillsCommitment)?;
+        let fulfills_query =
+            LinkQuery::try_new(action_hash.clone(), LinkTypes::EventFulfillsCommitment)?;
         let fulfills_links = get_links(fulfills_query, GetStrategy::default())?;
-        let fulfillment_links: Vec<ActionHash> = fulfills_links.iter()
+        let fulfillment_links: Vec<ActionHash> = fulfills_links
+            .iter()
             .filter_map(|l| ActionHash::try_from(l.target.clone()).ok())
             .collect();
 
-        Ok(Some(ReaEconomicEventOutput { action_hash, entry_hash, event, fulfillment_links }))
+        Ok(Some(ReaEconomicEventOutput {
+            action_hash,
+            entry_hash,
+            event,
+            fulfillment_links,
+        }))
     } else {
         Ok(None)
     }
