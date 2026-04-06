@@ -82,74 +82,13 @@ impl FederationConfig {
 }
 
 // =============================================================================
-// Zome Input/Output Types (match infrastructure coordinator zome exactly)
+// Zome Input/Output Types (shared with infrastructure coordinator zome)
 // =============================================================================
 
-/// Input for registering a doorway (matches infrastructure zome RegisterDoorwayInput)
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RegisterDoorwayInput {
-    pub id: String,
-    pub url: String,
-    pub capabilities_json: String,
-    pub reach: String,
-    pub region: Option<String>,
-    pub bandwidth_mbps: Option<u32>,
-    pub version: String,
-}
-
-/// Input for recording a heartbeat (matches infrastructure zome RecordHeartbeatInput)
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RecordHeartbeatInput {
-    pub doorway_id: String,
-    pub status: String,
-    pub uptime_ratio: f32,
-    pub active_connections: u32,
-    pub content_served: u64,
-}
-
-/// Input for recording a health attestation (matches infrastructure zome RecordHealthAttestationInput)
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RecordHealthAttestationInput {
-    pub attestor_doorway_id: String,
-    pub subject_doorway_id: String,
-    pub observed_status: String,
-    pub response_time_ms: Option<u32>,
-    pub conductor_healthy: Option<bool>,
-}
-
-/// Input for finding content publishers (matches infrastructure zome FindPublishersInput)
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct FindPublishersInput {
-    pub content_hash: String,
-    pub capability: Option<String>,
-    pub prefer_region: Option<String>,
-    pub limit: Option<usize>,
-    pub online_only: Option<bool>,
-}
-
-/// Output from doorway registration
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DoorwayOutput {
-    pub action_hash: Vec<u8>,
-    pub doorway: DoorwayInfo,
-}
-
-/// Doorway info (matches DoorwayRegistration from infrastructure integrity zome)
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DoorwayInfo {
-    pub id: String,
-    pub url: String,
-    pub operator_agent: String,
-    pub operator_human: Option<String>,
-    pub capabilities_json: String,
-    pub reach: String,
-    pub region: Option<String>,
-    pub bandwidth_mbps: Option<u32>,
-    pub version: String,
-    pub tier: String,
-    pub registered_at: String,
-    pub updated_at: String,
-}
+pub use infrastructure_types::{
+    DoorwayOutput, DoorwayRegistration, FindPublishersInput, RecordHealthAttestationInput,
+    RecordHeartbeatInput, RegisterDoorwayInput,
+};
 
 /// Federation error types
 #[derive(Debug)]
@@ -641,7 +580,7 @@ fn extract_domain_from_url(url: &str) -> Option<String> {
 pub async fn get_all_doorways(
     zome_caller: &ZomeCaller,
     config: &FederationConfig,
-) -> Result<Vec<DoorwayInfo>, String> {
+) -> Result<Vec<DoorwayRegistration>, String> {
     // Use get_doorways_by_region with empty region to get all,
     // or use find_publishers with wildcard. Since the zome doesn't have
     // a "get_all_doorways" function, we'll query by the current doorway's operator
@@ -906,7 +845,7 @@ mod tests {
             version: "0.1.0".to_string(),
         };
 
-        let bytes = rmp_serde::to_vec(&input).unwrap();
+        let bytes = rmp_serde::to_vec_named(&input).unwrap();
         let decoded: RegisterDoorwayInput = rmp_serde::from_slice(&bytes).unwrap();
         assert_eq!(decoded.id, "test-doorway");
     }
