@@ -202,6 +202,8 @@ pub struct P2PNode {
     pending_verifications: PendingVerificationMap,
     /// Whether startup EPR Head publication has run
     initial_publish_done: Arc<std::sync::atomic::AtomicBool>,
+    /// Identity-driven replication state
+    replication_state: replication::ReplicationState,
     /// Extraction cache for delivery capability advertisement
     extraction_cache: Option<Arc<ExtractionCache>>,
     /// Discovered peers with delivery capabilities (populated from mDNS + identify)
@@ -566,6 +568,7 @@ impl P2PNode {
                 std::collections::HashMap::new(),
             )),
             initial_publish_done: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+            replication_state: replication::ReplicationState::new(),
             extraction_cache: None,
             delivery_peers: Arc::new(DashMap::new()),
         })
@@ -687,10 +690,26 @@ impl P2PNode {
                 _ = status_interval.tick() => {
                     drop(swarm);
                     self.refresh_status().await;
-                    // One-time startup EPR Head publication
+                    // One-time startup EPR Head publication and replication state seeding
                     if !self.initial_publish_done.load(std::sync::atomic::Ordering::Relaxed) {
                         self.initial_publish_done.store(true, std::sync::atomic::Ordering::Relaxed);
                         self.publish_all_epr_heads().await;
+                        // Populate replication state with local content IDs
+                        if let Some(pool) = self.db_pool.as_ref() {
+                            if let Ok(mut conn) = pool.get() {
+                                let app_ctx = crate::db::AppContext::default_lamad();
+                                let query = crate::db::content_diesel::ContentQuery {
+                                    limit: 100_000,
+                                    ..Default::default()
+                                };
+                                if let Ok(items) = crate::db::content_diesel::list_content(&mut conn, &app_ctx, &query) {
+                                    let ids: std::collections::HashSet<String> =
+                                        items.iter().map(|c| c.content.id.clone()).collect();
+                                    tracing::info!(count = ids.len(), "Loaded local content IDs for replication state");
+                                    self.replication_state.set_local_ids(ids).await;
+                                }
+                            }
+                        }
                     }
                 }
                 _ = sync_interval.tick() => {
@@ -2573,6 +2592,7 @@ impl P2PNode {
         let relay_reservations = self
             .relay_reservations
             .load(std::sync::atomic::Ordering::Relaxed);
+        let replication = self.replication_state.status().await;
 
         let status = P2PStatusInfo {
             peer_id: self.peer_id().to_string(),
@@ -2584,7 +2604,7 @@ impl P2PNode {
             relay_reservations,
             announce_addresses: self.config.announce_addresses.clone(),
             relay_mode: self.config.relay_mode.to_string(),
-            replication: replication::ReplicationStatus::default(),
+            replication,
         };
         let _ = self.status_tx.send(status);
     }
