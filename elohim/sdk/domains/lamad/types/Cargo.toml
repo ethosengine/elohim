@@ -1,0 +1,20 @@
+[package]
+name = "lamad-types"
+version = "0.1.0"
+edition = "2021"
+description = "Wire types for lamad (learning) domain coordinator functions"
+
+[dependencies]
+holo_hash = { version = "=0.6.0", features = ["encoding"] }
+serde = { version = "1", features = ["derive"] }
+
+[dev-dependencies]
+rmp-serde = "1"
+
+[features]
+default = []
+ts = ["dep:ts-rs"]
+
+[dependencies.ts-rs]
+version = "10"
+optional = true
