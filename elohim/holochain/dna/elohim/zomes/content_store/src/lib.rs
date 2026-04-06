@@ -78,6 +78,51 @@ pub use lamad_types::PathWithStepsOutput as PathWithSteps;
 use lamad_types::Relationship as WireRelationship;
 use lamad_types::RelationshipOutput;
 
+// Re-export shefa wire types from shared crate
+pub use shefa_types::{
+    AcceptCommitmentInput,
+    AccessGrantOutput,
+    AgreementOutput,
+    BatchAcceptCommitmentsInput,
+    BatchAcceptCommitmentsOutput,
+    BatchUpdateCommitmentsInput,
+    // Contributor Dashboard
+    ContentImpactSummary,
+    // REA Economics
+    CreateAgreementInput,
+    // Custodian Commitments
+    CreateCustodianCommitmentInput,
+    CreatePremiumGateInput,
+    CreateReaCommitmentInput,
+    CreateReaEconomicEventInput,
+    // Premium Gating
+    CreateStewardCredentialInput,
+    CustodianCommitmentOutput,
+    GateRevenueSummary,
+    GrantAccessInput,
+    PremiumGateOutput,
+    QueryCommitmentsInput,
+    ReaCommitmentOutput,
+    ReaEconomicEventOutput,
+    RecognitionEventSummary,
+    RequiredAttestationInput,
+    RequiredMasteryInput,
+    RequiredVouchesInput,
+    StewardCredentialOutput,
+    StewardRevenueOutput,
+    StewardRevenueSummary,
+};
+
+// Aliases to disambiguate wire types from integrity entry types
+use shefa_types::AccessGrant as WireAccessGrant;
+use shefa_types::Agreement as WireAgreement;
+use shefa_types::Commitment as WireCommitment;
+use shefa_types::CustodianCommitment as WireCustodianCommitment;
+use shefa_types::EconomicEvent as WireEconomicEvent;
+use shefa_types::PremiumGate as WirePremiumGate;
+use shefa_types::StewardCredential as WireStewardCredential;
+use shefa_types::StewardRevenue as WireStewardRevenue;
+
 // =============================================================================
 // Conversion helpers: integrity entry types -> wire types
 // =============================================================================
@@ -286,6 +331,240 @@ fn path_extension_to_wire(pe: &content_store_integrity::PathExtension) -> WirePa
         stats_json: pe.stats_json.clone(),
         created_at: pe.created_at.clone(),
         updated_at: pe.updated_at.clone(),
+    }
+}
+
+// Shefa conversion helpers: integrity entry types -> wire types
+
+fn agreement_to_wire(a: &content_store_integrity::Agreement) -> WireAgreement {
+    WireAgreement {
+        id: a.id.clone(),
+        name: a.name.clone(),
+        note: a.note.clone(),
+        created_at: a.created_at.clone(),
+    }
+}
+
+fn commitment_to_wire(c: &content_store_integrity::Commitment) -> WireCommitment {
+    WireCommitment {
+        id: c.id.clone(),
+        action: c.action.clone(),
+        provider: c.provider.clone(),
+        receiver: c.receiver.clone(),
+        resource_conforms_to: c.resource_conforms_to.clone(),
+        resource_inventoried_as: c.resource_inventoried_as.clone(),
+        resource_classified_as_json: c.resource_classified_as_json.clone(),
+        resource_quantity_value: c.resource_quantity_value,
+        resource_quantity_unit: c.resource_quantity_unit.clone(),
+        effort_quantity_value: c.effort_quantity_value,
+        effort_quantity_unit: c.effort_quantity_unit.clone(),
+        has_point_in_time: c.has_point_in_time.clone(),
+        has_beginning: c.has_beginning.clone(),
+        has_end: c.has_end.clone(),
+        due: c.due.clone(),
+        clause_of: c.clause_of.clone(),
+        agreed_in: c.agreed_in.clone(),
+        input_of: c.input_of.clone(),
+        output_of: c.output_of.clone(),
+        satisfies: c.satisfies.clone(),
+        in_scope_of_json: c.in_scope_of_json.clone(),
+        finished: c.finished,
+        state: c.state.clone(),
+        note: c.note.clone(),
+        metadata_json: c.metadata_json.clone(),
+        created_at: c.created_at.clone(),
+        updated_at: c.updated_at.clone(),
+    }
+}
+
+fn economic_event_to_wire(e: &content_store_integrity::EconomicEvent) -> WireEconomicEvent {
+    WireEconomicEvent {
+        id: e.id.clone(),
+        action: e.action.clone(),
+        provider: e.provider.clone(),
+        receiver: e.receiver.clone(),
+        resource_conforms_to: e.resource_conforms_to.clone(),
+        resource_inventoried_as: e.resource_inventoried_as.clone(),
+        to_resource_inventoried_as: e.to_resource_inventoried_as.clone(),
+        resource_classified_as_json: e.resource_classified_as_json.clone(),
+        resource_quantity_value: e.resource_quantity_value,
+        resource_quantity_unit: e.resource_quantity_unit.clone(),
+        effort_quantity_value: e.effort_quantity_value,
+        effort_quantity_unit: e.effort_quantity_unit.clone(),
+        has_point_in_time: e.has_point_in_time.clone(),
+        has_duration: e.has_duration.clone(),
+        input_of: e.input_of.clone(),
+        output_of: e.output_of.clone(),
+        fulfills_json: e.fulfills_json.clone(),
+        realization_of: e.realization_of.clone(),
+        satisfies_json: e.satisfies_json.clone(),
+        in_scope_of_json: e.in_scope_of_json.clone(),
+        note: e.note.clone(),
+        state: e.state.clone(),
+        triggered_by: e.triggered_by.clone(),
+        at_location: e.at_location.clone(),
+        image: e.image.clone(),
+        lamad_event_type: e.lamad_event_type.clone(),
+        metadata_json: e.metadata_json.clone(),
+        created_at: e.created_at.clone(),
+    }
+}
+
+fn steward_credential_to_wire(
+    sc: &content_store_integrity::StewardCredential,
+) -> WireStewardCredential {
+    WireStewardCredential {
+        id: sc.id.clone(),
+        steward_presence_id: sc.steward_presence_id.clone(),
+        agent_id: sc.agent_id.clone(),
+        tier: sc.tier.clone(),
+        stewarded_presence_ids_json: sc.stewarded_presence_ids_json.clone(),
+        stewarded_content_ids_json: sc.stewarded_content_ids_json.clone(),
+        stewarded_path_ids_json: sc.stewarded_path_ids_json.clone(),
+        mastery_content_ids_json: sc.mastery_content_ids_json.clone(),
+        mastery_level_achieved: sc.mastery_level_achieved.clone(),
+        qualification_verified_at: sc.qualification_verified_at.clone(),
+        peer_attestation_ids_json: sc.peer_attestation_ids_json.clone(),
+        unique_attester_count: sc.unique_attester_count,
+        attester_reputation_sum: sc.attester_reputation_sum,
+        stewardship_quality_score: sc.stewardship_quality_score,
+        total_learners_served: sc.total_learners_served,
+        total_content_improvements: sc.total_content_improvements,
+        domain_tags_json: sc.domain_tags_json.clone(),
+        is_active: sc.is_active,
+        deactivation_reason: sc.deactivation_reason.clone(),
+        note: sc.note.clone(),
+        metadata_json: sc.metadata_json.clone(),
+        created_at: sc.created_at.clone(),
+        updated_at: sc.updated_at.clone(),
+    }
+}
+
+fn premium_gate_to_wire(pg: &content_store_integrity::PremiumGate) -> WirePremiumGate {
+    WirePremiumGate {
+        id: pg.id.clone(),
+        steward_credential_id: pg.steward_credential_id.clone(),
+        steward_presence_id: pg.steward_presence_id.clone(),
+        contributor_presence_id: pg.contributor_presence_id.clone(),
+        gated_resource_type: pg.gated_resource_type.clone(),
+        gated_resource_ids_json: pg.gated_resource_ids_json.clone(),
+        gate_title: pg.gate_title.clone(),
+        gate_description: pg.gate_description.clone(),
+        gate_image: pg.gate_image.clone(),
+        required_attestations_json: pg.required_attestations_json.clone(),
+        required_mastery_json: pg.required_mastery_json.clone(),
+        required_vouches_json: pg.required_vouches_json.clone(),
+        pricing_model: pg.pricing_model.clone(),
+        price_amount: pg.price_amount,
+        price_unit: pg.price_unit.clone(),
+        subscription_period_days: pg.subscription_period_days,
+        min_amount: pg.min_amount,
+        steward_share_percent: pg.steward_share_percent,
+        commons_share_percent: pg.commons_share_percent,
+        contributor_share_percent: pg.contributor_share_percent,
+        scholarship_eligible: pg.scholarship_eligible,
+        max_scholarships_per_period: pg.max_scholarships_per_period,
+        scholarship_criteria_json: pg.scholarship_criteria_json.clone(),
+        is_active: pg.is_active,
+        deactivation_reason: pg.deactivation_reason.clone(),
+        total_access_grants: pg.total_access_grants,
+        total_revenue_generated: pg.total_revenue_generated,
+        total_to_steward: pg.total_to_steward,
+        total_to_contributor: pg.total_to_contributor,
+        total_to_commons: pg.total_to_commons,
+        total_scholarships_granted: pg.total_scholarships_granted,
+        note: pg.note.clone(),
+        metadata_json: pg.metadata_json.clone(),
+        created_at: pg.created_at.clone(),
+        updated_at: pg.updated_at.clone(),
+    }
+}
+
+fn access_grant_to_wire(ag: &content_store_integrity::AccessGrant) -> WireAccessGrant {
+    WireAccessGrant {
+        id: ag.id.clone(),
+        gate_id: ag.gate_id.clone(),
+        learner_agent_id: ag.learner_agent_id.clone(),
+        grant_type: ag.grant_type.clone(),
+        granted_via: ag.granted_via.clone(),
+        payment_event_id: ag.payment_event_id.clone(),
+        payment_amount: ag.payment_amount,
+        payment_unit: ag.payment_unit.clone(),
+        scholarship_sponsor_id: ag.scholarship_sponsor_id.clone(),
+        scholarship_reason: ag.scholarship_reason.clone(),
+        granted_at: ag.granted_at.clone(),
+        valid_until: ag.valid_until.clone(),
+        renewal_due_at: ag.renewal_due_at.clone(),
+        is_active: ag.is_active,
+        revoked_at: ag.revoked_at.clone(),
+        revoke_reason: ag.revoke_reason.clone(),
+        metadata_json: ag.metadata_json.clone(),
+        created_at: ag.created_at.clone(),
+    }
+}
+
+fn steward_revenue_to_wire(sr: &content_store_integrity::StewardRevenue) -> WireStewardRevenue {
+    WireStewardRevenue {
+        id: sr.id.clone(),
+        access_grant_id: sr.access_grant_id.clone(),
+        gate_id: sr.gate_id.clone(),
+        from_learner_id: sr.from_learner_id.clone(),
+        to_steward_presence_id: sr.to_steward_presence_id.clone(),
+        to_contributor_presence_id: sr.to_contributor_presence_id.clone(),
+        gross_amount: sr.gross_amount,
+        payment_unit: sr.payment_unit.clone(),
+        steward_amount: sr.steward_amount,
+        contributor_amount: sr.contributor_amount,
+        commons_amount: sr.commons_amount,
+        steward_economic_event_id: sr.steward_economic_event_id.clone(),
+        contributor_economic_event_id: sr.contributor_economic_event_id.clone(),
+        commons_economic_event_id: sr.commons_economic_event_id.clone(),
+        status: sr.status.clone(),
+        completed_at: sr.completed_at.clone(),
+        failure_reason: sr.failure_reason.clone(),
+        note: sr.note.clone(),
+        metadata_json: sr.metadata_json.clone(),
+        created_at: sr.created_at.clone(),
+    }
+}
+
+fn custodian_commitment_to_wire(
+    cc: &content_store_integrity::CustodianCommitment,
+) -> WireCustodianCommitment {
+    WireCustodianCommitment {
+        id: cc.id.clone(),
+        custodian_agent_id: cc.custodian_agent_id.clone(),
+        beneficiary_agent_id: cc.beneficiary_agent_id.clone(),
+        commitment_type: cc.commitment_type.clone(),
+        basis: cc.basis.clone(),
+        relationship_id: cc.relationship_id.clone(),
+        category_override_json: cc.category_override_json.clone(),
+        content_filters_json: cc.content_filters_json.clone(),
+        estimated_content_count: cc.estimated_content_count,
+        estimated_size_mb: cc.estimated_size_mb,
+        shard_strategy: cc.shard_strategy.clone(),
+        redundancy_factor: cc.redundancy_factor,
+        shard_assignments_json: cc.shard_assignments_json.clone(),
+        emergency_triggers_json: cc.emergency_triggers_json.clone(),
+        emergency_contacts_json: cc.emergency_contacts_json.clone(),
+        recovery_instructions_json: cc.recovery_instructions_json.clone(),
+        cache_priority: cc.cache_priority,
+        bandwidth_class: cc.bandwidth_class.clone(),
+        geographic_affinity: cc.geographic_affinity.clone(),
+        state: cc.state.clone(),
+        proposed_at: cc.proposed_at.clone(),
+        accepted_at: cc.accepted_at.clone(),
+        activated_at: cc.activated_at.clone(),
+        last_verification_at: cc.last_verification_at.clone(),
+        verification_failures_json: cc.verification_failures_json.clone(),
+        shards_stored_count: cc.shards_stored_count,
+        last_shard_update_at: cc.last_shard_update_at.clone(),
+        total_restores_performed: cc.total_restores_performed,
+        shefa_commitment_id: cc.shefa_commitment_id.clone(),
+        note: cc.note.clone(),
+        metadata_json: cc.metadata_json.clone(),
+        created_at: cc.created_at.clone(),
+        updated_at: cc.updated_at.clone(),
     }
 }
 
@@ -1476,59 +1755,7 @@ pub struct ProgressSummary {
     pub completed_at: Option<String>,
 }
 
-// =============================================================================
-// Input/Output Types for CustodianCommitment (Digital Presence Stewardship)
-// =============================================================================
-
-/// Input for creating a custodian commitment
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct CreateCustodianCommitmentInput {
-    pub custodian_agent_id: String,
-    pub beneficiary_agent_id: String,
-    pub commitment_type: String, // relationship|category|community|steward
-    pub basis: String,           // intimate_relationship|trusted_relationship|etc.
-    pub relationship_id: Option<String>,
-    pub category_override_json: String,
-    pub content_filters_json: String,
-    pub estimated_content_count: u32,
-    pub estimated_size_mb: f64,
-    pub shard_strategy: String, // full_replica|threshold_split|erasure_coded
-    pub redundancy_factor: u32,
-    pub shard_assignments_json: String, // Empty initially, filled when shards created
-    pub emergency_triggers_json: String,
-    pub emergency_contacts_json: String,
-    pub recovery_instructions_json: String,
-    pub cache_priority: Option<u32>,
-    pub bandwidth_class: Option<String>,
-    pub geographic_affinity: Option<String>,
-    pub note: Option<String>,
-    pub metadata_json: Option<String>,
-}
-
-/// Output when retrieving a custodian commitment
-#[derive(Serialize, Deserialize, Debug)]
-pub struct CustodianCommitmentOutput {
-    pub action_hash: ActionHash,
-    pub entry_hash: EntryHash,
-    pub commitment: CustodianCommitment,
-}
-
-/// Input for querying custodian commitments
-#[derive(Serialize, Deserialize, Debug)]
-pub struct QueryCommitmentsInput {
-    pub custodian_agent_id: Option<String>,
-    pub beneficiary_agent_id: Option<String>,
-    pub commitment_type: Option<String>,
-    pub state: Option<String>,
-    pub basis: Option<String>,
-    pub limit: Option<u32>,
-}
-
-/// Input for accepting a commitment
-#[derive(Serialize, Deserialize, Debug)]
-pub struct AcceptCommitmentInput {
-    pub commitment_id: String,
-}
+// CustodianCommitment input/output types re-exported from shefa-types above.
 
 /// Input for activating emergency protocol
 #[derive(Serialize, Deserialize, Debug)]
@@ -5733,24 +5960,7 @@ pub struct ContributorDashboard {
     pub impact: Option<ContributorImpactOutput>,
 }
 
-/// Impact summary per content piece
-#[derive(Serialize, Deserialize, Debug)]
-pub struct ContentImpactSummary {
-    pub content_id: String,
-    pub recognition_points: i64,
-    pub learners_reached: u32,
-    pub mastery_count: u32,
-}
-
-/// Recent recognition event for the timeline
-#[derive(Serialize, Deserialize, Debug)]
-pub struct RecognitionEventSummary {
-    pub learner_id: String,
-    pub content_id: String,
-    pub flow_type: String,
-    pub recognition_points: i32,
-    pub occurred_at: String,
-}
+// ContentImpactSummary and RecognitionEventSummary re-exported from shefa-types above.
 
 /// Get or create a ContributorPresence for content.
 /// This is the key to allowing recognition to flow even when contributors aren't "present" yet.
@@ -6483,109 +6693,8 @@ pub fn get_my_contributor_dashboard(_: ()) -> ExternResult<ContributorDashboard>
 // - StewardRevenue: Three-way split (steward, contributor, commons)
 // =============================================================================
 
-/// Output for steward credential
-#[derive(Serialize, Deserialize, Debug)]
-pub struct StewardCredentialOutput {
-    pub action_hash: ActionHash,
-    pub credential: StewardCredential,
-}
-
-/// Output for premium gate
-#[derive(Serialize, Deserialize, Debug)]
-pub struct PremiumGateOutput {
-    pub action_hash: ActionHash,
-    pub gate: PremiumGate,
-}
-
-/// Output for access grant
-#[derive(Serialize, Deserialize, Debug)]
-pub struct AccessGrantOutput {
-    pub action_hash: ActionHash,
-    pub grant: AccessGrant,
-}
-
-/// Output for steward revenue
-#[derive(Serialize, Deserialize, Debug)]
-pub struct StewardRevenueOutput {
-    pub action_hash: ActionHash,
-    pub revenue: StewardRevenue,
-}
-
-/// Input for creating a steward credential
-#[derive(Serialize, Deserialize, Debug)]
-pub struct CreateStewardCredentialInput {
-    pub steward_presence_id: String,
-    pub tier: String,
-    pub domain_tags: Vec<String>,
-    pub mastery_content_ids: Vec<String>,
-    pub mastery_level_achieved: String,
-    pub peer_attestation_ids: Vec<String>,
-    pub stewarded_presence_ids: Vec<String>,
-    pub stewarded_content_ids: Vec<String>,
-    pub stewarded_path_ids: Vec<String>,
-    pub note: Option<String>,
-}
-
-/// Input for creating a premium gate
-#[derive(Serialize, Deserialize, Debug)]
-pub struct CreatePremiumGateInput {
-    pub steward_credential_id: String,
-    pub steward_presence_id: String,
-    pub contributor_presence_id: Option<String>,
-    pub gated_resource_type: String,
-    pub gated_resource_ids: Vec<String>,
-    pub gate_title: String,
-    pub gate_description: String,
-    pub gate_image: Option<String>,
-    pub required_attestations: Vec<RequiredAttestationInput>,
-    pub required_mastery: Vec<RequiredMasteryInput>,
-    pub required_vouches: Option<RequiredVouchesInput>,
-    pub pricing_model: String,
-    pub price_amount: Option<f64>,
-    pub price_unit: Option<String>,
-    pub subscription_period_days: Option<u32>,
-    pub min_amount: Option<f64>,
-    pub steward_share_percent: f64,
-    pub commons_share_percent: f64,
-    pub contributor_share_percent: Option<f64>,
-    pub scholarship_eligible: bool,
-    pub max_scholarships_per_period: Option<u32>,
-    pub scholarship_criteria_json: Option<String>,
-    pub note: Option<String>,
-}
-
-/// Required attestation for gate access
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct RequiredAttestationInput {
-    pub attestation_type: String,
-    pub attestation_id: Option<String>,
-}
-
-/// Required mastery for gate access
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct RequiredMasteryInput {
-    pub content_id: String,
-    pub min_level: String,
-}
-
-/// Required vouches for gate access
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct RequiredVouchesInput {
-    pub min_count: u32,
-    pub from_tier: Option<String>,
-}
-
-/// Input for granting access
-#[derive(Serialize, Deserialize, Debug)]
-pub struct GrantAccessInput {
-    pub gate_id: String,
-    pub grant_type: String,
-    pub granted_via: String,
-    pub payment_amount: Option<f64>,
-    pub payment_unit: Option<String>,
-    pub scholarship_sponsor_id: Option<String>,
-    pub scholarship_reason: Option<String>,
-}
+// Steward credential, premium gate, access grant, steward revenue, and grant access
+// input/output types re-exported from shefa-types above.
 
 /// Create a steward credential
 #[hdk_extern]
@@ -6688,7 +6797,7 @@ pub fn create_steward_credential(
 
     Ok(StewardCredentialOutput {
         action_hash,
-        credential,
+        credential: steward_credential_to_wire(&credential),
     })
 }
 
@@ -6718,7 +6827,7 @@ pub fn get_steward_credential(
             {
                 return Ok(Some(StewardCredentialOutput {
                     action_hash,
-                    credential,
+                    credential: steward_credential_to_wire(&credential),
                 }));
             }
         }
@@ -6755,7 +6864,7 @@ pub fn get_credentials_for_human(
                 if credential.is_active {
                     results.push(StewardCredentialOutput {
                         action_hash,
-                        credential,
+                        credential: steward_credential_to_wire(&credential),
                     });
                 }
             }
@@ -6897,7 +7006,10 @@ pub fn create_premium_gate(input: CreatePremiumGateInput) -> ExternResult<Premiu
         )?;
     }
 
-    Ok(PremiumGateOutput { action_hash, gate })
+    Ok(PremiumGateOutput {
+        action_hash,
+        gate: premium_gate_to_wire(&gate),
+    })
 }
 
 /// Get premium gate by ID
@@ -6916,7 +7028,10 @@ pub fn get_premium_gate(gate_id: String) -> ExternResult<Option<PremiumGateOutpu
         let record = get(action_hash.clone(), GetOptions::default())?;
         if let Some(rec) = record {
             if let Some(gate) = rec.entry().to_app_option::<PremiumGate>().ok().flatten() {
-                return Ok(Some(PremiumGateOutput { action_hash, gate }));
+                return Ok(Some(PremiumGateOutput {
+                    action_hash,
+                    gate: premium_gate_to_wire(&gate),
+                }));
             }
         }
     }
@@ -6942,7 +7057,10 @@ pub fn get_gates_for_resource(resource_id: String) -> ExternResult<Vec<PremiumGa
         if let Some(rec) = record {
             if let Some(gate) = rec.entry().to_app_option::<PremiumGate>().ok().flatten() {
                 if gate.is_active {
-                    results.push(PremiumGateOutput { action_hash, gate });
+                    results.push(PremiumGateOutput {
+                        action_hash,
+                        gate: premium_gate_to_wire(&gate),
+                    });
                 }
             }
         }
@@ -7063,12 +7181,15 @@ pub fn grant_access(input: GrantAccessInput) -> ExternResult<AccessGrantOutput> 
         }
     }
 
-    Ok(AccessGrantOutput { action_hash, grant })
+    Ok(AccessGrantOutput {
+        action_hash,
+        grant: access_grant_to_wire(&grant),
+    })
 }
 
 /// Create steward revenue record (internal function)
 fn create_steward_revenue(
-    gate: &PremiumGate,
+    gate: &WirePremiumGate,
     grant_id: &str,
     learner_id: &str,
     gross_amount: f64,
@@ -7157,7 +7278,7 @@ fn create_steward_revenue(
 
     Ok(StewardRevenueOutput {
         action_hash,
-        revenue,
+        revenue: steward_revenue_to_wire(&revenue),
     })
 }
 
@@ -7182,7 +7303,10 @@ pub fn check_access(gate_id: String) -> ExternResult<Option<AccessGrantOutput>> 
             if let Some(grant) = rec.entry().to_app_option::<AccessGrant>().ok().flatten() {
                 if grant.gate_id == gate_id && grant.is_active {
                     // TODO: Check expiration
-                    return Ok(Some(AccessGrantOutput { action_hash, grant }));
+                    return Ok(Some(AccessGrantOutput {
+                        action_hash,
+                        grant: access_grant_to_wire(&grant),
+                    }));
                 }
             }
         }
@@ -7212,7 +7336,10 @@ pub fn get_my_access_grants(_: ()) -> ExternResult<Vec<AccessGrantOutput>> {
         if let Some(rec) = record {
             if let Some(grant) = rec.entry().to_app_option::<AccessGrant>().ok().flatten() {
                 if grant.is_active {
-                    results.push(AccessGrantOutput { action_hash, grant });
+                    results.push(AccessGrantOutput {
+                        action_hash,
+                        grant: access_grant_to_wire(&grant),
+                    });
                 }
             }
         }
@@ -7221,23 +7348,7 @@ pub fn get_my_access_grants(_: ()) -> ExternResult<Vec<AccessGrantOutput>> {
     Ok(results)
 }
 
-/// Steward revenue summary
-#[derive(Serialize, Deserialize, Debug)]
-pub struct StewardRevenueSummary {
-    pub steward_presence_id: String,
-    pub total_revenue: f64,
-    pub total_grants: u32,
-    pub revenue_by_gate: Vec<GateRevenueSummary>,
-}
-
-/// Revenue summary per gate
-#[derive(Serialize, Deserialize, Debug)]
-pub struct GateRevenueSummary {
-    pub gate_id: String,
-    pub gate_title: String,
-    pub total_revenue: f64,
-    pub grant_count: u32,
-}
+// StewardRevenueSummary and GateRevenueSummary re-exported from shefa-types above.
 
 /// Get steward revenue summary
 #[hdk_extern]
@@ -7927,7 +8038,7 @@ pub fn create_custodian_commitment(
     Ok(CustodianCommitmentOutput {
         action_hash,
         entry_hash,
-        commitment,
+        commitment: custodian_commitment_to_wire(&commitment),
     })
 }
 
@@ -7991,7 +8102,7 @@ pub fn accept_custodian_commitment(
     Ok(CustodianCommitmentOutput {
         action_hash: updated_action_hash,
         entry_hash,
-        commitment,
+        commitment: custodian_commitment_to_wire(&commitment),
     })
 }
 
@@ -8035,7 +8146,7 @@ pub fn query_custodian_commitments(
                     results.push(CustodianCommitmentOutput {
                         action_hash,
                         entry_hash,
-                        commitment,
+                        commitment: custodian_commitment_to_wire(&commitment),
                     });
                 }
             }
@@ -8077,7 +8188,7 @@ pub fn query_custodian_commitments(
                         results.push(CustodianCommitmentOutput {
                             action_hash,
                             entry_hash,
-                            commitment,
+                            commitment: custodian_commitment_to_wire(&commitment),
                         });
                     }
                 }
@@ -8618,7 +8729,7 @@ pub fn activate_emergency_manual(
     Ok(CustodianCommitmentOutput {
         action_hash,
         entry_hash,
-        commitment,
+        commitment: custodian_commitment_to_wire(&commitment),
     })
 }
 
@@ -8688,7 +8799,7 @@ pub fn activate_emergency_trusted_party(
     Ok(CustodianCommitmentOutput {
         action_hash,
         entry_hash,
-        commitment,
+        commitment: custodian_commitment_to_wire(&commitment),
     })
 }
 
@@ -9053,7 +9164,7 @@ pub fn revoke_category_override(commitment_id: String) -> ExternResult<Custodian
     Ok(CustodianCommitmentOutput {
         action_hash,
         entry_hash,
-        commitment,
+        commitment: custodian_commitment_to_wire(&commitment),
     })
 }
 
@@ -9086,20 +9197,7 @@ pub fn should_verify_shard_sample(total_shards: u32) -> bool {
     random < (sample_probability * 100.0)
 }
 
-/// Batch accept multiple custodian commitments
-///
-/// Optimizes accepting multiple relationship-based commitments in one call
-#[derive(Serialize, Deserialize, Debug)]
-pub struct BatchAcceptCommitmentsInput {
-    pub commitment_ids: Vec<String>,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct BatchAcceptCommitmentsOutput {
-    pub accepted_count: u32,
-    pub failed_count: u32,
-    pub errors: Vec<String>,
-}
+// BatchAcceptCommitmentsInput, BatchAcceptCommitmentsOutput re-exported from shefa-types above.
 
 #[hdk_extern]
 pub fn batch_accept_commitments(
@@ -9156,13 +9254,7 @@ pub fn batch_accept_commitments(
     })
 }
 
-/// Batch update commitment metadata
-///
-/// Update multiple commitments' metadata in one call (e.g., cache priority changes)
-#[derive(Serialize, Deserialize, Debug)]
-pub struct BatchUpdateCommitmentsInput {
-    pub updates: Vec<(String, u32, Option<String>)>, // (commitment_id, new_cache_priority, new_bandwidth_class)
-}
+// BatchUpdateCommitmentsInput re-exported from shefa-types above.
 
 #[hdk_extern]
 pub fn batch_update_commitments(
@@ -11119,20 +11211,7 @@ pub fn get_current_author_for_content(content_id: String) -> ExternResult<Option
 // =============================================================================
 // REA Agreement — Coordinator
 // =============================================================================
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CreateAgreementInput {
-    pub id: String,
-    pub name: Option<String>,
-    pub note: Option<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AgreementOutput {
-    pub action_hash: ActionHash,
-    pub entry_hash: EntryHash,
-    pub agreement: Agreement,
-}
+// CreateAgreementInput, AgreementOutput re-exported from shefa-types above.
 
 #[hdk_extern]
 pub fn create_agreement(input: CreateAgreementInput) -> ExternResult<AgreementOutput> {
@@ -11162,7 +11241,7 @@ pub fn create_agreement(input: CreateAgreementInput) -> ExternResult<AgreementOu
     Ok(AgreementOutput {
         action_hash,
         entry_hash,
-        agreement,
+        agreement: agreement_to_wire(&agreement),
     })
 }
 
@@ -11180,7 +11259,7 @@ pub fn get_agreement(id: String) -> ExternResult<Option<AgreementOutput>> {
         let record = get(action_hash.clone(), GetOptions::default())?.ok_or_else(|| {
             wasm_error!(WasmErrorInner::Guest("Agreement record not found".into()))
         })?;
-        let agreement: Agreement = record
+        let agreement: content_store_integrity::Agreement = record
             .entry()
             .to_app_option()
             .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Deserialize error: {e}"))))?
@@ -11189,7 +11268,7 @@ pub fn get_agreement(id: String) -> ExternResult<Option<AgreementOutput>> {
         Ok(Some(AgreementOutput {
             action_hash,
             entry_hash,
-            agreement,
+            agreement: agreement_to_wire(&agreement),
         }))
     } else {
         Ok(None)
@@ -11199,35 +11278,7 @@ pub fn get_agreement(id: String) -> ExternResult<Option<AgreementOutput>> {
 // =============================================================================
 // REA Commitment — Coordinator
 // =============================================================================
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CreateReaCommitmentInput {
-    pub id: String,
-    pub action: String,
-    pub provider: String,
-    pub receiver: String,
-    #[serde(default)]
-    pub resource_classified_as: Vec<String>,
-    pub resource_quantity_value: Option<f64>,
-    pub resource_quantity_unit: Option<String>,
-    pub effort_quantity_value: Option<f64>,
-    pub effort_quantity_unit: Option<String>,
-    pub has_beginning: Option<String>,
-    pub has_end: Option<String>,
-    pub due: Option<String>,
-    pub clause_of: Option<String>,
-    #[serde(default)]
-    pub in_scope_of: Vec<String>,
-    pub note: Option<String>,
-    pub metadata_json: Option<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ReaCommitmentOutput {
-    pub action_hash: ActionHash,
-    pub entry_hash: EntryHash,
-    pub commitment: Commitment,
-}
+// CreateReaCommitmentInput, ReaCommitmentOutput re-exported from shefa-types above.
 
 #[hdk_extern]
 pub fn create_rea_commitment(input: CreateReaCommitmentInput) -> ExternResult<ReaCommitmentOutput> {
@@ -11317,7 +11368,7 @@ pub fn create_rea_commitment(input: CreateReaCommitmentInput) -> ExternResult<Re
     Ok(ReaCommitmentOutput {
         action_hash,
         entry_hash,
-        commitment,
+        commitment: commitment_to_wire(&commitment),
     })
 }
 
@@ -11344,7 +11395,7 @@ pub fn get_rea_commitment(id: String) -> ExternResult<Option<ReaCommitmentOutput
         Ok(Some(ReaCommitmentOutput {
             action_hash,
             entry_hash,
-            commitment,
+            commitment: commitment_to_wire(&commitment),
         }))
     } else {
         Ok(None)
@@ -11371,7 +11422,7 @@ pub fn get_commitments_by_agreement(
                 results.push(ReaCommitmentOutput {
                     action_hash,
                     entry_hash,
-                    commitment,
+                    commitment: commitment_to_wire(&commitment),
                 });
             }
         }
@@ -11383,35 +11434,7 @@ pub fn get_commitments_by_agreement(
 // =============================================================================
 // REA EconomicEvent — Coordinator
 // =============================================================================
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CreateReaEconomicEventInput {
-    pub id: String,
-    pub action: String,
-    pub provider: String,
-    pub receiver: String,
-    #[serde(default)]
-    pub resource_classified_as: Vec<String>,
-    pub resource_quantity_value: Option<f64>,
-    pub resource_quantity_unit: Option<String>,
-    pub effort_quantity_value: Option<f64>,
-    pub effort_quantity_unit: Option<String>,
-    pub has_point_in_time: String,
-    #[serde(default)]
-    pub fulfills: Vec<String>,
-    pub realization_of: Option<String>,
-    pub lamad_event_type: Option<String>,
-    pub note: Option<String>,
-    pub metadata_json: Option<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ReaEconomicEventOutput {
-    pub action_hash: ActionHash,
-    pub entry_hash: EntryHash,
-    pub event: EconomicEvent,
-    pub fulfillment_links: Vec<ActionHash>,
-}
+// CreateReaEconomicEventInput, ReaEconomicEventOutput re-exported from shefa-types above.
 
 #[hdk_extern]
 pub fn create_rea_economic_event(
@@ -11517,7 +11540,7 @@ pub fn create_rea_economic_event(
     Ok(ReaEconomicEventOutput {
         action_hash,
         entry_hash,
-        event,
+        event: economic_event_to_wire(&event),
         fulfillment_links,
     })
 }
@@ -11554,7 +11577,7 @@ pub fn get_rea_economic_event(id: String) -> ExternResult<Option<ReaEconomicEven
         Ok(Some(ReaEconomicEventOutput {
             action_hash,
             entry_hash,
-            event,
+            event: economic_event_to_wire(&event),
             fulfillment_links,
         }))
     } else {

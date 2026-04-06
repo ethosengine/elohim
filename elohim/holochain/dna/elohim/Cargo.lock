@@ -128,8 +128,10 @@ dependencies = [
  "hc-rna",
  "hdk",
  "holochain_serialized_bytes",
+ "lamad-types",
  "serde",
  "serde_json",
+ "shefa-types",
 ]
 
 [[package]]
@@ -675,6 +677,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "lamad-types"
+version = "0.1.0"
+dependencies = [
+ "holo_hash",
+ "serde",
+]
+
+[[package]]
 name = "libc"
 version = "0.2.178"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -921,6 +931,14 @@ dependencies = [
  "cfg-if",
  "cpufeatures",
  "digest",
+]
+
+[[package]]
+name = "shefa-types"
+version = "0.1.0"
+dependencies = [
+ "holo_hash",
+ "serde",
 ]
 
 [[package]]

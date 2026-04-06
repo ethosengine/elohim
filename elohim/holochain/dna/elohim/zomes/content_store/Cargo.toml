@@ -16,3 +16,4 @@ doorway-client.workspace = true
 content_store_integrity = { path = "../content_store_integrity" }
 hc-rna = { path = "../../../../rna/rust" }
 lamad-types = { path = "../../../../../sdk/domains/lamad/types" }
+shefa-types = { path = "../../../../../sdk/domains/shefa/types" }
