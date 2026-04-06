@@ -52,6 +52,7 @@ pub struct DoorwayRegistration {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct DoorwayOutput {
+    #[cfg_attr(feature = "ts", ts(type = "string"))]
     pub action_hash: ActionHash,
     pub doorway: DoorwayRegistration,
 }
@@ -185,6 +186,7 @@ pub struct ContentServer {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct ContentServerOutput {
+    #[cfg_attr(feature = "ts", ts(type = "string"))]
     pub action_hash: ActionHash,
     pub server: ContentServer,
 }
@@ -278,5 +280,32 @@ mod tests {
         let decoded = roundtrip(&input);
         assert_eq!(decoded.content_hash, "bafkrei123");
         assert_eq!(decoded.limit, Some(10));
+    }
+}
+
+#[cfg(test)]
+#[cfg(feature = "ts")]
+mod ts_export {
+    use super::*;
+    use ts_rs::TS;
+
+    #[test]
+    fn export_bindings() {
+        let out = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("bindings");
+        RegisterDoorwayInput::export_all_to(&out).unwrap();
+        DoorwayRegistration::export_all_to(&out).unwrap();
+        DoorwayOutput::export_all_to(&out).unwrap();
+        RecordHeartbeatInput::export_all_to(&out).unwrap();
+        RecordSummaryInput::export_all_to(&out).unwrap();
+        RecordHealthAttestationInput::export_all_to(&out).unwrap();
+        HealthAttestation::export_all_to(&out).unwrap();
+        HealthAttestationOutput::export_all_to(&out).unwrap();
+        RegisterContentServerInput::export_all_to(&out).unwrap();
+        StorageEndpointInput::export_all_to(&out).unwrap();
+        StorageEndpoint::export_all_to(&out).unwrap();
+        ContentServer::export_all_to(&out).unwrap();
+        ContentServerOutput::export_all_to(&out).unwrap();
+        FindPublishersInput::export_all_to(&out).unwrap();
+        FindPublishersOutput::export_all_to(&out).unwrap();
     }
 }

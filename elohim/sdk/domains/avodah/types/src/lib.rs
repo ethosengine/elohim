@@ -90,7 +90,9 @@ pub struct ServiceRequest {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct ServiceRequestOutput {
+    #[cfg_attr(feature = "ts", ts(type = "string"))]
     pub action_hash: ActionHash,
+    #[cfg_attr(feature = "ts", ts(type = "string"))]
     pub entry_hash: EntryHash,
     pub request: ServiceRequest,
 }
@@ -180,7 +182,9 @@ pub struct ServiceOffer {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct ServiceOfferOutput {
+    #[cfg_attr(feature = "ts", ts(type = "string"))]
     pub action_hash: ActionHash,
+    #[cfg_attr(feature = "ts", ts(type = "string"))]
     pub entry_hash: EntryHash,
     pub offer: ServiceOffer,
 }
@@ -250,7 +254,9 @@ pub struct ServiceMatch {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct ServiceMatchOutput {
+    #[cfg_attr(feature = "ts", ts(type = "string"))]
     pub action_hash: ActionHash,
+    #[cfg_attr(feature = "ts", ts(type = "string"))]
     pub entry_hash: EntryHash,
     pub service_match: ServiceMatch,
 }
@@ -354,6 +360,7 @@ pub struct FlowPlan {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct FlowPlanOutput {
+    #[cfg_attr(feature = "ts", ts(type = "string"))]
     pub action_hash: ActionHash,
     pub plan: FlowPlan,
 }
@@ -815,7 +822,9 @@ pub struct MemberRiskProfile {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct MemberRiskProfileOutput {
+    #[cfg_attr(feature = "ts", ts(type = "string"))]
     pub action_hash: ActionHash,
+    #[cfg_attr(feature = "ts", ts(type = "string"))]
     pub entry_hash: EntryHash,
     pub profile: MemberRiskProfile,
 }
@@ -896,7 +905,9 @@ pub struct CoveragePolicy {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct CoveragePolicyOutput {
+    #[cfg_attr(feature = "ts", ts(type = "string"))]
     pub action_hash: ActionHash,
+    #[cfg_attr(feature = "ts", ts(type = "string"))]
     pub entry_hash: EntryHash,
     pub policy: CoveragePolicy,
 }
@@ -971,7 +982,9 @@ pub struct InsuranceClaim {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct InsuranceClaimOutput {
+    #[cfg_attr(feature = "ts", ts(type = "string"))]
     pub action_hash: ActionHash,
+    #[cfg_attr(feature = "ts", ts(type = "string"))]
     pub entry_hash: EntryHash,
     pub claim: InsuranceClaim,
 }
@@ -1034,7 +1047,9 @@ pub struct AdjustmentReasoning {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct AdjustmentReasoningOutput {
+    #[cfg_attr(feature = "ts", ts(type = "string"))]
     pub action_hash: ActionHash,
+    #[cfg_attr(feature = "ts", ts(type = "string"))]
     pub entry_hash: EntryHash,
     pub reasoning: AdjustmentReasoning,
 }
@@ -1334,5 +1349,58 @@ mod tests {
         let decoded: CreateAdjustmentReasoningInput = rmp_serde::from_slice(&bytes).unwrap();
         assert_eq!(decoded.id, "ar-001");
         assert_eq!(decoded.approved_amount_value, Some(2000.0));
+    }
+}
+
+
+#[cfg(test)]
+#[cfg(feature = "ts")]
+mod ts_export {
+    use super::*;
+    use ts_rs::TS;
+
+    #[test]
+    fn export_bindings() {
+        let out = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("bindings");
+        CreateServiceRequestInput::export_all_to(&out).unwrap();
+        ServiceRequest::export_all_to(&out).unwrap();
+        ServiceRequestOutput::export_all_to(&out).unwrap();
+        GetServiceRequestInput::export_all_to(&out).unwrap();
+        CreateServiceOfferInput::export_all_to(&out).unwrap();
+        ServiceOffer::export_all_to(&out).unwrap();
+        ServiceOfferOutput::export_all_to(&out).unwrap();
+        GetServiceOfferInput::export_all_to(&out).unwrap();
+        CreateServiceMatchInput::export_all_to(&out).unwrap();
+        ServiceMatch::export_all_to(&out).unwrap();
+        ServiceMatchOutput::export_all_to(&out).unwrap();
+        GetServiceMatchInput::export_all_to(&out).unwrap();
+        CreateFlowPlanInput::export_all_to(&out).unwrap();
+        FlowPlan::export_all_to(&out).unwrap();
+        FlowPlanOutput::export_all_to(&out).unwrap();
+        GetPlansForStewardInput::export_all_to(&out).unwrap();
+        CreateFlowBudgetInput::export_all_to(&out).unwrap();
+        FlowBudget::export_all_to(&out).unwrap();
+        CreateFlowGoalInput::export_all_to(&out).unwrap();
+        FlowGoal::export_all_to(&out).unwrap();
+        CreateFlowMilestoneInput::export_all_to(&out).unwrap();
+        FlowMilestone::export_all_to(&out).unwrap();
+        CreateFlowScenarioInput::export_all_to(&out).unwrap();
+        FlowScenario::export_all_to(&out).unwrap();
+        CreateFlowProjectionInput::export_all_to(&out).unwrap();
+        FlowProjection::export_all_to(&out).unwrap();
+        CreateRecurringPatternInput::export_all_to(&out).unwrap();
+        RecurringPattern::export_all_to(&out).unwrap();
+        CreateMemberRiskProfileInput::export_all_to(&out).unwrap();
+        MemberRiskProfile::export_all_to(&out).unwrap();
+        MemberRiskProfileOutput::export_all_to(&out).unwrap();
+        CreateCoveragePolicyInput::export_all_to(&out).unwrap();
+        CoveragePolicy::export_all_to(&out).unwrap();
+        CoveragePolicyOutput::export_all_to(&out).unwrap();
+        CreateInsuranceClaimInput::export_all_to(&out).unwrap();
+        InsuranceClaim::export_all_to(&out).unwrap();
+        InsuranceClaimOutput::export_all_to(&out).unwrap();
+        CreateAdjustmentReasoningInput::export_all_to(&out).unwrap();
+        AdjustmentReasoning::export_all_to(&out).unwrap();
+        AdjustmentReasoningOutput::export_all_to(&out).unwrap();
     }
 }

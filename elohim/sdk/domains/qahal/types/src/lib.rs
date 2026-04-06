@@ -77,6 +77,7 @@ pub struct Challenge {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct ChallengeOutput {
+    #[cfg_attr(feature = "ts", ts(type = "string"))]
     pub action_hash: ActionHash,
     pub challenge: Challenge,
 }
@@ -160,6 +161,7 @@ pub struct Proposal {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct ProposalOutput {
+    #[cfg_attr(feature = "ts", ts(type = "string"))]
     pub action_hash: ActionHash,
     pub proposal: Proposal,
 }
@@ -227,6 +229,7 @@ pub struct Precedent {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct PrecedentOutput {
+    #[cfg_attr(feature = "ts", ts(type = "string"))]
     pub action_hash: ActionHash,
     pub precedent: Precedent,
 }
@@ -286,6 +289,7 @@ pub struct Discussion {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct DiscussionOutput {
+    #[cfg_attr(feature = "ts", ts(type = "string"))]
     pub action_hash: ActionHash,
     pub discussion: Discussion,
 }
@@ -352,6 +356,7 @@ pub struct GovernanceState {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct GovernanceStateOutput {
+    #[cfg_attr(feature = "ts", ts(type = "string"))]
     pub action_hash: ActionHash,
     pub governance_state: GovernanceState,
 }
@@ -419,6 +424,7 @@ pub struct GovernanceReaction {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct GovernanceReactionOutput {
+    #[cfg_attr(feature = "ts", ts(type = "string"))]
     pub action_hash: ActionHash,
     pub reaction: GovernanceReaction,
 }
@@ -483,6 +489,7 @@ pub struct GraduatedFeedback {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct GraduatedFeedbackOutput {
+    #[cfg_attr(feature = "ts", ts(type = "string"))]
     pub action_hash: ActionHash,
     pub feedback: GraduatedFeedback,
 }
@@ -548,6 +555,7 @@ pub struct ProposalVote {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct ProposalVoteOutput {
+    #[cfg_attr(feature = "ts", ts(type = "string"))]
     pub action_hash: ActionHash,
     pub vote: ProposalVote,
 }
@@ -610,6 +618,7 @@ pub struct OpinionStatement {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct OpinionStatementOutput {
+    #[cfg_attr(feature = "ts", ts(type = "string"))]
     pub action_hash: ActionHash,
     pub statement: OpinionStatement,
 }
@@ -660,6 +669,7 @@ pub struct StatementVote {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct StatementVoteOutput {
+    #[cfg_attr(feature = "ts", ts(type = "string"))]
     pub action_hash: ActionHash,
     pub statement_vote: StatementVote,
 }
@@ -694,11 +704,13 @@ pub enum VerificationStatus {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct CredentialVerification {
+    #[cfg_attr(feature = "ts", ts(type = "string"))]
     pub hash: ActionHash,
     pub status: VerificationStatus,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub entry_type: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(feature = "ts", ts(type = "string | null"))]
     pub agent: Option<AgentPubKey>,
 }
 
@@ -896,5 +908,61 @@ mod tests {
         let bytes = rmp_serde::to_vec_named(&input).unwrap();
         let decoded: CreateStatementVoteInput = rmp_serde::from_slice(&bytes).unwrap();
         assert_eq!(decoded.vote, "agree");
+    }
+}
+
+
+#[cfg(test)]
+#[cfg(feature = "ts")]
+mod ts_export {
+    use super::*;
+    use ts_rs::TS;
+
+    #[test]
+    fn export_bindings() {
+        let out = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("bindings");
+        CreateChallengeInput::export_all_to(&out).unwrap();
+        Challenge::export_all_to(&out).unwrap();
+        ChallengeOutput::export_all_to(&out).unwrap();
+        QueryChallengesInput::export_all_to(&out).unwrap();
+        CreateProposalInput::export_all_to(&out).unwrap();
+        Proposal::export_all_to(&out).unwrap();
+        ProposalOutput::export_all_to(&out).unwrap();
+        QueryProposalsInput::export_all_to(&out).unwrap();
+        CreatePrecedentInput::export_all_to(&out).unwrap();
+        Precedent::export_all_to(&out).unwrap();
+        PrecedentOutput::export_all_to(&out).unwrap();
+        QueryPrecedentsInput::export_all_to(&out).unwrap();
+        CreateDiscussionInput::export_all_to(&out).unwrap();
+        Discussion::export_all_to(&out).unwrap();
+        DiscussionOutput::export_all_to(&out).unwrap();
+        QueryDiscussionsInput::export_all_to(&out).unwrap();
+        CreateGovernanceStateInput::export_all_to(&out).unwrap();
+        GovernanceState::export_all_to(&out).unwrap();
+        GovernanceStateOutput::export_all_to(&out).unwrap();
+        GetGovernanceStateInput::export_all_to(&out).unwrap();
+        QueryGovernanceStatesInput::export_all_to(&out).unwrap();
+        CreateGovernanceReactionInput::export_all_to(&out).unwrap();
+        GovernanceReaction::export_all_to(&out).unwrap();
+        GovernanceReactionOutput::export_all_to(&out).unwrap();
+        QueryGovernanceReactionsInput::export_all_to(&out).unwrap();
+        CreateGraduatedFeedbackInput::export_all_to(&out).unwrap();
+        GraduatedFeedback::export_all_to(&out).unwrap();
+        GraduatedFeedbackOutput::export_all_to(&out).unwrap();
+        QueryGraduatedFeedbackInput::export_all_to(&out).unwrap();
+        CreateProposalVoteInput::export_all_to(&out).unwrap();
+        ProposalVote::export_all_to(&out).unwrap();
+        ProposalVoteOutput::export_all_to(&out).unwrap();
+        QueryProposalVotesInput::export_all_to(&out).unwrap();
+        CreateOpinionStatementInput::export_all_to(&out).unwrap();
+        OpinionStatement::export_all_to(&out).unwrap();
+        OpinionStatementOutput::export_all_to(&out).unwrap();
+        QueryOpinionStatementsInput::export_all_to(&out).unwrap();
+        CreateStatementVoteInput::export_all_to(&out).unwrap();
+        StatementVote::export_all_to(&out).unwrap();
+        StatementVoteOutput::export_all_to(&out).unwrap();
+        QueryStatementVotesInput::export_all_to(&out).unwrap();
+        VerificationStatus::export_all_to(&out).unwrap();
+        CredentialVerification::export_all_to(&out).unwrap();
     }
 }

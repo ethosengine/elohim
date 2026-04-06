@@ -45,7 +45,9 @@ pub struct Agreement {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct AgreementOutput {
+    #[cfg_attr(feature = "ts", ts(type = "string"))]
     pub action_hash: ActionHash,
+    #[cfg_attr(feature = "ts", ts(type = "string"))]
     pub entry_hash: EntryHash,
     pub agreement: Agreement,
 }
@@ -141,7 +143,9 @@ pub struct Commitment {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct ReaCommitmentOutput {
+    #[cfg_attr(feature = "ts", ts(type = "string"))]
     pub action_hash: ActionHash,
+    #[cfg_attr(feature = "ts", ts(type = "string"))]
     pub entry_hash: EntryHash,
     pub commitment: Commitment,
 }
@@ -235,9 +239,12 @@ pub struct EconomicEvent {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct ReaEconomicEventOutput {
+    #[cfg_attr(feature = "ts", ts(type = "string"))]
     pub action_hash: ActionHash,
+    #[cfg_attr(feature = "ts", ts(type = "string"))]
     pub entry_hash: EntryHash,
     pub event: EconomicEvent,
+    #[cfg_attr(feature = "ts", ts(type = "Array<string>"))]
     pub fulfillment_links: Vec<ActionHash>,
 }
 
@@ -297,6 +304,7 @@ pub struct StewardCredential {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct StewardCredentialOutput {
+    #[cfg_attr(feature = "ts", ts(type = "string"))]
     pub action_hash: ActionHash,
     pub credential: StewardCredential,
 }
@@ -423,6 +431,7 @@ pub struct PremiumGate {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct PremiumGateOutput {
+    #[cfg_attr(feature = "ts", ts(type = "string"))]
     pub action_hash: ActionHash,
     pub gate: PremiumGate,
 }
@@ -464,6 +473,7 @@ pub struct AccessGrant {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct AccessGrantOutput {
+    #[cfg_attr(feature = "ts", ts(type = "string"))]
     pub action_hash: ActionHash,
     pub grant: AccessGrant,
 }
@@ -520,6 +530,7 @@ pub struct StewardRevenue {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct StewardRevenueOutput {
+    #[cfg_attr(feature = "ts", ts(type = "string"))]
     pub action_hash: ActionHash,
     pub revenue: StewardRevenue,
 }
@@ -656,7 +667,9 @@ pub struct CustodianCommitment {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct CustodianCommitmentOutput {
+    #[cfg_attr(feature = "ts", ts(type = "string"))]
     pub action_hash: ActionHash,
+    #[cfg_attr(feature = "ts", ts(type = "string"))]
     pub entry_hash: EntryHash,
     pub commitment: CustodianCommitment,
 }
@@ -910,5 +923,53 @@ mod tests {
         let decoded: QueryCommitmentsInput = rmp_serde::from_slice(&bytes).unwrap();
         assert_eq!(decoded.custodian_agent_id, Some("agent-a".into()));
         assert_eq!(decoded.limit, Some(10));
+    }
+}
+
+
+#[cfg(test)]
+#[cfg(feature = "ts")]
+mod ts_export {
+    use super::*;
+    use ts_rs::TS;
+
+    #[test]
+    fn export_bindings() {
+        let out = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("bindings");
+        CreateAgreementInput::export_all_to(&out).unwrap();
+        Agreement::export_all_to(&out).unwrap();
+        AgreementOutput::export_all_to(&out).unwrap();
+        CreateReaCommitmentInput::export_all_to(&out).unwrap();
+        Commitment::export_all_to(&out).unwrap();
+        ReaCommitmentOutput::export_all_to(&out).unwrap();
+        CreateReaEconomicEventInput::export_all_to(&out).unwrap();
+        EconomicEvent::export_all_to(&out).unwrap();
+        ReaEconomicEventOutput::export_all_to(&out).unwrap();
+        CreateStewardCredentialInput::export_all_to(&out).unwrap();
+        StewardCredential::export_all_to(&out).unwrap();
+        StewardCredentialOutput::export_all_to(&out).unwrap();
+        RequiredAttestationInput::export_all_to(&out).unwrap();
+        RequiredMasteryInput::export_all_to(&out).unwrap();
+        RequiredVouchesInput::export_all_to(&out).unwrap();
+        CreatePremiumGateInput::export_all_to(&out).unwrap();
+        PremiumGate::export_all_to(&out).unwrap();
+        PremiumGateOutput::export_all_to(&out).unwrap();
+        AccessGrant::export_all_to(&out).unwrap();
+        AccessGrantOutput::export_all_to(&out).unwrap();
+        GrantAccessInput::export_all_to(&out).unwrap();
+        StewardRevenue::export_all_to(&out).unwrap();
+        StewardRevenueOutput::export_all_to(&out).unwrap();
+        GateRevenueSummary::export_all_to(&out).unwrap();
+        StewardRevenueSummary::export_all_to(&out).unwrap();
+        ContentImpactSummary::export_all_to(&out).unwrap();
+        RecognitionEventSummary::export_all_to(&out).unwrap();
+        CreateCustodianCommitmentInput::export_all_to(&out).unwrap();
+        CustodianCommitment::export_all_to(&out).unwrap();
+        CustodianCommitmentOutput::export_all_to(&out).unwrap();
+        QueryCommitmentsInput::export_all_to(&out).unwrap();
+        AcceptCommitmentInput::export_all_to(&out).unwrap();
+        BatchAcceptCommitmentsInput::export_all_to(&out).unwrap();
+        BatchAcceptCommitmentsOutput::export_all_to(&out).unwrap();
+        BatchUpdateCommitmentsInput::export_all_to(&out).unwrap();
     }
 }

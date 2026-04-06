@@ -53,6 +53,7 @@ pub struct Human {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct HumanOutput {
+    #[cfg_attr(feature = "ts", ts(type = "string"))]
     pub action_hash: ActionHash,
     pub human: Human,
 }
@@ -95,5 +96,20 @@ mod tests {
         let decoded: Human = rmp_serde::from_slice(&bytes).unwrap();
         assert_eq!(decoded.id, "test-456");
         assert_eq!(decoded.location, Some("Earth".to_string()));
+    }
+}
+
+#[cfg(test)]
+#[cfg(feature = "ts")]
+mod ts_export {
+    use super::*;
+    use ts_rs::TS;
+
+    #[test]
+    fn export_bindings() {
+        let out = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("bindings");
+        CreateHumanInput::export_all_to(&out).unwrap();
+        Human::export_all_to(&out).unwrap();
+        HumanOutput::export_all_to(&out).unwrap();
     }
 }

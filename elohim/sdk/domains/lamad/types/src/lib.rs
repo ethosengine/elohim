@@ -93,7 +93,9 @@ pub struct Content {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct ContentOutput {
+    #[cfg_attr(feature = "ts", ts(type = "string"))]
     pub action_hash: ActionHash,
+    #[cfg_attr(feature = "ts", ts(type = "string"))]
     pub entry_hash: EntryHash,
     pub content: Content,
 }
@@ -112,6 +114,7 @@ pub struct BulkCreateContentInput {
 pub struct BulkCreateContentOutput {
     pub import_id: String,
     pub created_count: u32,
+    #[cfg_attr(feature = "ts", ts(type = "Array<string>"))]
     pub action_hashes: Vec<ActionHash>,
     pub errors: Vec<String>,
 }
@@ -233,6 +236,7 @@ pub struct Relationship {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct RelationshipOutput {
+    #[cfg_attr(feature = "ts", ts(type = "string"))]
     pub action_hash: ActionHash,
     pub relationship: Relationship,
 }
@@ -463,6 +467,7 @@ pub struct BatchAddPathStepsInput {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct PathStepOutput {
+    #[cfg_attr(feature = "ts", ts(type = "string"))]
     pub action_hash: ActionHash,
     pub step: PathStep,
 }
@@ -492,6 +497,7 @@ pub struct UpdatePathInput {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct PathWithStepsOutput {
+    #[cfg_attr(feature = "ts", ts(type = "string"))]
     pub action_hash: ActionHash,
     pub path: LearningPath,
     pub steps: Vec<PathStepOutput>,
@@ -501,6 +507,7 @@ pub struct PathWithStepsOutput {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct PathOverviewOutput {
+    #[cfg_attr(feature = "ts", ts(type = "string"))]
     pub action_hash: ActionHash,
     pub path: LearningPath,
     pub step_count: usize,
@@ -559,6 +566,7 @@ pub struct CreateChapterInput {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct ChapterOutput {
+    #[cfg_attr(feature = "ts", ts(type = "string"))]
     pub action_hash: ActionHash,
     pub chapter: Chapter,
 }
@@ -648,6 +656,7 @@ pub struct CheckAttestationInput {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct AttestationOutput {
+    #[cfg_attr(feature = "ts", ts(type = "string"))]
     pub action_hash: ActionHash,
     pub attestation: AttestationRecord,
 }
@@ -759,6 +768,7 @@ pub struct CreateKnowledgeMapInput {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct KnowledgeMapOutput {
+    #[cfg_attr(feature = "ts", ts(type = "string"))]
     pub action_hash: ActionHash,
     pub knowledge_map: KnowledgeMap,
 }
@@ -836,6 +846,7 @@ pub struct CreatePathExtensionInput {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "ts", derive(ts_rs::TS))]
 pub struct PathExtensionOutput {
+    #[cfg_attr(feature = "ts", ts(type = "string"))]
     pub action_hash: ActionHash,
     pub path_extension: PathExtension,
 }
@@ -1211,5 +1222,74 @@ mod tests {
         let decoded: ImportChunkInput = rmp_serde::from_slice(&bytes).unwrap();
         assert_eq!(decoded.batch_id, "import-001");
         assert_eq!(decoded.chunk_index, 0);
+    }
+}
+
+
+#[cfg(test)]
+#[cfg(feature = "ts")]
+mod ts_export {
+    use super::*;
+    use ts_rs::TS;
+
+    #[test]
+    fn export_bindings() {
+        let out = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("bindings");
+        CreateContentInput::export_all_to(&out).unwrap();
+        Content::export_all_to(&out).unwrap();
+        ContentOutput::export_all_to(&out).unwrap();
+        BulkCreateContentInput::export_all_to(&out).unwrap();
+        BulkCreateContentOutput::export_all_to(&out).unwrap();
+        QueryByIdInput::export_all_to(&out).unwrap();
+        QueryByTypeInput::export_all_to(&out).unwrap();
+        CheckIdsExistInput::export_all_to(&out).unwrap();
+        CheckIdsExistOutput::export_all_to(&out).unwrap();
+        BatchGetContentInput::export_all_to(&out).unwrap();
+        BatchGetContentOutput::export_all_to(&out).unwrap();
+        PaginatedByTypeInput::export_all_to(&out).unwrap();
+        PaginatedByTagInput::export_all_to(&out).unwrap();
+        PaginatedContentOutput::export_all_to(&out).unwrap();
+        ContentStats::export_all_to(&out).unwrap();
+        CreateRelationshipInput::export_all_to(&out).unwrap();
+        Relationship::export_all_to(&out).unwrap();
+        RelationshipOutput::export_all_to(&out).unwrap();
+        GetRelationshipsInput::export_all_to(&out).unwrap();
+        QueryRelatedContentInput::export_all_to(&out).unwrap();
+        ContentGraphNode::export_all_to(&out).unwrap();
+        ContentGraph::export_all_to(&out).unwrap();
+        LearningPath::export_all_to(&out).unwrap();
+        PathStep::export_all_to(&out).unwrap();
+        CreatePathInput::export_all_to(&out).unwrap();
+        PathImportInput::export_all_to(&out).unwrap();
+        PathImportStepInput::export_all_to(&out).unwrap();
+        AddPathStepInput::export_all_to(&out).unwrap();
+        BatchAddPathStepsInput::export_all_to(&out).unwrap();
+        PathStepOutput::export_all_to(&out).unwrap();
+        UpdatePathInput::export_all_to(&out).unwrap();
+        PathWithStepsOutput::export_all_to(&out).unwrap();
+        PathOverviewOutput::export_all_to(&out).unwrap();
+        Chapter::export_all_to(&out).unwrap();
+        CreateChapterInput::export_all_to(&out).unwrap();
+        ChapterOutput::export_all_to(&out).unwrap();
+        UpdateChapterInput::export_all_to(&out).unwrap();
+        StartPathProgressInput::export_all_to(&out).unwrap();
+        CompleteStepInput::export_all_to(&out).unwrap();
+        QueryProgressInput::export_all_to(&out).unwrap();
+        GrantAttestationInput::export_all_to(&out).unwrap();
+        CheckAttestationInput::export_all_to(&out).unwrap();
+        AttestationOutput::export_all_to(&out).unwrap();
+        AttestationRecord::export_all_to(&out).unwrap();
+        ContentAttestation::export_all_to(&out).unwrap();
+        KnowledgeMap::export_all_to(&out).unwrap();
+        CreateKnowledgeMapInput::export_all_to(&out).unwrap();
+        KnowledgeMapOutput::export_all_to(&out).unwrap();
+        QueryKnowledgeMapInput::export_all_to(&out).unwrap();
+        PathExtension::export_all_to(&out).unwrap();
+        CreatePathExtensionInput::export_all_to(&out).unwrap();
+        PathExtensionOutput::export_all_to(&out).unwrap();
+        QueryPathExtensionInput::export_all_to(&out).unwrap();
+        QueueImportInput::export_all_to(&out).unwrap();
+        ImportChunkInput::export_all_to(&out).unwrap();
+        ImportStatusOutput::export_all_to(&out).unwrap();
     }
 }
