@@ -39,6 +39,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c08606f8c3cbf4ce6ec8e28fb0014a2c086708fe954eaa885384a6165172e7e8"
 
 [[package]]
+name = "avodah-types"
+version = "0.1.0"
+dependencies = [
+ "holo_hash",
+ "serde",
+]
+
+[[package]]
 name = "base64"
 version = "0.22.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -123,6 +131,7 @@ checksum = "7c74b8349d32d297c9134b8c88677813a227df8f779daa29bfc29c183fe3dca6"
 name = "content_store"
 version = "0.1.0"
 dependencies = [
+ "avodah-types",
  "content_store_integrity",
  "doorway-client",
  "hc-rna",

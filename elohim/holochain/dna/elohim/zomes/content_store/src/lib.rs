@@ -123,6 +123,50 @@ use shefa_types::PremiumGate as WirePremiumGate;
 use shefa_types::StewardCredential as WireStewardCredential;
 use shefa_types::StewardRevenue as WireStewardRevenue;
 
+// Re-export avodah wire types from shared crate
+pub use avodah_types::{
+    // Output types
+    AdjustmentReasoningOutput,
+    CoveragePolicyOutput,
+    // Insurance Mutual
+    CreateAdjustmentReasoningInput,
+    CreateCoveragePolicyInput,
+    // Flow Planning
+    CreateFlowBudgetInput,
+    CreateFlowGoalInput,
+    CreateFlowMilestoneInput,
+    CreateFlowPlanInput,
+    CreateFlowProjectionInput,
+    CreateFlowScenarioInput,
+    CreateInsuranceClaimInput,
+    CreateMemberRiskProfileInput,
+    CreateRecurringPatternInput,
+    // Service Marketplace
+    CreateServiceMatchInput,
+    CreateServiceOfferInput,
+    CreateServiceRequestInput,
+    FlowPlanOutput,
+    // Query types
+    GetPlansForStewardInput,
+    GetServiceMatchInput,
+    GetServiceOfferInput,
+    GetServiceRequestInput,
+    InsuranceClaimOutput,
+    MemberRiskProfileOutput,
+    ServiceMatchOutput,
+    ServiceOfferOutput,
+    ServiceRequestOutput,
+};
+
+// Aliases to disambiguate wire types from integrity entry types
+use avodah_types::AdjustmentReasoning as WireAdjustmentReasoning;
+use avodah_types::CoveragePolicy as WireCoveragePolicy;
+use avodah_types::InsuranceClaim as WireInsuranceClaim;
+use avodah_types::MemberRiskProfile as WireMemberRiskProfile;
+use avodah_types::ServiceMatch as WireServiceMatch;
+use avodah_types::ServiceOffer as WireServiceOffer;
+use avodah_types::ServiceRequest as WireServiceRequest;
+
 // =============================================================================
 // Conversion helpers: integrity entry types -> wire types
 // =============================================================================
@@ -565,6 +609,201 @@ fn custodian_commitment_to_wire(
         metadata_json: cc.metadata_json.clone(),
         created_at: cc.created_at.clone(),
         updated_at: cc.updated_at.clone(),
+    }
+}
+
+// =============================================================================
+// Avodah conversion helpers: integrity entry types -> wire types
+// =============================================================================
+
+fn member_risk_profile_to_wire(
+    p: &content_store_integrity::MemberRiskProfile,
+) -> WireMemberRiskProfile {
+    WireMemberRiskProfile {
+        id: p.id.clone(),
+        member_id: p.member_id.clone(),
+        risk_type: p.risk_type.clone(),
+        care_maintenance_score: p.care_maintenance_score,
+        community_connectedness_score: p.community_connectedness_score,
+        historical_claims_rate: p.historical_claims_rate,
+        risk_score: p.risk_score,
+        risk_tier: p.risk_tier.clone(),
+        risk_tier_rationale: p.risk_tier_rationale.clone(),
+        evidence_event_ids_json: p.evidence_event_ids_json.clone(),
+        evidence_breakdown_json: p.evidence_breakdown_json.clone(),
+        risk_trend_direction: p.risk_trend_direction.clone(),
+        last_risk_score: p.last_risk_score,
+        assessed_at: p.assessed_at.clone(),
+        last_assessment_at: p.last_assessment_at.clone(),
+        next_assessment_due: p.next_assessment_due.clone(),
+        assessment_event_ids_json: p.assessment_event_ids_json.clone(),
+        schema_version: p.schema_version,
+        validation_status: p.validation_status.clone(),
+        metadata_json: p.metadata_json.clone(),
+        created_at: p.created_at.clone(),
+        updated_at: p.updated_at.clone(),
+    }
+}
+
+fn coverage_policy_to_wire(p: &content_store_integrity::CoveragePolicy) -> WireCoveragePolicy {
+    WireCoveragePolicy {
+        id: p.id.clone(),
+        member_id: p.member_id.clone(),
+        coverage_level: p.coverage_level.clone(),
+        governed_at: p.governed_at.clone(),
+        covered_risks_json: p.covered_risks_json.clone(),
+        deductible_value: p.deductible_value,
+        deductible_unit: p.deductible_unit.clone(),
+        coinsurance: p.coinsurance,
+        out_of_pocket_maximum_value: p.out_of_pocket_maximum_value,
+        out_of_pocket_maximum_unit: p.out_of_pocket_maximum_unit.clone(),
+        effective_from: p.effective_from.clone(),
+        renewal_terms: p.renewal_terms.clone(),
+        renewal_due_at: p.renewal_due_at.clone(),
+        constitutional_basis: p.constitutional_basis.clone(),
+        last_premium_event_id: p.last_premium_event_id.clone(),
+        last_premium_paid_at: p.last_premium_paid_at.clone(),
+        schema_version: p.schema_version,
+        validation_status: p.validation_status.clone(),
+        modification_event_ids_json: p.modification_event_ids_json.clone(),
+        metadata_json: p.metadata_json.clone(),
+        created_at: p.created_at.clone(),
+        updated_at: p.updated_at.clone(),
+    }
+}
+
+fn insurance_claim_to_wire(c: &content_store_integrity::InsuranceClaim) -> WireInsuranceClaim {
+    WireInsuranceClaim {
+        id: c.id.clone(),
+        claim_number: c.claim_number.clone(),
+        policy_id: c.policy_id.clone(),
+        member_id: c.member_id.clone(),
+        filed_date: c.filed_date.clone(),
+        filed_by: c.filed_by.clone(),
+        loss_type: c.loss_type.clone(),
+        loss_date: c.loss_date.clone(),
+        description: c.description.clone(),
+        estimated_amount_value: c.estimated_amount_value,
+        estimated_amount_unit: c.estimated_amount_unit.clone(),
+        observer_attestation_ids_json: c.observer_attestation_ids_json.clone(),
+        member_document_ids_json: c.member_document_ids_json.clone(),
+        status: c.status.clone(),
+        status_history_json: c.status_history_json.clone(),
+        adjustment_event_ids_json: c.adjustment_event_ids_json.clone(),
+        appeal_event_ids_json: c.appeal_event_ids_json.clone(),
+        settlement_event_ids_json: c.settlement_event_ids_json.clone(),
+        schema_version: c.schema_version,
+        validation_status: c.validation_status.clone(),
+        metadata_json: c.metadata_json.clone(),
+        created_at: c.created_at.clone(),
+        updated_at: c.updated_at.clone(),
+    }
+}
+
+fn adjustment_reasoning_to_wire(
+    r: &content_store_integrity::AdjustmentReasoning,
+) -> WireAdjustmentReasoning {
+    WireAdjustmentReasoning {
+        id: r.id.clone(),
+        claim_id: r.claim_id.clone(),
+        adjuster_id: r.adjuster_id.clone(),
+        coverage_decision: r.coverage_decision.clone(),
+        approved_amount_value: r.approved_amount_value,
+        approved_amount_unit: r.approved_amount_unit.clone(),
+        plain_language_explanation: r.plain_language_explanation.clone(),
+        interpretation_notes: r.interpretation_notes.clone(),
+        applied_generosity_principle: r.applied_generosity_principle,
+        constitutional_basis_documents_json: r.constitutional_basis_documents_json.clone(),
+        policy_citations_json: r.policy_citations_json.clone(),
+        flagged_for_governance: r.flagged_for_governance,
+        governance_review_reason: r.governance_review_reason.clone(),
+        adjustment_date: r.adjustment_date.clone(),
+        created_at: r.created_at.clone(),
+    }
+}
+
+fn service_request_to_wire(r: &content_store_integrity::ServiceRequest) -> WireServiceRequest {
+    WireServiceRequest {
+        id: r.id.clone(),
+        request_number: r.request_number.clone(),
+        requester_id: r.requester_id.clone(),
+        title: r.title.clone(),
+        description: r.description.clone(),
+        contact_preference: r.contact_preference.clone(),
+        contact_value: r.contact_value.clone(),
+        time_zone: r.time_zone.clone(),
+        time_preference: r.time_preference.clone(),
+        interaction_type: r.interaction_type.clone(),
+        date_range_start: r.date_range_start.clone(),
+        date_range_end: r.date_range_end.clone(),
+        service_type_ids_json: r.service_type_ids_json.clone(),
+        required_skills_json: r.required_skills_json.clone(),
+        budget_value: r.budget_value,
+        budget_unit: r.budget_unit.clone(),
+        medium_of_exchange_ids_json: r.medium_of_exchange_ids_json.clone(),
+        status: r.status.clone(),
+        is_public: r.is_public,
+        links_json: r.links_json.clone(),
+        schema_version: r.schema_version,
+        validation_status: r.validation_status.clone(),
+        metadata_json: r.metadata_json.clone(),
+        created_at: r.created_at.clone(),
+        updated_at: r.updated_at.clone(),
+    }
+}
+
+fn service_offer_to_wire(o: &content_store_integrity::ServiceOffer) -> WireServiceOffer {
+    WireServiceOffer {
+        id: o.id.clone(),
+        offer_number: o.offer_number.clone(),
+        offeror_id: o.offeror_id.clone(),
+        title: o.title.clone(),
+        description: o.description.clone(),
+        contact_preference: o.contact_preference.clone(),
+        contact_value: o.contact_value.clone(),
+        time_zone: o.time_zone.clone(),
+        time_preference: o.time_preference.clone(),
+        interaction_type: o.interaction_type.clone(),
+        hours_per_week: o.hours_per_week,
+        date_range_start: o.date_range_start.clone(),
+        date_range_end: o.date_range_end.clone(),
+        service_type_ids_json: o.service_type_ids_json.clone(),
+        offered_skills_json: o.offered_skills_json.clone(),
+        rate_value: o.rate_value,
+        rate_unit: o.rate_unit.clone(),
+        rate_per: o.rate_per.clone(),
+        medium_of_exchange_ids_json: o.medium_of_exchange_ids_json.clone(),
+        accepts_alternative_payment: o.accepts_alternative_payment,
+        status: o.status.clone(),
+        is_public: o.is_public,
+        links_json: o.links_json.clone(),
+        schema_version: o.schema_version,
+        validation_status: o.validation_status.clone(),
+        metadata_json: o.metadata_json.clone(),
+        created_at: o.created_at.clone(),
+        updated_at: o.updated_at.clone(),
+    }
+}
+
+fn service_match_to_wire(m: &content_store_integrity::ServiceMatch) -> WireServiceMatch {
+    WireServiceMatch {
+        id: m.id.clone(),
+        request_id: m.request_id.clone(),
+        offer_id: m.offer_id.clone(),
+        match_reason: m.match_reason.clone(),
+        match_quality: m.match_quality,
+        shared_service_types_json: m.shared_service_types_json.clone(),
+        time_compatible: m.time_compatible,
+        interaction_compatible: m.interaction_compatible,
+        exchange_compatible: m.exchange_compatible,
+        status: m.status.clone(),
+        proposal_id: m.proposal_id.clone(),
+        commitment_id: m.commitment_id.clone(),
+        schema_version: m.schema_version,
+        validation_status: m.validation_status.clone(),
+        metadata_json: m.metadata_json.clone(),
+        created_at: m.created_at.clone(),
+        updated_at: m.updated_at.clone(),
     }
 }
 
@@ -9908,49 +10147,49 @@ pub enum ProjectionSignal {
     MemberRiskProfileCommitted {
         action_hash: ActionHash,
         entry_hash: EntryHash,
-        profile: MemberRiskProfile,
+        profile: WireMemberRiskProfile,
         author: AgentPubKey,
     },
     /// CoveragePolicy was created or updated
     CoveragePolicyCommitted {
         action_hash: ActionHash,
         entry_hash: EntryHash,
-        policy: CoveragePolicy,
+        policy: WireCoveragePolicy,
         author: AgentPubKey,
     },
     /// InsuranceClaim was created or updated
     InsuranceClaimCommitted {
         action_hash: ActionHash,
         entry_hash: EntryHash,
-        claim: InsuranceClaim,
+        claim: WireInsuranceClaim,
         author: AgentPubKey,
     },
     /// AdjustmentReasoning was created or updated
     AdjustmentReasoningCommitted {
         action_hash: ActionHash,
         entry_hash: EntryHash,
-        reasoning: AdjustmentReasoning,
+        reasoning: WireAdjustmentReasoning,
         author: AgentPubKey,
     },
     /// ServiceRequest was created or updated
     ServiceRequestCommitted {
         action_hash: ActionHash,
         entry_hash: EntryHash,
-        request: ServiceRequest,
+        request: WireServiceRequest,
         author: AgentPubKey,
     },
     /// ServiceOffer was created or updated
     ServiceOfferCommitted {
         action_hash: ActionHash,
         entry_hash: EntryHash,
-        offer: ServiceOffer,
+        offer: WireServiceOffer,
         author: AgentPubKey,
     },
     /// ServiceMatch was created or updated
     ServiceMatchCommitted {
         action_hash: ActionHash,
         entry_hash: EntryHash,
-        service_match: ServiceMatch,
+        service_match: WireServiceMatch,
         author: AgentPubKey,
     },
     /// DoorwayRegistration was created or updated
@@ -10172,7 +10411,7 @@ pub fn post_commit(committed_actions: Vec<SignedActionHashed>) -> ExternResult<(
             emit_signal(ProjectionSignal::MemberRiskProfileCommitted {
                 action_hash,
                 entry_hash,
-                profile,
+                profile: member_risk_profile_to_wire(&profile),
                 author,
             })?;
         } else if let Some(policy) = record
@@ -10184,7 +10423,7 @@ pub fn post_commit(committed_actions: Vec<SignedActionHashed>) -> ExternResult<(
             emit_signal(ProjectionSignal::CoveragePolicyCommitted {
                 action_hash,
                 entry_hash,
-                policy,
+                policy: coverage_policy_to_wire(&policy),
                 author,
             })?;
         } else if let Some(claim) = record
@@ -10196,7 +10435,7 @@ pub fn post_commit(committed_actions: Vec<SignedActionHashed>) -> ExternResult<(
             emit_signal(ProjectionSignal::InsuranceClaimCommitted {
                 action_hash,
                 entry_hash,
-                claim,
+                claim: insurance_claim_to_wire(&claim),
                 author,
             })?;
         } else if let Some(reasoning) = record
@@ -10208,7 +10447,7 @@ pub fn post_commit(committed_actions: Vec<SignedActionHashed>) -> ExternResult<(
             emit_signal(ProjectionSignal::AdjustmentReasoningCommitted {
                 action_hash,
                 entry_hash,
-                reasoning,
+                reasoning: adjustment_reasoning_to_wire(&reasoning),
                 author,
             })?;
         } else if let Some(request) = record
@@ -10220,7 +10459,7 @@ pub fn post_commit(committed_actions: Vec<SignedActionHashed>) -> ExternResult<(
             emit_signal(ProjectionSignal::ServiceRequestCommitted {
                 action_hash,
                 entry_hash,
-                request,
+                request: service_request_to_wire(&request),
                 author,
             })?;
         } else if let Some(offer) = record
@@ -10232,7 +10471,7 @@ pub fn post_commit(committed_actions: Vec<SignedActionHashed>) -> ExternResult<(
             emit_signal(ProjectionSignal::ServiceOfferCommitted {
                 action_hash,
                 entry_hash,
-                offer,
+                offer: service_offer_to_wire(&offer),
                 author,
             })?;
         } else if let Some(service_match) = record
@@ -10244,7 +10483,7 @@ pub fn post_commit(committed_actions: Vec<SignedActionHashed>) -> ExternResult<(
             emit_signal(ProjectionSignal::ServiceMatchCommitted {
                 action_hash,
                 entry_hash,
-                service_match,
+                service_match: service_match_to_wire(&service_match),
                 author,
             })?;
         } else if let Some(doorway) = record
