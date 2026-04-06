@@ -116,6 +116,9 @@ base64ct = "=1.6.0"
 # Shared types with DNAs
 doorway-client = { path = "../../crates/doorway-client" }
 
+# Shared wire types with imagodei DNA — compiler enforces agreement
+imagodei-types = { path = "../../elohim/sdk/domains/imagodei/types" }
+
 # Shared compute reporting types
 elohim-compute = { path = "../../elohim/elohim-compute" }
 

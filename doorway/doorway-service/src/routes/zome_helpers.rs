@@ -3,52 +3,14 @@
 //! Provides helper functions for calling specific zome functions from the
 //! doorway's HTTP handlers, particularly for identity management operations.
 
-use holo_hash::ActionHash;
-use serde::{Deserialize, Serialize};
 use tracing::{debug, warn};
 
 use crate::server::AppState;
 use crate::types::{DoorwayError, Result};
 use crate::worker::ZomeCallConfig;
 
-// =============================================================================
-// Imagodei Zome Types
-// =============================================================================
-
-/// Input for imagodei::create_human zome call
-/// Must match the Rust struct in holochain/dna/imagodei/zomes/imagodei/src/lib.rs
-#[derive(Debug, Clone, Serialize)]
-pub struct CreateHumanInput {
-    pub id: String,
-    pub display_name: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub bio: Option<String>,
-    pub affinities: Vec<String>,
-    pub profile_reach: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub location: Option<String>,
-}
-
-/// Output from imagodei::create_human
-/// Matches HumanOutput in the zome
-#[derive(Debug, Clone, Deserialize)]
-pub struct HumanOutput {
-    pub action_hash: ActionHash,
-    pub human: Human,
-}
-
-/// Human entry from the zome
-#[derive(Debug, Clone, Deserialize)]
-pub struct Human {
-    pub id: String,
-    pub display_name: String,
-    pub bio: Option<String>,
-    pub affinities: Vec<String>,
-    pub profile_reach: String,
-    pub location: Option<String>,
-    pub created_at: String,
-    pub updated_at: String,
-}
+// Wire types from SDK domain crate — compiler enforces zome/doorway agreement
+pub use imagodei_types::{CreateHumanInput, Human, HumanOutput};
 
 // =============================================================================
 // Zome Call Functions
