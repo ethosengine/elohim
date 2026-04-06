@@ -16,7 +16,6 @@ use holochain_client::{
     ZomeCallTarget,
 };
 use holochain_types::prelude::ExternIO;
-use holochain_zome_types::prelude::CellId;
 use serde::{de::DeserializeOwned, Serialize};
 use std::sync::Arc;
 use tokio::sync::{Mutex, RwLock};
@@ -32,8 +31,6 @@ pub struct ZomeCaller {
     installed_app_id: String,
     /// The connected AppWebsocket (lazily initialized)
     app_ws: RwLock<Option<AppWebsocket>>,
-    /// Cell ID discovered from app info
-    cell_id: RwLock<Option<CellId>>,
     /// Lock to prevent concurrent connection attempts
     connecting: Mutex<()>,
 }
@@ -54,7 +51,6 @@ impl ZomeCaller {
             app_addr: strip_ws_scheme(app_url),
             installed_app_id: installed_app_id.to_string(),
             app_ws: RwLock::new(None),
-            cell_id: RwLock::new(None),
             connecting: Mutex::new(()),
         }
     }
@@ -101,34 +97,41 @@ impl ZomeCaller {
             .find(|a| a.installed_app_id == self.installed_app_id)
             .ok_or_else(|| format!("App '{}' not found", self.installed_app_id))?;
 
-        // Find first provisioned cell
-        let cell_id = app_info
-            .cell_info
-            .values()
-            .flat_map(|cells| cells.iter())
-            .find_map(|cell| match cell {
-                holochain_client::CellInfo::Provisioned(p) => Some(p.cell_id.clone()),
-                _ => None,
-            })
-            .ok_or_else(|| "No provisioned cells found".to_string())?;
+        // Step 3: Authorize signing credentials for ALL provisioned cells
+        let signer = ClientAgentSigner::default();
+        let mut cell_count = 0u32;
+
+        for (role_name, cells) in &app_info.cell_info {
+            for cell in cells {
+                if let holochain_client::CellInfo::Provisioned(p) = cell {
+                    let credentials = admin_ws
+                        .authorize_signing_credentials(AuthorizeSigningCredentialsPayload {
+                            cell_id: p.cell_id.clone(),
+                            functions: None,
+                        })
+                        .await
+                        .map_err(|e| {
+                            format!(
+                                "authorize_signing_credentials failed for role '{role_name}': {e}"
+                            )
+                        })?;
+
+                    signer.add_credentials(p.cell_id.clone(), credentials);
+                    cell_count += 1;
+                    debug!(role = %role_name, "Authorized signing for cell");
+                }
+            }
+        }
+
+        if cell_count == 0 {
+            return Err("No provisioned cells found".to_string());
+        }
 
         info!(
             app_id = %self.installed_app_id,
-            "Found cell for app"
+            cells = cell_count,
+            "Signing credentials authorized for all cells"
         );
-
-        // Step 3: Authorize signing credentials
-        let signer = ClientAgentSigner::default();
-        let credentials = admin_ws
-            .authorize_signing_credentials(AuthorizeSigningCredentialsPayload {
-                cell_id: cell_id.clone(),
-                functions: None, // All functions
-            })
-            .await
-            .map_err(|e| format!("authorize_signing_credentials failed: {e}"))?;
-
-        signer.add_credentials(cell_id.clone(), credentials);
-        info!("Signing credentials authorized");
 
         // Step 4: Issue app auth token
         let token = admin_ws
@@ -151,14 +154,10 @@ impl ZomeCaller {
             self.app_addr
         );
 
-        // Store connection and cell_id
+        // Store connection
         {
             let mut ws = self.app_ws.write().await;
             *ws = Some(app_ws);
-        }
-        {
-            let mut cid = self.cell_id.write().await;
-            *cid = Some(cell_id);
         }
 
         Ok(())
@@ -169,16 +168,15 @@ impl ZomeCaller {
     /// The AppWebsocket handles signing automatically.
     pub async fn call_zome(
         &self,
-        _role_name: &str,
+        role_name: &str,
         zome_name: &str,
         fn_name: &str,
         payload: Vec<u8>,
     ) -> Result<Vec<u8>, String> {
         self.ensure_connected().await?;
 
-        let cell_id = self.cell_id.read().await.clone().ok_or("No cell_id")?;
-
         debug!(
+            role_name = %role_name,
             zome_name = %zome_name,
             fn_name = %fn_name,
             payload_len = payload.len(),
@@ -191,7 +189,7 @@ impl ZomeCaller {
             let app_ws = ws.as_ref().ok_or("Not connected")?;
             app_ws
                 .call_zome(
-                    ZomeCallTarget::CellId(cell_id),
+                    ZomeCallTarget::RoleName(role_name.into()),
                     zome_name.into(),
                     fn_name.into(),
                     ExternIO::from(payload),
