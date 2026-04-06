@@ -43,7 +43,6 @@ const PATHS_ONLY = args.includes('--paths-only') || process.env.PATHS_ONLY === '
 const SKIP_BLOB_UPLOAD = process.env.SKIP_BLOB_UPLOAD === 'true' || args.includes('--skip-blob-upload');
 const USE_ACCOUNT_PACKAGES = args.includes('--use-account-packages') || process.env.USE_ACCOUNT_PACKAGES === 'true';
 const ACCOUNT_PACKAGES_DIR = process.env.ACCOUNT_PACKAGES_DIR || path.join(GENESIS_DIR, 'data', 'account-packages');
-const CONDUCTOR_FOR = args.find(a => a.startsWith('--conductor-for='))?.split('=')[1];
 
 // ============================================================================
 // Canonical Human Registry (single source of truth: humans.json)
@@ -169,7 +168,7 @@ interface ConceptJson {
   blobHash?: string;       // Pre-computed hash (camelCase from JSON)
   blob_hash?: string;      // Alternative snake_case format
   entryPoint?: string;    // Entry point for html5-app (e.g., "index.html")
-  stewardedBy?: StewardAnnotation[];
+  stewardedBy?: Array<{ humanId: string; affinity: number; role: string }>;
 }
 
 interface PathJson {
@@ -436,38 +435,6 @@ function formatConceptTitle(conceptId: string): string {
     .split('-')
     .map(word => word.charAt(0).toUpperCase() + word.slice(1))
     .join(' ');
-}
-
-// ============================================================================
-// Stewardship Filtering
-// ============================================================================
-
-interface StewardAnnotation {
-  humanId: string;
-  affinity: number;
-  role: string;
-}
-
-/**
- * Filter content nodes to those stewarded by a specific human.
- * Returns content where the given humanId is the highest-affinity steward.
- * If no stewardedBy field exists, defaults to the operator (backwards compat).
- */
-function filterBySteward(
-  concepts: ConceptJson[],
-  humanId: string,
-  operatorId: string = 'human-matthew-manager',
-): ConceptJson[] {
-  return concepts.filter(concept => {
-    const stewards = concept.stewardedBy;
-
-    if (!stewards || stewards.length === 0) {
-      return humanId === operatorId;
-    }
-
-    const primary = stewards.reduce((max, s) => (s.affinity > max.affinity ? s : max), stewards[0]);
-    return primary.humanId === humanId;
-  });
 }
 
 // ============================================================================
@@ -872,18 +839,6 @@ async function main() {
   console.log(`   Content only: ${CONTENT_ONLY}`);
   console.log(`   Paths only: ${PATHS_ONLY}`);
   console.log(`   Skip blob upload: ${SKIP_BLOB_UPLOAD}`);
-  if (CONDUCTOR_FOR) {
-    console.log(`   Conductor for: ${CONDUCTOR_FOR}`);
-    if (VALID_HUMAN_IDS.size > 0 && !VALID_HUMAN_IDS.has(CONDUCTOR_FOR)) {
-      console.error(`\nError: --conductor-for="${CONDUCTOR_FOR}" is not a valid humanId`);
-      console.error(`Valid humanIds (from ${HUMANS_JSON_PATH}):`);
-      for (const id of [...VALID_HUMAN_IDS].sort()) {
-        console.error(`   ${id}`);
-      }
-      process.exit(1);
-    }
-  }
-
   // Check storage is available
   console.log(`\nChecking storage availability...`);
   try {
@@ -1031,12 +986,6 @@ async function main() {
         process.exit(1);
       }
       console.log(`   [stewardship] All stewardedBy humanIds validated against humans.json ✓`);
-    }
-
-    if (CONDUCTOR_FOR) {
-      const beforeCount = content.length;
-      content = filterBySteward(content, CONDUCTOR_FOR);
-      console.log(`   [stewardship] Filtered to ${content.length}/${beforeCount} content nodes for ${CONDUCTOR_FOR}`);
     }
 
     if (LIMIT > 0 && content.length > LIMIT) {
