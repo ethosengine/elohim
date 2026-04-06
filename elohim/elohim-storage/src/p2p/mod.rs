@@ -31,6 +31,7 @@
 pub mod behaviour;
 pub mod epr_protocol;
 pub mod kad_store;
+pub mod replication;
 pub mod shard_protocol;
 pub mod sync_protocol;
 pub mod trust_cache;
@@ -223,6 +224,8 @@ pub struct P2PStatusInfo {
     pub announce_addresses: Vec<String>,
     /// Relay mode this node is running in
     pub relay_mode: String,
+    /// Replication progress for identity-driven content sync
+    pub replication: replication::ReplicationStatus,
 }
 
 /// Commands sent from HTTP handlers to the P2P event loop.
@@ -528,6 +531,7 @@ impl P2PNode {
             relay_reservations: 0,
             announce_addresses: config.announce_addresses.clone(),
             relay_mode: config.relay_mode.to_string(),
+            replication: replication::ReplicationStatus::default(),
         };
         let (status_tx, _) = tokio::sync::watch::channel(initial_status);
 
@@ -2580,6 +2584,7 @@ impl P2PNode {
             relay_reservations,
             announce_addresses: self.config.announce_addresses.clone(),
             relay_mode: self.config.relay_mode.to_string(),
+            replication: replication::ReplicationStatus::default(),
         };
         let _ = self.status_tx.send(status);
     }
