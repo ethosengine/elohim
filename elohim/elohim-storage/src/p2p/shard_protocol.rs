@@ -28,6 +28,47 @@ pub enum ShardRequest {
     Have { hash: String },
     /// Push a shard to peer (replication)
     Push { hash: String, data: Vec<u8> },
+    /// List content inventory (EPR Head summaries for replication discovery)
+    ListContent {
+        /// Filter by reach level (e.g., "commons"). None = all reachable content.
+        reach_filter: Option<String>,
+        /// Pagination offset
+        offset: u32,
+        /// Pagination limit (max items per response)
+        limit: u32,
+    },
+    /// Get a full content record by ID (metadata + body, not just blob bytes)
+    GetContent { id: String },
+}
+
+/// Lightweight content summary for inventory listing
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ContentInventoryItem {
+    pub id: String,
+    pub title: String,
+    pub content_type: String,
+    pub content_format: String,
+    pub reach: String,
+    pub blob_cid: Option<String>,
+    pub updated_at: String,
+}
+
+/// Full content record for replication (everything needed to recreate locally)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ContentRecord {
+    pub id: String,
+    pub title: String,
+    pub description: Option<String>,
+    pub content_type: String,
+    pub content_format: String,
+    pub blob_hash: Option<String>,
+    pub blob_cid: Option<String>,
+    pub content_size_bytes: Option<i32>,
+    pub metadata_json: Option<String>,
+    pub reach: String,
+    pub created_by: Option<String>,
+    pub tags: Vec<String>,
+    pub content_body: Option<String>,
 }
 
 /// Shard response types
@@ -43,6 +84,16 @@ pub enum ShardResponse {
     NotFound,
     /// Error
     Error(String),
+    /// Content inventory listing
+    ContentList {
+        items: Vec<ContentInventoryItem>,
+        total: u64,
+        has_more: bool,
+    },
+    /// Full content record
+    Content(ContentRecord),
+    /// Content not found
+    ContentNotFound,
 }
 
 /// Codec for shard request/response

@@ -1452,6 +1452,14 @@ impl P2PNode {
                     }
                 }
             }
+            ShardRequest::ListContent { .. } => {
+                // TODO: implement content inventory listing for replication
+                ShardResponse::Error("ListContent not yet implemented".to_string())
+            }
+            ShardRequest::GetContent { .. } => {
+                // TODO: implement full content record fetch for replication
+                ShardResponse::Error("GetContent not yet implemented".to_string())
+            }
         }
     }
 
