@@ -30,9 +30,11 @@ There is no "seeder." There is no "bootstrap mode." There is only: I have keys, 
 
 ### Genesis Peer: Adam
 
-Adam replaces Matthew as the operator persona in the five-peer genesis topology. The five personas are now: **Adam** (operator/genesis), **Jessica**, **Pete**, **Timothy**, **Frank**. All are test data — there are no "real" participants yet.
+Adam (`human-adam-firstman`) already exists as a persona at the data layer — account package, presence, conductor-groups membership ("Eden Household"). What's missing is his K8s deployment. This sprint adds Adam as the 6th deployed conductor in the genesis topology, with elevated CPU/memory/storage so he can handle the initial seed write.
 
-Adam is the genesis peer — the first to ingest content via direct SQLite write. The other four peers pull from Adam via P2P replication. Adam's role as genesis peer also establishes a reusable pattern: any peer that lends compute for network bootstrap (or recovery, or migration) earns credit on the network as a shefa contribution.
+The deployed topology becomes: **Adam** (genesis, elevated resources), **Matthew**, **Jessica**, **Pete**, **Timothy**, **Frank**. Adam is the first and only peer to receive the direct content seed; the other five replicate from him via P2P.
+
+Adam's role as genesis peer establishes a reusable pattern: any peer that lends compute for network bootstrap (or recovery, or migration) earns credit on the network as a shefa contribution.
 
 ## Architecture
 

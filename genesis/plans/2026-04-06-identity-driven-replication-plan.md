@@ -739,31 +739,37 @@ batches and 100ms inter-batch delay."
 
 ---
 
-### Task 6: Create Adam Genesis Persona
+### Task 6: Create Adam K8s Manifest with Elevated Resources
 
 **Files:**
-- Create: `genesis/manifests/humans/adam-genesis.yaml`
+- Create: `genesis/manifests/humans/adam-firstman.yaml`
+- Create: `genesis/orchestrator/manifests/humans/adam-firstman.yaml` (mirror)
 - Modify: `genesis/seeder/src/seed-sqlite.ts` (remove `--conductor-for` filtering)
+
+**Note:** Adam already exists as a persona — `human-adam-firstman` is in `genesis/data/account-packages/adam-firstman.json`, `genesis/data/lamad/presences/adam-firstman.json`, and `genesis/docs/humans/humans.json`. He's in the "Eden Household" group in `conductor-groups.json`. What's missing is the K8s deployment manifest. We're adding the deployment, not the persona.
+
+The current K8s topology deploys 5 humans (matthew, jessica, pete, timothy, frank). Adam will be the 6th, with elevated CPU/memory resources to handle the initial seed write before other peers replicate from him.
 
 - [ ] **Step 1: Create Adam's K8s manifest**
 
-Copy the structure from `genesis/manifests/humans/matthew-manager.yaml` and adapt for Adam. Key changes: name `elohim-adam`, label `elohim-human: adam-genesis`, bootstrap peers include all five other conductors.
+Read `genesis/manifests/humans/matthew-manager.yaml` to understand the structure. Create `genesis/manifests/humans/adam-firstman.yaml` following the same pattern with these key changes:
+- All `matthew` / `matthew-manager` references → `adam` / `adam-firstman`
+- Container name: `elohim-adam-alpha`
+- HUMAN_ID env var: `human-adam-firstman`
+- Comment header: `# Adam — Genesis Peer / First-write target for content seed; replicates outward to other peers`
+- **Elevated resources**: bump memory and CPU limits/requests above what matthew has. If matthew has e.g. `memory: 2Gi` request, give adam `memory: 4Gi`. If matthew has `cpu: 1000m` limit, give adam `cpu: 2000m`. Match the existing field names exactly — only the values change.
+- StatefulSet PVC size: bump above matthew's (if matthew is `20Gi`, give adam `40Gi` since he holds all content initially)
+- Bootstrap peers: include all five other conductors so adam connects to everyone
 
-Create `genesis/manifests/humans/adam-genesis.yaml` following the existing pattern. The full YAML is long — copy `matthew-manager.yaml` and replace:
-- All `matthew` references → `adam`
-- All `matthew-manager` references → `adam-genesis`
-- Comment: `# Adam — Genesis Peer / Stewards: all content at network birth, relaxes to commons after replication`
-- `HUMAN_ID` value → `human-adam-genesis`
+Also create `genesis/orchestrator/manifests/humans/adam-firstman.yaml` as the orchestrator mirror (this directory is the source for jenkins; both must stay in sync).
 
-- [ ] **Step 2: Add Adam to seeder human definitions**
-
-Check if there's a humans list in the seeder that needs Adam added. Search for the list of human IDs:
+- [ ] **Step 2: Verify Adam is in conductor-groups.json**
 
 ```bash
-grep -rn "matthew-manager\|human-matthew\|humanId.*matthew" genesis/seeder/src/ | head -10
+grep -A 3 "human-adam-firstman" genesis/data/account-packages/conductor-groups.json
 ```
 
-If there's a hardcoded list, add `human-adam-genesis`.
+Should show Adam in "Eden Household" group already. No changes needed if present.
 
 - [ ] **Step 3: Simplify `seed-sqlite.ts` — remove `--conductor-for` filtering**
 
@@ -777,12 +783,16 @@ Search for and remove:
 - [ ] **Step 4: Commit**
 
 ```bash
-git add genesis/manifests/humans/adam-genesis.yaml genesis/seeder/src/seed-sqlite.ts
-git commit -m "feat(genesis): add Adam genesis peer, simplify seeder
+git add genesis/manifests/humans/adam-firstman.yaml genesis/orchestrator/manifests/humans/adam-firstman.yaml genesis/seeder/src/seed-sqlite.ts
+git commit -m "feat(genesis): deploy Adam as elevated-resource genesis peer
 
-Adam is the genesis peer — first to ingest all content. seed-sqlite.ts
-no longer needs --conductor-for filtering since only Adam receives
-the direct write. Other peers replicate via P2P."
+Adam already exists as a persona (human-adam-firstman in account
+packages and presences). This adds his K8s deployment manifest with
+elevated CPU/memory/storage so he can handle the full content seed
+write before other peers replicate from him.
+
+seed-sqlite.ts no longer needs --conductor-for filtering since only
+Adam receives the direct write."
 ```
 
 ---
