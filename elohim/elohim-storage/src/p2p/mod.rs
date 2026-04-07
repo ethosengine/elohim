@@ -92,6 +92,14 @@ type PendingVerificationMap = Arc<
     >,
 >;
 
+/// Map of pending replication GetContent requests: outbound request ID → content_id.
+/// Used to clean up replication state when requests fail at the transport level.
+type PendingReplicationFetchMap = Arc<
+    tokio::sync::Mutex<
+        std::collections::HashMap<request_response::OutboundRequestId, String>,
+    >,
+>;
+
 use dashmap::DashMap;
 
 use crate::blob_store::BlobStore;
@@ -204,6 +212,9 @@ pub struct P2PNode {
     initial_publish_done: Arc<std::sync::atomic::AtomicBool>,
     /// Identity-driven replication state
     replication_state: replication::ReplicationState,
+    /// Maps in-flight replication GetContent request IDs to content IDs.
+    /// Used to clean up replication state when requests fail.
+    pending_replication_fetches: PendingReplicationFetchMap,
     /// Extraction cache for delivery capability advertisement
     extraction_cache: Option<Arc<ExtractionCache>>,
     /// Discovered peers with delivery capabilities (populated from mDNS + identify)
@@ -569,6 +580,9 @@ impl P2PNode {
             )),
             initial_publish_done: Arc::new(std::sync::atomic::AtomicBool::new(false)),
             replication_state: replication::ReplicationState::new(),
+            pending_replication_fetches: Arc::new(tokio::sync::Mutex::new(
+                std::collections::HashMap::new(),
+            )),
             extraction_cache: None,
             delivery_peers: Arc::new(DashMap::new()),
         })
@@ -1097,6 +1111,8 @@ impl P2PNode {
                                 ShardResponse::Content(record) => {
                                     let content_id = record.id.clone();
                                     debug!(id = %content_id, "Received content record from peer");
+                                    // Remove the in-flight tracking entry (success path)
+                                    self.pending_replication_fetches.lock().await.remove(&request_id);
 
                                     let pool = match self.db_pool.as_ref() {
                                         Some(p) => p,
@@ -1182,7 +1198,18 @@ impl P2PNode {
                                     self.replication_state.update_caught_up().await;
                                 }
                                 ShardResponse::ContentNotFound => {
-                                    debug!("Content not found on peer during replication");
+                                    if let Some(content_id) = self
+                                        .pending_replication_fetches
+                                        .lock()
+                                        .await
+                                        .remove(&request_id)
+                                    {
+                                        debug!(content_id = %content_id, "Content not found on peer, marking failed");
+                                        self.replication_state.mark_failed(&content_id).await;
+                                        self.replication_state.update_caught_up().await;
+                                    } else {
+                                        debug!("Content not found on peer (no pending replication request)");
+                                    }
                                 }
                                 _ => {
                                     debug!(request_id = ?request_id, response = ?response, "Received shard response");
@@ -1221,6 +1248,14 @@ impl P2PNode {
                             );
                         }
                     }
+                }
+                // Clean up replication state if this was a replication fetch
+                if let Some(content_id) =
+                    self.pending_replication_fetches.lock().await.remove(&request_id)
+                {
+                    debug!(content_id = %content_id, error = ?error, "Replication fetch failed at transport level");
+                    self.replication_state.mark_failed(&content_id).await;
+                    self.replication_state.update_caught_up().await;
                 }
             }
             behaviour::ElohimStorageBehaviourEvent::ShardProtocol(
@@ -2742,11 +2777,15 @@ impl P2PNode {
             for id in chunk {
                 let request = ShardRequest::GetContent { id: id.clone() };
                 let mut swarm = self.swarm.write().await;
-                let _request_id = swarm
+                let request_id = swarm
                     .behaviour_mut()
                     .shard_protocol
                     .send_request(&peer, request);
                 drop(swarm);
+                self.pending_replication_fetches
+                    .lock()
+                    .await
+                    .insert(request_id, id.clone());
             }
             // Self-pace: let SQLite breathe between batches
             tokio::time::sleep(batch_delay).await;
