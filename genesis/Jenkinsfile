@@ -47,9 +47,10 @@ def resolveInternalDoorwayUrl(String doorwayHost) {
 }
 
 def resolveInternalStorageUrl(String doorwayHost) {
-    // Points to Matthew's per-human storage (founder/primary) for preflight checks
+    // Points to the genesis peer's per-human storage for preflight checks.
+    // Alpha: Adam is the genesis peer (direct seed recipient).
     if (doorwayHost.contains('alpha.elohim.host')) {
-        return 'elohim-matthew-alpha.elohim-alpha.svc.cluster.local:8090'
+        return 'elohim-adam-alpha.elohim-alpha.svc.cluster.local:8090'
     } else if (doorwayHost.contains('staging.elohim.host')) {
         return 'elohim-pete-staging.elohim-staging.svc.cluster.local:8090'
     } else if (doorwayHost.contains('elohim.host') && !doorwayHost.contains('alpha') && !doorwayHost.contains('staging')) {

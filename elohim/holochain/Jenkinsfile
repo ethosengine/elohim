@@ -226,11 +226,16 @@ def deployEdgeWithManifest(String env, String namespace, String manifestTemplate
 // ============================================================================
 
 /**
- * Fixed identity attributes for all 5 protocol humans.
+ * Fixed identity attributes for all protocol humans deployed to K8s.
  * Human-intrinsic values that never change regardless of deployment topology.
+ *
+ * Adam is the genesis peer (first to ingest content via direct SQLite write).
+ * The other 5 peers replicate from Adam via P2P identity-driven replication.
  */
 def getHumanRegistry() {
     return [
+        [name: 'adam', role: 'firstman', humanLabel: 'adam-firstman', humanId: 'human-adam-firstman',
+         manifest: 'genesis/orchestrator/manifests/humans/adam-firstman.yaml'],
         [name: 'matthew', role: 'manager', humanLabel: 'matthew-manager', humanId: 'human-matthew-manager',
          manifest: 'genesis/orchestrator/manifests/humans/matthew-manager.yaml'],
         [name: 'jessica', role: 'spouse', humanLabel: 'jessica-spouse', humanId: 'human-jessica-spouse',
@@ -257,7 +262,8 @@ def resolveHumanAssignments(String strategy, String customAssignments) {
             registry.each { h -> assignments[h.name] = 'alpha' }
             break
         case 'distributed':
-            assignments = [matthew: 'alpha', jessica: 'alpha', pete: 'staging', timothy: 'staging', frank: 'prod']
+            // Adam stays in alpha as the genesis/seed peer regardless of strategy.
+            assignments = [adam: 'alpha', matthew: 'alpha', jessica: 'alpha', pete: 'staging', timothy: 'staging', frank: 'prod']
             break
         case 'custom':
             customAssignments.split(',').each { pair ->
