@@ -124,7 +124,7 @@ impl CustomizeConnection<SqliteConnection, diesel::r2d2::Error> for SqlitePragma
         // where multiple connections may contend for write access.
         diesel::sql_query("PRAGMA busy_timeout = 5000")
             .execute(conn)
-            .map_err(|e| diesel::r2d2::Error::QueryError(e))?;
+            .map_err(diesel::r2d2::Error::QueryError)?;
         Ok(())
     }
 }

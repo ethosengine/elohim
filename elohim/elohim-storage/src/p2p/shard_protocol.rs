@@ -90,8 +90,8 @@ pub enum ShardResponse {
         total: u64,
         has_more: bool,
     },
-    /// Full content record
-    Content(ContentRecord),
+    /// Full content record (boxed to keep enum size small)
+    Content(Box<ContentRecord>),
     /// Content not found
     ContentNotFound,
 }

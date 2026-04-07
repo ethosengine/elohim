@@ -94,11 +94,8 @@ type PendingVerificationMap = Arc<
 
 /// Map of pending replication GetContent requests: outbound request ID → content_id.
 /// Used to clean up replication state when requests fail at the transport level.
-type PendingReplicationFetchMap = Arc<
-    tokio::sync::Mutex<
-        std::collections::HashMap<request_response::OutboundRequestId, String>,
-    >,
->;
+type PendingReplicationFetchMap =
+    Arc<tokio::sync::Mutex<std::collections::HashMap<request_response::OutboundRequestId, String>>>;
 
 use dashmap::DashMap;
 
@@ -1090,9 +1087,15 @@ impl P2PNode {
                         } else {
                             // Handle replication discovery responses (no pending map entry)
                             match response {
-                                ShardResponse::ContentList { items, total, has_more } => {
+                                ShardResponse::ContentList {
+                                    items,
+                                    total,
+                                    has_more,
+                                } => {
                                     info!(
-                                        count = items.len(), total = total, has_more = has_more,
+                                        count = items.len(),
+                                        total = total,
+                                        has_more = has_more,
                                         "Received content inventory from peer"
                                     );
                                     let remote_ids: Vec<String> =
@@ -1104,7 +1107,10 @@ impl P2PNode {
                                         debug!("No new content to replicate");
                                         self.replication_state.update_caught_up().await;
                                     } else {
-                                        info!(gaps = new_gaps.len(), "Discovered content gaps, starting fetch");
+                                        info!(
+                                            gaps = new_gaps.len(),
+                                            "Discovered content gaps, starting fetch"
+                                        );
                                         self.fetch_missing_content(peer, new_gaps).await;
                                     }
                                 }
@@ -1112,7 +1118,10 @@ impl P2PNode {
                                     let content_id = record.id.clone();
                                     debug!(id = %content_id, "Received content record from peer");
                                     // Remove the in-flight tracking entry (success path)
-                                    self.pending_replication_fetches.lock().await.remove(&request_id);
+                                    self.pending_replication_fetches
+                                        .lock()
+                                        .await
+                                        .remove(&request_id);
 
                                     let pool = match self.db_pool.as_ref() {
                                         Some(p) => p,
@@ -1168,16 +1177,12 @@ impl P2PNode {
                                                     let dht_record = Record {
                                                         key,
                                                         value: head_bytes,
-                                                        publisher: Some(
-                                                            *self.identity.peer_id(),
-                                                        ),
+                                                        publisher: Some(*self.identity.peer_id()),
                                                         expires: None,
                                                     };
                                                     let mut swarm = self.swarm.write().await;
-                                                    let _ = swarm
-                                                        .behaviour_mut()
-                                                        .kademlia
-                                                        .put_record(
+                                                    let _ =
+                                                        swarm.behaviour_mut().kademlia.put_record(
                                                             dht_record,
                                                             libp2p::kad::Quorum::One,
                                                         );
@@ -1190,9 +1195,7 @@ impl P2PNode {
                                         }
                                         Err(e) => {
                                             warn!(id = %content_id, error = %e, "Failed to store replicated content");
-                                            self.replication_state
-                                                .mark_failed(&content_id)
-                                                .await;
+                                            self.replication_state.mark_failed(&content_id).await;
                                         }
                                     }
                                     self.replication_state.update_caught_up().await;
@@ -1250,8 +1253,11 @@ impl P2PNode {
                     }
                 }
                 // Clean up replication state if this was a replication fetch
-                if let Some(content_id) =
-                    self.pending_replication_fetches.lock().await.remove(&request_id)
+                if let Some(content_id) = self
+                    .pending_replication_fetches
+                    .lock()
+                    .await
+                    .remove(&request_id)
                 {
                     debug!(content_id = %content_id, error = ?error, "Replication fetch failed at transport level");
                     self.replication_state.mark_failed(&content_id).await;
@@ -1629,7 +1635,11 @@ impl P2PNode {
                     }
                 }
             }
-            ShardRequest::ListContent { reach_filter, offset, limit } => {
+            ShardRequest::ListContent {
+                reach_filter,
+                offset,
+                limit,
+            } => {
                 let pool = match self.db_pool.as_ref() {
                     Some(p) => p,
                     None => return ShardResponse::Error("No database pool".to_string()),
@@ -1647,10 +1657,12 @@ impl P2PNode {
                 };
                 match crate::db::content_diesel::list_content(&mut conn, &app_ctx, &query) {
                     Ok(items) => {
-                        let total = crate::db::content_diesel::count_content(&mut conn, &app_ctx, &query)
-                            .unwrap_or(items.len() as i64) as u64;
-                        let inventory: Vec<shard_protocol::ContentInventoryItem> = items.iter().map(|cwt| {
-                            shard_protocol::ContentInventoryItem {
+                        let total =
+                            crate::db::content_diesel::count_content(&mut conn, &app_ctx, &query)
+                                .unwrap_or(items.len() as i64) as u64;
+                        let inventory: Vec<shard_protocol::ContentInventoryItem> = items
+                            .iter()
+                            .map(|cwt| shard_protocol::ContentInventoryItem {
                                 id: cwt.content.id.clone(),
                                 title: cwt.content.title.clone(),
                                 content_type: cwt.content.content_type.clone(),
@@ -1658,11 +1670,19 @@ impl P2PNode {
                                 reach: cwt.content.reach.clone(),
                                 blob_cid: cwt.content.blob_cid.clone(),
                                 updated_at: cwt.content.updated_at.clone(),
-                            }
-                        }).collect();
+                            })
+                            .collect();
                         let has_more = (offset as u64 + inventory.len() as u64) < total;
-                        info!(count = inventory.len(), total = total, "Serving content inventory");
-                        ShardResponse::ContentList { items: inventory, total, has_more }
+                        info!(
+                            count = inventory.len(),
+                            total = total,
+                            "Serving content inventory"
+                        );
+                        ShardResponse::ContentList {
+                            items: inventory,
+                            total,
+                            has_more,
+                        }
                     }
                     Err(e) => ShardResponse::Error(format!("Content query failed: {}", e)),
                 }
@@ -1680,7 +1700,7 @@ impl P2PNode {
                 match crate::db::content_diesel::get_content_with_tags(&mut conn, &app_ctx, &id) {
                     Ok(Some(cwt)) => {
                         debug!(id = %id, "Serving content record to peer");
-                        ShardResponse::Content(shard_protocol::ContentRecord {
+                        ShardResponse::Content(Box::new(shard_protocol::ContentRecord {
                             id: cwt.content.id,
                             title: cwt.content.title,
                             description: cwt.content.description,
@@ -1694,7 +1714,7 @@ impl P2PNode {
                             created_by: cwt.content.created_by,
                             tags: cwt.tags,
                             content_body: cwt.content.content_body,
-                        })
+                        }))
                     }
                     Ok(None) => ShardResponse::ContentNotFound,
                     Err(e) => ShardResponse::Error(format!("Content fetch failed: {}", e)),

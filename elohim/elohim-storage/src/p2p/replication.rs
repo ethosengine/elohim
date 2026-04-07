@@ -3,10 +3,10 @@
 //! Tracks what content this node should have vs what it has, and manages
 //! the fetch queue for pulling missing content from peers.
 
+use serde::Serialize;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use serde::Serialize;
 
 /// Replication progress exposed via /p2p/status
 #[derive(Debug, Clone, Default, Serialize)]
@@ -200,9 +200,7 @@ mod tests {
         state.set_local_ids(local).await;
 
         // Discover only items already held locally — no gaps expected
-        let gaps = state
-            .discover(vec!["a".to_string(), "b".to_string()])
-            .await;
+        let gaps = state.discover(vec!["a".to_string(), "b".to_string()]).await;
         assert_eq!(gaps.len(), 0);
         assert_eq!(state.status().await.pending, 0);
     }
