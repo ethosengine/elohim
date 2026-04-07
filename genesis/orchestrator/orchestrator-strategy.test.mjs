@@ -11,6 +11,9 @@
 
 import { describe, it } from 'node:test';
 import { strict as assert } from 'node:assert';
+import { readFileSync } from 'node:fs';
+import { resolve, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 // ══════════════════════════════════════════════════════════════════
 // PIPELINES config — extracted from Jenkinsfile (keep in sync!)
@@ -636,5 +639,135 @@ describe('real-world scenarios', () => {
     });
     assert.ok(pipelines.includes('elohim-holochain'), 'cache-core in holochain patterns');
     assert.ok(pipelines.includes('elohim-edge'), 'cache-core in edge patterns');
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════
+// Drift detection — assert this mirror matches live Jenkinsfile
+// ══════════════════════════════════════════════════════════════════
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const JENKINSFILE_PATH = resolve(__dirname, 'Jenkinsfile');
+
+/**
+ * Extract a Groovy list literal like ['.claude', '.github/'] from source.
+ * Returns the array of string contents, or null if not found.
+ */
+function extractGroovyStringList(source, varName) {
+  // Match: def varName = [ ... ]   (multi-line, with possible trailing comments)
+  const re = new RegExp(`def\\s+${varName}\\s*=\\s*\\[([^\\]]*)\\]`, 'g');
+  const matches = Array.from(source.matchAll(re));
+  if (matches.length === 0) return null;
+  if (matches.length > 1) {
+    throw new Error(
+      `extractGroovyStringList: found ${matches.length} matches for 'def ${varName}' — expected exactly 1. ` +
+      `Drift detector cannot disambiguate.`
+    );
+  }
+  // Guard: detect '//' inside string literals BEFORE comment stripping ate it.
+  // This catches the URL-corruption failure mode described in I-2.
+  const stringRe = /['"]([^'"]*)['"]/g;
+  let sm;
+  while ((sm = stringRe.exec(matches[0][1])) !== null) {
+    if (sm[1].includes('//')) {
+      throw new Error(
+        `extractGroovyStringList: string entry '${sm[1]}' in 'def ${varName}' contains '//', ` +
+        `which the comment stripper would corrupt. Use a quote-aware parser instead.`
+      );
+    }
+  }
+  // Strip line comments (// ...) before extracting strings — Groovy comments
+  // can contain apostrophes (e.g., "// orchestrator's pipeline") that would
+  // otherwise confuse the string extractor below.
+  const cleaned = matches[0][1].replace(/\/\/[^\n]*/g, '');
+  // FUTURE RISK: this stripper would corrupt a string entry containing '//'
+  // (e.g., a URL like 'https://example.com/hook'). If you add such an entry,
+  // either escape it or replace this stripper with a quote-aware tokenizer.
+  // I-2 guard above catches the most common case.
+  const items = [];
+  const itemRe = /['"]([^'"]+)['"]/g;
+  let im;
+  while ((im = itemRe.exec(cleaned)) !== null) items.push(im[1]);
+  return items;
+}
+
+/**
+ * Extract pipeline names from the @Field def PIPELINES = [ ... ] block.
+ * Walks the block respecting bracket depth AND string literals (so glob
+ * patterns like 'glob[ab]*' inside entries don't confuse the walker).
+ */
+function extractPipelineNames(source) {
+  const start = source.indexOf('@Field def PIPELINES');
+  if (start < 0) return null;
+  // Strip line comments (// ...) before walking — Groovy comments routinely
+  // contain unbalanced apostrophes ("don't", "doesn't") that would trap the
+  // string-aware walker below in an unterminated string state.
+  const stripped = source.replace(/\/\/[^\n]*/g, '');
+  const strippedStart = stripped.indexOf('@Field def PIPELINES');
+  if (strippedStart < 0) return null;
+  const open = stripped.indexOf('[', strippedStart);
+  let depth = 0;
+  let end = -1;
+  let inString = false;
+  let stringChar = null;
+  for (let i = open; i < stripped.length; i++) {
+    const c = stripped[i];
+    if (inString) {
+      if (c === stringChar && stripped[i - 1] !== '\\') {
+        inString = false;
+        stringChar = null;
+      }
+      continue;
+    }
+    if (c === "'" || c === '"') {
+      inString = true;
+      stringChar = c;
+      continue;
+    }
+    if (c === '[') depth++;
+    else if (c === ']') {
+      depth--;
+      if (depth === 0) { end = i; break; }
+    }
+  }
+  if (end < 0) return null;
+  const block = stripped.slice(open + 1, end);
+  // Top-level keys look like:    'elohim-holochain': [
+  const names = [];
+  const re = /^\s*'([a-z][a-z0-9-]*)'\s*:\s*\[/gm;
+  let m;
+  while ((m = re.exec(block)) !== null) names.push(m[1]);
+  return names;
+}
+
+describe('drift detection: mirror vs live Jenkinsfile', () => {
+  const source = readFileSync(JENKINSFILE_PATH, 'utf8');
+
+  it('CI_ONLY_PATTERNS in mirror matches ciOnlyPatterns in Jenkinsfile', () => {
+    const live = extractGroovyStringList(source, 'ciOnlyPatterns');
+    assert.ok(live && live.length > 0, 'failed to parse non-empty ciOnlyPatterns from Jenkinsfile');
+    assert.deepEqual([...CI_ONLY_PATTERNS].sort(), [...live].sort(),
+      `Mirror CI_ONLY_PATTERNS drifted from Jenkinsfile ciOnlyPatterns.\n` +
+      `Mirror: ${JSON.stringify(CI_ONLY_PATTERNS)}\n` +
+      `Live:   ${JSON.stringify(live)}`);
+  });
+
+  it('CI_ONLY_FILES in mirror matches ciOnlyFiles in Jenkinsfile', () => {
+    const live = extractGroovyStringList(source, 'ciOnlyFiles');
+    assert.ok(live && live.length > 0, 'failed to parse non-empty ciOnlyFiles from Jenkinsfile');
+    assert.deepEqual([...CI_ONLY_FILES].sort(), [...live].sort(),
+      `Mirror CI_ONLY_FILES drifted from Jenkinsfile ciOnlyFiles.\n` +
+      `Mirror: ${JSON.stringify(CI_ONLY_FILES)}\n` +
+      `Live:   ${JSON.stringify(live)}`);
+  });
+
+  it('PIPELINES keys in mirror match @Field def PIPELINES in Jenkinsfile', () => {
+    const live = extractPipelineNames(source);
+    assert.ok(live && live.length > 0, 'failed to parse non-empty PIPELINES block from Jenkinsfile');
+    const mirror = Object.keys(PIPELINES);
+    assert.deepEqual([...mirror].sort(), [...live].sort(),
+      `Mirror PIPELINES keys drifted from Jenkinsfile @Field def PIPELINES.\n` +
+      `Mirror: ${JSON.stringify(mirror)}\n` +
+      `Live:   ${JSON.stringify(live)}`);
   });
 });
