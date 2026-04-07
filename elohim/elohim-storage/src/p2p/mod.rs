@@ -31,6 +31,7 @@
 pub mod behaviour;
 pub mod epr_protocol;
 pub mod kad_store;
+pub mod replication;
 pub mod shard_protocol;
 pub mod sync_protocol;
 pub mod trust_cache;
@@ -88,6 +89,14 @@ type PendingShardPushMap = Arc<
 type PendingVerificationMap = Arc<
     tokio::sync::Mutex<
         std::collections::HashMap<request_response::OutboundRequestId, (String, String)>,
+    >,
+>;
+
+/// Map of pending replication GetContent requests: outbound request ID → content_id.
+/// Used to clean up replication state when requests fail at the transport level.
+type PendingReplicationFetchMap = Arc<
+    tokio::sync::Mutex<
+        std::collections::HashMap<request_response::OutboundRequestId, String>,
     >,
 >;
 
@@ -201,6 +210,11 @@ pub struct P2PNode {
     pending_verifications: PendingVerificationMap,
     /// Whether startup EPR Head publication has run
     initial_publish_done: Arc<std::sync::atomic::AtomicBool>,
+    /// Identity-driven replication state
+    replication_state: replication::ReplicationState,
+    /// Maps in-flight replication GetContent request IDs to content IDs.
+    /// Used to clean up replication state when requests fail.
+    pending_replication_fetches: PendingReplicationFetchMap,
     /// Extraction cache for delivery capability advertisement
     extraction_cache: Option<Arc<ExtractionCache>>,
     /// Discovered peers with delivery capabilities (populated from mDNS + identify)
@@ -223,6 +237,8 @@ pub struct P2PStatusInfo {
     pub announce_addresses: Vec<String>,
     /// Relay mode this node is running in
     pub relay_mode: String,
+    /// Replication progress for identity-driven content sync
+    pub replication: replication::ReplicationStatus,
 }
 
 /// Commands sent from HTTP handlers to the P2P event loop.
@@ -528,6 +544,7 @@ impl P2PNode {
             relay_reservations: 0,
             announce_addresses: config.announce_addresses.clone(),
             relay_mode: config.relay_mode.to_string(),
+            replication: replication::ReplicationStatus::default(),
         };
         let (status_tx, _) = tokio::sync::watch::channel(initial_status);
 
@@ -562,6 +579,10 @@ impl P2PNode {
                 std::collections::HashMap::new(),
             )),
             initial_publish_done: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+            replication_state: replication::ReplicationState::new(),
+            pending_replication_fetches: Arc::new(tokio::sync::Mutex::new(
+                std::collections::HashMap::new(),
+            )),
             extraction_cache: None,
             delivery_peers: Arc::new(DashMap::new()),
         })
@@ -666,6 +687,8 @@ impl P2PNode {
         let mut sync_interval = tokio::time::interval(Duration::from_secs(60));
         let mut verify_interval = tokio::time::interval(Duration::from_secs(300));
         verify_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+        let mut replication_interval = tokio::time::interval(Duration::from_secs(60));
+        replication_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
         let mut command_rx = self.command_rx.lock().await;
 
         loop {
@@ -683,15 +706,35 @@ impl P2PNode {
                 _ = status_interval.tick() => {
                     drop(swarm);
                     self.refresh_status().await;
-                    // One-time startup EPR Head publication
+                    // One-time startup EPR Head publication and replication state seeding
                     if !self.initial_publish_done.load(std::sync::atomic::Ordering::Relaxed) {
                         self.initial_publish_done.store(true, std::sync::atomic::Ordering::Relaxed);
                         self.publish_all_epr_heads().await;
+                        // Populate replication state with local content IDs
+                        if let Some(pool) = self.db_pool.as_ref() {
+                            if let Ok(mut conn) = pool.get() {
+                                let app_ctx = crate::db::AppContext::default_lamad();
+                                let query = crate::db::content_diesel::ContentQuery {
+                                    limit: 100_000,
+                                    ..Default::default()
+                                };
+                                if let Ok(items) = crate::db::content_diesel::list_content(&mut conn, &app_ctx, &query) {
+                                    let ids: std::collections::HashSet<String> =
+                                        items.iter().map(|c| c.content.id.clone()).collect();
+                                    tracing::info!(count = ids.len(), "Loaded local content IDs for replication state");
+                                    self.replication_state.set_local_ids(ids).await;
+                                }
+                            }
+                        }
                     }
                 }
                 _ = sync_interval.tick() => {
                     drop(swarm);
                     self.initiate_sync_round().await;
+                }
+                _ = replication_interval.tick() => {
+                    drop(swarm);
+                    self.run_replication_cycle().await;
                 }
                 _ = verify_interval.tick() => {
                     self.verify_shard_locations(&mut swarm).await;
@@ -1045,7 +1088,133 @@ impl P2PNode {
                                 }
                             }
                         } else {
-                            debug!(request_id = ?request_id, response = ?response, "Received shard response");
+                            // Handle replication discovery responses (no pending map entry)
+                            match response {
+                                ShardResponse::ContentList { items, total, has_more } => {
+                                    info!(
+                                        count = items.len(), total = total, has_more = has_more,
+                                        "Received content inventory from peer"
+                                    );
+                                    let remote_ids: Vec<String> =
+                                        items.into_iter().map(|i| i.id).collect();
+                                    let new_gaps =
+                                        self.replication_state.discover(remote_ids).await;
+
+                                    if new_gaps.is_empty() {
+                                        debug!("No new content to replicate");
+                                        self.replication_state.update_caught_up().await;
+                                    } else {
+                                        info!(gaps = new_gaps.len(), "Discovered content gaps, starting fetch");
+                                        self.fetch_missing_content(peer, new_gaps).await;
+                                    }
+                                }
+                                ShardResponse::Content(record) => {
+                                    let content_id = record.id.clone();
+                                    debug!(id = %content_id, "Received content record from peer");
+                                    // Remove the in-flight tracking entry (success path)
+                                    self.pending_replication_fetches.lock().await.remove(&request_id);
+
+                                    let pool = match self.db_pool.as_ref() {
+                                        Some(p) => p,
+                                        None => {
+                                            self.replication_state.mark_failed(&content_id).await;
+                                            return;
+                                        }
+                                    };
+                                    let mut conn = match pool.get() {
+                                        Ok(c) => c,
+                                        Err(_) => {
+                                            self.replication_state.mark_failed(&content_id).await;
+                                            return;
+                                        }
+                                    };
+
+                                    let input = crate::db::content_diesel::CreateContentInput {
+                                        id: record.id,
+                                        title: record.title,
+                                        description: record.description,
+                                        content_type: record.content_type,
+                                        content_format: record.content_format,
+                                        blob_hash: record.blob_hash,
+                                        blob_cid: record.blob_cid,
+                                        content_size_bytes: record.content_size_bytes,
+                                        metadata_json: record.metadata_json,
+                                        reach: record.reach,
+                                        created_by: record.created_by,
+                                        tags: record.tags,
+                                        content_body: record.content_body,
+                                    };
+
+                                    let app_ctx = crate::db::AppContext::default_lamad();
+                                    match crate::db::content_diesel::bulk_create_content(
+                                        &mut conn,
+                                        &app_ctx,
+                                        vec![input],
+                                    ) {
+                                        Ok(result) => {
+                                            if result.inserted > 0 || result.skipped > 0 {
+                                                self.replication_state
+                                                    .mark_completed(&content_id)
+                                                    .await;
+
+                                                // Republish EPR Head so other peers can discover from us
+                                                if let Some(head_bytes) =
+                                                    self.resolve_epr_head_locally(&content_id)
+                                                {
+                                                    let key = RecordKey::new(&format!(
+                                                        "epr:{}",
+                                                        content_id
+                                                    ));
+                                                    let dht_record = Record {
+                                                        key,
+                                                        value: head_bytes,
+                                                        publisher: Some(
+                                                            *self.identity.peer_id(),
+                                                        ),
+                                                        expires: None,
+                                                    };
+                                                    let mut swarm = self.swarm.write().await;
+                                                    let _ = swarm
+                                                        .behaviour_mut()
+                                                        .kademlia
+                                                        .put_record(
+                                                            dht_record,
+                                                            libp2p::kad::Quorum::One,
+                                                        );
+                                                }
+                                            } else {
+                                                self.replication_state
+                                                    .mark_failed(&content_id)
+                                                    .await;
+                                            }
+                                        }
+                                        Err(e) => {
+                                            warn!(id = %content_id, error = %e, "Failed to store replicated content");
+                                            self.replication_state
+                                                .mark_failed(&content_id)
+                                                .await;
+                                        }
+                                    }
+                                    self.replication_state.update_caught_up().await;
+                                }
+                                ShardResponse::ContentNotFound => {
+                                    if let Some(content_id) = self
+                                        .pending_replication_fetches
+                                        .lock()
+                                        .await
+                                        .remove(&request_id)
+                                    {
+                                        debug!(content_id = %content_id, "Content not found on peer, marking failed");
+                                        self.replication_state.mark_failed(&content_id).await;
+                                        self.replication_state.update_caught_up().await;
+                                    } else {
+                                        debug!("Content not found on peer (no pending replication request)");
+                                    }
+                                }
+                                _ => {
+                                    debug!(request_id = ?request_id, response = ?response, "Received shard response");
+                                }
+                            }
                         }
                     }
                 }
@@ -1079,6 +1248,14 @@ impl P2PNode {
                             );
                         }
                     }
+                }
+                // Clean up replication state if this was a replication fetch
+                if let Some(content_id) =
+                    self.pending_replication_fetches.lock().await.remove(&request_id)
+                {
+                    debug!(content_id = %content_id, error = ?error, "Replication fetch failed at transport level");
+                    self.replication_state.mark_failed(&content_id).await;
+                    self.replication_state.update_caught_up().await;
                 }
             }
             behaviour::ElohimStorageBehaviourEvent::ShardProtocol(
@@ -1450,6 +1627,77 @@ impl P2PNode {
                         error!(hash = %hash, error = %e, "Failed to store shard");
                         ShardResponse::Error(format!("Storage error: {}", e))
                     }
+                }
+            }
+            ShardRequest::ListContent { reach_filter, offset, limit } => {
+                let pool = match self.db_pool.as_ref() {
+                    Some(p) => p,
+                    None => return ShardResponse::Error("No database pool".to_string()),
+                };
+                let mut conn = match pool.get() {
+                    Ok(c) => c,
+                    Err(e) => return ShardResponse::Error(format!("DB connection failed: {}", e)),
+                };
+                let app_ctx = crate::db::AppContext::default_lamad();
+                let query = crate::db::content_diesel::ContentQuery {
+                    reach: reach_filter,
+                    limit: limit as i64,
+                    offset: offset as i64,
+                    ..Default::default()
+                };
+                match crate::db::content_diesel::list_content(&mut conn, &app_ctx, &query) {
+                    Ok(items) => {
+                        let total = crate::db::content_diesel::count_content(&mut conn, &app_ctx, &query)
+                            .unwrap_or(items.len() as i64) as u64;
+                        let inventory: Vec<shard_protocol::ContentInventoryItem> = items.iter().map(|cwt| {
+                            shard_protocol::ContentInventoryItem {
+                                id: cwt.content.id.clone(),
+                                title: cwt.content.title.clone(),
+                                content_type: cwt.content.content_type.clone(),
+                                content_format: cwt.content.content_format.clone(),
+                                reach: cwt.content.reach.clone(),
+                                blob_cid: cwt.content.blob_cid.clone(),
+                                updated_at: cwt.content.updated_at.clone(),
+                            }
+                        }).collect();
+                        let has_more = (offset as u64 + inventory.len() as u64) < total;
+                        info!(count = inventory.len(), total = total, "Serving content inventory");
+                        ShardResponse::ContentList { items: inventory, total, has_more }
+                    }
+                    Err(e) => ShardResponse::Error(format!("Content query failed: {}", e)),
+                }
+            }
+            ShardRequest::GetContent { id } => {
+                let pool = match self.db_pool.as_ref() {
+                    Some(p) => p,
+                    None => return ShardResponse::Error("No database pool".to_string()),
+                };
+                let mut conn = match pool.get() {
+                    Ok(c) => c,
+                    Err(e) => return ShardResponse::Error(format!("DB connection failed: {}", e)),
+                };
+                let app_ctx = crate::db::AppContext::default_lamad();
+                match crate::db::content_diesel::get_content_with_tags(&mut conn, &app_ctx, &id) {
+                    Ok(Some(cwt)) => {
+                        debug!(id = %id, "Serving content record to peer");
+                        ShardResponse::Content(shard_protocol::ContentRecord {
+                            id: cwt.content.id,
+                            title: cwt.content.title,
+                            description: cwt.content.description,
+                            content_type: cwt.content.content_type,
+                            content_format: cwt.content.content_format,
+                            blob_hash: cwt.content.blob_hash,
+                            blob_cid: cwt.content.blob_cid,
+                            content_size_bytes: cwt.content.content_size_bytes,
+                            metadata_json: cwt.content.metadata_json,
+                            reach: cwt.content.reach,
+                            created_by: cwt.content.created_by,
+                            tags: cwt.tags,
+                            content_body: cwt.content.content_body,
+                        })
+                    }
+                    Ok(None) => ShardResponse::ContentNotFound,
+                    Err(e) => ShardResponse::Error(format!("Content fetch failed: {}", e)),
                 }
             }
         }
@@ -2487,6 +2735,63 @@ impl P2PNode {
         }
     }
 
+    /// Run one cycle of identity-driven replication.
+    ///
+    /// Discovers content from peers, filters by reach (commons this sprint),
+    /// fetches missing records, stores locally, and republishes EPR Heads.
+    async fn run_replication_cycle(&self) {
+        let swarm = self.swarm.read().await;
+        let peers: Vec<PeerId> = swarm.connected_peers().cloned().collect();
+        drop(swarm);
+
+        if peers.is_empty() {
+            debug!("Replication cycle: no connected peers, skipping");
+            return;
+        }
+
+        // Phase 1: Discover — query first connected peer for commons content inventory
+        let peer = peers[0];
+        let request = ShardRequest::ListContent {
+            reach_filter: Some("commons".to_string()),
+            offset: 0,
+            limit: 5000,
+        };
+
+        let mut swarm = self.swarm.write().await;
+        let request_id = swarm
+            .behaviour_mut()
+            .shard_protocol
+            .send_request(&peer, request);
+        drop(swarm);
+
+        debug!(peer = %peer, request_id = ?request_id, "Sent ListContent for replication discovery");
+        // Response handled in shard response handler
+    }
+
+    /// Fetch missing content records from a peer.
+    async fn fetch_missing_content(&self, peer: PeerId, content_ids: Vec<String>) {
+        let batch_size = 50;
+        let batch_delay = Duration::from_millis(100);
+
+        for chunk in content_ids.chunks(batch_size) {
+            for id in chunk {
+                let request = ShardRequest::GetContent { id: id.clone() };
+                let mut swarm = self.swarm.write().await;
+                let request_id = swarm
+                    .behaviour_mut()
+                    .shard_protocol
+                    .send_request(&peer, request);
+                drop(swarm);
+                self.pending_replication_fetches
+                    .lock()
+                    .await
+                    .insert(request_id, id.clone());
+            }
+            // Self-pace: let SQLite breathe between batches
+            tokio::time::sleep(batch_delay).await;
+        }
+    }
+
     /// Refresh the status snapshot (called from event loop)
     async fn refresh_status(&self) {
         let swarm = self.swarm.read().await;
@@ -2498,6 +2803,7 @@ impl P2PNode {
         let relay_reservations = self
             .relay_reservations
             .load(std::sync::atomic::Ordering::Relaxed);
+        let replication = self.replication_state.status().await;
 
         let status = P2PStatusInfo {
             peer_id: self.peer_id().to_string(),
@@ -2509,6 +2815,7 @@ impl P2PNode {
             relay_reservations,
             announce_addresses: self.config.announce_addresses.clone(),
             relay_mode: self.config.relay_mode.to_string(),
+            replication,
         };
         let _ = self.status_tx.send(status);
     }

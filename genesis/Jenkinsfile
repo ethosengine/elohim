@@ -86,7 +86,10 @@ def getHumanStorageUrls(String ignored) {
     }
 
     // Fallback: all humans in alpha — proper replication before environment splitting
+    // Adam is first: he is the genesis peer that receives the direct seed write.
+    // All other peers replicate from Adam via P2P identity-driven replication.
     def humans = [
+        [humanId: 'human-adam-firstman',    service: 'elohim-adam-alpha',      namespace: 'elohim-alpha'],
         [humanId: 'human-matthew-manager',  service: 'elohim-matthew-alpha',   namespace: 'elohim-alpha'],
         [humanId: 'human-jessica-spouse',   service: 'elohim-jessica-alpha',   namespace: 'elohim-alpha'],
         [humanId: 'human-pete-pastor',      service: 'elohim-pete-alpha',      namespace: 'elohim-alpha'],
@@ -548,44 +551,83 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                 container('builder') {
                     script {
                         def humans = getHumanStorageUrls('alpha')
+                        def adam = humans.find { it.humanId == 'human-adam-firstman' }
+                        if (adam == null) {
+                            error("Genesis peer 'human-adam-firstman' not found in topology")
+                        }
+                        def otherPeers = humans.findAll { it.humanId != 'human-adam-firstman' }
 
                         dir('genesis/seeder') {
-                            for (human in humans) {
-                                def humanId = human.humanId
-                                def storageUrl = human.storageUrl
-                                def service = human.service
+                            sh """#!/bin/bash
+                                set -euo pipefail
 
+                                echo "═══════════════════════════════════════════════════════════"
+                                echo "🌱 SEEDING GENESIS PEER: ${adam.humanId}"
+                                echo "═══════════════════════════════════════════════════════════"
+                                echo "Storage: ${adam.storageUrl}"
+                                echo ""
+
+                                # Wait for Adam's storage to be ready
+                                for i in \$(seq 1 60); do
+                                    if curl -sf "http://${adam.storageUrl}/health" > /dev/null 2>&1; then
+                                        echo "✅ ${adam.service} storage is ready"
+                                        break
+                                    fi
+                                    if [ \$i -eq 60 ]; then
+                                        echo "❌ ${adam.service} storage not ready after 60 attempts"
+                                        exit 1
+                                    fi
+                                    echo "   Waiting for ${adam.service} storage... (\$i/60)"
+                                    sleep 2
+                                done
+
+                                # Direct seed: Adam ingests all content via SQLite write.
+                                # Other peers replicate from Adam via P2P identity-driven replication.
+                                STORAGE_URL="http://${adam.storageUrl}" npx tsx src/seed-sqlite.ts
+
+                                echo ""
+                                echo "✅ ${adam.humanId} seeded successfully"
+                                echo ""
+                            """
+
+                            for (peer in otherPeers) {
                                 sh """#!/bin/bash
                                     set -euo pipefail
 
                                     echo "═══════════════════════════════════════════════════════════"
-                                    echo "🌱 SEEDING ${humanId}"
+                                    echo "⏳ WAITING FOR REPLICATION: ${peer.humanId}"
                                     echo "═══════════════════════════════════════════════════════════"
-                                    echo "Storage: ${storageUrl}"
-                                    echo ""
+                                    echo "Storage: ${peer.storageUrl}"
 
-                                    # Wait for this conductor's storage to be ready
+                                    # Wait for this peer's storage to be ready
                                     for i in \$(seq 1 30); do
-                                        if curl -sf "http://${storageUrl}/health" > /dev/null 2>&1; then
-                                            echo "✅ ${service} storage is ready"
+                                        if curl -sf "http://${peer.storageUrl}/health" > /dev/null 2>&1; then
                                             break
                                         fi
-                                        if [ \$i -eq 30 ]; then
-                                            echo "❌ ${service} storage not ready after 30 attempts"
-                                            exit 1
-                                        fi
-                                        echo "   Waiting for ${service} storage... (\$i/30)"
                                         sleep 2
                                     done
 
-                                    # All peers get stewardship-filtered content.
-                                    # P2P EPR resolution handles cross-steward access.
-                                    SEED_CMD="npx tsx src/seed-sqlite.ts --conductor-for=${humanId}"
-                                    STORAGE_URL="http://${storageUrl}" \$SEED_CMD
+                                    # Poll /p2p/status until replication.caughtUp == true (timeout 600s)
+                                    DEADLINE=\$((SECONDS + 600))
+                                    while [ \$SECONDS -lt \$DEADLINE ]; do
+                                        STATUS=\$(curl -sf "http://${peer.storageUrl}/p2p/status" 2>/dev/null || echo '{}')
+                                        CAUGHT_UP=\$(echo "\$STATUS" | jq -r '.replication.caughtUp // false')
+                                        COMPLETED=\$(echo "\$STATUS" | jq -r '.replication.completed // 0')
+                                        PENDING=\$(echo "\$STATUS" | jq -r '.replication.pending // 0')
 
-                                    echo ""
-                                    echo "✅ ${humanId} seeded successfully"
-                                    echo ""
+                                        if [ "\$CAUGHT_UP" = "true" ] && [ "\$COMPLETED" -gt 0 ]; then
+                                            echo "✅ ${peer.humanId} caught up: \$COMPLETED items"
+                                            break
+                                        fi
+
+                                        echo "   ${peer.humanId}: \$COMPLETED completed, \$PENDING pending"
+                                        sleep 10
+                                    done
+
+                                    if [ \$SECONDS -ge \$DEADLINE ]; then
+                                        echo "❌ ${peer.humanId} replication timed out"
+                                        exit 1
+                                    fi
                                 """
                             }
 
@@ -603,7 +645,7 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                             }
                             sh '''#!/bin/bash
                                 echo "═══════════════════════════════════════════════════════════"
-                                echo "✅ ALL CONDUCTORS SEEDED"
+                                echo "✅ ALL CONDUCTORS HAVE CONTENT (genesis seeded + others replicated)"
                                 echo "═══════════════════════════════════════════════════════════"
                             '''
                         }
@@ -618,7 +660,7 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                 container('builder') {
                     script {
                         def humans = getHumanStorageUrls('alpha')
-                        def matthewUrl = humans[0].storageUrl
+                        def genesisUrl = humans[0].storageUrl
 
                         sh '''#!/bin/bash
                             echo "═══════════════════════════════════════════════════════════"
@@ -639,13 +681,13 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                             """
                         }
 
-                        // Verify sophia assessment content on Matthew's conductor (founder/primary)
+                        // Verify sophia assessment content on the genesis peer (Adam)
                         sh """#!/bin/bash
                             set -euo pipefail
                             echo ""
-                            echo "🔬 Verifying assessment content on Matthew's conductor..."
+                            echo "🔬 Verifying assessment content on genesis peer (Adam)..."
                             for ASSESSMENT_ID in assessment-personal-values assessment-values-hierarchy; do
-                                ASSESSMENT=\$(curl -sf "http://${matthewUrl}/db/content/\$ASSESSMENT_ID" || echo '{}')
+                                ASSESSMENT=\$(curl -sf "http://${genesisUrl}/db/content/\$ASSESSMENT_ID" || echo '{}')
                                 FMT=\$(echo "\$ASSESSMENT" | jq -r '.contentFormat // empty')
 
                                 if [ -z "\$FMT" ]; then

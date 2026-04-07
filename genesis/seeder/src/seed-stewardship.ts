@@ -648,7 +648,8 @@ async function main() {
   console.log();
 
   // Step 8: Bulk create allocations (in batches to avoid overwhelming the API)
-  const BATCH_SIZE = 500;
+  const BATCH_SIZE = 100;
+  const BATCH_DELAY_MS = 200; // Let SQLite breathe between batches
   let totalCreated = 0;
   let totalFailed = 0;
   const allErrors: string[] = [];
@@ -671,6 +672,10 @@ async function main() {
     } catch (error) {
       console.error(`   ERROR in batch ${batchNum}: ${error}`);
       totalFailed += batch.length;
+    }
+    // Brief pause between batches to avoid SQLite "database is locked" errors
+    if (i + BATCH_SIZE < allocations.length) {
+      await new Promise(resolve => setTimeout(resolve, BATCH_DELAY_MS));
     }
   }
 
@@ -745,6 +750,10 @@ async function main() {
       );
     } catch (error) {
       console.error(`   ERROR in affinity batch ${batchNum}: ${error}`);
+    }
+    // Brief pause between batches to avoid SQLite "database is locked" errors
+    if (i + BATCH_SIZE < affinityInputs.length) {
+      await new Promise(resolve => setTimeout(resolve, BATCH_DELAY_MS));
     }
   }
 
