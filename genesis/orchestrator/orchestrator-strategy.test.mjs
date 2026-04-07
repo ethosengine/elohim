@@ -18,6 +18,7 @@ import { strict as assert } from 'node:assert';
 
 const PIPELINES = {
   'elohim-holochain': {
+    jenkinsPath: 'elohim/holochain/dna/Jenkinsfile',
     changePatterns: ['elohim/holochain/dna/', 'elohim/elohim-cache-core/', 'elohim/holochain/rna/', 'VERSION'],
     dependsOn: [],
     cascades: true,
@@ -25,13 +26,15 @@ const PIPELINES = {
     triggersGenesis: true,
   },
   'elohim-edge': {
-    changePatterns: ['doorway/doorway-service/', 'doorway/doorway-app/', 'elohim/elohim-agent/elohim-agent-sdk/', 'elohim/holochain/edgenode/', 'elohim/elohim-storage/', 'elohim/elohim-cache-core/', 'crates/', 'VERSION'],
+    jenkinsPath: 'elohim/holochain/Jenkinsfile',
+    changePatterns: ['doorway/doorway-service/', 'doorway/doorway-app/', 'elohim/elohim-agent/elohim-agent-sdk/', 'elohim/holochain/edgenode/', 'elohim/elohim-storage/', 'elohim/elohim-cache-core/', 'crates/', 'genesis/orchestrator/manifests/', 'genesis/orchestrator/environments/', 'VERSION'],
     dependsOn: ['elohim-holochain'],
     cascades: undefined,
     manualOnly: false,
     triggersGenesis: true,
   },
   'elohim': {
+    jenkinsPath: 'Jenkinsfile',
     changePatterns: ['app/elohim-app/', 'app/elohim-library/', 'elohim/sdk/', 'VERSION'],
     dependsOn: ['elohim-sophia'],
     cascades: undefined,
@@ -39,6 +42,7 @@ const PIPELINES = {
     triggersGenesis: true,
   },
   'elohim-genesis': {
+    jenkinsPath: 'genesis/Jenkinsfile',
     changePatterns: ['genesis/', 'data/'],
     dependsOn: ['elohim-edge', 'elohim'],
     cascades: undefined,
@@ -46,6 +50,7 @@ const PIPELINES = {
     triggersGenesis: false,
   },
   'elohim-steward': {
+    jenkinsPath: 'steward/device/Jenkinsfile',
     changePatterns: ['steward/'],
     dependsOn: ['elohim-holochain'],
     cascades: undefined,
@@ -53,6 +58,7 @@ const PIPELINES = {
     triggersGenesis: false,
   },
   'elohim-sophia': {
+    jenkinsPath: 'sophia.Jenkinsfile',
     changePatterns: ['sophia/'],
     dependsOn: [],
     cascades: true,
@@ -65,8 +71,13 @@ const PIPELINES = {
 // Pure functions — ported from Jenkinsfile Groovy
 // ══════════════════════════════════════════════════════════════════
 
-const CI_ONLY_PATTERNS = ['genesis/orchestrator/', '.claude', '.github/', '.husky/'];
-const CI_ONLY_FILES = ['CLAUDE.md', 'ROADMAP.md'];
+const CI_ONLY_PATTERNS = ['.claude', '.github/', '.husky/'];
+const CI_ONLY_FILES = [
+  'CLAUDE.md',
+  'ROADMAP.md',
+  'genesis/orchestrator/Jenkinsfile',
+  'genesis/orchestrator/build-graph.groovy',
+];
 
 /**
  * Mirrors Jenkinsfile analyzePipelineRequirements() — changeset analysis.
@@ -75,15 +86,35 @@ const CI_ONLY_FILES = ['CLAUDE.md', 'ROADMAP.md'];
 function analyzePipelineRequirements(changedFiles) {
   const analysis = {};
 
+  // Build reverse index: jenkinsPath → owning pipeline name.
+  // A pipeline's own Jenkinsfile triggers ONLY that pipeline.
+  const jenkinsfileToPipeline = {};
+  for (const [pname, pconfig] of Object.entries(PIPELINES)) {
+    if (pconfig.jenkinsPath) {
+      jenkinsfileToPipeline[pconfig.jenkinsPath] = pname;
+    }
+  }
+
   for (const [name, config] of Object.entries(PIPELINES)) {
     const matchedPatterns = [];
     const matchedFiles = [];
 
     for (const file of changedFiles) {
-      // Skip CI-only files
-      if (file.endsWith('Jenkinsfile') ||
-          CI_ONLY_PATTERNS.some(p => file.startsWith(p)) ||
+      // Skip CI-only files (orchestrator glue, hooks, docs)
+      if (CI_ONLY_PATTERNS.some(p => file.startsWith(p)) ||
           CI_ONLY_FILES.includes(file)) {
+        continue;
+      }
+
+      // Pipeline Jenkinsfiles: route to owning pipeline only.
+      if (file.endsWith('Jenkinsfile')) {
+        const owningPipeline = jenkinsfileToPipeline[file];
+        if (owningPipeline === name) {
+          if (!matchedPatterns.includes('jenkinsfile')) {
+            matchedPatterns.push('jenkinsfile');
+          }
+          matchedFiles.push(file);
+        }
         continue;
       }
 
@@ -304,11 +335,19 @@ describe('changeset routing', () => {
     assert.ok(pipelines.includes('elohim'));
   });
 
-  it('Jenkinsfile-only changes trigger nothing', () => {
+  it('pipeline Jenkinsfile changes route to their owning pipeline', () => {
+    // Post-Adam fix: a pipeline's own Jenkinsfile is a real trigger for that
+    // pipeline (and only that pipeline). Root Jenkinsfile owns elohim (app);
+    // elohim/holochain/dna/Jenkinsfile owns elohim-holochain.
     const { pipelines } = simulate({
       changedFiles: ['Jenkinsfile', 'elohim/holochain/dna/Jenkinsfile'],
     });
-    assert.equal(pipelines.length, 0);
+    assert.ok(pipelines.includes('elohim'),
+      'root Jenkinsfile triggers the elohim app pipeline');
+    assert.ok(pipelines.includes('elohim-holochain'),
+      'dna Jenkinsfile triggers the holochain pipeline');
+    // unrelated pipelines should not be directly triggered (cascades may add some)
+    assert.ok(!pipelines.includes('elohim-steward'), 'steward not triggered');
   });
 
   it('orchestrator config changes trigger nothing', () => {
@@ -323,6 +362,31 @@ describe('changeset routing', () => {
       changedFiles: ['steward/src-tauri/src/lib.rs'],
     });
     assert.ok(!pipelines.includes('elohim-steward'));
+  });
+
+  it('change to elohim/holochain/Jenkinsfile triggers elohim-edge only', () => {
+    const { pipelines } = simulate({
+      changedFiles: ['elohim/holochain/Jenkinsfile'],
+    });
+    assert.ok(pipelines.includes('elohim-edge'),
+      'A pipeline-Jenkinsfile change must trigger that pipeline (Adam-shaped bug regression)');
+    // Note: cascade may also include elohim-genesis (triggersGenesis), so don't assert deepEqual.
+  });
+
+  it('change to genesis/orchestrator/Jenkinsfile triggers nothing (CI-only)', () => {
+    const { pipelines } = simulate({
+      changedFiles: ['genesis/orchestrator/Jenkinsfile'],
+    });
+    assert.deepEqual(pipelines, [],
+      'Orchestrator self-edits should not cascade');
+  });
+
+  it('change to genesis/orchestrator/manifests/ triggers elohim-edge', () => {
+    const { pipelines } = simulate({
+      changedFiles: ['genesis/orchestrator/manifests/elohim-edge/foo.yaml'],
+    });
+    assert.ok(pipelines.includes('elohim-edge'),
+      'K8s manifests are real deploy source for the edge pipeline');
   });
 
   it('unrelated files trigger nothing', () => {
