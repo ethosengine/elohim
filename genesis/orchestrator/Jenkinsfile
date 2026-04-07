@@ -38,7 +38,7 @@ import groovy.transform.Field
     ],
     'elohim-edge': [
         jenkinsPath: 'elohim/holochain/Jenkinsfile',
-        changePatterns: ['doorway/doorway-service/', 'doorway/doorway-app/', 'elohim/elohim-agent/elohim-agent-sdk/', 'elohim/holochain/edgenode/', 'elohim/elohim-storage/', 'elohim/elohim-cache-core/', 'crates/', 'VERSION'],
+        changePatterns: ['doorway/doorway-service/', 'doorway/doorway-app/', 'elohim/elohim-agent/elohim-agent-sdk/', 'elohim/holochain/edgenode/', 'elohim/elohim-storage/', 'elohim/elohim-cache-core/', 'crates/', 'genesis/orchestrator/manifests/', 'genesis/orchestrator/environments/', 'VERSION'],
         artifacts: ['elohim-doorway', 'doorway-app', 'elohim-agent-sdk', 'elohim-edgenode', 'elohim-storage', 'elohim-happ-installer'],
         dependsOn: ['elohim-holochain'],
         cascades: false,      // Edge changes don't auto-trigger genesis/app rebuilds
@@ -229,9 +229,29 @@ def analyzeChangeset(storedGlobalBaseline = null) {
  * pipelines that already built successfully for intermediate changes.
  */
 def analyzePipelineRequirements(changedFiles, pipelineBaselines = [:]) {
-    // CI config files that shouldn't trigger source builds
-    def ciOnlyPatterns = ['genesis/orchestrator/', '.claude', '.github/', '.husky/']
-    def ciOnlyFiles = ['CLAUDE.md', 'ROADMAP.md']
+    // CI config files/directories that shouldn't trigger source builds.
+    // NOTE: `genesis/orchestrator/` used to be here as a blanket pattern, but that
+    // conflated the orchestrator's own CI glue with actual deploy source (manifests
+    // and environment configs). Those now flow through pipeline-specific changePatterns
+    // (e.g., elohim-edge owns genesis/orchestrator/manifests/ and environments/).
+    def ciOnlyPatterns = ['.claude', '.github/', '.husky/']
+    def ciOnlyFiles = [
+        'CLAUDE.md',
+        'ROADMAP.md',
+        'genesis/orchestrator/Jenkinsfile',        // orchestrator's own pipeline (no PIPELINES entry)
+        'genesis/orchestrator/build-graph.groovy', // orchestrator helper library
+    ]
+
+    // Build a reverse index: Jenkinsfile path -> owning pipeline name.
+    // A pipeline's own Jenkinsfile is a trigger for that pipeline only (not for unrelated
+    // pipelines), since the Jenkinsfile IS the source of truth for what that pipeline deploys.
+    def jenkinsfileToPipeline = [:]
+    PIPELINES.each { pname, pconfig ->
+        if (pconfig.jenkinsPath) {
+            jenkinsfileToPipeline[pconfig.jenkinsPath] = pname
+        }
+    }
+
     def analysis = [:]
 
     // Cache git diffs per unique baseline commit to avoid redundant calls
@@ -273,11 +293,23 @@ def analyzePipelineRequirements(changedFiles, pipelineBaselines = [:]) {
         }
 
         filesToCheck.each { file ->
-            // Skip CI-only files (Jenkinsfiles, orchestrator config, hooks, docs)
-            if (file.endsWith('Jenkinsfile') ||
-                ciOnlyPatterns.any { pattern -> file.startsWith(pattern) } ||
+            // Skip CI-only files (orchestrator glue, hooks, docs)
+            if (ciOnlyPatterns.any { pattern -> file.startsWith(pattern) } ||
                 ciOnlyFiles.contains(file)) {
                 return  // skip this file
+            }
+
+            // Pipeline Jenkinsfiles: a file at a pipeline's jenkinsPath triggers that
+            // specific pipeline (and only that pipeline). Any other .Jenkinsfile is skipped.
+            if (file.endsWith('Jenkinsfile')) {
+                def owningPipeline = jenkinsfileToPipeline[file]
+                if (owningPipeline == name) {
+                    if (!matchedPatterns.contains('jenkinsfile')) {
+                        matchedPatterns.add('jenkinsfile')
+                    }
+                    matchedFiles.add(file)
+                }
+                return  // Jenkinsfile handled — don't let it also match changePatterns
             }
 
             config.changePatterns.each { pattern ->
