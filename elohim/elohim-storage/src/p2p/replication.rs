@@ -123,3 +123,87 @@ impl Default for ReplicationState {
         Self::new()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn replication_state_discovers_gaps() {
+        let state = ReplicationState::new();
+
+        // Simulate local node has items a, b, c
+        let local: HashSet<String> = ["a", "b", "c"].iter().map(|s| s.to_string()).collect();
+        state.set_local_ids(local).await;
+
+        // Peer advertises items a–e
+        let remote: Vec<String> = ["a", "b", "c", "d", "e"]
+            .iter()
+            .map(|s| s.to_string())
+            .collect();
+        let gaps = state.discover(remote).await;
+
+        assert_eq!(gaps.len(), 2);
+        assert!(gaps.contains(&"d".to_string()));
+        assert!(gaps.contains(&"e".to_string()));
+
+        let status = state.status().await;
+        assert_eq!(status.pending, 2);
+        assert_eq!(status.completed, 0);
+        assert!(!status.caught_up);
+    }
+
+    #[tokio::test]
+    async fn replication_state_marks_completed() {
+        let state = ReplicationState::new();
+        state.set_local_ids(HashSet::new()).await;
+
+        state.discover(vec!["x".to_string()]).await;
+        assert_eq!(state.status().await.pending, 1);
+
+        state.mark_completed("x").await;
+        let status = state.status().await;
+        assert_eq!(status.pending, 0);
+        assert_eq!(status.completed, 1);
+
+        state.update_caught_up().await;
+        assert!(state.status().await.caught_up);
+    }
+
+    #[tokio::test]
+    async fn replication_state_retries_failures() {
+        let state = ReplicationState::new();
+        state.set_local_ids(HashSet::new()).await;
+
+        state.discover(vec!["y".to_string()]).await;
+        assert_eq!(state.status().await.pending, 1);
+
+        // First failure (count=1, still < MAX_RETRIES=3) → re-queued
+        state.mark_failed("y").await;
+        assert_eq!(state.status().await.pending, 1);
+
+        // Second failure (count=2, still < 3) → re-queued
+        state.mark_failed("y").await;
+        assert_eq!(state.status().await.pending, 1);
+
+        // Third failure (count=3, not < 3) → dropped from pending, stays in failed
+        state.mark_failed("y").await;
+        let status = state.status().await;
+        assert_eq!(status.pending, 0);
+        assert_eq!(status.failed, 1);
+    }
+
+    #[tokio::test]
+    async fn replication_state_skips_known_local_ids() {
+        let state = ReplicationState::new();
+        let local: HashSet<String> = ["a", "b"].iter().map(|s| s.to_string()).collect();
+        state.set_local_ids(local).await;
+
+        // Discover only items already held locally — no gaps expected
+        let gaps = state
+            .discover(vec!["a".to_string(), "b".to_string()])
+            .await;
+        assert_eq!(gaps.len(), 0);
+        assert_eq!(state.status().await.pending, 0);
+    }
+}
