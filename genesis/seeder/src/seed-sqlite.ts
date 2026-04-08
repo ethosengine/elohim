@@ -26,6 +26,7 @@ import type { ContentFormat, ContentType, Reach } from './generated/schema-enums
 import type { CreateContentInput } from './generated/create-content-input.js';
 import type { ConceptMetadata, PathMetadata } from './generated/metadata-types.js';
 import type { Section, Item } from './generated/body-types.js';
+import { waitForDrain } from './wait-for-drain.js';
 
 // Directory setup
 const __filename = fileURLToPath(import.meta.url);
@@ -1085,6 +1086,39 @@ async function main() {
     }
 
     console.log(`\nPath seeding complete in ${pathTimer.elapsed()}`);
+  }
+
+  // ========================================
+  // Wait for P2P drain
+  // ========================================
+  // After content and paths are posted to the storage SQLite, the
+  // storage node's drain loop (Phase C) publishes rows to the DHT as
+  // peers become available. The pipeline must not declare success
+  // until drain.pending === 0, otherwise a "caught up" signal can race
+  // ahead of actual publish completion. See genesis/plans seeder DHT
+  // drain plan, Phase E2.
+  if (!DRY_RUN && totalInserted > 0) {
+    console.log(`\n${'='.repeat(70)}`);
+    console.log(`Waiting for P2P drain to complete`);
+    console.log(`${'='.repeat(70)}`);
+    try {
+      const drainTimeoutMs = parseInt(process.env.DRAIN_TIMEOUT_MS || '', 10) || 10 * 60_000;
+      await waitForDrain(STORAGE_URL!, {
+        timeoutMs: drainTimeoutMs,
+        // totalInserted is the lower bound we expect the storage node's
+        // drain queue to observe. Using it here guards against the
+        // zero-content edge case and catches drift if the count query
+        // is broken upstream.
+        expectedMinTotal: totalInserted,
+      });
+    } catch (err) {
+      console.error(`\nError: waitForDrain failed: ${err}`);
+      totalErrors.push(`waitForDrain: ${err}`);
+    }
+  } else if (DRY_RUN) {
+    console.log(`\nSkipping waitForDrain (dry run)`);
+  } else {
+    console.log(`\nSkipping waitForDrain (nothing inserted)`);
   }
 
   // ========================================
