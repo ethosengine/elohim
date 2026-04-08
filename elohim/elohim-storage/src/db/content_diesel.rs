@@ -109,6 +109,8 @@ pub struct ContentQuery {
     pub limit: i64,
     #[serde(default)]
     pub offset: i64,
+    #[serde(default)]
+    pub require_provenance: bool,
 }
 
 fn default_limit() -> i64 {
@@ -216,6 +218,18 @@ pub fn list_content(
 
     if let Some(ref reach) = query.reach {
         base_query = base_query.filter(content::reach.eq(reach));
+    }
+
+    // Provenance gate: exclude rows that have been neither notarized on Holochain
+    // (dht_anchor_hash) nor published to libp2p Kad (p2p_published_at). Either marker
+    // is sufficient. External HTTP reads set this to true; internal drain-loop
+    // queries set it to false so the loop can see unpublished rows.
+    if query.require_provenance {
+        base_query = base_query.filter(
+            content::dht_anchor_hash
+                .is_not_null()
+                .or(content::p2p_published_at.is_not_null()),
+        );
     }
 
     // Execute query
@@ -762,6 +776,71 @@ mod tests {
         let result2 = bulk_create_content(&mut conn, &lamad_ctx, items2).unwrap();
         assert_eq!(result2.inserted, 0, "Should insert 0 items (duplicate)");
         assert_eq!(result2.skipped, 1, "Should skip 1 item");
+    }
+
+    #[test]
+    fn test_list_content_respects_require_provenance() {
+        let mut conn = setup_test_db();
+        let ctx = AppContext::new("lamad");
+
+        // Insert two rows: one will be marked published, one not.
+        let published = CreateContentInput {
+            id: "cid-published".to_string(),
+            title: "Published".to_string(),
+            description: None,
+            content_type: "concept".to_string(),
+            content_format: "markdown".to_string(),
+            blob_hash: None,
+            blob_cid: None,
+            content_size_bytes: None,
+            metadata_json: None,
+            reach: "commons".to_string(),
+            created_by: None,
+            tags: vec![],
+            content_body: None,
+        };
+        let unpublished = CreateContentInput {
+            id: "cid-unpublished".to_string(),
+            ..published.clone()
+        };
+        create_content(&mut conn, &ctx, published).unwrap();
+        create_content(&mut conn, &ctx, unpublished).unwrap();
+
+        // Mark only the first as p2p_published.
+        diesel::sql_query(
+            "UPDATE content SET p2p_published_at = datetime('now') WHERE id = 'cid-published'",
+        )
+        .execute(&mut conn)
+        .unwrap();
+
+        // Default query (no provenance filter) — returns BOTH rows. Regression guard.
+        let unrestricted = list_content(
+            &mut conn,
+            &ctx,
+            &ContentQuery {
+                limit: 10,
+                offset: 0,
+                require_provenance: false,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(unrestricted.len(), 2, "unrestricted list should return all rows");
+
+        // Gated query — returns ONLY the published row.
+        let gated = list_content(
+            &mut conn,
+            &ctx,
+            &ContentQuery {
+                limit: 10,
+                offset: 0,
+                require_provenance: true,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(gated.len(), 1, "gated list should filter out unpublished rows");
+        assert_eq!(gated[0].content.id, "cid-published");
     }
 
     #[test]
