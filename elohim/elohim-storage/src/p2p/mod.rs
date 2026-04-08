@@ -238,7 +238,12 @@ pub struct P2PStatusInfo {
 
 /// Commands sent from HTTP handlers to the P2P event loop.
 pub enum P2PCommand {
-    /// Publish an EPR Head to Kademlia DHT
+    /// Publish an EPR Head to Kademlia DHT.
+    ///
+    /// Currently unused: the drain loop (`drain_publish_queue`) is the sole
+    /// publisher of EPR Heads and calls `put_record` directly on the swarm.
+    /// Retained as part of the P2PHandle abstraction for future use.
+    #[allow(dead_code)]
     PublishEprHead { id: String, head_bytes: Vec<u8> },
     /// Resolve an EPR Head via Kademlia DHT lookup
     ResolveEpr {
@@ -287,6 +292,12 @@ impl P2PHandle {
     }
 
     /// Publish an EPR Head to the DHT. Fire-and-forget.
+    ///
+    /// Currently unused: the drain loop (`drain_publish_queue`) is the sole
+    /// publisher of EPR Heads to Kademlia and calls `put_record` directly,
+    /// also setting `p2p_published_at` via `mark_published`. This method is
+    /// retained as part of the P2PHandle abstraction for future use.
+    #[allow(dead_code)]
     pub async fn publish_epr_head(&self, id: String, head_bytes: Vec<u8>) {
         if let Err(e) = self
             .command_tx
