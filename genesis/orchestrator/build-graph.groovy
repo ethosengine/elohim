@@ -55,15 +55,21 @@ def parseManifest(String content, String filePath) {
  */
 @NonCPS
 def composeGraph(List manifests) {
-    def graph = [steps: [:], pipelines: [:]]
+    // _validationErrors collects structural problems (duplicate pipelines,
+    // missing dependencies, cycles) as Strings. @NonCPS functions cannot
+    // `throw new RuntimeException(...)` under the Jenkins script-security
+    // sandbox, so errors are accumulated and surfaced by walkBuildGraph
+    // (CPS context) via error(...).
+    def graph = [steps: [:], pipelines: [:], _validationErrors: []]
 
     for (def manifest : manifests) {
         def pipeline = manifest.pipeline
         if (graph.pipelines.containsKey(pipeline)) {
-            throw new RuntimeException(
-                "Duplicate pipeline name '${pipeline}' in ${manifest._filePath} " +
-                "and ${graph.pipelines[pipeline]._filePath}"
+            graph._validationErrors.add(
+                ("Duplicate pipeline name '${pipeline}' in ${manifest._filePath} " +
+                 "and ${graph.pipelines[pipeline]._filePath}").toString()
             )
+            continue  // skip this manifest; keep collecting other errors
         }
         graph.pipelines[pipeline] = manifest
 
@@ -88,15 +94,15 @@ def composeGraph(List manifests) {
     graph.steps.each { name, step ->
         step.depends.each { dep ->
             if (!graph.steps.containsKey(dep)) {
-                throw new RuntimeException(
-                    "Step '${name}' depends on '${dep}' which does not exist. " +
-                    "Available steps: ${graph.steps.keySet().sort().join(', ')}"
+                graph._validationErrors.add(
+                    ("Step '${name}' depends on '${dep}' which does not exist. " +
+                     "Available steps: ${graph.steps.keySet().sort().join(', ')}").toString()
                 )
             }
         }
     }
 
-    // Detect cycles
+    // Detect cycles (accumulates into graph._validationErrors)
     detectCycles(graph)
 
     return graph
@@ -104,8 +110,8 @@ def composeGraph(List manifests) {
 
 @NonCPS
 def detectCycles(Map graph) {
-    def visited = new HashSet()
-    def inStack = new HashSet()
+    def visited = [] as Set
+    def inStack = [] as Set
 
     for (def stepName : graph.steps.keySet()) {
         if (!visited.contains(stepName)) {
@@ -127,7 +133,9 @@ def dfsDetectCycle(Map graph, String node, Set visited, Set inStack, List path) 
         } else if (inStack.contains(dep)) {
             def cycleStart = path.indexOf(dep)
             def cycle = path.subList(cycleStart, path.size()) + [dep]
-            throw new RuntimeException("Dependency cycle detected: ${cycle.join(' -> ')}")
+            graph._validationErrors.add(("Dependency cycle detected: ${cycle.join(' -> ')}").toString())
+            inStack.remove(node)
+            return  // abort this dfs branch; other branches may still find more cycles
         }
     }
 
@@ -675,6 +683,26 @@ def walkBuildGraph(List changedFiles) {
     echo "Parsed ${manifests.size()} build manifests"
 
     def graph = composeGraph(manifests)
+
+    // Surface structural validation errors from composeGraph (duplicate pipelines,
+    // missing dependencies, cycles). @NonCPS cannot throw under the sandbox, so
+    // composeGraph accumulates errors; walkBuildGraph (CPS) turns them into a
+    // loud orchestrator failure here.
+    if (graph._validationErrors && graph._validationErrors.size() > 0) {
+        error """
+═══════════════════════════════════════════════════════════════════════════════
+  ❌ BUILD GRAPH VALIDATION FAILED
+═══════════════════════════════════════════════════════════════════════════════
+  composeGraph found ${graph._validationErrors.size()} structural error(s) in the
+  manifest graph:
+
+  ${graph._validationErrors.collect { '  • ' + it }.join('\n')}
+
+  Fix the offending build-manifest.json file(s) and push again.
+═══════════════════════════════════════════════════════════════════════════════
+"""
+    }
+
     echo "Composed graph: ${graph.steps.size()} steps across ${graph.pipelines.size()} pipelines"
 
     def buildState = loadBuildState()
