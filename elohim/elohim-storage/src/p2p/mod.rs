@@ -956,6 +956,8 @@ impl P2PNode {
     /// peers, `put_record(Quorum::One)` would silently succeed locally without
     /// gossiping, creating phantom "published" state.
     async fn drain_publish_queue(&self, batch_limit: i64) -> usize {
+        const SUB_BATCH_SIZE: i64 = 50;
+
         // Peer-gate: without peers, Kademlia can't gossip. Bail early.
         {
             let swarm = self.swarm.read().await;
@@ -965,103 +967,126 @@ impl P2PNode {
             }
         }
 
-        let pool = match self.db_pool.as_ref() {
-            Some(p) => p,
-            None => {
-                debug!("drain_publish_queue: no DB pool, skipping");
-                return 0;
-            }
-        };
-        let mut conn = match pool.get() {
-            Ok(c) => c,
-            Err(e) => {
-                warn!(error = %e, "drain_publish_queue: DB connection failed");
-                return 0;
-            }
+        let Some(pool) = self.db_pool.as_ref() else {
+            debug!("drain_publish_queue: no DB pool, skipping");
+            return 0;
         };
 
         let app_ctx = crate::db::AppContext::default_lamad();
-        let pending_ids = match crate::db::content_diesel::list_unpublished_content_ids(
-            &mut conn, &app_ctx, batch_limit,
-        ) {
-            Ok(ids) => ids,
-            Err(e) => {
-                warn!(error = %e, "drain_publish_queue: list_unpublished failed");
-                return 0;
-            }
-        };
-
-        if pending_ids.is_empty() {
-            return 0;
-        }
-
-        info!(pending = pending_ids.len(), "drain_publish_queue: publishing batch");
-
         let mut published: usize = 0;
         let mut batch_delay = Duration::from_millis(1);
 
-        for content_id in &pending_ids {
-            let Some(head_bytes) = self.resolve_epr_head_locally(content_id) else {
-                // Can't resolve head — skip this row; it'll be retried next tick.
-                warn!(id = %content_id, "drain: EPR head not resolvable, skipping");
-                continue;
-            };
-
-            let key = RecordKey::new(&format!("epr:{}", content_id));
-            let record = Record {
-                key,
-                value: head_bytes,
-                publisher: Some(*self.identity.peer_id()),
-                expires: None,
-            };
-
-            // SAFETY: put_record returns synchronously in libp2p 0.54 — it
-            // queues the record in Kademlia's internal state but does not
-            // yield. Holding the swarm write lock across this call is bounded
-            // and safe. If a future libp2p upgrade makes this await, move the
-            // call out of the lock or reacquire per batch.
-            let put_result = {
-                let mut swarm = self.swarm.write().await;
-                swarm
-                    .behaviour_mut()
-                    .kademlia
-                    .put_record(record, libp2p::kad::Quorum::One)
-            };
-
-            match put_result {
-                Ok(_) => {
-                    match crate::db::content_diesel::mark_published(
-                        &mut conn, &app_ctx, content_id,
-                    ) {
-                        Ok(true) => {
-                            published += 1;
-                        }
-                        Ok(false) => {
-                            // Row was concurrently deleted — DHT publish succeeded,
-                            // nothing to mark. Not counted as an error.
-                            info!(id = %content_id, "drain: row gone after publish");
-                        }
-                        Err(e) => {
-                            warn!(id = %content_id, error = %e, "drain: mark_published failed");
-                        }
-                    }
-                    batch_delay =
-                        Duration::from_millis((batch_delay.as_millis() as u64 / 2).max(1));
-                }
+        while (published as i64) < batch_limit {
+            // Re-acquire a fresh connection per sub-batch so we don't hold
+            // a pool slot across the entire drain cycle.
+            let mut conn = match pool.get() {
+                Ok(c) => c,
                 Err(e) => {
-                    debug!(id = %content_id, error = ?e, "drain: put_record failed");
-                    batch_delay =
-                        Duration::from_millis((batch_delay.as_millis() as u64 * 2).min(500));
+                    warn!(error = %e, "drain_publish_queue: DB connection failed, stopping");
+                    break;
+                }
+            };
+
+            let remaining = batch_limit - published as i64;
+            let sub_limit = remaining.min(SUB_BATCH_SIZE);
+
+            let pending_ids = match crate::db::content_diesel::list_unpublished_content_ids(
+                &mut conn, &app_ctx, sub_limit,
+            ) {
+                Ok(ids) => ids,
+                Err(e) => {
+                    warn!(error = %e, "drain_publish_queue: list_unpublished failed, stopping");
+                    break;
+                }
+            };
+
+            if pending_ids.is_empty() {
+                break;
+            }
+
+            let sub_batch_start = published;
+
+            for content_id in &pending_ids {
+                let Some(head_bytes) = self.resolve_epr_head_locally(content_id) else {
+                    // Can't resolve head — skip this row; it'll be retried next tick.
+                    warn!(id = %content_id, "drain: EPR head not resolvable, skipping");
+                    continue;
+                };
+
+                let key = RecordKey::new(&format!("epr:{}", content_id));
+                let record = Record {
+                    key,
+                    value: head_bytes,
+                    publisher: Some(*self.identity.peer_id()),
+                    expires: None,
+                };
+
+                // SAFETY: put_record returns synchronously in libp2p 0.54 — it
+                // queues the record in Kademlia's internal state but does not
+                // yield. Holding the swarm write lock across this call is
+                // bounded and safe. If a future libp2p upgrade makes this
+                // await, move the call out of the lock or reacquire per batch.
+                let put_result = {
+                    let mut swarm = self.swarm.write().await;
+                    swarm
+                        .behaviour_mut()
+                        .kademlia
+                        .put_record(record, libp2p::kad::Quorum::One)
+                };
+
+                match put_result {
+                    Ok(_) => {
+                        match crate::db::content_diesel::mark_published(
+                            &mut conn, &app_ctx, content_id,
+                        ) {
+                            Ok(true) => {
+                                published += 1;
+                            }
+                            Ok(false) => {
+                                // Row was concurrently deleted — DHT publish succeeded,
+                                // nothing to mark. Not counted as an error.
+                                info!(id = %content_id, "drain: row gone after publish");
+                            }
+                            Err(e) => {
+                                warn!(id = %content_id, error = %e, "drain: mark_published failed");
+                            }
+                        }
+                        batch_delay =
+                            Duration::from_millis((batch_delay.as_millis() as u64 / 2).max(1));
+                    }
+                    Err(e) => {
+                        debug!(id = %content_id, error = ?e, "drain: put_record failed");
+                        batch_delay =
+                            Duration::from_millis((batch_delay.as_millis() as u64 * 2).min(500));
+                    }
+                }
+
+                if batch_delay.as_millis() > 1 {
+                    tokio::time::sleep(batch_delay).await;
                 }
             }
 
-            if batch_delay.as_millis() > 1 {
-                tokio::time::sleep(batch_delay).await;
+            // If the sub-batch made zero forward progress, break out to avoid
+            // spinning forever on rows that always fail (e.g. every row's
+            // EPR head is unresolvable). A future drain tick will retry.
+            if published == sub_batch_start {
+                debug!("drain_publish_queue: sub-batch made no progress, stopping");
+                break;
+            }
+
+            // Connection drops here (end of loop iteration) before the next
+            // sub-batch acquires a fresh one.
+            drop(conn);
+
+            // If the sub-batch returned fewer rows than we asked for, the
+            // queue is drained for now.
+            if (pending_ids.len() as i64) < sub_limit {
+                break;
             }
         }
 
         if published > 0 {
-            info!(published, total = pending_ids.len(), "drain_publish_queue: batch complete");
+            info!(published, "drain_publish_queue: cycle complete");
         }
         published
     }
@@ -1071,29 +1096,78 @@ impl P2PNode {
     /// "already have" from "need to fetch" without re-querying the DB every
     /// tick. Called once from `run()` before the event loop enters its
     /// select loop.
+    ///
+    /// Paginates through the content table in chunks of HYDRATE_PAGE_SIZE
+    /// rows so a node with >100k local rows doesn't silently truncate its
+    /// replication set (which would cause unnecessary re-fetches of content
+    /// it already has).
     async fn hydrate_replication_state(&self) {
+        const HYDRATE_PAGE_SIZE: i64 = 5_000;
+        const HYDRATE_HARD_CEILING: usize = 10_000_000; // safety net
+
         let Some(pool) = self.db_pool.as_ref() else { return };
-        let Ok(mut conn) = pool.get() else { return };
         let app_ctx = crate::db::AppContext::default_lamad();
-        // Internal call — require_provenance: false so we see ALL local rows,
-        // including ones that haven't been drained yet. The replication state
-        // must reflect reality, not the gated view.
-        let query = crate::db::content_diesel::ContentQuery {
-            limit: 100_000,
-            ..Default::default()
-        };
-        if let Ok(items) = crate::db::content_diesel::list_content(&mut conn, &app_ctx, &query, false) {
-            let count = items.len();
-            if count == 100_000 {
+        let mut ids: std::collections::HashSet<String> = std::collections::HashSet::new();
+        let mut offset: i64 = 0;
+
+        loop {
+            // Re-acquire a fresh connection per page so we don't hold a pool
+            // slot across the entire hydration scan.
+            let Ok(mut conn) = pool.get() else {
                 warn!(
-                    "hydrate_replication_state: hit 100k content limit — replication state may be truncated; consider paginating"
+                    offset,
+                    "hydrate_replication_state: db pool unavailable, stopping early"
                 );
+                break;
+            };
+
+            // Internal call — require_provenance: false so we see ALL local
+            // rows, including ones that haven't been drained yet. The
+            // replication state must reflect reality, not the gated view.
+            let query = crate::db::content_diesel::ContentQuery {
+                limit: HYDRATE_PAGE_SIZE,
+                offset,
+                ..Default::default()
+            };
+
+            let page = match crate::db::content_diesel::list_content(
+                &mut conn, &app_ctx, &query, false,
+            ) {
+                Ok(page) => page,
+                Err(e) => {
+                    warn!(
+                        error = %e,
+                        offset,
+                        "hydrate_replication_state: list_content failed, stopping early"
+                    );
+                    break;
+                }
+            };
+
+            let page_len = page.len();
+            for item in &page {
+                ids.insert(item.content.id.clone());
             }
-            let ids: std::collections::HashSet<String> =
-                items.iter().map(|c| c.content.id.clone()).collect();
-            tracing::info!(count = ids.len(), "Loaded local content IDs for replication state");
-            self.replication_state.set_local_ids(ids).await;
+
+            if ids.len() >= HYDRATE_HARD_CEILING {
+                warn!(
+                    count = ids.len(),
+                    "hydrate_replication_state: hit hard ceiling {}, stopping (should not happen in practice)",
+                    HYDRATE_HARD_CEILING
+                );
+                break;
+            }
+
+            if (page_len as i64) < HYDRATE_PAGE_SIZE {
+                // Last page (partial or empty) — done.
+                break;
+            }
+
+            offset += HYDRATE_PAGE_SIZE;
         }
+
+        tracing::info!(count = ids.len(), "Loaded local content IDs for replication state");
+        self.replication_state.set_local_ids(ids).await;
     }
 
     /// Handle a swarm event
