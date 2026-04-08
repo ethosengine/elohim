@@ -801,7 +801,7 @@ impl P2PNode {
                         // Cap the retry frequency: after 10 ticks (~5 minutes of no peers),
                         // slow down to every 5 minutes by skipping ticks.
                         let should_retry = consecutive_empty_ticks <= 10
-                            || consecutive_empty_ticks % 10 == 0;
+                            || consecutive_empty_ticks.is_multiple_of(10);
                         if should_retry {
                             info!(
                                 attempt = consecutive_empty_ticks,
