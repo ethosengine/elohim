@@ -74,6 +74,8 @@ export async function waitForDrain(
   const deadline = Date.now() + timeoutMs;
   let lastLoggedPending = -1;
   let consecutiveFetchErrors = 0;
+  let lastSeenDrain: DrainStatus | null = null;
+  let sawNonNullDrain = false;
 
   console.log(
     `waitForDrain: polling ${url} every ${pollIntervalMs}ms (timeout ${timeoutMs}ms, expectedMinTotal=${expectedMinTotal})`,
@@ -100,6 +102,8 @@ export async function waitForDrain(
           // Broken node signal — do NOT treat as "done".
           console.log(`waitForDrain: drain=null (peer DB unavailable), waiting...`);
         } else {
+          lastSeenDrain = status.drain;
+          sawNonNullDrain = true;
           const { total, published, pending } = status.drain;
           // Only log when progress changes, to keep pipeline output readable.
           if (pending !== lastLoggedPending) {
@@ -133,5 +137,8 @@ export async function waitForDrain(
     await new Promise(resolve => setTimeout(resolve, pollIntervalMs));
   }
 
-  throw new Error(`waitForDrain: drain did not complete within ${timeoutMs}ms`);
+  const lastState = sawNonNullDrain
+    ? `last seen drain: total=${lastSeenDrain!.total}, published=${lastSeenDrain!.published}, pending=${lastSeenDrain!.pending}`
+    : 'drain was null throughout (peer DB unavailable)';
+  throw new Error(`waitForDrain: drain did not complete within ${timeoutMs}ms — ${lastState}`);
 }

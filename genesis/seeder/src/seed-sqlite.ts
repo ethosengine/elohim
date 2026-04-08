@@ -1112,8 +1112,8 @@ async function main() {
         expectedMinTotal: totalInserted,
       });
     } catch (err) {
-      console.error(`\nError: waitForDrain failed: ${err}`);
-      totalErrors.push(`waitForDrain: ${err}`);
+      console.error(`\n❌ DRAIN FAILED: ${err instanceof Error ? err.message : err}\n`);
+      throw err;
     }
   } else if (DRY_RUN) {
     console.log(`\nSkipping waitForDrain (dry run)`);
