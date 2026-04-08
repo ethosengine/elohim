@@ -110,6 +110,12 @@ def composeGraph(List manifests) {
 
 @NonCPS
 def detectCycles(Map graph) {
+    // If composeGraph already recorded structural errors (duplicate pipelines,
+    // missing dependencies), the graph may reference steps that don't exist.
+    // Running dfs over that would NPE. Skip — walkBuildGraph will surface the
+    // prior errors via error() and the user can fix those first.
+    if (graph._validationErrors && graph._validationErrors.size() > 0) return
+
     def visited = [] as Set
     def inStack = [] as Set
 
@@ -122,11 +128,13 @@ def detectCycles(Map graph) {
 
 @NonCPS
 def dfsDetectCycle(Map graph, String node, Set visited, Set inStack, List path) {
+    def step = graph.steps[node]
+    if (step == null) return  // defense: missing dep already recorded by composeGraph
+
     visited.add(node)
     inStack.add(node)
     path = path + [node]
 
-    def step = graph.steps[node]
     for (def dep : step.depends) {
         if (!visited.contains(dep)) {
             dfsDetectCycle(graph, dep, visited, inStack, path)
