@@ -604,6 +604,7 @@ mod tests {
                 validation_status TEXT NOT NULL DEFAULT 'valid',
                 created_by TEXT,
                 dht_anchor_hash TEXT,
+                p2p_published_at TEXT,
                 created_at TEXT NOT NULL DEFAULT (datetime('now')),
                 updated_at TEXT NOT NULL DEFAULT (datetime('now'))
             )

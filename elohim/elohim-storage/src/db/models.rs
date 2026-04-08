@@ -89,6 +89,9 @@ pub struct Content {
     pub content_body: Option<String>,
     /// Source of truth: DHT (Content entry in lamad DNA). Classification: A (Notarized).
     pub dht_anchor_hash: Option<String>,
+    /// Timestamp when this content was successfully published to the DHT by the seeder drain loop.
+    /// NULL = not yet published. Classification: C (Operational).
+    pub p2p_published_at: Option<String>,
 }
 
 /// Content with tags attached (API response)

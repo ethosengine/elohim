@@ -77,6 +77,7 @@ diesel::table! {
         updated_at -> Text,
         content_body -> Nullable<Text>,
         dht_anchor_hash -> Nullable<Text>,
+        p2p_published_at -> Nullable<Text>,
     }
 }
 
