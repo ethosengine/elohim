@@ -678,6 +678,13 @@ pub fn list_unpublished_content_ids(
 /// dht_anchor_hash or any notarized state. Idempotent — re-publishing an
 /// already-published row just bumps the timestamp.
 ///
+/// Note: the drain query (list_unpublished_content_ids) filters only on
+/// p2p_published_at IS NULL, so this function also runs on content that
+/// has a dht_anchor_hash set (Holochain-notarized content that was never
+/// drained through the libp2p path). That is the intended behaviour —
+/// Kademlia publish and Holochain notarization are independent provenance
+/// markers.
+///
 /// Returns `Ok(true)` if the row was marked, `Ok(false)` if the row was
 /// concurrently deleted (e.g. by a purge between the caller's list query
 /// and this call) — the latter is NOT an error; the DHT publish already

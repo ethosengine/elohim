@@ -951,6 +951,11 @@ impl P2PNode {
                 expires: None,
             };
 
+            // SAFETY: put_record returns synchronously in libp2p 0.54 — it
+            // queues the record in Kademlia's internal state but does not
+            // yield. Holding the swarm write lock across this call is bounded
+            // and safe. If a future libp2p upgrade makes this await, move the
+            // call out of the lock or reacquire per batch.
             let put_result = {
                 let mut swarm = self.swarm.write().await;
                 swarm
@@ -970,7 +975,7 @@ impl P2PNode {
                         Ok(false) => {
                             // Row was concurrently deleted — DHT publish succeeded,
                             // nothing to mark. Not counted as an error.
-                            debug!(id = %content_id, "drain: row gone after publish");
+                            info!(id = %content_id, "drain: row gone after publish");
                         }
                         Err(e) => {
                             warn!(id = %content_id, error = %e, "drain: mark_published failed");
@@ -1014,6 +1019,12 @@ impl P2PNode {
             ..Default::default()
         };
         if let Ok(items) = crate::db::content_diesel::list_content(&mut conn, &app_ctx, &query, false) {
+            let count = items.len();
+            if count == 100_000 {
+                warn!(
+                    "hydrate_replication_state: hit 100k content limit — replication state may be truncated; consider paginating"
+                );
+            }
             let ids: std::collections::HashSet<String> =
                 items.iter().map(|c| c.content.id.clone()).collect();
             tracing::info!(count = ids.len(), "Loaded local content IDs for replication state");
