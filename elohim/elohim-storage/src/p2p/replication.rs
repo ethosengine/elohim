@@ -7,16 +7,21 @@ use serde::Serialize;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use tokio::sync::RwLock;
+use ts_rs::TS;
 
 /// Replication progress exposed via /p2p/status
-#[derive(Debug, Clone, Default, Serialize)]
+#[derive(Debug, Clone, Default, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
 pub struct ReplicationStatus {
     /// Content IDs discovered but not yet fetched
+    #[ts(type = "number")]
     pub pending: usize,
     /// Content IDs successfully replicated
+    #[ts(type = "number")]
     pub completed: usize,
     /// Content IDs that failed fetch (will retry)
+    #[ts(type = "number")]
     pub failed: usize,
     /// True when all discovered content has been fetched or failed with max retries
     pub caught_up: bool,

@@ -47,6 +47,7 @@ use libp2p::{
     tcp, yamux, Multiaddr, PeerId, SwarmBuilder,
 };
 use serde::Serialize;
+use ts_rs::TS;
 use sha2::{Digest, Sha256};
 use std::sync::Arc;
 use std::time::Duration;
@@ -219,8 +220,9 @@ pub struct P2PNode {
 /// Drain queue observability. Exposed via `P2PStatusInfo` so other peers can
 /// judge how busy/overloaded this node is and potentially route around it
 /// — not just for the local seeder's drain-complete check.
-#[derive(Debug, Clone, Serialize, Default)]
+#[derive(Debug, Clone, Serialize, Default, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
 pub struct DrainStatusInfo {
     /// Total rows in the local content projection (scoped to lamad app).
     pub total: i32,
@@ -230,17 +232,28 @@ pub struct DrainStatusInfo {
     pub pending: i32,
 }
 
-/// P2P node status for observability
-#[derive(Debug, Clone, Serialize)]
+/// P2P node status for observability.
+///
+/// NOTE: This struct intentionally does NOT use `rename_all = "camelCase"`
+/// because the wire format on `/p2p/status` has historically been snake_case
+/// and multiple consumers (doorway federation/main/server, elohim-app
+/// connection-indicator, simulate.sh, genesis Jenkinsfile) read snake_case
+/// field names. ts-rs will emit snake_case field names in the generated
+/// TypeScript type, preserving backward compatibility.
+#[derive(Debug, Clone, Serialize, TS)]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
 pub struct P2PStatusInfo {
     pub peer_id: String,
     pub listen_addresses: Vec<String>,
+    #[ts(type = "number")]
     pub connected_peers: usize,
     pub bootstrap_nodes: Vec<String>,
+    #[ts(type = "number")]
     pub sync_documents: usize,
     /// NAT status detected by autonat: "Unknown", "Public", "Private"
     pub nat_status: String,
     /// Number of active relay reservations
+    #[ts(type = "number")]
     pub relay_reservations: usize,
     /// Addresses announced to the network
     pub announce_addresses: Vec<String>,

@@ -629,8 +629,8 @@ importers:
   genesis/seeder:
     dependencies:
       '@elohim/storage-client':
-        specifier: ^0.1.0
-        version: 0.1.0
+        specifier: workspace:*
+        version: link:../../elohim/sdk/storage-client-ts
       '@holochain/client':
         specifier: ^0.20.1
         version: 0.20.2
@@ -1749,10 +1749,6 @@ packages:
     engines: {node: '>=18.12.0'}
     peerDependencies:
       stylelint: '>=16.0.0'
-
-  '@elohim/storage-client@0.1.0':
-    resolution: {integrity: sha512-e73kDLNViFRn+fFqDWF+m2JZIkDOEuDYvH0h3LsNsX6TLW4uKyVCF0Bwc0o1uLBFHzIrTr5eJ+sKivqJyB+lXA==}
-    engines: {node: '>=18.0.0'}
 
   '@emnapi/core@1.8.1':
     resolution: {integrity: sha512-AvT9QFpxK0Zd8J0jopedNm+w/2fIzvtPKPjqyw9jwvBaReTTqPBk9Hixaz7KbjimP+QNz605/XnjFcDAL2pqBg==}
@@ -12752,12 +12748,6 @@ snapshots:
     dependencies:
       postcss: 8.5.6
       stylelint: 17.4.0(typescript@5.7.3)
-
-  '@elohim/storage-client@0.1.0':
-    dependencies:
-      '@automerge/automerge': 3.2.4
-      multiformats: 13.4.2
-      zod: 3.25.76
 
   '@emnapi/core@1.8.1':
     dependencies:

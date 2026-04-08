@@ -26,19 +26,7 @@
  * resulting observable state.
  */
 
-interface DrainStatus {
-  total: number;
-  published: number;
-  pending: number;
-}
-
-interface P2pStatus {
-  // Only the fields the seeder cares about. The full P2PStatusInfo has
-  // more (peerId, listenAddresses, natStatus, relayMode, etc.) but those
-  // are not load-bearing for drain-completion detection.
-  drain: DrainStatus | null;
-  connectedPeers?: number;
-}
+import type { DrainStatusInfo, P2PStatusInfo } from '@elohim/storage-client';
 
 export interface WaitForDrainOptions {
   /** Total wait budget before throwing. Default: 5 minutes. */
@@ -63,7 +51,7 @@ export interface WaitForDrainOptions {
 export async function waitForDrain(
   baseUrl: string,
   options: WaitForDrainOptions = {},
-): Promise<DrainStatus> {
+): Promise<DrainStatusInfo> {
   const timeoutMs = options.timeoutMs ?? 5 * 60_000;
   const pollIntervalMs = options.pollIntervalMs ?? 2_000;
   const expectedMinTotal = options.expectedMinTotal ?? 1;
@@ -74,7 +62,7 @@ export async function waitForDrain(
   const deadline = Date.now() + timeoutMs;
   let lastLoggedPending = -1;
   let consecutiveFetchErrors = 0;
-  let lastSeenDrain: DrainStatus | null = null;
+  let lastSeenDrain: DrainStatusInfo | null = null;
   let sawNonNullDrain = false;
 
   console.log(
@@ -96,7 +84,7 @@ export async function waitForDrain(
         }
       } else {
         consecutiveFetchErrors = 0;
-        const status = (await resp.json()) as P2pStatus;
+        const status = (await resp.json()) as P2PStatusInfo;
 
         if (status.drain === null || status.drain === undefined) {
           // Broken node signal — do NOT treat as "done".
@@ -108,8 +96,8 @@ export async function waitForDrain(
           // Only log when progress changes, to keep pipeline output readable.
           if (pending !== lastLoggedPending) {
             const peersSuffix =
-              status.connectedPeers !== undefined
-                ? ` (connectedPeers=${status.connectedPeers})`
+              status.connected_peers !== undefined
+                ? ` (connectedPeers=${status.connected_peers})`
                 : '';
             console.log(
               `waitForDrain: ${published}/${total} published, ${pending} pending${peersSuffix}`,
