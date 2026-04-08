@@ -171,7 +171,6 @@ export * from "./PremiumGateView";
 export * from "./PreparationStatus";
 export * from "./ProposalOptionView";
 export * from "./ProposalView";
-export * from "./PublishStateView";
 export * from "./RankedVoteView";
 export * from "./ReaCommitmentView";
 export * from "./ReachLevelStorageView";

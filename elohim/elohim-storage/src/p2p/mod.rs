@@ -216,6 +216,29 @@ pub struct P2PNode {
     delivery_peers: Arc<DashMap<String, DeliveryPeer>>,
 }
 
+/// Drain queue observability. Exposed via `P2PStatusInfo` so other peers can
+/// judge how busy/overloaded this node is and potentially route around it
+/// — not just for the local seeder's drain-complete check.
+#[derive(Debug, Clone, Serialize)]
+pub struct DrainStatusInfo {
+    /// Total rows in the local content projection (scoped to lamad app).
+    pub total: i32,
+    /// Rows that have been successfully published to the libp2p Kad DHT.
+    pub published: i32,
+    /// Rows not yet drained. When this is 0 and stable, drain is caught up.
+    pub pending: i32,
+}
+
+impl Default for DrainStatusInfo {
+    fn default() -> Self {
+        Self {
+            total: 0,
+            published: 0,
+            pending: 0,
+        }
+    }
+}
+
 /// P2P node status for observability
 #[derive(Debug, Clone, Serialize)]
 pub struct P2PStatusInfo {
@@ -234,6 +257,10 @@ pub struct P2PStatusInfo {
     pub relay_mode: String,
     /// Replication progress for identity-driven content sync
     pub replication: replication::ReplicationStatus,
+    /// Drain queue state — updated after each drain tick (every 15s) and
+    /// on each regular status refresh (every 30s). Peers consuming this
+    /// status may use `drain.pending` as a load signal.
+    pub drain: DrainStatusInfo,
 }
 
 /// Commands sent from HTTP handlers to the P2P event loop.
@@ -551,6 +578,7 @@ impl P2PNode {
             announce_addresses: config.announce_addresses.clone(),
             relay_mode: config.relay_mode.to_string(),
             replication: replication::ReplicationStatus::default(),
+            drain: DrainStatusInfo::default(),
         };
         let (status_tx, _) = tokio::sync::watch::channel(initial_status);
 
@@ -741,6 +769,10 @@ impl P2PNode {
                 _ = drain_interval.tick() => {
                     drop(swarm);
                     let _ = self.drain_publish_queue(500).await;
+                    // Refresh status after draining so the watch channel reflects
+                    // post-drain counts immediately on the 15s drain cadence, not
+                    // only on the 30s status cadence.
+                    self.refresh_status().await;
                 }
                 _ = verify_interval.tick() => {
                     self.verify_shard_locations(&mut swarm).await;
@@ -2930,6 +2962,39 @@ impl P2PNode {
             .load(std::sync::atomic::Ordering::Relaxed);
         let replication = self.replication_state.status().await;
 
+        // Drain state: operational counts from the content projection. This
+        // is a separate DB query per refresh, but status refreshes are only
+        // every 15-30 seconds so cost is negligible. Fall back to default
+        // (all zeros) on any failure rather than propagating.
+        let drain = if let Some(ref pool) = self.db_pool {
+            match pool.get() {
+                Ok(mut conn) => {
+                    let app_ctx = crate::db::AppContext::default_lamad();
+                    match crate::db::content_diesel::count_publish_state(&mut conn, &app_ctx) {
+                        Ok((total_i64, published_i64)) => {
+                            let total: i32 = total_i64.try_into().unwrap_or(i32::MAX);
+                            let published: i32 = published_i64.try_into().unwrap_or(i32::MAX);
+                            DrainStatusInfo {
+                                total,
+                                published,
+                                pending: total.saturating_sub(published),
+                            }
+                        }
+                        Err(e) => {
+                            debug!(error = %e, "refresh_status: count_publish_state failed");
+                            DrainStatusInfo::default()
+                        }
+                    }
+                }
+                Err(e) => {
+                    debug!(error = %e, "refresh_status: db pool get failed");
+                    DrainStatusInfo::default()
+                }
+            }
+        } else {
+            DrainStatusInfo::default()
+        };
+
         let status = P2PStatusInfo {
             peer_id: self.peer_id().to_string(),
             listen_addresses,
@@ -2941,6 +3006,7 @@ impl P2PNode {
             announce_addresses: self.config.announce_addresses.clone(),
             relay_mode: self.config.relay_mode.to_string(),
             replication,
+            drain,
         };
         let _ = self.status_tx.send(status);
     }

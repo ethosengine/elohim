@@ -706,25 +706,35 @@ pub fn mark_published(
     Ok(rows > 0)
 }
 
-/// Drain debug: count total, published, pending rows scoped by app.
+/// Drain debug: count total, published rows scoped by app.
 /// Reads only the operational projection (content table) — no DHT lookup.
-/// Returns (total, published). Caller computes pending = total - published.
+/// Uses a single SQL query with FILTER (SQLite 3.30+) so the two counts
+/// are atomic against a concurrent drain tick. Returns (total, published);
+/// callers compute `pending = total - published` and clamp to i32 for wire.
 pub fn count_publish_state(
     conn: &mut SqliteConnection,
     ctx: &AppContext,
 ) -> Result<(i64, i64), StorageError> {
-    let total: i64 = content::table
-        .filter(content::h_app_id.eq(&ctx.h_app_id))
-        .count()
-        .get_result(conn)
-        .map_err(|e| StorageError::Internal(format!("count total failed: {}", e)))?;
-    let published: i64 = content::table
-        .filter(content::h_app_id.eq(&ctx.h_app_id))
-        .filter(content::p2p_published_at.is_not_null())
-        .count()
-        .get_result(conn)
-        .map_err(|e| StorageError::Internal(format!("count published failed: {}", e)))?;
-    Ok((total, published))
+    use diesel::sql_types::{BigInt, Text};
+
+    #[derive(diesel::QueryableByName)]
+    struct PublishCounts {
+        #[diesel(sql_type = BigInt)]
+        total: i64,
+        #[diesel(sql_type = BigInt)]
+        published: i64,
+    }
+
+    let row: PublishCounts = diesel::sql_query(
+        "SELECT COUNT(*) AS total, \
+         COUNT(*) FILTER (WHERE p2p_published_at IS NOT NULL) AS published \
+         FROM content WHERE h_app_id = ?",
+    )
+    .bind::<Text, _>(&ctx.h_app_id)
+    .get_result(conn)
+    .map_err(|e| StorageError::Internal(format!("count_publish_state failed: {}", e)))?;
+
+    Ok((row.total, row.published))
 }
 
 #[cfg(test)]
@@ -1251,6 +1261,10 @@ mod tests {
         let mut conn = setup_test_db();
         let ctx = AppContext::new("lamad");
 
+        // Empty table: (0, 0)
+        let (total, published) = count_publish_state(&mut conn, &ctx).unwrap();
+        assert_eq!((total, published), (0, 0));
+
         // Insert 2 rows, mark 1 as published.
         for id in ["row1", "row2"] {
             create_content(
@@ -1277,8 +1291,12 @@ mod tests {
         mark_published(&mut conn, &ctx, "row1").unwrap();
 
         let (total, published) = count_publish_state(&mut conn, &ctx).unwrap();
-        assert_eq!(total, 2);
-        assert_eq!(published, 1);
+        assert_eq!((total, published), (2, 1));
+
+        // All published: (2, 2) — this is the E2 seeder's termination condition.
+        mark_published(&mut conn, &ctx, "row2").unwrap();
+        let (total, published) = count_publish_state(&mut conn, &ctx).unwrap();
+        assert_eq!((total, published), (2, 2));
     }
 
     #[test]
