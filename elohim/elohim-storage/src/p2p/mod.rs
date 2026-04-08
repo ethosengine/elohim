@@ -1662,9 +1662,10 @@ impl P2PNode {
                 // cover pre-drain content.
                 match crate::db::content_diesel::list_content(&mut conn, &app_ctx, &query, false) {
                     Ok(items) => {
-                        let total =
-                            crate::db::content_diesel::count_content(&mut conn, &app_ctx, &query, false)
-                                .unwrap_or(items.len() as i64) as u64;
+                        let total = crate::db::content_diesel::count_content(
+                            &mut conn, &app_ctx, &query, false,
+                        )
+                        .unwrap_or(items.len() as i64) as u64;
                         let inventory: Vec<shard_protocol::ContentInventoryItem> = items
                             .iter()
                             .map(|cwt| shard_protocol::ContentInventoryItem {
@@ -1702,7 +1703,9 @@ impl P2PNode {
                     Err(e) => return ShardResponse::Error(format!("DB connection failed: {}", e)),
                 };
                 let app_ctx = crate::db::AppContext::default_lamad();
-                match crate::db::content_diesel::get_content_with_tags(&mut conn, &app_ctx, &id, false) {
+                match crate::db::content_diesel::get_content_with_tags(
+                    &mut conn, &app_ctx, &id, false,
+                ) {
                     Ok(Some(cwt)) => {
                         debug!(id = %id, "Serving content record to peer");
                         ShardResponse::Content(Box::new(shard_protocol::ContentRecord {

@@ -555,7 +555,9 @@ pub fn delete_content(
     Ok(deleted > 0)
 }
 
-/// Get content by tag - scoped by app
+/// Internal-only: lists content rows tagged with `tag`. The `require_provenance`
+/// parameter must be passed by the caller; pass `false` for internal callers
+/// (this function has no external HTTP route as of 2026-04-08).
 pub fn get_content_by_tag(
     conn: &mut SqliteConnection,
     ctx: &AppContext,
@@ -885,7 +887,11 @@ mod tests {
             false,
         )
         .unwrap();
-        assert_eq!(unrestricted.len(), 2, "unrestricted list should return all rows");
+        assert_eq!(
+            unrestricted.len(),
+            2,
+            "unrestricted list should return all rows"
+        );
 
         // Gated query — returns ONLY the published row.
         let gated = list_content(
@@ -899,7 +905,11 @@ mod tests {
             true,
         )
         .unwrap();
-        assert_eq!(gated.len(), 1, "gated list should filter out unpublished rows");
+        assert_eq!(
+            gated.len(),
+            1,
+            "gated list should filter out unpublished rows"
+        );
         assert_eq!(gated[0].content.id, "cid-published");
     }
 
@@ -936,22 +946,10 @@ mod tests {
         .execute(&mut conn)
         .unwrap();
 
-        let unrestricted = count_content(
-            &mut conn,
-            &ctx,
-            &ContentQuery::default(),
-            false,
-        )
-        .unwrap();
+        let unrestricted = count_content(&mut conn, &ctx, &ContentQuery::default(), false).unwrap();
         assert_eq!(unrestricted, 2, "unrestricted count should see both rows");
 
-        let gated = count_content(
-            &mut conn,
-            &ctx,
-            &ContentQuery::default(),
-            true,
-        )
-        .unwrap();
+        let gated = count_content(&mut conn, &ctx, &ContentQuery::default(), true).unwrap();
         assert_eq!(gated, 1, "gated count should filter out unpublished rows");
     }
 

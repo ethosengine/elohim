@@ -2131,34 +2131,35 @@ impl HttpServer {
                 // External read: bypass ContentService::list and call the gated
                 // diesel helper directly with require_provenance=true so
                 // unpublished rows never leak to external clients.
-                let pool = self.db_pool.as_ref().ok_or_else(|| {
-                    StorageError::Internal("Database pool not available".into())
-                })?;
+                let pool = self
+                    .db_pool
+                    .as_ref()
+                    .ok_or_else(|| StorageError::Internal("Database pool not available".into()))?;
                 let mut conn = pool.get().map_err(|e| {
                     StorageError::Internal(format!("Failed to get connection: {}", e))
                 })?;
                 let app_ctx = db::AppContext::default_lamad();
                 match db::content_diesel::list_content(&mut conn, &app_ctx, &query, true) {
-                Ok(items) => {
-                    // Reach-based filtering: unauthenticated requests only see commons/public
-                    let has_auth = req.headers().get(header::AUTHORIZATION).is_some()
-                        || req.headers().get("X-Agent-Id").is_some();
-                    let views: Vec<ContentView> = items
-                        .into_iter()
-                        .map(Into::into)
-                        .filter(|v: &ContentView| {
-                            has_auth || v.reach == "commons" || v.reach == "public"
-                        })
-                        .collect();
-                    let body = serde_json::json!({
-                        "items": views,
-                        "count": views.len(),
-                        "limit": query.limit,
-                        "offset": query.offset,
-                    });
-                    Ok(response::ok(&body))
-                }
-                Err(e) => Ok(response::error_response(e)),
+                    Ok(items) => {
+                        // Reach-based filtering: unauthenticated requests only see commons/public
+                        let has_auth = req.headers().get(header::AUTHORIZATION).is_some()
+                            || req.headers().get("X-Agent-Id").is_some();
+                        let views: Vec<ContentView> = items
+                            .into_iter()
+                            .map(Into::into)
+                            .filter(|v: &ContentView| {
+                                has_auth || v.reach == "commons" || v.reach == "public"
+                            })
+                            .collect();
+                        let body = serde_json::json!({
+                            "items": views,
+                            "count": views.len(),
+                            "limit": query.limit,
+                            "offset": query.offset,
+                        });
+                        Ok(response::ok(&body))
+                    }
+                    Err(e) => Ok(response::error_response(e)),
                 }
             }
             Method::POST => {
@@ -2633,13 +2634,10 @@ impl HttpServer {
                 })?;
                 let app_ctx = db::AppContext::default_lamad();
                 let result = db::content_diesel::get_content_with_tags(
-                    &mut conn,
-                    &app_ctx,
-                    content_id,
+                    &mut conn, &app_ctx, content_id,
                     true, // require_provenance: external HTTP boundary
                 )
                 .map(|opt| opt.map(ContentView::from));
-                drop(conn);
 
                 // Layer 1: Reach-based access control
                 // commons/public serve without auth, restricted content requires authentication
