@@ -654,17 +654,20 @@ pub fn tag_count(conn: &mut SqliteConnection, ctx: &AppContext) -> Result<i64, S
 /// Drain-loop query: return IDs of content rows that have not yet been
 /// published to the libp2p Kad DHT. Scoped by app context. Internal use
 /// only — does not apply the provenance gate (the drain loop IS the thing
-/// that produces provenance).
+/// that produces provenance). A non-positive limit returns an empty vec.
 pub fn list_unpublished_content_ids(
     conn: &mut SqliteConnection,
     ctx: &AppContext,
     limit: i64,
 ) -> Result<Vec<String>, StorageError> {
+    if limit <= 0 {
+        return Ok(Vec::new());
+    }
     content::table
         .filter(content::h_app_id.eq(&ctx.h_app_id))
         .filter(content::p2p_published_at.is_null())
         .select(content::id)
-        .order(content::created_at.asc())
+        .order((content::created_at.asc(), content::id.asc()))
         .limit(limit)
         .load::<String>(conn)
         .map_err(|e| StorageError::Internal(format!("list_unpublished_content_ids failed: {}", e)))
@@ -674,20 +677,26 @@ pub fn list_unpublished_content_ids(
 /// Operates on the operational projection column only — does not touch
 /// dht_anchor_hash or any notarized state. Idempotent — re-publishing an
 /// already-published row just bumps the timestamp.
+///
+/// Returns `Ok(true)` if the row was marked, `Ok(false)` if the row was
+/// concurrently deleted (e.g. by a purge between the caller's list query
+/// and this call) — the latter is NOT an error; the DHT publish already
+/// succeeded and there is nothing to mark.
 pub fn mark_published(
     conn: &mut SqliteConnection,
     ctx: &AppContext,
     content_id: &str,
-) -> Result<usize, StorageError> {
-    let now = chrono::Utc::now().to_rfc3339();
-    diesel::update(
+) -> Result<bool, StorageError> {
+    let now = chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
+    let rows = diesel::update(
         content::table
             .filter(content::h_app_id.eq(&ctx.h_app_id))
             .filter(content::id.eq(content_id)),
     )
     .set(content::p2p_published_at.eq(now))
     .execute(conn)
-    .map_err(|e| StorageError::Internal(format!("mark_published failed: {}", e)))
+    .map_err(|e| StorageError::Internal(format!("mark_published failed: {}", e)))?;
+    Ok(rows > 0)
 }
 
 #[cfg(test)]
@@ -1186,10 +1195,27 @@ mod tests {
         let pending_before = list_unpublished_content_ids(&mut conn, &ctx, 10).unwrap();
         assert_eq!(pending_before.len(), 1);
 
-        mark_published(&mut conn, &ctx, "x").unwrap();
+        let marked = mark_published(&mut conn, &ctx, "x").unwrap();
+        assert!(marked, "mark_published should return true for an existing row");
 
         let pending_after = list_unpublished_content_ids(&mut conn, &ctx, 10).unwrap();
         assert!(pending_after.is_empty());
+
+        // Verify the timestamp column was actually written with the canonical RFC 3339 Zulu format.
+        let ts_opt: Option<String> = content::table
+            .filter(content::h_app_id.eq(&ctx.h_app_id))
+            .filter(content::id.eq("x"))
+            .select(content::p2p_published_at)
+            .first(&mut conn)
+            .unwrap();
+        let ts = ts_opt.expect("p2p_published_at should be set");
+        assert!(ts.ends_with('Z'), "expected Zulu-suffixed RFC 3339, got: {}", ts);
+        chrono::DateTime::parse_from_rfc3339(&ts)
+            .expect("p2p_published_at should parse as RFC 3339");
+
+        // Also verify mark_published on a non-existent row returns false (not an error).
+        let missing = mark_published(&mut conn, &ctx, "nonexistent").unwrap();
+        assert!(!missing, "mark_published should return false for a missing row");
     }
 
     #[test]
