@@ -643,15 +643,23 @@ async fn async_main(
         info!("Shutting down...");
     };
 
+    // Start the P2P node immediately before entering the event loop.
+    // This shrinks the window between queuing bootstrap dials and polling
+    // the swarm to near-zero. Decoupled from the shutdown-channel guard
+    // below so that a missing shutdown channel cannot silently skip start().
+    #[cfg(feature = "p2p")]
+    if let Some(ref node) = p2p_node {
+        if let Err(e) = node.start().await {
+            error!(error = %e, "Failed to start P2P node");
+            return Err(e.into());
+        }
+        info!("P2P node started — dials queued, event loop about to poll");
+    }
+
     // Run HTTP server (and optionally P2P) with graceful shutdown
     #[cfg(feature = "p2p")]
     {
         if let (Some(node), Some(shutdown_rx)) = (p2p_node.as_ref(), p2p_shutdown_rx) {
-            if let Err(e) = node.start().await {
-                error!(error = %e, "Failed to start P2P node");
-                return Err(e.into());
-            }
-            info!("P2P node started — dials queued, event loop about to poll");
             tokio::select! {
                 result = http_server.run() => {
                     if let Err(e) = result {
