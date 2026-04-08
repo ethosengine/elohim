@@ -233,3 +233,11 @@ app-dev:
 # Production build of elohim-app
 app-build:
     cd {{app_dir}} && pnpm exec ng build
+
+# ─────────────────────────────────────────────────────────────────────
+# CI Preview
+# ─────────────────────────────────────────────────────────────────────
+
+# Preview what the orchestrator will decide for current changes
+ci-preview base="origin/dev":
+    @node {{genesis_dir}}/orchestrator/preview.mjs {{base}}
