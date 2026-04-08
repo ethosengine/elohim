@@ -1234,7 +1234,10 @@ mod tests {
         assert_eq!(pending_before.len(), 1);
 
         let marked = mark_published(&mut conn, &ctx, "x").unwrap();
-        assert!(marked, "mark_published should return true for an existing row");
+        assert!(
+            marked,
+            "mark_published should return true for an existing row"
+        );
 
         let pending_after = list_unpublished_content_ids(&mut conn, &ctx, 10).unwrap();
         assert!(pending_after.is_empty());
@@ -1247,13 +1250,20 @@ mod tests {
             .first(&mut conn)
             .unwrap();
         let ts = ts_opt.expect("p2p_published_at should be set");
-        assert!(ts.ends_with('Z'), "expected Zulu-suffixed RFC 3339, got: {}", ts);
+        assert!(
+            ts.ends_with('Z'),
+            "expected Zulu-suffixed RFC 3339, got: {}",
+            ts
+        );
         chrono::DateTime::parse_from_rfc3339(&ts)
             .expect("p2p_published_at should parse as RFC 3339");
 
         // Also verify mark_published on a non-existent row returns false (not an error).
         let missing = mark_published(&mut conn, &ctx, "nonexistent").unwrap();
-        assert!(!missing, "mark_published should return false for a missing row");
+        assert!(
+            !missing,
+            "mark_published should return false for a missing row"
+        );
     }
 
     #[test]

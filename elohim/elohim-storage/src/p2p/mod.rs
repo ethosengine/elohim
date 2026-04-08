@@ -47,12 +47,12 @@ use libp2p::{
     tcp, yamux, Multiaddr, PeerId, SwarmBuilder,
 };
 use serde::Serialize;
-use ts_rs::TS;
 use sha2::{Digest, Sha256};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::{broadcast, mpsc, oneshot, RwLock};
 use tracing::{debug, error, info, warn};
+use ts_rs::TS;
 
 use crate::db::DbPool;
 
@@ -1105,7 +1105,9 @@ impl P2PNode {
         const HYDRATE_PAGE_SIZE: i64 = 5_000;
         const HYDRATE_HARD_CEILING: usize = 10_000_000; // safety net
 
-        let Some(pool) = self.db_pool.as_ref() else { return };
+        let Some(pool) = self.db_pool.as_ref() else {
+            return;
+        };
         let app_ctx = crate::db::AppContext::default_lamad();
         let mut ids: std::collections::HashSet<String> = std::collections::HashSet::new();
         let mut offset: i64 = 0;
@@ -1130,19 +1132,18 @@ impl P2PNode {
                 ..Default::default()
             };
 
-            let page = match crate::db::content_diesel::list_content(
-                &mut conn, &app_ctx, &query, false,
-            ) {
-                Ok(page) => page,
-                Err(e) => {
-                    warn!(
-                        error = %e,
-                        offset,
-                        "hydrate_replication_state: list_content failed, stopping early"
-                    );
-                    break;
-                }
-            };
+            let page =
+                match crate::db::content_diesel::list_content(&mut conn, &app_ctx, &query, false) {
+                    Ok(page) => page,
+                    Err(e) => {
+                        warn!(
+                            error = %e,
+                            offset,
+                            "hydrate_replication_state: list_content failed, stopping early"
+                        );
+                        break;
+                    }
+                };
 
             let page_len = page.len();
             for item in &page {
@@ -1166,7 +1167,10 @@ impl P2PNode {
             offset += HYDRATE_PAGE_SIZE;
         }
 
-        tracing::info!(count = ids.len(), "Loaded local content IDs for replication state");
+        tracing::info!(
+            count = ids.len(),
+            "Loaded local content IDs for replication state"
+        );
         self.replication_state.set_local_ids(ids).await;
     }
 
