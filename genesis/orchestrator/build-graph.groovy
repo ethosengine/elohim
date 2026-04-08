@@ -623,12 +623,12 @@ def parseJson(String content) {
 @NonCPS
 def deepCopy(obj) {
     if (obj instanceof Map) {
-        def m = new HashMap()
+        def m = [:]
         obj.each { k, v -> m[k] = deepCopy(v) }
         return m
     }
     if (obj instanceof List) {
-        def l = new ArrayList()
+        def l = []
         obj.each { l.add(deepCopy(it)) }
         return l
     }
