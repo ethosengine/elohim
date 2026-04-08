@@ -591,6 +591,9 @@ def runBuildGraphShadow(List changedFiles, Map pipelinesAnalysis) {
         def buildGraph = load('genesis/orchestrator/build-graph.groovy')
         def result = buildGraph.walkBuildGraph(changedFiles)
 
+        // Per-file routing matrix (always-on visibility for unrouted files)
+        echo buildGraph.formatPerFileMatrix(result.graph, result.staleMap, changedFiles)
+
         // Print comparison matrix
         echo buildGraph.formatComparisonMatrix(pipelinesAnalysis, result.staleMap, result.graph)
 

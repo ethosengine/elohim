@@ -389,6 +389,97 @@ def formatDecisionMatrix(Map graph, Map staleMap) {
 }
 
 @NonCPS
+def formatPerFileMatrix(Map graph, Map staleMap, List changedFiles) {
+    def lines = []
+    lines.add('╔══════════════════════════════════════════════════════════════════════════╗')
+    lines.add('║                       PER-FILE ROUTING MATRIX                            ║')
+    lines.add('╠══════════════════════════════════════════════════════════════════════════╣')
+
+    if (changedFiles == null || changedFiles.isEmpty()) {
+        lines.add('║ (no changed files)                                                       ║')
+        lines.add('╚══════════════════════════════════════════════════════════════════════════╝')
+        return lines.join('\n')
+    }
+
+    // Build file -> [matched step qualified names] map by inspecting staleMap reasons.
+    // Reason formats produced by checkSourceChanges / checkBuildProcessChanges:
+    //   "source: <file> matches <pattern>"
+    //   "buildProcess: cannot read <file>"
+    //   "buildProcess: function <fn> not found in <file>"
+    //   "buildProcess: <file> hash changed"           (label = file)
+    //   "buildProcess: <file>@<fn> hash changed"      (label = file@func)
+    //   "depends: <stepName>"                         (propagated, no file)
+    def fileRouting = [:]
+    for (def file : changedFiles) {
+        fileRouting[file] = []
+    }
+
+    graph.steps.each { qualifiedName, step ->
+        def info = staleMap[qualifiedName]
+        if (!info?.stale) return
+        def reason = info.reason ?: ''
+        String matchedFile = null
+
+        def srcMatcher = (reason =~ /^source: (\S+) matches /)
+        if (srcMatcher.find()) {
+            matchedFile = srcMatcher.group(1)
+        } else {
+            def bpReadMatcher = (reason =~ /^buildProcess: cannot read (\S+)$/)
+            if (bpReadMatcher.find()) {
+                matchedFile = bpReadMatcher.group(1)
+            } else {
+                def bpFnMatcher = (reason =~ /^buildProcess: function \S+ not found in (\S+)$/)
+                if (bpFnMatcher.find()) {
+                    matchedFile = bpFnMatcher.group(1)
+                } else {
+                    def bpHashMatcher = (reason =~ /^buildProcess: (\S+) hash changed$/)
+                    if (bpHashMatcher.find()) {
+                        // Strip optional @function suffix to get the file path
+                        matchedFile = bpHashMatcher.group(1).split('@')[0]
+                    }
+                }
+            }
+        }
+
+        if (matchedFile != null && fileRouting.containsKey(matchedFile)) {
+            fileRouting[matchedFile].add(qualifiedName)
+        }
+    }
+
+    def routedCount = 0
+    def skippedCount = 0
+    for (def entry : fileRouting.entrySet()) {
+        def file = entry.key
+        def steps = entry.value
+        def displayFile = file.length() > 45 ? '...' + file.substring(file.length() - 42) : file
+        def status
+        if (steps.isEmpty()) {
+            status = 'SKIP — no manifest source matched'
+            skippedCount++
+        } else {
+            def shown = steps.take(2).join(', ')
+            def extra = steps.size() > 2 ? ' +' + (steps.size() - 2) : ''
+            status = "→ ${shown}${extra}"
+            routedCount++
+        }
+        def line = "║ ${displayFile.padRight(45)} ${status}"
+        if (line.length() > 75) line = line.substring(0, 72) + '...'
+        lines.add(line.padRight(76) + '║')
+    }
+
+    lines.add('╠══════════════════════════════════════════════════════════════════════════╣')
+    def summary = "║ ${routedCount} routed, ${skippedCount} unrouted of ${changedFiles.size()} total"
+    lines.add(summary.padRight(76) + '║')
+    lines.add('╚══════════════════════════════════════════════════════════════════════════╝')
+
+    if (skippedCount > 0) {
+        lines.add("ℹ️  ${skippedCount} file(s) matched no manifest. If this is unexpected, check build-manifest.json source globs.")
+    }
+
+    return lines.join('\n')
+}
+
+@NonCPS
 def formatComparisonMatrix(Map pipelinesAnalysis, Map graphStaleMap, Map graph) {
     def lines = []
     lines.add('╔══════════════════════════════════════════════════════════════════════════╗')
