@@ -351,9 +351,6 @@ async fn async_main(
             }
         }
 
-        // Start listening
-        p2p_node.start().await?;
-
         info!("P2P networking enabled");
         info!("  Peer ID: {}", p2p_node.peer_id());
         info!("  Relay mode: {}", relay_mode);
@@ -650,6 +647,11 @@ async fn async_main(
     #[cfg(feature = "p2p")]
     {
         if let (Some(node), Some(shutdown_rx)) = (p2p_node.as_ref(), p2p_shutdown_rx) {
+            if let Err(e) = node.start().await {
+                error!(error = %e, "Failed to start P2P node");
+                return Err(e.into());
+            }
+            info!("P2P node started — dials queued, event loop about to poll");
             tokio::select! {
                 result = http_server.run() => {
                     if let Err(e) = result {
