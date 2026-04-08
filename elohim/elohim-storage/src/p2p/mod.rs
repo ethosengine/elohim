@@ -516,6 +516,17 @@ fn reach_level_index(reach: &str) -> u8 {
     }
 }
 
+/// How often the drain loop scans the content table for unpublished rows.
+/// Referenced in http.rs comments on POST /db/content so the latency
+/// contract stays refactor-safe. First tick is delayed by
+/// DRAIN_INTERVAL_STARTUP_DELAY_SECS to give bootstrap time to connect.
+pub const DRAIN_INTERVAL_SECS: u64 = 15;
+
+/// Delay of the first drain tick after `run()` enters the event loop.
+/// Shorter than the regular interval so a cold-bootstrapped seeder gets
+/// its first drain attempt quickly once peers connect.
+pub const DRAIN_INTERVAL_STARTUP_DELAY_SECS: u64 = 5;
+
 impl P2PNode {
     /// Create a new P2P node
     pub async fn new(
@@ -735,11 +746,12 @@ impl P2PNode {
             Duration::from_secs(30),
         );
         bootstrap_retry_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
-        // Drain unpublished EPR Heads to Kademlia. Delay first tick by 5s to give
-        // start() a moment to queue dials before the first drain fires.
+        // Drain unpublished EPR Heads to Kademlia. Delay first tick by
+        // DRAIN_INTERVAL_STARTUP_DELAY_SECS to give start() a moment to queue
+        // dials before the first drain fires.
         let mut drain_interval = tokio::time::interval_at(
-            tokio::time::Instant::now() + Duration::from_secs(5),
-            Duration::from_secs(15),
+            tokio::time::Instant::now() + Duration::from_secs(DRAIN_INTERVAL_STARTUP_DELAY_SECS),
+            Duration::from_secs(DRAIN_INTERVAL_SECS),
         );
         drain_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
         // Track consecutive retry attempts for exponential backoff cap.
@@ -831,6 +843,11 @@ impl P2PNode {
     /// Handle a command from P2PHandle (HTTP handlers)
     async fn handle_command(&self, swarm: &mut Swarm<ElohimStorageBehaviour>, cmd: P2PCommand) {
         match cmd {
+            // PublishEprHead is currently unreachable — the drain loop in
+            // drain_publish_queue is the sole publisher of EPR Heads and calls
+            // put_record directly on the swarm. This arm is retained as part of
+            // the P2PHandle abstraction for potential future imperative publish
+            // use; see #[allow(dead_code)] on the variant declaration.
             P2PCommand::PublishEprHead { id, head_bytes } => {
                 let key = RecordKey::new(&format!("epr:{}", id));
                 let record = Record {
@@ -2971,6 +2988,12 @@ impl P2PNode {
         // every 15-30 seconds so cost is negligible. On failure we return
         // None so consumers can distinguish "data unavailable" from a real
         // "caught up" reading (pending == 0).
+        //
+        // TODO(multi-app): scope is hardcoded to lamad. When elohim-storage
+        // hosts a second app (e.g. mishpat content), either (a) aggregate
+        // across all app contexts, or (b) add an `?appId=` override on
+        // /p2p/status, or (c) return a per-app map. The current behaviour
+        // is correct for the lamad-only deployments we have today.
         let drain = if let Some(ref pool) = self.db_pool {
             match pool.get() {
                 Ok(mut conn) => {

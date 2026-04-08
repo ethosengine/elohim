@@ -2191,7 +2191,7 @@ impl HttpServer {
 
                 // EPR Head publishing is handled by the drain loop (p2p/mod.rs::drain_publish_queue),
                 // which is the sole writer of p2p_published_at. New content becomes visible to
-                // external reads within ~drain_interval (default 15s).
+                // external reads within ~p2p::DRAIN_INTERVAL_SECS seconds of the POST returning.
 
                 // Capture distribution data before manifest recording consumes manifest_data
                 #[cfg(feature = "p2p")]
@@ -2350,7 +2350,7 @@ impl HttpServer {
                 // EPR Head publishing is handled by the drain loop
                 // (p2p/mod.rs::drain_publish_queue), which is the sole writer of
                 // p2p_published_at. New content becomes visible to external reads
-                // within ~drain_interval (default 15s).
+                // within ~p2p::DRAIN_INTERVAL_SECS seconds of the POST returning.
 
                 // Capture distribution data before manifest_inputs is consumed
                 #[cfg(feature = "p2p")]
