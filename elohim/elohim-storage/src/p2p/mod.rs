@@ -686,7 +686,13 @@ impl P2PNode {
         verify_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
         let mut replication_interval = tokio::time::interval(Duration::from_secs(60));
         replication_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
-        let mut bootstrap_retry_interval = tokio::time::interval(Duration::from_secs(30));
+        // Delay first tick by the full retry interval so it doesn't race with the
+        // initial dials queued by start(). start() owns t=0 dialing; this loop owns
+        // subsequent attempts.
+        let mut bootstrap_retry_interval = tokio::time::interval_at(
+            tokio::time::Instant::now() + Duration::from_secs(30),
+            Duration::from_secs(30),
+        );
         bootstrap_retry_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
         // Track consecutive retry attempts for exponential backoff cap.
         let mut consecutive_empty_ticks: u32 = 0;
@@ -753,14 +759,20 @@ impl P2PNode {
                         if should_retry {
                             info!(
                                 attempt = consecutive_empty_ticks,
+                                bootstrap_count = self.config.bootstrap_nodes.len(),
                                 "Bootstrap retry: no connected peers, re-dialing bootstrap nodes"
                             );
                             for addr_str in &self.config.bootstrap_nodes {
-                                if let Ok(addr) = addr_str.parse::<Multiaddr>() {
-                                    match swarm.dial(addr.clone()) {
+                                match addr_str.parse::<Multiaddr>() {
+                                    Ok(addr) => match swarm.dial(addr.clone()) {
                                         Ok(_) => debug!(addr = %addr, "Re-dialed bootstrap"),
                                         Err(e) => debug!(addr = %addr, error = %e, "Re-dial failed"),
-                                    }
+                                    },
+                                    Err(e) => warn!(
+                                        addr = %addr_str,
+                                        error = %e,
+                                        "Bootstrap retry: invalid multiaddr in config, skipping"
+                                    ),
                                 }
                             }
                         }
