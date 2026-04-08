@@ -612,10 +612,27 @@ def parseJson(String content) {
 /**
  * Deep-convert LazyMap/LazyList from JsonSlurper into regular HashMap/ArrayList.
  * LazyMap is not CPS-serializable and breaks when crossing @NonCPS → pipeline boundary.
+ *
+ * The previous implementation round-tripped through JSON, but
+ * `new JsonSlurper().parseText(...)` ALSO returns LazyMap — so the round-trip
+ * was a no-op and the resulting graph state still threw NotSerializableException
+ * the moment it crossed back into CPS. The bug was masked for months by the
+ * try/catch in runBuildGraphShadow swallowing the exception. Sprint 1 removed
+ * that try/catch; this is the fix.
  */
 @NonCPS
 def deepCopy(obj) {
-    return new JsonSlurper().parseText(JsonOutput.toJson(obj))
+    if (obj instanceof Map) {
+        def m = new HashMap()
+        obj.each { k, v -> m[k] = deepCopy(v) }
+        return m
+    }
+    if (obj instanceof List) {
+        def l = new ArrayList()
+        obj.each { l.add(deepCopy(it)) }
+        return l
+    }
+    return obj
 }
 
 def saveBuildState(Map graph, Map staleMap, Map buildProcessHashes, String commitHash, Map previousState) {
