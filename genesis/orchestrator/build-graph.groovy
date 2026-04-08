@@ -479,6 +479,39 @@ def formatPerFileMatrix(Map graph, Map staleMap, List changedFiles) {
     return lines.join('\n')
 }
 
+// =============================================================================
+// KNOWN DIVERGENCES — Sprint 1 transitional allowlist
+// =============================================================================
+// Each entry is an asymmetric divergence between the legacy PIPELINES map
+// and the manifest-driven build graph. Sprint 2 closes these gaps and
+// empties the list. Any divergence NOT in this list is a hard failure — it
+// represents unexpected drift between the two source-of-truths.
+//
+// To remove an entry: reconcile the asymmetry (create a missing manifest
+// OR add a missing PIPELINES entry OR migrate off the legacy algorithm),
+// verify the comparison matrix shows ZERO divergences for that pipeline
+// across several real builds, then drop the entry from this list.
+@NonCPS
+def getKnownDivergences() {
+    return [
+        // Legacy-only: pipeline exists in PIPELINES, no build-manifest.json yet.
+        // Resolution (Sprint 2): add a build-manifest.json covering the sophia
+        // submodule's source pattern (sophia/ gitlink + sophia.Jenkinsfile shim).
+        'elohim-sophia',
+
+        // Graph-only: manifest exists, no PIPELINES entry. The orchestrator
+        // doesn't currently route changes to these pipelines via the legacy
+        // path. Resolution (Sprint 2): either add legacy PIPELINES entries so
+        // both algorithms agree, OR migrate the orchestrator fully off the
+        // legacy algorithm so manifests become authoritative.
+        'elohim-compute',           // elohim/elohim-compute/build-manifest.json
+        'elohim-doorway-app',       // doorway/doorway-app/build-manifest.json
+        'elohim-orchestrator',      // genesis/orchestrator/build-manifest.json
+                                    // (covers the orchestrator's own self-edits;
+                                    // legacy treats those as CI-only via ciOnlyFiles)
+    ]
+}
+
 @NonCPS
 def formatComparisonMatrix(Map pipelinesAnalysis, Map graphStaleMap, Map graph) {
     def lines = []
@@ -502,13 +535,20 @@ def formatComparisonMatrix(Map pipelinesAnalysis, Map graphStaleMap, Map graph) 
     }
 
     def divergences = 0
+    def unexpectedDivergences = []
+    def known = getKnownDivergences()
     def allPipelines = (pipelinesAnalysis.keySet() + graphPipelines.keySet()).sort().unique()
 
     for (def pipeline : allPipelines) {
         def pResult = pipelinesAnalysis[pipeline]?.shouldRun ?: false
         def gResult = graphPipelines[pipeline]?.shouldBuild ?: false
         def match = (pResult == gResult)
-        if (!match) divergences++
+        if (!match) {
+            divergences++
+            if (!known.contains(pipeline)) {
+                unexpectedDivergences.add(pipeline)
+            }
+        }
 
         def pStatus = pResult ? 'BUILD' : 'SKIP '
         def gStatus = gResult ? 'BUILD' : 'SKIP '
@@ -535,7 +575,10 @@ def formatComparisonMatrix(Map pipelinesAnalysis, Map graphStaleMap, Map graph) 
         lines.add("✓ PIPELINES and Build Graph agree on all pipelines")
     }
 
-    return lines.join('\n')
+    return [
+        text: lines.join('\n'),
+        unexpectedDivergences: unexpectedDivergences
+    ]
 }
 
 // ============================================================

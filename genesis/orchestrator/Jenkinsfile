@@ -587,22 +587,44 @@ def runBddCoverageGap() {
  * Compares results and logs divergences without affecting build decisions.
  */
 def runBuildGraphShadow(List changedFiles, Map pipelinesAnalysis) {
-    try {
-        def buildGraph = load('genesis/orchestrator/build-graph.groovy')
-        def result = buildGraph.walkBuildGraph(changedFiles)
+    def buildGraph = load('genesis/orchestrator/build-graph.groovy')
+    def result = buildGraph.walkBuildGraph(changedFiles)
 
-        // Per-file routing matrix (always-on visibility for unrouted files)
-        echo buildGraph.formatPerFileMatrix(result.graph, result.staleMap, changedFiles)
+    // Per-file routing matrix (always-on visibility, from Task 4)
+    echo buildGraph.formatPerFileMatrix(result.graph, result.staleMap, changedFiles)
 
-        // Print comparison matrix
-        echo buildGraph.formatComparisonMatrix(pipelinesAnalysis, result.staleMap, result.graph)
+    // Comparison matrix; capture struct for divergence handling
+    def comparison = buildGraph.formatComparisonMatrix(pipelinesAnalysis, result.staleMap, result.graph)
+    echo comparison.text
 
-        // Save build state for next run (even in shadow mode, to build up hash baseline)
-        def commitHash = getGitCommitHash()
-        buildGraph.saveBuildState(result.graph, result.staleMap, result.buildProcessHashes, commitHash, result.previousState)
+    // Save build state for next run
+    def commitHash = getGitCommitHash()
+    buildGraph.saveBuildState(result.graph, result.staleMap, result.buildProcessHashes, commitHash, result.previousState)
 
-    } catch (Exception e) {
-        echo "⚠️ Build Graph shadow mode failed (non-blocking): ${e}"
+    // Sprint 1 hard escalation: fail on unexpected divergences
+    if (comparison.unexpectedDivergences && comparison.unexpectedDivergences.size() > 0) {
+        error """
+═══════════════════════════════════════════════════════════════════════════════
+  ❌ ORCHESTRATOR / BUILD-GRAPH DIVERGENCE
+═══════════════════════════════════════════════════════════════════════════════
+  The legacy PIPELINES algorithm and the manifest-driven build graph
+  disagree on these pipelines:
+
+      ${comparison.unexpectedDivergences.join(', ')}
+
+  This means a build-manifest.json is missing or has incomplete coverage
+  of patterns in PIPELINES. To fix:
+
+    1. Add or extend the relevant build-manifest.json so its source globs
+       match the changed files (preferred — this advances Sprint 2 work)
+    2. Add the pipeline to getKnownDivergences() in build-graph.groovy
+       (transitional — only if Sprint 2 hasn't closed the gap yet)
+    3. Fix the legacy PIPELINES entry if it was the wrong one all along
+
+  See: /projects/.claude-config/plans/2026-04-07-ci-observability-sprint1.md
+       and the design doc at .claude-config/plans/lazy-foraging-muffin.md
+═══════════════════════════════════════════════════════════════════════════════
+"""
     }
 }
 
