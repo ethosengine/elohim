@@ -11,7 +11,8 @@
 
 import groovy.json.JsonSlurper
 import groovy.json.JsonOutput
-import java.security.MessageDigest
+// (java.security.MessageDigest is sandbox-rejected by Jenkins script-security;
+// sha256() shells out to `sha256sum` via writeFile + sh instead.)
 
 // ============================================================
 // DISCOVERY & PARSING
@@ -225,11 +226,23 @@ def extractFunctionBody(String fileContent, String functionName) {
     return fileContent.substring(start, pos - 1).trim()
 }
 
-@NonCPS
+// NOT @NonCPS — uses writeFile + sh pipeline steps. The Jenkins script-security
+// sandbox rejects java.security.MessageDigest.getInstance, so the previous
+// pure-Groovy implementation can't run. Shelling out to sha256sum is the
+// established pattern in this file for sandbox compatibility (see commits
+// 5285bed8, 9bc80528 for prior sandbox fixes).
 def sha256(String content) {
-    def digest = MessageDigest.getInstance('SHA-256')
-    def hash = digest.digest(content.getBytes('UTF-8'))
-    return hash.collect { String.format('%02x', it) }.join()
+    // Filename is keyed on content.hashCode so identical inputs reuse the
+    // same temp file (idempotent under concurrency) and different inputs
+    // get different files. Cleanup happens in the same shell as the read
+    // so no leftover files even on early failure of subsequent steps.
+    def tmpFile = ".build-graph-sha256-${content.hashCode()}.tmp"
+    writeFile file: tmpFile, text: content
+    def hash = sh(
+        script: "sha256sum '${tmpFile}' | cut -d' ' -f1 && rm -f '${tmpFile}'",
+        returnStdout: true,
+    ).trim()
+    return hash
 }
 
 def checkBuildProcessChanges(Map step, Map buildState, String qualifiedName) {
