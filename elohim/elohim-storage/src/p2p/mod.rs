@@ -686,6 +686,10 @@ impl P2PNode {
         verify_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
         let mut replication_interval = tokio::time::interval(Duration::from_secs(60));
         replication_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+        let mut bootstrap_retry_interval = tokio::time::interval(Duration::from_secs(30));
+        bootstrap_retry_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+        // Track consecutive retry attempts for exponential backoff cap.
+        let mut consecutive_empty_ticks: u32 = 0;
         let mut command_rx = self.command_rx.lock().await;
 
         loop {
@@ -736,6 +740,38 @@ impl P2PNode {
                 }
                 _ = verify_interval.tick() => {
                     self.verify_shard_locations(&mut swarm).await;
+                    drop(swarm);
+                }
+                _ = bootstrap_retry_interval.tick() => {
+                    let connected = swarm.connected_peers().count();
+                    if connected == 0 && !self.config.bootstrap_nodes.is_empty() {
+                        consecutive_empty_ticks = consecutive_empty_ticks.saturating_add(1);
+                        // Cap the retry frequency: after 10 ticks (~5 minutes of no peers),
+                        // slow down to every 5 minutes by skipping ticks.
+                        let should_retry = consecutive_empty_ticks <= 10
+                            || consecutive_empty_ticks % 10 == 0;
+                        if should_retry {
+                            info!(
+                                attempt = consecutive_empty_ticks,
+                                "Bootstrap retry: no connected peers, re-dialing bootstrap nodes"
+                            );
+                            for addr_str in &self.config.bootstrap_nodes {
+                                if let Ok(addr) = addr_str.parse::<Multiaddr>() {
+                                    match swarm.dial(addr.clone()) {
+                                        Ok(_) => debug!(addr = %addr, "Re-dialed bootstrap"),
+                                        Err(e) => debug!(addr = %addr, error = %e, "Re-dial failed"),
+                                    }
+                                }
+                            }
+                        }
+                    } else if connected > 0 && consecutive_empty_ticks > 0 {
+                        info!(
+                            connected = connected,
+                            prior_attempts = consecutive_empty_ticks,
+                            "Bootstrap recovered"
+                        );
+                        consecutive_empty_ticks = 0;
+                    }
                     drop(swarm);
                 }
                 _ = shutdown.recv() => {
