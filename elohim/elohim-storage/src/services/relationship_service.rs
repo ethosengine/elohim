@@ -295,7 +295,9 @@ impl RelationshipService {
     /// Validate that content exists
     fn validate_content_exists(&self, id: &str, field_name: &str) -> Result<(), StorageError> {
         let mut conn = self.conn()?;
-        let exists = content_diesel::get_content(&mut conn, &self.ctx, id)?.is_some();
+        // Internal existence check for relationship validation; pre-drain rows
+        // must still count as existing, so provenance gate is off.
+        let exists = content_diesel::get_content(&mut conn, &self.ctx, id, false)?.is_some();
 
         if !exists {
             return Err(StorageError::InvalidInput(format!(

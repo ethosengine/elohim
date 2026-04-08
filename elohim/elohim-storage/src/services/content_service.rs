@@ -40,10 +40,16 @@ impl ContentService {
     // Read Operations
     // =========================================================================
 
-    /// Get content by ID
+    /// Get content by ID.
+    ///
+    /// NOTE: this helper is currently used only by internal service code
+    /// (update merge, relationship existence check). It passes
+    /// `require_provenance: false` so those internal callers can still see
+    /// pre-drain rows. If this is ever exposed to an external HTTP handler,
+    /// add a `require_provenance: bool` parameter and thread it through.
     pub fn get(&self, id: &str) -> Result<Option<crate::db::models::Content>, StorageError> {
         let mut conn = self.conn()?;
-        content_diesel::get_content(&mut conn, &self.ctx, id)
+        content_diesel::get_content(&mut conn, &self.ctx, id, false)
     }
 
     /// List content with filters
@@ -147,7 +153,7 @@ impl ContentService {
         // Compute merged metadata_json before entering the DB layer
         let merged_metadata_json =
             if let Some(patch_meta) = &view.metadata {
-                let existing = content_diesel::get_content(&mut conn, &self.ctx, id)?
+                let existing = content_diesel::get_content(&mut conn, &self.ctx, id, false)?
                     .ok_or_else(|| StorageError::NotFound(format!("Content not found: {}", id)))?;
 
                 let existing_meta: serde_json::Value = existing

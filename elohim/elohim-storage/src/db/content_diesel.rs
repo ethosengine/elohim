@@ -130,28 +130,61 @@ pub struct BulkResult {
 // ============================================================================
 
 /// Get content by ID - scoped by app
+///
+/// `require_provenance`: when true, rows lacking both `dht_anchor_hash` and
+/// `p2p_published_at` are filtered out — returning `Ok(None)` as if the row
+/// did not exist. External HTTP handlers should pass `true`; internal drain
+/// and replication paths should pass `false`.
 pub fn get_content(
     conn: &mut SqliteConnection,
     ctx: &AppContext,
     content_id: &str,
+    require_provenance: bool,
 ) -> Result<Option<Content>, StorageError> {
-    content::table
+    let mut q = content::table
         .filter(content::h_app_id.eq(&ctx.h_app_id))
         .filter(content::id.eq(content_id))
-        .first(conn)
+        .into_boxed();
+
+    if require_provenance {
+        q = q.filter(
+            content::dht_anchor_hash
+                .is_not_null()
+                .or(content::p2p_published_at.is_not_null()),
+        );
+    }
+
+    q.first(conn)
         .optional()
         .map_err(|e| StorageError::Internal(format!("Query failed: {}", e)))
 }
 
 /// Get content with tags - scoped by app
+///
+/// `require_provenance`: see [`get_content`]. External HTTP handlers (e.g.
+/// `/epr-head/{id}`) should pass `true`; internal replication/sync paths in
+/// `p2p/mod.rs` should pass `false` so unpublished rows remain visible to the
+/// drain loop and shard inventory.
 pub fn get_content_with_tags(
     conn: &mut SqliteConnection,
     ctx: &AppContext,
     content_id: &str,
+    require_provenance: bool,
 ) -> Result<Option<ContentWithTags>, StorageError> {
-    let content_opt: Option<Content> = content::table
+    let mut q = content::table
         .filter(content::h_app_id.eq(&ctx.h_app_id))
         .filter(content::id.eq(content_id))
+        .into_boxed();
+
+    if require_provenance {
+        q = q.filter(
+            content::dht_anchor_hash
+                .is_not_null()
+                .or(content::p2p_published_at.is_not_null()),
+        );
+    }
+
+    let content_opt: Option<Content> = q
         .first(conn)
         .optional()
         .map_err(|e| StorageError::Internal(format!("Query failed: {}", e)))?;
@@ -422,8 +455,9 @@ pub fn update_content(
 
     let id = &input.id;
 
-    // Verify the row exists in this app scope
-    let existing = get_content_with_tags(conn, ctx, id)?
+    // Verify the row exists in this app scope. Internal update path — always
+    // `require_provenance: false` so we can update rows pre-drain.
+    let existing = get_content_with_tags(conn, ctx, id, false)?
         .ok_or_else(|| StorageError::NotFound(format!("Content not found: {}", id)))?;
 
     // Apply scalar field updates — use provided value or fall back to existing
@@ -489,8 +523,8 @@ pub fn update_content(
             }
         }
 
-        // Return updated record
-        get_content_with_tags(conn, ctx, id)?
+        // Return updated record — internal fetch, no provenance gate.
+        get_content_with_tags(conn, ctx, id, false)?
             .ok_or_else(|| StorageError::Internal("Failed to fetch updated content".into()))
     })
 }
@@ -571,6 +605,16 @@ pub fn count_content(
     }
     if let Some(ref reach) = query.reach {
         base_query = base_query.filter(content::reach.eq(reach));
+    }
+
+    // Provenance gate: mirrors list_content. External paginators must set this
+    // to true so totals stay consistent with the filtered row set.
+    if query.require_provenance {
+        base_query = base_query.filter(
+            content::dht_anchor_hash
+                .is_not_null()
+                .or(content::p2p_published_at.is_not_null()),
+        );
     }
 
     base_query
@@ -691,10 +735,10 @@ mod tests {
         let lamad_count = content_count(&mut conn, &lamad_ctx).unwrap();
         assert_eq!(lamad_count, 1, "Lamad should have 1 content item");
 
-        let lamad_manifesto = get_content(&mut conn, &lamad_ctx, "manifesto").unwrap();
+        let lamad_manifesto = get_content(&mut conn, &lamad_ctx, "manifesto", false).unwrap();
         assert!(lamad_manifesto.is_some(), "Lamad should find manifesto");
 
-        let lamad_resources = get_content(&mut conn, &lamad_ctx, "resources").unwrap();
+        let lamad_resources = get_content(&mut conn, &lamad_ctx, "resources", false).unwrap();
         assert!(
             lamad_resources.is_none(),
             "Lamad should NOT find elohim's resources"
@@ -704,10 +748,10 @@ mod tests {
         let elohim_count = content_count(&mut conn, &elohim_ctx).unwrap();
         assert_eq!(elohim_count, 1, "Elohim should have 1 content item");
 
-        let elohim_resources = get_content(&mut conn, &elohim_ctx, "resources").unwrap();
+        let elohim_resources = get_content(&mut conn, &elohim_ctx, "resources", false).unwrap();
         assert!(elohim_resources.is_some(), "Elohim should find resources");
 
-        let elohim_manifesto = get_content(&mut conn, &elohim_ctx, "manifesto").unwrap();
+        let elohim_manifesto = get_content(&mut conn, &elohim_ctx, "manifesto", false).unwrap();
         assert!(
             elohim_manifesto.is_none(),
             "Elohim should NOT find lamad's manifesto"
@@ -841,6 +885,101 @@ mod tests {
         .unwrap();
         assert_eq!(gated.len(), 1, "gated list should filter out unpublished rows");
         assert_eq!(gated[0].content.id, "cid-published");
+    }
+
+    #[test]
+    fn test_count_content_respects_require_provenance() {
+        let mut conn = setup_test_db();
+        let ctx = AppContext::new("lamad");
+
+        let published = CreateContentInput {
+            id: "cid-published".to_string(),
+            title: "Published".to_string(),
+            description: None,
+            content_type: "concept".to_string(),
+            content_format: "markdown".to_string(),
+            blob_hash: None,
+            blob_cid: None,
+            content_size_bytes: None,
+            metadata_json: None,
+            reach: "commons".to_string(),
+            created_by: None,
+            tags: vec![],
+            content_body: None,
+        };
+        let unpublished = CreateContentInput {
+            id: "cid-unpublished".to_string(),
+            ..published.clone()
+        };
+        create_content(&mut conn, &ctx, published).unwrap();
+        create_content(&mut conn, &ctx, unpublished).unwrap();
+
+        diesel::sql_query(
+            "UPDATE content SET p2p_published_at = datetime('now') WHERE id = 'cid-published'",
+        )
+        .execute(&mut conn)
+        .unwrap();
+
+        let unrestricted = count_content(
+            &mut conn,
+            &ctx,
+            &ContentQuery {
+                require_provenance: false,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(unrestricted, 2, "unrestricted count should see both rows");
+
+        let gated = count_content(
+            &mut conn,
+            &ctx,
+            &ContentQuery {
+                require_provenance: true,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(gated, 1, "gated count should filter out unpublished rows");
+    }
+
+    #[test]
+    fn test_get_content_respects_require_provenance() {
+        let mut conn = setup_test_db();
+        let ctx = AppContext::new("lamad");
+
+        let row = CreateContentInput {
+            id: "cid-unpublished".to_string(),
+            title: "Unpublished".to_string(),
+            description: None,
+            content_type: "concept".to_string(),
+            content_format: "markdown".to_string(),
+            blob_hash: None,
+            blob_cid: None,
+            content_size_bytes: None,
+            metadata_json: None,
+            reach: "commons".to_string(),
+            created_by: None,
+            tags: vec![],
+            content_body: None,
+        };
+        create_content(&mut conn, &ctx, row).unwrap();
+
+        // Gated fetch: row has no dht_anchor_hash and no p2p_published_at →
+        // external reads must see None, as if the row did not exist.
+        let gated = get_content(&mut conn, &ctx, "cid-unpublished", true).unwrap();
+        assert!(
+            gated.is_none(),
+            "gated get_content must hide unpublished rows from external readers"
+        );
+
+        // Ungated fetch: internal callers (drain loop) must still see it.
+        let ungated = get_content(&mut conn, &ctx, "cid-unpublished", false).unwrap();
+        assert!(
+            ungated.is_some(),
+            "ungated get_content must still return unpublished rows for internal callers"
+        );
+        assert_eq!(ungated.unwrap().id, "cid-unpublished");
     }
 
     #[test]

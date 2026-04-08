@@ -280,9 +280,15 @@ impl HttpServer {
             }
         };
         let app_ctx = db::AppContext::default_lamad();
+        // Startup slug index refresh. This cache backs external HTML5 app
+        // routing, so it must only index content that has a provenance
+        // marker (dht_anchor_hash or p2p_published_at). If the drain has
+        // not run yet, the index will be empty — that is the desired
+        // behavior: we must never serve undrained rows to browsers.
         let query = ContentQuery {
             content_format: Some("html5-app".to_string()),
             limit: 100,
+            require_provenance: true,
             ..Default::default()
         };
 
@@ -3453,9 +3459,12 @@ impl HttpServer {
     async fn lookup_slug_blob_hash(&self, slug: &str) -> Result<Option<String>, StorageError> {
         let mut conn = self.get_conn()?;
         let app_ctx = db::AppContext::default_lamad();
+        // External HTTP slug resolution — only consider rows that carry a
+        // provenance marker (Holochain dht_anchor_hash or libp2p Kad publish).
         let query = ContentQuery {
             content_format: Some("html5-app".to_string()),
             limit: 100,
+            require_provenance: true,
             ..Default::default()
         };
 
@@ -4877,7 +4886,11 @@ impl HttpServer {
         // Look up EPR Head from content DB by ID
         if let Ok(mut conn) = self.get_conn() {
             let app_ctx = db::AppContext::default_lamad();
-            let content_opt = db::content_diesel::get_content_with_tags(&mut conn, &app_ctx, id)?;
+            // External HTTP handler for GET /epr-head/{id} — gate on provenance
+            // so we never surface a row that has neither been notarized on
+            // Holochain nor published to libp2p Kad.
+            let content_opt =
+                db::content_diesel::get_content_with_tags(&mut conn, &app_ctx, id, true)?;
 
             if let Some(content_with_tags) = content_opt {
                 let content = &content_with_tags.content;

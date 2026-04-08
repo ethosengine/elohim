@@ -1697,7 +1697,7 @@ impl P2PNode {
                     Err(e) => return ShardResponse::Error(format!("DB connection failed: {}", e)),
                 };
                 let app_ctx = crate::db::AppContext::default_lamad();
-                match crate::db::content_diesel::get_content_with_tags(&mut conn, &app_ctx, &id) {
+                match crate::db::content_diesel::get_content_with_tags(&mut conn, &app_ctx, &id, false) {
                     Ok(Some(cwt)) => {
                         debug!(id = %id, "Serving content record to peer");
                         ShardResponse::Content(Box::new(shard_protocol::ContentRecord {
@@ -2099,7 +2099,9 @@ impl P2PNode {
         let pool = self.db_pool.as_ref()?;
         let mut conn = pool.get().ok()?;
         let app_ctx = crate::db::AppContext::default_lamad();
-        match crate::db::content_diesel::get_content_with_tags(&mut conn, &app_ctx, id) {
+        // Internal P2P-side EPR head resolution; provenance gate off so the
+        // drain loop (which also rides this path) can project pre-publish rows.
+        match crate::db::content_diesel::get_content_with_tags(&mut conn, &app_ctx, id, false) {
             Ok(Some(content_with_tags)) => {
                 let content = &content_with_tags.content;
                 let head = crate::epr_codec::EprHead {
@@ -2403,7 +2405,7 @@ impl P2PNode {
                 let app_ctx = crate::db::AppContext::default_lamad();
 
                 let content = crate::db::content_diesel::get_content_with_tags(
-                    &mut conn, &app_ctx, content_id,
+                    &mut conn, &app_ctx, content_id, false,
                 )
                 .map_err(|e| format!("Content lookup failed: {}", e))?
                 .ok_or_else(|| "Content not found".to_string())?;
@@ -2431,7 +2433,7 @@ impl P2PNode {
                         let app_ctx = crate::db::AppContext::default_lamad();
                         if let Ok(Some(content_with_tags)) =
                             crate::db::content_diesel::get_content_with_tags(
-                                &mut conn, &app_ctx, &id,
+                                &mut conn, &app_ctx, &id, false,
                             )
                         {
                             let reach = &content_with_tags.content.reach;
