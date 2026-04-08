@@ -1,6 +1,6 @@
 -- Source of truth: local (operational). Category C.
 -- Tracks local Kademlia publish state for EPR Heads.
--- NULL = not yet published to libp2p Kad DHT. Set by the drain loop in p2p/mod.rs.
+-- NULL = not yet published to libp2p Kad DHT. Set by the drain loop (p2p module).
 -- Distinct from `dht_anchor_hash` which tracks Holochain notarization.
 -- Reconstruction strategy: re-publish from the content table (put_record is idempotent);
 -- losing this column only costs one extra drain pass.
