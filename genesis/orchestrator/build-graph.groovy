@@ -96,7 +96,24 @@ def composeGraph(List manifests) {
         }
     }
 
-    // Validate: every dependency target exists
+    // Externalize cross-pipeline deps pointing at pipelines with no manifest.
+    // These are real dependencies (Sprint 2 will add their manifests and they
+    // become internal) but the graph can't validate or cycle-check them yet.
+    // Record them in graph._externalDeps and remove from step.depends.
+    graph._externalDeps = [] as Set
+    graph.steps.each { name, step ->
+        step.depends = step.depends.findAll { dep ->
+            if (graph.steps.containsKey(dep)) return true
+            def targetPipeline = dep.split(':', 2)[0]
+            if (!graph.pipelines.containsKey(targetPipeline)) {
+                graph._externalDeps.add(dep)
+                return false  // prune from the internal graph
+            }
+            return true  // intra-manifest gap — real error, keep for validation
+        }
+    }
+
+    // Validate: every remaining dependency target exists
     graph.steps.each { name, step ->
         step.depends.each { dep ->
             if (!graph.steps.containsKey(dep)) {
@@ -718,6 +735,9 @@ def walkBuildGraph(List changedFiles) {
     }
 
     echo "Composed graph: ${graph.steps.size()} steps across ${graph.pipelines.size()} pipelines"
+    if (graph._externalDeps && graph._externalDeps.size() > 0) {
+        echo "ℹ️  ${graph._externalDeps.size()} external dep(s) to unmanaged pipelines (Sprint 2): ${graph._externalDeps.sort().join(', ')}"
+    }
 
     def buildState = loadBuildState()
     if (buildState.lastSuccessfulCommit) {
