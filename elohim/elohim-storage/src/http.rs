@@ -93,6 +93,7 @@ use crate::views::{
     ObservationSummaryView,
     ObservationSystemStateView,
     PackageManifestView,
+    PublishStateView,
     RelationshipSeedView,
     RelationshipView,
     ScheduleView,
@@ -503,6 +504,11 @@ impl HttpServer {
             // P2P Status endpoint
             #[cfg(feature = "p2p")]
             (Method::GET, "/p2p/status") => self.handle_p2p_status().await,
+
+            // Drain queue observability — operational route, no DHT entry type
+            // or coordinator zome involvement. Returns {total, published, pending}
+            // so seeders/pipelines can poll until pending == 0.
+            (Method::GET, "/p2p/publish-state") => self.handle_publish_state().await,
 
             // Delivery peers — discovered peers with delivery capabilities
             // Used by frontend for multi-peer app delivery scoring
@@ -1356,6 +1362,39 @@ impl HttpServer {
                 )))
                 .unwrap())
         }
+    }
+
+    /// Handle drain queue observability request.
+    /// Returns `{total, published, pending}` for the lamad app context.
+    /// Operational route — reads only the content projection, no DHT lookup.
+    async fn handle_publish_state(&self) -> Result<Response<Full<Bytes>>, StorageError> {
+        let Some(ref pool) = self.db_pool else {
+            return Ok(Response::builder()
+                .status(StatusCode::SERVICE_UNAVAILABLE)
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Full::new(Bytes::from(
+                    r#"{"error": "DB pool not initialized"}"#,
+                )))
+                .unwrap());
+        };
+        let mut conn = pool
+            .get()
+            .map_err(|e| StorageError::Internal(format!("DB connection failed: {}", e)))?;
+        let ctx = AppContext::default_lamad();
+        let (total, published) = db::content_diesel::count_publish_state(&mut conn, &ctx)?;
+        let view = PublishStateView {
+            total,
+            published,
+            pending: total - published,
+        };
+        let json = serde_json::to_string(&view).map_err(|e| {
+            StorageError::Internal(format!("Failed to serialize publish state: {}", e))
+        })?;
+        Ok(Response::builder()
+            .status(StatusCode::OK)
+            .header(header::CONTENT_TYPE, "application/json")
+            .body(Full::new(Bytes::from(json)))
+            .unwrap())
     }
 
     /// Handle delivery peers request — returns discovered peers with capabilities

@@ -248,6 +248,21 @@ impl From<ContentWithTags> for ContentWithTagsView {
 }
 
 // ============================================================================
+// Publish State View (drain queue observability)
+// ============================================================================
+
+/// Drain queue counts for the operational content projection.
+/// Used by `GET /p2p/publish-state` so pipelines can poll until pending == 0.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct PublishStateView {
+    pub total: i64,
+    pub published: i64,
+    pub pending: i64,
+}
+
+// ============================================================================
 // Relationship Views
 // ============================================================================
 

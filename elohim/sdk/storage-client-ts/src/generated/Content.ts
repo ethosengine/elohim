@@ -7,4 +7,9 @@ export type Content = { id: string, h_app_id: string, title: string, description
 /**
  * Source of truth: DHT (Content entry in lamad DNA). Classification: A (Notarized).
  */
-dht_anchor_hash: string | null, };
+dht_anchor_hash: string | null, 
+/**
+ * Timestamp when this content was successfully published to the libp2p Kademlia DHT by the seeder drain loop.
+ * NULL = not yet published. Classification: C (Operational).
+ */
+p2p_published_at: string | null, };

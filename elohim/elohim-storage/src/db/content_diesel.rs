@@ -706,6 +706,27 @@ pub fn mark_published(
     Ok(rows > 0)
 }
 
+/// Drain debug: count total, published, pending rows scoped by app.
+/// Reads only the operational projection (content table) — no DHT lookup.
+/// Returns (total, published). Caller computes pending = total - published.
+pub fn count_publish_state(
+    conn: &mut SqliteConnection,
+    ctx: &AppContext,
+) -> Result<(i64, i64), StorageError> {
+    let total: i64 = content::table
+        .filter(content::h_app_id.eq(&ctx.h_app_id))
+        .count()
+        .get_result(conn)
+        .map_err(|e| StorageError::Internal(format!("count total failed: {}", e)))?;
+    let published: i64 = content::table
+        .filter(content::h_app_id.eq(&ctx.h_app_id))
+        .filter(content::p2p_published_at.is_not_null())
+        .count()
+        .get_result(conn)
+        .map_err(|e| StorageError::Internal(format!("count published failed: {}", e)))?;
+    Ok((total, published))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1223,6 +1244,41 @@ mod tests {
         // Also verify mark_published on a non-existent row returns false (not an error).
         let missing = mark_published(&mut conn, &ctx, "nonexistent").unwrap();
         assert!(!missing, "mark_published should return false for a missing row");
+    }
+
+    #[test]
+    fn test_count_publish_state_returns_correct_counts() {
+        let mut conn = setup_test_db();
+        let ctx = AppContext::new("lamad");
+
+        // Insert 2 rows, mark 1 as published.
+        for id in ["row1", "row2"] {
+            create_content(
+                &mut conn,
+                &ctx,
+                CreateContentInput {
+                    id: id.into(),
+                    title: id.into(),
+                    description: None,
+                    content_type: "concept".into(),
+                    content_format: "markdown".into(),
+                    blob_hash: None,
+                    blob_cid: None,
+                    content_size_bytes: None,
+                    metadata_json: None,
+                    reach: "commons".into(),
+                    created_by: None,
+                    tags: vec![],
+                    content_body: None,
+                },
+            )
+            .unwrap();
+        }
+        mark_published(&mut conn, &ctx, "row1").unwrap();
+
+        let (total, published) = count_publish_state(&mut conn, &ctx).unwrap();
+        assert_eq!(total, 2);
+        assert_eq!(published, 1);
     }
 
     #[test]
