@@ -651,6 +651,45 @@ pub fn tag_count(conn: &mut SqliteConnection, ctx: &AppContext) -> Result<i64, S
         .map_err(|e| StorageError::Internal(format!("Count query failed: {}", e)))
 }
 
+/// Drain-loop query: return IDs of content rows that have not yet been
+/// published to the libp2p Kad DHT. Scoped by app context. Internal use
+/// only — does not apply the provenance gate (the drain loop IS the thing
+/// that produces provenance).
+pub fn list_unpublished_content_ids(
+    conn: &mut SqliteConnection,
+    ctx: &AppContext,
+    limit: i64,
+) -> Result<Vec<String>, StorageError> {
+    content::table
+        .filter(content::h_app_id.eq(&ctx.h_app_id))
+        .filter(content::p2p_published_at.is_null())
+        .select(content::id)
+        .order(content::created_at.asc())
+        .limit(limit)
+        .load::<String>(conn)
+        .map_err(|e| StorageError::Internal(format!("list_unpublished_content_ids failed: {}", e)))
+}
+
+/// Drain-loop write: mark a content row as p2p_published at the current time.
+/// Operates on the operational projection column only — does not touch
+/// dht_anchor_hash or any notarized state. Idempotent — re-publishing an
+/// already-published row just bumps the timestamp.
+pub fn mark_published(
+    conn: &mut SqliteConnection,
+    ctx: &AppContext,
+    content_id: &str,
+) -> Result<usize, StorageError> {
+    let now = chrono::Utc::now().to_rfc3339();
+    diesel::update(
+        content::table
+            .filter(content::h_app_id.eq(&ctx.h_app_id))
+            .filter(content::id.eq(content_id)),
+    )
+    .set(content::p2p_published_at.eq(now))
+    .execute(conn)
+    .map_err(|e| StorageError::Internal(format!("mark_published failed: {}", e)))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1078,6 +1117,79 @@ mod tests {
             internal.is_some(),
             "internal get must still see unpublished content"
         );
+    }
+
+    #[test]
+    fn test_list_unpublished_content_ids_returns_only_unpublished() {
+        let mut conn = setup_test_db();
+        let ctx = AppContext::new("lamad");
+
+        // Three rows: A unpublished, B published, C unpublished.
+        for id in ["a", "b", "c"] {
+            create_content(
+                &mut conn,
+                &ctx,
+                CreateContentInput {
+                    id: id.into(),
+                    title: id.to_uppercase(),
+                    description: None,
+                    content_type: "concept".into(),
+                    content_format: "markdown".into(),
+                    blob_hash: None,
+                    blob_cid: None,
+                    content_size_bytes: None,
+                    metadata_json: None,
+                    reach: "commons".into(),
+                    created_by: None,
+                    tags: vec![],
+                    content_body: None,
+                },
+            )
+            .unwrap();
+        }
+
+        diesel::sql_query("UPDATE content SET p2p_published_at = datetime('now') WHERE id = 'b'")
+            .execute(&mut conn)
+            .unwrap();
+
+        let pending = list_unpublished_content_ids(&mut conn, &ctx, 100).unwrap();
+        assert_eq!(pending.len(), 2);
+        assert!(pending.contains(&"a".to_string()));
+        assert!(pending.contains(&"c".to_string()));
+    }
+
+    #[test]
+    fn test_mark_published_sets_timestamp() {
+        let mut conn = setup_test_db();
+        let ctx = AppContext::new("lamad");
+        create_content(
+            &mut conn,
+            &ctx,
+            CreateContentInput {
+                id: "x".into(),
+                title: "X".into(),
+                description: None,
+                content_type: "concept".into(),
+                content_format: "markdown".into(),
+                blob_hash: None,
+                blob_cid: None,
+                content_size_bytes: None,
+                metadata_json: None,
+                reach: "commons".into(),
+                created_by: None,
+                tags: vec![],
+                content_body: None,
+            },
+        )
+        .unwrap();
+
+        let pending_before = list_unpublished_content_ids(&mut conn, &ctx, 10).unwrap();
+        assert_eq!(pending_before.len(), 1);
+
+        mark_published(&mut conn, &ctx, "x").unwrap();
+
+        let pending_after = list_unpublished_content_ids(&mut conn, &ctx, 10).unwrap();
+        assert!(pending_after.is_empty());
     }
 
     #[test]
