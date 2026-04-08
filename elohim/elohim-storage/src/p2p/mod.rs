@@ -219,7 +219,8 @@ pub struct P2PNode {
 /// Drain queue observability. Exposed via `P2PStatusInfo` so other peers can
 /// judge how busy/overloaded this node is and potentially route around it
 /// — not just for the local seeder's drain-complete check.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Default)]
+#[serde(rename_all = "camelCase")]
 pub struct DrainStatusInfo {
     /// Total rows in the local content projection (scoped to lamad app).
     pub total: i32,
@@ -227,16 +228,6 @@ pub struct DrainStatusInfo {
     pub published: i32,
     /// Rows not yet drained. When this is 0 and stable, drain is caught up.
     pub pending: i32,
-}
-
-impl Default for DrainStatusInfo {
-    fn default() -> Self {
-        Self {
-            total: 0,
-            published: 0,
-            pending: 0,
-        }
-    }
 }
 
 /// P2P node status for observability
@@ -257,10 +248,10 @@ pub struct P2PStatusInfo {
     pub relay_mode: String,
     /// Replication progress for identity-driven content sync
     pub replication: replication::ReplicationStatus,
-    /// Drain queue state — updated after each drain tick (every 15s) and
-    /// on each regular status refresh (every 30s). Peers consuming this
-    /// status may use `drain.pending` as a load signal.
-    pub drain: DrainStatusInfo,
+    /// Drain queue state — None when the DB pool or query is unavailable.
+    /// Consumers should treat None as "data not available" (e.g., wait or
+    /// avoid using this peer as a load signal), NOT as "caught up".
+    pub drain: Option<DrainStatusInfo>,
 }
 
 /// Commands sent from HTTP handlers to the P2P event loop.
@@ -578,7 +569,7 @@ impl P2PNode {
             announce_addresses: config.announce_addresses.clone(),
             relay_mode: config.relay_mode.to_string(),
             replication: replication::ReplicationStatus::default(),
-            drain: DrainStatusInfo::default(),
+            drain: None,
         };
         let (status_tx, _) = tokio::sync::watch::channel(initial_status);
 
@@ -2964,8 +2955,9 @@ impl P2PNode {
 
         // Drain state: operational counts from the content projection. This
         // is a separate DB query per refresh, but status refreshes are only
-        // every 15-30 seconds so cost is negligible. Fall back to default
-        // (all zeros) on any failure rather than propagating.
+        // every 15-30 seconds so cost is negligible. On failure we return
+        // None so consumers can distinguish "data unavailable" from a real
+        // "caught up" reading (pending == 0).
         let drain = if let Some(ref pool) = self.db_pool {
             match pool.get() {
                 Ok(mut conn) => {
@@ -2974,25 +2966,25 @@ impl P2PNode {
                         Ok((total_i64, published_i64)) => {
                             let total: i32 = total_i64.try_into().unwrap_or(i32::MAX);
                             let published: i32 = published_i64.try_into().unwrap_or(i32::MAX);
-                            DrainStatusInfo {
+                            Some(DrainStatusInfo {
                                 total,
                                 published,
                                 pending: total.saturating_sub(published),
-                            }
+                            })
                         }
                         Err(e) => {
                             debug!(error = %e, "refresh_status: count_publish_state failed");
-                            DrainStatusInfo::default()
+                            None
                         }
                     }
                 }
                 Err(e) => {
                     debug!(error = %e, "refresh_status: db pool get failed");
-                    DrainStatusInfo::default()
+                    None
                 }
             }
         } else {
-            DrainStatusInfo::default()
+            None
         };
 
         let status = P2PStatusInfo {
