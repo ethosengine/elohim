@@ -40,28 +40,33 @@ impl ContentService {
     // Read Operations
     // =========================================================================
 
-    /// Get content by ID.
+    /// Get content by ID — INTERNAL use only.
     ///
-    /// NOTE: this helper is currently used only by internal service code
-    /// (update merge, relationship existence check). It passes
-    /// `require_provenance: false` so those internal callers can still see
-    /// pre-drain rows. If this is ever exposed to an external HTTP handler,
-    /// add a `require_provenance: bool` parameter and thread it through.
+    /// Passes `require_provenance: false` so internal callers (update merge,
+    /// relationship existence check, delete_cascade) can see pre-drain rows.
+    /// The external HTTP boundary (`handle_db_content_by_id`) does NOT route
+    /// through this method — it calls `content_diesel::get_content_with_tags`
+    /// directly with `require_provenance: true`.
     pub fn get(&self, id: &str) -> Result<Option<crate::db::models::Content>, StorageError> {
         let mut conn = self.conn()?;
         content_diesel::get_content(&mut conn, &self.ctx, id, false)
     }
 
-    /// List content with filters
+    /// List content with filters — INTERNAL use only.
+    ///
+    /// Passes `require_provenance: false`. The external HTTP boundary
+    /// (`handle_db_content_list`) does NOT route through this method.
+    #[allow(dead_code)]
     pub fn list(
         &self,
         query: &content_diesel::ContentQuery,
     ) -> Result<Vec<crate::db::models::ContentWithTags>, StorageError> {
         let mut conn = self.conn()?;
-        content_diesel::list_content(&mut conn, &self.ctx, query)
+        content_diesel::list_content(&mut conn, &self.ctx, query, false)
     }
 
-    /// Get content by tag
+    /// Get content by tag — INTERNAL use only.
+    #[allow(dead_code)]
     pub fn get_by_tag(
         &self,
         tag: &str,
@@ -71,7 +76,8 @@ impl ContentService {
         content_diesel::get_content_by_tag(&mut conn, &self.ctx, tag, limit as i64)
     }
 
-    /// Search content by text
+    /// Search content by text — INTERNAL use only.
+    #[allow(dead_code)]
     pub fn search(
         &self,
         query: &str,

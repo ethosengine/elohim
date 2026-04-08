@@ -92,6 +92,10 @@ where
 
 /// Query parameters for listing content - camelCase for URL params.
 /// Deserialized via `serde_urlencoded::from_str()` in the HTTP handler.
+///
+/// This struct carries ONLY client-controllable filter criteria. The
+/// provenance gate is a separate server-side parameter on `list_content` /
+/// `count_content` so that clients cannot disable it via URL params.
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ContentQuery {
@@ -109,8 +113,6 @@ pub struct ContentQuery {
     pub limit: i64,
     #[serde(default)]
     pub offset: i64,
-    #[serde(default)]
-    pub require_provenance: bool,
 }
 
 fn default_limit() -> i64 {
@@ -219,10 +221,17 @@ pub fn get_content_tags(
 }
 
 /// List content with filters - scoped by app
+///
+/// `require_provenance`: when true, rows lacking both `dht_anchor_hash` and
+/// `p2p_published_at` are filtered out. External HTTP handlers MUST pass
+/// `true`; internal drain/replication/sync paths pass `false`. This is a
+/// server-side parameter — NOT part of `ContentQuery` — so that clients
+/// cannot disable the gate via URL params.
 pub fn list_content(
     conn: &mut SqliteConnection,
     ctx: &AppContext,
     query: &ContentQuery,
+    require_provenance: bool,
 ) -> Result<Vec<ContentWithTags>, StorageError> {
     // Prepare search pattern if needed (must outlive the query)
     let search_pattern = query.search.as_ref().map(|s| format!("%{}%", s));
@@ -257,7 +266,7 @@ pub fn list_content(
     // (dht_anchor_hash) nor published to libp2p Kad (p2p_published_at). Either marker
     // is sufficient. External HTTP reads set this to true; internal drain-loop
     // queries set it to false so the loop can see unpublished rows.
-    if query.require_provenance {
+    if require_provenance {
         base_query = base_query.filter(
             content::dht_anchor_hash
                 .is_not_null()
@@ -553,6 +562,8 @@ pub fn get_content_by_tag(
     tag: &str,
     limit: i64,
 ) -> Result<Vec<ContentWithTags>, StorageError> {
+    // Internal helper — ContentService exposes this only through internal
+    // methods. External HTTP handlers do not route through this path.
     list_content(
         conn,
         ctx,
@@ -561,6 +572,7 @@ pub fn get_content_by_tag(
             limit,
             ..Default::default()
         },
+        false,
     )
 }
 
@@ -579,10 +591,14 @@ pub fn content_count(conn: &mut SqliteConnection, ctx: &AppContext) -> Result<i6
 
 /// Count content matching a query (respects filters, ignores limit/offset).
 /// Used for pagination total counts.
+///
+/// `require_provenance`: see [`list_content`]. External paginators MUST pass
+/// `true` so totals stay consistent with the gated row set.
 pub fn count_content(
     conn: &mut SqliteConnection,
     ctx: &AppContext,
     query: &ContentQuery,
+    require_provenance: bool,
 ) -> Result<i64, StorageError> {
     let search_pattern = query.search.as_ref().map(|s| format!("%{}%", s));
 
@@ -609,7 +625,7 @@ pub fn count_content(
 
     // Provenance gate: mirrors list_content. External paginators must set this
     // to true so totals stay consistent with the filtered row set.
-    if query.require_provenance {
+    if require_provenance {
         base_query = base_query.filter(
             content::dht_anchor_hash
                 .is_not_null()
@@ -864,9 +880,9 @@ mod tests {
             &ContentQuery {
                 limit: 10,
                 offset: 0,
-                require_provenance: false,
                 ..Default::default()
             },
+            false,
         )
         .unwrap();
         assert_eq!(unrestricted.len(), 2, "unrestricted list should return all rows");
@@ -878,9 +894,9 @@ mod tests {
             &ContentQuery {
                 limit: 10,
                 offset: 0,
-                require_provenance: true,
                 ..Default::default()
             },
+            true,
         )
         .unwrap();
         assert_eq!(gated.len(), 1, "gated list should filter out unpublished rows");
@@ -923,10 +939,8 @@ mod tests {
         let unrestricted = count_content(
             &mut conn,
             &ctx,
-            &ContentQuery {
-                require_provenance: false,
-                ..Default::default()
-            },
+            &ContentQuery::default(),
+            false,
         )
         .unwrap();
         assert_eq!(unrestricted, 2, "unrestricted count should see both rows");
@@ -934,10 +948,8 @@ mod tests {
         let gated = count_content(
             &mut conn,
             &ctx,
-            &ContentQuery {
-                require_provenance: true,
-                ..Default::default()
-            },
+            &ContentQuery::default(),
+            true,
         )
         .unwrap();
         assert_eq!(gated, 1, "gated count should filter out unpublished rows");
@@ -980,6 +992,94 @@ mod tests {
             "ungated get_content must still return unpublished rows for internal callers"
         );
         assert_eq!(ungated.unwrap().id, "cid-unpublished");
+    }
+
+    /// Regression guard for the A4 critical fix: the external HTTP handler
+    /// `handle_db_content_list` MUST pass `require_provenance=true` so that
+    /// unpublished rows never leak through `GET /db/content`. This test
+    /// exercises the exact call pattern the handler uses.
+    #[test]
+    fn test_list_content_external_call_pattern_excludes_unpublished() {
+        let mut conn = setup_test_db();
+        let ctx = AppContext::new("lamad");
+
+        let row = CreateContentInput {
+            id: "cid-unpublished".to_string(),
+            title: "Unpublished".to_string(),
+            description: None,
+            content_type: "concept".to_string(),
+            content_format: "markdown".to_string(),
+            blob_hash: None,
+            blob_cid: None,
+            content_size_bytes: None,
+            metadata_json: None,
+            reach: "commons".to_string(),
+            created_by: None,
+            tags: vec![],
+            content_body: None,
+        };
+        create_content(&mut conn, &ctx, row).unwrap();
+
+        let q = ContentQuery {
+            limit: 10,
+            ..Default::default()
+        };
+
+        // External call pattern — what handle_db_content_list will invoke.
+        let external = list_content(&mut conn, &ctx, &q, true).unwrap();
+        assert!(
+            external.is_empty(),
+            "external list must not leak unpublished content"
+        );
+
+        // Internal call pattern — what p2p replication/drain paths invoke.
+        let internal = list_content(&mut conn, &ctx, &q, false).unwrap();
+        assert_eq!(
+            internal.len(),
+            1,
+            "internal list must still see unpublished content"
+        );
+    }
+
+    /// Regression guard for the A4 critical fix: the external HTTP handler
+    /// `handle_db_content_by_id` MUST call `get_content_with_tags` with
+    /// `require_provenance=true` so that `GET /db/content/{id}` never leaks
+    /// unpublished rows.
+    #[test]
+    fn test_get_content_external_call_pattern_excludes_unpublished() {
+        let mut conn = setup_test_db();
+        let ctx = AppContext::new("lamad");
+
+        let row = CreateContentInput {
+            id: "cid-unpublished".to_string(),
+            title: "Unpublished".to_string(),
+            description: None,
+            content_type: "concept".to_string(),
+            content_format: "markdown".to_string(),
+            blob_hash: None,
+            blob_cid: None,
+            content_size_bytes: None,
+            metadata_json: None,
+            reach: "commons".to_string(),
+            created_by: None,
+            tags: vec![],
+            content_body: None,
+        };
+        create_content(&mut conn, &ctx, row).unwrap();
+
+        // External call pattern — what handle_db_content_by_id will invoke.
+        let external = get_content_with_tags(&mut conn, &ctx, "cid-unpublished", true).unwrap();
+        assert!(
+            external.is_none(),
+            "external get must not leak unpublished content"
+        );
+
+        // Internal call pattern.
+        let internal = get_content_with_tags(&mut conn, &ctx, "cid-unpublished", false).unwrap();
+        assert!(
+            internal.is_some(),
+            "internal get must still see unpublished content"
+        );
     }
 
     #[test]

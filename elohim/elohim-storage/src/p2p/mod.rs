@@ -715,7 +715,8 @@ impl P2PNode {
                                     limit: 100_000,
                                     ..Default::default()
                                 };
-                                if let Ok(items) = crate::db::content_diesel::list_content(&mut conn, &app_ctx, &query) {
+                                // Internal replication state — see all local rows, including pre-drain.
+                                if let Ok(items) = crate::db::content_diesel::list_content(&mut conn, &app_ctx, &query, false) {
                                     let ids: std::collections::HashSet<String> =
                                         items.iter().map(|c| c.content.id.clone()).collect();
                                     tracing::info!(count = ids.len(), "Loaded local content IDs for replication state");
@@ -873,8 +874,9 @@ impl P2PNode {
             limit: 10000,
             ..Default::default()
         };
+        // Internal startup publish — see all local rows regardless of provenance markers.
         let content_items =
-            match crate::db::content_diesel::list_content(&mut conn, &app_ctx, &query) {
+            match crate::db::content_diesel::list_content(&mut conn, &app_ctx, &query, false) {
                 Ok(items) => items,
                 Err(e) => {
                     warn!(error = %e, "Skipping startup EPR publish — content query failed");
@@ -1655,10 +1657,13 @@ impl P2PNode {
                     offset: offset as i64,
                     ..Default::default()
                 };
-                match crate::db::content_diesel::list_content(&mut conn, &app_ctx, &query) {
+                // P2P shard inventory — internal peer-to-peer protocol, not
+                // web2 HTTP. Peers must see all local rows so replication can
+                // cover pre-drain content.
+                match crate::db::content_diesel::list_content(&mut conn, &app_ctx, &query, false) {
                     Ok(items) => {
                         let total =
-                            crate::db::content_diesel::count_content(&mut conn, &app_ctx, &query)
+                            crate::db::content_diesel::count_content(&mut conn, &app_ctx, &query, false)
                                 .unwrap_or(items.len() as i64) as u64;
                         let inventory: Vec<shard_protocol::ContentInventoryItem> = items
                             .iter()

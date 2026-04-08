@@ -288,11 +288,11 @@ impl HttpServer {
         let query = ContentQuery {
             content_format: Some("html5-app".to_string()),
             limit: 100,
-            require_provenance: true,
             ..Default::default()
         };
 
-        match db::content_diesel::list_content(&mut conn, &app_ctx, &query) {
+        // External slug index — require provenance marker on every row.
+        match db::content_diesel::list_content(&mut conn, &app_ctx, &query, true) {
             Ok(items) => {
                 let mut index = self.slug_index.write().await;
                 index.clear();
@@ -2121,11 +2121,24 @@ impl HttpServer {
 
         // Parse query params via serde — ContentQuery has #[serde(rename_all = "camelCase")]
         // so the compiler enforces camelCase param names (contentType, contentFormat, etc.)
+        // NOTE: ContentQuery deliberately does NOT contain require_provenance — that is a
+        // server-side parameter so clients cannot disable the gate via URL params.
         let query_str = req.uri().query().unwrap_or("");
         let query: ContentQuery = serde_urlencoded::from_str(query_str).unwrap_or_default();
 
         match method {
-            Method::GET => match services.content.list(&query) {
+            Method::GET => {
+                // External read: bypass ContentService::list and call the gated
+                // diesel helper directly with require_provenance=true so
+                // unpublished rows never leak to external clients.
+                let pool = self.db_pool.as_ref().ok_or_else(|| {
+                    StorageError::Internal("Database pool not available".into())
+                })?;
+                let mut conn = pool.get().map_err(|e| {
+                    StorageError::Internal(format!("Failed to get connection: {}", e))
+                })?;
+                let app_ctx = db::AppContext::default_lamad();
+                match db::content_diesel::list_content(&mut conn, &app_ctx, &query, true) {
                 Ok(items) => {
                     // Reach-based filtering: unauthenticated requests only see commons/public
                     let has_auth = req.headers().get(header::AUTHORIZATION).is_some()
@@ -2146,7 +2159,8 @@ impl HttpServer {
                     Ok(response::ok(&body))
                 }
                 Err(e) => Ok(response::error_response(e)),
-            },
+                }
+            }
             Method::POST => {
                 // TODO(p2p-coherence): Populate dht_anchor_hash from post-commit signal.
                 // Currently null for direct storage writes. Backfill needed for pre-coherence data.
@@ -2606,10 +2620,26 @@ impl HttpServer {
 
         match method {
             Method::GET => {
-                let result = services
-                    .content
-                    .get(content_id)
-                    .map(|opt| opt.map(ContentView::from));
+                // External read: bypass ContentService::get (which hardcodes
+                // require_provenance=false for internal callers) and call the
+                // gated diesel helper directly. Unpublished rows must be
+                // invisible to external clients.
+                let pool = self
+                    .db_pool
+                    .as_ref()
+                    .ok_or_else(|| StorageError::Internal("Database pool not available".into()))?;
+                let mut conn = pool.get().map_err(|e| {
+                    StorageError::Internal(format!("Failed to get connection: {}", e))
+                })?;
+                let app_ctx = db::AppContext::default_lamad();
+                let result = db::content_diesel::get_content_with_tags(
+                    &mut conn,
+                    &app_ctx,
+                    content_id,
+                    true, // require_provenance: external HTTP boundary
+                )
+                .map(|opt| opt.map(ContentView::from));
+                drop(conn);
 
                 // Layer 1: Reach-based access control
                 // commons/public serve without auth, restricted content requires authentication
@@ -3464,11 +3494,10 @@ impl HttpServer {
         let query = ContentQuery {
             content_format: Some("html5-app".to_string()),
             limit: 100,
-            require_provenance: true,
             ..Default::default()
         };
 
-        let items = db::content_diesel::list_content(&mut conn, &app_ctx, &query)?;
+        let items = db::content_diesel::list_content(&mut conn, &app_ctx, &query, true)?;
         let mut found_hash = None;
 
         for item in items {

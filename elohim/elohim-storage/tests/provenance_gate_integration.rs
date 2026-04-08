@@ -89,9 +89,9 @@ fn unpublished_content_is_invisible_to_external_reads() {
         &ContentQuery {
             limit: 10,
             offset: 0,
-            require_provenance: true,
             ..Default::default()
         },
+        true, // require_provenance: external HTTP boundary
     )
     .unwrap();
     assert!(
@@ -105,9 +105,9 @@ fn unpublished_content_is_invisible_to_external_reads() {
         &ContentQuery {
             limit: 10,
             offset: 0,
-            require_provenance: false,
             ..Default::default()
         },
+        false, // require_provenance: internal drain/replication path
     )
     .unwrap();
     assert_eq!(internal.len(), 1, "internal reads must still see the row");
