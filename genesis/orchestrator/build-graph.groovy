@@ -74,7 +74,13 @@ def composeGraph(List manifests) {
         graph.pipelines[pipeline] = manifest
 
         manifest.steps.each { stepName, stepDef ->
-            def qualifiedName = "${pipeline}:${stepName}"
+            // .toString() everywhere we build a map key or a value that will be
+            // compared against a map key. Groovy interpolation produces GString,
+            // but JSON-parsed values are String, and GString.equals(String) is
+            // ALWAYS false — which causes containsKey() to silently fail with
+            // the paradoxical "Step X depends on Y which does not exist.
+            // Available steps: ... Y ..." error.
+            def qualifiedName = "${pipeline}:${stepName}".toString()
             graph.steps[qualifiedName] = [
                 pipeline: pipeline,
                 localName: stepName,
@@ -82,7 +88,7 @@ def composeGraph(List manifests) {
                 inputs: stepDef.inputs,
                 outputs: stepDef.outputs,
                 depends: (stepDef.depends ?: []).collect { dep ->
-                    dep.contains(':') ? dep : "${pipeline}:${dep}"
+                    (dep.contains(':') ? dep : "${pipeline}:${dep}").toString()
                 },
                 executor: stepDef.executor,
                 manualOnly: manifest.manualOnly ?: false
