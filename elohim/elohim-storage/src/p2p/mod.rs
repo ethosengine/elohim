@@ -101,8 +101,7 @@ type PendingReplicationFetchMap =
 /// Ordered queue of content IDs discovered as replication gaps, awaiting dispatch.
 /// Populated by discover() on each ListContent response; drained by drain_gap_queue()
 /// at the 5-second dispatch interval, bounded by MAX_REPLICATION_INFLIGHT.
-type ReplicationGapQueue =
-    Arc<tokio::sync::Mutex<std::collections::VecDeque<String>>>;
+type ReplicationGapQueue = Arc<tokio::sync::Mutex<std::collections::VecDeque<String>>>;
 
 use dashmap::DashMap;
 
@@ -643,9 +642,7 @@ impl P2PNode {
             pending_replication_fetches: Arc::new(tokio::sync::Mutex::new(
                 std::collections::HashMap::new(),
             )),
-            gap_queue: Arc::new(tokio::sync::Mutex::new(
-                std::collections::VecDeque::new(),
-            )),
+            gap_queue: Arc::new(tokio::sync::Mutex::new(std::collections::VecDeque::new())),
             extraction_cache: None,
             delivery_peers: Arc::new(DashMap::new()),
         })
@@ -1352,10 +1349,8 @@ impl P2PNode {
                                     );
                                     let remote_ids: Vec<String> =
                                         items.into_iter().map(|i| i.id).collect();
-                                    let new_gaps = self
-                                        .replication_state
-                                        .discover(remote_ids)
-                                        .await;
+                                    let new_gaps =
+                                        self.replication_state.discover(remote_ids).await;
 
                                     if new_gaps.is_empty() {
                                         debug!("No new content to replicate");
@@ -3112,8 +3107,7 @@ impl P2PNode {
 
         debug!(
             dispatching = to_dispatch.len(),
-            in_flight,
-            "Draining replication gap queue"
+            in_flight, "Draining replication gap queue"
         );
 
         for id in &to_dispatch {
