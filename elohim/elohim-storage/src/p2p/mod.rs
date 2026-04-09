@@ -3102,7 +3102,8 @@ impl P2PNode {
             if queue.is_empty() {
                 return;
             }
-            queue.drain(..available.min(queue.len())).collect()
+            let len = queue.len();
+            queue.drain(..available.min(len)).collect()
         };
 
         debug!(
