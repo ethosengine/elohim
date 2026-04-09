@@ -607,7 +607,7 @@ def formatComparisonMatrix(Map pipelinesAnalysis, Map graphStaleMap, Map graph) 
         def matchIcon = match ? '  ✓   ' : '  ✗   '
         def detail = ''
         if (!match && gResult) {
-            detail = graphPipelines[pipeline].reasons.take(1).join()
+            detail = graphPipelines[pipeline].reasons.take(1).join(', ')
         }
         if (!match && !gResult && pResult) {
             detail = 'PIPELINES false positive?'
