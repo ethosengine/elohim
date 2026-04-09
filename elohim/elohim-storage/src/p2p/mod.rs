@@ -1870,6 +1870,17 @@ impl P2PNode {
                 offset,
                 limit,
             } => {
+                // Validate reach_filter against schema-generated constants so
+                // unknown strings don't silently return empty results.
+                if let Some(ref r) = reach_filter {
+                    if !crate::generated_enums::CORE_REACH_LEVELS.contains(&r.as_str()) {
+                        return ShardResponse::Error(format!(
+                            "Unknown reach level {:?}. Valid values: {:?}",
+                            r,
+                            crate::generated_enums::CORE_REACH_LEVELS
+                        ));
+                    }
+                }
                 let pool = match self.db_pool.as_ref() {
                     Some(p) => p,
                     None => return ShardResponse::Error("No database pool".to_string()),
@@ -3007,10 +3018,12 @@ impl P2PNode {
             return;
         }
 
-        // Phase 1: Discover — query first connected peer for commons content inventory
+        // Phase 1: Discover — query first connected peer for full content inventory.
+        // reach_filter: None replicates all content regardless of reach level.
+        // To restrict by reach, use a value from `crate::generated_enums::CORE_REACH_LEVELS`.
         let peer = peers[0];
         let request = ShardRequest::ListContent {
-            reach_filter: Some("commons".to_string()),
+            reach_filter: None,
             offset: 0,
             limit: 5000,
         };

@@ -30,7 +30,9 @@ pub enum ShardRequest {
     Push { hash: String, data: Vec<u8> },
     /// List content inventory (EPR Head summaries for replication discovery)
     ListContent {
-        /// Filter by reach level (e.g., "commons"). None = all reachable content.
+        /// Filter by reach level. None = all reachable content.
+        /// Valid values are defined in `crate::generated_enums::CORE_REACH_LEVELS`
+        /// (e.g., "public", "commons"). Must match the stored DB value exactly.
         reach_filter: Option<String>,
         /// Pagination offset
         offset: u32,
