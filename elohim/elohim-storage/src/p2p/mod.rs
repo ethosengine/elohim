@@ -562,6 +562,8 @@ impl P2PNode {
                 yamux::Config::default,
             )
             .map_err(|e| StorageError::P2PNetwork(format!("Transport error: {}", e)))?
+            .with_dns()
+            .map_err(|e| StorageError::P2PNetwork(format!("DNS error: {}", e)))?
             .with_relay_client(noise::Config::new, yamux::Config::default)
             .map_err(|e| StorageError::P2PNetwork(format!("Relay client error: {}", e)))?
             .with_behaviour(|key, relay_client| {

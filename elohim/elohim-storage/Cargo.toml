@@ -125,6 +125,7 @@ zip = { version = "2.2", default-features = false, features = ["deflate"] }
 # https://github.com/libp2p/rust-libp2p
 libp2p = { version = "0.54", features = [
     "tcp",              # TCP transport
+    "dns",              # DNS resolution for /dns4/... multiaddrs
     "noise",            # Noise protocol encryption
     "yamux",            # Stream multiplexing
     "kad",              # Kademlia DHT
