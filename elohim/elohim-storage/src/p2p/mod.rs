@@ -98,6 +98,12 @@ type PendingVerificationMap = Arc<
 type PendingReplicationFetchMap =
     Arc<tokio::sync::Mutex<std::collections::HashMap<request_response::OutboundRequestId, String>>>;
 
+/// Ordered queue of content IDs discovered as replication gaps, awaiting dispatch.
+/// Populated by discover() on each ListContent response; drained by drain_gap_queue()
+/// at the 5-second dispatch interval, bounded by MAX_REPLICATION_INFLIGHT.
+type ReplicationGapQueue =
+    Arc<tokio::sync::Mutex<std::collections::VecDeque<String>>>;
+
 use dashmap::DashMap;
 
 use crate::blob_store::BlobStore;
@@ -211,6 +217,10 @@ pub struct P2PNode {
     /// Maps in-flight replication GetContent request IDs to content IDs.
     /// Used to clean up replication state when requests fail.
     pending_replication_fetches: PendingReplicationFetchMap,
+    /// Ordered queue of content IDs awaiting replication dispatch.
+    /// drain_gap_queue() consumes from this at a rate bounded by
+    /// MAX_REPLICATION_INFLIGHT, decoupling discovery from dispatch.
+    gap_queue: ReplicationGapQueue,
     /// Extraction cache for delivery capability advertisement
     extraction_cache: Option<Arc<ExtractionCache>>,
     /// Discovered peers with delivery capabilities (populated from mDNS + identify)
@@ -633,6 +643,9 @@ impl P2PNode {
             pending_replication_fetches: Arc::new(tokio::sync::Mutex::new(
                 std::collections::HashMap::new(),
             )),
+            gap_queue: Arc::new(tokio::sync::Mutex::new(
+                std::collections::VecDeque::new(),
+            )),
             extraction_cache: None,
             delivery_peers: Arc::new(DashMap::new()),
         })
@@ -740,6 +753,11 @@ impl P2PNode {
         verify_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
         let mut replication_interval = tokio::time::interval(Duration::from_secs(60));
         replication_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+        // Drain the replication gap queue every 5 seconds during bootstrap.
+        // Dispatches up to MAX_REPLICATION_INFLIGHT items per tick; idle
+        // (no-ops) when the queue is empty.
+        let mut gap_dispatch_interval = tokio::time::interval(Duration::from_secs(5));
+        gap_dispatch_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
         // Delay first tick by the full retry interval so it doesn't race with the
         // initial dials queued by start(). start() owns t=0 dialing; this loop owns
         // subsequent attempts.
@@ -783,6 +801,10 @@ impl P2PNode {
                 _ = replication_interval.tick() => {
                     drop(swarm);
                     self.run_replication_cycle().await;
+                }
+                _ = gap_dispatch_interval.tick() => {
+                    drop(swarm);
+                    self.drain_gap_queue().await;
                 }
                 _ = drain_interval.tick() => {
                     drop(swarm);
@@ -1330,14 +1352,9 @@ impl P2PNode {
                                     );
                                     let remote_ids: Vec<String> =
                                         items.into_iter().map(|i| i.id).collect();
-                                    // Cap items queued per cycle. Sized so the peer can respond
-                                    // within the 30s request timeout (~16 req/s × 18s ≈ 300).
-                                    // Unqueued items are not in `pending`, so the next cycle's
-                                    // discover() picks them up automatically.
-                                    const REPLICATION_CYCLE_MAX: usize = 300;
                                     let new_gaps = self
                                         .replication_state
-                                        .discover(remote_ids, REPLICATION_CYCLE_MAX)
+                                        .discover(remote_ids)
                                         .await;
 
                                     if new_gaps.is_empty() {
@@ -1346,9 +1363,11 @@ impl P2PNode {
                                     } else {
                                         info!(
                                             gaps = new_gaps.len(),
-                                            "Discovered content gaps, starting fetch"
+                                            "Queued content gaps for replication"
                                         );
-                                        self.fetch_missing_content(peer, new_gaps).await;
+                                        // Enqueue — drain_gap_queue() dispatches adaptively
+                                        // on the 5s interval, bounded by MAX_REPLICATION_INFLIGHT.
+                                        self.gap_queue.lock().await.extend(new_gaps);
                                     }
                                 }
                                 ShardResponse::Content(record) => {
@@ -3011,11 +3030,22 @@ impl P2PNode {
         }
     }
 
-    /// Run one cycle of identity-driven replication.
+    /// Run one cycle of replication discovery.
     ///
-    /// Discovers content from peers, filters by reach (commons this sprint),
-    /// fetches missing records, stores locally, and republishes EPR Heads.
+    /// Sends a ListContent request to discover gaps in this node's content
+    /// relative to a connected peer. Gaps are added to the gap_queue and
+    /// dispatched adaptively by drain_gap_queue() on the 5s interval.
+    ///
+    /// Skips if the gap queue is still draining from a previous cycle —
+    /// drain fully first, then rediscover to find any remaining items.
     async fn run_replication_cycle(&self) {
+        // Don't re-query while the queue is still draining — unnecessary
+        // network traffic and discover() would skip pending items anyway.
+        if !self.gap_queue.lock().await.is_empty() {
+            debug!("Replication cycle: gap queue non-empty, waiting for drain");
+            return;
+        }
+
         let swarm = self.swarm.read().await;
         let peers: Vec<PeerId> = swarm.connected_peers().cloned().collect();
         drop(swarm);
@@ -3025,9 +3055,8 @@ impl P2PNode {
             return;
         }
 
-        // Phase 1: Discover — query first connected peer for full content inventory.
-        // reach_filter: None replicates all content regardless of reach level.
-        // To restrict by reach, use a value from `crate::generated_enums::CORE_REACH_LEVELS`.
+        // Query peer for full content inventory. reach_filter: None = all content.
+        // To filter by reach, use a value from `crate::generated_enums::CORE_REACH_LEVELS`.
         let peer = peers[0];
         let request = ShardRequest::ListContent {
             reach_filter: None,
@@ -3043,36 +3072,62 @@ impl P2PNode {
         drop(swarm);
 
         debug!(peer = %peer, request_id = ?request_id, "Sent ListContent for replication discovery");
-        // Response handled in shard response handler
+        // Response handled in handle_shard_response → ContentList branch
     }
 
-    /// Fetch missing content records from a peer.
+    /// Dispatch replication fetches from the gap queue, bounded by in-flight count.
     ///
-    /// Sends requests in small batches with a delay between them so the peer's
-    /// event loop can process and respond before the next batch arrives.
-    /// The swarm event loop is blocked for the duration of this call (select!
-    /// can't run while we're awaiting here), so per-batch size controls the
-    /// maximum queue depth at the peer at any given moment.
-    async fn fetch_missing_content(&self, peer: PeerId, content_ids: Vec<String>) {
-        let batch_size = 20;
-        let batch_delay = Duration::from_millis(250);
+    /// Called every 5 seconds from the event loop. Checks how many GetContent
+    /// requests are currently in flight and dispatches up to
+    /// `MAX_REPLICATION_INFLIGHT - in_flight` more from the gap queue.
+    ///
+    /// This makes the dispatch rate a natural function of peer response speed:
+    /// fast peer → completions arrive quickly → slots free up → more dispatched.
+    /// slow peer → slots stay occupied → fewer dispatched per tick.
+    /// No sleeps, no blocking — the event loop stays responsive throughout.
+    async fn drain_gap_queue(&self) {
+        const MAX_REPLICATION_INFLIGHT: usize = 50;
 
-        for chunk in content_ids.chunks(batch_size) {
-            for id in chunk {
-                let request = ShardRequest::GetContent { id: id.clone() };
-                let mut swarm = self.swarm.write().await;
-                let request_id = swarm
-                    .behaviour_mut()
-                    .shard_protocol
-                    .send_request(&peer, request);
-                drop(swarm);
-                self.pending_replication_fetches
-                    .lock()
-                    .await
-                    .insert(request_id, id.clone());
+        let peers: Vec<PeerId> = {
+            let swarm = self.swarm.read().await;
+            swarm.connected_peers().cloned().collect()
+        };
+        let Some(peer) = peers.first().copied() else {
+            return; // No peer connected — items stay in queue
+        };
+
+        let in_flight = self.pending_replication_fetches.lock().await.len();
+        let available = MAX_REPLICATION_INFLIGHT.saturating_sub(in_flight);
+        if available == 0 {
+            return; // At capacity — wait for completions to free slots
+        }
+
+        let to_dispatch: Vec<String> = {
+            let mut queue = self.gap_queue.lock().await;
+            if queue.is_empty() {
+                return;
             }
-            // Self-pace: let SQLite breathe between batches
-            tokio::time::sleep(batch_delay).await;
+            queue.drain(..available.min(queue.len())).collect()
+        };
+
+        debug!(
+            dispatching = to_dispatch.len(),
+            in_flight,
+            "Draining replication gap queue"
+        );
+
+        for id in &to_dispatch {
+            let request = ShardRequest::GetContent { id: id.clone() };
+            let mut swarm = self.swarm.write().await;
+            let request_id = swarm
+                .behaviour_mut()
+                .shard_protocol
+                .send_request(&peer, request);
+            drop(swarm);
+            self.pending_replication_fetches
+                .lock()
+                .await
+                .insert(request_id, id.clone());
         }
     }
 
