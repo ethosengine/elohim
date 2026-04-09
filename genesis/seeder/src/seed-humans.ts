@@ -120,7 +120,13 @@ async function registerHuman(
       return await verifyExisting(doorwayUrl, creds, human.displayName);
     }
 
+    // 503 with "Agent already has a Human profile" means the Holochain DHT has the identity
+    // but doorway didn't return 409 (e.g. doorway DB was cleared but conductor wasn't reset).
+    // Treat as "exists" and verify via login.
     const errorText = await res.text();
+    if (res.status === 503 && errorText.includes('Agent already has a Human profile')) {
+      return await verifyExisting(doorwayUrl, creds, human.displayName);
+    }
     return {
       displayName: human.displayName,
       identifier: creds.identifier,
