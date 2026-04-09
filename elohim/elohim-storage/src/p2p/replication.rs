@@ -74,18 +74,28 @@ impl ReplicationState {
         inner.local_ids = ids;
     }
 
-    /// Discover content from a peer inventory. Returns IDs that are new gaps.
-    pub async fn discover(&self, remote_ids: Vec<String>) -> Vec<String> {
+    /// Discover content from a peer inventory. Returns IDs that are new gaps,
+    /// capped at `limit` per call.
+    ///
+    /// The full `remote_ids` slice is scanned so already-completed/pending items
+    /// are correctly skipped, but at most `limit` new items are added to the
+    /// pending queue. Items not queued this cycle are not in `pending`, so the
+    /// next call to `discover` (on the following replication cycle) will pick
+    /// them up naturally. This bounds the number of concurrent GetContent
+    /// requests dispatched to a peer per cycle.
+    pub async fn discover(&self, remote_ids: Vec<String>, limit: usize) -> Vec<String> {
         let mut inner = self.inner.write().await;
         let mut new_gaps = Vec::new();
         for id in remote_ids {
+            if new_gaps.len() >= limit {
+                break;
+            }
             if inner.local_ids.contains(&id)
                 || inner.completed.contains(&id)
                 || inner.pending.contains(&id)
             {
                 continue;
             }
-            // Skip if already failed max times
             if inner.failed.get(&id).copied().unwrap_or(0) >= MAX_RETRIES {
                 continue;
             }
@@ -104,16 +114,18 @@ impl ReplicationState {
         inner.local_ids.insert(id.to_string());
     }
 
-    /// Mark a content ID as failed (will retry up to MAX_RETRIES)
+    /// Mark a content ID as failed (will retry up to MAX_RETRIES).
+    ///
+    /// Items are removed from pending but NOT re-queued here. `discover()` will
+    /// re-include them on the next replication cycle (when the peer re-advertises
+    /// its inventory) if `fail_count < MAX_RETRIES`. This prevents a burst of
+    /// timed-out requests from being immediately re-dispatched, which was the
+    /// mechanism that caused replication to freeze at a partial completion count.
     pub async fn mark_failed(&self, id: &str) {
         let mut inner = self.inner.write().await;
         inner.pending.remove(id);
         let count = inner.failed.entry(id.to_string()).or_insert(0);
         *count += 1;
-        // Re-queue if under retry limit
-        if *count < MAX_RETRIES {
-            inner.pending.insert(id.to_string());
-        }
     }
 
     /// Check if all discovered content is fetched or exhausted retries
@@ -146,7 +158,7 @@ mod tests {
             .iter()
             .map(|s| s.to_string())
             .collect();
-        let gaps = state.discover(remote).await;
+        let gaps = state.discover(remote, 1000).await;
 
         assert_eq!(gaps.len(), 2);
         assert!(gaps.contains(&"d".to_string()));
@@ -163,7 +175,7 @@ mod tests {
         let state = ReplicationState::new();
         state.set_local_ids(HashSet::new()).await;
 
-        state.discover(vec!["x".to_string()]).await;
+        state.discover(vec!["x".to_string()], 1000).await;
         assert_eq!(state.status().await.pending, 1);
 
         state.mark_completed("x").await;
@@ -180,22 +192,38 @@ mod tests {
         let state = ReplicationState::new();
         state.set_local_ids(HashSet::new()).await;
 
-        state.discover(vec!["y".to_string()]).await;
+        state.discover(vec!["y".to_string()], 1000).await;
         assert_eq!(state.status().await.pending, 1);
 
-        // First failure (count=1, still < MAX_RETRIES=3) → re-queued
+        // First failure: removed from pending, NOT re-queued immediately.
+        // discover() on the next cycle will re-add it (fail_count=1 < MAX_RETRIES=3).
         state.mark_failed("y").await;
+        let s = state.status().await;
+        assert_eq!(s.pending, 0);
+        assert_eq!(s.failed, 1);
+
+        // Simulate next cycle: discover re-queues the item (count < MAX_RETRIES)
+        let gaps = state.discover(vec!["y".to_string()], 1000).await;
+        assert_eq!(gaps.len(), 1);
         assert_eq!(state.status().await.pending, 1);
 
-        // Second failure (count=2, still < 3) → re-queued
+        // Second failure
         state.mark_failed("y").await;
-        assert_eq!(state.status().await.pending, 1);
+        assert_eq!(state.status().await.pending, 0);
 
-        // Third failure (count=3, not < 3) → dropped from pending, stays in failed
+        // Simulate next cycle again
+        let gaps = state.discover(vec!["y".to_string()], 1000).await;
+        assert_eq!(gaps.len(), 1);
+
+        // Third failure: exhausted MAX_RETRIES
         state.mark_failed("y").await;
-        let status = state.status().await;
-        assert_eq!(status.pending, 0);
-        assert_eq!(status.failed, 1);
+
+        // discover() no longer re-queues (fail_count=3 >= MAX_RETRIES=3)
+        let gaps = state.discover(vec!["y".to_string()], 1000).await;
+        assert_eq!(gaps.len(), 0);
+        let s = state.status().await;
+        assert_eq!(s.pending, 0);
+        assert_eq!(s.failed, 1);
     }
 
     #[tokio::test]
@@ -205,7 +233,7 @@ mod tests {
         state.set_local_ids(local).await;
 
         // Discover only items already held locally — no gaps expected
-        let gaps = state.discover(vec!["a".to_string(), "b".to_string()]).await;
+        let gaps = state.discover(vec!["a".to_string(), "b".to_string()], 1000).await;
         assert_eq!(gaps.len(), 0);
         assert_eq!(state.status().await.pending, 0);
     }

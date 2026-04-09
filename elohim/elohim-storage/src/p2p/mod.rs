@@ -1330,8 +1330,15 @@ impl P2PNode {
                                     );
                                     let remote_ids: Vec<String> =
                                         items.into_iter().map(|i| i.id).collect();
-                                    let new_gaps =
-                                        self.replication_state.discover(remote_ids).await;
+                                    // Cap items queued per cycle. Sized so the peer can respond
+                                    // within the 30s request timeout (~16 req/s × 18s ≈ 300).
+                                    // Unqueued items are not in `pending`, so the next cycle's
+                                    // discover() picks them up automatically.
+                                    const REPLICATION_CYCLE_MAX: usize = 300;
+                                    let new_gaps = self
+                                        .replication_state
+                                        .discover(remote_ids, REPLICATION_CYCLE_MAX)
+                                        .await;
 
                                     if new_gaps.is_empty() {
                                         debug!("No new content to replicate");
@@ -3040,9 +3047,15 @@ impl P2PNode {
     }
 
     /// Fetch missing content records from a peer.
+    ///
+    /// Sends requests in small batches with a delay between them so the peer's
+    /// event loop can process and respond before the next batch arrives.
+    /// The swarm event loop is blocked for the duration of this call (select!
+    /// can't run while we're awaiting here), so per-batch size controls the
+    /// maximum queue depth at the peer at any given moment.
     async fn fetch_missing_content(&self, peer: PeerId, content_ids: Vec<String>) {
-        let batch_size = 50;
-        let batch_delay = Duration::from_millis(100);
+        let batch_size = 20;
+        let batch_delay = Duration::from_millis(250);
 
         for chunk in content_ids.chunks(batch_size) {
             for id in chunk {
