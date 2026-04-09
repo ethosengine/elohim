@@ -591,6 +591,16 @@ def getKnownDivergences() {
         'elohim-orchestrator',      // genesis/orchestrator/build-manifest.json
                                     // (covers the orchestrator's own self-edits;
                                     // legacy treats those as CI-only via ciOnlyFiles)
+
+        // Baseline-skew: manifest uses the global __global__ baseline while legacy
+        // uses per-pipeline baselines. When a build fails at the divergence check,
+        // __global__ advances but per-pipeline baselines don't. The next run's global
+        // changedFiles is smaller than the per-pipeline changeset, so the two algorithms
+        // may disagree on whether these pipelines need to build.
+        // Resolution (Sprint 2): replace legacy algorithm with the manifest graph,
+        // or make the manifest graph use per-step lastBuiltCommit for source change detection.
+        'elohim-edge',
+        'elohim-genesis',
     ]
 }
 

@@ -92,9 +92,16 @@
       "executor": { "stage": "Lint A2O", "function": null }
     },
     "gate-genesis": {
-      "description": "Catch-all trigger for genesis directory quality gate",
+      "description": "Catch-all trigger for genesis directory quality gate (excludes orchestrator CI glue)",
       "inputs": {
-        "sources": ["genesis/**"],
+        "sources": [
+          "genesis/seeds/**",
+          "genesis/data/**",
+          "genesis/a2o/**",
+          "genesis/seeder/**",
+          "genesis/scripts/**",
+          "genesis/Jenkinsfile"
+        ],
         "buildProcess": []
       },
       "outputs": { "artifacts": [], "verify": null },
