@@ -297,7 +297,19 @@ def checkBuildProcessChanges(Map step, Map buildState, String qualifiedName, Lis
         }
 
         def previousHash = buildState?.stepStates?.get(qualifiedName)?.buildProcessHashes?.get(ref)
-        if (previousHash == null || currentHash != previousHash) {
+        if (previousHash == null) {
+            // No stored hash — either a new buildProcess ref or a hash-algorithm migration
+            // (e.g. MessageDigest → sha256sum across recent orchestrator fixes). In both cases
+            // comparing is meaningless. Fall back to cold-start semantics: only stale if the
+            // file is actually in the current changeset. Current hash is still recorded so the
+            // next run can do a real comparison.
+            if (changedFiles != null && changedFiles.contains(fileName)) {
+                def label = funcName ? "${fileName}@${funcName}" : fileName
+                return [stale: true, reason: "buildProcess: ${label} in changeset (no prior hash)", hashes: currentHashes]
+            }
+            continue
+        }
+        if (currentHash != previousHash) {
             def label = funcName ? "${fileName}@${funcName}" : fileName
             return [stale: true, reason: "buildProcess: ${label} hash changed", hashes: currentHashes]
         }
