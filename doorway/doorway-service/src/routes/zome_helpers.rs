@@ -56,6 +56,26 @@ pub async fn call_create_human(state: &AppState, input: CreateHumanInput) -> Res
     Ok(result)
 }
 
+/// Call imagodei::get_my_human via ZomeCaller
+///
+/// Returns the existing Human profile for the calling agent, or None if not found.
+/// Used to recover an existing identity when create_human is rejected because the
+/// agent already has a profile (e.g. doorway DB cleared but conductor not reset).
+pub async fn call_get_my_human(state: &AppState) -> Result<Option<HumanOutput>> {
+    let zome_caller = state.zome_caller.as_ref().ok_or_else(|| {
+        DoorwayError::Internal("ZomeCaller not available - conductor not configured?".into())
+    })?;
+
+    debug!("Calling get_my_human on imagodei zome via ZomeCaller");
+
+    let result: Option<HumanOutput> = zome_caller
+        .call("imagodei", "imagodei", "get_my_human", &())
+        .await
+        .map_err(|e| DoorwayError::Holochain(format!("get_my_human failed: {e}")))?;
+
+    Ok(result)
+}
+
 /// Get agent public key from the imagodei zome config
 ///
 /// Returns the agent public key that the conductor uses for this app.

@@ -30,7 +30,9 @@ use crate::db::schemas::{
     get_registered_clients, validate_redirect_uri, OAuthSessionDoc, UserDoc,
     OAUTH_SESSION_COLLECTION, USER_COLLECTION,
 };
-use crate::routes::zome_helpers::{call_create_human, get_agent_pub_key, CreateHumanInput};
+use crate::routes::zome_helpers::{
+    call_create_human, call_get_my_human, get_agent_pub_key, CreateHumanInput,
+};
 use crate::server::AppState;
 use crate::types::DoorwayError;
 use rand::Rng;
@@ -661,96 +663,156 @@ async fn handle_register(
     };
 
     // For doorway-hosted registration, create identity via imagodei zome
-    let (human_id, agent_pub_key, profile) =
-        if body.human_id.is_empty() || body.agent_pub_key.is_empty() {
-            // Generate UUID for human_id
-            let generated_human_id = uuid::Uuid::new_v4().to_string();
+    let (human_id, agent_pub_key, profile) = if body.human_id.is_empty()
+        || body.agent_pub_key.is_empty()
+    {
+        // Generate UUID for human_id
+        let generated_human_id = uuid::Uuid::new_v4().to_string();
 
-            // Try to call imagodei zome (only if conductor is connected)
-            let zome_result = call_create_human(
-                &state,
-                CreateHumanInput {
-                    id: generated_human_id.clone(),
-                    display_name: display_name.clone(),
-                    bio: body.bio.clone(),
-                    affinities: body.affinities.clone(),
-                    profile_reach: body.profile_reach.clone(),
-                    location: body.location.clone(),
-                },
-            )
-            .await;
+        // Try to call imagodei zome (only if conductor is connected)
+        let zome_result = call_create_human(
+            &state,
+            CreateHumanInput {
+                id: generated_human_id.clone(),
+                display_name: display_name.clone(),
+                bio: body.bio.clone(),
+                affinities: body.affinities.clone(),
+                profile_reach: body.profile_reach.clone(),
+                location: body.location.clone(),
+            },
+        )
+        .await;
 
-            match zome_result {
-                Ok(human_output) => {
-                    // Get agent_pub_key from discovered zome config
-                    let agent_key = match get_agent_pub_key(&state) {
-                        Ok(k) => k,
-                        Err(e) => {
-                            warn!("Failed to get agent_pub_key: {}", e);
-                            return json_response(
-                                StatusCode::INTERNAL_SERVER_ERROR,
-                                &ErrorResponse {
-                                    error: "Failed to get agent identity".into(),
-                                    code: Some("AGENT_KEY_ERROR".into()),
-                                },
-                            );
-                        }
-                    };
-
-                    info!(
-                        "Created Holochain identity via imagodei zome: {} (display_name={})",
-                        human_output.human.id, display_name
-                    );
-
-                    let profile = HumanProfileResponse {
-                        id: human_output.human.id.clone(),
-                        display_name: human_output.human.display_name,
-                        bio: human_output.human.bio,
-                        affinities: human_output.human.affinities,
-                        profile_reach: human_output.human.profile_reach,
-                        location: human_output.human.location,
-                        created_at: human_output.human.created_at,
-                        updated_at: human_output.human.updated_at,
-                    };
-
-                    (human_output.human.id, agent_key, Some(profile))
-                }
-                Err(e) => {
-                    // Zome call failed - check if we should fall back to placeholder (dev mode)
-                    if state.args.dev_mode {
-                        warn!("Imagodei zome unavailable, using dev fallback: {}", e);
-                        // Generate deterministic IDs for dev mode
-                        use sha2::{Digest, Sha256};
-                        let mut hasher = Sha256::new();
-                        hasher.update(body.identifier.as_bytes());
-                        hasher.update(b"human_id_salt");
-                        let hash = hasher.finalize();
-                        let human_id = format!("uhCHk{}", hex::encode(&hash[..20]));
-
-                        let mut hasher2 = Sha256::new();
-                        hasher2.update(body.identifier.as_bytes());
-                        hasher2.update(b"agent_pub_key_salt");
-                        let hash2 = hasher2.finalize();
-                        let agent_pub_key = format!("uhCAk{}", hex::encode(&hash2[..20]));
-
-                        (human_id, agent_pub_key, None)
-                    } else {
-                        // Production mode - fail if zome unavailable
-                        warn!("Failed to create identity via imagodei zome: {}", e);
+        match zome_result {
+            Ok(human_output) => {
+                // Get agent_pub_key from discovered zome config
+                let agent_key = match get_agent_pub_key(&state) {
+                    Ok(k) => k,
+                    Err(e) => {
+                        warn!("Failed to get agent_pub_key: {}", e);
                         return json_response(
-                            StatusCode::SERVICE_UNAVAILABLE,
+                            StatusCode::INTERNAL_SERVER_ERROR,
                             &ErrorResponse {
-                                error: format!("Failed to create Holochain identity: {e}"),
-                                code: Some("IDENTITY_CREATION_FAILED".into()),
+                                error: "Failed to get agent identity".into(),
+                                code: Some("AGENT_KEY_ERROR".into()),
                             },
                         );
                     }
+                };
+
+                info!(
+                    "Created Holochain identity via imagodei zome: {} (display_name={})",
+                    human_output.human.id, display_name
+                );
+
+                let profile = HumanProfileResponse {
+                    id: human_output.human.id.clone(),
+                    display_name: human_output.human.display_name,
+                    bio: human_output.human.bio,
+                    affinities: human_output.human.affinities,
+                    profile_reach: human_output.human.profile_reach,
+                    location: human_output.human.location,
+                    created_at: human_output.human.created_at,
+                    updated_at: human_output.human.updated_at,
+                };
+
+                (human_output.human.id, agent_key, Some(profile))
+            }
+            Err(e) => {
+                let err_str = e.to_string();
+
+                // Agent already has a Human profile in the DHT (conductor not reset but DB was
+                // cleared). Recover by fetching the existing profile and continuing to create
+                // the DB record with the supplied credentials.
+                if err_str.contains("Agent already has a Human profile") {
+                    warn!(
+                        identifier = %body.identifier,
+                        "Agent already has Human profile in DHT — recovering existing identity for DB re-registration"
+                    );
+                    match call_get_my_human(&state).await {
+                        Ok(Some(existing)) => {
+                            let agent_key = match get_agent_pub_key(&state) {
+                                Ok(k) => k,
+                                Err(e2) => {
+                                    warn!("Failed to get agent_pub_key during recovery: {}", e2);
+                                    return json_response(
+                                        StatusCode::INTERNAL_SERVER_ERROR,
+                                        &ErrorResponse {
+                                            error: "Failed to get agent identity during recovery"
+                                                .into(),
+                                            code: Some("AGENT_KEY_ERROR".into()),
+                                        },
+                                    );
+                                }
+                            };
+                            let profile = HumanProfileResponse {
+                                id: existing.human.id.clone(),
+                                display_name: existing.human.display_name,
+                                bio: existing.human.bio,
+                                affinities: existing.human.affinities,
+                                profile_reach: existing.human.profile_reach,
+                                location: existing.human.location,
+                                created_at: existing.human.created_at,
+                                updated_at: existing.human.updated_at,
+                            };
+                            (existing.human.id, agent_key, Some(profile))
+                        }
+                        Ok(None) => {
+                            warn!("get_my_human returned None despite 'already has profile' error");
+                            return json_response(
+                                StatusCode::SERVICE_UNAVAILABLE,
+                                &ErrorResponse {
+                                    error: format!("Failed to create Holochain identity: {e}"),
+                                    code: Some("IDENTITY_CREATION_FAILED".into()),
+                                },
+                            );
+                        }
+                        Err(e2) => {
+                            warn!("Failed to recover existing Human profile: {}", e2);
+                            return json_response(
+                                StatusCode::SERVICE_UNAVAILABLE,
+                                &ErrorResponse {
+                                    error: format!("Failed to create Holochain identity: {e}"),
+                                    code: Some("IDENTITY_CREATION_FAILED".into()),
+                                },
+                            );
+                        }
+                    }
+                // Zome call failed - check if we should fall back to placeholder (dev mode)
+                } else if state.args.dev_mode {
+                    warn!("Imagodei zome unavailable, using dev fallback: {}", e);
+                    // Generate deterministic IDs for dev mode
+                    use sha2::{Digest, Sha256};
+                    let mut hasher = Sha256::new();
+                    hasher.update(body.identifier.as_bytes());
+                    hasher.update(b"human_id_salt");
+                    let hash = hasher.finalize();
+                    let human_id = format!("uhCHk{}", hex::encode(&hash[..20]));
+
+                    let mut hasher2 = Sha256::new();
+                    hasher2.update(body.identifier.as_bytes());
+                    hasher2.update(b"agent_pub_key_salt");
+                    let hash2 = hasher2.finalize();
+                    let agent_pub_key = format!("uhCAk{}", hex::encode(&hash2[..20]));
+
+                    (human_id, agent_pub_key, None)
+                } else {
+                    // Production mode - fail if zome unavailable
+                    warn!("Failed to create identity via imagodei zome: {}", e);
+                    return json_response(
+                        StatusCode::SERVICE_UNAVAILABLE,
+                        &ErrorResponse {
+                            error: format!("Failed to create Holochain identity: {e}"),
+                            code: Some("IDENTITY_CREATION_FAILED".into()),
+                        },
+                    );
                 }
             }
-        } else {
-            // human_id and agent_pub_key provided (legacy/external registration)
-            (body.human_id.clone(), body.agent_pub_key.clone(), None)
-        };
+        }
+    } else {
+        // human_id and agent_pub_key provided (legacy/external registration)
+        (body.human_id.clone(), body.agent_pub_key.clone(), None)
+    };
 
     // Attempt agent provisioning on a conductor (non-fatal)
     let provisioned = if let Some(registry) = &state.conductor_registry {
