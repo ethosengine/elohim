@@ -245,10 +245,20 @@ def sha256(String content) {
     return hash
 }
 
-def checkBuildProcessChanges(Map step, Map buildState, String qualifiedName) {
+def checkBuildProcessChanges(Map step, Map buildState, String qualifiedName, List changedFiles) {
     def refs = step.inputs?.buildProcess ?: []
     if (refs.isEmpty()) return [stale: false, hashes: [:]]
 
+    // Cold-start semantics: when there is no previous build state at all,
+    // hash comparison is meaningless (every previousHash will be null, which
+    // would mark every buildProcess-referencing step stale — producing a
+    // false-positive divergence against the legacy PIPELINES algorithm and
+    // locking the pipeline out of ever reaching a successful build to
+    // archive state from). Instead, fall back to changeset membership:
+    // a buildProcess file is "stale" on cold start only if it's actually in
+    // the current changeset. Hashes are still computed + returned so the
+    // next run (with a baseline) can do real comparisons.
+    def coldStart = (buildState?.lastSuccessfulCommit == null)
     def currentHashes = [:]
 
     for (def ref : refs) {
@@ -277,6 +287,14 @@ def checkBuildProcessChanges(Map step, Map buildState, String qualifiedName) {
 
         def currentHash = sha256(contentToHash)
         currentHashes[ref] = currentHash
+
+        if (coldStart) {
+            if (changedFiles != null && changedFiles.contains(fileName)) {
+                def label = funcName ? "${fileName}@${funcName}" : fileName
+                return [stale: true, reason: "buildProcess: ${label} in changeset (cold start)", hashes: currentHashes]
+            }
+            continue
+        }
 
         def previousHash = buildState?.stepStates?.get(qualifiedName)?.buildProcessHashes?.get(ref)
         if (previousHash == null || currentHash != previousHash) {
@@ -320,7 +338,7 @@ def detectAllStaleness(Map graph, List changedFiles, Map buildState) {
             continue
         }
 
-        def processResult = checkBuildProcessChanges(step, buildState, name)
+        def processResult = checkBuildProcessChanges(step, buildState, name, changedFiles)
         allHashes[name] = processResult.hashes
         if (processResult.stale) {
             staleMap[name] = [stale: true, reason: processResult.reason]
@@ -756,7 +774,7 @@ def walkBuildGraph(List changedFiles) {
     if (buildState.lastSuccessfulCommit) {
         echo "Previous build state: commit ${buildState.lastSuccessfulCommit}, ${buildState.stepStates.size()} step hashes"
     } else {
-        echo "No previous build state — all steps with buildProcess references will be marked stale"
+        echo "No previous build state — buildProcess staleness will be determined from the current changeset only (cold start)"
     }
 
     def detection = detectAllStaleness(graph, changedFiles, buildState)
