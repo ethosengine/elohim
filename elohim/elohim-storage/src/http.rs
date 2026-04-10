@@ -1822,11 +1822,20 @@ impl HttpServer {
         // to prevent them from being misinterpreted as h_app_id values.
         let legacy_prefixes = [
             // Core content routes
-            "content", "stats", "schema",
+            "content",
+            "stats",
+            "schema",
             // Diesel entity routes
-            "collectives", "humans", "human-relationships",
-            "presences", "events", "mastery", "allocations",
-            "nodes", "relationships", "knowledge-maps",
+            "collectives",
+            "humans",
+            "human-relationships",
+            "presences",
+            "events",
+            "mastery",
+            "allocations",
+            "nodes",
+            "relationships",
+            "knowledge-maps",
         ];
         for prefix in &legacy_prefixes {
             if sub_path == *prefix || sub_path.starts_with(&format!("{}/", prefix)) {
