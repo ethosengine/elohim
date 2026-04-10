@@ -26,3 +26,18 @@ check:
 
 # Quality gate: install + validate + test
 gate: install validate test
+
+# =============================================================================
+# Seeding Recipes
+# =============================================================================
+
+# Seed conductor identities for node/device humans (run BEFORE seed-humans)
+seed-conductors:
+    pnpm run seed:conductors
+
+# Seed humans via doorway registration (run AFTER seed-conductors)
+seed-humans:
+    pnpm run seed:humans
+
+# Full seed: conductor identities first, then doorway registration
+seed: seed-conductors seed-humans
