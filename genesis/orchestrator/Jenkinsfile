@@ -146,9 +146,9 @@ def runP2PValidation(String environment, String doorwayUrl) {
                 exit 0
             fi
 
-            PEERS=\$(echo "\$HEALTH" | python3 -c "import sys,json; d=json.load(sys.stdin); p=d.get('p2p'); print(p.get('connected_peers',0) if p else 'n/a')" 2>/dev/null)
-            SYNC_DOCS=\$(echo "\$HEALTH" | python3 -c "import sys,json; d=json.load(sys.stdin); p=d.get('p2p'); print(p.get('sync_documents',0) if p else 'n/a')" 2>/dev/null)
-            PEER_ID=\$(echo "\$HEALTH" | python3 -c "import sys,json; d=json.load(sys.stdin); p=d.get('p2p'); print(p.get('peer_id','unknown')[:12] if p else 'n/a')" 2>/dev/null)
+            PEERS=\$(echo "\$HEALTH" | python3 -c "import sys,json; d=json.load(sys.stdin); p=d.get('p2p'); print(p.get('connectedPeers',0) if p else 'n/a')" 2>/dev/null)
+            SYNC_DOCS=\$(echo "\$HEALTH" | python3 -c "import sys,json; d=json.load(sys.stdin); p=d.get('p2p'); print(p.get('syncDocuments',0) if p else 'n/a')" 2>/dev/null)
+            PEER_ID=\$(echo "\$HEALTH" | python3 -c "import sys,json; d=json.load(sys.stdin); p=d.get('p2p'); print(p.get('peerId','unknown')[:12] if p else 'n/a')" 2>/dev/null)
 
             echo "P2P [${environment}]: peers=\${PEERS} sync_docs=\${SYNC_DOCS} peer_id=\${PEER_ID}"
 

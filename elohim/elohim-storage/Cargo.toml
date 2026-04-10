@@ -154,6 +154,7 @@ p2p = ["libp2p", "futures"]
 
 [dev-dependencies]
 tempfile = "3"
+jsonschema = "0.28"
 
 [[bin]]
 name = "elohim-storage"

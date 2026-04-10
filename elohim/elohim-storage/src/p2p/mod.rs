@@ -224,6 +224,16 @@ pub struct P2PNode {
     extraction_cache: Option<Arc<ExtractionCache>>,
     /// Discovered peers with delivery capabilities (populated from mDNS + identify)
     delivery_peers: Arc<DashMap<String, DeliveryPeer>>,
+    /// Cached identify info per peer (populated from identify::Event::Received)
+    identify_cache: Arc<DashMap<String, CachedIdentifyInfo>>,
+}
+
+/// Cached identify protocol info for a connected peer.
+#[derive(Debug, Clone)]
+struct CachedIdentifyInfo {
+    agent_version: String,
+    protocols: Vec<String>,
+    listen_addrs: Vec<String>,
 }
 
 /// Drain queue observability. Exposed via `P2PStatusInfo` so other peers can
@@ -243,13 +253,10 @@ pub struct DrainStatusInfo {
 
 /// P2P node status for observability.
 ///
-/// NOTE: This struct intentionally does NOT use `rename_all = "camelCase"`
-/// because the wire format on `/p2p/status` has historically been snake_case
-/// and multiple consumers (doorway federation/main/server, elohim-app
-/// connection-indicator, simulate.sh, genesis Jenkinsfile) read snake_case
-/// field names. ts-rs will emit snake_case field names in the generated
-/// TypeScript type, preserving backward compatibility.
+/// Wire format governed by: `elohim/sdk/schemas/v1/views/p2p-status-view.schema.json`
+/// Schema contract test: `tests/schema_contract.rs::p2p_status_view_matches_schema`
 #[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
 #[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
 pub struct P2PStatusInfo {
     pub peer_id: String,
@@ -274,6 +281,45 @@ pub struct P2PStatusInfo {
     /// Consumers should treat None as "data not available" (e.g., wait or
     /// avoid using this peer as a load signal), NOT as "caught up".
     pub drain: Option<DrainStatusInfo>,
+}
+
+/// Per-peer detail from libp2p Swarm state.
+///
+/// Wire format governed by: `elohim/sdk/schemas/v1/views/peer-info-view.schema.json`
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct PeerInfoView {
+    pub peer_id: String,
+    pub multiaddrs: Vec<String>,
+    pub protocols: Vec<String>,
+    pub agent_version: String,
+    pub direction: String,
+    /// Tier 3 — populated in follow-up sprint
+    pub rtt_ms: Option<f64>,
+    /// Tier 3 — populated in follow-up sprint
+    #[ts(type = "number | null")]
+    pub last_seen_ms: Option<u64>,
+    /// Tier 3 — populated in follow-up sprint
+    pub remote_nat_status: Option<String>,
+    /// Tier 3 — populated in follow-up sprint
+    #[ts(type = "number | null")]
+    pub bandwidth_in: Option<u64>,
+    /// Tier 3 — populated in follow-up sprint
+    #[ts(type = "number | null")]
+    pub bandwidth_out: Option<u64>,
+}
+
+/// Paginated list of connected peers.
+///
+/// Wire format governed by: `elohim/sdk/schemas/v1/views/peer-list-view.schema.json`
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct PeerListView {
+    pub peers: Vec<PeerInfoView>,
+    #[ts(type = "number")]
+    pub total: usize,
 }
 
 /// Commands sent from HTTP handlers to the P2P event loop.
@@ -303,6 +349,10 @@ pub enum P2PCommand {
         data: Vec<u8>,
         reply: oneshot::Sender<Result<(), String>>,
     },
+    /// List connected peers with identify info
+    ListPeers {
+        reply: oneshot::Sender<Vec<PeerInfoView>>,
+    },
 }
 
 /// Send+Sync handle for querying P2P status and sending commands from HttpServer.
@@ -329,6 +379,21 @@ impl P2PHandle {
             .iter()
             .map(|entry| entry.value().clone())
             .collect()
+    }
+
+    /// List connected peers with identify protocol info.
+    /// Used by the /p2p/peers HTTP endpoint.
+    pub async fn list_peers(&self) -> Vec<PeerInfoView> {
+        let (tx, rx) = oneshot::channel();
+        if self
+            .command_tx
+            .send(P2PCommand::ListPeers { reply: tx })
+            .await
+            .is_err()
+        {
+            return vec![];
+        }
+        rx.await.unwrap_or_default()
     }
 
     /// Publish an EPR Head to the DHT. Fire-and-forget.
@@ -599,7 +664,7 @@ impl P2PNode {
             connected_peers: 0,
             bootstrap_nodes: config.bootstrap_nodes.clone(),
             sync_documents: 0,
-            nat_status: "Unknown".to_string(),
+            nat_status: "unknown".to_string(),
             relay_reservations: 0,
             announce_addresses: config.announce_addresses.clone(),
             relay_mode: config.relay_mode.to_string(),
@@ -619,7 +684,7 @@ impl P2PNode {
             sync_manager,
             shutdown_tx,
             status_tx,
-            nat_status: Arc::new(RwLock::new("Unknown".to_string())),
+            nat_status: Arc::new(RwLock::new("unknown".to_string())),
             relay_reservations: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
             command_rx: Arc::new(tokio::sync::Mutex::new(command_rx)),
             command_tx,
@@ -645,6 +710,7 @@ impl P2PNode {
             gap_queue: Arc::new(tokio::sync::Mutex::new(std::collections::VecDeque::new())),
             extraction_cache: None,
             delivery_peers: Arc::new(DashMap::new()),
+            identify_cache: Arc::new(DashMap::new()),
         })
     }
 
@@ -967,6 +1033,40 @@ impl P2PNode {
                     .lock()
                     .await
                     .insert(request_id, reply);
+            }
+            P2PCommand::ListPeers { reply } => {
+                let peers: Vec<PeerInfoView> = swarm
+                    .connected_peers()
+                    .cloned()
+                    .collect::<Vec<_>>()
+                    .into_iter()
+                    .map(|pid| {
+                        let pid_str = pid.to_string();
+                        let cached = self.identify_cache.get(&pid_str);
+                        PeerInfoView {
+                            peer_id: pid_str,
+                            multiaddrs: cached
+                                .as_ref()
+                                .map(|c| c.listen_addrs.clone())
+                                .unwrap_or_default(),
+                            protocols: cached
+                                .as_ref()
+                                .map(|c| c.protocols.clone())
+                                .unwrap_or_default(),
+                            agent_version: cached
+                                .as_ref()
+                                .map(|c| c.agent_version.clone())
+                                .unwrap_or_default(),
+                            direction: "unknown".to_string(),
+                            rtt_ms: None,
+                            last_seen_ms: None,
+                            remote_nat_status: None,
+                            bandwidth_in: None,
+                            bandwidth_out: None,
+                        }
+                    })
+                    .collect();
+                let _ = reply.send(peers);
             }
         }
     }
@@ -1777,6 +1877,15 @@ impl P2PNode {
                     protocols = ?info.protocols.len(),
                     "Identify: received peer info"
                 );
+                // Cache identify info for /p2p/peers endpoint
+                self.identify_cache.insert(
+                    peer_id.to_string(),
+                    CachedIdentifyInfo {
+                        agent_version: info.agent_version.clone(),
+                        protocols: info.protocols.iter().map(|p| p.to_string()).collect(),
+                        listen_addrs: info.listen_addrs.iter().map(|a| a.to_string()).collect(),
+                    },
+                );
                 // Add observed addresses to Kademlia for better routing
                 let mut swarm = self.swarm.write().await;
                 for addr in info.listen_addrs {
@@ -1798,9 +1907,9 @@ impl P2PNode {
                 new,
             }) => {
                 let status_str = match &new {
-                    autonat::NatStatus::Public(_addr) => "Public",
-                    autonat::NatStatus::Private => "Private",
-                    autonat::NatStatus::Unknown => "Unknown",
+                    autonat::NatStatus::Public(_addr) => "public",
+                    autonat::NatStatus::Private => "private",
+                    autonat::NatStatus::Unknown => "unknown",
                 };
                 info!(
                     old = ?old,

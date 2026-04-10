@@ -5,30 +5,26 @@ import type { ReplicationStatus } from "./ReplicationStatus";
 /**
  * P2P node status for observability.
  *
- * NOTE: This struct intentionally does NOT use `rename_all = "camelCase"`
- * because the wire format on `/p2p/status` has historically been snake_case
- * and multiple consumers (doorway federation/main/server, elohim-app
- * connection-indicator, simulate.sh, genesis Jenkinsfile) read snake_case
- * field names. ts-rs will emit snake_case field names in the generated
- * TypeScript type, preserving backward compatibility.
+ * Wire format governed by: `elohim/sdk/schemas/v1/views/p2p-status-view.schema.json`
+ * Schema contract test: `tests/schema_contract.rs::p2p_status_view_matches_schema`
  */
-export type P2PStatusInfo = { peer_id: string, listen_addresses: Array<string>, connected_peers: number, bootstrap_nodes: Array<string>, sync_documents: number, 
+export type P2PStatusInfo = { peerId: string, listenAddresses: Array<string>, connectedPeers: number, bootstrapNodes: Array<string>, syncDocuments: number, 
 /**
  * NAT status detected by autonat: "Unknown", "Public", "Private"
  */
-nat_status: string, 
+natStatus: string, 
 /**
  * Number of active relay reservations
  */
-relay_reservations: number, 
+relayReservations: number, 
 /**
  * Addresses announced to the network
  */
-announce_addresses: Array<string>, 
+announceAddresses: Array<string>, 
 /**
  * Relay mode this node is running in
  */
-relay_mode: string, 
+relayMode: string, 
 /**
  * Replication progress for identity-driven content sync
  */

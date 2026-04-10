@@ -14,6 +14,29 @@ import json
 import os
 import re
 import sys
+from datetime import datetime, timezone
+
+
+COOLDOWN_FILE = os.path.join(os.path.dirname(__file__), '.p2p-audit-cooldown.json')
+
+
+def is_silenced() -> tuple[bool, str]:
+    """Check if the audit is silenced via cooldown file.
+
+    Returns (silenced: bool, reason: str).
+    Cooldown file format:
+        {"until": "2026-04-09T15:00:00Z", "reason": "...", "sprint": "..."}
+    """
+    try:
+        with open(COOLDOWN_FILE) as f:
+            cooldown = json.load(f)
+        until_str = cooldown.get('until', '')
+        until = datetime.fromisoformat(until_str)
+        if until > datetime.now(timezone.utc):
+            return True, cooldown.get('reason', '')
+    except (FileNotFoundError, json.JSONDecodeError, ValueError):
+        pass
+    return False, ''
 
 
 # Each rule: (flag_pattern, antidote_pattern, warning_message)
@@ -82,6 +105,11 @@ def main():
 
         # Only audit plan documents
         if '/plans/' not in file_path or not file_path.endswith('.md'):
+            sys.exit(0)
+
+        # Check cooldown — silenced after explicit acknowledgement
+        silenced, reason = is_silenced()
+        if silenced:
             sys.exit(0)
 
         try:

@@ -160,6 +160,17 @@ Follow this workflow:
 4. **http.rs** - Add routes using InputView/View types
 5. **Regenerate TS** - Run `cargo test export_bindings`
 
+## Schema Contract (view validation)
+
+View types must match their JSON Schema in `../sdk/schemas/v1/views/`.
+The `tests/schema_contract.rs` integration test validates this at `cargo test` time.
+
+When modifying a View struct:
+1. Update the schema first (`elohim/sdk/schemas/v1/views/{name}.schema.json`)
+2. Update the Rust struct to match
+3. Run `cargo test --test schema_contract` to verify
+4. Run `pnpm run schema:codegen:ts` to regenerate TypeScript
+
 ---
 
 ## Anti-Patterns (DO NOT DO)

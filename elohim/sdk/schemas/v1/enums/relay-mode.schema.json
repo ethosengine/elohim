@@ -1,0 +1,8 @@
+{
+  "$id": "epr:schema:enum:relay-mode",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "RelayMode",
+  "description": "Relay operating mode for libp2p circuit relay",
+  "type": "string",
+  "enum": ["disabled", "client", "server", "both"]
+}

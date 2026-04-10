@@ -294,12 +294,9 @@ async fn query_storage_p2p_status(
         .await
         .map_err(|e| format!("JSON parse error: {}", e))?;
 
-    let peer_id = body["peer_id"]
-        .as_str()
-        .ok_or("Missing peer_id")?
-        .to_string();
+    let peer_id = body["peerId"].as_str().ok_or("Missing peerId")?.to_string();
 
-    let multiaddrs: Vec<String> = body["listen_addresses"]
+    let multiaddrs: Vec<String> = body["listenAddresses"]
         .as_array()
         .map(|arr| {
             arr.iter()
@@ -308,9 +305,9 @@ async fn query_storage_p2p_status(
         })
         .unwrap_or_default();
 
-    let nat_status = body["nat_status"].as_str().map(String::from);
+    let nat_status = body["natStatus"].as_str().map(String::from);
 
-    let relay_mode = body["relay_mode"].as_str().unwrap_or("client");
+    let relay_mode = body["relayMode"].as_str().unwrap_or("client");
     let mut capabilities = vec!["shard".to_string(), "sync".to_string()];
     if relay_mode == "server" || relay_mode == "both" {
         capabilities.push("relay".to_string());

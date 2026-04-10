@@ -159,7 +159,7 @@ cmd_test() {
             local name="${storage%%:*}"
             local port="${storage##*:}"
             local peers
-            peers=$(curl -sf "http://localhost:$port/p2p/status" 2>/dev/null | grep -o '"connected_peers":[0-9]*' | grep -o '[0-9]*' || echo "0")
+            peers=$(curl -sf "http://localhost:$port/p2p/status" 2>/dev/null | grep -o '"connectedPeers":[0-9]*' | grep -o '[0-9]*' || echo "0")
             if [[ "$peers" -ge 1 ]]; then
                 echo -e "  ${GREEN}●${NC} $name - $peers peer(s) connected"
             else
@@ -205,7 +205,7 @@ cmd_test() {
         local reconnected=0
         for port in 8091 8092; do
             local peers
-            peers=$(curl -sf "http://localhost:$port/p2p/status" 2>/dev/null | grep -o '"connected_peers":[0-9]*' | grep -o '[0-9]*' || echo "0")
+            peers=$(curl -sf "http://localhost:$port/p2p/status" 2>/dev/null | grep -o '"connectedPeers":[0-9]*' | grep -o '[0-9]*' || echo "0")
             if [[ "$peers" -ge 1 ]]; then
                 reconnected=$((reconnected + 1))
             fi

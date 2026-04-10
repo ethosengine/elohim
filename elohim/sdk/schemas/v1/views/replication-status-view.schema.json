@@ -1,0 +1,27 @@
+{
+  "$id": "epr:schema:view:replication-status",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ReplicationStatusView",
+  "description": "Identity-driven content replication progress. Source of truth: in-memory ReplicationInner struct (Operational, Category C). Rebuilt from discovery on every process start.",
+  "type": "object",
+  "required": ["pending", "completed", "failed", "caughtUp"],
+  "properties": {
+    "pending": {
+      "type": "integer",
+      "description": "Content IDs discovered but not yet fetched"
+    },
+    "completed": {
+      "type": "integer",
+      "description": "Content IDs successfully replicated"
+    },
+    "failed": {
+      "type": "integer",
+      "description": "Content IDs that failed fetch (will retry)"
+    },
+    "caughtUp": {
+      "type": "boolean",
+      "description": "True when all discovered content has been fetched or failed with max retries"
+    }
+  },
+  "additionalProperties": false
+}

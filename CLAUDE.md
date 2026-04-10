@@ -206,6 +206,21 @@ pnpm run schema:codegen:ts       # Regenerate TS from protocol schemas (verifica
 pnpm run lamad:codegen            # Regenerate manifest-types.ts from lamad manifest
 ```
 
+### View Schema Contract (HTTP wire shapes)
+View schemas in `elohim/sdk/schemas/v1/views/` define the JSON wire format for HTTP API responses. They are the source of truth for the Rust-to-TypeScript boundary.
+
+**Pattern:** Write the schema -> Rust structs match it (hand-written with `#[serde(rename_all = "camelCase")]`) -> validation harness (`tests/schema_contract.rs`) catches drift -> TS codegen generates TypeScript interfaces.
+
+**Conventions:** See `elohim/sdk/schemas/v1/views/CONVENTIONS.md` for the 10 rules.
+
+**Adding a new view:**
+1. Write `{name}.schema.json` in `elohim/sdk/schemas/v1/views/`
+2. Write matching Rust struct in elohim-storage with `#[serde(rename_all = "camelCase")]`
+3. Add schema contract test in `elohim/elohim-storage/tests/schema_contract.rs`
+4. Add to `INTERFACE_FILES` in `elohim/sdk/schemas/scripts/codegen-ts.mjs`
+5. Run `pnpm run schema:codegen:ts` to generate and distribute TypeScript
+6. Pre-push hook validates codegen freshness automatically
+
 ## Critical Gotchas
 
 ### RUSTFLAGS Override Required

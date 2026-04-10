@@ -503,6 +503,8 @@ impl HttpServer {
             // P2P Status endpoint
             #[cfg(feature = "p2p")]
             (Method::GET, "/p2p/status") => self.handle_p2p_status().await,
+            #[cfg(feature = "p2p")]
+            (Method::GET, "/p2p/peers") => self.handle_p2p_peers().await,
 
             // Delivery peers — discovered peers with delivery capabilities
             // Used by frontend for multi-peer app delivery scoring
@@ -1354,6 +1356,37 @@ impl HttpServer {
                 .body(Full::new(Bytes::from(
                     r#"{"error": "P2P networking not enabled"}"#,
                 )))
+                .unwrap())
+        }
+    }
+
+    /// Handle /p2p/peers — connected peers with identify info
+    #[cfg(feature = "p2p")]
+    async fn handle_p2p_peers(&self) -> Result<Response<Full<Bytes>>, StorageError> {
+        use crate::p2p::PeerListView;
+
+        if let Some(ref handle) = self.p2p_handle {
+            let peers = handle.list_peers().await;
+            let total = peers.len();
+            let response = PeerListView { peers, total };
+            let json = serde_json::to_string(&response).map_err(|e| {
+                StorageError::Internal(format!("Failed to serialize peer list: {}", e))
+            })?;
+            Ok(Response::builder()
+                .status(StatusCode::OK)
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Full::new(Bytes::from(json)))
+                .unwrap())
+        } else {
+            let empty = PeerListView {
+                peers: vec![],
+                total: 0,
+            };
+            let json = serde_json::to_string(&empty).unwrap();
+            Ok(Response::builder()
+                .status(StatusCode::OK)
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Full::new(Bytes::from(json)))
                 .unwrap())
         }
     }

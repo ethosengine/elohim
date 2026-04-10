@@ -1,0 +1,72 @@
+{
+  "$id": "epr:schema:view:p2p-status",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "P2PStatusView",
+  "description": "P2P node status for observability. Source of truth: libp2p Swarm state + in-memory replication tracker + SQLite drain query (Operational, Category C). Reconstructed per request. Not persisted.",
+  "type": "object",
+  "required": [
+    "peerId",
+    "listenAddresses",
+    "connectedPeers",
+    "bootstrapNodes",
+    "syncDocuments",
+    "natStatus",
+    "relayReservations",
+    "announceAddresses",
+    "relayMode",
+    "replication"
+  ],
+  "properties": {
+    "peerId": {
+      "type": "string",
+      "description": "libp2p PeerId (base58 encoded)"
+    },
+    "listenAddresses": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Multiaddrs this node is listening on"
+    },
+    "connectedPeers": {
+      "type": "integer",
+      "description": "Number of currently connected peers"
+    },
+    "bootstrapNodes": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Configured bootstrap node multiaddrs"
+    },
+    "syncDocuments": {
+      "type": "integer",
+      "description": "Number of Automerge sync documents"
+    },
+    "natStatus": {
+      "$ref": "../enums/nat-status.schema.json",
+      "description": "NAT status detected by autonat"
+    },
+    "relayReservations": {
+      "type": "integer",
+      "description": "Number of active relay reservations"
+    },
+    "announceAddresses": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Addresses announced to the network"
+    },
+    "relayMode": {
+      "$ref": "../enums/relay-mode.schema.json",
+      "description": "Relay mode this node is running in"
+    },
+    "replication": {
+      "$ref": "replication-status-view.schema.json",
+      "description": "Identity-driven content replication progress"
+    },
+    "drain": {
+      "oneOf": [
+        { "$ref": "drain-status-view.schema.json" },
+        { "type": "null" }
+      ],
+      "description": "Drain queue state. null when DB pool or query unavailable — treat as 'data not available', NOT 'caught up'"
+    }
+  },
+  "additionalProperties": false
+}

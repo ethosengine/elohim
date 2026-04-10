@@ -1,0 +1,23 @@
+{
+  "$id": "epr:schema:view:drain-status",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "DrainStatusView",
+  "description": "Drain queue state for DHT publication. Source of truth: SQLite aggregate query over p2p_published_at column (Operational, Category C).",
+  "type": "object",
+  "required": ["total", "published", "pending"],
+  "properties": {
+    "total": {
+      "type": "integer",
+      "description": "Total rows in the local content projection (scoped to lamad app)"
+    },
+    "published": {
+      "type": "integer",
+      "description": "Rows successfully published to libp2p Kad DHT"
+    },
+    "pending": {
+      "type": "integer",
+      "description": "Rows not yet drained. 0 and stable = caught up"
+    }
+  },
+  "additionalProperties": false
+}

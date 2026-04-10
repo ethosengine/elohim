@@ -1,0 +1,57 @@
+{
+  "$id": "epr:schema:view:peer-info",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PeerInfoView",
+  "description": "Per-peer detail from libp2p Swarm state. Source of truth: libp2p identify protocol + per-peer runtime tracking (Operational, Category C). All ephemeral.",
+  "type": "object",
+  "required": ["peerId", "multiaddrs", "protocols", "agentVersion", "direction"],
+  "properties": {
+    "peerId": {
+      "type": "string",
+      "description": "libp2p PeerId (base58 encoded)"
+    },
+    "multiaddrs": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Known multiaddrs for this peer (from identify)"
+    },
+    "protocols": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Protocols supported by this peer (from identify)"
+    },
+    "agentVersion": {
+      "type": "string",
+      "description": "Agent version string from identify protocol"
+    },
+    "direction": {
+      "type": "string",
+      "enum": ["inbound", "outbound"],
+      "description": "Connection direction — who initiated"
+    },
+    "rttMs": {
+      "type": ["number", "null"],
+      "description": "Round-trip time in milliseconds. Tier 3 — null until follow-up sprint implements RTT ring buffer"
+    },
+    "lastSeenMs": {
+      "type": ["integer", "null"],
+      "description": "Unix epoch millis of last activity. Tier 3 — null until follow-up sprint implements lastSeen tracking"
+    },
+    "remoteNatStatus": {
+      "oneOf": [
+        { "$ref": "../enums/nat-status.schema.json" },
+        { "type": "null" }
+      ],
+      "description": "Remote peer's NAT status. Tier 3 — null until follow-up sprint implements dial-back results"
+    },
+    "bandwidthIn": {
+      "type": ["integer", "null"],
+      "description": "Bytes received from this peer since connection. Tier 3 — null until follow-up sprint implements BandwidthSinks"
+    },
+    "bandwidthOut": {
+      "type": ["integer", "null"],
+      "description": "Bytes sent to this peer since connection. Tier 3 — null until follow-up sprint implements BandwidthSinks"
+    }
+  },
+  "additionalProperties": false
+}

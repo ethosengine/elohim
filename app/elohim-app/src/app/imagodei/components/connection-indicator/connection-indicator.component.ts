@@ -203,7 +203,7 @@ export class ConnectionIndicatorComponent implements OnInit {
             // Steward mode: poll elohim-storage directly
             const baseUrl = this.storageClient.getStorageBaseUrl();
             return this.http
-              .get<{ connected_peers?: number; peer_count?: number }>(`${baseUrl}/p2p/status`)
+              .get<{ connectedPeers?: number; peer_count?: number }>(`${baseUrl}/p2p/status`)
               .pipe(catchError(() => of(null)));
           }
           // Hosted mode: extract from doorway /health
@@ -219,9 +219,9 @@ export class ConnectionIndicatorComponent implements OnInit {
           this.peerCount.set(0);
           return;
         }
-        // Direct mode returns connected_peers, doorway health returns p2p.peer_count
+        // Direct mode returns connectedPeers, doorway health returns p2p.peer_count
         const count =
-          (resp as { connected_peers?: number }).connected_peers ??
+          (resp as { connectedPeers?: number }).connectedPeers ??
           (resp as { p2p?: { peer_count?: number } }).p2p?.peer_count ??
           0;
         this.peerCount.set(count);

@@ -1,0 +1,20 @@
+{
+  "$id": "epr:schema:view:peer-list",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PeerListView",
+  "description": "Paginated list of connected peers. Source of truth: libp2p Swarm state (Operational, Category C).",
+  "type": "object",
+  "required": ["peers", "total"],
+  "properties": {
+    "peers": {
+      "type": "array",
+      "items": { "$ref": "peer-info-view.schema.json" },
+      "description": "Connected peers with detail"
+    },
+    "total": {
+      "type": "integer",
+      "description": "Total connected peer count"
+    }
+  },
+  "additionalProperties": false
+}

@@ -615,8 +615,8 @@ pub async fn run(state: Arc<AppState>) -> Result<(), DoorwayError> {
                         if let Ok(body) = resp.json::<serde_json::Value>().await {
                             let health = crate::routes::health::P2PHealth {
                                 enabled: true,
-                                peer_count: body["connected_peers"].as_u64().unwrap_or(0) as usize,
-                                peer_id: body["peer_id"].as_str().map(String::from),
+                                peer_count: body["connectedPeers"].as_u64().unwrap_or(0) as usize,
+                                peer_id: body["peerId"].as_str().map(String::from),
                             };
                             *p2p_health.write().await = Some(health);
                         }

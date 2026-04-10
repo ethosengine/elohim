@@ -38,6 +38,11 @@ const INTERFACE_FILES = [
   { src: 'inputs/create-attestation-input.ts', dest: 'create-attestation-input.ts' },
   { src: 'views/content-view.ts', dest: 'content-view.ts' },
   { src: 'views/economic-event-view.ts', dest: 'economic-event-view.ts' },
+  { src: 'views/p2p-status-view.ts', dest: 'p2p-status-view.ts' },
+  { src: 'views/drain-status-view.ts', dest: 'drain-status-view.ts' },
+  { src: 'views/replication-status-view.ts', dest: 'replication-status-view.ts' },
+  { src: 'views/peer-info-view.ts', dest: 'peer-info-view.ts' },
+  { src: 'views/peer-list-view.ts', dest: 'peer-list-view.ts' },
 ];
 
 /**
@@ -60,6 +65,23 @@ async function loadRefMap(baseDir) {
     // Also map from same-level reference
     refMap.set(`enums/${file}`, schema);
   }
+
+  // Load view schemas for cross-view $ref (e.g., p2p-status-view → drain-status-view)
+  const viewDir = join(baseDir, 'views');
+  let viewFiles;
+  try {
+    viewFiles = (await readdir(viewDir)).filter((f) => f.endsWith('.schema.json'));
+  } catch {
+    viewFiles = [];
+  }
+  for (const file of viewFiles) {
+    const schema = JSON.parse(await readFile(join(viewDir, file), 'utf8'));
+    // Same-directory ref from views/: just the filename
+    refMap.set(file, schema);
+    // Cross-dir ref from other directories
+    refMap.set(`../views/${file}`, schema);
+  }
+
   return refMap;
 }
 
@@ -78,9 +100,10 @@ function inlineRefs(schema, refMap) {
     if (key === '$ref' && typeof value === 'string' && !value.startsWith('#')) {
       const referenced = refMap.get(value);
       if (referenced) {
-        // Inline the referenced schema (strip meta-schema fields)
+        // Inline the referenced schema (strip meta-schema fields),
+        // then recursively inline any nested $ref in the result
         const { $id, $schema, _dna, _source, ...rest } = referenced;
-        Object.assign(result, rest);
+        Object.assign(result, inlineRefs(rest, refMap));
       } else {
         result[key] = value;
       }
