@@ -29,6 +29,7 @@ interface HumansJsonHuman {
   category: string;
   profileReach: string;
   affinities?: string[];
+  agencyPhase?: string;
 }
 
 interface HumansJson {
@@ -98,6 +99,7 @@ async function registerHuman(
     bio: human.bio,
     affinities: human.affinities ?? [],
     profileReach: human.profileReach,
+    agencyPhase: human.agencyPhase ?? 'visitor',
   };
 
   if (isAdmin && adminBootstrapKey) {
@@ -194,17 +196,28 @@ async function main(): Promise<void> {
   const jsonPath = resolve(__dirname, '../../docs/humans/humans.json');
   const humansJson: HumansJson = JSON.parse(readFileSync(jsonPath, 'utf-8'));
 
+  // Filter to active humans (those with a non-visitor agencyPhase)
+  const active = humansJson.humans.filter(
+    h => h.agencyPhase && h.agencyPhase !== 'visitor'
+  );
+
   console.log('=== Seed Humans ===\n');
   console.log(`Doorway:  ${doorwayUrl}`);
-  console.log(`Humans:   ${humansJson.humans.length}`);
+  console.log(`Humans:   ${active.length} active of ${humansJson.humans.length} total`);
   console.log(`Admin key: ${adminBootstrapKey ? 'provided' : 'not set'}`);
   console.log('');
 
-  // Sort: Matthew first, then the rest
-  const sorted = [...humansJson.humans].sort((a, b) => {
-    if (a.id === ADMIN_HUMAN_ID) return -1;
-    if (b.id === ADMIN_HUMAN_ID) return 1;
-    return 0;
+  // Sort: doorway operator first, then node, device, hosted
+  const phaseOrder: Record<string, number> = {
+    doorway: 0,
+    node: 1,
+    device: 2,
+    hosted: 3,
+  };
+  const sorted = [...active].sort((a, b) => {
+    const aOrder = phaseOrder[a.agencyPhase ?? 'hosted'] ?? 99;
+    const bOrder = phaseOrder[b.agencyPhase ?? 'hosted'] ?? 99;
+    return aOrder - bOrder;
   });
 
   const results: RegisterResult[] = [];
@@ -215,8 +228,11 @@ async function main(): Promise<void> {
 
     const icon =
       result.result === 'registered' ? '+' : result.result === 'exists' ? '=' : 'X';
+    const phase = human.agencyPhase ?? 'visitor';
     const suffix = result.error ? ` (${result.error})` : '';
-    console.log(`  [${icon}] ${result.displayName.padEnd(16)} ${result.identifier}${suffix}`);
+    console.log(
+      `  [${icon}] ${result.displayName.padEnd(16)} ${result.identifier.padEnd(40)} ${phase}${suffix}`
+    );
   }
 
   // Summary
