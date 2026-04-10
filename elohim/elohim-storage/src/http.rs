@@ -1818,7 +1818,16 @@ impl HttpServer {
     /// - Legacy: /db/content/... -> AppContext("lamad") for backwards compatibility
     fn extract_app_context(sub_path: &str) -> (db::AppContext, &str) {
         // Check if path starts with a known resource type (legacy route)
-        let legacy_prefixes = ["content", "stats", "schema"];
+        // This must include ALL top-level resource prefixes from handle_db_request
+        // to prevent them from being misinterpreted as h_app_id values.
+        let legacy_prefixes = [
+            // Core content routes
+            "content", "stats", "schema",
+            // Diesel entity routes
+            "collectives", "humans", "human-relationships",
+            "presences", "events", "mastery", "allocations",
+            "nodes", "relationships", "knowledge-maps",
+        ];
         for prefix in &legacy_prefixes {
             if sub_path == *prefix || sub_path.starts_with(&format!("{}/", prefix)) {
                 // Legacy route: default to 'lamad' for learning content
