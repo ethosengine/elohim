@@ -90,7 +90,7 @@
       "constitutionalParentId": "neighborhood-valley",
       "description": "Nuclear family — Matthew, Jessica, Timothy. Co-stewards of household, education, and faith formation.",
       "governanceModel": "steward-consent",
-      "domain": "family",
+      "domain": "household",
       "place": null,
       "coupling": {
         "lamad": "household-wisdom",
@@ -137,7 +137,7 @@
       "reach": "trusted",
       "description": "The originals + community connectors",
       "governanceModel": "consent",
-      "domain": "family",
+      "domain": "household",
       "place": null,
       "coupling": {
         "lamad": "household-wisdom",
