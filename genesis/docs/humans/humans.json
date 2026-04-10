@@ -6,6 +6,7 @@
   "humans": [
     {
       "id": "human-matthew-manager",
+      "agencyPhase": "doorway",
       "displayName": "Matthew",
       "bio": "EthosEngine founder, exploring how technology can serve human flourishing. Family man, learner, builder.",
       "category": "core-family",
@@ -17,6 +18,7 @@
     },
     {
       "id": "human-adam-firstman",
+      "agencyPhase": "node",
       "displayName": "Adam",
       "bio": "The original gardener. Tending the network like he once tended the garden. Still naming things.",
       "category": "core-family",
@@ -27,6 +29,7 @@
     },
     {
       "id": "human-eve-firstwoman",
+      "agencyPhase": "device",
       "displayName": "Eve",
       "bio": "Curious by nature. First to reach for knowledge. Still asking the hard questions nobody else will.",
       "category": "core-family",
@@ -37,6 +40,7 @@
     },
     {
       "id": "human-jessica-spouse",
+      "agencyPhase": "device",
       "displayName": "Jessica",
       "bio": "Partner in life and learning. Focused on family flourishing, community connection, and meaningful work.",
       "category": "core-family",
@@ -81,6 +85,7 @@
     },
     {
       "id": "human-nancy-neighbor",
+      "agencyPhase": "hosted",
       "displayName": "Nancy",
       "bio": "Long-time resident of Tech Valley. Community organizer, block captain, and believer in the power of neighbors helping neighbors.",
       "category": "community",
@@ -115,6 +120,7 @@
     },
     {
       "id": "human-pete-pastor",
+      "agencyPhase": "device",
       "displayName": "Pastor Pete",
       "bio": "Shepherd of Community Church. Committed to helping people grow in faith and community.",
       "category": "affinity",
@@ -126,6 +132,7 @@
     },
     {
       "id": "human-timothy-tutor",
+      "agencyPhase": "device",
       "displayName": "Timothy",
       "bio": "Educator and learning facilitator. Helping kids and adults discover the joy of learning.",
       "category": "affinity",
