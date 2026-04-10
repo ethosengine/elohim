@@ -1,0 +1,166 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "elohim:protocol:collectives",
+  "title": "Collectives Seed Data",
+  "description": "Holonic collective definitions with constitutional relationships. Source of truth for governance layer, reach, and relationship type enums. Collectives are protocol-core entities (Category A — DHT-notarized in Mishpat DNA). Relationships are derived (Category A2 — Links on Mishpat DNA). See design: genesis/plans/2026-04-10-collectives-schema-design.md",
+  "type": "object",
+  "required": ["version", "collectives"],
+  "properties": {
+    "version": {
+      "type": "string",
+      "const": "2.0.0"
+    },
+    "description": { "type": "string" },
+    "collectives": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/Collective" },
+      "minItems": 1
+    },
+    "relationships": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/CollectiveRelationship" }
+    },
+    "reachConstraints": {
+      "description": "Dunbar-aware fuzzy ranges per reach level — protocol configuration, not stored data (Category C operational)",
+      "$ref": "#/$defs/ReachConstraints"
+    },
+    "relationshipTypes": {
+      "description": "Protocol-core relationship type vocabulary with provenance flow semantics",
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/RelationshipTypeDefinition" }
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "Collective": {
+      "type": "object",
+      "required": ["id", "name", "governanceLayer", "reach"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]*[a-z0-9]$",
+          "description": "Unique slug identifier. Naming convention: {type}-{identifier} where type is couple-, family-, bible-study-, neighborhood-, community-, org-"
+        },
+        "name": { "type": "string", "minLength": 1 },
+        "governanceLayer": {
+          "type": "string",
+          "enum": ["family", "neighborhood", "faith", "education", "interest", "geographic", "workplace", "economic", "community"],
+          "description": "Source: Rust governance_layers::ALL in elohim-storage/src/db/models.rs"
+        },
+        "reach": {
+          "type": "string",
+          "enum": ["private", "self", "intimate", "trusted", "familiar", "community", "public", "commons"],
+          "description": "Source: Protocol ReachLevels in elohim/sdk/src/types.ts. See reachConstraints for Dunbar-aware ranges."
+        },
+        "constitutionalParentId": {
+          "type": ["string", "null"],
+          "description": "Primary constitutional appeal chain. Must reference another collective's id. Validated by companion script (JSON Schema cannot enforce cross-references)."
+        },
+        "description": { "type": ["string", "null"] },
+        "governanceModel": {
+          "type": ["string", "null"],
+          "enum": ["consent", "steward-consent", "community-vote", "constitutional", "consensus", null],
+          "description": "Source: qahal collective-metadata.schema.json. Flows through metadata_json in storage."
+        },
+        "domain": {
+          "type": ["string", "null"],
+          "enum": ["household", "curriculum", "worship", "infrastructure", "trade", "land-use", "economy", "defense", null],
+          "description": "What this collective governs. Domain-bounded authority. Flows through metadata_json."
+        },
+        "place": {
+          "type": ["string", "null"],
+          "description": "H3 cell ID for geographic grounding. Null for non-geographic collectives. Flows through metadata_json."
+        },
+        "coupling": {
+          "type": ["object", "null"],
+          "description": "Three-leg EPR coupling declaration. Makes this collective a protocol entity, not just a group.",
+          "properties": {
+            "lamad": { "type": "string", "description": "Knowledge this collective stewards" },
+            "shefa": { "type": "string", "description": "Economic flows through this collective" },
+            "qahal": { "type": "string", "description": "Governance model for this collective" }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "CollectiveRelationship": {
+      "type": "object",
+      "required": ["type", "from", "to"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["contains", "participates-in", "delegates-to", "peers-with", "succeeds"],
+          "description": "Protocol-core relationship type. See relationshipTypes for provenance semantics."
+        },
+        "from": {
+          "type": "string",
+          "description": "Source collective id. Validated by companion script."
+        },
+        "to": {
+          "type": "string",
+          "description": "Target collective id. Validated by companion script."
+        },
+        "description": { "type": ["string", "null"] },
+        "domainOverlap": {
+          "type": ["string", "null"],
+          "description": "Required for peers-with relationships. Declares the shared governance concern."
+        }
+      },
+      "additionalProperties": false,
+      "if": { "properties": { "type": { "const": "peers-with" } } },
+      "then": { "required": ["type", "from", "to", "domainOverlap"] }
+    },
+    "ReachConstraints": {
+      "type": "object",
+      "description": "Fuzzy Dunbar-aware ranges per reach level. suggestedRange is [min, typical_max]. cautionAbove triggers elohim observation signals. directParticipants:false means governance is through sub-collective delegates only.",
+      "properties": {
+        "private":   { "$ref": "#/$defs/ReachConstraint" },
+        "self":      { "$ref": "#/$defs/ReachConstraint" },
+        "intimate":  { "$ref": "#/$defs/ReachConstraint" },
+        "trusted":   { "$ref": "#/$defs/ReachConstraint" },
+        "familiar":  { "$ref": "#/$defs/ReachConstraint" },
+        "community": { "$ref": "#/$defs/ReachConstraint" },
+        "public":    { "$ref": "#/$defs/DelegateOnlyConstraint" },
+        "commons":   { "$ref": "#/$defs/DelegateOnlyConstraint" }
+      },
+      "additionalProperties": false
+    },
+    "ReachConstraint": {
+      "type": "object",
+      "properties": {
+        "suggestedRange": {
+          "type": "array",
+          "items": { "type": "integer" },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "cautionAbove": { "type": "integer" },
+        "description": { "type": "string" }
+      },
+      "required": ["suggestedRange", "cautionAbove"]
+    },
+    "DelegateOnlyConstraint": {
+      "type": "object",
+      "properties": {
+        "directParticipants": { "type": "boolean", "const": false },
+        "description": { "type": "string" }
+      },
+      "required": ["directParticipants"]
+    },
+    "RelationshipTypeDefinition": {
+      "type": "object",
+      "properties": {
+        "description": { "type": "string" },
+        "provenanceFlow": {
+          "type": "string",
+          "enum": ["bidirectional-filtered", "directional-read", "directional-governance", "bidirectional-scoped", "directional-historical"]
+        },
+        "agentSemantics": { "type": "string" },
+        "humanSemantics": { "type": "string" },
+        "constraint": { "type": ["string", "null"] }
+      },
+      "required": ["description", "provenanceFlow", "agentSemantics", "humanSemantics"]
+    }
+  }
+}
