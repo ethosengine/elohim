@@ -3249,24 +3249,26 @@ impl P2PNode {
             return;
         }
 
-        // Query peer for full content inventory. reach_filter: None = all content.
-        // To filter by reach, use a value from `crate::generated_enums::CORE_REACH_LEVELS`.
-        let peer = peers[0];
-        let request = ShardRequest::ListContent {
-            reach_filter: None,
-            offset: 0,
-            limit: 5000,
-        };
+        // Query ALL connected peers for content inventory so we discover
+        // content regardless of which peer holds it. The response handler
+        // (ContentList branch) deduplicates via replication_state.discover().
+        for peer in &peers {
+            let request = ShardRequest::ListContent {
+                reach_filter: None,
+                offset: 0,
+                limit: 5000,
+            };
 
-        let mut swarm = self.swarm.write().await;
-        let request_id = swarm
-            .behaviour_mut()
-            .shard_protocol
-            .send_request(&peer, request);
-        drop(swarm);
+            let mut swarm = self.swarm.write().await;
+            let request_id = swarm
+                .behaviour_mut()
+                .shard_protocol
+                .send_request(peer, request);
+            drop(swarm);
 
-        debug!(peer = %peer, request_id = ?request_id, "Sent ListContent for replication discovery");
-        // Response handled in handle_shard_response → ContentList branch
+            debug!(peer = %peer, request_id = ?request_id, "Sent ListContent for replication discovery");
+        }
+        // Responses handled in handle_shard_response → ContentList branch
     }
 
     /// Dispatch replication fetches from the gap queue, bounded by in-flight count.
@@ -3286,9 +3288,9 @@ impl P2PNode {
             let swarm = self.swarm.read().await;
             swarm.connected_peers().cloned().collect()
         };
-        let Some(peer) = peers.first().copied() else {
+        if peers.is_empty() {
             return; // No peer connected — items stay in queue
-        };
+        }
 
         let in_flight = self.pending_replication_fetches.lock().await.len();
         let available = MAX_REPLICATION_INFLIGHT.saturating_sub(in_flight);
@@ -3310,7 +3312,10 @@ impl P2PNode {
             in_flight, "Draining replication gap queue"
         );
 
-        for id in &to_dispatch {
+        // Round-robin fetches across all connected peers so content
+        // can be retrieved from whichever peer actually has it.
+        for (i, id) in to_dispatch.iter().enumerate() {
+            let peer = peers[i % peers.len()];
             let request = ShardRequest::GetContent { id: id.clone() };
             let mut swarm = self.swarm.write().await;
             let request_id = swarm
