@@ -1,301 +1,463 @@
 {
   "$schema": "./collectives.schema.json",
   "description": "Collective definitions — governance contexts with graduated participation",
-  "version": "1.0.0",
+  "version": "2.0.0",
+  "reachConstraints": {
+    "private":   { "suggestedRange": [1, 1],     "cautionAbove": 1,   "description": "Self — individual agent context" },
+    "self":      { "suggestedRange": [1, 1],     "cautionAbove": 1,   "description": "Self — individual agent context" },
+    "intimate":  { "suggestedRange": [2, 7],     "cautionAbove": 7,   "description": "Couple, closest partnership" },
+    "trusted":   { "suggestedRange": [5, 20],    "cautionAbove": 20,  "description": "Family, inner circle" },
+    "familiar":  { "suggestedRange": [15, 65],   "cautionAbove": 65,  "description": "Small group, study circle" },
+    "community": { "suggestedRange": [50, 250],  "cautionAbove": 250, "description": "Dunbar-limit community" },
+    "public":    { "directParticipants": false,   "description": "Composed of sub-collectives only" },
+    "commons":   { "directParticipants": false,   "description": "Constitutional — delegate representation only" }
+  },
+  "relationshipTypes": {
+    "contains": {
+      "description": "Holonic nesting — parent holon contains child holon",
+      "provenanceFlow": "bidirectional-filtered",
+      "agentSemantics": "Parent context sees child summaries; child inherits constitutional constraints",
+      "humanSemantics": "Child collective operates within parent's constitutional frame",
+      "constraint": "Only valid within same constitutional chain — church does not contain family"
+    },
+    "participates-in": {
+      "description": "Collective-to-collective membership — a holon participates in a larger context",
+      "provenanceFlow": "directional-read",
+      "agentSemantics": "Agent references shared context without inheriting full history",
+      "humanSemantics": "Collective joins a larger context but retains autonomy — can withdraw",
+      "constraint": "Cross-domain participation — family participates-in church, not contained-by"
+    },
+    "delegates-to": {
+      "description": "Sociocratic double-link — representative carries governance between circles",
+      "provenanceFlow": "directional-governance",
+      "agentSemantics": "Agent carries decisions, precedents, and confidence envelopes along this edge",
+      "humanSemantics": "Representative carries consent of constituents; can be recalled",
+      "constraint": null
+    },
+    "peers-with": {
+      "description": "Horizontal governance coupling — collectives coordinate on overlapping domains",
+      "provenanceFlow": "bidirectional-scoped",
+      "agentSemantics": "Agents share provenance within declared domain overlap only",
+      "humanSemantics": "Collectives coordinate on shared concerns without hierarchy",
+      "constraint": "Requires declared domain overlap"
+    },
+    "succeeds": {
+      "description": "Generational succession — new collective inherits precedent history",
+      "provenanceFlow": "directional-historical",
+      "agentSemantics": "New context inherits precedent and memory from predecessor",
+      "humanSemantics": "Governance continuity across generational transitions",
+      "constraint": null
+    }
+  },
   "collectives": [
     {
-      "id": "household-dowell",
-      "name": "Dowell Household",
+      "id": "couple-adam-eve",
+      "name": "Adam & Eve",
       "governanceLayer": "family",
-      "description": "Core family + workplace — the founders and builders",
-      "reach": "private"
+      "reach": "intimate",
+      "constitutionalParentId": "family-eden",
+      "description": "Genesis couple — the original partnership",
+      "governanceModel": "consent",
+      "domain": "household",
+      "place": null,
+      "coupling": {
+        "lamad": "household-wisdom",
+        "shefa": "household-economy",
+        "qahal": "consent"
+      }
     },
     {
-      "id": "household-eden",
-      "name": "Eden Household",
+      "id": "couple-matthew-jessica",
+      "name": "Matthew & Jessica",
       "governanceLayer": "family",
+      "reach": "intimate",
+      "constitutionalParentId": "family-dowell",
+      "description": "Founding couple — co-stewards of household decisions",
+      "governanceModel": "consent",
+      "domain": "household",
+      "place": null,
+      "coupling": {
+        "lamad": "household-wisdom",
+        "shefa": "household-economy",
+        "qahal": "consent"
+      }
+    },
+    {
+      "id": "family-dowell",
+      "name": "Dowell Family",
+      "governanceLayer": "family",
+      "reach": "trusted",
+      "constitutionalParentId": "neighborhood-valley",
+      "description": "Nuclear family — Matthew, Jessica, Timothy. Co-stewards of household, education, and faith formation.",
+      "governanceModel": "steward-consent",
+      "domain": "family",
+      "place": null,
+      "coupling": {
+        "lamad": "household-wisdom",
+        "shefa": "household-economy",
+        "qahal": "steward-consent"
+      }
+    },
+    {
+      "id": "bible-study-valley",
+      "name": "Valley Bible Study",
+      "governanceLayer": "faith",
+      "reach": "familiar",
+      "constitutionalParentId": "community-local-church",
+      "description": "Weekly bible study — Matthew, Jessica, Timothy, Pete",
+      "governanceModel": "consent",
+      "domain": "worship",
+      "place": null,
+      "coupling": {
+        "lamad": "scriptural-study",
+        "shefa": "shared-materials",
+        "qahal": "consent"
+      }
+    },
+    {
+      "id": "neighborhood-valley",
+      "name": "Valley Neighborhood",
+      "governanceLayer": "geographic",
+      "reach": "familiar",
+      "constitutionalParentId": "community-neighborhood-association",
+      "description": "Immediate neighborhood — Matthew, Jessica, Timothy, Nancy",
+      "governanceModel": "community-vote",
+      "domain": "land-use",
+      "place": null,
+      "coupling": {
+        "lamad": "local-knowledge",
+        "shefa": "shared-infrastructure",
+        "qahal": "community-vote"
+      }
+    },
+    {
+      "id": "family-eden",
+      "name": "Eden Family",
+      "governanceLayer": "family",
+      "reach": "trusted",
       "description": "The originals + community connectors",
-      "reach": "private"
+      "governanceModel": "consent",
+      "domain": "family",
+      "place": null,
+      "coupling": {
+        "lamad": "household-wisdom",
+        "shefa": "household-economy",
+        "qahal": "consent"
+      }
     },
     {
-      "id": "household-valley-economy",
+      "id": "neighborhood-valley-economy",
       "name": "Valley Economy",
       "governanceLayer": "neighborhood",
+      "reach": "familiar",
       "description": "Local economy workers, builders, and faith community",
-      "reach": "local"
+      "domain": "economy"
     },
     {
-      "id": "household-extended",
+      "id": "neighborhood-extended",
       "name": "Extended Network",
       "governanceLayer": "neighborhood",
-      "description": "Investors, gig workers, newcomers, visitors",
-      "reach": "local"
+      "reach": "familiar",
+      "description": "Investors, gig workers, newcomers, visitors"
     },
     {
       "id": "community-local-church",
       "name": "Valley Community Church",
       "governanceLayer": "faith",
+      "reach": "community",
       "description": "Local faith community in Tech Valley",
-      "reach": "community"
+      "governanceModel": "consent",
+      "domain": "worship"
     },
     {
       "id": "community-homeschool-coop",
       "name": "Valley Homeschool Co-op",
       "governanceLayer": "education",
+      "reach": "community",
       "description": "Homeschooling families sharing resources",
-      "reach": "community"
+      "governanceModel": "consent",
+      "domain": "curriculum"
     },
     {
       "id": "community-garden-club",
       "name": "Eden Valley Garden Club",
       "governanceLayer": "interest",
-      "description": "Gardeners and growers sharing knowledge",
-      "reach": "community"
+      "reach": "community",
+      "description": "Gardeners and growers sharing knowledge"
     },
     {
       "id": "community-neighborhood-association",
       "name": "Valley Neighborhood Association",
       "governanceLayer": "geographic",
+      "reach": "community",
       "description": "Local neighborhood governance",
-      "reach": "community"
+      "governanceModel": "community-vote",
+      "domain": "land-use"
     },
     {
       "id": "community-regen-ag-network",
       "name": "Regenerative Agriculture Network",
       "governanceLayer": "interest",
-      "description": "Farmers and growers practicing regenerative methods",
-      "reach": "community"
+      "reach": "community",
+      "description": "Farmers and growers practicing regenerative methods"
     },
     {
       "id": "community-rust-meetup",
       "name": "Rust Language Meetup",
       "governanceLayer": "interest",
-      "description": "Local Rust programming community",
-      "reach": "community"
+      "reach": "community",
+      "description": "Local Rust programming community"
     },
     {
       "id": "community-holochain-devs",
       "name": "Holochain Developers",
       "governanceLayer": "interest",
-      "description": "Holochain protocol developers",
-      "reach": "community"
+      "reach": "community",
+      "description": "Holochain protocol developers"
     },
     {
       "id": "community-pastoral-network",
       "name": "Pastoral Care Network",
       "governanceLayer": "faith",
-      "description": "Pastoral support and counseling network",
-      "reach": "community"
+      "reach": "community",
+      "description": "Pastoral support and counseling network"
     },
     {
       "id": "community-educators-network",
       "name": "Valley Educators Network",
       "governanceLayer": "education",
-      "description": "Teachers and educators sharing practices",
-      "reach": "community"
+      "reach": "community",
+      "description": "Teachers and educators sharing practices"
     },
     {
       "id": "community-impact-investors",
       "name": "Impact Investors Circle",
       "governanceLayer": "economic",
-      "description": "Values-aligned investors supporting local enterprise",
-      "reach": "community"
+      "reach": "community",
+      "description": "Values-aligned investors supporting local enterprise"
     },
     {
       "id": "community-farmers-market",
       "name": "Valley Farmers Market",
       "governanceLayer": "economic",
-      "description": "Local producers and consumers marketplace",
-      "reach": "community"
+      "reach": "community",
+      "description": "Local producers and consumers marketplace"
     },
     {
       "id": "community-local-business",
       "name": "Valley Local Business Alliance",
       "governanceLayer": "economic",
-      "description": "Local business owners supporting each other",
-      "reach": "community"
+      "reach": "community",
+      "description": "Local business owners supporting each other"
     },
     {
       "id": "community-manufacturers-guild",
       "name": "Valley Manufacturers Guild",
       "governanceLayer": "economic",
-      "description": "Local manufacturing cooperative",
-      "reach": "community"
+      "reach": "community",
+      "description": "Local manufacturing cooperative"
     },
     {
       "id": "community-builders-guild",
       "name": "Builders Guild",
       "governanceLayer": "economic",
-      "description": "Construction professionals sharing knowledge",
-      "reach": "community"
+      "reach": "community",
+      "description": "Construction professionals sharing knowledge"
     },
     {
       "id": "community-apprenticeship-program",
       "name": "Valley Apprenticeship Program",
       "governanceLayer": "education",
-      "description": "Trade apprenticeship matching and support",
-      "reach": "community"
+      "reach": "community",
+      "description": "Trade apprenticeship matching and support"
     },
     {
       "id": "community-gig-workers-alliance",
       "name": "Gig Workers Alliance",
       "governanceLayer": "economic",
-      "description": "Independent workers advocating for fair conditions",
-      "reach": "community"
+      "reach": "community",
+      "description": "Independent workers advocating for fair conditions"
     },
     {
       "id": "community-rideshare-drivers",
       "name": "Valley Rideshare Drivers",
       "governanceLayer": "economic",
-      "description": "Rideshare drivers mutual support",
-      "reach": "community"
+      "reach": "community",
+      "description": "Rideshare drivers mutual support"
     },
     {
       "id": "community-mining-town",
       "name": "Mining Town Community",
       "governanceLayer": "geographic",
-      "description": "Mining community residents",
-      "reach": "community"
+      "reach": "community",
+      "description": "Mining community residents"
     },
     {
       "id": "community-utility-workers",
       "name": "Utility Workers Network",
       "governanceLayer": "economic",
-      "description": "Power and utility workers community",
-      "reach": "community"
+      "reach": "community",
+      "description": "Power and utility workers community"
     },
     {
       "id": "community-immigrant-support",
       "name": "Immigrant Support Network",
       "governanceLayer": "community",
-      "description": "Supporting newcomers and immigrants",
-      "reach": "community"
+      "reach": "community",
+      "description": "Supporting newcomers and immigrants"
     },
     {
       "id": "community-esl-program",
       "name": "ESL Learning Program",
       "governanceLayer": "education",
-      "description": "English as second language learning community",
-      "reach": "community"
+      "reach": "community",
+      "description": "English as second language learning community"
     },
     {
       "id": "community-refugee-resettlement",
       "name": "Refugee Resettlement Network",
       "governanceLayer": "community",
-      "description": "Supporting refugee integration",
-      "reach": "community"
+      "reach": "community",
+      "description": "Supporting refugee integration"
     },
     {
       "id": "community-engineers-network",
       "name": "Engineers Network",
       "governanceLayer": "interest",
-      "description": "Professional engineers community",
-      "reach": "community"
+      "reach": "community",
+      "description": "Professional engineers community"
     },
     {
       "id": "org-ethosengine",
       "name": "EthosEngine",
       "governanceLayer": "workplace",
-      "description": "Protocol development organization",
-      "reach": "municipal"
+      "reach": "community",
+      "description": "Protocol development organization"
     },
     {
       "id": "org-community-church",
       "name": "Valley Community Church (organization)",
       "governanceLayer": "workplace",
-      "description": "Church as workplace for staff",
-      "reach": "community"
+      "reach": "community",
+      "description": "Church as workplace for staff"
     },
     {
       "id": "org-valley-school-district",
       "name": "Valley School District",
       "governanceLayer": "workplace",
-      "description": "Local school district",
-      "reach": "municipal"
+      "reach": "community",
+      "description": "Local school district"
     },
     {
       "id": "org-teachers-union",
       "name": "Valley Teachers Union",
       "governanceLayer": "workplace",
-      "description": "Teachers union local chapter",
-      "reach": "municipal"
+      "reach": "community",
+      "description": "Teachers union local chapter"
     },
     {
       "id": "org-learning-collective",
       "name": "Valley Learning Collective",
       "governanceLayer": "education",
-      "description": "Collaborative learning facilitation",
-      "reach": "community"
+      "reach": "community",
+      "description": "Collaborative learning facilitation"
     },
     {
       "id": "org-community-foundation",
       "name": "Valley Community Foundation",
       "governanceLayer": "economic",
-      "description": "Community development foundation",
-      "reach": "municipal"
+      "reach": "community",
+      "description": "Community development foundation"
     },
     {
       "id": "org-franks-farm",
       "name": "Frank's Family Farm",
       "governanceLayer": "workplace",
-      "description": "Family-owned regenerative farm",
-      "reach": "local"
+      "reach": "familiar",
+      "description": "Family-owned regenerative farm"
     },
     {
       "id": "org-valley-market",
       "name": "Valley Market",
       "governanceLayer": "workplace",
-      "description": "Local grocery and market",
-      "reach": "local"
+      "reach": "familiar",
+      "description": "Local grocery and market"
     },
     {
       "id": "org-valley-machine-works",
       "name": "Valley Machine Works",
       "governanceLayer": "workplace",
-      "description": "Local manufacturing business",
-      "reach": "local"
+      "reach": "familiar",
+      "description": "Local manufacturing business"
     },
     {
       "id": "org-bub-construction",
       "name": "Bub's Construction",
       "governanceLayer": "workplace",
-      "description": "General contracting and construction",
-      "reach": "local"
+      "reach": "familiar",
+      "description": "General contracting and construction"
     },
     {
       "id": "org-consolidated-mining",
       "name": "Consolidated Mining Corp",
       "governanceLayer": "workplace",
-      "description": "Mining corporation",
-      "reach": "municipal"
+      "reach": "community",
+      "description": "Mining corporation"
     },
     {
       "id": "org-miners-union-local-347",
       "name": "Miners Union Local 347",
       "governanceLayer": "workplace",
-      "description": "Mining workers union local",
-      "reach": "municipal"
+      "reach": "community",
+      "description": "Mining workers union local"
     },
     {
       "id": "org-valley-power-electric",
       "name": "Valley Power & Electric",
       "governanceLayer": "workplace",
-      "description": "Local power utility",
-      "reach": "municipal"
+      "reach": "community",
+      "description": "Local power utility"
     },
     {
       "id": "org-ibew-local-123",
       "name": "IBEW Local 123",
       "governanceLayer": "workplace",
-      "description": "Electrical workers union local",
-      "reach": "municipal"
+      "reach": "community",
+      "description": "Electrical workers union local"
     },
     {
       "id": "org-pure-valley-association",
       "name": "Pure Valley Community Association",
       "governanceLayer": "geographic",
-      "description": "Community governance association",
-      "reach": "community"
+      "reach": "community",
+      "description": "Community governance association"
     }
+  ],
+  "relationships": [
+    { "type": "contains", "from": "family-dowell", "to": "couple-matthew-jessica", "description": "Nuclear family contains founding couple" },
+    { "type": "contains", "from": "family-eden", "to": "couple-adam-eve", "description": "Eden family contains genesis couple" },
+    { "type": "succeeds", "from": "couple-adam-eve", "to": "couple-matthew-jessica", "description": "Generational succession — genesis couple to founding couple" },
+    { "type": "participates-in", "from": "family-dowell", "to": "community-local-church", "description": "Dowell family are church members" },
+    { "type": "participates-in", "from": "family-dowell", "to": "neighborhood-valley", "description": "Dowell family in the neighborhood" },
+    { "type": "participates-in", "from": "family-dowell", "to": "community-homeschool-coop", "description": "Dowell family homeschools through co-op" },
+    { "type": "participates-in", "from": "family-eden", "to": "community-local-church", "description": "Eden family are church members" },
+    { "type": "participates-in", "from": "family-eden", "to": "neighborhood-valley", "description": "Eden family in the neighborhood" },
+    { "type": "contains", "from": "community-local-church", "to": "bible-study-valley", "description": "Church contains bible study small group" },
+    { "type": "contains", "from": "community-neighborhood-association", "to": "neighborhood-valley", "description": "Association contains the neighborhood" },
+    { "type": "delegates-to", "from": "bible-study-valley", "to": "community-local-church", "description": "Bible study sends representative to church governance" },
+    { "type": "delegates-to", "from": "neighborhood-valley", "to": "community-neighborhood-association", "description": "Neighborhood sends delegate to association" },
+    { "type": "peers-with", "from": "community-local-church", "to": "community-homeschool-coop", "domainOverlap": "child-development", "description": "Church and co-op coordinate on children's holistic development" },
+    { "type": "peers-with", "from": "community-local-church", "to": "community-pastoral-network", "domainOverlap": "pastoral-care", "description": "Church and pastoral network coordinate on care" },
+    { "type": "participates-in", "from": "org-ethosengine", "to": "community-holochain-devs", "description": "EthosEngine participates in Holochain dev community" },
+    { "type": "participates-in", "from": "org-franks-farm", "to": "community-regen-ag-network", "description": "Frank's Farm in the regenerative agriculture network" },
+    { "type": "participates-in", "from": "org-franks-farm", "to": "community-farmers-market", "description": "Frank's Farm sells at the market" },
+    { "type": "peers-with", "from": "community-farmers-market", "to": "community-local-business", "domainOverlap": "local-commerce", "description": "Market and business alliance coordinate on local economy" },
+    { "type": "participates-in", "from": "org-consolidated-mining", "to": "community-mining-town", "description": "Mining corp operates in mining town" },
+    { "type": "participates-in", "from": "org-miners-union-local-347", "to": "community-mining-town", "description": "Miners union represents workers in mining town" },
+    { "type": "peers-with", "from": "org-consolidated-mining", "to": "org-miners-union-local-347", "domainOverlap": "labor-conditions", "description": "Management and union negotiate labor conditions" },
+    { "type": "participates-in", "from": "org-valley-power-electric", "to": "community-utility-workers", "description": "Power company workers in utility network" },
+    { "type": "participates-in", "from": "org-ibew-local-123", "to": "community-utility-workers", "description": "IBEW represents electrical workers" },
+    { "type": "participates-in", "from": "community-immigrant-support", "to": "community-esl-program", "description": "Immigrant support feeds into ESL program" },
+    { "type": "participates-in", "from": "community-refugee-resettlement", "to": "community-immigrant-support", "description": "Refugee resettlement feeds into immigrant support" }
   ]
 }
