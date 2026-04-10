@@ -4,7 +4,7 @@ use libp2p::{
     autonat, dcutr, identify,
     identity::Keypair,
     kad::{self, Behaviour as Kademlia},
-    mdns, relay,
+    mdns, ping, relay,
     request_response::{self, Behaviour as RequestResponse, ProtocolSupport},
     swarm::{behaviour::toggle::Toggle, NetworkBehaviour},
     PeerId,
@@ -83,6 +83,8 @@ pub struct ElohimStorageBehaviour {
     pub identify: identify::Behaviour,
     /// Automatic NAT detection (probe peers to determine NAT status)
     pub autonat: autonat::Behaviour,
+    /// Ping protocol for RTT measurement
+    pub ping: ping::Behaviour,
 }
 
 /// Events emitted by ElohimStorageBehaviour
@@ -115,6 +117,8 @@ pub enum ElohimStorageBehaviourEvent {
     Identify(identify::Event),
     /// AutoNAT event (NAT status changes)
     AutoNat(autonat::Event),
+    /// Ping event (RTT measurement)
+    Ping(ping::Event),
 }
 
 impl From<kad::Event> for ElohimStorageBehaviourEvent {
@@ -201,6 +205,12 @@ impl From<autonat::Event> for ElohimStorageBehaviourEvent {
     }
 }
 
+impl From<ping::Event> for ElohimStorageBehaviourEvent {
+    fn from(event: ping::Event) -> Self {
+        Self::Ping(event)
+    }
+}
+
 impl ElohimStorageBehaviour {
     /// Create a new behaviour with NAT traversal support.
     ///
@@ -273,6 +283,8 @@ impl ElohimStorageBehaviour {
             },
         );
 
+        let ping = ping::Behaviour::new(ping::Config::new());
+
         Self {
             kademlia,
             shard_protocol,
@@ -285,6 +297,7 @@ impl ElohimStorageBehaviour {
             dcutr,
             identify,
             autonat,
+            ping,
         }
     }
 }

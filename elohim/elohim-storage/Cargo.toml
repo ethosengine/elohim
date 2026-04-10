@@ -133,6 +133,7 @@ libp2p = { version = "0.54", features = [
     "mdns",             # Local network discovery
     "relay",            # NAT traversal relay
     "dcutr",            # Direct Connection Upgrade through Relay
+    "ping",             # Ping protocol for RTT measurement
     "autonat",          # Automatic NAT detection
     "tokio",            # Async runtime integration
     "macros",           # NetworkBehaviour derive macro

@@ -42,7 +42,7 @@ use libp2p::kad::{store::RecordStore, Record, RecordKey};
 use libp2p::{
     autonat, dcutr, identify, kad, mdns,
     multiaddr::Protocol,
-    noise, relay, request_response,
+    noise, ping, relay, request_response,
     swarm::{Swarm, SwarmEvent},
     tcp, yamux, Multiaddr, PeerId, SwarmBuilder,
 };
@@ -226,6 +226,8 @@ pub struct P2PNode {
     delivery_peers: Arc<DashMap<String, DeliveryPeer>>,
     /// Cached identify info per peer (populated from identify::Event::Received)
     identify_cache: Arc<DashMap<String, CachedIdentifyInfo>>,
+    /// Per-peer runtime metrics (direction, last-seen, RTT)
+    peer_metrics: Arc<DashMap<String, PeerMetrics>>,
 }
 
 /// Cached identify protocol info for a connected peer.
@@ -234,6 +236,39 @@ struct CachedIdentifyInfo {
     agent_version: String,
     protocols: Vec<String>,
     listen_addrs: Vec<String>,
+}
+
+/// Per-peer runtime metrics tracked from swarm events.
+struct PeerMetrics {
+    /// Connection direction: "inbound" or "outbound"
+    direction: &'static str,
+    /// Unix epoch millis of last peer activity
+    last_seen_ms: u64,
+    /// Ring buffer of RTT samples from ping (max 8)
+    rtt_samples: std::collections::VecDeque<Duration>,
+}
+
+/// Current unix epoch in milliseconds.
+fn now_unix_ms() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis() as u64
+}
+
+/// Compute median RTT from a ring buffer of samples.
+fn median_rtt(samples: &std::collections::VecDeque<Duration>) -> Option<f64> {
+    if samples.is_empty() {
+        return None;
+    }
+    let mut sorted: Vec<f64> = samples.iter().map(|d| d.as_secs_f64() * 1000.0).collect();
+    sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    let mid = sorted.len() / 2;
+    if sorted.len().is_multiple_of(2) {
+        Some((sorted[mid - 1] + sorted[mid]) / 2.0)
+    } else {
+        Some(sorted[mid])
+    }
 }
 
 /// Drain queue observability. Exposed via `P2PStatusInfo` so other peers can
@@ -711,6 +746,7 @@ impl P2PNode {
             extraction_cache: None,
             delivery_peers: Arc::new(DashMap::new()),
             identify_cache: Arc::new(DashMap::new()),
+            peer_metrics: Arc::new(DashMap::new()),
         })
     }
 
@@ -1043,6 +1079,7 @@ impl P2PNode {
                     .map(|pid| {
                         let pid_str = pid.to_string();
                         let cached = self.identify_cache.get(&pid_str);
+                        let metrics = self.peer_metrics.get(&pid_str);
                         PeerInfoView {
                             peer_id: pid_str,
                             multiaddrs: cached
@@ -1057,9 +1094,12 @@ impl P2PNode {
                                 .as_ref()
                                 .map(|c| c.agent_version.clone())
                                 .unwrap_or_default(),
-                            direction: "unknown".to_string(),
-                            rtt_ms: None,
-                            last_seen_ms: None,
+                            direction: metrics
+                                .as_ref()
+                                .map(|m| m.direction.to_string())
+                                .unwrap_or_else(|| "unknown".to_string()),
+                            rtt_ms: metrics.as_ref().and_then(|m| median_rtt(&m.rtt_samples)),
+                            last_seen_ms: metrics.as_ref().map(|m| m.last_seen_ms),
                             remote_nat_status: None,
                             bandwidth_in: None,
                             bandwidth_out: None,
@@ -1305,6 +1345,22 @@ impl P2PNode {
                 peer_id, endpoint, ..
             } => {
                 debug!(peer = %peer_id, "Connected to peer");
+                // Track connection direction and last-seen for /p2p/peers
+                let direction = if endpoint.is_dialer() {
+                    "outbound"
+                } else {
+                    "inbound"
+                };
+                self.peer_metrics
+                    .entry(peer_id.to_string())
+                    .and_modify(|m| {
+                        m.last_seen_ms = now_unix_ms();
+                    })
+                    .or_insert_with(|| PeerMetrics {
+                        direction,
+                        last_seen_ms: now_unix_ms(),
+                        rtt_samples: std::collections::VecDeque::with_capacity(8),
+                    });
                 {
                     let mut swarm = self.swarm.write().await;
                     // In K8s (mDNS disabled), add connected peers to Kademlia for DHT routing.
@@ -1338,6 +1394,8 @@ impl P2PNode {
             SwarmEvent::ConnectionClosed { peer_id, cause, .. } => {
                 debug!(peer = %peer_id, cause = ?cause, "Disconnected from peer");
                 self.peer_trust_cache.remove(&peer_id).await;
+                self.peer_metrics.remove(&peer_id.to_string());
+                self.identify_cache.remove(&peer_id.to_string());
                 self.refresh_status().await;
             }
             SwarmEvent::Behaviour(event) => {
@@ -1886,6 +1944,9 @@ impl P2PNode {
                         listen_addrs: info.listen_addrs.iter().map(|a| a.to_string()).collect(),
                     },
                 );
+                if let Some(mut m) = self.peer_metrics.get_mut(&peer_id.to_string()) {
+                    m.last_seen_ms = now_unix_ms();
+                }
                 // Add observed addresses to Kademlia for better routing
                 let mut swarm = self.swarm.write().await;
                 for addr in info.listen_addrs {
@@ -1922,6 +1983,35 @@ impl P2PNode {
             behaviour::ElohimStorageBehaviourEvent::AutoNat(event) => {
                 debug!(event = ?event, "AutoNAT event");
             }
+
+            behaviour::ElohimStorageBehaviourEvent::Ping(ping::Event {
+                peer,
+                result: Ok(rtt),
+                ..
+            }) => {
+                let pid = peer.to_string();
+                self.peer_metrics
+                    .entry(pid)
+                    .and_modify(|m| {
+                        if m.rtt_samples.len() >= 8 {
+                            m.rtt_samples.pop_front();
+                        }
+                        m.rtt_samples.push_back(rtt);
+                        m.last_seen_ms = now_unix_ms();
+                    })
+                    .or_insert_with(|| {
+                        let mut samples = std::collections::VecDeque::with_capacity(8);
+                        samples.push_back(rtt);
+                        PeerMetrics {
+                            direction: "unknown",
+                            last_seen_ms: now_unix_ms(),
+                            rtt_samples: samples,
+                        }
+                    });
+            }
+            behaviour::ElohimStorageBehaviourEvent::Ping(ping::Event {
+                result: Err(_), ..
+            }) => {}
 
             behaviour::ElohimStorageBehaviourEvent::RelayClient(
                 relay::client::Event::ReservationReqAccepted {
