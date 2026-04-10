@@ -12,7 +12,8 @@
           "app/elohim-app/tsconfig*.json",
           "app/elohim-app/package.json",
           "app/elohim-app/vite.config.ts",
-          "app/elohim-library/**"
+          "app/elohim-library/**",
+          "elohim/sdk/**"
         ],
         "buildProcess": ["Jenkinsfile"]
       },
