@@ -17612,7 +17612,7 @@
   ],
   "collectives": [
     {
-      "collectiveId": "household-eden",
+      "collectiveId": "family-eden",
       "roleContext": null,
       "intimacyLevel": "intimate"
     },
@@ -17625,6 +17625,11 @@
       "collectiveId": "community-homeschool-coop",
       "roleContext": null,
       "intimacyLevel": "connection"
+    },
+    {
+      "collectiveId": "couple-adam-eve",
+      "roleContext": "partner",
+      "intimacyLevel": "intimate"
     }
   ],
   "conductorGroup": 1,

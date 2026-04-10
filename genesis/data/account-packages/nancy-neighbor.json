@@ -20769,7 +20769,7 @@
   ],
   "collectives": [
     {
-      "collectiveId": "household-eden",
+      "collectiveId": "family-eden",
       "roleContext": null,
       "intimacyLevel": "intimate"
     },
@@ -20780,6 +20780,11 @@
     },
     {
       "collectiveId": "community-local-church",
+      "roleContext": null,
+      "intimacyLevel": "connection"
+    },
+    {
+      "collectiveId": "neighborhood-valley",
       "roleContext": null,
       "intimacyLevel": "connection"
     }

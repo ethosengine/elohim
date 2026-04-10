@@ -13733,7 +13733,7 @@
   "stewardship": [],
   "collectives": [
     {
-      "collectiveId": "household-extended",
+      "collectiveId": "neighborhood-extended",
       "roleContext": null,
       "intimacyLevel": "trusted"
     },

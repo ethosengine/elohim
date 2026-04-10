@@ -17608,7 +17608,7 @@
   ],
   "collectives": [
     {
-      "collectiveId": "household-eden",
+      "collectiveId": "family-eden",
       "roleContext": null,
       "intimacyLevel": "intimate"
     },
@@ -17621,6 +17621,11 @@
       "collectiveId": "community-regen-ag-network",
       "roleContext": null,
       "intimacyLevel": "connection"
+    },
+    {
+      "collectiveId": "couple-adam-eve",
+      "roleContext": "partner",
+      "intimacyLevel": "intimate"
     }
   ],
   "conductorGroup": 1,

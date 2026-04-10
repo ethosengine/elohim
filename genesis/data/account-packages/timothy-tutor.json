@@ -12618,7 +12618,7 @@
   "stewardship": [],
   "collectives": [
     {
-      "collectiveId": "household-valley-economy",
+      "collectiveId": "neighborhood-valley-economy",
       "roleContext": null,
       "intimacyLevel": "trusted"
     },
@@ -12635,6 +12635,16 @@
     {
       "collectiveId": "org-learning-collective",
       "roleContext": "facilitator",
+      "intimacyLevel": "connection"
+    },
+    {
+      "collectiveId": "bible-study-valley",
+      "roleContext": null,
+      "intimacyLevel": "connection"
+    },
+    {
+      "collectiveId": "neighborhood-valley",
+      "roleContext": null,
       "intimacyLevel": "connection"
     }
   ],

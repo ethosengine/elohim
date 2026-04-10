@@ -20778,7 +20778,7 @@
   ],
   "collectives": [
     {
-      "collectiveId": "household-dowell",
+      "collectiveId": "family-dowell",
       "roleContext": null,
       "intimacyLevel": "intimate"
     },
@@ -20789,6 +20789,21 @@
     },
     {
       "collectiveId": "community-homeschool-coop",
+      "roleContext": null,
+      "intimacyLevel": "connection"
+    },
+    {
+      "collectiveId": "couple-matthew-jessica",
+      "roleContext": "partner",
+      "intimacyLevel": "intimate"
+    },
+    {
+      "collectiveId": "bible-study-valley",
+      "roleContext": null,
+      "intimacyLevel": "connection"
+    },
+    {
+      "collectiveId": "neighborhood-valley",
       "roleContext": null,
       "intimacyLevel": "connection"
     }
