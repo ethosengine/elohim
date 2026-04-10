@@ -133,6 +133,10 @@ pub struct RegisterRequest {
     /// Must match the API_KEY_ADMIN environment variable.
     #[serde(default)]
     pub admin_bootstrap_key: Option<String>,
+    /// Agency phase for graduated stewardship: doorway, node, device, hosted, visitor.
+    /// Determines registration flow — whether doorway creates identity or just DB record.
+    #[serde(default)]
+    pub agency_phase: Option<String>,
 }
 
 fn default_profile_reach() -> String {
