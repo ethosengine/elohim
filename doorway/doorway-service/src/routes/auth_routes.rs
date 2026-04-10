@@ -891,7 +891,6 @@ async fn handle_register(
                     },
                 )
                 .await
-                .map_err(|e| e)
             } else {
                 // No conductor registry (dev mode or not configured) — fall back
                 // to singleton ZomeCaller
