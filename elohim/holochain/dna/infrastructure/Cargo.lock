@@ -613,9 +613,18 @@ version = "0.1.0"
 dependencies = [
  "hdk",
  "holochain_serialized_bytes",
+ "infrastructure-types",
  "infrastructure_integrity",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "infrastructure-types"
+version = "0.1.0"
+dependencies = [
+ "holo_hash",
+ "serde",
 ]
 
 [[package]]

@@ -1097,6 +1097,7 @@ dependencies = [
  "hyper-tungstenite",
  "hyper-util",
  "imagodei-types",
+ "infrastructure-types",
  "ipld-core",
  "jsonwebtoken",
  "mongodb",
@@ -2388,6 +2389,14 @@ dependencies = [
  "quick-xml",
  "rgb",
  "str_stack",
+]
+
+[[package]]
+name = "infrastructure-types"
+version = "0.1.0"
+dependencies = [
+ "holo_hash 0.6.0",
+ "serde",
 ]
 
 [[package]]

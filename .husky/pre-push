@@ -151,6 +151,9 @@ if [ "$USE_MANIFEST" = false ]; then
   if echo "$CHANGED" | grep -q "^genesis/a2o/"; then
     PROJECTS="$PROJECTS genesis-a2o"
   fi
+  if echo "$CHANGED" | grep -q "^elohim/sdk/"; then
+    PROJECTS="$PROJECTS domain-types"
+  fi
 fi
 
 # Trim leading space
@@ -174,7 +177,7 @@ run_gate() {
   cd "$PROJECT_DIR" || return 1
 
   # Schema checks run pnpm scripts directly — no justfile needed
-  if [ "$PROJECT_NAME" = "schema-validate" ] || [ "$PROJECT_NAME" = "schema-dna" ] || [ "$PROJECT_NAME" = "schema-codegen" ] || [ "$PROJECT_NAME" = "constants-sync" ]; then
+  if [ "$PROJECT_NAME" = "schema-validate" ] || [ "$PROJECT_NAME" = "schema-dna" ] || [ "$PROJECT_NAME" = "schema-codegen" ] || [ "$PROJECT_NAME" = "constants-sync" ] || [ "$PROJECT_NAME" = "domain-types" ]; then
     case "$PROJECT_NAME" in
       schema-validate)
         echo "[$PROJECT_NAME] Validating seed data against protocol schemas..."
@@ -196,6 +199,24 @@ run_gate() {
         echo "[$PROJECT_NAME] Running constants sync (schema ↔ generated enums ↔ seed data)..."
         (cd genesis/seeder && pnpm exec vitest run src/__tests__/constants-sync.test.ts) 2>&1
         rc=$?
+        ;;
+      domain-types)
+        echo "[$PROJECT_NAME] Checking all 6 domain types crates compile..."
+        rc=0
+        for types_crate in \
+          elohim/sdk/domains/imagodei/types \
+          elohim/sdk/domains/infrastructure/types \
+          elohim/sdk/domains/lamad/types \
+          elohim/sdk/domains/qahal/types \
+          elohim/sdk/domains/shefa/types \
+          elohim/sdk/domains/avodah/types; do
+          crate_name=$(basename "$(dirname "$types_crate")")-types
+          echo "  cargo check $crate_name..."
+          if ! RUSTFLAGS="" cargo check --manifest-path "$types_crate/Cargo.toml" 2>&1; then
+            echo "  FAILED: $crate_name"
+            rc=1
+          fi
+        done
         ;;
     esac
   elif command -v just >/dev/null 2>&1 && [ -f justfile ]; then
@@ -370,6 +391,7 @@ for PROJECT in $PROJECTS; do
       constants-sync)   PROJECT_DIR="." ;;
       genesis-a2o)      PROJECT_DIR="genesis/a2o" ;;
       orchestrator)     PROJECT_DIR="genesis/orchestrator" ;;
+      domain-types)     PROJECT_DIR="." ;;
       *)                PROJECT_DIR="$PROJECT" ;;
     esac
   fi

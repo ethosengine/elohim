@@ -7,6 +7,13 @@
             "type": "command",
             "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/load-project-context.py\"",
             "timeout": 5000
+          },
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/scripts/clean-caches.sh\" 2>&1 | grep -E '\\[clean-caches\\]' || true",
+            "timeout": 300,
+            "statusMessage": "Checking disk usage...",
+            "async": true
           }
         ]
       }
