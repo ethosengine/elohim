@@ -370,9 +370,8 @@ async fn main() -> anyhow::Result<()> {
                         if let Ok(status) = resp.json::<serde_json::Value>().await {
                             let health = doorway::routes::health::P2PHealth {
                                 enabled: true,
-                                peer_count: status["connected_peers"].as_u64().unwrap_or(0)
-                                    as usize,
-                                peer_id: status["peer_id"].as_str().map(|s| s.to_string()),
+                                peer_count: status["connectedPeers"].as_u64().unwrap_or(0) as usize,
+                                peer_id: status["peerId"].as_str().map(|s| s.to_string()),
                             };
                             *p2p_health.write().await = Some(health);
                         }
@@ -760,22 +759,10 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-/// Derive admin WebSocket URL from app URL by replacing the port
+/// Derive admin WebSocket URL from app URL by replacing the port.
+/// Delegates to the library implementation so there is a single source of truth.
 fn derive_admin_url_from_app(app_url: &str) -> String {
-    if let Some(host_start) = app_url.find("://") {
-        let after_scheme = &app_url[host_start + 3..];
-        if let Some(port_start) = after_scheme.rfind(':') {
-            let host = &after_scheme[..port_start];
-            let port_str = &after_scheme[port_start + 1..];
-            // Admin port = app port - 1 (socat convention: 8444=admin, 8445=app; 4444/4445)
-            let admin_port = port_str
-                .parse::<u16>()
-                .map(|p| p.saturating_sub(1))
-                .unwrap_or(4444);
-            return format!("{}://{}:{}", &app_url[..host_start], host, admin_port);
-        }
-    }
-    "ws://localhost:4444".to_string()
+    doorway::derive_admin_url_from_app(app_url)
 }
 
 /// Discover existing agents by querying each conductor's admin API.

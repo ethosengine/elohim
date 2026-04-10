@@ -41,3 +41,24 @@ pub mod worker;
 pub use config::Args;
 pub use server::{run, AppState};
 pub use types::{DoorwayError, Result};
+
+/// Derive admin WebSocket URL from app URL by replacing the port.
+///
+/// The admin port is the app port minus 1 (socat convention: 8444=admin, 8445=app).
+/// Exposed at crate root so both `routes::zome_helpers` and `routes::auth_routes` can
+/// construct temporary `ZomeCaller` instances without depending on `main`.
+pub fn derive_admin_url_from_app(app_url: &str) -> String {
+    if let Some(host_start) = app_url.find("://") {
+        let after_scheme = &app_url[host_start + 3..];
+        if let Some(port_start) = after_scheme.rfind(':') {
+            let host = &after_scheme[..port_start];
+            let port_str = &after_scheme[port_start + 1..];
+            let admin_port = port_str
+                .parse::<u16>()
+                .map(|p| p.saturating_sub(1))
+                .unwrap_or(4444);
+            return format!("{}://{}:{}", &app_url[..host_start], host, admin_port);
+        }
+    }
+    "ws://localhost:4444".to_string()
+}

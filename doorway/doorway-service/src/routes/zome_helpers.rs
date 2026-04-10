@@ -76,6 +76,38 @@ pub async fn call_get_my_human(state: &AppState) -> Result<Option<HumanOutput>> 
     Ok(result)
 }
 
+/// Call imagodei::create_human on a specific conductor (not the singleton ZomeCaller).
+///
+/// Used for `hosted` registrations where the human's identity is created on
+/// the operator's conductor (identified during provisioning), not the doorway's
+/// default ZomeCaller target.
+pub async fn call_create_human_on_conductor(
+    conductor_url: &str,
+    installed_app_id: &str,
+    input: CreateHumanInput,
+) -> crate::types::Result<HumanOutput> {
+    let admin_url = crate::derive_admin_url_from_app(conductor_url);
+
+    debug!(
+        conductor_url = %conductor_url,
+        admin_url = %admin_url,
+        installed_app_id = %installed_app_id,
+        human_id = %input.id,
+        "Creating temporary ZomeCaller for hosted registration"
+    );
+
+    let caller = crate::services::ZomeCaller::new(&admin_url, conductor_url, installed_app_id);
+
+    let result: HumanOutput = caller
+        .call("imagodei", "imagodei", "create_human", &input)
+        .await
+        .map_err(|e| {
+            crate::types::DoorwayError::Holochain(format!("create_human on conductor failed: {e}"))
+        })?;
+
+    Ok(result)
+}
+
 /// Get agent public key from the imagodei zome config
 ///
 /// Returns the agent public key that the conductor uses for this app.
