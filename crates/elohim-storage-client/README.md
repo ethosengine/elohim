@@ -129,3 +129,4 @@ let info = client.get_manifest(&hash_or_cid).await?;
 ## License
 
 AGPL-3.0
+
