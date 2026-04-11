@@ -11,11 +11,7 @@
     "community",
     "human-graph"
   ],
-  "relatedNodeIds": [
-    "human-jessica-spouse",
-    "human-james-son",
-    "human-timothy-tutor"
-  ],
+  "relatedNodeIds": [],
   "metadata": {
     "category": "community",
     "memberCount": 3,

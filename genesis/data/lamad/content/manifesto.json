@@ -46,8 +46,586 @@
   "stewardedBy": [
     {
       "humanId": "human-matthew-manager",
-      "affinity": 1.0,
+      "affinity": 1,
       "role": "author"
+    }
+  ],
+  "contributors": [
+    {
+      "presenceId": "presence-b-lab-global-site",
+      "contributionType": "inspired",
+      "weight": null,
+      "context": "Inspired the manifesto via Consilience Garden curation (section: Saved)"
+    },
+    {
+      "presenceId": "presence-buycott",
+      "contributionType": "inspired",
+      "weight": null,
+      "context": "Inspired the manifesto via Consilience Garden curation (section: Saved)"
+    },
+    {
+      "presenceId": "presence-sustainable-shopping-eco-friendly-fair-trade-clothing-shoes",
+      "contributionType": "inspired",
+      "weight": null,
+      "context": "Inspired the manifesto via Consilience Garden curation (section: Saved)"
+    },
+    {
+      "presenceId": "presence-leverage-points-places-to-intervene-in-a-system",
+      "contributionType": "inspired",
+      "weight": null,
+      "context": "Inspired the manifesto via Consilience Garden curation (section: Saved)"
+    },
+    {
+      "presenceId": "presence-meta-crisis-meta-resource",
+      "contributionType": "inspired",
+      "weight": null,
+      "context": "Inspired the manifesto via Consilience Garden curation (section: Saved)"
+    },
+    {
+      "presenceId": "presence-about",
+      "contributionType": "inspired",
+      "weight": null,
+      "context": "Inspired the manifesto via Consilience Garden curation (section: Saved)"
+    },
+    {
+      "presenceId": "presence-home-initiative-for-digital-public-infrastructure",
+      "contributionType": "inspired",
+      "weight": null,
+      "context": "Inspired the manifesto via Consilience Garden curation (section: Saved)"
+    },
+    {
+      "presenceId": "presence-foundations-of-humane-technology-course",
+      "contributionType": "inspired",
+      "weight": null,
+      "context": "Inspired the manifesto via Consilience Garden curation (section: Saved)"
+    },
+    {
+      "presenceId": "presence-future-thinkers-daniel-schmachtenberger-the-existential-game",
+      "contributionType": "inspired",
+      "weight": null,
+      "context": "Inspired the manifesto via Consilience Garden curation (section: Saved)"
+    },
+    {
+      "presenceId": "presence-new-public-for-better-digital-public-spaces",
+      "contributionType": "inspired",
+      "weight": null,
+      "context": "Inspired the manifesto via Consilience Garden curation (section: Saved)"
+    },
+    {
+      "presenceId": "presence-a-problem-well-stated-is-half-solved-your-undivided-attentio",
+      "contributionType": "inspired",
+      "weight": null,
+      "context": "Inspired the manifesto via Consilience Garden curation (section: Saved)"
+    },
+    {
+      "presenceId": "presence-iftf-home",
+      "contributionType": "inspired",
+      "weight": null,
+      "context": "Inspired the manifesto via Consilience Garden curation (section: Saved)"
+    },
+    {
+      "presenceId": "presence-civilization-research-institute",
+      "contributionType": "inspired",
+      "weight": null,
+      "context": "Inspired the manifesto via Consilience Garden curation (section: Saved)"
+    },
+    {
+      "presenceId": "presence-the-consilience-project",
+      "contributionType": "inspired",
+      "weight": null,
+      "context": "Inspired the manifesto via Consilience Garden curation (section: Saved)"
+    },
+    {
+      "presenceId": "presence-consilience-project-institute-for-quantitative-social-scienc",
+      "contributionType": "inspired",
+      "weight": null,
+      "context": "Inspired the manifesto via Consilience Garden curation (section: Saved)"
+    },
+    {
+      "presenceId": "presence-daniel-schmachtenberger-the-consilience-project",
+      "contributionType": "inspired",
+      "weight": null,
+      "context": "Inspired the manifesto via Consilience Garden curation (section: Saved)"
+    },
+    {
+      "presenceId": "presence-p2p-lab-research-collective",
+      "contributionType": "inspired",
+      "weight": null,
+      "context": "Inspired the manifesto via Consilience Garden curation (section: Built for Purpose)"
+    },
+    {
+      "presenceId": "presence-agile-learning-centers-education-evolved",
+      "contributionType": "inspired",
+      "weight": null,
+      "context": "Inspired the manifesto via Consilience Garden curation (section: Built for Purpose)"
+    },
+    {
+      "presenceId": "presence-idealoom",
+      "contributionType": "inspired",
+      "weight": null,
+      "context": "Inspired the manifesto via Consilience Garden curation (section: Built for Purpose)"
+    },
+    {
+      "presenceId": "presence-conversence-39-s-idealoom-platform",
+      "contributionType": "inspired",
+      "weight": null,
+      "context": "Inspired the manifesto via Consilience Garden curation (section: Built for Purpose)"
+    },
+    {
+      "presenceId": "presence-ground-news",
+      "contributionType": "inspired",
+      "weight": null,
+      "context": "Inspired the manifesto via Consilience Garden curation (section: Built for Purpose)"
+    },
+    {
+      "presenceId": "presence-bonfire",
+      "contributionType": "inspired",
+      "weight": null,
+      "context": "Inspired the manifesto via Consilience Garden curation (section: Built for Purpose)"
+    },
+    {
+      "presenceId": "presence-khan-academy-free-online-courses-lessons-practice",
+      "contributionType": "inspired",
+      "weight": null,
+      "context": "Inspired the manifesto via Consilience Garden curation (section: Built for Purpose)"
+    },
+    {
+      "presenceId": "presence-hylo-social-coordination-for-a-thriving-planet",
+      "contributionType": "inspired",
+      "weight": null,
+      "context": "Inspired the manifesto via Consilience Garden curation (section: Built for Purpose)"
+    },
+    {
+      "presenceId": "presence-kolibri-a-free-open-source-education-for-all-learning-equali",
+      "contributionType": "inspired",
+      "weight": null,
+      "context": "Inspired the manifesto via Consilience Garden curation (section: Built for Purpose)"
+    },
+    {
+      "presenceId": "presence-forward-labs",
+      "contributionType": "inspired",
+      "weight": null,
+      "context": "Inspired the manifesto via Consilience Garden curation (section: Built for Purpose)"
+    },
+    {
+      "presenceId": "presence-pubhubs",
+      "contributionType": "inspired",
+      "weight": null,
+      "context": "Inspired the manifesto via Consilience Garden curation (section: Built for Purpose)"
+    },
+    {
+      "presenceId": "presence-holochain-app-framework-with-p2p-networking",
+      "contributionType": "inspired",
+      "weight": null,
+      "context": "Inspired the manifesto via Consilience Garden curation (section: Built for Purpose)"
+    },
+    {
+      "presenceId": "presence-dework",
+      "contributionType": "inspired",
+      "weight": null,
+      "context": "Inspired the manifesto via Consilience Garden curation (section: Built for Purpose)"
+    },
+    {
+      "presenceId": "presence-front-porch-forum-is-a-free-community-building-service-in-ve",
+      "contributionType": "inspired",
+      "weight": null,
+      "context": "Inspired the manifesto via Consilience Garden curation (section: Built for Purpose)"
+    },
+    {
+      "presenceId": "presence-powerledger-energy-projects",
+      "contributionType": "inspired",
+      "weight": null,
+      "context": "Inspired the manifesto via Consilience Garden curation (section: Built for Purpose)"
+    },
+    {
+      "presenceId": "presence-solutions-ecochain",
+      "contributionType": "inspired",
+      "weight": null,
+      "context": "Inspired the manifesto via Consilience Garden curation (section: Built for Purpose)"
+    },
+    {
+      "presenceId": "presence-oecd-better-life-index",
+      "contributionType": "inspired",
+      "weight": null,
+      "context": "Inspired the manifesto via Consilience Garden curation (section: Shared Meaning)"
+    },
+    {
+      "presenceId": "presence-human-development-index-human-development-reports",
+      "contributionType": "inspired",
+      "weight": null,
+      "context": "Inspired the manifesto via Consilience Garden curation (section: Shared Meaning)"
+    },
+    {
+      "presenceId": "presence-happy-planet-index-how-happy-is-the-planet",
+      "contributionType": "inspired",
+      "weight": null,
+      "context": "Inspired the manifesto via Consilience Garden curation (section: Shared Meaning)"
+    },
+    {
+      "presenceId": "presence-thriving-places-index",
+      "contributionType": "inspired",
+      "weight": null,
+      "context": "Inspired the manifesto via Consilience Garden curation (section: Shared Meaning)"
+    },
+    {
+      "presenceId": "presence-genuine-progress-indicator-gross-national-happiness-usa",
+      "contributionType": "inspired",
+      "weight": null,
+      "context": "Inspired the manifesto via Consilience Garden curation (section: Shared Meaning)"
+    },
+    {
+      "presenceId": "presence-commons-transition-commons-transition",
+      "contributionType": "inspired",
+      "weight": null,
+      "context": "Inspired the manifesto via Consilience Garden curation (section: Shared Meaning)"
+    },
+    {
+      "presenceId": "presence-transitiontowns",
+      "contributionType": "inspired",
+      "weight": null,
+      "context": "Inspired the manifesto via Consilience Garden curation (section: Shared Meaning)"
+    },
+    {
+      "presenceId": "presence-solarpunk",
+      "contributionType": "inspired",
+      "weight": null,
+      "context": "Inspired the manifesto via Consilience Garden curation (section: Shared Meaning)"
+    },
+    {
+      "presenceId": "presence-welcome-to-regeneration-project-regeneration",
+      "contributionType": "inspired",
+      "weight": null,
+      "context": "Inspired the manifesto via Consilience Garden curation (section: Shared Meaning)"
+    },
+    {
+      "presenceId": "presence-home",
+      "contributionType": "inspired",
+      "weight": null,
+      "context": "Inspired the manifesto via Consilience Garden curation (section: Shared Meaning)"
+    },
+    {
+      "presenceId": "presence-future-scouts-international-learning-program-social-app-and",
+      "contributionType": "inspired",
+      "weight": null,
+      "context": "Inspired the manifesto via Consilience Garden curation (section: Shared Meaning)"
+    },
+    {
+      "presenceId": "presence-transition-network-transition-towns-the-circular-economy",
+      "contributionType": "inspired",
+      "weight": null,
+      "context": "Inspired the manifesto via Consilience Garden curation (section: Shared Meaning)"
+    },
+    {
+      "presenceId": "presence-2000-watt-society-and-2000-watt-site",
+      "contributionType": "inspired",
+      "weight": null,
+      "context": "Inspired the manifesto via Consilience Garden curation (section: Shared Meaning)"
+    },
+    {
+      "presenceId": "presence-about-p2p-foundation",
+      "contributionType": "inspired",
+      "weight": null,
+      "context": "Inspired the manifesto via Consilience Garden curation (section: Digital Governance and Democracy)"
+    },
+    {
+      "presenceId": "presence-blockchaingov",
+      "contributionType": "inspired",
+      "weight": null,
+      "context": "Inspired the manifesto via Consilience Garden curation (section: Digital Governance and Democracy)"
+    },
+    {
+      "presenceId": "presence-sociocracy-basic-concepts-and-principles",
+      "contributionType": "inspired",
+      "weight": null,
+      "context": "Inspired the manifesto via Consilience Garden curation (section: Digital Governance and Democracy)"
+    },
+    {
+      "presenceId": "presence-home-2021-edemocracy-network",
+      "contributionType": "inspired",
+      "weight": null,
+      "context": "Inspired the manifesto via Consilience Garden curation (section: Digital Governance and Democracy)"
+    },
+    {
+      "presenceId": "presence-public-engagement-and-online-decision-making-ethelo",
+      "contributionType": "inspired",
+      "weight": null,
+      "context": "Inspired the manifesto via Consilience Garden curation (section: Digital Governance and Democracy)"
+    },
+    {
+      "presenceId": "presence-artificial-intelligence-values-and-alignment",
+      "contributionType": "inspired",
+      "weight": null,
+      "context": "Inspired the manifesto via Consilience Garden curation (section: Digital Governance and Democracy)"
+    },
+    {
+      "presenceId": "presence-home-page-e-estonia",
+      "contributionType": "inspired",
+      "weight": null,
+      "context": "Inspired the manifesto via Consilience Garden curation (section: Digital Governance and Democracy)"
+    },
+    {
+      "presenceId": "presence-basic-law-for-the-federal-republic-of-germany",
+      "contributionType": "inspired",
+      "weight": null,
+      "context": "Inspired the manifesto via Consilience Garden curation (section: Digital Governance and Democracy)"
+    },
+    {
+      "presenceId": "presence-radicalxchange",
+      "contributionType": "inspired",
+      "weight": null,
+      "context": "Inspired the manifesto via Consilience Garden curation (section: Digital Governance and Democracy)"
+    },
+    {
+      "presenceId": "presence-eco-efficiency-vs-eco-effectiveness-ecocation",
+      "contributionType": "inspired",
+      "weight": null,
+      "context": "Inspired the manifesto via Consilience Garden curation (section: Design & Planning)"
+    },
+    {
+      "presenceId": "presence-global-carbon-reward-climate-initiative",
+      "contributionType": "inspired",
+      "weight": null,
+      "context": "Inspired the manifesto via Consilience Garden curation (section: Design & Planning)"
+    },
+    {
+      "presenceId": "presence-commons-engine-designing-commons-oriented-economies",
+      "contributionType": "inspired",
+      "weight": null,
+      "context": "Inspired the manifesto via Consilience Garden curation (section: Design & Planning)"
+    },
+    {
+      "presenceId": "presence-our-philosophy",
+      "contributionType": "inspired",
+      "weight": null,
+      "context": "Inspired the manifesto via Consilience Garden curation (section: Design & Planning)"
+    },
+    {
+      "presenceId": "presence-valueflows",
+      "contributionType": "inspired",
+      "weight": null,
+      "context": "Inspired the manifesto via Consilience Garden curation (section: Design & Planning)"
+    },
+    {
+      "presenceId": "presence-effective-altruism",
+      "contributionType": "inspired",
+      "weight": null,
+      "context": "Inspired the manifesto via Consilience Garden curation (section: Design & Planning)"
+    },
+    {
+      "presenceId": "presence-responsible-tech-guide",
+      "contributionType": "inspired",
+      "weight": null,
+      "context": "Inspired the manifesto via Consilience Garden curation (section: Design & Planning)"
+    },
+    {
+      "presenceId": "presence-humane-by-design",
+      "contributionType": "inspired",
+      "weight": null,
+      "context": "Inspired the manifesto via Consilience Garden curation (section: Design & Planning)"
+    },
+    {
+      "presenceId": "presence-wij-willen-het-internet-terug-publicspaces",
+      "contributionType": "inspired",
+      "weight": null,
+      "context": "Inspired the manifesto via Consilience Garden curation (section: Design & Planning)"
+    },
+    {
+      "presenceId": "presence-about-us",
+      "contributionType": "inspired",
+      "weight": null,
+      "context": "Inspired the manifesto via Consilience Garden curation (section: Design & Planning)"
+    },
+    {
+      "presenceId": "presence-home-partnership-on-ai",
+      "contributionType": "inspired",
+      "weight": null,
+      "context": "Inspired the manifesto via Consilience Garden curation (section: Design & Planning)"
+    },
+    {
+      "presenceId": "presence-world3-wikipedia",
+      "contributionType": "inspired",
+      "weight": null,
+      "context": "Inspired the manifesto via Consilience Garden curation (section: Design & Planning)"
+    },
+    {
+      "presenceId": "presence-scaling-trust-on-the-web",
+      "contributionType": "inspired",
+      "weight": null,
+      "context": "Inspired the manifesto via Consilience Garden curation (section: Safety)"
+    },
+    {
+      "presenceId": "presence-resilience-against-disinformation-tilt",
+      "contributionType": "inspired",
+      "weight": null,
+      "context": "Inspired the manifesto via Consilience Garden curation (section: Safety)"
+    },
+    {
+      "presenceId": "presence-gifct-global-internet-forum-to-counter-terrorism",
+      "contributionType": "inspired",
+      "weight": null,
+      "context": "Inspired the manifesto via Consilience Garden curation (section: Safety)"
+    },
+    {
+      "presenceId": "presence-integrity-institute",
+      "contributionType": "inspired",
+      "weight": null,
+      "context": "Inspired the manifesto via Consilience Garden curation (section: Safety)"
+    },
+    {
+      "presenceId": "presence-home-future-of-life-institute",
+      "contributionType": "inspired",
+      "weight": null,
+      "context": "Inspired the manifesto via Consilience Garden curation (section: Safety)"
+    },
+    {
+      "presenceId": "presence-jigsaw",
+      "contributionType": "inspired",
+      "weight": null,
+      "context": "Inspired the manifesto via Consilience Garden curation (section: Safety)"
+    },
+    {
+      "presenceId": "presence-regrid-nationwide-land-parcels-location-context-data-for-eve",
+      "contributionType": "inspired",
+      "weight": null,
+      "context": "Inspired the manifesto via Consilience Garden curation (section: Physical Commons)"
+    },
+    {
+      "presenceId": "presence-climate-town",
+      "contributionType": "inspired",
+      "weight": null,
+      "context": "Inspired the manifesto via Consilience Garden curation (section: Physical Commons)"
+    },
+    {
+      "presenceId": "presence-the-permaculture-principles",
+      "contributionType": "inspired",
+      "weight": null,
+      "context": "Inspired the manifesto via Consilience Garden curation (section: Physical Commons)"
+    },
+    {
+      "presenceId": "presence-strong-towns",
+      "contributionType": "inspired",
+      "weight": null,
+      "context": "Inspired the manifesto via Consilience Garden curation (section: Physical Commons)"
+    },
+    {
+      "presenceId": "presence-not-just-bikes",
+      "contributionType": "inspired",
+      "weight": null,
+      "context": "Inspired the manifesto via Consilience Garden curation (section: Physical Commons)"
+    },
+    {
+      "presenceId": "presence-how-we-work",
+      "contributionType": "inspired",
+      "weight": null,
+      "context": "Inspired the manifesto via Consilience Garden curation (section: Community suggestions)"
+    },
+    {
+      "presenceId": "presence-the-regenerates-regenesis-institute-for-regenerative-practic",
+      "contributionType": "inspired",
+      "weight": null,
+      "context": "Inspired the manifesto via Consilience Garden curation (section: Community suggestions)"
+    },
+    {
+      "presenceId": "presence-green-gross-domestic-product-wikipedia",
+      "contributionType": "inspired",
+      "weight": null,
+      "context": "Inspired the manifesto via Consilience Garden curation (section: Community suggestions)"
+    },
+    {
+      "presenceId": "presence-index",
+      "contributionType": "inspired",
+      "weight": null,
+      "context": "Inspired the manifesto via Consilience Garden curation (section: Community suggestions)"
+    },
+    {
+      "presenceId": "presence-jacque-fresco-the-venus-project",
+      "contributionType": "inspired",
+      "weight": null,
+      "context": "Inspired the manifesto via Consilience Garden curation (section: )"
+    },
+    {
+      "presenceId": "presence-fli-worldbuilding-contest",
+      "contributionType": "inspired",
+      "weight": null,
+      "context": "Inspired the manifesto via Consilience Garden curation (section: )"
+    },
+    {
+      "presenceId": "presence-democracy-earth-foundation",
+      "contributionType": "inspired",
+      "weight": null,
+      "context": "Inspired the manifesto via Consilience Garden curation (section: )"
+    },
+    {
+      "presenceId": "presence-homepage",
+      "contributionType": "inspired",
+      "weight": null,
+      "context": "Inspired the manifesto via Consilience Garden curation (section: )"
+    },
+    {
+      "presenceId": "presence-normality-principle-wikipedia",
+      "contributionType": "inspired",
+      "weight": null,
+      "context": "Inspired the manifesto via Consilience Garden curation (section: )"
+    },
+    {
+      "presenceId": "presence-polis",
+      "contributionType": "inspired",
+      "weight": null,
+      "context": "Inspired the manifesto via Consilience Garden curation (section: )"
+    },
+    {
+      "presenceId": "presence-calm-technology",
+      "contributionType": "inspired",
+      "weight": null,
+      "context": "Inspired the manifesto via Consilience Garden curation (section: )"
+    },
+    {
+      "presenceId": "presence-design-justice-network",
+      "contributionType": "inspired",
+      "weight": null,
+      "context": "Inspired the manifesto via Consilience Garden curation (section: )"
+    },
+    {
+      "presenceId": "presence-open-collective",
+      "contributionType": "inspired",
+      "weight": null,
+      "context": "Inspired the manifesto via Consilience Garden curation (section: )"
+    },
+    {
+      "presenceId": "presence-new-public",
+      "contributionType": "inspired",
+      "weight": null,
+      "context": "Inspired the manifesto via Consilience Garden curation (section: )"
+    },
+    {
+      "presenceId": "presence-international-idea",
+      "contributionType": "inspired",
+      "weight": null,
+      "context": "Inspired the manifesto via Consilience Garden curation (section: )"
+    },
+    {
+      "presenceId": "presence-international-idea-ace-electoral-knowledge-network",
+      "contributionType": "inspired",
+      "weight": null,
+      "context": "Inspired the manifesto via Consilience Garden curation (section: )"
+    },
+    {
+      "presenceId": "presence-kim-stanley-robinson",
+      "contributionType": "inspired",
+      "weight": null,
+      "context": "Inspired the manifesto via Consilience Garden curation (section: unknown)"
+    },
+    {
+      "presenceId": "presence-joseph-tainter",
+      "contributionType": "inspired",
+      "weight": null,
+      "context": "Inspired the manifesto via Consilience Garden curation (section: unknown)"
+    },
+    {
+      "presenceId": "presence-james-p-carse",
+      "contributionType": "inspired",
+      "weight": null,
+      "context": "Inspired the manifesto via Consilience Garden curation (section: unknown)"
     }
   ]
 }

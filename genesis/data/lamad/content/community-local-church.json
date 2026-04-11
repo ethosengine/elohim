@@ -11,21 +11,7 @@
     "community",
     "human-graph"
   ],
-  "relatedNodeIds": [
-    "human-matthew-manager",
-    "human-jessica-spouse",
-    "human-gertrude-grandma",
-    "human-nancy-neighbor",
-    "human-pam-polarized",
-    "human-janice-janitor",
-    "human-pete-pastor",
-    "human-timothy-tutor",
-    "human-tommy-teacher",
-    "human-meriadoc-moneybags",
-    "human-bub-builder",
-    "human-lenny-lineworker",
-    "human-mary-migrant"
-  ],
+  "relatedNodeIds": [],
   "metadata": {
     "category": "community",
     "memberCount": 13,

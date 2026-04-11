@@ -1,0 +1,1064 @@
+{
+  "version": "2.0.0",
+  "description": "Generated from genesis/data/humans/*.md. DO NOT EDIT BY HAND. Regenerate with: pnpm --filter genesis-seeder run build:data",
+  "humans": [
+    {
+      "id": "human-adam-firstman",
+      "displayName": "Adam",
+      "agencyPhase": "node",
+      "category": "core-family",
+      "profileReach": "community",
+      "bio": "The original gardener. Tending the network like he once tended the garden. Still naming things.",
+      "location": {
+        "layer": "neighborhood",
+        "name": "Eden Valley"
+      },
+      "communities": [
+        "community-garden-club",
+        "community-regen-ag-network"
+      ],
+      "affinities": [
+        "gardening",
+        "naming-things",
+        "stewardship",
+        "ecology",
+        "beginnings"
+      ]
+    },
+    {
+      "id": "human-bub-builder",
+      "displayName": "Bub",
+      "category": "local-economy",
+      "profileReach": "community",
+      "bio": "General contractor. Building homes and communities for 25 years. Teaching the next generation the trade.",
+      "location": {
+        "layer": "county_regional",
+        "name": "Valley County"
+      },
+      "organizations": [
+        {
+          "id": "org-bub-construction",
+          "name": "Bub's Construction",
+          "role": "owner"
+        }
+      ],
+      "communities": [
+        "community-builders-guild",
+        "community-apprenticeship-program",
+        "community-local-church"
+      ],
+      "affinities": [
+        "construction",
+        "skilled-trades",
+        "apprenticeship",
+        "quality-craftsmanship",
+        "sustainable-building"
+      ],
+      "attestations": [
+        "attestation-general-contractor-license",
+        "attestation-master-builder"
+      ]
+    },
+    {
+      "id": "human-charlie-challenged",
+      "displayName": "Charlie",
+      "category": "red-team",
+      "profileReach": "community",
+      "bio": "Truth-seeker. The mainstream doesn't want you to know what I know.",
+      "affinities": [
+        "conspiracy-theories",
+        "alternative-medicine",
+        "anti-establishment",
+        "viral-content"
+      ],
+      "flags": [
+        {
+          "type": "content-disputed",
+          "reason": "Multiple content items flagged for misinformation",
+          "count": 12
+        },
+        {
+          "type": "reach-restricted",
+          "reason": "Reach limited due to community governance decision"
+        }
+      ],
+      "notes": "Misinformation spreader whose reach has been democratically constrained."
+    },
+    {
+      "id": "human-dan-developer",
+      "displayName": "Dan",
+      "category": "workplace",
+      "profileReach": "public",
+      "bio": "Software developer at EthosEngine. Passionate about open source, distributed systems, and building tools that respect users.",
+      "location": {
+        "layer": "municipality",
+        "name": "Metro City"
+      },
+      "organizations": [
+        {
+          "id": "org-ethosengine",
+          "name": "EthosEngine",
+          "role": "developer"
+        }
+      ],
+      "communities": [
+        "community-rust-meetup",
+        "community-holochain-devs"
+      ],
+      "affinities": [
+        "holochain",
+        "rust",
+        "distributed-systems",
+        "open-source",
+        "privacy"
+      ],
+      "attestations": [
+        "attestation-rust-developer",
+        "attestation-holochain-basics"
+      ]
+    },
+    {
+      "id": "human-dolittle-doctor",
+      "displayName": "Dr. Dolittle",
+      "category": "red-team",
+      "profileReach": "community",
+      "bio": "Medical professional. 30 years experience. I know things they don't teach in schools anymore.",
+      "affinities": [
+        "alternative-medicine",
+        "natural-health",
+        "medical-freedom",
+        "wellness"
+      ],
+      "flags": [
+        {
+          "type": "unverified-credentials",
+          "reason": "Claims professional credentials without verification",
+          "severity": "caution"
+        },
+        {
+          "type": "medical-misinformation",
+          "reason": "Content flagged by health-focused community stewards",
+          "count": 5
+        }
+      ],
+      "claimedAttestations": [
+        {
+          "claim": "MD from University",
+          "status": "unverified",
+          "challengedAt": "2025-08-15"
+        }
+      ],
+      "notes": "Credentials fraud / authority impersonation."
+    },
+    {
+      "id": "human-eve-firstwoman",
+      "displayName": "Eve",
+      "agencyPhase": "device",
+      "category": "core-family",
+      "profileReach": "community",
+      "bio": "Curious by nature. First to reach for knowledge. Still asking the hard questions nobody else will.",
+      "location": {
+        "layer": "neighborhood",
+        "name": "Eden Valley"
+      },
+      "communities": [
+        "community-garden-club",
+        "community-homeschool-coop"
+      ],
+      "affinities": [
+        "knowledge-seeking",
+        "courage",
+        "family-systems",
+        "truth-seeking",
+        "new-beginnings"
+      ]
+    },
+    {
+      "id": "human-ezra-newcomer",
+      "displayName": "Ezra",
+      "category": "newcomer",
+      "profileReach": "private",
+      "bio": "New to the network. Eager to contribute but still building trust and understanding norms.",
+      "location": {
+        "layer": "city",
+        "name": "New Haven"
+      },
+      "affinities": [
+        "learning",
+        "community-building",
+        "governance"
+      ]
+    },
+    {
+      "id": "human-frank-farmer",
+      "displayName": "Frank",
+      "category": "local-economy",
+      "profileReach": "community",
+      "bio": "Third-generation farmer working the land. Exploring regenerative agriculture and local food systems. Skeptical of tech, but curious.",
+      "location": {
+        "layer": "county_regional",
+        "name": "Valley County"
+      },
+      "organizations": [
+        {
+          "id": "org-franks-farm",
+          "name": "Frank's Family Farm",
+          "role": "owner"
+        }
+      ],
+      "communities": [
+        "community-farmers-market",
+        "community-regen-ag-network"
+      ],
+      "affinities": [
+        "regenerative-agriculture",
+        "local-food",
+        "soil-health",
+        "traditional-farming",
+        "sustainability"
+      ]
+    },
+    {
+      "id": "human-georgina-grocer",
+      "displayName": "Georgina",
+      "category": "local-economy",
+      "profileReach": "community",
+      "bio": "Owner of Valley Market, the local grocery store. Connecting farmers to families for 15 years.",
+      "location": {
+        "layer": "municipality",
+        "name": "Valley Town"
+      },
+      "organizations": [
+        {
+          "id": "org-valley-market",
+          "name": "Valley Market",
+          "role": "owner"
+        }
+      ],
+      "communities": [
+        "community-local-business",
+        "community-farmers-market"
+      ],
+      "affinities": [
+        "local-food",
+        "small-business",
+        "supply-chain",
+        "community-economics"
+      ]
+    },
+    {
+      "id": "human-gertrude-grandma",
+      "displayName": "Gertrude",
+      "category": "core-family",
+      "profileReach": "familiar",
+      "bio": "Grandmother, gardener, keeper of family stories. Learning to navigate this digital world with help from family.",
+      "location": {
+        "layer": "neighborhood",
+        "name": "Sunset Acres"
+      },
+      "communities": [
+        "community-garden-club",
+        "community-local-church"
+      ],
+      "affinities": [
+        "gardening",
+        "family-history",
+        "cooking",
+        "faith"
+      ],
+      "accessibilityNeeds": [
+        "large-text",
+        "simple-navigation"
+      ]
+    },
+    {
+      "id": "human-ginny-gigworker",
+      "displayName": "Ginny",
+      "category": "local-economy",
+      "profileReach": "community",
+      "bio": "Freelancer juggling multiple gigs. Rideshare, delivery, odd jobs. Looking for stability and fair pay.",
+      "location": {
+        "layer": "municipality",
+        "name": "Metro City"
+      },
+      "communities": [
+        "community-gig-workers-alliance",
+        "community-rideshare-drivers"
+      ],
+      "affinities": [
+        "gig-economy",
+        "worker-rights",
+        "portable-benefits",
+        "fair-wages",
+        "platform-cooperatives"
+      ],
+      "notes": "Key for demonstrating value scanner (recognizing invisible work)."
+    },
+    {
+      "id": "human-james-son",
+      "displayName": "James",
+      "category": "core-family",
+      "profileReach": "familiar",
+      "bio": "Learning about the world. Interested in games, building things, and asking questions.",
+      "ageCategory": "minor",
+      "communities": [
+        "community-homeschool-coop"
+      ],
+      "affinities": [
+        "games",
+        "building",
+        "science",
+        "animals"
+      ],
+      "guardianIds": [
+        "human-matthew-manager",
+        "human-jessica-spouse"
+      ]
+    },
+    {
+      "id": "human-janice-janitor",
+      "displayName": "Janice",
+      "category": "edge-case",
+      "profileReach": "familiar",
+      "bio": "Working hard, keeping things clean. Don't have much time for this stuff but trying to stay connected.",
+      "location": {
+        "layer": "municipality",
+        "name": "Valley Town"
+      },
+      "organizations": [
+        {
+          "id": "org-valley-school-district",
+          "name": "Valley School District",
+          "role": "custodian"
+        }
+      ],
+      "communities": [
+        "community-local-church"
+      ],
+      "affinities": [
+        "practical-skills",
+        "community-service",
+        "family"
+      ],
+      "accessibilityNeeds": [
+        "limited-screen-time",
+        "simple-interface"
+      ],
+      "notes": "Low-tech-engagement user. Important for demonstrating reach/trust works for casual users."
+    },
+    {
+      "id": "human-jessica-spouse",
+      "displayName": "Jessica",
+      "agencyPhase": "device",
+      "category": "core-family",
+      "profileReach": "familiar",
+      "bio": "Partner in life and learning. Focused on family flourishing, community connection, and meaningful work.",
+      "location": {
+        "layer": "neighborhood",
+        "name": "Tech Valley"
+      },
+      "communities": [
+        "community-local-church",
+        "community-homeschool-coop"
+      ],
+      "affinities": [
+        "education",
+        "family-systems",
+        "community-building",
+        "health-wellness"
+      ]
+    },
+    {
+      "id": "human-lenny-lineworker",
+      "displayName": "Lenny",
+      "category": "local-economy",
+      "profileReach": "community",
+      "bio": "Lineman for the power company. Keeping the lights on through storms, heat, and cold. Union proud.",
+      "location": {
+        "layer": "county_regional",
+        "name": "Valley County"
+      },
+      "organizations": [
+        {
+          "id": "org-valley-power-electric",
+          "name": "Valley Power & Electric",
+          "role": "journeyman-lineman"
+        },
+        {
+          "id": "org-ibew-local-123",
+          "name": "IBEW Local 123",
+          "role": "member"
+        }
+      ],
+      "communities": [
+        "community-utility-workers",
+        "community-local-church"
+      ],
+      "affinities": [
+        "infrastructure",
+        "electrical-work",
+        "union-labor",
+        "public-safety",
+        "grid-resilience"
+      ],
+      "attestations": [
+        "attestation-journeyman-lineman",
+        "attestation-high-voltage-certified"
+      ]
+    },
+    {
+      "id": "human-levi-contributor",
+      "displayName": "Levi",
+      "category": "community",
+      "profileReach": "familiar",
+      "bio": "Moderate-trust contributor. Building reputation through consistent, quality contributions.",
+      "location": {
+        "layer": "city",
+        "name": "Riverside"
+      },
+      "affinities": [
+        "knowledge-sharing",
+        "peer-review",
+        "open-source"
+      ]
+    },
+    {
+      "id": "human-manny-manufacturer",
+      "displayName": "Manny",
+      "category": "local-economy",
+      "profileReach": "community",
+      "bio": "Third-generation manufacturer. Running our family's machine shop, adapting to the new economy.",
+      "location": {
+        "layer": "county_regional",
+        "name": "Valley County"
+      },
+      "organizations": [
+        {
+          "id": "org-valley-machine-works",
+          "name": "Valley Machine Works",
+          "role": "owner"
+        }
+      ],
+      "communities": [
+        "community-manufacturers-guild",
+        "community-local-business"
+      ],
+      "affinities": [
+        "manufacturing",
+        "supply-chain",
+        "worker-ownership",
+        "local-economy",
+        "skilled-trades"
+      ],
+      "attestations": [
+        "attestation-master-machinist",
+        "attestation-iso-certified"
+      ]
+    },
+    {
+      "id": "human-mary-migrant",
+      "displayName": "Maria",
+      "category": "newcomer",
+      "profileReach": "familiar",
+      "bio": "Came here for a better life. Working hard, learning the language, trying to build a future for my family.",
+      "location": {
+        "layer": "neighborhood",
+        "name": "Tech Valley"
+      },
+      "communities": [
+        "community-immigrant-support",
+        "community-local-church",
+        "community-esl-program"
+      ],
+      "affinities": [
+        "language-learning",
+        "family",
+        "community-integration",
+        "faith"
+      ],
+      "languagePreferences": {
+        "primary": "es",
+        "secondary": "en",
+        "learningLevel": "intermediate"
+      },
+      "accessibilityNeeds": [
+        "translation-support",
+        "simple-language"
+      ]
+    },
+    {
+      "id": "human-mary-miner",
+      "displayName": "Mary",
+      "category": "local-economy",
+      "profileReach": "community",
+      "bio": "Working the mines like my father and grandfather. Hard work, fair pay. Concerned about automation.",
+      "location": {
+        "layer": "county_regional",
+        "name": "Mining County"
+      },
+      "organizations": [
+        {
+          "id": "org-consolidated-mining",
+          "name": "Consolidated Mining Corp",
+          "role": "worker"
+        },
+        {
+          "id": "org-miners-union-local-347",
+          "name": "Miners Union Local 347",
+          "role": "steward"
+        }
+      ],
+      "communities": [
+        "community-mining-town"
+      ],
+      "affinities": [
+        "labor-rights",
+        "union-organizing",
+        "just-transition",
+        "community-resilience",
+        "automation-impacts"
+      ],
+      "attestations": [
+        "attestation-mine-safety-certified",
+        "attestation-union-steward"
+      ]
+    },
+    {
+      "id": "human-matthew-manager",
+      "displayName": "Matthew",
+      "agencyPhase": "doorway",
+      "category": "core-family",
+      "profileReach": "community",
+      "bio": "EthosEngine founder, exploring how technology can serve human flourishing. Family man, learner, builder.",
+      "location": {
+        "layer": "neighborhood",
+        "name": "Tech Valley"
+      },
+      "organizations": [
+        {
+          "id": "org-ethosengine",
+          "name": "EthosEngine",
+          "role": "founder"
+        }
+      ],
+      "communities": [
+        "community-local-church"
+      ],
+      "affinities": [
+        "governance",
+        "ai-ethics",
+        "holochain",
+        "family-systems",
+        "christian-theology"
+      ]
+    },
+    {
+      "id": "human-meriadoc-moneybags",
+      "displayName": "Meriadoc",
+      "category": "affinity",
+      "profileReach": "familiar",
+      "bio": "Community investor and philanthropist. Interested in funding projects that build genuine community wealth.",
+      "location": {
+        "layer": "county_regional",
+        "name": "Valley Region"
+      },
+      "organizations": [
+        {
+          "id": "org-community-foundation",
+          "name": "Valley Community Foundation",
+          "role": "board-member"
+        }
+      ],
+      "communities": [
+        "community-impact-investors",
+        "community-local-church"
+      ],
+      "affinities": [
+        "impact-investing",
+        "community-economics",
+        "regenerative-finance",
+        "social-enterprise",
+        "rea-economics"
+      ],
+      "notes": "Represents community investor archetype from Elohim Protocol governance docs."
+    },
+    {
+      "id": "human-miriam-author",
+      "displayName": "Miriam",
+      "category": "community",
+      "profileReach": "community",
+      "bio": "Trusted content author. Contributes educational materials with a focus on accessibility and inclusion.",
+      "location": {
+        "layer": "city",
+        "name": "Riverside"
+      },
+      "affinities": [
+        "content-creation",
+        "accessibility",
+        "education",
+        "inclusion"
+      ]
+    },
+    {
+      "id": "human-nancy-neighbor",
+      "displayName": "Nancy",
+      "agencyPhase": "hosted",
+      "category": "community",
+      "profileReach": "community",
+      "bio": "Long-time resident of Tech Valley. Community organizer, block captain, and believer in the power of neighbors helping neighbors.",
+      "location": {
+        "layer": "neighborhood",
+        "name": "Tech Valley"
+      },
+      "communities": [
+        "community-neighborhood-association",
+        "community-local-church"
+      ],
+      "affinities": [
+        "community-organizing",
+        "local-government",
+        "neighborhood-safety",
+        "mutual-aid"
+      ]
+    },
+    {
+      "id": "human-pam-polarized",
+      "displayName": "Pam",
+      "category": "community",
+      "profileReach": "familiar",
+      "bio": "Passionate about truth. Tired of being manipulated by media. Looking for authentic community and honest conversation.",
+      "location": {
+        "layer": "neighborhood",
+        "name": "Tech Valley"
+      },
+      "communities": [
+        "community-local-church"
+      ],
+      "affinities": [
+        "media-literacy",
+        "truth-seeking",
+        "community",
+        "faith",
+        "politics"
+      ],
+      "notes": "Representative of someone recovering from information ecosystem damage."
+    },
+    {
+      "id": "human-pete-pastor",
+      "displayName": "Pete",
+      "agencyPhase": "device",
+      "category": "affinity",
+      "profileReach": "community",
+      "bio": "Shepherd of Community Church. Committed to helping people grow in faith and community.",
+      "location": {
+        "layer": "neighborhood",
+        "name": "Valley Community"
+      },
+      "organizations": [
+        {
+          "id": "org-community-church",
+          "name": "Community Church",
+          "role": "pastor"
+        }
+      ],
+      "communities": [
+        "community-local-church",
+        "community-pastoral-network"
+      ],
+      "affinities": [
+        "christian-theology",
+        "pastoral-care",
+        "community-building",
+        "discipleship",
+        "faith-and-technology"
+      ]
+    },
+    {
+      "id": "human-renold-regent",
+      "displayName": "Renold",
+      "category": "red-team",
+      "profileReach": "community",
+      "bio": "Community leader. Protecting our values and way of life. If you're not with us, you're against us.",
+      "organizations": [
+        {
+          "id": "org-pure-valley-association",
+          "name": "Pure Valley Community Association",
+          "role": "president"
+        }
+      ],
+      "affinities": [
+        "community-purity",
+        "traditional-values",
+        "exclusivity",
+        "group-loyalty"
+      ],
+      "flags": [
+        {
+          "type": "exclusionary-behavior",
+          "reason": "Pattern of rejecting connections based on group identity"
+        }
+      ],
+      "notes": "Tribal gatekeeper pattern. Exclusionary behavior visible to bridge-builders."
+    },
+    {
+      "id": "human-ronald-refugee",
+      "displayName": "Ronald",
+      "category": "newcomer",
+      "profileReach": "community",
+      "bio": "Fled conflict in my home country. Now rebuilding life here. Engineer by training, doing what work I can find.",
+      "location": {
+        "layer": "municipality",
+        "name": "Metro City"
+      },
+      "communities": [
+        "community-refugee-resettlement",
+        "community-engineers-network"
+      ],
+      "affinities": [
+        "engineering",
+        "refugee-rights",
+        "professional-recertification",
+        "community-building"
+      ],
+      "languagePreferences": {
+        "primary": "ar",
+        "secondary": "en",
+        "learningLevel": "advanced"
+      },
+      "accessibilityNeeds": [
+        "translation-support"
+      ],
+      "notes": "Represents legitimate foreign credentials pending verification (contrast with dolittle-doctor fraud).",
+      "foreignCredentials": [
+        {
+          "type": "degree",
+          "name": "Bachelor of Engineering - Civil",
+          "status": "pending-equivalency"
+        }
+      ]
+    },
+    {
+      "id": "human-sam-shipper",
+      "displayName": "Sam",
+      "category": "red-team",
+      "profileReach": "public",
+      "bio": "Entrepreneur. Building the future of commerce. DM me for opportunities!",
+      "affinities": [
+        "dropshipping",
+        "passive-income",
+        "hustle-culture",
+        "crypto"
+      ],
+      "flags": [
+        {
+          "type": "spam-warning",
+          "reason": "High volume of unsolicited connection requests",
+          "count": 45
+        },
+        {
+          "type": "commercial-intent",
+          "reason": "Primarily commercial engagement pattern"
+        }
+      ],
+      "notes": "Spam/commercial abuse pattern. High-volume low-quality connections."
+    },
+    {
+      "id": "human-susan-household",
+      "displayName": "Susan",
+      "category": "core-family",
+      "profileReach": "familiar",
+      "bio": "Matthew's sister. Household member exploring how families can steward digital resources together.",
+      "location": {
+        "layer": "neighborhood",
+        "name": "Tech Valley"
+      },
+      "communities": [
+        "community-local-church",
+        "community-homeschool-coop"
+      ],
+      "affinities": [
+        "family-systems",
+        "education",
+        "digital-stewardship",
+        "community-building"
+      ]
+    },
+    {
+      "id": "human-tiffany-teen",
+      "displayName": "Tiffany",
+      "category": "red-team",
+      "profileReach": "familiar",
+      "bio": "Just vibing. Follow for follow?",
+      "location": {
+        "layer": "neighborhood",
+        "name": "Tech Valley"
+      },
+      "ageCategory": "minor",
+      "affinities": [
+        "social-media",
+        "trends",
+        "music",
+        "fashion"
+      ],
+      "flags": [
+        {
+          "type": "unguarded-minor",
+          "reason": "Minor account without guardian linkage",
+          "severity": "warning"
+        },
+        {
+          "type": "high-connection-velocity",
+          "reason": "Accepting connections rapidly without vetting"
+        }
+      ],
+      "notes": "Vulnerable minor without guardian oversight. Importance of guardian controls."
+    },
+    {
+      "id": "human-timothy-tutor",
+      "displayName": "Timothy",
+      "agencyPhase": "device",
+      "category": "affinity",
+      "profileReach": "community",
+      "bio": "Educator and learning facilitator. Helping kids and adults discover the joy of learning.",
+      "location": {
+        "layer": "neighborhood",
+        "name": "Valley Community"
+      },
+      "organizations": [
+        {
+          "id": "org-learning-collective",
+          "name": "Valley Learning Collective",
+          "role": "facilitator"
+        }
+      ],
+      "communities": [
+        "community-homeschool-coop",
+        "community-local-church"
+      ],
+      "affinities": [
+        "education",
+        "learning-science",
+        "youth-development",
+        "faith-formation",
+        "mastery-learning"
+      ],
+      "attestations": [
+        "attestation-teaching-certification"
+      ]
+    },
+    {
+      "id": "human-tommy-teacher",
+      "displayName": "Tommy",
+      "category": "affinity",
+      "profileReach": "community",
+      "bio": "Public school teacher. 20 years in the classroom. Trying to help every kid find their potential.",
+      "location": {
+        "layer": "municipality",
+        "name": "Valley Town"
+      },
+      "organizations": [
+        {
+          "id": "org-valley-school-district",
+          "name": "Valley School District",
+          "role": "teacher"
+        },
+        {
+          "id": "org-teachers-union",
+          "name": "Valley Teachers Union",
+          "role": "building-rep"
+        }
+      ],
+      "communities": [
+        "community-educators-network",
+        "community-local-church"
+      ],
+      "affinities": [
+        "education",
+        "youth-development",
+        "public-schools",
+        "differentiated-learning",
+        "teacher-advocacy"
+      ],
+      "attestations": [
+        "attestation-teaching-license",
+        "attestation-masters-education"
+      ]
+    },
+    {
+      "id": "human-traveler",
+      "displayName": "Traveler",
+      "category": "visitor",
+      "profileReach": "hidden",
+      "bio": "Anonymous explorer. Just passing through, learning about this place.",
+      "isPseudonymous": true,
+      "acceptingConnections": false,
+      "notes": "Represents anonymous/visitor user experience."
+    }
+  ],
+  "relationships": [
+    {
+      "source": "human-adam-firstman",
+      "target": "human-eve-firstwoman",
+      "relationshipType": "spouse",
+      "intimacyLevel": "intimate"
+    },
+    {
+      "source": "human-matthew-manager",
+      "target": "human-jessica-spouse",
+      "relationshipType": "spouse",
+      "intimacyLevel": "intimate"
+    },
+    {
+      "source": "human-matthew-manager",
+      "target": "human-james-son",
+      "relationshipType": "parent-of",
+      "intimacyLevel": "intimate"
+    },
+    {
+      "source": "human-jessica-spouse",
+      "target": "human-james-son",
+      "relationshipType": "parent-of",
+      "intimacyLevel": "intimate"
+    },
+    {
+      "source": "human-gertrude-grandma",
+      "target": "human-matthew-manager",
+      "relationshipType": "grandparent-of",
+      "intimacyLevel": "trusted"
+    },
+    {
+      "source": "human-gertrude-grandma",
+      "target": "human-james-son",
+      "relationshipType": "grandparent-of",
+      "intimacyLevel": "trusted"
+    },
+    {
+      "source": "human-matthew-manager",
+      "target": "human-dan-developer",
+      "relationshipType": "coworker",
+      "intimacyLevel": "connection",
+      "context": "org-ethosengine"
+    },
+    {
+      "source": "human-matthew-manager",
+      "target": "human-nancy-neighbor",
+      "relationshipType": "neighbor",
+      "intimacyLevel": "connection"
+    },
+    {
+      "source": "human-matthew-manager",
+      "target": "human-pete-pastor",
+      "relationshipType": "congregation-member",
+      "intimacyLevel": "trusted"
+    },
+    {
+      "source": "human-jessica-spouse",
+      "target": "human-timothy-tutor",
+      "relationshipType": "learning-partner",
+      "intimacyLevel": "connection"
+    },
+    {
+      "source": "human-james-son",
+      "target": "human-timothy-tutor",
+      "relationshipType": "mentee-of",
+      "intimacyLevel": "connection"
+    },
+    {
+      "source": "human-frank-farmer",
+      "target": "human-georgina-grocer",
+      "relationshipType": "business-partner",
+      "intimacyLevel": "trusted"
+    },
+    {
+      "source": "human-bub-builder",
+      "target": "human-manny-manufacturer",
+      "relationshipType": "business-partner",
+      "intimacyLevel": "trusted"
+    },
+    {
+      "source": "human-bub-builder",
+      "target": "human-frank-farmer",
+      "relationshipType": "business-partner",
+      "intimacyLevel": "connection"
+    },
+    {
+      "source": "human-lenny-lineworker",
+      "target": "human-bub-builder",
+      "relationshipType": "acquaintance",
+      "intimacyLevel": "connection"
+    },
+    {
+      "source": "human-mary-miner",
+      "target": "human-ginny-gigworker",
+      "relationshipType": "acquaintance",
+      "intimacyLevel": "connection"
+    },
+    {
+      "source": "human-bub-builder",
+      "target": "human-pete-pastor",
+      "relationshipType": "congregation-member",
+      "intimacyLevel": "trusted"
+    },
+    {
+      "source": "human-lenny-lineworker",
+      "target": "human-pete-pastor",
+      "relationshipType": "congregation-member",
+      "intimacyLevel": "connection"
+    },
+    {
+      "source": "human-pam-polarized",
+      "target": "human-pete-pastor",
+      "relationshipType": "congregation-member",
+      "intimacyLevel": "connection"
+    },
+    {
+      "source": "human-pam-polarized",
+      "target": "human-nancy-neighbor",
+      "relationshipType": "neighbor",
+      "intimacyLevel": "connection"
+    },
+    {
+      "source": "human-meriadoc-moneybags",
+      "target": "human-matthew-manager",
+      "relationshipType": "acquaintance",
+      "intimacyLevel": "connection"
+    },
+    {
+      "source": "human-meriadoc-moneybags",
+      "target": "human-pete-pastor",
+      "relationshipType": "congregation-member",
+      "intimacyLevel": "connection"
+    },
+    {
+      "source": "human-georgina-grocer",
+      "target": "human-jessica-spouse",
+      "relationshipType": "community-member",
+      "intimacyLevel": "recognition"
+    },
+    {
+      "source": "human-tommy-teacher",
+      "target": "human-janice-janitor",
+      "relationshipType": "coworker",
+      "intimacyLevel": "connection",
+      "context": "org-valley-school-district"
+    },
+    {
+      "source": "human-matthew-manager",
+      "target": "human-susan-household",
+      "relationshipType": "sibling",
+      "intimacyLevel": "intimate"
+    },
+    {
+      "source": "human-susan-household",
+      "target": "human-georgina-grocer",
+      "relationshipType": "community-member",
+      "intimacyLevel": "connection"
+    },
+    {
+      "source": "human-susan-household",
+      "target": "human-pete-pastor",
+      "relationshipType": "congregation-member",
+      "intimacyLevel": "trusted"
+    }
+  ]
+}

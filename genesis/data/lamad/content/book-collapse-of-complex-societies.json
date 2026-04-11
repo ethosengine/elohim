@@ -1,0 +1,33 @@
+{
+  "id": "book-collapse-of-complex-societies",
+  "contentType": "book",
+  "title": "The Collapse of Complex Societies",
+  "description": "Analysis of why complex civilizations collapse, arguing that increasing sociopolitical complexity yields diminishing returns on investment.",
+  "content": "# The Collapse of Complex Societies\n\n**Author:** Joseph Tainter (1988)\n\nAnalysis of why complex civilizations collapse, arguing that increasing sociopolitical complexity yields diminishing returns on investment.\n\nThis book was curated in Matthew's Consilience Garden keen in 2021 as part of the \"Media and Books\" section — one of the thinkers who shaped the protocol's framing.",
+  "contentFormat": "markdown",
+  "tags": [
+    "book",
+    "media-and-books",
+    "consilience-garden"
+  ],
+  "metadata": {
+    "category": "governance",
+    "sourceSection": "Media and Books",
+    "year": 1988
+  },
+  "stewardedBy": [
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 1,
+      "role": "steward"
+    }
+  ],
+  "contributors": [
+    {
+      "presenceId": "presence-joseph-tainter",
+      "contributionType": "author",
+      "weight": null,
+      "context": "Author of The Collapse of Complex Societies"
+    }
+  ]
+}

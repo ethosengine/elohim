@@ -1,0 +1,273 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "elohim:protocol:humans",
+  "title": "Human Frontmatter Schema — operational source of truth for seed data vocabulary",
+  "description": "Operational IoC contract (Category C) for human frontmatter in genesis/data/humans/*.md. This schema is a projection of the notarized Human entry type in imagodei DNA; the DNA entry is the authority for core identity fields, and this schema adds the seed-data vocabulary that rides on metadata_json at the Rust boundary. Reconstruction strategy: rebuild from Rust Human struct + design doc genesis/plans/2026-04-11-humans-schema-design.md. Every field name, enum value, and pattern defined here is referenced as a constant by companion validators; treat edits as protocol-law changes.",
+  "type": "object",
+  "required": ["id", "displayName", "category", "profileReach"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^human-[a-z0-9][a-z0-9-]*[a-z0-9]$",
+      "description": "Unique slug. Must match filename stem (e.g. matthew-manager.md -> human-matthew-manager)."
+    },
+    "displayName": {
+      "type": "string",
+      "minLength": 1
+    },
+    "bio": {
+      "type": ["string", "null"]
+    },
+    "agencyPhase": {
+      "type": ["string", "null"],
+      "enum": ["doorway", "hosted", "device", "node", "retired", null],
+      "description": "Graduated capability phase. Rides in metadata_json; operational projection of imagodei DNA agency state."
+    },
+    "category": {
+      "type": "string",
+      "enum": [
+        "core-family",
+        "workplace",
+        "community",
+        "affinity",
+        "local-economy",
+        "newcomer",
+        "visitor",
+        "edge-case",
+        "red-team"
+      ],
+      "description": "Seed-data categorization of the human's role in the genesis cast. Operational only — not notarized."
+    },
+    "profileReach": {
+      "type": "string",
+      "enum": [
+        "private",
+        "self",
+        "intimate",
+        "trusted",
+        "familiar",
+        "community",
+        "public",
+        "commons",
+        "hidden"
+      ],
+      "description": "Visibility reach for the profile. Mirrors protocol ReachLevels. Humans add 'hidden' beyond the protocol ReachLevels enum to support not-yet-revealed genesis cast members — pseudonymous or visitor personas whose existence is known to tests but not discoverable through the human graph. Collectives do not need this extension because they are always publicly enumerable. This is an operational extension to the base reach vocabulary; it does not round-trip to the notarized Human entry type."
+    },
+    "location": {
+      "type": ["object", "null"],
+      "required": ["layer", "name"],
+      "properties": {
+        "layer": {
+          "type": "string",
+          "enum": [
+            "neighborhood",
+            "municipality",
+            "city",
+            "county_regional",
+            "bioregion",
+            "nation",
+            "global"
+          ]
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "h3Cell": {
+          "type": ["string", "null"],
+          "description": "Optional H3 cell id for geographic grounding."
+        }
+      },
+      "additionalProperties": false
+    },
+    "organizations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "role"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Must reference a collective or presence id. Cross-reference validated by companion script."
+          },
+          "name": { "type": "string" },
+          "role": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "communities": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "description": "Must reference a collective id. Cross-reference validated by companion script."
+      }
+    },
+    "affinities": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "guardianIds": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "description": "Must reference another human id. Cross-reference validated by companion script."
+      }
+    },
+    "ageCategory": {
+      "type": ["string", "null"],
+      "enum": ["minor", "adult", "elder", null]
+    },
+    "isPseudonymous": {
+      "type": "boolean",
+      "default": false,
+      "description": "Marks personas whose real-world identity is intentionally concealed (the 'Traveler' visitor persona). Downstream display and discovery code may treat pseudonymous humans differently from confirmed identities."
+    },
+    "acceptingConnections": {
+      "type": "boolean",
+      "default": true,
+      "description": "When false, this human declines new relationship requests. Advisory at the seed-data layer; enforcement happens in the runtime relationship creation flow."
+    },
+    "languagePreferences": {
+      "type": ["object", "null"],
+      "properties": {
+        "primary": { "type": "string" },
+        "secondary": { "type": ["string", "null"] },
+        "learningLevel": {
+          "type": ["string", "null"],
+          "enum": ["beginner", "intermediate", "advanced", null]
+        }
+      },
+      "additionalProperties": false
+    },
+    "accessibilityNeeds": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "flags": {
+      "type": "array",
+      "description": "Moderation and safety annotations. Written by community governance actions (red-team persona records, reach restrictions, dispute outcomes). Not self-reported.",
+      "items": {
+        "type": "object",
+        "required": ["type", "reason"],
+        "properties": {
+          "type": { "type": "string" },
+          "reason": { "type": "string" },
+          "count": { "type": ["integer", "null"] },
+          "severity": {
+            "type": ["string", "null"],
+            "enum": ["info", "caution", "warning", "restriction", null]
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "claimedAttestations": {
+      "type": "array",
+      "description": "Claims made BY this human about their own credentials. Contrast with Attestation entries issued ABOUT them by others (notarized in imagodei DNA).",
+      "items": {
+        "type": "object",
+        "required": ["claim", "status"],
+        "properties": {
+          "claim": { "type": "string" },
+          "status": {
+            "type": "string",
+            "enum": ["pending", "verified", "unverified", "disputed", "revoked"]
+          },
+          "challengedAt": {
+            "type": ["string", "null"],
+            "format": "date"
+          },
+          "verifiedBy": {
+            "type": ["string", "null"],
+            "description": "Human id of verifier. Cross-reference validated by companion script."
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "HumanRelationshipType": {
+      "type": "string",
+      "description": "Vocabulary for human-to-human relationship types. Source of truth for this enum until a Rust `human_relationship_types` constant module is introduced. Referenced by `$defs.Relationship.relationshipType` and by the companion validator. Operational source of truth for the human relationship vocabulary. Currently a String in Rust with no notarized enum; this schema is the authority until a future sprint promotes it to a Rust constant module. See design doc for the dimensioned semantic table (family/caregiving/work/community/learning/weak-tie).",
+      "enum": [
+        "spouse",
+        "parent-of",
+        "child-of",
+        "sibling",
+        "grandparent-of",
+        "grandchild-of",
+        "extended-family",
+        "guardian-of",
+        "ward-of",
+        "caregiver-of",
+        "key-steward-of",
+        "coworker",
+        "supervises",
+        "reports-to",
+        "business-partner",
+        "neighbor",
+        "congregation-member",
+        "community-member",
+        "mentor-of",
+        "mentee-of",
+        "learning-partner",
+        "acquaintance"
+      ]
+    },
+    "Relationship": {
+      "type": "object",
+      "description": "Relationship entry shape for `genesis/data/humans/relationships.md`. This $def is referenced by the companion validator (validate-humans.ts) — not by any top-level property of this schema — because humans and relationships live in separate markdown files. The validator loads this $def at parse time and applies it to each entry in the relationships array of relationships.md's frontmatter. Human-to-human relationship edge. Single source of truth lives in genesis/data/humans/relationships.md; individual human markdown files get auto-generated Relationships sections derived from that file.",
+      "required": ["source", "target", "relationshipType", "intimacyLevel"],
+      "properties": {
+        "source": {
+          "type": "string",
+          "pattern": "^human-[a-z0-9][a-z0-9-]*[a-z0-9]$",
+          "description": "Source human id. Cross-reference validated by companion script."
+        },
+        "target": {
+          "type": "string",
+          "pattern": "^human-[a-z0-9][a-z0-9-]*[a-z0-9]$",
+          "description": "Target human id. Cross-reference validated by companion script."
+        },
+        "relationshipType": {
+          "$ref": "#/$defs/HumanRelationshipType"
+        },
+        "intimacyLevel": {
+          "type": "string",
+          "enum": ["recognition", "connection", "trusted", "intimate"],
+          "description": "Relationship intimacy. Operational projection of protocol reach semantics applied to dyadic ties."
+        },
+        "context": {
+          "type": ["string", "null"],
+          "description": "Relationship context (e.g. organization id for coworker ties). Required when relationshipType == 'coworker'."
+        },
+        "startedAt": {
+          "type": ["string", "null"],
+          "format": "date"
+        },
+        "expiresAt": {
+          "type": ["string", "null"],
+          "format": "date"
+        },
+        "notes": {
+          "type": ["string", "null"]
+        }
+      },
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": { "relationshipType": { "const": "coworker" } },
+            "required": ["relationshipType"]
+          },
+          "then": {
+            "required": ["source", "target", "relationshipType", "intimacyLevel", "context"]
+          }
+        }
+      ]
+    }
+  }
+}

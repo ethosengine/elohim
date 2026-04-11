@@ -551,7 +551,19 @@
       "stewardRatio": null
     },
     {
+      "contentId": "human-james-son",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
       "contentId": "human-janice-janitor",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "human-jessica-spouse",
       "reach": "commons",
       "reason": "commons",
       "stewardRatio": null
@@ -629,18 +641,6 @@
       "stewardRatio": null
     },
     {
-      "contentId": "human-james-son",
-      "reach": "commons",
-      "reason": "commons",
-      "stewardRatio": null
-    },
-    {
-      "contentId": "human-jessica-spouse",
-      "reach": "commons",
-      "reason": "commons",
-      "stewardRatio": null
-    },
-    {
       "contentId": "human-tiffany-teen",
       "reach": "commons",
       "reason": "commons",
@@ -674,7 +674,7 @@
   "stewardship": [],
   "collectives": [
     {
-      "collectiveId": "neighborhood-extended",
+      "collectiveId": "household-extended",
       "roleContext": null,
       "intimacyLevel": "trusted"
     }
@@ -682,8 +682,8 @@
   "conductorGroup": 3,
   "manifest": {
     "version": "1.0.0",
-    "generatedAt": "2026-03-03T19:08:21.469Z",
+    "generatedAt": "2026-04-11T13:08:38.875Z",
     "sourceStory": "genesis",
-    "contentHash": "10deb111"
+    "contentHash": "54005035"
   }
 }

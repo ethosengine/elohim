@@ -37,11 +37,11 @@ Feature: Human Resilience Profile
   # --- Community Depth ----------------------------------------------------
 
   @wip
-  Scenario: Matthew + Susan + Pastor Pete — community depth through trust topology
+  Scenario: Matthew + Susan + Pete — community depth through trust topology
     Given human "Matthew" is logged in on doorway "alpha" with device
     And human "Susan" is in Matthew's household with relationship "spouse"
-    And human "Pastor Pete" is at congregation with relationship "congregation_member"
-    And Pastor Pete has neighborhood-reach content that replicates to Matthew
+    And human "Pete" is at congregation with relationship "congregation_member"
+    And Pete has neighborhood-reach content that replicates to Matthew
     When the resilience profile is computed for Matthew
     Then the trust circle count should be 2
     And the content risk breakdown should include:
@@ -56,7 +56,7 @@ Feature: Human Resilience Profile
   Scenario: Full network — 5 conductors, protected
     Given human "Matthew" is logged in on doorway "alpha" with device
     And human "Susan" is in Matthew's household with relationship "spouse"
-    And human "Pastor Pete" is at congregation with relationship "congregation_member"
+    And human "Pete" is at congregation with relationship "congregation_member"
     And human "Timothy" is connected via relationship "learning_partner"
     And human "Frank" is connected via relationship "community_member"
     And there are 3 reciprocated mutual aid commitments

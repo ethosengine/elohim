@@ -1,46 +1,116 @@
 {
   "version": "1.0.0",
-  "generatedAt": "2026-03-03T19:08:21.752Z",
-  "totalPackages": 29,
+  "generatedAt": "2026-04-11T13:08:39.190Z",
+  "totalPackages": 33,
   "packages": [
-    {
-      "humanId": "human-matthew-manager",
-      "displayName": "Matthew",
-      "category": "core-family",
-      "conductorGroup": 0,
-      "contentCount": 3453,
-      "relationshipCount": 7,
-      "stewardshipCount": 19,
-      "collectiveCount": 3
-    },
     {
       "humanId": "human-adam-firstman",
       "displayName": "Adam",
       "category": "core-family",
       "conductorGroup": 1,
-      "contentCount": 2928,
+      "contentCount": 2876,
       "relationshipCount": 1,
       "stewardshipCount": 2,
       "collectiveCount": 3
+    },
+    {
+      "humanId": "human-bub-builder",
+      "displayName": "Bub",
+      "category": "local-economy",
+      "conductorGroup": 2,
+      "contentCount": 2490,
+      "relationshipCount": 4,
+      "stewardshipCount": 0,
+      "collectiveCount": 5
+    },
+    {
+      "humanId": "human-charlie-challenged",
+      "displayName": "Charlie",
+      "category": "red-team",
+      "conductorGroup": 3,
+      "contentCount": 109,
+      "relationshipCount": 0,
+      "stewardshipCount": 0,
+      "collectiveCount": 1
+    },
+    {
+      "humanId": "human-dan-developer",
+      "displayName": "Dan",
+      "category": "workplace",
+      "conductorGroup": 0,
+      "contentCount": 3370,
+      "relationshipCount": 1,
+      "stewardshipCount": 3,
+      "collectiveCount": 4
+    },
+    {
+      "humanId": "human-dolittle-doctor",
+      "displayName": "Dr. Dolittle",
+      "category": "red-team",
+      "conductorGroup": 3,
+      "contentCount": 109,
+      "relationshipCount": 0,
+      "stewardshipCount": 0,
+      "collectiveCount": 1
     },
     {
       "humanId": "human-eve-firstwoman",
       "displayName": "Eve",
       "category": "core-family",
       "conductorGroup": 1,
-      "contentCount": 2927,
+      "contentCount": 2875,
       "relationshipCount": 1,
       "stewardshipCount": 4,
       "collectiveCount": 3
     },
     {
-      "humanId": "human-jessica-spouse",
-      "displayName": "Jessica",
+      "humanId": "human-ezra-newcomer",
+      "displayName": "Ezra",
+      "category": "newcomer",
+      "conductorGroup": 3,
+      "contentCount": 557,
+      "relationshipCount": 0,
+      "stewardshipCount": 0,
+      "collectiveCount": 1
+    },
+    {
+      "humanId": "human-frank-farmer",
+      "displayName": "Frank",
+      "category": "local-economy",
+      "conductorGroup": 2,
+      "contentCount": 2307,
+      "relationshipCount": 2,
+      "stewardshipCount": 4,
+      "collectiveCount": 4
+    },
+    {
+      "humanId": "human-georgina-grocer",
+      "displayName": "Georgina",
+      "category": "local-economy",
+      "conductorGroup": 2,
+      "contentCount": 2406,
+      "relationshipCount": 3,
+      "stewardshipCount": 0,
+      "collectiveCount": 4
+    },
+    {
+      "humanId": "human-gertrude-grandma",
+      "displayName": "Gertrude",
       "category": "core-family",
       "conductorGroup": 0,
-      "contentCount": 3453,
-      "relationshipCount": 4,
-      "stewardshipCount": 2,
+      "contentCount": 3370,
+      "relationshipCount": 2,
+      "stewardshipCount": 0,
+      "collectiveCount": 3
+    },
+    {
+      "humanId": "human-ginny-gigworker",
+      "displayName": "Ginny",
+      "category": "local-economy",
+      "conductorGroup": 3,
+      "contentCount": 2284,
+      "relationshipCount": 1,
+      "stewardshipCount": 0,
       "collectiveCount": 3
     },
     {
@@ -48,48 +118,8 @@
       "displayName": "James",
       "category": "core-family",
       "conductorGroup": 0,
-      "contentCount": 3453,
+      "contentCount": 3370,
       "relationshipCount": 4,
-      "stewardshipCount": 0,
-      "collectiveCount": 2
-    },
-    {
-      "humanId": "human-gertrude-grandma",
-      "displayName": "Gertrude",
-      "category": "core-family",
-      "conductorGroup": 0,
-      "contentCount": 3453,
-      "relationshipCount": 2,
-      "stewardshipCount": 0,
-      "collectiveCount": 3
-    },
-    {
-      "humanId": "human-dan-developer",
-      "displayName": "Dan",
-      "category": "workplace",
-      "conductorGroup": 0,
-      "contentCount": 3453,
-      "relationshipCount": 1,
-      "stewardshipCount": 3,
-      "collectiveCount": 4
-    },
-    {
-      "humanId": "human-nancy-neighbor",
-      "displayName": "Nancy",
-      "category": "community",
-      "conductorGroup": 1,
-      "contentCount": 3453,
-      "relationshipCount": 2,
-      "stewardshipCount": 3,
-      "collectiveCount": 3
-    },
-    {
-      "humanId": "human-pam-polarized",
-      "displayName": "Pam",
-      "category": "community",
-      "conductorGroup": 1,
-      "contentCount": 1146,
-      "relationshipCount": 2,
       "stewardshipCount": 0,
       "collectiveCount": 2
     },
@@ -104,14 +134,174 @@
       "collectiveCount": 3
     },
     {
+      "humanId": "human-jessica-spouse",
+      "displayName": "Jessica",
+      "category": "core-family",
+      "conductorGroup": 0,
+      "contentCount": 3370,
+      "relationshipCount": 4,
+      "stewardshipCount": 2,
+      "collectiveCount": 3
+    },
+    {
+      "humanId": "human-lenny-lineworker",
+      "displayName": "Lenny",
+      "category": "local-economy",
+      "conductorGroup": 3,
+      "contentCount": 292,
+      "relationshipCount": 2,
+      "stewardshipCount": 0,
+      "collectiveCount": 5
+    },
+    {
+      "humanId": "human-levi-contributor",
+      "displayName": "Levi",
+      "category": "community",
+      "conductorGroup": 3,
+      "contentCount": 111,
+      "relationshipCount": 0,
+      "stewardshipCount": 0,
+      "collectiveCount": 1
+    },
+    {
+      "humanId": "human-manny-manufacturer",
+      "displayName": "Manny",
+      "category": "local-economy",
+      "conductorGroup": 2,
+      "contentCount": 419,
+      "relationshipCount": 1,
+      "stewardshipCount": 0,
+      "collectiveCount": 4
+    },
+    {
+      "humanId": "human-mary-migrant",
+      "displayName": "Maria",
+      "category": "newcomer",
+      "conductorGroup": 3,
+      "contentCount": 258,
+      "relationshipCount": 0,
+      "stewardshipCount": 0,
+      "collectiveCount": 4
+    },
+    {
+      "humanId": "human-mary-miner",
+      "displayName": "Mary",
+      "category": "local-economy",
+      "conductorGroup": 3,
+      "contentCount": 2283,
+      "relationshipCount": 1,
+      "stewardshipCount": 0,
+      "collectiveCount": 4
+    },
+    {
+      "humanId": "human-matthew-manager",
+      "displayName": "Matthew",
+      "category": "core-family",
+      "conductorGroup": 0,
+      "contentCount": 3370,
+      "relationshipCount": 8,
+      "stewardshipCount": 19,
+      "collectiveCount": 3
+    },
+    {
+      "humanId": "human-meriadoc-moneybags",
+      "displayName": "Meriadoc",
+      "category": "affinity",
+      "conductorGroup": 3,
+      "contentCount": 3370,
+      "relationshipCount": 2,
+      "stewardshipCount": 3,
+      "collectiveCount": 4
+    },
+    {
+      "humanId": "human-miriam-author",
+      "displayName": "Miriam",
+      "category": "community",
+      "conductorGroup": 3,
+      "contentCount": 1997,
+      "relationshipCount": 0,
+      "stewardshipCount": 0,
+      "collectiveCount": 1
+    },
+    {
+      "humanId": "human-nancy-neighbor",
+      "displayName": "Nancy",
+      "category": "community",
+      "conductorGroup": 1,
+      "contentCount": 3370,
+      "relationshipCount": 2,
+      "stewardshipCount": 3,
+      "collectiveCount": 3
+    },
+    {
+      "humanId": "human-pam-polarized",
+      "displayName": "Pam",
+      "category": "community",
+      "conductorGroup": 1,
+      "contentCount": 1094,
+      "relationshipCount": 2,
+      "stewardshipCount": 0,
+      "collectiveCount": 2
+    },
+    {
       "humanId": "human-pete-pastor",
-      "displayName": "Pastor Pete",
+      "displayName": "Pete",
       "category": "affinity",
       "conductorGroup": 2,
-      "contentCount": 3453,
-      "relationshipCount": 5,
+      "contentCount": 3370,
+      "relationshipCount": 6,
       "stewardshipCount": 6,
       "collectiveCount": 4
+    },
+    {
+      "humanId": "human-renold-regent",
+      "displayName": "Renold",
+      "category": "red-team",
+      "conductorGroup": 3,
+      "contentCount": 109,
+      "relationshipCount": 0,
+      "stewardshipCount": 0,
+      "collectiveCount": 2
+    },
+    {
+      "humanId": "human-ronald-refugee",
+      "displayName": "Ronald",
+      "category": "newcomer",
+      "conductorGroup": 3,
+      "contentCount": 233,
+      "relationshipCount": 0,
+      "stewardshipCount": 0,
+      "collectiveCount": 3
+    },
+    {
+      "humanId": "human-sam-shipper",
+      "displayName": "Sam",
+      "category": "red-team",
+      "conductorGroup": 3,
+      "contentCount": 109,
+      "relationshipCount": 0,
+      "stewardshipCount": 0,
+      "collectiveCount": 1
+    },
+    {
+      "humanId": "human-susan-household",
+      "displayName": "Susan",
+      "category": "core-family",
+      "conductorGroup": 3,
+      "contentCount": 3370,
+      "relationshipCount": 3,
+      "stewardshipCount": 0,
+      "collectiveCount": 3
+    },
+    {
+      "humanId": "human-tiffany-teen",
+      "displayName": "Tiffany",
+      "category": "red-team",
+      "conductorGroup": 3,
+      "contentCount": 109,
+      "relationshipCount": 0,
+      "stewardshipCount": 0,
+      "collectiveCount": 1
     },
     {
       "humanId": "human-timothy-tutor",
@@ -134,159 +324,9 @@
       "collectiveCount": 5
     },
     {
-      "humanId": "human-meriadoc-moneybags",
-      "displayName": "Meriadoc",
-      "category": "affinity",
-      "conductorGroup": 3,
-      "contentCount": 3453,
-      "relationshipCount": 2,
-      "stewardshipCount": 3,
-      "collectiveCount": 4
-    },
-    {
-      "humanId": "human-frank-farmer",
-      "displayName": "Frank",
-      "category": "local-economy",
-      "conductorGroup": 2,
-      "contentCount": 2307,
-      "relationshipCount": 2,
-      "stewardshipCount": 4,
-      "collectiveCount": 4
-    },
-    {
-      "humanId": "human-georgina-grocer",
-      "displayName": "Georgina",
-      "category": "local-economy",
-      "conductorGroup": 2,
-      "contentCount": 2406,
-      "relationshipCount": 2,
-      "stewardshipCount": 0,
-      "collectiveCount": 4
-    },
-    {
-      "humanId": "human-manny-manufacturer",
-      "displayName": "Manny",
-      "category": "local-economy",
-      "conductorGroup": 2,
-      "contentCount": 419,
-      "relationshipCount": 1,
-      "stewardshipCount": 0,
-      "collectiveCount": 4
-    },
-    {
-      "humanId": "human-bub-builder",
-      "displayName": "Bub",
-      "category": "local-economy",
-      "conductorGroup": 2,
-      "contentCount": 2490,
-      "relationshipCount": 4,
-      "stewardshipCount": 0,
-      "collectiveCount": 5
-    },
-    {
-      "humanId": "human-ginny-gigworker",
-      "displayName": "Ginny",
-      "category": "local-economy",
-      "conductorGroup": 3,
-      "contentCount": 2284,
-      "relationshipCount": 1,
-      "stewardshipCount": 0,
-      "collectiveCount": 3
-    },
-    {
-      "humanId": "human-mary-miner",
-      "displayName": "Mary",
-      "category": "local-economy",
-      "conductorGroup": 3,
-      "contentCount": 2283,
-      "relationshipCount": 1,
-      "stewardshipCount": 0,
-      "collectiveCount": 4
-    },
-    {
-      "humanId": "human-lenny-lineworker",
-      "displayName": "Lenny",
-      "category": "local-economy",
-      "conductorGroup": 3,
-      "contentCount": 292,
-      "relationshipCount": 2,
-      "stewardshipCount": 0,
-      "collectiveCount": 5
-    },
-    {
-      "humanId": "human-mary-migrant",
-      "displayName": "Maria",
-      "category": "newcomer",
-      "conductorGroup": 3,
-      "contentCount": 258,
-      "relationshipCount": 0,
-      "stewardshipCount": 0,
-      "collectiveCount": 4
-    },
-    {
-      "humanId": "human-ronald-refugee",
-      "displayName": "Ronald",
-      "category": "newcomer",
-      "conductorGroup": 3,
-      "contentCount": 233,
-      "relationshipCount": 0,
-      "stewardshipCount": 0,
-      "collectiveCount": 3
-    },
-    {
       "humanId": "human-traveler",
       "displayName": "Traveler",
       "category": "visitor",
-      "conductorGroup": 3,
-      "contentCount": 109,
-      "relationshipCount": 0,
-      "stewardshipCount": 0,
-      "collectiveCount": 1
-    },
-    {
-      "humanId": "human-charlie-challenged",
-      "displayName": "Charlie",
-      "category": "red-team",
-      "conductorGroup": 3,
-      "contentCount": 109,
-      "relationshipCount": 0,
-      "stewardshipCount": 0,
-      "collectiveCount": 1
-    },
-    {
-      "humanId": "human-sam-shipper",
-      "displayName": "Sam",
-      "category": "red-team",
-      "conductorGroup": 3,
-      "contentCount": 109,
-      "relationshipCount": 0,
-      "stewardshipCount": 0,
-      "collectiveCount": 1
-    },
-    {
-      "humanId": "human-renold-regent",
-      "displayName": "Renold",
-      "category": "red-team",
-      "conductorGroup": 3,
-      "contentCount": 109,
-      "relationshipCount": 0,
-      "stewardshipCount": 0,
-      "collectiveCount": 2
-    },
-    {
-      "humanId": "human-dolittle-doctor",
-      "displayName": "Dr. Dolittle",
-      "category": "red-team",
-      "conductorGroup": 3,
-      "contentCount": 109,
-      "relationshipCount": 0,
-      "stewardshipCount": 0,
-      "collectiveCount": 1
-    },
-    {
-      "humanId": "human-tiffany-teen",
-      "displayName": "Tiffany",
-      "category": "red-team",
       "conductorGroup": 3,
       "contentCount": 109,
       "relationshipCount": 0,

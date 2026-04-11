@@ -127,139 +127,139 @@
     },
     {
       "contentId": "community-apprenticeship-program",
-      "reach": "neighborhood",
+      "reach": "familiar",
       "reason": "affinity",
       "stewardRatio": null
     },
     {
       "contentId": "community-builders-guild",
-      "reach": "neighborhood",
+      "reach": "familiar",
       "reason": "affinity",
       "stewardRatio": null
     },
     {
       "contentId": "community-educators-network",
-      "reach": "neighborhood",
+      "reach": "familiar",
       "reason": "affinity",
       "stewardRatio": null
     },
     {
       "contentId": "community-engineers-network",
-      "reach": "neighborhood",
+      "reach": "familiar",
       "reason": "affinity",
       "stewardRatio": null
     },
     {
       "contentId": "community-esl-program",
-      "reach": "neighborhood",
+      "reach": "familiar",
       "reason": "affinity",
       "stewardRatio": null
     },
     {
       "contentId": "community-farmers-market",
-      "reach": "neighborhood",
+      "reach": "familiar",
       "reason": "affinity",
       "stewardRatio": null
     },
     {
       "contentId": "community-garden-club",
-      "reach": "neighborhood",
+      "reach": "familiar",
       "reason": "affinity",
       "stewardRatio": null
     },
     {
       "contentId": "community-gig-workers-alliance",
-      "reach": "neighborhood",
+      "reach": "familiar",
       "reason": "affinity",
       "stewardRatio": null
     },
     {
       "contentId": "community-holochain-devs",
-      "reach": "neighborhood",
+      "reach": "familiar",
       "reason": "affinity",
       "stewardRatio": null
     },
     {
       "contentId": "community-homeschool-coop",
-      "reach": "neighborhood",
+      "reach": "familiar",
       "reason": "affinity",
       "stewardRatio": null
     },
     {
       "contentId": "community-immigrant-support",
-      "reach": "neighborhood",
+      "reach": "familiar",
       "reason": "affinity",
       "stewardRatio": null
     },
     {
       "contentId": "community-impact-investors",
-      "reach": "neighborhood",
+      "reach": "familiar",
       "reason": "affinity",
       "stewardRatio": null
     },
     {
       "contentId": "community-local-business",
-      "reach": "neighborhood",
+      "reach": "familiar",
       "reason": "affinity",
       "stewardRatio": null
     },
     {
       "contentId": "community-local-church",
-      "reach": "neighborhood",
+      "reach": "familiar",
       "reason": "affinity",
       "stewardRatio": null
     },
     {
       "contentId": "community-manufacturers-guild",
-      "reach": "neighborhood",
+      "reach": "familiar",
       "reason": "affinity",
       "stewardRatio": null
     },
     {
       "contentId": "community-mining-town",
-      "reach": "neighborhood",
+      "reach": "familiar",
       "reason": "affinity",
       "stewardRatio": null
     },
     {
       "contentId": "community-neighborhood-association",
-      "reach": "neighborhood",
+      "reach": "familiar",
       "reason": "affinity",
       "stewardRatio": null
     },
     {
       "contentId": "community-pastoral-network",
-      "reach": "neighborhood",
+      "reach": "familiar",
       "reason": "affinity",
       "stewardRatio": null
     },
     {
       "contentId": "community-refugee-resettlement",
-      "reach": "neighborhood",
+      "reach": "familiar",
       "reason": "affinity",
       "stewardRatio": null
     },
     {
       "contentId": "community-regen-ag-network",
-      "reach": "neighborhood",
+      "reach": "familiar",
       "reason": "affinity",
       "stewardRatio": null
     },
     {
       "contentId": "community-rideshare-drivers",
-      "reach": "neighborhood",
+      "reach": "familiar",
       "reason": "affinity",
       "stewardRatio": null
     },
     {
       "contentId": "community-rust-meetup",
-      "reach": "neighborhood",
+      "reach": "familiar",
       "reason": "affinity",
       "stewardRatio": null
     },
     {
       "contentId": "community-utility-workers",
-      "reach": "neighborhood",
+      "reach": "familiar",
       "reason": "affinity",
       "stewardRatio": null
     },
@@ -1519,60 +1519,6 @@
     },
     {
       "contentId": "hrea-process-recipe",
-      "reach": "commons",
-      "reason": "commons",
-      "stewardRatio": null
-    },
-    {
-      "contentId": "human-bub-builder",
-      "reach": "commons",
-      "reason": "commons",
-      "stewardRatio": null
-    },
-    {
-      "contentId": "human-frank-farmer",
-      "reach": "commons",
-      "reason": "commons",
-      "stewardRatio": null
-    },
-    {
-      "contentId": "human-georgina-grocer",
-      "reach": "commons",
-      "reason": "commons",
-      "stewardRatio": null
-    },
-    {
-      "contentId": "human-ginny-gigworker",
-      "reach": "commons",
-      "reason": "commons",
-      "stewardRatio": null
-    },
-    {
-      "contentId": "human-lenny-lineworker",
-      "reach": "commons",
-      "reason": "commons",
-      "stewardRatio": null
-    },
-    {
-      "contentId": "human-manny-manufacturer",
-      "reach": "commons",
-      "reason": "commons",
-      "stewardRatio": null
-    },
-    {
-      "contentId": "human-mary-miner",
-      "reach": "commons",
-      "reason": "commons",
-      "stewardRatio": null
-    },
-    {
-      "contentId": "human-nancy-neighbor",
-      "reach": "commons",
-      "reason": "commons",
-      "stewardRatio": null
-    },
-    {
-      "contentId": "human-pam-polarized",
       "reach": "commons",
       "reason": "commons",
       "stewardRatio": null
@@ -13752,6 +13698,12 @@
       "stewardRatio": null
     },
     {
+      "contentId": "human-bub-builder",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
       "contentId": "human-charlie-challenged",
       "reach": "commons",
       "reason": "commons",
@@ -13770,7 +13722,31 @@
       "stewardRatio": null
     },
     {
+      "contentId": "human-frank-farmer",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "human-georgina-grocer",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
       "contentId": "human-gertrude-grandma",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "human-ginny-gigworker",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "human-james-son",
       "reach": "commons",
       "reason": "commons",
       "stewardRatio": null
@@ -13782,7 +13758,31 @@
       "stewardRatio": null
     },
     {
+      "contentId": "human-jessica-spouse",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "human-lenny-lineworker",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "human-manny-manufacturer",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
       "contentId": "human-mary-migrant",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "human-mary-miner",
       "reach": "commons",
       "reason": "commons",
       "stewardRatio": null
@@ -13795,6 +13795,18 @@
     },
     {
       "contentId": "human-meriadoc-moneybags",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "human-nancy-neighbor",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "human-pam-polarized",
       "reach": "commons",
       "reason": "commons",
       "stewardRatio": null
@@ -13819,18 +13831,6 @@
     },
     {
       "contentId": "human-sam-shipper",
-      "reach": "commons",
-      "reason": "commons",
-      "stewardRatio": null
-    },
-    {
-      "contentId": "human-james-son",
-      "reach": "commons",
-      "reason": "commons",
-      "stewardRatio": null
-    },
-    {
-      "contentId": "human-jessica-spouse",
       "reach": "commons",
       "reason": "commons",
       "stewardRatio": null
@@ -13868,15 +13868,11 @@
   "relationships": [
     {
       "targetId": "human-georgina-grocer",
-      "relationshipType": "business_partner",
-      "intimacyLevel": "trusted",
       "isBidirectional": true,
       "reach": null
     },
     {
       "targetId": "human-bub-builder",
-      "relationshipType": "business_partner",
-      "intimacyLevel": "connection",
       "isBidirectional": true,
       "reach": null
     }
@@ -13905,7 +13901,7 @@
   ],
   "collectives": [
     {
-      "collectiveId": "neighborhood-valley-economy",
+      "collectiveId": "household-valley-economy",
       "roleContext": null,
       "intimacyLevel": "trusted"
     },
@@ -13928,8 +13924,8 @@
   "conductorGroup": 2,
   "manifest": {
     "version": "1.0.0",
-    "generatedAt": "2026-03-03T19:08:21.459Z",
+    "generatedAt": "2026-04-11T13:08:38.878Z",
     "sourceStory": "genesis",
-    "contentHash": "10deb111"
+    "contentHash": "54005035"
   }
 }

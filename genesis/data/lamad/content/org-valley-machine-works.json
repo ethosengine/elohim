@@ -11,9 +11,7 @@
     "organization",
     "human-graph"
   ],
-  "relatedNodeIds": [
-    "human-manny-manufacturer"
-  ],
+  "relatedNodeIds": [],
   "metadata": {
     "category": "organization",
     "memberCount": 1,

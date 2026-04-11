@@ -11,9 +11,7 @@
     "organization",
     "human-graph"
   ],
-  "relatedNodeIds": [
-    "human-pete-pastor"
-  ],
+  "relatedNodeIds": [],
   "metadata": {
     "category": "organization",
     "memberCount": 1,

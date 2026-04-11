@@ -1,0 +1,33 @@
+{
+  "id": "book-ministry-for-the-future",
+  "contentType": "book",
+  "title": "The Ministry for the Future",
+  "description": "Speculative fiction about an international body established to advocate for the rights of future generations.",
+  "content": "# The Ministry for the Future\n\n**Author:** Kim Stanley Robinson (2020)\n\nSpeculative fiction about an international body established to advocate for the rights of future generations.\n\nThis book was curated in Matthew's Consilience Garden keen in 2021 as part of the \"Media and Books\" section — one of the thinkers who shaped the protocol's framing.",
+  "contentFormat": "markdown",
+  "tags": [
+    "book",
+    "media-and-books",
+    "consilience-garden"
+  ],
+  "metadata": {
+    "category": "governance",
+    "sourceSection": "Media and Books",
+    "year": 2020
+  },
+  "stewardedBy": [
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 1,
+      "role": "steward"
+    }
+  ],
+  "contributors": [
+    {
+      "presenceId": "presence-kim-stanley-robinson",
+      "contributionType": "author",
+      "weight": null,
+      "context": "Author of The Ministry for the Future"
+    }
+  ]
+}

@@ -40,6 +40,11 @@
     "seed:collectives:dev": "DOORWAY_URL='https://doorway-alpha.elohim.host' npx tsx src/seed-collectives.ts",
     "seed:collectives:dry": "npx tsx src/seed-collectives.ts --dry-run",
     "validate:collectives": "npx tsx src/validate-collectives.ts",
+    "validate:humans": "tsx src/validate-humans.ts",
+    "validate:presences": "tsx src/validate-presences.ts",
+    "validate:all": "pnpm validate:humans && pnpm validate:presences && pnpm validate:collectives",
+    "build:data": "tsx src/build-data.ts all",
+    "seed:presences": "tsx src/seed-presences.ts",
     "seed:collectives:validate": "npx tsx src/seed-collectives.ts --validate-only",
     "seed:accounts": "npx tsx src/seed-accounts.ts",
     "seed:accounts:dev": "DOORWAY_URL='https://doorway-alpha.elohim.host' npx tsx src/seed-accounts.ts",
@@ -57,7 +62,8 @@
     "@elohim/storage-client": "workspace:*",
     "@holochain/client": "^0.20.1",
     "multiformats": "^13.4.1",
-    "ws": "^8.16.0"
+    "ws": "^8.16.0",
+    "yaml": "^2.8.3"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

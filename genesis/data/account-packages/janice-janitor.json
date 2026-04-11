@@ -4,7 +4,7 @@
     "humanId": "human-janice-janitor",
     "displayName": "Janice",
     "category": "edge-case",
-    "profileReach": "network",
+    "profileReach": "familiar",
     "bio": "Working hard, keeping things clean. Don't have much time for this stuff but trying to stay connected.",
     "location": "Valley Town (municipality)",
     "affinities": [
@@ -556,7 +556,19 @@
       "stewardRatio": null
     },
     {
+      "contentId": "human-james-son",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
       "contentId": "human-janice-janitor",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "human-jessica-spouse",
       "reach": "commons",
       "reason": "commons",
       "stewardRatio": null
@@ -634,18 +646,6 @@
       "stewardRatio": null
     },
     {
-      "contentId": "human-james-son",
-      "reach": "commons",
-      "reason": "commons",
-      "stewardRatio": null
-    },
-    {
-      "contentId": "human-jessica-spouse",
-      "reach": "commons",
-      "reason": "commons",
-      "stewardRatio": null
-    },
-    {
       "contentId": "human-tiffany-teen",
       "reach": "commons",
       "reason": "commons",
@@ -678,8 +678,6 @@
   "relationships": [
     {
       "targetId": "human-tommy-teacher",
-      "relationshipType": "coworker",
-      "intimacyLevel": "connection",
       "isBidirectional": true,
       "reach": null
     }
@@ -687,7 +685,7 @@
   "stewardship": [],
   "collectives": [
     {
-      "collectiveId": "family-eden",
+      "collectiveId": "household-eden",
       "roleContext": null,
       "intimacyLevel": "intimate"
     },
@@ -705,8 +703,8 @@
   "conductorGroup": 1,
   "manifest": {
     "version": "1.0.0",
-    "generatedAt": "2026-03-03T19:08:21.449Z",
+    "generatedAt": "2026-04-11T13:08:38.886Z",
     "sourceStory": "genesis",
-    "contentHash": "10deb111"
+    "contentHash": "54005035"
   }
 }

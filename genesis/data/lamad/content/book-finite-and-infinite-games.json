@@ -1,0 +1,33 @@
+{
+  "id": "book-finite-and-infinite-games",
+  "contentType": "book",
+  "title": "Finite and Infinite Games",
+  "description": "A Vision of Life as Play and Possibility. Distinction between finite games (played to win) and infinite games (played to continue playing).",
+  "content": "# Finite and Infinite Games\n\n**Author:** James P. Carse (1986)\n\nA Vision of Life as Play and Possibility. Distinction between finite games (played to win) and infinite games (played to continue playing).\n\nThis book was curated in Matthew's Consilience Garden keen in 2021 as part of the \"Media and Books\" section — one of the thinkers who shaped the protocol's framing.",
+  "contentFormat": "markdown",
+  "tags": [
+    "book",
+    "media-and-books",
+    "consilience-garden"
+  ],
+  "metadata": {
+    "category": "governance",
+    "sourceSection": "Media and Books",
+    "year": 1986
+  },
+  "stewardedBy": [
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 1,
+      "role": "steward"
+    }
+  ],
+  "contributors": [
+    {
+      "presenceId": "presence-james-p-carse",
+      "contributionType": "author",
+      "weight": null,
+      "context": "Author of Finite and Infinite Games"
+    }
+  ]
+}

@@ -1,0 +1,4164 @@
+{
+  "version": "1.0.0",
+  "description": "Generated from genesis/data/presences/*.md. DO NOT EDIT BY HAND. Regenerate with: pnpm --filter genesis-seeder run build:data",
+  "presences": [
+    {
+      "id": "presence-2000-watt-society-and-2000-watt-site",
+      "displayName": "2000-Watt society and 2000-Watt Site",
+      "presenceType": "organization",
+      "bio": "Das Zertifikat «2000-Watt-Areal» zeichnet Siedlungsgebiete aus, die sich für den Klimaschutz einsetzen und einen nachhaltigen Umgang mit Ressourcen vorweisen.",
+      "observations": [
+        {
+          "observerId": "human-matthew-manager",
+          "observedAt": "2021-08-07T21:58:56Z",
+          "context": "Collected in Consilience Garden keen, section: Shared Meaning",
+          "contextContentId": null
+        }
+      ],
+      "primaryStewardId": "human-matthew-manager",
+      "stewardshipStartedAt": "2021-08-07T21:58:56Z",
+      "externalIdentifiers": [
+        {
+          "type": "homepage",
+          "value": "https://www.2000watt.swiss/english.html"
+        }
+      ],
+      "tags": [
+        "shared-meaning",
+        "consilience-garden"
+      ],
+      "image": {
+        "local": "images/presence-2000-watt-society-and-2000-watt-site.webp",
+        "placeholder": false,
+        "sourceUrl": "https://www.2000watt.swiss/dam/jcr:72138c9d-8927-40e6-b345-d9a97682ea1c/2000W_mob_004.jpg"
+      }
+    },
+    {
+      "id": "presence-a-problem-well-stated-is-half-solved-your-undivided-attentio",
+      "displayName": "A Problem Well-Stated is Half-Solved | Your Undivided Attention",
+      "presenceType": "organization",
+      "bio": "Jun 25, 2021 ... We've explored many different problems on Your Undivided Attention — addiction, disinformation, polarization, climate change, and more.",
+      "observations": [
+        {
+          "observerId": "human-matthew-manager",
+          "observedAt": "2021-08-07T21:58:56Z",
+          "context": "Collected in Consilience Garden keen, section: Saved",
+          "contextContentId": null
+        }
+      ],
+      "primaryStewardId": "human-matthew-manager",
+      "stewardshipStartedAt": "2021-08-07T21:58:56Z",
+      "externalIdentifiers": [
+        {
+          "type": "homepage",
+          "value": "https://your-undivided-attention.simplecast.com/episodes/a-problem-well-stated-is-half-solved-0nI8m2G3"
+        }
+      ],
+      "tags": [
+        "saved",
+        "consilience-garden"
+      ],
+      "image": {
+        "local": "images/presence-a-problem-well-stated-is-half-solved-your-undivided-attentio.webp",
+        "placeholder": false,
+        "sourceUrl": "https://image.simplecastcdn.com/images/31899577-55af-4c11-b070-4e30ab4b390c/62fd5caf-9f19-4bc6-b1b2-0f86c0fdcb96/podcastart-option1-final.jpg"
+      }
+    },
+    {
+      "id": "presence-about",
+      "displayName": "About",
+      "presenceType": "organization",
+      "observations": [
+        {
+          "observerId": "human-matthew-manager",
+          "observedAt": "2021-08-07T21:58:56Z",
+          "context": "Collected in Consilience Garden keen, section: Saved",
+          "contextContentId": null
+        }
+      ],
+      "primaryStewardId": "human-matthew-manager",
+      "stewardshipStartedAt": "2021-08-07T21:58:56Z",
+      "externalIdentifiers": [
+        {
+          "type": "homepage",
+          "value": "https://www.prosocial.world/about"
+        }
+      ],
+      "tags": [
+        "saved",
+        "consilience-garden"
+      ],
+      "image": {
+        "local": "images/presence-about.webp",
+        "placeholder": false,
+        "sourceUrl": null
+      }
+    },
+    {
+      "id": "presence-about-p2p-foundation",
+      "displayName": "About - P2P Foundation",
+      "presenceType": "organization",
+      "bio": "Read about our Story, Mission, and Strategic Priorities",
+      "observations": [
+        {
+          "observerId": "human-matthew-manager",
+          "observedAt": "2021-08-07T21:58:56Z",
+          "context": "Collected in Consilience Garden keen, section: Digital Governance and Democracy",
+          "contextContentId": null
+        }
+      ],
+      "primaryStewardId": "human-matthew-manager",
+      "stewardshipStartedAt": "2021-08-07T21:58:56Z",
+      "externalIdentifiers": [
+        {
+          "type": "homepage",
+          "value": "https://p2pfoundation.net/the-p2p-foundation/about-the-p2p-foundation"
+        }
+      ],
+      "tags": [
+        "digital-governance-and-democracy",
+        "consilience-garden"
+      ],
+      "image": {
+        "local": "images/placeholder-organization.webp",
+        "placeholder": true,
+        "sourceUrl": "https://welcome-cdn1.p2pfoundation.net/wp-content/uploads/2017/08/About-rule.jpg"
+      }
+    },
+    {
+      "id": "presence-about-us",
+      "displayName": "About us",
+      "presenceType": "organization",
+      "bio": "&amp;nbsp; About Us The Cities Coalition for Digital Rights, launched by the Cities of Amsterdam, Barcelona and New York in November 2018 and now with a membership of over 50 cities worldwide,",
+      "observations": [
+        {
+          "observerId": "human-matthew-manager",
+          "observedAt": "2021-08-07T21:58:56Z",
+          "context": "Collected in Consilience Garden keen, section: Design & Planning",
+          "contextContentId": null
+        }
+      ],
+      "primaryStewardId": "human-matthew-manager",
+      "stewardshipStartedAt": "2021-08-07T21:58:56Z",
+      "externalIdentifiers": [
+        {
+          "type": "homepage",
+          "value": "https://citiesfordigitalrights.org/thecoalition"
+        }
+      ],
+      "tags": [
+        "design-planning",
+        "consilience-garden"
+      ],
+      "image": {
+        "local": "images/presence-about-us.webp",
+        "placeholder": false,
+        "sourceUrl": "https://citiesfordigitalrights.org/sites/default/files/LOGO%20CC4DR%20BLAU.png"
+      }
+    },
+    {
+      "id": "presence-agile-learning-centers-education-evolved",
+      "displayName": "Agile Learning Centers, Education Evolved",
+      "presenceType": "organization",
+      "bio": "Agile Learning Centers are a rapidly expanding network of micro-schools leveraging agile tools to support self-directed education.",
+      "observations": [
+        {
+          "observerId": "human-matthew-manager",
+          "observedAt": "2021-08-07T21:58:56Z",
+          "context": "Collected in Consilience Garden keen, section: Built for Purpose",
+          "contextContentId": null
+        }
+      ],
+      "primaryStewardId": "human-matthew-manager",
+      "stewardshipStartedAt": "2021-08-07T21:58:56Z",
+      "externalIdentifiers": [
+        {
+          "type": "homepage",
+          "value": "https://agilelearningcenters.org"
+        }
+      ],
+      "tags": [
+        "built-for-purpose",
+        "consilience-garden"
+      ],
+      "image": {
+        "local": "images/placeholder-organization.webp",
+        "placeholder": true,
+        "sourceUrl": "https://agilelearningcenters.org/wp-content/uploads/2015/07/ALC-Facebook-Embed-01.png"
+      }
+    },
+    {
+      "id": "presence-andy-crouch",
+      "displayName": "Andy Crouch",
+      "presenceType": "person",
+      "bio": "Author referenced in Pastor Pete's FCT curriculum.",
+      "observations": [
+        {
+          "observerId": "human-pete-pastor",
+          "observedAt": "2026-01-15T00:00:00Z",
+          "context": "Cited in fct-module-14-ready-to-act while building the FCT curriculum",
+          "contextContentId": "fct-module-14-ready-to-act"
+        }
+      ],
+      "primaryStewardId": "human-pete-pastor",
+      "stewardshipStartedAt": "2026-01-15T00:00:00Z",
+      "works": [
+        {
+          "title": "The Tech-Wise Family",
+          "kind": "book",
+          "year": null,
+          "url": null,
+          "citedInContentIds": [
+            "fct-module-14-ready-to-act"
+          ]
+        }
+      ],
+      "tags": [
+        "fct",
+        "author"
+      ],
+      "image": {
+        "local": "images/placeholder-person.webp",
+        "placeholder": true,
+        "sourceUrl": null
+      }
+    },
+    {
+      "id": "presence-artificial-intelligence-values-and-alignment",
+      "displayName": "Artificial Intelligence, Values and Alignment",
+      "presenceType": "organization",
+      "bio": "This paper looks at philosophical questions that arise in the context of AI alignment. It defends three propositions. First, normative and technical aspects of the AI alignment problem are interrelated, creating space for productive engagement between people working in both domains. Second, it is…",
+      "observations": [
+        {
+          "observerId": "human-matthew-manager",
+          "observedAt": "2021-08-07T21:58:56Z",
+          "context": "Collected in Consilience Garden keen, section: Digital Governance and Democracy",
+          "contextContentId": null
+        }
+      ],
+      "primaryStewardId": "human-matthew-manager",
+      "stewardshipStartedAt": "2021-08-07T21:58:56Z",
+      "externalIdentifiers": [
+        {
+          "type": "homepage",
+          "value": "https://www.deepmind.com/publications/artificial-intelligence-values-and-alignment"
+        }
+      ],
+      "tags": [
+        "digital-governance-and-democracy",
+        "consilience-garden"
+      ],
+      "image": {
+        "local": "images/presence-artificial-intelligence-values-and-alignment.webp",
+        "placeholder": false,
+        "sourceUrl": null
+      }
+    },
+    {
+      "id": "presence-ava-du",
+      "displayName": "Ava Du",
+      "presenceType": "person",
+      "bio": "Author referenced in Pastor Pete's FCT curriculum.",
+      "observations": [
+        {
+          "observerId": "human-pete-pastor",
+          "observedAt": "2026-01-15T00:00:00Z",
+          "context": "Cited in fct-module-12-fairness-justice while building the FCT curriculum",
+          "contextContentId": "fct-module-12-fairness-justice"
+        }
+      ],
+      "primaryStewardId": "human-pete-pastor",
+      "stewardshipStartedAt": "2026-01-15T00:00:00Z",
+      "works": [
+        {
+          "title": "directed",
+          "kind": "book",
+          "year": null,
+          "url": null,
+          "citedInContentIds": [
+            "fct-module-12-fairness-justice"
+          ]
+        }
+      ],
+      "tags": [
+        "fct",
+        "author"
+      ],
+      "image": {
+        "local": "images/placeholder-person.webp",
+        "placeholder": true,
+        "sourceUrl": null
+      }
+    },
+    {
+      "id": "presence-b-lab-global-site",
+      "displayName": "B Lab Global Site",
+      "presenceType": "organization",
+      "bio": "B Lab is a global nonprofit network transforming the global economy to benefit all people, communities, and the planet. We won’t stop until all business is a force for good.",
+      "observations": [
+        {
+          "observerId": "human-matthew-manager",
+          "observedAt": "2021-08-07T21:58:56Z",
+          "context": "Collected in Consilience Garden keen, section: Saved",
+          "contextContentId": null
+        }
+      ],
+      "primaryStewardId": "human-matthew-manager",
+      "stewardshipStartedAt": "2021-08-07T21:58:56Z",
+      "externalIdentifiers": [
+        {
+          "type": "homepage",
+          "value": "https://www.bcorporation.net/en-us/"
+        }
+      ],
+      "tags": [
+        "saved",
+        "consilience-garden"
+      ],
+      "image": {
+        "local": "images/placeholder-organization.webp",
+        "placeholder": true,
+        "sourceUrl": "https://www.bcorporation.net/static/og-blab-fcb145ce7ad15cb0a25d5c0ca98d6c4c.png"
+      }
+    },
+    {
+      "id": "presence-basic-law-for-the-federal-republic-of-germany",
+      "displayName": "Basic Law for the Federal Republic of Germany",
+      "presenceType": "organization",
+      "observations": [
+        {
+          "observerId": "human-matthew-manager",
+          "observedAt": "2021-08-07T21:58:56Z",
+          "context": "Collected in Consilience Garden keen, section: Digital Governance and Democracy",
+          "contextContentId": null
+        }
+      ],
+      "primaryStewardId": "human-matthew-manager",
+      "stewardshipStartedAt": "2021-08-07T21:58:56Z",
+      "externalIdentifiers": [
+        {
+          "type": "homepage",
+          "value": "https://www.gesetze-im-internet.de/englisch_gg/englisch_gg.html"
+        }
+      ],
+      "tags": [
+        "digital-governance-and-democracy",
+        "consilience-garden"
+      ],
+      "image": {
+        "local": "images/presence-basic-law-for-the-federal-republic-of-germany.webp",
+        "placeholder": false,
+        "sourceUrl": "https://www.gesetze-im-internet.de/img/lay/BMJV_BfJ_2018_Web_Sonderskalierung_137px_de_de.gif"
+      }
+    },
+    {
+      "id": "presence-blockchaingov",
+      "displayName": "BlockchainGov",
+      "presenceType": "organization",
+      "bio": "<p>Blockchain-powered distributed governancefor communities, institutions and the world.We are a 5-year long, transdisciplinary research effort aimed at restoring trust in institutions at the community and global levels, by promoting better […]</p>\\n",
+      "observations": [
+        {
+          "observerId": "human-matthew-manager",
+          "observedAt": "2021-08-07T21:58:56Z",
+          "context": "Collected in Consilience Garden keen, section: Digital Governance and Democracy",
+          "contextContentId": null
+        }
+      ],
+      "primaryStewardId": "human-matthew-manager",
+      "stewardshipStartedAt": "2021-08-07T21:58:56Z",
+      "externalIdentifiers": [
+        {
+          "type": "homepage",
+          "value": "https://blockchaingov.eu"
+        }
+      ],
+      "tags": [
+        "digital-governance-and-democracy",
+        "consilience-garden"
+      ],
+      "image": {
+        "local": "images/presence-blockchaingov.webp",
+        "placeholder": false,
+        "sourceUrl": "https://blockchaingov.eu/wp-content/uploads/2021/07/Logo-Home2.png"
+      }
+    },
+    {
+      "id": "presence-bonfire",
+      "displayName": "Bonfire",
+      "presenceType": "organization",
+      "bio": "A federated social network for individuals and communities to design, operate and control their own digital lives.",
+      "observations": [
+        {
+          "observerId": "human-matthew-manager",
+          "observedAt": "2021-08-07T21:58:56Z",
+          "context": "Collected in Consilience Garden keen, section: Built for Purpose",
+          "contextContentId": null
+        }
+      ],
+      "primaryStewardId": "human-matthew-manager",
+      "stewardshipStartedAt": "2021-08-07T21:58:56Z",
+      "externalIdentifiers": [
+        {
+          "type": "homepage",
+          "value": "https://bonfirenetworks.org"
+        }
+      ],
+      "tags": [
+        "built-for-purpose",
+        "consilience-garden"
+      ],
+      "image": {
+        "local": "images/presence-bonfire.webp",
+        "placeholder": false,
+        "sourceUrl": null
+      }
+    },
+    {
+      "id": "presence-buycott",
+      "displayName": "Buycott",
+      "presenceType": "organization",
+      "bio": "Buycott is a free app to vote with your wallet. Boycott bad products and find sustainable alternatives.",
+      "observations": [
+        {
+          "observerId": "human-matthew-manager",
+          "observedAt": "2021-08-07T21:58:56Z",
+          "context": "Collected in Consilience Garden keen, section: Saved",
+          "contextContentId": null
+        }
+      ],
+      "primaryStewardId": "human-matthew-manager",
+      "stewardshipStartedAt": "2021-08-07T21:58:56Z",
+      "externalIdentifiers": [
+        {
+          "type": "homepage",
+          "value": "https://www.buycott.com/"
+        }
+      ],
+      "tags": [
+        "saved",
+        "consilience-garden"
+      ],
+      "image": {
+        "local": "images/presence-buycott.webp",
+        "placeholder": false,
+        "sourceUrl": "https://s3.amazonaws.com/buycott/assets/spin.gif"
+      }
+    },
+    {
+      "id": "presence-cal-newport",
+      "displayName": "Cal Newport",
+      "presenceType": "person",
+      "bio": "Author referenced in Pastor Pete's FCT curriculum.",
+      "observations": [
+        {
+          "observerId": "human-pete-pastor",
+          "observedAt": "2026-01-15T00:00:00Z",
+          "context": "Cited in fct-module-01-church-dilemma while building the FCT curriculum",
+          "contextContentId": "fct-module-01-church-dilemma"
+        }
+      ],
+      "primaryStewardId": "human-pete-pastor",
+      "stewardshipStartedAt": "2026-01-15T00:00:00Z",
+      "works": [
+        {
+          "title": "Deep Work",
+          "kind": "book",
+          "year": null,
+          "url": null,
+          "citedInContentIds": [
+            "fct-module-01-church-dilemma"
+          ]
+        }
+      ],
+      "tags": [
+        "fct",
+        "author"
+      ],
+      "image": {
+        "local": "images/placeholder-person.webp",
+        "placeholder": true,
+        "sourceUrl": null
+      }
+    },
+    {
+      "id": "presence-calm-technology",
+      "displayName": "Calm Technology",
+      "presenceType": "organization",
+      "bio": "Calm technology is maintained by Amber Case",
+      "observations": [
+        {
+          "observerId": "human-matthew-manager",
+          "observedAt": "2021-08-07T21:58:56Z",
+          "context": "Collected in Consilience Garden keen, section: unnamed",
+          "contextContentId": null
+        }
+      ],
+      "primaryStewardId": "human-matthew-manager",
+      "stewardshipStartedAt": "2021-08-07T21:58:56Z",
+      "externalIdentifiers": [
+        {
+          "type": "homepage",
+          "value": "https://calmtech.com/"
+        }
+      ],
+      "tags": [
+        "unnamed",
+        "consilience-garden"
+      ],
+      "image": {
+        "local": "images/presence-calm-technology.webp",
+        "placeholder": false,
+        "sourceUrl": "https://calmtech.com/images/hamburger.png"
+      }
+    },
+    {
+      "id": "presence-civilization-research-institute",
+      "displayName": "Civilization Research Institute",
+      "presenceType": "organization",
+      "bio": "Civilization Research Institute is focused on advancing humanity's collective intelligence. · We believe that improving collective sensemaking — our ability to make ...",
+      "observations": [
+        {
+          "observerId": "human-matthew-manager",
+          "observedAt": "2021-08-07T21:58:56Z",
+          "context": "Collected in Consilience Garden keen, section: Saved",
+          "contextContentId": null
+        }
+      ],
+      "primaryStewardId": "human-matthew-manager",
+      "stewardshipStartedAt": "2021-08-07T21:58:56Z",
+      "externalIdentifiers": [
+        {
+          "type": "homepage",
+          "value": "https://www.civilizationresearchinstitute.org/"
+        }
+      ],
+      "tags": [
+        "saved",
+        "consilience-garden"
+      ],
+      "image": {
+        "local": "images/presence-civilization-research-institute.webp",
+        "placeholder": false,
+        "sourceUrl": "https://images.squarespace-cdn.com/content/v1/5f57163d740fbb7a4f63a8fc/1599624788648-AXADO7CB5GNH8RWOQU74/Globe.jpg?format=1000w"
+      }
+    },
+    {
+      "id": "presence-climate-town",
+      "displayName": "Climate Town",
+      "presenceType": "organization",
+      "bio": "Rollie Williams and a ragtag team of climate communicators, creatives and comedians are here to examine climate change in a way that doesn’t make you want to eat a cyanide pill. Get informed about the climate crisis before the weather does it for you.\nPatreon if you’re feeling crazy - https://www.patreon.com/ClimateTown…",
+      "observations": [
+        {
+          "observerId": "human-matthew-manager",
+          "observedAt": "2021-08-07T21:58:56Z",
+          "context": "Collected in Consilience Garden keen, section: Physical Commons",
+          "contextContentId": null
+        }
+      ],
+      "primaryStewardId": "human-matthew-manager",
+      "stewardshipStartedAt": "2021-08-07T21:58:56Z",
+      "externalIdentifiers": [
+        {
+          "type": "homepage",
+          "value": "https://www.youtube.com/c/ClimateTown"
+        }
+      ],
+      "tags": [
+        "physical-commons",
+        "consilience-garden"
+      ],
+      "image": {
+        "local": "images/placeholder-organization.webp",
+        "placeholder": true,
+        "sourceUrl": "https://yt3.ggpht.com/JgeCuW8_HUm_M1w9ZyO4qr2-prBZ01Mh58AMoHjYh5snCf2oDydG8kphYIleQeXzd_Q1750x=s900-c-k-c0x00ffffff-no-rj"
+      }
+    },
+    {
+      "id": "presence-commons-engine-designing-commons-oriented-economies",
+      "displayName": "Commons Engine – Designing Commons-Oriented Economies",
+      "presenceType": "organization",
+      "bio": "Commons Engine solves real-world problems through helping to generate commons-resource sharing organizations",
+      "observations": [
+        {
+          "observerId": "human-matthew-manager",
+          "observedAt": "2021-08-07T21:58:56Z",
+          "context": "Collected in Consilience Garden keen, section: Design & Planning",
+          "contextContentId": null
+        }
+      ],
+      "primaryStewardId": "human-matthew-manager",
+      "stewardshipStartedAt": "2021-08-07T21:58:56Z",
+      "externalIdentifiers": [
+        {
+          "type": "homepage",
+          "value": "https://commonsengine.org"
+        }
+      ],
+      "tags": [
+        "design-planning",
+        "consilience-garden"
+      ],
+      "image": {
+        "local": "images/placeholder-organization.webp",
+        "placeholder": true,
+        "sourceUrl": "https://commonsengine.org/wp-content/uploads/2018/11/ConsEngHigh.png"
+      }
+    },
+    {
+      "id": "presence-commons-transition-commons-transition",
+      "displayName": "Commons Transition - Commons Transition",
+      "presenceType": "organization",
+      "bio": "Commons Transition showcases practical experiences and policy proposals for a more humane and environmentally grounded mode of societal organization.",
+      "observations": [
+        {
+          "observerId": "human-matthew-manager",
+          "observedAt": "2021-08-07T21:58:56Z",
+          "context": "Collected in Consilience Garden keen, section: Shared Meaning",
+          "contextContentId": null
+        }
+      ],
+      "primaryStewardId": "human-matthew-manager",
+      "stewardshipStartedAt": "2021-08-07T21:58:56Z",
+      "externalIdentifiers": [
+        {
+          "type": "homepage",
+          "value": "https://commonstransition.org/"
+        }
+      ],
+      "tags": [
+        "shared-meaning",
+        "consilience-garden"
+      ],
+      "image": {
+        "local": "images/placeholder-organization.webp",
+        "placeholder": true,
+        "sourceUrl": "https://commonstransition.org/wp-content/uploads/2014/11/CT-Home-feat-img1.png"
+      }
+    },
+    {
+      "id": "presence-consilience-project-institute-for-quantitative-social-scienc",
+      "displayName": "Consilience Project | Institute for Quantitative Social Science",
+      "presenceType": "organization",
+      "bio": "Technology Architect and Senior Software Engineer, Consilience, Data Science. 1737 Cambridge St, K328 Cambridge, MA 02138. rtreacy@hmdc.harvard.edu.",
+      "observations": [
+        {
+          "observerId": "human-matthew-manager",
+          "observedAt": "2021-08-07T21:58:56Z",
+          "context": "Collected in Consilience Garden keen, section: Saved",
+          "contextContentId": null
+        }
+      ],
+      "primaryStewardId": "human-matthew-manager",
+      "stewardshipStartedAt": "2021-08-07T21:58:56Z",
+      "externalIdentifiers": [
+        {
+          "type": "homepage",
+          "value": "https://www.iq.harvard.edu/people/program/consilience"
+        }
+      ],
+      "tags": [
+        "saved",
+        "consilience-garden"
+      ],
+      "image": {
+        "local": "images/placeholder-organization.webp",
+        "placeholder": true,
+        "sourceUrl": null
+      }
+    },
+    {
+      "id": "presence-conversence-39-s-idealoom-platform",
+      "displayName": "Conversence&#39;s IdeaLoom platform",
+      "presenceType": "organization",
+      "bio": "IdeaLoom is our flagship Collective Intelligence platform, which allows large communities to hold a meaningful conversation at scale, converge to a common understanding, and elaborate solutions beyond what each participant could have envisioned. IdeaLoom allows a structured navigation through conversations on&nbsp;...",
+      "observations": [
+        {
+          "observerId": "human-matthew-manager",
+          "observedAt": "2021-08-07T21:58:56Z",
+          "context": "Collected in Consilience Garden keen, section: Built for Purpose",
+          "contextContentId": null
+        }
+      ],
+      "primaryStewardId": "human-matthew-manager",
+      "stewardshipStartedAt": "2021-08-07T21:58:56Z",
+      "externalIdentifiers": [
+        {
+          "type": "homepage",
+          "value": "https://www.conversence.com/pages/idealoom.html"
+        }
+      ],
+      "tags": [
+        "built-for-purpose",
+        "consilience-garden"
+      ],
+      "image": {
+        "local": "images/presence-conversence-39-s-idealoom-platform.webp",
+        "placeholder": false,
+        "sourceUrl": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQAO3cGuhig9EZLutOthl_VS5rEKMH1Bgd_VRuw-WP54rhLhA"
+      }
+    },
+    {
+      "id": "presence-daniel-kahneman",
+      "displayName": "Daniel Kahneman",
+      "presenceType": "person",
+      "bio": "Author referenced in Pastor Pete's FCT curriculum.",
+      "observations": [
+        {
+          "observerId": "human-pete-pastor",
+          "observedAt": "2026-01-15T00:00:00Z",
+          "context": "Cited in fct-module-01-church-dilemma while building the FCT curriculum",
+          "contextContentId": "fct-module-01-church-dilemma"
+        }
+      ],
+      "primaryStewardId": "human-pete-pastor",
+      "stewardshipStartedAt": "2026-01-15T00:00:00Z",
+      "works": [
+        {
+          "title": "Thinking",
+          "kind": "book",
+          "year": null,
+          "url": null,
+          "citedInContentIds": [
+            "fct-module-01-church-dilemma"
+          ]
+        },
+        {
+          "title": "Fast and Slow",
+          "kind": "book",
+          "year": null,
+          "url": null,
+          "citedInContentIds": [
+            "fct-module-01-church-dilemma"
+          ]
+        }
+      ],
+      "tags": [
+        "fct",
+        "author"
+      ],
+      "image": {
+        "local": "images/placeholder-person.webp",
+        "placeholder": true,
+        "sourceUrl": null
+      }
+    },
+    {
+      "id": "presence-daniel-levitin",
+      "displayName": "Daniel Levitin",
+      "presenceType": "person",
+      "bio": "Author referenced in Pastor Pete's FCT curriculum.",
+      "observations": [
+        {
+          "observerId": "human-pete-pastor",
+          "observedAt": "2026-01-15T00:00:00Z",
+          "context": "Cited in fct-module-01-church-dilemma while building the FCT curriculum",
+          "contextContentId": "fct-module-01-church-dilemma"
+        }
+      ],
+      "primaryStewardId": "human-pete-pastor",
+      "stewardshipStartedAt": "2026-01-15T00:00:00Z",
+      "works": [
+        {
+          "title": "The Organized Mind",
+          "kind": "book",
+          "year": null,
+          "url": null,
+          "citedInContentIds": [
+            "fct-module-01-church-dilemma"
+          ]
+        }
+      ],
+      "tags": [
+        "fct",
+        "author"
+      ],
+      "image": {
+        "local": "images/placeholder-person.webp",
+        "placeholder": true,
+        "sourceUrl": null
+      }
+    },
+    {
+      "id": "presence-daniel-schmachtenberger-the-consilience-project",
+      "displayName": "Daniel Schmachtenberger - The Consilience Project",
+      "presenceType": "person",
+      "bio": "The Consilience Project ... The Consilience Project is developing a transmedia body of social theory and philosophy that explains and seeks solutions to the unique ...",
+      "observations": [
+        {
+          "observerId": "human-matthew-manager",
+          "observedAt": "2021-08-07T21:58:56Z",
+          "context": "Collected in Consilience Garden keen, section: Saved",
+          "contextContentId": null
+        }
+      ],
+      "primaryStewardId": "human-matthew-manager",
+      "stewardshipStartedAt": "2021-08-07T21:58:56Z",
+      "externalIdentifiers": [
+        {
+          "type": "homepage",
+          "value": "https://www.linkedin.com/in/danielschmachtenberger"
+        }
+      ],
+      "tags": [
+        "saved",
+        "consilience-garden"
+      ],
+      "image": {
+        "local": "images/placeholder-person.webp",
+        "placeholder": true,
+        "sourceUrl": "https://media-exp1.licdn.com/dms/image/C5603AQFiIz94qai-BQ/profile-displayphoto-shrink_200_200/0/1522400177584?e=1633564800&v=beta&t=lUrHMSJZqsRK9EW69nfMTZuehQ-jR1F9regS8ka3JYU"
+      }
+    },
+    {
+      "id": "presence-democracy-earth-foundation",
+      "displayName": "Democracy Earth Foundation",
+      "presenceType": "organization",
+      "bio": "Tools for a borderless democracy. For everyone, anywhere.",
+      "observations": [
+        {
+          "observerId": "human-matthew-manager",
+          "observedAt": "2021-08-07T21:58:56Z",
+          "context": "Collected in Consilience Garden keen, section: unnamed",
+          "contextContentId": null
+        }
+      ],
+      "primaryStewardId": "human-matthew-manager",
+      "stewardshipStartedAt": "2021-08-07T21:58:56Z",
+      "externalIdentifiers": [
+        {
+          "type": "homepage",
+          "value": "https://democracy.earth"
+        }
+      ],
+      "tags": [
+        "unnamed",
+        "consilience-garden"
+      ],
+      "image": {
+        "local": "images/presence-democracy-earth-foundation.webp",
+        "placeholder": false,
+        "sourceUrl": "https://gateway.pinata.cloud/ipfs/QmYDY5rT8j4qReux1VPkDWBohTbjVGmm2VVHuRst82tR9F"
+      }
+    },
+    {
+      "id": "presence-design-justice-network",
+      "displayName": "Design Justice Network",
+      "presenceType": "organization",
+      "bio": "Design justice rethinks design processes, centers people who are normally marginalized by design, and uses collaborative, creative practices to address the deepest challenges our communities face.",
+      "observations": [
+        {
+          "observerId": "human-matthew-manager",
+          "observedAt": "2021-08-07T21:58:56Z",
+          "context": "Collected in Consilience Garden keen, section: unnamed",
+          "contextContentId": null
+        }
+      ],
+      "primaryStewardId": "human-matthew-manager",
+      "stewardshipStartedAt": "2021-08-07T21:58:56Z",
+      "externalIdentifiers": [
+        {
+          "type": "homepage",
+          "value": "https://designjustice.org"
+        }
+      ],
+      "tags": [
+        "unnamed",
+        "consilience-garden"
+      ],
+      "image": {
+        "local": "images/placeholder-organization.webp",
+        "placeholder": true,
+        "sourceUrl": {
+          "optimized_MAX_500": "https://storage.googleapis.com/download/storage/v1/b/keen_images_bucket/o/keens%2FnvBCVtcYER7C9s3H6zxS%2Ftips%2FDSfZJpyhCPddbO5uaILb%2Ftip_images%2Fmetalink_images%2Foptimized%2Foptimized_500x500%3E_bucketUrl_7f03a37e-ac02-45d6-a2f6-e7e5834daf10.png?generation=1651353232229712&alt=media",
+          "bucketUrl": "https://www.googleapis.com/download/storage/v1/b/keen_images_bucket/o/keens%2FnvBCVtcYER7C9s3H6zxS%2Ftips%2FDSfZJpyhCPddbO5uaILb%2Ftip_images%2Fmetalink_images%2FbucketUrl_7f03a37e-ac02-45d6-a2f6-e7e5834daf10.png?generation=1651353231411558&alt=media"
+        }
+      }
+    },
+    {
+      "id": "presence-dework",
+      "displayName": "Dework",
+      "presenceType": "organization",
+      "bio": "The task manager for DAOs and decentralized work",
+      "observations": [
+        {
+          "observerId": "human-matthew-manager",
+          "observedAt": "2021-08-07T21:58:56Z",
+          "context": "Collected in Consilience Garden keen, section: Built for Purpose",
+          "contextContentId": null
+        }
+      ],
+      "primaryStewardId": "human-matthew-manager",
+      "stewardshipStartedAt": "2021-08-07T21:58:56Z",
+      "externalIdentifiers": [
+        {
+          "type": "homepage",
+          "value": "https://dework.xyz/"
+        }
+      ],
+      "tags": [
+        "built-for-purpose",
+        "consilience-garden"
+      ],
+      "image": {
+        "local": "images/presence-dework.webp",
+        "placeholder": false,
+        "sourceUrl": "https://dework-og-image-fant.vercel.app/Dework.png?fontSize=100px&heights=300&images=https%3A%2F%2Fapp.dework.xyz%2Flogo.png&md=1&subtitle=The%20task%20manager%20for%20DAOs%20and%20decentralized%20work&widths=300"
+      }
+    },
+    {
+      "id": "presence-eco-efficiency-vs-eco-effectiveness-ecocation",
+      "displayName": "Eco Efficiency vs Eco Effectiveness - EcoCation",
+      "presenceType": "organization",
+      "bio": "Eco efficiency vs eco-effectiveness: Eco efficiency means being less bad, whereas eco-effectiveness means being just good.",
+      "observations": [
+        {
+          "observerId": "human-matthew-manager",
+          "observedAt": "2021-08-07T21:58:56Z",
+          "context": "Collected in Consilience Garden keen, section: Design & Planning",
+          "contextContentId": null
+        }
+      ],
+      "primaryStewardId": "human-matthew-manager",
+      "stewardshipStartedAt": "2021-08-07T21:58:56Z",
+      "externalIdentifiers": [
+        {
+          "type": "homepage",
+          "value": "https://ecocation.org/eco-efficiency-vs-eco-effectiveness/"
+        }
+      ],
+      "tags": [
+        "design-planning",
+        "consilience-garden"
+      ],
+      "image": {
+        "local": "images/presence-eco-efficiency-vs-eco-effectiveness-ecocation.webp",
+        "placeholder": false,
+        "sourceUrl": "https://ecocation.org/wp-content/uploads/2022/05/Eco-effectiveness-vs-eco-efficiency-edited-from-58.png"
+      }
+    },
+    {
+      "id": "presence-effective-altruism",
+      "displayName": "Effective Altruism",
+      "presenceType": "organization",
+      "observations": [
+        {
+          "observerId": "human-matthew-manager",
+          "observedAt": "2021-08-07T21:58:56Z",
+          "context": "Collected in Consilience Garden keen, section: Design & Planning",
+          "contextContentId": null
+        }
+      ],
+      "primaryStewardId": "human-matthew-manager",
+      "stewardshipStartedAt": "2021-08-07T21:58:56Z",
+      "externalIdentifiers": [
+        {
+          "type": "homepage",
+          "value": "https://www.effectivealtruism.org"
+        }
+      ],
+      "tags": [
+        "design-planning",
+        "consilience-garden"
+      ],
+      "image": {
+        "local": "images/presence-effective-altruism.webp",
+        "placeholder": false,
+        "sourceUrl": "https://res.cloudinary.com/cea/image/upload/c_fill,w_300,h_300/v1648672982/achievements/malaria-nets.jpg"
+      }
+    },
+    {
+      "id": "presence-ezra-klein",
+      "displayName": "Ezra Klein",
+      "presenceType": "person",
+      "bio": "Author referenced in Pastor Pete's FCT curriculum.",
+      "observations": [
+        {
+          "observerId": "human-pete-pastor",
+          "observedAt": "2026-01-15T00:00:00Z",
+          "context": "Cited in fct-module-01-church-dilemma while building the FCT curriculum",
+          "contextContentId": "fct-module-01-church-dilemma"
+        }
+      ],
+      "primaryStewardId": "human-pete-pastor",
+      "stewardshipStartedAt": "2026-01-15T00:00:00Z",
+      "works": [
+        {
+          "title": "Why We're Polarized",
+          "kind": "book",
+          "year": null,
+          "url": null,
+          "citedInContentIds": [
+            "fct-module-01-church-dilemma"
+          ]
+        }
+      ],
+      "tags": [
+        "fct",
+        "author"
+      ],
+      "image": {
+        "local": "images/placeholder-person.webp",
+        "placeholder": true,
+        "sourceUrl": null
+      }
+    },
+    {
+      "id": "presence-fli-worldbuilding-contest",
+      "displayName": "FLI Worldbuilding Contest",
+      "presenceType": "organization",
+      "observations": [
+        {
+          "observerId": "human-matthew-manager",
+          "observedAt": "2021-08-07T21:58:56Z",
+          "context": "Collected in Consilience Garden keen, section: unnamed",
+          "contextContentId": null
+        }
+      ],
+      "primaryStewardId": "human-matthew-manager",
+      "stewardshipStartedAt": "2021-08-07T21:58:56Z",
+      "externalIdentifiers": [
+        {
+          "type": "homepage",
+          "value": "https://worldbuild.ai"
+        }
+      ],
+      "tags": [
+        "unnamed",
+        "consilience-garden"
+      ],
+      "image": {
+        "local": "images/presence-fli-worldbuilding-contest.webp",
+        "placeholder": false,
+        "sourceUrl": "https://worldbuild.ai/wp-content/uploads/2022/01/earth16_horizontal4-1024x576.png"
+      }
+    },
+    {
+      "id": "presence-forward-labs",
+      "displayName": "Forward Labs",
+      "presenceType": "organization",
+      "observations": [
+        {
+          "observerId": "human-matthew-manager",
+          "observedAt": "2021-08-07T21:58:56Z",
+          "context": "Collected in Consilience Garden keen, section: Built for Purpose",
+          "contextContentId": null
+        }
+      ],
+      "primaryStewardId": "human-matthew-manager",
+      "stewardshipStartedAt": "2021-08-07T21:58:56Z",
+      "externalIdentifiers": [
+        {
+          "type": "homepage",
+          "value": "https://www.forwardlabs.io"
+        }
+      ],
+      "tags": [
+        "built-for-purpose",
+        "consilience-garden"
+      ],
+      "image": {
+        "local": "images/placeholder-organization.webp",
+        "placeholder": true,
+        "sourceUrl": "https://www.forwardlabs.io/images/logo.png"
+      }
+    },
+    {
+      "id": "presence-foundations-of-humane-technology-course",
+      "displayName": "Foundations of Humane Technology Course",
+      "presenceType": "organization",
+      "bio": "A free online course for product teams building technology that strengthens human capacity.",
+      "observations": [
+        {
+          "observerId": "human-matthew-manager",
+          "observedAt": "2021-08-07T21:58:56Z",
+          "context": "Collected in Consilience Garden keen, section: Saved",
+          "contextContentId": null
+        }
+      ],
+      "primaryStewardId": "human-matthew-manager",
+      "stewardshipStartedAt": "2021-08-07T21:58:56Z",
+      "externalIdentifiers": [
+        {
+          "type": "homepage",
+          "value": "https://www.humanetech.com/course"
+        }
+      ],
+      "tags": [
+        "saved",
+        "consilience-garden"
+      ],
+      "image": {
+        "local": "images/presence-foundations-of-humane-technology-course.webp",
+        "placeholder": false,
+        "sourceUrl": "https://assets-global.website-files.com/5f0e1294f002b15080e1f2ff/62212686316eb702667d3643_foundations-of-humane-technology-course-social-thumbnail.png"
+      }
+    },
+    {
+      "id": "presence-front-porch-forum-is-a-free-community-building-service-in-ve",
+      "displayName": "Front Porch Forum is a free community-building service in Ve",
+      "presenceType": "organization",
+      "observations": [
+        {
+          "observerId": "human-matthew-manager",
+          "observedAt": "2021-08-07T21:58:56Z",
+          "context": "Collected in Consilience Garden keen, section: Built for Purpose",
+          "contextContentId": null
+        }
+      ],
+      "primaryStewardId": "human-matthew-manager",
+      "stewardshipStartedAt": "2021-08-07T21:58:56Z",
+      "externalIdentifiers": [
+        {
+          "type": "homepage",
+          "value": "https://frontporchforum.com"
+        }
+      ],
+      "tags": [
+        "built-for-purpose",
+        "consilience-garden"
+      ],
+      "image": {
+        "local": "images/placeholder-organization.webp",
+        "placeholder": true,
+        "sourceUrl": "https://frontporchforum.com/packs/media/images/logos/logo-fpf-birds-58782e9cab7d736c4d01621cf2f95c20.png"
+      }
+    },
+    {
+      "id": "presence-future-scouts-international-learning-program-social-app-and",
+      "displayName": "Future Scouts International learning program, Social App and Handbook",
+      "presenceType": "organization",
+      "bio": "The Future Scouts offer an international learning program, the Future Scouts App & the Future Scouts Handbook of 21st Century Survival Skills.",
+      "observations": [
+        {
+          "observerId": "human-matthew-manager",
+          "observedAt": "2021-08-07T21:58:56Z",
+          "context": "Collected in Consilience Garden keen, section: Shared Meaning",
+          "contextContentId": null
+        }
+      ],
+      "primaryStewardId": "human-matthew-manager",
+      "stewardshipStartedAt": "2021-08-07T21:58:56Z",
+      "externalIdentifiers": [
+        {
+          "type": "homepage",
+          "value": "https://futurescouts.cc/"
+        }
+      ],
+      "tags": [
+        "shared-meaning",
+        "consilience-garden"
+      ],
+      "image": {
+        "local": "images/placeholder-organization.webp",
+        "placeholder": true,
+        "sourceUrl": "https://futurescouts.cc/wp-content/uploads/2021/07/KALKI_Artboard-19-copy.png"
+      }
+    },
+    {
+      "id": "presence-future-thinkers-daniel-schmachtenberger-the-existential-game",
+      "displayName": "Future Thinkers - Daniel Schmachtenberger - The Existential Game",
+      "presenceType": "organization",
+      "bio": "Daniel Schmachtenberger interview on mitigating natural and human-caused existential risks and designing post-capitalist systems. Show notes: http://futurethinkers.org/46 Listen to previous episodes with Daniel Schmachtenberger: http://futurethinkers.org/daniel…",
+      "observations": [
+        {
+          "observerId": "human-matthew-manager",
+          "observedAt": "2021-08-07T21:58:56Z",
+          "context": "Collected in Consilience Garden keen, section: Saved",
+          "contextContentId": null
+        }
+      ],
+      "primaryStewardId": "human-matthew-manager",
+      "stewardshipStartedAt": "2021-08-07T21:58:56Z",
+      "externalIdentifiers": [
+        {
+          "type": "homepage",
+          "value": "https://podcasts.google.com/feed/aHR0cHM6Ly9mdXR1cmV0aGlua2Vycy5saWJzeW4uY29tL3Jzcw/episode/ZGEwODgwNTEzYzg1MWEzMDY0NzMyZWE0YmQ3OWZiMjA"
+        }
+      ],
+      "tags": [
+        "saved",
+        "consilience-garden"
+      ],
+      "image": {
+        "local": "images/presence-future-thinkers-daniel-schmachtenberger-the-existential-game.webp",
+        "placeholder": false,
+        "sourceUrl": "https://encrypted-tbn1.gstatic.com/images?q=tbn:ANd9GcTwffidEIMGlIz4bh4VKSyD2JPJbEz8cHWi__gAxUUg1REaSc4"
+      }
+    },
+    {
+      "id": "presence-genuine-progress-indicator-gross-national-happiness-usa",
+      "displayName": "Genuine Progress Indicator - Gross National Happiness USA",
+      "presenceType": "organization",
+      "bio": "Genuine Progress Indicator takes into account the well-being of a nation by incorporating environmental and social factors which are not measured by GDP.",
+      "observations": [
+        {
+          "observerId": "human-matthew-manager",
+          "observedAt": "2021-08-07T21:58:56Z",
+          "context": "Collected in Consilience Garden keen, section: Shared Meaning",
+          "contextContentId": null
+        }
+      ],
+      "primaryStewardId": "human-matthew-manager",
+      "stewardshipStartedAt": "2021-08-07T21:58:56Z",
+      "externalIdentifiers": [
+        {
+          "type": "homepage",
+          "value": "https://gnhusa.org/genuine-progress-indicator/"
+        }
+      ],
+      "tags": [
+        "shared-meaning",
+        "consilience-garden"
+      ],
+      "image": {
+        "local": "images/presence-genuine-progress-indicator-gross-national-happiness-usa.webp",
+        "placeholder": false,
+        "sourceUrl": "https://gnhusa.org/wp-content/uploads/2016/11/Genuine-Progress-Indicator-041-296x300.png"
+      }
+    },
+    {
+      "id": "presence-george-hunsberger",
+      "displayName": "George Hunsberger",
+      "presenceType": "person",
+      "bio": "Author referenced in Pastor Pete's FCT curriculum.",
+      "observations": [
+        {
+          "observerId": "human-pete-pastor",
+          "observedAt": "2026-01-15T00:00:00Z",
+          "context": "Cited in fct-module-14-ready-to-act while building the FCT curriculum",
+          "contextContentId": "fct-module-14-ready-to-act"
+        }
+      ],
+      "primaryStewardId": "human-pete-pastor",
+      "stewardshipStartedAt": "2026-01-15T00:00:00Z",
+      "works": [
+        {
+          "title": "Ethics in the Age of Technology",
+          "kind": "book",
+          "year": null,
+          "url": null,
+          "citedInContentIds": [
+            "fct-module-14-ready-to-act"
+          ]
+        }
+      ],
+      "tags": [
+        "fct",
+        "author"
+      ],
+      "image": {
+        "local": "images/placeholder-person.webp",
+        "placeholder": true,
+        "sourceUrl": null
+      }
+    },
+    {
+      "id": "presence-gifct-global-internet-forum-to-counter-terrorism",
+      "displayName": "GIFCT | Global Internet Forum to Counter Terrorism",
+      "presenceType": "organization",
+      "bio": "The Global Internet Forum to Counter Terrorism brings together the technology industry, government, civil society, and academia to foster collaboration and information-sharing to counter terrorist and violent extremist activity online.",
+      "observations": [
+        {
+          "observerId": "human-matthew-manager",
+          "observedAt": "2021-08-07T21:58:56Z",
+          "context": "Collected in Consilience Garden keen, section: Safety",
+          "contextContentId": null
+        }
+      ],
+      "primaryStewardId": "human-matthew-manager",
+      "stewardshipStartedAt": "2021-08-07T21:58:56Z",
+      "externalIdentifiers": [
+        {
+          "type": "homepage",
+          "value": "https://gifct.org/"
+        }
+      ],
+      "tags": [
+        "safety",
+        "consilience-garden"
+      ],
+      "image": {
+        "local": "images/presence-gifct-global-internet-forum-to-counter-terrorism.webp",
+        "placeholder": false,
+        "sourceUrl": "https://gifct.org/wp-content/uploads/2020/11/GIFCT-Facebook-Yoast-Banner-1.1.png"
+      }
+    },
+    {
+      "id": "presence-global-carbon-reward-climate-initiative",
+      "displayName": "Global Carbon Reward - Climate Initiative",
+      "presenceType": "organization",
+      "bio": "The Global Carbon Reward is a system-changing policy for funding climate mitigation together with healthy ecosystems, vibrant communities, and reliable clean energy.",
+      "observations": [
+        {
+          "observerId": "human-matthew-manager",
+          "observedAt": "2021-08-07T21:58:56Z",
+          "context": "Collected in Consilience Garden keen, section: Design & Planning",
+          "contextContentId": null
+        }
+      ],
+      "primaryStewardId": "human-matthew-manager",
+      "stewardshipStartedAt": "2021-08-07T21:58:56Z",
+      "externalIdentifiers": [
+        {
+          "type": "homepage",
+          "value": "https://globalcarbonreward.org/"
+        }
+      ],
+      "tags": [
+        "design-planning",
+        "consilience-garden"
+      ],
+      "image": {
+        "local": "images/presence-global-carbon-reward-climate-initiative.webp",
+        "placeholder": false,
+        "sourceUrl": "https://globalcarbonreward.org/wp-content/uploads/2021/05/GCR_Feature_Home.png"
+      }
+    },
+    {
+      "id": "presence-green-gross-domestic-product-wikipedia",
+      "displayName": "Green gross domestic product - Wikipedia",
+      "presenceType": "organization",
+      "observations": [
+        {
+          "observerId": "human-matthew-manager",
+          "observedAt": "2021-08-07T21:58:56Z",
+          "context": "Collected in Consilience Garden keen, section: Community suggestions",
+          "contextContentId": null
+        }
+      ],
+      "primaryStewardId": "human-matthew-manager",
+      "stewardshipStartedAt": "2021-08-07T21:58:56Z",
+      "externalIdentifiers": [
+        {
+          "type": "homepage",
+          "value": "https://en.wikipedia.org/wiki/Green_gross_domestic_product"
+        }
+      ],
+      "tags": [
+        "community-suggestions",
+        "consilience-garden"
+      ],
+      "image": {
+        "local": "images/presence-green-gross-domestic-product-wikipedia.webp",
+        "placeholder": false,
+        "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/c/ce/Wen_Jiabao_(Cropped).jpg"
+      }
+    },
+    {
+      "id": "presence-ground-news",
+      "displayName": "Ground News",
+      "presenceType": "organization",
+      "bio": "Top Stories from around you and around the world. Compare how different news publishers frame the same news",
+      "observations": [
+        {
+          "observerId": "human-matthew-manager",
+          "observedAt": "2021-08-07T21:58:56Z",
+          "context": "Collected in Consilience Garden keen, section: Built for Purpose",
+          "contextContentId": null
+        }
+      ],
+      "primaryStewardId": "human-matthew-manager",
+      "stewardshipStartedAt": "2021-08-07T21:58:56Z",
+      "externalIdentifiers": [
+        {
+          "type": "homepage",
+          "value": "https://ground.news"
+        }
+      ],
+      "tags": [
+        "built-for-purpose",
+        "consilience-garden"
+      ],
+      "image": {
+        "local": "images/presence-ground-news.webp",
+        "placeholder": false,
+        "sourceUrl": "https://groundnews.b-cdn.net/assets/logo4/GN_Square.png"
+      }
+    },
+    {
+      "id": "presence-happy-planet-index-how-happy-is-the-planet",
+      "displayName": "Happy Planet Index – How happy Is the planet",
+      "presenceType": "organization",
+      "bio": "How happy Is the planet",
+      "observations": [
+        {
+          "observerId": "human-matthew-manager",
+          "observedAt": "2021-08-07T21:58:56Z",
+          "context": "Collected in Consilience Garden keen, section: Shared Meaning",
+          "contextContentId": null
+        }
+      ],
+      "primaryStewardId": "human-matthew-manager",
+      "stewardshipStartedAt": "2021-08-07T21:58:56Z",
+      "externalIdentifiers": [
+        {
+          "type": "homepage",
+          "value": "https://happyplanetindex.org/"
+        }
+      ],
+      "tags": [
+        "shared-meaning",
+        "consilience-garden"
+      ],
+      "image": {
+        "local": "images/presence-happy-planet-index-how-happy-is-the-planet.webp",
+        "placeholder": false,
+        "sourceUrl": "https://happyplanetindex.org/wp-content/uploads/2021/09/example-4.jpg"
+      }
+    },
+    {
+      "id": "presence-heather-mc",
+      "displayName": "Heather Mc",
+      "presenceType": "person",
+      "bio": "Author referenced in Pastor Pete's FCT curriculum.",
+      "observations": [
+        {
+          "observerId": "human-pete-pastor",
+          "observedAt": "2026-01-15T00:00:00Z",
+          "context": "Cited in fct-module-12-fairness-justice while building the FCT curriculum",
+          "contextContentId": "fct-module-12-fairness-justice"
+        }
+      ],
+      "primaryStewardId": "human-pete-pastor",
+      "stewardshipStartedAt": "2026-01-15T00:00:00Z",
+      "works": [
+        {
+          "title": "The Sum of Us",
+          "kind": "book",
+          "year": null,
+          "url": null,
+          "citedInContentIds": [
+            "fct-module-12-fairness-justice"
+          ]
+        }
+      ],
+      "tags": [
+        "fct",
+        "author"
+      ],
+      "image": {
+        "local": "images/placeholder-person.webp",
+        "placeholder": true,
+        "sourceUrl": null
+      }
+    },
+    {
+      "id": "presence-holochain-app-framework-with-p2p-networking",
+      "displayName": "Holochain | App framework with P2P networking",
+      "presenceType": "organization",
+      "bio": "Holochain delivers beyond the promises of blockchain by providing a lightweight, secure and versatile framework for everyday distributed apps.",
+      "observations": [
+        {
+          "observerId": "human-matthew-manager",
+          "observedAt": "2021-08-07T21:58:56Z",
+          "context": "Collected in Consilience Garden keen, section: Built for Purpose",
+          "contextContentId": null
+        }
+      ],
+      "primaryStewardId": "human-matthew-manager",
+      "stewardshipStartedAt": "2021-08-07T21:58:56Z",
+      "externalIdentifiers": [
+        {
+          "type": "homepage",
+          "value": "https://www.holochain.org"
+        }
+      ],
+      "tags": [
+        "built-for-purpose",
+        "consilience-garden"
+      ],
+      "image": {
+        "local": "images/presence-holochain-app-framework-with-p2p-networking.webp",
+        "placeholder": false,
+        "sourceUrl": "https://holochain.org/img/meta/Holochain_Preview_1200x630.png"
+      }
+    },
+    {
+      "id": "presence-home",
+      "displayName": "Home",
+      "presenceType": "organization",
+      "bio": "Amplifying cooperation in service to regeneration in the Bay Area bioregion through technology, collective action and rebuilding the commons",
+      "observations": [
+        {
+          "observerId": "human-matthew-manager",
+          "observedAt": "2021-08-07T21:58:56Z",
+          "context": "Collected in Consilience Garden keen, section: Shared Meaning",
+          "contextContentId": null
+        }
+      ],
+      "primaryStewardId": "human-matthew-manager",
+      "stewardshipStartedAt": "2021-08-07T21:58:56Z",
+      "externalIdentifiers": [
+        {
+          "type": "homepage",
+          "value": "https://www.terran.io/"
+        }
+      ],
+      "tags": [
+        "shared-meaning",
+        "consilience-garden"
+      ],
+      "image": {
+        "local": "images/placeholder-organization.webp",
+        "placeholder": true,
+        "sourceUrl": {
+          "optimized_MAX_500": "https://storage.googleapis.com/download/storage/v1/b/keen_images_bucket/o/keens%2FnvBCVtcYER7C9s3H6zxS%2Ftips%2FGekxnF3JQMnFnSJZWQ3R%2Ftip_images%2Fmetalink_images%2Foptimized%2Foptimized_500x500%3E_bucketUrl_8ab162e2-cd96-44c5-92c4-4aea01ab0455.jpeg?generation=1663266697831029&alt=media",
+          "bucketUrl": "https://storage.googleapis.com/download/storage/v1/b/keen_images_bucket/o/keens%2FnvBCVtcYER7C9s3H6zxS%2Ftips%2FGekxnF3JQMnFnSJZWQ3R%2Ftip_images%2Fmetalink_images%2FbucketUrl_8ab162e2-cd96-44c5-92c4-4aea01ab0455.jpeg?generation=1663266696749304&alt=media"
+        }
+      }
+    },
+    {
+      "id": "presence-home-2021-edemocracy-network",
+      "displayName": "Home 2021 - eDemocracy Network",
+      "presenceType": "organization",
+      "bio": "This is what democracy looks like? We are a non-profit organization that helps community members achieve fair, accessible and engaging public consultation processes that prioritize ensuring all voices are heard. We are focused on climate solutions, […]",
+      "observations": [
+        {
+          "observerId": "human-matthew-manager",
+          "observedAt": "2021-08-07T21:58:56Z",
+          "context": "Collected in Consilience Garden keen, section: Digital Governance and Democracy",
+          "contextContentId": null
+        }
+      ],
+      "primaryStewardId": "human-matthew-manager",
+      "stewardshipStartedAt": "2021-08-07T21:58:56Z",
+      "externalIdentifiers": [
+        {
+          "type": "homepage",
+          "value": "https://edemocracy.net"
+        }
+      ],
+      "tags": [
+        "digital-governance-and-democracy",
+        "consilience-garden"
+      ],
+      "image": {
+        "local": "images/placeholder-organization.webp",
+        "placeholder": true,
+        "sourceUrl": "https://edemocracy.net/wp-content/uploads/2021/10/climate-montage.png"
+      }
+    },
+    {
+      "id": "presence-home-future-of-life-institute",
+      "displayName": "Home - Future of Life Institute",
+      "presenceType": "organization",
+      "observations": [
+        {
+          "observerId": "human-matthew-manager",
+          "observedAt": "2021-08-07T21:58:56Z",
+          "context": "Collected in Consilience Garden keen, section: Safety",
+          "contextContentId": null
+        }
+      ],
+      "primaryStewardId": "human-matthew-manager",
+      "stewardshipStartedAt": "2021-08-07T21:58:56Z",
+      "externalIdentifiers": [
+        {
+          "type": "homepage",
+          "value": "https://futureoflife.org/"
+        }
+      ],
+      "tags": [
+        "safety",
+        "consilience-garden"
+      ],
+      "image": {
+        "local": "images/presence-home-future-of-life-institute.webp",
+        "placeholder": false,
+        "sourceUrl": "https://futureoflife.org/wp-content/uploads/2016/04/FLI_logo_square_250.png"
+      }
+    },
+    {
+      "id": "presence-home-initiative-for-digital-public-infrastructure",
+      "displayName": "Home - Initiative for Digital Public Infrastructure",
+      "presenceType": "organization",
+      "bio": "We’re imagining, studying, and building public spaces and public goods on the internet. Listen to our podcast,Reimagining the Internet. Read the latest articles written by members of the Initiative team. Learn about the research we’re conducting at iDPI. What is Digital Public Infrastructure? The In…",
+      "observations": [
+        {
+          "observerId": "human-matthew-manager",
+          "observedAt": "2021-08-07T21:58:56Z",
+          "context": "Collected in Consilience Garden keen, section: Saved",
+          "contextContentId": null
+        }
+      ],
+      "primaryStewardId": "human-matthew-manager",
+      "stewardshipStartedAt": "2021-08-07T21:58:56Z",
+      "externalIdentifiers": [
+        {
+          "type": "homepage",
+          "value": "https://publicinfrastructure.org/"
+        }
+      ],
+      "tags": [
+        "saved",
+        "consilience-garden"
+      ],
+      "image": {
+        "local": "images/presence-home-initiative-for-digital-public-infrastructure.webp",
+        "placeholder": false,
+        "sourceUrl": "https://publicinfrastructure.org/wp-content/uploads/2021/11/Screen-Shot-2021-11-04-at-1.50.13-PM-1024x789.png"
+      }
+    },
+    {
+      "id": "presence-home-page-e-estonia",
+      "displayName": "Home page - e-Estonia",
+      "presenceType": "organization",
+      "observations": [
+        {
+          "observerId": "human-matthew-manager",
+          "observedAt": "2021-08-07T21:58:56Z",
+          "context": "Collected in Consilience Garden keen, section: Digital Governance and Democracy",
+          "contextContentId": null
+        }
+      ],
+      "primaryStewardId": "human-matthew-manager",
+      "stewardshipStartedAt": "2021-08-07T21:58:56Z",
+      "externalIdentifiers": [
+        {
+          "type": "homepage",
+          "value": "https://e-estonia.com"
+        }
+      ],
+      "tags": [
+        "digital-governance-and-democracy",
+        "consilience-garden"
+      ],
+      "image": {
+        "local": "images/presence-home-page-e-estonia.webp",
+        "placeholder": false,
+        "sourceUrl": "https://e-estonia.com/wp-content/uploads/marekmetslaid_mmp1364.jpg"
+      }
+    },
+    {
+      "id": "presence-home-partnership-on-ai",
+      "displayName": "Home - Partnership on AI",
+      "presenceType": "organization",
+      "observations": [
+        {
+          "observerId": "human-matthew-manager",
+          "observedAt": "2021-08-07T21:58:56Z",
+          "context": "Collected in Consilience Garden keen, section: Design & Planning",
+          "contextContentId": null
+        }
+      ],
+      "primaryStewardId": "human-matthew-manager",
+      "stewardshipStartedAt": "2021-08-07T21:58:56Z",
+      "externalIdentifiers": [
+        {
+          "type": "homepage",
+          "value": "https://partnershiponai.org/"
+        }
+      ],
+      "tags": [
+        "design-planning",
+        "consilience-garden"
+      ],
+      "image": {
+        "local": "images/presence-home-partnership-on-ai.webp",
+        "placeholder": false,
+        "sourceUrl": "https://partnershiponai.org/wp-content/uploads/2021/08/ai-logo.png"
+      }
+    },
+    {
+      "id": "presence-homepage",
+      "displayName": "Homepage",
+      "presenceType": "organization",
+      "bio": "The blockchain dispute resolution layer. Fast, open and affordable justice for all.",
+      "observations": [
+        {
+          "observerId": "human-matthew-manager",
+          "observedAt": "2021-08-07T21:58:56Z",
+          "context": "Collected in Consilience Garden keen, section: unnamed",
+          "contextContentId": null
+        }
+      ],
+      "primaryStewardId": "human-matthew-manager",
+      "stewardshipStartedAt": "2021-08-07T21:58:56Z",
+      "externalIdentifiers": [
+        {
+          "type": "homepage",
+          "value": "https://kleros.io/"
+        }
+      ],
+      "tags": [
+        "unnamed",
+        "consilience-garden"
+      ],
+      "image": {
+        "local": "images/presence-homepage.webp",
+        "placeholder": false,
+        "sourceUrl": "https://kleros.io/static/open-graph-card-ec90c20e2e4b2b3aa0cd0bce9fc31787.png"
+      }
+    },
+    {
+      "id": "presence-how-we-work",
+      "displayName": "How we work",
+      "presenceType": "organization",
+      "bio": "Transforming the way humans inhabit the Earth",
+      "observations": [
+        {
+          "observerId": "human-matthew-manager",
+          "observedAt": "2021-08-07T21:58:56Z",
+          "context": "Collected in Consilience Garden keen, section: Community suggestions",
+          "contextContentId": null
+        }
+      ],
+      "primaryStewardId": "human-matthew-manager",
+      "stewardshipStartedAt": "2021-08-07T21:58:56Z",
+      "externalIdentifiers": [
+        {
+          "type": "homepage",
+          "value": "https://regenesisgroup.com/how-we-work/"
+        }
+      ],
+      "tags": [
+        "community-suggestions",
+        "consilience-garden"
+      ],
+      "image": {
+        "local": "images/presence-how-we-work.webp",
+        "placeholder": false,
+        "sourceUrl": "https://regenesisgroup.com/wp-content/uploads/2015/01/IMG_1855.jpg"
+      }
+    },
+    {
+      "id": "presence-hugo-mercier",
+      "displayName": "Hugo Mercier",
+      "presenceType": "person",
+      "bio": "Author referenced in Pastor Pete's FCT curriculum.",
+      "observations": [
+        {
+          "observerId": "human-pete-pastor",
+          "observedAt": "2026-01-15T00:00:00Z",
+          "context": "Cited in fct-module-01-church-dilemma while building the FCT curriculum",
+          "contextContentId": "fct-module-01-church-dilemma"
+        }
+      ],
+      "primaryStewardId": "human-pete-pastor",
+      "stewardshipStartedAt": "2026-01-15T00:00:00Z",
+      "works": [
+        {
+          "title": "The Enigma of Reason",
+          "kind": "book",
+          "year": null,
+          "url": null,
+          "citedInContentIds": [
+            "fct-module-01-church-dilemma"
+          ]
+        }
+      ],
+      "tags": [
+        "fct",
+        "author"
+      ],
+      "image": {
+        "local": "images/placeholder-person.webp",
+        "placeholder": true,
+        "sourceUrl": null
+      }
+    },
+    {
+      "id": "presence-human-development-index-human-development-reports",
+      "displayName": "Human Development Index | Human Development Reports",
+      "presenceType": "organization",
+      "observations": [
+        {
+          "observerId": "human-matthew-manager",
+          "observedAt": "2021-08-07T21:58:56Z",
+          "context": "Collected in Consilience Garden keen, section: Shared Meaning",
+          "contextContentId": null
+        }
+      ],
+      "primaryStewardId": "human-matthew-manager",
+      "stewardshipStartedAt": "2021-08-07T21:58:56Z",
+      "externalIdentifiers": [
+        {
+          "type": "homepage",
+          "value": "https://hdr.undp.org/data-center/human-development-index"
+        }
+      ],
+      "tags": [
+        "shared-meaning",
+        "consilience-garden"
+      ],
+      "image": {
+        "local": "images/presence-human-development-index-human-development-reports.webp",
+        "placeholder": false,
+        "sourceUrl": "https://hdr.undp.org/sites/default/files/styles/original/public/images/2022-03/hdiRoadMap.png?itok=_Q5mwWs0"
+      }
+    },
+    {
+      "id": "presence-humane-by-design",
+      "displayName": "Humane by Design",
+      "presenceType": "organization",
+      "bio": "A resource that provides guidance for designing ethically humane digital products through patterns focused on user well-being.",
+      "observations": [
+        {
+          "observerId": "human-matthew-manager",
+          "observedAt": "2021-08-07T21:58:56Z",
+          "context": "Collected in Consilience Garden keen, section: Design & Planning",
+          "contextContentId": null
+        }
+      ],
+      "primaryStewardId": "human-matthew-manager",
+      "stewardshipStartedAt": "2021-08-07T21:58:56Z",
+      "externalIdentifiers": [
+        {
+          "type": "homepage",
+          "value": "https://humanebydesign.com"
+        }
+      ],
+      "tags": [
+        "design-planning",
+        "consilience-garden"
+      ],
+      "image": {
+        "local": "images/placeholder-organization.webp",
+        "placeholder": true,
+        "sourceUrl": "https://humanebydesign.com/images/social/social_og.jpg"
+      }
+    },
+    {
+      "id": "presence-hylo-social-coordination-for-a-thriving-planet",
+      "displayName": "Hylo — Social Coordination for a Thriving Planet",
+      "presenceType": "organization",
+      "bio": "Hylo amplifies cooperation among people regenerating our communities and our planet, enabling collective action through emergent, decentralized collaboration.",
+      "observations": [
+        {
+          "observerId": "human-matthew-manager",
+          "observedAt": "2021-08-07T21:58:56Z",
+          "context": "Collected in Consilience Garden keen, section: Built for Purpose",
+          "contextContentId": null
+        }
+      ],
+      "primaryStewardId": "human-matthew-manager",
+      "stewardshipStartedAt": "2021-08-07T21:58:56Z",
+      "externalIdentifiers": [
+        {
+          "type": "homepage",
+          "value": "https://www.hylo.com/"
+        }
+      ],
+      "tags": [
+        "built-for-purpose",
+        "consilience-garden"
+      ],
+      "image": {
+        "local": "images/placeholder-organization.webp",
+        "placeholder": true,
+        "sourceUrl": "https://www.hylo.com/static-assets/Images/social-coordination-2.png"
+      }
+    },
+    {
+      "id": "presence-idealoom",
+      "displayName": "IdeaLoom",
+      "presenceType": "organization",
+      "bio": "IdeaLoom is a Collective Intelligence platform, which allows large communities to hold a meaningful conversation at scale, reach a common understanding, and develop solutions beyond what each participant could have envisioned. IdeaLoom allows a structured navigation of conversations on complex issue…",
+      "observations": [
+        {
+          "observerId": "human-matthew-manager",
+          "observedAt": "2021-08-07T21:58:56Z",
+          "context": "Collected in Consilience Garden keen, section: Built for Purpose",
+          "contextContentId": null
+        }
+      ],
+      "primaryStewardId": "human-matthew-manager",
+      "stewardshipStartedAt": "2021-08-07T21:58:56Z",
+      "externalIdentifiers": [
+        {
+          "type": "homepage",
+          "value": "https://www.idealoom.org/"
+        }
+      ],
+      "tags": [
+        "built-for-purpose",
+        "consilience-garden"
+      ],
+      "image": {
+        "local": "images/presence-idealoom.webp",
+        "placeholder": false,
+        "sourceUrl": "https://www.idealoom.org/images/idealoom.png"
+      }
+    },
+    {
+      "id": "presence-iftf-home",
+      "displayName": "IFTF: Home",
+      "presenceType": "organization",
+      "bio": "IFTF Fast Futures: Foresight for Beginners in 90 minutes. August 10 • 10:00am PDT / 17:00 UTC • $99 • An online foresight learning experience for beginners in  ...",
+      "observations": [
+        {
+          "observerId": "human-matthew-manager",
+          "observedAt": "2021-08-07T21:58:56Z",
+          "context": "Collected in Consilience Garden keen, section: Saved",
+          "contextContentId": null
+        }
+      ],
+      "primaryStewardId": "human-matthew-manager",
+      "stewardshipStartedAt": "2021-08-07T21:58:56Z",
+      "externalIdentifiers": [
+        {
+          "type": "homepage",
+          "value": "https://www.iftf.org/home/"
+        }
+      ],
+      "tags": [
+        "saved",
+        "consilience-garden"
+      ],
+      "image": {
+        "local": "images/placeholder-organization.webp",
+        "placeholder": true,
+        "sourceUrl": "https://www.iftf.org/uploads/pics/foresighttraining_ftr_sml.jpg"
+      }
+    },
+    {
+      "id": "presence-index",
+      "displayName": "index",
+      "presenceType": "organization",
+      "observations": [
+        {
+          "observerId": "human-matthew-manager",
+          "observedAt": "2021-08-07T21:58:56Z",
+          "context": "Collected in Consilience Garden keen, section: Community suggestions",
+          "contextContentId": null
+        }
+      ],
+      "primaryStewardId": "human-matthew-manager",
+      "stewardshipStartedAt": "2021-08-07T21:58:56Z",
+      "externalIdentifiers": [
+        {
+          "type": "homepage",
+          "value": "https://www.systemicpeace.org"
+        }
+      ],
+      "tags": [
+        "community-suggestions",
+        "consilience-garden"
+      ],
+      "image": {
+        "local": "images/presence-index.webp",
+        "placeholder": false,
+        "sourceUrl": "https://www.systemicpeace.org/images/csplogo2.jpg"
+      }
+    },
+    {
+      "id": "presence-integrity-institute",
+      "displayName": "Integrity Institute",
+      "presenceType": "organization",
+      "bio": "We are a community of integrity professionals, who want a social internet that helps individuals, societies, and democracies thrive. We are here to explore, research, and tech - each other, the platforms, and the world - how to do that best.",
+      "observations": [
+        {
+          "observerId": "human-matthew-manager",
+          "observedAt": "2021-08-07T21:58:56Z",
+          "context": "Collected in Consilience Garden keen, section: Safety",
+          "contextContentId": null
+        }
+      ],
+      "primaryStewardId": "human-matthew-manager",
+      "stewardshipStartedAt": "2021-08-07T21:58:56Z",
+      "externalIdentifiers": [
+        {
+          "type": "homepage",
+          "value": "https://integrityinstitute.org/"
+        }
+      ],
+      "tags": [
+        "safety",
+        "consilience-garden"
+      ],
+      "image": {
+        "local": "images/placeholder-organization.webp",
+        "placeholder": true,
+        "sourceUrl": {
+          "optimized_MAX_500": "https://storage.googleapis.com/download/storage/v1/b/keen_images_bucket/o/keens%2FnvBCVtcYER7C9s3H6zxS%2Ftips%2F9dxrmbEj2c6nP2NUJSBi%2Ftip_images%2Fmetalink_images%2Foptimized%2Foptimized_500x500%3E_bucketUrl_64c71a30-460f-4736-b605-934b30a948fc.png?generation=1652129782814368&alt=media",
+          "bucketUrl": "https://www.googleapis.com/download/storage/v1/b/keen_images_bucket/o/keens%2FnvBCVtcYER7C9s3H6zxS%2Ftips%2F9dxrmbEj2c6nP2NUJSBi%2Ftip_images%2Fmetalink_images%2FbucketUrl_64c71a30-460f-4736-b605-934b30a948fc.png?generation=1652129782221881&alt=media"
+        }
+      }
+    },
+    {
+      "id": "presence-international-idea",
+      "displayName": "International IDEA",
+      "presenceType": "organization",
+      "bio": "Our objective is to promote and advance sustainable democracy and to ... International Institute for Democracy and Electoral Assistance (International IDEA )",
+      "observations": [
+        {
+          "observerId": "human-matthew-manager",
+          "observedAt": "2021-08-07T21:58:56Z",
+          "context": "Collected in Consilience Garden keen, section: unnamed",
+          "contextContentId": null
+        }
+      ],
+      "primaryStewardId": "human-matthew-manager",
+      "stewardshipStartedAt": "2021-08-07T21:58:56Z",
+      "externalIdentifiers": [
+        {
+          "type": "homepage",
+          "value": "https://www.idea.int/"
+        }
+      ],
+      "tags": [
+        "unnamed",
+        "consilience-garden"
+      ],
+      "image": {
+        "local": "images/presence-international-idea.webp",
+        "placeholder": false,
+        "sourceUrl": "https://www.idea.int/sites/default/files/webpage_images/2021-06-GlobalStateofDemocracy-newdata-promo.png"
+      }
+    },
+    {
+      "id": "presence-international-idea-ace-electoral-knowledge-network",
+      "displayName": "International IDEA — - ACE Electoral Knowledge Network",
+      "presenceType": "organization",
+      "bio": "The International Institute for Democracy and Electoral Assistance (International IDEA) is an intergovernmental organization with the mandate to promote and ...",
+      "observations": [
+        {
+          "observerId": "human-matthew-manager",
+          "observedAt": "2021-08-07T21:58:56Z",
+          "context": "Collected in Consilience Garden keen, section: unnamed",
+          "contextContentId": null
+        }
+      ],
+      "primaryStewardId": "human-matthew-manager",
+      "stewardshipStartedAt": "2021-08-07T21:58:56Z",
+      "externalIdentifiers": [
+        {
+          "type": "homepage",
+          "value": "https://aceproject.org/about-en/full-partners/IDEA"
+        }
+      ],
+      "tags": [
+        "unnamed",
+        "consilience-garden"
+      ],
+      "image": {
+        "local": "images/presence-international-idea-ace-electoral-knowledge-network.webp",
+        "placeholder": false,
+        "sourceUrl": "https://aceproject.org/logo.jpg"
+      }
+    },
+    {
+      "id": "presence-jack-reese",
+      "displayName": "Jack Reese",
+      "presenceType": "person",
+      "bio": "Author referenced in Pastor Pete's FCT curriculum.",
+      "observations": [
+        {
+          "observerId": "human-pete-pastor",
+          "observedAt": "2026-01-15T00:00:00Z",
+          "context": "Cited in fct-module-01-church-dilemma while building the FCT curriculum",
+          "contextContentId": "fct-module-01-church-dilemma"
+        }
+      ],
+      "primaryStewardId": "human-pete-pastor",
+      "stewardshipStartedAt": "2026-01-15T00:00:00Z",
+      "works": [
+        {
+          "title": "\\* At the Blue Hole (book",
+          "kind": "book",
+          "year": null,
+          "url": null,
+          "citedInContentIds": [
+            "fct-module-01-church-dilemma"
+          ]
+        }
+      ],
+      "tags": [
+        "fct",
+        "author"
+      ],
+      "image": {
+        "local": "images/placeholder-person.webp",
+        "placeholder": true,
+        "sourceUrl": null
+      }
+    },
+    {
+      "id": "presence-jacob-shatzer",
+      "displayName": "Jacob Shatzer",
+      "presenceType": "person",
+      "bio": "Author referenced in Pastor Pete's FCT curriculum.",
+      "observations": [
+        {
+          "observerId": "human-pete-pastor",
+          "observedAt": "2026-01-15T00:00:00Z",
+          "context": "Cited in fct-module-14-ready-to-act while building the FCT curriculum",
+          "contextContentId": "fct-module-14-ready-to-act"
+        }
+      ],
+      "primaryStewardId": "human-pete-pastor",
+      "stewardshipStartedAt": "2026-01-15T00:00:00Z",
+      "works": [
+        {
+          "title": "Transhumanism and the Image of God",
+          "kind": "book",
+          "year": null,
+          "url": null,
+          "citedInContentIds": [
+            "fct-module-14-ready-to-act"
+          ]
+        }
+      ],
+      "tags": [
+        "fct",
+        "author"
+      ],
+      "image": {
+        "local": "images/placeholder-person.webp",
+        "placeholder": true,
+        "sourceUrl": null
+      }
+    },
+    {
+      "id": "presence-jacque-fresco-the-venus-project",
+      "displayName": "Jacque Fresco | The Venus Project",
+      "presenceType": "organization",
+      "bio": "Jacque Fresco is an industrial designer and social engineer. He’s also active in the field of Human Factors, where he developed an integrated social system.",
+      "observations": [
+        {
+          "observerId": "human-matthew-manager",
+          "observedAt": "2021-08-07T21:58:56Z",
+          "context": "Collected in Consilience Garden keen, section: unnamed",
+          "contextContentId": null
+        }
+      ],
+      "primaryStewardId": "human-matthew-manager",
+      "stewardshipStartedAt": "2021-08-07T21:58:56Z",
+      "externalIdentifiers": [
+        {
+          "type": "homepage",
+          "value": "https://www.thevenusproject.com/the-venus-project/jacque-fresco/"
+        }
+      ],
+      "tags": [
+        "unnamed",
+        "consilience-garden"
+      ],
+      "image": {
+        "local": "images/presence-jacque-fresco-the-venus-project.webp",
+        "placeholder": false,
+        "sourceUrl": "https://www.thevenusproject.com/wp-content/uploads/2015/09/jacque-on-bridge.jpg"
+      }
+    },
+    {
+      "id": "presence-james-p-carse",
+      "displayName": "James P. Carse",
+      "presenceType": "person",
+      "bio": "Author of Finite and Infinite Games.",
+      "observations": [
+        {
+          "observerId": "human-matthew-manager",
+          "observedAt": "2021-08-07T21:58:56Z",
+          "context": "Collected 'Finite and Infinite Games' in Consilience Garden keen, section: Media and Books",
+          "contextContentId": "book-finite-and-infinite-games"
+        }
+      ],
+      "primaryStewardId": "human-matthew-manager",
+      "stewardshipStartedAt": "2021-08-07T21:58:56Z",
+      "works": [
+        {
+          "title": "Finite and Infinite Games",
+          "kind": "book",
+          "year": 1986,
+          "url": null,
+          "citedInContentIds": [
+            "book-finite-and-infinite-games"
+          ]
+        }
+      ],
+      "tags": [
+        "author",
+        "media-and-books",
+        "consilience-garden"
+      ],
+      "image": {
+        "local": "images/placeholder-person.webp",
+        "placeholder": true,
+        "sourceUrl": null
+      }
+    },
+    {
+      "id": "presence-jigsaw",
+      "displayName": "Jigsaw",
+      "presenceType": "organization",
+      "bio": "Jigsaw is a unit within Google that explores threats to open societies, and builds technology that inspires scalable solutions.",
+      "observations": [
+        {
+          "observerId": "human-matthew-manager",
+          "observedAt": "2021-08-07T21:58:56Z",
+          "context": "Collected in Consilience Garden keen, section: Safety",
+          "contextContentId": null
+        }
+      ],
+      "primaryStewardId": "human-matthew-manager",
+      "stewardshipStartedAt": "2021-08-07T21:58:56Z",
+      "externalIdentifiers": [
+        {
+          "type": "homepage",
+          "value": "https://jigsaw.google.com/"
+        }
+      ],
+      "tags": [
+        "safety",
+        "consilience-garden"
+      ],
+      "image": {
+        "local": "images/placeholder-organization.webp",
+        "placeholder": true,
+        "sourceUrl": "https://jigsaw.google.com/static/images/social-share.jpg?cache=df11f5c"
+      }
+    },
+    {
+      "id": "presence-johann-hari",
+      "displayName": "Johann Hari",
+      "presenceType": "person",
+      "bio": "Author referenced in Pastor Pete's FCT curriculum.",
+      "observations": [
+        {
+          "observerId": "human-pete-pastor",
+          "observedAt": "2026-01-15T00:00:00Z",
+          "context": "Cited in fct-module-11-collaboration-sensemaking while building the FCT curriculum",
+          "contextContentId": "fct-module-11-collaboration-sensemaking"
+        }
+      ],
+      "primaryStewardId": "human-pete-pastor",
+      "stewardshipStartedAt": "2026-01-15T00:00:00Z",
+      "works": [
+        {
+          "title": "Everything you think you know about addiction is wrong",
+          "kind": "book",
+          "year": null,
+          "url": null,
+          "citedInContentIds": [
+            "fct-module-11-collaboration-sensemaking"
+          ]
+        }
+      ],
+      "tags": [
+        "fct",
+        "author"
+      ],
+      "image": {
+        "local": "images/placeholder-person.webp",
+        "placeholder": true,
+        "sourceUrl": null
+      }
+    },
+    {
+      "id": "presence-john-dyer",
+      "displayName": "John Dyer",
+      "presenceType": "person",
+      "bio": "Author referenced in Pastor Pete's FCT curriculum.",
+      "observations": [
+        {
+          "observerId": "human-pete-pastor",
+          "observedAt": "2026-01-15T00:00:00Z",
+          "context": "Cited in fct-module-14-ready-to-act while building the FCT curriculum",
+          "contextContentId": "fct-module-14-ready-to-act"
+        }
+      ],
+      "primaryStewardId": "human-pete-pastor",
+      "stewardshipStartedAt": "2026-01-15T00:00:00Z",
+      "works": [
+        {
+          "title": "From the Garden to the City",
+          "kind": "book",
+          "year": null,
+          "url": null,
+          "citedInContentIds": [
+            "fct-module-14-ready-to-act"
+          ]
+        }
+      ],
+      "tags": [
+        "fct",
+        "author"
+      ],
+      "image": {
+        "local": "images/placeholder-person.webp",
+        "placeholder": true,
+        "sourceUrl": null
+      }
+    },
+    {
+      "id": "presence-joseph-tainter",
+      "displayName": "Joseph Tainter",
+      "presenceType": "person",
+      "bio": "Author of The Collapse of Complex Societies.",
+      "observations": [
+        {
+          "observerId": "human-matthew-manager",
+          "observedAt": "2021-08-07T21:58:56Z",
+          "context": "Collected 'The Collapse of Complex Societies' in Consilience Garden keen, section: Media and Books",
+          "contextContentId": "book-collapse-of-complex-societies"
+        }
+      ],
+      "primaryStewardId": "human-matthew-manager",
+      "stewardshipStartedAt": "2021-08-07T21:58:56Z",
+      "works": [
+        {
+          "title": "The Collapse of Complex Societies",
+          "kind": "book",
+          "year": 1988,
+          "url": null,
+          "citedInContentIds": [
+            "book-collapse-of-complex-societies"
+          ]
+        }
+      ],
+      "tags": [
+        "author",
+        "media-and-books",
+        "consilience-garden"
+      ],
+      "image": {
+        "local": "images/placeholder-person.webp",
+        "placeholder": true,
+        "sourceUrl": null
+      }
+    },
+    {
+      "id": "presence-khan-academy-free-online-courses-lessons-practice",
+      "displayName": "Khan Academy | Free Online Courses, Lessons & Practice",
+      "presenceType": "organization",
+      "bio": "Learn for free about math, art, computer programming, economics, physics, chemistry, biology, medicine, finance, history, and more. Khan Academy is a nonprofit with the mission of providing a free, world-class education for anyone, anywhere.",
+      "observations": [
+        {
+          "observerId": "human-matthew-manager",
+          "observedAt": "2021-08-07T21:58:56Z",
+          "context": "Collected in Consilience Garden keen, section: Built for Purpose",
+          "contextContentId": null
+        }
+      ],
+      "primaryStewardId": "human-matthew-manager",
+      "stewardshipStartedAt": "2021-08-07T21:58:56Z",
+      "externalIdentifiers": [
+        {
+          "type": "homepage",
+          "value": "https://www.khanacademy.org/"
+        }
+      ],
+      "tags": [
+        "built-for-purpose",
+        "consilience-garden"
+      ],
+      "image": {
+        "local": "images/presence-khan-academy-free-online-courses-lessons-practice.webp",
+        "placeholder": false,
+        "sourceUrl": "https://cdn.kastatic.org/images/khan-logo-dark-background-2.png"
+      }
+    },
+    {
+      "id": "presence-kim-stanley-robinson",
+      "displayName": "Kim Stanley Robinson",
+      "presenceType": "person",
+      "bio": "Author of The Ministry for the Future.",
+      "observations": [
+        {
+          "observerId": "human-matthew-manager",
+          "observedAt": "2021-08-07T21:58:56Z",
+          "context": "Collected 'The Ministry for the Future' in Consilience Garden keen, section: Media and Books",
+          "contextContentId": "book-ministry-for-the-future"
+        }
+      ],
+      "primaryStewardId": "human-matthew-manager",
+      "stewardshipStartedAt": "2021-08-07T21:58:56Z",
+      "works": [
+        {
+          "title": "The Ministry for the Future",
+          "kind": "book",
+          "year": 2020,
+          "url": null,
+          "citedInContentIds": [
+            "book-ministry-for-the-future"
+          ]
+        }
+      ],
+      "tags": [
+        "author",
+        "media-and-books",
+        "consilience-garden"
+      ],
+      "image": {
+        "local": "images/placeholder-person.webp",
+        "placeholder": true,
+        "sourceUrl": null
+      }
+    },
+    {
+      "id": "presence-kolibri-a-free-open-source-education-for-all-learning-equali",
+      "displayName": "Kolibri : A Free, Open Source Education for All | Learning Equality",
+      "presenceType": "organization",
+      "observations": [
+        {
+          "observerId": "human-matthew-manager",
+          "observedAt": "2021-08-07T21:58:56Z",
+          "context": "Collected in Consilience Garden keen, section: Built for Purpose",
+          "contextContentId": null
+        }
+      ],
+      "primaryStewardId": "human-matthew-manager",
+      "stewardshipStartedAt": "2021-08-07T21:58:56Z",
+      "externalIdentifiers": [
+        {
+          "type": "homepage",
+          "value": "https://learningequality.org/kolibri/"
+        }
+      ],
+      "tags": [
+        "built-for-purpose",
+        "consilience-garden"
+      ],
+      "image": {
+        "local": "images/placeholder-organization.webp",
+        "placeholder": true,
+        "sourceUrl": "https://learningequality.org/static/img/kickstarter/fb-sharedlink.png"
+      }
+    },
+    {
+      "id": "presence-lee-mc",
+      "displayName": "Lee Mc",
+      "presenceType": "person",
+      "bio": "Author referenced in Pastor Pete's FCT curriculum.",
+      "observations": [
+        {
+          "observerId": "human-pete-pastor",
+          "observedAt": "2026-01-15T00:00:00Z",
+          "context": "Cited in fct-module-01-church-dilemma while building the FCT curriculum",
+          "contextContentId": "fct-module-01-church-dilemma"
+        }
+      ],
+      "primaryStewardId": "human-pete-pastor",
+      "stewardshipStartedAt": "2026-01-15T00:00:00Z",
+      "works": [
+        {
+          "title": "Post-Truth",
+          "kind": "book",
+          "year": null,
+          "url": null,
+          "citedInContentIds": [
+            "fct-module-01-church-dilemma"
+          ]
+        }
+      ],
+      "tags": [
+        "fct",
+        "author"
+      ],
+      "image": {
+        "local": "images/placeholder-person.webp",
+        "placeholder": true,
+        "sourceUrl": null
+      }
+    },
+    {
+      "id": "presence-leverage-points-places-to-intervene-in-a-system",
+      "displayName": "Leverage Points: Places to Intervene in a System",
+      "presenceType": "organization",
+      "observations": [
+        {
+          "observerId": "human-matthew-manager",
+          "observedAt": "2021-08-07T21:58:56Z",
+          "context": "Collected in Consilience Garden keen, section: Saved",
+          "contextContentId": null
+        }
+      ],
+      "primaryStewardId": "human-matthew-manager",
+      "stewardshipStartedAt": "2021-08-07T21:58:56Z",
+      "externalIdentifiers": [
+        {
+          "type": "homepage",
+          "value": "https://donellameadows.org/archives/leverage-points-places-to-intervene-in-a-system/"
+        }
+      ],
+      "tags": [
+        "saved",
+        "consilience-garden"
+      ],
+      "image": {
+        "local": "images/presence-leverage-points-places-to-intervene-in-a-system.webp",
+        "placeholder": false,
+        "sourceUrl": "https://donellameadows.org/wp-content/themes/donellameadows/images/logo-2.gif"
+      }
+    },
+    {
+      "id": "presence-matthew-desmond",
+      "displayName": "Matthew Desmond",
+      "presenceType": "person",
+      "bio": "Author referenced in Pastor Pete's FCT curriculum.",
+      "observations": [
+        {
+          "observerId": "human-pete-pastor",
+          "observedAt": "2026-01-15T00:00:00Z",
+          "context": "Cited in fct-module-12-fairness-justice while building the FCT curriculum",
+          "contextContentId": "fct-module-12-fairness-justice"
+        }
+      ],
+      "primaryStewardId": "human-pete-pastor",
+      "stewardshipStartedAt": "2026-01-15T00:00:00Z",
+      "works": [
+        {
+          "title": "Poverty",
+          "kind": "book",
+          "year": null,
+          "url": null,
+          "citedInContentIds": [
+            "fct-module-12-fairness-justice"
+          ]
+        },
+        {
+          "title": "by America",
+          "kind": "book",
+          "year": null,
+          "url": null,
+          "citedInContentIds": [
+            "fct-module-12-fairness-justice"
+          ]
+        }
+      ],
+      "tags": [
+        "fct",
+        "author"
+      ],
+      "image": {
+        "local": "images/placeholder-person.webp",
+        "placeholder": true,
+        "sourceUrl": null
+      }
+    },
+    {
+      "id": "presence-meta-crisis-meta-resource",
+      "displayName": "🤯 Meta-Crisis Meta-Resource",
+      "presenceType": "organization",
+      "bio": "🤯 Meta-Crisis Meta-Resource",
+      "observations": [
+        {
+          "observerId": "human-matthew-manager",
+          "observedAt": "2021-08-07T21:58:56Z",
+          "context": "Collected in Consilience Garden keen, section: Saved",
+          "contextContentId": null
+        }
+      ],
+      "primaryStewardId": "human-matthew-manager",
+      "stewardshipStartedAt": "2021-08-07T21:58:56Z",
+      "externalIdentifiers": [
+        {
+          "type": "homepage",
+          "value": "https://metacrisis.org"
+        }
+      ],
+      "tags": [
+        "saved",
+        "consilience-garden"
+      ],
+      "image": {
+        "local": "images/placeholder-organization.webp",
+        "placeholder": true,
+        "sourceUrl": null
+      }
+    },
+    {
+      "id": "presence-michelle-alexander",
+      "displayName": "Michelle Alexander",
+      "presenceType": "person",
+      "bio": "Author referenced in Pastor Pete's FCT curriculum.",
+      "observations": [
+        {
+          "observerId": "human-pete-pastor",
+          "observedAt": "2026-01-15T00:00:00Z",
+          "context": "Cited in fct-module-12-fairness-justice while building the FCT curriculum",
+          "contextContentId": "fct-module-12-fairness-justice"
+        }
+      ],
+      "primaryStewardId": "human-pete-pastor",
+      "stewardshipStartedAt": "2026-01-15T00:00:00Z",
+      "works": [
+        {
+          "title": "The New Jim Crow",
+          "kind": "book",
+          "year": null,
+          "url": null,
+          "citedInContentIds": [
+            "fct-module-12-fairness-justice"
+          ]
+        }
+      ],
+      "tags": [
+        "fct",
+        "author"
+      ],
+      "image": {
+        "local": "images/placeholder-person.webp",
+        "placeholder": true,
+        "sourceUrl": null
+      }
+    },
+    {
+      "id": "presence-michiko-kakutani",
+      "displayName": "Michiko Kakutani",
+      "presenceType": "person",
+      "bio": "Author referenced in Pastor Pete's FCT curriculum.",
+      "observations": [
+        {
+          "observerId": "human-pete-pastor",
+          "observedAt": "2026-01-15T00:00:00Z",
+          "context": "Cited in fct-module-01-church-dilemma while building the FCT curriculum",
+          "contextContentId": "fct-module-01-church-dilemma"
+        }
+      ],
+      "primaryStewardId": "human-pete-pastor",
+      "stewardshipStartedAt": "2026-01-15T00:00:00Z",
+      "works": [
+        {
+          "title": "The Death of Truth",
+          "kind": "book",
+          "year": null,
+          "url": null,
+          "citedInContentIds": [
+            "fct-module-01-church-dilemma"
+          ]
+        }
+      ],
+      "tags": [
+        "fct",
+        "author"
+      ],
+      "image": {
+        "local": "images/placeholder-person.webp",
+        "placeholder": true,
+        "sourceUrl": null
+      }
+    },
+    {
+      "id": "presence-mike-caulfield",
+      "displayName": "Mike Caulfield",
+      "presenceType": "person",
+      "bio": "Author referenced in Pastor Pete's FCT curriculum.",
+      "observations": [
+        {
+          "observerId": "human-pete-pastor",
+          "observedAt": "2026-01-15T00:00:00Z",
+          "context": "Cited in fct-module-01-church-dilemma while building the FCT curriculum",
+          "contextContentId": "fct-module-01-church-dilemma"
+        }
+      ],
+      "primaryStewardId": "human-pete-pastor",
+      "stewardshipStartedAt": "2026-01-15T00:00:00Z",
+      "works": [
+        {
+          "title": "Web Literacy for Student Fact-Checkers",
+          "kind": "book",
+          "year": null,
+          "url": null,
+          "citedInContentIds": [
+            "fct-module-01-church-dilemma"
+          ]
+        }
+      ],
+      "tags": [
+        "fct",
+        "author"
+      ],
+      "image": {
+        "local": "images/placeholder-person.webp",
+        "placeholder": true,
+        "sourceUrl": null
+      }
+    },
+    {
+      "id": "presence-nassim-taleb",
+      "displayName": "Nassim Taleb",
+      "presenceType": "person",
+      "bio": "Author referenced in Pastor Pete's FCT curriculum.",
+      "observations": [
+        {
+          "observerId": "human-pete-pastor",
+          "observedAt": "2026-01-15T00:00:00Z",
+          "context": "Cited in fct-module-02-systems-thinking while building the FCT curriculum",
+          "contextContentId": "fct-module-02-systems-thinking"
+        }
+      ],
+      "primaryStewardId": "human-pete-pastor",
+      "stewardshipStartedAt": "2026-01-15T00:00:00Z",
+      "works": [
+        {
+          "title": "Antifragility: Strong Towns supports building systems that thrive under stress",
+          "kind": "book",
+          "year": null,
+          "url": null,
+          "citedInContentIds": [
+            "fct-module-02-systems-thinking"
+          ]
+        },
+        {
+          "title": "inspired",
+          "kind": "book",
+          "year": null,
+          "url": null,
+          "citedInContentIds": [
+            "fct-module-02-systems-thinking"
+          ]
+        }
+      ],
+      "tags": [
+        "fct",
+        "author"
+      ],
+      "image": {
+        "local": "images/placeholder-person.webp",
+        "placeholder": true,
+        "sourceUrl": null
+      }
+    },
+    {
+      "id": "presence-new-public",
+      "displayName": "New_ Public",
+      "presenceType": "organization",
+      "bio": "​Email us your stories at hello@newpublic.org with 'Flash Fiction' in the subject line. Deadline: 9/1/21. Theme: Social Media Word Limit: 500 words",
+      "observations": [
+        {
+          "observerId": "human-matthew-manager",
+          "observedAt": "2021-08-07T21:58:56Z",
+          "context": "Collected in Consilience Garden keen, section: unnamed",
+          "contextContentId": null
+        }
+      ],
+      "primaryStewardId": "human-matthew-manager",
+      "stewardshipStartedAt": "2021-08-07T21:58:56Z",
+      "externalIdentifiers": [
+        {
+          "type": "homepage",
+          "value": "https://newpublic.substack.com/"
+        }
+      ],
+      "tags": [
+        "unnamed",
+        "consilience-garden"
+      ],
+      "image": {
+        "local": "images/presence-new-public.webp",
+        "placeholder": false,
+        "sourceUrl": "https://cdn.substack.com/image/fetch/w_256,c_limit,f_auto,q_auto:good,fl_progressive:steep/https%3A%2F%2Fbucketeer-e05bbc84-baa3-437e-9518-adb32be77984.s3.amazonaws.com%2Fpublic%2Fimages%2F17c2e01f-171a-4e55-af08-8db1c5eff4bb_1067x1067.png"
+      }
+    },
+    {
+      "id": "presence-new-public-for-better-digital-public-spaces",
+      "displayName": "New_ Public - For Better Digital Public Spaces",
+      "presenceType": "organization",
+      "bio": "New_ Public aims to inspire and connect designers and technologists to build more flourishing, public friendly digital spaces.",
+      "observations": [
+        {
+          "observerId": "human-matthew-manager",
+          "observedAt": "2021-08-07T21:58:56Z",
+          "context": "Collected in Consilience Garden keen, section: Saved",
+          "contextContentId": null
+        }
+      ],
+      "primaryStewardId": "human-matthew-manager",
+      "stewardshipStartedAt": "2021-08-07T21:58:56Z",
+      "externalIdentifiers": [
+        {
+          "type": "homepage",
+          "value": "https://newpublic.org/"
+        }
+      ],
+      "tags": [
+        "saved",
+        "consilience-garden"
+      ],
+      "image": {
+        "local": "images/presence-new-public-for-better-digital-public-spaces.webp",
+        "placeholder": false,
+        "sourceUrl": "https://newpublic.org/uploads/2020/09/about-illu-04@3x.png"
+      }
+    },
+    {
+      "id": "presence-nicholas-carr",
+      "displayName": "Nicholas Carr",
+      "presenceType": "person",
+      "bio": "Author referenced in Pastor Pete's FCT curriculum.",
+      "observations": [
+        {
+          "observerId": "human-pete-pastor",
+          "observedAt": "2026-01-15T00:00:00Z",
+          "context": "Cited in fct-module-01-church-dilemma while building the FCT curriculum",
+          "contextContentId": "fct-module-01-church-dilemma"
+        }
+      ],
+      "primaryStewardId": "human-pete-pastor",
+      "stewardshipStartedAt": "2026-01-15T00:00:00Z",
+      "works": [
+        {
+          "title": "Is Google Making Us Stupid?",
+          "kind": "book",
+          "year": null,
+          "url": null,
+          "citedInContentIds": [
+            "fct-module-01-church-dilemma"
+          ]
+        }
+      ],
+      "tags": [
+        "fct",
+        "author"
+      ],
+      "image": {
+        "local": "images/placeholder-person.webp",
+        "placeholder": true,
+        "sourceUrl": null
+      }
+    },
+    {
+      "id": "presence-normality-principle-wikipedia",
+      "displayName": "Normality principle - Wikipedia",
+      "presenceType": "organization",
+      "observations": [
+        {
+          "observerId": "human-matthew-manager",
+          "observedAt": "2021-08-07T21:58:56Z",
+          "context": "Collected in Consilience Garden keen, section: unnamed",
+          "contextContentId": null
+        }
+      ],
+      "primaryStewardId": "human-matthew-manager",
+      "stewardshipStartedAt": "2021-08-07T21:58:56Z",
+      "externalIdentifiers": [
+        {
+          "type": "homepage",
+          "value": "https://en.wikipedia.org/wiki/Normality_principle"
+        }
+      ],
+      "tags": [
+        "unnamed",
+        "consilience-garden"
+      ],
+      "image": {
+        "local": "images/placeholder-organization.webp",
+        "placeholder": true,
+        "sourceUrl": "https://en.wikipedia.org/static/images/footer/wikimedia-button.png"
+      }
+    },
+    {
+      "id": "presence-not-just-bikes",
+      "displayName": "Not Just Bikes",
+      "presenceType": "organization",
+      "bio": "Stories of great urban planning and urban experiences from the Netherlands and beyond. There are a lot of reasons why Dutch cities are so great; it’s not just bikes. Unfortunately I’ve been overwhelmed with emails and DMs, and I can’t answer most of them anymore. If you really think you need to con…",
+      "observations": [
+        {
+          "observerId": "human-matthew-manager",
+          "observedAt": "2021-08-07T21:58:56Z",
+          "context": "Collected in Consilience Garden keen, section: Physical Commons",
+          "contextContentId": null
+        }
+      ],
+      "primaryStewardId": "human-matthew-manager",
+      "stewardshipStartedAt": "2021-08-07T21:58:56Z",
+      "externalIdentifiers": [
+        {
+          "type": "homepage",
+          "value": "https://www.youtube.com/c/notjustbikes"
+        }
+      ],
+      "tags": [
+        "physical-commons",
+        "consilience-garden"
+      ],
+      "image": {
+        "local": "images/placeholder-organization.webp",
+        "placeholder": true,
+        "sourceUrl": "https://yt3.ggpht.com/5DBP22k02WIMvHgeoUj_Tt14Kh8u-oaAhYHQu1gXCoHuisGXnavb5k-ivpyffqIARNDzgpBbUw=s900-c-k-c0x00ffffff-no-rj"
+      }
+    },
+    {
+      "id": "presence-oecd-better-life-index",
+      "displayName": "OECD Better Life Index",
+      "presenceType": "organization",
+      "observations": [
+        {
+          "observerId": "human-matthew-manager",
+          "observedAt": "2021-08-07T21:58:56Z",
+          "context": "Collected in Consilience Garden keen, section: Shared Meaning",
+          "contextContentId": null
+        }
+      ],
+      "primaryStewardId": "human-matthew-manager",
+      "stewardshipStartedAt": "2021-08-07T21:58:56Z",
+      "externalIdentifiers": [
+        {
+          "type": "homepage",
+          "value": "https://www.oecdbetterlifeindex.org/"
+        }
+      ],
+      "tags": [
+        "shared-meaning",
+        "consilience-garden"
+      ],
+      "image": {
+        "local": "images/placeholder-organization.webp",
+        "placeholder": true,
+        "sourceUrl": "https://www.oecdbetterlifeindex.org/media/bli/images/home-carousel-2.png"
+      }
+    },
+    {
+      "id": "presence-open-collective",
+      "displayName": "Open Collective",
+      "presenceType": "organization",
+      "bio": "Make your community sustainable. Collect and spend money transparently.",
+      "observations": [
+        {
+          "observerId": "human-matthew-manager",
+          "observedAt": "2021-08-07T21:58:56Z",
+          "context": "Collected in Consilience Garden keen, section: unnamed",
+          "contextContentId": null
+        }
+      ],
+      "primaryStewardId": "human-matthew-manager",
+      "stewardshipStartedAt": "2021-08-07T21:58:56Z",
+      "externalIdentifiers": [
+        {
+          "type": "homepage",
+          "value": "https://opencollective.com/"
+        }
+      ],
+      "tags": [
+        "unnamed",
+        "consilience-garden"
+      ],
+      "image": {
+        "local": "images/presence-open-collective.webp",
+        "placeholder": false,
+        "sourceUrl": "https://opencollective.com/static/images/opencollective-og-default.png"
+      }
+    },
+    {
+      "id": "presence-our-philosophy",
+      "displayName": "Our Philosophy",
+      "presenceType": "organization",
+      "bio": "We are building the technological tools and social patterns and practices to enable the next economy — one that is distributed, equitable, and regenerative.",
+      "observations": [
+        {
+          "observerId": "human-matthew-manager",
+          "observedAt": "2021-08-07T21:58:56Z",
+          "context": "Collected in Consilience Garden keen, section: Design & Planning",
+          "contextContentId": null
+        }
+      ],
+      "primaryStewardId": "human-matthew-manager",
+      "stewardshipStartedAt": "2021-08-07T21:58:56Z",
+      "externalIdentifiers": [
+        {
+          "type": "homepage",
+          "value": "https://metacurrency.org/about/"
+        }
+      ],
+      "tags": [
+        "design-planning",
+        "consilience-garden"
+      ],
+      "image": {
+        "local": "images/placeholder-organization.webp",
+        "placeholder": true,
+        "sourceUrl": "https://i1.wp.com/metacurrency.org/wp-content/uploads/2016/05/Levels-of-Wealth_Water.png?fit=769%2C571&ssl=1"
+      }
+    },
+    {
+      "id": "presence-p2p-lab-research-collective",
+      "displayName": "P2P Lab ← research collective",
+      "presenceType": "organization",
+      "observations": [
+        {
+          "observerId": "human-matthew-manager",
+          "observedAt": "2021-08-07T21:58:56Z",
+          "context": "Collected in Consilience Garden keen, section: Built for Purpose",
+          "contextContentId": null
+        }
+      ],
+      "primaryStewardId": "human-matthew-manager",
+      "stewardshipStartedAt": "2021-08-07T21:58:56Z",
+      "externalIdentifiers": [
+        {
+          "type": "homepage",
+          "value": "https://www.p2plab.gr/en/"
+        }
+      ],
+      "tags": [
+        "built-for-purpose",
+        "consilience-garden"
+      ],
+      "image": {
+        "local": "images/placeholder-organization.webp",
+        "placeholder": true,
+        "sourceUrl": "https://p2plab.gr/el/wp-content/uploads/2014/01/P2P-Lab-Logo1.png"
+      }
+    },
+    {
+      "id": "presence-paul-sparks",
+      "displayName": "Paul Sparks",
+      "presenceType": "person",
+      "bio": "Author referenced in Pastor Pete's FCT curriculum.",
+      "observations": [
+        {
+          "observerId": "human-pete-pastor",
+          "observedAt": "2026-01-15T00:00:00Z",
+          "context": "Cited in fct-module-13-helping-thrive while building the FCT curriculum",
+          "contextContentId": "fct-module-13-helping-thrive"
+        }
+      ],
+      "primaryStewardId": "human-pete-pastor",
+      "stewardshipStartedAt": "2026-01-15T00:00:00Z",
+      "works": [
+        {
+          "title": "The New Parish",
+          "kind": "book",
+          "year": null,
+          "url": null,
+          "citedInContentIds": [
+            "fct-module-13-helping-thrive"
+          ]
+        }
+      ],
+      "tags": [
+        "fct",
+        "author"
+      ],
+      "image": {
+        "local": "images/placeholder-person.webp",
+        "placeholder": true,
+        "sourceUrl": null
+      }
+    },
+    {
+      "id": "presence-polis",
+      "displayName": "Polis",
+      "presenceType": "organization",
+      "observations": [
+        {
+          "observerId": "human-matthew-manager",
+          "observedAt": "2021-08-07T21:58:56Z",
+          "context": "Collected in Consilience Garden keen, section: unnamed",
+          "contextContentId": null
+        }
+      ],
+      "primaryStewardId": "human-matthew-manager",
+      "stewardshipStartedAt": "2021-08-07T21:58:56Z",
+      "externalIdentifiers": [
+        {
+          "type": "homepage",
+          "value": "https://pol.is/home"
+        }
+      ],
+      "tags": [
+        "unnamed",
+        "consilience-garden"
+      ],
+      "image": {
+        "local": "images/placeholder-organization.webp",
+        "placeholder": true,
+        "sourceUrl": null
+      }
+    },
+    {
+      "id": "presence-powerledger-energy-projects",
+      "displayName": "Powerledger Energy Projects",
+      "presenceType": "organization",
+      "bio": "The operating system for new energy markets, Power Ledger is a blockchain enabled software platform for trading renewable energy and environmental commodities.",
+      "observations": [
+        {
+          "observerId": "human-matthew-manager",
+          "observedAt": "2021-08-07T21:58:56Z",
+          "context": "Collected in Consilience Garden keen, section: Built for Purpose",
+          "contextContentId": null
+        }
+      ],
+      "primaryStewardId": "human-matthew-manager",
+      "stewardshipStartedAt": "2021-08-07T21:58:56Z",
+      "externalIdentifiers": [
+        {
+          "type": "homepage",
+          "value": "https://powerledger.io"
+        }
+      ],
+      "tags": [
+        "built-for-purpose",
+        "consilience-garden"
+      ],
+      "image": {
+        "local": "images/presence-powerledger-energy-projects.webp",
+        "placeholder": false,
+        "sourceUrl": "https://assets.website-files.com/612e1d86b8aa434030a7da5c/61b68603f825ce655e54d3f0_pl_logo.svg"
+      }
+    },
+    {
+      "id": "presence-pubhubs",
+      "displayName": "PubHubs",
+      "presenceType": "organization",
+      "bio": "PubHubs - Sociaal platform gebaseerd op publieke waarden.",
+      "observations": [
+        {
+          "observerId": "human-matthew-manager",
+          "observedAt": "2021-08-07T21:58:56Z",
+          "context": "Collected in Consilience Garden keen, section: Built for Purpose",
+          "contextContentId": null
+        }
+      ],
+      "primaryStewardId": "human-matthew-manager",
+      "stewardshipStartedAt": "2021-08-07T21:58:56Z",
+      "externalIdentifiers": [
+        {
+          "type": "homepage",
+          "value": "https://pubhubs.net/en/"
+        }
+      ],
+      "tags": [
+        "built-for-purpose",
+        "consilience-garden"
+      ],
+      "image": {
+        "local": "images/placeholder-organization.webp",
+        "placeholder": true,
+        "sourceUrl": "https://pubhubs.net/assets/Pubhubslogowhite.svg"
+      }
+    },
+    {
+      "id": "presence-public-engagement-and-online-decision-making-ethelo",
+      "displayName": "Public Engagement and Online Decision-Making | Ethelo",
+      "presenceType": "organization",
+      "bio": "Make big decisions better. Ethelo is an online group decision-making platform that enables communities to solve complex problems and build consensus in a transparent way.",
+      "observations": [
+        {
+          "observerId": "human-matthew-manager",
+          "observedAt": "2021-08-07T21:58:56Z",
+          "context": "Collected in Consilience Garden keen, section: Digital Governance and Democracy",
+          "contextContentId": null
+        }
+      ],
+      "primaryStewardId": "human-matthew-manager",
+      "stewardshipStartedAt": "2021-08-07T21:58:56Z",
+      "externalIdentifiers": [
+        {
+          "type": "homepage",
+          "value": "https://ethelo.com/"
+        }
+      ],
+      "tags": [
+        "digital-governance-and-democracy",
+        "consilience-garden"
+      ],
+      "image": {
+        "local": "images/placeholder-organization.webp",
+        "placeholder": true,
+        "sourceUrl": "https://ethelo.com/wp-content/uploads/2020/04/Copy-of-Untitled-1.png"
+      }
+    },
+    {
+      "id": "presence-quentin-schultze",
+      "displayName": "Quentin Schultze",
+      "presenceType": "person",
+      "bio": "Author referenced in Pastor Pete's FCT curriculum.",
+      "observations": [
+        {
+          "observerId": "human-pete-pastor",
+          "observedAt": "2026-01-15T00:00:00Z",
+          "context": "Cited in fct-module-14-ready-to-act while building the FCT curriculum",
+          "contextContentId": "fct-module-14-ready-to-act"
+        }
+      ],
+      "primaryStewardId": "human-pete-pastor",
+      "stewardshipStartedAt": "2026-01-15T00:00:00Z",
+      "works": [
+        {
+          "title": "Habits of the High-Tech Heart",
+          "kind": "book",
+          "year": null,
+          "url": null,
+          "citedInContentIds": [
+            "fct-module-14-ready-to-act"
+          ]
+        }
+      ],
+      "tags": [
+        "fct",
+        "author"
+      ],
+      "image": {
+        "local": "images/placeholder-person.webp",
+        "placeholder": true,
+        "sourceUrl": null
+      }
+    },
+    {
+      "id": "presence-radicalxchange",
+      "displayName": "RadicalxChange",
+      "presenceType": "organization",
+      "bio": "We are a community of activists, artists, entrepreneurs, and scholars committed to using mechanism design to inspire radical social change.",
+      "observations": [
+        {
+          "observerId": "human-matthew-manager",
+          "observedAt": "2021-08-07T21:58:56Z",
+          "context": "Collected in Consilience Garden keen, section: Digital Governance and Democracy",
+          "contextContentId": null
+        }
+      ],
+      "primaryStewardId": "human-matthew-manager",
+      "stewardshipStartedAt": "2021-08-07T21:58:56Z",
+      "externalIdentifiers": [
+        {
+          "type": "homepage",
+          "value": "https://www.radicalxchange.org/"
+        }
+      ],
+      "tags": [
+        "digital-governance-and-democracy",
+        "consilience-garden"
+      ],
+      "image": {
+        "local": "images/presence-radicalxchange.webp",
+        "placeholder": false,
+        "sourceUrl": "https://www.radicalxchange.org/images/logos/open-graph-logo.png"
+      }
+    },
+    {
+      "id": "presence-regrid-nationwide-land-parcels-location-context-data-for-eve",
+      "displayName": "Regrid | Nationwide Land Parcels & Location Context Data for Everyone",
+      "presenceType": "organization",
+      "bio": "Regrid is the leading provider of nationwide land parcels and location context data, with over 155 million property boundaries and records.",
+      "observations": [
+        {
+          "observerId": "human-matthew-manager",
+          "observedAt": "2021-08-07T21:58:56Z",
+          "context": "Collected in Consilience Garden keen, section: Physical Commons",
+          "contextContentId": null
+        }
+      ],
+      "primaryStewardId": "human-matthew-manager",
+      "stewardshipStartedAt": "2021-08-07T21:58:56Z",
+      "externalIdentifiers": [
+        {
+          "type": "homepage",
+          "value": "https://regrid.com"
+        }
+      ],
+      "tags": [
+        "physical-commons",
+        "consilience-garden"
+      ],
+      "image": {
+        "local": "images/presence-regrid-nationwide-land-parcels-location-context-data-for-eve.webp",
+        "placeholder": false,
+        "sourceUrl": "https://regrid.com/hubfs/sitepreviewimage-1.png#keepProtocol"
+      }
+    },
+    {
+      "id": "presence-resilience-against-disinformation-tilt",
+      "displayName": "Resilience against disinformation - Tilt",
+      "presenceType": "organization",
+      "bio": "In search for solutions against disinformation, radicalisation or online manipulation? This is our field of expertise. Tiltstudio.co",
+      "observations": [
+        {
+          "observerId": "human-matthew-manager",
+          "observedAt": "2021-08-07T21:58:56Z",
+          "context": "Collected in Consilience Garden keen, section: Safety",
+          "contextContentId": null
+        }
+      ],
+      "primaryStewardId": "human-matthew-manager",
+      "stewardshipStartedAt": "2021-08-07T21:58:56Z",
+      "externalIdentifiers": [
+        {
+          "type": "homepage",
+          "value": "https://www.tiltstudio.co/"
+        }
+      ],
+      "tags": [
+        "safety",
+        "consilience-garden"
+      ],
+      "image": {
+        "local": "images/presence-resilience-against-disinformation-tilt.webp",
+        "placeholder": false,
+        "sourceUrl": "https://www.tiltstudio.co/wp-content/uploads/2022/04/20220310-tilt-187.jpg"
+      }
+    },
+    {
+      "id": "presence-responsible-tech-guide",
+      "displayName": "Responsible Tech Guide",
+      "presenceType": "organization",
+      "bio": "There is a vibrant community focused on reducing the harms of technology, diversifying the tech pipeline, and ensuring that technology is aligned with the public interest.",
+      "observations": [
+        {
+          "observerId": "human-matthew-manager",
+          "observedAt": "2021-08-07T21:58:56Z",
+          "context": "Collected in Consilience Garden keen, section: Design & Planning",
+          "contextContentId": null
+        }
+      ],
+      "primaryStewardId": "human-matthew-manager",
+      "stewardshipStartedAt": "2021-08-07T21:58:56Z",
+      "externalIdentifiers": [
+        {
+          "type": "homepage",
+          "value": "https://alltechishuman.org"
+        }
+      ],
+      "tags": [
+        "design-planning",
+        "consilience-garden"
+      ],
+      "image": {
+        "local": "images/placeholder-organization.webp",
+        "placeholder": true,
+        "sourceUrl": {
+          "optimized_MAX_500": "https://storage.googleapis.com/download/storage/v1/b/keen_images_bucket/o/keens%2FnvBCVtcYER7C9s3H6zxS%2Ftips%2F1zLJX7mh9E2HOZhNyrdA%2Ftip_images%2Fmetalink_images%2Foptimized%2Foptimized_500x500%3E_bucketUrl_fb57232a-2225-496e-bfed-bc004ade031d.png?generation=1652129279737952&alt=media",
+          "bucketUrl": "https://www.googleapis.com/download/storage/v1/b/keen_images_bucket/o/keens%2FnvBCVtcYER7C9s3H6zxS%2Ftips%2F1zLJX7mh9E2HOZhNyrdA%2Ftip_images%2Fmetalink_images%2FbucketUrl_fb57232a-2225-496e-bfed-bc004ade031d.png?generation=1652129279177252&alt=media"
+        }
+      }
+    },
+    {
+      "id": "presence-richard-rothstein",
+      "displayName": "Richard Rothstein",
+      "presenceType": "person",
+      "bio": "Author referenced in Pastor Pete's FCT curriculum.",
+      "observations": [
+        {
+          "observerId": "human-pete-pastor",
+          "observedAt": "2026-01-15T00:00:00Z",
+          "context": "Cited in fct-module-12-fairness-justice while building the FCT curriculum",
+          "contextContentId": "fct-module-12-fairness-justice"
+        }
+      ],
+      "primaryStewardId": "human-pete-pastor",
+      "stewardshipStartedAt": "2026-01-15T00:00:00Z",
+      "works": [
+        {
+          "title": "The Color of Law",
+          "kind": "book",
+          "year": null,
+          "url": null,
+          "citedInContentIds": [
+            "fct-module-12-fairness-justice"
+          ]
+        }
+      ],
+      "tags": [
+        "fct",
+        "author"
+      ],
+      "image": {
+        "local": "images/placeholder-person.webp",
+        "placeholder": true,
+        "sourceUrl": null
+      }
+    },
+    {
+      "id": "presence-rolf-dobelli",
+      "displayName": "Rolf Dobelli",
+      "presenceType": "person",
+      "bio": "Author referenced in Pastor Pete's FCT curriculum.",
+      "observations": [
+        {
+          "observerId": "human-pete-pastor",
+          "observedAt": "2026-01-15T00:00:00Z",
+          "context": "Cited in fct-module-01-church-dilemma while building the FCT curriculum",
+          "contextContentId": "fct-module-01-church-dilemma"
+        }
+      ],
+      "primaryStewardId": "human-pete-pastor",
+      "stewardshipStartedAt": "2026-01-15T00:00:00Z",
+      "works": [
+        {
+          "title": "The Art of Thinking Clearly",
+          "kind": "book",
+          "year": null,
+          "url": null,
+          "citedInContentIds": [
+            "fct-module-01-church-dilemma"
+          ]
+        }
+      ],
+      "tags": [
+        "fct",
+        "author"
+      ],
+      "image": {
+        "local": "images/placeholder-person.webp",
+        "placeholder": true,
+        "sourceUrl": null
+      }
+    },
+    {
+      "id": "presence-scaling-trust-on-the-web",
+      "displayName": "Scaling trust on the web",
+      "presenceType": "organization",
+      "bio": "The Task Force for a Trustworthy Future Web’s report captures analysis of the systems gaps and critical opportunities that will define how the next generation of online spaces will be constructed.",
+      "observations": [
+        {
+          "observerId": "human-matthew-manager",
+          "observedAt": "2021-08-07T21:58:56Z",
+          "context": "Collected in Consilience Garden keen, section: Safety",
+          "contextContentId": null
+        }
+      ],
+      "primaryStewardId": "human-matthew-manager",
+      "stewardshipStartedAt": "2021-08-07T21:58:56Z",
+      "externalIdentifiers": [
+        {
+          "type": "homepage",
+          "value": "https://www.atlanticcouncil.org/in-depth-research-reports/report/scaling-trust/"
+        }
+      ],
+      "tags": [
+        "safety",
+        "consilience-garden"
+      ],
+      "image": {
+        "local": "images/presence-scaling-trust-on-the-web.webp",
+        "placeholder": false,
+        "sourceUrl": "https://www.atlanticcouncil.org/wp-content/uploads/2023/06/TechBrain.png"
+      }
+    },
+    {
+      "id": "presence-sociocracy-basic-concepts-and-principles",
+      "displayName": "Sociocracy - basic concepts and principles",
+      "presenceType": "organization",
+      "bio": "Brief overview of sociocracy: basic concepts and principles, history, its use in organizations, its limits and differences to voting, consensus and hierarchical forms of organizing.",
+      "observations": [
+        {
+          "observerId": "human-matthew-manager",
+          "observedAt": "2021-08-07T21:58:56Z",
+          "context": "Collected in Consilience Garden keen, section: Digital Governance and Democracy",
+          "contextContentId": null
+        }
+      ],
+      "primaryStewardId": "human-matthew-manager",
+      "stewardshipStartedAt": "2021-08-07T21:58:56Z",
+      "externalIdentifiers": [
+        {
+          "type": "homepage",
+          "value": "https://www.sociocracyforall.org/sociocracy/"
+        }
+      ],
+      "tags": [
+        "digital-governance-and-democracy",
+        "consilience-garden"
+      ],
+      "image": {
+        "local": "images/placeholder-organization.webp",
+        "placeholder": true,
+        "sourceUrl": "https://enc7bbk2fpx.exactdn.com/wp-content/uploads/2020/08/sociocracy-poster_denser_small.jpg"
+      }
+    },
+    {
+      "id": "presence-solarpunk",
+      "displayName": "Solarpunk",
+      "presenceType": "organization",
+      "bio": "Solarpunk is a genre of speculative fiction that is also its own distinguished aesthetic, focusing mainly on renewable energy, living in harmony with nature, and the better future envisioned through both. Solarpunk also emphasizes handcrafted wares (as opposed to mass-produced products) and communit…",
+      "observations": [
+        {
+          "observerId": "human-matthew-manager",
+          "observedAt": "2021-08-07T21:58:56Z",
+          "context": "Collected in Consilience Garden keen, section: Shared Meaning",
+          "contextContentId": null
+        }
+      ],
+      "primaryStewardId": "human-matthew-manager",
+      "stewardshipStartedAt": "2021-08-07T21:58:56Z",
+      "externalIdentifiers": [
+        {
+          "type": "homepage",
+          "value": "https://aesthetics.fandom.com/wiki/Solarpunk"
+        }
+      ],
+      "tags": [
+        "shared-meaning",
+        "consilience-garden"
+      ],
+      "image": {
+        "local": "images/presence-solarpunk.webp",
+        "placeholder": false,
+        "sourceUrl": null
+      }
+    },
+    {
+      "id": "presence-solutions-ecochain",
+      "displayName": "Solutions - Ecochain",
+      "presenceType": "organization",
+      "bio": "LCA software used to give you one footprint at a time. With our Environmental Intelligence Platform, you can generate hundreds. Try out now.",
+      "observations": [
+        {
+          "observerId": "human-matthew-manager",
+          "observedAt": "2021-08-07T21:58:56Z",
+          "context": "Collected in Consilience Garden keen, section: Built for Purpose",
+          "contextContentId": null
+        }
+      ],
+      "primaryStewardId": "human-matthew-manager",
+      "stewardshipStartedAt": "2021-08-07T21:58:56Z",
+      "externalIdentifiers": [
+        {
+          "type": "homepage",
+          "value": "https://ecochain.com/solutions/"
+        }
+      ],
+      "tags": [
+        "built-for-purpose",
+        "consilience-garden"
+      ],
+      "image": {
+        "local": "images/placeholder-organization.webp",
+        "placeholder": true,
+        "sourceUrl": "https://ecochain.com/wp-content/uploads/2020/01/social1.jpg"
+      }
+    },
+    {
+      "id": "presence-steven-sloman",
+      "displayName": "Steven Sloman",
+      "presenceType": "person",
+      "bio": "Author referenced in Pastor Pete's FCT curriculum.",
+      "observations": [
+        {
+          "observerId": "human-pete-pastor",
+          "observedAt": "2026-01-15T00:00:00Z",
+          "context": "Cited in fct-module-01-church-dilemma while building the FCT curriculum",
+          "contextContentId": "fct-module-01-church-dilemma"
+        }
+      ],
+      "primaryStewardId": "human-pete-pastor",
+      "stewardshipStartedAt": "2026-01-15T00:00:00Z",
+      "works": [
+        {
+          "title": "The Knowledge Illusion",
+          "kind": "book",
+          "year": null,
+          "url": null,
+          "citedInContentIds": [
+            "fct-module-01-church-dilemma"
+          ]
+        }
+      ],
+      "tags": [
+        "fct",
+        "author"
+      ],
+      "image": {
+        "local": "images/placeholder-person.webp",
+        "placeholder": true,
+        "sourceUrl": null
+      }
+    },
+    {
+      "id": "presence-strong-towns",
+      "displayName": "Strong Towns",
+      "presenceType": "organization",
+      "bio": "<p>Our mission is to support a model of growth that allows America’s cities, towns and neighborhoods to become financially strong and resilient. Join the Strong towns movement today.</p>",
+      "observations": [
+        {
+          "observerId": "human-matthew-manager",
+          "observedAt": "2021-08-07T21:58:56Z",
+          "context": "Collected in Consilience Garden keen, section: Physical Commons",
+          "contextContentId": null
+        }
+      ],
+      "primaryStewardId": "human-matthew-manager",
+      "stewardshipStartedAt": "2021-08-07T21:58:56Z",
+      "externalIdentifiers": [
+        {
+          "type": "homepage",
+          "value": "https://www.strongtowns.org"
+        }
+      ],
+      "tags": [
+        "physical-commons",
+        "consilience-garden"
+      ],
+      "image": {
+        "local": "images/placeholder-organization.webp",
+        "placeholder": true,
+        "sourceUrl": {
+          "optimized_MAX_500": "https://storage.googleapis.com/download/storage/v1/b/keen_images_bucket/o/keens%2FnvBCVtcYER7C9s3H6zxS%2Ftips%2F6dA3875PIeoIZUAghFBt%2Ftip_images%2Fmetalink_images%2Foptimized%2Foptimized_500x500%3E_bucketUrl_eeffb384-244a-40af-a4a6-c818c2f78eaf.png?generation=1663266524429555&alt=media",
+          "bucketUrl": "https://storage.googleapis.com/download/storage/v1/b/keen_images_bucket/o/keens%2FnvBCVtcYER7C9s3H6zxS%2Ftips%2F6dA3875PIeoIZUAghFBt%2Ftip_images%2Fmetalink_images%2FbucketUrl_eeffb384-244a-40af-a4a6-c818c2f78eaf.png?generation=1663266523876131&alt=media"
+        }
+      }
+    },
+    {
+      "id": "presence-sustainable-shopping-eco-friendly-fair-trade-clothing-shoes",
+      "displayName": "Sustainable Shopping – Eco-Friendly, Fair Trade Clothing, Shoes & More",
+      "presenceType": "organization",
+      "bio": "With a DoneGood gift card your giftee can shop thousands of unique and purposeful goods—and know that no matter what they choose, they’re doing good for the planet and for the person who made their gift.\nIf you know someone really nice who likes to do good, you can send them a DoneGood gift card and…",
+      "observations": [
+        {
+          "observerId": "human-matthew-manager",
+          "observedAt": "2021-08-07T21:58:56Z",
+          "context": "Collected in Consilience Garden keen, section: Saved",
+          "contextContentId": null
+        }
+      ],
+      "primaryStewardId": "human-matthew-manager",
+      "stewardshipStartedAt": "2021-08-07T21:58:56Z",
+      "externalIdentifiers": [
+        {
+          "type": "homepage",
+          "value": "https://donegood.co/"
+        }
+      ],
+      "tags": [
+        "saved",
+        "consilience-garden"
+      ],
+      "image": {
+        "local": "images/presence-sustainable-shopping-eco-friendly-fair-trade-clothing-shoes.webp",
+        "placeholder": false,
+        "sourceUrl": "https://cdn.shopify.com/s/files/1/2143/7011/files/DG_Header_Logo_Slogan.png?height=628&pad_color=fff&v=1614326784&width=1200"
+      }
+    },
+    {
+      "id": "presence-tema-okun",
+      "displayName": "Tema Okun",
+      "presenceType": "person",
+      "bio": "Author referenced in Pastor Pete's FCT curriculum.",
+      "observations": [
+        {
+          "observerId": "human-pete-pastor",
+          "observedAt": "2026-01-15T00:00:00Z",
+          "context": "Cited in fct-module-12-fairness-justice while building the FCT curriculum",
+          "contextContentId": "fct-module-12-fairness-justice"
+        }
+      ],
+      "primaryStewardId": "human-pete-pastor",
+      "stewardshipStartedAt": "2026-01-15T00:00:00Z",
+      "works": [
+        {
+          "title": "The Characteristics of White Supremacy Culture",
+          "kind": "book",
+          "year": null,
+          "url": null,
+          "citedInContentIds": [
+            "fct-module-12-fairness-justice"
+          ]
+        }
+      ],
+      "tags": [
+        "fct",
+        "author"
+      ],
+      "image": {
+        "local": "images/placeholder-person.webp",
+        "placeholder": true,
+        "sourceUrl": null
+      }
+    },
+    {
+      "id": "presence-the-consilience-project",
+      "displayName": "The Consilience Project",
+      "presenceType": "organization",
+      "bio": "The Consilience Project is a non-profit media organization that aims to help catalyze a cultural movement toward higher-quality sensemaking.",
+      "observations": [
+        {
+          "observerId": "human-matthew-manager",
+          "observedAt": "2021-08-07T21:58:56Z",
+          "context": "Collected in Consilience Garden keen, section: Saved",
+          "contextContentId": null
+        }
+      ],
+      "primaryStewardId": "human-matthew-manager",
+      "stewardshipStartedAt": "2021-08-07T21:58:56Z",
+      "externalIdentifiers": [
+        {
+          "type": "homepage",
+          "value": "https://consilienceproject.org/"
+        }
+      ],
+      "tags": [
+        "saved",
+        "consilience-garden"
+      ],
+      "image": {
+        "local": "images/placeholder-organization.webp",
+        "placeholder": true,
+        "sourceUrl": "https://consilienceproject.org/content/images/2021/03/Logo.png"
+      }
+    },
+    {
+      "id": "presence-the-permaculture-principles",
+      "displayName": "The Permaculture Principles",
+      "presenceType": "organization",
+      "bio": "The Permaculture Principles guide our design decisions and formulate the structure of our Permaculture system. We are using David Holmgren’s 12 principle ver...",
+      "observations": [
+        {
+          "observerId": "human-matthew-manager",
+          "observedAt": "2021-08-07T21:58:56Z",
+          "context": "Collected in Consilience Garden keen, section: Physical Commons",
+          "contextContentId": null
+        }
+      ],
+      "primaryStewardId": "human-matthew-manager",
+      "stewardshipStartedAt": "2021-08-07T21:58:56Z",
+      "externalIdentifiers": [
+        {
+          "type": "homepage",
+          "value": "https://youtu.be/0mwRAf3z9ag"
+        }
+      ],
+      "tags": [
+        "physical-commons",
+        "consilience-garden"
+      ],
+      "image": {
+        "local": "images/presence-the-permaculture-principles.webp",
+        "placeholder": false,
+        "sourceUrl": "https://i.ytimg.com/vi/0mwRAf3z9ag/maxresdefault.jpg"
+      }
+    },
+    {
+      "id": "presence-the-regenerates-regenesis-institute-for-regenerative-practic",
+      "displayName": "The Regenerates | Regenesis Institute for Regenerative Practice",
+      "presenceType": "organization",
+      "observations": [
+        {
+          "observerId": "human-matthew-manager",
+          "observedAt": "2021-08-07T21:58:56Z",
+          "context": "Collected in Consilience Garden keen, section: Community suggestions",
+          "contextContentId": null
+        }
+      ],
+      "primaryStewardId": "human-matthew-manager",
+      "stewardshipStartedAt": "2021-08-07T21:58:56Z",
+      "externalIdentifiers": [
+        {
+          "type": "homepage",
+          "value": "https://www.regenerat.es/"
+        }
+      ],
+      "tags": [
+        "community-suggestions",
+        "consilience-garden"
+      ],
+      "image": {
+        "local": "images/placeholder-organization.webp",
+        "placeholder": true,
+        "sourceUrl": null
+      }
+    },
+    {
+      "id": "presence-thriving-places-index",
+      "displayName": "Thriving Places Index",
+      "presenceType": "organization",
+      "bio": "The Thriving Places Index measures the local conditions for wellbeing, and whether those conditions are being delivered fairly and sustainably. It consists of a broad set of indicators grouped into these three headline domains, from datasets produced by established national data agencies such as the…",
+      "observations": [
+        {
+          "observerId": "human-matthew-manager",
+          "observedAt": "2021-08-07T21:58:56Z",
+          "context": "Collected in Consilience Garden keen, section: Shared Meaning",
+          "contextContentId": null
+        }
+      ],
+      "primaryStewardId": "human-matthew-manager",
+      "stewardshipStartedAt": "2021-08-07T21:58:56Z",
+      "externalIdentifiers": [
+        {
+          "type": "homepage",
+          "value": "https://www.thrivingplacesindex.org/"
+        }
+      ],
+      "tags": [
+        "shared-meaning",
+        "consilience-garden"
+      ],
+      "image": {
+        "local": "images/placeholder-organization.webp",
+        "placeholder": true,
+        "sourceUrl": "https://www.thrivingplacesindex.org/packs/media/images/logo-824f2b614004dfb83ea4712a81d32664.png"
+      }
+    },
+    {
+      "id": "presence-tim-challies",
+      "displayName": "Tim Challies",
+      "presenceType": "person",
+      "bio": "Author referenced in Pastor Pete's FCT curriculum.",
+      "observations": [
+        {
+          "observerId": "human-pete-pastor",
+          "observedAt": "2026-01-15T00:00:00Z",
+          "context": "Cited in fct-module-14-ready-to-act while building the FCT curriculum",
+          "contextContentId": "fct-module-14-ready-to-act"
+        }
+      ],
+      "primaryStewardId": "human-pete-pastor",
+      "stewardshipStartedAt": "2026-01-15T00:00:00Z",
+      "works": [
+        {
+          "title": "The Next Story: Faith",
+          "kind": "book",
+          "year": null,
+          "url": null,
+          "citedInContentIds": [
+            "fct-module-14-ready-to-act"
+          ]
+        },
+        {
+          "title": "Friends",
+          "kind": "book",
+          "year": null,
+          "url": null,
+          "citedInContentIds": [
+            "fct-module-14-ready-to-act"
+          ]
+        },
+        {
+          "title": "Family",
+          "kind": "book",
+          "year": null,
+          "url": null,
+          "citedInContentIds": [
+            "fct-module-14-ready-to-act"
+          ]
+        },
+        {
+          "title": "and the Digital World",
+          "kind": "book",
+          "year": null,
+          "url": null,
+          "citedInContentIds": [
+            "fct-module-14-ready-to-act"
+          ]
+        }
+      ],
+      "tags": [
+        "fct",
+        "author"
+      ],
+      "image": {
+        "local": "images/placeholder-person.webp",
+        "placeholder": true,
+        "sourceUrl": null
+      }
+    },
+    {
+      "id": "presence-tom-nichols",
+      "displayName": "Tom Nichols",
+      "presenceType": "person",
+      "bio": "Author referenced in Pastor Pete's FCT curriculum.",
+      "observations": [
+        {
+          "observerId": "human-pete-pastor",
+          "observedAt": "2026-01-15T00:00:00Z",
+          "context": "Cited in fct-module-01-church-dilemma while building the FCT curriculum",
+          "contextContentId": "fct-module-01-church-dilemma"
+        }
+      ],
+      "primaryStewardId": "human-pete-pastor",
+      "stewardshipStartedAt": "2026-01-15T00:00:00Z",
+      "works": [
+        {
+          "title": "The Death of Expertise",
+          "kind": "book",
+          "year": null,
+          "url": null,
+          "citedInContentIds": [
+            "fct-module-01-church-dilemma"
+          ]
+        }
+      ],
+      "tags": [
+        "fct",
+        "author"
+      ],
+      "image": {
+        "local": "images/placeholder-person.webp",
+        "placeholder": true,
+        "sourceUrl": null
+      }
+    },
+    {
+      "id": "presence-tony-reinke",
+      "displayName": "Tony Reinke",
+      "presenceType": "person",
+      "bio": "Author referenced in Pastor Pete's FCT curriculum.",
+      "observations": [
+        {
+          "observerId": "human-pete-pastor",
+          "observedAt": "2026-01-15T00:00:00Z",
+          "context": "Cited in fct-module-14-ready-to-act while building the FCT curriculum",
+          "contextContentId": "fct-module-14-ready-to-act"
+        }
+      ],
+      "primaryStewardId": "human-pete-pastor",
+      "stewardshipStartedAt": "2026-01-15T00:00:00Z",
+      "works": [
+        {
+          "title": "12 Ways Your Phone Is Changing You",
+          "kind": "book",
+          "year": null,
+          "url": null,
+          "citedInContentIds": [
+            "fct-module-14-ready-to-act"
+          ]
+        }
+      ],
+      "tags": [
+        "fct",
+        "author"
+      ],
+      "image": {
+        "local": "images/placeholder-person.webp",
+        "placeholder": true,
+        "sourceUrl": null
+      }
+    },
+    {
+      "id": "presence-transition-network-transition-towns-the-circular-economy",
+      "displayName": "Transition Network | Transition Towns | The Circular Economy",
+      "presenceType": "organization",
+      "bio": "Transition Network encourage communities to come together and rebuild our world. Step up and address the big challenges we face by starting local.",
+      "observations": [
+        {
+          "observerId": "human-matthew-manager",
+          "observedAt": "2021-08-07T21:58:56Z",
+          "context": "Collected in Consilience Garden keen, section: Shared Meaning",
+          "contextContentId": null
+        }
+      ],
+      "primaryStewardId": "human-matthew-manager",
+      "stewardshipStartedAt": "2021-08-07T21:58:56Z",
+      "externalIdentifiers": [
+        {
+          "type": "homepage",
+          "value": "https://transitionnetwork.org/"
+        }
+      ],
+      "tags": [
+        "shared-meaning",
+        "consilience-garden"
+      ],
+      "image": {
+        "local": "images/presence-transition-network-transition-towns-the-circular-economy.webp",
+        "placeholder": false,
+        "sourceUrl": "https://transitionnetwork.org/wp-content/uploads/2016/07/facebook-share.jpg"
+      }
+    },
+    {
+      "id": "presence-transitiontowns",
+      "displayName": "TransitionTowns",
+      "presenceType": "organization",
+      "bio": "An international movement of communities reimagining and rebuilding our world.",
+      "observations": [
+        {
+          "observerId": "human-matthew-manager",
+          "observedAt": "2021-08-07T21:58:56Z",
+          "context": "Collected in Consilience Garden keen, section: Shared Meaning",
+          "contextContentId": null
+        }
+      ],
+      "primaryStewardId": "human-matthew-manager",
+      "stewardshipStartedAt": "2021-08-07T21:58:56Z",
+      "externalIdentifiers": [
+        {
+          "type": "homepage",
+          "value": "https://www.youtube.com/@TransitionTowns"
+        }
+      ],
+      "tags": [
+        "shared-meaning",
+        "consilience-garden"
+      ],
+      "image": {
+        "local": "images/presence-transitiontowns.webp",
+        "placeholder": false,
+        "sourceUrl": "https://yt3.googleusercontent.com/ytc/AL5GRJWFXil4yx1Xhmno6-Z_5qkDtIvGYOYcKrG_XLIJ=s900-c-k-c0x00ffffff-no-rj"
+      }
+    },
+    {
+      "id": "presence-valueflows",
+      "displayName": "Valueflows",
+      "presenceType": "organization",
+      "observations": [
+        {
+          "observerId": "human-matthew-manager",
+          "observedAt": "2021-08-07T21:58:56Z",
+          "context": "Collected in Consilience Garden keen, section: Design & Planning",
+          "contextContentId": null
+        }
+      ],
+      "primaryStewardId": "human-matthew-manager",
+      "stewardshipStartedAt": "2021-08-07T21:58:56Z",
+      "externalIdentifiers": [
+        {
+          "type": "homepage",
+          "value": "https://valueflo.ws/"
+        }
+      ],
+      "tags": [
+        "design-planning",
+        "consilience-garden"
+      ],
+      "image": {
+        "local": "images/presence-valueflows.webp",
+        "placeholder": false,
+        "sourceUrl": "https://www.valueflo.ws/assets/VF-logo-heading.jpg"
+      }
+    },
+    {
+      "id": "presence-vi-hart",
+      "displayName": "Vi Hart",
+      "presenceType": "person",
+      "bio": "Author referenced in Pastor Pete's FCT curriculum.",
+      "observations": [
+        {
+          "observerId": "human-pete-pastor",
+          "observedAt": "2026-01-15T00:00:00Z",
+          "context": "Cited in fct-module-12-fairness-justice while building the FCT curriculum",
+          "contextContentId": "fct-module-12-fairness-justice"
+        }
+      ],
+      "primaryStewardId": "human-pete-pastor",
+      "stewardshipStartedAt": "2026-01-15T00:00:00Z",
+      "works": [
+        {
+          "title": "Revisit this interactive demonstration",
+          "kind": "book",
+          "year": null,
+          "url": null,
+          "citedInContentIds": [
+            "fct-module-12-fairness-justice"
+          ]
+        }
+      ],
+      "tags": [
+        "fct",
+        "author"
+      ],
+      "image": {
+        "local": "images/placeholder-person.webp",
+        "placeholder": true,
+        "sourceUrl": null
+      }
+    },
+    {
+      "id": "presence-virginia-eubanks",
+      "displayName": "Virginia Eubanks",
+      "presenceType": "person",
+      "bio": "Author referenced in Pastor Pete's FCT curriculum.",
+      "observations": [
+        {
+          "observerId": "human-pete-pastor",
+          "observedAt": "2026-01-15T00:00:00Z",
+          "context": "Cited in fct-module-12-fairness-justice while building the FCT curriculum",
+          "contextContentId": "fct-module-12-fairness-justice"
+        }
+      ],
+      "primaryStewardId": "human-pete-pastor",
+      "stewardshipStartedAt": "2026-01-15T00:00:00Z",
+      "works": [
+        {
+          "title": "Automating Inequality",
+          "kind": "book",
+          "year": null,
+          "url": null,
+          "citedInContentIds": [
+            "fct-module-12-fairness-justice"
+          ]
+        }
+      ],
+      "tags": [
+        "fct",
+        "author"
+      ],
+      "image": {
+        "local": "images/placeholder-person.webp",
+        "placeholder": true,
+        "sourceUrl": null
+      }
+    },
+    {
+      "id": "presence-welcome-to-regeneration-project-regeneration",
+      "displayName": "Welcome to Regeneration | Project Regeneration",
+      "presenceType": "organization",
+      "bio": "Regeneration means putting life at the center of every action and decision. It is inclusive, engaging, and generous. And everyone can do it.",
+      "observations": [
+        {
+          "observerId": "human-matthew-manager",
+          "observedAt": "2021-08-07T21:58:56Z",
+          "context": "Collected in Consilience Garden keen, section: Shared Meaning",
+          "contextContentId": null
+        }
+      ],
+      "primaryStewardId": "human-matthew-manager",
+      "stewardshipStartedAt": "2021-08-07T21:58:56Z",
+      "externalIdentifiers": [
+        {
+          "type": "homepage",
+          "value": "https://regeneration.org/"
+        }
+      ],
+      "tags": [
+        "shared-meaning",
+        "consilience-garden"
+      ],
+      "image": {
+        "local": "images/presence-welcome-to-regeneration-project-regeneration.webp",
+        "placeholder": false,
+        "sourceUrl": "https://regeneration.org/sites/default/files/2021-08/metashare_default03.jpg"
+      }
+    },
+    {
+      "id": "presence-wij-willen-het-internet-terug-publicspaces",
+      "displayName": "Wij willen het internet terug - PublicSpaces",
+      "presenceType": "organization",
+      "bio": "Door PublicSpaces zijn in 2026 zijn alle privacy officers en CTO’s van publieke organisaties in Nederland op de hoogte van alternatieve digitale instrumenten gebaseerd op publieke waarden.",
+      "observations": [
+        {
+          "observerId": "human-matthew-manager",
+          "observedAt": "2021-08-07T21:58:56Z",
+          "context": "Collected in Consilience Garden keen, section: Design & Planning",
+          "contextContentId": null
+        }
+      ],
+      "primaryStewardId": "human-matthew-manager",
+      "stewardshipStartedAt": "2021-08-07T21:58:56Z",
+      "externalIdentifiers": [
+        {
+          "type": "homepage",
+          "value": "https://publicspaces.net"
+        }
+      ],
+      "tags": [
+        "design-planning",
+        "consilience-garden"
+      ],
+      "image": {
+        "local": "images/presence-wij-willen-het-internet-terug-publicspaces.webp",
+        "placeholder": false,
+        "sourceUrl": "https://publicspaces.net/wp-content/uploads/2019/01/PublicSpaces-1-300x169.jpg"
+      }
+    },
+    {
+      "id": "presence-world3-wikipedia",
+      "displayName": "World3 - Wikipedia",
+      "presenceType": "organization",
+      "observations": [
+        {
+          "observerId": "human-matthew-manager",
+          "observedAt": "2021-08-07T21:58:56Z",
+          "context": "Collected in Consilience Garden keen, section: Design & Planning",
+          "contextContentId": null
+        }
+      ],
+      "primaryStewardId": "human-matthew-manager",
+      "stewardshipStartedAt": "2021-08-07T21:58:56Z",
+      "externalIdentifiers": [
+        {
+          "type": "homepage",
+          "value": "https://en.wikipedia.org/wiki/World3"
+        }
+      ],
+      "tags": [
+        "design-planning",
+        "consilience-garden"
+      ],
+      "image": {
+        "local": "images/placeholder-organization.webp",
+        "placeholder": true,
+        "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/thumb/b/be/Limits-to-growth-figure-35.svg/220px-Limits-to-growth-figure-35.svg.png"
+      }
+    }
+  ]
+}

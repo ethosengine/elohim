@@ -72,6 +72,27 @@ if [ -z "$CHANGED" ]; then
   exit 0
 fi
 
+# ── Humans/Presences Schema Validation + Freshness ───────────────
+#
+# When genesis/data/humans/ or genesis/data/presences/ markdown changes,
+# validate schemas and ensure the generated humans.json / presences.json
+# artifacts are fresh relative to their markdown sources.
+if echo "$CHANGED" | grep -qE "genesis/data/humans/|genesis/data/presences/"; then
+  echo "[pre-push] Validating humans and presences schemas..."
+  (cd genesis/seeder && pnpm run validate:humans) || exit 1
+  (cd genesis/seeder && pnpm run validate:presences) || exit 1
+
+  echo "[pre-push] Regenerating humans.json / presences.json from markdown sources..."
+  (cd genesis/seeder && pnpm run build:data) || exit 1
+
+  if ! git diff --quiet -- genesis/data/humans/humans.json genesis/data/presences/presences.json 2>/dev/null; then
+    echo "[pre-push] ERROR: humans.json or presences.json is stale relative to markdown sources."
+    echo "  Re-run 'pnpm --filter genesis-seeder run build:data' and stage the changes before pushing."
+    exit 1
+  fi
+  echo "[pre-push] humans/presences validation ✓"
+fi
+
 # ── Project Detection (manifest-driven) ──────────────────────────
 #
 # Try graph walker first — reads build-manifest.json files and matches

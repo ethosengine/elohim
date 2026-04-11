@@ -12,7 +12,7 @@ Feature: Fixture Human Categories
   Scenario: Core family — Matthew's household
     Given human "Matthew" is logged in on doorway "alpha"
     And human "Susan" is logged in on doorway "alpha"
-    And human "Sammy" is logged in on doorway "alpha"
+    And human "James" is logged in on doorway "alpha"
     And human "Gertrude" is logged in on doorway "alpha"
     Then all 4 humans should have distinct tokens
 
@@ -22,7 +22,7 @@ Feature: Fixture Human Categories
     Then all 2 humans should have distinct tokens
 
   Scenario: Affinity group — learning and faith
-    Given human "Pastor Pete" is logged in on doorway "alpha"
+    Given human "Pete" is logged in on doorway "alpha"
     And human "Timothy" is logged in on doorway "alpha"
     And human "Tommy" is logged in on doorway "alpha"
     And human "Meriadoc" is logged in on doorway "alpha"

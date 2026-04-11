@@ -1,0 +1,193 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "elohim:protocol:presences",
+  "title": "ContributorPresence Frontmatter Schema — operational source of truth for the observation model; notarized projection target is the contributor_presences DHT entry type in imagodei DNA",
+  "description": "Operational IoC contract (Category C) for presence frontmatter in genesis/data/presences/*.md. Presences are observation-graph nodes representing cited contributors (authors, organizations, speakers) who may later claim their own agent-scoped identity. This schema is a projection of the notarized ContributorPresence entry type; the DNA entry is the authority for core identity fields, and this schema adds seed-data vocabulary that rides on metadata_json at the Rust boundary. Reconstruction strategy: rebuild from Rust ContributorPresence struct + design doc genesis/plans/2026-04-11-humans-schema-design.md.",
+  "type": "object",
+  "required": ["id", "displayName", "presenceType", "observations"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^presence-[a-z0-9][a-z0-9-]*[a-z0-9]$",
+      "description": "Unique slug. Must match filename stem."
+    },
+    "displayName": {
+      "type": "string",
+      "minLength": 1
+    },
+    "presenceType": {
+      "type": "string",
+      "enum": ["person", "organization"],
+      "description": "Discriminator. Rides in metadata_json."
+    },
+    "bio": {
+      "type": ["string", "null"]
+    },
+    "observations": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/Observation" },
+      "description": "Observation edges. Each observation is a witnessing act by a registered human; at least one is required at genesis."
+    },
+    "primaryStewardId": {
+      "type": ["string", "null"],
+      "description": "Current steward's human id. Defaults to observations[0].observerId if unset. Cross-reference validated by companion script."
+    },
+    "stewardshipStartedAt": {
+      "type": ["string", "null"],
+      "format": "date-time"
+    },
+    "externalIdentifiers": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/ExternalIdentifier" }
+    },
+    "sameAsPresenceIds": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^presence-[a-z0-9][a-z0-9-]*[a-z0-9]$"
+      },
+      "default": [],
+      "description": "Known duplicate presences. Empty at genesis; populated by future merge work."
+    },
+    "works": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/Work" }
+    },
+    "suggestedCollectiveIds": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "description": "Soft hint for the claim flow — which collectives this presence is likely affiliated with. Cross-reference validated by companion script."
+      }
+    },
+    "tags": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Free-form thematic tags. Currently populated by the one-shot Consilience Garden migration (section names slugified). Future sprints may introduce a tag vocabulary but this field stays free-form at the schema layer."
+    },
+    "image": {
+      "type": ["object", "null"],
+      "required": ["local"],
+      "properties": {
+        "local": {
+          "type": "string",
+          "pattern": "^images/[a-z0-9-]+\\.webp$",
+          "description": "Path to local webp image, relative to the presences/ directory."
+        },
+        "placeholder": {
+          "type": "boolean",
+          "description": "True when the image is a stub awaiting a real upload."
+        },
+        "sourceUrl": {
+          "type": ["string", "null"]
+        }
+      },
+      "additionalProperties": false
+    },
+    "note": {
+      "type": ["string", "null"]
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "Observation": {
+      "type": "object",
+      "description": "A witnessing act by a registered human that brings this presence into the observation graph.",
+      "required": ["observerId", "observedAt", "context"],
+      "properties": {
+        "observerId": {
+          "type": "string",
+          "pattern": "^human-[a-z0-9][a-z0-9-]*[a-z0-9]$",
+          "description": "Human id of the observer. Must reference a human in genesis/data/humans/. Cross-reference validated by companion script."
+        },
+        "observedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "UTC timestamp of the observation moment — when the observer first took note of this presence and created the recognition record. This is the anchor for the value-flow graph: each observation with a contextContentId can eventually trigger a flow event back to the observer when the cited content accumulates recognition."
+        },
+        "context": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Free-form context for the observation (how/where the observer encountered this presence)."
+        },
+        "contextContentId": {
+          "type": ["string", "null"],
+          "description": "Optional content node id tying the observation to a specific ContentNode. Cross-reference validated by companion script when non-null."
+        }
+      },
+      "additionalProperties": false
+    },
+    "ExternalIdentifier": {
+      "type": "object",
+      "description": "External handle or canonical identifier for this presence (ORCID, Wikipedia, social, etc.).",
+      "required": ["type", "value"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "description": "Ordered by semantic weight for claim verification: canonical research identifiers first (orcid, isni, wikipedia, wikidata) — strongest signal; social identities (linkedin, twitter, mastodon, personal-domain) — medium signal; direct-work identifiers (doi, isbn, arxiv, github) — strong when present; contact (homepage, email) — weakest. New entries should be inserted in the appropriate tier.",
+          "enum": [
+            "orcid",
+            "isni",
+            "wikipedia",
+            "wikidata",
+            "linkedin",
+            "twitter",
+            "mastodon",
+            "personal-domain",
+            "doi",
+            "isbn",
+            "arxiv",
+            "github",
+            "homepage",
+            "email"
+          ]
+        },
+        "value": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "Work": {
+      "type": "object",
+      "description": "A work attributed to this presence (book, paper, talk, project, etc.).",
+      "required": ["title", "kind"],
+      "properties": {
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "book",
+            "paper",
+            "talk",
+            "podcast",
+            "video",
+            "project",
+            "organization",
+            "website",
+            "other"
+          ]
+        },
+        "year": {
+          "type": ["integer", "null"]
+        },
+        "url": {
+          "type": ["string", "null"]
+        },
+        "citedInContentIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "description": "Content node id where this work is cited. Cross-reference validated by companion script."
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

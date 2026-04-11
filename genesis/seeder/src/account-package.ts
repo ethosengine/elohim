@@ -39,7 +39,7 @@ const __filename = fileURLToPath(import.meta.url);
 const SEEDER_DIR = path.dirname(path.dirname(__filename));
 const GENESIS_DIR = path.resolve(SEEDER_DIR, '..');
 const DATA_DIR = path.join(GENESIS_DIR, 'data', 'lamad');
-const HUMANS_FILE = path.join(GENESIS_DIR, 'docs', 'humans', 'humans.json');
+const HUMANS_FILE = path.join(GENESIS_DIR, 'data', 'humans', 'humans.json');
 const OUTPUT_DIR = path.join(GENESIS_DIR, 'data', 'account-packages');
 const CONDUCTOR_GROUPS_FILE = path.join(OUTPUT_DIR, 'conductor-groups.json');
 

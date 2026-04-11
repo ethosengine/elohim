@@ -1,0 +1,3376 @@
+{
+  "schemaVersion": 1,
+  "identity": {
+    "humanId": "human-ezra-newcomer",
+    "displayName": "Ezra",
+    "category": "newcomer",
+    "profileReach": "private",
+    "bio": "New to the network. Eager to contribute but still building trust and understanding norms.",
+    "location": "New Haven (city)",
+    "affinities": [
+      "learning",
+      "community-building",
+      "governance"
+    ],
+    "organizations": []
+  },
+  "content": [
+    {
+      "contentId": "assessment-attachment-style",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "assessment-constitutional-reasoning",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "assessment-personal-values",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "assessment-strengths-finder",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "assessment-values-hierarchy",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "book-collapse-of-complex-societies",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "book-finite-and-infinite-games",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "book-ministry-for-the-future",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "care-economy-visibility",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "community-apprenticeship-program",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "community-builders-guild",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "community-educators-network",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "community-engineers-network",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "community-esl-program",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "community-farmers-market",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "community-garden-club",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "community-gig-workers-alliance",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "community-holochain-devs",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "community-homeschool-coop",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "community-immigrant-support",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "community-impact-investors",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "community-local-business",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "community-local-church",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "community-manufacturers-guild",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "community-mining-town",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "community-neighborhood-association",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "community-pastoral-network",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "community-refugee-resettlement",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "community-regen-ag-network",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "community-rideshare-drivers",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "community-rust-meetup",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "community-utility-workers",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "concept-centralized-control",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "concept-communities-self-govern",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "concept-community-wisdom-at-scale",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "concept-complexity-exceeds-processing",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "concept-connection-genuine",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "concept-cross-layer-verification",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "concept-currency-carries-no-values",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "concept-currency-concentrate-not-circulate",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "concept-currency-fail-to-reward-care",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "concept-currency-no-natural-limits",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "concept-dark-patterns-impossible",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "concept-different-values-coexist",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "concept-economic-alignment",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "concept-engagement-optimization",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "concept-engineering-specifications",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "concept-feedback-loops-broken",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "concept-graduated-intimacy",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "concept-growth-encouraged-exploitation-prevented",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "concept-human-creativity-flourishes",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "concept-incorruptible-stewardship",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "concept-indigenous-wisdom",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "concept-intergenerational-thinking",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "concept-love-as-technology",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "concept-one-size-fits-all-moderation",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "concept-path-forward-communities",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "concept-path-forward-developers",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "concept-path-forward-policymakers",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "concept-peer-to-peer-architecture",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "concept-poverty-of-currency",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "concept-redemptive-security-model",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "concept-representation-capturable",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "concept-scandinavian-insight",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "concept-surveillance-capitalism",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "concept-technology-serves-love",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "concept-transparency-as-immune-system",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "concept-value-generative-economics",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "concept-votes-binary-infrequent",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "concept-vulnerable-people-protected",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "elohim-global-orchestra",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "elohim-observer-protocol",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "elohim-public-observer-epic",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "feature-governance-appellant-scenarios-community",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "feature-governance-appellant-scenarios-family",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "feature-governance-appellant-scenarios-global",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "feature-governance-appellant-scenarios-individual-family",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "feature-governance-appellant-scenarios-individual",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "feature-governance-appellant-scenarios-nation-state",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "feature-governance-appellant-scenarios-provincial-state",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "feature-governance-community-leader-scenarios-community",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "feature-governance-community-leader-scenarios-municipal",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "feature-governance-community-leader-scenarios-municipality",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "feature-governance-constitutional-council-member-scenarios-community",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "feature-governance-constitutional-council-member-scenarios-global",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "feature-governance-constitutional-council-member-scenarios-nation-state",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "feature-governance-constitutional-council-member-scenarios-provincial-state",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "feature-governance-policy-maker-scenarios-global",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "feature-governance-policy-maker-scenarios-nation-state",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "feature-governance-policy-maker-scenarios-provincial-state",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "feature-governance-researcher-scenarios-community",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "feature-governance-researcher-scenarios-global",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "feature-governance-researcher-scenarios-nation-state",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "feature-governance-researcher-scenarios-national",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "feature-governance-researcher-scenarios-provincial-state",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "feature-governance-technical-expert-scenarios-global",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "feature-governance-technical-expert-scenarios-nation-state",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "feature-governance-technical-expert-scenarios-provincial-state",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "feature-social-medium-activist-scenarios-affinity-network",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "feature-social-medium-activist-scenarios-community",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "feature-social-medium-activist-scenarios-global",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "feature-social-medium-activist-scenarios-individual",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "feature-social-medium-child-scenarios-affinity-network",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "feature-social-medium-child-scenarios-educational",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "feature-social-medium-child-scenarios-family",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "feature-social-medium-community-moderator-scenarios-community",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "feature-social-medium-content-creator-scenarios-affinity-network",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "feature-social-medium-content-creator-scenarios-community",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "feature-social-medium-displaced-person-scenarios-community",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "feature-social-medium-displaced-person-scenarios-ecological-bioregional",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "feature-social-medium-elder-scenarios-affinity-network",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "feature-social-medium-elder-scenarios-family",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "feature-social-medium-elder-scenarios-neighborhood",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "feature-social-medium-refugee-scenarios-global",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "global-orchestra",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "governance-appellant-readme",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "governance-audio-future-thinkers-daniel-schmachtenberger-the-existential-game-readme",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "governance-community-leader-readme",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "governance-constitutional-council-member-readme",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "governance-epic",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "governance-policy-maker-readme",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "governance-researcher-readme",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "governance-technical-expert-readme",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "governance-video-climate-town-readme",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "governance-video-not-just-bikes-readme",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "governance-video-the-permaculture-principles-readme",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "governance-video-transitiontowns-readme",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "hardware-spec",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "hrea-agent-model",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "hrea-appreciation-gift",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "hrea-economic-events",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "hrea-intent-commitment",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "hrea-process-recipe",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "manifesto",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "observer-protocol",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "organizations-decomposition",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "quiz-digital-dignity",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "quiz-governance-foundations",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "rea-foundations",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-appellant-scenarios-community-appeal escalation path when community review insufficient",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-appellant-scenarios-community-appeal includes community context testimony",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-appellant-scenarios-community-appeal of community surveillance or monitoring practices",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-appellant-scenarios-community-appeal reveals need for community-specific calibration",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-appellant-scenarios-community-appealing community conflict mediation outcome",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-appellant-scenarios-community-appealing community resource allocation decision",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-appellant-scenarios-community-community appeal informs local policy development",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-appellant-scenarios-community-community elohim identifies clear error in family elohim decision",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-appellant-scenarios-community-first-layer appeal review within 24 hours",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-appellant-scenarios-community-multiple appellants challenge same community decision",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-appellant-scenarios-community-unsuccessful appeal but protocol transparency builds trust",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-appellant-scenarios-family-appeal about generational authority and respect",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-appellant-scenarios-family-appeal after family member death reveals intervention value",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-appellant-scenarios-family-appeal family intervention that strained trust",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-appellant-scenarios-family-appeal involving adolescent autonomy within family",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-appellant-scenarios-family-appealing family emergency decision in crisis",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-appellant-scenarios-family-appealing family privacy boundaries",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-appellant-scenarios-family-appealing resource allocation within family unit",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-appellant-scenarios-family-cross-cultural family appeal about care norms",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-appellant-scenarios-family-family member appeals on behalf of vulnerable member",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-appellant-scenarios-family-multi-family appeal about shared resources",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-appellant-scenarios-global-access to global appeal precedent database",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-appellant-scenarios-global-appellant case reveals gap in global constitutional framework",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-appellant-scenarios-global-constitutional amendment from appellant-driven insights",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-appellant-scenarios-global-cross-cultural constitutional interpretation",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-appellant-scenarios-global-emergency global appeal during existential threat",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-appellant-scenarios-global-global appeal data informs protocol evolution",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-appellant-scenarios-global-global precedent for existential constitutional questions",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-appellant-scenarios-global-participate in 7-year constitutional convention",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-appellant-scenarios-global-protect appellant rights as universal constitutional minimum",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-appellant-scenarios-individual-accessing appeals process without technical expertise",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-appellant-scenarios-individual-accessing precedent to understand similar cases",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-appellant-scenarios-individual-appeal contributes to constitutional evolution",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-appellant-scenarios-individual-appeal mental health intervention with privacy concerns",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-appellant-scenarios-individual-appeal unsuccessful but feeling heard through the process",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-appellant-scenarios-individual-escalating appeal when initial review doesn't satisfy",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-appellant-scenarios-individual-family-access appeal interface during high emotional distress",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-appellant-scenarios-individual-family-appeal agent decision that involved factual error",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-appellant-scenarios-individual-family-appeal mental health intervention that violated privacy",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-appellant-scenarios-individual-family-experience dignity throughout appeal process",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-appellant-scenarios-individual-family-pre-specify alert preferences after appeal experience",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-appellant-scenarios-individual-family-request explainable agent reasoning during appeal",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-appellant-scenarios-individual-family-track appeal status and progress",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-appellant-scenarios-individual-pre-specifying preferences after successful appeal",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-appellant-scenarios-individual-protection from retaliation after filing appeal",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-appellant-scenarios-individual-successfully overturning an agent decision through appeal",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-appellant-scenarios-individual-understanding agent reasoning through appeal process",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-appellant-scenarios-nation-state-appeal challenges national protocol implementation standard",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-appellant-scenarios-nation-state-appeal escalates to national level due to fundamental constitutional tension",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-appellant-scenarios-nation-state-appeal involves national security or existential risk considerations",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-appellant-scenarios-nation-state-appeal involves superintelligent agent reasoning complexity",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-appellant-scenarios-nation-state-appeal reveals need for constitutional amendment",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-appellant-scenarios-nation-state-appellant testimony influences national policy legislation",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-appellant-scenarios-nation-state-cross-cultural appeal about universal human dignity",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-appellant-scenarios-nation-state-national media coverage of landmark appeal",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-appellant-scenarios-nation-state-national precedent creates appellant bill of rights",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-appellant-scenarios-nation-state-national precedent reconciles conflicting regional interpretations",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-appellant-scenarios-nation-state-research on national appeal patterns informs my case",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-appellant-scenarios-nation-state-successful national appeal leads to protocol version update",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-appellant-scenarios-provincial-state-appeal establishes novel constitutional precedent",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-appellant-scenarios-provincial-state-appeal involves technical complexity requiring expert testimony",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-appellant-scenarios-provincial-state-appeal involving cultural specificity vs constitutional minimums",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-appellant-scenarios-provincial-state-appeal outcome influences provincial policy making",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-appellant-scenarios-provincial-state-appeal precedent cited in research on democratic ai governance",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-appellant-scenarios-provincial-state-appeal reveals systematic bias across multiple communities",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-appellant-scenarios-provincial-state-appeal with significant regional impact gets extensive deliberation",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-appellant-scenarios-provincial-state-cross-community appeal requiring regional coordination",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-appellant-scenarios-provincial-state-dissenting opinion preserved in regional precedent",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-appellant-scenarios-provincial-state-escalated appeal reaches regional constitutional council",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-appellant-scenarios-provincial-state-rapid appeal review during regional crisis",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-community-leader-scenarios-community-addressing implementation challenges pragmatically",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-community-leader-scenarios-community-adopting elohim protocol through community referendum",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-community-leader-scenarios-community-calibrating protocol to community-specific values",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-community-leader-scenarios-community-convening deliberative assembly for community conflict",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-community-leader-scenarios-community-demonstrating visible community benefit for reelection",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-community-leader-scenarios-community-funding community protocol infrastructure sustainably",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-community-leader-scenarios-community-identifying patterns in appeals informing local policy",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-community-leader-scenarios-community-integrating protocol with existing city governance",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-community-leader-scenarios-community-mediating between community members and agents",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-community-leader-scenarios-community-planning for crisis response maintaining democratic oversight",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-community-leader-scenarios-community-preparing community for potential authoritarian resistance",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-community-leader-scenarios-community-protecting protocol sovereignty from state overreach",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-community-leader-scenarios-community-providing local context to constitutional council deliberations",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-community-leader-scenarios-community-sharing implementation wisdom with other community leaders",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-community-leader-scenarios-municipal-address climate refugee resettlement at municipal scale",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-community-leader-scenarios-municipal-coordinate resource allocation across diverse neighborhoods",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-community-leader-scenarios-municipal-coordinate with county and state on cross-boundary issues",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-community-leader-scenarios-municipal-crisis coordination across municipal infrastructure",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-community-leader-scenarios-municipal-facilitate inter-neighborhood dialogue on shared challenges",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-community-leader-scenarios-municipal-monitor municipal wellbeing indicators for policy improvement",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-community-leader-scenarios-municipal-municipal policy integration with protocol decisions",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-community-leader-scenarios-municipality-coordinating across neighborhoods with different needs",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-community-leader-scenarios-municipality-coordinating economic development across municipality",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-community-leader-scenarios-municipality-cross-municipal coordination with neighboring cities",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-community-leader-scenarios-municipality-integrating municipal services with protocol coordination",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-community-leader-scenarios-municipality-managing municipal-level crisis affecting whole city",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-community-leader-scenarios-municipality-municipal budget allocation informed by protocol data",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-community-leader-scenarios-municipality-municipal constitutional council handles city-level appeals",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-community-leader-scenarios-municipality-municipal elohim provides cross-neighborhood insights",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-community-leader-scenarios-municipality-municipal governance evolution through protocol learning",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-community-leader-scenarios-municipality-municipal level participates in county-state coordination",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-community-leader-scenarios-municipality-municipal planning commission uses agent constitutional analysis",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-community-leader-scenarios-municipality-municipal transparency dashboard for public accountability",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-community-leader-scenarios-municipality-resolving conflict between neighborhood protocol calibrations",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-community-leader-scenarios-municipality-training city staff to work alongside protocol agents",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-constitutional-council-member-scenarios-community-anonymous service when facing community controversy",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-constitutional-council-member-scenarios-community-balancing technical expert advice with my human judgment",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-constitutional-council-member-scenarios-community-creating precedent that will guide future cases",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-constitutional-council-member-scenarios-community-deliberating with structured process ensuring all voices heard",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-constitutional-council-member-scenarios-community-experiencing the weight of judgment affecting real lives",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-constitutional-council-member-scenarios-community-intensive training prepares me for constitutional interpretation",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-constitutional-council-member-scenarios-community-random selection to serve on community constitutional council",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-constitutional-council-member-scenarios-community-reviewing my first appeal case with fellow council members",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-constitutional-council-member-scenarios-community-ruling against agent decision when constitutional bounds exceeded",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-constitutional-council-member-scenarios-community-seeing patterns across multiple appeals inform community calibration",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-constitutional-council-member-scenarios-community-term limits protect me from capture while preserving learning",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-constitutional-council-member-scenarios-global-convention creates amendments from accumulated lived experience",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-constitutional-council-member-scenarios-global-creating precedent for global crisis coordination",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-constitutional-council-member-scenarios-global-cross-cultural deliberation with radical diversity",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-constitutional-council-member-scenarios-global-deliberating on adolescent autonomy constitutional amendment",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-constitutional-council-member-scenarios-global-deliberating on ecological standing constitutional amendment",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-constitutional-council-member-scenarios-global-experiencing transformation through global service",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-constitutional-council-member-scenarios-global-grappling with superintelligence governance at convention",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-constitutional-council-member-scenarios-global-my healthcare amendment proposal passes convention",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-constitutional-council-member-scenarios-global-my service inspires future generations' democratic participation",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-constitutional-council-member-scenarios-global-participating in global public education through convention",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-constitutional-council-member-scenarios-global-random selection to global constitutional convention",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-constitutional-council-member-scenarios-global-voting on constitutional amendments after deep deliberation",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-constitutional-council-member-scenarios-nation-state-balancing national security claims with individual rights",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-constitutional-council-member-scenarios-nation-state-creating national appellant bill of rights from precedent",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-constitutional-council-member-scenarios-nation-state-deliberating fundamental constitutional tension",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-constitutional-council-member-scenarios-nation-state-facing superintelligent agent reasoning complexity",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-constitutional-council-member-scenarios-nation-state-grappling with universal dignity across cultural differences",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-constitutional-council-member-scenarios-nation-state-identifying need for constitutional amendment",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-constitutional-council-member-scenarios-nation-state-my judgment influences national legislation",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-constitutional-council-member-scenarios-nation-state-producing comprehensive written opinion for landmark case",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-constitutional-council-member-scenarios-nation-state-reconciling conflicting regional constitutional interpretations",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-constitutional-council-member-scenarios-nation-state-research on council effectiveness includes my service",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-constitutional-council-member-scenarios-nation-state-selected for national constitutional council serving entire nation",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-constitutional-council-member-scenarios-provincial-state-balancing speed and deliberation quality under time pressure",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-constitutional-council-member-scenarios-provincial-state-contributing to regional policy improvement through recommendations",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-constitutional-council-member-scenarios-provincial-state-creating novel constitutional precedent for new situation",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-constitutional-council-member-scenarios-provincial-state-deliberating multi-community coordination case",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-constitutional-council-member-scenarios-provincial-state-documenting dissenting opinion preserving minority view",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-constitutional-council-member-scenarios-provincial-state-grappling with cultural diversity and constitutional minimums",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-constitutional-council-member-scenarios-provincial-state-my judgment influences policy maker legislation",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-constitutional-council-member-scenarios-provincial-state-reviewing case with significant technical complexity",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-constitutional-council-member-scenarios-provincial-state-reviewing systematic bias revealed across community appeals",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-constitutional-council-member-scenarios-provincial-state-serving on regional council with greater complexity and time",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-policy-maker-scenarios-global-addressing existential ai risk through democratic governance",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-policy-maker-scenarios-global-addressing global inequality in protocol access",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-policy-maker-scenarios-global-advocating for protocol sovereignty in international forums",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-policy-maker-scenarios-global-building international coalition resisting corporate capture",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-policy-maker-scenarios-global-coordinating response to authoritarian threats to protocol",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-policy-maker-scenarios-global-crafting legislation enabling global constitutional amendments",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-policy-maker-scenarios-global-learning from diverse national approaches to protocol",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-policy-maker-scenarios-global-my national experience informs global ai governance norms",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-policy-maker-scenarios-global-opposing trade agreements compromising protocol sovereignty",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-policy-maker-scenarios-global-participating in global constitutional convention as observer",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-policy-maker-scenarios-global-participating in un discussions on ai governance standards",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-policy-maker-scenarios-global-promoting research on global ai governance effectiveness",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-policy-maker-scenarios-global-supporting protocol adoption in global south nations",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-policy-maker-scenarios-nation-state-addressing protocol implications for labor and employment law",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-policy-maker-scenarios-nation-state-commissioning independent research on protocol effectiveness",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-policy-maker-scenarios-nation-state-coordinating with international counterparts on ai governance",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-policy-maker-scenarios-nation-state-creating digital constitutional rights amendment",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-policy-maker-scenarios-nation-state-creating national crisis reserve funds for protocol resilience",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-policy-maker-scenarios-nation-state-creating sunset provisions and mandatory review",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-policy-maker-scenarios-nation-state-defending legislation against corporate capture testimony",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-policy-maker-scenarios-nation-state-drafting community ai infrastructure act for national funding",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-policy-maker-scenarios-nation-state-establishing federal-state coordination framework",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-policy-maker-scenarios-nation-state-integrating protocol with national court system",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-policy-maker-scenarios-nation-state-participating in national media discourse on ai governance",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-policy-maker-scenarios-nation-state-responding to national security agencies' concerns",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-policy-maker-scenarios-nation-state-testifying to national constitutional council on policy needs",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-policy-maker-scenarios-provincial-state-addressing protocol-tax law integration questions",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-policy-maker-scenarios-provincial-state-coordinating interstate recognition of protocol decisions",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-policy-maker-scenarios-provincial-state-crafting enabling legislation protecting protocol sovereignty",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-policy-maker-scenarios-provincial-state-establishing legal recognition of constitutional council decisions",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-policy-maker-scenarios-provincial-state-establishing liability framework for agent errors",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-policy-maker-scenarios-provincial-state-funding state grants for community protocol adoption",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-policy-maker-scenarios-provincial-state-hearing testimony from mayor jamal about implementation reality",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-policy-maker-scenarios-provincial-state-learning from protocol outcomes to improve legislation",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-policy-maker-scenarios-provincial-state-mandating transparency while protecting privacy",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-policy-maker-scenarios-provincial-state-resisting corporate lobbying for regulatory capture",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-policy-maker-scenarios-provincial-state-responding to constituent concerns about ai governance",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-policy-maker-scenarios-provincial-state-using research evidence to justify protocol support",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-researcher-scenarios-community-analyzing appeal patterns to understand constitutional interpretation",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-researcher-scenarios-community-collaborating with mayor jamal on participatory action research",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-researcher-scenarios-community-conducting ethnographic research in riverside community",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-researcher-scenarios-community-documenting community-specific calibration process",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-researcher-scenarios-community-ethical data practices respecting community sovereignty",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-researcher-scenarios-community-identifying implementation challenges through participant observation",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-researcher-scenarios-community-interviewing appellant about appeal experience and recourse",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-researcher-scenarios-community-observing constitutional council deliberation in real-time",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-researcher-scenarios-community-research findings immediately improve local governance",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-researcher-scenarios-community-studying trust building through transparent governance",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-researcher-scenarios-community-tracking community wellbeing indicators over time",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-researcher-scenarios-global-analyzing global constitutional convention deliberations",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-researcher-scenarios-global-comparative analysis of protocol adoption across 100+ nations",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-researcher-scenarios-global-contributing to global public discourse on ai governance",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-researcher-scenarios-global-global data infrastructure with privacy and sovereignty protection",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-researcher-scenarios-global-global meta-analysis synthesizing all protocol research",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-researcher-scenarios-global-global research ethics and decolonizing methodology",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-researcher-scenarios-global-global research network coordinating cross-cultural studies",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-researcher-scenarios-global-historical and comparative analysis contextualizing protocol",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-researcher-scenarios-global-longitudinal global study tracking generational transformation",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-researcher-scenarios-global-presenting research at global constitutional convention",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-researcher-scenarios-global-research on cultural values and constitutional universality",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-researcher-scenarios-global-research on protocol as global existential risk mitigation",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-researcher-scenarios-global-studying global inequality in protocol access and benefits",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-researcher-scenarios-nation-state-analyzing national constitutional council precedent development",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-researcher-scenarios-nation-state-analyzing national media discourse about ai governance",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-researcher-scenarios-nation-state-comparing national adoption across different political systems",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-researcher-scenarios-nation-state-evaluating national policy impact on protocol outcomes",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-researcher-scenarios-nation-state-national longitudinal study tracking 10-year outcomes",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-researcher-scenarios-nation-state-national research infrastructure enabling cumulative knowledge",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-researcher-scenarios-nation-state-national survey research on public trust and legitimacy",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-researcher-scenarios-nation-state-null findings about protocol effects inform honest assessment",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-researcher-scenarios-nation-state-providing congressional testimony on protocol effectiveness",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-researcher-scenarios-nation-state-research on superintelligence governance and democratic legitimacy",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-researcher-scenarios-nation-state-studying national constitutional convention as deliberative democracy",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-researcher-scenarios-nation-state-studying national crisis response and protocol resilience",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-researcher-scenarios-national-analyze whether initial wellbeing gains sustain or decay",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-researcher-scenarios-national-document how national constitutional council precedents evolve",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-researcher-scenarios-national-establish 10-year longitudinal study tracking protocol evolution",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-researcher-scenarios-national-examine cohort effects comparing early vs late adopters",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-researcher-scenarios-national-follow sarah martinez's democratic development after council service",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-researcher-scenarios-national-investigate whether protocol governance quality degrades as it scales",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-researcher-scenarios-national-provide evidence to senator ruiz for federal policy continuation",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-researcher-scenarios-national-publish comprehensive 10-year findings in major journal",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-researcher-scenarios-national-study long-term effects on mental health and social cohesion",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-researcher-scenarios-national-study systematic bias correction over time",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-researcher-scenarios-national-study whether children growing up with protocol develop different capacities",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-researcher-scenarios-national-track how riverside community evolves over 10 years",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-researcher-scenarios-provincial-state-analyzing regional constitutional council decision patterns",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-researcher-scenarios-provincial-state-analyzing technical expert influence on council decisions",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-researcher-scenarios-provincial-state-comparative methodology testing different governance models",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-researcher-scenarios-provincial-state-comparing protocol adoption outcomes across hundreds of communities",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-researcher-scenarios-provincial-state-identifying emerging issues through annual evaluation cycles",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-researcher-scenarios-provincial-state-longitudinal study of constitutional council member development",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-researcher-scenarios-provincial-state-natural experiment comparing communities with vs without protocol",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-researcher-scenarios-provincial-state-preregistration of hypotheses to prevent cherry-picking results",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-researcher-scenarios-provincial-state-providing evidence to senator ruiz for policy development",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-researcher-scenarios-provincial-state-regional research consortium collaboration",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-researcher-scenarios-provincial-state-studying marginalized community access and outcomes",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-technical-expert-scenarios-global-acknowledging limits of technical solutions to political problems",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-technical-expert-scenarios-global-advising on ecological standing amendment technical implications",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-technical-expert-scenarios-global-advising on global crisis governance maintaining democracy",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-technical-expert-scenarios-global-advising on global technical standards with cultural sensitivity",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-technical-expert-scenarios-global-collaborating with dr. chen on global sortition research",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-technical-expert-scenarios-global-contributing to global explainability research agenda",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-technical-expert-scenarios-global-explaining attack vectors from authoritarian and corporate actors",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-technical-expert-scenarios-global-explaining cryptographic constitutional proof to global assembly",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-technical-expert-scenarios-global-grappling with fundamental question of governing superintelligence",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-technical-expert-scenarios-global-my journey from cryptographer to democratic governance enabler",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-technical-expert-scenarios-global-participating in global protocol security threat assessment",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-technical-expert-scenarios-global-peer reviewing global expert testimony across cultures",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-technical-expert-scenarios-global-presenting to 10,000 global citizens on superintelligence governance",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-technical-expert-scenarios-global-testifying about technical feasibility of constitutional minimums",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-technical-expert-scenarios-nation-state-advising national council on fundamental constitutional tension",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-technical-expert-scenarios-nation-state-advising on national constitutional amendment technical implications",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-technical-expert-scenarios-nation-state-advising on national security vs constitutional rights tension",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-technical-expert-scenarios-nation-state-assessing whether national protocol standard violates constitution",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-technical-expert-scenarios-nation-state-collaborating with national research on protocol effectiveness",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-technical-expert-scenarios-nation-state-contributing to national appellant bill of rights implementation",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-technical-expert-scenarios-nation-state-explaining cryptographic impossibility of backdoor mandates",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-technical-expert-scenarios-nation-state-explaining limitations of explainability for complex reasoning",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-technical-expert-scenarios-nation-state-grappling with my influence on decisions affecting millions",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-technical-expert-scenarios-nation-state-identifying need for capability limits until problems solved",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-technical-expert-scenarios-nation-state-participating in national technical standards development",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-technical-expert-scenarios-nation-state-peer reviewing other expert testimony for quality assurance",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-technical-expert-scenarios-nation-state-testifying to congressional committee on protocol security",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-technical-expert-scenarios-provincial-state-acknowledging uncertainty in technical analysis",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-technical-expert-scenarios-provincial-state-advising council without dominating their judgment",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-technical-expert-scenarios-provincial-state-avoiding conflict of interest through transparency",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-technical-expert-scenarios-provincial-state-explaining attack vectors and security risks",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-technical-expert-scenarios-provincial-state-explaining cryptographic constitutional verification to sarah's council",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-technical-expert-scenarios-provincial-state-explaining pattern detection without overwhelming council",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-technical-expert-scenarios-provincial-state-identifying technical error that strengthens appellant's case",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-technical-expert-scenarios-provincial-state-participating in protocol research council review",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-technical-expert-scenarios-provincial-state-presenting competing technical interpretations to council",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-technical-expert-scenarios-provincial-state-providing audit access to deep technical details",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-technical-expert-scenarios-provincial-state-testing agent behavior in isolated environment",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-governance-technical-expert-scenarios-provincial-state-training constitutional council members on technical literacy",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-activist-scenarios-affinity-network-activist coordinates rapid response across network",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-activist-scenarios-affinity-network-activist creates cross-geographic climate justice network",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-activist-scenarios-affinity-network-activist prevents movement co-optation by bad actors",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-activist-scenarios-affinity-network-activist shares successful tactic that spreads through trust",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-activist-scenarios-community-activist builds coalition across neighborhood boundaries",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-activist-scenarios-community-activist creates community organizing space",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-activist-scenarios-community-activist prevents infiltration attempt",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-activist-scenarios-community-activist shares evidence-based call to action",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-activist-scenarios-global-activist builds cross-border solidarity network",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-activist-scenarios-global-activist coordinates planetary climate strike",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-activist-scenarios-global-activist prevents extraction by powerful institutions",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-activist-scenarios-global-activist shares evidence across borders under repression",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-activist-scenarios-individual-activist detects surveillance attempt and activates sanctuary",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-activist-scenarios-individual-activist establishes protected digital identity",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-activist-scenarios-individual-activist manages multiple digital identities safely",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-activist-scenarios-individual-activist recovers data after device seizure",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-child-scenarios-affinity-network-child joins age-appropriate interest community",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-child-scenarios-affinity-network-child learns from elder mentor in safe context",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-child-scenarios-affinity-network-child prevented from exposure to inappropriate content",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-child-scenarios-affinity-network-child's creative work spreads through earned reach",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-child-scenarios-educational-child contributes to science fair project collaboration",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-child-scenarios-educational-child earns district reach through exceptional science project",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-child-scenarios-educational-child joins school homework help space",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-child-scenarios-educational-child protected from cyberbullying attempt",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-child-scenarios-family-child blocked from exposure to harmful content",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-child-scenarios-family-child creates first contribution within family circle",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-child-scenarios-family-child receives help during distress",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-child-scenarios-family-child's gradual reach expansion through good judgment",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-community-moderator-scenarios-community-moderator coordinates with other moderators on cross-community issue",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-community-moderator-scenarios-community-moderator detects and prevents infiltration attempt",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-community-moderator-scenarios-community-moderator protects child while educating peer",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-community-moderator-scenarios-community-moderator resolves conflict with restorative approach",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-content-creator-scenarios-affinity-network-creator documents elder wisdom for cultural preservation",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-content-creator-scenarios-affinity-network-creator prevented from spreading misinformation",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-content-creator-scenarios-affinity-network-creator produces quality educational content that earns reach",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-content-creator-scenarios-affinity-network-creator receives sustainable support from communities",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-content-creator-scenarios-community-creator collaborates with activists on community campaign",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-content-creator-scenarios-community-creator covers local civic issue with evidence-based reporting",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-content-creator-scenarios-community-creator documents community history through elder interviews",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-content-creator-scenarios-community-creator produces age-appropriate content for local youth",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-displaced-person-scenarios-community-displaced person builds connection in new community",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-displaced-person-scenarios-community-displaced person maintains safe connection with home community",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-displaced-person-scenarios-community-displaced person receives support from domestic violence network",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-displaced-person-scenarios-community-displaced person's abuser attempts to locate her",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-displaced-person-scenarios-ecological-bioregional-climate-displaced community maintains cohesion across distance",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-displaced-person-scenarios-ecological-bioregional-displaced community coordinates managed retreat",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-displaced-person-scenarios-ecological-bioregional-displaced community coordinates with climate adaptation network",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-displaced-person-scenarios-ecological-bioregional-elder preserves bioregional knowledge across displacement",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-elder-scenarios-affinity-network-elder finds peer support during life transition",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-elder-scenarios-affinity-network-elder joins quilting affinity network",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-elder-scenarios-affinity-network-elder protected from health fraud in wellness network",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-elder-scenarios-affinity-network-elder shares cultural knowledge across generations",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-elder-scenarios-family-elder protected from romance scam while maintaining real connections",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-elder-scenarios-family-elder reaches out during health concern",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-elder-scenarios-family-elder shares family wisdom with grandchildren",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-elder-scenarios-family-elder stays connected to grandchild's daily life",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-elder-scenarios-neighborhood-elder coordinates neighborhood elder check-in system",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-elder-scenarios-neighborhood-elder protected from medicare scam",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-elder-scenarios-neighborhood-elder shares traditional skill with neighborhood",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-elder-scenarios-neighborhood-elder's institutional memory aids community decision",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-refugee-scenarios-global-refugee connects with cultural community in diaspora",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-refugee-scenarios-global-refugee documents journey for family reunification",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-refugee-scenarios-global-refugee maintains family connection across borders",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "scenario-social-medium-refugee-scenarios-global-refugee protected from human trafficking scheme",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "social-medium-activist-readme",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "social-medium-articles-new-public-readme",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "social-medium-child-readme",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "social-medium-community-moderator-readme",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "social-medium-content-creator-readme",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "social-medium-displaced-person-readme",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "social-medium-elder-readme",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "social-medium-epic",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "social-medium-organizations-foundations-of-humane-technology-course-readme",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "social-medium-organizations-ground-news-readme",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "social-medium-organizations-home-ihrwgho5-readme",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "social-medium-organizations-homepage-readme",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "social-medium-organizations-humane-by-design-readme",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "social-medium-organizations-open-collective-readme",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "social-medium-organizations-pubhubs-readme",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "social-medium-organizations-public-engagement-and-online-decision-making-ethelo-readme",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "social-medium-organizations-solutions-ecochain-readme",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "social-medium-refugee-readme",
+      "reach": "familiar",
+      "reason": "affinity",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "unit-appeals-process",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "unit-civic-participation",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "unit-community-moderation",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "unit-constitutional-councils",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "unit-core-principles",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "unit-digital-dignity",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "unit-distributed-governance",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "unit-economic-coordination",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "unit-five-epics",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "unit-governance-crisis",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "unit-invisible-economy",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "unit-observer-protocol",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "unit-platform-design",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "unit-rea-accounting",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "unit-recognition-systems",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "unit-stakeholder-roles",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "unit-trust-networks",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "unit-value-flows",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "unit-value-recognition",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "unit-why-elohim",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "unit-worker-agency",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "unit-worker-ownership",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "valueflows-elohim-bridge",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "human-bub-builder",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "human-charlie-challenged",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "human-dan-developer",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "human-dolittle-doctor",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "human-frank-farmer",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "human-georgina-grocer",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "human-gertrude-grandma",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "human-ginny-gigworker",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "human-james-son",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "human-janice-janitor",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "human-jessica-spouse",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "human-lenny-lineworker",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "human-manny-manufacturer",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "human-mary-migrant",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "human-mary-miner",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "human-matthew-manager",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "human-meriadoc-moneybags",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "human-nancy-neighbor",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "human-pam-polarized",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "human-pete-pastor",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "human-renold-regent",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "human-ronald-refugee",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "human-sam-shipper",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "human-tiffany-teen",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "human-timothy-tutor",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "human-tommy-teacher",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "human-traveler",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    }
+  ],
+  "relationships": [],
+  "stewardship": [],
+  "collectives": [
+    {
+      "collectiveId": "household-extended",
+      "roleContext": null,
+      "intimacyLevel": "trusted"
+    }
+  ],
+  "conductorGroup": 3,
+  "manifest": {
+    "version": "1.0.0",
+    "generatedAt": "2026-04-11T13:08:38.877Z",
+    "sourceStory": "genesis",
+    "contentHash": "54005035"
+  }
+}

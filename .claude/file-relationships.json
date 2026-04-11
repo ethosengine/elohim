@@ -140,6 +140,26 @@
         }
       ]
     },
+    "humans-presences-sync": {
+      "description": "Humans, presences, and content citations must stay bidirectionally consistent",
+      "patterns": [
+        {
+          "changed": "genesis/data/humans/*.md",
+          "related": "genesis/data/presences/*.md",
+          "message": "Humans changed — check that observer/steward references in presences still resolve"
+        },
+        {
+          "changed": "genesis/data/presences/*.md",
+          "related": "genesis/data/lamad/content/*.json",
+          "message": "Presences changed — check that content contributors[] references still resolve"
+        },
+        {
+          "changed": "genesis/data/lamad/content/*.json",
+          "related": "genesis/data/presences/*.md",
+          "message": "Content changed — check bidirectional consistency with presence.works.citedInContentIds"
+        }
+      ]
+    },
     "model-sync": {
       "description": "ContentNode models must stay in sync between service and app",
       "pairs": [

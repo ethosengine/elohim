@@ -1,5 +1,5 @@
 /**
- * Human fixtures — pre-seeded test personas from genesis/docs/humans/humans.json.
+ * Human fixtures — pre-seeded test personas from genesis/data/humans/humans.json.
  *
  * These humans are registered in the deployment by `genesis/seeder/src/seed-humans.ts`.
  * Tests can login as any of them without needing to register first.
@@ -120,8 +120,8 @@ let _cache: {
 
 function loadHumansJson(): HumansJson {
   const __dirname = dirname(fileURLToPath(import.meta.url));
-  // genesis/a2o/src/framework/fixtures/ → genesis/docs/humans/humans.json
-  const jsonPath = resolve(__dirname, '../../../../docs/humans/humans.json');
+  // genesis/a2o/src/framework/fixtures/ → genesis/data/humans/humans.json
+  const jsonPath = resolve(__dirname, '../../../../data/humans/humans.json');
   const raw = readFileSync(jsonPath, 'utf-8');
   return JSON.parse(raw) as HumansJson;
 }

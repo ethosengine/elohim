@@ -41,12 +41,12 @@ Feature: Persona Testnet — 20 Humans on One Box
       | memory   | 4000   | megabytes  |
 
   @scaling @compute
-  Scenario: Step 3 — Cross-cluster bridge to Pastor Pete
-    Given 3 conductors are running for "Matthew", "Susan", and "Pastor Pete"
+  Scenario: Step 3 — Cross-cluster bridge to Pete
+    Given 3 conductors are running for "Matthew", "Susan", and "Pete"
     And each conductor is seeded with its stewardship content
     When cross-cluster discovery activates via congregation_member relationship
-    Then Pastor Pete can see community-reach content from Matthew's household
-    And Pastor Pete cannot see family-private content
+    Then Pete can see community-reach content from Matthew's household
+    And Pete cannot see family-private content
     And content replication follows trust topology not bulk access
     And compute for 3 conductors is within budget
       | resource | budget | unit       |
@@ -55,7 +55,7 @@ Feature: Persona Testnet — 20 Humans on One Box
 
   @scaling @compute
   Scenario: Step 5 — Five conductors with multi-hop content discovery
-    Given 5 conductors are running for "Matthew", "Susan", "Pastor Pete", "Timothy", and "Frank"
+    Given 5 conductors are running for "Matthew", "Susan", "Pete", "Timothy", and "Frank"
     And each conductor is seeded with its stewardship content
     When all conductors have discovered their peers
     Then Timothy sees learning content via Susan's learning_partner bridge
@@ -76,10 +76,10 @@ Feature: Persona Testnet — 20 Humans on One Box
     And Susan should see 4 peers in her cluster
     And Sammy's node should be running with guardian constraints
 
-  Scenario: Faith community forms around Pastor Pete
+  Scenario: Faith community forms around Pete
     Given cluster "faith-community" has 5 personas
     When the cluster has been running for 30 seconds
-    Then Pastor Pete should see 4 peers in his cluster
+    Then Pete should see 4 peers in his cluster
     And Timothy should see Sammy as a cross-cluster mentee
 
   Scenario: Local economy nodes discover business partners
@@ -99,7 +99,7 @@ Feature: Persona Testnet — 20 Humans on One Box
   Scenario: Trust topology creates cross-cluster sync paths
     Given all 4 clusters are running
     When a document is created on Matthew's node
-    Then it should reach Pastor Pete within 10 seconds via congregation bridge
+    Then it should reach Pete within 10 seconds via congregation bridge
     And it should reach Nancy within 10 seconds via neighbor bridge
     And it should NOT reach Maria who has no trust path to Matthew
 
@@ -119,10 +119,10 @@ Feature: Persona Testnet — 20 Humans on One Box
 
   Scenario: Network partition heals correctly
     Given all 20 personas are healthy and synced
-    When Pastor Pete's node is killed (partition)
+    When Pete's node is killed (partition)
     Then the faith community should continue operating with 4 nodes
-    When Pastor Pete's node is healed (restart)
-    Then Pastor Pete should resync within 30 seconds
+    When Pete's node is healed (restart)
+    Then Pete should resync within 30 seconds
     And no documents should be lost
 
   # ─── Compute Budget ────────────────────────────────────────────────────

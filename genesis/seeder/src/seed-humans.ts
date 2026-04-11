@@ -14,7 +14,7 @@
  *   1 — one or more humans failed to register
  */
 
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -191,9 +191,14 @@ async function main(): Promise<void> {
   );
   const adminBootstrapKey = process.env.API_KEY_ADMIN || undefined;
 
-  // Load humans.json
+  // Load humans.json (generated from genesis/data/humans/*.md by build-data.ts)
   const __dirname = dirname(fileURLToPath(import.meta.url));
-  const jsonPath = resolve(__dirname, '../../docs/humans/humans.json');
+  const jsonPath = resolve(__dirname, '../../data/humans/humans.json');
+  if (!existsSync(jsonPath)) {
+    console.error(`humans.json not found at ${jsonPath}`);
+    console.error('Run `pnpm run build:data` in genesis/seeder to generate it from the markdown sources.');
+    process.exit(1);
+  }
   const humansJson: HumansJson = JSON.parse(readFileSync(jsonPath, 'utf-8'));
 
   // Filter to active humans (those with a non-visitor agencyPhase)

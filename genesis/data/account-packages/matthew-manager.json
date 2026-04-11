@@ -120,6 +120,24 @@
       "stewardRatio": 0.3
     },
     {
+      "contentId": "book-collapse-of-complex-societies",
+      "reach": "local",
+      "reason": "steward",
+      "stewardRatio": 0.35
+    },
+    {
+      "contentId": "book-finite-and-infinite-games",
+      "reach": "local",
+      "reason": "steward",
+      "stewardRatio": 0.35
+    },
+    {
+      "contentId": "book-ministry-for-the-future",
+      "reach": "local",
+      "reason": "steward",
+      "stewardRatio": 0.35
+    },
+    {
       "contentId": "care-economy-visibility",
       "reach": "commons",
       "reason": "commons",
@@ -1186,192 +1204,6 @@
       "reach": "local",
       "reason": "steward",
       "stewardRatio": 0.4
-    },
-    {
-      "contentId": "fct-contributor-andy-crouch",
-      "reach": "local",
-      "reason": "steward",
-      "stewardRatio": 0.5
-    },
-    {
-      "contentId": "fct-contributor-ava-du",
-      "reach": "local",
-      "reason": "steward",
-      "stewardRatio": 0.5
-    },
-    {
-      "contentId": "fct-contributor-cal-newport",
-      "reach": "local",
-      "reason": "steward",
-      "stewardRatio": 0.5
-    },
-    {
-      "contentId": "fct-contributor-daniel-kahneman",
-      "reach": "local",
-      "reason": "steward",
-      "stewardRatio": 0.5
-    },
-    {
-      "contentId": "fct-contributor-daniel-levitin",
-      "reach": "local",
-      "reason": "steward",
-      "stewardRatio": 0.5
-    },
-    {
-      "contentId": "fct-contributor-ezra-klein",
-      "reach": "local",
-      "reason": "steward",
-      "stewardRatio": 0.5
-    },
-    {
-      "contentId": "fct-contributor-george-hunsberger",
-      "reach": "local",
-      "reason": "steward",
-      "stewardRatio": 0.5
-    },
-    {
-      "contentId": "fct-contributor-heather-mc",
-      "reach": "local",
-      "reason": "steward",
-      "stewardRatio": 0.5
-    },
-    {
-      "contentId": "fct-contributor-hugo-mercier",
-      "reach": "local",
-      "reason": "steward",
-      "stewardRatio": 0.5
-    },
-    {
-      "contentId": "fct-contributor-jack-reese",
-      "reach": "local",
-      "reason": "steward",
-      "stewardRatio": 0.5
-    },
-    {
-      "contentId": "fct-contributor-jacob-shatzer",
-      "reach": "local",
-      "reason": "steward",
-      "stewardRatio": 0.5
-    },
-    {
-      "contentId": "fct-contributor-johann-hari",
-      "reach": "local",
-      "reason": "steward",
-      "stewardRatio": 0.5
-    },
-    {
-      "contentId": "fct-contributor-john-dyer",
-      "reach": "local",
-      "reason": "steward",
-      "stewardRatio": 0.5
-    },
-    {
-      "contentId": "fct-contributor-lee-mc",
-      "reach": "local",
-      "reason": "steward",
-      "stewardRatio": 0.5
-    },
-    {
-      "contentId": "fct-contributor-matthew-desmond",
-      "reach": "local",
-      "reason": "steward",
-      "stewardRatio": 0.5
-    },
-    {
-      "contentId": "fct-contributor-michelle-alexander",
-      "reach": "local",
-      "reason": "steward",
-      "stewardRatio": 0.5
-    },
-    {
-      "contentId": "fct-contributor-michiko-kakutani",
-      "reach": "local",
-      "reason": "steward",
-      "stewardRatio": 0.5
-    },
-    {
-      "contentId": "fct-contributor-mike-caulfield",
-      "reach": "local",
-      "reason": "steward",
-      "stewardRatio": 0.5
-    },
-    {
-      "contentId": "fct-contributor-nassim-taleb",
-      "reach": "local",
-      "reason": "steward",
-      "stewardRatio": 0.5
-    },
-    {
-      "contentId": "fct-contributor-nicholas-carr",
-      "reach": "local",
-      "reason": "steward",
-      "stewardRatio": 0.5
-    },
-    {
-      "contentId": "fct-contributor-paul-sparks",
-      "reach": "local",
-      "reason": "steward",
-      "stewardRatio": 0.5
-    },
-    {
-      "contentId": "fct-contributor-quentin-schultze",
-      "reach": "local",
-      "reason": "steward",
-      "stewardRatio": 0.5
-    },
-    {
-      "contentId": "fct-contributor-richard-rothstein",
-      "reach": "local",
-      "reason": "steward",
-      "stewardRatio": 0.5
-    },
-    {
-      "contentId": "fct-contributor-rolf-dobelli",
-      "reach": "local",
-      "reason": "steward",
-      "stewardRatio": 0.5
-    },
-    {
-      "contentId": "fct-contributor-steven-sloman",
-      "reach": "local",
-      "reason": "steward",
-      "stewardRatio": 0.5
-    },
-    {
-      "contentId": "fct-contributor-tema-okun",
-      "reach": "local",
-      "reason": "steward",
-      "stewardRatio": 0.5
-    },
-    {
-      "contentId": "fct-contributor-tim-challies",
-      "reach": "local",
-      "reason": "steward",
-      "stewardRatio": 0.5
-    },
-    {
-      "contentId": "fct-contributor-tom-nichols",
-      "reach": "local",
-      "reason": "steward",
-      "stewardRatio": 0.5
-    },
-    {
-      "contentId": "fct-contributor-tony-reinke",
-      "reach": "local",
-      "reason": "steward",
-      "stewardRatio": 0.5
-    },
-    {
-      "contentId": "fct-contributor-vi-hart",
-      "reach": "local",
-      "reason": "steward",
-      "stewardRatio": 0.5
-    },
-    {
-      "contentId": "fct-contributor-virginia-eubanks",
-      "reach": "local",
-      "reason": "steward",
-      "stewardRatio": 0.5
     },
     {
       "contentId": "fct-media-00-documentary-coded-bias",
@@ -3408,24 +3240,6 @@
       "stewardRatio": 0.35
     },
     {
-      "contentId": "governance-books-finite-and-infinite-games-readme",
-      "reach": "local",
-      "reason": "steward",
-      "stewardRatio": 0.35
-    },
-    {
-      "contentId": "governance-books-future-scouts-international-learning-program-social-app-and-handbook-readme",
-      "reach": "local",
-      "reason": "steward",
-      "stewardRatio": 0.35
-    },
-    {
-      "contentId": "governance-books-the-collapse-of-complex-societies-readme",
-      "reach": "local",
-      "reason": "steward",
-      "stewardRatio": 0.35
-    },
-    {
       "contentId": "governance-community-leader-readme",
       "reach": "local",
       "reason": "steward",
@@ -3439,318 +3253,6 @@
     },
     {
       "contentId": "governance-epic",
-      "reach": "local",
-      "reason": "steward",
-      "stewardRatio": 0.35
-    },
-    {
-      "contentId": "governance-organizations-2000-watt-society-and-2000-watt-site-readme",
-      "reach": "local",
-      "reason": "steward",
-      "stewardRatio": 0.35
-    },
-    {
-      "contentId": "governance-organizations-a-problem-well-stated-is-half-solved-your-undivided-attention-readme",
-      "reach": "local",
-      "reason": "steward",
-      "stewardRatio": 0.35
-    },
-    {
-      "contentId": "governance-organizations-about-us-readme",
-      "reach": "local",
-      "reason": "steward",
-      "stewardRatio": 0.35
-    },
-    {
-      "contentId": "governance-organizations-agile-learning-centers-education-evolved-readme",
-      "reach": "local",
-      "reason": "steward",
-      "stewardRatio": 0.35
-    },
-    {
-      "contentId": "governance-organizations-basic-law-for-the-federal-republic-of-germany-readme",
-      "reach": "local",
-      "reason": "steward",
-      "stewardRatio": 0.35
-    },
-    {
-      "contentId": "governance-organizations-bonfire-readme",
-      "reach": "local",
-      "reason": "steward",
-      "stewardRatio": 0.35
-    },
-    {
-      "contentId": "governance-organizations-buycott-readme",
-      "reach": "local",
-      "reason": "steward",
-      "stewardRatio": 0.35
-    },
-    {
-      "contentId": "governance-organizations-calm-technology-readme",
-      "reach": "local",
-      "reason": "steward",
-      "stewardRatio": 0.35
-    },
-    {
-      "contentId": "governance-organizations-civilization-research-institute-readme",
-      "reach": "local",
-      "reason": "steward",
-      "stewardRatio": 0.35
-    },
-    {
-      "contentId": "governance-organizations-consilience-project-institute-for-quantitative-social-science-readme",
-      "reach": "local",
-      "reason": "steward",
-      "stewardRatio": 0.35
-    },
-    {
-      "contentId": "governance-organizations-daniel-schmachtenberger-the-consilience-project-readme",
-      "reach": "local",
-      "reason": "steward",
-      "stewardRatio": 0.35
-    },
-    {
-      "contentId": "governance-organizations-dework-readme",
-      "reach": "local",
-      "reason": "steward",
-      "stewardRatio": 0.35
-    },
-    {
-      "contentId": "governance-organizations-eco-efficiency-vs-eco-effectiveness-ecocation-readme",
-      "reach": "local",
-      "reason": "steward",
-      "stewardRatio": 0.35
-    },
-    {
-      "contentId": "governance-organizations-effective-altruism-readme",
-      "reach": "local",
-      "reason": "steward",
-      "stewardRatio": 0.35
-    },
-    {
-      "contentId": "governance-organizations-fli-worldbuilding-contest-readme",
-      "reach": "local",
-      "reason": "steward",
-      "stewardRatio": 0.35
-    },
-    {
-      "contentId": "governance-organizations-frontporchforumcom-readme",
-      "reach": "local",
-      "reason": "steward",
-      "stewardRatio": 0.35
-    },
-    {
-      "contentId": "governance-organizations-genuine-progress-indicator-gross-national-happiness-usa-readme",
-      "reach": "local",
-      "reason": "steward",
-      "stewardRatio": 0.35
-    },
-    {
-      "contentId": "governance-organizations-global-carbon-reward-climate-initiative-readme",
-      "reach": "local",
-      "reason": "steward",
-      "stewardRatio": 0.35
-    },
-    {
-      "contentId": "governance-organizations-green-gross-domestic-product-wikipedia-readme",
-      "reach": "local",
-      "reason": "steward",
-      "stewardRatio": 0.35
-    },
-    {
-      "contentId": "governance-organizations-happy-planet-index-how-happy-is-the-planet-readme",
-      "reach": "local",
-      "reason": "steward",
-      "stewardRatio": 0.35
-    },
-    {
-      "contentId": "governance-organizations-holochain-app-framework-with-p2p-networking-readme",
-      "reach": "local",
-      "reason": "steward",
-      "stewardRatio": 0.35
-    },
-    {
-      "contentId": "governance-organizations-home-future-of-life-institute-readme",
-      "reach": "local",
-      "reason": "steward",
-      "stewardRatio": 0.35
-    },
-    {
-      "contentId": "governance-organizations-home-gmnkujzl-readme",
-      "reach": "local",
-      "reason": "steward",
-      "stewardRatio": 0.35
-    },
-    {
-      "contentId": "governance-organizations-home-page-e-estonia-readme",
-      "reach": "local",
-      "reason": "steward",
-      "stewardRatio": 0.35
-    },
-    {
-      "contentId": "governance-organizations-home-partnership-on-ai-readme",
-      "reach": "local",
-      "reason": "steward",
-      "stewardRatio": 0.35
-    },
-    {
-      "contentId": "governance-organizations-how-we-work-readme",
-      "reach": "local",
-      "reason": "steward",
-      "stewardRatio": 0.35
-    },
-    {
-      "contentId": "governance-organizations-human-development-index-human-development-reports-readme",
-      "reach": "local",
-      "reason": "steward",
-      "stewardRatio": 0.35
-    },
-    {
-      "contentId": "governance-organizations-hylo-social-coordination-for-a-thriving-planet-readme",
-      "reach": "local",
-      "reason": "steward",
-      "stewardRatio": 0.35
-    },
-    {
-      "contentId": "governance-organizations-idealoom-readme",
-      "reach": "local",
-      "reason": "steward",
-      "stewardRatio": 0.35
-    },
-    {
-      "contentId": "governance-organizations-iftf-home-readme",
-      "reach": "local",
-      "reason": "steward",
-      "stewardRatio": 0.35
-    },
-    {
-      "contentId": "governance-organizations-index-readme",
-      "reach": "local",
-      "reason": "steward",
-      "stewardRatio": 0.35
-    },
-    {
-      "contentId": "governance-organizations-jacque-fresco-the-venus-project-readme",
-      "reach": "local",
-      "reason": "steward",
-      "stewardRatio": 0.35
-    },
-    {
-      "contentId": "governance-organizations-jigsaw-readme",
-      "reach": "local",
-      "reason": "steward",
-      "stewardRatio": 0.35
-    },
-    {
-      "contentId": "governance-organizations-khan-academy-free-online-courses-lessons-practice-readme",
-      "reach": "local",
-      "reason": "steward",
-      "stewardRatio": 0.35
-    },
-    {
-      "contentId": "governance-organizations-leverage-points-places-to-intervene-in-a-system-readme",
-      "reach": "local",
-      "reason": "steward",
-      "stewardRatio": 0.35
-    },
-    {
-      "contentId": "governance-organizations-meta-crisis-meta-resource-readme",
-      "reach": "local",
-      "reason": "steward",
-      "stewardRatio": 0.35
-    },
-    {
-      "contentId": "governance-organizations-normality-principle-wikipedia-readme",
-      "reach": "local",
-      "reason": "steward",
-      "stewardRatio": 0.35
-    },
-    {
-      "contentId": "governance-organizations-oecd-better-life-index-readme",
-      "reach": "local",
-      "reason": "steward",
-      "stewardRatio": 0.35
-    },
-    {
-      "contentId": "governance-organizations-polis-readme",
-      "reach": "local",
-      "reason": "steward",
-      "stewardRatio": 0.35
-    },
-    {
-      "contentId": "governance-organizations-radicalxchange-readme",
-      "reach": "local",
-      "reason": "steward",
-      "stewardRatio": 0.35
-    },
-    {
-      "contentId": "governance-organizations-regrid-nationwide-land-parcels-location-context-data-for-everyone-readme",
-      "reach": "local",
-      "reason": "steward",
-      "stewardRatio": 0.35
-    },
-    {
-      "contentId": "governance-organizations-resilience-against-disinformation-tilt-readme",
-      "reach": "local",
-      "reason": "steward",
-      "stewardRatio": 0.35
-    },
-    {
-      "contentId": "governance-organizations-scaling-trust-on-the-web-readme",
-      "reach": "local",
-      "reason": "steward",
-      "stewardRatio": 0.35
-    },
-    {
-      "contentId": "governance-organizations-solarpunk-readme",
-      "reach": "local",
-      "reason": "steward",
-      "stewardRatio": 0.35
-    },
-    {
-      "contentId": "governance-organizations-solarpunk-syquydyu-readme",
-      "reach": "local",
-      "reason": "steward",
-      "stewardRatio": 0.35
-    },
-    {
-      "contentId": "governance-organizations-solarpunk-uzy71bfs-readme",
-      "reach": "local",
-      "reason": "steward",
-      "stewardRatio": 0.35
-    },
-    {
-      "contentId": "governance-organizations-strong-towns-lfnozrau-readme",
-      "reach": "local",
-      "reason": "steward",
-      "stewardRatio": 0.35
-    },
-    {
-      "contentId": "governance-organizations-strong-towns-readme",
-      "reach": "local",
-      "reason": "steward",
-      "stewardRatio": 0.35
-    },
-    {
-      "contentId": "governance-organizations-the-consilience-project-readme",
-      "reach": "local",
-      "reason": "steward",
-      "stewardRatio": 0.35
-    },
-    {
-      "contentId": "governance-organizations-thriving-places-index-readme",
-      "reach": "local",
-      "reason": "steward",
-      "stewardRatio": 0.35
-    },
-    {
-      "contentId": "governance-organizations-welcome-to-regeneration-project-regeneration-readme",
-      "reach": "local",
-      "reason": "steward",
-      "stewardRatio": 0.35
-    },
-    {
-      "contentId": "governance-organizations-world3-wikipedia-readme",
       "reach": "local",
       "reason": "steward",
       "stewardRatio": 0.35
@@ -3829,60 +3331,6 @@
     },
     {
       "contentId": "hrea-process-recipe",
-      "reach": "commons",
-      "reason": "commons",
-      "stewardRatio": null
-    },
-    {
-      "contentId": "human-bub-builder",
-      "reach": "commons",
-      "reason": "commons",
-      "stewardRatio": null
-    },
-    {
-      "contentId": "human-frank-farmer",
-      "reach": "commons",
-      "reason": "commons",
-      "stewardRatio": null
-    },
-    {
-      "contentId": "human-georgina-grocer",
-      "reach": "commons",
-      "reason": "commons",
-      "stewardRatio": null
-    },
-    {
-      "contentId": "human-ginny-gigworker",
-      "reach": "commons",
-      "reason": "commons",
-      "stewardRatio": null
-    },
-    {
-      "contentId": "human-lenny-lineworker",
-      "reach": "commons",
-      "reason": "commons",
-      "stewardRatio": null
-    },
-    {
-      "contentId": "human-manny-manufacturer",
-      "reach": "commons",
-      "reason": "commons",
-      "stewardRatio": null
-    },
-    {
-      "contentId": "human-mary-miner",
-      "reach": "commons",
-      "reason": "commons",
-      "stewardRatio": null
-    },
-    {
-      "contentId": "human-nancy-neighbor",
-      "reach": "commons",
-      "reason": "commons",
-      "stewardRatio": null
-    },
-    {
-      "contentId": "human-pam-polarized",
       "reach": "commons",
       "reason": "commons",
       "stewardRatio": null
@@ -20628,6 +20076,12 @@
       "stewardRatio": null
     },
     {
+      "contentId": "human-bub-builder",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
       "contentId": "human-charlie-challenged",
       "reach": "commons",
       "reason": "commons",
@@ -20646,7 +20100,31 @@
       "stewardRatio": null
     },
     {
+      "contentId": "human-frank-farmer",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "human-georgina-grocer",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
       "contentId": "human-gertrude-grandma",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "human-ginny-gigworker",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "human-james-son",
       "reach": "commons",
       "reason": "commons",
       "stewardRatio": null
@@ -20658,7 +20136,31 @@
       "stewardRatio": null
     },
     {
+      "contentId": "human-jessica-spouse",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "human-lenny-lineworker",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "human-manny-manufacturer",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
       "contentId": "human-mary-migrant",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "human-mary-miner",
       "reach": "commons",
       "reason": "commons",
       "stewardRatio": null
@@ -20671,6 +20173,18 @@
     },
     {
       "contentId": "human-meriadoc-moneybags",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "human-nancy-neighbor",
+      "reach": "commons",
+      "reason": "commons",
+      "stewardRatio": null
+    },
+    {
+      "contentId": "human-pam-polarized",
       "reach": "commons",
       "reason": "commons",
       "stewardRatio": null
@@ -20695,18 +20209,6 @@
     },
     {
       "contentId": "human-sam-shipper",
-      "reach": "commons",
-      "reason": "commons",
-      "stewardRatio": null
-    },
-    {
-      "contentId": "human-james-son",
-      "reach": "commons",
-      "reason": "commons",
-      "stewardRatio": null
-    },
-    {
-      "contentId": "human-jessica-spouse",
       "reach": "commons",
       "reason": "commons",
       "stewardRatio": null
@@ -20744,50 +20246,41 @@
   "relationships": [
     {
       "targetId": "human-jessica-spouse",
-      "relationshipType": "spouse",
-      "intimacyLevel": "intimate",
       "isBidirectional": true,
       "reach": null
     },
     {
       "targetId": "human-james-son",
-      "relationshipType": "parent",
-      "intimacyLevel": "intimate",
       "isBidirectional": true,
       "reach": null
     },
     {
       "targetId": "human-gertrude-grandma",
-      "relationshipType": "grandparent",
-      "intimacyLevel": "trusted",
       "isBidirectional": true,
       "reach": null
     },
     {
       "targetId": "human-dan-developer",
-      "relationshipType": "coworker",
-      "intimacyLevel": "connection",
       "isBidirectional": true,
       "reach": null
     },
     {
       "targetId": "human-nancy-neighbor",
-      "relationshipType": "neighbor",
-      "intimacyLevel": "connection",
       "isBidirectional": true,
       "reach": null
     },
     {
       "targetId": "human-pete-pastor",
-      "relationshipType": "congregation_member",
-      "intimacyLevel": "trusted",
       "isBidirectional": true,
       "reach": null
     },
     {
       "targetId": "human-meriadoc-moneybags",
-      "relationshipType": "network_connection",
-      "intimacyLevel": "connection",
+      "isBidirectional": true,
+      "reach": null
+    },
+    {
+      "targetId": "human-susan-household",
       "isBidirectional": true,
       "reach": null
     }
@@ -20891,7 +20384,7 @@
   ],
   "collectives": [
     {
-      "collectiveId": "family-dowell",
+      "collectiveId": "household-dowell",
       "roleContext": null,
       "intimacyLevel": "intimate"
     },
@@ -20904,28 +20397,13 @@
       "collectiveId": "org-ethosengine",
       "roleContext": "founder",
       "intimacyLevel": "connection"
-    },
-    {
-      "collectiveId": "couple-matthew-jessica",
-      "roleContext": "partner",
-      "intimacyLevel": "intimate"
-    },
-    {
-      "collectiveId": "bible-study-valley",
-      "roleContext": null,
-      "intimacyLevel": "connection"
-    },
-    {
-      "collectiveId": "neighborhood-valley",
-      "roleContext": null,
-      "intimacyLevel": "connection"
     }
   ],
   "conductorGroup": 0,
   "manifest": {
     "version": "1.0.0",
-    "generatedAt": "2026-03-03T19:08:21.416Z",
+    "generatedAt": "2026-04-11T13:08:38.892Z",
     "sourceStory": "genesis",
-    "contentHash": "10deb111"
+    "contentHash": "54005035"
   }
 }
