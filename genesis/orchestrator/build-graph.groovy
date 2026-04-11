@@ -679,9 +679,15 @@ def formatComparisonMatrix(Map pipelinesAnalysis, Map graphStaleMap, Map graph) 
 
 def loadBuildState() {
     try {
+        // Use lastCompleted() (not lastSuccessful()) so build state advances on
+        // UNSTABLE runs too. Aligns with loadPipelineBaselines() in Jenkinsfile.
+        // Previous lastSuccessful() selector meant that a string of UNSTABLE
+        // orchestrator runs (common when genesis flakes) would freeze
+        // build-state.json at a stale commit, locking the graph walker into
+        // cold-start mode every run.
         copyArtifacts(
             projectName: env.JOB_NAME,
-            selector: lastSuccessful(),
+            selector: lastCompleted(),
             filter: 'build-state.json',
             optional: true,
             fingerprintArtifacts: false

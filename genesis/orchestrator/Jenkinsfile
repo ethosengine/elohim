@@ -133,6 +133,45 @@ def getRemediationHint(String p) {
 def calculateTriagePriority(int f, int u) { f > 0 && u > 0 ? 'CRITICAL' : f > 0 ? 'HIGH' : u > 0 ? 'MEDIUM' : 'LOW' }
 
 /**
+ * Archive per-pipeline baselines for the next orchestrator run's change detection.
+ *
+ * Called at multiple checkpoints ('plan' → 'execute' → 'post') so that a single
+ * interrupted stage cannot wipe the baseline permanently. Each checkpoint is a
+ * valid resume point on its own because __global__ is refreshed every call.
+ *
+ * Pure pipeline steps only (readJSON/writeJSON/archiveArtifacts) — safe to call
+ * from inside a container() block or from bare post.always.
+ *
+ * Fails loudly (error + no allowEmptyArchive) on writeJSON/archive drop-outs.
+ * Silent degradation is what caused the original "No previous pipeline baselines
+ * found (first run)" stuck state that re-triggered every pipeline on every push.
+ */
+def archivePipelineBaselines(String checkpoint) {
+    def baselines = readJSON(text: env.PIPELINE_BASELINES ?: '{}')
+    if (env.GIT_COMMIT_FULL) {
+        baselines['__global__'] = env.GIT_COMMIT_FULL
+    }
+    // Persist back to env so later checkpoints and post.always see latest state
+    env.PIPELINE_BASELINES = writeJSON(returnText: true, json: baselines)
+
+    writeJSON file: 'pipeline-baselines.json', json: baselines, pretty: 2
+
+    // Defensive: writeJSON is synchronous but workspace/CPS issues have bitten
+    // us before. Check the file is actually there before archiving.
+    if (!fileExists('pipeline-baselines.json')) {
+        error "pipeline-baselines.json missing after writeJSON (checkpoint=${checkpoint}) — workspace or CPS issue"
+    }
+
+    // No allowEmptyArchive: if this file is missing, fail the post-block loudly
+    // so the next orchestrator build sees a red signal instead of a silent cold-start.
+    archiveArtifacts artifacts: 'pipeline-baselines.json', fingerprint: true
+
+    def perPipelineCount = baselines.findAll { k, v -> k != '__global__' }.size()
+    def globalBrief = baselines['__global__'] ? baselines['__global__'].toString().take(8) : '(null)'
+    echo "📋 [baseline:${checkpoint}] archived — __global__=${globalBrief}, per-pipeline=${perPipelineCount}"
+}
+
+/**
  * Advisory P2P peer validation — checks doorway /health for P2P status.
  * Logs warnings but never fails the build.
  */
@@ -472,8 +511,31 @@ def loadPipelineBaselines() {
             baselines.each { name, commit ->
                 echo "   ${name}: ${commit.take(8)}"
             }
+        } else if (env.GIT_PREVIOUS_SUCCESSFUL_COMMIT) {
+            // Contradictory state: Jenkins remembers a prior successful build but
+            // we can't find its pipeline-baselines.json. This means the previous
+            // build's post.always either skipped the archive (container step
+            // failed, pod evicted) or copyArtifacts can't resolve JOB_NAME. Both
+            // are bugs — loud warning so we see them instead of silently
+            // cold-starting into a rebuild-everything cascade.
+            echo """
+╔══════════════════════════════════════════════════════════════════════════════╗
+║  ⚠️  BASELINE CASCADE WARNING                                                ║
+╠══════════════════════════════════════════════════════════════════════════════╣
+║  copyArtifacts(lastCompleted) found NO pipeline-baselines.json               ║
+║  but GIT_PREVIOUS_SUCCESSFUL_COMMIT = ${env.GIT_PREVIOUS_SUCCESSFUL_COMMIT.take(8)}
+║  JOB_NAME = ${env.JOB_NAME}
+║                                                                              ║
+║  The previous orchestrator build either:                                     ║
+║    (a) failed to archive pipeline-baselines.json                             ║
+║    (b) archived it but copyArtifacts can't resolve the selector              ║
+║                                                                              ║
+║  Falling back to GIT_PREVIOUS_SUCCESSFUL_COMMIT. Investigate the previous    ║
+║  build's post block for archive failures.                                    ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+            """
         } else {
-            echo "No previous pipeline baselines found (first run)"
+            echo "No previous pipeline baselines found (cold start — genuinely first run)"
         }
     } catch (Exception e) {
         echo "WARNING: Could not load pipeline baselines: ${e.message}"
@@ -973,6 +1035,13 @@ spec:
                         } else {
                             currentBuild.description = "${mode}: ${ordered.join(', ')}"
                         }
+
+                        // Checkpoint 1: archive baseline now so that if Execute
+                        // Builds or post.always gets interrupted (pod eviction,
+                        // abort-on-milestone, OOM), the next orchestrator run
+                        // still has a __global__ = HEAD resume point. See
+                        // archivePipelineBaselines() docstring for rationale.
+                        archivePipelineBaselines('plan')
                     }
                 }
             }
@@ -1087,6 +1156,13 @@ spec:
                             env.BUILD_RESULTS = writeJSON(returnText: true, json: results)
                             env.PIPELINE_BASELINES = writeJSON(returnText: true, json: pipelineBaselines)
                         }
+
+                        // Checkpoint 2: archive per-pipeline baselines captured
+                        // during this Execute Builds run. If Verify Deployment
+                        // or post.always is interrupted, the next build still
+                        // inherits these per-pipeline baselines and can skip
+                        // re-running pipelines that already succeeded.
+                        archivePipelineBaselines('execute')
                     }
                 }
             }
@@ -1236,20 +1312,25 @@ spec:
 
     post {
         always {
-            container('builder') {
-                script {
-                    def results = readJSON(text: env.BUILD_RESULTS ?: '{}')
-                    def preflight = readJSON(text: env.PREFLIGHT_HEALTH ?: '{}')
-                    def postflight = readJSON(text: env.POSTFLIGHT_HEALTH ?: '{}')
-                    def verification = readJSON(text: env.VERIFICATION_RESULTS ?: '{}')
+            // NOTE: no container('builder') wrapper here — every step inside is a
+            // pure pipeline step (readJSON/writeJSON/archiveArtifacts/echo/Groovy
+            // stdlib). Wrapping in a container step made the whole post-block
+            // skip when the pod was dead/evicted/aborted, which silently wiped
+            // pipeline-baselines.json and caused the orchestrator to re-trigger
+            // every pipeline on every push. Post runs at agent level instead.
+            script {
+                def results = readJSON(text: env.BUILD_RESULTS ?: '{}')
+                def preflight = readJSON(text: env.PREFLIGHT_HEALTH ?: '{}')
+                def postflight = readJSON(text: env.POSTFLIGHT_HEALTH ?: '{}')
+                def verification = readJSON(text: env.VERIFICATION_RESULTS ?: '{}')
 
-                    def successCount = results.count { k, v -> v?.success && !v?.unstable }
-                    def unstableCount = results.count { k, v -> v?.unstable }
-                    def failCount = results.count { k, v -> !v?.success }
-                    def healthyCount = postflight.count { k, v -> v?.healthy }
-                    def verifiedCount = verification.count { k, v -> v?.match }
+                def successCount = results.count { k, v -> v?.success && !v?.unstable }
+                def unstableCount = results.count { k, v -> v?.unstable }
+                def failCount = results.count { k, v -> !v?.success }
+                def healthyCount = postflight.count { k, v -> v?.healthy }
+                def verifiedCount = verification.count { k, v -> v?.match }
 
-                    echo """
+                echo """
 ═══════════════════════════════════════════════════════════════════════════════
                               📊 ORCHESTRATOR SUMMARY
 ═══════════════════════════════════════════════════════════════════════════════
@@ -1266,91 +1347,90 @@ ${failCount > 0 ? '  ❌ ATTENTION: Build failures detected!' : unstableCount > 
 ${healthyCount < postflight.size() ? '  ⚠️  ATTENTION: Some services unhealthy!' : ''}
 
 ═══════════════════════════════════════════════════════════════════════════════
-                    """
+                """
 
-                    if (failCount > 0) {
-                        echo 'Failed pipelines:'
-                        results.findAll { k, v -> !v?.success }.each { name, result ->
-                            echo "  ❌ ${name}: ${result?.result ?: 'UNKNOWN'}"
-                            if (result?.url) echo "     ${result.url}"
+                if (failCount > 0) {
+                    echo 'Failed pipelines:'
+                    results.findAll { k, v -> !v?.success }.each { name, result ->
+                        echo "  ❌ ${name}: ${result?.result ?: 'UNKNOWN'}"
+                        if (result?.url) echo "     ${result.url}"
                     }
                 }
 
-                    if (unstableCount > 0) {
-                        echo 'Unstable pipelines:'
-                        results.findAll { k, v -> v?.unstable }.each { name, result ->
-                            echo "  ⚠️ ${name}: UNSTABLE"
-                            if (result?.url) echo "     ${result.url}"
-                        }
+                if (unstableCount > 0) {
+                    echo 'Unstable pipelines:'
+                    results.findAll { k, v -> v?.unstable }.each { name, result ->
+                        echo "  ⚠️ ${name}: UNSTABLE"
+                        if (result?.url) echo "     ${result.url}"
                     }
+                }
 
-                    // Propagate unstable status to orchestrator build
-                    if (failCount == 0 && unstableCount > 0) {
-                        currentBuild.result = 'UNSTABLE'
-                    }
+                // Propagate unstable status to orchestrator build
+                if (failCount == 0 && unstableCount > 0) {
+                    currentBuild.result = 'UNSTABLE'
+                }
 
-                    // Generate machine-readable CI summary for Claude consumption
-                    def unhealthyCount = postflight.count { k, v -> !v?.healthy }
-                    def ciSummary = [
-                        schema_version: '1.0.0',
-                        timestamp: new Date().format("yyyy-MM-dd'T'HH:mm:ss'Z'", TimeZone.getTimeZone('UTC')),
-                        orchestration: [
-                            build_number: env.BUILD_NUMBER,
-                            build_url: env.BUILD_URL,
-                            branch: env.BRANCH_NAME,
-                            commit: env.GIT_COMMIT_SHORT ?: 'unknown',
-                            mode: params.MODE,
-                            duration_seconds: (System.currentTimeMillis() - currentBuild.startTimeInMillis) / 1000
-                        ],
-                        pipelines: results.collect { name, r ->
-                            [
-                                name: name,
-                                status: r?.unstable ? 'UNSTABLE' : (r?.success ? 'SUCCESS' : (r?.result ?: 'FAILURE')),
-                                url: r?.url,
-                                duration_ms: r?.duration,
-                                category: r?.success ? null : categorizeFailure(name),
-                                remediation_hint: r?.success ? null : getRemediationHint(name)
-                            ]
-                        },
-                        health: [
-                            preflight: preflight,
-                            postflight: postflight,
-                            degraded_services: postflight.findAll { k, v -> !v?.healthy }.keySet().toList()
-                        ],
-                        deployment: [
-                            verified: verification.every { k, v -> v?.match },
-                            verification_results: verification,
-                            mismatches: verification.findAll { k, v -> !v?.match }.keySet().toList()
-                        ],
-                        summary: [
-                            overall_status: failCount > 0 ? 'FAILURE' : (unstableCount > 0 || unhealthyCount > 0 ? 'UNSTABLE' : 'SUCCESS'),
-                            builds_succeeded: successCount,
-                            builds_unstable: unstableCount,
-                            builds_failed: failCount,
-                            services_healthy: healthyCount,
-                            services_total: postflight.size(),
-                            failed_pipelines: results.findAll { k, v -> !v?.success }.keySet().toList(),
-                            triage_priority: calculateTriagePriority(failCount, unhealthyCount),
-                            action_required: failCount > 0 ? results.findAll { k, v -> !v?.success }.collect { name, r ->
-                                "${name}: ${getRemediationHint(name)}"
-                            } : []
+                // Generate machine-readable CI summary for Claude consumption
+                def unhealthyCount = postflight.count { k, v -> !v?.healthy }
+                def ciSummary = [
+                    schema_version: '1.0.0',
+                    timestamp: new Date().format("yyyy-MM-dd'T'HH:mm:ss'Z'", TimeZone.getTimeZone('UTC')),
+                    orchestration: [
+                        build_number: env.BUILD_NUMBER,
+                        build_url: env.BUILD_URL,
+                        branch: env.BRANCH_NAME,
+                        commit: env.GIT_COMMIT_SHORT ?: 'unknown',
+                        mode: params.MODE,
+                        duration_seconds: (System.currentTimeMillis() - currentBuild.startTimeInMillis) / 1000
+                    ],
+                    pipelines: results.collect { name, r ->
+                        [
+                            name: name,
+                            status: r?.unstable ? 'UNSTABLE' : (r?.success ? 'SUCCESS' : (r?.result ?: 'FAILURE')),
+                            url: r?.url,
+                            duration_ms: r?.duration,
+                            category: r?.success ? null : categorizeFailure(name),
+                            remediation_hint: r?.success ? null : getRemediationHint(name)
                         ]
+                    },
+                    health: [
+                        preflight: preflight,
+                        postflight: postflight,
+                        degraded_services: postflight.findAll { k, v -> !v?.healthy }.keySet().toList()
+                    ],
+                    deployment: [
+                        verified: verification.every { k, v -> v?.match },
+                        verification_results: verification,
+                        mismatches: verification.findAll { k, v -> !v?.match }.keySet().toList()
+                    ],
+                    summary: [
+                        overall_status: failCount > 0 ? 'FAILURE' : (unstableCount > 0 || unhealthyCount > 0 ? 'UNSTABLE' : 'SUCCESS'),
+                        builds_succeeded: successCount,
+                        builds_unstable: unstableCount,
+                        builds_failed: failCount,
+                        services_healthy: healthyCount,
+                        services_total: postflight.size(),
+                        failed_pipelines: results.findAll { k, v -> !v?.success }.keySet().toList(),
+                        triage_priority: calculateTriagePriority(failCount, unhealthyCount),
+                        action_required: failCount > 0 ? results.findAll { k, v -> !v?.success }.collect { name, r ->
+                            "${name}: ${getRemediationHint(name)}"
+                        } : []
                     ]
+                ]
 
-                    writeJSON file: 'ci-summary.json', json: ciSummary, pretty: 2
+                writeJSON file: 'ci-summary.json', json: ciSummary, pretty: 2
 
-                    // Archive per-pipeline baselines for next run's change detection
-                    // __global__ advances on every completed build (even UNSTABLE),
-                    // preventing stale GIT_PREVIOUS_SUCCESSFUL_COMMIT from re-triggering everything
-                    def pipelineBaselines = readJSON(text: env.PIPELINE_BASELINES ?: '{}')
-                    if (env.GIT_COMMIT_FULL) {
-                        pipelineBaselines['__global__'] = env.GIT_COMMIT_FULL
-                    }
-                    writeJSON file: 'pipeline-baselines.json', json: pipelineBaselines, pretty: 2
+                // CI summary is informational — allowEmptyArchive is fine here.
+                // If an earlier stage bailed before writeJSON ran, we don't want
+                // the post-block to fail on a missing optional artifact.
+                archiveArtifacts artifacts: 'ci-summary.json', allowEmptyArchive: true
+                echo "📋 CI Summary archived: ${env.BUILD_URL}artifact/ci-summary.json"
 
-                    archiveArtifacts artifacts: 'ci-summary.json,pipeline-baselines.json', allowEmptyArchive: true
-                    echo "📋 CI Summary archived: ${env.BUILD_URL}artifact/ci-summary.json"
-                }
+                // Checkpoint 3 (last word): archive the baseline one final time.
+                // The helper asserts the file exists and archives without
+                // allowEmptyArchive — any failure surfaces loudly on the next
+                // build via the BASELINE CASCADE WARNING in loadPipelineBaselines.
+                archivePipelineBaselines('post')
             }
         }
     }
