@@ -22,7 +22,7 @@
  *   1 — one or more humans failed
  */
 
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { AdminWebsocket, AppWebsocket, type AppInfo } from '@holochain/client';
@@ -319,9 +319,15 @@ async function main(): Promise<void> {
     .map(u => u.trim())
     .filter(Boolean);
 
-  // Load humans.json
+  // Load humans.json (generated artifact from genesis/data/humans/*.md)
   const __dirname = dirname(fileURLToPath(import.meta.url));
-  const jsonPath = resolve(__dirname, '../../docs/humans/humans.json');
+  const jsonPath = resolve(__dirname, '../../data/humans/humans.json');
+  if (!existsSync(jsonPath)) {
+    console.error(`ERROR: ${jsonPath} not found`);
+    console.error('  humans.json is generated from markdown. Run:');
+    console.error('  pnpm --filter genesis-seeder run build:data');
+    process.exit(1);
+  }
   const humansJson: HumansJson = JSON.parse(readFileSync(jsonPath, 'utf-8'));
 
   // Filter to node and device humans only

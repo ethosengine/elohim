@@ -29,10 +29,12 @@ class Steward(TypedDict):
 
 
 # ─── Canonical Human Registry ──────────────────────────────────────────────
-# Single source of truth: genesis/docs/humans/humans.json
+# Single source of truth: genesis/data/humans/*.md (YAML frontmatter)
+# humans.json is a generated artifact — regenerate with:
+#   pnpm --filter genesis-seeder run build:data
 # All humanIds in stewardship rules MUST exist in this registry.
 
-HUMANS_JSON = Path(__file__).parent.parent / "docs" / "humans" / "humans.json"
+HUMANS_JSON = Path(__file__).parent.parent / "data" / "humans" / "humans.json"
 
 
 def load_valid_human_ids() -> set[str]:

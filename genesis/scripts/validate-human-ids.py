@@ -1,7 +1,13 @@
 #!/usr/bin/env python3
 """
 Validate that all humanId references across genesis artifacts match
-the canonical registry in genesis/docs/humans/humans.json.
+the canonical registry in genesis/data/humans/humans.json.
+
+The canonical source is now genesis/data/humans/*.md (one markdown file
+per human with YAML frontmatter). humans.json is a generated artifact
+produced by `pnpm --filter genesis-seeder run build:data`. This script
+reads the generated JSON for speed; if it's missing, it prints a hint
+to regenerate.
 
 Fast preflight check (~2s for 3500 files). Run before seeding or pushing.
 
@@ -14,7 +20,7 @@ import sys
 from pathlib import Path
 
 GENESIS_DIR = Path(__file__).parent.parent
-HUMANS_JSON = GENESIS_DIR / "docs" / "humans" / "humans.json"
+HUMANS_JSON = GENESIS_DIR / "data" / "humans" / "humans.json"
 CONTENT_DIR = GENESIS_DIR / "data" / "lamad" / "content"
 MANIFESTS_DIR = GENESIS_DIR / "manifests" / "humans"
 
@@ -22,6 +28,8 @@ MANIFESTS_DIR = GENESIS_DIR / "manifests" / "humans"
 def load_registry() -> set[str]:
     if not HUMANS_JSON.exists():
         print(f"ERROR: {HUMANS_JSON} not found")
+        print("  humans.json is a generated artifact. Run:")
+        print("  pnpm --filter genesis-seeder run build:data")
         sys.exit(1)
     with open(HUMANS_JSON) as f:
         data = json.load(f)
