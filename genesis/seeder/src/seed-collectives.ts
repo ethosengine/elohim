@@ -19,7 +19,7 @@
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import type { CreateCollectiveInputView } from '@elohim/storage-client';
+import type { CreateCollectiveInputView, JsonValue } from '@elohim/storage-client';
 
 import { validateCollectivesFile, validateReferentialIntegrity } from './validate-collectives.js';
 
@@ -49,11 +49,11 @@ interface CollectiveEntry {
 // =============================================================================
 
 function toInputView(entry: CollectiveEntry): CreateCollectiveInputView {
-  const metadata: Record<string, unknown> = {};
+  const metadata: Record<string, JsonValue> = {};
   if (entry.governanceModel) metadata.governanceModel = entry.governanceModel;
   if (entry.domain) metadata.domain = entry.domain;
   if (entry.place) metadata.place = entry.place;
-  if (entry.coupling) metadata.coupling = entry.coupling;
+  if (entry.coupling) metadata.coupling = entry.coupling as JsonValue;
 
   return {
     id: entry.id,

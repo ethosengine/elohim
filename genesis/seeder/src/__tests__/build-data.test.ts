@@ -39,7 +39,7 @@ describe('buildHumansJson', () => {
     expect(result.version).toBe('2.0.0');
     expect(result.description).toContain('Generated from');
     // Regression: no timestamps allowed — they break the pre-push freshness diff
-    expect((result as Record<string, unknown>).generatedAt).toBeUndefined();
+    expect((result as unknown as Record<string, unknown>).generatedAt).toBeUndefined();
   });
 
   it('skips relationships.md and README.md from human walk', async () => {
@@ -133,7 +133,7 @@ describe('buildPresencesJson', () => {
     expect(result.version).toBe('1.0.0');
     expect(result.description).toContain('DO NOT EDIT BY HAND');
     // Regression: no timestamps allowed — they break the pre-push freshness diff
-    expect((result as Record<string, unknown>).generatedAt).toBeUndefined();
+    expect((result as unknown as Record<string, unknown>).generatedAt).toBeUndefined();
   });
 
   it('skips relationships.md and README.md', async () => {

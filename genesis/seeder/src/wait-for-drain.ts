@@ -96,8 +96,8 @@ export async function waitForDrain(
           // Only log when progress changes, to keep pipeline output readable.
           if (pending !== lastLoggedPending) {
             const peersSuffix =
-              status.connectedPeers !== undefined
-                ? ` (connectedPeers=${status.connectedPeers})`
+              status.connected_peers !== undefined
+                ? ` (connectedPeers=${status.connected_peers})`
                 : '';
             console.log(
               `waitForDrain: ${published}/${total} published, ${pending} pending${peersSuffix}`,
