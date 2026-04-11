@@ -5,3 +5,6 @@
 	path = elohim/rust-ipfs
 	url = https://github.com/ethosengine/rust-ipfs.git
 	branch = elohim
+[submodule "elohim/brit"]
+	path = elohim/brit
+	url = https://github.com/ethosengine/brit.git
