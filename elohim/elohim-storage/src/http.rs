@@ -7825,6 +7825,22 @@ pub fn build_manifest() -> doorway_client::DoorwayRoutes {
                 .handler("observation_report")
                 .build(),
         )
+        // =====================================================================
+        // /account -- Account Import/Export (seeding & recovery)
+        // =====================================================================
+        // Serves genesis seeding AND account recovery (restoring a human's world
+        // from backup). Dispatch is hand-coded at the top of handle() — these
+        // manifest entries exist so doorway discovers and proxies them.
+        .route(
+            Route::post("/account/import")
+                .handler("account_import")
+                .build(),
+        )
+        .route(
+            Route::get("/account/export/{human_id}")
+                .handler("account_export")
+                .build(),
+        )
         // Blob proxy: doorway caches blobs from /blob/{hash}
         .with_blobs_at("/blob")
         .build()
@@ -7860,6 +7876,14 @@ mod tests {
         assert!(
             paths.contains(&"/api/v1/presence"),
             "missing /api/v1/presence"
+        );
+        assert!(
+            paths.contains(&"/account/import"),
+            "missing /account/import (seeder regression)"
+        );
+        assert!(
+            paths.contains(&"/account/export/{human_id}"),
+            "missing /account/export/{{human_id}} (recovery regression)"
         );
         // Ensure infrastructure routes are NOT in the manifest
         assert!(
