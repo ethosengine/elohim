@@ -736,18 +736,20 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                         } catch (e) {
                             echo "doorway-admin-bootstrap-key credential not found — seeding without admin promotion"
                         }
-                        dir('genesis/seeder') {
-                            withEnv(["API_KEY_ADMIN=${adminKey}"]) {
-                                sh """#!/bin/bash
-                                    set -euo pipefail
-                                    echo "═══════════════════════════════════════════════════════════"
-                                    echo "SEED HUMANS"
-                                    echo "═══════════════════════════════════════════════════════════"
-                                    echo "Doorway: ${doorwayHost}"
-                                    echo "Admin key: \${API_KEY_ADMIN:+provided}\${API_KEY_ADMIN:-not set}"
-                                    echo ""
-                                    DOORWAY_URL="${doorwayHost}" npx tsx src/seed-humans.ts
-                                """
+                        catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
+                            dir('genesis/seeder') {
+                                withEnv(["API_KEY_ADMIN=${adminKey}"]) {
+                                    sh """#!/bin/bash
+                                        set -euo pipefail
+                                        echo "═══════════════════════════════════════════════════════════"
+                                        echo "SEED HUMANS"
+                                        echo "═══════════════════════════════════════════════════════════"
+                                        echo "Doorway: ${doorwayHost}"
+                                        echo "Admin key: \${API_KEY_ADMIN:+provided}\${API_KEY_ADMIN:-not set}"
+                                        echo ""
+                                        DOORWAY_URL="${doorwayHost}" npx tsx src/seed-humans.ts
+                                    """
+                                }
                             }
                         }
                     }
@@ -772,18 +774,20 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                         } catch (e) {
                             echo "doorway-admin-bootstrap-key credential not found — seeding without admin promotion"
                         }
-                        dir('genesis/seeder') {
-                            withEnv(["API_KEY_ADMIN=${adminKey}"]) {
-                                sh """#!/bin/bash
-                                    set -euo pipefail
-                                    echo "═══════════════════════════════════════════════════════════"
-                                    echo "SEED PRESENCES"
-                                    echo "═══════════════════════════════════════════════════════════"
-                                    echo "Doorway: ${doorwayHost}"
-                                    echo "Admin key: \${API_KEY_ADMIN:+provided}\${API_KEY_ADMIN:-not set}"
-                                    echo ""
-                                    DOORWAY_URL="${doorwayHost}" npx tsx src/seed-presences.ts
-                                """
+                        catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
+                            dir('genesis/seeder') {
+                                withEnv(["API_KEY_ADMIN=${adminKey}"]) {
+                                    sh """#!/bin/bash
+                                        set -euo pipefail
+                                        echo "═══════════════════════════════════════════════════════════"
+                                        echo "SEED PRESENCES"
+                                        echo "═══════════════════════════════════════════════════════════"
+                                        echo "Doorway: ${doorwayHost}"
+                                        echo "Admin key: \${API_KEY_ADMIN:+provided}\${API_KEY_ADMIN:-not set}"
+                                        echo ""
+                                        DOORWAY_URL="${doorwayHost}" npx tsx src/seed-presences.ts
+                                    """
+                                }
                             }
                         }
                     }
@@ -800,16 +804,18 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                 container('builder') {
                     script {
                         def doorwayHost = env.RESOLVED_DOORWAY_HOST
-                        dir('genesis/seeder') {
-                            sh """#!/bin/bash
-                                set -euo pipefail
-                                echo "═══════════════════════════════════════════════════════════"
-                                echo "SEED COLLECTIVES"
-                                echo "═══════════════════════════════════════════════════════════"
-                                echo "Doorway: ${doorwayHost}"
-                                echo ""
-                                DOORWAY_URL="${doorwayHost}" npx tsx src/seed-collectives.ts
-                            """
+                        catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
+                            dir('genesis/seeder') {
+                                sh """#!/bin/bash
+                                    set -euo pipefail
+                                    echo "═══════════════════════════════════════════════════════════"
+                                    echo "SEED COLLECTIVES"
+                                    echo "═══════════════════════════════════════════════════════════"
+                                    echo "Doorway: ${doorwayHost}"
+                                    echo ""
+                                    DOORWAY_URL="${doorwayHost}" npx tsx src/seed-collectives.ts
+                                """
+                            }
                         }
                     }
                 }
@@ -825,16 +831,18 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                 container('builder') {
                     script {
                         def doorwayHost = env.RESOLVED_DOORWAY_HOST
-                        dir('genesis/seeder') {
-                            sh """#!/bin/bash
-                                set -euo pipefail
-                                echo "═══════════════════════════════════════════════════════════"
-                                echo "SEED ACCOUNTS"
-                                echo "═══════════════════════════════════════════════════════════"
-                                echo "Doorway: ${doorwayHost}"
-                                echo ""
-                                DOORWAY_URL="${doorwayHost}" npx tsx src/seed-accounts.ts
-                            """
+                        catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
+                            dir('genesis/seeder') {
+                                sh """#!/bin/bash
+                                    set -euo pipefail
+                                    echo "═══════════════════════════════════════════════════════════"
+                                    echo "SEED ACCOUNTS"
+                                    echo "═══════════════════════════════════════════════════════════"
+                                    echo "Doorway: ${doorwayHost}"
+                                    echo ""
+                                    DOORWAY_URL="${doorwayHost}" npx tsx src/seed-accounts.ts
+                                """
+                            }
                         }
                     }
                 }
