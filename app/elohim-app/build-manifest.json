@@ -13,7 +13,8 @@
           "app/elohim-app/package.json",
           "app/elohim-app/vite.config.ts",
           "app/elohim-library/**",
-          "elohim/sdk/**"
+          "elohim/sdk/**",
+          "VERSION"
         ],
         "buildProcess": ["Jenkinsfile"]
       },

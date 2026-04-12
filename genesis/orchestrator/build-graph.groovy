@@ -533,30 +533,24 @@ def formatPerFileMatrix(Map graph, Map staleMap, List changedFiles) {
     for (def entry : fileRouting.entrySet()) {
         def file = entry.key
         def steps = entry.value
-        def displayFile = file.length() > 45 ? '...' + file.substring(file.length() - 42) : file
-        def status
         if (steps.isEmpty()) {
-            status = 'SKIP — no manifest source matched'
             skippedCount++
         } else {
+            def displayFile = file.length() > 45 ? '...' + file.substring(file.length() - 42) : file
             def shown = steps.take(2).join(', ')
             def extra = steps.size() > 2 ? ' +' + (steps.size() - 2) : ''
-            status = "→ ${shown}${extra}"
+            def status = "→ ${shown}${extra}"
+            def line = "║ ${displayFile.padRight(45)} ${status}"
+            if (line.length() > 75) line = line.substring(0, 72) + '...'
+            lines.add(line.padRight(76) + '║')
             routedCount++
         }
-        def line = "║ ${displayFile.padRight(45)} ${status}"
-        if (line.length() > 75) line = line.substring(0, 72) + '...'
-        lines.add(line.padRight(76) + '║')
     }
 
     lines.add('╠══════════════════════════════════════════════════════════════════════════╣')
-    def summary = "║ ${routedCount} routed, ${skippedCount} unrouted of ${changedFiles.size()} total"
+    def summary = "║ ${routedCount} routed, ${skippedCount} skipped of ${changedFiles.size()} changed files"
     lines.add(summary.padRight(76) + '║')
     lines.add('╚══════════════════════════════════════════════════════════════════════════╝')
-
-    if (skippedCount > 0) {
-        lines.add("ℹ️  ${skippedCount} file(s) matched no manifest. If this is unexpected, check build-manifest.json source globs.")
-    }
 
     return lines.join('\n')
 }

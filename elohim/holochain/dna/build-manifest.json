@@ -11,7 +11,9 @@
           "elohim/holochain/dna/**/Cargo.toml",
           "elohim/holochain/dna/**/Cargo.lock",
           "elohim/holochain/dna/**/*.nix",
-          "elohim/elohim-cache-core/**"
+          "elohim/elohim-cache-core/**",
+          "elohim/holochain/rna/**",
+          "VERSION"
         ],
         "buildProcess": [
           "elohim/holochain/dna/Jenkinsfile"
