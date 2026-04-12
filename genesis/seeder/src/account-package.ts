@@ -382,9 +382,12 @@ function loadContentItems(): ContentItem[] {
     const dirPath = path.join(contentDir, dir);
     if (fs.statSync(dirPath).isDirectory()) {
       for (const file of fs.readdirSync(dirPath)) {
-        if (file.endsWith('.json')) {
+        if (file.endsWith('.json') && file !== 'index.json') {
           try {
-            items.push(JSON.parse(fs.readFileSync(path.join(dirPath, file), 'utf-8')));
+            const item = JSON.parse(fs.readFileSync(path.join(dirPath, file), 'utf-8'));
+            if (item.id) {
+              items.push(item);
+            }
           } catch {
             // Skip malformed
           }

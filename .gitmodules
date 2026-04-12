@@ -8,3 +8,6 @@
 [submodule "elohim/brit"]
 	path = elohim/brit
 	url = https://github.com/ethosengine/brit.git
+[submodule "elohim/rakia"]
+	path = elohim/rakia
+	url = https://github.com/ethosengine/rakia.git
