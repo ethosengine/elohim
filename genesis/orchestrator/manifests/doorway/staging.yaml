@@ -30,7 +30,7 @@ metadata:
     environment: staging
     app.kubernetes.io/name: doorway
     app.kubernetes.io/instance: doorway-staging
-    app.kubernetes.io/version: DEPLOY_VERSION_PLACEHOLDER
+    app.kubernetes.io/version: "DEPLOY_VERSION_PLACEHOLDER"
     app.kubernetes.io/component: gateway
     app.kubernetes.io/part-of: elohim
     app.kubernetes.io/managed-by: jenkins
@@ -51,7 +51,7 @@ metadata:
     environment: staging
     app.kubernetes.io/name: doorway
     app.kubernetes.io/instance: doorway-staging
-    app.kubernetes.io/version: DEPLOY_VERSION_PLACEHOLDER
+    app.kubernetes.io/version: "DEPLOY_VERSION_PLACEHOLDER"
     app.kubernetes.io/component: gateway
     app.kubernetes.io/part-of: elohim
     app.kubernetes.io/managed-by: jenkins
@@ -68,7 +68,7 @@ spec:
         environment: staging
         app.kubernetes.io/name: doorway
         app.kubernetes.io/instance: doorway-staging
-        app.kubernetes.io/version: DEPLOY_VERSION_PLACEHOLDER
+        app.kubernetes.io/version: "DEPLOY_VERSION_PLACEHOLDER"
         app.kubernetes.io/component: gateway
         app.kubernetes.io/part-of: elohim
         app.kubernetes.io/managed-by: jenkins
@@ -227,7 +227,7 @@ metadata:
     environment: staging
     app.kubernetes.io/name: doorway
     app.kubernetes.io/instance: doorway-staging
-    app.kubernetes.io/version: DEPLOY_VERSION_PLACEHOLDER
+    app.kubernetes.io/version: "DEPLOY_VERSION_PLACEHOLDER"
     app.kubernetes.io/component: gateway
     app.kubernetes.io/part-of: elohim
     app.kubernetes.io/managed-by: jenkins
@@ -261,7 +261,7 @@ metadata:
     environment: staging
     app.kubernetes.io/name: doorway
     app.kubernetes.io/instance: doorway-staging
-    app.kubernetes.io/version: DEPLOY_VERSION_PLACEHOLDER
+    app.kubernetes.io/version: "DEPLOY_VERSION_PLACEHOLDER"
     app.kubernetes.io/component: gateway
     app.kubernetes.io/part-of: elohim
     app.kubernetes.io/managed-by: jenkins

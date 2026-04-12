@@ -34,7 +34,7 @@ metadata:
     environment: ENV_PLACEHOLDER
     app.kubernetes.io/name: edgenode
     app.kubernetes.io/instance: INSTANCE_PLACEHOLDER
-    app.kubernetes.io/version: DEPLOY_VERSION_PLACEHOLDER
+    app.kubernetes.io/version: "DEPLOY_VERSION_PLACEHOLDER"
     app.kubernetes.io/component: data
     app.kubernetes.io/part-of: elohim
     app.kubernetes.io/managed-by: jenkins
@@ -77,7 +77,7 @@ metadata:
     environment: ENV_PLACEHOLDER
     app.kubernetes.io/name: edgenode
     app.kubernetes.io/instance: INSTANCE_PLACEHOLDER
-    app.kubernetes.io/version: DEPLOY_VERSION_PLACEHOLDER
+    app.kubernetes.io/version: "DEPLOY_VERSION_PLACEHOLDER"
     app.kubernetes.io/component: data
     app.kubernetes.io/part-of: elohim
     app.kubernetes.io/managed-by: jenkins
@@ -100,7 +100,7 @@ spec:
         environment: ENV_PLACEHOLDER
         app.kubernetes.io/name: edgenode
         app.kubernetes.io/instance: INSTANCE_PLACEHOLDER
-        app.kubernetes.io/version: DEPLOY_VERSION_PLACEHOLDER
+        app.kubernetes.io/version: "DEPLOY_VERSION_PLACEHOLDER"
         app.kubernetes.io/component: data
         app.kubernetes.io/part-of: elohim
         app.kubernetes.io/managed-by: jenkins
@@ -367,7 +367,7 @@ metadata:
     environment: ENV_PLACEHOLDER
     app.kubernetes.io/name: edgenode
     app.kubernetes.io/instance: INSTANCE_PLACEHOLDER
-    app.kubernetes.io/version: DEPLOY_VERSION_PLACEHOLDER
+    app.kubernetes.io/version: "DEPLOY_VERSION_PLACEHOLDER"
     app.kubernetes.io/component: data
     app.kubernetes.io/part-of: elohim
     app.kubernetes.io/managed-by: jenkins
@@ -402,7 +402,7 @@ metadata:
     environment: ENV_PLACEHOLDER
     app.kubernetes.io/name: edgenode
     app.kubernetes.io/instance: INSTANCE_PLACEHOLDER
-    app.kubernetes.io/version: DEPLOY_VERSION_PLACEHOLDER
+    app.kubernetes.io/version: "DEPLOY_VERSION_PLACEHOLDER"
     app.kubernetes.io/component: data
     app.kubernetes.io/part-of: elohim
     app.kubernetes.io/managed-by: jenkins
