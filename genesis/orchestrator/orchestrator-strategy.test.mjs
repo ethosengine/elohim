@@ -14,6 +14,7 @@ import { strict as assert } from 'node:assert';
 import { readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { loadManifests } from './manifest-utils.mjs';
 
 // ══════════════════════════════════════════════════════════════════
 // Algorithm under test — imported from the pure-function module so
@@ -530,4 +531,72 @@ describe('drift detection: mirror vs live Jenkinsfile', () => {
       `Mirror: ${JSON.stringify(mirror)}\n` +
       `Live:   ${JSON.stringify(live)}`);
   });
+});
+
+// ══════════════════════════════════════════════════════════════════
+// Cross-validation: PIPELINES changePatterns vs manifest source globs
+// ══════════════════════════════════════════════════════════════════
+// For each PIPELINES entry that has a build-manifest.json and is NOT in
+// the known divergences list, verify that every changePattern is covered
+// by at least one manifest source glob. This catches the exact divergence
+// class that causes CI hard failures (e.g., VERSION missing from sources).
+
+import picomatch from 'picomatch';
+
+// Known divergences — mirrors getKnownDivergences() in build-graph.groovy.
+// Pipelines in this list are allowed to diverge (Sprint 2 will close them).
+const KNOWN_DIVERGENCES = [
+  'elohim-sophia',
+  'elohim-compute',
+  'elohim-doorway-app',
+  'elohim-orchestrator',
+  'elohim-edge',
+  'elohim-genesis',
+];
+
+describe('PIPELINES changePatterns covered by manifest source globs', () => {
+  const repoRoot = resolve(__dirname, '../..');
+  const manifests = loadManifests(repoRoot);
+  const manifestByPipeline = new Map(
+    manifests.map(m => [m.content.pipeline, m])
+  );
+
+  for (const [pipelineName, config] of Object.entries(PIPELINES)) {
+    if (KNOWN_DIVERGENCES.includes(pipelineName)) continue;
+    // manualOnly pipelines never set shouldRun/shouldBuild on either side,
+    // so they can never cause a CI divergence. Skip them.
+    if (config.manualOnly) continue;
+
+    const manifest = manifestByPipeline.get(pipelineName);
+    if (!manifest) continue;
+
+    // Collect all source globs from all steps in this manifest
+    const allSourceGlobs = [];
+    for (const step of Object.values(manifest.content.steps)) {
+      allSourceGlobs.push(...(step.inputs.sources || []));
+    }
+
+    for (const pattern of config.changePatterns) {
+      it(`${pipelineName}: pattern '${pattern}' is covered by manifest`, () => {
+        // Generate a synthetic file that the legacy algorithm would match.
+        // Directory patterns (ending in '/') get a synthetic nested file.
+        // File patterns (like 'VERSION') are used as-is.
+        const syntheticFile = pattern.endsWith('/')
+          ? `${pattern}src/synthetic-test-file.rs`
+          : pattern;
+
+        // Check if any manifest source glob matches the synthetic file
+        const covered = allSourceGlobs.some(glob => {
+          const matcher = picomatch(glob);
+          return matcher(syntheticFile);
+        });
+
+        assert.ok(covered,
+          `PIPELINES['${pipelineName}'] has changePattern '${pattern}' but no manifest source glob ` +
+          `matches synthetic file '${syntheticFile}'.\n` +
+          `Manifest globs: ${JSON.stringify(allSourceGlobs)}\n` +
+          `Fix: add a matching glob to a step in ${manifest.path}`);
+      });
+    }
+  }
 });
