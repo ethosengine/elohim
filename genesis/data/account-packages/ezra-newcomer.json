@@ -3350,11 +3350,6 @@
       "reach": "commons",
       "reason": "commons",
       "stewardRatio": null
-    },
-    {
-      "reach": "commons",
-      "reason": "commons",
-      "stewardRatio": null
     }
   ],
   "relationships": [],
@@ -3369,8 +3364,8 @@
   "conductorGroup": 3,
   "manifest": {
     "version": "1.0.0",
-    "generatedAt": "2026-04-11T13:08:38.877Z",
+    "generatedAt": "2026-04-12T21:42:19.358Z",
     "sourceStory": "genesis",
-    "contentHash": "54005035"
+    "contentHash": "64454699"
   }
 }
