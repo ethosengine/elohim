@@ -34,4 +34,8 @@ replication: ReplicationStatus,
  * Consumers should treat None as "data not available" (e.g., wait or
  * avoid using this peer as a load signal), NOT as "caught up".
  */
-drain: DrainStatusInfo | null, };
+drain: DrainStatusInfo | null, 
+/**
+ * True when sync/replication is paused for backpressure (bulk write in progress).
+ */
+syncPaused: boolean, };
