@@ -1004,6 +1004,11 @@ spec:
                             def graphResult = runBuildGraph(changedFiles, analysis)
                             graphPipelines = graphResult.pipelineSteps.keySet().toList()
 
+                            // Filter to pipelines that have Jenkins jobs (in PIPELINES map).
+                            // Graph-only pipelines (elohim-compute, elohim-doorway-app, etc.)
+                            // run as pre-push gates, not as Jenkins builds.
+                            graphPipelines.removeAll { !PIPELINES.containsKey(it) }
+
                             // Genesis auto-include: if any triggering pipeline is in the graph result
                             if (!graphPipelines.contains('elohim-genesis') && !params.SKIP_GENESIS) {
                                 def isDevBranch = env.BRANCH_NAME == 'dev' || env.BRANCH_NAME ==~ /dev-.+|feat-.+|claude\/.+/
