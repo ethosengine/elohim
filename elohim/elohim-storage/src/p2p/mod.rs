@@ -48,6 +48,7 @@ use libp2p::{
 };
 use serde::Serialize;
 use sha2::{Digest, Sha256};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::{broadcast, mpsc, oneshot, RwLock};
@@ -228,6 +229,10 @@ pub struct P2PNode {
     identify_cache: Arc<DashMap<String, CachedIdentifyInfo>>,
     /// Per-peer runtime metrics (direction, last-seen, RTT)
     peer_metrics: Arc<DashMap<String, PeerMetrics>>,
+    /// Backpressure flag: when true, sync/replication cycles are skipped.
+    /// Set by bulk write operations (account import, content bulk) to prevent
+    /// P2P sync from competing for memory during heavy writes.
+    sync_paused: Arc<AtomicBool>,
 }
 
 /// Cached identify protocol info for a connected peer.
@@ -316,6 +321,8 @@ pub struct P2PStatusInfo {
     /// Consumers should treat None as "data not available" (e.g., wait or
     /// avoid using this peer as a load signal), NOT as "caught up".
     pub drain: Option<DrainStatusInfo>,
+    /// True when sync/replication is paused for backpressure (bulk write in progress).
+    pub sync_paused: bool,
 }
 
 /// Per-peer detail from libp2p Swarm state.
@@ -390,6 +397,20 @@ pub enum P2PCommand {
     },
 }
 
+/// RAII guard that resumes P2P sync when dropped.
+/// Created by `P2PHandle::pause_sync()` — ensures sync always resumes
+/// even if the bulk write panics or returns early.
+pub struct SyncPauseGuard {
+    flag: Arc<AtomicBool>,
+}
+
+impl Drop for SyncPauseGuard {
+    fn drop(&mut self) {
+        self.flag.store(false, Ordering::Release);
+        info!("P2P sync resumed (backpressure released)");
+    }
+}
+
 /// Send+Sync handle for querying P2P status and sending commands from HttpServer.
 /// Separated from P2PNode because libp2p Swarm types are not Send.
 #[derive(Clone)]
@@ -399,12 +420,24 @@ pub struct P2PHandle {
     agent_pubkey: String,
     /// Shared ref to delivery peer registry (populated by P2P event loop)
     delivery_peers: Arc<DashMap<String, DeliveryPeer>>,
+    /// Shared backpressure flag — set by bulk write handlers, read by event loop
+    sync_paused: Arc<AtomicBool>,
 }
 
 impl P2PHandle {
     /// Get the latest P2P status snapshot
     pub fn status(&self) -> P2PStatusInfo {
         self.status_rx.borrow().clone()
+    }
+
+    /// Pause sync/replication cycles for backpressure during bulk writes.
+    /// Returns a guard that automatically resumes sync when dropped.
+    pub fn pause_sync(&self, reason: &str) -> SyncPauseGuard {
+        self.sync_paused.store(true, Ordering::Release);
+        info!(reason = %reason, "P2P sync paused for backpressure");
+        SyncPauseGuard {
+            flag: Arc::clone(&self.sync_paused),
+        }
     }
 
     /// Get all known delivery peers with their capabilities.
@@ -705,6 +738,7 @@ impl P2PNode {
             relay_mode: config.relay_mode.to_string(),
             replication: replication::ReplicationStatus::default(),
             drain: None,
+            sync_paused: false,
         };
         let (status_tx, _) = tokio::sync::watch::channel(initial_status);
 
@@ -747,6 +781,7 @@ impl P2PNode {
             delivery_peers: Arc::new(DashMap::new()),
             identify_cache: Arc::new(DashMap::new()),
             peer_metrics: Arc::new(DashMap::new()),
+            sync_paused: Arc::new(AtomicBool::new(false)),
         })
     }
 
@@ -895,15 +930,27 @@ impl P2PNode {
                 }
                 _ = sync_interval.tick() => {
                     drop(swarm);
-                    self.initiate_sync_round().await;
+                    if self.sync_paused.load(Ordering::Acquire) {
+                        debug!("Skipping sync round (backpressure)");
+                    } else {
+                        self.initiate_sync_round().await;
+                    }
                 }
                 _ = replication_interval.tick() => {
                     drop(swarm);
-                    self.run_replication_cycle().await;
+                    if self.sync_paused.load(Ordering::Acquire) {
+                        debug!("Skipping replication cycle (backpressure)");
+                    } else {
+                        self.run_replication_cycle().await;
+                    }
                 }
                 _ = gap_dispatch_interval.tick() => {
                     drop(swarm);
-                    self.drain_gap_queue().await;
+                    if self.sync_paused.load(Ordering::Acquire) {
+                        debug!("Skipping gap dispatch (backpressure)");
+                    } else {
+                        self.drain_gap_queue().await;
+                    }
                 }
                 _ = drain_interval.tick() => {
                     drop(swarm);
@@ -3189,6 +3236,7 @@ impl P2PNode {
             command_tx: self.command_tx.clone(),
             agent_pubkey: self.identity.agent_pubkey().to_string(),
             delivery_peers: Arc::clone(&self.delivery_peers),
+            sync_paused: Arc::clone(&self.sync_paused),
         }
     }
 
@@ -3395,6 +3443,7 @@ impl P2PNode {
             relay_mode: self.config.relay_mode.to_string(),
             replication,
             drain,
+            sync_paused: self.sync_paused.load(Ordering::Acquire),
         };
         let _ = self.status_tx.send(status);
     }

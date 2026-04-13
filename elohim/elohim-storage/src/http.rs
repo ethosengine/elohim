@@ -2394,6 +2394,18 @@ impl HttpServer {
             input_views.into_iter().map(|v| v.into()).collect();
 
         let count = items.len();
+
+        // Pause P2P sync during bulk content creation to prevent memory pressure.
+        // The guard resumes sync automatically when dropped.
+        #[cfg(feature = "p2p")]
+        let _sync_guard = if count >= 50 {
+            self.p2p_handle
+                .as_ref()
+                .map(|h| h.pause_sync(&format!("bulk content create ({} items)", count)))
+        } else {
+            None
+        };
+
         info!(count = count, "Bulk creating content");
 
         match services.content.bulk_create(items) {
@@ -5365,6 +5377,20 @@ impl HttpServer {
 
         let human_id = package.identity.human_id.clone();
         let ctx = AppContext::default_lamad();
+
+        let item_count = package.content.len()
+            + package.relationships.len()
+            + package.stewardship.len();
+
+        // Pause P2P sync during bulk import to prevent memory pressure.
+        // The guard resumes sync automatically when dropped (even on error/panic).
+        #[cfg(feature = "p2p")]
+        let _sync_guard = self.p2p_handle.as_ref().map(|h| {
+            h.pause_sync(&format!(
+                "account import for {} ({} items)",
+                human_id, item_count
+            ))
+        });
 
         info!(
             human_id = %human_id,
