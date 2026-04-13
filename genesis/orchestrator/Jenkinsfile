@@ -653,9 +653,12 @@ def runBuildGraph(List changedFiles, Map pipelinesAnalysis) {
     def comparison = buildGraph.formatComparisonMatrix(pipelinesAnalysis, result.staleMap, result.graph)
     echo comparison.text
 
-    // Save build state for next run
-    def commitHash = getGitCommitHash()
-    buildGraph.saveBuildState(result.graph, result.staleMap, result.buildProcessHashes, commitHash, result.previousState)
+    // Save build state with buildProcess hashes for next run, but do NOT
+    // advance lastSuccessfulCommit yet — that happens only after Execute
+    // Builds succeeds. Advancing it here caused the graph to think all
+    // changes were already built when the previous run NPE'd before builds ran.
+    def previousCommit = result.previousState?.lastSuccessfulCommit ?: null
+    buildGraph.saveBuildState(result.graph, result.staleMap, result.buildProcessHashes, previousCommit, result.previousState)
 
     // Advisory warning on divergences (legacy algorithm is no longer authoritative)
     if (comparison.unexpectedDivergences && comparison.unexpectedDivergences.size() > 0) {
@@ -1155,11 +1158,19 @@ spec:
                             env.PIPELINE_BASELINES = writeJSON(returnText: true, json: pipelineBaselines)
                         }
 
+                        // Now that builds succeeded, advance the build graph's
+                        // lastSuccessfulCommit. During planning we deliberately
+                        // kept the previous commit to avoid baseline leapfrog
+                        // when builds fail before reaching this point.
+                        if (fileExists('build-state.json')) {
+                            def bState = readJSON(file: 'build-state.json')
+                            bState.lastSuccessfulCommit = env.GIT_COMMIT_FULL
+                            writeJSON(file: 'build-state.json', json: bState, pretty: 2)
+                            archiveArtifacts(artifacts: 'build-state.json', fingerprint: true)
+                        }
+
                         // Checkpoint 2: archive per-pipeline baselines captured
-                        // during this Execute Builds run. If Verify Deployment
-                        // or post.always is interrupted, the next build still
-                        // inherits these per-pipeline baselines and can skip
-                        // re-running pipelines that already succeeded.
+                        // during this Execute Builds run.
                         archivePipelineBaselines('execute')
                     }
                 }
