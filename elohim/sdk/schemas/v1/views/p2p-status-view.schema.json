@@ -14,7 +14,8 @@
     "relayReservations",
     "announceAddresses",
     "relayMode",
-    "replication"
+    "replication",
+    "syncPaused"
   ],
   "properties": {
     "peerId": {
@@ -66,6 +67,10 @@
         { "type": "null" }
       ],
       "description": "Drain queue state. null when DB pool or query unavailable — treat as 'data not available', NOT 'caught up'"
+    },
+    "syncPaused": {
+      "type": "boolean",
+      "description": "True when sync/replication is paused for backpressure (bulk write in progress). Operators and elohim agents use this to understand node load state."
     }
   },
   "additionalProperties": false

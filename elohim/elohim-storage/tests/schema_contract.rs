@@ -152,6 +152,7 @@ fn p2p_status_view_matches_schema() {
             published: 95,
             pending: 5,
         }),
+        sync_paused: false,
     };
 
     let json = serde_json::to_value(&status).unwrap();
@@ -172,6 +173,7 @@ fn p2p_status_view_with_null_drain() {
         relay_mode: "disabled".to_string(),
         replication: ReplicationStatus::default(),
         drain: None,
+        sync_paused: true,
     };
 
     let json = serde_json::to_value(&status).unwrap();

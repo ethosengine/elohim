@@ -48,6 +48,10 @@ export interface P2PStatusView {
    * Drain queue state. null when DB pool or query unavailable — treat as 'data not available', NOT 'caught up'
    */
   drain?: DrainStatusView | null;
+  /**
+   * True when sync/replication is paused for backpressure (bulk write in progress). Operators and elohim agents use this to understand node load state.
+   */
+  syncPaused: boolean;
 }
 /**
  * Identity-driven content replication progress
