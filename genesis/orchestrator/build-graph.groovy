@@ -570,11 +570,6 @@ def formatPerFileMatrix(Map graph, Map staleMap, List changedFiles) {
 @NonCPS
 def getKnownDivergences() {
     return [
-        // Legacy-only: pipeline exists in PIPELINES, no build-manifest.json yet.
-        // Resolution (Sprint 2): add a build-manifest.json covering the sophia
-        // submodule's source pattern (sophia/ gitlink + sophia.Jenkinsfile shim).
-        'elohim-sophia',
-
         // Graph-only: manifest exists, no PIPELINES entry. The orchestrator
         // doesn't currently route changes to these pipelines via the legacy
         // path. Resolution (Sprint 2): either add legacy PIPELINES entries so

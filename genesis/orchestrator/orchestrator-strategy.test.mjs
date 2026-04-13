@@ -546,7 +546,6 @@ import picomatch from 'picomatch';
 // Known divergences — mirrors getKnownDivergences() in build-graph.groovy.
 // Pipelines in this list are allowed to diverge (Sprint 2 will close them).
 const KNOWN_DIVERGENCES = [
-  'elohim-sophia',
   'elohim-compute',
   'elohim-doorway-app',
   'elohim-orchestrator',
