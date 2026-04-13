@@ -59,6 +59,19 @@ Feature: P2P Peer Validation
     Then sync_paused should be false after the error response
     # RAII guard: SyncPauseGuard resumes sync on drop, including error paths.
 
+  @wip @regression
+  Scenario: Sync auto-suppressed while drain backlog is large
+    Given elohim-storage on doorway "alpha" has 5 connected peers
+    And 3424 content items have been bulk-seeded
+    When the drain publish queue has more than 100 items pending
+    Then sync_paused should be true (auto-suppressed by drain)
+    And sync/replication cycles should be skipped
+    And once drain pending drops below 100, sync_paused should be false
+    # Discovery: 4Gi pod OOM-killed at 73% drain (2500/3424) because
+    # sync + replication + drain competed for memory simultaneously.
+    # Operational parameters: 4Gi limit, 5 peers, 3424 items, 500/cycle drain
+    # The drain is the priority after a seed — sync can wait.
+
   @wip
   Scenario: P2P status endpoint exposes sync_paused state
     Given the doorway health endpoint is accessible

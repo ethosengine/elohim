@@ -954,11 +954,26 @@ impl P2PNode {
                 }
                 _ = drain_interval.tick() => {
                     drop(swarm);
-                    let _ = self.drain_publish_queue(500).await;
+                    let published = self.drain_publish_queue(500).await;
                     // Refresh status after draining so the watch channel reflects
                     // post-drain counts immediately on the 15s drain cadence, not
                     // only on the 30s status cadence.
                     self.refresh_status().await;
+                    // Auto-suppress sync while drain has a large backlog.
+                    // Sync would add memory pressure for inventory data that's
+                    // about to change anyway. The node prioritizes publishing
+                    // over synchronizing until it catches up.
+                    if published > 0 {
+                        let status = self.status_tx.borrow().clone();
+                        let pending = status.drain.map(|d| d.pending).unwrap_or(0);
+                        if pending > 100 && !self.sync_paused.load(Ordering::Acquire) {
+                            self.sync_paused.store(true, Ordering::Release);
+                            info!(pending, "Sync auto-suppressed: drain backlog > 100");
+                        } else if pending <= 100 && self.sync_paused.load(Ordering::Acquire) {
+                            self.sync_paused.store(false, Ordering::Release);
+                            info!(pending, "Sync auto-resumed: drain backlog cleared");
+                        }
+                    }
                 }
                 _ = verify_interval.tick() => {
                     self.verify_shard_locations(&mut swarm).await;
