@@ -409,7 +409,7 @@ def orderByDependencies(pipelineList) {
 
     while (!remaining.isEmpty()) {
         def ready = remaining.find { name ->
-            def deps = PIPELINES[name].dependsOn ?: []
+            def deps = PIPELINES[name]?.dependsOn ?: []
             deps.every { dep ->
                 !remaining.contains(dep) || ordered.contains(dep)
             }
@@ -440,7 +440,7 @@ def groupByDependencyLevel(pipelineList) {
     while (placed.size() < nonGenesis.size()) {
         def currentLevel = nonGenesis.findAll { name ->
             if (placed.contains(name)) return false
-            def deps = (PIPELINES[name].dependsOn ?: [])
+            def deps = (PIPELINES[name]?.dependsOn ?: [])
             deps.every { dep -> !nonGenesis.contains(dep) || placed.contains(dep) }
         }
         if (currentLevel.isEmpty()) break
