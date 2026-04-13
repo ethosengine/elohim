@@ -11,8 +11,11 @@
 import { readdir, readFile } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import Ajv2020 from 'ajv/dist/2020.js';
-import addFormats from 'ajv-formats';
+import { createRequire } from 'node:module';
+
+const require = createRequire(import.meta.url);
+const Ajv2020 = require('ajv/dist/2020.js') as typeof import('ajv/dist/2020.js').default;
+const addFormats = require('ajv-formats') as typeof import('ajv-formats').default;
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PKG_DIR = join(__dirname, '..', '..', 'data', 'account-packages');
