@@ -20234,11 +20234,15 @@
   "relationships": [
     {
       "targetId": "human-matthew-manager",
+      "relationshipType": "grandparent-of",
+      "intimacyLevel": "trusted",
       "isBidirectional": true,
       "reach": null
     },
     {
       "targetId": "human-james-son",
+      "relationshipType": "grandparent-of",
+      "intimacyLevel": "trusted",
       "isBidirectional": true,
       "reach": null
     }
@@ -20264,7 +20268,7 @@
   "conductorGroup": 0,
   "manifest": {
     "version": "1.0.0",
-    "generatedAt": "2026-04-12T21:42:19.361Z",
+    "generatedAt": "2026-04-13T00:48:52.488Z",
     "sourceStory": "genesis",
     "contentHash": "64454699"
   }

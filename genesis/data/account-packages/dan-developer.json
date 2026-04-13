@@ -20241,6 +20241,8 @@
   "relationships": [
     {
       "targetId": "human-matthew-manager",
+      "relationshipType": "coworker",
+      "intimacyLevel": "connection",
       "isBidirectional": true,
       "reach": null
     }
@@ -20287,7 +20289,7 @@
   "conductorGroup": 0,
   "manifest": {
     "version": "1.0.0",
-    "generatedAt": "2026-04-12T21:42:19.355Z",
+    "generatedAt": "2026-04-13T00:48:52.482Z",
     "sourceStory": "genesis",
     "contentHash": "64454699"
   }

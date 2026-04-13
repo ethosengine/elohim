@@ -17271,6 +17271,8 @@
   "relationships": [
     {
       "targetId": "human-eve-firstwoman",
+      "relationshipType": "spouse",
+      "intimacyLevel": "intimate",
       "isBidirectional": true,
       "reach": null
     }
@@ -17307,7 +17309,7 @@
   "conductorGroup": 1,
   "manifest": {
     "version": "1.0.0",
-    "generatedAt": "2026-04-12T21:42:19.328Z",
+    "generatedAt": "2026-04-13T00:48:52.454Z",
     "sourceStory": "genesis",
     "contentHash": "64454699"
   }

@@ -93,6 +93,17 @@ if echo "$CHANGED" | grep -qE "genesis/data/humans/|genesis/data/presences/"; th
   echo "[pre-push] humans/presences validation ✓"
 fi
 
+# ── Account Package Schema Validation ────────────────────────────
+#
+# When account packages or their source data change, validate the
+# generated JSON against account-package.schema.json. Catches field
+# drift (e.g. missing relationshipType) before it reaches CI/deploy.
+if echo "$CHANGED" | grep -qE "genesis/data/account-packages/|genesis/data/humans/|genesis/seeder/src/account-package\.ts"; then
+  echo "[pre-push] Validating account packages against schema..."
+  (cd genesis/seeder && pnpm run validate:account-packages) || exit 1
+  echo "[pre-push] account-packages validation ✓"
+fi
+
 # ── Project Detection (manifest-driven) ──────────────────────────
 #
 # Try graph walker first — reads build-manifest.json files and matches

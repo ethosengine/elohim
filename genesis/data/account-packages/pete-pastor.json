@@ -20241,31 +20241,43 @@
   "relationships": [
     {
       "targetId": "human-matthew-manager",
+      "relationshipType": "congregation-member",
+      "intimacyLevel": "trusted",
       "isBidirectional": true,
       "reach": null
     },
     {
       "targetId": "human-bub-builder",
+      "relationshipType": "congregation-member",
+      "intimacyLevel": "trusted",
       "isBidirectional": true,
       "reach": null
     },
     {
       "targetId": "human-lenny-lineworker",
+      "relationshipType": "congregation-member",
+      "intimacyLevel": "connection",
       "isBidirectional": true,
       "reach": null
     },
     {
       "targetId": "human-pam-polarized",
+      "relationshipType": "congregation-member",
+      "intimacyLevel": "connection",
       "isBidirectional": true,
       "reach": null
     },
     {
       "targetId": "human-meriadoc-moneybags",
+      "relationshipType": "congregation-member",
+      "intimacyLevel": "connection",
       "isBidirectional": true,
       "reach": null
     },
     {
       "targetId": "human-susan-household",
+      "relationshipType": "congregation-member",
+      "intimacyLevel": "trusted",
       "isBidirectional": true,
       "reach": null
     }
@@ -20327,7 +20339,7 @@
   "conductorGroup": 2,
   "manifest": {
     "version": "1.0.0",
-    "generatedAt": "2026-04-12T21:42:19.378Z",
+    "generatedAt": "2026-04-13T00:48:52.506Z",
     "sourceStory": "genesis",
     "contentHash": "64454699"
   }

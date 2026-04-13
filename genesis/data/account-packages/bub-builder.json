@@ -14961,21 +14961,29 @@
   "relationships": [
     {
       "targetId": "human-manny-manufacturer",
+      "relationshipType": "business-partner",
+      "intimacyLevel": "trusted",
       "isBidirectional": true,
       "reach": null
     },
     {
       "targetId": "human-frank-farmer",
+      "relationshipType": "business-partner",
+      "intimacyLevel": "connection",
       "isBidirectional": true,
       "reach": null
     },
     {
       "targetId": "human-lenny-lineworker",
+      "relationshipType": "acquaintance",
+      "intimacyLevel": "connection",
       "isBidirectional": true,
       "reach": null
     },
     {
       "targetId": "human-pete-pastor",
+      "relationshipType": "congregation-member",
+      "intimacyLevel": "trusted",
       "isBidirectional": true,
       "reach": null
     }
@@ -15011,7 +15019,7 @@
   "conductorGroup": 2,
   "manifest": {
     "version": "1.0.0",
-    "generatedAt": "2026-04-12T21:42:19.353Z",
+    "generatedAt": "2026-04-13T00:48:52.479Z",
     "sourceStory": "genesis",
     "contentHash": "64454699"
   }

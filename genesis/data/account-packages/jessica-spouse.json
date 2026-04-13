@@ -20234,21 +20234,29 @@
   "relationships": [
     {
       "targetId": "human-matthew-manager",
+      "relationshipType": "spouse",
+      "intimacyLevel": "intimate",
       "isBidirectional": true,
       "reach": null
     },
     {
       "targetId": "human-james-son",
+      "relationshipType": "parent-of",
+      "intimacyLevel": "intimate",
       "isBidirectional": true,
       "reach": null
     },
     {
       "targetId": "human-timothy-tutor",
+      "relationshipType": "learning-partner",
+      "intimacyLevel": "connection",
       "isBidirectional": true,
       "reach": null
     },
     {
       "targetId": "human-georgina-grocer",
+      "relationshipType": "community-member",
+      "intimacyLevel": "recognition",
       "isBidirectional": true,
       "reach": null
     }
@@ -20285,7 +20293,7 @@
   "conductorGroup": 0,
   "manifest": {
     "version": "1.0.0",
-    "generatedAt": "2026-04-12T21:42:19.368Z",
+    "generatedAt": "2026-04-13T00:48:52.496Z",
     "sourceStory": "genesis",
     "contentHash": "64454699"
   }

@@ -20234,11 +20234,15 @@
   "relationships": [
     {
       "targetId": "human-matthew-manager",
+      "relationshipType": "neighbor",
+      "intimacyLevel": "connection",
       "isBidirectional": true,
       "reach": null
     },
     {
       "targetId": "human-pam-polarized",
+      "relationshipType": "neighbor",
+      "intimacyLevel": "connection",
       "isBidirectional": true,
       "reach": null
     }
@@ -20280,7 +20284,7 @@
   "conductorGroup": 1,
   "manifest": {
     "version": "1.0.0",
-    "generatedAt": "2026-04-12T21:42:19.376Z",
+    "generatedAt": "2026-04-13T00:48:52.503Z",
     "sourceStory": "genesis",
     "contentHash": "64454699"
   }

@@ -161,6 +161,39 @@
       "description": "Investors, gig workers, newcomers, visitors"
     },
     {
+      "id": "household-dowell",
+      "name": "Dowell Household",
+      "governanceLayer": "family",
+      "reach": "trusted",
+      "constitutionalParentId": "neighborhood-valley",
+      "description": "Compute shard — Dowell family members colocated in Tech Valley",
+      "domain": "household"
+    },
+    {
+      "id": "household-eden",
+      "name": "Eden Household",
+      "governanceLayer": "family",
+      "reach": "trusted",
+      "description": "Compute shard — Eden family members",
+      "domain": "household"
+    },
+    {
+      "id": "household-valley-economy",
+      "name": "Valley Economy Household",
+      "governanceLayer": "neighborhood",
+      "reach": "familiar",
+      "description": "Compute shard — Valley economy workers and builders",
+      "domain": "household"
+    },
+    {
+      "id": "household-extended",
+      "name": "Extended Network Household",
+      "governanceLayer": "neighborhood",
+      "reach": "familiar",
+      "description": "Compute shard — extended network participants, visitors, newcomers",
+      "domain": "household"
+    },
+    {
       "id": "community-local-church",
       "name": "Valley Community Church",
       "governanceLayer": "faith",

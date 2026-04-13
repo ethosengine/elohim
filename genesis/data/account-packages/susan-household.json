@@ -20234,16 +20234,22 @@
   "relationships": [
     {
       "targetId": "human-matthew-manager",
+      "relationshipType": "sibling",
+      "intimacyLevel": "intimate",
       "isBidirectional": true,
       "reach": null
     },
     {
       "targetId": "human-georgina-grocer",
+      "relationshipType": "community-member",
+      "intimacyLevel": "connection",
       "isBidirectional": true,
       "reach": null
     },
     {
       "targetId": "human-pete-pastor",
+      "relationshipType": "congregation-member",
+      "intimacyLevel": "trusted",
       "isBidirectional": true,
       "reach": null
     }
@@ -20269,7 +20275,7 @@
   "conductorGroup": 3,
   "manifest": {
     "version": "1.0.0",
-    "generatedAt": "2026-04-12T21:42:19.381Z",
+    "generatedAt": "2026-04-13T00:48:52.509Z",
     "sourceStory": "genesis",
     "contentHash": "64454699"
   }

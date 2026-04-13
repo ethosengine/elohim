@@ -14456,16 +14456,22 @@
   "relationships": [
     {
       "targetId": "human-frank-farmer",
+      "relationshipType": "business-partner",
+      "intimacyLevel": "trusted",
       "isBidirectional": true,
       "reach": null
     },
     {
       "targetId": "human-jessica-spouse",
+      "relationshipType": "community-member",
+      "intimacyLevel": "recognition",
       "isBidirectional": true,
       "reach": null
     },
     {
       "targetId": "human-susan-household",
+      "relationshipType": "community-member",
+      "intimacyLevel": "connection",
       "isBidirectional": true,
       "reach": null
     }
@@ -14496,7 +14502,7 @@
   "conductorGroup": 2,
   "manifest": {
     "version": "1.0.0",
-    "generatedAt": "2026-04-12T21:42:19.360Z",
+    "generatedAt": "2026-04-13T00:48:52.486Z",
     "sourceStory": "genesis",
     "contentHash": "64454699"
   }

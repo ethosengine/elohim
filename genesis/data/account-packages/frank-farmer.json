@@ -13863,11 +13863,15 @@
   "relationships": [
     {
       "targetId": "human-georgina-grocer",
+      "relationshipType": "business-partner",
+      "intimacyLevel": "trusted",
       "isBidirectional": true,
       "reach": null
     },
     {
       "targetId": "human-bub-builder",
+      "relationshipType": "business-partner",
+      "intimacyLevel": "connection",
       "isBidirectional": true,
       "reach": null
     }
@@ -13919,7 +13923,7 @@
   "conductorGroup": 2,
   "manifest": {
     "version": "1.0.0",
-    "generatedAt": "2026-04-12T21:42:19.359Z",
+    "generatedAt": "2026-04-13T00:48:52.486Z",
     "sourceStory": "genesis",
     "contentHash": "64454699"
   }

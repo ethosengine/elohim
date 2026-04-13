@@ -1,0 +1,154 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "elohim:operational:account-package",
+  "title": "Account Package Schema — bootstrap/migration envelope for bulk-loading human state",
+  "description": "Operational IoC contract (Category C) for account packages in genesis/data/account-packages/*.json. This is a bootstrap artifact, not a protocol primitive. The Rust AccountPackageInputView struct in elohim-storage/src/views.rs is the runtime authority; this schema catches drift at dev time before the seeder hits the HTTP endpoint.",
+  "type": "object",
+  "required": ["schemaVersion", "identity", "content"],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": {
+      "type": "integer",
+      "const": 1,
+      "description": "Must be 1. Rust default_schema_version() returns 1."
+    },
+    "identity": {
+      "$ref": "#/$defs/AccountIdentity"
+    },
+    "content": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/ContentAssignment" }
+    },
+    "relationships": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/RelationshipSeed" },
+      "default": []
+    },
+    "stewardship": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/StewardshipSeed" },
+      "default": []
+    },
+    "collectives": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/CollectiveSeed" },
+      "default": []
+    },
+    "conductorGroup": {
+      "type": ["integer", "null"],
+      "description": "Conductor group index — determines compute shard (household) placement"
+    },
+    "manifest": {
+      "oneOf": [
+        { "$ref": "#/$defs/PackageManifest" },
+        { "type": "null" }
+      ]
+    }
+  },
+  "$defs": {
+    "AccountIdentity": {
+      "type": "object",
+      "required": ["humanId", "displayName"],
+      "additionalProperties": false,
+      "properties": {
+        "humanId": {
+          "type": "string",
+          "pattern": "^human-[a-z0-9][a-z0-9-]*[a-z0-9]$"
+        },
+        "displayName": {
+          "type": "string",
+          "minLength": 1
+        },
+        "category": {
+          "type": ["string", "null"]
+        },
+        "profileReach": {
+          "type": ["string", "null"]
+        },
+        "bio": {
+          "type": ["string", "null"]
+        },
+        "location": {
+          "type": ["string", "null"]
+        },
+        "affinities": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": []
+        },
+        "organizations": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/OrganizationContext" },
+          "default": []
+        }
+      }
+    },
+    "OrganizationContext": {
+      "type": "object",
+      "required": ["id", "name"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "role": { "type": ["string", "null"] }
+      }
+    },
+    "ContentAssignment": {
+      "type": "object",
+      "required": ["contentId", "reach"],
+      "additionalProperties": false,
+      "properties": {
+        "contentId": { "type": "string" },
+        "reach": { "type": "string" },
+        "reason": { "type": ["string", "null"] },
+        "stewardRatio": { "type": ["number", "null"] }
+      }
+    },
+    "RelationshipSeed": {
+      "type": "object",
+      "required": ["targetId", "relationshipType", "intimacyLevel"],
+      "additionalProperties": false,
+      "properties": {
+        "targetId": { "type": "string" },
+        "relationshipType": { "type": "string" },
+        "intimacyLevel": { "type": "string" },
+        "isBidirectional": {
+          "type": "boolean",
+          "default": false
+        },
+        "reach": { "type": ["string", "null"] }
+      }
+    },
+    "StewardshipSeed": {
+      "type": "object",
+      "required": ["contentCategory", "allocationRatio"],
+      "additionalProperties": false,
+      "properties": {
+        "contentCategory": { "type": "string" },
+        "allocationRatio": { "type": "number" },
+        "contributionType": { "type": ["string", "null"] }
+      }
+    },
+    "CollectiveSeed": {
+      "type": "object",
+      "required": ["collectiveId"],
+      "additionalProperties": false,
+      "properties": {
+        "collectiveId": { "type": "string" },
+        "roleContext": { "type": ["string", "null"] },
+        "intimacyLevel": { "type": ["string", "null"] }
+      }
+    },
+    "PackageManifest": {
+      "type": "object",
+      "required": ["version", "generatedAt"],
+      "additionalProperties": false,
+      "properties": {
+        "version": { "type": "string" },
+        "generatedAt": { "type": "string", "format": "date-time" },
+        "sourceStory": { "type": ["string", "null"] },
+        "contentHash": { "type": ["string", "null"] }
+      }
+    }
+  }
+}

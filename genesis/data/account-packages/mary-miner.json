@@ -13724,6 +13724,8 @@
   "relationships": [
     {
       "targetId": "human-ginny-gigworker",
+      "relationshipType": "acquaintance",
+      "intimacyLevel": "connection",
       "isBidirectional": true,
       "reach": null
     }
@@ -13754,7 +13756,7 @@
   "conductorGroup": 3,
   "manifest": {
     "version": "1.0.0",
-    "generatedAt": "2026-04-12T21:42:19.371Z",
+    "generatedAt": "2026-04-13T00:48:52.499Z",
     "sourceStory": "genesis",
     "contentHash": "64454699"
   }

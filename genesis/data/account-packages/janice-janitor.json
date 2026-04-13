@@ -673,6 +673,8 @@
   "relationships": [
     {
       "targetId": "human-tommy-teacher",
+      "relationshipType": "coworker",
+      "intimacyLevel": "connection",
       "isBidirectional": true,
       "reach": null
     }
@@ -698,7 +700,7 @@
   "conductorGroup": 1,
   "manifest": {
     "version": "1.0.0",
-    "generatedAt": "2026-04-12T21:42:19.367Z",
+    "generatedAt": "2026-04-13T00:48:52.495Z",
     "sourceStory": "genesis",
     "contentHash": "64454699"
   }

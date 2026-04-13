@@ -20241,41 +20241,57 @@
   "relationships": [
     {
       "targetId": "human-jessica-spouse",
+      "relationshipType": "spouse",
+      "intimacyLevel": "intimate",
       "isBidirectional": true,
       "reach": null
     },
     {
       "targetId": "human-james-son",
+      "relationshipType": "parent-of",
+      "intimacyLevel": "intimate",
       "isBidirectional": true,
       "reach": null
     },
     {
       "targetId": "human-gertrude-grandma",
+      "relationshipType": "grandparent-of",
+      "intimacyLevel": "trusted",
       "isBidirectional": true,
       "reach": null
     },
     {
       "targetId": "human-dan-developer",
+      "relationshipType": "coworker",
+      "intimacyLevel": "connection",
       "isBidirectional": true,
       "reach": null
     },
     {
       "targetId": "human-nancy-neighbor",
+      "relationshipType": "neighbor",
+      "intimacyLevel": "connection",
       "isBidirectional": true,
       "reach": null
     },
     {
       "targetId": "human-pete-pastor",
+      "relationshipType": "congregation-member",
+      "intimacyLevel": "trusted",
       "isBidirectional": true,
       "reach": null
     },
     {
       "targetId": "human-meriadoc-moneybags",
+      "relationshipType": "acquaintance",
+      "intimacyLevel": "connection",
       "isBidirectional": true,
       "reach": null
     },
     {
       "targetId": "human-susan-household",
+      "relationshipType": "sibling",
+      "intimacyLevel": "intimate",
       "isBidirectional": true,
       "reach": null
     }
@@ -20397,7 +20413,7 @@
   "conductorGroup": 0,
   "manifest": {
     "version": "1.0.0",
-    "generatedAt": "2026-04-12T21:42:19.373Z",
+    "generatedAt": "2026-04-13T00:48:52.500Z",
     "sourceStory": "genesis",
     "contentHash": "64454699"
   }

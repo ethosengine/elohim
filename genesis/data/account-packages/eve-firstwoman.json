@@ -17265,6 +17265,8 @@
   "relationships": [
     {
       "targetId": "human-adam-firstman",
+      "relationshipType": "spouse",
+      "intimacyLevel": "intimate",
       "isBidirectional": true,
       "reach": null
     }
@@ -17311,7 +17313,7 @@
   "conductorGroup": 1,
   "manifest": {
     "version": "1.0.0",
-    "generatedAt": "2026-04-12T21:42:19.357Z",
+    "generatedAt": "2026-04-13T00:48:52.484Z",
     "sourceStory": "genesis",
     "contentHash": "64454699"
   }

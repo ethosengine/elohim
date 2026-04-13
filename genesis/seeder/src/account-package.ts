@@ -88,8 +88,8 @@ interface HumanEntry {
 interface RelationshipEntry {
   source: string;
   target: string;
-  type: string;
-  intimacy: 'intimate' | 'trusted' | 'connection' | 'recognition';
+  relationshipType: string;
+  intimacyLevel: 'intimate' | 'trusted' | 'connection' | 'recognition';
   context?: string;
 }
 
@@ -533,8 +533,8 @@ function buildRelationshipSeeds(
     if (rel.source === human.id) {
       seeds.push({
         targetId: rel.target,
-        relationshipType: rel.type,
-        intimacyLevel: rel.intimacy,
+        relationshipType: rel.relationshipType,
+        intimacyLevel: rel.intimacyLevel,
         isBidirectional: true,
         reach: null,
       });
@@ -542,8 +542,8 @@ function buildRelationshipSeeds(
       // Bidirectional: also include reverse relationships
       seeds.push({
         targetId: rel.source,
-        relationshipType: rel.type,
-        intimacyLevel: rel.intimacy,
+        relationshipType: rel.relationshipType,
+        intimacyLevel: rel.intimacyLevel,
         isBidirectional: true,
         reach: null,
       });

@@ -12597,11 +12597,15 @@
   "relationships": [
     {
       "targetId": "human-jessica-spouse",
+      "relationshipType": "learning-partner",
+      "intimacyLevel": "connection",
       "isBidirectional": true,
       "reach": null
     },
     {
       "targetId": "human-james-son",
+      "relationshipType": "mentee-of",
+      "intimacyLevel": "connection",
       "isBidirectional": true,
       "reach": null
     }
@@ -12632,7 +12636,7 @@
   "conductorGroup": 2,
   "manifest": {
     "version": "1.0.0",
-    "generatedAt": "2026-04-12T21:42:19.382Z",
+    "generatedAt": "2026-04-13T00:48:52.510Z",
     "sourceStory": "genesis",
     "contentHash": "64454699"
   }
