@@ -550,6 +550,7 @@ const KNOWN_DIVERGENCES = [
   'elohim-compute',
   'elohim-doorway-app',
   'elohim-orchestrator',
+  'elohim',
   'elohim-edge',
   'elohim-genesis',
 ];

@@ -593,6 +593,7 @@ def getKnownDivergences() {
         // may disagree on whether these pipelines need to build.
         // Resolution (Sprint 2): replace legacy algorithm with the manifest graph,
         // or make the manifest graph use per-step lastBuiltCommit for source change detection.
+        'elohim',
         'elohim-edge',
         'elohim-genesis',
     ]
