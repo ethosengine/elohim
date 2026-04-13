@@ -147,28 +147,17 @@ def calculateTriagePriority(int f, int u) { f > 0 && u > 0 ? 'CRITICAL' : f > 0 
  * found (first run)" stuck state that re-triggered every pipeline on every push.
  */
 def archivePipelineBaselines(String checkpoint) {
-    def baselines = readJSON(text: env.PIPELINE_BASELINES ?: '{}')
+    def baselines = [:]
     if (env.GIT_COMMIT_FULL) {
         baselines['__global__'] = env.GIT_COMMIT_FULL
     }
-    // Persist back to env so later checkpoints and post.always see latest state
     env.PIPELINE_BASELINES = writeJSON(returnText: true, json: baselines)
-
     writeJSON file: 'pipeline-baselines.json', json: baselines, pretty: 2
-
-    // Defensive: writeJSON is synchronous but workspace/CPS issues have bitten
-    // us before. Check the file is actually there before archiving.
     if (!fileExists('pipeline-baselines.json')) {
-        error "pipeline-baselines.json missing after writeJSON (checkpoint=${checkpoint}) — workspace or CPS issue"
+        error "pipeline-baselines.json missing after writeJSON (checkpoint=${checkpoint})"
     }
-
-    // No allowEmptyArchive: if this file is missing, fail the post-block loudly
-    // so the next orchestrator build sees a red signal instead of a silent cold-start.
     archiveArtifacts artifacts: 'pipeline-baselines.json', fingerprint: true
-
-    def perPipelineCount = baselines.findAll { k, v -> k != '__global__' }.size()
-    def globalBrief = baselines['__global__'] ? baselines['__global__'].toString().take(8) : '(null)'
-    echo "📋 [baseline:${checkpoint}] archived — __global__=${globalBrief}, per-pipeline=${perPipelineCount}"
+    echo "[baseline:${checkpoint}] archived — __global__=${baselines['__global__']?.toString()?.take(8) ?: '(null)'}"
 }
 
 /**
@@ -217,6 +206,7 @@ def getGitCommitHashFull() {
  *   3. GIT_PREVIOUS_SUCCESSFUL_COMMIT (Jenkins Git plugin - only advances on SUCCESS)
  *   4. HEAD~1 fallback (only diffs the latest push)
  */
+// DEPRECATED: advisory only, will be removed
 def analyzeChangeset(storedGlobalBaseline = null) {
     // 1. Manual override via FORCE_COMMIT parameter
     def baseCommit = params.FORCE_COMMIT?.trim() ?: null
@@ -267,6 +257,7 @@ def analyzeChangeset(storedGlobalBaseline = null) {
  * Uses per-pipeline baselines when available to avoid re-triggering
  * pipelines that already built successfully for intermediate changes.
  */
+// DEPRECATED: advisory only, will be removed
 def analyzePipelineRequirements(changedFiles, pipelineBaselines = [:]) {
     // CI config files/directories that shouldn't trigger source builds.
     // NOTE: `genesis/orchestrator/` used to be here as a blanket pattern, but that
@@ -411,6 +402,7 @@ def checkHealth(String name, String url) {
 /**
  * Order pipelines by dependencies using topological sort
  */
+// DEPRECATED: advisory only, will be removed
 def orderByDependencies(pipelineList) {
     def ordered = []
     def remaining = pipelineList.collect()
@@ -464,6 +456,7 @@ def groupByDependencyLevel(pipelineList) {
  * Uses fixed-point iteration for transitive propagation.
  * Example: DNA builds → edge auto-includes (dependsOn DNA) → genesis auto-includes (dependsOn edge)
  */
+// DEPRECATED: advisory only, will be removed
 def propagateDependencies(pipelines, analysis) {
     def added = true
     while (added) {
@@ -645,17 +638,18 @@ def runBddCoverageGap() {
 }
 
 /**
- * Run build graph walker in shadow mode alongside PIPELINES analysis.
- * Compares results and logs divergences without affecting build decisions.
+ * Run manifest-driven build graph — primary change detection algorithm.
+ * Returns the graph result (used to determine which pipelines build).
+ * Also runs advisory comparison against legacy PIPELINES analysis.
  */
-def runBuildGraphShadow(List changedFiles, Map pipelinesAnalysis) {
+def runBuildGraph(List changedFiles, Map pipelinesAnalysis) {
     def buildGraph = load('genesis/orchestrator/build-graph.groovy')
     def result = buildGraph.walkBuildGraph(changedFiles)
 
     // Per-file routing matrix (always-on visibility, from Task 4)
     echo buildGraph.formatPerFileMatrix(result.graph, result.staleMap, changedFiles)
 
-    // Comparison matrix; capture struct for divergence handling
+    // Comparison matrix; advisory only — legacy algorithm is deprecated
     def comparison = buildGraph.formatComparisonMatrix(pipelinesAnalysis, result.staleMap, result.graph)
     echo comparison.text
 
@@ -663,31 +657,12 @@ def runBuildGraphShadow(List changedFiles, Map pipelinesAnalysis) {
     def commitHash = getGitCommitHash()
     buildGraph.saveBuildState(result.graph, result.staleMap, result.buildProcessHashes, commitHash, result.previousState)
 
-    // Sprint 1 hard escalation: fail on unexpected divergences
+    // Advisory warning on divergences (legacy algorithm is no longer authoritative)
     if (comparison.unexpectedDivergences && comparison.unexpectedDivergences.size() > 0) {
-        error """
-═══════════════════════════════════════════════════════════════════════════════
-  ❌ ORCHESTRATOR / BUILD-GRAPH DIVERGENCE
-═══════════════════════════════════════════════════════════════════════════════
-  The legacy PIPELINES algorithm and the manifest-driven build graph
-  disagree on these pipelines:
-
-      ${comparison.unexpectedDivergences.join(', ')}
-
-  This means a build-manifest.json is missing or has incomplete coverage
-  of patterns in PIPELINES. To fix:
-
-    1. Add or extend the relevant build-manifest.json so its source globs
-       match the changed files (preferred — this advances Sprint 2 work)
-    2. Add the pipeline to getKnownDivergences() in build-graph.groovy
-       (transitional — only if Sprint 2 hasn't closed the gap yet)
-    3. Fix the legacy PIPELINES entry if it was the wrong one all along
-
-  See: /projects/.claude-config/plans/2026-04-07-ci-observability-sprint1.md
-       and the design doc at .claude-config/plans/lazy-foraging-muffin.md
-═══════════════════════════════════════════════════════════════════════════════
-"""
+        echo "⚠️  ADVISORY: legacy PIPELINES disagrees with build graph on: ${comparison.unexpectedDivergences.join(', ')}"
     }
+
+    return result
 }
 
 // =============================================================================
@@ -1016,24 +991,42 @@ spec:
                             env.ANALYSIS_JSON = writeJSON(returnText: true, json: analysis)
                         }
 
-                        // Order pipelines by dependencies
-                        def ordered = orderByDependencies(pipelines)
-                        env.PIPELINES_TO_RUN = ordered.join(',')
+                        // Legacy ordering (advisory only — feeds comparison matrix)
+                        def legacyOrdered = orderByDependencies(pipelines)
 
-                        // ALWAYS show the decision matrix
-                        printDecisionMatrix(analysis, ordered)
+                        // ALWAYS show the legacy decision matrix (advisory)
+                        printDecisionMatrix(analysis, legacyOrdered)
 
-                        echo '\n=== Build Graph Shadow Mode ==='
-                        runBuildGraphShadow(changedFiles, analysis)
+                        def graphPipelines
+                        if (mode in ['auto', 'status']) {
+                            // Build graph is PRIMARY for auto mode
+                            echo '\n=== Build Graph (Primary) ==='
+                            def graphResult = runBuildGraph(changedFiles, analysis)
+                            graphPipelines = graphResult.pipelineSteps.keySet().toList()
+
+                            // Genesis auto-include: if any triggering pipeline is in the graph result
+                            if (!graphPipelines.contains('elohim-genesis') && !params.SKIP_GENESIS) {
+                                def isDevBranch = env.BRANCH_NAME == 'dev' || env.BRANCH_NAME ==~ /dev-.+|feat-.+|claude\/.+/
+                                def triggeringPipeline = graphPipelines.find { PIPELINES[it]?.triggersGenesis }
+                                if (triggeringPipeline && isDevBranch) {
+                                    graphPipelines.add('elohim-genesis')
+                                }
+                            }
+                        } else {
+                            // Manual mode: use the explicitly requested pipelines
+                            graphPipelines = pipelines
+                        }
+
+                        env.PIPELINES_TO_RUN = graphPipelines.join(',')
 
                         // Set build description
-                        if (ordered.isEmpty() && mode == 'auto') {
+                        if (graphPipelines.isEmpty() && mode == 'auto') {
                             echo 'ℹ️  No pipelines need to run for these changes'
                             currentBuild.description = "No builds needed (${changedFiles.size()} files)"
                         } else if (mode == 'status') {
                             currentBuild.description = "Status check only"
                         } else {
-                            currentBuild.description = "${mode}: ${ordered.join(', ')}"
+                            currentBuild.description = "${mode}: ${graphPipelines.join(', ')}"
                         }
 
                         // Checkpoint 1: archive baseline now so that if Execute

@@ -543,13 +543,16 @@ describe('drift detection: mirror vs live Jenkinsfile', () => {
 
 import picomatch from 'picomatch';
 
-// Known divergences — mirrors getKnownDivergences() in build-graph.groovy.
-// Pipelines in this list are allowed to diverge (Sprint 2 will close them).
+// Pipelines whose legacy PIPELINES changePatterns aren't fully covered by
+// manifest source globs. These are skipped in the cross-validation test.
+// Graph-only pipelines have no PIPELINES entry; manifest-gap pipelines have
+// legacy patterns that no manifest glob matches yet.
 const KNOWN_DIVERGENCES = [
+  // Graph-only: manifest exists, no PIPELINES entry
   'elohim-compute',
   'elohim-doorway-app',
   'elohim-orchestrator',
-  'elohim',
+  // Manifest-gap: legacy patterns not yet covered by manifest globs
   'elohim-edge',
   'elohim-genesis',
 ];
