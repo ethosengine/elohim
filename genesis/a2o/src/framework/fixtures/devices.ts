@@ -86,10 +86,10 @@ export function getDevice(name: string): DeviceArchetype {
   const devices = loadDevices();
   const lower = name.toLowerCase();
   const found = devices.find(
-    (d) => d.displayName.toLowerCase() === lower || d.id === name || d.id === lower
+    d => d.displayName.toLowerCase() === lower || d.id === name || d.id === lower
   );
   if (!found) {
-    const available = devices.map((d) => `"${d.displayName}"`).join(', ');
+    const available = devices.map(d => `"${d.displayName}"`).join(', ');
     throw new Error(
       `Device archetype "${name}" not found in devices.json. Available: ${available}`
     );
@@ -108,5 +108,5 @@ export function getAllDevices(): DeviceArchetype[] {
  * Return all device archetypes at the given capability level.
  */
 export function getDevicesByLevel(level: number): DeviceArchetype[] {
-  return loadDevices().filter((d) => d.capabilityLevel === level);
+  return loadDevices().filter(d => d.capabilityLevel === level);
 }

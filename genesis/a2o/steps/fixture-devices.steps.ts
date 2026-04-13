@@ -8,9 +8,16 @@
  */
 
 import { Given, Then, DataTable } from '@cucumber/cucumber';
+
+// eslint-disable-next-line import/no-extraneous-dependencies
 import { expect } from 'chai';
 
-import { DeviceArchetype, getDevice, getAllDevices, getDevicesByLevel } from '../src/framework/fixtures/devices.js';
+import {
+  DeviceArchetype,
+  getDevice,
+  getAllDevices,
+  getDevicesByLevel,
+} from '../src/framework/fixtures/devices.js';
 import { E2EWorld } from '../src/framework/world.js';
 
 // ---------------------------------------------------------------------------
@@ -20,7 +27,10 @@ import { E2EWorld } from '../src/framework/world.js';
 // `this` in the step function (typed as E2EWorld & { currentDevice? }).
 // ---------------------------------------------------------------------------
 
-type WorldWithDevice = E2EWorld & { currentDevice?: DeviceArchetype; allDevices?: DeviceArchetype[] };
+type WorldWithDevice = E2EWorld & {
+  currentDevice?: DeviceArchetype;
+  allDevices?: DeviceArchetype[];
+};
 
 // ---------------------------------------------------------------------------
 // Given — load device(s)
@@ -71,22 +81,26 @@ Then(
 
 Then('the device can steward content', function (this: WorldWithDevice) {
   const device = requireDevice(this);
-  expect(device.canSteward, `Expected ${device.displayName} to have canSteward=true`).to.be.true;
+  expect(device.canSteward, `Expected ${device.displayName} to have canSteward=true`).to.equal(
+    true
+  );
 });
 
 Then('the device cannot steward content', function (this: WorldWithDevice) {
   const device = requireDevice(this);
-  expect(device.canSteward, `Expected ${device.displayName} to have canSteward=false`).to.be.false;
+  expect(device.canSteward, `Expected ${device.displayName} to have canSteward=false`).to.equal(
+    false
+  );
 });
 
 Then('the device should be always-on', function (this: WorldWithDevice) {
   const device = requireDevice(this);
-  expect(device.alwaysOn, `Expected ${device.displayName} to be always-on`).to.be.true;
+  expect(device.alwaysOn, `Expected ${device.displayName} to be always-on`).to.equal(true);
 });
 
 Then('the device should not be always-on', function (this: WorldWithDevice) {
   const device = requireDevice(this);
-  expect(device.alwaysOn, `Expected ${device.displayName} to not be always-on`).to.be.false;
+  expect(device.alwaysOn, `Expected ${device.displayName} to not be always-on`).to.equal(false);
 });
 
 Then(
@@ -152,19 +166,16 @@ Then(
  *     | capability           |
  *     | hardware-key-signing |
  */
-Then(
-  'the device should support attestation:',
-  function (this: WorldWithDevice, table: DataTable) {
-    const device = requireDevice(this);
-    const expectedCaps: string[] = table.rows().map((row: string[]) => row[0]);
-    for (const cap of expectedCaps) {
-      expect(
-        device.attestationCapabilities,
-        `Expected ${device.displayName} to support attestation capability "${cap}"`
-      ).to.include(cap);
-    }
+Then('the device should support attestation:', function (this: WorldWithDevice, table: DataTable) {
+  const device = requireDevice(this);
+  const expectedCaps: string[] = table.rows().map((row: string[]) => row[0]);
+  for (const cap of expectedCaps) {
+    expect(
+      device.attestationCapabilities,
+      `Expected ${device.displayName} to support attestation capability "${cap}"`
+    ).to.include(cap);
   }
-);
+});
 
 // ---------------------------------------------------------------------------
 // Then — portfolio coverage
