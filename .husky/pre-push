@@ -93,6 +93,25 @@ if echo "$CHANGED" | grep -qE "genesis/data/humans/|genesis/data/presences/"; th
   echo "[pre-push] humans/presences validation ✓"
 fi
 
+# ── Device Archetype Validation ──────────────────────────────────
+#
+# When device archetype markdown files change, validate frontmatter
+# against devices.schema.json and regenerate devices.json.
+if echo "$CHANGED" | grep -qE "genesis/data/devices/"; then
+  echo "[pre-push] Validating device archetypes..."
+  (cd genesis/seeder && pnpm run validate:devices) || exit 1
+
+  echo "[pre-push] Regenerating devices.json from markdown sources..."
+  (cd genesis/seeder && pnpm run generate:devices) || exit 1
+
+  if ! git diff --quiet -- genesis/data/devices/devices.json 2>/dev/null; then
+    echo "[pre-push] ERROR: devices.json is stale relative to markdown sources."
+    echo "  Re-run 'pnpm --filter holochain-seeder run generate:devices' and stage the changes before pushing."
+    exit 1
+  fi
+  echo "[pre-push] device archetype validation ✓"
+fi
+
 # ── Account Package Schema Validation ────────────────────────────
 #
 # When account packages or their source data change, validate the
