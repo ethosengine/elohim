@@ -31,7 +31,7 @@ import type { AccountImportResultView, AccountPackageInputView } from '@elohim/s
 
 function loadPackages(packagesDir: string, humanFilter?: string): AccountPackageInputView[] {
   const files = readdirSync(packagesDir).filter(
-    f => f.endsWith('.json') && f !== 'index.json' && f !== 'conductor-groups.json'
+    f => f.endsWith('.json') && f !== 'index.json' && f !== 'conductor-groups.json' && !f.endsWith('.schema.json')
   );
 
   const packages: AccountPackageInputView[] = [];
