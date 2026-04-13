@@ -1312,12 +1312,15 @@ spec:
 
     post {
         always {
-            // NOTE: no container('builder') wrapper here — every step inside is a
-            // pure pipeline step (readJSON/writeJSON/archiveArtifacts/echo/Groovy
-            // stdlib). Wrapping in a container step made the whole post-block
-            // skip when the pod was dead/evicted/aborted, which silently wiped
-            // pipeline-baselines.json and caused the orchestrator to re-trigger
-            // every pipeline on every push. Post runs at agent level instead.
+            // Wrap in node{} so writeJSON/archiveArtifacts have a workspace
+            // even when the Kubernetes pod was killed (abort/eviction).
+            // Previous approach: bare post.always without node — failed with
+            // MissingContextVariableException (hudson.FilePath) when the pod
+            // was gone, which prevented pipeline-baselines.json from archiving
+            // and caused the orchestrator to re-trigger every pipeline.
+            // Using node('built-in') instead of container('builder') because
+            // container() skips entirely when the pod is dead.
+            node('built-in') {
             script {
                 def results = readJSON(text: env.BUILD_RESULTS ?: '{}')
                 def preflight = readJSON(text: env.PREFLIGHT_HEALTH ?: '{}')
@@ -1432,6 +1435,7 @@ ${healthyCount < postflight.size() ? '  ⚠️  ATTENTION: Some services unhealt
                 // build via the BASELINE CASCADE WARNING in loadPipelineBaselines.
                 archivePipelineBaselines('post')
             }
+            } // node('built-in')
         }
     }
 }
