@@ -5378,9 +5378,8 @@ impl HttpServer {
         let human_id = package.identity.human_id.clone();
         let ctx = AppContext::default_lamad();
 
-        let item_count = package.content.len()
-            + package.relationships.len()
-            + package.stewardship.len();
+        let item_count =
+            package.content.len() + package.relationships.len() + package.stewardship.len();
 
         // Pause P2P sync during bulk import to prevent memory pressure.
         // The guard resumes sync automatically when dropped (even on error/panic).
