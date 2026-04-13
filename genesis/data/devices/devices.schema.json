@@ -1,0 +1,122 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "elohim:protocol:devices",
+  "title": "Device Archetype Frontmatter Schema",
+  "description": "Operational IoC contract (Category C) for device archetypes in genesis/data/devices/*.md. These are abstract hardware archetypes — the species of the network — not specific physical devices. Each archetype defines a performance envelope that parameterizes a2o scenarios and informs operator presets.",
+  "type": "object",
+  "required": [
+    "id", "displayName", "formFactor", "capabilityLevel",
+    "memoryGb", "storageGb", "storageType", "cpuCores",
+    "alwaysOn", "natType", "bandwidthDownMbps", "bandwidthUpMbps",
+    "serviceability", "circularity", "degradationMode"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^device-[a-z0-9][a-z0-9-]*[a-z0-9]$",
+      "description": "Unique slug. Must match filename stem (e.g. 2019-android-phone.md -> device-2019-android-phone)."
+    },
+    "displayName": {
+      "type": "string",
+      "minLength": 1
+    },
+    "formFactor": {
+      "type": "string",
+      "enum": [
+        "phone", "tablet", "laptop", "desktop", "sbc",
+        "mini-pc", "rack-module", "server", "iot-sensor",
+        "wearable", "thin-client", "fob", "container"
+      ]
+    },
+    "capabilityLevel": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 5,
+      "description": "0=streams-only, 1=micro-conductor, 2=light-conductor, 3=full-storage, 4=storage+inference, 5=storage+inference+doorway"
+    },
+    "stage": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 4,
+      "description": "Hardware spec stage from hardware-spec.md"
+    },
+    "memoryGb": { "type": "number", "minimum": 0 },
+    "storageGb": { "type": "number", "minimum": 0 },
+    "storageType": {
+      "type": "string",
+      "enum": ["emmc", "sd-card", "ssd", "nvme", "hdd", "flash"]
+    },
+    "cpuCores": { "type": "integer", "minimum": 1 },
+    "cpuClass": { "type": ["string", "null"] },
+    "gpu": { "type": ["string", "null"] },
+    "sensors": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "camera", "microphone", "lidar", "infrared", "biometric",
+          "environmental", "accelerometer", "gps", "nfc", "lora"
+        ]
+      },
+      "default": []
+    },
+    "battery": { "type": "boolean" },
+    "powerWatts": { "type": ["number", "null"] },
+    "alwaysOn": { "type": "boolean" },
+    "natType": {
+      "type": "string",
+      "enum": ["public", "symmetric-nat", "port-restricted", "carrier-grade-nat", "offline-first"]
+    },
+    "bandwidthDownMbps": { "type": "number", "minimum": 0 },
+    "bandwidthUpMbps": { "type": "number", "minimum": 0 },
+    "latencyMs": { "type": ["number", "null"] },
+    "canSteward": { "type": "boolean", "default": false },
+    "canInfer": { "type": "boolean", "default": false },
+    "canDoorway": { "type": "boolean", "default": false },
+    "streamsTo": {
+      "type": ["string", "null"],
+      "description": "For level 0-1 devices: what they stream data to. Null for self-sufficient devices."
+    },
+    "serviceability": {
+      "type": "string",
+      "enum": ["none", "consumer", "modular", "full"]
+    },
+    "healthSurfaces": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "smart", "thermal", "power", "usb-enumeration",
+          "battery-health", "memory-ecc", "fan-rpm"
+        ]
+      },
+      "default": []
+    },
+    "circularity": {
+      "type": "string",
+      "enum": ["disposable", "recyclable", "repairable", "modular-upgradeable"]
+    },
+    "degradationMode": {
+      "type": "string",
+      "enum": ["cliff", "graceful", "modular"]
+    },
+    "replacementLeadTime": {
+      "type": ["string", "null"],
+      "enum": ["hours", "days", "weeks", null]
+    },
+    "expectedLifespanYears": { "type": ["integer", "null"] },
+    "attestationCapabilities": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "voice-presence", "facial-presence", "physical-presence",
+          "hardware-key-signing", "spatial-occupancy",
+          "environmental-conditions", "biometric-identity"
+        ]
+      },
+      "default": []
+    }
+  },
+  "additionalProperties": false
+}
