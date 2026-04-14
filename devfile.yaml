@@ -128,7 +128,7 @@ components:
   # Nix store lives at /nix/store, XDG caches at /nix/xdg/.
   - name: persistent
     volume:
-      size: 100Gi
+      size: 120Gi
 commands:
   - id: setup-pnpm
     exec:
