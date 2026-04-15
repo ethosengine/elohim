@@ -217,8 +217,8 @@ commands:
       commandLine: |
         pnpm install && pnpm run seed
 
-#events:
-#  postStart:
-#    - setup-pnpm
-#    - setup-vscode-cli
-#    - setup-claude-mcp
+events:
+  postStart:
+    - setup-pnpm
+    - setup-vscode-cli
+    - setup-claude-mcp
