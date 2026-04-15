@@ -418,6 +418,10 @@ def deployHumanManifest(Map humanConfig, String envFile, List allHumans) {
         "s|BOOTSTRAP_URL_PLACEHOLDER|${envConfig.bootstrapUrl}|g",
         "s|SIGNAL_URL_PLACEHOLDER|${envConfig.signalUrl}|g",
         "s|P2P_BOOTSTRAP_NODES_PLACEHOLDER|${p2pNodes}|g",
+        // Node-local storage class — P2P dataplane owns replication, not k8s.
+        // openebs-hostpath keeps PV data on the scheduled node; avoids cross-node (or
+        // cross-WireGuard for shem) replication that would duplicate the P2P layer.
+        "s|STORAGE_CLASS_PLACEHOLDER|openebs-hostpath|g",
     ].collect { "-e '${it}'" }.join(' ')
 
     def outputFile = humanConfig.manifest.replace('.yaml', "-rendered.yaml")

@@ -88,19 +88,12 @@ spec:
     spec:
       securityContext:
         fsGroup: 1000
+      # Matthew: household bootstrap anchor + doorway host — requires performance node
       affinity:
         nodeAffinity:
-          preferredDuringSchedulingIgnoredDuringExecution:
-            - weight: 80
-              preference:
-                matchExpressions:
-                  - key: node-type
-                    operator: In
-                    values:
-                      - operations
-            - weight: 70
-              preference:
-                matchExpressions:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
                   - key: node-type
                     operator: In
                     values:
@@ -324,6 +317,8 @@ spec:
         name: holochain-data
       spec:
         accessModes: [ReadWriteOnce]
+        # Node-local storage — P2P dataplane is the replication layer, not k8s
+        storageClassName: "STORAGE_CLASS_PLACEHOLDER"
         resources:
           requests:
             storage: 10Gi
@@ -331,6 +326,8 @@ spec:
         name: storage-data
       spec:
         accessModes: [ReadWriteOnce]
+        # Node-local storage — P2P dataplane is the replication layer, not k8s
+        storageClassName: "STORAGE_CLASS_PLACEHOLDER"
         resources:
           requests:
             storage: 5Gi

@@ -88,23 +88,16 @@ spec:
     spec:
       securityContext:
         fsGroup: 1000
+      # Timothy: Chromebook-class stewarded child — edge only, trimmed resources
       affinity:
         nodeAffinity:
-          preferredDuringSchedulingIgnoredDuringExecution:
-            - weight: 80
-              preference:
-                matchExpressions:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
                   - key: node-type
                     operator: In
                     values:
-                      - operations
-            - weight: 70
-              preference:
-                matchExpressions:
-                  - key: node-type
-                    operator: In
-                    values:
-                      - performance
+                      - edge
       # Init container fetches hApp from Harbor registry using oras
       initContainers:
         - name: happ-fetcher
@@ -149,13 +142,14 @@ spec:
           env:
             - name: CONDUCTOR_MODE
               value: "true"
+          # Chromebook profile: ~1GB steady-state budget shared with ChromeOS/browser
           resources:
             requests:
-              memory: "512Mi"
-              cpu: "250m"
+              memory: "384Mi"
+              cpu: "150m"
             limits:
-              memory: "1536Mi"
-              cpu: "1000m"
+              memory: "768Mi"
+              cpu: "500m"
           volumeMounts:
             - name: holochain-data
               mountPath: /data
@@ -260,13 +254,14 @@ spec:
             - name: p2p
               containerPort: 9876
               protocol: TCP
+          # Chromebook profile: small shard — stewarded by parents, not a heavy storage node
           resources:
             requests:
               memory: "64Mi"
               cpu: "50m"
             limits:
-              memory: "256Mi"
-              cpu: "250m"
+              memory: "192Mi"
+              cpu: "200m"
           volumeMounts:
             - name: storage-data
               mountPath: /data
@@ -323,6 +318,8 @@ spec:
         name: holochain-data
       spec:
         accessModes: [ReadWriteOnce]
+        # Node-local storage — P2P dataplane is the replication layer, not k8s
+        storageClassName: "STORAGE_CLASS_PLACEHOLDER"
         resources:
           requests:
             storage: 10Gi
@@ -330,6 +327,8 @@ spec:
         name: storage-data
       spec:
         accessModes: [ReadWriteOnce]
+        # Node-local storage — P2P dataplane is the replication layer, not k8s
+        storageClassName: "STORAGE_CLASS_PLACEHOLDER"
         resources:
           requests:
             storage: 5Gi

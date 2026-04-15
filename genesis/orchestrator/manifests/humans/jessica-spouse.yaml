@@ -98,23 +98,17 @@ spec:
     spec:
       securityContext:
         fsGroup: 1000
+      # Jessica: typical device steward — operations or edge, never remote/performance
       affinity:
         nodeAffinity:
-          preferredDuringSchedulingIgnoredDuringExecution:
-            - weight: 80
-              preference:
-                matchExpressions:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
                   - key: node-type
                     operator: In
                     values:
                       - operations
-            - weight: 70
-              preference:
-                matchExpressions:
-                  - key: node-type
-                    operator: In
-                    values:
-                      - performance
+                      - edge
       # Init container fetches hApp from Harbor registry using oras
       initContainers:
         - name: happ-fetcher
@@ -334,6 +328,8 @@ spec:
         name: holochain-data
       spec:
         accessModes: [ReadWriteOnce]
+        # Node-local storage — P2P dataplane is the replication layer, not k8s
+        storageClassName: "STORAGE_CLASS_PLACEHOLDER"
         resources:
           requests:
             storage: 10Gi
@@ -341,6 +337,8 @@ spec:
         name: storage-data
       spec:
         accessModes: [ReadWriteOnce]
+        # Node-local storage — P2P dataplane is the replication layer, not k8s
+        storageClassName: "STORAGE_CLASS_PLACEHOLDER"
         resources:
           requests:
             storage: 5Gi

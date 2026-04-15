@@ -88,23 +88,16 @@ spec:
     spec:
       securityContext:
         fsGroup: 1000
+      # Frank: remote peer on shem — external device steward over WireGuard
       affinity:
         nodeAffinity:
-          preferredDuringSchedulingIgnoredDuringExecution:
-            - weight: 80
-              preference:
-                matchExpressions:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
                   - key: node-type
                     operator: In
                     values:
-                      - operations
-            - weight: 70
-              preference:
-                matchExpressions:
-                  - key: node-type
-                    operator: In
-                    values:
-                      - performance
+                      - remote
       # Init container fetches hApp from Harbor registry using oras
       initContainers:
         - name: happ-fetcher
@@ -323,6 +316,8 @@ spec:
         name: holochain-data
       spec:
         accessModes: [ReadWriteOnce]
+        # Node-local storage — P2P dataplane is the replication layer, not k8s
+        storageClassName: "STORAGE_CLASS_PLACEHOLDER"
         resources:
           requests:
             storage: 10Gi
@@ -330,6 +325,8 @@ spec:
         name: storage-data
       spec:
         accessModes: [ReadWriteOnce]
+        # Node-local storage — P2P dataplane is the replication layer, not k8s
+        storageClassName: "STORAGE_CLASS_PLACEHOLDER"
         resources:
           requests:
             storage: 5Gi
