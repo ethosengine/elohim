@@ -1304,6 +1304,7 @@ dependencies = [
  "h3o",
  "hex",
  "holochain_client",
+ "holochain_types",
  "http-body-util",
  "hyper 1.8.1",
  "hyper-tungstenite",

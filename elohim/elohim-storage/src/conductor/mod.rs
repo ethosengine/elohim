@@ -79,8 +79,10 @@ mod transport;
 
 // Public modules
 mod client;
+pub mod process_manager;
 mod session;
 
 // Re-export the public API
 pub use client::{ConductorClient, ConductorClientConfig};
+pub use process_manager::ConductorManager;
 pub use session::{Session, SessionConfig};

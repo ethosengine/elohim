@@ -45,13 +45,14 @@ pub mod api;
 
 // Core modules (always available)
 pub mod blob_store;
-pub mod conductor; // Custom conductor connection (unsigned - deprecated)
+pub mod conductor; // Conductor process manager — spawns/monitors holochain binary
 pub mod conductor_client; // Legacy: kept for backward compatibility during migration
 pub mod config;
 pub mod dag_store;
 pub mod db; // SQLite content storage
 pub mod epr_codec;
 pub mod error;
+pub mod happ_manager;
 pub mod hc_client;
 pub mod http;
 pub mod import_handler;
