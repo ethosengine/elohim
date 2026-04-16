@@ -28,8 +28,9 @@ data:
       - driver:
           type: websocket
           port: 4444
-          # Allow any origin - conductor only binds to localhost anyway
-          # Doorway gateway handles external authentication
+          host: "0.0.0.0"
+          # Consolidated mode: conductor binds to pod network so doorway
+          # can reach it directly (no socat bridge). Doorway handles auth.
           allowed_origins: "*"
     network:
       # Bootstrap served by Doorway gateway
