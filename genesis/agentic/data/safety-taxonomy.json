@@ -1,0 +1,141 @@
+{
+  "$description": "Command safety classifications for permission allowlist generalization. Source of truth for the /generalize-permissions skill.",
+  "$spec_ref": "genesis/docs/superpowers/specs/2026-04-16-agentic-developer-loop-design.md#palette-safety-taxonomy",
+
+  "broadly_safe": [
+    "cargo",
+    "pnpm",
+    "npm",
+    "npx",
+    "pnpx",
+    "yarn",
+    "vitest",
+    "jest",
+    "pytest",
+    "eslint",
+    "stylelint",
+    "prettier",
+    "tsc",
+    "rustup",
+    "rustc",
+    "node",
+    "jq"
+  ],
+
+  "subcommand_scoped": [
+    {
+      "command": "git",
+      "safe_subcommands": [
+        "add",
+        "commit",
+        "diff",
+        "status",
+        "log",
+        "show",
+        "fetch",
+        "pull",
+        "rev-parse",
+        "describe",
+        "blame",
+        "ls-files",
+        "stash",
+        "worktree"
+      ],
+      "prompt_subcommands": [
+        "push",
+        "reset",
+        "branch",
+        "checkout",
+        "rebase",
+        "merge",
+        "cherry-pick",
+        "tag",
+        "remote"
+      ]
+    },
+    {
+      "command": "kubectl",
+      "safe_subcommands": [
+        "get",
+        "describe",
+        "logs",
+        "config",
+        "version",
+        "cluster-info",
+        "explain"
+      ],
+      "prompt_subcommands": [
+        "apply",
+        "delete",
+        "patch",
+        "rollout",
+        "scale",
+        "exec",
+        "port-forward",
+        "cp"
+      ]
+    },
+    {
+      "command": "docker",
+      "safe_subcommands": ["ps", "logs", "inspect", "images", "version", "info"],
+      "prompt_subcommands": ["rm", "rmi", "run", "exec", "build", "push", "pull"]
+    },
+    {
+      "command": "gh",
+      "safe_subcommands": [
+        "pr list",
+        "pr view",
+        "issue list",
+        "issue view",
+        "run list",
+        "run view",
+        "auth status",
+        "api"
+      ],
+      "prompt_subcommands": [
+        "pr create",
+        "pr merge",
+        "pr close",
+        "issue create",
+        "issue close",
+        "release create",
+        "delete"
+      ]
+    }
+  ],
+
+  "never_wildcard": [
+    {
+      "command": "rm",
+      "reason": "Destructive; path wildcarding is too dangerous for auto-approval."
+    },
+    {
+      "command": "sudo",
+      "reason": "Privilege elevation must always be deliberate and explicit."
+    },
+    {
+      "command": "curl",
+      "reason": "Can exfiltrate data to arbitrary endpoints; parameters too variable."
+    },
+    {
+      "command": "wget",
+      "reason": "Same exfiltration concern as curl."
+    },
+    {
+      "command": "ssh",
+      "reason": "Remote execution; must be approved per-target."
+    },
+    {
+      "command": "scp",
+      "reason": "Data exfiltration potential."
+    },
+    {
+      "command": "aws",
+      "reason": "Cloud credentials + destructive subcommands; per-command review required."
+    },
+    {
+      "command": "gcloud",
+      "reason": "Same cloud-credential concern as aws."
+    }
+  ]
+}
