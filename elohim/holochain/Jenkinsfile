@@ -440,7 +440,13 @@ def deployHumanManifest(Map humanConfig, String envFile, List allHumans) {
         "s|EDGENODE_MEMORY_LIMIT_PLACEHOLDER|${humanConfig.edgenodeMemoryLimit ?: ''}|g",
         "s|EDGENODE_CPU_REQUEST_PLACEHOLDER|${humanConfig.edgenodeCpuRequest ?: ''}|g",
         "s|EDGENODE_CPU_LIMIT_PLACEHOLDER|${humanConfig.edgenodeCpuLimit ?: ''}|g",
-    ].collect { "-e '${it}'" }.join(' ')
+    ].collect {
+        // Each sed expression is wrapped in single quotes for the shell, so any
+        // apostrophe inside the expression (e.g. "Matthew's role" in an affinity
+        // comment) closes the shell string prematurely. Escape `'` → `'\''`
+        // (close, escape, reopen) to embed it safely inside single quotes.
+        "-e '${it.replace("'", "'\\''")}'"
+    }.join(' ')
 
     // Output path uses resourcePrefix so multiple humans sharing a template
     // don't collide on a single rendered file.
