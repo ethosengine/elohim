@@ -1,3 +1,8 @@
+# --- Extract holochain binaries from edgenode image ---
+# This copies the conductor binary we've been running in production.
+# When we own the conductor version pin, replace this with a direct build.
+FROM ghcr.io/holo-host/edgenode:v0.0.8-alpha31-hc0.6.0-go-pion-custom AS conductor-source
+
 # Build stage
 # NOTE: Build context should be repo root directory
 # Run: docker build -f elohim/elohim-storage/Dockerfile -t elohim-storage .
@@ -114,8 +119,15 @@ RUN useradd -m -u 1000 storage
 # Create data directory
 RUN mkdir -p /data && chown storage:storage /data
 
+# Conductor data directory (lair keystore, chain state)
+RUN mkdir -p /var/local/lib/holochain && chown storage:storage /var/local/lib/holochain
+
 # Copy binary from builder
 COPY --from=builder /app/target/release/elohim-storage /usr/local/bin/elohim-storage
+
+# Holochain conductor binary — for embedded conductor mode.
+# Extracted from the same edgenode image we've been running in production.
+COPY --from=conductor-source /usr/local/bin/holochain /usr/local/bin/holochain
 
 # Set ownership
 RUN chown -R storage:storage /app

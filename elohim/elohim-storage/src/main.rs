@@ -97,6 +97,39 @@ struct Args {
     #[arg(long, default_value = "content_store")]
     zome_name: String,
 
+    // --- Embedded conductor mode ---
+
+    /// Enable embedded conductor mode. When set, elohim-storage spawns and
+    /// manages the holochain conductor as a child process instead of
+    /// connecting to an external conductor.
+    #[arg(long, env = "EMBEDDED_CONDUCTOR")]
+    embedded_conductor: bool,
+
+    /// Path to the holochain conductor binary.
+    /// Only used when --embedded-conductor is set.
+    #[arg(long, env = "CONDUCTOR_BINARY", default_value = "holochain")]
+    conductor_binary: PathBuf,
+
+    /// Path to the conductor configuration YAML file.
+    /// Only used when --embedded-conductor is set.
+    #[arg(long, env = "CONDUCTOR_CONFIG_PATH", default_value = "/etc/holochain/conductor-config.yaml")]
+    conductor_config_path: PathBuf,
+
+    /// Conductor data root directory (lair keystore, chain data).
+    /// Only used when --embedded-conductor is set.
+    #[arg(long, env = "CONDUCTOR_DATA_DIR", default_value = "/var/local/lib/holochain")]
+    conductor_data_dir: PathBuf,
+
+    /// Path to the hApp bundle file.
+    /// Only used when --embedded-conductor is set.
+    #[arg(long, env = "HAPP_PATH", default_value = "/opt/holochain/elohim.happ")]
+    happ_path: PathBuf,
+
+    /// Maximum retries waiting for conductor readiness (2s between retries).
+    /// Only used when --embedded-conductor is set.
+    #[arg(long, env = "CONDUCTOR_MAX_RETRIES", default_value_t = 60)]
+    conductor_max_retries: u32,
+
     /// Disable import handler (HTTP only mode)
     #[arg(long)]
     no_import: bool,
@@ -249,6 +282,42 @@ async fn async_main(
         config.save(&config_path)?;
         info!(path = %config_path.display(), "Created default config");
     }
+
+    // --- Embedded conductor mode ---
+    // When enabled, spawn the holochain conductor as a child process and
+    // install the hApp before starting storage services. The manager is held
+    // in scope as a lifecycle anchor — Drop kills the conductor on exit.
+    let _conductor_manager = if args.embedded_conductor {
+        use elohim_storage::conductor::ConductorManager;
+        use elohim_storage::happ_manager;
+
+        info!("Embedded conductor mode enabled");
+
+        let mut manager = ConductorManager::new(
+            args.conductor_binary.clone(),
+            args.conductor_config_path.clone(),
+            args.conductor_data_dir.clone(),
+            4444, // admin port — must match conductor config
+        );
+
+        // Start conductor as child process
+        manager.start()?;
+
+        // Wait for conductor readiness
+        let admin_ws = manager.wait_for_ready(args.conductor_max_retries).await?;
+
+        // Install/validate hApp
+        happ_manager::ensure_happ_installed(
+            &admin_ws,
+            &args.happ_path,
+            &args.app_id,
+        ).await?;
+
+        info!("Embedded conductor ready, hApp installed");
+        Some(manager)
+    } else {
+        None
+    };
 
     // Initialize blob store
     let blob_store = Arc::new(BlobStore::new(config.blobs_dir()).await?);
