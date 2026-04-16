@@ -95,6 +95,15 @@ test('matchesPalette rejects commands with embedded newlines', () => {
   assert.equal(matchesPalette('pnpm\x00injected', palette), false);
 });
 
+test('matchesPalette rejects Unicode line separators', () => {
+  const palette = ['Bash(pnpm *)'];
+  assert.equal(matchesPalette('pnpm run\u2028rm -rf /', palette), false);
+  assert.equal(matchesPalette('pnpm run\u2029rm -rf /', palette), false);
+  assert.equal(matchesPalette('pnpm\u0085injected', palette), false);
+  assert.equal(matchesPalette('pnpm\x0Binjected', palette), false);
+  assert.equal(matchesPalette('pnpm\x0Cinjected', palette), false);
+});
+
 test('matchesPalette skips malformed palette entries', () => {
   // Empty Bash(), non-string entries, empty-glob patterns — all skipped, no crash.
   const palette = ['Bash()', null, 42, '   ', 'Bash(pnpm *)'];
