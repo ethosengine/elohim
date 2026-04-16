@@ -4,6 +4,10 @@
 .mcp.json
 .worktrees/
 
+# Agentic developer shift artifacts (local only)
+.claude/shifts/*
+!.claude/shifts/.gitkeep
+
 # Node
 node_modules/
 npm-debug.log
