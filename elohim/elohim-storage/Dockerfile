@@ -127,7 +127,7 @@ COPY --from=builder /app/target/release/elohim-storage /usr/local/bin/elohim-sto
 
 # Holochain conductor binary — for embedded conductor mode.
 # Extracted from the same edgenode image we've been running in production.
-COPY --from=conductor-source /usr/local/bin/holochain /usr/local/bin/holochain
+COPY --from=conductor-source /usr/bin/holochain /usr/local/bin/holochain
 
 # Set ownership
 RUN chown -R storage:storage /app
