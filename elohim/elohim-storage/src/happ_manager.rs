@@ -100,9 +100,7 @@ fn is_stale(app_info: &holochain_client::AppInfo) -> bool {
                 return true;
             }
             Some(cells) => {
-                let provisioned = cells
-                    .iter()
-                    .any(|c| matches!(c, CellInfo::Provisioned(_)));
+                let provisioned = cells.iter().any(|c| matches!(c, CellInfo::Provisioned(_)));
                 if !provisioned {
                     warn!(role = role, "Stale: role has no provisioned cells");
                     return true;

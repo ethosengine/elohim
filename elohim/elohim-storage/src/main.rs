@@ -98,7 +98,6 @@ struct Args {
     zome_name: String,
 
     // --- Embedded conductor mode ---
-
     /// Enable embedded conductor mode. When set, elohim-storage spawns and
     /// manages the holochain conductor as a child process instead of
     /// connecting to an external conductor.
@@ -112,12 +111,20 @@ struct Args {
 
     /// Path to the conductor configuration YAML file.
     /// Only used when --embedded-conductor is set.
-    #[arg(long, env = "CONDUCTOR_CONFIG_PATH", default_value = "/etc/holochain/conductor-config.yaml")]
+    #[arg(
+        long,
+        env = "CONDUCTOR_CONFIG_PATH",
+        default_value = "/etc/holochain/conductor-config.yaml"
+    )]
     conductor_config_path: PathBuf,
 
     /// Conductor data root directory (lair keystore, chain data).
     /// Only used when --embedded-conductor is set.
-    #[arg(long, env = "CONDUCTOR_DATA_DIR", default_value = "/var/local/lib/holochain")]
+    #[arg(
+        long,
+        env = "CONDUCTOR_DATA_DIR",
+        default_value = "/var/local/lib/holochain"
+    )]
     conductor_data_dir: PathBuf,
 
     /// Path to the hApp bundle file.
@@ -307,11 +314,7 @@ async fn async_main(
         let admin_ws = manager.wait_for_ready(args.conductor_max_retries).await?;
 
         // Install/validate hApp
-        happ_manager::ensure_happ_installed(
-            &admin_ws,
-            &args.happ_path,
-            &args.app_id,
-        ).await?;
+        happ_manager::ensure_happ_installed(&admin_ws, &args.happ_path, &args.app_id).await?;
 
         info!("Embedded conductor ready, hApp installed");
         Some(manager)

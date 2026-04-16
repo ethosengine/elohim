@@ -84,10 +84,7 @@ impl ConductorManager {
     ///
     /// Retries up to `max_retries` times with a 2-second delay between attempts.
     /// Returns the connected AdminWebsocket on success.
-    pub async fn wait_for_ready(
-        &self,
-        max_retries: u32,
-    ) -> Result<AdminWebsocket, ConductorError> {
+    pub async fn wait_for_ready(&self, max_retries: u32) -> Result<AdminWebsocket, ConductorError> {
         let addr = format!("localhost:{}", self.admin_port);
         info!(
             addr = %addr,
@@ -98,7 +95,10 @@ impl ConductorManager {
         for attempt in 1..=max_retries {
             match AdminWebsocket::connect(&addr, None).await {
                 Ok(ws) => {
-                    info!(attempt = attempt, "Conductor is ready — AdminWebsocket connected");
+                    info!(
+                        attempt = attempt,
+                        "Conductor is ready — AdminWebsocket connected"
+                    );
                     return Ok(ws);
                 }
                 Err(e) => {
@@ -132,9 +132,9 @@ impl ConductorManager {
     pub fn is_running(&mut self) -> bool {
         match self.child.as_mut() {
             Some(child) => match child.try_wait() {
-                Ok(None) => true,        // Still running
-                Ok(Some(_)) => false,    // Exited
-                Err(_) => false,         // Error checking — assume not running
+                Ok(None) => true,     // Still running
+                Ok(Some(_)) => false, // Exited
+                Err(_) => false,      // Error checking — assume not running
             },
             None => false,
         }
