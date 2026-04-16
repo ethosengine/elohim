@@ -75,6 +75,11 @@ metadata:
 spec:
   serviceName: RESOURCE_PREFIX_PLACEHOLDER-headless
   replicas: 1
+  # Retain PVCs across StatefulSet delete/recreate — needed when a forbidden-field
+  # change (e.g. volumeClaimTemplates, selector) forces orphan-delete + reapply.
+  persistentVolumeClaimRetentionPolicy:
+    whenDeleted: Retain
+    whenScaled: Retain
   podManagementPolicy: Parallel
   updateStrategy:
     type: RollingUpdate

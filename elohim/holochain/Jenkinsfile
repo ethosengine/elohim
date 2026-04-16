@@ -448,7 +448,29 @@ def deployHumanManifest(Map humanConfig, String envFile, List allHumans) {
         sh "kubectl delete statefulset/${humanConfig.resourcePrefix} -n ${humanConfig.namespace} --ignore-not-found=true"
     }
 
-    sh "kubectl apply -f ${outputFile}"
+    // Apply with forbidden-field drift fallback. StatefulSet spec fields like
+    // volumeClaimTemplates, selector, serviceName, and podManagementPolicy are
+    // immutable after creation. When a template change touches one, kubectl apply
+    // returns a 'Forbidden: updates to statefulset spec' error. We orphan-delete
+    // the StatefulSet (pods + PVCs remain — the manifest sets
+    // persistentVolumeClaimRetentionPolicy: Retain) and reapply, which re-adopts
+    // the existing pods and PVCs under the new spec. No data loss.
+    def applyLog = "/tmp/kubectl-apply-${humanConfig.resourcePrefix}.log"
+    def applyCode = sh(
+        script: "kubectl apply -f ${outputFile} > ${applyLog} 2>&1",
+        returnStatus: true,
+    )
+    sh "cat ${applyLog}"
+    if (applyCode != 0) {
+        def applyOutput = readFile(applyLog)
+        if (applyOutput.contains('Forbidden: updates to statefulset spec')) {
+            echo "Forbidden-field drift detected — orphan-deleting StatefulSet ${humanConfig.resourcePrefix} (pods + PVCs retained) and reapplying"
+            sh "kubectl delete statefulset/${humanConfig.resourcePrefix} -n ${humanConfig.namespace} --cascade=orphan --ignore-not-found=true"
+            sh "kubectl apply -f ${outputFile}"
+        } else {
+            error "kubectl apply failed for ${humanConfig.resourcePrefix}:\n${applyOutput}"
+        }
+    }
     sh "kubectl rollout restart statefulset/${humanConfig.resourcePrefix} -n ${humanConfig.namespace}"
     sh "kubectl rollout status statefulset/${humanConfig.resourcePrefix} -n ${humanConfig.namespace} --timeout=600s"
 
