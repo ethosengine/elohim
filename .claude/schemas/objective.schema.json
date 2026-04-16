@@ -1,0 +1,84 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://elohim.protocol/schemas/agentic/objective.schema.json",
+  "title": "Agentic Developer Shift Objective",
+  "description": "Measurable, bounded, scoped goal that an agentic developer shift iterates toward.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["name", "description", "measure", "target", "baseline", "budget", "scope"],
+  "properties": {
+    "name": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{2,60}$",
+      "description": "Slug-case identifier; used in shift id."
+    },
+    "description": {
+      "type": "string",
+      "minLength": 10,
+      "maxLength": 1000
+    },
+    "measure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "run"],
+      "properties": {
+        "type": { "const": "cmd" },
+        "run": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Shell command that returns a single parseable number on stdout."
+        }
+      }
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["predicate", "value", "stability"],
+      "properties": {
+        "predicate": { "enum": [">=", "<=", "==", ">", "<"] },
+        "value": { "type": "number" },
+        "stability": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["consecutive", "across_triggers"],
+          "properties": {
+            "consecutive": { "type": "integer", "minimum": 1, "default": 2 },
+            "across_triggers": { "type": "boolean", "default": true }
+          }
+        }
+      }
+    },
+    "baseline": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["predicate", "value"],
+      "properties": {
+        "predicate": { "enum": [">=", "<=", "==", ">", "<"] },
+        "value": { "type": "number" }
+      },
+      "description": "Regression floor; measurement must not drop below this during the shift."
+    },
+    "budget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["iterations", "wall_clock_min"],
+      "properties": {
+        "iterations": { "type": "integer", "minimum": 1, "maximum": 100 },
+        "wall_clock_min": { "type": "integer", "minimum": 1, "maximum": 1440 }
+      }
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["paths"],
+      "properties": {
+        "paths": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 },
+          "description": "Glob patterns — Opus may only edit files matching these."
+        }
+      }
+    }
+  }
+}
