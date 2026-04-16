@@ -160,6 +160,36 @@ function validateRecord(
     }
   }
 
+  // Sed-hazard characters in any field that gets interpolated into a sed
+  // expression inside deployHumanManifest. Even with the Jenkinsfile's
+  // shell-escape dance for apostrophes (see commit 5e704040), a literal
+  // '|' would truncate the sed substitution (it's the delimiter) and a
+  // newline would split the expression across sed commands.
+  //
+  // This catches the class of "looks fine in JSON, breaks in Jenkins" bugs
+  // — including Adam's "Matthew's role" apostrophe (caught at runtime, not
+  // by static validation), which commit 5e704040 now handles in-flight but
+  // we still want flagged at validation time as a defense-in-depth.
+  const sedInterpolatedFields = [
+    'affinityComment',
+    'edgenodeMemoryRequest',
+    'edgenodeMemoryLimit',
+    'edgenodeCpuRequest',
+    'edgenodeCpuLimit',
+    'humanLabel',
+    'humanId',
+  ] as const;
+  for (const field of sedInterpolatedFields) {
+    const value = record[field];
+    if (typeof value !== 'string') continue;
+    if (value.includes('|')) {
+      errors.push(`${tag} ${field} contains '|' (the sed delimiter) — would truncate substitution: ${JSON.stringify(value)}`);
+    }
+    if (/[\n\r]/.test(value)) {
+      errors.push(`${tag} ${field} contains a line break — would split the sed expression: ${JSON.stringify(value)}`);
+    }
+  }
+
   // humanId should match the pattern human-<humanLabel>
   if (record.humanId && record.humanLabel && record.humanId !== `human-${record.humanLabel}`) {
     errors.push(`${tag} humanId "${record.humanId}" must equal "human-${record.humanLabel}"`);
