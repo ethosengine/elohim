@@ -87,3 +87,50 @@ test('loadPalette tolerates missing local file', async () => {
   assert.deepEqual(loaded, ['Bash(ls)']);
   rmSync(dir, { recursive: true, force: true });
 });
+
+test('matchesPalette rejects commands with embedded newlines', () => {
+  const palette = ['Bash(pnpm *)'];
+  assert.equal(matchesPalette('pnpm run\nrm -rf /', palette), false);
+  assert.equal(matchesPalette('pnpm run\r\nmalicious', palette), false);
+  assert.equal(matchesPalette('pnpm\x00injected', palette), false);
+});
+
+test('matchesPalette skips malformed palette entries', () => {
+  // Empty Bash(), non-string entries, empty-glob patterns — all skipped, no crash.
+  const palette = ['Bash()', null, 42, '   ', 'Bash(pnpm *)'];
+  assert.equal(matchesPalette('pnpm run test', palette), true);
+  assert.equal(matchesPalette('foo', palette), false);
+});
+
+test('loadPalette tolerates malformed JSON', async () => {
+  const { writeFileSync, mkdirSync, rmSync } = await import('node:fs');
+  const { join } = await import('node:path');
+  const { tmpdir } = await import('node:os');
+  const dir = join(tmpdir(), `palette-bad-json-${Date.now()}`);
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, 'settings.json'), 'not-json {{');
+  const loaded = loadPalette({
+    durablePath: join(dir, 'settings.json'),
+    localPath: join(dir, 'missing.json'),
+  });
+  assert.deepEqual(loaded, []);
+  rmSync(dir, { recursive: true, force: true });
+});
+
+test('loadPalette tolerates non-array allow field', async () => {
+  const { writeFileSync, mkdirSync, rmSync } = await import('node:fs');
+  const { join } = await import('node:path');
+  const { tmpdir } = await import('node:os');
+  const dir = join(tmpdir(), `palette-bad-allow-${Date.now()}`);
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(
+    join(dir, 'settings.json'),
+    JSON.stringify({ permissions: { allow: 'not an array' } }),
+  );
+  const loaded = loadPalette({
+    durablePath: join(dir, 'settings.json'),
+    localPath: join(dir, 'missing.json'),
+  });
+  assert.deepEqual(loaded, []);
+  rmSync(dir, { recursive: true, force: true });
+});

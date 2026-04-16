@@ -9,19 +9,32 @@ function extractBashPattern(entry) {
 }
 
 function toGlob(palettePattern) {
-  // Claude-style patterns use `*` as a wildcard, `:*` as "any trailing args".
-  // Convert to picomatch glob: both become `*` spanning any chars.
-  return palettePattern.replaceAll(':*', '*');
+  if (!palettePattern || typeof palettePattern !== 'string') return null;
+  const trimmed = palettePattern.trim();
+  if (!trimmed) return null;
+  return trimmed.replaceAll(':*', '*');
 }
 
 export function matchesPalette(command, paletteEntries) {
+  // Reject anything that isn't a clean single-line string — newlines or
+  // control characters would let a matched prefix smuggle a second command
+  // through a shell that interprets line breaks as separators.
+  if (!command || typeof command !== 'string') return false;
+  if (/[\n\r\x00]/.test(command)) return false;
+
   const trimmed = command.trim();
   for (const entry of paletteEntries) {
-    // Accept both Bash(...) and bare MCP tool names (mcp__foo__*).
+    if (typeof entry !== 'string') continue;
     const bashBody = extractBashPattern(entry);
     const candidate = bashBody ?? entry;
     const glob = toGlob(candidate);
-    if (picomatch.isMatch(trimmed, glob, { dot: true })) return true;
+    if (!glob) continue;
+    try {
+      if (picomatch.isMatch(trimmed, glob, { dot: true })) return true;
+    } catch {
+      // Malformed glob pattern — skip this entry, never fail-open.
+      continue;
+    }
   }
   return false;
 }
@@ -30,8 +43,14 @@ export function loadPalette({ durablePath, localPath }) {
   const out = [];
   for (const path of [durablePath, localPath]) {
     if (!existsSync(path)) continue;
-    const contents = JSON.parse(readFileSync(path, 'utf8'));
-    const allow = contents?.permissions?.allow ?? [];
+    let contents;
+    try {
+      contents = JSON.parse(readFileSync(path, 'utf8'));
+    } catch {
+      continue; // malformed JSON → skip file, never fail-open
+    }
+    const allow = contents?.permissions?.allow;
+    if (!Array.isArray(allow)) continue;
     for (const entry of allow) if (typeof entry === 'string') out.push(entry);
   }
   return out;
