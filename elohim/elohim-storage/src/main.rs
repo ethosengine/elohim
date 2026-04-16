@@ -487,6 +487,10 @@ async fn async_main(
     let mut http_server =
         HttpServer::new(blob_store.clone(), http_addr).with_progress_hub(Arc::clone(&progress_hub));
 
+    if args.embedded_conductor {
+        http_server = http_server.with_embedded_conductor();
+    }
+
     if let Some(ref cache) = extraction_cache {
         http_server = http_server.with_extraction_cache(Arc::clone(cache));
     }

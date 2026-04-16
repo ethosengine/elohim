@@ -156,6 +156,8 @@ pub struct HttpServer {
     slug_index: Arc<RwLock<std::collections::HashMap<String, String>>>,
     /// Concurrency limiter: prevents OOM under burst traffic (e.g., HTML5 app loads)
     request_semaphore: Arc<Semaphore>,
+    /// Whether the conductor is managed as an embedded child process
+    embedded_conductor: bool,
 }
 
 /// Extract X-Schema-Version header from request and validate it.
@@ -209,7 +211,14 @@ impl HttpServer {
             extraction_cache: None,
             slug_index: Arc::new(RwLock::new(std::collections::HashMap::new())),
             request_semaphore: Arc::new(Semaphore::new(MAX_CONCURRENT_REQUESTS)),
+            embedded_conductor: false,
         }
+    }
+
+    /// Mark this server as running in embedded conductor mode
+    pub fn with_embedded_conductor(mut self) -> Self {
+        self.embedded_conductor = true;
+        self
     }
 
     /// Set the Import API handler
@@ -803,6 +812,9 @@ impl HttpServer {
             body["blobs"] = serde_json::json!(stats.total_blobs);
             body["bytes"] = serde_json::json!(stats.total_bytes);
             body["importEnabled"] = serde_json::json!(self.import_api.is_some());
+            body["conductor"] = serde_json::json!({
+                "mode": if self.embedded_conductor { "embedded" } else { "external" },
+            });
         }
 
         // debug level: resource details
