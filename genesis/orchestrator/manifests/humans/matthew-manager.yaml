@@ -142,13 +142,14 @@ spec:
           env:
             - name: CONDUCTOR_MODE
               value: "true"
+          # Bootstrap anchor + doorway host — matches adam's node-steward profile
           resources:
             requests:
-              memory: "512Mi"
-              cpu: "250m"
+              memory: "1Gi"
+              cpu: "500m"
             limits:
-              memory: "1536Mi"
-              cpu: "1000m"
+              memory: "4Gi"
+              cpu: "2000m"
           volumeMounts:
             - name: holochain-data
               mountPath: /data
@@ -255,11 +256,11 @@ spec:
               protocol: TCP
           resources:
             requests:
-              memory: "64Mi"
-              cpu: "50m"
+              memory: "1Gi"
+              cpu: "500m"
             limits:
-              memory: "256Mi"
-              cpu: "250m"
+              memory: "4Gi"
+              cpu: "2000m"
           volumeMounts:
             - name: storage-data
               mountPath: /data
