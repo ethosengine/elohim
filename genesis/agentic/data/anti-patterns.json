@@ -1,0 +1,78 @@
+{
+  "$description": "Reference catalog of pipeline output anti-patterns that waste Haiku's effort. Surfaced in Haiku summaries and aggregated into sprint results for between-sprint cleanup.",
+  "$spec_ref": "genesis/docs/superpowers/specs/2026-04-16-agentic-developer-loop-design.md#pre-sprint-pipeline-readiness-out-of-loop-passive",
+
+  "patterns": [
+    {
+      "id": "AP-001",
+      "name": "Full log dump on failure",
+      "description": "Stage emits entire kubectl/docker describe output or raw tool logs instead of an extracted error summary.",
+      "detection_hints": [
+        "stage output > 500 lines",
+        "error message buried in the last 10% of output",
+        "no explicit 'ERROR' or 'FAIL' prefix near the actual failure"
+      ],
+      "attestation_maps_to": "BuildAttestation.failure_summary field (brit Phase 2a+)"
+    },
+    {
+      "id": "AP-002",
+      "name": "Repetitive progress listing",
+      "description": "Thousands of '✓ test-name' lines with no aggregation; takes tokens to reduce to pass/fail counts.",
+      "detection_hints": [
+        "repeated prefix like '✓ ', 'PASS ', 'ok ' over > 100 lines",
+        "no trailing summary line with counts"
+      ],
+      "attestation_maps_to": "BuildAttestation.test_summary counts field"
+    },
+    {
+      "id": "AP-003",
+      "name": "Pre-emptive configuration noise",
+      "description": "Stage echoes environment vars, tool versions, directory listings before any real work.",
+      "detection_hints": [
+        "> 50 lines before the first real command output",
+        "lines matching ENV=, VERSION=, total usage, du -h, etc."
+      ],
+      "attestation_maps_to": "BuildAttestation.environment snapshot (reference, not log-embedded)"
+    },
+    {
+      "id": "AP-004",
+      "name": "Missing stack trace extraction",
+      "description": "On exception, full thread-dump emitted instead of a structured stack-trace block keyed to the failure.",
+      "detection_hints": [
+        "no 'Caused by' or 'at <file>:<line>' structure in summary position",
+        "stack text appears multiple times across concurrent threads"
+      ],
+      "attestation_maps_to": "BuildAttestation.failure_summary.stack_trace"
+    },
+    {
+      "id": "AP-005",
+      "name": "Unparseable stage boundaries",
+      "description": "Stage start/end markers are free-text or inconsistent across the pipeline; Haiku cannot reliably segment the log.",
+      "detection_hints": [
+        "no consistent '=== Stage X ===' or '[stage:X]' marker",
+        "stage names contain spaces or vary between runs"
+      ],
+      "attestation_maps_to": "BuildAttestation.stages[].name + .log_offset fields"
+    },
+    {
+      "id": "AP-006",
+      "name": "No machine-readable overall result",
+      "description": "Pipeline produces no JSON or structured artifact describing overall pass/fail and per-stage outcome — everything must be scraped from the log.",
+      "detection_hints": [
+        "no `*-result.json`, `digest.json`, or similar artifact archived",
+        "pipeline result only accessible via log grep"
+      ],
+      "attestation_maps_to": "BuildAttestation document as a whole replaces this"
+    },
+    {
+      "id": "AP-007",
+      "name": "Duplicate-error cascade",
+      "description": "One root cause triggers many downstream errors all logged verbosely; Haiku must deduplicate.",
+      "detection_hints": [
+        "same error_class appears N+ times",
+        "errors share a common timestamp window"
+      ],
+      "attestation_maps_to": "BuildAttestation.failure_summary.root_cause_id + .derived_errors[]"
+    }
+  ]
+}
