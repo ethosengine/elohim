@@ -1,0 +1,76 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://elohim.protocol/schemas/agentic/haiku-output.schema.json",
+  "title": "Haiku Observation Output",
+  "description": "Bounded structured summary that Haiku returns to Opus per iteration.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "iteration",
+    "measurement",
+    "context",
+    "primary_failure",
+    "observed_anti_patterns",
+    "confidence"
+  ],
+  "properties": {
+    "iteration": { "type": "integer", "minimum": 1 },
+
+    "measurement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["value", "delta", "baseline", "target"],
+      "properties": {
+        "value": { "type": "number" },
+        "delta": { "type": "number", "description": "Signed delta vs. previous iteration." },
+        "baseline": { "type": "number" },
+        "target": { "type": "number" }
+      }
+    },
+
+    "context": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["build_id", "status", "first_failing_stage"],
+      "properties": {
+        "build_id": { "type": ["integer", "null"] },
+        "status": { "enum": ["passed", "failed", "running", "unknown"] },
+        "first_failing_stage": { "type": ["string", "null"] }
+      }
+    },
+
+    "primary_failure": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["error_class", "evidence", "files_mentioned"],
+          "properties": {
+            "error_class": { "type": "string", "minLength": 1 },
+            "evidence": { "type": "string", "minLength": 1 },
+            "files_mentioned": {
+              "type": "array",
+              "items": { "type": "string" }
+            }
+          }
+        }
+      ]
+    },
+
+    "observed_anti_patterns": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["pattern", "evidence"],
+        "properties": {
+          "pattern": { "type": "string", "minLength": 1 },
+          "evidence": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+
+    "confidence": { "enum": ["low", "medium", "high"] }
+  }
+}
