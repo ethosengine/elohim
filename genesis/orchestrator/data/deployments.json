@@ -1,0 +1,92 @@
+{
+  "$comment": "Per-human deployment records driven by elohim/holochain/Jenkinsfile. See genesis/orchestrator/manifests/humans/_edgenode-legacy.template.yaml for the template rendered against `legacy`-pattern humans. `consolidated`-pattern humans reference an explicit manifest file (Adam is the current reference impl while 0.0.0.0 conductor binding is unverified — see commit 62bd1550 and genesis/plans/2026-04-16-elohim-node-consolidation-design.md).",
+  "schemaVersion": 1,
+  "humans": [
+    {
+      "name": "adam",
+      "role": "firstman",
+      "humanLabel": "adam-firstman",
+      "humanId": "human-adam-firstman",
+      "pattern": "consolidated",
+      "manifest": "genesis/orchestrator/manifests/humans/adam-firstman.yaml",
+      "deviceArchetype": "device-family-node-base",
+      "affinityComment": "Adam: remote-side bootstrap anchor on shem — mirrors Matthew's role across WireGuard",
+      "nodeTypes": ["remote"]
+    },
+    {
+      "name": "matthew",
+      "role": "manager",
+      "humanLabel": "matthew-manager",
+      "humanId": "human-matthew-manager",
+      "pattern": "legacy",
+      "template": "genesis/orchestrator/manifests/humans/_edgenode-legacy.template.yaml",
+      "deviceArchetype": "device-family-node-base",
+      "affinityComment": "Matthew: household bootstrap anchor + doorway host — requires performance node",
+      "nodeTypes": ["performance"],
+      "edgenodeMemoryRequest": "1Gi",
+      "edgenodeMemoryLimit": "4Gi",
+      "edgenodeCpuRequest": "500m",
+      "edgenodeCpuLimit": "2000m"
+    },
+    {
+      "name": "jessica",
+      "role": "spouse",
+      "humanLabel": "jessica-spouse",
+      "humanId": "human-jessica-spouse",
+      "pattern": "legacy",
+      "template": "genesis/orchestrator/manifests/humans/_edgenode-legacy.template.yaml",
+      "deviceArchetype": "device-recycled-laptop",
+      "affinityComment": "Jessica: typical device steward — operations or edge, never remote/performance",
+      "nodeTypes": ["operations", "edge"],
+      "edgenodeMemoryRequest": "512Mi",
+      "edgenodeMemoryLimit": "1536Mi",
+      "edgenodeCpuRequest": "250m",
+      "edgenodeCpuLimit": "1000m"
+    },
+    {
+      "name": "pete",
+      "role": "pastor",
+      "humanLabel": "pete-pastor",
+      "humanId": "human-pete-pastor",
+      "pattern": "legacy",
+      "template": "genesis/orchestrator/manifests/humans/_edgenode-legacy.template.yaml",
+      "deviceArchetype": "device-home-nuc",
+      "affinityComment": "Pete: remote peer on shem — external device steward over WireGuard",
+      "nodeTypes": ["remote"],
+      "edgenodeMemoryRequest": "512Mi",
+      "edgenodeMemoryLimit": "1536Mi",
+      "edgenodeCpuRequest": "250m",
+      "edgenodeCpuLimit": "1000m"
+    },
+    {
+      "name": "timothy",
+      "role": "tutor",
+      "humanLabel": "timothy-tutor",
+      "humanId": "human-timothy-tutor",
+      "pattern": "legacy",
+      "template": "genesis/orchestrator/manifests/humans/_edgenode-legacy.template.yaml",
+      "deviceArchetype": "device-chromebook-edu",
+      "affinityComment": "Timothy: Chromebook-class stewarded child — edge only, trimmed resources",
+      "nodeTypes": ["edge"],
+      "edgenodeMemoryRequest": "384Mi",
+      "edgenodeMemoryLimit": "768Mi",
+      "edgenodeCpuRequest": "150m",
+      "edgenodeCpuLimit": "500m"
+    },
+    {
+      "name": "frank",
+      "role": "farmer",
+      "humanLabel": "frank-farmer",
+      "humanId": "human-frank-farmer",
+      "pattern": "legacy",
+      "template": "genesis/orchestrator/manifests/humans/_edgenode-legacy.template.yaml",
+      "deviceArchetype": "device-raspberry-pi-4",
+      "affinityComment": "Frank: remote peer on shem — external device steward over WireGuard",
+      "nodeTypes": ["remote"],
+      "edgenodeMemoryRequest": "512Mi",
+      "edgenodeMemoryLimit": "1536Mi",
+      "edgenodeCpuRequest": "250m",
+      "edgenodeCpuLimit": "1000m"
+    }
+  ]
+}

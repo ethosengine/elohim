@@ -229,24 +229,19 @@ def deployEdgeWithManifest(String env, String namespace, String manifestTemplate
  * Fixed identity attributes for all protocol humans deployed to K8s.
  * Human-intrinsic values that never change regardless of deployment topology.
  *
- * Adam is the genesis peer (first to ingest content via direct SQLite write).
- * The other 5 peers replicate from Adam via P2P identity-driven replication.
+ * Source of truth: genesis/orchestrator/data/deployments.json. Each record
+ * declares a deployment `pattern` (legacy | consolidated), which manifest
+ * or template renders it, node affinity, device archetype, and per-human
+ * edgenode resource sizing.
+ *
+ * Adam is the genesis peer and currently the only human on the consolidated
+ * elohim-node single-container pattern. The other 5 remain on the legacy
+ * 4-container pattern until the conductor 0.0.0.0 binding is verified
+ * (see genesis/plans/2026-04-16-elohim-node-consolidation-design.md).
  */
 def getHumanRegistry() {
-    return [
-        [name: 'adam', role: 'firstman', humanLabel: 'adam-firstman', humanId: 'human-adam-firstman',
-         manifest: 'genesis/orchestrator/manifests/humans/adam-firstman.yaml'],
-        [name: 'matthew', role: 'manager', humanLabel: 'matthew-manager', humanId: 'human-matthew-manager',
-         manifest: 'genesis/orchestrator/manifests/humans/matthew-manager.yaml'],
-        [name: 'jessica', role: 'spouse', humanLabel: 'jessica-spouse', humanId: 'human-jessica-spouse',
-         manifest: 'genesis/orchestrator/manifests/humans/jessica-spouse.yaml'],
-        [name: 'pete', role: 'pastor', humanLabel: 'pete-pastor', humanId: 'human-pete-pastor',
-         manifest: 'genesis/orchestrator/manifests/humans/pete-pastor.yaml'],
-        [name: 'timothy', role: 'tutor', humanLabel: 'timothy-tutor', humanId: 'human-timothy-tutor',
-         manifest: 'genesis/orchestrator/manifests/humans/timothy-tutor.yaml'],
-        [name: 'frank', role: 'farmer', humanLabel: 'frank-farmer', humanId: 'human-frank-farmer',
-         manifest: 'genesis/orchestrator/manifests/humans/frank-farmer.yaml'],
-    ]
+    def data = readJSON(file: 'genesis/orchestrator/data/deployments.json')
+    return data.humans
 }
 
 /**
@@ -400,8 +395,23 @@ def deployHumanManifest(Map humanConfig, String envFile, List allHumans) {
     def envConfig = getEnvConfig()[humanConfig.env]
     def p2pNodes = computeP2PBootstrapNodes(humanConfig, allHumans)
 
+    // Pick source manifest based on deployment pattern. `consolidated` humans
+    // have a hand-crafted manifest (Adam — the reference impl while
+    // elohim-node 0.0.0.0 binding is unverified). `legacy` humans share a
+    // template rendered with their per-human placeholders from deployments.json.
+    def sourceFile = humanConfig.pattern == 'consolidated' ?
+        humanConfig.manifest :
+        humanConfig.template
+    if (!sourceFile) {
+        error "Human ${humanConfig.name}: neither 'manifest' nor 'template' resolved (pattern=${humanConfig.pattern})"
+    }
+
+    // Render nodeTypes list as an inline YAML flow-style sequence.
+    // Produces: ["performance"] or ["operations", "edge"].
+    def nodeTypeValues = '[' + (humanConfig.nodeTypes ?: []).collect { "\"${it}\"" }.join(', ') + ']'
+
     def sedArgs = [
-        // Image tag placeholders (existing)
+        // Image tag placeholders
         "s|EDGENODE_TAG_PLACEHOLDER|${versions.EDGENODE_TAG}|g",
         "s|DOORWAY_TAG_PLACEHOLDER|${versions.DOORWAY_TAG}|g",
         "s|STORAGE_TAG_PLACEHOLDER|${versions.STORAGE_TAG}|g",
@@ -410,7 +420,7 @@ def deployHumanManifest(Map humanConfig, String envFile, List allHumans) {
         "s|HAPP_TAG_PLACEHOLDER|${versions.HAPP_TAG}|g",
         "s|AGENT_SDK_TAG_PLACEHOLDER|${versions.AGENT_SDK_TAG ?: versions.EDGENODE_TAG}|g",
         "s|DEPLOY_VERSION_PLACEHOLDER|${deployVersion}|g",
-        // Topology placeholders (new)
+        // Topology placeholders
         "s|NAMESPACE_PLACEHOLDER|${humanConfig.namespace}|g",
         "s|ENV_PLACEHOLDER|${humanConfig.env}|g",
         "s|RESOURCE_PREFIX_PLACEHOLDER|${humanConfig.resourcePrefix}|g",
@@ -419,13 +429,23 @@ def deployHumanManifest(Map humanConfig, String envFile, List allHumans) {
         "s|SIGNAL_URL_PLACEHOLDER|${envConfig.signalUrl}|g",
         "s|P2P_BOOTSTRAP_NODES_PLACEHOLDER|${p2pNodes}|g",
         // Node-local storage class — P2P dataplane owns replication, not k8s.
-        // openebs-hostpath keeps PV data on the scheduled node; avoids cross-node (or
-        // cross-WireGuard for shem) replication that would duplicate the P2P layer.
         "s|STORAGE_CLASS_PLACEHOLDER|openebs-hostpath|g",
+        // Per-human placeholders (no-ops on the consolidated manifest, which
+        // has these values hand-coded for Adam).
+        "s|HUMAN_LABEL_PLACEHOLDER|${humanConfig.humanLabel}|g",
+        "s|HUMAN_ID_PLACEHOLDER|${humanConfig.humanId}|g",
+        "s|NODE_TYPE_VALUES_PLACEHOLDER|${nodeTypeValues}|g",
+        "s|AFFINITY_COMMENT_PLACEHOLDER|${humanConfig.affinityComment ?: ''}|g",
+        "s|EDGENODE_MEMORY_REQUEST_PLACEHOLDER|${humanConfig.edgenodeMemoryRequest ?: ''}|g",
+        "s|EDGENODE_MEMORY_LIMIT_PLACEHOLDER|${humanConfig.edgenodeMemoryLimit ?: ''}|g",
+        "s|EDGENODE_CPU_REQUEST_PLACEHOLDER|${humanConfig.edgenodeCpuRequest ?: ''}|g",
+        "s|EDGENODE_CPU_LIMIT_PLACEHOLDER|${humanConfig.edgenodeCpuLimit ?: ''}|g",
     ].collect { "-e '${it}'" }.join(' ')
 
-    def outputFile = humanConfig.manifest.replace('.yaml', "-rendered.yaml")
-    sh "sed ${sedArgs} ${humanConfig.manifest} > ${outputFile}"
+    // Output path uses resourcePrefix so multiple humans sharing a template
+    // don't collide on a single rendered file.
+    def outputFile = "genesis/orchestrator/manifests/humans/${humanConfig.resourcePrefix}-rendered.yaml"
+    sh "sed ${sedArgs} ${sourceFile} > ${outputFile}"
 
     // Fail fast if any placeholders remain
     def remaining = sh(script: "grep -c '_PLACEHOLDER' ${outputFile} || true", returnStdout: true).trim()
