@@ -630,6 +630,11 @@ spec:
             description: 'Delete and recreate human StatefulSets before deploying. Use when changing topology or for clean state.'
         )
         string(name: 'STEPS', defaultValue: 'all', description: 'Comma-separated build steps to run. "all" runs everything.')
+        booleanParam(
+            name: 'SKIP_LEGACY_IMAGES',
+            defaultValue: false,
+            description: 'Skip building edgenode and happ-installer images (humans using consolidated elohim-node mode)'
+        )
     }
 
     options {
@@ -978,6 +983,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
             when { allOf {
                 expression { env.PIPELINE_SKIPPED != 'true' }
                 expression { shouldRunStep('build-edge-image') }
+                expression { !(params.SKIP_LEGACY_IMAGES ?: false) }
             }}
             steps {
                 container('builder') {
@@ -1031,7 +1037,10 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         }
 
         stage('Build hApp Installer') {
-            when { expression { env.PIPELINE_SKIPPED != 'true' } }
+            when { allOf {
+                expression { env.PIPELINE_SKIPPED != 'true' }
+                expression { !(params.SKIP_LEGACY_IMAGES ?: false) }
+            }}
             steps {
                 container('builder') {
                     script {
