@@ -238,6 +238,19 @@ diesel::table! {
 }
 
 diesel::table! {
+    peer_statuses (peer_id) {
+        peer_id -> Text,
+        status -> Text,
+        general_pool_member -> Integer,
+        accepting_stewardship_reserves -> Integer,
+        archetype_class -> Nullable<Text>,
+        timestamp -> BigInt,
+        dht_anchor_hash -> Binary,
+        updated_at -> BigInt,
+    }
+}
+
+diesel::table! {
     relationships (id) {
         id -> Text,
         h_app_id -> Text,
@@ -1076,6 +1089,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     node_stewardship,
     observation_entries,
     observation_sessions,
+    peer_statuses,
     precedents,
     premium_gates,
     proposal_options,
