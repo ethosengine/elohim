@@ -4,9 +4,10 @@
 //! Task 12 of Peer-Stewarded Availability Phase 1.
 //!
 //! The task is split behind two traits so unit tests can inject fakes:
-//! - [`Publisher`] — publishes `PeerStatus` (real impl: ZomeCall, Task 13).
-//! - [`LiveProbe`] — samples runtime `LiveState` (real impl: blob store +
-//!   conductor probe, Task 13).
+//! - [`Publisher`] — publishes `PeerStatus` (real impl: [`ZomeCallPublisher`],
+//!   Task 13).
+//! - [`LiveProbe`] — samples runtime `LiveState` (real impl: [`DefaultProbe`],
+//!   Task 13).
 //!
 //! Lifecycle transitions driven by `tick_once`:
 //! - Starting → Online on first tick (peer has its first reading)
@@ -152,6 +153,153 @@ impl<P: Publisher, L: LiveProbe> HeartbeatTask<P, L> {
                 }
             }
         }
+    }
+}
+
+// =============================================================================
+// Real Publisher + LiveProbe implementations (Task 13)
+// =============================================================================
+
+/// Real [`Publisher`] that commits a `PeerStatus` DHT entry via a signed zome
+/// call to the `infrastructure` coordinator (`record_peer_status`).
+///
+/// The payload is serialized as MessagePack (with named fields) to match the
+/// DNA-side `PeerStatus` entry layout. See
+/// `elohim/holochain/dna/infrastructure/zomes/infrastructure_integrity/src/peer_status.rs`.
+pub struct ZomeCallPublisher {
+    hc: std::sync::Arc<crate::hc_client::HcClient>,
+    agent: holochain_types::prelude::AgentPubKey,
+}
+
+impl ZomeCallPublisher {
+    pub fn new(
+        hc: std::sync::Arc<crate::hc_client::HcClient>,
+        agent: holochain_types::prelude::AgentPubKey,
+    ) -> Self {
+        Self { hc, agent }
+    }
+}
+
+/// Wire-side mirror of the DNA `PeerLifecycleState` enum.
+///
+/// MUST match variant names exactly — serde externally-tagged encoding writes
+/// the variant name as a MessagePack string, which is what the DNA integrity
+/// zome expects when it deserializes the entry.
+#[derive(serde::Serialize)]
+enum WirePeerLifecycleState {
+    Starting,
+    Online,
+    Degraded,
+    Maintenance,
+    Leaving,
+}
+
+impl WirePeerLifecycleState {
+    fn parse(s: &str) -> Self {
+        match s {
+            "starting" => Self::Starting,
+            "degraded" => Self::Degraded,
+            "maintenance" => Self::Maintenance,
+            "leaving" => Self::Leaving,
+            _ => Self::Online,
+        }
+    }
+}
+
+/// Wire-side mirror of the DNA `PeerCapabilityFlags` struct.
+#[derive(serde::Serialize)]
+struct WirePeerCapabilityFlags {
+    general_pool_member: bool,
+    accepting_stewardship_reserves: bool,
+}
+
+/// Wire-side mirror of the DNA `PeerStatus` entry. Field names and order
+/// MUST match the integrity zome definition.
+#[derive(serde::Serialize)]
+struct WirePeerStatus {
+    peer_id: holochain_types::prelude::AgentPubKey,
+    status: WirePeerLifecycleState,
+    flags: WirePeerCapabilityFlags,
+    archetype_class: Option<String>,
+    timestamp: holochain_types::prelude::Timestamp,
+}
+
+#[async_trait::async_trait]
+impl Publisher for ZomeCallPublisher {
+    async fn publish(&self, p: Published) -> anyhow::Result<()> {
+        let wire = WirePeerStatus {
+            peer_id: self.agent.clone(),
+            status: WirePeerLifecycleState::parse(&p.status),
+            flags: WirePeerCapabilityFlags {
+                general_pool_member: p.flags.general_pool_member,
+                accepting_stewardship_reserves: p.flags.accepting_stewardship_reserves,
+            },
+            archetype_class: p.archetype_class,
+            timestamp: holochain_types::prelude::Timestamp::now(),
+        };
+
+        let payload = rmp_serde::to_vec_named(&wire)
+            .map_err(|e| anyhow::anyhow!("encode PeerStatus: {e}"))?;
+
+        self.hc
+            .call_zome("infrastructure", "record_peer_status", payload)
+            .await
+            .map_err(|e| anyhow::anyhow!("record_peer_status zome call failed: {e}"))?;
+        Ok(())
+    }
+}
+
+/// Real [`LiveProbe`] combining a blob store handle (for free-storage sampling)
+/// and an [`HcClient`](crate::hc_client::HcClient) handle (for a conductor ping).
+///
+/// **Free-storage sampling (v1 fallback):** the blob store does not currently
+/// expose a disk-utilization API, and no other part of elohim-storage measures
+/// filesystem free space yet. Rather than pull in a libc/statvfs dependency
+/// in this task, the probe returns an optimistic `free_storage_pct = 100`.
+///
+/// The policy default for `accept_general_traffic` is `Auto`, which — combined
+/// with this value — keeps peers in the general pool. That is the correct
+/// behaviour for typical Phase 1 deployments where operators want their node
+/// serving traffic by default. The probe MUST be upgraded to a real disk
+/// measurement before thin-client deployment in Phase 2, at which point
+/// operators with low-disk nodes will rely on the `min_free_storage_pct`
+/// threshold to gate their participation.
+pub struct DefaultProbe {
+    #[allow(dead_code)]
+    blob: std::sync::Arc<crate::blob_store::BlobStore>,
+    hc: std::sync::Arc<crate::hc_client::HcClient>,
+}
+
+impl DefaultProbe {
+    pub fn new(
+        blob: std::sync::Arc<crate::blob_store::BlobStore>,
+        hc: std::sync::Arc<crate::hc_client::HcClient>,
+    ) -> Self {
+        Self { blob, hc }
+    }
+}
+
+#[async_trait::async_trait]
+impl LiveProbe for DefaultProbe {
+    async fn sample(&self) -> anyhow::Result<LiveState> {
+        // Free storage %: see struct docs for fallback rationale.
+        let free_storage_pct: u8 = 100;
+
+        // Conductor health: a successful `list_apps` via HcClient::ping is a
+        // reasonable liveness check — admin websocket is responsive AND the
+        // conductor's app manager is answering queries.
+        let conductor_healthy = match self.hc.ping().await {
+            Ok(()) => true,
+            Err(e) => {
+                tracing::warn!("conductor ping failed: {e}");
+                false
+            }
+        };
+
+        Ok(LiveState {
+            free_storage_pct,
+            conductor_healthy,
+        })
     }
 }
 

@@ -325,6 +325,79 @@ async fn async_main(
     // Initialize blob store
     let blob_store = Arc::new(BlobStore::new(config.blobs_dir()).await?);
 
+    // Graceful-shutdown broadcast channel — shared by the import handler,
+    // the PeerStatus heartbeat, and any other task that needs to react to
+    // ctrl-c. Created here (before the tasks that subscribe) so a single
+    // send fans out to every consumer.
+    let (shutdown_tx, _shutdown_rx_root) = broadcast::channel::<()>(1);
+
+    // Peer-Stewarded Availability — spawn the PeerStatus heartbeat task.
+    //
+    // Connects a dedicated HcClient to the `infrastructure` role so we can
+    // issue signed `record_peer_status` zome calls on a 60s cadence and
+    // publish one final `leaving` snapshot at shutdown. Failure to connect
+    // (e.g. embedded conductor not ready in some dev flows) is logged and
+    // does NOT abort startup — the node still serves HTTP/blobs.
+    //
+    // TODO(Task 16): replace the hard-coded path with `cfg.peer_policy_path`
+    // once the storage config gains that field.
+    let peer_policy_path = std::path::PathBuf::from("./config/peer-policy.toml");
+    if let Some(admin_url) = &args.admin_url {
+        match elohim_storage::policy::PolicyConfig::load(&peer_policy_path) {
+            Ok(policy_cfg) => {
+                match elohim_storage::hc_client::HcClient::connect(
+                    elohim_storage::hc_client::HcClientConfig {
+                        admin_url: admin_url.clone(),
+                        app_url: args.app_url.clone(),
+                        app_id: args.app_id.clone(),
+                        role: Some("infrastructure".to_string()),
+                    },
+                )
+                .await
+                {
+                    Ok(hc) => {
+                        let hc = Arc::new(hc);
+                        let agent = hc.cell_id().agent_pubkey().clone();
+                        let publisher = elohim_storage::heartbeat::ZomeCallPublisher::new(
+                            hc.clone(),
+                            agent,
+                        );
+                        let probe = elohim_storage::heartbeat::DefaultProbe::new(
+                            blob_store.clone(),
+                            hc.clone(),
+                        );
+                        let heartbeat = elohim_storage::heartbeat::HeartbeatTask::new(
+                            policy_cfg, publisher, probe,
+                        );
+                        let hb_shutdown = shutdown_tx.subscribe();
+                        tokio::spawn(async move {
+                            heartbeat.run(hb_shutdown).await;
+                        });
+                        info!(
+                            policy_path = %peer_policy_path.display(),
+                            "PeerStatus heartbeat task started (infrastructure role)"
+                        );
+                    }
+                    Err(e) => {
+                        warn!(
+                            "PeerStatus heartbeat disabled: infrastructure HcClient connect failed: {}",
+                            e
+                        );
+                    }
+                }
+            }
+            Err(e) => {
+                warn!(
+                    policy_path = %peer_policy_path.display(),
+                    "PeerStatus heartbeat disabled: policy config load failed: {}",
+                    e
+                );
+            }
+        }
+    } else {
+        info!("PeerStatus heartbeat disabled: no --admin-url / HOLOCHAIN_ADMIN_URL set");
+    }
+
     // Create progress hub for WebSocket streaming
     let progress_hub = Arc::new(ProgressHub::new(ProgressHubConfig::default()));
     info!("Progress hub initialized for WebSocket streaming");
@@ -680,9 +753,10 @@ async fn async_main(
 
             let mut import_handler = ImportHandler::new(import_config, blob_store.clone());
 
-            // Create shutdown channel
-            let (shutdown_tx, shutdown_rx) = broadcast::channel::<()>(1);
-            import_handler.set_shutdown(shutdown_rx);
+            // Subscribe to the shared graceful-shutdown broadcast created
+            // earlier in main(). The outer `shutdown_tx.send(())` call in the
+            // ctrl-c handler fans out to this receiver and to the heartbeat.
+            import_handler.set_shutdown(shutdown_tx.subscribe());
 
             info!("Import handler enabled");
             info!("  App ID: {}", args.app_id);
@@ -694,7 +768,7 @@ async fn async_main(
                 }
             });
 
-            Some((handle, shutdown_tx))
+            Some(handle)
         } else {
             warn!("Import handler disabled: no --admin-url or HOLOCHAIN_ADMIN_URL set");
             info!("  To enable import processing, set HOLOCHAIN_ADMIN_URL or use --admin-url");
@@ -776,9 +850,12 @@ async fn async_main(
         }
     }
 
-    // Signal import handler to stop
-    if let Some((handle, shutdown_tx)) = import_handle {
-        let _ = shutdown_tx.send(());
+    // Signal all graceful-shutdown subscribers (import handler, PeerStatus
+    // heartbeat). A single broadcast fans out to every subscriber so the
+    // heartbeat publishes its final `leaving` snapshot in parallel with the
+    // import handler draining.
+    let _ = shutdown_tx.send(());
+    if let Some(handle) = import_handle {
         let _ = handle.await;
     }
 
