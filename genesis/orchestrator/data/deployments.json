@@ -1,5 +1,5 @@
 {
-  "$comment": "Per-human deployment records driven by elohim/holochain/Jenkinsfile. See genesis/orchestrator/manifests/humans/_edgenode-legacy.template.yaml for the template rendered against `legacy`-pattern humans. `consolidated`-pattern humans reference an explicit manifest file (Adam is the current reference impl while 0.0.0.0 conductor binding is unverified — see commit 62bd1550 and genesis/plans/2026-04-16-elohim-node-consolidation-design.md).",
+  "$comment": "Per-human deployment records driven by elohim/holochain/Jenkinsfile. See genesis/orchestrator/manifests/humans/_edgenode-legacy.template.yaml for the template rendered against `legacy`-pattern humans. `consolidated`-pattern humans reference an explicit manifest file (Adam is the current reference impl while 0.0.0.0 conductor binding is unverified — see commit 62bd1550 and genesis/plans/2026-04-16-elohim-node-consolidation-design.md). The edgenode{Memory,Cpu}{Request,Limit} fields are THE source of truth for per-human conductor resource budgets — each set is tied to a deviceArchetype from genesis/plans/2026-04-13-device-archetypes-design.md. Treat these as the archetype's validated minimum; when bumped temporarily to unblock work, leave an entry-level $comment noting the intended floor and the follow-up that restores it.",
   "schemaVersion": 1,
   "humans": [
     {
@@ -59,6 +59,13 @@
       "edgenodeCpuLimit": "1000m"
     },
     {
+      "$comment": "TEMPORARY BUMP (2026-04-17) to unblock seeding — Chromebook floor was 384Mi/768Mi + 150m/500m, OOMing under initial seed burst. Bumped to the Jessica/Frank/Pete 'typical steward' tier so we can (a) complete seeding, (b) validate the consolidated-pod strategy under real load, then (c) tune back down to the Chromebook floor and prove the device-chromebook-edu archetype story in genesis/plans/2026-04-13-device-archetypes-design.md. The floor values are preserved below as the restoration target.",
+      "$chromebookFloor": {
+        "edgenodeMemoryRequest": "384Mi",
+        "edgenodeMemoryLimit": "768Mi",
+        "edgenodeCpuRequest": "150m",
+        "edgenodeCpuLimit": "500m"
+      },
       "name": "timothy",
       "role": "tutor",
       "humanLabel": "timothy-tutor",
@@ -66,12 +73,12 @@
       "pattern": "legacy",
       "template": "genesis/orchestrator/manifests/humans/_edgenode-legacy.template.yaml",
       "deviceArchetype": "device-chromebook-edu",
-      "affinityComment": "Timothy: Chromebook-class stewarded child — edge only, trimmed resources",
+      "affinityComment": "Timothy: Chromebook-class stewarded child — edge only, bumped for seeding (see $comment)",
       "nodeTypes": ["edge"],
-      "edgenodeMemoryRequest": "384Mi",
-      "edgenodeMemoryLimit": "768Mi",
-      "edgenodeCpuRequest": "150m",
-      "edgenodeCpuLimit": "500m"
+      "edgenodeMemoryRequest": "512Mi",
+      "edgenodeMemoryLimit": "1536Mi",
+      "edgenodeCpuRequest": "250m",
+      "edgenodeCpuLimit": "1000m"
     },
     {
       "name": "frank",
