@@ -41,9 +41,10 @@ enum LifecycleState {
     Starting,
     Online,
     Degraded,
-    /// Operator-driven maintenance mode. Phase 2 will add a setter for the
-    /// co-stewardship directive channel to transition into this state.
-    #[allow(dead_code)]
+    /// Operator-driven maintenance mode. Entered via
+    /// [`HeartbeatTask::enter_maintenance`] / exited via
+    /// [`HeartbeatTask::exit_maintenance`]. Phase 2's co-stewardship directive
+    /// channel will drive these setters from operator intent.
     Maintenance,
     Leaving,
 }
@@ -101,6 +102,11 @@ impl<P: Publisher, L: LiveProbe> HeartbeatTask<P, L> {
             LifecycleState::Degraded if flags.general_pool_member => {
                 *lifecycle = LifecycleState::Online;
             }
+            // Maintenance / Leaving are externally driven — while in either
+            // state the task continues to publish heartbeats but status stays
+            // pinned (e.g. "maintenance") regardless of live flags until the
+            // operator explicitly transitions out via enter/exit_maintenance
+            // or announce_leaving.
             _ => {}
         }
         let status = lifecycle.as_str().to_string();
@@ -131,6 +137,29 @@ impl<P: Publisher, L: LiveProbe> HeartbeatTask<P, L> {
                 archetype_class: self.archetype_class.clone(),
             })
             .await
+    }
+
+    /// Transition the task into operator-driven Maintenance mode.
+    ///
+    /// Subsequent `tick_once` calls will continue publishing heartbeats but
+    /// will keep `status = "maintenance"` regardless of live flags, until
+    /// [`exit_maintenance`](Self::exit_maintenance) or
+    /// [`announce_leaving`](Self::announce_leaving) is called.
+    pub async fn enter_maintenance(&self) {
+        let mut lifecycle = self.lifecycle.lock().await;
+        *lifecycle = LifecycleState::Maintenance;
+    }
+
+    /// Exit Maintenance mode.
+    ///
+    /// Resets the state machine to `Starting` so the next `tick_once`
+    /// reconciles from live flags (transitioning to Online, or Degraded if
+    /// flags warrant it). No-op if not currently in Maintenance.
+    pub async fn exit_maintenance(&self) {
+        let mut lifecycle = self.lifecycle.lock().await;
+        if *lifecycle == LifecycleState::Maintenance {
+            *lifecycle = LifecycleState::Starting;
+        }
     }
 
     pub async fn run(self, mut shutdown: broadcast::Receiver<()>) {
@@ -410,6 +439,74 @@ mod tests {
         task.announce_leaving().await.unwrap();
         let p = rx.recv().await.unwrap();
         assert_eq!(p.status, "leaving");
+    }
+
+    #[tokio::test]
+    async fn enter_maintenance_publishes_maintenance_on_next_tick() {
+        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+        let task = HeartbeatTask::new(
+            base_cfg(),
+            TestPublisher { tx },
+            TestProbe {
+                state: LiveState {
+                    free_storage_pct: 50,
+                    conductor_healthy: true,
+                },
+            },
+        );
+        task.tick_once().await.unwrap(); // Starting -> Online
+        let _ = rx.recv().await;
+        task.enter_maintenance().await;
+        task.tick_once().await.unwrap();
+        let p = rx.recv().await.unwrap();
+        assert_eq!(p.status, "maintenance");
+    }
+
+    #[tokio::test]
+    async fn maintenance_persists_across_ticks_until_explicit_exit() {
+        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+        let task = HeartbeatTask::new(
+            base_cfg(),
+            TestPublisher { tx },
+            TestProbe {
+                state: LiveState {
+                    free_storage_pct: 50,
+                    conductor_healthy: true,
+                },
+            },
+        );
+        task.tick_once().await.unwrap();
+        let _ = rx.recv().await;
+        task.enter_maintenance().await;
+        for _ in 0..3 {
+            task.tick_once().await.unwrap();
+            let p = rx.recv().await.unwrap();
+            assert_eq!(p.status, "maintenance");
+        }
+    }
+
+    #[tokio::test]
+    async fn exit_maintenance_returns_to_online() {
+        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+        let task = HeartbeatTask::new(
+            base_cfg(),
+            TestPublisher { tx },
+            TestProbe {
+                state: LiveState {
+                    free_storage_pct: 50,
+                    conductor_healthy: true,
+                },
+            },
+        );
+        task.tick_once().await.unwrap();
+        let _ = rx.recv().await;
+        task.enter_maintenance().await;
+        task.tick_once().await.unwrap();
+        let _ = rx.recv().await; // maintenance
+        task.exit_maintenance().await;
+        task.tick_once().await.unwrap();
+        let p = rx.recv().await.unwrap();
+        assert_eq!(p.status, "online");
     }
 
     #[tokio::test]
