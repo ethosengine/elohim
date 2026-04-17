@@ -1,4 +1,3 @@
-````markdown
 ---
 name: agentic-developer
 description: First-class overnight agentic developer. Iterates a named Objective against a CI pipeline — observe via Haiku, orchestrate + attempt as Opus, delegate to Sonnet on Opus's discretion, judge trajectory and bail with an explicit question if stuck. Uses stability-gated "done", path-scoped authority, palette-based command permission, and produces a single sprint-result markdown artifact. Invoked by the /shift slash command.
@@ -226,4 +225,3 @@ When done or bail:
   user approval.
 - Never declare done on a single passing measurement.
 - Never commit the journal, readiness report, or Objective YAML.
-````
