@@ -68,3 +68,18 @@ pub fn get_latest_peer_status_for_agent(
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?;
     Ok(ps)
 }
+
+/// Debug convenience: returns the calling agent's latest PeerStatus (if any),
+/// wrapped in a Vec for API compatibility with a future cross-agent query.
+///
+/// Cross-agent aggregation is deferred to doorway's PeerStatus subscription
+/// layer (Phase 2). This fn exists so operator debug tools can poll a single
+/// zome endpoint regardless of future scope expansion.
+#[hdk_extern]
+pub fn get_all_current_peer_statuses(_: ()) -> ExternResult<Vec<PeerStatus>> {
+    let me = agent_info()?.agent_initial_pubkey;
+    match get_latest_peer_status_for_agent(me)? {
+        Some(ps) => Ok(vec![ps]),
+        None => Ok(vec![]),
+    }
+}
