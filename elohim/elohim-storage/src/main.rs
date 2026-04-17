@@ -345,6 +345,22 @@ async fn async_main(
     if let Some(admin_url) = &args.admin_url {
         match elohim_storage::policy::PolicyConfig::load(&peer_policy_path) {
             Ok(policy_cfg) => {
+                // Peer-Stewarded Availability — conditionally spawn the
+                // conductor forwarder so remote peers can reach this node's
+                // internal conductor port. Failure to bind is non-fatal,
+                // consistent with the heartbeat startup pattern above: we
+                // continue serving HTTP even if peer-status is unavailable.
+                if policy_cfg.network.expose_conductor_externally {
+                    if let Err(e) = elohim_storage::forwarder::spawn_forwarder(
+                        &policy_cfg.network.conductor_external_bind,
+                        policy_cfg.network.conductor_internal_port,
+                    )
+                    .await
+                    {
+                        warn!("conductor forwarder failed to start: {e}");
+                    }
+                }
+
                 match elohim_storage::hc_client::HcClient::connect(
                     elohim_storage::hc_client::HcClientConfig {
                         admin_url: admin_url.clone(),
