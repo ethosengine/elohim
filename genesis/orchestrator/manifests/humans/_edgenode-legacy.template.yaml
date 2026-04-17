@@ -152,7 +152,7 @@ spec:
       containers:
         # Main Holochain conductor — resources sized per human device archetype.
         # Placeholders below are substituted from deployments.json at render time
-        # (see elohim/holochain/Jenkinsfile EDGENODE_*_PLACEHOLDER sed args). The
+        # (see elohim/holochain/Jenkinsfile EDGENODE_* sed args). The
         # per-human values in deployments.json ARE the source of truth for the
         # archetype's validated minimum runtime budget — not this template.
         - name: edgenode
