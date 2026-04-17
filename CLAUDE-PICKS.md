@@ -17,6 +17,7 @@ These items have been built since the original survey (2026-02-25). Archived her
 - **Ambient Trust Architecture (2026-03-23)**: Per-connection DHT-verified trust negotiation designed and scaffolded. `/elohim/trust/1.0.0` handshake protocol (MessagePack codec with roundtrip tests). `PeerTrustCache` with TTL expiry. `trust_verification` module with three-pillar types and reach ceiling calculation. `verify_credentials()` zome functions in imagodei and mishpat DNAs. Fast-path in `check_reach_authorization` skips DB for cached peers. Conductor integration stubs ready for live DHT verification.
 - **EPR Visibility (2026-03-23)**: Reach and resilience badge indicators on content-viewer and lesson-view headers. Progressive disclosure: ambient icons, tooltip on hover, click-through to trust tab. Proves the EPR data pipeline end-to-end from Rust storage to Angular UI.
 - **Content Flags & Stewardship Display (2026-03-23)**: Content flags (disputed, outdated, appeal-pending, under-review, partial-revocation) render as subtle colored tags in content-viewer and lesson-view headers — only visible when flags exist, click navigates to trust tab. Stewardship section in trust tab shows allocation cards with steward name, role badge, allocation bar, recognition accumulated, and dispute indicator. Loads via `StewardshipAllocationService.getContentStewardship()`. 79 content-viewer tests passing.
+- **EPR Link Navigation Boxes (2026-04-17)**: `EprRelationshipCardComponent` + `EprRelationshipsPanelComponent` in elohim pillar. Content-viewer and lesson-view fetch the EPR Head and render typed relationship cards (PREREQUISITE/TEACHES/CONTAINS/REFERENCES) with reach badges and resilience badges below content body. Click navigates to target concept. 12 new tests, 7201 total passing.
 
 ---
 
@@ -115,5 +116,4 @@ The ambient trust architecture is scaffolded (protocol, cache, types, fast-path)
 
 ## Small Gaps to Close
 
-- **EPR link navigation boxes (Surface 2)**: Content references should render as compact cards with reach/resilience badges. The `EprRelationship` data is in EPR Heads but not rendered as navigation. Designed, not built.
 - **Context menu (Surface 3)**: Three-dot menu on content with flag/feedback modal + deep navigation to stewardship/governance/attestation detail. Designed, not built.
