@@ -21,9 +21,23 @@ closes with done or a clean bail.
 3. **Judgment governs loop length.** Bail when stuck with an explicit
    question. Budget is the safety net, not the primary exit.
 4. **Done is stable.** Two consecutive passing measurements, at least one
-   from a fresh trigger. A single green is a *done-candidate*, not *done*.
-5. **Allowlist is the authority surface.** Never run bash outside the
-   palette. Log wishlist instead; curate in sprint result.
+   from a **fresh trigger** — a new Jenkins build invoked this shift via
+   `mcp__jenkins__triggerBuild` or a fresh `git push`, *not* a poll or
+   replay of a prior build id. A single green is a *done-candidate* (one
+   pass, awaiting fresh-trigger confirmation), not *done*.
+
+   The stability counter lives in the journal's **Stability Tracker**
+   header. Increment on pass, reset to 0 on fail, evaluate at end of
+   step 6 Judge *before* writing the stanza. Record whether the
+   measurement came from a fresh trigger in the same header.
+5. **Allowlist (palette) is the authority surface.** Never run bash
+   outside the palette. Before any Bash call, verify the command matches
+   by loading the palette union (durable + shift-scoped) and running
+   `matchesPalette(cmd, palette)` from `genesis/agentic/palette.mjs` —
+   e.g. a one-line `node --input-type=module -e "import(...)"` shim.
+   If no match: do NOT attempt the command. Log it to the journal's
+   **Permission wishlist** section (redirect / wishlist / blocker per
+   the Wishlist curation rules) and either work around it or bail.
 6. **You may not edit the judge.** The Objective, measure command, files
    the measure reads, test runners, and test fixtures are off-limits.
    Bail with a proposal if they need to change.
@@ -44,8 +58,10 @@ When `/shift` invokes this skill:
    - *"What paths may I edit? (globs)"*
    - *"Budget — how many iterations, how many minutes?"*
 
-   Compose an Objective YAML conforming to
-   `.claude/schemas/objective.schema.json`. Show it to the user.
+   Compose an Objective conforming to
+   `.claude/schemas/objective.schema.json`. Write as JSON at
+   `.claude/shifts/<shift-id>.objective.json` — the readiness script
+   parses JSON in v1 (YAML support deferred). Show it to the user.
    Wait for explicit *"yes, kick off"* before proceeding.
 
 3. **Predict the command palette for this shift.** Based on the Objective
@@ -58,17 +74,21 @@ When `/shift` invokes this skill:
 4. **Run pre-shift readiness check.**
 
    ```bash
-   pnpm run agentic:readiness -- --objective .claude/shifts/<shift-id>.objective.yaml
+   pnpm run agentic:readiness -- --objective .claude/shifts/<shift-id>.objective.json
    ```
 
    If `ready: false` in output, ABORT. Write a readiness report to
    `.claude/shifts/<shift-id>.readiness-report.md` explaining what failed,
-   commit nothing, exit. User fixes in the morning.
+   commit nothing, and remove any shift-scoped `// shift:<id>` entries
+   that step 3 added to `.claude/settings.local.json` before exiting.
+   User fixes in the morning.
 
-5. **Initialize the journal.** Create
+5. **Initialize the journal.** The **shift id** is
+   `<ISO-timestamp-no-colons>-<objective-slug>` (e.g.
+   `2026-04-16T22-30-lift-edge-pipeline-to-green`). Create
    `.claude/shifts/<shift-id>.journal.md` from
    `genesis/docs/shifts/JOURNAL-TEMPLATE.md`. Fill header; stability
-   counter = 0; trajectory summary = empty.
+   counter = 0; fresh-trigger = no; trajectory summary = empty.
 
 ## Iteration loop
 
@@ -101,10 +121,13 @@ Example Haiku dispatch:
 
 > *"Reduce the following Jenkins build output into the structured
 > summary defined by `.claude/schemas/haiku-output.schema.json`.
-> Iteration is 4. Previous measurement was 0.15; current is in
-> context.measurement.value of the artifact you'll fetch. Flag any
-> anti-patterns per `genesis/agentic/data/anti-patterns.json` with IDs
-> and evidence. Be bounded: 5-10 lines max for evidence fields."*
+> Return ALL required fields: `iteration`, `measurement` (value, delta,
+> baseline, target), `context` (build_id, status, first_failing_stage),
+> `primary_failure` (error_class, evidence, files_mentioned) or null,
+> `observed_anti_patterns[]`, and `confidence`. Iteration is 4. Previous
+> measurement was 0.15. Flag any anti-patterns per
+> `genesis/agentic/data/anti-patterns.json` with IDs and evidence. Be
+> bounded: 5-10 lines max for evidence fields."*
 
 ### 3. Verify (Sonnet dispatch, optional)
 
@@ -137,9 +160,11 @@ Pick ONE action:
 ### 5. Measure
 
 Wait for the external action to produce a result (build completes,
-test run finishes). For overnight shifts, use `ScheduleWakeup` with a
-delay ≈ pipeline-run-time + 5 min. When you wake, run
-`objective.measure` and capture the number.
+test run finishes). For overnight shifts, use `ScheduleWakeup` with
+`delaySeconds` = observed pipeline-run-time + 300s; if no estimate yet,
+default to 1800 (30 min). On wake, check `mcp__jenkins__getStatus` —
+if the build is still running, re-sleep with a shorter delay (600s);
+otherwise run `objective.measure` and capture the number.
 
 ### 6. Judge
 
@@ -158,7 +183,15 @@ Decide:
 
 Append an iteration stanza to `.claude/shifts/<shift-id>.journal.md`
 following the shape in `genesis/docs/shifts/JOURNAL-TEMPLATE.md`.
-Update the stability counter. Update the trajectory summary header.
+In the same write:
+
+- Update the **Stability Tracker** header (counter value,
+  fresh-trigger yes/no).
+- Refresh the **Trajectory Summary** header to cover the last 3
+  iterations including the one just appended.
+- Append any new entries from this iteration to the accumulated
+  **Permission wishlist** and **Observed anti-patterns** sections —
+  never defer these to Close; context may roll between iterations.
 
 ### 8. Next
 
@@ -224,4 +257,4 @@ When done or bail:
 - Never promote shift-scoped palette entries to durable without explicit
   user approval.
 - Never declare done on a single passing measurement.
-- Never commit the journal, readiness report, or Objective YAML.
+- Never commit the journal, readiness report, or Objective JSON.
