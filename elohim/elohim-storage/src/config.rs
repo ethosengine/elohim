@@ -69,6 +69,15 @@ pub struct Config {
     /// Extraction cache for HTML5 apps and rendered content
     #[serde(default)]
     pub extraction_cache: elohim_cache_core::extraction::ExtractionCacheConfig,
+
+    /// Path to peer-stewarded availability policy TOML file
+    /// (heartbeat cadence, conductor forwarder settings, etc.)
+    #[serde(default = "default_peer_policy_path")]
+    pub peer_policy_path: PathBuf,
+}
+
+fn default_peer_policy_path() -> PathBuf {
+    PathBuf::from("./config/peer-policy.toml")
 }
 
 fn default_http_port() -> u16 {
@@ -124,6 +133,7 @@ impl Default for Config {
             p2p_bootstrap_nodes: Vec::new(),
             enable_mdns: true,
             extraction_cache: elohim_cache_core::extraction::ExtractionCacheConfig::default(),
+            peer_policy_path: default_peer_policy_path(),
         }
     }
 }

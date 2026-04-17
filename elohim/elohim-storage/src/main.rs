@@ -215,6 +215,11 @@ struct Args {
     #[arg(long, env = "ANNOUNCE_ADDRS", value_delimiter = ',')]
     #[cfg(feature = "p2p")]
     announce_addrs: Vec<String>,
+
+    /// Path to peer-stewarded availability policy TOML file
+    /// Overrides `peer_policy_path` from the storage config file.
+    #[arg(long, env = "ELOHIM_STORAGE_PEER_POLICY_PATH")]
+    peer_policy_path: Option<PathBuf>,
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
@@ -272,6 +277,9 @@ async fn async_main(
     }
     if let Some(port) = args.http_port {
         config.http_port = port;
+    }
+    if let Some(path) = args.peer_policy_path.clone() {
+        config.peer_policy_path = path;
     }
 
     info!(
@@ -339,9 +347,7 @@ async fn async_main(
     // (e.g. embedded conductor not ready in some dev flows) is logged and
     // does NOT abort startup — the node still serves HTTP/blobs.
     //
-    // TODO(Task 16): replace the hard-coded path with `cfg.peer_policy_path`
-    // once the storage config gains that field.
-    let peer_policy_path = std::path::PathBuf::from("./config/peer-policy.toml");
+    let peer_policy_path = config.peer_policy_path.clone();
     if let Some(admin_url) = &args.admin_url {
         match elohim_storage::policy::PolicyConfig::load(&peer_policy_path) {
             Ok(policy_cfg) => {
