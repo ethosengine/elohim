@@ -245,7 +245,13 @@ pub fn create_contributor_presence(
     diesel::insert_into(contributor_presences::table)
         .values(&new_presence)
         .execute(conn)
-        .map_err(|e| StorageError::Internal(format!("Insert failed: {}", e)))?;
+        .map_err(|e| match e {
+            diesel::result::Error::DatabaseError(
+                diesel::result::DatabaseErrorKind::UniqueViolation,
+                _,
+            ) => StorageError::AlreadyExists(format!("Presence {} already exists", id)),
+            other => StorageError::Internal(format!("Insert failed: {}", other)),
+        })?;
 
     get_contributor_presence(conn, ctx, &id)?
         .ok_or_else(|| StorageError::Internal("Failed to retrieve created presence".into()))

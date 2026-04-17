@@ -10,6 +10,9 @@ pub enum StorageError {
     #[error("Blob not found: {0}")]
     NotFound(String),
 
+    #[error("Already exists: {0}")]
+    AlreadyExists(String),
+
     #[error("Blob not found in storage: {0}")]
     BlobNotFound(String),
 

@@ -113,6 +113,7 @@ pub fn service_unavailable(message: &str) -> Response<Full<Bytes>> {
 pub fn error_response(error: StorageError) -> Response<Full<Bytes>> {
     let (status, message) = match &error {
         StorageError::NotFound(msg) => (StatusCode::NOT_FOUND, msg.clone()),
+        StorageError::AlreadyExists(msg) => (StatusCode::CONFLICT, msg.clone()),
         StorageError::BlobNotFound(msg) => {
             (StatusCode::NOT_FOUND, format!("Blob not found: {}", msg))
         }
