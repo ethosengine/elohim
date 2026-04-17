@@ -301,6 +301,9 @@ pub enum LinkTypes {
     AgentToContentServer,       // Anchor(agent_pubkey) -> ContentServer
     CapabilityToContentServer,  // Anchor(capability) -> ContentServer
     RegionToContentServer,      // Anchor(region) -> ContentServer (for geo-routing)
+
+    // PeerStatus links
+    AgentToPeerStatus,          // base: AgentPubKey (as EntryHash), target: PeerStatus action hash
 }
 
 // =============================================================================
