@@ -104,6 +104,9 @@ pub mod sovereignty;
 // Peer policy engine (operator-declared availability & capability flags)
 pub mod policy;
 
+// Heartbeat task — periodic policy eval + PeerStatus publication
+pub mod heartbeat;
+
 // Re-exports
 pub use blob_store::BlobStore;
 pub use config::Config;
