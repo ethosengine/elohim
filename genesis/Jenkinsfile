@@ -831,6 +831,11 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                 container('builder') {
                     script {
                         def doorwayHost = env.RESOLVED_DOORWAY_HOST
+                        // SEEDER_TARGET_PEERS (optional): comma-separated storage URLs.
+                        // When set, accounts are hash-mod distributed across peers instead
+                        // of all going through the single doorway. Spreads author load and
+                        // diversifies the DHT genesis authorship across bootstrap anchors.
+                        def targetPeers = (env.SEEDER_TARGET_PEERS ?: '').trim()
                         catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
                             dir('genesis/seeder') {
                                 sh """#!/bin/bash
@@ -838,9 +843,15 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                                     echo "═══════════════════════════════════════════════════════════"
                                     echo "SEED ACCOUNTS"
                                     echo "═══════════════════════════════════════════════════════════"
-                                    echo "Doorway: ${doorwayHost}"
+                                    if [ -n "${targetPeers}" ]; then
+                                      echo "Targets: ${targetPeers}"
+                                    else
+                                      echo "Doorway: ${doorwayHost}  (single target; set SEEDER_TARGET_PEERS to split)"
+                                    fi
                                     echo ""
-                                    DOORWAY_URL="${doorwayHost}" npx tsx src/seed-accounts.ts
+                                    DOORWAY_URL="${doorwayHost}" \\
+                                    SEEDER_TARGET_PEERS="${targetPeers}" \\
+                                      npx tsx src/seed-accounts.ts
                                 """
                             }
                         }
