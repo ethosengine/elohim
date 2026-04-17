@@ -1443,6 +1443,39 @@ ${healthyCount < postflight.size() ? '  ⚠️  ATTENTION: Some services unhealt
                 // allowEmptyArchive — any failure surfaces loudly on the next
                 // build via the BASELINE CASCADE WARNING in loadPipelineBaselines.
                 archivePipelineBaselines('post')
+
+                // Continuity guard for build-state.json.
+                // When this run was interrupted before saveBuildState() ran
+                // (e.g. superseded by a newer push, pod evicted, SCM checkout
+                // aborted → NOT_BUILT), no build-state.json was archived this
+                // run. The next orchestrator build's copyArtifacts(lastCompleted())
+                // would return 0 files for 'build-state.json' and trigger a
+                // cold-start cascade — every pipeline rebuilds despite most
+                // being unchanged. Observed as an oscillating pattern: every
+                // other build cold-starts when rapid pushes supersede each other.
+                //
+                // Fix: if we don't have a local build-state.json, copy forward
+                // the most recent good one and re-archive. That way every
+                // completed build leaves at least *a* baseline for the next run.
+                if (!fileExists('build-state.json')) {
+                    try {
+                        copyArtifacts(
+                            projectName: env.JOB_NAME,
+                            selector: lastSuccessful(),
+                            filter: 'build-state.json',
+                            optional: true,
+                            fingerprintArtifacts: false
+                        )
+                    } catch (Exception e) {
+                        echo "[baseline:post] could not copy-forward build-state.json: ${e.message}"
+                    }
+                }
+                if (fileExists('build-state.json')) {
+                    archiveArtifacts artifacts: 'build-state.json', fingerprint: true
+                    echo "[baseline:post] build-state.json archived (continuity)"
+                } else {
+                    echo "[baseline:post] no prior build-state.json found — genuine first run"
+                }
             }
             } // node('built-in')
         }
