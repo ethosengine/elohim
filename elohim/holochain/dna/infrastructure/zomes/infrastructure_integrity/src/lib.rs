@@ -337,7 +337,7 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                         validate_content_server(&server)
                     }
                     EntryTypes::StringAnchor(_) => Ok(ValidateCallbackResult::Valid),
-                    EntryTypes::PeerStatus(_) => Ok(ValidateCallbackResult::Valid),
+                    EntryTypes::PeerStatus(ps) => validate_peer_status(&ps, &action),
                 }
             }
             OpEntry::UpdateEntry { app_entry, action, .. } => {
@@ -498,6 +498,38 @@ fn validate_health_attestation(
                 "Invalid observed_status '{}'. Must be one of: {:?}",
                 attestation.observed_status, ATTESTATION_STATUSES
             ),
+        ));
+    }
+
+    Ok(ValidateCallbackResult::Valid)
+}
+
+/// Validate PeerStatus
+///
+/// Rules:
+/// - Author must equal `peer_id` (peers cannot author PeerStatus for others).
+/// - Timestamp must be within ±5 minutes of DHT validation time.
+fn validate_peer_status(
+    ps: &PeerStatus,
+    action: &Create,
+) -> ExternResult<ValidateCallbackResult> {
+    // Rule 1: author must equal peer_id (self-authored only)
+    if ps.peer_id != action.author {
+        return Ok(ValidateCallbackResult::Invalid(
+            "PeerStatus.peer_id must match entry author".to_string(),
+        ));
+    }
+
+    // Rule 2: timestamp within ±5 minutes of the action timestamp.
+    // We compare against action.timestamp (signed by author, non-repudiable)
+    // rather than sys_time(): integrity validation must be deterministic, so
+    // every validator arrives at the same verdict. See spec §PeerStatus.
+    let now_us = action.timestamp.as_micros();
+    let ts_us = ps.timestamp.as_micros();
+    let delta = (now_us - ts_us).abs();
+    if delta > 5 * 60 * 1_000_000 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "PeerStatus.timestamp outside ±5m window".to_string(),
         ));
     }
 
