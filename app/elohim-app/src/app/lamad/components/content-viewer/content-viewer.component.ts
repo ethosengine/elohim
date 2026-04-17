@@ -19,6 +19,9 @@ import { catchError, takeUntil } from 'rxjs/operators';
 import { Subject, Subscription, forkJoin, of } from 'rxjs';
 
 import { TrustBadge } from '@app/elohim/models/trust-badge.model';
+import type { EprRelationship } from '@app/elohim/models/epr-head.model';
+import { EprRelationshipsPanelComponent } from '@app/elohim/components/epr-relationships-panel/epr-relationships-panel.component';
+import { EprResolverService } from '@app/elohim/services/epr-resolver.service';
 import { AffinityTrackingService } from '@app/elohim/services/affinity-tracking.service';
 import { AgentService } from '@app/elohim/services/agent.service';
 import {
@@ -89,6 +92,7 @@ import { MiniGraphComponent } from '../mini-graph/mini-graph.component';
     FocusedViewToggleComponent,
     ContentAnalyticsComponent,
     ProtocolOmnibarComponent,
+    EprRelationshipsPanelComponent,
   ],
   templateUrl: './content-viewer.component.html',
   styleUrls: ['./content-viewer.component.css'],
@@ -181,6 +185,9 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
   private readonly stewardshipService = inject(StewardshipAllocationService);
   private readonly resilienceService = inject(ResilienceService);
   private readonly attentionTracker = inject(AttentionTrackerService);
+  private readonly eprResolver = inject(EprResolverService);
+
+  eprRelationships: EprRelationship[] = [];
 
   /** Default feedback profile type for learning content */
   private readonly LEARNING_CONTENT_PROFILE = 'learning-content';
@@ -399,6 +406,9 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
 
           // Load related nodes
           this.loadRelatedNodes(contentNode.relatedNodeIds);
+
+          // Load EPR relationships (protocol-level relationships from EPR Head)
+          this.loadEprRelationships(contentNode.id);
 
           // Load containing paths (Wikipedia-style "appears in" back-links)
           this.loadContainingPaths(nodeId);
@@ -824,6 +834,19 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
         error: () => {
           this.relatedNodes = [];
         },
+      });
+  }
+
+  /**
+   * Load EPR relationships from the EPR Head for this content.
+   */
+  private loadEprRelationships(contentId: string): void {
+    this.eprRelationships = [];
+    this.eprResolver
+      .resolveEprHead(contentId)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(head => {
+        this.eprRelationships = head?.relationships ?? [];
       });
   }
 

@@ -399,6 +399,13 @@
             </button>
           </div>
         </div>
+
+        <!-- EPR Relationships (protocol-level content relationships) -->
+        <app-epr-relationships-panel
+          *ngIf="eprRelationships.length > 0"
+          [relationships]="eprRelationships"
+          data-testid="viewer-relationships-panel"
+        ></app-epr-relationships-panel>
       </section>
 
       <!-- Trust/Attestations Tab -->

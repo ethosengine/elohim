@@ -17,6 +17,7 @@ import { ContentNode } from '../../models/content-node.model';
 import { GovernanceSignalService } from '@app/elohim/services/governance-signal.service';
 import { StewardshipAllocationService } from '../../services/stewardship-allocation.service';
 import { SignalHarnessService } from '../../services/signal-harness.service';
+import { EprResolverService } from '@app/elohim/services/epr-resolver.service';
 import { vi, Mock } from 'vitest';
 
 describe('ContentViewerComponent', () => {
@@ -157,6 +158,24 @@ describe('ContentViewerComponent', () => {
         { provide: GovernanceSignalService, useValue: governanceSignalSpyObj },
         { provide: StewardshipAllocationService, useValue: stewardshipSpyObj },
         { provide: SignalHarnessService, useValue: { onRendererComplete: vi.fn().mockResolvedValue(undefined) } },
+        {
+          provide: EprResolverService,
+          useValue: {
+            resolveEprHead: vi.fn().mockReturnValue(of({
+              version: 1,
+              id: 'test-content-1',
+              content: 'bafk-test',
+              lamad: { title: 'Test', contentType: 'concept' },
+              shefa: {},
+              qahal: {},
+              relationships: [{ type: 'PREREQUISITE', target: 'foo' }],
+            })),
+            resolveUrl: vi.fn().mockReturnValue({ ref: {}, url: '', route: null }),
+            resolve: vi.fn().mockReturnValue(of(null)),
+            resolveInContext: vi.fn().mockReturnValue({ route: ['/resource', 'foo'], resolution: 'standalone' }),
+            resolveBlobUrl: vi.fn().mockReturnValue(''),
+          },
+        },
         {
           provide: ActivatedRoute,
           useValue: {
@@ -999,6 +1018,37 @@ describe('ContentViewerComponent', () => {
       tick();
 
       expect(component.canEditContent).toBe(false);
+    }));
+  });
+
+  describe('EPR relationships', () => {
+    it('renders the EPR relationships panel when the head has relationships', fakeAsync(() => {
+      fixture.detectChanges();
+      tick();
+      fixture.detectChanges();
+
+      const panel = fixture.nativeElement.querySelector('[data-testid="viewer-relationships-panel"]');
+      expect(panel).toBeTruthy();
+    }));
+
+    it('does not render the panel when there are no relationships', fakeAsync(() => {
+      const eprResolverSpy = TestBed.inject(EprResolverService);
+      (eprResolverSpy.resolveEprHead as Mock).mockReturnValue(of({
+        version: 1,
+        id: 'test-content-1',
+        content: 'bafk-test',
+        lamad: { title: 'Test', contentType: 'concept' },
+        shefa: {},
+        qahal: {},
+        relationships: [],
+      }));
+
+      fixture.detectChanges();
+      tick();
+      fixture.detectChanges();
+
+      const panel = fixture.nativeElement.querySelector('[data-testid="viewer-relationships-panel"]');
+      expect(panel).toBeFalsy();
     }));
   });
 });
