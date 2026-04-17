@@ -298,6 +298,25 @@ async fn async_main(
         info!(path = %config_path.display(), "Created default config");
     }
 
+    // Initialize the process-wide Diesel pool up front so every consumer
+    // (HTTP /db/*, /session, P2P EPR resolution, PeerStatus signal
+    // projection, bootstrap-from-session lookup) shares one pool. Previously
+    // the pool was created in up to three separate sites, which multiplied
+    // SQLite file handles and made /db/stats blind to subscriber activity.
+    // Un-gated from --enable-content-db: the pool is a process-wide fixture
+    // and the marginal cost of an extra SQLite open is trivial; the content
+    // DB flag now only gates HTTP route registration below, not pool init.
+    let db_pool = match init_pool_from_dir(&config.storage_dir) {
+        Ok(pool) => Some(pool),
+        Err(e) => {
+            warn!(
+                "Failed to initialize database pool: {} (database + session APIs disabled)",
+                e
+            );
+            None
+        }
+    };
+
     // --- Embedded conductor mode ---
     // When enabled, spawn the holochain conductor as a child process and
     // install the hApp before starting storage services. The manager is held
@@ -402,51 +421,48 @@ async fn async_main(
                         // signal stream and project `InfrastructureSignal::PeerStatusRecorded`
                         // into the SQLite `peer_statuses` table via `signals::handle_signal`.
                         //
-                        // Uses a dedicated pool initialized from the storage dir so the
-                        // subscriber does not depend on `--enable-content-db`. Non-fatal:
-                        // if pool init or subscribe fails, we log and the node keeps
-                        // serving HTTP (consistent with the heartbeat startup precedent).
-                        match elohim_storage::db::init_pool_from_dir(&config.storage_dir) {
-                            Ok(subscriber_pool) => {
-                                let hc_sub = hc.clone();
-                                tokio::spawn(async move {
-                                    let pool = subscriber_pool;
-                                    let handle_id = hc_sub
-                                        .subscribe_infrastructure_signals(
-                                            move |signal: elohim_storage::signals::InfrastructureSignal| {
-                                                match pool.get() {
-                                                    Ok(mut conn) => {
-                                                        if let Err(e) =
-                                                            elohim_storage::signals::handle_signal(
-                                                                &mut conn, signal,
-                                                            )
-                                                        {
-                                                            warn!(
-                                                                error = %e,
-                                                                "InfrastructureSignal projection failed"
-                                                            );
-                                                        }
+                        // Shares the process-wide Diesel pool (created once at startup)
+                        // so subscriber activity is visible via /db/stats and we don't
+                        // multiply SQLite file handles. Non-fatal: if the pool is
+                        // unavailable we log and the node keeps serving HTTP
+                        // (consistent with the heartbeat startup precedent).
+                        if let Some(subscriber_pool) = db_pool.clone() {
+                            let hc_sub = hc.clone();
+                            tokio::spawn(async move {
+                                let pool = subscriber_pool;
+                                let handle_id = hc_sub
+                                    .subscribe_infrastructure_signals(
+                                        move |signal: elohim_storage::signals::InfrastructureSignal| {
+                                            match pool.get() {
+                                                Ok(mut conn) => {
+                                                    if let Err(e) =
+                                                        elohim_storage::signals::handle_signal(
+                                                            &mut conn, signal,
+                                                        )
+                                                    {
+                                                        warn!(
+                                                            error = %e,
+                                                            "InfrastructureSignal projection failed"
+                                                        );
                                                     }
-                                                    Err(e) => warn!(
-                                                        error = %e,
-                                                        "Failed to acquire DB connection for signal projection"
-                                                    ),
                                                 }
-                                            },
-                                        )
-                                        .await;
-                                    info!(
-                                        subscription_id = %handle_id,
-                                        "InfrastructureSignal subscriber registered (projects PeerStatusRecorded → SQLite)"
-                                    );
-                                });
-                            }
-                            Err(e) => {
-                                warn!(
-                                    "InfrastructureSignal subscriber disabled: DB pool init failed: {}",
-                                    e
+                                                Err(e) => warn!(
+                                                    error = %e,
+                                                    "Failed to acquire DB connection for signal projection"
+                                                ),
+                                            }
+                                        },
+                                    )
+                                    .await;
+                                info!(
+                                    subscription_id = %handle_id,
+                                    "InfrastructureSignal subscriber registered (projects PeerStatusRecorded → SQLite)"
                                 );
-                            }
+                            });
+                        } else {
+                            warn!(
+                                "InfrastructureSignal subscriber disabled: shared DB pool unavailable"
+                            );
                         }
                     }
                     Err(e) => {
@@ -493,40 +509,32 @@ async fn async_main(
         // Collect bootstrap nodes from CLI args
         let mut bootstrap_nodes = args.bootstrap_nodes.clone();
 
-        // Optionally load bootstrap URL from active session (stored in SQLite)
+        // Optionally load bootstrap URL from active session (stored in SQLite).
+        // Uses the shared process-wide pool initialized at startup.
         if args.bootstrap_from_session {
-            // Initialize Diesel pool to read session data
-            match init_pool_from_dir(&config.storage_dir) {
-                Ok(pool) => {
-                    match pool.get() {
-                        Ok(mut conn) => {
-                            match local_sessions::get_active_session(&mut conn) {
-                                Ok(Some(session)) => {
-                                    if let Some(bootstrap_url) = session.bootstrap_url {
-                                        info!(
-                                            "  Loading bootstrap from session: {}",
-                                            bootstrap_url
-                                        );
-                                        // Bootstrap URL from doorway handoff (libp2p multiaddr format)
-                                        bootstrap_nodes.push(bootstrap_url);
-                                    }
-                                }
-                                Ok(None) => {
-                                    info!("  No active session found for bootstrap");
-                                }
-                                Err(e) => {
-                                    warn!("  Failed to load session for bootstrap: {}", e);
-                                }
+            if let Some(ref pool) = db_pool {
+                match pool.get() {
+                    Ok(mut conn) => match local_sessions::get_active_session(&mut conn) {
+                        Ok(Some(session)) => {
+                            if let Some(bootstrap_url) = session.bootstrap_url {
+                                info!("  Loading bootstrap from session: {}", bootstrap_url);
+                                // Bootstrap URL from doorway handoff (libp2p multiaddr format)
+                                bootstrap_nodes.push(bootstrap_url);
                             }
                         }
-                        Err(e) => {
-                            warn!("  Failed to get DB connection for bootstrap lookup: {}", e);
+                        Ok(None) => {
+                            info!("  No active session found for bootstrap");
                         }
+                        Err(e) => {
+                            warn!("  Failed to load session for bootstrap: {}", e);
+                        }
+                    },
+                    Err(e) => {
+                        warn!("  Failed to get DB connection for bootstrap lookup: {}", e);
                     }
                 }
-                Err(e) => {
-                    warn!("  Failed to initialize DB pool for bootstrap lookup: {}", e);
-                }
+            } else {
+                warn!("  Bootstrap-from-session disabled: shared DB pool unavailable");
             }
         }
 
@@ -553,9 +561,10 @@ async fn async_main(
         // Create P2P node with blob store access
         let mut p2p_node = P2PNode::new(identity, p2p_config, blob_store.clone()).await?;
 
-        // Wire DB pool for EPR Head resolution (if content DB is available)
+        // Wire DB pool for EPR Head resolution (if content DB is available).
+        // Reuses the shared process-wide pool.
         if args.enable_content_db {
-            if let Ok(pool) = init_pool_from_dir(&config.storage_dir) {
+            if let Some(pool) = db_pool.clone() {
                 p2p_node = p2p_node.with_db_pool(pool.clone());
                 // Wire policy enforcement for content filtering on P2P path
                 let policy_cache = elohim_storage::db::policy_cache::PolicyCache::new(pool);
@@ -744,59 +753,45 @@ async fn async_main(
         }
     }
 
-    // Initialize Diesel connection pool for all database operations
-    if args.enable_content_db {
-        match init_pool_from_dir(&config.storage_dir) {
-            Ok(pool) => {
-                // Create services with the pool
-                let services = Arc::new(Services::new(pool.clone()));
-                http_server = http_server.with_services(services);
-                // Wire policy enforcement for content filtering
-                let policy_cache = elohim_storage::db::policy_cache::PolicyCache::new(pool.clone());
-                let enforcement = Arc::new(
-                    elohim_storage::db::policy_cache::PolicyEnforcement::new(policy_cache),
-                );
-                http_server = http_server.with_policy_enforcement(enforcement);
-                http_server = http_server.with_db_pool(pool);
+    // Wire the shared Diesel pool into the HTTP server. Pool creation happens
+    // once at startup (see `db_pool` above); this section only gates which
+    // route groups register against it. `/db/*` requires --enable-content-db;
+    // `/session` is always on so long as the pool initialized.
+    if let Some(pool) = db_pool.clone() {
+        if args.enable_content_db {
+            // Create services with the shared pool
+            let services = Arc::new(Services::new(pool.clone()));
+            http_server = http_server.with_services(services);
+            // Wire policy enforcement for content filtering
+            let policy_cache = elohim_storage::db::policy_cache::PolicyCache::new(pool.clone());
+            let enforcement = Arc::new(elohim_storage::db::policy_cache::PolicyEnforcement::new(
+                policy_cache,
+            ));
+            http_server = http_server.with_policy_enforcement(enforcement);
+            http_server = http_server.with_db_pool(pool);
 
-                info!("Database API:");
-                info!("  GET  /db/stats           - Database statistics");
-                info!("  GET  /db/content         - List content");
-                info!("  GET  /db/content/{{id}}    - Get content by ID");
-                info!("  POST /db/content         - Create content");
-                info!("  POST /db/content/bulk    - Bulk create content");
-                info!("Session API:");
-                info!("  GET    /session       - Get active session");
-                info!("  POST   /session       - Create session");
-                info!("  DELETE /session       - Delete session");
-                info!("  GET    /session/all   - List all sessions");
-            }
-            Err(e) => {
-                error!(
-                    "Failed to initialize database pool: {} (database API disabled)",
-                    e
-                );
-            }
+            info!("Database API:");
+            info!("  GET  /db/stats           - Database statistics");
+            info!("  GET  /db/content         - List content");
+            info!("  GET  /db/content/{{id}}    - Get content by ID");
+            info!("  POST /db/content         - Create content");
+            info!("  POST /db/content/bulk    - Bulk create content");
+            info!("Session API:");
+            info!("  GET    /session       - Get active session");
+            info!("  POST   /session       - Create session");
+            info!("  DELETE /session       - Delete session");
+            info!("  GET    /session/all   - List all sessions");
+        } else {
+            http_server = http_server.with_db_pool(pool);
+            info!("Session API:");
+            info!("  GET    /session       - Get active session");
+            info!("  POST   /session       - Create session");
+            info!("  DELETE /session       - Delete session");
+            info!("  GET    /session/all   - List all sessions");
+            info!("Content database disabled (use --enable-content-db or ENABLE_CONTENT_DB=true)");
         }
     } else {
-        // Even without content DB, initialize pool for session management
-        match init_pool_from_dir(&config.storage_dir) {
-            Ok(pool) => {
-                http_server = http_server.with_db_pool(pool);
-                info!("Session API:");
-                info!("  GET    /session       - Get active session");
-                info!("  POST   /session       - Create session");
-                info!("  DELETE /session       - Delete session");
-                info!("  GET    /session/all   - List all sessions");
-            }
-            Err(e) => {
-                warn!(
-                    "Failed to initialize session pool: {} (session API disabled)",
-                    e
-                );
-            }
-        }
-        info!("Content database disabled (use --enable-content-db or ENABLE_CONTENT_DB=true)");
+        error!("Database + session APIs disabled: shared pool unavailable");
     }
 
     // Wire P2P services into HTTP server
