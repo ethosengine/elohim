@@ -616,8 +616,11 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                                         COMPLETED=\$(echo "\$STATUS" | jq -r '.replication.completed // 0')
                                         PENDING=\$(echo "\$STATUS" | jq -r '.replication.pending // 0')
 
-                                        if [ "\$CAUGHT_UP" = "true" ] && [ "\$COMPLETED" -gt 0 ]; then
-                                            echo "✅ ${peer.humanId} caught up: \$COMPLETED items"
+                                        # Done when caught up and nothing is pending.
+                                        # COMPLETED=0 is valid when the peer already had everything
+                                        # (prior seed / P2P sync), so don't gate on it.
+                                        if [ "\$CAUGHT_UP" = "true" ] && [ "\$PENDING" = "0" ]; then
+                                            echo "✅ ${peer.humanId} caught up: \$COMPLETED replicated this run, 0 pending"
                                             break
                                         fi
 
