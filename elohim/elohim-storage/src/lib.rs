@@ -101,6 +101,9 @@ pub mod sync;
 pub mod cluster;
 pub mod sovereignty;
 
+// Peer policy engine (operator-declared availability & capability flags)
+pub mod policy;
+
 // Re-exports
 pub use blob_store::BlobStore;
 pub use config::Config;

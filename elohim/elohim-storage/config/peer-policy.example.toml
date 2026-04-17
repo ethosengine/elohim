@@ -1,0 +1,13 @@
+[pool]
+accept_general_traffic = "auto"
+min_free_storage_pct = 20
+require_conductor_healthy = true
+
+[stewardship]
+accept_new_reserves = "auto"
+max_storage_pct = 80
+
+[network]
+expose_conductor_externally = false
+conductor_external_bind = "0.0.0.0:4445"
+conductor_internal_port = 4445
