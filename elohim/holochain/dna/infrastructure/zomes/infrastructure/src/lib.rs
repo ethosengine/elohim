@@ -133,6 +133,22 @@ pub enum InfrastructureSignal {
         attestation: HealthAttestation,
         author: String,
     },
+    /// PeerStatus was recorded (self-authored availability snapshot)
+    ///
+    /// Fields are flattened (rather than embedding the full `PeerStatus`
+    /// struct) so the storage-side projection can deserialize without
+    /// depending on the integrity crate. `peer_id` and `action_hash`
+    /// serialize as base64 strings over the signal channel — the
+    /// elohim-storage mirror variant should declare them as `String`.
+    PeerStatusRecorded {
+        peer_id: AgentPubKey,
+        status: String,
+        general_pool_member: bool,
+        accepting_stewardship_reserves: bool,
+        archetype_class: Option<String>,
+        timestamp: i64,
+        action_hash: ActionHash,
+    },
 }
 
 // =============================================================================
@@ -218,6 +234,21 @@ pub fn post_commit(committed_actions: Vec<SignedActionHashed>) -> ExternResult<(
                 entry_hash: entry_hash.to_string(),
                 attestation,
                 author: author.to_string(),
+            })?;
+        } else if let Some(ps) = record
+            .entry()
+            .to_app_option::<PeerStatus>()
+            .ok()
+            .flatten()
+        {
+            emit_signal(InfrastructureSignal::PeerStatusRecorded {
+                peer_id: ps.peer_id.clone(),
+                status: ps.status.to_string(),
+                general_pool_member: ps.flags.general_pool_member,
+                accepting_stewardship_reserves: ps.flags.accepting_stewardship_reserves,
+                archetype_class: ps.archetype_class.clone(),
+                timestamp: ps.timestamp.as_micros(),
+                action_hash,
             })?;
         }
     }
