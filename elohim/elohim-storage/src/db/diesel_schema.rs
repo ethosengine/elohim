@@ -245,7 +245,7 @@ diesel::table! {
         accepting_stewardship_reserves -> Integer,
         archetype_class -> Nullable<Text>,
         timestamp -> BigInt,
-        dht_anchor_hash -> Binary,
+        dht_anchor_hash -> Text,
         updated_at -> BigInt,
     }
 }

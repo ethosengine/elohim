@@ -82,6 +82,9 @@ pub mod policy_cache;
 // Observation session diagnostic system (Category C — operational)
 pub mod observation_sessions;
 
+// Peer status projection (Peer-Stewarded Availability — Phase 1)
+pub mod peer_statuses;
+
 use std::path::Path;
 use std::time::Duration;
 

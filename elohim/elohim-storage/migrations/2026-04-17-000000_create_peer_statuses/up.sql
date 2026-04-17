@@ -11,7 +11,7 @@ CREATE TABLE peer_statuses (
     accepting_stewardship_reserves INTEGER NOT NULL, -- 0/1
     archetype_class TEXT,                            -- optional archetype id (e.g. "home-nuc")
     timestamp BIGINT NOT NULL,                       -- micros since epoch (from PeerStatus.timestamp)
-    dht_anchor_hash BLOB NOT NULL,                   -- ActionHash of the upstream DHT entry
+    dht_anchor_hash TEXT NOT NULL,                   -- ActionHash (base64) of the upstream DHT entry
     updated_at BIGINT NOT NULL                       -- local insert/update time, micros since epoch
 );
 
