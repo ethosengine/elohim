@@ -3,6 +3,7 @@ import { Injectable, inject } from '@angular/core';
 import { GovernanceApiService } from '@app/elohim/services/governance-api.service';
 import type {
   SensemakingResultView,
+  StatementView,
   ProposalView,
   CreateProposalInputView,
   CreateProposalOptionInputView,
@@ -59,7 +60,7 @@ export class BracketSynthesisService {
     const proposal = await this.governanceApi.createProposal(proposalInput);
 
     const options: CreateProposalOptionInputView[] =
-      sensemakingResult.bridgingStatements.map((s, i) => ({
+      sensemakingResult.bridgingStatements.map((s: StatementView, i: number) => ({
         id: `synth-opt-${i}`,
         label: s.text.substring(0, 100),
         description: s.text,
