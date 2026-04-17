@@ -7,6 +7,9 @@ import { PathContext } from '../../models/exploration-context.model';
 import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { RelatedConceptsPanelComponent } from '../related-concepts-panel/related-concepts-panel.component';
 import { MiniGraphComponent } from '../mini-graph/mini-graph.component';
+import { EprRelationshipsPanelComponent } from '@app/elohim/components/epr-relationships-panel/epr-relationships-panel.component';
+import { EprResolverService } from '@app/elohim/services/epr-resolver.service';
+import { of } from 'rxjs';
 import { vi, Mock } from 'vitest';
 
 // Mock components
@@ -26,6 +29,11 @@ class MockRelatedConceptsPanelComponent {
   @Input() compact = true;
   @Input() limit = 4;
   @Output() navigate = new EventEmitter<string>();
+}
+
+@Component({ selector: 'app-epr-relationships-panel', standalone: true, template: '' })
+class MockEprRelationshipsPanelComponent {
+  @Input() relationships: any[] = [];
 }
 
 // Mock renderer component
@@ -78,16 +86,34 @@ describe('LessonViewComponent', () => {
       providers: [
         provideHttpClient(),
         { provide: RendererRegistryService, useValue: rendererRegistrySpy },
+        {
+          provide: EprResolverService,
+          useValue: {
+            resolve: vi.fn().mockReturnValue(of(null)),
+            resolveUrl: vi.fn().mockReturnValue({ ref: {}, url: '', route: null }),
+            resolveEprHead: vi.fn().mockReturnValue(of({
+              version: 1,
+              id: 'test-concept',
+              content: 'bafk-test',
+              lamad: { title: 'Test', contentType: 'concept' },
+              shefa: {},
+              qahal: {},
+              relationships: [{ type: 'TEACHES', target: 'bar' }],
+            })),
+            resolveInContext: vi.fn().mockReturnValue({ route: ['/resource', 'bar'], resolution: 'standalone' }),
+            resolveBlobUrl: vi.fn().mockReturnValue(''),
+          },
+        },
       ],
     })
       // Override component imports to use mocks for shallow testing
       // This prevents deep dependency injection chains that require complex setup
       .overrideComponent(LessonViewComponent, {
         remove: {
-          imports: [RelatedConceptsPanelComponent, MiniGraphComponent],
+          imports: [RelatedConceptsPanelComponent, MiniGraphComponent, EprRelationshipsPanelComponent],
         },
         add: {
-          imports: [MockMiniGraphComponent, MockRelatedConceptsPanelComponent],
+          imports: [MockMiniGraphComponent, MockRelatedConceptsPanelComponent, MockEprRelationshipsPanelComponent],
         },
       })
       .compileComponents();
@@ -782,5 +808,54 @@ describe('LessonViewComponent', () => {
       expect(h1).toBeTruthy();
       expect(h1?.classList.contains('lesson-title')).toBe(true);
     });
+  });
+
+  describe('EPR relationships panel', () => {
+    it('renders the relationships panel for the current step', fakeAsync(() => {
+      component.content = mockContent;
+      component.ngOnChanges({
+        content: {
+          currentValue: mockContent,
+          previousValue: undefined,
+          firstChange: true,
+          isFirstChange: () => true,
+        },
+      });
+      fixture.detectChanges();
+      tick();
+      fixture.detectChanges();
+
+      const panel = fixture.nativeElement.querySelector('[data-testid="lesson-relationships-panel"]');
+      expect(panel).toBeTruthy();
+    }));
+
+    it('does not render the panel when there are no relationships', fakeAsync(() => {
+      const eprResolverSpy = TestBed.inject(EprResolverService);
+      (eprResolverSpy.resolveEprHead as Mock).mockReturnValue(of({
+        version: 1,
+        id: 'test-concept',
+        content: 'bafk-test',
+        lamad: { title: 'Test', contentType: 'concept' },
+        shefa: {},
+        qahal: {},
+        relationships: [],
+      }));
+
+      component.content = mockContent;
+      component.ngOnChanges({
+        content: {
+          currentValue: mockContent,
+          previousValue: undefined,
+          firstChange: true,
+          isFirstChange: () => true,
+        },
+      });
+      fixture.detectChanges();
+      tick();
+      fixture.detectChanges();
+
+      const panel = fixture.nativeElement.querySelector('[data-testid="lesson-relationships-panel"]');
+      expect(panel).toBeNull();
+    }));
   });
 });

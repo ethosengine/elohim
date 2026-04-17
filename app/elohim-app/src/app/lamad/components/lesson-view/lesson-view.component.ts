@@ -18,7 +18,13 @@ import { RouterModule } from '@angular/router';
 
 // @coverage: 100.0% (2026-02-24)
 
+import { takeUntil } from 'rxjs/operators';
+
 import { Subject, Subscription } from 'rxjs';
+
+import { EprRelationshipsPanelComponent } from '@app/elohim/components/epr-relationships-panel/epr-relationships-panel.component';
+import { EprResolverService } from '@app/elohim/services/epr-resolver.service';
+import { FeedbackMechanismGatewayComponent } from '@app/qahal';
 
 import { ContentNode } from '../../models/content-node.model';
 import { PathContext } from '../../models/exploration-context.model';
@@ -28,10 +34,10 @@ import {
   InteractiveRenderer,
   RendererCompletionEvent,
 } from '../../renderers/renderer-registry.service';
-import { FeedbackMechanismGatewayComponent } from '@app/qahal';
-
 import { MiniGraphComponent } from '../mini-graph/mini-graph.component';
 import { RelatedConceptsPanelComponent } from '../related-concepts-panel/related-concepts-panel.component';
+
+import type { EprHead, EprRelationship } from '@app/elohim/models/epr-head.model';
 // TODO: Quiz engine requires Perseus/React dependencies - enable when ready
 // import { InlineQuizComponent, InlineQuizCompletionEvent } from '../../quiz-engine';
 
@@ -75,6 +81,7 @@ interface InlineQuizCompletionEvent {
     RelatedConceptsPanelComponent,
     MiniGraphComponent,
     FeedbackMechanismGatewayComponent,
+    EprRelationshipsPanelComponent,
     // TODO: InlineQuizComponent - requires Perseus/React dependencies
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -105,7 +112,9 @@ interface InlineQuizCompletionEvent {
                     [class]="getFlagClass(flag.type)"
                     [title]="flag.reason"
                     data-testid="lesson-content-flag"
-                  >{{ getFlagLabel(flag.type) }}</span>
+                  >
+                    {{ getFlagLabel(flag.type) }}
+                  </span>
                 }
               </div>
             }
@@ -117,12 +126,16 @@ interface InlineQuizCompletionEvent {
               [class]="'reach-badge reach-' + (content.reach || 'commons')"
               [title]="getReachTooltip()"
               data-testid="lesson-reach-badge"
-            >{{ getReachIcon() }}</span>
+            >
+              {{ getReachIcon() }}
+            </span>
             <span
               class="resilience-info"
               [title]="getResilienceTooltip()"
               data-testid="lesson-resilience-info"
-            >{{ getResilienceIcon() }}</span>
+            >
+              {{ getResilienceIcon() }}
+            </span>
           </h1>
           @if (content.description) {
             <p class="lesson-description">{{ content.description }}</p>
@@ -164,6 +177,13 @@ interface InlineQuizCompletionEvent {
           [entityType]="'content'"
           [entityId]="content.id"
         ></qahal-feedback-mechanism-gateway>
+
+        @if (eprRelationships.length > 0) {
+          <app-epr-relationships-panel
+            [relationships]="eprRelationships"
+            data-testid="lesson-relationships-panel"
+          ></app-epr-relationships-panel>
+        }
       </div>
 
       <!-- Exploration panel toggle (mobile) -->
@@ -305,7 +325,8 @@ interface InlineQuizCompletionEvent {
         line-height: 1.3;
       }
 
-      .reach-badge, .resilience-info {
+      .reach-badge,
+      .resilience-info {
         font-size: 0.45em;
         vertical-align: super;
         cursor: help;
@@ -315,7 +336,8 @@ interface InlineQuizCompletionEvent {
         letter-spacing: -0.1em;
       }
 
-      .reach-badge:hover, .resilience-info:hover {
+      .reach-badge:hover,
+      .resilience-info:hover {
         opacity: 1;
       }
 
@@ -333,12 +355,34 @@ interface InlineQuizCompletionEvent {
         cursor: help;
         opacity: 0.85;
       }
-      .flag-tag:hover { opacity: 1; }
-      .flag-disputed { background: rgb(239 68 68 / 8%); color: #dc2626; border: 1px solid rgb(239 68 68 / 25%); }
-      .flag-outdated { background: rgb(245 158 11 / 8%); color: #d97706; border: 1px solid rgb(245 158 11 / 25%); }
-      .flag-appeal-pending { background: rgb(139 92 246 / 8%); color: #7c3aed; border: 1px solid rgb(139 92 246 / 25%); }
-      .flag-under-review { background: rgb(59 130 246 / 8%); color: #2563eb; border: 1px solid rgb(59 130 246 / 25%); }
-      .flag-partial-revocation { background: rgb(239 68 68 / 8%); color: #dc2626; border: 1px solid rgb(239 68 68 / 25%); }
+      .flag-tag:hover {
+        opacity: 1;
+      }
+      .flag-disputed {
+        background: rgb(239 68 68 / 8%);
+        color: #dc2626;
+        border: 1px solid rgb(239 68 68 / 25%);
+      }
+      .flag-outdated {
+        background: rgb(245 158 11 / 8%);
+        color: #d97706;
+        border: 1px solid rgb(245 158 11 / 25%);
+      }
+      .flag-appeal-pending {
+        background: rgb(139 92 246 / 8%);
+        color: #7c3aed;
+        border: 1px solid rgb(139 92 246 / 25%);
+      }
+      .flag-under-review {
+        background: rgb(59 130 246 / 8%);
+        color: #2563eb;
+        border: 1px solid rgb(59 130 246 / 25%);
+      }
+      .flag-partial-revocation {
+        background: rgb(239 68 68 / 8%);
+        color: #dc2626;
+        border: 1px solid rgb(239 68 68 / 25%);
+      }
 
       .lesson-description {
         margin: 0;
@@ -631,11 +675,16 @@ export class LessonViewComponent implements OnChanges, OnDestroy {
 
   private readonly rendererRegistry = inject(RendererRegistryService);
   private readonly cdr = inject(ChangeDetectorRef);
+  private readonly eprResolver = inject(EprResolverService);
+
+  eprRelationships: EprRelationship[] = [];
 
   ngOnChanges(changes: SimpleChanges): void {
     if (changes['content'] && this.content) {
       // Load renderer after view updates
       setTimeout(() => this.loadRenderer(), 0);
+      // Load EPR relationships (protocol-level relationships from EPR Head)
+      this.loadEprRelationships(this.content.id);
     }
     // Handle refresh trigger (for focused view mode)
     if (changes['refreshKey'] && !changes['refreshKey'].firstChange) {
@@ -717,12 +766,23 @@ export class LessonViewComponent implements OnChanges, OnDestroy {
   getReachIcon(): string {
     const reach = (this.content?.reach as string) || 'commons';
     switch (reach) {
-      case 'private': case 'self': return '\u{1F512}';
-      case 'intimate': return '\u{25C9}';
-      case 'trusted': return '\u{25CE}';
-      case 'familiar': case 'invited': return '\u{25CB}\u{25CF}';
-      case 'community': case 'local': case 'neighborhood': case 'municipal': return '\u{25CE}\u{25CB}';
-      default: return '\u{25CB}\u{25CB}\u{25CB}';
+      case 'private':
+      case 'self':
+        return '\u{1F512}';
+      case 'intimate':
+        return '\u{25C9}';
+      case 'trusted':
+        return '\u{25CE}';
+      case 'familiar':
+      case 'invited':
+        return '\u{25CB}\u{25CF}';
+      case 'community':
+      case 'local':
+      case 'neighborhood':
+      case 'municipal':
+        return '\u{25CE}\u{25CB}';
+      default:
+        return '\u{25CB}\u{25CB}\u{25CB}';
     }
   }
 
@@ -755,7 +815,7 @@ export class LessonViewComponent implements OnChanges, OnDestroy {
     if (!this.content?.stewardedBy?.length) return 'No stewards assigned';
     const stewards = this.content.stewardedBy
       .sort((a, b) => b.affinity - a.affinity)
-      .map((s) => `${s.humanId} (${s.role}, ${Math.round(s.affinity * 100)}%)`)
+      .map(s => `${s.humanId} (${s.role}, ${Math.round(s.affinity * 100)}%)`)
       .join(', ');
     return `Stewards: ${stewards}`;
   }
@@ -767,8 +827,8 @@ export class LessonViewComponent implements OnChanges, OnDestroy {
 
   getFlagLabel(type: string): string {
     const labels: Record<string, string> = {
-      'disputed': 'Disputed',
-      'outdated': 'Outdated',
+      disputed: 'Disputed',
+      outdated: 'Outdated',
       'appeal-pending': 'Appeal Pending',
       'under-review': 'Under Review',
       'partial-revocation': 'Partial Revocation',
@@ -839,6 +899,20 @@ export class LessonViewComponent implements OnChanges, OnDestroy {
     }
 
     this.cdr.markForCheck();
+  }
+
+  /**
+   * Load EPR relationships from the EPR Head for this content.
+   */
+  private loadEprRelationships(contentId: string): void {
+    this.eprRelationships = [];
+    this.eprResolver
+      .resolveEprHead(contentId)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((head: EprHead | null) => {
+        this.eprRelationships = head?.relationships ?? [];
+        this.cdr.markForCheck();
+      });
   }
 
   /**
