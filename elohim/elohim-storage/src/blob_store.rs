@@ -86,6 +86,14 @@ impl BlobStore {
         Ok(Self { root_dir })
     }
 
+    /// Get the root directory of this blob store.
+    ///
+    /// Used by subsystems that need to measure filesystem-level attributes
+    /// (e.g. free disk space for the peer-stewarded availability probe).
+    pub fn root_dir(&self) -> &Path {
+        &self.root_dir
+    }
+
     /// Create an in-memory blob store (for tests)
     ///
     /// Uses a temporary directory that will be cleaned up when dropped.

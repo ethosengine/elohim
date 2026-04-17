@@ -113,6 +113,9 @@ uuid = { version = "1", features = ["v4"] }
 # Reed-Solomon encoding for erasure coding
 reed-solomon-erasure = "6"
 
+# Cross-platform filesystem free-space probe (peer-stewarded availability heartbeat)
+fs4 = "0.8"
+
 # Timestamps
 chrono = { version = "0.4", features = ["serde"] }
 

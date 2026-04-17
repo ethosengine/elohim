@@ -281,24 +281,37 @@ impl Publisher for ZomeCallPublisher {
     }
 }
 
+/// Measure available disk space on the volume containing `path`, returned as
+/// an integer percentage in `[0, 100]`.
+///
+/// Uses `fs4::available_space` / `fs4::total_space` — a cross-platform
+/// statvfs/GetDiskFreeSpaceEx wrapper — and clamps to the valid range.
+/// If `total == 0` (a pathological response from the platform), returns 100
+/// to avoid spuriously flipping peers out of the general pool.
+///
+/// This is a free function (not a probe method) to keep the test surface
+/// narrow: the disk-measurement logic can be exercised without constructing
+/// a real `HcClient`.
+pub fn measure_free_pct(path: &std::path::Path) -> anyhow::Result<u8> {
+    let avail = fs4::available_space(path)?;
+    let total = fs4::total_space(path)?;
+    if total == 0 {
+        return Ok(100);
+    }
+    let pct = (avail as f64 / total as f64 * 100.0) as u64;
+    Ok(pct.min(100) as u8)
+}
+
 /// Real [`LiveProbe`] combining a blob store handle (for free-storage sampling)
 /// and an [`HcClient`](crate::hc_client::HcClient) handle (for a conductor ping).
 ///
-/// **Free-storage sampling (v1 fallback):** the blob store does not currently
-/// expose a disk-utilization API, and no other part of elohim-storage measures
-/// filesystem free space yet. Rather than pull in a libc/statvfs dependency
-/// in this task, the probe returns an optimistic `free_storage_pct = 100`.
-///
-/// The policy default for `accept_general_traffic` is `Auto`, which — combined
-/// with this value — keeps peers in the general pool. That is the correct
-/// behaviour for typical Phase 1 deployments where operators want their node
-/// serving traffic by default. The probe MUST be upgraded to a real disk
-/// measurement before thin-client deployment in Phase 2, at which point
-/// operators with low-disk nodes will rely on the `min_free_storage_pct`
-/// threshold to gate their participation.
+/// Free-storage % is computed against the blob store's root directory via
+/// [`measure_free_pct`]. Measurement runs inside `spawn_blocking` so a slow
+/// filesystem mount cannot stall the tokio runtime. Any error falls back to
+/// 100% (logged) so transient probe failures do not flip an otherwise healthy
+/// peer out of the general pool.
 pub struct DefaultProbe {
-    #[allow(dead_code)]
-    blob: std::sync::Arc<crate::blob_store::BlobStore>,
+    storage_path: std::path::PathBuf,
     hc: std::sync::Arc<crate::hc_client::HcClient>,
 }
 
@@ -307,15 +320,32 @@ impl DefaultProbe {
         blob: std::sync::Arc<crate::blob_store::BlobStore>,
         hc: std::sync::Arc<crate::hc_client::HcClient>,
     ) -> Self {
-        Self { blob, hc }
+        Self {
+            storage_path: blob.root_dir().to_path_buf(),
+            hc,
+        }
     }
 }
 
 #[async_trait::async_trait]
 impl LiveProbe for DefaultProbe {
     async fn sample(&self) -> anyhow::Result<LiveState> {
-        // Free storage %: see struct docs for fallback rationale.
-        let free_storage_pct: u8 = 100;
+        // Free storage %: offload to a blocking thread — statvfs can block on
+        // slow mounts (NFS, failing disks) and we must not stall the runtime.
+        let path = self.storage_path.clone();
+        let free_storage_pct = match tokio::task::spawn_blocking(move || measure_free_pct(&path))
+            .await
+        {
+            Ok(Ok(pct)) => pct,
+            Ok(Err(e)) => {
+                tracing::warn!("free-storage probe failed: {e}; defaulting to 100%");
+                100
+            }
+            Err(e) => {
+                tracing::warn!("free-storage probe join error: {e}; defaulting to 100%");
+                100
+            }
+        };
 
         // Conductor health: a successful `list_apps` via HcClient::ping is a
         // reasonable liveness check — admin websocket is responsive AND the
@@ -507,6 +537,13 @@ mod tests {
         task.tick_once().await.unwrap();
         let p = rx.recv().await.unwrap();
         assert_eq!(p.status, "online");
+    }
+
+    #[test]
+    fn measure_free_pct_returns_bounded_value() {
+        let tmp = tempfile::tempdir().expect("tmp dir");
+        let pct = measure_free_pct(tmp.path()).expect("measure");
+        assert!(pct <= 100, "free pct within bounds: {pct}");
     }
 
     #[tokio::test]
