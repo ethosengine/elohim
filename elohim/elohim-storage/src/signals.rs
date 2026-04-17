@@ -347,3 +347,171 @@ impl SignalHandler {
         });
     }
 }
+
+// =============================================================================
+// InfrastructureSignal — projection of infrastructure DNA post-commit signals
+// =============================================================================
+//
+// Mirrors the DNA-side `InfrastructureSignal` enum (see
+// `elohim/holochain/dna/infrastructure/zomes/infrastructure/src/lib.rs`).
+// Fields that are `AgentPubKey` or `ActionHash` on the DNA side serialize as
+// base64 `String`s over the wire — the storage mirror declares them as
+// `String` so the projection layer needs no integrity-crate dependency.
+//
+// Serde tagging (`tag = "type", content = "payload"`) MUST match the DNA
+// side exactly; variant names MUST match exactly.
+
+/// Storage-side mirror of the DNA `InfrastructureSignal` enum.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type", content = "payload")]
+pub enum InfrastructureSignal {
+    /// PeerStatus DHT entry was recorded — project into SQLite.
+    PeerStatusRecorded {
+        peer_id: String,
+        status: String,
+        general_pool_member: bool,
+        accepting_stewardship_reserves: bool,
+        archetype_class: Option<String>,
+        timestamp: i64,
+        action_hash: String,
+    },
+}
+
+/// Dispatch an `InfrastructureSignal` into the SQLite projection.
+///
+/// New variants add a match arm here and a call into the corresponding
+/// `db::*` module. Keep this function thin — the per-entity projection
+/// logic belongs next to its Diesel model.
+pub fn handle_signal(
+    conn: &mut diesel::sqlite::SqliteConnection,
+    signal: InfrastructureSignal,
+) -> Result<(), StorageError> {
+    match signal {
+        InfrastructureSignal::PeerStatusRecorded {
+            peer_id,
+            status,
+            general_pool_member,
+            accepting_stewardship_reserves,
+            archetype_class,
+            timestamp,
+            action_hash,
+        } => {
+            let row = crate::db::peer_statuses::PeerStatusRow {
+                peer_id,
+                status,
+                general_pool_member: general_pool_member as i32,
+                accepting_stewardship_reserves: accepting_stewardship_reserves as i32,
+                archetype_class,
+                timestamp,
+                dht_anchor_hash: action_hash,
+                updated_at: chrono::Utc::now().timestamp_micros(),
+            };
+            crate::db::peer_statuses::upsert(conn, &row)?;
+            Ok(())
+        }
+    }
+}
+
+#[cfg(test)]
+mod peer_status_tests {
+    use super::*;
+    use crate::db::peer_statuses::get_by_peer;
+    use diesel::connection::SimpleConnection;
+    use diesel::prelude::*;
+    use diesel::sqlite::SqliteConnection;
+
+    fn setup_test_conn() -> SqliteConnection {
+        let mut conn =
+            SqliteConnection::establish(":memory:").expect("Failed to create in-memory database");
+
+        conn.batch_execute(
+            r#"
+            CREATE TABLE peer_statuses (
+                peer_id TEXT PRIMARY KEY,
+                status TEXT NOT NULL,
+                general_pool_member INTEGER NOT NULL,
+                accepting_stewardship_reserves INTEGER NOT NULL,
+                archetype_class TEXT,
+                timestamp BIGINT NOT NULL,
+                dht_anchor_hash TEXT NOT NULL,
+                updated_at BIGINT NOT NULL
+            );
+            CREATE INDEX idx_peer_statuses_status ON peer_statuses(status);
+            CREATE INDEX idx_peer_statuses_pool ON peer_statuses(general_pool_member);
+            "#,
+        )
+        .expect("Failed to create test table");
+
+        conn
+    }
+
+    #[test]
+    fn peer_status_recorded_upserts_row() {
+        let mut conn = setup_test_conn();
+
+        let signal = InfrastructureSignal::PeerStatusRecorded {
+            peer_id: "uhCAkABC".into(),
+            status: "online".into(),
+            general_pool_member: true,
+            accepting_stewardship_reserves: false,
+            archetype_class: Some("home-nuc".into()),
+            timestamp: 1_700_000_000_000_000,
+            action_hash: "uhCkkDEF".into(),
+        };
+
+        handle_signal(&mut conn, signal).unwrap();
+
+        let row = get_by_peer(&mut conn, "uhCAkABC").unwrap().unwrap();
+        assert_eq!(row.status, "online");
+        assert_eq!(row.general_pool_member, 1);
+        assert_eq!(row.accepting_stewardship_reserves, 0);
+        assert_eq!(row.archetype_class.as_deref(), Some("home-nuc"));
+        assert_eq!(row.dht_anchor_hash, "uhCkkDEF");
+    }
+
+    #[test]
+    fn peer_status_recorded_updates_existing_row() {
+        let mut conn = setup_test_conn();
+
+        let signal = |status: &str| InfrastructureSignal::PeerStatusRecorded {
+            peer_id: "uhCAkABC".into(),
+            status: status.into(),
+            general_pool_member: true,
+            accepting_stewardship_reserves: true,
+            archetype_class: None,
+            timestamp: 1,
+            action_hash: "uhCkkDEF".into(),
+        };
+        handle_signal(&mut conn, signal("starting")).unwrap();
+        handle_signal(&mut conn, signal("online")).unwrap();
+
+        let row = get_by_peer(&mut conn, "uhCAkABC").unwrap().unwrap();
+        assert_eq!(row.status, "online", "upsert should have replaced 'starting'");
+    }
+
+    #[test]
+    fn serde_tag_matches_dna_wire_format() {
+        // Verify the serde(tag, content) shape matches the DNA-side signal
+        // exactly: `{"type": "PeerStatusRecorded", "payload": { ... }}`.
+        // Deserialization drift here would silently break projection.
+        let wire = serde_json::json!({
+            "type": "PeerStatusRecorded",
+            "payload": {
+                "peer_id": "uhCAkABC",
+                "status": "online",
+                "general_pool_member": true,
+                "accepting_stewardship_reserves": false,
+                "archetype_class": "home-nuc",
+                "timestamp": 1_700_000_000_000_000_i64,
+                "action_hash": "uhCkkDEF",
+            }
+        });
+        let signal: InfrastructureSignal = serde_json::from_value(wire).unwrap();
+        match signal {
+            InfrastructureSignal::PeerStatusRecorded { peer_id, status, .. } => {
+                assert_eq!(peer_id, "uhCAkABC");
+                assert_eq!(status, "online");
+            }
+        }
+    }
+}
