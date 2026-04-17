@@ -377,6 +377,52 @@ impl HcClient {
         health
     }
 
+    /// Subscribe to InfrastructureSignals emitted by the conductor's app interface.
+    ///
+    /// Wraps `AppWebsocket::on_signal` — the official client filters signals to
+    /// this app's cells. For each signal, we msgpack-decode the inner `AppSignal`
+    /// payload into a `serde_json::Value`, then try to parse it as an
+    /// `InfrastructureSignal`. Non-infrastructure signals (e.g. lamad DNA signals
+    /// that share the same conductor) are logged at debug and ignored.
+    ///
+    /// Returns a subscription handle (string id) from the underlying client.
+    /// Dropping the returned value does NOT unsubscribe — `AppWebsocket::on_signal`
+    /// registers the handler for the lifetime of the websocket connection. When the
+    /// HcClient is dropped, the subscription ends with it.
+    pub async fn subscribe_infrastructure_signals<F>(&self, handler: F) -> String
+    where
+        F: Fn(crate::signals::InfrastructureSignal) + Send + Sync + 'static,
+    {
+        use holochain_types::signal::Signal;
+
+        self.app_ws
+            .on_signal(move |signal| {
+                if let Signal::App { signal, .. } = signal {
+                    let bytes: Vec<u8> = signal.into_inner().into();
+                    match rmp_serde::from_slice::<serde_json::Value>(&bytes) {
+                        Ok(value) => {
+                            match serde_json::from_value::<crate::signals::InfrastructureSignal>(
+                                value.clone(),
+                            ) {
+                                Ok(infra) => handler(infra),
+                                Err(e) => {
+                                    debug!(
+                                        error = %e,
+                                        value = %value,
+                                        "Received app signal not matching InfrastructureSignal — ignoring"
+                                    );
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            debug!(error = %e, "Failed to msgpack-decode app signal");
+                        }
+                    }
+                }
+            })
+            .await
+    }
+
     /// Quick health check - just verify conductor is responsive
     pub async fn ping(&self) -> Result<(), StorageError> {
         // Use list_apps as a simple ping

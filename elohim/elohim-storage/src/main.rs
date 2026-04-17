@@ -397,6 +397,57 @@ async fn async_main(
                             policy_path = %peer_policy_path.display(),
                             "PeerStatus heartbeat task started (infrastructure role)"
                         );
+
+                        // Peer-Stewarded Availability — subscribe to the conductor's
+                        // signal stream and project `InfrastructureSignal::PeerStatusRecorded`
+                        // into the SQLite `peer_statuses` table via `signals::handle_signal`.
+                        //
+                        // Uses a dedicated pool initialized from the storage dir so the
+                        // subscriber does not depend on `--enable-content-db`. Non-fatal:
+                        // if pool init or subscribe fails, we log and the node keeps
+                        // serving HTTP (consistent with the heartbeat startup precedent).
+                        match elohim_storage::db::init_pool_from_dir(&config.storage_dir) {
+                            Ok(subscriber_pool) => {
+                                let hc_sub = hc.clone();
+                                tokio::spawn(async move {
+                                    let pool = subscriber_pool;
+                                    let handle_id = hc_sub
+                                        .subscribe_infrastructure_signals(
+                                            move |signal: elohim_storage::signals::InfrastructureSignal| {
+                                                match pool.get() {
+                                                    Ok(mut conn) => {
+                                                        if let Err(e) =
+                                                            elohim_storage::signals::handle_signal(
+                                                                &mut conn, signal,
+                                                            )
+                                                        {
+                                                            warn!(
+                                                                error = %e,
+                                                                "InfrastructureSignal projection failed"
+                                                            );
+                                                        }
+                                                    }
+                                                    Err(e) => warn!(
+                                                        error = %e,
+                                                        "Failed to acquire DB connection for signal projection"
+                                                    ),
+                                                }
+                                            },
+                                        )
+                                        .await;
+                                    info!(
+                                        subscription_id = %handle_id,
+                                        "InfrastructureSignal subscriber registered (projects PeerStatusRecorded → SQLite)"
+                                    );
+                                });
+                            }
+                            Err(e) => {
+                                warn!(
+                                    "InfrastructureSignal subscriber disabled: DB pool init failed: {}",
+                                    e
+                                );
+                            }
+                        }
                     }
                     Err(e) => {
                         warn!(

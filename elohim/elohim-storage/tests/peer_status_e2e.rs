@@ -26,24 +26,20 @@
 //!      directory. All existing integration tests (`sync_integration.rs`,
 //!      `provenance_gate_integration.rs`, `resilience_integration.rs`,
 //!      `schema_contract.rs`) are pure-Rust, no-conductor tests.
-//!    - `elohim_storage::hc_client::HcClient` does not currently expose
-//!      a signal receiver. The underlying `AppWebsocket` supports
-//!      `on_signal(...)` (see doorway's `projection/subscriber.rs` for
-//!      the reference implementation), but that API is not plumbed
-//!      through `HcClient` yet, and `main.rs` does not spawn a
-//!      subscriber task. Phase 2 should:
-//!        a) Add `HcClient::subscribe_signals(handler)` that wraps
-//!           `AppWebsocket::on_signal` and msgpack-decodes the payload
-//!           into `InfrastructureSignal` (doorway does the same thing
-//!           for `ProjectionSignal`).
-//!        b) In `main.rs`, after the heartbeat `HcClient` connects on
-//!           the `infrastructure` role, spawn a task that calls
-//!           `subscribe_signals` and routes each `InfrastructureSignal`
-//!           into `signals::handle_signal` against the pool.
-//!        c) Delete the `#[ignore]` below and wire it up to a real
-//!           harness (likely: bring up a tmp conductor dir + happ, as
-//!           done by `elohim-import`'s integration tests, and assert on
-//!           the SQLite projection after one 60s heartbeat tick).
+//!    - The signal-subscription plumbing (Phase 1 Gap 1) IS now in place:
+//!        a) `HcClient::subscribe_infrastructure_signals(handler)` wraps
+//!           `AppWebsocket::on_signal` and msgpack-decodes the payload into
+//!           `InfrastructureSignal` — same pattern doorway uses for its
+//!           `ProjectionSignal` in `projection/subscriber.rs`.
+//!        b) `main.rs` spawns a subscriber task right after the heartbeat
+//!           `HcClient` connects on the `infrastructure` role; each decoded
+//!           `InfrastructureSignal` is routed into `signals::handle_signal`
+//!           against a dedicated Diesel pool.
+//!      The only remaining blocker for deleting `#[ignore]` is the harness:
+//!      bring up a tmp conductor dir + happ (as `elohim-import`'s integration
+//!      tests do), hold the HTTP server up, and assert the SQLite projection
+//!      after one 60s heartbeat tick. That harness is its own project-scale
+//!      concern — tracked separately from Phase 1.
 //!
 //! Running:
 //! ```text
