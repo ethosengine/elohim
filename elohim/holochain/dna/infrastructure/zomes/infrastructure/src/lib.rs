@@ -12,6 +12,9 @@
 use hdk::prelude::*;
 use infrastructure_integrity::*;
 
+pub mod peer_status;
+pub use peer_status::*;
+
 // =============================================================================
 // Wire Types (re-exported from shared crate)
 // =============================================================================
