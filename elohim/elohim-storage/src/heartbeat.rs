@@ -333,19 +333,18 @@ impl LiveProbe for DefaultProbe {
         // Free storage %: offload to a blocking thread — statvfs can block on
         // slow mounts (NFS, failing disks) and we must not stall the runtime.
         let path = self.storage_path.clone();
-        let free_storage_pct = match tokio::task::spawn_blocking(move || measure_free_pct(&path))
-            .await
-        {
-            Ok(Ok(pct)) => pct,
-            Ok(Err(e)) => {
-                tracing::warn!("free-storage probe failed: {e}; defaulting to 100%");
-                100
-            }
-            Err(e) => {
-                tracing::warn!("free-storage probe join error: {e}; defaulting to 100%");
-                100
-            }
-        };
+        let free_storage_pct =
+            match tokio::task::spawn_blocking(move || measure_free_pct(&path)).await {
+                Ok(Ok(pct)) => pct,
+                Ok(Err(e)) => {
+                    tracing::warn!("free-storage probe failed: {e}; defaulting to 100%");
+                    100
+                }
+                Err(e) => {
+                    tracing::warn!("free-storage probe join error: {e}; defaulting to 100%");
+                    100
+                }
+            };
 
         // Conductor health: a successful `list_apps` via HcClient::ping is a
         // reasonable liveness check — admin websocket is responsive AND the
