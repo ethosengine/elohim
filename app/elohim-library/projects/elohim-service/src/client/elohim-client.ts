@@ -261,16 +261,16 @@ export class ElohimClient {
     contentType: ContentType,
     ids: string[]
   ): Promise<Map<string, T>> {
-    const results = new Map<string, T>();
+    const fetched = await Promise.all(
+      ids.map(async id => [id, await this.get<T>(contentType, id)] as const)
+    );
 
-    // TODO: Implement batch endpoint for better performance
-    for (const id of ids) {
-      const content = await this.get<T>(contentType, id);
+    const results = new Map<string, T>();
+    for (const [id, content] of fetched) {
       if (content) {
         results.set(id, content);
       }
     }
-
     return results;
   }
 
