@@ -10,6 +10,9 @@
 
 use hdi::prelude::*;
 
+pub mod peer_status;
+pub use peer_status::{PeerCapabilityFlags, PeerLifecycleState, PeerStatus};
+
 // =============================================================================
 // Doorway Status Constants
 // =============================================================================
@@ -267,6 +270,7 @@ pub enum EntryTypes {
     HealthAttestation(HealthAttestation),
     ContentServer(ContentServer),
     StringAnchor(StringAnchor),
+    PeerStatus(PeerStatus),
 }
 
 // =============================================================================
@@ -330,6 +334,7 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                         validate_content_server(&server)
                     }
                     EntryTypes::StringAnchor(_) => Ok(ValidateCallbackResult::Valid),
+                    EntryTypes::PeerStatus(_) => Ok(ValidateCallbackResult::Valid),
                 }
             }
             OpEntry::UpdateEntry { app_entry, action, .. } => {
