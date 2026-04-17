@@ -107,6 +107,9 @@ pub mod policy;
 // Heartbeat task — periodic policy eval + PeerStatus publication
 pub mod heartbeat;
 
+// TCP forwarder — external-facing listener piped to localhost conductor
+pub mod forwarder;
+
 // Re-exports
 pub use blob_store::BlobStore;
 pub use config::Config;
