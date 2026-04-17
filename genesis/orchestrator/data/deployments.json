@@ -23,10 +23,11 @@
       "deviceArchetype": "device-family-node-base",
       "affinityComment": "Matthew: household bootstrap anchor + doorway host — requires performance node",
       "nodeTypes": ["performance"],
-      "edgenodeMemoryRequest": "1Gi",
-      "edgenodeMemoryLimit": "4Gi",
-      "edgenodeCpuRequest": "500m",
-      "edgenodeCpuLimit": "2000m"
+      "$comment": "TEMP BUMP (2026-04-17): seeder routes all /account/import traffic through matthew-alpha's storage; 4Gi/2000m OOMed with RESTARTS=2 serving 3409 content items to 33 parallel imports. Archetype floor for device-family-node-base is 1Gi/4Gi + 500m/2000m — restore once seeder import is split across peers or backpressure lands.",
+      "edgenodeMemoryRequest": "2Gi",
+      "edgenodeMemoryLimit": "8Gi",
+      "edgenodeCpuRequest": "1000m",
+      "edgenodeCpuLimit": "3000m"
     },
     {
       "name": "jessica",
