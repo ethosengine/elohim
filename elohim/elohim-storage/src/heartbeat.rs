@@ -41,6 +41,9 @@ enum LifecycleState {
     Starting,
     Online,
     Degraded,
+    /// Operator-driven maintenance mode. Phase 2 will add a setter for the
+    /// co-stewardship directive channel to transition into this state.
+    #[allow(dead_code)]
     Maintenance,
     Leaving,
 }

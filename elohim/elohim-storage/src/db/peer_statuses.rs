@@ -49,10 +49,7 @@ pub fn upsert(conn: &mut SqliteConnection, row: &PeerStatusRow) -> QueryResult<u
 }
 
 /// Look up the current projected status for a single peer, if any.
-pub fn get_by_peer(
-    conn: &mut SqliteConnection,
-    peer: &str,
-) -> QueryResult<Option<PeerStatusRow>> {
+pub fn get_by_peer(conn: &mut SqliteConnection, peer: &str) -> QueryResult<Option<PeerStatusRow>> {
     peer_statuses::table
         .find(peer)
         .first::<PeerStatusRow>(conn)

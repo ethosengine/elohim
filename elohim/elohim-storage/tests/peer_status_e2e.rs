@@ -115,8 +115,8 @@ async fn peer_status_signal_projects_into_sqlite_row() {
         }
     });
 
-    let signal: InfrastructureSignal =
-        serde_json::from_value(wire).expect("wire shape must deserialize into InfrastructureSignal");
+    let signal: InfrastructureSignal = serde_json::from_value(wire)
+        .expect("wire shape must deserialize into InfrastructureSignal");
 
     handle_signal(&mut conn, signal).expect("handle_signal must project into SQLite");
 

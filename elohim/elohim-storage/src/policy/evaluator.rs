@@ -71,31 +71,103 @@ mod tests {
     #[test]
     fn auto_pool_member_respects_conductor_and_storage() {
         let cfg = base_cfg();
-        assert!(evaluate(&cfg, &LiveState { free_storage_pct: 50, conductor_healthy: true }).general_pool_member);
-        assert!(!evaluate(&cfg, &LiveState { free_storage_pct: 50, conductor_healthy: false }).general_pool_member);
-        assert!(!evaluate(&cfg, &LiveState { free_storage_pct: 10, conductor_healthy: true }).general_pool_member);
+        assert!(
+            evaluate(
+                &cfg,
+                &LiveState {
+                    free_storage_pct: 50,
+                    conductor_healthy: true
+                }
+            )
+            .general_pool_member
+        );
+        assert!(
+            !evaluate(
+                &cfg,
+                &LiveState {
+                    free_storage_pct: 50,
+                    conductor_healthy: false
+                }
+            )
+            .general_pool_member
+        );
+        assert!(
+            !evaluate(
+                &cfg,
+                &LiveState {
+                    free_storage_pct: 10,
+                    conductor_healthy: true
+                }
+            )
+            .general_pool_member
+        );
     }
 
     #[test]
     fn explicit_bool_overrides_auto() {
         let mut cfg = base_cfg();
         cfg.pool.accept_general_traffic = AutoOrBool::Bool(false);
-        assert!(!evaluate(&cfg, &LiveState { free_storage_pct: 50, conductor_healthy: true }).general_pool_member);
+        assert!(
+            !evaluate(
+                &cfg,
+                &LiveState {
+                    free_storage_pct: 50,
+                    conductor_healthy: true
+                }
+            )
+            .general_pool_member
+        );
 
         cfg.pool.accept_general_traffic = AutoOrBool::Bool(true);
         // even when auto would say false (conductor unhealthy), explicit true wins
-        assert!(evaluate(&cfg, &LiveState { free_storage_pct: 50, conductor_healthy: false }).general_pool_member);
+        assert!(
+            evaluate(
+                &cfg,
+                &LiveState {
+                    free_storage_pct: 50,
+                    conductor_healthy: false
+                }
+            )
+            .general_pool_member
+        );
     }
 
     #[test]
     fn stewardship_respects_max_storage() {
         let cfg = base_cfg();
         // used=15, max=80 → accept
-        assert!(evaluate(&cfg, &LiveState { free_storage_pct: 85, conductor_healthy: true }).accepting_stewardship_reserves);
+        assert!(
+            evaluate(
+                &cfg,
+                &LiveState {
+                    free_storage_pct: 85,
+                    conductor_healthy: true
+                }
+            )
+            .accepting_stewardship_reserves
+        );
         // used=85, max=80 → refuse
-        assert!(!evaluate(&cfg, &LiveState { free_storage_pct: 15, conductor_healthy: true }).accepting_stewardship_reserves);
+        assert!(
+            !evaluate(
+                &cfg,
+                &LiveState {
+                    free_storage_pct: 15,
+                    conductor_healthy: true
+                }
+            )
+            .accepting_stewardship_reserves
+        );
         // used=80 exactly → accept (inclusive <=)
-        assert!(evaluate(&cfg, &LiveState { free_storage_pct: 20, conductor_healthy: true }).accepting_stewardship_reserves);
+        assert!(
+            evaluate(
+                &cfg,
+                &LiveState {
+                    free_storage_pct: 20,
+                    conductor_healthy: true
+                }
+            )
+            .accepting_stewardship_reserves
+        );
     }
 
     #[test]
@@ -103,6 +175,15 @@ mod tests {
         let mut cfg = base_cfg();
         cfg.pool.require_conductor_healthy = false;
         // conductor unhealthy but storage fine → still pool member (Auto, no conductor gate)
-        assert!(evaluate(&cfg, &LiveState { free_storage_pct: 50, conductor_healthy: false }).general_pool_member);
+        assert!(
+            evaluate(
+                &cfg,
+                &LiveState {
+                    free_storage_pct: 50,
+                    conductor_healthy: false
+                }
+            )
+            .general_pool_member
+        );
     }
 }

@@ -380,10 +380,8 @@ async fn async_main(
                     Ok(hc) => {
                         let hc = Arc::new(hc);
                         let agent = hc.cell_id().agent_pubkey().clone();
-                        let publisher = elohim_storage::heartbeat::ZomeCallPublisher::new(
-                            hc.clone(),
-                            agent,
-                        );
+                        let publisher =
+                            elohim_storage::heartbeat::ZomeCallPublisher::new(hc.clone(), agent);
                         let probe = elohim_storage::heartbeat::DefaultProbe::new(
                             blob_store.clone(),
                             hc.clone(),

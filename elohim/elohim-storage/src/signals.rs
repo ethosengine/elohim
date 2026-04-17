@@ -486,7 +486,10 @@ mod peer_status_tests {
         handle_signal(&mut conn, signal("online")).unwrap();
 
         let row = get_by_peer(&mut conn, "uhCAkABC").unwrap().unwrap();
-        assert_eq!(row.status, "online", "upsert should have replaced 'starting'");
+        assert_eq!(
+            row.status, "online",
+            "upsert should have replaced 'starting'"
+        );
     }
 
     #[test]
@@ -508,7 +511,9 @@ mod peer_status_tests {
         });
         let signal: InfrastructureSignal = serde_json::from_value(wire).unwrap();
         match signal {
-            InfrastructureSignal::PeerStatusRecorded { peer_id, status, .. } => {
+            InfrastructureSignal::PeerStatusRecorded {
+                peer_id, status, ..
+            } => {
                 assert_eq!(peer_id, "uhCAkABC");
                 assert_eq!(status, "online");
             }
