@@ -18,7 +18,8 @@ import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
-import { Given, When, Then } from '@cucumber/cucumber';
+import { Given, When, Then, DataTable } from '@cucumber/cucumber';
+import { readFileSync } from 'node:fs';
 
 import { E2EWorld } from '../src/framework/world.js';
 
@@ -396,3 +397,57 @@ Then('both imports exit successfully', function (this: E2EWorld) {
 Then('no errors mention {string}', function (this: E2EWorld, _substring: string) {
   return 'pending';
 });
+
+// ---------------------------------------------------------------------------
+// Deployment registry coherence — steps for human-device-mapping.feature
+// ---------------------------------------------------------------------------
+
+interface DeploymentRegistryFile {
+  humans?: Array<{ humanId: string; name?: string }>;
+}
+
+const REGISTRY_STATE = Symbol.for('a2o.deploymentRegistryState');
+
+interface RegistryState {
+  registry?: DeploymentRegistryFile;
+}
+
+function regState(world: E2EWorld): RegistryState {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const w = world as any;
+  if (!w[REGISTRY_STATE]) {
+    w[REGISTRY_STATE] = {} as RegistryState;
+  }
+  return w[REGISTRY_STATE] as RegistryState;
+}
+
+Given(
+  'the deployment registry from {string}',
+  function (this: E2EWorld, relativePath: string) {
+    const repoRoot = resolve(process.cwd(), '..', '..');
+    const path = resolve(repoRoot, relativePath);
+    const parsed = JSON.parse(readFileSync(path, 'utf-8')) as DeploymentRegistryFile;
+    regState(this).registry = parsed;
+  },
+);
+
+Then(
+  'the registry contains a record for each name:',
+  function (this: E2EWorld, table: DataTable) {
+    const registry = regState(this).registry;
+    assert.ok(registry, 'deployment registry not loaded — missing Given step');
+    assert.ok(Array.isArray(registry.humans), 'registry missing "humans" array');
+
+    const actualNames = new Set(
+      (registry.humans ?? []).map(h => h.name).filter((n): n is string => typeof n === 'string'),
+    );
+
+    const expectedNames = table.rows().map(row => row[0]);
+    const missing = expectedNames.filter(n => !actualNames.has(n));
+    assert.equal(
+      missing.length,
+      0,
+      `deployment registry is missing expected humans: ${missing.join(', ')}`,
+    );
+  },
+);

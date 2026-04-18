@@ -87,7 +87,6 @@ Feature: Human × Device × Deployment mapping is internally consistent
 
   # --- Completeness ---
 
-  @wip
   Scenario: The six protocol humans are all represented in the deployment registry
     Given the deployment registry from "genesis/orchestrator/data/deployments.json"
     Then the registry contains a record for each name:
