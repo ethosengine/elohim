@@ -154,7 +154,14 @@
             "onAttest": { "action": "produce", "resourceConformsTo": "experience-evidence" }
           },
           "governance": { "defaultReach": "self", "governanceModel": "steward-consent" },
-          "claims": [{ "asserts": "witnessed-evidence", "validityHorizon": "P90D" }]
+          "claims": [
+            {
+              "asserts": "community-value-confirmed",
+              "contradictedBy": "content-misleading",
+              "validityHorizon": "P90D",
+              "leg": "knowledge"
+            }
+          ]
         }
       },
       "experience-moment": {
@@ -164,7 +171,14 @@
           "knowledge": { "relationships": { "ATTESTS_TO": ["experience-story"] } },
           "value": {},
           "governance": { "defaultReach": "self", "governanceModel": "agent-scoped" },
-          "claims": []
+          "claims": [
+            {
+              "asserts": "community-value-confirmed",
+              "contradictedBy": "content-misleading",
+              "validityHorizon": "P30D",
+              "leg": "knowledge"
+            }
+          ]
         }
       },
       "reflection": {
@@ -834,6 +848,7 @@
       "experience-attestation": {
         "substrateSignal": "attention",
         "economicAction": "produce",
+        "resourceType": "experience-attestation",
         "description": "A :story-point attestation minted by the discernment gate when meaningful evidence is recognized. Emitted alongside the Holochain Link; dual-encoded as an EconomicEvent in shefa."
       },
       "peer-review-completed": {
