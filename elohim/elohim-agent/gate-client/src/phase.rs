@@ -30,7 +30,7 @@ use ts_rs::TS;
 ///
 /// See spec §5.5 (Dev-context attestation marker) and §1.6 (Dev-context
 /// rehearsal behavior).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "typescript", derive(TS))]
 #[cfg_attr(
     feature = "typescript",
@@ -40,6 +40,7 @@ use ts_rs::TS;
 pub enum Phase {
     /// Pre-elohim-activation: wisdom-invoke is mocked; decisions are legible
     /// but carry no reputation weight in the post-activation graph.
+    #[default]
     DevContext,
 
     /// Post-elohim-activation: real elohim sign decisions with real wisdom;
@@ -54,11 +55,5 @@ impl Phase {
 
     pub fn is_elohim_active(&self) -> bool {
         matches!(self, Phase::ElohimActive)
-    }
-}
-
-impl Default for Phase {
-    fn default() -> Self {
-        Phase::DevContext
     }
 }

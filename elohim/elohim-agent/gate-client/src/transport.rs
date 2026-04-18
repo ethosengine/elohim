@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use crate::phase::Phase;
 
 /// How the gate-client reaches the elohim-agent-service for wisdom invocation.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "kebab-case")]
 pub enum Transport {
     /// Co-located elohim-agent-service, direct Rust call.
@@ -19,13 +19,8 @@ pub enum Transport {
     /// Remote elohim-agent-service over gRPC (future).
     Grpc { url: String },
     /// Phase 0 / rehearsal stub — wisdom-invoke returns mocked Allow.
+    #[default]
     Mock,
-}
-
-impl Default for Transport {
-    fn default() -> Self {
-        Transport::Mock
-    }
 }
 
 /// Runtime configuration for the gate-client.
