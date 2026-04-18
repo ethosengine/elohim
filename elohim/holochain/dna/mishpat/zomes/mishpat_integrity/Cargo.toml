@@ -11,3 +11,6 @@ name = "mishpat_integrity"
 hdi.workspace = true
 holochain_serialized_bytes.workspace = true
 serde.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true

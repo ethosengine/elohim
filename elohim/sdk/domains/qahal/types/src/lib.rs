@@ -687,6 +687,86 @@ pub struct QueryStatementVotesInput {
 }
 
 // =============================================================================
+// Gate Decision Attestation Types
+// =============================================================================
+
+/// Input for mishpat::create_gate_decision_attestation coordinator function.
+///
+/// All fields are flat Strings — no AgentPubKey or specific types — to avoid
+/// HDK version drift concerns when this crate is consumed from native targets.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct CreateGateDecisionAttestationInput {
+    /// CID of this attestation (self-addressing, computed by caller from content hash).
+    pub decision_id: String,
+    /// Phase discriminator: "dev-context" | "elohim-active"
+    pub phase: String,
+    /// AgentPubKey of the elohim that made the decision (base64 encoded).
+    pub elohim_id: String,
+    /// CID of the elohim's substance declaration (model-weights + constitution + deployment-context).
+    pub elohim_substance_cid: String,
+    /// Name of the gate that produced this decision (e.g. "discernment-gate-v1-mechanical").
+    pub gate_name: String,
+    /// CID of the GateProcessDeclaration DAG that was executed.
+    pub gate_process_cid: String,
+    /// Serialized RequestRef — identifies the RelationalImpactEvent that triggered the gate.
+    pub request_ref_json: String,
+    /// Serialized GateStatus: "allow" | "decline" | "escalate" | "verdict"
+    pub decision: String,
+    /// Full ConstitutionalReasoning as JSON.
+    pub reasoning_json: String,
+    /// CID of the assembled GateContext summary (privacy-respecting snapshot).
+    pub context_summary_cid: String,
+    /// ISO-8601 timestamp of the decision.
+    pub decided_at: String,
+    /// CID of the universal-band DAG declaration that ran above the domain gate.
+    pub universal_band_cid: String,
+}
+
+/// GateDecisionAttestation wire type.
+///
+/// Matches the integrity zome's GateDecisionAttestation entry type field-for-field.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct GateDecisionAttestation {
+    pub decision_id: String,
+    pub phase: String,
+    pub elohim_id: String,
+    pub elohim_substance_cid: String,
+    pub gate_name: String,
+    pub gate_process_cid: String,
+    pub request_ref_json: String,
+    pub decision: String,
+    pub reasoning_json: String,
+    pub context_summary_cid: String,
+    pub decided_at: String,
+    pub universal_band_cid: String,
+}
+
+/// Output from mishpat::create_gate_decision_attestation coordinator function.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct GateDecisionAttestationOutput {
+    #[cfg_attr(feature = "ts", ts(type = "string"))]
+    pub action_hash: ActionHash,
+    pub attestation: GateDecisionAttestation,
+}
+
+/// Input for querying gate decision attestations.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct QueryGateDecisionsInput {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub elohim_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub gate_name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub phase: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub limit: Option<u32>,
+}
+
+// =============================================================================
 // Credential Verification Types
 // =============================================================================
 
@@ -909,6 +989,29 @@ mod tests {
         let decoded: CreateStatementVoteInput = rmp_serde::from_slice(&bytes).unwrap();
         assert_eq!(decoded.vote, "agree");
     }
+
+    #[test]
+    fn create_gate_decision_attestation_input_msgpack_roundtrip() {
+        let input = CreateGateDecisionAttestationInput {
+            decision_id: "bafybeigdecision1".into(),
+            phase: "dev-context".into(),
+            elohim_id: "uhCAk...".into(),
+            elohim_substance_cid: "bafybeielohimsubstance".into(),
+            gate_name: "discernment-gate-v1-mechanical".into(),
+            gate_process_cid: "bafybeigateprocess".into(),
+            request_ref_json: r#"{"eventId":"evt-1","requestedAt":"2026-04-18T00:00:00Z"}"#.into(),
+            decision: "allow".into(),
+            reasoning_json: r#"{"summary":"No concerns","rules":[]}"#.into(),
+            context_summary_cid: "bafybeicontextsummary".into(),
+            decided_at: "2026-04-18T00:00:00Z".into(),
+            universal_band_cid: "bafybeiband".into(),
+        };
+        let bytes = rmp_serde::to_vec_named(&input).unwrap();
+        let decoded: CreateGateDecisionAttestationInput = rmp_serde::from_slice(&bytes).unwrap();
+        assert_eq!(decoded.phase, "dev-context");
+        assert_eq!(decoded.decision, "allow");
+        assert_eq!(decoded.gate_name, "discernment-gate-v1-mechanical");
+    }
 }
 
 
@@ -964,5 +1067,9 @@ mod ts_export {
         QueryStatementVotesInput::export_all_to(&out).unwrap();
         VerificationStatus::export_all_to(&out).unwrap();
         CredentialVerification::export_all_to(&out).unwrap();
+        CreateGateDecisionAttestationInput::export_all_to(&out).unwrap();
+        GateDecisionAttestation::export_all_to(&out).unwrap();
+        GateDecisionAttestationOutput::export_all_to(&out).unwrap();
+        QueryGateDecisionsInput::export_all_to(&out).unwrap();
     }
 }

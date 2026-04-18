@@ -10,6 +10,8 @@ pub use qahal_types::{
     CreateChallengeInput,
     // Discussion
     CreateDiscussionInput,
+    // GateDecisionAttestation
+    CreateGateDecisionAttestationInput,
     // GovernanceReaction
     CreateGovernanceReactionInput,
     // GovernanceState
@@ -29,6 +31,7 @@ pub use qahal_types::{
     // Credential verification
     CredentialVerification,
     DiscussionOutput,
+    GateDecisionAttestationOutput,
     GetGovernanceStateInput,
     GovernanceReactionOutput,
     GovernanceStateOutput,
@@ -39,6 +42,7 @@ pub use qahal_types::{
     ProposalVoteOutput,
     QueryChallengesInput,
     QueryDiscussionsInput,
+    QueryGateDecisionsInput,
     QueryGovernanceReactionsInput,
     QueryGovernanceStatesInput,
     QueryGraduatedFeedbackInput,
@@ -241,6 +245,25 @@ fn wire_statement_vote(e: &mishpat_integrity::StatementVote) -> qahal_types::Sta
         vote: e.vote.clone(),
         created_at: e.created_at.clone(),
         metadata_json: e.metadata_json.clone(),
+    }
+}
+
+fn wire_gate_decision_attestation(
+    e: &mishpat_integrity::GateDecisionAttestation,
+) -> qahal_types::GateDecisionAttestation {
+    qahal_types::GateDecisionAttestation {
+        decision_id: e.decision_id.clone(),
+        phase: e.phase.clone(),
+        elohim_id: e.elohim_id.clone(),
+        elohim_substance_cid: e.elohim_substance_cid.clone(),
+        gate_name: e.gate_name.clone(),
+        gate_process_cid: e.gate_process_cid.clone(),
+        request_ref_json: e.request_ref_json.clone(),
+        decision: e.decision.clone(),
+        reasoning_json: e.reasoning_json.clone(),
+        context_summary_cid: e.context_summary_cid.clone(),
+        decided_at: e.decided_at.clone(),
+        universal_band_cid: e.universal_band_cid.clone(),
     }
 }
 
@@ -1751,6 +1774,319 @@ pub fn query_statement_votes(
     }
 
     Ok(results)
+}
+
+// ============================================================
+// GATE DECISION ATTESTATION FUNCTIONS
+// ============================================================
+//
+// GateDecisionAttestation is a notarized record of every gate evaluation.
+// Indexed by: decision_id, elohim_id, gate_name, phase.
+// elohim-storage (Task 4.2) receives the post-commit signal and projects
+// into SQLite with dht_anchor_hash for fast query.
+
+/// Signal emitted after a GateDecisionAttestation is committed to the DHT.
+///
+/// elohim-storage listens for this signal and projects the entry into its
+/// local SQLite index with dht_anchor_hash for downstream query.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(tag = "type", content = "payload")]
+pub enum MishpatSignal {
+    GateDecisionCreated {
+        action_hash: ActionHash,
+        entry_hash: EntryHash,
+        entry: mishpat_integrity::GateDecisionAttestation,
+        author: AgentPubKey,
+    },
+}
+
+/// Create and notarize a GateDecisionAttestation on the Mishpat DHT.
+///
+/// Indexes via four StringAnchor links so storage can query by
+/// decision_id, elohim_id, gate_name, or phase without a full DHT scan.
+///
+/// Returns the ActionHash of the committed record. The caller receives the
+/// entry hash via the post-commit signal (MishpatSignal::GateDecisionCreated).
+#[hdk_extern]
+pub fn create_gate_decision_attestation(
+    input: CreateGateDecisionAttestationInput,
+) -> ExternResult<ActionHash> {
+    let entry = mishpat_integrity::GateDecisionAttestation {
+        decision_id: input.decision_id.clone(),
+        phase: input.phase.clone(),
+        elohim_id: input.elohim_id.clone(),
+        elohim_substance_cid: input.elohim_substance_cid.clone(),
+        gate_name: input.gate_name.clone(),
+        gate_process_cid: input.gate_process_cid.clone(),
+        request_ref_json: input.request_ref_json.clone(),
+        decision: input.decision.clone(),
+        reasoning_json: input.reasoning_json.clone(),
+        context_summary_cid: input.context_summary_cid.clone(),
+        decided_at: input.decided_at.clone(),
+        universal_band_cid: input.universal_band_cid.clone(),
+    };
+
+    let action_hash = create_entry(&EntryTypes::GateDecisionAttestation(entry.clone()))?;
+
+    // Index by decision_id (primary lookup — one attestation per CID)
+    let id_anchor = StringAnchor::new("gate_decision_id", &input.decision_id);
+    let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
+    create_link(
+        id_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::IdToGateDecision,
+        (),
+    )?;
+
+    // Index by elohim_id (all decisions by a given elohim agent)
+    let elohim_anchor = StringAnchor::new("gate_decision_elohim", &input.elohim_id);
+    let elohim_anchor_hash = hash_entry(&EntryTypes::StringAnchor(elohim_anchor))?;
+    create_link(
+        elohim_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::ElohimToGateDecisions,
+        (),
+    )?;
+
+    // Index by gate_name (all decisions produced by a given gate)
+    let gate_anchor = StringAnchor::new("gate_decision_gate_name", &input.gate_name);
+    let gate_anchor_hash = hash_entry(&EntryTypes::StringAnchor(gate_anchor))?;
+    create_link(
+        gate_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::GateNameToDecisions,
+        (),
+    )?;
+
+    // Index by phase (dev-context vs elohim-active audit split)
+    let phase_anchor = StringAnchor::new("gate_decision_phase", &input.phase);
+    let phase_anchor_hash = hash_entry(&EntryTypes::StringAnchor(phase_anchor))?;
+    create_link(
+        phase_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::PhaseToDecisions,
+        (),
+    )?;
+
+    Ok(action_hash)
+}
+
+/// Get a GateDecisionAttestation by its decision_id CID.
+#[hdk_extern]
+pub fn get_gate_decision_by_id(
+    decision_id: String,
+) -> ExternResult<Option<GateDecisionAttestationOutput>> {
+    let id_anchor = StringAnchor::new("gate_decision_id", &decision_id);
+    let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
+
+    let query = LinkQuery::try_new(id_anchor_hash, LinkTypes::IdToGateDecision)?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    if let Some(link) = links.first() {
+        let action_hash = ActionHash::try_from(link.target.clone()).map_err(|_| {
+            wasm_error!(WasmErrorInner::Guest(
+                "Invalid gate decision hash".to_string()
+            ))
+        })?;
+
+        let record = get(action_hash.clone(), GetOptions::default())?;
+        if let Some(record) = record {
+            if let Some(entry) = record
+                .entry()
+                .to_app_option::<mishpat_integrity::GateDecisionAttestation>()
+                .ok()
+                .flatten()
+            {
+                return Ok(Some(GateDecisionAttestationOutput {
+                    action_hash,
+                    attestation: wire_gate_decision_attestation(&entry),
+                }));
+            }
+        }
+    }
+
+    Ok(None)
+}
+
+/// Query all GateDecisionAttestations by elohim_id.
+///
+/// Returns all gate decisions made by the given elohim agent, up to limit.
+#[hdk_extern]
+pub fn get_decisions_by_elohim(
+    input: QueryGateDecisionsInput,
+) -> ExternResult<Vec<GateDecisionAttestationOutput>> {
+    let elohim_id = input.elohim_id.ok_or_else(|| {
+        wasm_error!(WasmErrorInner::Guest(
+            "elohim_id is required for get_decisions_by_elohim".to_string()
+        ))
+    })?;
+    let limit = input.limit.unwrap_or(100) as usize;
+
+    let elohim_anchor = StringAnchor::new("gate_decision_elohim", &elohim_id);
+    let elohim_anchor_hash = hash_entry(&EntryTypes::StringAnchor(elohim_anchor))?;
+
+    let query = LinkQuery::try_new(elohim_anchor_hash, LinkTypes::ElohimToGateDecisions)?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    let mut results = Vec::new();
+    for link in links.iter().take(limit) {
+        let action_hash = ActionHash::try_from(link.target.clone()).map_err(|_| {
+            wasm_error!(WasmErrorInner::Guest(
+                "Invalid gate decision hash".to_string()
+            ))
+        })?;
+
+        let record = get(action_hash.clone(), GetOptions::default())?;
+        if let Some(record) = record {
+            if let Some(entry) = record
+                .entry()
+                .to_app_option::<mishpat_integrity::GateDecisionAttestation>()
+                .ok()
+                .flatten()
+            {
+                results.push(GateDecisionAttestationOutput {
+                    action_hash,
+                    attestation: wire_gate_decision_attestation(&entry),
+                });
+            }
+        }
+    }
+
+    Ok(results)
+}
+
+/// Query all GateDecisionAttestations by gate_name.
+///
+/// Returns all gate decisions produced by the named gate, up to limit.
+#[hdk_extern]
+pub fn get_decisions_by_gate(
+    input: QueryGateDecisionsInput,
+) -> ExternResult<Vec<GateDecisionAttestationOutput>> {
+    let gate_name = input.gate_name.ok_or_else(|| {
+        wasm_error!(WasmErrorInner::Guest(
+            "gate_name is required for get_decisions_by_gate".to_string()
+        ))
+    })?;
+    let limit = input.limit.unwrap_or(100) as usize;
+
+    let gate_anchor = StringAnchor::new("gate_decision_gate_name", &gate_name);
+    let gate_anchor_hash = hash_entry(&EntryTypes::StringAnchor(gate_anchor))?;
+
+    let query = LinkQuery::try_new(gate_anchor_hash, LinkTypes::GateNameToDecisions)?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    let mut results = Vec::new();
+    for link in links.iter().take(limit) {
+        let action_hash = ActionHash::try_from(link.target.clone()).map_err(|_| {
+            wasm_error!(WasmErrorInner::Guest(
+                "Invalid gate decision hash".to_string()
+            ))
+        })?;
+
+        let record = get(action_hash.clone(), GetOptions::default())?;
+        if let Some(record) = record {
+            if let Some(entry) = record
+                .entry()
+                .to_app_option::<mishpat_integrity::GateDecisionAttestation>()
+                .ok()
+                .flatten()
+            {
+                results.push(GateDecisionAttestationOutput {
+                    action_hash,
+                    attestation: wire_gate_decision_attestation(&entry),
+                });
+            }
+        }
+    }
+
+    Ok(results)
+}
+
+/// Query all GateDecisionAttestations by phase.
+///
+/// Returns all gate decisions for the given phase discriminator, up to limit.
+#[hdk_extern]
+pub fn get_decisions_by_phase(
+    input: QueryGateDecisionsInput,
+) -> ExternResult<Vec<GateDecisionAttestationOutput>> {
+    let phase = input.phase.ok_or_else(|| {
+        wasm_error!(WasmErrorInner::Guest(
+            "phase is required for get_decisions_by_phase".to_string()
+        ))
+    })?;
+    let limit = input.limit.unwrap_or(100) as usize;
+
+    let phase_anchor = StringAnchor::new("gate_decision_phase", &phase);
+    let phase_anchor_hash = hash_entry(&EntryTypes::StringAnchor(phase_anchor))?;
+
+    let query = LinkQuery::try_new(phase_anchor_hash, LinkTypes::PhaseToDecisions)?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    let mut results = Vec::new();
+    for link in links.iter().take(limit) {
+        let action_hash = ActionHash::try_from(link.target.clone()).map_err(|_| {
+            wasm_error!(WasmErrorInner::Guest(
+                "Invalid gate decision hash".to_string()
+            ))
+        })?;
+
+        let record = get(action_hash.clone(), GetOptions::default())?;
+        if let Some(record) = record {
+            if let Some(entry) = record
+                .entry()
+                .to_app_option::<mishpat_integrity::GateDecisionAttestation>()
+                .ok()
+                .flatten()
+            {
+                results.push(GateDecisionAttestationOutput {
+                    action_hash,
+                    attestation: wire_gate_decision_attestation(&entry),
+                });
+            }
+        }
+    }
+
+    Ok(results)
+}
+
+/// Post-commit hook — emits MishpatSignal::GateDecisionCreated for each
+/// committed GateDecisionAttestation so elohim-storage can project it.
+///
+/// Other entry types currently have no post-commit projection needs;
+/// this hook is a no-op for them.
+#[hdk_extern]
+pub fn post_commit(committed_actions: Vec<SignedActionHashed>) -> ExternResult<()> {
+    for signed_action in committed_actions {
+        let action = signed_action.action();
+        let author = action.author().clone();
+
+        // Only handle Create/Update actions that carry an entry
+        let (action_hash, entry_hash) = match action {
+            Action::Create(create) => (signed_action.as_hash().clone(), create.entry_hash.clone()),
+            Action::Update(update) => (signed_action.as_hash().clone(), update.entry_hash.clone()),
+            _ => continue,
+        };
+
+        let record = match get(action_hash.clone(), GetOptions::default())? {
+            Some(r) => r,
+            None => continue,
+        };
+
+        if let Some(entry) = record
+            .entry()
+            .to_app_option::<mishpat_integrity::GateDecisionAttestation>()
+            .ok()
+            .flatten()
+        {
+            let _ = emit_signal(MishpatSignal::GateDecisionCreated {
+                action_hash,
+                entry_hash,
+                entry,
+                author,
+            });
+        }
+    }
+    Ok(())
 }
 
 // ============================================================
