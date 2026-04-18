@@ -27,6 +27,7 @@ pub mod expr;
 pub mod interpreter;
 pub mod rule_expr;
 pub mod rules_artifact;
+pub mod seven_valence_rules;
 pub mod universal_band;
 
 // ─── Public re-exports ────────────────────────────────────────────────────────

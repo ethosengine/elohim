@@ -1,0 +1,105 @@
+{
+  "id": "seven-valence-rules-v1",
+  "contentType": "gate-rules-declaration",
+  "title": "Seven-Valence Rules v1",
+  "description": "Seven-valence mechanical discernment ruleset for experience-moment attestation. Classifies each new experience-moment against prior attestations on the same experience-story to decide whether to mint a Tier-2 story-point attestation and which valence it carries. Implements spec §7.3 of 2026-04-18-experience-story-epr-design.md.",
+  "content": "# seven-valence-rules-v1\n# See gate-client/src/dag/rules/seven_valence_v1.json for the canonical embedded source.\n# This seed entry makes the seven-valence rules discoverable as a ContentNode on the DHT.\n#\n# The authoritative JSON is embedded in the gate-client binary at compile time.\n# This seed is a reference copy for DHT-based governance lookup (Phase 5+).\n#\n# Context pre-computation contract (Task 3.4 must implement):\n# Rules 5 and 6 use precomputed boolean fields:\n#   priorAttestations.witnessEligible\n#   priorAttestations.refinementEligible\n# These must be injected by the context-assemble step before the mechanical-ruleset step runs.\n\nruleSetName: \"seven-valence-v1\"\nversion: \"1.0.0\"\nappliesToEventType: \"attestation-write\"\ninputKeysExpected:\n  - moment\n  - priorAttestations\noutputShape: StoryPointTag\n\nrules:\n  - rule-1-first-pass-green: progress/meaningful when passed with no priors\n  - rule-2a-novel-failure-class: discovery/meaningful when failed with new error class\n  - rule-2b-known-cause-recurrence: regression/meaningful when failed with known error class\n  - rule-3-validates-failure-mode: validation/meaningful when @validates-failure-mode tag fails\n  - rule-4-recovery: progress/meaningful when passed after prior failure\n  - rule-5-witness: witness/meaningful when different fingerprint attests same status\n  - rule-6-refinement: refinement/small when same fingerprint attests richer evidence\n  - rule-7 (implicit): no-mint when no rule matches (steady-state silence)",
+  "contentFormat": "plaintext",
+  "tags": [
+    "gate",
+    "discernment",
+    "seven-valence",
+    "experience-story",
+    "attestation",
+    "mechanical-ruleset"
+  ],
+  "metadata": {
+    "ruleSetName": "seven-valence-v1",
+    "version": "1.0.0",
+    "description": "Seven-valence mechanical discernment of experience-moments. Classifies each new experience-moment against prior attestations on the same experience-story to decide whether to mint a Tier-2 story-point attestation (and which valence it carries). Implements spec §7.3 of 2026-04-18-experience-story-epr-design.md.",
+    "appliesToEventType": "attestation-write",
+    "inputKeysExpected": ["moment", "priorAttestations"],
+    "outputShape": "StoryPointTag",
+    "rules": [
+      {
+        "id": "rule-1-first-pass-green",
+        "when": "moment.status == \"passed\" AND priorAttestations.count == 0",
+        "outcome": {
+          "valence": "progress",
+          "magnitude": "meaningful",
+          "evidenceType": "first-pass-green"
+        },
+        "rationale": "Spec §7.3 rule 1: status is passed AND no prior attestation exists on this experience-story from any compute fingerprint. The system can now do something it could not before. This is the canonical first-time-green event — the story anchor has its first witnessed evidence. Magnitude meaningful because every first-pass is a non-trivial milestone."
+      },
+      {
+        "id": "rule-2a-novel-failure-class",
+        "when": "moment.status == \"failed\" AND priorAttestations.mostRecentStatus == \"passed\" AND priorAttestations.errorClassIsNew == true",
+        "outcome": {
+          "valence": "discovery",
+          "magnitude": "meaningful",
+          "evidenceType": "novel-failure-class"
+        },
+        "rationale": "Spec §7.3 rule 2 (novel branch): status is failed, prior attestation was passed (green-to-red flip), AND the error class has not been seen in any prior attestation on this story. This is discovery: the system has surfaced a previously-unknown failure mode. Rule 2 is evaluated before rule 3 by design — a @validates-failure-mode scenario that had a prior-passed attestation is correctly classified here as discovery (not rule 3 validation). This is the deliberate ordering from spec §7.3."
+      },
+      {
+        "id": "rule-2b-known-cause-recurrence",
+        "when": "moment.status == \"failed\" AND priorAttestations.mostRecentStatus == \"passed\" AND priorAttestations.errorClassIsNew == false",
+        "outcome": {
+          "valence": "regression",
+          "magnitude": "meaningful",
+          "evidenceType": "known-cause-recurrence"
+        },
+        "rationale": "Spec §7.3 rule 2 (regression branch): status is failed, prior attestation was passed (green-to-red flip), AND the error class has been seen before in prior attestations on this story. The story has moved backward with a known cause. Rule 2 is evaluated before rule 3 by design — the regression classification takes precedence over the validation classification when a prior passed attestation exists."
+      },
+      {
+        "id": "rule-3-validates-failure-mode",
+        "when": "moment.status == \"failed\" AND moment.scenarioTagsContainsValidatesFailureMode == true",
+        "outcome": {
+          "valence": "validation",
+          "magnitude": "meaningful",
+          "evidenceType": "failure-mode-confirmed"
+        },
+        "rationale": "Spec §7.3 rule 3: status is failed AND the scenario is tagged @validates-failure-mode. This confirms that the system correctly refuses to do something it should refuse — an expected failure. Rule 3 fires only when rules 2a and 2b did not match (no prior passed attestation, so the green-to-red flip semantics do not apply). The @validates-failure-mode tag is precomputed into the boolean field moment.scenarioTagsContainsValidatesFailureMode by the context-assemble step because the DSL does not support array-contains operations."
+      },
+      {
+        "id": "rule-4-recovery",
+        "when": "moment.status == \"passed\" AND priorAttestations.mostRecentStatus == \"failed\"",
+        "outcome": {
+          "valence": "progress",
+          "magnitude": "meaningful",
+          "evidenceType": "recovery"
+        },
+        "rationale": "Spec §7.3 rule 4: status is passed AND prior attestation was failed (red-to-green flip). The story has recovered — a scenario that was broken is now working again. Valence is progress because recovery represents forward movement, not merely a return to baseline."
+      },
+      {
+        "id": "rule-5-witness",
+        "when": "priorAttestations.witnessEligible == true",
+        "outcome": {
+          "valence": "witness",
+          "magnitude": "meaningful",
+          "evidenceType": "cross-fingerprint-attestation"
+        },
+        "rationale": "Spec §7.3 rule 5: the moment's status matches the most recent prior attestation status AND the compute fingerprint is new for this experience-story (a different validator is seeing the same result). This is independent re-validation: witness valence feeds directly into brit/rakia reach computation (self → community → public). The boolean priorAttestations.witnessEligible must be precomputed by the context-assemble step (Task 3.4) because the DSL does not support path-on-both-sides comparisons: witnessEligible = (moment.status == priorAttestations.mostRecentStatus) AND (priorAttestations.computeFingerprintIsNew == true)."
+      },
+      {
+        "id": "rule-6-refinement",
+        "when": "priorAttestations.refinementEligible == true",
+        "outcome": {
+          "valence": "refinement",
+          "magnitude": "small",
+          "evidenceType": "evidence-enriched"
+        },
+        "rationale": "Spec §7.3 rule 6: the moment's status matches the most recent prior attestation status, the fingerprint matches a prior attestation's fingerprint, AND the moment carries materially richer evidence (new sidecar artifact present, duration improvement >20%, or new captured detail). The same compute context is producing better attestations. Magnitude is small because refinement is incremental improvement, not a milestone. The boolean priorAttestations.refinementEligible must be precomputed by the context-assemble step (Task 3.4): refinementEligible = (moment.status == priorAttestations.mostRecentStatus) AND (priorAttestations.hasRicherEvidence == true) AND (priorAttestations.computeFingerprintIsNew == false)."
+      }
+    ]
+  },
+  "createdAt": "2026-04-18T00:00:00.000Z",
+  "updatedAt": "2026-04-18T00:00:00.000Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 1.0,
+      "role": "author"
+    }
+  ]
+}
