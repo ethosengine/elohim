@@ -443,6 +443,12 @@ Post-commit signal handlers in elohim-storage project Tier 1 to the global `expe
 
 This spec defines the **data model and the v1 mechanical discernment that must ship with it**. Everything else is downstream and depends on the shapes here.
 
+### 12.1 Cross-cutting meta-concern: compute substrate accounting
+
+The underlying compute consumed to run a2o scenarios — CPU-seconds, memory-seconds, storage bytes, bandwidth on matthew-alpha's pod — is itself a REA resource. The codebase already emits `compute-contribution` EconomicEvents for this (see `app/elohim-app/src/app/shefa/services/compute-event-api.service.ts`). When that substrate is fully wired, each `:story-point` EconomicEvent emitted by this spec should be **linkable** to the compute-contribution events that funded the work — closing the economic loop: compute flows in → evidence value flows out. The protocol can then reason about story-points-per-compute-hour, incentivize diverse validators who contribute compute toward high-value stories, and allocate future compute accordingly.
+
+This linkage is **explicitly out of scope for this spec**. It is a meta-concern at the elohim-protocol core level — where compute and value economies meet — and likely belongs in a future shefa cross-economy spec that touches both substrate accounting and evidence attestation. This spec's coordinator `attest()` function should leave room in its output (perhaps an optional `linkedComputeContributionHashes` field on the EconomicEvent) for that linkage to slot in later without schema-breaking changes.
+
 ## 13. Open questions
 
 1. **Role provenance.** Existing `role` ContentNodes — are there enough authored already to cover Matthew's likely contexts (`as-entrepreneur`, `as-learner`, `as-father`)? If not, sub-project A will need to seed them. *(Not blocking this spec; flagged for the implementation plan.)*
