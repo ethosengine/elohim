@@ -1,0 +1,88 @@
+{
+  "id": "discernment-gate-v1-mechanical",
+  "contentType": "gate-process-declaration",
+  "title": "Discernment Gate v1 (Mechanical)",
+  "description": "Seven-valence discernment of experience-moments. Wires the seven-valence mechanical ruleset to classify experience-moment attestation-write events and emit StoryPointTag verdicts. Three-node DAG: assemble → rules → synthesize. Implements spec §3.3 of 2026-04-18-experience-story-epr-design.md.",
+  "content": "# discernment-gate-v1-mechanical\n# See gate-client/src/dag/discernment_gate_v1.yaml for the canonical embedded source.\n# This seed entry makes the discernment gate discoverable as a ContentNode on the DHT.\n#\n# The authoritative YAML is embedded in the gate-client binary at compile time.\n# This seed is a reference copy for DHT-based governance lookup (Phase 5+).\n#\n# Three-node DAG:\n#   assemble (context-assemble)\n#     └─ next ──► rules (mechanical-ruleset, rules_cid: epr:rules:seven-valence-v1)\n#                     ├─ ruleDecision == null  ──► terminal: terminal-no-mint\n#                     └─ ruleDecision != null  ──► synthesize (synthesize, Terminate)\n#\n# Context pre-computation contract (Task 3.4 must implement):\n#   The context-assemble step must inject precomputed boolean fields:\n#     priorAttestations.witnessEligible\n#     priorAttestations.refinementEligible\n#   before the mechanical-ruleset step runs.\n\nname: \"discernment-gate-v1-mechanical\"\nversion: \"1.0.0\"\nevent_type: \"attestation-write\"\n\ndag:\n  entrypoint: \"assemble\"\n\n  steps:\n    assemble:\n      type: \"context-assemble\"\n      params:\n        pulls:\n          - from: \"source-chain\"\n            query: \"experience-moment.entry\"\n            output_key: \"moment\"\n          - from: \"elohim-storage\"\n            query: \"prior-attestations.for-experience-story\"\n            output_key: \"priorAttestations\"\n      next: \"rules\"\n\n    rules:\n      type: \"mechanical-ruleset\"\n      params:\n        rules_cid: \"epr:rules:seven-valence-v1\"\n        input_keys:\n          - \"moment\"\n          - \"priorAttestations\"\n        output_key: \"ruleDecision\"\n      edges:\n        - when: \"ruleDecision == null\"\n          target: \"terminal-no-mint\"\n        - when: \"ruleDecision != null\"\n          target: \"synthesize\"\n\n    synthesize:\n      type: \"synthesize\"\n      params:\n        input_keys:\n          - \"ruleDecision\"\n          - \"moment\"\n        decision_builder: \"verdict-from-rule\"\n        side_effects:\n          - type: \"MintAttestation\"\n            params_from_keys:\n              - \"momentEntryHash\"\n              - \"ruleDecision\"\n            shape: \"StoryPointLink\"\n          - type: \"EmitEconomicEvent\"\n            params_from_keys:\n              - \"ruleDecision\"\n\n  terminals:\n    terminal-no-mint:\n      decision:\n        status: \"allow\"\n        exempt: true\n        rationale: \"steady-state-silence\"\n      side_effects: []",
+  "contentFormat": "plaintext",
+  "tags": [
+    "gate",
+    "discernment",
+    "seven-valence",
+    "experience-moment",
+    "experience-story",
+    "attestation",
+    "story-point",
+    "mechanical-ruleset"
+  ],
+  "metadata": {
+    "name": "discernment-gate-v1-mechanical",
+    "version": "1.0.0",
+    "eventType": "attestation-write",
+    "supersedes": null,
+    "dag": {
+      "entrypoint": "assemble",
+      "steps": {
+        "assemble": {
+          "type": "context-assemble",
+          "params": {
+            "pulls": [
+              { "from": "source-chain", "query": "experience-moment.entry", "output_key": "moment" },
+              { "from": "elohim-storage", "query": "prior-attestations.for-experience-story", "output_key": "priorAttestations" }
+            ]
+          },
+          "next": "rules"
+        },
+        "rules": {
+          "type": "mechanical-ruleset",
+          "params": {
+            "rules_cid": "epr:rules:seven-valence-v1",
+            "input_keys": ["moment", "priorAttestations"],
+            "output_key": "ruleDecision"
+          },
+          "edges": [
+            { "when": "ruleDecision == null", "target": "terminal-no-mint" },
+            { "when": "ruleDecision != null", "target": "synthesize" }
+          ]
+        },
+        "synthesize": {
+          "type": "synthesize",
+          "params": {
+            "input_keys": ["ruleDecision", "moment"],
+            "decision_builder": "verdict-from-rule",
+            "side_effects": [
+              {
+                "type": "MintAttestation",
+                "params_from_keys": ["momentEntryHash", "ruleDecision"],
+                "shape": "StoryPointLink"
+              },
+              {
+                "type": "EmitEconomicEvent",
+                "params_from_keys": ["ruleDecision"]
+              }
+            ]
+          }
+        }
+      },
+      "terminals": {
+        "terminal-no-mint": {
+          "decision": {
+            "status": "allow",
+            "exempt": true,
+            "rationale": "steady-state-silence"
+          },
+          "sideEffects": []
+        }
+      }
+    }
+  },
+  "createdAt": "2026-04-18T00:00:00.000Z",
+  "updatedAt": "2026-04-18T00:00:00.000Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 1.0,
+      "role": "author"
+    }
+  ]
+}

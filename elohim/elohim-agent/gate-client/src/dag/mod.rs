@@ -21,6 +21,7 @@ use std::collections::HashMap;
 // ─── Sub-modules ─────────────────────────────────────────────────────────────
 
 pub mod context;
+pub mod discernment_gate;
 pub mod executor;
 pub mod executors;
 pub mod expr;

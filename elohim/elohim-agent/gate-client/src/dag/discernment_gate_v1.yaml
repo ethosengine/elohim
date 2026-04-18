@@ -1,0 +1,127 @@
+# Discernment Gate v1 — mechanical — seven-valence discernment of experience-moments.
+#
+# Spec §3.3.  This is the first app-domain gate in Phase 3.  It wires the
+# seven-valence mechanical ruleset (Task 3.2) to classify `experience-moment`
+# events and emit StoryPointTag verdicts.
+#
+# event_type: "attestation-write"
+#   This gate is scoped to the attestation-write relational-impact event.  When
+#   the discernment gate fires, the context-assemble step pulls the moment data
+#   and prior attestations from their respective sources.  The mechanical-ruleset
+#   step then applies the seven-valence rules (Task 3.2) to produce a
+#   ruleDecision.  If no rule matches (steady-state), the gate routes to the
+#   terminal-no-mint terminal.  If a rule matches, the synthesize step emits a
+#   Verdict(StoryPointTag) and triggers MintAttestation + EmitEconomicEvent.
+#
+# Three-node DAG:
+#   assemble (context-assemble)
+#     └─ next ──► rules (mechanical-ruleset)
+#                     ├─ ruleDecision == null   ──► terminal: terminal-no-mint
+#                     └─ ruleDecision != null   ──► synthesize (synthesize, Terminate)
+#
+# Context pre-computation contract (Task 3.4 must implement):
+#   The context-assemble step (assemble) is responsible for injecting the
+#   precomputed boolean fields required by rules 5 and 6:
+#     priorAttestations.witnessEligible
+#     priorAttestations.refinementEligible
+#   See seven_valence_rules.rs §context-pre-computation-contract for full spec.
+#
+# Terminal design note:
+#   terminal-no-mint is declared as a terminal (not a step) because it carries a
+#   static decision with no executor side effects and needs no executor at all.
+#   The interpreter checks terminals FIRST; routing here bypasses all executors.
+#   synthesize is a step backed by SynthesizeExecutor which returns Terminate
+#   directly — it is NOT in the terminals map.
+
+name: "discernment-gate-v1-mechanical"
+version: "1.0.0"
+event_type: "attestation-write"
+
+input_schema:
+  type: "object"
+  description: "AttestationWrite event carrying the experience-moment entry hash and author"
+output_schema:
+  type: "object"
+  description: "GateDecision — Verdict(StoryPointTag) if a rule fires, Allow{exempt} if no rule matches"
+
+dag:
+  entrypoint: "assemble"
+
+  steps:
+    # ── Step 1: assemble ──────────────────────────────────────────────────────
+    # context-assemble step.  Phase 3: pulls the experience-moment entry from
+    # source-chain and prior attestations from elohim-storage.  Both pulls return
+    # null via Phase 3+ stubs until real resolver wiring lands in Task 3.4.
+    # Task 3.4 must also precompute witnessEligible and refinementEligible into
+    # the priorAttestations object before the rules step runs.
+    assemble:
+      type: "context-assemble"
+      params:
+        pulls:
+          - from: "source-chain"
+            query: "experience-moment.entry"
+            output_key: "moment"
+          - from: "elohim-storage"
+            query: "prior-attestations.for-experience-story"
+            output_key: "priorAttestations"
+      next: "rules"
+
+    # ── Step 2: rules ─────────────────────────────────────────────────────────
+    # mechanical-ruleset step.  Loads the seven-valence rules artifact by CID
+    # and evaluates each rule in order against the assembled context.  Writes
+    # the first matching rule's outcome to the output key "ruleDecision", or
+    # null if no rule matches (rule 7 — steady-state silence).
+    #
+    # Phase 3: MechanicalRulesetExecutor resolves the CID via
+    # EmbeddedContentNodeResolver pre-loaded with SEVEN_VALENCE_RULES_V1_CID.
+    rules:
+      type: "mechanical-ruleset"
+      params:
+        rules_cid: "epr:rules:seven-valence-v1"
+        input_keys:
+          - "moment"
+          - "priorAttestations"
+        output_key: "ruleDecision"
+      edges:
+        - when: "ruleDecision == null"
+          target: "terminal-no-mint"
+        - when: "ruleDecision != null"
+          target: "synthesize"
+
+    # ── Step 3: synthesize ────────────────────────────────────────────────────
+    # synthesize step.  Reads ruleDecision and moment from context, constructs a
+    # Verdict(StoryPointTag), and fires two side effects:
+    #   - MintAttestation: writes a :story-point Holochain Link (StoryPointLink)
+    #   - EmitEconomicEvent: dual-encodes the attestation as a shefa EconomicEvent
+    #
+    # SynthesizeExecutor returns StepOutcome::Terminate directly.  synthesize is
+    # NOT in the terminals map — it uses verdict-from-rule decision_builder.
+    synthesize:
+      type: "synthesize"
+      params:
+        input_keys:
+          - "ruleDecision"
+          - "moment"
+        decision_builder: "verdict-from-rule"
+        side_effects:
+          - type: "MintAttestation"
+            params_from_keys:
+              - "momentEntryHash"
+              - "ruleDecision"
+            shape: "StoryPointLink"
+          - type: "EmitEconomicEvent"
+            params_from_keys:
+              - "ruleDecision"
+
+  # terminals map.
+  # terminal-no-mint: rule-7 steady-state path — no rule matched, do not mint.
+  # Emits an Allow{exempt: true} decision with a rationale of "steady-state-silence".
+  # All other terminal behaviour (when a rule fires) is produced by the
+  # synthesize executor (StepOutcome::Terminate with Verdict).
+  terminals:
+    terminal-no-mint:
+      decision:
+        status: "allow"
+        exempt: true
+        rationale: "steady-state-silence"
+      side_effects: []

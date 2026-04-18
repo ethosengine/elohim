@@ -170,7 +170,11 @@
         "coupling": {
           "knowledge": { "relationships": { "ATTESTS_TO": ["experience-story"] } },
           "value": {},
-          "governance": { "defaultReach": "self", "governanceModel": "agent-scoped" },
+          "governance": {
+            "defaultReach": "self",
+            "governanceModel": "agent-scoped",
+            "gates": ["discernment-gate-v1-mechanical"]
+          },
           "claims": [
             {
               "asserts": "community-value-confirmed",
@@ -1036,6 +1040,16 @@
       "component": "PathViewerComponent",
       "formats": ["epr-composite"],
       "platform": "angular"
+    }
+  },
+  "gates": {
+    "discernment-gate-v1-mechanical": {
+      "processCid": "epr:gates:discernment-gate-v1-mechanical",
+      "description": "Seven-valence discernment of experience-moments; mints :story-point attestations.",
+      "handlesEvents": ["AttestationWrite"],
+      "governanceReach": "community",
+      "peerReviewedBy": [],
+      "supersedes": null
     }
   }
 }

@@ -211,6 +211,9 @@ pub fn __test_set_decision_override(decision: Option<GateDecision>) {
 }
 
 // Public re-exports for ergonomic use.
+pub use dag::discernment_gate::{
+    default_discernment_gate_declaration, default_discernment_gate_yaml, DISCERNMENT_GATE_V1_CID,
+};
 pub use dag::executors::{
     ContentNodeResolver, ContextAssembleExecutor, EmbeddedContentNodeResolver,
     EscalateToReviewExecutor, MechanicalRulesetExecutor, SynthesizeExecutor, WisdomInvokeExecutor,
