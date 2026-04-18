@@ -13,7 +13,7 @@
 //! 5. The `__test_set_decision_override` short-circuit fires BEFORE the DAG.
 //! 6. Exempt space types return `Allow { exempt: true }` without running the DAG.
 
-use gate_client::{check, events::RelationalImpactEvent, phase::Phase, GateDecision, GateStatus};
+use gate_client::{check, events::RelationalImpactEvent, phase::Phase, GateStatus};
 
 // ─── E2E-1: ContentPublish through real DAG ───────────────────────────────────
 //

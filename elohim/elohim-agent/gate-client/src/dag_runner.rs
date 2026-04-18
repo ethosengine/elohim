@@ -51,11 +51,15 @@ pub struct DagRunner {
     declaration: GateProcessDeclaration,
 }
 
-// SAFETY: DagInterpreter contains Arc<dyn StepExecutor> (all Send+Sync) and a
-// HashMap.  GateProcessDeclaration is plain-data Serialize/Deserialize.
-// Neither holds any interior mutability; both are sound to share across threads.
-unsafe impl Send for DagRunner {}
-unsafe impl Sync for DagRunner {}
+// DagRunner auto-derives Send + Sync because:
+// - DagInterpreter holds HashMap<StepKind, Arc<dyn StepExecutor>>, where
+//   `StepExecutor: Send + Sync` is declared at src/dag/executor.rs.
+// - GateProcessDeclaration is plain-data Serialize/Deserialize.
+// The prior `unsafe impl Send/Sync` was redundant — the auto-impls already
+// apply. Keeping unsafe here would be a code smell (misleading reviewers into
+// thinking compile-time verification is bypassed, and risking real unsoundness
+// if a future maintainer adds a !Send/!Sync field without realizing the unsafe
+// impl was papering over it).
 
 impl DagRunner {
     /// Construct a runner with all four Phase 2 executors registered.

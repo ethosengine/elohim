@@ -269,28 +269,25 @@ pub async fn check(event: RelationalImpactEvent) -> GateResult<GateDecision> {
 /// Mirrors [`check`] but runs the async DAG on a freshly-created single-use
 /// Tokio runtime so it can be called from synchronous WASM contexts.
 ///
-/// If a Tokio runtime is already running on the current thread (e.g., in a
-/// `#[tokio::test]`), this falls back to `block_in_place` / `spawn_blocking`
-/// to avoid a nested-runtime panic.  In Holochain WASM there is no ambient
-/// runtime so the dedicated runtime path always executes.
+/// Target use case: Holochain zome coordinator functions that run in WASM
+/// without an ambient Tokio runtime. This path always spins a fresh
+/// current-thread runtime and runs the gate check on it.
+///
+/// **Do NOT call this from inside an existing Tokio runtime.** It will panic
+/// with "Cannot start a runtime from within a runtime." Async callers should
+/// use [`check`] with `.await` instead. Phase 3+ may add a `block_in_place`
+/// bridge path if a legitimate nested-runtime use case emerges.
 pub fn check_blocking(event: RelationalImpactEvent) -> GateResult<GateDecision> {
     let space = space::detect_from_event(&event);
     if space.is_exempt() {
         return Ok(GateDecision::allow_exempt(Phase::DevContext));
     }
 
-    // If called from within an existing async context (e.g., tests), bridge
-    // via tokio::task::block_in_place to avoid nested-runtime panic.
-    // In WASM / Holochain host there is no ambient runtime — we spin one.
-    if let Ok(handle) = tokio::runtime::Handle::try_current() {
-        handle.block_on(dag_runner::run_with_tracing(&event))
-    } else {
-        tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()
-            .map_err(|e| GateError::DagExecution(format!("runtime build error: {e}")))?
-            .block_on(dag_runner::run_with_tracing(&event))
-    }
+    tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .map_err(|e| GateError::DagExecution(format!("runtime build error: {e}")))?
+        .block_on(dag_runner::run_with_tracing(&event))
 }
 
 /// Configure the gate client — transport, phase override, trust assessor.
