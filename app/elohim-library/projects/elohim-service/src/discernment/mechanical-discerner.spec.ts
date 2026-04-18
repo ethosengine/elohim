@@ -3,6 +3,51 @@ import { describe, expect, it } from 'vitest';
 import { discernMechanical } from './mechanical-discerner.js';
 import { momentFixture, priorFixture } from './fixtures.js';
 
+describe('discernMechanical — rule 3 (validation)', () => {
+  it('mints validation/meaningful/failure-mode-confirmed when a @validates-failure-mode scenario fails and there is no prior-passed attestation', () => {
+    const moment = momentFixture({
+      status: 'failed',
+      scenarioTags: ['@e2e', '@lamad', '@validates-failure-mode'],
+      errorClass: 'ExpectedFailure/unauthorized',
+    });
+
+    const tag = discernMechanical(
+      {
+        moment,
+        priors: { knownErrorClasses: new Set(['ExpectedFailure/unauthorized']) },
+      },
+      'uhCEk-moment-hash',
+    );
+
+    expect(tag).toMatchObject({
+      valence: 'validation',
+      magnitude: 'meaningful',
+      evidenceType: 'failure-mode-confirmed',
+    });
+  });
+
+  it('yields to rule 2 when a @validates-failure-mode scenario fails AFTER a prior-passed attestation (the validation itself regressed)', () => {
+    const moment = momentFixture({
+      status: 'failed',
+      scenarioTags: ['@e2e', '@validates-failure-mode'],
+      errorClass: 'AssertionError/timeout',
+    });
+
+    const tag = discernMechanical(
+      {
+        moment,
+        priors: {
+          latestAny: priorFixture({ status: 'passed' }),
+          knownErrorClasses: new Set<string>(),
+        },
+      },
+      'uhCEk-moment-hash',
+    );
+
+    expect(tag).toMatchObject({ valence: 'discovery' });
+  });
+});
+
 describe('discernMechanical — rule 2 (failed after prior-passed)', () => {
   it('mints discovery/meaningful/novel-failure-class when error class is new', () => {
     const moment = momentFixture({

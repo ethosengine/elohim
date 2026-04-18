@@ -42,6 +42,8 @@ export function discernMechanical(
   }
 
   // Rule 2 — failed after prior-passed → discovery (novel) or regression (known)
+  // NOTE: Rule 2 must come BEFORE rule 3 so that a @validates-failure-mode scenario
+  // that regressed (had prior-passed) gets classified by rule 2, not rule 3.
   if (moment.status === 'failed' && priors.latestAny?.status === 'passed') {
     const isNovel =
       !moment.errorClass || !priors.knownErrorClasses.has(moment.errorClass);
@@ -52,6 +54,11 @@ export function discernMechanical(
       'meaningful',
       isNovel ? 'novel-failure-class' : 'known-cause-recurrence',
     );
+  }
+
+  // Rule 3 — @validates-failure-mode scenario failing with no prior-passed attestation
+  if (moment.status === 'failed' && moment.scenarioTags.includes('@validates-failure-mode')) {
+    return mkTag(input, momentEntryHash, 'validation', 'meaningful', 'failure-mode-confirmed');
   }
 
   return null;
