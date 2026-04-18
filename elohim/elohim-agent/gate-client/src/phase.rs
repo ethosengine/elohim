@@ -11,7 +11,25 @@ use ts_rs::TS;
 
 /// Execution phase for gate decisions.
 ///
-/// See spec §5.5 (Dev-context attestation marker).
+/// Every [`crate::GateDecision`] carries a `Phase` marker so rehearsal-era
+/// decisions can be cleanly distinguished from real protocol state when
+/// reputation aggregation turns on.
+///
+/// Why the marker exists: during Phase 0/1 the `wisdom-invoke` DAG steps
+/// return a mocked `Allow`. These decisions are legible and shape-correct
+/// but carry no wisdom judgment — they must not accrue reputation weight
+/// once real elohim are live. The `DevContext` marker lets the
+/// accountability-graph aggregator skip them.
+///
+/// # Variants
+///
+/// - [`DevContext`](Phase::DevContext) — pre-elohim-activation: wisdom-invoke
+///   is mocked, decisions carry no reputation weight.
+/// - [`ElohimActive`](Phase::ElohimActive) — post-activation: real elohim
+///   sign decisions, reputation accumulates from these attestations.
+///
+/// See spec §5.5 (Dev-context attestation marker) and §1.6 (Dev-context
+/// rehearsal behavior).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "typescript", derive(TS))]
 #[cfg_attr(

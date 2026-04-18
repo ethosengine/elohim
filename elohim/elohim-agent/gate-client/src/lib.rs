@@ -1,7 +1,20 @@
 //! Gate Client — Wisdom-as-System-Auth for the Elohim Protocol.
 //!
 //! This crate is the cross-cutting library every relational-impact write path
-//! in the protocol calls to ensure wisdom wraps every creation-event.
+//! in the protocol calls so that wisdom wraps every creation-event.
+//!
+//! # Why every write path invokes the gate
+//!
+//! Three principles from the spec drive the architecture of this crate:
+//!
+//! - **P0 — Capability-Wisdom Coupling.** Capability and wisdom scale together
+//!   by construction: no code path gains reach without passing through wisdom.
+//! - **P1 — Wisdom-as-System-Auth.** Every creation-event with potential for
+//!   relational impact on others passes through the wisdom layer before
+//!   execution — like auth middleware, you cannot forget it by accident.
+//! - **P1.5 — Privacy, Drafting, Play as Architectural Primitives.** The gate
+//!   fires at boundary-crossing, not at every interior action; offline and
+//!   private-drafting interiors are architecturally exempt.
 //!
 //! # Architecture
 //!
@@ -11,7 +24,7 @@
 //! distributed across:
 //!
 //! - Zome coordinator functions (before DHT commit)
-//! - Doorway HTTP POST handlers (via tower::Layer)
+//! - Doorway HTTP POST handlers (via `tower::Layer`)
 //! - libp2p custom-protocol senders
 //! - Sync triggers projecting private state to peers
 //! - Elohim-agent capability invocations
@@ -19,7 +32,7 @@
 //!
 //! # Phase
 //!
-//! This crate ships in two phases:
+//! This crate ships in two phases (see [`phase::Phase`]):
 //!
 //! - **DevContext (rehearsal):** `wisdom-invoke` steps are mocked to return
 //!   `Allow { phase: DevContext }`. Mechanical gates execute real logic. Every
@@ -27,6 +40,134 @@
 //!   intended shape before real elohim are live.
 //! - **ElohimActive:** `wisdom-invoke` calls a running elohim-agent-service.
 //!   Activating is a configuration flip, not a rewrite.
+//!
+//! # Call-site patterns
+//!
+//! The same [`check`] / [`check_blocking`] / [`tower_layer`] surface serves
+//! three integration shapes. Each is demonstrated below — all three pattern
+//! examples are compiled by `cargo test --doc`.
+//!
+//! - [**Pattern A**](#pattern-a--zome-coordinator-pre-commit) — Zome coordinator
+//!   pre-commit check, uses [`check_blocking`] because Holochain zomes run
+//!   synchronously in WASM.
+//! - [**Pattern B**](#pattern-b--doorway-http-post-handler-towerlayer) — Doorway
+//!   HTTP POST handler wraps an Axum router with [`tower_layer`].
+//! - [**Pattern C**](#pattern-c--direct-in-process-call) — Direct in-process
+//!   call from a libp2p sender, sync trigger, or elohim-agent invocation.
+//!
+//! ## Pattern A — Zome coordinator (pre-commit)
+//!
+//! In a Holochain zome coordinator function, the gate fires **before** the
+//! entry is committed. [`check_blocking`] is required because zome
+//! coordinators run synchronously inside WASM.
+//!
+//! Real zome code depends on the HDK (not available in doctests), so this
+//! example is marked `no_run` but shows the exact shape of the call site.
+//! See spec §1.4 Pattern A.
+//!
+//! ```rust,no_run
+//! use gate_client::{check_blocking, GateDecision, GateStatus, RelationalImpactEvent};
+//!
+//! // In real code this is `fn create_content(input) -> ExternResult<ActionHash>`
+//! // and uses HDK functions like `agent_info()?.agent_latest_pubkey` and
+//! // `create_entry(&input.content)?`. We inline plain strings here so the
+//! // example stays self-contained.
+//! fn create_content_zome(cid: String, reach: String, author: String)
+//!     -> Result<String, String>
+//! {
+//!     let event = RelationalImpactEvent::ContentPublish {
+//!         content_cid: cid,
+//!         declared_reach: reach,
+//!         author,
+//!     };
+//!
+//!     let decision: GateDecision =
+//!         check_blocking(event).map_err(|e| format!("gate error: {e}"))?;
+//!
+//!     match decision.status {
+//!         GateStatus::Allow { .. } => {
+//!             // Proceed with `create_entry(&input.content)?` in real zome code.
+//!             Ok("action-hash".to_string())
+//!         }
+//!         GateStatus::Decline { grounds } => {
+//!             // In real zome code: `Err(wasm_error!(format!(...)))`.
+//!             Err(format!("gate declined: {}", grounds.summary))
+//!         }
+//!         GateStatus::Escalate { target, .. } => {
+//!             // Queue for review, return a stub to the upstream caller.
+//!             Err(format!("queued for review by {:?}", target))
+//!         }
+//!         GateStatus::Verdict(_tag) => {
+//!             Err("verdict shape unexpected for ContentPublish in a zome".into())
+//!         }
+//!     }
+//! }
+//! ```
+//!
+//! ## Pattern B — Doorway HTTP POST handler (tower::Layer)
+//!
+//! Every state-changing HTTP route on doorway opts in with a single
+//! `.layer(gate_client::tower_layer())` call. The layer infers a
+//! [`RelationalImpactEvent`] from the request path, calls [`check`], and
+//! short-circuits with 403 / 202 for Decline / Escalate. See
+//! [`tower`] for the full path-inference table and spec §1.4 Pattern B.
+//!
+//! Marked `no_run` to avoid binding a port, but the router builds and
+//! type-checks.
+//!
+//! ```rust,no_run
+//! use axum::{routing::post, Router};
+//!
+//! async fn create_content() -> &'static str { "ok" }
+//! async fn create_attestation() -> &'static str { "ok" }
+//! async fn emit_economic_event() -> &'static str { "ok" }
+//!
+//! # async fn run() {
+//! let app: Router = Router::new()
+//!     .route("/content", post(create_content))
+//!     .route("/attestation", post(create_attestation))
+//!     .route("/economic-event", post(emit_economic_event))
+//!     .layer(gate_client::tower_layer());
+//!
+//! // In real code doorway binds the port:
+//! let listener = tokio::net::TcpListener::bind("0.0.0.0:8080").await.unwrap();
+//! axum::serve(listener, app).await.unwrap();
+//! # }
+//! ```
+//!
+//! ## Pattern C — Direct in-process call
+//!
+//! Callers outside zomes and tower (libp2p senders, sync triggers, direct
+//! elohim-agent invocations) await [`check`] directly and branch on the
+//! status. This example actually runs under `cargo test --doc` using the
+//! DevContext mock. See spec §1.4 Pattern C.
+//!
+//! ```rust
+//! use gate_client::{check, GateStatus, RelationalImpactEvent};
+//!
+//! async fn send_peer_message(recipient: String, payload_kind: String) -> Result<(), String> {
+//!     let event = RelationalImpactEvent::PeerMessage { recipient, payload_kind };
+//!
+//!     let decision = check(event).await.map_err(|e| format!("gate error: {e}"))?;
+//!
+//!     match decision.status {
+//!         GateStatus::Allow { .. } => {
+//!             // proceed with libp2p send, sync projection, etc.
+//!             Ok(())
+//!         }
+//!         GateStatus::Decline { grounds } => Err(format!("declined: {}", grounds.summary)),
+//!         GateStatus::Escalate { .. } => Err("escalated to review".into()),
+//!         GateStatus::Verdict(_) => Ok(()), // evaluator-shape gate, proceed
+//!     }
+//! }
+//!
+//! // DevContext mock returns Allow — this example runs in `cargo test --doc`.
+//! tokio_test::block_on(async {
+//!     send_peer_message("agent-peer".to_string(), "handshake".to_string()).await.unwrap();
+//! });
+//! ```
+//!
+//! # Further reading
 //!
 //! See `elohim/elohim-agent/spec/2026-04-18-gate-interface.md` for the full
 //! architectural specification.

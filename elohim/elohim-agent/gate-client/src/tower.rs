@@ -56,9 +56,29 @@ use crate::{
 ///
 /// Gated methods: POST, PUT, PATCH, DELETE. GET/HEAD/OPTIONS pass straight through.
 ///
-/// Usage:
-/// ```rust,ignore
-/// Router::new()
+/// This is the entry point for **Pattern B** at the doorway HTTP boundary —
+/// see the [crate-level "Pattern B" docs](crate#pattern-b--doorway-http-post-handler-towerlayer)
+/// for a complete example.
+///
+/// The layer infers a [`RelationalImpactEvent`] from the request path (see
+/// the module-level table), calls [`crate::check`], and on non-Allow decisions
+/// short-circuits with:
+///
+/// - **Decline** → HTTP 403 with JSON grounds in the body and
+///   `x-gate-verdict: decline` header.
+/// - **Escalate** → HTTP 202 with the review target / severity in the body
+///   and `x-gate-verdict: escalate` header.
+/// - **Allow / Verdict** → pass through to the inner service with
+///   `x-gate-verdict: allow` or `x-gate-verdict: verdict` added.
+///
+/// Usage sketch:
+///
+/// ```rust,no_run
+/// use axum::{routing::post, Router};
+///
+/// async fn create_content() -> &'static str { "ok" }
+///
+/// let app: Router = Router::new()
 ///     .route("/content", post(create_content))
 ///     .layer(gate_client::tower_layer());
 /// ```

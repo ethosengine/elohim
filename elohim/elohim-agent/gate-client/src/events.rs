@@ -3,6 +3,26 @@
 //! Per spec §1.2: "Adding a new variant is a protocol-level change. Non-listed
 //! events are either exempt (private-drafting, offline, play-interior) or
 //! flagged as 'must declare a variant' during code review. No silent bypass."
+//!
+//! # Closed for v1
+//!
+//! The [`RelationalImpactEvent`] enum has exactly 8 variants in v1 and is
+//! deliberately closed — extending it is a protocol-level change that
+//! requires governance ratification. An open-set extensibility mechanism
+//! arrives in v1.1.
+//!
+//! ## The 8 variants
+//!
+//! | Variant | When it fires |
+//! |---|---|
+//! | [`ContentPublish`](RelationalImpactEvent::ContentPublish) | Publishing content to the DHT for peer consumption |
+//! | [`AttestationWrite`](RelationalImpactEvent::AttestationWrite) | Writing a brit/rakia/mishpat attestation |
+//! | [`EconomicEventEmit`](RelationalImpactEvent::EconomicEventEmit) | Emitting an REA valueflow into the shefa economy |
+//! | [`PeerMessage`](RelationalImpactEvent::PeerMessage) | Sending a libp2p custom-protocol message |
+//! | [`SyncToPeers`](RelationalImpactEvent::SyncToPeers) | Projecting accumulated private state to peers |
+//! | [`AdviceSought`](RelationalImpactEvent::AdviceSought) | Requesting advice or reflection from an elohim |
+//! | [`CapabilityInvoke`](RelationalImpactEvent::CapabilityInvoke) | Invoking an ElohimCapability |
+//! | [`PrivateToPublicCrossing`](RelationalImpactEvent::PrivateToPublicCrossing) | Explicit boundary-crossing (draft → published, play → public) |
 
 use serde::{Deserialize, Serialize};
 

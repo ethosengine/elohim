@@ -11,9 +11,24 @@ use crate::phase::Phase;
 
 /// The decision emitted from a gate invocation.
 ///
-/// Every relational-impact write path receives one of these. The status
-/// determines whether the caller may proceed; side effects declare work the
-/// caller must perform (mint attestation, emit economic event, etc.).
+/// Every relational-impact write path receives one of these. The decision has
+/// four structural parts:
+///
+/// - [`status`](Self::status) — one of four outcomes (Allow, Decline, Escalate,
+///   Verdict), see [`GateStatus`]. This is the caller-observable branch.
+/// - [`reasoning`](Self::reasoning) — a [`ConstitutionalReasoningSummary`]
+///   describing the primary principle applied, a summary, and a confidence
+///   score. In DevContext the summary is the placeholder `dev-context-mock`.
+/// - [`side_effects`](Self::side_effects) — a list of [`SideEffect`]s the
+///   caller must execute after the gate returns. Per spec §1.3: "the caller
+///   executes side effects after the gate returns. The gate library does not
+///   reach into conductor/DHT itself."
+/// - [`phase`](Self::phase) — the [`Phase`] marker distinguishing rehearsal
+///   (DevContext) from post-activation (ElohimActive) decisions, so
+///   reputation aggregation can filter out non-load-bearing decisions.
+///
+/// `decision_attestation_cid` is populated when the decision has been
+/// persisted as a `GateDecisionAttestation` on the DHT — empty in DevContext.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "typescript", derive(TS))]
 #[cfg_attr(
@@ -69,9 +84,19 @@ impl GateDecision {
 
 /// The four possible outcomes of a gate invocation.
 ///
-/// Mirrors spec §1.3: Allow lets the caller proceed; Decline short-circuits;
-/// Escalate routes to human review; Verdict emits a typed classification (e.g.,
-/// StoryPointTag from the discernment gate).
+/// Mirrors spec §1.3. Each variant has a distinct caller contract:
+///
+/// - [`Allow`](Self::Allow) — caller proceeds with the relational-impact
+///   write. `exempt: true` means the gate never ran (interior space);
+///   `exempt: false` means wisdom actively allowed the event.
+/// - [`Decline`](Self::Decline) — caller must not proceed. `grounds` carries
+///   the category and rationale. Tower layer maps this to HTTP 403.
+/// - [`Escalate`](Self::Escalate) — caller must not proceed; decision is
+///   routed to a reviewer (app-steward, qahal, or existential-boundary).
+///   Tower layer maps this to HTTP 202 with a review target in the body.
+/// - [`Verdict`](Self::Verdict) — evaluator-shape gates (discernment,
+///   reach, content-safety) emit a typed classification instead of a
+///   binary allow/decline. Caller proceeds but must also act on the tag.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "typescript", derive(TS))]
 #[cfg_attr(
