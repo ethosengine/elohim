@@ -6,6 +6,8 @@ export const LAMAD_CONTENT_TYPES = [
   'lesson',
   'assessment',
   'exercise',
+  'experience-story',
+  'experience-moment',
   'reflection',
   'discussion',
   'article',
@@ -31,6 +33,7 @@ export const LAMAD_CONTENT_FORMATS = [
   'gherkin',
   'sophia-quiz-json',
   'html5-app',
+  'spa-bundle',
   'epr-composite',
   'html',
   'plaintext',
@@ -61,6 +64,7 @@ export const LAMAD_SIGNALS = [
   'path-completed',
   'practice-engagement',
   'contribution-created',
+  'experience-attestation',
   'peer-review-completed',
 ] as const;
 export type LamadSignal = (typeof LAMAD_SIGNALS)[number];

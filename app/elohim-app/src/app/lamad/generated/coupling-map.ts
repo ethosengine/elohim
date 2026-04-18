@@ -69,6 +69,28 @@ export const LAMAD_COUPLING_MAP: Record<string, ContentTypeCoupling> = {
       signalTypes: ['practice-engagement', 'learning-signal'],
     },
   },
+  'experience-story': {
+    value: {
+
+    },
+    governance: {
+      defaultReach: 'self',
+      minimumReach: 'community',
+      governanceModel: 'steward-consent',
+      signalTypes: [],
+    },
+  },
+  'experience-moment': {
+    value: {
+
+    },
+    governance: {
+      defaultReach: 'self',
+      minimumReach: 'community',
+      governanceModel: 'agent-scoped',
+      signalTypes: [],
+    },
+  },
   'reflection': {
     value: {
       onConsume: { action: 'use', resourceConformsTo: 'learning-content', recognition: 'mastery-credit' },
