@@ -3,4 +3,4 @@
 /**
  * Rationale for a Decline decision.
  */
-export type DeclineGrounds = { category: string, summary: string, principle_refs: Array<string>, };
+export type DeclineGrounds = { category: string, summary: string, principleRefs: Array<string>, };

@@ -3,4 +3,4 @@
 /**
  * Where an escalated decision routes.
  */
-export type EscalationTarget = { "kind": "app-steward", steward_id: string, } | { "kind": "qahal", community_id: string, } | { "kind": "existential-boundary" };
+export type EscalationTarget = { "kind": "app-steward", stewardId: string, } | { "kind": "qahal", communityId: string, } | { "kind": "existential-boundary" };

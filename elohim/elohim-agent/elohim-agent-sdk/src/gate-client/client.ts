@@ -78,10 +78,10 @@ export function createGateClient(config: GateClientConfig): GateClient {
  * no real wisdom invocation ran.
  */
 const MOCKED_REASONING = {
-  primary_principle: 'dev-context-mock',
+  primaryPrinciple: 'dev-context-mock',
   summary: 'Rehearsal phase: wisdom-invoke mocked to Allow.',
   confidence: 0.0,
-  phase_note: 'This decision carries no reputation weight.',
+  phaseNote: 'This decision carries no reputation weight.',
 } as const;
 
 class MockGateClient implements GateClient {
@@ -93,8 +93,8 @@ class MockGateClient implements GateClient {
     return {
       status: { status: 'allow', exempt: false },
       reasoning: { ...MOCKED_REASONING },
-      side_effects: [],
-      decision_attestation_cid: null,
+      sideEffects: [],
+      decisionAttestationCid: null,
       phase: 'dev-context',
     };
   }
@@ -103,19 +103,10 @@ class MockGateClient implements GateClient {
     _target: EscalationTarget,
     _context: unknown,
   ): Promise<string> {
-    // Synthetic UUID — the mock transport does not persist escalations.
+    // RFC-4122 v4 UUID — the mock transport does not persist escalations.
     // Phase 2 wires in a real queue via the http transport.
-    return generateMockReviewId();
+    return crypto.randomUUID();
   }
-}
-
-function generateMockReviewId(): string {
-  // RFC-4122 v4 shape; random, not cryptographic. Sufficient for mock mode
-  // where the ID is a placeholder carried through to a never-retrieved queue.
-  const hex = (n: number) => Math.floor(Math.random() * n).toString(16);
-  const segment = (len: number) =>
-    Array.from({ length: len }, () => hex(16)).join('');
-  return `${segment(8)}-${segment(4)}-4${segment(3)}-${segment(4)}-${segment(12)}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -157,7 +148,7 @@ class HttpGateClient implements GateClient {
       );
     }
 
-    const body = (await response.json()) as { review_id: string };
-    return body.review_id;
+    const body = (await response.json()) as { reviewId: string };
+    return body.reviewId;
   }
 }

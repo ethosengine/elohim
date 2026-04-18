@@ -20,7 +20,7 @@ use ts_rs::TS;
     feature = "typescript",
     ts(export, export_to = "../../elohim-agent-sdk/src/gate-client/generated/")
 )]
-#[serde(tag = "kind", rename_all = "kebab-case")]
+#[serde(tag = "kind", rename_all = "kebab-case", rename_all_fields = "camelCase")]
 pub enum RelationalImpactEvent {
     /// Publishing content to the DHT for peer consumption.
     ContentPublish {

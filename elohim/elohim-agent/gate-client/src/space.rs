@@ -93,6 +93,7 @@ impl SpaceType {
     feature = "typescript",
     ts(export, export_to = "../../elohim-agent-sdk/src/gate-client/generated/")
 )]
+#[serde(rename_all = "camelCase")]
 pub struct SpaceContext {
     pub space_type: SpaceType,
     /// Caller-declared play-mode override (user in playful creation mode).

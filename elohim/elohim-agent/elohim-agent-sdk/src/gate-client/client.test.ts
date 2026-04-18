@@ -25,8 +25,8 @@ const EVENT_FIXTURES: Array<[string, RelationalImpactEvent]> = [
     'content-publish',
     {
       kind: 'content-publish',
-      content_cid: 'bafybeigtest',
-      declared_reach: 'public',
+      contentCid: 'bafybeigtest',
+      declaredReach: 'public',
       author: 'agent-a',
     },
   ],
@@ -34,8 +34,8 @@ const EVENT_FIXTURES: Array<[string, RelationalImpactEvent]> = [
     'attestation-write',
     {
       kind: 'attestation-write',
-      subject_hash: 'bafkreitest',
-      claim_kind: 'brit',
+      subjectHash: 'bafkreitest',
+      claimKind: 'brit',
       issuer: 'agent-a',
     },
   ],
@@ -43,7 +43,7 @@ const EVENT_FIXTURES: Array<[string, RelationalImpactEvent]> = [
     'economic-event-emit',
     {
       kind: 'economic-event-emit',
-      event_kind: 'produce',
+      eventKind: 'produce',
       provider: 'agent-a',
       receiver: 'agent-b',
       quantity: '1.0',
@@ -54,15 +54,15 @@ const EVENT_FIXTURES: Array<[string, RelationalImpactEvent]> = [
     {
       kind: 'peer-message',
       recipient: 'agent-b',
-      payload_kind: 'chat',
+      payloadKind: 'chat',
     },
   ],
   [
     'sync-to-peers',
     {
       kind: 'sync-to-peers',
-      manifest_cid: 'bafybeimanifest',
-      item_count: 42,
+      manifestCid: 'bafybeimanifest',
+      itemCount: 42,
     },
   ],
   [
@@ -70,7 +70,7 @@ const EVENT_FIXTURES: Array<[string, RelationalImpactEvent]> = [
     {
       kind: 'advice-sought',
       requester: 'agent-a',
-      summary_cid: 'bafkreisummary',
+      summaryCid: 'bafkreisummary',
       topic: 'reflection',
     },
   ],
@@ -80,15 +80,15 @@ const EVENT_FIXTURES: Array<[string, RelationalImpactEvent]> = [
       kind: 'capability-invoke',
       capability: 'advise',
       requester: 'agent-a',
-      request_id: 'req-1',
+      requestId: 'req-1',
     },
   ],
   [
     'private-to-public-crossing',
     {
       kind: 'private-to-public-crossing',
-      source_space: 'draft-a',
-      artifact_ref: 'bafkreiartifact',
+      sourceSpace: 'draft-a',
+      artifactRef: 'bafkreiartifact',
     },
   ],
 ];
@@ -128,15 +128,15 @@ describe('MockGateClient.check', () => {
 
     expect(decision.status.status).toBe('allow');
     expect(decision.phase).toBe('dev-context');
-    expect(decision.side_effects).toEqual([]);
-    expect(decision.decision_attestation_cid).toBeNull();
+    expect(decision.sideEffects).toEqual([]);
+    expect(decision.decisionAttestationCid).toBeNull();
   });
 
   it('carries the mocked reasoning summary', async () => {
     const client = createGateClient({ transport: 'mock' });
     const decision = await client.check(EVENT_FIXTURES[0][1]);
 
-    expect(decision.reasoning.primary_principle).toBe('dev-context-mock');
+    expect(decision.reasoning.primaryPrinciple).toBe('dev-context-mock');
     expect(decision.reasoning.confidence).toBe(0.0);
   });
 
@@ -165,7 +165,7 @@ describe('MockGateClient.queueForReview', () => {
     const client = createGateClient({ transport: 'mock' });
     const target: EscalationTarget = {
       kind: 'app-steward',
-      steward_id: 'steward-a',
+      stewardId: 'steward-a',
     };
     const id = await client.queueForReview(target, { reason: 'needs-review' });
     expect(typeof id).toBe('string');

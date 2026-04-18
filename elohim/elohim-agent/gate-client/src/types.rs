@@ -20,6 +20,7 @@ use crate::phase::Phase;
     feature = "typescript",
     ts(export, export_to = "../../elohim-agent-sdk/src/gate-client/generated/")
 )]
+#[serde(rename_all = "camelCase")]
 pub struct GateDecision {
     pub status: GateStatus,
     pub reasoning: ConstitutionalReasoningSummary,
@@ -104,6 +105,7 @@ pub enum GateStatus {
     feature = "typescript",
     ts(export, export_to = "../../elohim-agent-sdk/src/gate-client/generated/")
 )]
+#[serde(rename_all = "camelCase")]
 pub struct DeclineGrounds {
     pub category: String,
     pub summary: String,
@@ -117,7 +119,7 @@ pub struct DeclineGrounds {
     feature = "typescript",
     ts(export, export_to = "../../elohim-agent-sdk/src/gate-client/generated/")
 )]
-#[serde(tag = "kind", rename_all = "kebab-case")]
+#[serde(tag = "kind", rename_all = "kebab-case", rename_all_fields = "camelCase")]
 pub enum EscalationTarget {
     /// App-declared steward — fastest path, most context.
     AppSteward { steward_id: String },
@@ -153,7 +155,7 @@ pub enum Severity {
     feature = "typescript",
     ts(export, export_to = "../../elohim-agent-sdk/src/gate-client/generated/")
 )]
-#[serde(tag = "tag_kind", rename_all = "kebab-case")]
+#[serde(tag = "tag_kind", rename_all = "kebab-case", rename_all_fields = "camelCase")]
 pub enum GateTag {
     /// Discernment gate output — carries the 7-valence classification.
     StoryPoint {
@@ -177,7 +179,7 @@ pub enum GateTag {
     feature = "typescript",
     ts(export, export_to = "../../elohim-agent-sdk/src/gate-client/generated/")
 )]
-#[serde(tag = "effect", rename_all = "kebab-case")]
+#[serde(tag = "effect", rename_all = "kebab-case", rename_all_fields = "camelCase")]
 pub enum SideEffect {
     /// Mint an attestation on DHT.
     MintAttestation {
@@ -211,6 +213,7 @@ pub enum SideEffect {
     feature = "typescript",
     ts(export, export_to = "../../elohim-agent-sdk/src/gate-client/generated/")
 )]
+#[serde(rename_all = "camelCase")]
 pub struct ConstitutionalReasoningSummary {
     pub primary_principle: String,
     pub summary: String,

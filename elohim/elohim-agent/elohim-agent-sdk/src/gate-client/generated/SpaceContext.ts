@@ -4,12 +4,12 @@ import type { SpaceType } from "./SpaceType.js";
 /**
  * Context enriching a space-type with caller-declared mode flags.
  */
-export type SpaceContext = { space_type: SpaceType, 
+export type SpaceContext = { spaceType: SpaceType, 
 /**
  * Caller-declared play-mode override (user in playful creation mode).
  */
-play_mode: boolean, 
+playMode: boolean, 
 /**
  * Caller-declared roleplay-mode override (user in fictional identity).
  */
-roleplay_mode: boolean, };
+roleplayMode: boolean, };

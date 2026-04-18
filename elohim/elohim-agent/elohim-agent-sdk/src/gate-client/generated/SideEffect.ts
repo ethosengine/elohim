@@ -6,4 +6,4 @@
  * Per spec §1.3: "The caller executes side effects after the gate returns.
  * The gate library does not reach into conductor/DHT itself."
  */
-export type SideEffect = { "effect": "mint-attestation", shape: string, target_hash: string, tag_json: string, } | { "effect": "emit-economic-event", event_json: string, } | { "effect": "open-steward-review", grounds_json: string, context_json: string, } | { "effect": "update-reach-aggregation", subject_hash: string, delta_json: string, };
+export type SideEffect = { "effect": "mint-attestation", shape: string, targetHash: string, tagJson: string, } | { "effect": "emit-economic-event", eventJson: string, } | { "effect": "open-steward-review", groundsJson: string, contextJson: string, } | { "effect": "update-reach-aggregation", subjectHash: string, deltaJson: string, };

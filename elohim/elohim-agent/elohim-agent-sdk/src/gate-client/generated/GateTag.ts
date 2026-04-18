@@ -7,4 +7,4 @@
  * carrying valence + magnitude + evidenceType. `reach-gate` emits a ReachLevel
  * variant.
  */
-export type GateTag = { "tag_kind": "story-point", valence: string, magnitude: string, evidence_type: string, } | { "tag_kind": "reach-level", level: string, } | { "tag_kind": "content-safety", classification: string, };
+export type GateTag = { "tag_kind": "story-point", valence: string, magnitude: string, evidenceType: string, } | { "tag_kind": "reach-level", level: string, } | { "tag_kind": "content-safety", classification: string, };

@@ -4,6 +4,16 @@
   "private": true,
   "type": "module",
   "main": "dist/server.js",
+  "exports": {
+    ".": {
+      "import": "./dist/server.js",
+      "types": "./dist/server.d.ts"
+    },
+    "./gate-client": {
+      "import": "./dist/gate-client/index.js",
+      "types": "./dist/gate-client/index.d.ts"
+    }
+  },
   "scripts": {
     "build": "tsc",
     "start": "node dist/server.js",

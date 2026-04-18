@@ -11,4 +11,4 @@ import type { SideEffect } from "./SideEffect.js";
  * determines whether the caller may proceed; side effects declare work the
  * caller must perform (mint attestation, emit economic event, etc.).
  */
-export type GateDecision = { status: GateStatus, reasoning: ConstitutionalReasoningSummary, side_effects: Array<SideEffect>, decision_attestation_cid: string | null, phase: Phase, };
+export type GateDecision = { status: GateStatus, reasoning: ConstitutionalReasoningSummary, sideEffects: Array<SideEffect>, decisionAttestationCid: string | null, phase: Phase, };

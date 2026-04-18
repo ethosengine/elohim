@@ -8,4 +8,4 @@
  * the rehearsal phase; during ElohimActive, this will be replaced by the
  * full `ConstitutionalReasoning` struct from `elohim-agent::response`.
  */
-export type ConstitutionalReasoningSummary = { primary_principle: string, summary: string, confidence: number, phase_note: string, };
+export type ConstitutionalReasoningSummary = { primaryPrinciple: string, summary: string, confidence: number, phaseNote: string, };
