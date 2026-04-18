@@ -25,6 +25,7 @@ pub mod executor;
 pub mod executors;
 pub mod expr;
 pub mod interpreter;
+pub mod universal_band;
 
 // ─── Public re-exports ────────────────────────────────────────────────────────
 

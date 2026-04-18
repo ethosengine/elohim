@@ -1,0 +1,155 @@
+# Universal Band v1 — the protocol-root gate DAG that runs before every gate invocation.
+#
+# Spec §2.5.  This declaration is a governable artifact: the active version is
+# determined by the constitutional pointer (ACTIVE_UNIVERSAL_BAND_NAME /
+# ACTIVE_UNIVERSAL_BAND_VERSION in universal_band.rs).  Phase 3+ will replace
+# the pointer with a DHT lookup so the community can ratify a new version
+# without a binary release.
+#
+# event_type: "*"
+#   The universal band is not scoped to a single event kind.  We represent
+#   "applies to all events" with the literal string "*".  The DAG runner
+#   (Task 2.4) matches this sentinel and runs the band before every gate
+#   invocation regardless of the event's discriminator.
+#
+# Phase 2 simplification:
+#   - wisdom-invoke steps are mocked (WisdomInvokeExecutor always writes
+#     {"decision":"allow"} into the output key).
+#   - Conditional edges for decline / escalate / need-deeper are wired but
+#     will NOT fire in DevContext.
+#   - wisdom-deeper (recursive NeedDeeper handling) is a Phase 3+ TODO;
+#     for v1 the need-deeper edge falls through to record-decision (allow).
+#
+# All step types used here are the four v1 types:
+#   ContextAssemble, WisdomInvoke, Synthesize, EscalateToReview.
+#
+# Terminal design note:
+#   record-decision, record-decline, and escalate-to-review are declared as
+#   steps (not terminals) because they use registered executors (Synthesize and
+#   EscalateToReview) that return StepOutcome::Terminate directly.  The
+#   interpreter checks the terminals map FIRST; putting executor-backed steps
+#   there would bypass their executors entirely.  The terminals map is empty
+#   for this DAG — all terminal behaviour comes from executor-produced Terminate.
+
+name: "universal-band-v1"
+version: "1.0.0"
+event_type: "*"
+
+# Minimal schemas — the universal band's input/output shape is protocol-wide.
+# Phase 3+ will formalise these with CID-addressed JSON Schema documents.
+input_schema:
+  type: "object"
+  description: "RelationalImpactEvent passed from the gate caller"
+output_schema:
+  type: "object"
+  description: "GateDecision produced by the record-decision or record-decline synthesize step"
+
+dag:
+  entrypoint: "authorize"
+
+  steps:
+    # ── Step 1: authorize ─────────────────────────────────────────────────────
+    # context-assemble step.  Phase 2: pulls return null (stubs).  Any event
+    # passes — the authorize step never blocks in DevContext.
+    authorize:
+      type: "context-assemble"
+      params:
+        pulls:
+          - from: "source-chain"
+            query: "agent.identity"
+            output_key: "agent_identity"
+          - from: "manifest"
+            query: "gate.event_kind"
+            output_key: "event_kind"
+      next: "assemble-context"
+
+    # ── Step 2: assemble-context ──────────────────────────────────────────────
+    # context-assemble step.  Pulls space-type and event kind into ctx so the
+    # wisdom step has a populated context to reason over.  Phase 2: all pulls
+    # return null via Phase 3+ stubs — the context keys are present but null.
+    assemble-context:
+      type: "context-assemble"
+      params:
+        pulls:
+          - from: "manifest"
+            query: "space.type"
+            output_key: "space_type"
+          - from: "manifest"
+            query: "gate.event_kind"
+            output_key: "event_kind_ctx"
+          - from: "source-chain"
+            query: "agent.trust_level"
+            output_key: "agent_trust"
+      next: "wisdom-primary"
+
+    # ── Step 3: wisdom-primary ────────────────────────────────────────────────
+    # wisdom-invoke step.  Core constitution primed, full context, returns
+    # Allow / Decline / Escalate / NeedDeeper shape.
+    # Phase 2: WisdomInvokeExecutor always writes {"decision":"allow"} to
+    # "wisdom_output" — the conditional edges below won't fire in DevContext.
+    wisdom-primary:
+      type: "wisdom-invoke"
+      params:
+        # Phase 2 placeholder CIDs.  Phase 6+ will resolve these to real
+        # CID-addressed constitution and framing documents on the DHT.
+        constitution_cid: "epr:constitution-v1"
+        framing_cid: "epr:universal-band-framing-v1"
+        context_keys:
+          - "agent_identity"
+          - "event_kind"
+          - "space_type"
+          - "agent_trust"
+        output_key: "wisdom_output"
+      edges:
+        - when: "wisdom_output.decision == 'allow'"
+          target: "record-decision"
+        - when: "wisdom_output.decision == 'decline'"
+          target: "record-decline"
+        - when: "wisdom_output.decision == 'escalate'"
+          target: "escalate-to-review"
+        # Phase 3 TODO: wire wisdom-deeper for recursive NeedDeeper handling.
+        # For v1 DevContext, NeedDeeper falls through to record-decision (allow).
+        - when: "wisdom_output.decision == 'need-deeper'"
+          target: "record-decision"
+
+    # ── Terminal steps (executors return StepOutcome::Terminate) ──────────────
+
+    # record-decision: emits Allow with full wisdom reasoning attached.
+    # Uses allow-with-wisdom decision_builder (reads wisdomOutput key from ctx).
+    record-decision:
+      type: "synthesize"
+      params:
+        input_keys:
+          - "wisdom_output"
+          - "agent_identity"
+          - "event_kind"
+        decision_builder: "allow-with-wisdom"
+        side_effects: []
+
+    # record-decline: emits Decline with wisdom reasoning.
+    record-decline:
+      type: "synthesize"
+      params:
+        input_keys:
+          - "wisdom_output"
+          - "agent_identity"
+          - "event_kind"
+        decision_builder: "decline-from-wisdom"
+        side_effects: []
+
+    # escalate-to-review: routes to app-steward for human review.
+    # EscalateToReviewExecutor returns StepOutcome::Terminate directly.
+    escalate-to-review:
+      type: "escalate-to-review"
+      params:
+        # Phase 2 placeholder CID.  Phase 3+ will resolve to a real
+        # CID-addressed escalation-target specification.
+        target_spec_cid: "epr:escalation-target-app-steward-v1"
+        severity: "medium"
+
+  # terminals map — empty for this DAG.
+  # All terminal behaviour is produced by executors (Synthesize returns
+  # StepOutcome::Terminate; EscalateToReview returns StepOutcome::Terminate).
+  # The interpreter checks terminals first, so this must remain empty to
+  # avoid bypassing the executor logic on record-decision / record-decline.
+  terminals: {}

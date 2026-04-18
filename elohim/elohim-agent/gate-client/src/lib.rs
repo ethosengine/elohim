@@ -213,6 +213,10 @@ pub fn __test_set_decision_override(decision: Option<GateDecision>) {
 pub use dag::executors::{
     ContextAssembleExecutor, EscalateToReviewExecutor, SynthesizeExecutor, WisdomInvokeExecutor,
 };
+pub use dag::universal_band::{
+    default_universal_band_declaration, default_universal_band_yaml, ACTIVE_UNIVERSAL_BAND_NAME,
+    ACTIVE_UNIVERSAL_BAND_VERSION,
+};
 pub use error::{GateError, GateResult};
 pub use events::RelationalImpactEvent;
 pub use phase::Phase;
@@ -475,11 +479,17 @@ mod check_tests {
         };
         // First call consumes the override.
         let first = check(event.clone()).await.unwrap();
-        assert!(!first.is_allowed(), "first call must return the injected Decline");
+        assert!(
+            !first.is_allowed(),
+            "first call must return the injected Decline"
+        );
 
         // Second call on the same thread must fall back to the DevContext default Allow.
         let second = check(event).await.unwrap();
-        assert!(second.is_allowed(), "second call must return DevContext Allow (override cleared)");
+        assert!(
+            second.is_allowed(),
+            "second call must return DevContext Allow (override cleared)"
+        );
     }
 }
 
@@ -527,7 +537,11 @@ mod tower_header_tests {
         let status = resp.status();
         let headers = resp.headers().clone();
         let bytes = resp.into_body().collect().await.unwrap().to_bytes();
-        (status, headers, String::from_utf8_lossy(&bytes).into_owned())
+        (
+            status,
+            headers,
+            String::from_utf8_lossy(&bytes).into_owned(),
+        )
     }
 
     // ─── M-5: Decline produces 403, x-gate-verdict: decline, grounds in body ──
@@ -544,7 +558,9 @@ mod tower_header_tests {
 
         assert_eq!(status, StatusCode::FORBIDDEN, "Decline must produce 403");
 
-        let verdict = headers.get("x-gate-verdict").expect("x-gate-verdict header must be present");
+        let verdict = headers
+            .get("x-gate-verdict")
+            .expect("x-gate-verdict header must be present");
         assert_eq!(verdict, "decline", "x-gate-verdict must be 'decline'");
 
         assert!(
@@ -575,7 +591,9 @@ mod tower_header_tests {
 
         assert_eq!(status, StatusCode::ACCEPTED, "Escalate must produce 202");
 
-        let verdict = headers.get("x-gate-verdict").expect("x-gate-verdict header must be present");
+        let verdict = headers
+            .get("x-gate-verdict")
+            .expect("x-gate-verdict header must be present");
         assert_eq!(verdict, "escalate", "x-gate-verdict must be 'escalate'");
 
         // The body JSON must include the target and severity fields.
@@ -607,9 +625,15 @@ mod tower_header_tests {
         let (status, headers, body) = post_to(router, "/crossing").await;
 
         // Verdict passes through to inner handler — should return 200 from ok_handler.
-        assert_eq!(status, StatusCode::OK, "Verdict must pass through to inner handler");
+        assert_eq!(
+            status,
+            StatusCode::OK,
+            "Verdict must pass through to inner handler"
+        );
 
-        let verdict = headers.get("x-gate-verdict").expect("x-gate-verdict header must be present");
+        let verdict = headers
+            .get("x-gate-verdict")
+            .expect("x-gate-verdict header must be present");
         assert_eq!(verdict, "verdict", "x-gate-verdict must be 'verdict'");
 
         assert!(

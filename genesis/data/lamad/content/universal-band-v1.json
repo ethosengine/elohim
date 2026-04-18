@@ -1,0 +1,36 @@
+{
+  "id": "universal-band-v1",
+  "contentType": "universal-band-declaration",
+  "title": "Universal Band v1",
+  "description": "Protocol-root gate DAG that runs before every gate invocation. Governs authorize, context-assemble, wisdom-invoke, and terminal record/escalate steps for all relational-impact events.",
+  "content": "# universal-band-v1\n# See gate-client/src/dag/universal_band_v1.yaml for the canonical embedded source.\n# This seed entry makes the universal band discoverable as a ContentNode on the DHT.\n#\n# The authoritative YAML is embedded in the gate-client binary at compile time.\n# This seed is a reference copy for DHT-based governance lookup (Phase 3+).\n\nname: \"universal-band-v1\"\nversion: \"1.0.0\"\nevent_type: \"*\"\n\ninput_schema:\n  type: \"object\"\n  description: \"RelationalImpactEvent passed from the gate caller\"\noutput_schema:\n  type: \"object\"\n  description: \"GateDecision produced by the record-decision or record-decline synthesize step\"\n\ndag:\n  entrypoint: \"authorize\"\n\n  steps:\n    authorize:\n      type: \"context-assemble\"\n      params:\n        pulls:\n          - from: \"source-chain\"\n            query: \"agent.identity\"\n            output_key: \"agent_identity\"\n          - from: \"manifest\"\n            query: \"gate.event_kind\"\n            output_key: \"event_kind\"\n      next: \"assemble-context\"\n\n    assemble-context:\n      type: \"context-assemble\"\n      params:\n        pulls:\n          - from: \"manifest\"\n            query: \"space.type\"\n            output_key: \"space_type\"\n          - from: \"manifest\"\n            query: \"gate.event_kind\"\n            output_key: \"event_kind_ctx\"\n          - from: \"source-chain\"\n            query: \"agent.trust_level\"\n            output_key: \"agent_trust\"\n      next: \"wisdom-primary\"\n\n    wisdom-primary:\n      type: \"wisdom-invoke\"\n      params:\n        constitution_cid: \"epr:constitution-v1\"\n        framing_cid: \"epr:universal-band-framing-v1\"\n        context_keys:\n          - \"agent_identity\"\n          - \"event_kind\"\n          - \"space_type\"\n          - \"agent_trust\"\n        output_key: \"wisdom_output\"\n      edges:\n        - when: \"wisdom_output.decision == 'allow'\"\n          target: \"record-decision\"\n        - when: \"wisdom_output.decision == 'decline'\"\n          target: \"record-decline\"\n        - when: \"wisdom_output.decision == 'escalate'\"\n          target: \"escalate-to-review\"\n        - when: \"wisdom_output.decision == 'need-deeper'\"\n          target: \"record-decision\"\n\n    record-decision:\n      type: \"synthesize\"\n      params:\n        input_keys:\n          - \"wisdom_output\"\n          - \"agent_identity\"\n          - \"event_kind\"\n        decision_builder: \"allow-with-wisdom\"\n        side_effects: []\n\n    record-decline:\n      type: \"synthesize\"\n      params:\n        input_keys:\n          - \"wisdom_output\"\n          - \"agent_identity\"\n          - \"event_kind\"\n        decision_builder: \"decline-from-wisdom\"\n        side_effects: []\n\n    escalate-to-review:\n      type: \"escalate-to-review\"\n      params:\n        target_spec_cid: \"epr:escalation-target-app-steward-v1\"\n        severity: \"medium\"\n\n  terminals: {}\n",
+  "contentFormat": "plaintext",
+  "tags": [
+    "gate",
+    "universal-band",
+    "governance",
+    "constitutional",
+    "protocol-core"
+  ],
+  "metadata": {
+    "declarationType": "universal-band-declaration",
+    "eventType": "*",
+    "bandVersion": "1.0.0",
+    "constitutionalPointer": true,
+    "phase": "2",
+    "phaseNote": "Phase 2: wisdom-invoke is mocked (DevContext). Phase 3+: DHT lookup replaces compile-time constant in gate-client.",
+    "sourceFile": "elohim-agent/gate-client/src/dag/universal_band_v1.yaml",
+    "steps": ["authorize", "assemble-context", "wisdom-primary", "record-decision", "record-decline", "escalate-to-review"],
+    "entrypoint": "authorize",
+    "terminals": []
+  },
+  "createdAt": "2026-04-18T00:00:00.000Z",
+  "updatedAt": "2026-04-18T00:00:00.000Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 1.0,
+      "role": "author"
+    }
+  ]
+}
