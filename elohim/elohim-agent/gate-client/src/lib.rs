@@ -211,6 +211,7 @@ pub fn __test_set_decision_override(decision: Option<GateDecision>) {
 }
 
 // Public re-exports for ergonomic use.
+pub use dag::context::GateContext;
 pub use dag::discernment_gate::{
     default_discernment_gate_declaration, default_discernment_gate_yaml, DISCERNMENT_GATE_V1_CID,
 };
@@ -226,7 +227,9 @@ pub use dag::universal_band::{
     active_universal_band_pointer, default_universal_band_declaration, default_universal_band_yaml,
     UniversalBandPointer, ACTIVE_UNIVERSAL_BAND_NAME, ACTIVE_UNIVERSAL_BAND_VERSION,
 };
-pub use dag_runner::{configure_runner, global_runner, AlreadyConfigured, DagRunner};
+pub use dag_runner::{
+    configure_runner, global_runner, run_discernment_gate, AlreadyConfigured, DagRunner,
+};
 pub use error::{GateError, GateResult};
 pub use events::RelationalImpactEvent;
 pub use phase::Phase;

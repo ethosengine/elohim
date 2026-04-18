@@ -96,9 +96,11 @@ fn convert_one(spec: &SideEffectSpec, ctx: &GateContext) -> Result<SideEffect, G
             let tag_val = require_key(ctx, tag_key)?;
             let tag_json = serde_json::to_string(tag_val)?;
 
-            // The spec may carry a `shape` hint via a third key or default.
-            // For Phase 2 we just use a default — the shape is contextual.
-            let shape = "Unknown".to_string();
+            // Use the `shape` field from the spec declaration if present,
+            // otherwise default to "Unknown".  For the discernment-gate the
+            // YAML declares `shape: "StoryPointLink"`, which flows through here
+            // so callers can verify the correct attestation shape was requested.
+            let shape = spec.shape.clone().unwrap_or_else(|| "Unknown".to_string());
 
             Ok(SideEffect::MintAttestation { shape, target_hash, tag_json })
         }
@@ -213,6 +215,7 @@ mod tests {
         let specs = vec![SideEffectSpec {
             effect_type: "MintAttestation".into(),
             params_from_keys: vec!["momentEntryHash".into(), "ruleDecision".into()],
+            shape: None,
         }];
         let ctx = ctx_with(&[
             ("momentEntryHash", json!("hash-abc")),
@@ -232,6 +235,7 @@ mod tests {
         let specs = vec![SideEffectSpec {
             effect_type: "MintAttestation".into(),
             params_from_keys: vec!["missingHash".into(), "ruleDecision".into()],
+            shape: None,
         }];
         let ctx = ctx_with(&[("ruleDecision", json!({}))]);
         let err = convert_side_effect_specs(&specs, &ctx).unwrap_err();
@@ -247,6 +251,7 @@ mod tests {
         let specs = vec![SideEffectSpec {
             effect_type: "EmitEconomicEvent".into(),
             params_from_keys: vec!["eventPayload".into()],
+            shape: None,
         }];
         let ctx = ctx_with(&[("eventPayload", json!({"kind": "transfer", "amount": 5}))]);
         let result = convert_side_effect_specs(&specs, &ctx).unwrap();
@@ -263,6 +268,7 @@ mod tests {
         let specs = vec![SideEffectSpec {
             effect_type: "EmitEconomicEvent".into(),
             params_from_keys: vec!["noSuchKey".into()],
+            shape: None,
         }];
         let ctx = GateContext::new();
         let err = convert_side_effect_specs(&specs, &ctx).unwrap_err();
@@ -278,6 +284,7 @@ mod tests {
         let specs = vec![SideEffectSpec {
             effect_type: "OpenStewardReview".into(),
             params_from_keys: vec!["grounds".into(), "context".into()],
+            shape: None,
         }];
         let ctx = ctx_with(&[
             (
@@ -301,6 +308,7 @@ mod tests {
         let specs = vec![SideEffectSpec {
             effect_type: "OpenStewardReview".into(),
             params_from_keys: vec!["grounds".into(), "missingContext".into()],
+            shape: None,
         }];
         let ctx = ctx_with(&[("grounds", json!({}))]);
         let err = convert_side_effect_specs(&specs, &ctx).unwrap_err();
@@ -316,6 +324,7 @@ mod tests {
         let specs = vec![SideEffectSpec {
             effect_type: "UpdateReachAggregation".into(),
             params_from_keys: vec!["subject".into(), "delta".into()],
+            shape: None,
         }];
         let ctx = ctx_with(&[
             ("subject", json!("agent-hash-xyz")),
@@ -336,6 +345,7 @@ mod tests {
         let specs = vec![SideEffectSpec {
             effect_type: "UpdateReachAggregation".into(),
             params_from_keys: vec!["subject".into(), "missingDelta".into()],
+            shape: None,
         }];
         let ctx = ctx_with(&[("subject", json!("agent-hash"))]);
         let err = convert_side_effect_specs(&specs, &ctx).unwrap_err();
@@ -351,6 +361,7 @@ mod tests {
         let specs = vec![SideEffectSpec {
             effect_type: "TeleportEntity".into(),
             params_from_keys: vec![],
+            shape: None,
         }];
         let ctx = GateContext::new();
         let err = convert_side_effect_specs(&specs, &ctx).unwrap_err();
@@ -376,10 +387,12 @@ mod tests {
             SideEffectSpec {
                 effect_type: "EmitEconomicEvent".into(),
                 params_from_keys: vec!["ev".into()],
+                shape: None,
             },
             SideEffectSpec {
                 effect_type: "MintAttestation".into(),
                 params_from_keys: vec!["hash".into(), "tag".into()],
+                shape: None,
             },
         ];
         let ctx = ctx_with(&[

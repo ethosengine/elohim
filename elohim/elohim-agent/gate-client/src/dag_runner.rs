@@ -56,8 +56,9 @@ use crate::dag::executors::{
     EscalateToReviewExecutor, MechanicalRulesetExecutor, SynthesizeExecutor, WisdomInvokeExecutor,
 };
 use crate::dag::{
-    context::GateContext, interpreter::DagInterpreter,
-    universal_band::default_universal_band_declaration, GateProcessDeclaration,
+    context::GateContext, discernment_gate::default_discernment_gate_declaration,
+    interpreter::DagInterpreter, universal_band::default_universal_band_declaration,
+    GateProcessDeclaration,
 };
 use crate::error::GateError;
 use crate::events::RelationalImpactEvent;
@@ -95,6 +96,10 @@ impl DagRunner {
     /// Use this when the DAG being run includes `mechanical-ruleset` steps
     /// that need to resolve real CIDs (e.g., for app-domain gates or unit
     /// tests against hand-constructed rule artifacts).
+    ///
+    /// The runner uses the **universal-band** declaration.  To run an
+    /// app-domain gate (e.g., the discernment-gate), use
+    /// [`DagRunner::with_content_resolver_and_declaration`].
     ///
     /// # Example
     ///
@@ -135,6 +140,48 @@ impl DagRunner {
         );
 
         let declaration = default_universal_band_declaration();
+
+        Self {
+            interpreter,
+            declaration,
+        }
+    }
+
+    /// Construct a runner with a caller-supplied [`ContentNodeResolver`] **and**
+    /// a specific [`GateProcessDeclaration`].
+    ///
+    /// Use this to run app-domain gates (e.g., `discernment-gate-v1-mechanical`)
+    /// that have their own DAG topology and resolver requirements.  The
+    /// universal-band declaration is NOT used; the caller supplies the target gate
+    /// declaration directly.
+    ///
+    /// # Phase 3 usage
+    ///
+    /// `run_discernment_gate` uses this constructor to build a runner for the
+    /// discernment-gate DAG with the seven-valence rules loaded into the resolver.
+    pub fn with_content_resolver_and_declaration(
+        resolver: Box<dyn ContentNodeResolver>,
+        declaration: GateProcessDeclaration,
+    ) -> Self {
+        let mut interpreter = DagInterpreter::new();
+
+        interpreter.register(
+            StepKind::ContextAssemble,
+            Arc::new(ContextAssembleExecutor::new()),
+        );
+        interpreter.register(
+            StepKind::WisdomInvoke,
+            Arc::new(WisdomInvokeExecutor::new()),
+        );
+        interpreter.register(
+            StepKind::MechanicalRuleset,
+            Arc::new(MechanicalRulesetExecutor::new(resolver)),
+        );
+        interpreter.register(StepKind::Synthesize, Arc::new(SynthesizeExecutor::new()));
+        interpreter.register(
+            StepKind::EscalateToReview,
+            Arc::new(EscalateToReviewExecutor::new()),
+        );
 
         Self {
             interpreter,
@@ -333,6 +380,113 @@ pub async fn run_with_tracing(event: &RelationalImpactEvent) -> Result<GateDecis
     );
 
     runner.run(event, initial_ctx).instrument(span).await
+}
+
+// ─── Discernment-gate dispatch ────────────────────────────────────────────────
+
+/// Run both the universal-band DAG **and** the discernment-gate DAG for an
+/// `AttestationWrite` event, returning the discernment-gate's `GateDecision`.
+///
+/// # Phase 3 contract
+///
+/// Phase 3 routes ALL `AttestationWrite` events through the discernment-gate.
+/// Phase 4 will use a manifest-driven content-type dispatch table to route only
+/// `experience-moment` attestations here, while other attestation types skip
+/// the discernment-gate.  For Phase 3, the simpler all-or-nothing approach is
+/// intentional — see task description §Choice C.
+///
+/// # Context injection
+///
+/// The discernment-gate's `assemble` step pulls `moment` and `priorAttestations`
+/// via Phase 3 stubs (returns `Value::Null` with a warn log).  For testing, the
+/// caller MUST pre-populate these keys in `gate_context_extension` before calling
+/// this function.  The extension map is merged into the initial context AFTER the
+/// universal-band fields are set but BEFORE the discernment-gate DAG runs.
+///
+/// # Execution order
+///
+/// 1. Run the universal-band DAG (same as `check()`).  If it does NOT return
+///    Allow, short-circuit and return that decision.
+/// 2. Build the discernment-gate runner with the embedded seven-valence rules
+///    pre-loaded into its `EmbeddedContentNodeResolver`.
+/// 3. Merge `gate_context_extension` into the initial context.
+/// 4. Run the discernment-gate DAG and return its decision.
+pub async fn run_discernment_gate(
+    event: &RelationalImpactEvent,
+    gate_context_extension: GateContext,
+) -> Result<GateDecision, GateError> {
+    use crate::dag::seven_valence_rules::SEVEN_VALENCE_RULES_V1_BODY;
+    use crate::dag::seven_valence_rules::SEVEN_VALENCE_RULES_V1_CID;
+
+    // Step 1: universal-band must Allow first.
+    let universal_decision = run_with_tracing(event).await?;
+    if !universal_decision.is_allowed() {
+        return Ok(universal_decision);
+    }
+
+    // Step 2: build the embedded resolver with the seven-valence rules.
+    //
+    // The rules JSON is embedded at compile time via `include_str!`.
+    let rules_body: serde_json::Value =
+        serde_json::from_str(SEVEN_VALENCE_RULES_V1_BODY).map_err(|e| {
+            GateError::DagExecution(format!(
+                "failed to parse embedded seven_valence_v1.json: {e}"
+            ))
+        })?;
+
+    let mut cid_map = std::collections::HashMap::new();
+    cid_map.insert(SEVEN_VALENCE_RULES_V1_CID.to_string(), rules_body);
+    let resolver = Box::new(EmbeddedContentNodeResolver::new(cid_map));
+
+    // Step 3: build initial context and pre-populate it with the extension.
+    //
+    // Phase 3 context injection strategy:
+    //
+    // The discernment-gate's `assemble` step pulls `moment` and `priorAttestations`
+    // via Phase 3 stubs (returns null) because real elohim-storage and source-chain
+    // resolvers are not yet wired.  If the DAG ran the `assemble` step, it would
+    // overwrite any pre-populated context keys with null — defeating the purpose
+    // of the extension.
+    //
+    // To avoid this, `run_discernment_gate` skips the `assemble` step by using a
+    // modified declaration whose entrypoint is `rules` (not `assemble`).  The
+    // caller supplies the moment and priorAttestations context directly via the
+    // `gate_context_extension` parameter.
+    //
+    // Phase 4 will wire real resolvers into ContextAssembleExecutor so `assemble`
+    // can pull from DHT and elohim-storage.  At that point, the DAG will run from
+    // `assemble` again and the context extension parameter will be removed.
+    let mut ctx = build_initial_context(event);
+    ctx.merge(gate_context_extension);
+
+    // The `synthesize` step's MintAttestation side effect requires `momentEntryHash`
+    // to be in the context.  This would normally be populated by the `assemble`
+    // step pulling the entry hash from the source chain.  Since Phase 3 skips the
+    // `assemble` step, we derive it from the event's `subject_hash` field — which
+    // carries the entry hash of the experience-moment being attested.
+    //
+    // Phase 4: once the `assemble` step is wired to the real source-chain resolver,
+    // this explicit insertion will be removed.
+    if let RelationalImpactEvent::AttestationWrite { subject_hash, .. } = event {
+        if !ctx.contains("momentEntryHash") {
+            ctx.insert("momentEntryHash", json!(subject_hash));
+        }
+    }
+
+    // Build the discernment-gate declaration with entrypoint set to `rules`.
+    let mut effective_declaration = default_discernment_gate_declaration();
+    effective_declaration.dag.entrypoint = "rules".to_string();
+
+    let discernment_runner =
+        DagRunner::with_content_resolver_and_declaration(resolver, effective_declaration);
+
+    // Step 4: run the discernment-gate DAG starting at `rules`.
+    let span = info_span!(
+        "gate_check",
+        event_kind = event.kind(),
+        band = "discernment-gate-v1-mechanical"
+    );
+    discernment_runner.run(event, ctx).instrument(span).await
 }
 
 // ─── Tests ────────────────────────────────────────────────────────────────────

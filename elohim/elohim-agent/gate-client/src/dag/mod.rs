@@ -125,6 +125,13 @@ pub struct SideEffectSpec {
     #[serde(rename = "type")]
     pub effect_type: String,
     pub params_from_keys: Vec<String>,
+    /// Optional shape hint for the side effect (e.g. "StoryPointLink").
+    ///
+    /// When present, this is passed through to the concrete `SideEffect`
+    /// constructor.  When absent, the conversion falls back to "Unknown".
+    /// Declared in the gate-process YAML alongside the side-effect type.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub shape: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

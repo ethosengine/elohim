@@ -507,6 +507,7 @@ mod tests {
                 side_effects: vec![SideEffectSpec {
                     effect_type: "MintAttestation".into(),
                     params_from_keys: vec!["momentEntryHash".into(), "ruleDecision".into()],
+                    shape: None,
                 }],
             },
         };

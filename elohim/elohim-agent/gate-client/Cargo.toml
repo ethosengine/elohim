@@ -74,3 +74,10 @@ required-features = ["testing"]
 # binary so each test run gets a fresh OnceLock state.
 [[test]]
 name = "configure_runner"
+
+# Integration test: discernment-gate v1 seven-valence rules, end-to-end.
+# Requires the "testing" feature for __test_set_decision_override and
+# gate_client::testing helpers used in the override short-circuit test.
+[[test]]
+name = "discernment_gate_integration"
+required-features = ["testing"]
