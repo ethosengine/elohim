@@ -35,7 +35,7 @@ The design separates three distinct entities with three different durability nee
 | Tier | Entity | Classification (per p2p-design-gate) | Source of Truth | Volume |
 |---|---|---|---|---|
 | **1** | `experience-story` — the narrative junction | **Notarized (A)** — new contentType on existing `ContentNode` entry type (public visibility) | Holochain DHT | ~50–200 total, ever |
-| **2** | `:story-point` — a discerned attestation | **Derived (A2)** — typed Holochain Link off the Tier-1 ContentNode, valence/magnitude in tag | Holochain DHT (via link) | Bounded by discernment rate, not pipeline rate |
+| **2** | `:story-point` — a discerned attestation, dual-emitted as a Link AND as an `EconomicEvent` (existing entry type, REA semantics — see §5.4) | **Derived (A2)** for the link + **Notarized (A)** via existing `EconomicEvent` entry type — no new DNA capacity consumed | Holochain DHT | Bounded by discernment rate, not pipeline rate |
 | **3** | `experience-moment` — one persona × one scenario × one run | **Agent-scoped (B)** — private source-chain entry; see §6.1 for entry-type decision | Persona's source-chain → projected to that persona's elohim-storage sqlite | High volume (~770/run) but never gossipped |
 
 Discernment reads Tier 3 (raw moments accumulating on the persona's storage) and decides when to mint Tier 2 (attestation links) on Tier 1 (the durable story).
@@ -120,16 +120,44 @@ A typed Holochain Link from an `experience-story` (Tier 1) to an `experience-mom
 
 ### 5.3 Valence vocabulary (the value function)
 
-Story-points carry one of these valences. None is "negative." All are recognized contributions to the story's worth, weighted by `magnitude` (`small | meaningful | significant`).
+Story-points carry one of these valences. None is "negative." All are recognized contributions to the story's worth, weighted by `magnitude` (`small | meaningful | significant`). A regression is value too: knowing the system moved backward is worth knowing.
 
 | Valence | When it fires | Example |
 |---|---|---|
-| `progress` | The system can now do something it couldn't before, or does it better. | First-time green; performance threshold met that wasn't before. |
-| `discovery` | The system surfaced previously-unknown behavior — typically a failure that exposes a real constraint. | New error class on a previously-green scenario; a flake-class failure that turns out to be deterministic on a specific compute context. |
-| `validation` | An expected failure mode confirmed itself. The system is correctly refusing to do something it should refuse. | A `@validates-failure-mode` scenario fails as designed, on commit changes that should not affect it. |
-| `confirmation` | Steady-state baseline — the system continues to behave as it has. Low magnitude by default; rises if confirmed by a new compute context. | Same scenario green 100 runs running; same scenario green now from a new device archetype. |
+| `progress` | The system can now do something it couldn't before, or does it better. | First-time green; performance threshold newly met. |
+| `discovery` | The system surfaced previously-unknown behavior — typically a failure exposing a real constraint. | New error class on a previously-green scenario; a flake-class failure proven deterministic on a specific compute context. |
+| `regression` | The story moved backward — a known-cause failure recurs on a scenario that had been passing, or a trend reverses. | A scenario that flipped green→red with a previously-seen error class; a recovery that itself reverts. |
+| `validation` | An expected failure mode confirmed itself. The system is correctly refusing to do something it should refuse. | A `@validates-failure-mode` scenario fails as designed under unrelated commit changes. |
+| `witness` | A **different** compute context (different fingerprint) attests the same status — independent re-validation. Direct input to brit/rakia reach computation. | Adam-on-laptop's run produces the same green result Matthew-on-edge-node already attested; or another fingerprint confirms a previously-isolated failure as structural. |
+| `refinement` | The **same** compute context produces a richer or improved attestation — better performance, more captured evidence, more detail. | A scenario that was barely green now passes with 30% timing headroom; a moment whose new sidecar (e.g., trace) reveals previously-invisible behavior. |
+| `confirmation` | Steady-state baseline — the system continues to behave as it has, on the same compute context, with no improvement. Lowest magnitude. | Same scenario green for the 100th run on the same fingerprint with no measurable change. |
 
-`magnitude` modulates each: a `confirmation/small` is the cheapest attestation; a `discovery/significant` carries the most weight.
+`magnitude` modulates each: a `confirmation/small` is the cheapest attestation; a `discovery/significant` or `regression/significant` carries the most weight.
+
+### 5.4 REA mapping — `:story-point` IS an EconomicEvent
+
+The `:story-point` attestation is not just a structural link; it is a Resource-Event-Agent event in the protocol's REA economy. Co-emitted with the link, an `EconomicEvent` (existing DHT entry type, see `app/elohim-app/src/app/shefa/`) carries the value-flow semantics:
+
+| REA dimension | This design |
+|---|---|
+| **Resource** | The `experience-story` (the asset whose value accumulates). |
+| **Event** | The attestation itself. |
+| **Provider (agent)** | The persona whose moment fed the discerner (e.g., `human:matthew-manager`) — the one whose validating work produced the evidence. |
+| **Receiver (agent)** | The subject of the experience-story (often the same persona; for `collective` subjects, the collective). |
+| **Action** | `produce` for `progress` / `discovery` / `refinement`; `cite` for `witness` / `confirmation`; protocol's existing action vocabulary covers all valences. |
+| **Quantity** | `magnitude` mapped to a numeric value (small=1, meaningful=3, significant=8 — the agile fibonacci familiarity is intentional, but the unit is *attested story-points*, not estimated points). |
+| **lamadEventType** | `experience-attestation` (new value to add to lamad EconomicEvent type vocabulary). |
+
+So Tier 2 has a **dual representation**:
+
+1. **Structural link** (`:story-point` from experience-story to experience-moment) — cheap, queryable via Holochain link traversal, used by the dashboard to walk the evidence trail.
+2. **EconomicEvent entry** (existing DHT entry type) — feeds shefa's REA economy. Sub-project D consumes the EconomicEvent stream to compute valueflows, velocity per persona/role, story-worth aggregates, and reach.
+
+Both are minted in the same coordinator call. They share `momentEntryHash`, `valence`, `magnitude`, and `evidenceType` metadata. Neither duplicates the other's role: the link is the graph edge, the event is the value flow.
+
+### 5.5 Discernment as a gateable, stubbable seam
+
+Per the project's broader pattern (most elohim services are stubbed pending sophisticated implementations), the v1 mechanical discerner (§7) is itself a stub: a pure-function gate that fires deterministically given a moment and prior attestations. The real architecture is the **gate**, not the v1 implementation. Tests should mock the discernment call directly with explicit `(moment, priorAttestations) → Optional<StoryPointTag>` fixtures, exercising each valence at each magnitude. When sophisticated discernment lands (sophia-mediated, steward-curated, or REA-weighted), the gate doesn't move — the implementation behind it does.
 
 ### 5.4 Compute fingerprint
 
@@ -278,9 +306,10 @@ This keeps v1 deliberately local — each persona discerns its own evidence. Sop
 
 For each new `experience-moment` that the discerner sees on a persona's storage:
 
-- The moment itself (status, scenario, compute fingerprint, error class if failed)
+- The moment itself (status, scenario, compute fingerprint, error class if failed, sidecar manifest, duration)
 - The most recent attestation (if any) on the same `experience-story` from any compute fingerprint
 - The most recent attestation (if any) on the same `experience-story` from this moment's compute fingerprint
+- The set of error classes ever seen on prior attestations for this experience-story (for novel-vs-recurring classification in rule 2)
 
 ### 7.3 Decision rules (in order)
 
@@ -293,7 +322,7 @@ For each new `experience-moment` that the discerner sees on a persona's storage:
      If error class is new (not seen in prior attestations on this story):
        valence=discovery, magnitude=meaningful, evidenceType=novel-failure-class
      Else:
-       valence=discovery, magnitude=small, evidenceType=known-failure-class-recurrence
+       valence=regression, magnitude=meaningful, evidenceType=known-cause-recurrence
      → MINT
 
 3. If status == failed AND scenario tags include @validates-failure-mode:
@@ -305,25 +334,36 @@ For each new `experience-moment` that the discerner sees on a persona's storage:
      → MINT
 
 5. If status matches prior attestation status AND compute fingerprint is new
-   for this experience-story:
-     valence=confirmation, magnitude=meaningful, evidenceType=new-compute-context-attestation
+   for this experience-story (a different validator):
+     valence=witness, magnitude=meaningful, evidenceType=cross-fingerprint-attestation
      → MINT
 
-6. Else:
+6. If status matches prior attestation status, fingerprint matches prior
+   attestation's fingerprint, AND moment carries materially richer evidence
+   (new sidecar artifact present that wasn't on prior attestation, OR duration
+   improvement >20%, OR new captured detail):
+     valence=refinement, magnitude=small, evidenceType=evidence-enriched
+     → MINT
+
+7. Else:
      → DO NOT MINT  (steady-state — the moment is recorded on the persona's chain
-                     but no DHT attestation is added)
+                     but no DHT attestation is added; baseline confirmation is
+                     implicit in the absence of an attestation, not a positive event)
 ```
+
+Note that `confirmation` valence is reserved for cases where the discernment service has explicit reason to mark steady-state (e.g., a periodic baseline-snapshot triggered by a scheduler rather than by a moment event). The v1 mechanical rules do not mint confirmation attestations — silence is the steady-state signal. Sophisticated discernment may add confirmation rules later.
 
 ### 7.4 Why these rules survive the DHT budget
 
-Steady-state runs (rule 6) mint zero attestations. A pipeline that runs hourly with no changes burns zero DHT entries. Attestation rate scales with *meaningful change rate*, not pipeline rate. At realistic change cadence (a few flips and a few new compute contexts per day), the DHT carries hundreds of attestation links per year, well within the ~3000-entry total budget after accounting for ~150 experience-stories.
+Steady-state runs (rule 7) mint zero attestations. A pipeline that runs hourly with no changes burns zero DHT entries. Attestation rate scales with *meaningful change rate*, not pipeline rate. With the dual-emission model (each attestation = 1 link + 1 EconomicEvent entry), realistic change cadence (a few flips, a couple of new fingerprints, occasional refinements per day) yields roughly 2× the link count in EconomicEvent entries. Even so, this stays in the low thousands per year — within the ~3000-entry total budget after accounting for ~150 experience-stories — and the EconomicEvent entry type already exists, so no new DNA capacity is consumed by the dual emission.
 
 ### 7.5 What this spec does NOT decide about discernment
 
 - Whether sophia is invoked to score evidence value (follow-on)
 - Whether human stewards ratify high-value attestations (follow-on)
-- How `magnitude` translates into REA economic event quantity (follow-on — sub-project D)
-- How recurring `discovery/known-failure-class-recurrence` attestations get pruned or aggregated (follow-on — operational concern)
+- How REA economic events emitted here aggregate into shefa valueflows (follow-on — sub-project D)
+- How recurring `regression/known-cause-recurrence` attestations get pruned or rolled up (follow-on — operational concern; flagged as open question)
+- Confirmation-as-positive-event semantics (deferred — silence is steady-state in v1)
 
 ## 8. HTTP routes (designed last, per p2p-design-gate)
 
@@ -351,8 +391,10 @@ lamad_coordinator::experience_story::
     // Idempotent: same triple → same EntryHash
   attest(experience_story: EntryHash,
          experience_moment: EntryHash,
-         tag: StoryPointTag) -> ActionHash
-    // Creates the typed Link from story to moment with tag
+         tag: StoryPointTag) -> AttestationHandles
+    // Dual-emit: creates the typed Link (Tier 2 structural) AND the
+    // EconomicEvent entry (Tier 2 REA) atomically. Returns both hashes.
+    // AttestationHandles { link_action_hash, economic_event_entry_hash }
   list_attestations(experience_story: EntryHash) -> Vec<Link>
   get(experience_story: EntryHash) -> Option<ExperienceStory>
 
@@ -363,7 +405,7 @@ lamad_coordinator::experience_moment::
     // Caller's own source-chain only
 ```
 
-Post-commit signal handlers in elohim-storage project Tier 1 + Tier 2 to the global sqlite (`experience_stories`, `story_point_attestations`); Tier 3 projects to the calling persona's local sqlite (`experience_moments`).
+Post-commit signal handlers in elohim-storage project Tier 1 to the global `experience_stories` sqlite table, and Tier 2 to BOTH `story_point_attestations` (link projection — keeps the structural edge denormalized for graph queries) and the existing `economic_events` table (REA projection — already maintained by shefa). Tier 3 projects to the calling persona's local `experience_moments` sqlite. The two Tier-2 projections share the `momentEntryHash` foreign key for cross-walk; sub-project D consumes the `economic_events` stream.
 
 ## 10. Anti-pattern check (per p2p-design-gate)
 
@@ -383,9 +425,12 @@ Post-commit signal handlers in elohim-storage project Tier 1 + Tier 2 to the glo
 - A `lamad:codegen` run regenerates `manifest-types.ts` to include `experience-story` as a recognized contentType.
 - An a2o test scenario can be exercised by `human:matthew-manager` via the existing `PlaywrightDevice`, and on completion the framework records an `experience-moment` to matthew-alpha's source-chain. The moment surfaces in matthew-alpha's `experience_moments` sqlite projection within 5 seconds.
 - The v1 mechanical discerner classifies the moment per §7.2 rules and, if a mint is warranted, calls `experience_story::attest`. The resulting Tier-2 link is queryable via `GET /api/v1/experience-stories/{cid}` within 10 seconds.
-- A second run of the same scenario on the same compute fingerprint with unchanged status produces no new Tier-2 link (rule 6 — steady-state).
+- A second run of the same scenario on the same compute fingerprint with unchanged status and no enriched evidence produces no new Tier-2 link (rule 7 — steady-state).
 - A failure on a scenario tagged `@validates-failure-mode` mints an attestation with `valence=validation`, not `discovery` or `progress`.
-- Total DHT entries created across 100 simulated pipeline runs at typical change rate (≤5 flips per run) stays under 1000.
+- Total DHT entries created across 100 simulated pipeline runs at typical change rate (≤5 flips per run, ≤2 new fingerprints introduced) stays under 1500 — counting both `:story-point` links and their co-emitted EconomicEvent entries.
+- The discernment gate is independently mockable: a unit test can call `discern(moment, priorAttestations)` directly with fixture data and assert the returned `Optional<StoryPointTag>` for each of the seven valences (`progress` / `discovery` / `regression` / `validation` / `witness` / `refinement` and the explicit none-case), without standing up Holochain.
+- A passing scenario re-run on the same compute fingerprint with materially improved duration (>20% faster) mints a `refinement` attestation; an identical re-run mints nothing (rule 7).
+- A passing scenario validated by a previously-unseen compute fingerprint mints a `witness` attestation, not `confirmation`.
 
 ## 12. What this spec is NOT (sub-project boundaries)
 
@@ -402,10 +447,12 @@ This spec defines the **data model and the v1 mechanical discernment that must s
 
 1. **Role provenance.** Existing `role` ContentNodes — are there enough authored already to cover Matthew's likely contexts (`as-entrepreneur`, `as-learner`, `as-father`)? If not, sub-project A will need to seed them. *(Not blocking this spec; flagged for the implementation plan.)*
 2. **Collective subjects.** First test cases use `human` subjects only. The first `collective` subject (e.g., `collective:maintainers as-supplier exercising fair-exchange-protocol`) should be exercised in an integration test before we declare `subject` polymorphism stable.
-3. **Pruning policy for `discovery/known-failure-class-recurrence`.** A persistently-flaky scenario could mint an attestation per run under rule 2's else branch. Need a follow-on operational policy (probably: aggregate same-class recurrences within a time window).
+3. **Pruning policy for `regression/known-cause-recurrence`.** A persistently-flaky scenario could mint a regression attestation per run under rule 2's else branch. Need a follow-on operational policy (probably: aggregate same-class recurrences within a time window, or de-duplicate via debounce on the discerner side).
 4. **EPR alias collision strategy.** What happens if a role gets renamed? The slug-based EPR alias would silently shift. Need a stable-slug-derivation rule before this lands. *(Likely: hash of role's CID, not its slug.)*
 5. **Witness vs. discerner.** The protocol verb is "witness." This spec uses "discerner" for the v1 mechanical service. Reconcile naming when the sophisticated discernment spec lands — these may collapse into one role with two implementations.
 6. **Private ContentNode vs. dedicated private entry type.** Flagged in §6.1. Implementation plan must pick α (reuse ContentNode with private visibility) or β (new `ExperienceMoment` entry type in lamad integrity zome). Affects which migration lands first.
+7. **EconomicEvent action vocabulary alignment.** §5.4 maps `progress`/`discovery`/`refinement` → `produce` and `witness`/`confirmation` → `cite`. The mapping for `regression` and `validation` is not yet decided — `regression` could be `decrement` (if such action exists in REA vocabulary) or `produce` with a discriminator field; `validation` arguably is `cite` (citing the failure mode definition). Implementation plan should grep `app/elohim-app/src/app/shefa/` and the storage-client EconomicEvent type to lock the mapping against the existing action enum.
+8. **Magnitude→quantity scale.** §5.4 proposes small=1, meaningful=3, significant=8 (fibonacci). This should be a config constant, not hardcoded, so sub-project D can re-tune as the network learns what story-point magnitudes mean operationally.
 
 ## 14. References
 
