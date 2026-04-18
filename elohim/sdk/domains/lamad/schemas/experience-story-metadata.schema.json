@@ -1,0 +1,31 @@
+{
+  "$id": "lamad:schema:metadata:experience-story",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ExperienceStoryMetadata",
+  "description": "App-schema metadata for the experience-story contentType. The subject/role/feature identity is realized in the link graph; this object carries discoverability and index hints.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["subjectRef", "roleRef", "featureRef"],
+  "properties": {
+    "subjectRef": {
+      "type": "string",
+      "description": "CID or slug reference to the subject ContentNode (human or collective).",
+      "pattern": "^(human|collective):[a-z0-9-]+$|^baf[a-z0-9]+$"
+    },
+    "roleRef": {
+      "type": "string",
+      "description": "CID or slug reference to the role ContentNode.",
+      "pattern": "^role:[a-z0-9-]+$|^baf[a-z0-9]+$"
+    },
+    "featureRef": {
+      "type": "string",
+      "description": "CID or slug reference to the feature ContentNode (gherkin feature canonical entry).",
+      "pattern": "^feature:[a-z0-9-]+$|^baf[a-z0-9]+$"
+    },
+    "aliasEpr": {
+      "type": "string",
+      "description": "Optional human-readable EPR alias, e.g. epr:experience-story/matthew-manager/as-entrepreneur/learning-journey.",
+      "pattern": "^epr:experience-story/[a-z0-9-]+/[a-z0-9-]+/[a-z0-9-]+$"
+    }
+  }
+}

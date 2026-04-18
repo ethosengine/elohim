@@ -1,0 +1,106 @@
+{
+  "$id": "lamad:schema:metadata:experience-moment",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ExperienceMomentMetadata",
+  "description": "App-schema metadata for the experience-moment contentType — one persona's first-person recording of one scenario at one moment in time.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "subjectRef", "roleRef", "featureRef",
+    "scenarioName", "scenarioUri", "status",
+    "durationMs", "commit", "runId", "computeFingerprint"
+  ],
+  "properties": {
+    "subjectRef": {
+      "type": "string",
+      "description": "CID or slug reference to the subject ContentNode (human or collective)."
+    },
+    "roleRef": {
+      "type": "string",
+      "description": "CID or slug reference to the role ContentNode."
+    },
+    "featureRef": {
+      "type": "string",
+      "description": "CID or slug reference to the feature ContentNode (gherkin feature canonical entry)."
+    },
+    "scenarioName": {
+      "type": "string",
+      "description": "The scenario name (Scenario: or Scenario Outline: line from the feature file)."
+    },
+    "scenarioUri": {
+      "type": "string",
+      "description": "Relative path from genesis/a2o/features to the feature file, e.g. 'lamad/learning-paths/path-progression.feature'."
+    },
+    "scenarioLine": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Line number where the scenario starts in the feature file."
+    },
+    "scenarioTags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Cucumber tags from the scenario (e.g., @regression, @smoke)."
+    },
+    "status": {
+      "type": "string",
+      "enum": ["passed", "failed", "pending", "skipped"],
+      "description": "Scenario execution status."
+    },
+    "durationMs": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Total execution time in milliseconds."
+    },
+    "commit": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{7,40}$",
+      "description": "Git commit SHA (abbreviated 7 chars or full 40 chars)."
+    },
+    "runId": {
+      "type": "string",
+      "description": "Unique identifier for this test run (e.g., CI build ID or local run timestamp)."
+    },
+    "computeFingerprint": {
+      "type": "string",
+      "description": "Format: {pod}:{deviceArchetype}:{archetypeRevisionHash} — identifies the compute environment.",
+      "pattern": "^[a-z0-9-]+:[a-z0-9-]+:[a-f0-9]+$"
+    },
+    "errorClass": {
+      "type": "string",
+      "description": "Present when status=failed; classifies the error (e.g., 'AssertionError/timeout', 'NetworkError/503')."
+    },
+    "sidecarArtifacts": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "References to test artifacts (CIDs or paths).",
+      "properties": {
+        "cucumber": {
+          "type": "string",
+          "description": "Cucumber JSON report artifact."
+        },
+        "observation": {
+          "type": "string",
+          "description": "Behavior observation recording."
+        },
+        "screenshot": {
+          "type": "string",
+          "description": "Screenshot of failure or key state."
+        },
+        "trace": {
+          "type": "string",
+          "description": "Browser/network trace (e.g., Playwright HAR)."
+        },
+        "console": {
+          "type": "string",
+          "description": "Console/log output."
+        }
+      }
+    },
+    "relatedExperienceStory": {
+      "type": "string",
+      "description": "CID or slug reference to the parent experience-story ContentNode."
+    }
+  }
+}
