@@ -3,6 +3,40 @@ import { describe, expect, it } from 'vitest';
 import { discernMechanical } from './mechanical-discerner.js';
 import { momentFixture, priorFixture } from './fixtures.js';
 
+describe('discernMechanical — rule 7 (steady-state: no mint)', () => {
+  it('returns null for identical status on same fingerprint with no enriched evidence', () => {
+    const moment = momentFixture({
+      status: 'passed',
+      durationMs: 2050,
+      sidecarArtifacts: { cucumber: 'blob:bafkrei-cucumber/xyz.json' },
+    });
+
+    const tag = discernMechanical(
+      {
+        moment,
+        priors: {
+          latestAny: priorFixture({
+            status: 'passed',
+            durationMs: 2100,
+            sidecarArtifactNames: ['cucumber'],
+            computeFingerprint: moment.computeFingerprint,
+          }),
+          latestSameFingerprint: priorFixture({
+            status: 'passed',
+            durationMs: 2100,
+            sidecarArtifactNames: ['cucumber'],
+            computeFingerprint: moment.computeFingerprint,
+          }),
+          knownErrorClasses: new Set<string>(),
+        },
+      },
+      'uhCEk-moment-hash',
+    );
+
+    expect(tag).toBeNull();
+  });
+});
+
 describe('discernMechanical — rule 6 (refinement)', () => {
   it('mints refinement/small/evidence-enriched when a new sidecar artifact is present that was not on the prior', () => {
     const moment = momentFixture({
