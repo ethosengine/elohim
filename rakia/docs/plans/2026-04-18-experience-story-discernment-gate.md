@@ -1,6 +1,25 @@
 # Experience-Story Discernment Gate — Implementation Plan
 
+> **⚠️ SUPERSEDED (2026-04-18) — architectural reframe.** The original plan below proposed a TypeScript pure function in `elohim-library`. During Batch F execution the user course-corrected: **discernment is a first-class primitive of `@elohim/elohim-agent`, not an app concern.** The `.ts` surface is legitimately the "sense-and-respond" layer (gathering context, rendering results), but the gate itself — its evaluation, its registry, its constitutional-reasoning coupling — lives as a Rust `Gate` trait in `elohim-agent-service`, invoked by the SDK. The specific ruleset for a given contentType (the 7 valences for experience-story, or future gates for journal drafting, comment reach, imagination bounds) is declared **in the app manifest** as an emergent app-domain dimension that builds on a protocol-core gate-interface.
+>
+> **What got reverted:** commits `80fe6c70`..`0ecef2ec` — the TS discernment module (scaffolding, rule 1, rules 2-7, edge cases, public-api export). Revert commit: `dfadce0b`.
+>
+> **What survives and is still valid:** the metadata schemas (`514547b5`), contentType registrations (`6f8d0fe8`), the `experience-attestation` signal (`29fd9755`), and the regenerated manifest types (`46be756b`). The manifest already forward-references "the discernment gate" at `elohim/sdk/domains/lamad/manifest.json` line 837 — when the real gate lands in elohim-agent, that reference resolves.
+>
+> **What's relevant from the reverted work** (preserved here so it isn't lost when the Rust port is drafted):
+>
+> - **Seven-valence vocabulary with 6 mechanical rules + steady-state** — all rules, thresholds (20% duration improvement for refinement), and rule ordering (1→2→3→4→5→6→null) are crystallized in the spec at `genesis/docs/superpowers/specs/2026-04-18-experience-story-epr-design.md` §5–§7. The Rust port should produce identical decisions for identical inputs.
+> - **Fixture shape and TDD rhythm** — `momentFixture`, `priorFixture`, one test per rule, non-terminal status safety-net tests — proven to cover the rule space in ~150 lines of tests. Replicate as Rust fixtures + `#[test]` cases.
+> - **The "rule 3 vs rule 2 overlap" nuance** — a `@validates-failure-mode` scenario that had a prior-passed attestation is correctly classified by rule 2 as discovery/regression, not rule 3 as validation. This is a deliberate ordering that the Rust port must preserve.
+> - **The seven new valences** (`progress` / `discovery` / `regression` / `validation` / `witness` / `refinement` / `confirmation`) and seven `evidenceType` values are also in the spec and will flow into the manifest-declared gate config.
+>
+> **Next step:** author a new protocol-core spec for the elohim-agent gate-interface primitive + manifest declaration field, THEN re-plan the Rust implementation on top of it. The experience-story discernment-gate becomes this primitive's first concrete implementation. Prompt for kicking off that spec session is in the repo's session log.
+
+---
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+>
+> **Do not execute this plan as-is.** The tasks below reflect the superseded TS architecture and are kept for reference only. A new plan will be authored after the gate-interface spec lands.
 
 **Goal:** Ship the v1 mechanical discernment gate as a pure, fixture-mockable TypeScript function in `elohim-service`, alongside the lamad manifest entries for `experience-story` / `experience-moment` contentTypes, so that later plans (a2o integration, storage projection, Holochain attestation) have a tested interface to call into.
 
