@@ -831,6 +831,11 @@
         "economicAction": "produce",
         "resourceType": "contribution"
       },
+      "experience-attestation": {
+        "substrateSignal": "attention",
+        "economicAction": "produce",
+        "description": "A :story-point attestation minted by the discernment gate when meaningful evidence is recognized. Emitted alongside the Holochain Link; dual-encoded as an EconomicEvent in shefa."
+      },
       "peer-review-completed": {
         "description": "Emitted when a peer review of content is completed. Produces a peer attestation that strengthens content trust and steward standing.",
         "substrateSignal": "compute",
