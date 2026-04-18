@@ -61,5 +61,10 @@ export function discernMechanical(
     return mkTag(input, momentEntryHash, 'validation', 'meaningful', 'failure-mode-confirmed');
   }
 
+  // Rule 4 — passed after prior-failed → recovery
+  if (moment.status === 'passed' && priors.latestAny?.status === 'failed') {
+    return mkTag(input, momentEntryHash, 'progress', 'meaningful', 'recovery');
+  }
+
   return null;
 }

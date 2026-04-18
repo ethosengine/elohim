@@ -3,6 +3,34 @@ import { describe, expect, it } from 'vitest';
 import { discernMechanical } from './mechanical-discerner.js';
 import { momentFixture, priorFixture } from './fixtures.js';
 
+describe('discernMechanical — rule 4 (recovery)', () => {
+  it('mints progress/meaningful/recovery when a scenario passes after a prior-failed attestation', () => {
+    const moment = momentFixture({ status: 'passed' });
+
+    const tag = discernMechanical(
+      {
+        moment,
+        priors: {
+          latestAny: priorFixture({
+            status: 'failed',
+            valence: 'regression',
+            evidenceType: 'known-cause-recurrence',
+            errorClass: 'NetworkError/503',
+          }),
+          knownErrorClasses: new Set(['NetworkError/503']),
+        },
+      },
+      'uhCEk-moment-hash',
+    );
+
+    expect(tag).toMatchObject({
+      valence: 'progress',
+      magnitude: 'meaningful',
+      evidenceType: 'recovery',
+    });
+  });
+});
+
 describe('discernMechanical — rule 3 (validation)', () => {
   it('mints validation/meaningful/failure-mode-confirmed when a @validates-failure-mode scenario fails and there is no prior-passed attestation', () => {
     const moment = momentFixture({
