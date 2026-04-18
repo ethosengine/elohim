@@ -149,7 +149,7 @@ impl<'a> Tokenizer<'a> {
                         "unterminated string literal in edge expression".to_string(),
                     ))
                 }
-                Some(b) if b == b'\\' => {
+                Some(b'\\') => {
                     // Escape sequence — only \" and \' and \\ are supported.
                     match self.advance() {
                         Some(b'"') => result.push('"'),

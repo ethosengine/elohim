@@ -48,11 +48,14 @@ impl StepType {
 // ─── StepOutcome ─────────────────────────────────────────────────────────────
 
 /// What a step executor returns to the interpreter after executing.
+#[allow(clippy::large_enum_variant)]
 pub enum StepOutcome {
     /// The DAG should continue walking edges to find the next step or terminal.
     Continue,
 
     /// The executor has determined the final decision; short-circuit and return.
+    /// Boxed-vs-inline is a Phase 3+ optimization — the wrapped `GateDecision`
+    /// is small enough today and inlining keeps the trait signature simpler.
     Terminate(GateDecision, Vec<SideEffect>),
 }
 
