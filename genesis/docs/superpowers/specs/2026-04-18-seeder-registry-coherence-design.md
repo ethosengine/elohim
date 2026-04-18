@@ -66,7 +66,7 @@ export function loadDeploymentRegistry(opts: {
 2. `--registry=` flag or `SEEDER_REGISTRY` env → read that JSON file
 3. Default: resolve `genesis/orchestrator/data/deployments.json` relative to the seeder module
 
-The explicit-list form accepts either short names (`adam`) or full humanIds (`human-adam-firstman`); short names are mapped by reading the registry file first if available, otherwise rejected with a clear error.
+The explicit-list form requires full humanIds (`human-adam-firstman`). Short names are rejected with an error listing the expected format — this keeps the contract unambiguous and avoids a name-resolution dependency cycle between the flag and the registry file.
 
 ## Component 2: Seeder filtering
 
