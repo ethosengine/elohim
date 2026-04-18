@@ -135,6 +135,8 @@ pub fn detect_from_event(event: &RelationalImpactEvent) -> SpaceContext {
 mod tests {
     use super::*;
 
+    // ─── Legacy consolidated tests (kept for regression) ─────────────────────
+
     #[test]
     fn exempt_interiors_are_exempt() {
         assert!(SpaceType::Offline.is_exempt());
@@ -158,5 +160,133 @@ mod tests {
             topic: "reflection".to_string(),
         };
         assert_eq!(detect_from_event(&event).space_type, SpaceType::AdviceSeeking);
+    }
+
+    // ─── Exempt interior variants — explicit per-variant ─────────────────────
+
+    #[test]
+    fn offline_is_exempt_not_boundary_crossing() {
+        assert!(SpaceType::Offline.is_exempt());
+        assert!(!SpaceType::Offline.is_boundary_crossing());
+    }
+
+    #[test]
+    fn private_drafting_interior_is_exempt_not_boundary_crossing() {
+        assert!(SpaceType::PrivateDraftingInterior.is_exempt());
+        assert!(!SpaceType::PrivateDraftingInterior.is_boundary_crossing());
+    }
+
+    #[test]
+    fn play_interior_is_exempt_not_boundary_crossing() {
+        assert!(SpaceType::PlayInterior.is_exempt());
+        assert!(!SpaceType::PlayInterior.is_boundary_crossing());
+    }
+
+    #[test]
+    fn roleplay_interior_is_exempt_not_boundary_crossing() {
+        assert!(SpaceType::RoleplayInterior.is_exempt());
+        assert!(!SpaceType::RoleplayInterior.is_boundary_crossing());
+    }
+
+    // ─── Boundary-crossing variants — explicit per-variant ───────────────────
+
+    #[test]
+    fn private_drafting_crossing_is_boundary_crossing_not_exempt() {
+        assert!(SpaceType::PrivateDraftingCrossing.is_boundary_crossing());
+        assert!(!SpaceType::PrivateDraftingCrossing.is_exempt());
+    }
+
+    #[test]
+    fn play_exiting_is_boundary_crossing_not_exempt() {
+        assert!(SpaceType::PlayExiting.is_boundary_crossing());
+        assert!(!SpaceType::PlayExiting.is_exempt());
+    }
+
+    #[test]
+    fn roleplay_exiting_is_boundary_crossing_not_exempt() {
+        assert!(SpaceType::RoleplayExiting.is_boundary_crossing());
+        assert!(!SpaceType::RoleplayExiting.is_exempt());
+    }
+
+    #[test]
+    fn sync_after_offline_is_boundary_crossing_not_exempt() {
+        assert!(SpaceType::SyncAfterOffline.is_boundary_crossing());
+        assert!(!SpaceType::SyncAfterOffline.is_exempt());
+    }
+
+    #[test]
+    fn advice_seeking_is_boundary_crossing_not_exempt() {
+        assert!(SpaceType::AdviceSeeking.is_boundary_crossing());
+        assert!(!SpaceType::AdviceSeeking.is_exempt());
+    }
+
+    // ─── Public: neither exempt nor boundary-crossing ─────────────────────────
+    //
+    // `Public` is the "normal network activity" default. The gate fires (not
+    // exempt), but it is not a *boundary-crossing* space per spec §1.5 —
+    // boundary-crossing specifically refers to events that cross a privacy
+    // boundary (offline→sync, draft→published, play→public).
+
+    #[test]
+    fn public_is_neither_exempt_nor_boundary_crossing() {
+        assert!(!SpaceType::Public.is_exempt());
+        assert!(!SpaceType::Public.is_boundary_crossing());
+    }
+
+    // ─── SpaceContext.is_exempt() delegates to SpaceType.is_exempt() ──────────
+
+    #[test]
+    fn space_context_is_exempt_delegates_to_space_type() {
+        let exempt_ctx = SpaceContext {
+            space_type: SpaceType::Offline,
+            play_mode: false,
+            roleplay_mode: false,
+        };
+        assert!(exempt_ctx.is_exempt());
+
+        let non_exempt_ctx = SpaceContext {
+            space_type: SpaceType::Public,
+            play_mode: false,
+            roleplay_mode: false,
+        };
+        assert!(!non_exempt_ctx.is_exempt());
+    }
+
+    // ─── detect_from_event: play_mode and roleplay_mode default to false ──────
+
+    #[test]
+    fn detect_from_event_always_returns_false_for_mode_flags() {
+        // Phase 0: mode flags are not yet wired in. Confirm they are always false.
+        let event = RelationalImpactEvent::ContentPublish {
+            content_cid: "cid".to_string(),
+            declared_reach: "public".to_string(),
+            author: "agent".to_string(),
+        };
+        let ctx = detect_from_event(&event);
+        assert!(!ctx.play_mode, "Phase 0: play_mode must be false");
+        assert!(!ctx.roleplay_mode, "Phase 0: roleplay_mode must be false");
+    }
+
+    // ─── Serde round-trip for SpaceType ───────────────────────────────────────
+
+    #[test]
+    fn space_type_serde_round_trip() {
+        let variants = [
+            SpaceType::Public,
+            SpaceType::PrivateDraftingCrossing,
+            SpaceType::PlayExiting,
+            SpaceType::RoleplayExiting,
+            SpaceType::SyncAfterOffline,
+            SpaceType::AdviceSeeking,
+            SpaceType::Offline,
+            SpaceType::PrivateDraftingInterior,
+            SpaceType::PlayInterior,
+            SpaceType::RoleplayInterior,
+        ];
+        for variant in &variants {
+            let json = serde_json::to_string(variant).expect("serialize");
+            let rt: SpaceType = serde_json::from_str(&json).expect("deserialize");
+            assert_eq!(rt, *variant, "round-trip failed for {variant:?}");
+        }
     }
 }

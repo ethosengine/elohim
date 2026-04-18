@@ -465,4 +465,111 @@ mod path_tests {
         let event = infer_event_from_path("/content").unwrap();
         assert!(is_path_inferred(&event));
     }
+
+    // ─── All 8 registered paths resolve to the correct event variant ──────────
+
+    #[test]
+    fn all_registered_paths_resolve() {
+        let cases: &[(&str, &str)] = &[
+            ("/content", "content-publish"),
+            ("/attestation", "attestation-write"),
+            ("/economic-event", "economic-event-emit"),
+            ("/peer-message", "peer-message"),
+            ("/sync", "sync-to-peers"),
+            ("/advice", "advice-sought"),
+            ("/agent/invoke", "capability-invoke"),
+            ("/crossing", "private-to-public-crossing"),
+        ];
+        for (path, expected_kind) in cases {
+            let event = infer_event_from_path(path)
+                .unwrap_or_else(|| panic!("path '{path}' must resolve to an event"));
+            assert_eq!(
+                event.kind(),
+                *expected_kind,
+                "path '{path}' must infer event kind '{expected_kind}'"
+            );
+        }
+    }
+
+    // ─── Path inference edge cases ────────────────────────────────────────────
+
+    #[test]
+    fn empty_path_returns_none() {
+        assert!(infer_event_from_path("").is_none());
+    }
+
+    #[test]
+    fn bare_slash_returns_none() {
+        assert!(infer_event_from_path("/").is_none());
+    }
+
+    #[test]
+    fn trailing_slash_on_registered_path_still_resolves() {
+        // "/content/" → first segment is "content", second is "". Still matches.
+        assert!(infer_event_from_path("/content/").is_some());
+    }
+
+    #[test]
+    fn deeply_nested_registered_path_resolves_by_first_segment() {
+        assert!(infer_event_from_path("/content/a/b/c/d").is_some());
+        let event = infer_event_from_path("/content/a/b/c/d").unwrap();
+        assert_eq!(event.kind(), "content-publish");
+    }
+
+    #[test]
+    fn agent_without_invoke_returns_none() {
+        assert!(infer_event_from_path("/agent").is_none());
+        assert!(infer_event_from_path("/agent/").is_none());
+    }
+
+    #[test]
+    fn agent_with_wrong_second_segment_returns_none() {
+        assert!(infer_event_from_path("/agent/invoke-not").is_none());
+        assert!(infer_event_from_path("/agent/status").is_none());
+        assert!(infer_event_from_path("/agent/metrics").is_none());
+    }
+
+    #[test]
+    fn agent_invoke_with_extra_segments_resolves() {
+        // "/agent/invoke/foo/bar" — first two segments are "agent"/"invoke", matches.
+        let event = infer_event_from_path("/agent/invoke/extra").unwrap();
+        assert_eq!(event.kind(), "capability-invoke");
+    }
+
+    #[test]
+    fn is_path_inferred_is_true_for_all_inferred_events() {
+        let paths = [
+            "/content",
+            "/attestation",
+            "/economic-event",
+            "/peer-message",
+            "/sync",
+            "/advice",
+            "/agent/invoke",
+            "/crossing",
+        ];
+        for path in &paths {
+            let event = infer_event_from_path(path)
+                .unwrap_or_else(|| panic!("expected event for path {path}"));
+            assert!(
+                is_path_inferred(&event),
+                "is_path_inferred must be true for event inferred from '{path}'"
+            );
+        }
+    }
+
+    #[test]
+    fn manually_constructed_real_event_is_not_path_inferred() {
+        // An event with real (non-sentinel) field values must NOT be flagged as
+        // path-inferred. This guards against false positives in Phase 2 logic.
+        let event = RelationalImpactEvent::ContentPublish {
+            content_cid: "bafkreiabc123".to_string(),
+            declared_reach: "public".to_string(),
+            author: "agent-real".to_string(),
+        };
+        assert!(
+            !is_path_inferred(&event),
+            "real events with non-sentinel fields must not be flagged as path-inferred"
+        );
+    }
 }
