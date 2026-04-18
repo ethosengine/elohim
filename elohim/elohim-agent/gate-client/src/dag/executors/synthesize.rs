@@ -5,7 +5,7 @@
 //! `GateDecision` + converted side effects.
 
 use async_trait::async_trait;
-use tracing::debug;
+use tracing::{debug, warn};
 
 use crate::dag::executor::{StepExecutor, StepOutcome};
 use crate::dag::{StepType, SynthesizeParams};
@@ -71,12 +71,12 @@ impl StepExecutor for SynthesizeExecutor {
             "SynthesizeExecutor: building decision"
         );
 
-        let status = build_status(params, ctx)?;
+        let (status, reasoning_override) = build_status(params, ctx)?;
         let side_effects = convert_side_effect_specs(&params.side_effects, ctx)?;
 
         let decision = GateDecision {
             status,
-            reasoning: ConstitutionalReasoningSummary::mocked(),
+            reasoning: reasoning_override.unwrap_or_else(ConstitutionalReasoningSummary::mocked),
             side_effects,
             decision_attestation_cid: None,
             phase: Phase::DevContext,
@@ -86,10 +86,16 @@ impl StepExecutor for SynthesizeExecutor {
     }
 }
 
-/// Apply the `decision_builder` selector and return the appropriate `GateStatus`.
-fn build_status(params: &SynthesizeParams, ctx: &GateContext) -> Result<GateStatus, GateError> {
+/// Apply the `decision_builder` selector and return the appropriate `GateStatus`
+/// plus an optional `ConstitutionalReasoningSummary` override.
+///
+/// When the override is `None`, the caller uses `ConstitutionalReasoningSummary::mocked()`.
+fn build_status(
+    params: &SynthesizeParams,
+    ctx: &GateContext,
+) -> Result<(GateStatus, Option<ConstitutionalReasoningSummary>), GateError> {
     match params.decision_builder.as_str() {
-        "allow-passthrough" => Ok(GateStatus::Allow { exempt: false }),
+        "allow-passthrough" => Ok((GateStatus::Allow { exempt: false }, None)),
 
         "allow-with-wisdom" => {
             // Read wisdom output — default key is "wisdomOutput".
@@ -98,8 +104,42 @@ fn build_status(params: &SynthesizeParams, ctx: &GateContext) -> Result<GateStat
                 .first()
                 .map(String::as_str)
                 .unwrap_or("wisdomOutput");
-            let _wisdom = ctx.get(wisdom_key); // presence is best-effort in dev-context
-            Ok(GateStatus::Allow { exempt: false })
+            let wisdom = ctx.get(wisdom_key).ok_or_else(|| {
+                GateError::DagExecution(format!(
+                    "allow-with-wisdom builder: missing required context key '{wisdom_key}'"
+                ))
+            })?;
+
+            // Build ConstitutionalReasoningSummary from wisdom reasoning sub-object.
+            // If the reasoning sub-shape is absent, fall back to mocked() with a warning.
+            let reasoning_val = wisdom.get("reasoning");
+            if reasoning_val.is_none() {
+                warn!(
+                    wisdom_key,
+                    "allow-with-wisdom: wisdom output missing 'reasoning' sub-object; \
+                     falling back to mocked ConstitutionalReasoningSummary"
+                );
+            }
+            let reasoning_override = reasoning_val.map(|r| ConstitutionalReasoningSummary {
+                primary_principle: r
+                    .get("primary_principle")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("dev-context-mock")
+                    .to_string(),
+                confidence: r
+                    .get("confidence")
+                    .and_then(|v| v.as_f64())
+                    .map(|f| f as f32)
+                    .unwrap_or(0.0),
+                summary: r
+                    .get("summary")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("wisdom-sourced")
+                    .to_string(),
+                phase_note: "wisdom-sourced".to_string(),
+            });
+
+            Ok((GateStatus::Allow { exempt: false }, reasoning_override))
         }
 
         "decline-from-wisdom" => {
@@ -125,15 +165,18 @@ fn build_status(params: &SynthesizeParams, ctx: &GateContext) -> Result<GateStat
                     .unwrap_or("declined by wisdom")
                     .to_string();
 
-                Ok(GateStatus::Decline {
-                    grounds: DeclineGrounds {
-                        category: "wisdom-decline".to_string(),
-                        summary,
-                        principle_refs: vec![],
+                Ok((
+                    GateStatus::Decline {
+                        grounds: DeclineGrounds {
+                            category: "wisdom-decline".to_string(),
+                            summary,
+                            principle_refs: vec![],
+                        },
                     },
-                })
+                    None,
+                ))
             } else {
-                Ok(GateStatus::Allow { exempt: false })
+                Ok((GateStatus::Allow { exempt: false }, None))
             }
         }
 
@@ -155,7 +198,7 @@ fn build_status(params: &SynthesizeParams, ctx: &GateContext) -> Result<GateStat
                     "synthesize step 'verdict-from-rule': could not parse ruleDecision as GateTag: {e}"
                 ))
             })?;
-            Ok(GateStatus::Verdict(tag))
+            Ok((GateStatus::Verdict(tag), None))
         }
 
         unknown => Err(GateError::DagExecution(format!(
@@ -205,11 +248,14 @@ mod tests {
             StepOutcome::Terminate(d, se) => (d, se),
             _ => panic!("expected Terminate"),
         };
-        assert!(matches!(decision.status, GateStatus::Allow { exempt: false }));
+        assert!(matches!(
+            decision.status,
+            GateStatus::Allow { exempt: false }
+        ));
         assert!(decision.side_effects.is_empty());
     }
 
-    // ─── allow-with-wisdom → Allow ────────────────────────────────────────────
+    // ─── allow-with-wisdom → Allow with propagated reasoning ─────────────────
 
     #[tokio::test]
     async fn allow_with_wisdom_returns_allow() {
@@ -230,6 +276,85 @@ mod tests {
         assert!(decision.is_allowed());
     }
 
+    // ─── allow-with-wisdom propagates wisdom reasoning.summary ───────────────
+
+    #[tokio::test]
+    async fn allow_with_wisdom_propagates_reasoning_summary() {
+        let exec = SynthesizeExecutor::new();
+        let step = synthesize_step("allow-with-wisdom", vec!["wisdomOutput".into()]);
+
+        let mut ctx = GateContext::new();
+        ctx.insert(
+            "wisdomOutput",
+            json!({
+                "decision": "allow",
+                "reasoning": {
+                    "primary_principle": "test-principle",
+                    "confidence": 0.9,
+                    "summary": "unique-test-marker"
+                }
+            }),
+        );
+
+        let outcome = exec.execute(&step, &mut ctx, &event()).await.unwrap();
+        let (decision, _) = match outcome {
+            StepOutcome::Terminate(d, se) => (d, se),
+            _ => panic!("expected Terminate"),
+        };
+        assert!(decision.is_allowed());
+        assert_eq!(
+            decision.reasoning.summary, "unique-test-marker",
+            "reasoning.summary should be propagated from wisdom output, got: {:?}",
+            decision.reasoning.summary
+        );
+        assert_eq!(decision.reasoning.phase_note, "wisdom-sourced");
+        assert_eq!(decision.reasoning.primary_principle, "test-principle");
+    }
+
+    // ─── allow-with-wisdom missing key → error ────────────────────────────────
+
+    #[tokio::test]
+    async fn allow_with_wisdom_missing_key_returns_error() {
+        let exec = SynthesizeExecutor::new();
+        let step = synthesize_step("allow-with-wisdom", vec!["wisdomOutput".into()]);
+        let mut ctx = GateContext::new(); // wisdomOutput not inserted
+
+        let result = exec.execute(&step, &mut ctx, &event()).await;
+        let err = match result {
+            Err(e) => e,
+            Ok(_) => panic!("expected Err but got Ok"),
+        };
+        assert!(matches!(err, GateError::DagExecution(_)));
+        let msg = err.to_string();
+        assert!(
+            msg.contains("wisdomOutput"),
+            "error should name the missing key, got: {msg}"
+        );
+    }
+
+    // ─── allow-with-wisdom missing reasoning sub-object → mocked fallback ────
+
+    #[tokio::test]
+    async fn allow_with_wisdom_missing_reasoning_falls_back_to_mocked() {
+        let exec = SynthesizeExecutor::new();
+        let step = synthesize_step("allow-with-wisdom", vec!["wisdomOutput".into()]);
+
+        let mut ctx = GateContext::new();
+        ctx.insert("wisdomOutput", json!({"decision": "allow"})); // no "reasoning" key
+
+        let outcome = exec.execute(&step, &mut ctx, &event()).await.unwrap();
+        let (decision, _) = match outcome {
+            StepOutcome::Terminate(d, se) => (d, se),
+            _ => panic!("expected Terminate"),
+        };
+        assert!(decision.is_allowed());
+        // Falls back to mocked — phase_note is NOT "wisdom-sourced"
+        assert_ne!(
+            decision.reasoning.phase_note, "wisdom-sourced",
+            "missing reasoning should fall back to mocked, not wisdom-sourced"
+        );
+    }
+
     // ─── decline-from-wisdom when wisdom says allow → Allow ──────────────────
 
     #[tokio::test]
@@ -238,7 +363,10 @@ mod tests {
         let step = synthesize_step("decline-from-wisdom", vec!["wisdomOutput".into()]);
 
         let mut ctx = GateContext::new();
-        ctx.insert("wisdomOutput", json!({"decision": "allow", "reasoning": {"summary": "ok"}}));
+        ctx.insert(
+            "wisdomOutput",
+            json!({"decision": "allow", "reasoning": {"summary": "ok"}}),
+        );
 
         let outcome = exec.execute(&step, &mut ctx, &event()).await.unwrap();
         let (decision, _) = match outcome {
@@ -256,10 +384,13 @@ mod tests {
         let step = synthesize_step("decline-from-wisdom", vec!["wisdomOutput".into()]);
 
         let mut ctx = GateContext::new();
-        ctx.insert("wisdomOutput", json!({
-            "decision": "decline",
-            "reasoning": {"summary": "content violates safety principle"}
-        }));
+        ctx.insert(
+            "wisdomOutput",
+            json!({
+                "decision": "decline",
+                "reasoning": {"summary": "content violates safety principle"}
+            }),
+        );
 
         let outcome = exec.execute(&step, &mut ctx, &event()).await.unwrap();
         let (decision, _) = match outcome {
@@ -269,7 +400,8 @@ mod tests {
         assert!(!decision.is_allowed());
         assert!(
             matches!(&decision.status, GateStatus::Decline { grounds } if grounds.category == "wisdom-decline"),
-            "got: {:?}", decision.status
+            "got: {:?}",
+            decision.status
         );
     }
 
@@ -281,12 +413,15 @@ mod tests {
         let step = synthesize_step("verdict-from-rule", vec!["ruleDecision".into()]);
 
         let mut ctx = GateContext::new();
-        ctx.insert("ruleDecision", json!({
-            "tag_kind": "story-point",
-            "valence": "constructive",
-            "magnitude": "medium",
-            "evidenceType": "direct"
-        }));
+        ctx.insert(
+            "ruleDecision",
+            json!({
+                "tag_kind": "story-point",
+                "valence": "constructive",
+                "magnitude": "medium",
+                "evidenceType": "direct"
+            }),
+        );
 
         let outcome = exec.execute(&step, &mut ctx, &event()).await.unwrap();
         let (decision, _) = match outcome {
@@ -297,7 +432,8 @@ mod tests {
             matches!(&decision.status,
                 GateStatus::Verdict(GateTag::StoryPoint { valence, .. }) if valence == "constructive"
             ),
-            "got: {:?}", decision.status
+            "got: {:?}",
+            decision.status
         );
     }
 
@@ -316,7 +452,10 @@ mod tests {
         };
         assert!(matches!(err, GateError::DagExecution(_)));
         let msg = err.to_string();
-        assert!(msg.contains("ruleDecision"), "error should name the missing key, got: {msg}");
+        assert!(
+            msg.contains("ruleDecision"),
+            "error should name the missing key, got: {msg}"
+        );
     }
 
     // ─── Unknown decision_builder → error ────────────────────────────────────
@@ -367,10 +506,7 @@ mod tests {
                 decision_builder: "allow-passthrough".into(),
                 side_effects: vec![SideEffectSpec {
                     effect_type: "MintAttestation".into(),
-                    params_from_keys: vec![
-                        "momentEntryHash".into(),
-                        "ruleDecision".into(),
-                    ],
+                    params_from_keys: vec!["momentEntryHash".into(), "ruleDecision".into()],
                 }],
             },
         };

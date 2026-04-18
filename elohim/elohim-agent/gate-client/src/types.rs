@@ -33,7 +33,10 @@ use crate::phase::Phase;
 #[cfg_attr(feature = "typescript", derive(TS))]
 #[cfg_attr(
     feature = "typescript",
-    ts(export, export_to = "../../elohim-agent-sdk/src/gate-client/generated/")
+    ts(
+        export,
+        export_to = "../../elohim-agent-sdk/src/gate-client/generated/"
+    )
 )]
 #[serde(rename_all = "camelCase")]
 pub struct GateDecision {
@@ -101,7 +104,10 @@ impl GateDecision {
 #[cfg_attr(feature = "typescript", derive(TS))]
 #[cfg_attr(
     feature = "typescript",
-    ts(export, export_to = "../../elohim-agent-sdk/src/gate-client/generated/")
+    ts(
+        export,
+        export_to = "../../elohim-agent-sdk/src/gate-client/generated/"
+    )
 )]
 #[serde(tag = "status", rename_all = "kebab-case")]
 pub enum GateStatus {
@@ -128,7 +134,10 @@ pub enum GateStatus {
 #[cfg_attr(feature = "typescript", derive(TS))]
 #[cfg_attr(
     feature = "typescript",
-    ts(export, export_to = "../../elohim-agent-sdk/src/gate-client/generated/")
+    ts(
+        export,
+        export_to = "../../elohim-agent-sdk/src/gate-client/generated/"
+    )
 )]
 #[serde(rename_all = "camelCase")]
 pub struct DeclineGrounds {
@@ -142,9 +151,16 @@ pub struct DeclineGrounds {
 #[cfg_attr(feature = "typescript", derive(TS))]
 #[cfg_attr(
     feature = "typescript",
-    ts(export, export_to = "../../elohim-agent-sdk/src/gate-client/generated/")
+    ts(
+        export,
+        export_to = "../../elohim-agent-sdk/src/gate-client/generated/"
+    )
 )]
-#[serde(tag = "kind", rename_all = "kebab-case", rename_all_fields = "camelCase")]
+#[serde(
+    tag = "kind",
+    rename_all = "kebab-case",
+    rename_all_fields = "camelCase"
+)]
 pub enum EscalationTarget {
     /// App-declared steward — fastest path, most context.
     AppSteward { steward_id: String },
@@ -159,7 +175,10 @@ pub enum EscalationTarget {
 #[cfg_attr(feature = "typescript", derive(TS))]
 #[cfg_attr(
     feature = "typescript",
-    ts(export, export_to = "../../elohim-agent-sdk/src/gate-client/generated/")
+    ts(
+        export,
+        export_to = "../../elohim-agent-sdk/src/gate-client/generated/"
+    )
 )]
 #[serde(rename_all = "kebab-case")]
 pub enum Severity {
@@ -178,9 +197,16 @@ pub enum Severity {
 #[cfg_attr(feature = "typescript", derive(TS))]
 #[cfg_attr(
     feature = "typescript",
-    ts(export, export_to = "../../elohim-agent-sdk/src/gate-client/generated/")
+    ts(
+        export,
+        export_to = "../../elohim-agent-sdk/src/gate-client/generated/"
+    )
 )]
-#[serde(tag = "tag_kind", rename_all = "kebab-case", rename_all_fields = "camelCase")]
+#[serde(
+    tag = "tag_kind",
+    rename_all = "kebab-case",
+    rename_all_fields = "camelCase"
+)]
 pub enum GateTag {
     /// Discernment gate output — carries the 7-valence classification.
     StoryPoint {
@@ -202,9 +228,16 @@ pub enum GateTag {
 #[cfg_attr(feature = "typescript", derive(TS))]
 #[cfg_attr(
     feature = "typescript",
-    ts(export, export_to = "../../elohim-agent-sdk/src/gate-client/generated/")
+    ts(
+        export,
+        export_to = "../../elohim-agent-sdk/src/gate-client/generated/"
+    )
 )]
-#[serde(tag = "effect", rename_all = "kebab-case", rename_all_fields = "camelCase")]
+#[serde(
+    tag = "effect",
+    rename_all = "kebab-case",
+    rename_all_fields = "camelCase"
+)]
 pub enum SideEffect {
     /// Mint an attestation on DHT.
     MintAttestation {
@@ -236,7 +269,10 @@ pub enum SideEffect {
 #[cfg_attr(feature = "typescript", derive(TS))]
 #[cfg_attr(
     feature = "typescript",
-    ts(export, export_to = "../../elohim-agent-sdk/src/gate-client/generated/")
+    ts(
+        export,
+        export_to = "../../elohim-agent-sdk/src/gate-client/generated/"
+    )
 )]
 #[serde(rename_all = "camelCase")]
 pub struct ConstitutionalReasoningSummary {
@@ -483,7 +519,10 @@ mod tests {
         };
         let json = serde_json::to_string(&t).expect("serialize");
         assert!(json.contains("\"kind\":\"app-steward\""), "got: {json}");
-        assert!(json.contains("stewardId"), "camelCase field expected, got: {json}");
+        assert!(
+            json.contains("stewardId"),
+            "camelCase field expected, got: {json}"
+        );
     }
 
     #[test]
@@ -493,13 +532,19 @@ mod tests {
         };
         let json = serde_json::to_string(&t).expect("serialize");
         assert!(json.contains("\"kind\":\"qahal\""), "got: {json}");
-        assert!(json.contains("communityId"), "camelCase field expected, got: {json}");
+        assert!(
+            json.contains("communityId"),
+            "camelCase field expected, got: {json}"
+        );
     }
 
     #[test]
     fn escalation_target_existential_boundary_tag() {
         let t = EscalationTarget::ExistentialBoundary;
         let json = serde_json::to_string(&t).expect("serialize");
-        assert!(json.contains("\"kind\":\"existential-boundary\""), "got: {json}");
+        assert!(
+            json.contains("\"kind\":\"existential-boundary\""),
+            "got: {json}"
+        );
     }
 }

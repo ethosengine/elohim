@@ -17,6 +17,9 @@ use crate::error::GateError;
 use crate::events::RelationalImpactEvent;
 
 use super::super::context::GateContext;
+use super::phase3_stubs::{
+    DhtResolver, ElohimStorageResolver, ManifestResolver, SourceChainResolver,
+};
 
 // ─── Pull source enum ─────────────────────────────────────────────────────────
 
@@ -42,8 +45,9 @@ pub enum PullSource {
 // ─── PullResolver trait ───────────────────────────────────────────────────────
 
 /// Maps a query string to a resolved `Value`.
+#[async_trait]
 pub trait PullResolver: Send + Sync {
-    fn resolve(&self, query: &str) -> Result<Value, GateError>;
+    async fn resolve(&self, query: &str) -> Result<Value, GateError>;
 }
 
 // ─── StubResolver ────────────────────────────────────────────────────────────
@@ -71,8 +75,9 @@ impl StubResolver {
     }
 }
 
+#[async_trait]
 impl PullResolver for StubResolver {
-    fn resolve(&self, query: &str) -> Result<Value, GateError> {
+    async fn resolve(&self, query: &str) -> Result<Value, GateError> {
         // Exact key match first, then wildcard, then null.
         if let Some(v) = self.values.get(query) {
             return Ok(v.clone());
@@ -80,57 +85,6 @@ impl PullResolver for StubResolver {
         if let Some(v) = self.values.get("*") {
             return Ok(v.clone());
         }
-        Ok(Value::Null)
-    }
-}
-
-// ─── Phase 3+ stub resolvers ──────────────────────────────────────────────────
-
-struct ElohimStorageResolver;
-struct DhtResolver;
-struct SourceChainResolver;
-struct ManifestResolver;
-
-impl PullResolver for ElohimStorageResolver {
-    fn resolve(&self, query: &str) -> Result<Value, GateError> {
-        warn!(
-            pull.source = "elohim-storage",
-            pull.query = query,
-            "elohim-storage pull resolver not yet implemented (Phase 3+); returning null"
-        );
-        Ok(Value::Null)
-    }
-}
-
-impl PullResolver for DhtResolver {
-    fn resolve(&self, query: &str) -> Result<Value, GateError> {
-        warn!(
-            pull.source = "dht",
-            pull.query = query,
-            "DHT pull resolver not yet implemented (Phase 3+); returning null"
-        );
-        Ok(Value::Null)
-    }
-}
-
-impl PullResolver for SourceChainResolver {
-    fn resolve(&self, query: &str) -> Result<Value, GateError> {
-        warn!(
-            pull.source = "source-chain",
-            pull.query = query,
-            "source-chain pull resolver not yet implemented (Phase 3+); returning null"
-        );
-        Ok(Value::Null)
-    }
-}
-
-impl PullResolver for ManifestResolver {
-    fn resolve(&self, query: &str) -> Result<Value, GateError> {
-        warn!(
-            pull.source = "manifest",
-            pull.query = query,
-            "manifest pull resolver not yet implemented (Phase 3+); returning null"
-        );
         Ok(Value::Null)
     }
 }
@@ -154,7 +108,9 @@ impl ContextAssembleExecutor {
     /// Create an executor with no pre-registered resolvers (Phase 3+ stubs fire
     /// for every pull).
     pub fn new() -> Self {
-        Self { resolvers: HashMap::new() }
+        Self {
+            resolvers: HashMap::new(),
+        }
     }
 
     /// Register a named resolver. The name is matched against `pull.from`.
@@ -162,21 +118,21 @@ impl ContextAssembleExecutor {
         self.resolvers.insert(source_name.into(), resolver);
     }
 
-    fn execute_params(
+    async fn execute_params(
         &self,
         params: &ContextAssembleParams,
         ctx: &mut GateContext,
     ) -> Result<(), GateError> {
         for pull in &params.pulls {
             let value = if let Some(resolver) = self.resolvers.get(&pull.from) {
-                resolver.resolve(&pull.query)?
+                resolver.resolve(&pull.query).await?
             } else {
                 // Route to the appropriate Phase 3+ stub by source name.
                 match pull.from.as_str() {
-                    "elohim-storage" => ElohimStorageResolver.resolve(&pull.query)?,
-                    "dht" => DhtResolver.resolve(&pull.query)?,
-                    "source-chain" => SourceChainResolver.resolve(&pull.query)?,
-                    "manifest" => ManifestResolver.resolve(&pull.query)?,
+                    "elohim-storage" => ElohimStorageResolver.resolve(&pull.query).await?,
+                    "dht" => DhtResolver.resolve(&pull.query).await?,
+                    "source-chain" => SourceChainResolver.resolve(&pull.query).await?,
+                    "manifest" => ManifestResolver.resolve(&pull.query).await?,
                     other => {
                         warn!(
                             pull.source = other,
@@ -215,7 +171,7 @@ impl StepExecutor for ContextAssembleExecutor {
                 ))
             }
         };
-        self.execute_params(params, ctx)?;
+        self.execute_params(params, ctx).await?;
         Ok(StepOutcome::Continue)
     }
 }
@@ -276,8 +232,16 @@ mod tests {
         exec.register("src", Box::new(StubResolver::new(values)));
 
         let step = assemble_step(vec![
-            Pull { from: "src".into(), query: "q1".into(), output_key: "key1".into() },
-            Pull { from: "src".into(), query: "q2".into(), output_key: "key2".into() },
+            Pull {
+                from: "src".into(),
+                query: "q1".into(),
+                output_key: "key1".into(),
+            },
+            Pull {
+                from: "src".into(),
+                query: "q2".into(),
+                output_key: "key2".into(),
+            },
         ]);
 
         let mut ctx = GateContext::new();
@@ -380,7 +344,7 @@ mod tests {
     #[tokio::test]
     async fn constant_stub_resolver_returns_value_for_any_query() {
         let resolver = StubResolver::constant(json!(99));
-        assert_eq!(resolver.resolve("anything").unwrap(), json!(99));
-        assert_eq!(resolver.resolve("other-query").unwrap(), json!(99));
+        assert_eq!(resolver.resolve("anything").await.unwrap(), json!(99));
+        assert_eq!(resolver.resolve("other-query").await.unwrap(), json!(99));
     }
 }

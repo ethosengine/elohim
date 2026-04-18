@@ -18,6 +18,9 @@
 
 pub mod context_assemble;
 pub mod escalate_to_review;
+/// Phase 3+ pull resolver stubs — return `Value::Null` with a warn log until
+/// real elohim-storage, DHT, source-chain, and manifest wiring lands.
+pub mod phase3_stubs;
 pub mod synthesize;
 pub mod wisdom_invoke;
 
@@ -213,7 +216,8 @@ mod tests {
         assert_eq!(result.len(), 1);
         assert!(
             matches!(&result[0], SideEffect::MintAttestation { target_hash, .. } if target_hash == "hash-abc"),
-            "got: {:?}", result[0]
+            "got: {:?}",
+            result[0]
         );
     }
 
@@ -243,7 +247,8 @@ mod tests {
         assert_eq!(result.len(), 1);
         assert!(
             matches!(&result[0], SideEffect::EmitEconomicEvent { event_json } if event_json.contains("transfer")),
-            "got: {:?}", result[0]
+            "got: {:?}",
+            result[0]
         );
     }
 
@@ -269,7 +274,10 @@ mod tests {
             params_from_keys: vec!["grounds".into(), "context".into()],
         }];
         let ctx = ctx_with(&[
-            ("grounds", json!({"category": "safety", "summary": "potential harm"})),
+            (
+                "grounds",
+                json!({"category": "safety", "summary": "potential harm"}),
+            ),
             ("context", json!({"eventId": "evt-1"})),
         ]);
         let result = convert_side_effect_specs(&specs, &ctx).unwrap();
@@ -277,7 +285,8 @@ mod tests {
         assert!(
             matches!(&result[0], SideEffect::OpenStewardReview { grounds_json, .. }
                 if grounds_json.contains("safety")),
-            "got: {:?}", result[0]
+            "got: {:?}",
+            result[0]
         );
     }
 
@@ -311,7 +320,8 @@ mod tests {
         assert!(
             matches!(&result[0], SideEffect::UpdateReachAggregation { subject_hash, .. }
                 if subject_hash.contains("agent-hash-xyz")),
-            "got: {:?}", result[0]
+            "got: {:?}",
+            result[0]
         );
     }
 
