@@ -16,7 +16,10 @@ use crate::phase::Phase;
 /// caller must perform (mint attestation, emit economic event, etc.).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "typescript", derive(TS))]
-#[cfg_attr(feature = "typescript", ts(export))]
+#[cfg_attr(
+    feature = "typescript",
+    ts(export, export_to = "../../elohim-agent-sdk/src/gate-client/generated/")
+)]
 pub struct GateDecision {
     pub status: GateStatus,
     pub reasoning: ConstitutionalReasoningSummary,
@@ -70,7 +73,10 @@ impl GateDecision {
 /// StoryPointTag from the discernment gate).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "typescript", derive(TS))]
-#[cfg_attr(feature = "typescript", ts(export))]
+#[cfg_attr(
+    feature = "typescript",
+    ts(export, export_to = "../../elohim-agent-sdk/src/gate-client/generated/")
+)]
 #[serde(tag = "status", rename_all = "kebab-case")]
 pub enum GateStatus {
     /// Caller may proceed. `exempt` indicates the gate did not fire (interior
@@ -94,7 +100,10 @@ pub enum GateStatus {
 /// Rationale for a Decline decision.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "typescript", derive(TS))]
-#[cfg_attr(feature = "typescript", ts(export))]
+#[cfg_attr(
+    feature = "typescript",
+    ts(export, export_to = "../../elohim-agent-sdk/src/gate-client/generated/")
+)]
 pub struct DeclineGrounds {
     pub category: String,
     pub summary: String,
@@ -104,7 +113,10 @@ pub struct DeclineGrounds {
 /// Where an escalated decision routes.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "typescript", derive(TS))]
-#[cfg_attr(feature = "typescript", ts(export))]
+#[cfg_attr(
+    feature = "typescript",
+    ts(export, export_to = "../../elohim-agent-sdk/src/gate-client/generated/")
+)]
 #[serde(tag = "kind", rename_all = "kebab-case")]
 pub enum EscalationTarget {
     /// App-declared steward — fastest path, most context.
@@ -118,7 +130,10 @@ pub enum EscalationTarget {
 /// Escalation severity tier.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "typescript", derive(TS))]
-#[cfg_attr(feature = "typescript", ts(export))]
+#[cfg_attr(
+    feature = "typescript",
+    ts(export, export_to = "../../elohim-agent-sdk/src/gate-client/generated/")
+)]
 #[serde(rename_all = "kebab-case")]
 pub enum Severity {
     Low,
@@ -134,7 +149,10 @@ pub enum Severity {
 /// variant.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "typescript", derive(TS))]
-#[cfg_attr(feature = "typescript", ts(export))]
+#[cfg_attr(
+    feature = "typescript",
+    ts(export, export_to = "../../elohim-agent-sdk/src/gate-client/generated/")
+)]
 #[serde(tag = "tag_kind", rename_all = "kebab-case")]
 pub enum GateTag {
     /// Discernment gate output — carries the 7-valence classification.
@@ -155,7 +173,10 @@ pub enum GateTag {
 /// The gate library does not reach into conductor/DHT itself."
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "typescript", derive(TS))]
-#[cfg_attr(feature = "typescript", ts(export))]
+#[cfg_attr(
+    feature = "typescript",
+    ts(export, export_to = "../../elohim-agent-sdk/src/gate-client/generated/")
+)]
 #[serde(tag = "effect", rename_all = "kebab-case")]
 pub enum SideEffect {
     /// Mint an attestation on DHT.
@@ -186,7 +207,10 @@ pub enum SideEffect {
 /// full `ConstitutionalReasoning` struct from `elohim-agent::response`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "typescript", derive(TS))]
-#[cfg_attr(feature = "typescript", ts(export))]
+#[cfg_attr(
+    feature = "typescript",
+    ts(export, export_to = "../../elohim-agent-sdk/src/gate-client/generated/")
+)]
 pub struct ConstitutionalReasoningSummary {
     pub primary_principle: String,
     pub summary: String,

@@ -14,7 +14,10 @@ use ts_rs::TS;
 /// See spec §5.5 (Dev-context attestation marker).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "typescript", derive(TS))]
-#[cfg_attr(feature = "typescript", ts(export))]
+#[cfg_attr(
+    feature = "typescript",
+    ts(export, export_to = "../../elohim-agent-sdk/src/gate-client/generated/")
+)]
 #[serde(rename_all = "kebab-case")]
 pub enum Phase {
     /// Pre-elohim-activation: wisdom-invoke is mocked; decisions are legible

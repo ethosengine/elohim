@@ -20,7 +20,10 @@ use crate::events::RelationalImpactEvent;
 /// Primitives).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "typescript", derive(TS))]
-#[cfg_attr(feature = "typescript", ts(export))]
+#[cfg_attr(
+    feature = "typescript",
+    ts(export, export_to = "../../elohim-agent-sdk/src/gate-client/generated/")
+)]
 #[serde(rename_all = "kebab-case")]
 pub enum SpaceType {
     /// Normal network activity. Universal band fires with full wisdom.
@@ -86,7 +89,10 @@ impl SpaceType {
 /// Context enriching a space-type with caller-declared mode flags.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "typescript", derive(TS))]
-#[cfg_attr(feature = "typescript", ts(export))]
+#[cfg_attr(
+    feature = "typescript",
+    ts(export, export_to = "../../elohim-agent-sdk/src/gate-client/generated/")
+)]
 pub struct SpaceContext {
     pub space_type: SpaceType,
     /// Caller-declared play-mode override (user in playful creation mode).

@@ -16,7 +16,10 @@ use ts_rs::TS;
 /// extensibility via open types is a v1.1 upgrade path.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "typescript", derive(TS))]
-#[cfg_attr(feature = "typescript", ts(export))]
+#[cfg_attr(
+    feature = "typescript",
+    ts(export, export_to = "../../elohim-agent-sdk/src/gate-client/generated/")
+)]
 #[serde(tag = "kind", rename_all = "kebab-case")]
 pub enum RelationalImpactEvent {
     /// Publishing content to the DHT for peer consumption.

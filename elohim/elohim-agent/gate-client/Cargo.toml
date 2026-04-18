@@ -37,11 +37,18 @@ bytes.workspace = true
 elohim-agent.workspace = true
 
 # Optional: TypeScript export
-ts-rs = { workspace = true, optional = true }
+# import-esm makes generated imports use ".js" extensions, compatible with
+# NodeNext module resolution in the elohim-agent-sdk TypeScript package.
+ts-rs = { workspace = true, optional = true, features = ["import-esm"] }
 
 [features]
 default = []
-typescript = ["ts-rs", "elohim-agent/typescript"]
+# Note: we deliberately do NOT forward the typescript feature to elohim-agent.
+# The gate-client's TS-exported types (GateDecision, RelationalImpactEvent, etc.)
+# do not reference any elohim-agent types — ConstitutionalReasoningSummary is a
+# local placeholder owned by this crate. Enabling elohim-agent/typescript would
+# cascade into constitution/typescript, which has un-bridged DateTime<Utc> fields.
+typescript = ["ts-rs"]
 
 [dev-dependencies]
 tokio-test = "0.4"
