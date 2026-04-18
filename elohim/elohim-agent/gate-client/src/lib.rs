@@ -36,6 +36,7 @@ pub mod error;
 pub mod events;
 pub mod phase;
 pub mod space;
+pub mod tower;
 pub mod transport;
 pub mod types;
 
@@ -47,6 +48,7 @@ pub use error::{GateError, GateResult};
 pub use events::RelationalImpactEvent;
 pub use phase::Phase;
 pub use space::{SpaceContext, SpaceType};
+pub use tower::{tower_layer, GateLayer};
 pub use transport::{GateClientConfig, Transport};
 pub use types::{
     DeclineGrounds, EscalationTarget, GateDecision, GateStatus, GateTag, Severity, SideEffect,

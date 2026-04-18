@@ -28,6 +28,10 @@ chrono.workspace = true
 # IDs
 uuid.workspace = true
 
+# HTTP middleware
+tower.workspace = true
+http.workspace = true
+
 # Internal
 elohim-agent.workspace = true
 
@@ -40,3 +44,6 @@ typescript = ["ts-rs", "elohim-agent/typescript"]
 
 [dev-dependencies]
 tokio-test = "0.4"
+axum.workspace = true
+http-body-util.workspace = true
+tower = { workspace = true, features = ["util"] }

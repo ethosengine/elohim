@@ -53,6 +53,13 @@ chrono = { version = "0.4", features = ["serde"] }
 tokio-stream = "0.1"
 pin-project-lite = "0.2"
 
+# HTTP server / middleware
+tower = { version = "0.5", features = ["util"] }
+tower-http = { version = "0.6", features = ["trace"] }
+axum = { version = "0.8" }
+http = "1"
+http-body-util = "0.1"
+
 # TypeScript bindings
 ts-rs = "10.0"
 
