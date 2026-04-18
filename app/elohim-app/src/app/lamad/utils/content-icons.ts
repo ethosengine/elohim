@@ -53,6 +53,8 @@ export const CONTENT_TYPE_ICONS: Record<ContentType, string> = {
   'work-project': '🗂️',
   'issue-report': '🐛',
   application: '🖥️',
+  'experience-story': '📖',
+  'experience-moment': '📸',
   // App-layer extensions
   community: '👥',
   'discovery-assessment': '🔮',
