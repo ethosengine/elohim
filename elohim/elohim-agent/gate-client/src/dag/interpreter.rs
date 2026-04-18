@@ -34,6 +34,7 @@ use crate::types::{ConstitutionalReasoningSummary, GateDecision, GateStatus};
 
 use super::context::GateContext;
 use super::executor::{ArcExecutor, StepKind, StepOutcome};
+use super::executors::convert_side_effect_specs;
 use super::expr::eval_edge;
 use super::{GateProcessDeclaration, StepType, TerminalNode};
 
@@ -177,7 +178,7 @@ impl DagInterpreter {
 /// authoring error and we return `DagExecution`.
 ///
 /// `terminal_id` is threaded through for diagnostic error messages.
-fn terminal_to_decision(terminal_id: &str, terminal: &TerminalNode, _ctx: &GateContext) -> Result<GateDecision, GateError> {
+fn terminal_to_decision(terminal_id: &str, terminal: &TerminalNode, ctx: &GateContext) -> Result<GateDecision, GateError> {
     let status: GateStatus = serde_json::from_value(terminal.decision.clone())
         .map_err(|e| {
             GateError::DagExecution(format!(
@@ -185,19 +186,8 @@ fn terminal_to_decision(terminal_id: &str, terminal: &TerminalNode, _ctx: &GateC
             ))
         })?;
 
-    // Side effects from the terminal node are collected and included.
-    let side_effects = terminal
-        .side_effects
-        .iter()
-        .map(|spec| {
-            // In Phase 2.1, side-effect conversion is not yet wired — the
-            // SideEffectSpec carries a `type` string + `params_from_keys`.
-            // Task 2.2 will map these to concrete SideEffect variants.
-            // For now we return no side effects from terminal nodes.
-            let _ = spec;
-        })
-        .collect::<Vec<_>>();
-    let _ = side_effects;
+    // Convert side-effect specs to concrete SideEffect values using the shared helper.
+    let side_effects = convert_side_effect_specs(&terminal.side_effects, ctx)?;
 
     Ok(GateDecision {
         status,
@@ -207,7 +197,7 @@ fn terminal_to_decision(terminal_id: &str, terminal: &TerminalNode, _ctx: &GateC
             confidence: 1.0,
             phase_note: "Phase 2 DAG interpreter.".to_string(),
         },
-        side_effects: vec![],
+        side_effects,
         decision_attestation_cid: None,
         phase: Phase::DevContext,
     })

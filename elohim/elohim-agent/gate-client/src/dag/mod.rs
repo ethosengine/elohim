@@ -22,6 +22,7 @@ use std::collections::HashMap;
 
 pub mod context;
 pub mod executor;
+pub mod executors;
 pub mod expr;
 pub mod interpreter;
 
@@ -29,6 +30,9 @@ pub mod interpreter;
 
 pub use context::GateContext;
 pub use executor::{ArcExecutor, StepExecutor, StepKind, StepOutcome};
+pub use executors::{
+    ContextAssembleExecutor, EscalateToReviewExecutor, SynthesizeExecutor, WisdomInvokeExecutor,
+};
 pub use interpreter::DagInterpreter;
 
 // ─── Phase-0 type definitions (path-stable) ──────────────────────────────────

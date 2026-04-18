@@ -210,6 +210,9 @@ pub fn __test_set_decision_override(decision: Option<GateDecision>) {
 }
 
 // Public re-exports for ergonomic use.
+pub use dag::executors::{
+    ContextAssembleExecutor, EscalateToReviewExecutor, SynthesizeExecutor, WisdomInvokeExecutor,
+};
 pub use error::{GateError, GateResult};
 pub use events::RelationalImpactEvent;
 pub use phase::Phase;
