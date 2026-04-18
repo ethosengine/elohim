@@ -53,9 +53,19 @@ default = []
 # local placeholder owned by this crate. Enabling elohim-agent/typescript would
 # cascade into constitution/typescript, which has un-bridged DateTime<Utc> fields.
 typescript = ["ts-rs"]
+# Exposes testing helpers (mock_allow/mock_decline/etc.) and the
+# __test_set_decision_override mechanism to integration tests and downstream
+# test crates.  Never enable in production builds.
+testing = []
 
 [dev-dependencies]
 tokio-test = "0.4"
 axum.workspace = true
 http-body-util.workspace = true
 tower = { workspace = true, features = ["util"] }
+
+# Integration test: universal_band_integration requires the "testing" feature
+# so that __test_set_decision_override and gate_client::testing are available.
+[[test]]
+name = "universal_band_integration"
+required-features = ["testing"]

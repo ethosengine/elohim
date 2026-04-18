@@ -150,15 +150,25 @@ mod tests {
     async fn escalate_low_severity_terminates_with_escalate_status() {
         let exec = EscalateToReviewExecutor::new();
         let mut ctx = GateContext::new();
-        let outcome = exec.execute(&escalate_step("low"), &mut ctx, &event()).await.unwrap();
+        let outcome = exec
+            .execute(&escalate_step("low"), &mut ctx, &event())
+            .await
+            .unwrap();
 
         let decision = match outcome {
             StepOutcome::Terminate(d, _) => d,
             _ => panic!("expected Terminate"),
         };
         assert!(
-            matches!(&decision.status, GateStatus::Escalate { severity: Severity::Low, .. }),
-            "got: {:?}", decision.status
+            matches!(
+                &decision.status,
+                GateStatus::Escalate {
+                    severity: Severity::Low,
+                    ..
+                }
+            ),
+            "got: {:?}",
+            decision.status
         );
     }
 
@@ -166,38 +176,62 @@ mod tests {
     async fn escalate_medium_severity() {
         let exec = EscalateToReviewExecutor::new();
         let mut ctx = GateContext::new();
-        let outcome = exec.execute(&escalate_step("medium"), &mut ctx, &event()).await.unwrap();
-        let decision = match outcome {
-            StepOutcome::Terminate(d, _) => d,
-            _ => panic!("expected Terminate"),
-        };
-        assert!(matches!(&decision.status, GateStatus::Escalate { severity: Severity::Medium, .. }));
-    }
-
-    #[tokio::test]
-    async fn escalate_high_severity() {
-        let exec = EscalateToReviewExecutor::new();
-        let mut ctx = GateContext::new();
-        let outcome = exec.execute(&escalate_step("high"), &mut ctx, &event()).await.unwrap();
-        let decision = match outcome {
-            StepOutcome::Terminate(d, _) => d,
-            _ => panic!("expected Terminate"),
-        };
-        assert!(matches!(&decision.status, GateStatus::Escalate { severity: Severity::High, .. }));
-    }
-
-    #[tokio::test]
-    async fn escalate_existential_severity() {
-        let exec = EscalateToReviewExecutor::new();
-        let mut ctx = GateContext::new();
-        let outcome = exec.execute(&escalate_step("existential"), &mut ctx, &event()).await.unwrap();
+        let outcome = exec
+            .execute(&escalate_step("medium"), &mut ctx, &event())
+            .await
+            .unwrap();
         let decision = match outcome {
             StepOutcome::Terminate(d, _) => d,
             _ => panic!("expected Terminate"),
         };
         assert!(matches!(
             &decision.status,
-            GateStatus::Escalate { severity: Severity::Existential, .. }
+            GateStatus::Escalate {
+                severity: Severity::Medium,
+                ..
+            }
+        ));
+    }
+
+    #[tokio::test]
+    async fn escalate_high_severity() {
+        let exec = EscalateToReviewExecutor::new();
+        let mut ctx = GateContext::new();
+        let outcome = exec
+            .execute(&escalate_step("high"), &mut ctx, &event())
+            .await
+            .unwrap();
+        let decision = match outcome {
+            StepOutcome::Terminate(d, _) => d,
+            _ => panic!("expected Terminate"),
+        };
+        assert!(matches!(
+            &decision.status,
+            GateStatus::Escalate {
+                severity: Severity::High,
+                ..
+            }
+        ));
+    }
+
+    #[tokio::test]
+    async fn escalate_existential_severity() {
+        let exec = EscalateToReviewExecutor::new();
+        let mut ctx = GateContext::new();
+        let outcome = exec
+            .execute(&escalate_step("existential"), &mut ctx, &event())
+            .await
+            .unwrap();
+        let decision = match outcome {
+            StepOutcome::Terminate(d, _) => d,
+            _ => panic!("expected Terminate"),
+        };
+        assert!(matches!(
+            &decision.status,
+            GateStatus::Escalate {
+                severity: Severity::Existential,
+                ..
+            }
         ));
     }
 
@@ -207,12 +241,21 @@ mod tests {
     async fn severity_parsing_is_case_insensitive() {
         let exec = EscalateToReviewExecutor::new();
         let mut ctx = GateContext::new();
-        let outcome = exec.execute(&escalate_step("HIGH"), &mut ctx, &event()).await.unwrap();
+        let outcome = exec
+            .execute(&escalate_step("HIGH"), &mut ctx, &event())
+            .await
+            .unwrap();
         let decision = match outcome {
             StepOutcome::Terminate(d, _) => d,
             _ => panic!("expected Terminate"),
         };
-        assert!(matches!(&decision.status, GateStatus::Escalate { severity: Severity::High, .. }));
+        assert!(matches!(
+            &decision.status,
+            GateStatus::Escalate {
+                severity: Severity::High,
+                ..
+            }
+        ));
     }
 
     // ─── Unknown severity → error ─────────────────────────────────────────────
@@ -221,14 +264,19 @@ mod tests {
     async fn unknown_severity_returns_dag_execution_error() {
         let exec = EscalateToReviewExecutor::new();
         let mut ctx = GateContext::new();
-        let result = exec.execute(&escalate_step("ultra"), &mut ctx, &event()).await;
+        let result = exec
+            .execute(&escalate_step("ultra"), &mut ctx, &event())
+            .await;
         let err = match result {
             Err(e) => e,
             Ok(_) => panic!("expected Err but got Ok"),
         };
         assert!(matches!(err, GateError::DagExecution(_)));
         let msg = err.to_string();
-        assert!(msg.contains("ultra"), "error should name the unknown severity, got: {msg}");
+        assert!(
+            msg.contains("ultra"),
+            "error should name the unknown severity, got: {msg}"
+        );
     }
 
     // ─── ExistentialBoundary is the Phase 2 stub target ──────────────────────
@@ -237,16 +285,24 @@ mod tests {
     async fn phase2_stub_target_is_existential_boundary() {
         let exec = EscalateToReviewExecutor::new();
         let mut ctx = GateContext::new();
-        let outcome = exec.execute(&escalate_step("high"), &mut ctx, &event()).await.unwrap();
+        let outcome = exec
+            .execute(&escalate_step("high"), &mut ctx, &event())
+            .await
+            .unwrap();
         let decision = match outcome {
             StepOutcome::Terminate(d, _) => d,
             _ => panic!("expected Terminate"),
         };
         assert!(
-            matches!(&decision.status,
-                GateStatus::Escalate { target: EscalationTarget::ExistentialBoundary, .. }
+            matches!(
+                &decision.status,
+                GateStatus::Escalate {
+                    target: EscalationTarget::ExistentialBoundary,
+                    ..
+                }
             ),
-            "Phase 2 must use ExistentialBoundary as stub target, got: {:?}", decision.status
+            "Phase 2 must use ExistentialBoundary as stub target, got: {:?}",
+            decision.status
         );
     }
 

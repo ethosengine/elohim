@@ -75,8 +75,7 @@ impl GateContext {
         let mut sorted: Vec<(&String, &Value)> = self.0.iter().collect();
         sorted.sort_by_key(|(k, _)| k.as_str());
 
-        let canonical = serde_json::to_string(&sorted)
-            .unwrap_or_else(|_| "{}".to_string());
+        let canonical = serde_json::to_string(&sorted).unwrap_or_else(|_| "{}".to_string());
 
         // Inline SHA-256 using std only — avoids adding a new dep.
         // sha2 is already a workspace dep; use it.

@@ -27,6 +27,8 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use tracing::Instrument;
+
 use crate::error::GateError;
 use crate::events::RelationalImpactEvent;
 use crate::phase::Phase;
@@ -62,7 +64,9 @@ impl Default for DagInterpreter {
 impl DagInterpreter {
     /// Create a new interpreter with an empty executor registry.
     pub fn new() -> Self {
-        Self { executors: HashMap::new() }
+        Self {
+            executors: HashMap::new(),
+        }
     }
 
     /// Register an executor for a specific step kind.
@@ -117,9 +121,7 @@ impl DagInterpreter {
 
             // ── Step lookup ──────────────────────────────────────────────────
             let step_node = dag.steps.get(&current_id).ok_or_else(|| {
-                GateError::DagExecution(format!(
-                    "unknown step id '{current_id}' in DAG"
-                ))
+                GateError::DagExecution(format!("unknown step id '{current_id}' in DAG"))
             })?;
 
             let step: &StepType = &step_node.step;
@@ -132,7 +134,15 @@ impl DagInterpreter {
                 ))
             })?;
 
-            let outcome = executor.execute(step, &mut ctx, event).await?;
+            let step_span = tracing::debug_span!(
+                "dag_step",
+                step_id = %current_id,
+                kind = ?kind
+            );
+            let outcome = executor
+                .execute(step, &mut ctx, event)
+                .instrument(step_span)
+                .await?;
 
             // ── Early termination ────────────────────────────────────────────
             if let StepOutcome::Terminate(decision, _side_effects) = outcome {
@@ -178,7 +188,11 @@ impl DagInterpreter {
 /// authoring error and we return `DagExecution`.
 ///
 /// `terminal_id` is threaded through for diagnostic error messages.
-fn terminal_to_decision(terminal_id: &str, terminal: &TerminalNode, ctx: &GateContext) -> Result<GateDecision, GateError> {
+fn terminal_to_decision(
+    terminal_id: &str,
+    terminal: &TerminalNode,
+    ctx: &GateContext,
+) -> Result<GateDecision, GateError> {
     let status: GateStatus = serde_json::from_value(terminal.decision.clone())
         .map_err(|e| {
             GateError::DagExecution(format!(
@@ -210,8 +224,7 @@ mod tests {
     use super::*;
     use crate::dag::{
         executor::{TerminateExecutor, TestExecutor},
-        ConditionalEdge, ContextAssembleParams, GateProcessDag, StepNode,
-        WisdomInvokeParams,
+        ConditionalEdge, ContextAssembleParams, GateProcessDag, StepNode, WisdomInvokeParams,
     };
     use crate::phase::Phase;
     use crate::types::{GateStatus, GateTag};
@@ -320,7 +333,11 @@ mod tests {
             event_type: "content-publish".into(),
             input_schema: json!({}),
             output_schema: json!({}),
-            dag: GateProcessDag { entrypoint: "step-a".to_string(), steps, terminals },
+            dag: GateProcessDag {
+                entrypoint: "step-a".to_string(),
+                steps,
+                terminals,
+            },
         };
 
         let interp = build_interpreter_with_continue();
@@ -364,7 +381,11 @@ mod tests {
             event_type: "content-publish".into(),
             input_schema: json!({}),
             output_schema: json!({}),
-            dag: GateProcessDag { entrypoint: "step-a".to_string(), steps, terminals },
+            dag: GateProcessDag {
+                entrypoint: "step-a".to_string(),
+                steps,
+                terminals,
+            },
         };
 
         // Executor writes "result" = "positive" to context.
@@ -382,7 +403,10 @@ mod tests {
             .await
             .unwrap();
 
-        assert!(decision.is_allowed(), "should have routed to allow-terminal");
+        assert!(
+            decision.is_allowed(),
+            "should have routed to allow-terminal"
+        );
     }
 
     #[tokio::test]
@@ -414,7 +438,11 @@ mod tests {
             event_type: "content-publish".into(),
             input_schema: json!({}),
             output_schema: json!({}),
-            dag: GateProcessDag { entrypoint: "step-a".to_string(), steps, terminals },
+            dag: GateProcessDag {
+                entrypoint: "step-a".to_string(),
+                steps,
+                terminals,
+            },
         };
 
         let mut interp = DagInterpreter::new();
@@ -431,7 +459,10 @@ mod tests {
             .await
             .unwrap();
 
-        assert!(!decision.is_allowed(), "should have fallen through to decline-terminal");
+        assert!(
+            !decision.is_allowed(),
+            "should have fallen through to decline-terminal"
+        );
     }
 
     // ─── Early terminal via StepOutcome::Terminate ────────────────────────────
@@ -474,7 +505,11 @@ mod tests {
             event_type: "content-publish".into(),
             input_schema: json!({}),
             output_schema: json!({}),
-            dag: GateProcessDag { entrypoint: "step-a".to_string(), steps, terminals },
+            dag: GateProcessDag {
+                entrypoint: "step-a".to_string(),
+                steps,
+                terminals,
+            },
         };
 
         // WisdomInvoke executor terminates immediately with Decline.
@@ -495,7 +530,9 @@ mod tests {
         let mut interp = DagInterpreter::new();
         interp.register(
             StepKind::WisdomInvoke,
-            Arc::new(TerminateExecutor { decision: terminating_decision }),
+            Arc::new(TerminateExecutor {
+                decision: terminating_decision,
+            }),
         );
 
         let decision = interp
@@ -503,7 +540,10 @@ mod tests {
             .await
             .unwrap();
 
-        assert!(!decision.is_allowed(), "executor Terminate must short-circuit to Decline");
+        assert!(
+            !decision.is_allowed(),
+            "executor Terminate must short-circuit to Decline"
+        );
         let json = serde_json::to_string(&decision.status).unwrap();
         assert!(json.contains("early-terminate"), "got: {json}");
     }
@@ -539,7 +579,10 @@ mod tests {
             "expected DagExecution error, got: {err:?}"
         );
         let msg = err.to_string();
-        assert!(msg.contains("step-x"), "error message should name the bad id, got: {msg}");
+        assert!(
+            msg.contains("step-x"),
+            "error message should name the bad id, got: {msg}"
+        );
     }
 
     // ─── Cycle detection ─────────────────────────────────────────────────────
@@ -566,7 +609,11 @@ mod tests {
             event_type: "content-publish".into(),
             input_schema: json!({}),
             output_schema: json!({}),
-            dag: GateProcessDag { entrypoint: "step-a".to_string(), steps, terminals },
+            dag: GateProcessDag {
+                entrypoint: "step-a".to_string(),
+                steps,
+                terminals,
+            },
         };
 
         let interp = build_interpreter_with_continue();
@@ -619,7 +666,11 @@ mod tests {
             event_type: "content-publish".into(),
             input_schema: json!({}),
             output_schema: json!({}),
-            dag: GateProcessDag { entrypoint: "step-0".to_string(), steps, terminals },
+            dag: GateProcessDag {
+                entrypoint: "step-0".to_string(),
+                steps,
+                terminals,
+            },
         };
 
         let interp = build_interpreter_with_continue();
@@ -677,7 +728,11 @@ mod tests {
             event_type: "content-publish".into(),
             input_schema: json!({}),
             output_schema: json!({}),
-            dag: GateProcessDag { entrypoint: "step-0".to_string(), steps, terminals },
+            dag: GateProcessDag {
+                entrypoint: "step-0".to_string(),
+                steps,
+                terminals,
+            },
         };
 
         let interp = build_interpreter_with_continue();
@@ -686,7 +741,10 @@ mod tests {
             .await
             .expect("10-step linear DAG must complete without hitting any cap");
 
-        assert!(decision.is_allowed(), "linear DAG should reach allow-terminal");
+        assert!(
+            decision.is_allowed(),
+            "linear DAG should reach allow-terminal"
+        );
     }
 
     // ─── Multi-terminal DAG ───────────────────────────────────────────────────
@@ -732,7 +790,10 @@ mod tests {
             "constructive-terminal".to_string(),
             verdict_terminal("constructive"),
         );
-        terminals.insert("conflict-terminal".to_string(), verdict_terminal("conflict"));
+        terminals.insert(
+            "conflict-terminal".to_string(),
+            verdict_terminal("conflict"),
+        );
         terminals.insert("default-terminal".to_string(), allow_terminal());
 
         let dag = GateProcessDeclaration {
@@ -803,7 +864,11 @@ mod tests {
             event_type: "content-publish".into(),
             input_schema: json!({}),
             output_schema: json!({}),
-            dag: GateProcessDag { entrypoint: "step-a".to_string(), steps, terminals },
+            dag: GateProcessDag {
+                entrypoint: "step-a".to_string(),
+                steps,
+                terminals,
+            },
         };
 
         let mut initial = GateContext::new();
@@ -819,8 +884,14 @@ mod tests {
             }),
         );
 
-        let decision = interp.run(&dag, &content_publish_event(), initial).await.unwrap();
-        assert!(decision.is_allowed(), "initial context key should have matched the edge");
+        let decision = interp
+            .run(&dag, &content_publish_event(), initial)
+            .await
+            .unwrap();
+        assert!(
+            decision.is_allowed(),
+            "initial context key should have matched the edge"
+        );
     }
 
     // ─── No executor registered ───────────────────────────────────────────────
@@ -852,7 +923,11 @@ mod tests {
             event_type: "content-publish".into(),
             input_schema: json!({}),
             output_schema: json!({}),
-            dag: GateProcessDag { entrypoint: "step-a".to_string(), steps, terminals },
+            dag: GateProcessDag {
+                entrypoint: "step-a".to_string(),
+                steps,
+                terminals,
+            },
         };
 
         // No executor registered — DagInterpreter::new() only.
@@ -881,7 +956,7 @@ mod tests {
                 step: StepType::ContextAssemble {
                     params: ContextAssembleParams { pulls: vec![] },
                 },
-                next: None,  // no fallback
+                next: None,    // no fallback
                 edges: vec![], // no conditional edges
             },
         );
@@ -893,7 +968,11 @@ mod tests {
             event_type: "content-publish".into(),
             input_schema: json!({}),
             output_schema: json!({}),
-            dag: GateProcessDag { entrypoint: "step-a".to_string(), steps, terminals },
+            dag: GateProcessDag {
+                entrypoint: "step-a".to_string(),
+                steps,
+                terminals,
+            },
         };
 
         let interp = build_interpreter_with_continue();

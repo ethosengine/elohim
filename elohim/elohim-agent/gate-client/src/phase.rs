@@ -34,7 +34,10 @@ use ts_rs::TS;
 #[cfg_attr(feature = "typescript", derive(TS))]
 #[cfg_attr(
     feature = "typescript",
-    ts(export, export_to = "../../elohim-agent-sdk/src/gate-client/generated/")
+    ts(
+        export,
+        export_to = "../../elohim-agent-sdk/src/gate-client/generated/"
+    )
 )]
 #[serde(rename_all = "kebab-case")]
 pub enum Phase {

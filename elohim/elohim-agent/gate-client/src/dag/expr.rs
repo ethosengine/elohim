@@ -47,12 +47,9 @@ impl Literal {
         match self {
             Literal::Null => serde_json::Value::Null,
             Literal::Bool(b) => serde_json::Value::Bool(*b),
-            Literal::Number(n) => {
-                serde_json::Value::Number(
-                    serde_json::Number::from_f64(*n)
-                        .unwrap_or_else(|| serde_json::Number::from(0u64)),
-                )
-            }
+            Literal::Number(n) => serde_json::Value::Number(
+                serde_json::Number::from_f64(*n).unwrap_or_else(|| serde_json::Number::from(0u64)),
+            ),
             Literal::Str(s) => serde_json::Value::String(s.clone()),
         }
     }
@@ -71,7 +68,7 @@ pub enum Expr {
 
 #[derive(Debug, Clone, PartialEq)]
 enum Token {
-    Ident(String),  // path segment or keyword (null, true, false)
+    Ident(String), // path segment or keyword (null, true, false)
     Dot,
     EqEq,
     BangEq,
@@ -86,7 +83,10 @@ struct Tokenizer<'a> {
 
 impl<'a> Tokenizer<'a> {
     fn new(s: &'a str) -> Self {
-        Self { input: s.as_bytes(), pos: 0 }
+        Self {
+            input: s.as_bytes(),
+            pos: 0,
+        }
     }
 
     fn peek(&self) -> Option<u8> {
@@ -95,7 +95,9 @@ impl<'a> Tokenizer<'a> {
 
     fn advance(&mut self) -> Option<u8> {
         let b = self.input.get(self.pos).copied();
-        if b.is_some() { self.pos += 1; }
+        if b.is_some() {
+            self.pos += 1;
+        }
         b
     }
 
@@ -125,18 +127,15 @@ impl<'a> Tokenizer<'a> {
         let start = self.pos;
         // Optional leading minus already consumed by caller (if any).
         while let Some(b) = self.peek() {
-            if b.is_ascii_digit() || b == b'.' || b == b'e' || b == b'E'
-                || b == b'+' || b == b'-'
-            {
+            if b.is_ascii_digit() || b == b'.' || b == b'e' || b == b'E' || b == b'+' || b == b'-' {
                 self.advance();
             } else {
                 break;
             }
         }
         let s = String::from_utf8_lossy(&self.input[start..self.pos]).into_owned();
-        s.parse::<f64>().map_err(|_| {
-            GateError::DagExecution(format!("invalid number literal: {s}"))
-        })
+        s.parse::<f64>()
+            .map_err(|_| GateError::DagExecution(format!("invalid number literal: {s}")))
     }
 
     fn read_quoted_string(&mut self, quote: u8) -> Result<String, GateError> {
@@ -261,7 +260,10 @@ impl<'a> Tokenizer<'a> {
 /// expression. Unknown operators are hard errors — not silent allows.
 pub fn parse_expr(s: &str) -> Result<Expr, GateError> {
     let tokens = Tokenizer::new(s).tokenize()?;
-    let mut parser = Parser { tokens: &tokens, pos: 0 };
+    let mut parser = Parser {
+        tokens: &tokens,
+        pos: 0,
+    };
     parser.parse()
 }
 
@@ -277,7 +279,9 @@ impl<'t> Parser<'t> {
 
     fn advance(&mut self) -> Option<&Token> {
         let t = self.tokens.get(self.pos);
-        if t.is_some() { self.pos += 1; }
+        if t.is_some() {
+            self.pos += 1;
+        }
         t
     }
 
@@ -433,13 +437,19 @@ mod tests {
     #[test]
     fn parse_eq_null() {
         let expr = parse_expr("ruleDecision == null").unwrap();
-        assert_eq!(expr, Expr::Eq(Path(vec!["ruleDecision".into()]), Literal::Null));
+        assert_eq!(
+            expr,
+            Expr::Eq(Path(vec!["ruleDecision".into()]), Literal::Null)
+        );
     }
 
     #[test]
     fn parse_ne_null() {
         let expr = parse_expr("ruleDecision != null").unwrap();
-        assert_eq!(expr, Expr::Ne(Path(vec!["ruleDecision".into()]), Literal::Null));
+        assert_eq!(
+            expr,
+            Expr::Ne(Path(vec!["ruleDecision".into()]), Literal::Null)
+        );
     }
 
     #[test]
@@ -469,13 +479,19 @@ mod tests {
     #[test]
     fn parse_eq_bool_true() {
         let expr = parse_expr("isReady == true").unwrap();
-        assert_eq!(expr, Expr::Eq(Path(vec!["isReady".into()]), Literal::Bool(true)));
+        assert_eq!(
+            expr,
+            Expr::Eq(Path(vec!["isReady".into()]), Literal::Bool(true))
+        );
     }
 
     #[test]
     fn parse_eq_bool_false() {
         let expr = parse_expr("isReady == false").unwrap();
-        assert_eq!(expr, Expr::Eq(Path(vec!["isReady".into()]), Literal::Bool(false)));
+        assert_eq!(
+            expr,
+            Expr::Eq(Path(vec!["isReady".into()]), Literal::Bool(false))
+        );
     }
 
     #[test]
@@ -517,7 +533,10 @@ mod tests {
     #[test]
     fn parse_escaped_double_quote_inside_string() {
         let expr = parse_expr(r#"x == "he\"llo""#).unwrap();
-        assert_eq!(expr, Expr::Eq(Path(vec!["x".into()]), Literal::Str(r#"he"llo"#.into())));
+        assert_eq!(
+            expr,
+            Expr::Eq(Path(vec!["x".into()]), Literal::Str(r#"he"llo"#.into()))
+        );
     }
 
     // ─── Parser: path depth enforcement ──────────────────────────────────────
@@ -525,7 +544,10 @@ mod tests {
     #[test]
     fn path_with_three_segments_errors() {
         let result = parse_expr("a.b.c == 'foo'");
-        assert!(result.is_err(), "3-segment path should be rejected at parse time");
+        assert!(
+            result.is_err(),
+            "3-segment path should be rejected at parse time"
+        );
         let msg = result.unwrap_err().to_string();
         assert!(
             msg.contains("too many segments") && msg.contains("a.b.c"),
@@ -580,7 +602,10 @@ mod tests {
 
     #[test]
     fn parse_rejects_bare_identifier_as_rhs() {
-        assert!(parse_expr("x == someVar").is_err(), "bare identifier (non-keyword) as RHS");
+        assert!(
+            parse_expr("x == someVar").is_err(),
+            "bare identifier (non-keyword) as RHS"
+        );
     }
 
     #[test]
@@ -647,7 +672,10 @@ mod tests {
     fn eval_ne_null_false_when_key_missing() {
         let ctx = GateContext::new();
         let expr = parse_expr("missing != null").unwrap();
-        assert!(!evaluate(&expr, &ctx), "missing key is null; != null is false");
+        assert!(
+            !evaluate(&expr, &ctx),
+            "missing key is null; != null is false"
+        );
     }
 
     #[test]

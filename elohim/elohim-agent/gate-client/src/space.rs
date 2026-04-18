@@ -46,7 +46,10 @@ use crate::events::RelationalImpactEvent;
 #[cfg_attr(feature = "typescript", derive(TS))]
 #[cfg_attr(
     feature = "typescript",
-    ts(export, export_to = "../../elohim-agent-sdk/src/gate-client/generated/")
+    ts(
+        export,
+        export_to = "../../elohim-agent-sdk/src/gate-client/generated/"
+    )
 )]
 #[serde(rename_all = "kebab-case")]
 pub enum SpaceType {
@@ -115,7 +118,10 @@ impl SpaceType {
 #[cfg_attr(feature = "typescript", derive(TS))]
 #[cfg_attr(
     feature = "typescript",
-    ts(export, export_to = "../../elohim-agent-sdk/src/gate-client/generated/")
+    ts(
+        export,
+        export_to = "../../elohim-agent-sdk/src/gate-client/generated/"
+    )
 )]
 #[serde(rename_all = "camelCase")]
 pub struct SpaceContext {
@@ -183,7 +189,10 @@ mod tests {
             summary_cid: "bafkrei...".to_string(),
             topic: "reflection".to_string(),
         };
-        assert_eq!(detect_from_event(&event).space_type, SpaceType::AdviceSeeking);
+        assert_eq!(
+            detect_from_event(&event).space_type,
+            SpaceType::AdviceSeeking
+        );
     }
 
     // ─── Exempt interior variants — explicit per-variant ─────────────────────

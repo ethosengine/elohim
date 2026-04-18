@@ -38,9 +38,16 @@ use ts_rs::TS;
 #[cfg_attr(feature = "typescript", derive(TS))]
 #[cfg_attr(
     feature = "typescript",
-    ts(export, export_to = "../../elohim-agent-sdk/src/gate-client/generated/")
+    ts(
+        export,
+        export_to = "../../elohim-agent-sdk/src/gate-client/generated/"
+    )
 )]
-#[serde(tag = "kind", rename_all = "kebab-case", rename_all_fields = "camelCase")]
+#[serde(
+    tag = "kind",
+    rename_all = "kebab-case",
+    rename_all_fields = "camelCase"
+)]
 pub enum RelationalImpactEvent {
     /// Publishing content to the DHT for peer consumption.
     ContentPublish {
@@ -223,7 +230,10 @@ mod tests {
 
     #[test]
     fn private_to_public_crossing_kind() {
-        assert_eq!(private_to_public_crossing().kind(), "private-to-public-crossing");
+        assert_eq!(
+            private_to_public_crossing().kind(),
+            "private-to-public-crossing"
+        );
     }
 
     // ─── Serde round-trip tests — one per variant ─────────────────────────────
@@ -253,7 +263,10 @@ mod tests {
         let rt = round_trip(&orig);
         assert_eq!(rt.kind(), orig.kind());
         let json = serde_json::to_string(&orig).unwrap();
-        assert!(json.contains("\"kind\":\"attestation-write\""), "got: {json}");
+        assert!(
+            json.contains("\"kind\":\"attestation-write\""),
+            "got: {json}"
+        );
     }
 
     #[test]
@@ -262,7 +275,10 @@ mod tests {
         let rt = round_trip(&orig);
         assert_eq!(rt.kind(), orig.kind());
         let json = serde_json::to_string(&orig).unwrap();
-        assert!(json.contains("\"kind\":\"economic-event-emit\""), "got: {json}");
+        assert!(
+            json.contains("\"kind\":\"economic-event-emit\""),
+            "got: {json}"
+        );
     }
 
     #[test]
@@ -298,7 +314,10 @@ mod tests {
         let rt = round_trip(&orig);
         assert_eq!(rt.kind(), orig.kind());
         let json = serde_json::to_string(&orig).unwrap();
-        assert!(json.contains("\"kind\":\"capability-invoke\""), "got: {json}");
+        assert!(
+            json.contains("\"kind\":\"capability-invoke\""),
+            "got: {json}"
+        );
     }
 
     #[test]
@@ -307,7 +326,10 @@ mod tests {
         let rt = round_trip(&orig);
         assert_eq!(rt.kind(), orig.kind());
         let json = serde_json::to_string(&orig).unwrap();
-        assert!(json.contains("\"kind\":\"private-to-public-crossing\""), "got: {json}");
+        assert!(
+            json.contains("\"kind\":\"private-to-public-crossing\""),
+            "got: {json}"
+        );
     }
 
     // ─── Space-type inference per event variant ───────────────────────────────
@@ -366,7 +388,10 @@ mod tests {
     #[test]
     fn private_to_public_crossing_infers_private_drafting_crossing() {
         let ctx = crate::space::detect_from_event(&private_to_public_crossing());
-        assert_eq!(ctx.space_type, crate::space::SpaceType::PrivateDraftingCrossing);
+        assert_eq!(
+            ctx.space_type,
+            crate::space::SpaceType::PrivateDraftingCrossing
+        );
         assert!(!ctx.is_exempt());
         assert!(ctx.space_type.is_boundary_crossing());
     }

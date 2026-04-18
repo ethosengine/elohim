@@ -7,10 +7,10 @@
 
 use std::sync::Arc;
 
-use async_trait::async_trait;
 use crate::error::GateError;
 use crate::events::RelationalImpactEvent;
 use crate::types::{GateDecision, SideEffect};
+use async_trait::async_trait;
 
 use super::context::GateContext;
 use super::StepType;
@@ -157,7 +157,10 @@ mod tests {
             output_value: json!("hello"),
         };
         let mut ctx = GateContext::new();
-        let outcome = exec.execute(&sample_step(), &mut ctx, &sample_event()).await.unwrap();
+        let outcome = exec
+            .execute(&sample_step(), &mut ctx, &sample_event())
+            .await
+            .unwrap();
         assert!(matches!(outcome, StepOutcome::Continue));
         assert_eq!(ctx.get("result"), Some(&json!("hello")));
     }
@@ -168,7 +171,10 @@ mod tests {
             decision: GateDecision::allow_mocked(Phase::DevContext),
         };
         let mut ctx = GateContext::new();
-        let outcome = exec.execute(&sample_step(), &mut ctx, &sample_event()).await.unwrap();
+        let outcome = exec
+            .execute(&sample_step(), &mut ctx, &sample_event())
+            .await
+            .unwrap();
         assert!(matches!(outcome, StepOutcome::Terminate(_, _)));
     }
 

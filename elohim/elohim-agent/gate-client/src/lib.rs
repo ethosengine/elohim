@@ -173,6 +173,7 @@
 //! architectural specification.
 
 pub mod dag;
+pub mod dag_runner;
 pub mod error;
 pub mod events;
 pub mod phase;
@@ -181,7 +182,7 @@ pub mod tower;
 pub mod transport;
 pub mod types;
 
-#[cfg(test)]
+#[cfg(any(test, feature = "testing"))]
 pub mod testing;
 
 // ─── Test-only decision override ──────────────────────────────────────────────
@@ -194,15 +195,15 @@ pub mod testing;
 //   gate_client::__test_set_decision_override(Some(gate_client::testing::mock_decline(...)));
 //   // ... drive the request ...
 //   gate_client::__test_set_decision_override(None); // restore
-#[cfg(test)]
+#[cfg(any(test, feature = "testing"))]
 thread_local! {
     static DECISION_OVERRIDE: std::cell::RefCell<Option<GateDecision>> =
         const { std::cell::RefCell::new(None) };
 }
 
 /// Set a one-shot decision override for the next `check()` call on this thread.
-/// Only available in `#[cfg(test)]` builds.
-#[cfg(test)]
+/// Only available in `#[cfg(test)]` or `feature = "testing"` builds.
+#[cfg(any(test, feature = "testing"))]
 pub fn __test_set_decision_override(decision: Option<GateDecision>) {
     DECISION_OVERRIDE.with(|cell| {
         *cell.borrow_mut() = decision;
@@ -230,11 +231,22 @@ pub use types::{
 /// Primary entry point for gate checks.
 ///
 /// Called from every relational-impact write path before the side effect is
-/// realized. In DevContext phase, returns a mocked `Allow` for boundary-crossing
-/// events and `Allow { exempt: true }` for interior events.
+/// realized. In DevContext phase, returns an Allow driven by the universal-band
+/// DAG for boundary-crossing events and `Allow { exempt: true }` for interior
+/// events.
+///
+/// # Execution order
+///
+/// 1. If a `__test_set_decision_override` is set (test builds only), consume and
+///    return it — the DAG does NOT run.
+/// 2. If the event's space-type is exempt (offline / private-drafting-interior /
+///    play-interior / roleplay-interior), return `Allow { exempt: true }` without
+///    running the DAG.
+/// 3. Otherwise, run the universal-band DAG via the global `DagRunner` with
+///    tracing spans (spec §6.3).
 pub async fn check(event: RelationalImpactEvent) -> GateResult<GateDecision> {
     // Test-only: consume a one-shot decision override if one is set.
-    #[cfg(test)]
+    #[cfg(any(test, feature = "testing"))]
     {
         let override_decision = DECISION_OVERRIDE.with(|cell| cell.borrow_mut().take());
         if let Some(decision) = override_decision {
@@ -248,23 +260,37 @@ pub async fn check(event: RelationalImpactEvent) -> GateResult<GateDecision> {
         return Ok(GateDecision::allow_exempt(Phase::DevContext));
     }
 
-    // Phase 0 skeleton: returns a mocked Allow.
-    // Phase 1 will wire in context-assembly + DAG interpreter.
-    // Phase 2 will wire in the universal-band DAG.
-    Ok(GateDecision::allow_mocked(Phase::DevContext))
+    // Phase 2: run the universal-band DAG with observability spans.
+    dag_runner::run_with_tracing(&event).await
 }
 
 /// Synchronous variant for zome coordinator contexts (Holochain WASM).
 ///
-/// Phase 0 stub. Will be implemented when the Rust HDK/WASM integration lands.
+/// Mirrors [`check`] but runs the async DAG on a freshly-created single-use
+/// Tokio runtime so it can be called from synchronous WASM contexts.
+///
+/// If a Tokio runtime is already running on the current thread (e.g., in a
+/// `#[tokio::test]`), this falls back to `block_in_place` / `spawn_blocking`
+/// to avoid a nested-runtime panic.  In Holochain WASM there is no ambient
+/// runtime so the dedicated runtime path always executes.
 pub fn check_blocking(event: RelationalImpactEvent) -> GateResult<GateDecision> {
-    // Bridge to async via a minimal executor once we're in WASM context.
-    // Phase 0: return the same mock without actually blocking.
     let space = space::detect_from_event(&event);
     if space.is_exempt() {
         return Ok(GateDecision::allow_exempt(Phase::DevContext));
     }
-    Ok(GateDecision::allow_mocked(Phase::DevContext))
+
+    // If called from within an existing async context (e.g., tests), bridge
+    // via tokio::task::block_in_place to avoid nested-runtime panic.
+    // In WASM / Holochain host there is no ambient runtime — we spin one.
+    if let Ok(handle) = tokio::runtime::Handle::try_current() {
+        handle.block_on(dag_runner::run_with_tracing(&event))
+    } else {
+        tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .map_err(|e| GateError::DagExecution(format!("runtime build error: {e}")))?
+            .block_on(dag_runner::run_with_tracing(&event))
+    }
 }
 
 /// Configure the gate client — transport, phase override, trust assessor.

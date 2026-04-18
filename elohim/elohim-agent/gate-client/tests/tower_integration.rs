@@ -11,11 +11,7 @@
 //!   3. An unmapped path (`/unmapped-path`) falls through to the inner service
 //!      (Phase 1 fall-through contract — documented in src/tower.rs).
 
-use axum::{
-    body::Body,
-    routing::post,
-    Router,
-};
+use axum::{body::Body, routing::post, Router};
 use http::{Method, Request, StatusCode};
 use http_body_util::BodyExt;
 use tower::ServiceExt;

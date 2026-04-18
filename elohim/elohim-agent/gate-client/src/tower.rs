@@ -104,9 +104,7 @@ pub fn is_path_inferred(event: &RelationalImpactEvent) -> bool {
     // of Phase 1 path inference — maintained until body parsing lands in Phase 7.
     match event {
         RelationalImpactEvent::ContentPublish { content_cid, .. } => content_cid == "inferred",
-        RelationalImpactEvent::AttestationWrite { subject_hash, .. } => {
-            subject_hash == "inferred"
-        }
+        RelationalImpactEvent::AttestationWrite { subject_hash, .. } => subject_hash == "inferred",
         RelationalImpactEvent::EconomicEventEmit { event_kind, .. } => event_kind == "inferred",
         RelationalImpactEvent::PeerMessage { payload_kind, .. } => payload_kind == "inferred",
         RelationalImpactEvent::SyncToPeers { manifest_cid, .. } => manifest_cid == "inferred",
@@ -202,10 +200,8 @@ where
                     // Attach the verdict phase as a debug response header after
                     // the inner service responds.
                     let mut resp = inner.call(req).await?;
-                    resp.headers_mut().insert(
-                        "x-gate-verdict",
-                        http::HeaderValue::from_static("allow"),
-                    );
+                    resp.headers_mut()
+                        .insert("x-gate-verdict", http::HeaderValue::from_static("allow"));
                     Ok(resp)
                 }
 
@@ -227,10 +223,8 @@ where
                         .header("content-type", "application/json")
                         .body(ResBody::from(body_bytes))
                         .expect("infallible 403 response build");
-                    resp.headers_mut().insert(
-                        "x-gate-verdict",
-                        http::HeaderValue::from_static("decline"),
-                    );
+                    resp.headers_mut()
+                        .insert("x-gate-verdict", http::HeaderValue::from_static("decline"));
                     Ok(resp)
                 }
 
@@ -249,20 +243,16 @@ where
                         .header("content-type", "application/json")
                         .body(ResBody::from(body_bytes))
                         .expect("infallible 202 response build");
-                    resp.headers_mut().insert(
-                        "x-gate-verdict",
-                        http::HeaderValue::from_static("escalate"),
-                    );
+                    resp.headers_mut()
+                        .insert("x-gate-verdict", http::HeaderValue::from_static("escalate"));
                     Ok(resp)
                 }
 
                 GateStatus::Verdict(_tag) => {
                     // Evaluator-shape gates: pass through; attach verdict header.
                     let mut resp = inner.call(req).await?;
-                    resp.headers_mut().insert(
-                        "x-gate-verdict",
-                        http::HeaderValue::from_static("verdict"),
-                    );
+                    resp.headers_mut()
+                        .insert("x-gate-verdict", http::HeaderValue::from_static("verdict"));
                     Ok(resp)
                 }
             }
@@ -421,7 +411,11 @@ mod tower_service_tests {
             .body(Body::empty())
             .unwrap();
         let resp = router.oneshot(req).await.unwrap();
-        assert_eq!(resp.status(), StatusCode::OK, "PUT should reach inner handler when gate allows");
+        assert_eq!(
+            resp.status(),
+            StatusCode::OK,
+            "PUT should reach inner handler when gate allows"
+        );
     }
 
     #[tokio::test]
@@ -437,7 +431,11 @@ mod tower_service_tests {
             .body(Body::empty())
             .unwrap();
         let resp = router.oneshot(req).await.unwrap();
-        assert_eq!(resp.status(), StatusCode::OK, "PATCH should reach inner handler when gate allows");
+        assert_eq!(
+            resp.status(),
+            StatusCode::OK,
+            "PATCH should reach inner handler when gate allows"
+        );
     }
 }
 

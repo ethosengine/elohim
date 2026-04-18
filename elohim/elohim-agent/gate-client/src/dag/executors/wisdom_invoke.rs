@@ -140,8 +140,13 @@ mod tests {
         let outcome = exec.execute(&step, &mut ctx, &event()).await.unwrap();
 
         assert!(matches!(outcome, StepOutcome::Continue));
-        let output = ctx.get("wisdomOutput").expect("wisdomOutput must be written");
-        assert_eq!(output.get("decision").and_then(|v| v.as_str()), Some("allow"));
+        let output = ctx
+            .get("wisdomOutput")
+            .expect("wisdomOutput must be written");
+        assert_eq!(
+            output.get("decision").and_then(|v| v.as_str()),
+            Some("allow")
+        );
     }
 
     // ─── Output shape has required fields ────────────────────────────────────
@@ -167,9 +172,15 @@ mod tests {
             reasoning.get("confidence").and_then(|v| v.as_f64()),
             Some(0.0)
         );
-        assert!(reasoning.get("summary").is_some(), "must have 'summary' in reasoning");
+        assert!(
+            reasoning.get("summary").is_some(),
+            "must have 'summary' in reasoning"
+        );
         // phase marker
-        assert_eq!(out.get("phase").and_then(|v| v.as_str()), Some("dev-context"));
+        assert_eq!(
+            out.get("phase").and_then(|v| v.as_str()),
+            Some("dev-context")
+        );
     }
 
     // ─── Context keys are assembled into wisdomContext ────────────────────────
@@ -187,8 +198,14 @@ mod tests {
 
         let out = ctx.get("wisdomOutput").unwrap();
         let wctx = out.get("wisdomContext").expect("must have wisdomContext");
-        assert_eq!(wctx.get("contentCid").and_then(|v| v.as_str()), Some("cid-abc"));
-        assert_eq!(wctx.get("author").and_then(|v| v.as_str()), Some("agent-xyz"));
+        assert_eq!(
+            wctx.get("contentCid").and_then(|v| v.as_str()),
+            Some("cid-abc")
+        );
+        assert_eq!(
+            wctx.get("author").and_then(|v| v.as_str()),
+            Some("agent-xyz")
+        );
     }
 
     // ─── Missing context key → null in wisdomContext (not an error) ──────────
