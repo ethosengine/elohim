@@ -412,6 +412,229 @@ pub fn handle_signal(
     }
 }
 
+// =============================================================================
+// MishpatSignal — projection of mishpat DNA post-commit signals
+// =============================================================================
+//
+// Mirrors the DNA-side `MishpatSignal` enum (mishpat DNA, gate_decision zome).
+// Fields that are `AgentPubKey` or `ActionHash` on the DNA side serialize as
+// base64 `String`s over the wire — no integrity-crate dependency needed here.
+//
+// Serde tagging (`tag = "type", content = "payload"`) MUST match the DNA
+// side exactly. The entry sub-struct uses snake_case to match the DNA wire
+// format (HDK serialises Rust structs as snake_case by default).
+
+/// Storage-side mirror of the GateDecisionAttestation entry fields as they
+/// arrive in the signal payload.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GateDecisionAttestationEntry {
+    pub decision_id: String,
+    pub phase: String,
+    pub elohim_id: String,
+    pub elohim_substance_cid: String,
+    pub gate_name: String,
+    pub gate_process_cid: String,
+    pub request_ref_json: String,
+    pub decision: String,
+    pub reasoning_json: String,
+    pub context_summary_cid: String,
+    pub decided_at: String,
+    pub universal_band_cid: String,
+}
+
+/// Storage-side mirror of the DNA `MishpatSignal` enum.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type", content = "payload")]
+pub enum MishpatSignal {
+    /// GateDecisionAttestation DHT entry was recorded — project into SQLite.
+    GateDecisionCreated {
+        action_hash: String,
+        entry_hash: String,
+        author: String,
+        entry: GateDecisionAttestationEntry,
+    },
+}
+
+/// Dispatch a `MishpatSignal` into the SQLite projection.
+///
+/// New variants add a match arm here and a call into the corresponding
+/// `db::*` module. Keep this function thin — the per-entity projection
+/// logic belongs next to its Diesel model.
+pub fn handle_mishpat_signal(
+    conn: &mut diesel::sqlite::SqliteConnection,
+    app_id: &str,
+    signal: MishpatSignal,
+) -> Result<(), StorageError> {
+    match signal {
+        MishpatSignal::GateDecisionCreated {
+            action_hash,
+            entry_hash: _,
+            author: _,
+            entry,
+        } => {
+            let now = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
+            let row = crate::db::gate_decision_attestations::GateDecisionAttestationRow {
+                app_id: app_id.to_string(),
+                decision_id: entry.decision_id,
+                phase: entry.phase,
+                elohim_id: entry.elohim_id,
+                elohim_substance_cid: entry.elohim_substance_cid,
+                gate_name: entry.gate_name,
+                gate_process_cid: entry.gate_process_cid,
+                request_ref_json: entry.request_ref_json,
+                decision: entry.decision,
+                reasoning_json: entry.reasoning_json,
+                context_summary_cid: entry.context_summary_cid,
+                decided_at: entry.decided_at,
+                universal_band_cid: entry.universal_band_cid,
+                dht_anchor_hash: action_hash,
+                created_at: now.clone(),
+                updated_at: now,
+            };
+            crate::db::gate_decision_attestations::upsert(conn, &row)?;
+            Ok(())
+        }
+    }
+}
+
+#[cfg(test)]
+mod mishpat_signal_tests {
+    use super::*;
+    use diesel::connection::SimpleConnection;
+    use diesel::prelude::*;
+    use diesel::sqlite::SqliteConnection;
+
+    fn setup_test_conn() -> SqliteConnection {
+        let mut conn =
+            SqliteConnection::establish(":memory:").expect("Failed to create in-memory SQLite");
+
+        conn.batch_execute(
+            r#"
+            CREATE TABLE gate_decision_attestations (
+                app_id TEXT NOT NULL,
+                decision_id TEXT NOT NULL,
+                phase TEXT NOT NULL,
+                elohim_id TEXT NOT NULL,
+                elohim_substance_cid TEXT NOT NULL,
+                gate_name TEXT NOT NULL,
+                gate_process_cid TEXT NOT NULL,
+                request_ref_json TEXT NOT NULL,
+                decision TEXT NOT NULL,
+                reasoning_json TEXT NOT NULL,
+                context_summary_cid TEXT NOT NULL,
+                decided_at TEXT NOT NULL,
+                universal_band_cid TEXT NOT NULL,
+                dht_anchor_hash TEXT NOT NULL,
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+                PRIMARY KEY (app_id, decision_id)
+            );
+            "#,
+        )
+        .expect("Failed to create test table");
+
+        conn
+    }
+
+    fn make_signal(decision_id: &str, decision: &str, phase: &str) -> MishpatSignal {
+        MishpatSignal::GateDecisionCreated {
+            action_hash: "uhCkkDEFABC".to_string(),
+            entry_hash: "uhCEkDEFABC".to_string(),
+            author: "uhCAkABCDEF".to_string(),
+            entry: GateDecisionAttestationEntry {
+                decision_id: decision_id.to_string(),
+                phase: phase.to_string(),
+                elohim_id: "uhCAkABCDEF".to_string(),
+                elohim_substance_cid: "bafySubstance".to_string(),
+                gate_name: "discernment-gate-v1-mechanical".to_string(),
+                gate_process_cid: "bafyProcess".to_string(),
+                request_ref_json: r#"{"eventId":"ev1"}"#.to_string(),
+                decision: decision.to_string(),
+                reasoning_json: r#"{"steps":[]}"#.to_string(),
+                context_summary_cid: "bafyCtx".to_string(),
+                decided_at: "2026-04-18T12:00:00Z".to_string(),
+                universal_band_cid: "bafyBand".to_string(),
+            },
+        }
+    }
+
+    #[test]
+    fn gate_decision_created_projects_row() {
+        let mut conn = setup_test_conn();
+        let signal = make_signal("bafyDec001", "allow", "elohim-active");
+        handle_mishpat_signal(&mut conn, "test-app", signal).unwrap();
+
+        let row =
+            crate::db::gate_decision_attestations::find_by_id(&mut conn, "test-app", "bafyDec001")
+                .unwrap()
+                .expect("Row must be present after signal");
+
+        assert_eq!(row.decision, "allow");
+        assert_eq!(row.phase, "elohim-active");
+        assert_eq!(row.dht_anchor_hash, "uhCkkDEFABC");
+        assert_eq!(row.gate_name, "discernment-gate-v1-mechanical");
+    }
+
+    #[test]
+    fn gate_decision_created_is_idempotent() {
+        let mut conn = setup_test_conn();
+        let signal = make_signal("bafyDec002", "decline", "dev-context");
+        handle_mishpat_signal(&mut conn, "test-app", signal.clone()).unwrap();
+        handle_mishpat_signal(&mut conn, "test-app", signal).unwrap();
+
+        let rows = crate::db::gate_decision_attestations::find_by_phase(
+            &mut conn,
+            "test-app",
+            "dev-context",
+        )
+        .unwrap();
+        assert_eq!(
+            rows.len(),
+            1,
+            "Re-delivered signal must not duplicate the row"
+        );
+    }
+
+    #[test]
+    fn serde_tag_matches_dna_wire_format() {
+        // Verify `{"type": "GateDecisionCreated", "payload": {...}}` round-trips.
+        // Drift here would silently break projection.
+        let wire = serde_json::json!({
+            "type": "GateDecisionCreated",
+            "payload": {
+                "action_hash": "uhCkkABC",
+                "entry_hash": "uhCEkABC",
+                "author": "uhCAkABC",
+                "entry": {
+                    "decision_id": "bafyDec",
+                    "phase": "elohim-active",
+                    "elohim_id": "uhCAkABC",
+                    "elohim_substance_cid": "bafySub",
+                    "gate_name": "discernment-gate-v1",
+                    "gate_process_cid": "bafyProc",
+                    "request_ref_json": "{}",
+                    "decision": "allow",
+                    "reasoning_json": "{}",
+                    "context_summary_cid": "bafyCtx",
+                    "decided_at": "2026-04-18T00:00:00Z",
+                    "universal_band_cid": "bafyBand",
+                }
+            }
+        });
+
+        let signal: MishpatSignal = serde_json::from_value(wire).unwrap();
+        match signal {
+            MishpatSignal::GateDecisionCreated {
+                action_hash, entry, ..
+            } => {
+                assert_eq!(action_hash, "uhCkkABC");
+                assert_eq!(entry.decision, "allow");
+                assert_eq!(entry.phase, "elohim-active");
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod peer_status_tests {
     use super::*;

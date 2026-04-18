@@ -5989,3 +5989,73 @@ pub struct VerificationResultView {
     pub hash_match: bool,
     pub error: Option<String>,
 }
+
+// ============================================================================
+// Gate Decision Attestation View
+// ============================================================================
+//
+// Source of truth: DHT (mishpat DNA, GateDecisionAttestation entry, Category A).
+// This view is served from the read-optimised SQLite projection populated by
+// `MishpatSignal::GateDecisionCreated`. If the projection and the DHT disagree,
+// the DHT wins.
+//
+// JSON fields (requestRefJson, reasoningJson) are surfaced as opaque strings —
+// the gate client owns parsing of those payloads.
+
+use crate::db::gate_decision_attestations::GateDecisionAttestationRow;
+
+/// Wire view for a notarized gate decision attestation.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct GateDecisionAttestationView {
+    /// CID of this attestation (self-addressing, globally unique).
+    pub decision_id: String,
+    /// Deployment phase: "dev-context" | "elohim-active".
+    pub phase: String,
+    /// AgentPubKey (base64) of the deciding elohim agent.
+    pub elohim_id: String,
+    /// CID of the substance declaration active at decision time.
+    pub elohim_substance_cid: String,
+    /// Name of the gate that evaluated the request.
+    pub gate_name: String,
+    /// CID of the GateProcessDeclaration DAG that was executed.
+    pub gate_process_cid: String,
+    /// Serialised RequestRef (opaque JSON string).
+    pub request_ref_json: String,
+    /// Decision outcome: "allow" | "decline" | "escalate" | "verdict".
+    pub decision: String,
+    /// Full ConstitutionalReasoning (opaque JSON string).
+    pub reasoning_json: String,
+    /// CID of the privacy-respecting GateContext snapshot.
+    pub context_summary_cid: String,
+    /// ISO 8601 timestamp of when the decision was made.
+    pub decided_at: String,
+    /// CID of the universal-band DAG declaration active at decision time.
+    pub universal_band_cid: String,
+    /// ActionHash (base64) of the upstream DHT entry — provenance anchor.
+    pub dht_anchor_hash: String,
+    /// ISO 8601 timestamp of when this projection row was inserted.
+    pub created_at: String,
+}
+
+impl From<GateDecisionAttestationRow> for GateDecisionAttestationView {
+    fn from(row: GateDecisionAttestationRow) -> Self {
+        Self {
+            decision_id: row.decision_id,
+            phase: row.phase,
+            elohim_id: row.elohim_id,
+            elohim_substance_cid: row.elohim_substance_cid,
+            gate_name: row.gate_name,
+            gate_process_cid: row.gate_process_cid,
+            request_ref_json: row.request_ref_json,
+            decision: row.decision,
+            reasoning_json: row.reasoning_json,
+            context_summary_cid: row.context_summary_cid,
+            decided_at: row.decided_at,
+            universal_band_cid: row.universal_band_cid,
+            dht_anchor_hash: row.dht_anchor_hash,
+            created_at: row.created_at,
+        }
+    }
+}

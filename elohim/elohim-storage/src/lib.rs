@@ -151,3 +151,6 @@ pub use db::policy_cache::{
 pub use services::{
     ContentService, EventBus, KnowledgeService, RelationshipService, Services, StorageEvent,
 };
+
+// View re-exports (used by schema contract tests and external callers)
+pub use views::GateDecisionAttestationView;

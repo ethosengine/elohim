@@ -238,6 +238,27 @@ diesel::table! {
 }
 
 diesel::table! {
+    gate_decision_attestations (app_id, decision_id) {
+        app_id -> Text,
+        decision_id -> Text,
+        phase -> Text,
+        elohim_id -> Text,
+        elohim_substance_cid -> Text,
+        gate_name -> Text,
+        gate_process_cid -> Text,
+        request_ref_json -> Text,
+        decision -> Text,
+        reasoning_json -> Text,
+        context_summary_cid -> Text,
+        decided_at -> Text,
+        universal_band_cid -> Text,
+        dht_anchor_hash -> Text,
+        created_at -> Text,
+        updated_at -> Text,
+    }
+}
+
+diesel::table! {
     peer_statuses (peer_id) {
         peer_id -> Text,
         status -> Text,
@@ -1077,6 +1098,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     discussions,
     economic_events,
     enum_registry,
+    gate_decision_attestations,
     governance_dispositions,
     governance_signals,
     governance_states,

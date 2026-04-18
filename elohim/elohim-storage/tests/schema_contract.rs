@@ -256,6 +256,67 @@ fn peer_list_view_matches_schema() {
     validate_against_schema("views/peer-list-view.schema.json", &json);
 }
 
+// ── Gate Decision Attestation ───────────────────────────────────
+
+#[test]
+fn gate_decision_attestation_view_matches_schema() {
+    use elohim_storage::GateDecisionAttestationView;
+
+    let view = GateDecisionAttestationView {
+        decision_id: "bafyreib2vq7fztfnmgzrmo7q5jnfkdvxkfxpvsjmesxrqjzqxkzqzqzqa".to_string(),
+        phase: "elohim-active".to_string(),
+        elohim_id: "uhCAkABCDEFGHIJKLMNOPQRSTUVWXYZ012345678901234567890123456789012".to_string(),
+        elohim_substance_cid: "bafyreib2vq7substance01234567890123456789012345678901234567"
+            .to_string(),
+        gate_name: "discernment-gate-v1-mechanical".to_string(),
+        gate_process_cid: "bafyreib2vq7process01234567890123456789012345678901234567890"
+            .to_string(),
+        request_ref_json: r#"{"eventId":"ev-001","agentId":"uhCAkABC"}"#.to_string(),
+        decision: "allow".to_string(),
+        reasoning_json: r#"{"steps":[],"verdict":"allow","constitutional_basis":[]}"#.to_string(),
+        context_summary_cid: "bafyreib2vq7context01234567890123456789012345678901234567890"
+            .to_string(),
+        decided_at: "2026-04-18T12:00:00Z".to_string(),
+        universal_band_cid: "bafyreib2vq7univband01234567890123456789012345678901234567"
+            .to_string(),
+        dht_anchor_hash: "uhCkkDEFGHIJKLMNOPQRSTUVWXYZ0123456789012345678901234567890123"
+            .to_string(),
+        created_at: "2026-04-18T12:00:01Z".to_string(),
+    };
+
+    let json = serde_json::to_value(&view).unwrap();
+    validate_against_schema("views/gate-decision-attestation-view.schema.json", &json);
+}
+
+#[test]
+fn gate_decision_attestation_view_dev_context_phase() {
+    use elohim_storage::GateDecisionAttestationView;
+
+    let view = GateDecisionAttestationView {
+        decision_id: "bafyreib2vq7decision-dev-context-01234567890123456789012345".to_string(),
+        phase: "dev-context".to_string(),
+        elohim_id: "uhCAkDEV01234567890123456789012345678901234567890123456789012".to_string(),
+        elohim_substance_cid: "bafyreib2vq7substance-dev-0123456789012345678901234567890"
+            .to_string(),
+        gate_name: "discernment-gate-v1-mechanical".to_string(),
+        gate_process_cid: "bafyreib2vq7process-dev-01234567890123456789012345678901234".to_string(),
+        request_ref_json: r#"{"eventId":"ev-dev-001"}"#.to_string(),
+        decision: "decline".to_string(),
+        reasoning_json: r#"{"steps":[],"verdict":"decline"}"#.to_string(),
+        context_summary_cid: "bafyreib2vq7ctx-dev-01234567890123456789012345678901234567"
+            .to_string(),
+        decided_at: "2026-04-18T08:30:00Z".to_string(),
+        universal_band_cid: "bafyreib2vq7band-dev-0123456789012345678901234567890123456"
+            .to_string(),
+        dht_anchor_hash: "uhCkkDEV01234567890123456789012345678901234567890123456789012"
+            .to_string(),
+        created_at: "2026-04-18T08:30:01Z".to_string(),
+    };
+
+    let json = serde_json::to_value(&view).unwrap();
+    validate_against_schema("views/gate-decision-attestation-view.schema.json", &json);
+}
+
 // ── Convention enforcement ──────────────────────────────────────
 
 #[test]
@@ -268,6 +329,7 @@ fn view_schemas_declare_source_of_truth() {
         "views/peer-list-view.schema.json",
         "views/content-view.schema.json",
         "views/economic-event-view.schema.json",
+        "views/gate-decision-attestation-view.schema.json",
     ];
 
     for schema_name in &view_schemas {

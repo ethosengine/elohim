@@ -43,6 +43,7 @@ const INTERFACE_FILES = [
   { src: 'views/replication-status-view.ts', dest: 'replication-status-view.ts' },
   { src: 'views/peer-info-view.ts', dest: 'peer-info-view.ts' },
   { src: 'views/peer-list-view.ts', dest: 'peer-list-view.ts' },
+  { src: 'views/gate-decision-attestation-view.ts', dest: 'gate-decision-attestation-view.ts' },
 ];
 
 /**

@@ -85,6 +85,9 @@ pub mod observation_sessions;
 // Peer status projection (Peer-Stewarded Availability — Phase 1)
 pub mod peer_statuses;
 
+// Gate decision attestation projection (mishpat DNA — Phase 4)
+pub mod gate_decision_attestations;
+
 use std::path::Path;
 use std::time::Duration;
 
