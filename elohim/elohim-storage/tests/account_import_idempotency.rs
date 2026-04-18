@@ -48,8 +48,8 @@ use elohim_storage::error::StorageError;
 /// the exact DDL that production uses (mirrors the unit-test helper in
 /// `src/db/human_relationships.rs` and the production migration).
 fn setup_db() -> SqliteConnection {
-    let mut conn = SqliteConnection::establish(":memory:")
-        .expect("failed to open in-memory SQLite");
+    let mut conn =
+        SqliteConnection::establish(":memory:").expect("failed to open in-memory SQLite");
 
     conn.batch_execute(
         r#"
@@ -199,7 +199,11 @@ fn adam_eve_bidirectional_spouse_converges() {
     let (adam_created, adam_skipped, adam_errors) =
         run_relationship_phase(&mut conn, &ctx, "human-adam-firstman", &adam_seeds);
 
-    assert_eq!(adam_errors, Vec::<String>::new(), "Adam import must have no errors");
+    assert_eq!(
+        adam_errors,
+        Vec::<String>::new(),
+        "Adam import must have no errors"
+    );
     assert_eq!(adam_created, 1, "Adam import must create 1 relationship");
     assert_eq!(adam_skipped, 0, "Adam import must skip nothing");
 
@@ -224,7 +228,11 @@ fn adam_eve_bidirectional_spouse_converges() {
     let (eve_created, eve_skipped, eve_errors) =
         run_relationship_phase(&mut conn, &ctx, "human-eve-firstwoman", &eve_seeds);
 
-    assert_eq!(eve_errors, Vec::<String>::new(), "Eve import must have no errors");
+    assert_eq!(
+        eve_errors,
+        Vec::<String>::new(),
+        "Eve import must have no errors"
+    );
     assert_eq!(
         eve_created, 0,
         "Eve import must create 0 relationships (already exists)"
@@ -277,7 +285,11 @@ fn rerunning_import_is_idempotent() {
     let (created1, skipped1, errors1) =
         run_relationship_phase(&mut conn, &ctx, "human-boaz-kinsman", &make_seeds());
 
-    assert_eq!(errors1, Vec::<String>::new(), "first run must have no errors");
+    assert_eq!(
+        errors1,
+        Vec::<String>::new(),
+        "first run must have no errors"
+    );
     assert_eq!(created1, 2, "first run must create 2 relationships");
     assert_eq!(skipped1, 0, "first run must skip nothing");
     assert_eq!(count_rel_rows(&mut conn, &ctx), 2, "2 rows after first run");
@@ -286,7 +298,11 @@ fn rerunning_import_is_idempotent() {
     let (created2, skipped2, errors2) =
         run_relationship_phase(&mut conn, &ctx, "human-boaz-kinsman", &make_seeds());
 
-    assert_eq!(errors2, Vec::<String>::new(), "second run must have no errors");
+    assert_eq!(
+        errors2,
+        Vec::<String>::new(),
+        "second run must have no errors"
+    );
     assert_eq!(
         created2, 0,
         "second run must create 0 relationships (already exist)"

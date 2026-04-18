@@ -598,8 +598,8 @@ mod tests {
     use diesel::connection::SimpleConnection;
 
     fn setup_test_db() -> SqliteConnection {
-        let mut conn = SqliteConnection::establish(":memory:")
-            .expect("Failed to create in-memory database");
+        let mut conn =
+            SqliteConnection::establish(":memory:").expect("Failed to create in-memory database");
 
         conn.batch_execute(
             r#"
