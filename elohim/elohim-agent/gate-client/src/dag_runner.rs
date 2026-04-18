@@ -162,12 +162,33 @@ impl DagRunner {
 
 static RUNNER: OnceLock<Arc<DagRunner>> = OnceLock::new();
 
+/// Returned by [`configure_runner`] when the global singleton was already
+/// initialized before the call arrived.
+///
+/// This happens when [`global_runner()`] (or [`run_with_tracing`]) was called
+/// before `configure_runner`. The resolver that was supplied to `configure_runner`
+/// was **not** installed. The caller can decide whether to treat this as a fatal
+/// startup error or log-and-continue.
+#[derive(Debug)]
+pub struct AlreadyConfigured;
+
+impl std::fmt::Display for AlreadyConfigured {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "gate-client: configure_runner called after the global DagRunner \
+             was already initialized — the supplied resolver was not installed"
+        )
+    }
+}
+
 /// Pre-configure the global singleton with a custom [`ContentNodeResolver`]
 /// before first use.
 ///
 /// **Must be called before the first [`global_runner()`] call** to take effect.
-/// If the singleton is already initialized, this is a no-op (the `OnceLock`
-/// has already fired).
+/// Returns `Ok(())` when the resolver is successfully installed, or
+/// `Err(AlreadyConfigured)` when the singleton was already initialized and
+/// the supplied resolver was silently discarded.
 ///
 /// # Typical use
 ///
@@ -175,15 +196,17 @@ static RUNNER: OnceLock<Arc<DagRunner>> = OnceLock::new();
 /// to inject the production DHT-backed resolver before any gate checks run.
 ///
 /// ```rust,ignore
-/// use gate_client::dag_runner::configure_runner;
+/// use gate_client::dag_runner::{configure_runner, AlreadyConfigured};
 /// use gate_client::dag::executors::EmbeddedContentNodeResolver;
 ///
 /// // In production: inject DHT resolver here.
 /// // In tests or dev-context: inject EmbeddedContentNodeResolver.
-/// configure_runner(Box::new(my_dht_resolver));
+/// configure_runner(Box::new(my_dht_resolver)).expect("configure_runner must be called before first use");
 /// ```
-pub fn configure_runner(resolver: Box<dyn ContentNodeResolver>) {
-    RUNNER.get_or_init(|| Arc::new(DagRunner::with_content_resolver(resolver)));
+pub fn configure_runner(resolver: Box<dyn ContentNodeResolver>) -> Result<(), AlreadyConfigured> {
+    RUNNER
+        .set(Arc::new(DagRunner::with_content_resolver(resolver)))
+        .map_err(|_| AlreadyConfigured)
 }
 
 /// Return the process-global [`DagRunner`], constructing it on first call.

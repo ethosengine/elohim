@@ -173,7 +173,23 @@ impl MechanicalRulesetExecutor {
             })?;
 
             if evaluate_condition(&condition, &rule_ctx) {
+                // Phase 3: unconditionally add `tag_kind: "story-point"` so that
+                // the SynthesizeExecutor's `verdict-from-rule` builder can
+                // deserialize this value as `GateTag::StoryPoint` via
+                // `serde_json::from_value`.
+                //
+                // GateTag uses `#[serde(tag = "tag_kind", rename_all = "kebab-case")]`,
+                // so the discriminator key is the literal string `tag_kind` and the
+                // StoryPoint variant serializes as `"story-point"`.
+                //
+                // The extra audit fields (`ruleId`, `ruleSetName`) are ignored by serde
+                // because struct-variant deserialization accepts unknown fields.
+                //
+                // Phase 5+ will make this outputShape-driven via
+                // `RulesArtifact::output_shape` so non-StoryPoint gates can declare
+                // their own tag kind.
                 matched_outcome = Some(json!({
+                    "tag_kind": "story-point",
                     "valence": rule.outcome.valence,
                     "magnitude": rule.outcome.magnitude,
                     "evidenceType": rule.outcome.evidence_type,
@@ -573,6 +589,91 @@ mod tests {
             out.get("ruleId").and_then(|v| v.as_str()),
             Some("first"),
             "ruleId must identify the winning rule"
+        );
+    }
+
+    // ─── C-1 regression: outcome JSON carries tag_kind so it can deserialize ──
+    //
+    // GateTag::StoryPoint requires `tag_kind: "story-point"` in the JSON
+    // (serde `tag = "tag_kind"`, `rename_all = "kebab-case"`). Without this
+    // field, `serde_json::from_value::<GateTag>(...)` in the
+    // `verdict-from-rule` builder would fail at runtime.
+
+    #[tokio::test]
+    async fn outcome_carries_tag_kind_story_point() {
+        let exec = executor_with("cid-rules", minimal_rules_body());
+        let mut ctx = GateContext::new();
+        ctx.insert("moment", json!({"status": "passed"}));
+        ctx.insert("priorAttestations", json!({"count": 0}));
+
+        let s = step(
+            "cid-rules",
+            vec!["moment".into(), "priorAttestations".into()],
+            "ruleDecision",
+        );
+        exec.execute(&s, &mut ctx, &event()).await.unwrap();
+
+        let decision = ctx.get("ruleDecision").unwrap();
+        assert_eq!(
+            decision.get("tag_kind").and_then(|v| v.as_str()),
+            Some("story-point"),
+            "outcome must carry tag_kind: \"story-point\" for GateTag deserialization"
+        );
+    }
+
+    // ─── C-1 regression: full round-trip executor → synthesize → GateDecision ─
+    //
+    // Proves that the JSON emitted by MechanicalRulesetExecutor can be
+    // deserialized into GateTag::StoryPoint by SynthesizeExecutor's
+    // `verdict-from-rule` builder, producing a GateDecision with the correct
+    // Verdict status and StoryPoint fields.
+
+    #[tokio::test]
+    async fn outcome_deserializes_into_gate_tag_story_point_via_serde() {
+        use crate::types::{GateStatus, GateTag};
+
+        // Run the MechanicalRulesetExecutor to get the outcome JSON.
+        let exec = executor_with("cid-rules", minimal_rules_body());
+        let mut ctx = GateContext::new();
+        ctx.insert("moment", json!({"status": "passed"}));
+        ctx.insert("priorAttestations", json!({"count": 0}));
+
+        let s = step(
+            "cid-rules",
+            vec!["moment".into(), "priorAttestations".into()],
+            "ruleDecision",
+        );
+        exec.execute(&s, &mut ctx, &event()).await.unwrap();
+
+        // Now attempt to deserialize the written context value as GateTag.
+        let rule_val = ctx
+            .get("ruleDecision")
+            .expect("ruleDecision must be present")
+            .clone();
+        let tag: GateTag = serde_json::from_value(rule_val)
+            .expect("ruleDecision must deserialize into GateTag — tag_kind is required");
+
+        // Confirm the decoded tag carries the correct StoryPoint fields.
+        match tag {
+            GateTag::StoryPoint {
+                valence,
+                magnitude,
+                evidence_type,
+            } => {
+                assert_eq!(valence, "progress");
+                assert_eq!(magnitude, "meaningful");
+                assert_eq!(evidence_type, "first-pass-green");
+            }
+            other => panic!("expected GateTag::StoryPoint, got: {other:?}"),
+        }
+
+        // Confirm the full Verdict shape is correct.
+        let rule_val2 = ctx.get("ruleDecision").unwrap().clone();
+        let gate_tag: GateTag = serde_json::from_value(rule_val2).unwrap();
+        let status = GateStatus::Verdict(gate_tag);
+        assert!(
+            matches!(&status, GateStatus::Verdict(GateTag::StoryPoint { valence, .. }) if valence == "progress"),
+            "GateStatus::Verdict must wrap the correct StoryPoint"
         );
     }
 

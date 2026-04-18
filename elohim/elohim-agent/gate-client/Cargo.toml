@@ -69,3 +69,8 @@ tower = { workspace = true, features = ["util"] }
 [[test]]
 name = "universal_band_integration"
 required-features = ["testing"]
+
+# Integration test: configure_runner singleton initialization. Uses a separate
+# binary so each test run gets a fresh OnceLock state.
+[[test]]
+name = "configure_runner"

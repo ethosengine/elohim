@@ -219,6 +219,7 @@ pub use dag::universal_band::{
     active_universal_band_pointer, default_universal_band_declaration, default_universal_band_yaml,
     UniversalBandPointer, ACTIVE_UNIVERSAL_BAND_NAME, ACTIVE_UNIVERSAL_BAND_VERSION,
 };
+pub use dag_runner::{configure_runner, global_runner, AlreadyConfigured, DagRunner};
 pub use error::{GateError, GateResult};
 pub use events::RelationalImpactEvent;
 pub use phase::Phase;
