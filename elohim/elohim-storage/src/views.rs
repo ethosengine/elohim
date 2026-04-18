@@ -2108,6 +2108,7 @@ pub struct AccountImportResultView {
     pub human_id: String,
     pub content_updated: usize,
     pub relationships_created: usize,
+    pub relationships_skipped: usize,
     pub stewardship_created: usize,
     pub collectives_joined: usize,
     pub errors: Vec<String>,

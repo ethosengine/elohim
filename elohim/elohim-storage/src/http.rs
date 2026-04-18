@@ -5457,13 +5457,34 @@ impl HttpServer {
             );
         }
 
-        // Phase 2: Create human relationships
+        // Phase 2: Create human relationships (idempotent)
+        //
+        // Both Adam and Eve's packages may declare the same symmetric edge
+        // (e.g. spouse). The directional unique index on human_relationships
+        // would reject the second import; here we pre-check with bidirectional
+        // awareness, and catch UNIQUE violations as a race-condition fallback
+        // (same pattern as stewardship allocations below).
+        let mut relationships_skipped: usize = 0;
         if !package.relationships.is_empty() {
             let mut conn = pool
                 .get()
                 .map_err(|e| StorageError::Internal(format!("Pool error: {}", e)))?;
 
             for rel_seed in &package.relationships {
+                let existing = human_relationships::find_existing_relationship(
+                    &mut conn,
+                    &ctx,
+                    &human_id,
+                    &rel_seed.target_id,
+                    &rel_seed.relationship_type,
+                    rel_seed.is_bidirectional,
+                )?;
+
+                if existing.is_some() {
+                    relationships_skipped += 1;
+                    continue;
+                }
+
                 let input = human_relationships::CreateHumanRelationshipInput {
                     id: None,
                     party_a_id: human_id.clone(),
@@ -5472,7 +5493,7 @@ impl HttpServer {
                     intimacy_level: rel_seed.intimacy_level.clone(),
                     is_bidirectional: rel_seed.is_bidirectional,
                     consent_given_by_a: true,
-                    consent_given_by_b: false, // Other party consents independently
+                    consent_given_by_b: false,
                     initiated_by: human_id.clone(),
                     governance_layer: None,
                     reach: rel_seed
@@ -5485,6 +5506,12 @@ impl HttpServer {
 
                 match human_relationships::create_human_relationship(&mut conn, &ctx, input) {
                     Ok(_) => relationships_created += 1,
+                    Err(StorageError::Internal(msg)) if msg.contains("UNIQUE constraint") => {
+                        // Race: another concurrent import inserted between
+                        // our pre-check and our insert. Same-shape row —
+                        // treat as skipped, not an error.
+                        relationships_skipped += 1;
+                    }
                     Err(e) => {
                         errors.push(format!(
                             "Failed to create relationship {} -> {}: {}",
@@ -5497,6 +5524,7 @@ impl HttpServer {
             info!(
                 human_id = %human_id,
                 relationships_created = relationships_created,
+                relationships_skipped = relationships_skipped,
                 "Human relationship creation complete"
             );
         }
@@ -5617,6 +5645,7 @@ impl HttpServer {
             human_id,
             content_updated,
             relationships_created,
+            relationships_skipped,
             stewardship_created,
             collectives_joined,
             errors,
