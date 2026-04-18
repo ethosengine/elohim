@@ -1,7 +1,10 @@
 import type {
   DiscernmentInput,
   EvidenceType,
+  ExperienceMomentPayload,
   Magnitude,
+  PriorAttestation,
+  SidecarName,
   StoryPointTag,
   Valence,
 } from './types.js';
@@ -24,6 +27,26 @@ function mkTag(
     momentEntryHash,
     discernerId: 'discernment-service-v1-mechanical',
   };
+}
+
+const DURATION_REFINEMENT_THRESHOLD = 0.2;
+
+function isMateriallyRicher(
+  moment: ExperienceMomentPayload,
+  prior: PriorAttestation,
+): boolean {
+  const priorSidecars = new Set<SidecarName>(prior.sidecarArtifactNames);
+  const momentSidecarNames = Object.keys(moment.sidecarArtifacts) as SidecarName[];
+  for (const s of momentSidecarNames) {
+    if (!priorSidecars.has(s)) return true;
+  }
+
+  if (prior.durationMs > 0) {
+    const improvement = (prior.durationMs - moment.durationMs) / prior.durationMs;
+    if (improvement > DURATION_REFINEMENT_THRESHOLD) return true;
+  }
+
+  return false;
 }
 
 /**
@@ -79,6 +102,16 @@ export function discernMechanical(
       'meaningful',
       'cross-fingerprint-attestation',
     );
+  }
+
+  // Rule 6 — refinement (same status, same fingerprint, richer evidence)
+  if (
+    priors.latestSameFingerprint &&
+    priors.latestSameFingerprint.status === moment.status &&
+    priors.latestSameFingerprint.computeFingerprint === moment.computeFingerprint &&
+    isMateriallyRicher(moment, priors.latestSameFingerprint)
+  ) {
+    return mkTag(input, momentEntryHash, 'refinement', 'small', 'evidence-enriched');
   }
 
   return null;

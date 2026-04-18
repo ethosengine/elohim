@@ -3,6 +3,96 @@ import { describe, expect, it } from 'vitest';
 import { discernMechanical } from './mechanical-discerner.js';
 import { momentFixture, priorFixture } from './fixtures.js';
 
+describe('discernMechanical — rule 6 (refinement)', () => {
+  it('mints refinement/small/evidence-enriched when a new sidecar artifact is present that was not on the prior', () => {
+    const moment = momentFixture({
+      status: 'passed',
+      sidecarArtifacts: {
+        cucumber: 'blob:bafkrei-cucumber/xyz.json',
+        trace: 'blob:bafkrei-trace/abc.zip',
+      },
+    });
+
+    const tag = discernMechanical(
+      {
+        moment,
+        priors: {
+          latestAny: priorFixture({
+            status: 'passed',
+            sidecarArtifactNames: ['cucumber'],
+            computeFingerprint: moment.computeFingerprint,
+          }),
+          latestSameFingerprint: priorFixture({
+            status: 'passed',
+            sidecarArtifactNames: ['cucumber'],
+            computeFingerprint: moment.computeFingerprint,
+          }),
+          knownErrorClasses: new Set<string>(),
+        },
+      },
+      'uhCEk-moment-hash',
+    );
+
+    expect(tag).toMatchObject({
+      valence: 'refinement',
+      magnitude: 'small',
+      evidenceType: 'evidence-enriched',
+    });
+  });
+
+  it('mints refinement when duration improves by more than 20%', () => {
+    const moment = momentFixture({ status: 'passed', durationMs: 1500 });
+
+    const tag = discernMechanical(
+      {
+        moment,
+        priors: {
+          latestAny: priorFixture({
+            status: 'passed',
+            durationMs: 2100,
+            computeFingerprint: moment.computeFingerprint,
+          }),
+          latestSameFingerprint: priorFixture({
+            status: 'passed',
+            durationMs: 2100,
+            computeFingerprint: moment.computeFingerprint,
+          }),
+          knownErrorClasses: new Set<string>(),
+        },
+      },
+      'uhCEk-moment-hash',
+    );
+
+    expect(tag).toMatchObject({ valence: 'refinement', evidenceType: 'evidence-enriched' });
+  });
+
+  it('does NOT mint refinement when duration improves by less than 20%', () => {
+    const moment = momentFixture({ status: 'passed', durationMs: 1900 });
+
+    const tag = discernMechanical(
+      {
+        moment,
+        priors: {
+          latestAny: priorFixture({
+            status: 'passed',
+            durationMs: 2100,
+            computeFingerprint: moment.computeFingerprint,
+          }),
+          latestSameFingerprint: priorFixture({
+            status: 'passed',
+            durationMs: 2100,
+            computeFingerprint: moment.computeFingerprint,
+          }),
+          knownErrorClasses: new Set<string>(),
+        },
+      },
+      'uhCEk-moment-hash',
+    );
+
+    expect(tag).toBeNull();
+  });
+});
+
 describe('discernMechanical — rule 5 (witness)', () => {
   it('mints witness/meaningful/cross-fingerprint-attestation when a passing scenario is validated by a NEW compute fingerprint', () => {
     const moment = momentFixture({
