@@ -499,5 +499,13 @@ mod tower_header_tests {
             resp.headers().get("x-gate-verdict").is_none(),
             "x-gate-verdict must NOT be present when gate bypassed the path"
         );
+
+        // Confirm the inner handler was actually reached (not some other 200-producing path).
+        let bytes = resp.into_body().collect().await.unwrap().to_bytes();
+        let body = String::from_utf8_lossy(&bytes).into_owned();
+        assert!(
+            body.contains("\"handled\":true"),
+            "inner handler body must be present, got: {body}"
+        );
     }
 }

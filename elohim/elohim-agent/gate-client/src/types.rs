@@ -404,6 +404,17 @@ mod tests {
         assert!((rt.confidence - orig.confidence).abs() < f32::EPSILON);
     }
 
+    #[test]
+    fn constitutional_reasoning_summary_exempt_round_trips() {
+        let original = ConstitutionalReasoningSummary::exempt();
+        let json = serde_json::to_string(&original).unwrap();
+        let restored: ConstitutionalReasoningSummary = serde_json::from_str(&json).unwrap();
+        assert_eq!(restored.primary_principle, original.primary_principle);
+        assert_eq!(restored.summary, original.summary);
+        assert_eq!(restored.confidence, original.confidence);
+        assert_eq!(restored.phase_note, original.phase_note);
+    }
+
     // ─── GateStatus serde discriminants ──────────────────────────────────────
     //
     // Confirm the `status` tag field uses kebab-case per the serde attribute.
