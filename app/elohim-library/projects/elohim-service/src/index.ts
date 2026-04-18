@@ -86,9 +86,3 @@ export {
 
 // Re-export main functions for convenience
 export { runImportPipeline, importContent } from './services/import-pipeline.service';
-
-/*
- * Experience-story discernment (v1 mechanical).
- * Pure function gate; see spec 2026-04-18-experience-story-epr-design.md §5–§7.
- */
-export * from './discernment/index.js';
