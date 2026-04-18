@@ -28,6 +28,9 @@ chrono.workspace = true
 # IDs
 uuid.workspace = true
 
+# Hashing (for GateContext::to_summary_cid)
+sha2.workspace = true
+
 # HTTP middleware
 tower.workspace = true
 http.workspace = true

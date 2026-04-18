@@ -1,11 +1,40 @@
 //! Gate-process DAG interpreter — reads a GateProcessDeclaration and executes
 //! its step graph against an assembled GateContext.
 //!
-//! Phase 0: types only. The interpreter executor and step dispatch arrive in
-//! Phase 2 alongside the universal-band-declaration.
+//! # Module structure
+//!
+//! - `mod.rs` (this file) — public API re-exports + Phase-0 type definitions.
+//! - [`context`] — [`GateContext`]: the typed key-value accumulator.
+//! - [`executor`] — [`StepExecutor`] trait, [`StepKind`], [`StepOutcome`].
+//! - [`expr`] — minimal conditional-edge expression parser + evaluator.
+//! - [`interpreter`] — [`DagInterpreter`]: the DAG walk engine.
+//!
+//! # Phase note
+//!
+//! Phase 0 landed the type stubs below. Phase 2 Task 2.1 adds the interpreter
+//! engine (context, executor trait, expression language, and the interpreter
+//! itself). Phase 2 Task 2.2 implements the seven concrete step executors.
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+
+// ─── Sub-modules ─────────────────────────────────────────────────────────────
+
+pub mod context;
+pub mod executor;
+pub mod expr;
+pub mod interpreter;
+
+// ─── Public re-exports ────────────────────────────────────────────────────────
+
+pub use context::GateContext;
+pub use executor::{ArcExecutor, StepExecutor, StepKind, StepOutcome};
+pub use interpreter::DagInterpreter;
+
+// ─── Phase-0 type definitions (path-stable) ──────────────────────────────────
+//
+// These types were originally in `src/dag.rs`. They remain public with the
+// same paths as before: `gate_client::dag::StepType`, etc.
 
 /// The seven v1 step types, per spec §2.1.
 #[derive(Debug, Clone, Serialize, Deserialize)]
