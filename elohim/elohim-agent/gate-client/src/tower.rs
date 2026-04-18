@@ -1,8 +1,9 @@
 //! Tower middleware integration for the gate-client.
 //!
-//! Wraps Axum (or any `tower`-compatible) HTTP POST routes so the gate fires
-//! before the inner service handles the request. Every doorway HTTP POST route
-//! can opt-in with a single `.layer(gate_client::tower_layer())` call.
+//! Wraps Axum (or any `tower`-compatible) HTTP POST/PUT/PATCH/DELETE routes so
+//! the gate fires before the inner service handles the request. Every doorway
+//! HTTP state-changing route can opt-in with a single
+//! `.layer(gate_client::tower_layer())` call.
 //!
 //! # Phase 1 limitation: path-based event inference
 //!
@@ -10,14 +11,21 @@
 //! segment rather than parsed from the request body. This keeps the tower layer
 //! body-agnostic and avoids consuming the body before the inner service sees it.
 //!
-//! Known limitation: if a path does not match any of the eight registered
-//! prefixes the request falls through to the inner service WITHOUT a gate
-//! check. This is a deliberate Phase 1 trade-off. Phase 7 will wire full
-//! body-extracted event context when doorway integrates. Any new POST route
-//! that carries relational impact and is NOT listed below MUST be added here —
-//! treat a missing mapping as a code-review gate.
+//! **IMPORTANT — path-inferred events carry sentinel field values.**
+//! When Phase 2 lands the DAG interpreter, `context-assemble` steps will read
+//! event fields. Consumers MUST NOT treat field values from path-inferred events
+//! as reliable — only the variant *kind* is meaningful. Call
+//! `is_path_inferred(&event)` to detect these events at any Phase 2 call site.
 //!
-//! Registered path → event mappings (prefix match on the first path segment):
+//! Phase 7 will wire full body-extracted event context when doorway integrates.
+//! Any new state-changing route that carries relational impact and is NOT listed
+//! below MUST be added here — treat a missing mapping as a code-review gate.
+//!
+//! Known limitation: if a path does not match any of the eight registered
+//! segments the request falls through to the inner service WITHOUT a gate
+//! check. This is a deliberate Phase 1 trade-off.
+//!
+//! Registered path → event mappings (first path segment match):
 //! - `/content`        → `ContentPublish`
 //! - `/attestation`    → `AttestationWrite`
 //! - `/economic-event` → `EconomicEventEmit`
@@ -33,6 +41,7 @@ use std::{
     task::{Context, Poll},
 };
 
+use bytes::Bytes;
 use http::{Method, Request, Response, StatusCode};
 use tower::{Layer, Service};
 
@@ -43,7 +52,9 @@ use crate::{
 
 // ─── Public factory ───────────────────────────────────────────────────────────
 
-/// Create a `tower::Layer` that wraps every POST request in a gate check.
+/// Create a `tower::Layer` that wraps every state-changing request in a gate check.
+///
+/// Gated methods: POST, PUT, PATCH, DELETE. GET/HEAD/OPTIONS pass straight through.
 ///
 /// Usage:
 /// ```rust,ignore
@@ -55,9 +66,41 @@ pub fn tower_layer() -> GateLayer {
     GateLayer::new()
 }
 
+// ─── Path-inference marker ────────────────────────────────────────────────────
+
+/// Returns `true` if this event was produced by Phase 1 path inference.
+///
+/// Path-inferred events carry sentinel field values (`"inferred"`, `"unknown"`,
+/// `0`, etc.). The *variant kind* is reliable; individual field values are NOT.
+///
+/// Any Phase 2 `context-assemble` step that reads event fields MUST check this
+/// first and skip field-level reads when `true`.
+///
+/// Phase 7: body parsing replaces path inference. Consumers MUST NOT read field
+/// values from path-inferred events as reliable — only the variant kind.
+pub fn is_path_inferred(event: &RelationalImpactEvent) -> bool {
+    // All events produced by `infer_event_from_path` carry the sentinel string
+    // "inferred" as the primary identifier field. This is the structural marker
+    // of Phase 1 path inference — maintained until body parsing lands in Phase 7.
+    match event {
+        RelationalImpactEvent::ContentPublish { content_cid, .. } => content_cid == "inferred",
+        RelationalImpactEvent::AttestationWrite { subject_hash, .. } => {
+            subject_hash == "inferred"
+        }
+        RelationalImpactEvent::EconomicEventEmit { event_kind, .. } => event_kind == "inferred",
+        RelationalImpactEvent::PeerMessage { payload_kind, .. } => payload_kind == "inferred",
+        RelationalImpactEvent::SyncToPeers { manifest_cid, .. } => manifest_cid == "inferred",
+        RelationalImpactEvent::AdviceSought { summary_cid, .. } => summary_cid == "inferred",
+        RelationalImpactEvent::CapabilityInvoke { capability, .. } => capability == "inferred",
+        RelationalImpactEvent::PrivateToPublicCrossing { source_space, .. } => {
+            source_space == "inferred"
+        }
+    }
+}
+
 // ─── Layer ────────────────────────────────────────────────────────────────────
 
-/// A `tower::Layer` that injects a gate check before every POST request.
+/// A `tower::Layer` that injects a gate check before every state-changing request.
 #[derive(Clone, Debug, Default)]
 pub struct GateLayer;
 
@@ -89,7 +132,7 @@ where
     S::Future: Send + 'static,
     S::Error: Into<Box<dyn std::error::Error + Send + Sync>>,
     ReqBody: Send + 'static,
-    ResBody: Default + Send + 'static,
+    ResBody: From<Bytes> + Send + 'static,
 {
     type Response = Response<ResBody>;
     type Error = S::Error;
@@ -100,10 +143,18 @@ where
     }
 
     fn call(&mut self, req: Request<ReqBody>) -> Self::Future {
-        // Only gate POST requests. Other methods pass straight through.
-        if req.method() != Method::POST {
-            let fut = self.inner.call(req);
-            return Box::pin(async move { fut.await });
+        // Per tower contract: the service polled ready is the one we must call.
+        // Clone now, replace self.inner with the clone, use the owned original.
+        let clone = self.inner.clone();
+        let mut inner = std::mem::replace(&mut self.inner, clone);
+
+        // Only gate state-changing methods. Read-only methods pass straight through.
+        let is_state_changing = matches!(
+            req.method(),
+            &Method::POST | &Method::PUT | &Method::PATCH | &Method::DELETE
+        );
+        if !is_state_changing {
+            return Box::pin(async move { inner.call(req).await });
         }
 
         let path = req.uri().path().to_owned();
@@ -111,19 +162,9 @@ where
 
         // No event mapping → fall through without gate check (Phase 1 limitation).
         // See module-level doc comment for the rationale and upgrade path.
-        if event_opt.is_none() {
-            let fut = self.inner.call(req);
-            return Box::pin(async move { fut.await });
-        }
-
-        let event = event_opt.unwrap();
-
-        // Clone the inner service so we can move it into the async block.
-        // `poll_ready` was already called on `self.inner` above; we use a
-        // clone here because tower's service contract requires that the service
-        // used for `call` is the one that was polled ready.  For Phase 1 the
-        // inner service is cheap to clone (Axum Router).
-        let mut inner = self.inner.clone();
+        let Some(event) = event_opt else {
+            return Box::pin(async move { inner.call(req).await });
+        };
 
         Box::pin(async move {
             let decision: GateDecision = match crate::check(event).await {
@@ -157,30 +198,15 @@ where
                             "principleRefs": grounds.principle_refs,
                         }
                     });
-                    let body_bytes =
-                        serde_json::to_vec(&body_json).unwrap_or_else(|_| b"{}".to_vec());
+                    let body_bytes: Bytes = serde_json::to_vec(&body_json)
+                        .unwrap_or_else(|_| b"{}".to_vec())
+                        .into();
 
-                    // We need a ResBody from bytes. For Phase 1 we use axum's
-                    // axum::body::Body when compiled with axum, but GateService is
-                    // generic over ResBody — the short-circuit body must come from
-                    // ResBody::default(). The 403 body is attached as a bytes
-                    // extension on the response parts so callers can read it.
-                    //
-                    // Limitation: the default ResBody carries no bytes. Full body
-                    // propagation requires constraining ResBody to From<Bytes>, which
-                    // is a Phase 7 refinement. In Phase 1 the 403 status code alone
-                    // is the gate signal; the body is best-effort.
                     let mut resp = Response::builder()
                         .status(StatusCode::FORBIDDEN)
                         .header("content-type", "application/json")
-                        .extension(body_bytes)
-                        .body(ResBody::default())
-                        .unwrap_or_else(|_| {
-                            Response::builder()
-                                .status(StatusCode::FORBIDDEN)
-                                .body(ResBody::default())
-                                .expect("infallible response build")
-                        });
+                        .body(ResBody::from(body_bytes))
+                        .expect("infallible 403 response build");
                     resp.headers_mut().insert(
                         "x-gate-verdict",
                         http::HeaderValue::from_static("decline"),
@@ -194,20 +220,15 @@ where
                         "target": target,
                         "severity": severity,
                     });
-                    let body_bytes =
-                        serde_json::to_vec(&body_json).unwrap_or_else(|_| b"{}".to_vec());
+                    let body_bytes: Bytes = serde_json::to_vec(&body_json)
+                        .unwrap_or_else(|_| b"{}".to_vec())
+                        .into();
 
                     let mut resp = Response::builder()
                         .status(StatusCode::ACCEPTED)
                         .header("content-type", "application/json")
-                        .extension(body_bytes)
-                        .body(ResBody::default())
-                        .unwrap_or_else(|_| {
-                            Response::builder()
-                                .status(StatusCode::ACCEPTED)
-                                .body(ResBody::default())
-                                .expect("infallible response build")
-                        });
+                        .body(ResBody::from(body_bytes))
+                        .expect("infallible 202 response build");
                     resp.headers_mut().insert(
                         "x-gate-verdict",
                         http::HeaderValue::from_static("escalate"),
@@ -233,66 +254,215 @@ where
 
 /// Infer a `RelationalImpactEvent` from an HTTP path.
 ///
+/// Matches on the **first path segment** (not a prefix) to avoid false matches
+/// (e.g. `/contentious` must NOT match `/content`).
+///
 /// Returns `None` for paths that have no declared mapping. See module-level
 /// doc for the full list and the Phase 1 fall-through contract.
+///
+/// **WARNING — sentinel field values.**  All returned events carry `"inferred"` /
+/// `"unknown"` / `0` as field values. These are structural sentinels, not real
+/// data. See `is_path_inferred()` and the module-level doc.
+///
+/// Phase 7: body parsing replaces path inference. Consumers MUST NOT read field
+/// values from path-inferred events as reliable — only the variant kind.
 fn infer_event_from_path(path: &str) -> Option<RelationalImpactEvent> {
-    // Normalise: strip trailing slash, match on first-segment prefix.
-    let p = path.trim_end_matches('/');
+    // Strip leading slash, then split into segments. Match on first (and
+    // optionally second) segment — no prefix matching to avoid over-matching.
+    let trimmed = path.trim_start_matches('/');
+    let mut segments = trimmed.split('/');
+    let first = segments.next();
+    let second = segments.next();
 
-    if p.starts_with("/content") {
-        return Some(RelationalImpactEvent::ContentPublish {
+    match (first, second) {
+        (Some("content"), _) => Some(RelationalImpactEvent::ContentPublish {
             content_cid: "inferred".to_string(),
             declared_reach: "public".to_string(),
             author: "unknown".to_string(),
-        });
-    }
-    if p.starts_with("/attestation") {
-        return Some(RelationalImpactEvent::AttestationWrite {
+        }),
+        (Some("attestation"), _) => Some(RelationalImpactEvent::AttestationWrite {
             subject_hash: "inferred".to_string(),
             claim_kind: "inferred".to_string(),
             issuer: "unknown".to_string(),
-        });
-    }
-    if p.starts_with("/economic-event") {
-        return Some(RelationalImpactEvent::EconomicEventEmit {
+        }),
+        (Some("economic-event"), _) => Some(RelationalImpactEvent::EconomicEventEmit {
             event_kind: "inferred".to_string(),
             provider: "unknown".to_string(),
             receiver: "unknown".to_string(),
             quantity: "0".to_string(),
-        });
-    }
-    if p.starts_with("/peer-message") {
-        return Some(RelationalImpactEvent::PeerMessage {
+        }),
+        (Some("peer-message"), _) => Some(RelationalImpactEvent::PeerMessage {
             recipient: "unknown".to_string(),
             payload_kind: "inferred".to_string(),
-        });
-    }
-    if p.starts_with("/sync") {
-        return Some(RelationalImpactEvent::SyncToPeers {
+        }),
+        (Some("sync"), _) => Some(RelationalImpactEvent::SyncToPeers {
             manifest_cid: "inferred".to_string(),
             item_count: 0,
-        });
-    }
-    if p.starts_with("/advice") {
-        return Some(RelationalImpactEvent::AdviceSought {
+        }),
+        (Some("advice"), _) => Some(RelationalImpactEvent::AdviceSought {
             requester: "unknown".to_string(),
             summary_cid: "inferred".to_string(),
             topic: "inferred".to_string(),
-        });
-    }
-    if p.starts_with("/agent/invoke") {
-        return Some(RelationalImpactEvent::CapabilityInvoke {
+        }),
+        (Some("agent"), Some("invoke")) => Some(RelationalImpactEvent::CapabilityInvoke {
             capability: "inferred".to_string(),
             requester: "unknown".to_string(),
             request_id: "inferred".to_string(),
-        });
-    }
-    if p.starts_with("/crossing") {
-        return Some(RelationalImpactEvent::PrivateToPublicCrossing {
+        }),
+        (Some("crossing"), _) => Some(RelationalImpactEvent::PrivateToPublicCrossing {
             source_space: "inferred".to_string(),
             artifact_ref: "inferred".to_string(),
-        });
+        }),
+        _ => None,
+    }
+}
+
+// ─── Unit tests ──────────────────────────────────────────────────────────────
+
+/// Service-level tests for the gate tower layer, including the Decline path.
+/// These tests require axum (dev-dependency) and tokio.
+#[cfg(test)]
+mod tower_service_tests {
+    use axum::{body::Body, routing::post, Router};
+    use http::{Method, Request, StatusCode};
+    use http_body_util::BodyExt;
+    use tower::ServiceExt;
+
+    async fn ok_handler() -> axum::response::Response {
+        axum::response::Response::builder()
+            .status(StatusCode::OK)
+            .body(Body::from(r#"{"handled":true}"#))
+            .unwrap()
     }
 
-    None
+    fn build_gated_router() -> Router {
+        Router::new()
+            .route("/content", post(ok_handler))
+            .layer(crate::tower::GateLayer::new())
+    }
+
+    async fn post_to(router: Router, path: &str) -> (StatusCode, String) {
+        let req = Request::builder()
+            .method(Method::POST)
+            .uri(path)
+            .body(Body::empty())
+            .unwrap();
+        let resp = router.oneshot(req).await.unwrap();
+        let status = resp.status();
+        let bytes = resp.into_body().collect().await.unwrap().to_bytes();
+        (status, String::from_utf8_lossy(&bytes).into_owned())
+    }
+
+    #[tokio::test]
+    async fn decline_returns_403_with_json_body() {
+        // Inject a Decline decision for this thread.
+        crate::__test_set_decision_override(Some(crate::testing::mock_decline(
+            "test-category",
+            "test decline reason",
+        )));
+
+        let router = build_gated_router();
+        let (status, body) = post_to(router, "/content").await;
+
+        assert_eq!(status, StatusCode::FORBIDDEN, "Decline must produce 403");
+        assert!(
+            body.contains("\"gate\":\"declined\"") || body.contains("\"gate\": \"declined\""),
+            "403 response must carry gate JSON body, got: {body}"
+        );
+        assert!(
+            body.contains("test-category"),
+            "403 body must include grounds category, got: {body}"
+        );
+    }
+
+    #[tokio::test]
+    async fn decline_403_is_absent_when_gate_allows() {
+        // No override — default DevContext always returns Allow.
+        let router = build_gated_router();
+        let (status, _body) = post_to(router, "/content").await;
+        assert_eq!(
+            status,
+            StatusCode::OK,
+            "Allow must reach inner handler and return 200"
+        );
+    }
+
+    #[tokio::test]
+    async fn put_is_gated_and_reaches_inner_handler() {
+        // State-changing verbs other than POST must also pass through the gate.
+        // With DevContext Always-Allow, PUT should reach the inner service.
+        let router = Router::new()
+            .route("/content", axum::routing::put(ok_handler))
+            .layer(crate::tower::GateLayer::new());
+
+        let req = Request::builder()
+            .method(Method::PUT)
+            .uri("/content")
+            .body(Body::empty())
+            .unwrap();
+        let resp = router.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::OK, "PUT should reach inner handler when gate allows");
+    }
+
+    #[tokio::test]
+    async fn patch_is_gated_and_reaches_inner_handler() {
+        // PATCH must also pass through the gate.
+        let router = Router::new()
+            .route("/content", axum::routing::patch(ok_handler))
+            .layer(crate::tower::GateLayer::new());
+
+        let req = Request::builder()
+            .method(Method::PATCH)
+            .uri("/content")
+            .body(Body::empty())
+            .unwrap();
+        let resp = router.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::OK, "PATCH should reach inner handler when gate allows");
+    }
+}
+
+// ─── Unit tests for path inference ───────────────────────────────────────────
+
+#[cfg(test)]
+mod path_tests {
+    use super::*;
+
+    #[test]
+    fn content_segment_matches() {
+        assert!(infer_event_from_path("/content").is_some());
+        assert!(infer_event_from_path("/content/foo").is_some());
+        // Note: in real usage `req.uri().path()` strips the query string before
+        // calling this function, so `/content?x=1` never reaches here with the
+        // query attached. The gate layer calls `uri().path()` which returns only
+        // the path component. This function receives clean paths.
+    }
+
+    #[test]
+    fn contentious_does_not_match_content() {
+        // The critical regression: starts_with would have matched this wrongly.
+        assert!(infer_event_from_path("/contentious").is_none());
+        assert!(infer_event_from_path("/contentious/bar").is_none());
+    }
+
+    #[test]
+    fn agent_invoke_requires_second_segment() {
+        assert!(infer_event_from_path("/agent/invoke").is_some());
+        assert!(infer_event_from_path("/agent/invoke/extra").is_some());
+        // /agent alone has no mapping (no second segment "invoke")
+        assert!(infer_event_from_path("/agent").is_none());
+        assert!(infer_event_from_path("/agent/other").is_none());
+    }
+
+    #[test]
+    fn unmapped_paths_return_none() {
+        assert!(infer_event_from_path("/unmapped").is_none());
+        assert!(infer_event_from_path("/").is_none());
+        assert!(infer_event_from_path("").is_none());
+    }
+
+    #[test]
+    fn is_path_inferred_detects_sentinel_events() {
+        let event = infer_event_from_path("/content").unwrap();
+        assert!(is_path_inferred(&event));
+    }
 }

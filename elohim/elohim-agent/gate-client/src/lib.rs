@@ -43,6 +43,31 @@ pub mod types;
 #[cfg(test)]
 pub mod testing;
 
+// ─── Test-only decision override ──────────────────────────────────────────────
+//
+// Allows integration tests to inject a specific GateDecision for one `check()`
+// call without building a full mock infrastructure. Scoped to the current thread
+// so parallel tests cannot interfere.
+//
+// Usage:
+//   gate_client::__test_set_decision_override(Some(gate_client::testing::mock_decline(...)));
+//   // ... drive the request ...
+//   gate_client::__test_set_decision_override(None); // restore
+#[cfg(test)]
+thread_local! {
+    static DECISION_OVERRIDE: std::cell::RefCell<Option<GateDecision>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+/// Set a one-shot decision override for the next `check()` call on this thread.
+/// Only available in `#[cfg(test)]` builds.
+#[cfg(test)]
+pub fn __test_set_decision_override(decision: Option<GateDecision>) {
+    DECISION_OVERRIDE.with(|cell| {
+        *cell.borrow_mut() = decision;
+    });
+}
+
 // Public re-exports for ergonomic use.
 pub use error::{GateError, GateResult};
 pub use events::RelationalImpactEvent;
@@ -60,6 +85,15 @@ pub use types::{
 /// realized. In DevContext phase, returns a mocked `Allow` for boundary-crossing
 /// events and `Allow { exempt: true }` for interior events.
 pub async fn check(event: RelationalImpactEvent) -> GateResult<GateDecision> {
+    // Test-only: consume a one-shot decision override if one is set.
+    #[cfg(test)]
+    {
+        let override_decision = DECISION_OVERRIDE.with(|cell| cell.borrow_mut().take());
+        if let Some(decision) = override_decision {
+            return Ok(decision);
+        }
+    }
+
     let space = space::detect_from_event(&event);
 
     if space.is_exempt() {
