@@ -16,7 +16,7 @@
  *   npx tsx scripts/extract-failures.ts --report path/to/cucumber.json --out path/to/failures.jsonl
  */
 
-import { existsSync, mkdirSync, readFileSync, appendFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, appendFileSync, readdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -112,10 +112,7 @@ function collectArtifacts(scenarioName: string): FailureRecord['artifacts'] {
   ] as const) {
     if (!existsSync(dir)) continue;
     try {
-      const fs = require('node:fs') as typeof import('node:fs');
-      const matches = fs
-        .readdirSync(dir)
-        .filter(f => f.startsWith(prefix) && f.endsWith(`.${ext}`));
+      const matches = readdirSync(dir).filter(f => f.startsWith(prefix) && f.endsWith(`.${ext}`));
       if (matches.length && matches[0]) out[key] = join(dir, matches[0]);
     } catch {
       // best-effort
