@@ -1,0 +1,79 @@
+{
+  "$id": "lamad:schema:metadata:escalation-target-spec",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "EscalationTargetSpecMetadata",
+  "description": "Parameter artifact for `escalate-to-review` step type (spec §2.1). Declares where an escalated gate decision routes, at what severity, with what notification shape. Escalation is tiered: app-steward → qahal → existential-boundary (spec §Question 6).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["specName", "version", "tiers"],
+  "properties": {
+    "specName": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]+$",
+      "description": "Kebab-case escalation-target spec name."
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+      "description": "Semantic version of this escalation spec."
+    },
+    "description": {
+      "type": "string",
+      "description": "What class of escalations this spec handles."
+    },
+    "tiers": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/EscalationTier" },
+      "description": "Ordered tiers keyed by severity. Higher severity routes to higher reach."
+    }
+  },
+  "$defs": {
+    "EscalationTier": {
+      "type": "object",
+      "required": ["severity", "target"],
+      "additionalProperties": false,
+      "properties": {
+        "severity": {
+          "type": "string",
+          "enum": ["low", "medium", "high", "existential"]
+        },
+        "target": { "$ref": "#/$defs/Target" },
+        "notificationShape": {
+          "type": "string",
+          "description": "Optional reference to a notification template CID."
+        },
+        "timeoutSeconds": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "If the target doesn't respond within this window, auto-escalate to the next tier."
+        }
+      }
+    },
+    "Target": {
+      "type": "object",
+      "required": ["kind"],
+      "oneOf": [
+        {
+          "properties": {
+            "kind": { "const": "app-steward" },
+            "stewardId": { "type": "string" }
+          },
+          "required": ["kind", "stewardId"]
+        },
+        {
+          "properties": {
+            "kind": { "const": "qahal" },
+            "communityId": { "type": "string" }
+          },
+          "required": ["kind", "communityId"]
+        },
+        {
+          "properties": {
+            "kind": { "const": "existential-boundary" }
+          },
+          "required": ["kind"]
+        }
+      ]
+    }
+  }
+}

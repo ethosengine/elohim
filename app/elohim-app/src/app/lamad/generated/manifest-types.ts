@@ -25,6 +25,11 @@ export const LAMAD_CONTENT_TYPES = [
   'simulation',
   'feature',
   'practice',
+  'gate-process-declaration',
+  'universal-band-declaration',
+  'gate-rules-declaration',
+  'aggregation-spec',
+  'escalation-target-spec',
 ] as const;
 export type LamadContentType = (typeof LAMAD_CONTENT_TYPES)[number];
 

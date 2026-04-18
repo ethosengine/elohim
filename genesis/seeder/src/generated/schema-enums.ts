@@ -99,6 +99,11 @@ export const ALL_CONTENT_TYPES = [
   'work-project',
   'issue-report',
   'application',
+  'gate-process-declaration',
+  'universal-band-declaration',
+  'gate-rules-declaration',
+  'aggregation-spec',
+  'escalation-target-spec',
 ] as const;
 export const CONTENT_TYPES = ALL_CONTENT_TYPES;
 export type ContentType = (typeof ALL_CONTENT_TYPES)[number];

@@ -507,6 +507,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "gate-client"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "elohim-agent",
+ "futures",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.17",
+ "tokio",
+ "tokio-test",
+ "tracing",
+ "ts-rs",
+ "uuid",
+]
+
+[[package]]
 name = "generic-array"
 version = "0.14.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"

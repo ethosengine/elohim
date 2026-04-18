@@ -1,0 +1,39 @@
+{
+  "$id": "lamad:schema:metadata:universal-band-declaration",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "UniversalBandDeclarationMetadata",
+  "description": "Protocol-root universal-band DAG — the wisdom-as-system-auth layer that wraps every relational-impact invocation (spec §P1, §2.5). Structurally identical to a GateProcessDeclaration but scoped to protocol-reach governance rather than app-reach. Referenced by a well-known constitutional pointer; every elohim loads it at startup.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "activatedAt", "dag"],
+  "properties": {
+    "version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+      "description": "Semantic version of this universal-band declaration."
+    },
+    "activatedAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp when protocol governance ratified this declaration."
+    },
+    "supersedes": {
+      "type": ["string", "null"],
+      "description": "CID of a superseded universal-band-declaration, or null for the first."
+    },
+    "dag": {
+      "$ref": "./gate-process-declaration-metadata.schema.json#/$defs/ProcessDag",
+      "description": "The universal-band step graph. Runs for every invocation regardless of app context."
+    },
+    "governanceReach": {
+      "type": "string",
+      "const": "protocol",
+      "description": "Universal band is always governed at protocol reach."
+    },
+    "ratificationAttestationCids": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "CIDs of protocol-reach ratification attestations that authorized activation."
+    }
+  }
+}

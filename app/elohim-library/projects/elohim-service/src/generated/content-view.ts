@@ -40,7 +40,12 @@ export type ContentType =
   | 'work-story'
   | 'work-project'
   | 'issue-report'
-  | 'application';
+  | 'application'
+  | 'gate-process-declaration'
+  | 'universal-band-declaration'
+  | 'gate-rules-declaration'
+  | 'aggregation-spec'
+  | 'escalation-target-spec';
 /**
  * Content format for rendering. Core formats are DNA-notarized. Extended formats are storage-level rendering hints.
  */

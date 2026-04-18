@@ -15,7 +15,9 @@
     "module", "quiz", "podcast", "simulation",
     "node-context", "stewardship-context",
     "work-story", "work-project", "issue-report",
-    "application"
+    "application",
+    "gate-process-declaration", "universal-band-declaration",
+    "gate-rules-declaration", "aggregation-spec", "escalation-target-spec"
   ],
   "_tiers": {
     "core": {
@@ -34,8 +36,10 @@
                  "module", "quiz", "podcast", "simulation",
                  "node-context", "stewardship-context",
                  "work-story", "work-project", "issue-report",
-                 "application"],
-      "rationale": "Community-defined vocabulary. Accepted by storage, not validated by DNA. Communities register new types without protocol changes."
+                 "application",
+                 "gate-process-declaration", "universal-band-declaration",
+                 "gate-rules-declaration", "aggregation-spec", "escalation-target-spec"],
+      "rationale": "Community-defined vocabulary. Accepted by storage, not validated by DNA. Communities register new types without protocol changes. Includes gate-infrastructure contentTypes for the elohim-agent gate-interface primitive."
     }
   },
   "_dna": {

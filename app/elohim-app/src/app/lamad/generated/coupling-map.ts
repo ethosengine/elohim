@@ -287,4 +287,59 @@ export const LAMAD_COUPLING_MAP: Record<string, ContentTypeCoupling> = {
       signalTypes: ['practice-engagement', 'mastery-achieved'],
     },
   },
+  'gate-process-declaration': {
+    value: {
+
+    },
+    governance: {
+      defaultReach: 'commons',
+      minimumReach: 'community',
+      governanceModel: 'steward-consent',
+      signalTypes: ['attestation-granted', 'attestation-revoked'],
+    },
+  },
+  'universal-band-declaration': {
+    value: {
+
+    },
+    governance: {
+      defaultReach: 'commons',
+      minimumReach: 'commons',
+      governanceModel: 'protocol-ratification',
+      signalTypes: ['attestation-granted'],
+    },
+  },
+  'gate-rules-declaration': {
+    value: {
+
+    },
+    governance: {
+      defaultReach: 'commons',
+      minimumReach: 'community',
+      governanceModel: 'steward-consent',
+      signalTypes: ['attestation-granted', 'attestation-revoked'],
+    },
+  },
+  'aggregation-spec': {
+    value: {
+
+    },
+    governance: {
+      defaultReach: 'commons',
+      minimumReach: 'community',
+      governanceModel: 'steward-consent',
+      signalTypes: ['attestation-granted', 'attestation-revoked'],
+    },
+  },
+  'escalation-target-spec': {
+    value: {
+
+    },
+    governance: {
+      defaultReach: 'commons',
+      minimumReach: 'community',
+      governanceModel: 'steward-consent',
+      signalTypes: ['attestation-granted', 'attestation-revoked'],
+    },
+  },
 };

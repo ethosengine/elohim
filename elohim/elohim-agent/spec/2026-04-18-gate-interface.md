@@ -772,8 +772,8 @@ No call-site rewrite required.
 
 ### 8.1 Resolved during implementation plan
 
-1. **Decision-attestation entry type placement** — v1 leans new `GateDecisionAttestation` entry type in mishpat. If mishpat has a generic `Attestation` entry type that fits, reuse.
-2. **ElohimSubstance A vs A2 classification** — depends on imagodei zome structure; re-confirm before zome work starts.
+1. **Decision-attestation entry type placement** — ✅ **Resolved (Phase 0, 2026-04-18):** new `GateDecisionAttestation` entry type in mishpat. Mishpat has no generic Attestation type to extend; truth gravity is correctly governance/accountability. See Appendix A for details.
+2. **ElohimSubstance A vs A2 classification** — ✅ **Resolved (Phase 0, 2026-04-18):** Category A — new entry type in imagodei. A2 via link was ruled out because link tags cannot carry versioned CID-triples and `elohim_substance_cid` requires independent DHT addressability. See Appendix A for details.
 3. **Exact conditional expression language** — simple comparison operators are the target; precise grammar specified in plan phase.
 
 ### 8.2 Deferred to v1.1
@@ -810,12 +810,18 @@ Summary of the mandatory P2P Design Gate classifications; full rationale in the 
 
 | Entity | Category | Address | Source of Truth | DNA |
 |---|---|---|---|---|
-| GateDecisionAttestation | A — Notarized | Content-Derived CID | Holochain DHT | mishpat (new entry type, 11/~100) |
+| GateDecisionAttestation | A — Notarized (new entry type, confirmed 2026-04-18) | Content-Derived CID | Holochain DHT | mishpat (11/~100 → 12/~100) |
 | GateProcessDeclaration | A — Notarized (reuses ContentNode) | Content-Derived CID | Holochain DHT | lamad (existing entry type) |
 | UniversalBandDeclaration | A — Notarized (reuses ContentNode) | Content-Derived CID | Holochain DHT | lamad (existing entry type) |
 | StepParameterArtifact | A — Notarized (reuses ContentNode) | Content-Derived CID | Holochain DHT | lamad (existing entry type) |
-| ElohimSubstance | A2 — Derived (provisional) | Agent-Scoped Composite | Holochain DHT | imagodei (confirm in plan) |
+| ElohimSubstance | A — Notarized (new entry type, confirmed 2026-04-18) | Content-Derived CID | Holochain DHT | imagodei (28/~100 → 29/~100) |
 | ManifestInspectionCache | C — Operational | N/A | SQLite (local) | None |
+
+**Phase 0 resolutions (2026-04-18):**
+
+- **ElohimSubstance → Category A** (new entry type in imagodei, not A2 via link). A2 ruled out for three reasons: (1) Holochain link tags are designed for small routing hints, not structured versioned content; (2) `GateDecisionAttestation::elohim_substance_cid` requires independent DHT addressability, which a link tag cannot provide; (3) constitution/model rotation requires queryable history of substance snapshots, incompatible with tag-based storage. The existing `Agent` entry in imagodei covers elohim identity; `ElohimSubstance` is a separate content-addressed entry linked from `Agent` via `AgentToSubstance` and `ActiveSubstance` link types.
+
+- **GateDecisionAttestation → new entry type in mishpat** (R2). R1 (extend existing Attestation) ruled out: mishpat has no generic Attestation type to extend — it is the governance/accountability DNA (Challenge, Proposal, Precedent, GovernanceState, etc.), distinct from imagodei's identity/attestation surface. Truth gravity is correct — gate decisions are accountability records, not identity claims. Full entry/coordinator/signal/link shapes in the research report at `elohim/elohim-agent/research/2026-04-18-gate-theory.md` companion notes; will be implemented in Phase 4.
 
 New contentTypes on lamad ContentNode (zero new DNA entry types):
 

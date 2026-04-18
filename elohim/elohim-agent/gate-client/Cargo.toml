@@ -1,0 +1,42 @@
+[package]
+name = "gate-client"
+description = "Cross-cutting wisdom-as-system-auth library for the Elohim Protocol gate interface. Called from every relational-impact write path."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[dependencies]
+# Async runtime
+tokio.workspace = true
+async-trait.workspace = true
+futures.workspace = true
+
+# Serialization
+serde.workspace = true
+serde_json.workspace = true
+
+# Error handling
+thiserror.workspace = true
+
+# Observability
+tracing.workspace = true
+
+# Time
+chrono.workspace = true
+
+# IDs
+uuid.workspace = true
+
+# Internal
+elohim-agent.workspace = true
+
+# Optional: TypeScript export
+ts-rs = { workspace = true, optional = true }
+
+[features]
+default = []
+typescript = ["ts-rs", "elohim-agent/typescript"]
+
+[dev-dependencies]
+tokio-test = "0.4"

@@ -689,6 +689,91 @@
             { "asserts": "mastery-attestation-meaningful", "contradictedBy": "downstream-prerequisite-failure", "validityHorizon": "P90D", "leg": "value" }
           ]
         }
+      },
+      "gate-process-declaration": {
+        "description": "An app-manifest-declared gate-process DAG. Carries the step graph an elohim executes when a RelationalImpactEvent fires for a given content type. CID-addressed and inspectable (spec P3). See elohim/elohim-agent/spec/2026-04-18-gate-interface.md §2.",
+        "metadataSchema": { "$ref": "./schemas/gate-process-declaration-metadata.schema.json" },
+        "coupling": {
+          "knowledge": { "relationships": { "REFERENCES": ["gate-rules-declaration", "aggregation-spec", "escalation-target-spec"] } },
+          "value": {},
+          "governance": {
+            "defaultReach": "commons",
+            "minimumReach": "community",
+            "governanceModel": "steward-consent",
+            "signalTypes": ["attestation-granted", "attestation-revoked"]
+          },
+          "claims": [
+            { "asserts": "peer-review-verified", "contradictedBy": "manifest-challenged", "validityHorizon": "P365D", "leg": "governance" }
+          ]
+        }
+      },
+      "universal-band-declaration": {
+        "description": "Protocol-root universal-band DAG — the wisdom-as-system-auth layer that wraps every relational-impact invocation. Structurally identical to gate-process-declaration but protocol-reach governed. Referenced by a well-known constitutional pointer.",
+        "metadataSchema": { "$ref": "./schemas/universal-band-declaration-metadata.schema.json" },
+        "coupling": {
+          "knowledge": { "relationships": { "REFERENCES": ["gate-rules-declaration", "aggregation-spec", "escalation-target-spec"] } },
+          "value": {},
+          "governance": {
+            "defaultReach": "commons",
+            "minimumReach": "commons",
+            "governanceModel": "protocol-ratification",
+            "signalTypes": ["attestation-granted"]
+          },
+          "claims": [
+            { "asserts": "peer-review-verified", "contradictedBy": "manifest-challenged", "validityHorizon": "P365D", "leg": "governance" }
+          ]
+        }
+      },
+      "gate-rules-declaration": {
+        "description": "Parameter artifact for the `mechanical-ruleset` step type. An ordered rule list referenced by CID from a gate-process-declaration. Example: the 7-valence discernment ruleset for experience-moment.",
+        "metadataSchema": { "$ref": "./schemas/gate-rules-declaration-metadata.schema.json" },
+        "coupling": {
+          "knowledge": {},
+          "value": {},
+          "governance": {
+            "defaultReach": "commons",
+            "minimumReach": "community",
+            "governanceModel": "steward-consent",
+            "signalTypes": ["attestation-granted", "attestation-revoked"]
+          },
+          "claims": [
+            { "asserts": "peer-review-verified", "contradictedBy": "manifest-challenged", "validityHorizon": "P365D", "leg": "governance" }
+          ]
+        }
+      },
+      "aggregation-spec": {
+        "description": "Parameter artifact for the `aggregate-attestations` step type. Declares how a step queries the DHT attestation graph and reduces results to a scalar (e.g., reach-level tiers for reach-gate).",
+        "metadataSchema": { "$ref": "./schemas/aggregation-spec-metadata.schema.json" },
+        "coupling": {
+          "knowledge": {},
+          "value": {},
+          "governance": {
+            "defaultReach": "commons",
+            "minimumReach": "community",
+            "governanceModel": "steward-consent",
+            "signalTypes": ["attestation-granted", "attestation-revoked"]
+          },
+          "claims": [
+            { "asserts": "peer-review-verified", "contradictedBy": "manifest-challenged", "validityHorizon": "P365D", "leg": "governance" }
+          ]
+        }
+      },
+      "escalation-target-spec": {
+        "description": "Parameter artifact for the `escalate-to-review` step type. Declares where escalated decisions route (app-steward / qahal / existential-boundary) and at what severity tier.",
+        "metadataSchema": { "$ref": "./schemas/escalation-target-spec-metadata.schema.json" },
+        "coupling": {
+          "knowledge": {},
+          "value": {},
+          "governance": {
+            "defaultReach": "commons",
+            "minimumReach": "community",
+            "governanceModel": "steward-consent",
+            "signalTypes": ["attestation-granted", "attestation-revoked"]
+          },
+          "claims": [
+            { "asserts": "peer-review-verified", "contradictedBy": "manifest-challenged", "validityHorizon": "P365D", "leg": "governance" }
+          ]
+        }
       }
     },
     "contentFormats": {

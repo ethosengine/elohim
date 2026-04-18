@@ -3,6 +3,7 @@ resolver = "2"
 members = [
     "constitution",
     "elohim-agent/elohim-agent-service",
+    "elohim-agent/gate-client",
     "eae",
     "elohim-compute",
     "elohim-token",
@@ -61,4 +62,5 @@ dashmap = "6.1"
 # Internal crate dependencies
 constitution = { path = "constitution" }
 elohim-agent = { path = "elohim-agent/elohim-agent-service" }
+gate-client = { path = "elohim-agent/gate-client" }
 eae = { path = "eae" }

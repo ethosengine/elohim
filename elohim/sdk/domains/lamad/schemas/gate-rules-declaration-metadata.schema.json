@@ -1,0 +1,71 @@
+{
+  "$id": "lamad:schema:metadata:gate-rules-declaration",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "GateRulesDeclarationMetadata",
+  "description": "Parameter artifact for `mechanical-ruleset` step type (spec §2.1). A declarative, ordered rule list referenced by CID from a gate-process-declaration. The ordered rule evaluation is first-match-wins against the step's GateContext inputs. Example: the 7-valence discernment ruleset.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["ruleSetName", "version", "rules"],
+  "properties": {
+    "ruleSetName": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]+$",
+      "description": "Kebab-case rule-set name (e.g., seven-valence-v1)."
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+      "description": "Semantic version of this rule set."
+    },
+    "description": {
+      "type": "string",
+      "description": "Human-readable summary of what this rule set classifies."
+    },
+    "appliesToEventType": {
+      "type": "string",
+      "description": "Which RelationalImpactEvent variant this rule set reasons over."
+    },
+    "inputKeysExpected": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "GateContext keys the rules consume (e.g., ['moment', 'priorAttestations'])."
+    },
+    "outputShape": {
+      "type": "string",
+      "description": "JSON schema $ref or shape descriptor for the rule-set's output (e.g., StoryPointTag shape)."
+    },
+    "rules": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/Rule" },
+      "description": "Ordered rule list. First match wins. Last rule typically matches steady-state (no-mint)."
+    }
+  },
+  "$defs": {
+    "Rule": {
+      "type": "object",
+      "required": ["id", "when", "outcome"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Stable rule identifier (e.g., rule-1-first-pass-green)."
+        },
+        "when": {
+          "type": "string",
+          "description": "Declarative match expression over input keys. Non-Turing-complete; inspectable by elohim before execution."
+        },
+        "outcome": {
+          "oneOf": [
+            { "type": "object", "description": "Structured outcome object (e.g., {valence, magnitude, evidenceType}) to emit when the rule matches." },
+            { "type": "null", "description": "Null outcome = 'do not mint / no judgment to record' (steady-state)." }
+          ],
+          "description": "Outcome returned by this rule on match. Null means silence (baseline absence)."
+        },
+        "rationale": {
+          "type": "string",
+          "description": "Human-readable justification. Carried into ConstitutionalReasoning when the rule fires."
+        }
+      }
+    }
+  }
+}

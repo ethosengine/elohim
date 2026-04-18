@@ -1,0 +1,162 @@
+{
+  "$id": "lamad:schema:metadata:gate-process-declaration",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "GateProcessDeclarationMetadata",
+  "description": "App-manifest-declared gate-process DAG. Declares the step graph an elohim executes when a RelationalImpactEvent fires for a given content type. All step parameters are CID-addressed to existing ContentNodes, making the DAG inspectable by any elohim encountering it (per spec P3 'Inspect-Before-Execute').",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["name", "version", "eventType", "dag"],
+  "properties": {
+    "name": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]+$",
+      "description": "Kebab-case gate name including version suffix (e.g., discernment-gate-v1-mechanical)."
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+      "description": "Semantic version of this gate process declaration."
+    },
+    "eventType": {
+      "type": "string",
+      "description": "Which RelationalImpactEvent variant this gate handles (kebab-case).",
+      "enum": [
+        "content-publish",
+        "attestation-write",
+        "economic-event-emit",
+        "peer-message",
+        "sync-to-peers",
+        "advice-sought",
+        "capability-invoke",
+        "private-to-public-crossing"
+      ]
+    },
+    "inputSchemaRef": {
+      "type": "string",
+      "description": "CID or $ref to a JSON schema describing the gate's input GateContext shape."
+    },
+    "outputSchemaRef": {
+      "type": "string",
+      "description": "CID or $ref to a JSON schema describing the gate's output decision + side-effect shape."
+    },
+    "supersedes": {
+      "type": ["string", "null"],
+      "description": "CID of a superseded gate-process-declaration, or null."
+    },
+    "dag": {
+      "$ref": "#/$defs/ProcessDag",
+      "description": "The step graph this gate executes."
+    }
+  },
+  "$defs": {
+    "ProcessDag": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["entrypoint", "steps", "terminals"],
+      "properties": {
+        "entrypoint": {
+          "type": "string",
+          "description": "Step id where execution begins."
+        },
+        "steps": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/StepNode" },
+          "description": "Map of step-id to step definition. Keys are stable references used by edges."
+        },
+        "terminals": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/TerminalNode" },
+          "description": "Map of terminal-id to terminal node. Terminals emit a decision and optional side effects."
+        }
+      }
+    },
+    "StepNode": {
+      "type": "object",
+      "required": ["type", "params"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "context-assemble",
+            "wisdom-invoke",
+            "mechanical-ruleset",
+            "aggregate-attestations",
+            "skill-invoke",
+            "synthesize",
+            "escalate-to-review"
+          ],
+          "description": "One of the seven v1 protocol-governed step types (spec §2.1)."
+        },
+        "params": {
+          "type": "object",
+          "description": "Step-type-specific parameters. Shape depends on type. CID references may point to gate-rules-declaration, aggregation-spec, or escalation-target-spec ContentNodes."
+        },
+        "next": {
+          "type": "string",
+          "description": "Unconditional next step or terminal id."
+        },
+        "edges": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/ConditionalEdge" },
+          "description": "Conditional edges evaluated against GateContext. First matching edge wins."
+        }
+      }
+    },
+    "ConditionalEdge": {
+      "type": "object",
+      "required": ["when", "target"],
+      "additionalProperties": false,
+      "properties": {
+        "when": {
+          "type": "string",
+          "description": "Simple comparison expression over GateContext keys (e.g., 'ruleDecision == null'). Intentionally non-Turing-complete for static reachability analysis."
+        },
+        "target": {
+          "type": "string",
+          "description": "Target step id or terminal id."
+        }
+      }
+    },
+    "TerminalNode": {
+      "type": "object",
+      "required": ["decision"],
+      "additionalProperties": false,
+      "properties": {
+        "decision": {
+          "type": "object",
+          "description": "Decision shape emitted at this terminal (status + verdict/grounds as applicable)."
+        },
+        "sideEffects": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/SideEffectSpec" },
+          "description": "Side effects the caller must execute. The gate does NOT execute them itself."
+        }
+      }
+    },
+    "SideEffectSpec": {
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "MintAttestation",
+            "EmitEconomicEvent",
+            "OpenStewardReview",
+            "UpdateReachAggregation"
+          ],
+          "description": "Side effect kind."
+        },
+        "shape": {
+          "type": "string",
+          "description": "For MintAttestation: attestation shape name (e.g., StoryPointLink)."
+        },
+        "paramsFromKeys": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "GateContext keys whose values populate the side effect's parameters."
+        }
+      }
+    }
+  }
+}
