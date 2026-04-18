@@ -13,7 +13,7 @@
 > - **The "rule 3 vs rule 2 overlap" nuance** — a `@validates-failure-mode` scenario that had a prior-passed attestation is correctly classified by rule 2 as discovery/regression, not rule 3 as validation. This is a deliberate ordering that the Rust port must preserve.
 > - **The seven new valences** (`progress` / `discovery` / `regression` / `validation` / `witness` / `refinement` / `confirmation`) and seven `evidenceType` values are also in the spec and will flow into the manifest-declared gate config.
 >
-> **Next step:** author a new protocol-core spec for the elohim-agent gate-interface primitive + manifest declaration field, THEN re-plan the Rust implementation on top of it. The experience-story discernment-gate becomes this primitive's first concrete implementation. Prompt for kicking off that spec session is in the repo's session log.
+> **Next step (landed 2026-04-18):** the protocol-core spec is now authored at `elohim/elohim-agent/spec/2026-04-18-gate-interface.md`, with theory companion at `elohim/elohim-agent/research/2026-04-18-gate-theory.md` and implementation plan at `genesis/plans/2026-04-18-elohim-agent-gate-interface-plan.md`. The experience-story discernment-gate is scheduled as **Phase 3** of that plan (`discernment-gate-v1-mechanical`), shipping as the first concrete Gate implementation. All seven rules + steady-state from the reverted TS work port directly to a Rust `mechanical-ruleset` step executor against a CID-addressed rules artifact. This plan is fully superseded; do not execute.
 
 ---
 
