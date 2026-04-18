@@ -41,5 +41,18 @@ export function discernMechanical(
     return mkTag(input, momentEntryHash, 'progress', 'meaningful', 'first-pass-green');
   }
 
+  // Rule 2 — failed after prior-passed → discovery (novel) or regression (known)
+  if (moment.status === 'failed' && priors.latestAny?.status === 'passed') {
+    const isNovel =
+      !moment.errorClass || !priors.knownErrorClasses.has(moment.errorClass);
+    return mkTag(
+      input,
+      momentEntryHash,
+      isNovel ? 'discovery' : 'regression',
+      'meaningful',
+      isNovel ? 'novel-failure-class' : 'known-cause-recurrence',
+    );
+  }
+
   return null;
 }
