@@ -40,7 +40,8 @@ function state(world: E2EWorld): SeederState {
   if (!w[SEEDER_STATE]) {
     const s: SeederState = {};
     w[SEEDER_STATE] = s;
-    world.onCleanup(() => {
+    // eslint-disable-next-line @typescript-eslint/require-await -- onCleanup expects Promise<void>
+    world.onCleanup(async () => {
       if (s.tmpDir) {
         try {
           rmSync(s.tmpDir, { recursive: true, force: true });
