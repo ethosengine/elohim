@@ -3,4 +3,4 @@
 /**
  * Result of an account package import
  */
-export type AccountImportResultView = { humanId: string, contentUpdated: number, relationshipsCreated: number, stewardshipCreated: number, collectivesJoined: number, errors: Array<string>, };
+export type AccountImportResultView = { humanId: string, contentUpdated: number, relationshipsCreated: number, relationshipsSkipped: number, stewardshipCreated: number, collectivesJoined: number, errors: Array<string>, };
