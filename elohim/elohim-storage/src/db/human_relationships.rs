@@ -546,3 +546,201 @@ pub fn stats_by_intimacy(
         .load(conn)
         .map_err(|e| StorageError::Internal(format!("Stats query failed: {}", e)))
 }
+
+// ============================================================================
+// Idempotency Helpers
+// ============================================================================
+
+/// Look up an existing relationship between two parties, with optional
+/// direction-insensitivity. Used by account import to converge when both
+/// parties independently author the same symmetric social edge (Adam + Eve
+/// both declaring a spouse relationship).
+///
+/// - `is_bidirectional = false`: checks (party_a, party_b, type) only.
+/// - `is_bidirectional = true`: checks (party_a, party_b, type) OR (party_b, party_a, type).
+pub fn find_existing_relationship(
+    conn: &mut SqliteConnection,
+    ctx: &AppContext,
+    party_a: &str,
+    party_b: &str,
+    relationship_type: &str,
+    is_bidirectional: bool,
+) -> Result<Option<HumanRelationship>, StorageError> {
+    let mut query = human_relationships::table
+        .filter(human_relationships::h_app_id.eq(&ctx.h_app_id))
+        .filter(human_relationships::relationship_type.eq(relationship_type))
+        .into_boxed();
+
+    if is_bidirectional {
+        query = query.filter(
+            (human_relationships::party_a_id
+                .eq(party_a)
+                .and(human_relationships::party_b_id.eq(party_b)))
+            .or(human_relationships::party_a_id
+                .eq(party_b)
+                .and(human_relationships::party_b_id.eq(party_a))),
+        );
+    } else {
+        query = query
+            .filter(human_relationships::party_a_id.eq(party_a))
+            .filter(human_relationships::party_b_id.eq(party_b));
+    }
+
+    query
+        .first::<HumanRelationship>(conn)
+        .optional()
+        .map_err(|e| StorageError::Internal(format!("Query failed: {}", e)))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use diesel::connection::SimpleConnection;
+
+    fn setup_test_db() -> SqliteConnection {
+        let mut conn = SqliteConnection::establish(":memory:")
+            .expect("Failed to create in-memory database");
+
+        conn.batch_execute(
+            r#"
+            CREATE TABLE human_relationships (
+                id TEXT PRIMARY KEY,
+                h_app_id TEXT NOT NULL,
+                party_a_id TEXT NOT NULL,
+                party_b_id TEXT NOT NULL,
+                relationship_type TEXT NOT NULL,
+                intimacy_level TEXT NOT NULL,
+                is_bidirectional INTEGER NOT NULL DEFAULT 0,
+                consent_given_by_a INTEGER NOT NULL DEFAULT 0,
+                consent_given_by_b INTEGER NOT NULL DEFAULT 0,
+                custody_enabled_by_a INTEGER NOT NULL DEFAULT 0,
+                custody_enabled_by_b INTEGER NOT NULL DEFAULT 0,
+                auto_custody_enabled INTEGER NOT NULL DEFAULT 0,
+                emergency_access_enabled INTEGER NOT NULL DEFAULT 0,
+                initiated_by TEXT NOT NULL,
+                verified_at TEXT,
+                governance_layer TEXT,
+                reach TEXT NOT NULL DEFAULT 'private',
+                context_json TEXT,
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+                expires_at TEXT,
+                dht_anchor_hash TEXT,
+                UNIQUE (h_app_id, party_a_id, party_b_id, relationship_type)
+            );
+            "#,
+        )
+        .expect("Failed to create test table");
+
+        conn
+    }
+
+    fn test_ctx() -> AppContext {
+        AppContext::new("test-app")
+    }
+
+    fn insert_relationship(
+        conn: &mut SqliteConnection,
+        ctx: &AppContext,
+        party_a: &str,
+        party_b: &str,
+        rel_type: &str,
+    ) {
+        create_human_relationship(
+            conn,
+            ctx,
+            CreateHumanRelationshipInput {
+                id: None,
+                party_a_id: party_a.to_string(),
+                party_b_id: party_b.to_string(),
+                relationship_type: rel_type.to_string(),
+                intimacy_level: "recognition".to_string(),
+                is_bidirectional: false,
+                consent_given_by_a: false,
+                consent_given_by_b: false,
+                initiated_by: party_a.to_string(),
+                governance_layer: None,
+                reach: "private".to_string(),
+                context_json: None,
+                expires_at: None,
+            },
+        )
+        .expect("test insert failed");
+    }
+
+    #[test]
+    fn finds_directional_match() {
+        let mut conn = setup_test_db();
+        let ctx = test_ctx();
+        insert_relationship(&mut conn, &ctx, "adam", "eve", "spouse");
+
+        let found = find_existing_relationship(&mut conn, &ctx, "adam", "eve", "spouse", false)
+            .expect("query should not error");
+        assert!(found.is_some(), "directional lookup should find the row");
+        let rel = found.unwrap();
+        assert_eq!(rel.party_a_id, "adam");
+        assert_eq!(rel.party_b_id, "eve");
+        assert_eq!(rel.relationship_type, "spouse");
+    }
+
+    #[test]
+    fn directional_lookup_ignores_reverse() {
+        let mut conn = setup_test_db();
+        let ctx = test_ctx();
+        insert_relationship(&mut conn, &ctx, "adam", "eve", "spouse");
+
+        let found = find_existing_relationship(&mut conn, &ctx, "eve", "adam", "spouse", false)
+            .expect("query should not error");
+        assert!(
+            found.is_none(),
+            "directional lookup of (eve, adam) must not find (adam, eve)"
+        );
+    }
+
+    #[test]
+    fn bidirectional_lookup_matches_reverse() {
+        let mut conn = setup_test_db();
+        let ctx = test_ctx();
+        insert_relationship(&mut conn, &ctx, "adam", "eve", "spouse");
+
+        let found = find_existing_relationship(&mut conn, &ctx, "eve", "adam", "spouse", true)
+            .expect("query should not error");
+        assert!(
+            found.is_some(),
+            "bidirectional lookup of (eve, adam) should find (adam, eve)"
+        );
+        let rel = found.unwrap();
+        assert_eq!(rel.party_a_id, "adam");
+        assert_eq!(rel.party_b_id, "eve");
+    }
+
+    #[test]
+    fn different_relationship_type_does_not_match() {
+        let mut conn = setup_test_db();
+        let ctx = test_ctx();
+        insert_relationship(&mut conn, &ctx, "adam", "eve", "spouse");
+
+        let found = find_existing_relationship(&mut conn, &ctx, "adam", "eve", "sibling", true)
+            .expect("query should not error");
+        assert!(
+            found.is_none(),
+            "lookup for 'sibling' must not find a 'spouse' row"
+        );
+    }
+
+    #[test]
+    fn different_app_does_not_match() {
+        let mut conn = setup_test_db();
+        let ctx = test_ctx();
+        insert_relationship(&mut conn, &ctx, "adam", "eve", "spouse");
+
+        let other_ctx = AppContext::new("other-app");
+        let found =
+            find_existing_relationship(&mut conn, &other_ctx, "adam", "eve", "spouse", true)
+                .expect("query should not error");
+        assert!(
+            found.is_none(),
+            "lookup in 'other-app' must not find rows from 'test-app'"
+        );
+    }
+}
