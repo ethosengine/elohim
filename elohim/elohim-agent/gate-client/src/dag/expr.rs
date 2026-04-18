@@ -336,6 +336,17 @@ impl<'t> Parser<'t> {
             }
         }
 
+        // Per spec §2.3 the language is non-Turing-complete and must hard-fail
+        // on unsupported constructs. Only `key` (1 segment) and `key.field`
+        // (2 segments) are supported. Reject deeper paths at parse time rather
+        // than silently evaluating them as null.
+        if segments.len() > 2 {
+            let path_str = segments.join(".");
+            return Err(GateError::DagExecution(format!(
+                "expression path has too many segments (max 2): '{path_str}'"
+            )));
+        }
+
         Ok(Path(segments))
     }
 
@@ -507,6 +518,37 @@ mod tests {
     fn parse_escaped_double_quote_inside_string() {
         let expr = parse_expr(r#"x == "he\"llo""#).unwrap();
         assert_eq!(expr, Expr::Eq(Path(vec!["x".into()]), Literal::Str(r#"he"llo"#.into())));
+    }
+
+    // ─── Parser: path depth enforcement ──────────────────────────────────────
+
+    #[test]
+    fn path_with_three_segments_errors() {
+        let result = parse_expr("a.b.c == 'foo'");
+        assert!(result.is_err(), "3-segment path should be rejected at parse time");
+        let msg = result.unwrap_err().to_string();
+        assert!(
+            msg.contains("too many segments") && msg.contains("a.b.c"),
+            "error should name the offending path and the segment limit, got: {msg}"
+        );
+    }
+
+    #[test]
+    fn path_with_two_segments_parses() {
+        // spec §2.3 supports exactly key.field (2 segments)
+        let result = parse_expr("decision.kind == 'allow'");
+        assert!(
+            result.is_ok(),
+            "2-segment path must parse successfully, got: {:?}",
+            result
+        );
+        assert_eq!(
+            result.unwrap(),
+            Expr::Eq(
+                Path(vec!["decision".into(), "kind".into()]),
+                Literal::Str("allow".into())
+            )
+        );
     }
 
     // ─── Parser: rejection of unsupported syntax ─────────────────────────────

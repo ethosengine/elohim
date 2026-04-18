@@ -63,6 +63,13 @@ impl GateContext {
     /// the `context_summary_cid` on `GateDecisionAttestation`.
     ///
     /// Implementation: SHA-256 over the canonical JSON (sorted keys).
+    ///
+    // PHASE 4 TODO: canonicalize number representations (e.g., integer-valued floats
+    // → integers) before summary CID stability can be claimed across heterogeneous
+    // executor implementations. Today, Value::Number(1.0) and Value::Number(1)
+    // serialize differently, producing different CIDs for what manifest authors
+    // may consider "the same" value. Not a bug for Task 2.1 — a contract to resolve
+    // before the CID lands in DHT attestations (Phase 4).
     pub fn to_summary_cid(&self) -> String {
         // Build a sorted-key map for deterministic serialization.
         let mut sorted: Vec<(&String, &Value)> = self.0.iter().collect();

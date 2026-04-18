@@ -16,9 +16,13 @@
 //!
 //! ## Cycle detection
 //!
-//! If any step id is visited more than `MAX_STEP_VISITS` times, the interpreter
-//! returns `GateError::DagExecution("cycle detected in DAG")`. A valid DAG has
-//! no cycles; this protects against malformed manifests.
+//! Two guards run in parallel:
+//! - Per-step: if any step id is visited more than `MAX_STEP_VISITS` times,
+//!   the interpreter returns a cycle error.
+//! - Global: if total step executions exceed `MAX_TOTAL_STEPS`, the interpreter
+//!   returns a ceiling error. This guards against pathological manifests with
+//!   many distinct step ids arranged in a long cycle (e.g., 100 ids × 64 visits
+//!   = 6 400 executions before the per-step guard fires).
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -36,6 +40,13 @@ use super::{GateProcessDeclaration, StepType, TerminalNode};
 /// Maximum number of times a single step id may be visited before the
 /// interpreter declares a cycle.
 const MAX_STEP_VISITS: usize = 64;
+
+/// Hard ceiling on total step executions across all ids.
+///
+/// Guards against pathological manifests with many distinct ids arranged in a
+/// long cycle: e.g., 100 ids × 64 visits each = 6 400 executions before the
+/// per-id guard fires. Both caps must pass independently.
+const MAX_TOTAL_STEPS: usize = 256;
 
 pub struct DagInterpreter {
     executors: HashMap<StepKind, ArcExecutor>,
@@ -75,11 +86,21 @@ impl DagInterpreter {
         let mut ctx = initial_context;
         let mut current_id = dag.entrypoint.clone();
 
-        // Visit counter for cycle detection.
+        // Visit counters for cycle detection.
         let mut visit_counts: HashMap<String, usize> = HashMap::new();
+        let mut total_visits: usize = 0;
 
         loop {
             // ── Cycle detection ──────────────────────────────────────────────
+            // Global cap: fires first against pathological many-id long cycles.
+            total_visits += 1;
+            if total_visits > MAX_TOTAL_STEPS {
+                return Err(GateError::DagExecution(format!(
+                    "DAG exceeded {MAX_TOTAL_STEPS} total step executions at step '{current_id}' \
+                     — cycle or pathological manifest"
+                )));
+            }
+            // Per-id cap: fires against tight self-loops or small-cycle repeats.
             let visits = visit_counts.entry(current_id.clone()).or_insert(0);
             *visits += 1;
             if *visits > MAX_STEP_VISITS {
@@ -90,7 +111,7 @@ impl DagInterpreter {
 
             // ── Terminal check ───────────────────────────────────────────────
             if let Some(terminal) = dag.terminals.get(&current_id) {
-                return terminal_to_decision(terminal, &ctx);
+                return terminal_to_decision(&current_id, terminal, &ctx);
             }
 
             // ── Step lookup ──────────────────────────────────────────────────
@@ -154,11 +175,13 @@ impl DagInterpreter {
 /// The terminal's `decision` field must be a JSON object with a `status` tag
 /// that deserializes into [`GateStatus`]. If it doesn't parse, that is a DAG
 /// authoring error and we return `DagExecution`.
-fn terminal_to_decision(terminal: &TerminalNode, _ctx: &GateContext) -> Result<GateDecision, GateError> {
+///
+/// `terminal_id` is threaded through for diagnostic error messages.
+fn terminal_to_decision(terminal_id: &str, terminal: &TerminalNode, _ctx: &GateContext) -> Result<GateDecision, GateError> {
     let status: GateStatus = serde_json::from_value(terminal.decision.clone())
         .map_err(|e| {
             GateError::DagExecution(format!(
-                "terminal node 'decision' did not deserialize into GateStatus: {e}"
+                "terminal node '{terminal_id}' 'decision' field did not deserialize into GateStatus: {e}"
             ))
         })?;
 
@@ -571,6 +594,109 @@ mod tests {
             msg.contains("cycle"),
             "error message should mention cycle, got: {msg}"
         );
+    }
+
+    // ─── Global step-count cap ────────────────────────────────────────────────
+
+    #[tokio::test]
+    async fn global_step_cap_fires_on_long_cycle() {
+        // Construct a DAG with 20 distinct step ids arranged in a ring cycle:
+        //   step-0 → step-1 → ... → step-19 → step-0
+        //
+        // The per-id cap is MAX_STEP_VISITS = 64, so each id would need to be
+        // visited 65 times before it fires: 20 × 64 = 1 280 executions minimum.
+        // The global cap MAX_TOTAL_STEPS = 256 must fire first.
+        const RING_SIZE: usize = 20;
+        let mut steps = HashMap::new();
+        for i in 0..RING_SIZE {
+            let next_id = format!("step-{}", (i + 1) % RING_SIZE);
+            steps.insert(
+                format!("step-{i}"),
+                StepNode {
+                    step: StepType::ContextAssemble {
+                        params: ContextAssembleParams { pulls: vec![] },
+                    },
+                    next: Some(next_id),
+                    edges: vec![],
+                },
+            );
+        }
+        let terminals = HashMap::new();
+
+        let dag = GateProcessDeclaration {
+            name: "long-cycle".into(),
+            version: "1".into(),
+            event_type: "content-publish".into(),
+            input_schema: json!({}),
+            output_schema: json!({}),
+            dag: GateProcessDag { entrypoint: "step-0".to_string(), steps, terminals },
+        };
+
+        let interp = build_interpreter_with_continue();
+        let err = interp
+            .run(&dag, &content_publish_event(), GateContext::new())
+            .await
+            .unwrap_err();
+
+        assert!(
+            matches!(err, GateError::DagExecution(_)),
+            "expected DagExecution error from global cap"
+        );
+        let msg = err.to_string();
+        // Must mention the total-steps ceiling, not the per-id cycle.
+        assert!(
+            msg.contains("256") || msg.contains("total"),
+            "global cap error should mention total-step ceiling, got: {msg}"
+        );
+        // Crucially, must NOT be the per-id cycle message (which would only fire
+        // after 64 visits to a single id = step-0 visited 65 times).
+        assert!(
+            !msg.contains("64 times"),
+            "global cap should have fired before per-id cap, got: {msg}"
+        );
+    }
+
+    #[tokio::test]
+    async fn normal_linear_dag_does_not_trip_global_cap() {
+        // 10 linear steps → terminal.  Well within MAX_TOTAL_STEPS = 256.
+        const STEP_COUNT: usize = 10;
+        let mut steps = HashMap::new();
+        for i in 0..STEP_COUNT {
+            let next: Option<String> = if i + 1 < STEP_COUNT {
+                Some(format!("step-{}", i + 1))
+            } else {
+                Some("allow-terminal".to_string())
+            };
+            steps.insert(
+                format!("step-{i}"),
+                StepNode {
+                    step: StepType::ContextAssemble {
+                        params: ContextAssembleParams { pulls: vec![] },
+                    },
+                    next,
+                    edges: vec![],
+                },
+            );
+        }
+        let mut terminals = HashMap::new();
+        terminals.insert("allow-terminal".to_string(), allow_terminal());
+
+        let dag = GateProcessDeclaration {
+            name: "linear".into(),
+            version: "1".into(),
+            event_type: "content-publish".into(),
+            input_schema: json!({}),
+            output_schema: json!({}),
+            dag: GateProcessDag { entrypoint: "step-0".to_string(), steps, terminals },
+        };
+
+        let interp = build_interpreter_with_continue();
+        let decision = interp
+            .run(&dag, &content_publish_event(), GateContext::new())
+            .await
+            .expect("10-step linear DAG must complete without hitting any cap");
+
+        assert!(decision.is_allowed(), "linear DAG should reach allow-terminal");
     }
 
     // ─── Multi-terminal DAG ───────────────────────────────────────────────────
