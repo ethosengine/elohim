@@ -23,15 +23,48 @@
 use super::GateProcessDeclaration;
 
 // ─── Constitutional pointer ───────────────────────────────────────────────────
+//
+// External consumers should call `active_universal_band_pointer()` rather than
+// reading these constants directly.  The function is the stable API; the
+// constants are an internal implementation detail that Phase 3+ will supersede
+// with a DHT-backed lookup.
 
 /// The name of the currently active universal band declaration.
 ///
-/// Phase 2: compile-time constant.
-/// Phase 3+: replace with DHT lookup against the community-ratified pointer.
+/// Internal use and tests only.  External callers: use
+/// [`active_universal_band_pointer()`] instead.
 pub const ACTIVE_UNIVERSAL_BAND_NAME: &str = "universal-band-v1";
 
 /// The version of the currently active universal band declaration.
+///
+/// Internal use and tests only.  External callers: use
+/// [`active_universal_band_pointer()`] instead.
 pub const ACTIVE_UNIVERSAL_BAND_VERSION: &str = "1.0.0";
+
+// ─── Typed pointer ────────────────────────────────────────────────────────────
+
+/// A reference to the active universal-band declaration at a moment in time.
+///
+/// Phase 2: always resolves to the embedded default (compile-time).
+/// Phase 3+: will resolve via DHT lookup against a well-known constitutional
+/// pointer, with graceful fallback to the embedded default on lookup failure.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UniversalBandPointer {
+    pub name: String,
+    pub version: String,
+    // Phase 3+: add resolution_source: PointerSource enum
+}
+
+/// Return the currently-active universal-band pointer.
+///
+/// Phase 2: returns the embedded default. Phase 3+: will query DHT, falling
+/// back to the embedded default on any resolution failure.
+pub fn active_universal_band_pointer() -> UniversalBandPointer {
+    UniversalBandPointer {
+        name: ACTIVE_UNIVERSAL_BAND_NAME.to_string(),
+        version: ACTIVE_UNIVERSAL_BAND_VERSION.to_string(),
+    }
+}
 
 // ─── Embedded YAML ───────────────────────────────────────────────────────────
 
@@ -265,6 +298,25 @@ mod tests {
             "escalate-to-review",
             "escalate edge must target escalate-to-review"
         );
+    }
+
+    #[test]
+    fn active_universal_band_pointer_returns_expected_name_and_version() {
+        let ptr = active_universal_band_pointer();
+        assert_eq!(ptr.name, "universal-band-v1");
+        assert_eq!(ptr.version, "1.0.0");
+    }
+
+    #[test]
+    fn wisdom_primary_need_deeper_edge_targets_record_decision() {
+        let decl = default_universal_band_declaration();
+        let wisdom_primary = decl.dag.steps.get("wisdom-primary").unwrap();
+        let need_deeper_edge = wisdom_primary
+            .edges
+            .iter()
+            .find(|e| e.when.contains("need-deeper"))
+            .expect("wisdom-primary must have a need-deeper edge");
+        assert_eq!(need_deeper_edge.target, "record-decision");
     }
 
     #[test]

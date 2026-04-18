@@ -115,7 +115,7 @@ dag:
     # ── Terminal steps (executors return StepOutcome::Terminate) ──────────────
 
     # record-decision: emits Allow with full wisdom reasoning attached.
-    # Uses allow-with-wisdom decision_builder (reads wisdomOutput key from ctx).
+    # Uses allow-with-wisdom decision_builder (reads wisdom_output key from ctx).
     record-decision:
       type: "synthesize"
       params:

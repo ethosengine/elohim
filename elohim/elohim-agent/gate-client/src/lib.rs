@@ -214,8 +214,8 @@ pub use dag::executors::{
     ContextAssembleExecutor, EscalateToReviewExecutor, SynthesizeExecutor, WisdomInvokeExecutor,
 };
 pub use dag::universal_band::{
-    default_universal_band_declaration, default_universal_band_yaml, ACTIVE_UNIVERSAL_BAND_NAME,
-    ACTIVE_UNIVERSAL_BAND_VERSION,
+    active_universal_band_pointer, default_universal_band_declaration, default_universal_band_yaml,
+    UniversalBandPointer, ACTIVE_UNIVERSAL_BAND_NAME, ACTIVE_UNIVERSAL_BAND_VERSION,
 };
 pub use error::{GateError, GateResult};
 pub use events::RelationalImpactEvent;

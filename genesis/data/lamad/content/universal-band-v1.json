@@ -13,16 +13,76 @@
     "protocol-core"
   ],
   "metadata": {
-    "declarationType": "universal-band-declaration",
-    "eventType": "*",
-    "bandVersion": "1.0.0",
-    "constitutionalPointer": true,
-    "phase": "2",
-    "phaseNote": "Phase 2: wisdom-invoke is mocked (DevContext). Phase 3+: DHT lookup replaces compile-time constant in gate-client.",
-    "sourceFile": "elohim-agent/gate-client/src/dag/universal_band_v1.yaml",
-    "steps": ["authorize", "assemble-context", "wisdom-primary", "record-decision", "record-decline", "escalate-to-review"],
-    "entrypoint": "authorize",
-    "terminals": []
+    "version": "1.0.0",
+    "activatedAt": "2026-04-18T00:00:00.000Z",
+    "supersedes": null,
+    "governanceReach": "protocol",
+    "ratificationAttestationCids": [],
+    "dag": {
+      "entrypoint": "authorize",
+      "steps": {
+        "authorize": {
+          "type": "context-assemble",
+          "params": {
+            "pulls": [
+              { "from": "source-chain", "query": "agent.identity", "output_key": "agent_identity" },
+              { "from": "manifest", "query": "gate.event_kind", "output_key": "event_kind" }
+            ]
+          },
+          "next": "assemble-context"
+        },
+        "assemble-context": {
+          "type": "context-assemble",
+          "params": {
+            "pulls": [
+              { "from": "manifest", "query": "space.type", "output_key": "space_type" },
+              { "from": "manifest", "query": "gate.event_kind", "output_key": "event_kind_ctx" },
+              { "from": "source-chain", "query": "agent.trust_level", "output_key": "agent_trust" }
+            ]
+          },
+          "next": "wisdom-primary"
+        },
+        "wisdom-primary": {
+          "type": "wisdom-invoke",
+          "params": {
+            "constitution_cid": "epr:constitution-v1",
+            "framing_cid": "epr:universal-band-framing-v1",
+            "context_keys": ["agent_identity", "event_kind", "space_type", "agent_trust"],
+            "output_key": "wisdom_output"
+          },
+          "edges": [
+            { "when": "wisdom_output.decision == 'allow'", "target": "record-decision" },
+            { "when": "wisdom_output.decision == 'decline'", "target": "record-decline" },
+            { "when": "wisdom_output.decision == 'escalate'", "target": "escalate-to-review" },
+            { "when": "wisdom_output.decision == 'need-deeper'", "target": "record-decision" }
+          ]
+        },
+        "record-decision": {
+          "type": "synthesize",
+          "params": {
+            "input_keys": ["wisdom_output", "agent_identity", "event_kind"],
+            "decision_builder": "allow-with-wisdom",
+            "side_effects": []
+          }
+        },
+        "record-decline": {
+          "type": "synthesize",
+          "params": {
+            "input_keys": ["wisdom_output", "agent_identity", "event_kind"],
+            "decision_builder": "decline-from-wisdom",
+            "side_effects": []
+          }
+        },
+        "escalate-to-review": {
+          "type": "escalate-to-review",
+          "params": {
+            "target_spec_cid": "epr:escalation-target-app-steward-v1",
+            "severity": "medium"
+          }
+        }
+      },
+      "terminals": {}
+    }
   },
   "createdAt": "2026-04-18T00:00:00.000Z",
   "updatedAt": "2026-04-18T00:00:00.000Z",
