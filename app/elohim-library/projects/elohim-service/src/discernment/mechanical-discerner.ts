@@ -66,5 +66,20 @@ export function discernMechanical(
     return mkTag(input, momentEntryHash, 'progress', 'meaningful', 'recovery');
   }
 
+  // Rule 5 — witness (same status, DIFFERENT fingerprint)
+  if (
+    priors.latestAny &&
+    priors.latestAny.status === moment.status &&
+    priors.latestAny.computeFingerprint !== moment.computeFingerprint
+  ) {
+    return mkTag(
+      input,
+      momentEntryHash,
+      'witness',
+      'meaningful',
+      'cross-fingerprint-attestation',
+    );
+  }
+
   return null;
 }
