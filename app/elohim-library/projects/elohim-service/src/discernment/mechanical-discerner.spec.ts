@@ -335,3 +335,23 @@ describe('discernMechanical — rule 1 (first-pass-green)', () => {
     });
   });
 });
+
+describe('discernMechanical — non-terminal statuses', () => {
+  it('returns null for a skipped scenario', () => {
+    const moment = momentFixture({ status: 'skipped' });
+    const tag = discernMechanical(
+      { moment, priors: { knownErrorClasses: new Set<string>() } },
+      'uhCEk',
+    );
+    expect(tag).toBeNull();
+  });
+
+  it('returns null for a pending scenario', () => {
+    const moment = momentFixture({ status: 'pending' });
+    const tag = discernMechanical(
+      { moment, priors: { knownErrorClasses: new Set<string>() } },
+      'uhCEk',
+    );
+    expect(tag).toBeNull();
+  });
+});
