@@ -6,8 +6,10 @@
 //! - [`SynthesizeExecutor`] — composes prior step outputs into a final GateDecision.
 //! - [`EscalateToReviewExecutor`] — routes to steward/qahal/existential review.
 //!
-//! Phase 3+ will add `MechanicalRulesetExecutor`, `AggregateAttestationsExecutor`,
-//! and `SkillInvokeExecutor`.
+//! Phase 3 adds:
+//! - [`MechanicalRulesetExecutor`] — applies a CID-addressed declarative rule set.
+//!
+//! Phase 5+ will add `AggregateAttestationsExecutor` and `SkillInvokeExecutor`.
 //!
 //! ## Side-effect conversion
 //!
@@ -18,6 +20,7 @@
 
 pub mod context_assemble;
 pub mod escalate_to_review;
+pub mod mechanical_ruleset;
 /// Phase 3+ pull resolver stubs — return `Value::Null` with a warn log until
 /// real elohim-storage, DHT, source-chain, and manifest wiring lands.
 pub mod phase3_stubs;
@@ -26,6 +29,9 @@ pub mod wisdom_invoke;
 
 pub use context_assemble::ContextAssembleExecutor;
 pub use escalate_to_review::EscalateToReviewExecutor;
+pub use mechanical_ruleset::{
+    ContentNodeResolver, EmbeddedContentNodeResolver, MechanicalRulesetExecutor,
+};
 pub use synthesize::SynthesizeExecutor;
 pub use wisdom_invoke::WisdomInvokeExecutor;
 

@@ -2,7 +2,7 @@
 //!
 //! This module owns the singleton that `check()` delegates to.  It:
 //!
-//! 1. Constructs a [`DagInterpreter`] with all four Phase 2 executors registered.
+//! 1. Constructs a [`DagInterpreter`] with all five Phase 2+3 executors registered.
 //! 2. Parses the embedded universal-band v1 declaration once at startup.
 //! 3. Exposes a `run()` method that accepts a [`RelationalImpactEvent`] plus a
 //!    pre-populated initial [`GateContext`] and drives the DAG to completion.
@@ -14,6 +14,27 @@
 //! the hot path.  Because `DagInterpreter` and all registered executors are
 //! stateless once constructed, `DagRunner` is `Send + Sync`.
 //!
+//! # ContentNodeResolver injection (Phase 3 widening)
+//!
+//! The `MechanicalRulesetExecutor` needs a [`ContentNodeResolver`] to fetch
+//! `gate-rules-declaration` bodies by CID.  Two construction paths exist:
+//!
+//! - **`DagRunner::new()`** — the default used by `global_runner()`.  Injects
+//!   an empty [`EmbeddedContentNodeResolver`] which will return
+//!   `GateError::DagExecution` if a `mechanical-ruleset` step is actually
+//!   reached.  Sufficient for the universal-band DAG (which has no such steps).
+//!
+//! - **`DagRunner::with_content_resolver(resolver)`** — builds a runner with
+//!   a caller-supplied resolver.  Use this for:
+//!   - App-domain gates (discernment-gate etc.) that include `mechanical-ruleset`
+//!     steps with real CIDs.
+//!   - Unit tests against hand-constructed rule artifacts.
+//!
+//! For process-wide configuration before the singleton is initialized, call
+//! [`configure_runner`] **before the first [`global_runner()`] call**. If the
+//! singleton is already initialized when `configure_runner` is called, the call
+//! is a no-op (the singleton is immutable once set).
+//!
 //! # ContextAssemble resolvers
 //!
 //! The universal-band DAG's `authorize` and `assemble-context` steps pull from
@@ -23,6 +44,7 @@
 //! intentional: the wisdom step receives null context values but still produces
 //! its mock Allow, and the DAG completes successfully.
 
+use std::collections::HashMap;
 use std::sync::{Arc, OnceLock};
 
 use serde_json::json;
@@ -30,7 +52,8 @@ use tracing::{info_span, Instrument};
 
 use crate::dag::executor::StepKind;
 use crate::dag::executors::{
-    ContextAssembleExecutor, EscalateToReviewExecutor, SynthesizeExecutor, WisdomInvokeExecutor,
+    ContentNodeResolver, ContextAssembleExecutor, EmbeddedContentNodeResolver,
+    EscalateToReviewExecutor, MechanicalRulesetExecutor, SynthesizeExecutor, WisdomInvokeExecutor,
 };
 use crate::dag::{
     context::GateContext, interpreter::DagInterpreter,
@@ -55,18 +78,41 @@ pub struct DagRunner {
 // - DagInterpreter holds HashMap<StepKind, Arc<dyn StepExecutor>>, where
 //   `StepExecutor: Send + Sync` is declared at src/dag/executor.rs.
 // - GateProcessDeclaration is plain-data Serialize/Deserialize.
-// The prior `unsafe impl Send/Sync` was redundant — the auto-impls already
-// apply. Keeping unsafe here would be a code smell (misleading reviewers into
-// thinking compile-time verification is bypassed, and risking real unsoundness
-// if a future maintainer adds a !Send/!Sync field without realizing the unsafe
-// impl was papering over it).
 
 impl DagRunner {
-    /// Construct a runner with all four Phase 2 executors registered.
+    /// Construct a runner with all Phase 2+3 executors registered.
+    ///
+    /// `MechanicalRulesetExecutor` is injected with an empty
+    /// [`EmbeddedContentNodeResolver`] — if a `mechanical-ruleset` step is
+    /// reached with a real CID, it will return `GateError::DagExecution`.
+    /// Sufficient for the universal-band DAG (no mechanical-ruleset steps).
     fn new() -> Self {
+        Self::with_content_resolver(Box::new(EmbeddedContentNodeResolver::new(HashMap::new())))
+    }
+
+    /// Construct a runner with a caller-supplied [`ContentNodeResolver`].
+    ///
+    /// Use this when the DAG being run includes `mechanical-ruleset` steps
+    /// that need to resolve real CIDs (e.g., for app-domain gates or unit
+    /// tests against hand-constructed rule artifacts).
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// use gate_client::dag_runner::DagRunner;
+    /// use gate_client::dag::executors::EmbeddedContentNodeResolver;
+    /// use serde_json::json;
+    ///
+    /// let resolver = EmbeddedContentNodeResolver::single(
+    ///     "bafkrei-seven-valence",
+    ///     json!({ /* rules artifact body */ }),
+    /// );
+    /// let runner = DagRunner::with_content_resolver(Box::new(resolver));
+    /// ```
+    pub fn with_content_resolver(resolver: Box<dyn ContentNodeResolver>) -> Self {
         let mut interpreter = DagInterpreter::new();
 
-        // ContextAssembleExecutor — no pre-registered resolvers.
+        // ContextAssembleExecutor — no pre-registered pull resolvers.
         // Phase 3+ stubs handle elohim-storage / dht / source-chain / manifest
         // sources by returning Value::Null (with tracing::warn).
         interpreter.register(
@@ -76,6 +122,11 @@ impl DagRunner {
         interpreter.register(
             StepKind::WisdomInvoke,
             Arc::new(WisdomInvokeExecutor::new()),
+        );
+        // Phase 3: MechanicalRulesetExecutor with injected ContentNodeResolver.
+        interpreter.register(
+            StepKind::MechanicalRuleset,
+            Arc::new(MechanicalRulesetExecutor::new(resolver)),
         );
         interpreter.register(StepKind::Synthesize, Arc::new(SynthesizeExecutor::new()));
         interpreter.register(
@@ -111,10 +162,38 @@ impl DagRunner {
 
 static RUNNER: OnceLock<Arc<DagRunner>> = OnceLock::new();
 
+/// Pre-configure the global singleton with a custom [`ContentNodeResolver`]
+/// before first use.
+///
+/// **Must be called before the first [`global_runner()`] call** to take effect.
+/// If the singleton is already initialized, this is a no-op (the `OnceLock`
+/// has already fired).
+///
+/// # Typical use
+///
+/// Call during process initialization (e.g., in `main()` or service startup)
+/// to inject the production DHT-backed resolver before any gate checks run.
+///
+/// ```rust,ignore
+/// use gate_client::dag_runner::configure_runner;
+/// use gate_client::dag::executors::EmbeddedContentNodeResolver;
+///
+/// // In production: inject DHT resolver here.
+/// // In tests or dev-context: inject EmbeddedContentNodeResolver.
+/// configure_runner(Box::new(my_dht_resolver));
+/// ```
+pub fn configure_runner(resolver: Box<dyn ContentNodeResolver>) {
+    RUNNER.get_or_init(|| Arc::new(DagRunner::with_content_resolver(resolver)));
+}
+
 /// Return the process-global [`DagRunner`], constructing it on first call.
 ///
 /// Construction parses the embedded YAML and registers executors.  All
 /// subsequent calls return a clone of the same `Arc` with no blocking.
+///
+/// If [`configure_runner`] was called before this, the pre-configured runner
+/// is returned. Otherwise, a default runner with an empty
+/// [`EmbeddedContentNodeResolver`] is constructed.
 pub fn global_runner() -> Arc<DagRunner> {
     RUNNER.get_or_init(|| Arc::new(DagRunner::new())).clone()
 }

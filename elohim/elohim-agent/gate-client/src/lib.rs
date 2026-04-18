@@ -212,7 +212,8 @@ pub fn __test_set_decision_override(decision: Option<GateDecision>) {
 
 // Public re-exports for ergonomic use.
 pub use dag::executors::{
-    ContextAssembleExecutor, EscalateToReviewExecutor, SynthesizeExecutor, WisdomInvokeExecutor,
+    ContentNodeResolver, ContextAssembleExecutor, EmbeddedContentNodeResolver,
+    EscalateToReviewExecutor, MechanicalRulesetExecutor, SynthesizeExecutor, WisdomInvokeExecutor,
 };
 pub use dag::universal_band::{
     active_universal_band_pointer, default_universal_band_declaration, default_universal_band_yaml,

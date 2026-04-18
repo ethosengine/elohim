@@ -25,6 +25,8 @@ pub mod executor;
 pub mod executors;
 pub mod expr;
 pub mod interpreter;
+pub mod rule_expr;
+pub mod rules_artifact;
 pub mod universal_band;
 
 // ─── Public re-exports ────────────────────────────────────────────────────────
@@ -32,7 +34,8 @@ pub mod universal_band;
 pub use context::GateContext;
 pub use executor::{ArcExecutor, StepExecutor, StepKind, StepOutcome};
 pub use executors::{
-    ContextAssembleExecutor, EscalateToReviewExecutor, SynthesizeExecutor, WisdomInvokeExecutor,
+    ContentNodeResolver, ContextAssembleExecutor, EmbeddedContentNodeResolver,
+    EscalateToReviewExecutor, MechanicalRulesetExecutor, SynthesizeExecutor, WisdomInvokeExecutor,
 };
 pub use interpreter::DagInterpreter;
 
