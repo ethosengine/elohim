@@ -31,6 +31,9 @@ import { fileURLToPath } from 'node:url';
 
 import type { AccountImportResultView, AccountPackageInputView } from '@elohim/storage-client';
 
+import type { DeploymentRegistry } from './deployment-registry.js';
+import { loadDeploymentRegistry, parseDeployedHumansArg } from './deployment-registry.js';
+
 // =============================================================================
 // Package loading
 // =============================================================================
@@ -59,6 +62,43 @@ function loadPackages(packagesDir: string, humanFilter?: string): AccountPackage
 }
 
 // =============================================================================
+// Registry-based partitioning
+// =============================================================================
+
+export interface PartitionResult {
+  toSeed: AccountPackageInputView[];
+  staged: AccountPackageInputView[];
+  orphanRegistryEntries: string[];
+}
+
+export function partitionByRegistry(
+  packages: AccountPackageInputView[],
+  registry: DeploymentRegistry,
+): PartitionResult {
+  const toSeed: AccountPackageInputView[] = [];
+  const staged: AccountPackageInputView[] = [];
+  const packageIds = new Set<string>();
+
+  for (const pkg of packages) {
+    packageIds.add(pkg.identity.humanId);
+    if (registry.deployedHumanIds.has(pkg.identity.humanId)) {
+      toSeed.push(pkg);
+    } else {
+      staged.push(pkg);
+    }
+  }
+
+  const orphanRegistryEntries: string[] = [];
+  for (const id of registry.deployedHumanIds) {
+    if (!packageIds.has(id)) {
+      orphanRegistryEntries.push(id);
+    }
+  }
+
+  return { toSeed, staged, orphanRegistryEntries };
+}
+
+// =============================================================================
 // Import
 // =============================================================================
 
@@ -70,6 +110,7 @@ interface SeedResult {
   outcome: Outcome;
   contentUpdated: number;
   relationshipsCreated: number;
+  relationshipsSkipped: number;
   stewardshipCreated: number;
   collectivesJoined: number;
   errors: string[];
@@ -142,6 +183,7 @@ async function importPackage(
         outcome: 'imported',
         contentUpdated: outcome.result.contentUpdated,
         relationshipsCreated: outcome.result.relationshipsCreated,
+        relationshipsSkipped: outcome.result.relationshipsSkipped ?? 0,
         stewardshipCreated: outcome.result.stewardshipCreated,
         collectivesJoined: outcome.result.collectivesJoined ?? 0,
         errors: outcome.result.errors ?? [],
@@ -158,6 +200,7 @@ async function importPackage(
     outcome: 'failed',
     contentUpdated: 0,
     relationshipsCreated: 0,
+    relationshipsSkipped: 0,
     stewardshipCreated: 0,
     collectivesJoined: 0,
     errors,
@@ -182,6 +225,18 @@ async function main(): Promise<void> {
   const targetPeersArg = args.find(a => a.startsWith('--target-peers='))?.split('=')[1]
     ?? (args.includes('--target-peers') ? args[args.indexOf('--target-peers') + 1] : undefined);
 
+  const registryPathArg = args.find(a => a.startsWith('--registry='))?.split('=')[1]
+    ?? (args.includes('--registry') ? args[args.indexOf('--registry') + 1] : undefined);
+  const deployedHumansArg = args.find(a => a.startsWith('--deployed-humans='))?.split('=')[1]
+    ?? (args.includes('--deployed-humans') ? args[args.indexOf('--deployed-humans') + 1] : undefined);
+
+  const registry = loadDeploymentRegistry({
+    registryPath: registryPathArg ?? process.env.SEEDER_REGISTRY,
+    deployedHumans: parseDeployedHumansArg(
+      deployedHumansArg ?? process.env.SEEDER_DEPLOYED_HUMANS,
+    ),
+  });
+
   const stripSlash = (u: string) => u.replace(/\/$/, '');
   const rawTargetPeers = targetPeersArg ?? process.env.SEEDER_TARGET_PEERS;
   const targetPeers: string[] = rawTargetPeers
@@ -203,8 +258,24 @@ async function main(): Promise<void> {
   if (humanFilter) console.log(`Filter:    ${humanFilter}`);
   console.log('');
 
-  const packages = loadPackages(packagesDir, humanFilter);
-  console.log(`Found ${packages.length} account packages\n`);
+  const allPackages = loadPackages(packagesDir, humanFilter);
+  const { toSeed: packages, staged, orphanRegistryEntries } = partitionByRegistry(allPackages, registry);
+
+  const registryLabel = registry.path ?? `flag: ${registry.deployedHumanIds.size} humans`;
+  console.log(`Registry:  ${registryLabel} (${registry.deployedHumanIds.size} deployed humans)`);
+  console.log(
+    `Packages:  ${packagesDir} (${allPackages.length} found, ${packages.length} deployed, ${staged.length} staged)\n`,
+  );
+
+  for (const pkg of staged) {
+    console.log(`  [-] ${pkg.identity.displayName.padEnd(18)} (staged — not in deployment registry)`);
+  }
+  if (staged.length > 0) console.log('');
+
+  for (const orphanId of orphanRegistryEntries) {
+    console.warn(`  WARNING: registry references ${orphanId}, no package found`);
+  }
+  if (orphanRegistryEntries.length > 0) console.log('');
 
   if (packages.length === 0) {
     console.log('No packages to import.');
@@ -227,6 +298,7 @@ async function main(): Promise<void> {
   const results: SeedResult[] = [];
   let totalContent = 0;
   let totalRels = 0;
+  let totalSkipped = 0;
   let totalStew = 0;
   let totalColl = 0;
 
@@ -239,11 +311,12 @@ async function main(): Promise<void> {
     const retried = result.attempts > 1 ? ` retry=${result.attempts}` : '';
     console.log(
       `  [${icon}] ${result.displayName.padEnd(18)} -> ${result.targetUrl}${retried} ` +
-      `content=${result.contentUpdated} rels=${result.relationshipsCreated} stew=${result.stewardshipCreated} coll=${result.collectivesJoined}${warnings}`
+      `content=${result.contentUpdated} rels=${result.relationshipsCreated} skipped=${result.relationshipsSkipped} stew=${result.stewardshipCreated} coll=${result.collectivesJoined}${warnings}`
     );
 
     totalContent += result.contentUpdated;
     totalRels += result.relationshipsCreated;
+    totalSkipped += result.relationshipsSkipped;
     totalStew += result.stewardshipCreated;
     totalColl += result.collectivesJoined;
   }
@@ -254,9 +327,10 @@ async function main(): Promise<void> {
   const withErrors = results.filter(r => r.errors.length > 0);
 
   console.log('');
-  console.log(`=== Results: ${imported} imported, ${failed} failed ===`);
+  console.log(`=== Results: ${imported} imported, ${failed} failed, ${staged.length} staged ===`);
   console.log(`    Content updated: ${totalContent}`);
   console.log(`    Relationships created: ${totalRels}`);
+  console.log(`    Relationships skipped: ${totalSkipped}`);
   console.log(`    Stewardship created: ${totalStew}`);
   console.log(`    Collectives joined: ${totalColl}`);
 

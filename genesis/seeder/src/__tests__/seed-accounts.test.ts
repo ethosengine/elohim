@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { AccountPackageInputView } from '@elohim/storage-client';
-import { resolveTargetUrl, stableHash } from '../seed-accounts.js';
+import { partitionByRegistry, resolveTargetUrl, stableHash } from '../seed-accounts.js';
+import type { DeploymentRegistry } from '../deployment-registry.js';
 
 function pkg(humanId: string): AccountPackageInputView {
   return {
@@ -61,5 +62,48 @@ describe('resolveTargetUrl', () => {
 
   it('throws when peer list is empty', () => {
     expect(() => resolveTargetUrl(pkg('human-matthew-manager'), [])).toThrow(/must not be empty/);
+  });
+});
+
+describe('partitionByRegistry', () => {
+  function mkPkg(humanId: string): AccountPackageInputView {
+    return {
+      identity: { humanId, displayName: humanId } as AccountPackageInputView['identity'],
+      content: [], relationships: [], stewardship: [], collectives: [],
+    } as unknown as AccountPackageInputView;
+  }
+
+  function mkRegistry(ids: string[]): DeploymentRegistry {
+    return { deployedHumanIds: new Set(ids), source: 'file' };
+  }
+
+  it('returns deployed packages in toSeed and others in staged', () => {
+    const pkgs = [
+      mkPkg('human-adam-firstman'),
+      mkPkg('human-eve-firstwoman'),
+      mkPkg('human-matthew-manager'),
+    ];
+    const reg = mkRegistry(['human-adam-firstman', 'human-matthew-manager']);
+
+    const { toSeed, staged } = partitionByRegistry(pkgs, reg);
+
+    expect(toSeed.map(p => p.identity.humanId)).toEqual([
+      'human-adam-firstman', 'human-matthew-manager',
+    ]);
+    expect(staged.map(p => p.identity.humanId)).toEqual(['human-eve-firstwoman']);
+  });
+
+  it('stages all packages when registry is empty', () => {
+    const pkgs = [mkPkg('human-adam-firstman')];
+    const { toSeed, staged } = partitionByRegistry(pkgs, mkRegistry([]));
+    expect(toSeed).toHaveLength(0);
+    expect(staged).toHaveLength(1);
+  });
+
+  it('reports registry entries that have no package as an orphan list', () => {
+    const pkgs = [mkPkg('human-adam-firstman')];
+    const reg = mkRegistry(['human-adam-firstman', 'human-ghost']);
+    const { orphanRegistryEntries } = partitionByRegistry(pkgs, reg);
+    expect(orphanRegistryEntries).toEqual(['human-ghost']);
   });
 });
