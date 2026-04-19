@@ -1,0 +1,47 @@
+{
+  "$id": "epr:schema:enum:elohim-strength",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ElohimStrength",
+  "description": "Observed strengths accrued from attestation history. Core strengths are protocol-named reputation dimensions the imagodei layer tracks. Extensible strengths are community-named emergent patterns. Phase 10 ships a minimal core vocabulary; Phase 11+ will codify additional values from real attestation-history analysis.",
+  "type": "string",
+  "enum": [
+    "high-confidence-judgments",
+    "appeals-sustained",
+    "consensus-alignment",
+    "novel-pattern-detection",
+    "steady-baseline",
+    "consistent-constitutional-reasoning",
+    "low-false-positive-rate",
+    "fast-resolution",
+    "cross-context-consistency",
+    "escalation-accuracy"
+  ],
+  "_tiers": {
+    "core": {
+      "values": [
+        "high-confidence-judgments",
+        "appeals-sustained",
+        "consensus-alignment",
+        "novel-pattern-detection",
+        "steady-baseline"
+      ],
+      "rationale": "Protocol-named attestation-history dimensions. high-confidence-judgments: decisions made confidently and upheld. appeals-sustained: appeals that overturned prior decisions (surfaces calibration gaps). consensus-alignment: agreement with peer elohim on same inputs. novel-pattern-detection: surfaced new attestation classes. steady-baseline: consistent no-mint steady-state. These five dimensions directly inform peer-diversity selection and elohim trust scoring in Phase 11+."
+    },
+    "extensible": {
+      "values": [
+        "consistent-constitutional-reasoning",
+        "low-false-positive-rate",
+        "fast-resolution",
+        "cross-context-consistency",
+        "escalation-accuracy"
+      ],
+      "rationale": "Emergent reputation dimensions observed in practice but not yet wired to protocol scoring. Community-named; operator may populate these from external evaluation pipelines. Phase 11 attestation-history analysis may promote some to core."
+    }
+  },
+  "_dna": {
+    "constant": "ELOHIM_STRENGTHS",
+    "zome": "imagodei_integrity",
+    "file": "elohim/holochain/dna/imagodei/zomes/imagodei_integrity/src/lib.rs",
+    "tier": "core"
+  }
+}

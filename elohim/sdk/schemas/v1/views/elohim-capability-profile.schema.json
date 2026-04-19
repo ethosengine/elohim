@@ -33,18 +33,18 @@
     },
     "specialties": {
       "type": "array",
-      "items": { "type": "string" },
-      "description": "Domains this elohim is primed for via constitution or fine-tuning. E.g. child-safety, medical, code-review, curriculum-design. Free-form in Phase 9; Phase 10+ may enumerate a controlled vocabulary"
+      "items": { "$ref": "../enums/elohim-specialty.schema.json" },
+      "description": "Domains this elohim is primed for via constitution or fine-tuning. Values constrained to elohim-specialty vocabulary (Task 10.3). Core values affect gate dispatch routing; extensible values inform peer-diversity selection"
     },
     "skills": {
       "type": "array",
-      "items": { "type": "string" },
-      "description": "Named capabilities this elohim can dispatch. E.g. content-safety-review, discernment-evaluation, mastery-assessment. Maps to gate names or service names that gate-client uses for dispatch"
+      "items": { "$ref": "../enums/elohim-skill.schema.json" },
+      "description": "Named gate capabilities this elohim can dispatch. Values constrained to elohim-skill vocabulary (Task 10.3). Core values map to active gate interfaces (content-safety-gate, discernment-gate-v1-mechanical, reach-gate-v1); extensible values map to ElohimCapability variants"
     },
     "strengths": {
       "type": "array",
-      "items": { "type": "string" },
-      "description": "Observed strengths accrued from attestation history. Populated by the protocol over time as gate decisions accumulate; operator-initialized as empty"
+      "items": { "$ref": "../enums/elohim-strength.schema.json" },
+      "description": "Observed strengths accrued from attestation history. Values constrained to elohim-strength vocabulary (Task 10.3). Populated by the protocol over time as gate decisions accumulate; operator-initialized as empty"
     },
     "activeSince": {
       "type": "string",

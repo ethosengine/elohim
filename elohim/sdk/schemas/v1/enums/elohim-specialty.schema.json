@@ -1,0 +1,87 @@
+{
+  "$id": "epr:schema:enum:elohim-specialty",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ElohimSpecialty",
+  "description": "Domains an elohim is primed for via constitution or fine-tuning. Core specialties are protocol-known and affect dispatch routing. Extensible specialties are community-declared and accepted by storage without DNA validation.",
+  "type": "string",
+  "enum": [
+    "child-safety",
+    "family-dynamics",
+    "content-safety",
+    "discernment",
+    "reach-evaluation",
+    "medical",
+    "legal",
+    "crisis",
+    "education",
+    "code-review",
+    "financial-advice",
+    "creative-writing",
+    "technical-documentation",
+    "translation",
+    "poetry",
+    "philosophy",
+    "governance",
+    "conflict-resolution",
+    "curriculum-design",
+    "counseling",
+    "theology",
+    "science",
+    "mathematics",
+    "history",
+    "language-learning",
+    "mental-health",
+    "disability-support",
+    "elder-care",
+    "research",
+    "journalism"
+  ],
+  "_tiers": {
+    "core": {
+      "values": [
+        "child-safety",
+        "family-dynamics",
+        "content-safety",
+        "discernment",
+        "reach-evaluation",
+        "medical",
+        "legal",
+        "crisis"
+      ],
+      "rationale": "Protocol-known specialties that affect gate dispatch routing. An elohim declaring child-safety, medical, or crisis receives specific gate invocations the protocol itself orchestrates. DNA-notarized for validation at imagodei layer."
+    },
+    "extensible": {
+      "values": [
+        "education",
+        "code-review",
+        "financial-advice",
+        "creative-writing",
+        "technical-documentation",
+        "translation",
+        "poetry",
+        "philosophy",
+        "governance",
+        "conflict-resolution",
+        "curriculum-design",
+        "counseling",
+        "theology",
+        "science",
+        "mathematics",
+        "history",
+        "language-learning",
+        "mental-health",
+        "disability-support",
+        "elder-care",
+        "research",
+        "journalism"
+      ],
+      "rationale": "Community-declared specialties. Inform peer-diversity selection and operator documentation but are not wired to specific protocol gate routes. Communities register new values without protocol changes."
+    }
+  },
+  "_dna": {
+    "constant": "ELOHIM_SPECIALTIES",
+    "zome": "imagodei_integrity",
+    "file": "elohim/holochain/dna/imagodei/zomes/imagodei_integrity/src/lib.rs",
+    "tier": "core"
+  }
+}

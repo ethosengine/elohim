@@ -479,6 +479,181 @@ fn elohim_capability_profile_standalone_matches_schema() {
     validate_against_schema("views/elohim-capability-profile.schema.json", &json);
 }
 
+// ── ElohimCapabilityProfile vocabulary validation ───────────────
+
+#[test]
+fn elohim_capability_profile_core_specialties_valid() {
+    // Core-tier specialties must pass schema validation.
+    let profile = serde_json::json!({
+        "modelName": "claude-opus-4-7",
+        "modelFamily": "claude",
+        "contextWindowTokens": 200000,
+        "specialties": ["child-safety", "family-dynamics", "content-safety", "discernment",
+                        "reach-evaluation", "medical", "legal", "crisis"],
+        "skills": [],
+        "strengths": [],
+        "activeSince": "2026-04-18T00:00:00Z"
+    });
+    validate_against_schema("views/elohim-capability-profile.schema.json", &profile);
+}
+
+#[test]
+fn elohim_capability_profile_extensible_specialties_valid() {
+    // Extensible-tier specialties must also pass schema validation.
+    let profile = serde_json::json!({
+        "modelName": "llama-3.1-70b",
+        "modelFamily": "llama",
+        "contextWindowTokens": 128000,
+        "specialties": ["education", "code-review", "governance", "curriculum-design"],
+        "skills": [],
+        "strengths": [],
+        "activeSince": "2026-04-18T00:00:00Z"
+    });
+    validate_against_schema("views/elohim-capability-profile.schema.json", &profile);
+}
+
+#[test]
+fn elohim_capability_profile_unknown_specialty_rejected() {
+    // Unknown specialty values must be rejected by the schema (strict vocabulary).
+    let profile = serde_json::json!({
+        "modelName": "test-model",
+        "modelFamily": "test",
+        "contextWindowTokens": 4096,
+        "specialties": ["pineapple"],
+        "skills": [],
+        "strengths": [],
+        "activeSince": "2026-04-18T00:00:00Z"
+    });
+    let schema = load_schema("views/elohim-capability-profile.schema.json");
+    let validator = jsonschema::validator_for(&schema).unwrap();
+    let errors: Vec<_> = validator.iter_errors(&profile).collect();
+    assert!(
+        !errors.is_empty(),
+        "Schema must reject unknown specialty 'pineapple' — ElohimSpecialty vocabulary is strict"
+    );
+}
+
+#[test]
+fn elohim_capability_profile_core_skills_valid() {
+    // Core-tier skills (gate-shaped) must pass schema validation.
+    let profile = serde_json::json!({
+        "modelName": "claude-opus-4-7",
+        "modelFamily": "claude",
+        "contextWindowTokens": 200000,
+        "specialties": [],
+        "skills": [
+            "content-safety-review",
+            "discernment-evaluation",
+            "reach-negotiation",
+            "attestation-recommendation",
+            "spiral-detection",
+            "care-connection",
+            "graduated-intervention",
+            "constitutional-verification"
+        ],
+        "strengths": [],
+        "activeSince": "2026-04-18T00:00:00Z"
+    });
+    validate_against_schema("views/elohim-capability-profile.schema.json", &profile);
+}
+
+#[test]
+fn elohim_capability_profile_extensible_skills_valid() {
+    // Extensible skills (full ElohimCapability variant set) must pass schema validation.
+    let profile = serde_json::json!({
+        "modelName": "gpt-4o",
+        "modelFamily": "gpt",
+        "contextWindowTokens": 128000,
+        "specialties": [],
+        "skills": [
+            "accuracy-verification",
+            "knowledge-map-synthesis",
+            "mastery-assessment-design",
+            "feedback-profile-negotiation",
+            "bioregional-enforcement"
+        ],
+        "strengths": [],
+        "activeSince": "2026-04-18T00:00:00Z"
+    });
+    validate_against_schema("views/elohim-capability-profile.schema.json", &profile);
+}
+
+#[test]
+fn elohim_capability_profile_unknown_skill_rejected() {
+    // Unknown skill values must be rejected by the schema (strict vocabulary).
+    let profile = serde_json::json!({
+        "modelName": "test-model",
+        "modelFamily": "test",
+        "contextWindowTokens": 4096,
+        "specialties": [],
+        "skills": ["psychic-prediction"],
+        "strengths": [],
+        "activeSince": "2026-04-18T00:00:00Z"
+    });
+    let schema = load_schema("views/elohim-capability-profile.schema.json");
+    let validator = jsonschema::validator_for(&schema).unwrap();
+    let errors: Vec<_> = validator.iter_errors(&profile).collect();
+    assert!(
+        !errors.is_empty(),
+        "Schema must reject unknown skill 'psychic-prediction' — ElohimSkill vocabulary is strict"
+    );
+}
+
+#[test]
+fn elohim_capability_profile_core_strengths_valid() {
+    // Core-tier strengths must pass schema validation.
+    let profile = serde_json::json!({
+        "modelName": "claude-opus-4-7",
+        "modelFamily": "claude",
+        "contextWindowTokens": 200000,
+        "specialties": [],
+        "skills": [],
+        "strengths": [
+            "high-confidence-judgments",
+            "consensus-alignment",
+            "steady-baseline"
+        ],
+        "activeSince": "2026-04-18T00:00:00Z"
+    });
+    validate_against_schema("views/elohim-capability-profile.schema.json", &profile);
+}
+
+#[test]
+fn elohim_capability_profile_extensible_strengths_valid() {
+    // Extensible-tier strengths must also pass schema validation.
+    let profile = serde_json::json!({
+        "modelName": "claude-opus-4-7",
+        "modelFamily": "claude",
+        "contextWindowTokens": 200000,
+        "specialties": [],
+        "skills": [],
+        "strengths": ["consistent-constitutional-reasoning", "low-false-positive-rate"],
+        "activeSince": "2026-04-18T00:00:00Z"
+    });
+    validate_against_schema("views/elohim-capability-profile.schema.json", &profile);
+}
+
+#[test]
+fn elohim_capability_profile_unknown_strength_rejected() {
+    // Unknown strength values must be rejected by the schema (strict vocabulary).
+    let profile = serde_json::json!({
+        "modelName": "test-model",
+        "modelFamily": "test",
+        "contextWindowTokens": 4096,
+        "specialties": [],
+        "skills": [],
+        "strengths": ["made-up-accolade"],
+        "activeSince": "2026-04-18T00:00:00Z"
+    });
+    let schema = load_schema("views/elohim-capability-profile.schema.json");
+    let validator = jsonschema::validator_for(&schema).unwrap();
+    let errors: Vec<_> = validator.iter_errors(&profile).collect();
+    assert!(
+        !errors.is_empty(),
+        "Schema must reject unknown strength 'made-up-accolade' — ElohimStrength vocabulary is strict"
+    );
+}
+
 // ── Convention enforcement ──────────────────────────────────────
 
 #[test]

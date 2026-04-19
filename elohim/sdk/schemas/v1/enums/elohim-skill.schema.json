@@ -1,0 +1,85 @@
+{
+  "$id": "epr:schema:enum:elohim-skill",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ElohimSkill",
+  "description": "Named gate capabilities an elohim can dispatch. Core skills map directly to registered gate interfaces the protocol orchestrates (content-safety-gate, discernment-gate-v1-mechanical, reach-gate-v1). Extensible skills map to the full ElohimCapability variant set and any community-registered capabilities.",
+  "type": "string",
+  "enum": [
+    "content-safety-review",
+    "discernment-evaluation",
+    "reach-negotiation",
+    "attestation-recommendation",
+    "spiral-detection",
+    "care-connection",
+    "graduated-intervention",
+    "constitutional-verification",
+    "accuracy-verification",
+    "knowledge-map-synthesis",
+    "affinity-analysis",
+    "path-recommendation",
+    "cross-layer-validation",
+    "existential-boundary-enforcement",
+    "governance-ratification",
+    "path-analysis",
+    "learning-objective-validation",
+    "prerequisite-verification",
+    "mastery-assessment-design",
+    "family-value-alignment",
+    "personal-agent-support",
+    "feedback-profile-negotiation",
+    "feedback-profile-enforcement",
+    "feedback-profile-upgrade",
+    "feedback-profile-downgrade",
+    "place-attestation",
+    "place-naming-governance",
+    "geographic-reach-assignment",
+    "bioregional-enforcement"
+  ],
+  "_tiers": {
+    "core": {
+      "values": [
+        "content-safety-review",
+        "discernment-evaluation",
+        "reach-negotiation",
+        "attestation-recommendation",
+        "spiral-detection",
+        "care-connection",
+        "graduated-intervention",
+        "constitutional-verification"
+      ],
+      "rationale": "Gate-shaped skills with active registered gate interfaces: content-safety-gate, discernment-gate-v1-mechanical, reach-gate-v1. These 8 skills are wired to protocol gate invocation paths. Phase 4 Section 6.3 gate primitives. DNA-notarized for dispatch validation."
+    },
+    "extensible": {
+      "values": [
+        "accuracy-verification",
+        "knowledge-map-synthesis",
+        "affinity-analysis",
+        "path-recommendation",
+        "cross-layer-validation",
+        "existential-boundary-enforcement",
+        "governance-ratification",
+        "path-analysis",
+        "learning-objective-validation",
+        "prerequisite-verification",
+        "mastery-assessment-design",
+        "family-value-alignment",
+        "personal-agent-support",
+        "feedback-profile-negotiation",
+        "feedback-profile-enforcement",
+        "feedback-profile-upgrade",
+        "feedback-profile-downgrade",
+        "place-attestation",
+        "place-naming-governance",
+        "geographic-reach-assignment",
+        "bioregional-enforcement"
+      ],
+      "rationale": "Full ElohimCapability variant set (kebab-case). These 21 capabilities are recognized by elohim-agent-service but not yet wired to active gate routes. Accepted by storage; not validated by DNA dispatch. Mirrors ElohimCapability enum in elohim-agent-service/src/capability/types.rs."
+    }
+  },
+  "_dna": {
+    "constant": "ELOHIM_SKILLS",
+    "zome": "imagodei_integrity",
+    "file": "elohim/holochain/dna/imagodei/zomes/imagodei_integrity/src/lib.rs",
+    "tier": "core"
+  }
+}

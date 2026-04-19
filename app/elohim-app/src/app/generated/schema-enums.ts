@@ -108,6 +108,117 @@ export const ALL_CONTENT_TYPES = [
 export const CONTENT_TYPES = ALL_CONTENT_TYPES;
 export type ContentType = (typeof ALL_CONTENT_TYPES)[number];
 
+export const CORE_ELOHIM_SKILLS = [
+  'content-safety-review',
+  'discernment-evaluation',
+  'reach-negotiation',
+  'attestation-recommendation',
+  'spiral-detection',
+  'care-connection',
+  'graduated-intervention',
+  'constitutional-verification',
+] as const;
+export const ALL_ELOHIM_SKILLS = [
+  'content-safety-review',
+  'discernment-evaluation',
+  'reach-negotiation',
+  'attestation-recommendation',
+  'spiral-detection',
+  'care-connection',
+  'graduated-intervention',
+  'constitutional-verification',
+  'accuracy-verification',
+  'knowledge-map-synthesis',
+  'affinity-analysis',
+  'path-recommendation',
+  'cross-layer-validation',
+  'existential-boundary-enforcement',
+  'governance-ratification',
+  'path-analysis',
+  'learning-objective-validation',
+  'prerequisite-verification',
+  'mastery-assessment-design',
+  'family-value-alignment',
+  'personal-agent-support',
+  'feedback-profile-negotiation',
+  'feedback-profile-enforcement',
+  'feedback-profile-upgrade',
+  'feedback-profile-downgrade',
+  'place-attestation',
+  'place-naming-governance',
+  'geographic-reach-assignment',
+  'bioregional-enforcement',
+] as const;
+export const ELOHIM_SKILLS = ALL_ELOHIM_SKILLS;
+export type ElohimSkill = (typeof ALL_ELOHIM_SKILLS)[number];
+
+export const CORE_ELOHIM_SPECIALTIES = [
+  'child-safety',
+  'family-dynamics',
+  'content-safety',
+  'discernment',
+  'reach-evaluation',
+  'medical',
+  'legal',
+  'crisis',
+] as const;
+export const ALL_ELOHIM_SPECIALTIES = [
+  'child-safety',
+  'family-dynamics',
+  'content-safety',
+  'discernment',
+  'reach-evaluation',
+  'medical',
+  'legal',
+  'crisis',
+  'education',
+  'code-review',
+  'financial-advice',
+  'creative-writing',
+  'technical-documentation',
+  'translation',
+  'poetry',
+  'philosophy',
+  'governance',
+  'conflict-resolution',
+  'curriculum-design',
+  'counseling',
+  'theology',
+  'science',
+  'mathematics',
+  'history',
+  'language-learning',
+  'mental-health',
+  'disability-support',
+  'elder-care',
+  'research',
+  'journalism',
+] as const;
+export const ELOHIM_SPECIALTIES = ALL_ELOHIM_SPECIALTIES;
+export type ElohimSpecialty = (typeof ALL_ELOHIM_SPECIALTIES)[number];
+
+export const CORE_ELOHIM_STRENGTHS = [
+  'high-confidence-judgments',
+  'appeals-sustained',
+  'consensus-alignment',
+  'novel-pattern-detection',
+  'steady-baseline',
+] as const;
+export const ALL_ELOHIM_STRENGTHS = [
+  'high-confidence-judgments',
+  'appeals-sustained',
+  'consensus-alignment',
+  'novel-pattern-detection',
+  'steady-baseline',
+  'consistent-constitutional-reasoning',
+  'low-false-positive-rate',
+  'fast-resolution',
+  'cross-context-consistency',
+  'escalation-accuracy',
+] as const;
+export const ELOHIM_STRENGTHS = ALL_ELOHIM_STRENGTHS;
+export type ElohimStrength = (typeof ALL_ELOHIM_STRENGTHS)[number];
+
 export const CORE_ENGAGEMENT_TYPES = [
   'view',
   'quiz',
