@@ -1,5 +1,6 @@
 ---
 id: "human-timothy-tutor"
+householdId: "household-timothy"
 displayName: "Timothy"
 agencyPhase: "device"
 category: "affinity"

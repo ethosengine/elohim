@@ -123,6 +123,12 @@ export const SLUG_PATTERN = /^human-[a-z0-9][a-z0-9-]*[a-z0-9]$/;
 export interface HumanFrontmatter {
   id: string;
   displayName: string;
+  /**
+   * Household collective id (kind:household in collectives). Optional —
+   * humans outside a household grouping leave this null. Projects onto
+   * humans.household_id in elohim-storage for fast household joins.
+   */
+  householdId?: string | null;
   bio?: string | null;
   agencyPhase?: string | null;
   category: string;

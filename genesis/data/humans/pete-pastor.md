@@ -1,5 +1,6 @@
 ---
 id: "human-pete-pastor"
+householdId: "household-pete"
 displayName: "Pete"
 agencyPhase: "device"
 category: "affinity"

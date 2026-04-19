@@ -1,5 +1,6 @@
 ---
 id: "human-jessica-spouse"
+householdId: "household-matthew"
 displayName: "Jessica"
 agencyPhase: "device"
 category: "core-family"

@@ -1,5 +1,6 @@
 ---
 id: "human-ezra-newcomer"
+householdId: "household-ezra"
 displayName: "Ezra"
 category: "newcomer"
 profileReach: "private"

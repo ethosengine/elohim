@@ -1,5 +1,6 @@
 ---
 id: "human-nancy-neighbor"
+householdId: "household-nancy"
 displayName: "Nancy"
 agencyPhase: "hosted"
 category: "community"

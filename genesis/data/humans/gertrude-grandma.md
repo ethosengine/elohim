@@ -1,5 +1,6 @@
 ---
 id: "human-gertrude-grandma"
+householdId: "household-gertrude"
 displayName: "Gertrude"
 category: "core-family"
 profileReach: "familiar"
