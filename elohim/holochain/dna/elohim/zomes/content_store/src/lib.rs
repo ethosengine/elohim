@@ -8,7 +8,6 @@
 
 use content_store_integrity::*;
 use doorway_client::{CacheRule, CacheRuleBuilder, CacheSignal, CacheSignalType, DoorwaySignal};
-use gate_client_zome::{check_blocking, GateStatus, RelationalImpactEvent};
 use hdk::prelude::*;
 use std::collections::HashMap;
 
@@ -819,6 +818,12 @@ pub mod healing_integration;
 
 // Entry type providers for flexible healing architecture
 pub mod providers;
+
+// Gate check helpers — wisdom-as-auth seam for content_store coordinator.
+// Routes experience-moment content through AttestationWrite (multi-gate) and
+// all other content types through ContentPublish (content-safety-gate only).
+mod gate;
+use gate::gate_check_for_content;
 
 // =============================================================================
 // Cross-DNA Bridge Calls to Imagodei
@@ -2312,39 +2317,6 @@ pub struct PrivilegeCheckResult {
 // Content CRUD Operations
 // =============================================================================
 
-/// Invoke the gate before a content DHT commit.
-///
-/// Wisdom-as-auth invariant: the gate fires BEFORE `create_entry` so that no
-/// DHT write occurs unless the gate allows it.  In DevContext the gate always
-/// returns Allow; Phase 8+ will bridge to elohim-agent-service.
-///
-/// Shape note: `content_cid` uses `blob_cid` when present, falling back to
-/// the content `id`.  The DevContext mock does not inspect the CID value.
-/// Phase 8+ will require a fully-resolved CID; callers should ensure
-/// `blob_cid` is set before that activation gate is raised.
-fn gate_check_content_publish(input: &CreateContentInput) -> ExternResult<()> {
-    let author = agent_info()?.agent_initial_pubkey.to_string();
-    let content_cid = input.blob_cid.clone().unwrap_or_else(|| input.id.clone());
-    let event = RelationalImpactEvent::ContentPublish {
-        content_cid,
-        declared_reach: input.reach.clone(),
-        author,
-    };
-    let decision = check_blocking(event)
-        .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("gate error: {e}"))))?;
-    match decision.status {
-        GateStatus::Allow { .. } => Ok(()),
-        GateStatus::Verdict(_) => Ok(()), // Verdict carries a tag; content-publish proceeds.
-        GateStatus::Decline { grounds } => Err(wasm_error!(WasmErrorInner::Guest(format!(
-            "Gate declined: {}",
-            grounds.summary
-        )))),
-        GateStatus::Escalate { .. } => Err(wasm_error!(WasmErrorInner::Guest(
-            "Gate escalated to steward review".to_string()
-        ))),
-    }
-}
-
 /// Create a single content entry with all index links.
 /// Returns an error if content with the same ID already exists.
 #[hdk_extern]
@@ -2368,7 +2340,11 @@ fn create_content_unchecked(input: CreateContentInput) -> ExternResult<ContentOu
     // Gate check: wisdom-as-auth invariant — fires BEFORE any DHT commit.
     // Must come before the Content{} construction that partially moves `input`.
     // DevContext: always Allow.  Phase 8+: bridges to elohim-agent-service.
-    gate_check_content_publish(&input)?;
+    //
+    // Routing: experience-moment → AttestationWrite (content-safety + discernment)
+    //          all other types  → ContentPublish (content-safety only)
+    // See gate.rs for the full routing logic and subject_hash derivation.
+    gate_check_for_content(&input)?;
 
     let agent_info = agent_info()?;
     let now = sys_time()?;
