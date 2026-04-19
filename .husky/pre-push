@@ -16,6 +16,8 @@
 #   schema-validate          → protocol schema seed validation (genesis/ or schema changes)
 #   schema-dna               → DNA conformance check (holochain/ or schema changes)
 #   schema-codegen           → verify codegen is fresh (schema changes)
+#   rakia-codegen            → verify rakia generated_types.rs is fresh (rakia schema or rakia-core changes)
+#   rakia-validate           → validate build-manifest.json files against rakia schema (any manifest or rakia schema change)
 #   genesis/a2o/             → E2E lint + typecheck
 #   genesis/orchestrator/    → Jenkinsfile linting (any *Jenkinsfile* change)
 #
@@ -193,6 +195,12 @@ if [ "$USE_MANIFEST" = false ]; then
   if echo "$CHANGED" | grep -q "^elohim/sdk/schemas/"; then
     PROJECTS="$PROJECTS schema-codegen"
   fi
+  if echo "$CHANGED" | grep -qE "^elohim/rakia/schemas/|^elohim/rakia/rakia-core/src/(generated_types|manifest)\.rs$"; then
+    PROJECTS="$PROJECTS rakia-codegen"
+  fi
+  if echo "$CHANGED" | grep -qE "(^|/)build-manifest\.json$|^elohim/rakia/schemas/v1/build-manifest\.schema\.json$"; then
+    PROJECTS="$PROJECTS rakia-validate"
+  fi
   if echo "$CHANGED" | grep -q "Jenkinsfile"; then
     PROJECTS="$PROJECTS orchestrator"
   fi
@@ -228,7 +236,7 @@ run_gate() {
   cd "$PROJECT_DIR" || return 1
 
   # Schema checks run pnpm scripts directly — no justfile needed
-  if [ "$PROJECT_NAME" = "schema-validate" ] || [ "$PROJECT_NAME" = "schema-dna" ] || [ "$PROJECT_NAME" = "schema-codegen" ] || [ "$PROJECT_NAME" = "constants-sync" ] || [ "$PROJECT_NAME" = "domain-types" ]; then
+  if [ "$PROJECT_NAME" = "schema-validate" ] || [ "$PROJECT_NAME" = "schema-dna" ] || [ "$PROJECT_NAME" = "schema-codegen" ] || [ "$PROJECT_NAME" = "constants-sync" ] || [ "$PROJECT_NAME" = "domain-types" ] || [ "$PROJECT_NAME" = "rakia-codegen" ] || [ "$PROJECT_NAME" = "rakia-validate" ]; then
     case "$PROJECT_NAME" in
       schema-validate)
         echo "[$PROJECT_NAME] Validating seed data against protocol schemas..."
@@ -244,6 +252,16 @@ run_gate() {
         echo "[$PROJECT_NAME] Verifying schema codegen freshness..."
         pnpm run schema:codegen:ts -- --verify 2>&1 && \
         pnpm run schema:codegen:rs -- --verify 2>&1
+        rc=$?
+        ;;
+      rakia-codegen)
+        echo "[$PROJECT_NAME] Verifying rakia generated_types.rs is fresh..."
+        pnpm run rakia:codegen:rs:verify 2>&1
+        rc=$?
+        ;;
+      rakia-validate)
+        echo "[$PROJECT_NAME] Validating build-manifest.json files against rakia schema..."
+        pnpm run rakia:schema:validate 2>&1
         rc=$?
         ;;
       constants-sync)
@@ -356,6 +374,16 @@ run_gate() {
         pnpm run schema:codegen:rs -- --verify 2>&1
         rc=$?
         ;;
+      rakia-codegen)
+        echo "Verifying rakia generated_types.rs is fresh..."
+        pnpm run rakia:codegen:rs:verify 2>&1
+        rc=$?
+        ;;
+      rakia-validate)
+        echo "Validating build-manifest.json files against rakia schema..."
+        pnpm run rakia:schema:validate 2>&1
+        rc=$?
+        ;;
       genesis-a2o)
         pnpm run lint 2>&1 && pnpm run format:check 2>&1 && pnpm run typecheck 2>&1
         rc=$?
@@ -446,6 +474,8 @@ for PROJECT in $PROJECTS; do
       genesis-a2o)      PROJECT_DIR="genesis/a2o" ;;
       orchestrator)     PROJECT_DIR="genesis/orchestrator" ;;
       domain-types)     PROJECT_DIR="." ;;
+      rakia-codegen)    PROJECT_DIR="." ;;
+      rakia-validate)   PROJECT_DIR="." ;;
       *)                PROJECT_DIR="$PROJECT" ;;
     esac
   fi
