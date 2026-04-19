@@ -1654,6 +1654,16 @@
         "description": "Community contributions are not producing engagement or downstream learning",
         "instrument": "outcome-correlation",
         "polarity": "negative"
+      },
+      "peer-review-verified": {
+        "description": "A gate-process-declaration or universal-band-declaration has been reviewed by qualified peers and accepted as sound constitutional logic",
+        "instrument": "community-report",
+        "polarity": "positive"
+      },
+      "manifest-challenged": {
+        "description": "A gate-process-declaration has been formally challenged (incorrectness, scope-creep, or jurisdiction overreach)",
+        "instrument": "community-report",
+        "polarity": "negative"
       }
     }
   },
