@@ -59,11 +59,13 @@
 use std::collections::HashMap;
 use std::sync::{Arc, OnceLock};
 
+use async_trait::async_trait;
 use serde_json::json;
 use tracing::{info_span, Instrument};
 
 use crate::dag::attestation::DecisionAttestationBuilder;
 use crate::dag::executor::StepKind;
+use crate::dag::executors::aggregate_attestations::AttestationRecord;
 use crate::dag::executors::{
     AggregateAttestationsExecutor, AttestationResolver, ContentNodeResolver,
     ContextAssembleExecutor, EmbeddedContentNodeResolver, EscalateToReviewExecutor,
@@ -146,10 +148,17 @@ impl GateRegistry {
             let resolver =
                 Arc::new(EmbeddedContentNodeResolver::new(cid_map)) as Arc<dyn ContentNodeResolver>;
 
+            // Phase 5 DevContext: skip `assemble`; start at `aggregate` so
+            // pre-injected context fields (subject) are not overwritten by the
+            // Phase 3 stub that returns Value::Null for the "event" source.
+            // Parallel to the discernment-gate's entrypoint override above.
+            let mut decl = default_reach_gate_declaration();
+            decl.dag.entrypoint = "aggregate".to_string();
+
             gates.insert(
                 "reach-gate-v1",
                 GateEntry {
-                    declaration: default_reach_gate_declaration(),
+                    declaration: decl,
                     content_resolver: resolver,
                     gate_cid: REACH_GATE_V1_CID,
                 },
@@ -603,9 +612,14 @@ pub(crate) fn domain_gate_for_event(event: &RelationalImpactEvent) -> Option<&'s
 /// inject pre-populated context fields per gate name without changing this
 /// function's signature.  In production builds, the map is always empty and the
 /// context extension defaults to an empty `GateContext`.
+///
+/// `attestation_resolver_override`: when `Some`, the resolver replaces
+/// `NullAttestationResolver` inside `run_app_domain_gate`. Used by test builds
+/// to inject fixture attestation records for reach-gate E2E tests.
 pub(crate) async fn run_unified(
     event: &RelationalImpactEvent,
     ctx_extensions: HashMap<String, GateContext>,
+    attestation_resolver_override: Option<Arc<dyn AttestationResolver>>,
 ) -> Result<GateDecision, GateError> {
     // Step 1: universal-band must Allow first.
     let universal_decision = run_with_tracing(event).await?;
@@ -623,7 +637,34 @@ pub(crate) async fn run_unified(
     let ctx_extension = ctx_extensions.get(gate_name).cloned().unwrap_or_default();
 
     // Step 4: run the dispatched app-domain gate.
-    run_app_domain_gate(gate_name, event, ctx_extension).await
+    run_app_domain_gate(
+        gate_name,
+        event,
+        ctx_extension,
+        attestation_resolver_override,
+    )
+    .await
+}
+
+// ─── Arc<dyn AttestationResolver> adapter ────────────────────────────────────
+
+/// Thin newtype that wraps `Arc<dyn AttestationResolver>` and implements the
+/// trait by delegating, allowing the Arc to be erased into a `Box<dyn AttestationResolver>`.
+///
+/// Needed because `Arc<dyn Trait>` does not automatically coerce to
+/// `Box<dyn Trait>` when the trait has async methods (via `async_trait`).
+struct ArcAttestationResolverAdapter(Arc<dyn AttestationResolver>);
+
+#[async_trait]
+impl AttestationResolver for ArcAttestationResolverAdapter {
+    async fn fetch(
+        &self,
+        subject: &str,
+        kinds: &[String],
+        time_window: Option<&str>,
+    ) -> Result<Vec<AttestationRecord>, GateError> {
+        self.0.fetch(subject, kinds, time_window).await
+    }
 }
 
 // ─── Generic app-domain gate runner ──────────────────────────────────────────
@@ -637,6 +678,12 @@ pub(crate) async fn run_unified(
 /// `run_discernment_gate` is a thin convenience shim over this function that
 /// pre-populates context fields specific to the discernment-gate (`momentEntryHash`).
 ///
+/// `attestation_resolver_override`: when `Some`, replaces the default
+/// [`NullAttestationResolver`] for the one-off gate runner built here.  This
+/// allows test builds to inject fixture attestation records for reach-gate E2E
+/// tests without modifying the process-global singleton.  Phase 6+ will replace
+/// this with a DHT-backed resolver injected at process startup.
+///
 /// # Errors
 ///
 /// Returns `GateError::DagExecution` if `gate_name` is not in the registry.
@@ -644,6 +691,7 @@ pub(crate) async fn run_app_domain_gate(
     gate_name: &str,
     event: &RelationalImpactEvent,
     gate_context_extension: GateContext,
+    attestation_resolver_override: Option<Arc<dyn AttestationResolver>>,
 ) -> Result<GateDecision, GateError> {
     let runner = global_runner();
     let entry = runner.registry.get(gate_name).ok_or_else(|| {
@@ -672,11 +720,21 @@ pub(crate) async fn run_app_domain_gate(
 
     let context_summary_cid = ctx.to_summary_cid();
 
+    // Choose the attestation resolver: injected override takes precedence over
+    // the default NullAttestationResolver.
+    let attestation_resolver: Box<dyn AttestationResolver> =
+        if let Some(arc_resolver) = attestation_resolver_override {
+            // Wrap the Arc in a thin Box adapter so we satisfy the Box<dyn> contract.
+            Box::new(ArcAttestationResolverAdapter(arc_resolver))
+        } else {
+            Box::new(NullAttestationResolver)
+        };
+
     // Build a one-off DagRunner for this gate, re-using the registry's resolver.
     // The registry's declaration has the right entrypoint already set.
     let gate_runner = DagRunner::build_interpreter_and_wrap(
         entry.content_resolver.clone(),
-        Box::new(NullAttestationResolver),
+        attestation_resolver,
         entry.declaration.clone(),
     );
 
@@ -728,6 +786,7 @@ pub(crate) async fn run_discernment_gate(
         "discernment-gate-v1-mechanical",
         event,
         gate_context_extension,
+        None, // discernment-gate has no attestation step; resolver is unused
     )
     .await
 }

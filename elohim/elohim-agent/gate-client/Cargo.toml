@@ -81,3 +81,10 @@ name = "configure_runner"
 [[test]]
 name = "discernment_gate_integration"
 required-features = ["testing"]
+
+# Integration test: reach-gate v1 attestation-graph reach computation, end-to-end.
+# Requires the "testing" feature for __test_set_gate_ctx, __test_set_attestation_resolver,
+# __test_set_decision_override, and gate_client::testing helpers.
+[[test]]
+name = "reach_gate_integration"
+required-features = ["testing"]

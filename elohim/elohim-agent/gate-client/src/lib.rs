@@ -255,6 +255,47 @@ pub fn __test_set_gate_ctx(gate_name: &str, ctx: Option<GateContext>) {
     });
 }
 
+// ─── Test-only attestation resolver injection ─────────────────────────────────
+//
+// Allows integration tests to inject a concrete AttestationResolver for the next
+// `check()` call on this thread that routes to a gate with an
+// `aggregate-attestations` step (currently: reach-gate-v1).
+//
+// Design choice: flat thread-local (not gate-keyed).  When multiple gates with
+// AttestationResolver needs coexist in Phase 6+, consider a keyed variant
+// `__test_set_gate_attestation_resolver(gate_name, resolver)`.
+//
+// Usage:
+//   gate_client::__test_set_attestation_resolver(Some(
+//       Arc::new(StubAttestationResolver::single("subj", records))
+//   ));
+//   // ... call check(CapabilityInvoke{capability:"reach-negotiation"}) ...
+//   // resolver is auto-consumed; call with None to clear if needed.
+#[cfg(any(test, feature = "testing"))]
+thread_local! {
+    static ATTESTATION_RESOLVER: std::cell::RefCell<Option<std::sync::Arc<dyn AttestationResolver>>> =
+        std::cell::RefCell::new(None);
+}
+
+/// Set a one-shot [`AttestationResolver`] for the next `check()` call on this
+/// thread that invokes the `aggregate-attestations` step.
+///
+/// The resolver is consumed by `run_app_domain_gate` the first time it is
+/// called from this thread.  Pass `None` to clear any pending resolver.
+///
+/// # Phase 6+ note
+///
+/// When multiple gates with `AttestationResolver` needs coexist, extend this
+/// to a gate-keyed variant: `__test_set_gate_attestation_resolver(gate_name, resolver)`.
+///
+/// Only available in `#[cfg(test)]` or `feature = "testing"` builds.
+#[cfg(any(test, feature = "testing"))]
+pub fn __test_set_attestation_resolver(resolver: Option<std::sync::Arc<dyn AttestationResolver>>) {
+    ATTESTATION_RESOLVER.with(|cell| {
+        *cell.borrow_mut() = resolver;
+    });
+}
+
 /// Set a one-shot discernment context extension for the next `check()` call on
 /// this thread that routes to the discernment gate.
 ///
@@ -371,7 +412,13 @@ pub async fn check(event: RelationalImpactEvent) -> GateResult<GateDecision> {
     #[cfg(not(any(test, feature = "testing")))]
     let ctx_exts: std::collections::HashMap<String, GateContext> = std::collections::HashMap::new();
 
-    dag_runner::run_unified(&event, ctx_exts).await
+    // Consume the one-shot attestation resolver injection (test builds only).
+    #[cfg(any(test, feature = "testing"))]
+    let attestation_resolver_override = ATTESTATION_RESOLVER.with(|cell| cell.borrow_mut().take());
+    #[cfg(not(any(test, feature = "testing")))]
+    let attestation_resolver_override: Option<std::sync::Arc<dyn AttestationResolver>> = None;
+
+    dag_runner::run_unified(&event, ctx_exts, attestation_resolver_override).await
 }
 
 /// Synchronous variant for zome coordinator contexts (Holochain WASM).
@@ -407,11 +454,21 @@ pub fn check_blocking(event: RelationalImpactEvent) -> GateResult<GateDecision> 
     #[cfg(not(any(test, feature = "testing")))]
     let ctx_exts: std::collections::HashMap<String, GateContext> = std::collections::HashMap::new();
 
+    // Consume the one-shot attestation resolver injection (test builds only).
+    #[cfg(any(test, feature = "testing"))]
+    let attestation_resolver_override = ATTESTATION_RESOLVER.with(|cell| cell.borrow_mut().take());
+    #[cfg(not(any(test, feature = "testing")))]
+    let attestation_resolver_override: Option<std::sync::Arc<dyn AttestationResolver>> = None;
+
     tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
         .map_err(|e| GateError::DagExecution(format!("runtime build error: {e}")))?
-        .block_on(dag_runner::run_unified(&event, ctx_exts))
+        .block_on(dag_runner::run_unified(
+            &event,
+            ctx_exts,
+            attestation_resolver_override,
+        ))
 }
 
 /// Configure the gate client — transport, phase override, trust assessor.
