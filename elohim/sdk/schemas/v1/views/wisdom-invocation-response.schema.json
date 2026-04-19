@@ -1,0 +1,56 @@
+{
+  "$id": "epr:schema:view:wisdom-invocation-response",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "WisdomInvocationResponse",
+  "description": "Source of truth: elohim-agent-service inference result (Operational, Category C). The phase field is the authoritative marker: 'elohim-active' ONLY when a real LLM call produced this response; 'dev-context' when the service returned a stub (no API key, backend unavailable, or error fallback). This phase is the signal downstream gate code uses for attestation phase-marking.",
+  "type": "object",
+  "required": [
+    "decision",
+    "phase",
+    "reasoning"
+  ],
+  "properties": {
+    "decision": {
+      "type": "string",
+      "enum": ["allow", "decline", "escalate", "verdict", "need-deeper"],
+      "description": "Wisdom's verdict on the relational impact event"
+    },
+    "phase": {
+      "type": "string",
+      "enum": ["dev-context", "elohim-active"],
+      "description": "Authoritative phase marker. 'elohim-active' ONLY if a real LLM inference produced this response. 'dev-context' if stubbed, degraded, or no backend configured."
+    },
+    "reasoning": {
+      "type": "object",
+      "required": ["primaryPrinciple", "confidence", "summary", "phaseNote"],
+      "properties": {
+        "primaryPrinciple": {
+          "type": "string",
+          "description": "The constitutional principle the wisdom call applied as its primary guide"
+        },
+        "confidence": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "description": "Confidence score for the decision (0.0 = no confidence / stub; 1.0 = fully confident)"
+        },
+        "summary": {
+          "type": "string",
+          "description": "Human-readable explanation of the reasoning"
+        },
+        "phaseNote": {
+          "type": "string",
+          "description": "Contextual note about the phase — for dev-context: explains stub behaviour; for elohim-active: may be empty"
+        }
+      },
+      "additionalProperties": false,
+      "description": "Reasoning audit trail for the wisdom decision"
+    },
+    "sideEffects": {
+      "type": "array",
+      "items": {},
+      "description": "Side effects to apply as a result of the verdict. Reserved for Phase 9+ when verdicts carry executable side-effect payloads. Callers MUST ignore unknown entries."
+    }
+  },
+  "additionalProperties": false
+}

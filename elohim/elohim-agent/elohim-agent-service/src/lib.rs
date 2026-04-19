@@ -31,6 +31,7 @@ pub mod response;
 pub mod service;
 pub mod stream;
 pub mod types;
+pub mod wisdom;
 
 // Re-export main types for convenience
 pub use backend::traits::{CompletionRequest, CompletionResponse, LlmBackend, LlmError};
@@ -39,3 +40,7 @@ pub use request::{ElohimRequest, RequestPriority};
 pub use response::{ElohimResponse, ResponseStatus};
 pub use service::{ElohimAgentService, ServiceError};
 pub use types::*;
+pub use wisdom::{
+    invoke_wisdom, invoke_wisdom_with_backend, WisdomDecision, WisdomInvocationInput,
+    WisdomInvocationResponse, WisdomPhase, WisdomReasoning,
+};
