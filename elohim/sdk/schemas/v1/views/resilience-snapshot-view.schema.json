@@ -1,0 +1,49 @@
+{
+  "$id": "resilience-snapshot-view.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ResilienceSnapshotView",
+  "description": "Enriched household-first resilience claim consumed by <elohim-resilience-snapshot>. Extends HouseholdResilienceView with commitment-backed counts, diversity score, regional distribution, and placement-gap rollup. Source of truth: computed projection. Operational Category C.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contentId",
+    "householdsStewarding",
+    "commitmentBackedHouseholds",
+    "diversityScore",
+    "regionalDistribution",
+    "placementGaps",
+    "protectionStatus"
+  ],
+  "properties": {
+    "contentId":                  { "type": "string" },
+    "householdsStewarding":       { "type": "integer", "minimum": 0 },
+    "commitmentBackedHouseholds": { "type": "integer", "minimum": 0, "description": "Households with an active REA commitment covering this content." },
+    "diversityScore":             { "type": "number",  "minimum": 0, "maximum": 1, "description": "0..1 — ratio of achieved distinct-household placements to requested." },
+    "regionalDistribution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["local", "regional", "global", "unknown"],
+      "properties": {
+        "local":    { "type": "integer", "minimum": 0 },
+        "regional": { "type": "integer", "minimum": 0 },
+        "global":   { "type": "integer", "minimum": 0 },
+        "unknown":  { "type": "integer", "minimum": 0 }
+      }
+    },
+    "placementGaps": {
+      "type": "array",
+      "items": { "$ref": "placement-gap-view.schema.json" }
+    },
+    "protectionStatus": { "enum": ["at-risk", "partial", "protected"] },
+    "householdsReciprocated": { "type": "integer", "minimum": 0 },
+    "details": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "stewardHouseholds": { "type": "array", "items": { "type": "string" } },
+        "onlinePeerCount":   { "type": "integer", "minimum": 0 },
+        "healthScore":       { "type": "number",  "minimum": 0, "maximum": 1 }
+      }
+    }
+  }
+}
