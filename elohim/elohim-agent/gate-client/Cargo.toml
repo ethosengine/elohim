@@ -97,3 +97,12 @@ required-features = ["testing"]
 [[test]]
 name = "activation_e2e"
 required-features = ["testing"]
+
+# Integration test: Phase 9 Task 9.1 — identity threading E2E.
+# Verifies elohim_id / elohim_substance_cid flow from GateClientConfig through
+# configure_runner_with_config → DagRunner → DecisionAttestationBuilder.
+# Uses a separate binary so the OnceLock is fresh.
+# Requires "testing" feature for check() + configure_runner_with_config.
+[[test]]
+name = "identity_threading_e2e"
+required-features = ["testing"]

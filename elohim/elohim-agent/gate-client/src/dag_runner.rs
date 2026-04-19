@@ -219,6 +219,10 @@ impl GateRegistry {
 /// Phase 8: holds a `WisdomTransport` that determines whether wisdom-invoke
 /// steps use the hardcoded mock or the in-process `elohim_agent::wisdom`
 /// function.  The default (`Mock`) preserves all existing DevContext behaviour.
+///
+/// Phase 9: holds optional `elohim_id` / `elohim_substance_cid` that are threaded
+/// into every `DecisionAttestationBuilder` emitted from this runner.  When `None`
+/// the builder falls back to `DEV_CONTEXT_ELOHIM_ID` / `DEV_CONTEXT_SUBSTANCE_CID`.
 pub struct DagRunner {
     interpreter: DagInterpreter,
     declaration: GateProcessDeclaration,
@@ -226,6 +230,14 @@ pub struct DagRunner {
     registry: GateRegistry,
     /// How wisdom-invoke steps reach the wisdom engine.
     wisdom_transport: WisdomTransport,
+    /// AgentPubKey of the elohim making gate decisions.
+    ///
+    /// `None` → `DecisionAttestationBuilder` uses [`DEV_CONTEXT_ELOHIM_ID`] sentinel.
+    elohim_id: Option<String>,
+    /// CID of the elohim's substance declaration (model + constitution + deployment context).
+    ///
+    /// `None` → `DecisionAttestationBuilder` uses [`DEV_CONTEXT_SUBSTANCE_CID`] sentinel.
+    elohim_substance_cid: Option<String>,
 }
 
 // DagRunner auto-derives Send + Sync because:
@@ -436,6 +448,8 @@ impl DagRunner {
             declaration,
             registry: GateRegistry::build(),
             wisdom_transport,
+            elohim_id: None,
+            elohim_substance_cid: None,
         }
     }
 
@@ -454,9 +468,11 @@ impl DagRunner {
     pub fn with_capability_dispatcher(self, dispatcher: Arc<dyn CapabilityDispatcher>) -> Self {
         // Re-build the interpreter to swap in the new dispatcher.  The registry
         // is rebuilt too; GateRegistry::build() is cheap (just HashMap + YAML).
-        // Preserve the existing wisdom_transport so callers who set InProcess
-        // don't lose it when swapping the dispatcher.
-        Self::build_interpreter_and_wrap_with_dispatcher_and_wisdom(
+        // Preserve the existing wisdom_transport and elohim identity fields so
+        // callers who set InProcess / with_elohim_identity don't lose them here.
+        let elohim_id = self.elohim_id;
+        let elohim_substance_cid = self.elohim_substance_cid;
+        let mut runner = Self::build_interpreter_and_wrap_with_dispatcher_and_wisdom(
             // We cannot recover the content_resolver from the existing interpreter,
             // so default to an empty EmbeddedContentNodeResolver.  Callers who need
             // both a real content resolver AND a real capability dispatcher should
@@ -468,7 +484,10 @@ impl DagRunner {
             self.declaration,
             Some(dispatcher),
             self.wisdom_transport,
-        )
+        );
+        runner.elohim_id = elohim_id;
+        runner.elohim_substance_cid = elohim_substance_cid;
+        runner
     }
 
     /// Builder: set the `WisdomTransport` for this runner.
@@ -489,7 +508,11 @@ impl DagRunner {
     /// let runner = DagRunner::new().with_wisdom_transport(WisdomTransport::InProcess);
     /// ```
     pub fn with_wisdom_transport(self, wisdom_transport: WisdomTransport) -> Self {
-        Self::build_interpreter_and_wrap_with_dispatcher_and_wisdom(
+        // Preserve elohim identity fields — callers may chain
+        // `.with_wisdom_transport(...).with_elohim_identity(...)` in either order.
+        let elohim_id = self.elohim_id;
+        let elohim_substance_cid = self.elohim_substance_cid;
+        let mut runner = Self::build_interpreter_and_wrap_with_dispatcher_and_wisdom(
             Arc::new(EmbeddedContentNodeResolver::new(
                 std::collections::HashMap::new(),
             )),
@@ -497,7 +520,46 @@ impl DagRunner {
             self.declaration,
             None,
             wisdom_transport,
-        )
+        );
+        runner.elohim_id = elohim_id;
+        runner.elohim_substance_cid = elohim_substance_cid;
+        runner
+    }
+
+    /// Builder: set the elohim identity fields threaded into every attestation
+    /// emitted from this runner.
+    ///
+    /// Calling this does **not** affect phase observation — the phase is always
+    /// observed from the wisdom-invoke outcome.  It only determines which agent
+    /// key and substance CID appear in the `DecisionAttestationPayload`.
+    ///
+    /// Both parameters accept `Into<String>` so callers can pass `&str` or
+    /// `String` without explicit conversion.
+    ///
+    /// # DevContext fallback
+    ///
+    /// If this builder method is never called, or if `DagRunner::new()` is used
+    /// directly, the runner emits attestations with
+    /// `DEV_CONTEXT_ELOHIM_ID` / `DEV_CONTEXT_SUBSTANCE_CID` sentinels.
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// use gate_client::dag_runner::DagRunner;
+    /// use gate_client::transport::WisdomTransport;
+    ///
+    /// let runner = DagRunner::new()
+    ///     .with_wisdom_transport(WisdomTransport::InProcess)
+    ///     .with_elohim_identity("uhCAkRealAgentPubKey", "sha256-substance-cid-abc");
+    /// ```
+    pub fn with_elohim_identity(
+        mut self,
+        elohim_id: impl Into<String>,
+        elohim_substance_cid: impl Into<String>,
+    ) -> Self {
+        self.elohim_id = Some(elohim_id.into());
+        self.elohim_substance_cid = Some(elohim_substance_cid.into());
+        self
     }
 
     /// Execute the universal-band DAG for the given event and return the
@@ -602,7 +664,20 @@ pub fn configure_runner(resolver: Box<dyn ContentNodeResolver>) -> Result<(), Al
 pub fn configure_runner_with_config(
     config: crate::transport::GateClientConfig,
 ) -> Result<(), AlreadyConfigured> {
-    let runner = DagRunner::new().with_wisdom_transport(config.wisdom_transport);
+    // Phase 9: thread elohim_id and elohim_substance_cid from config into the runner.
+    // When both are None the runner falls back to DEV_CONTEXT_* sentinels.
+    let runner = {
+        let mut r = DagRunner::new().with_wisdom_transport(config.wisdom_transport);
+        if config.elohim_id.is_some() || config.elohim_substance_cid.is_some() {
+            // Use with_elohim_identity only when at least one field is set;
+            // the builder accepts Option-flavoured values via separate assignment
+            // rather than unwrap so we use direct field assignment to preserve
+            // mixed Some/None correctly.
+            r.elohim_id = config.elohim_id;
+            r.elohim_substance_cid = config.elohim_substance_cid;
+        }
+        r
+    };
     RUNNER.set(Arc::new(runner)).map_err(|_| AlreadyConfigured)
 }
 
@@ -743,9 +818,13 @@ pub async fn run_with_tracing(event: &RelationalImpactEvent) -> Result<GateDecis
 
     let mut decision = runner.run(event, initial_ctx).instrument(span).await?;
 
-    // Phase 4: compute and attach the attestation CID.
+    // Phase 4/9: compute and attach the attestation CID.
     // The CID is computed in-process; the DHT write is Phase 6+ activation.
-    let builder = DecisionAttestationBuilder::new(None, None);
+    // Phase 9: runner carries real identity if configure_runner_with_config was called.
+    let builder = DecisionAttestationBuilder::new(
+        runner.elohim_id.clone(),
+        runner.elohim_substance_cid.clone(),
+    );
     let (_, cid) = builder.build_with_cid(
         &decision,
         ACTIVE_UNIVERSAL_BAND_NAME,
@@ -988,8 +1067,12 @@ pub(crate) async fn run_app_domain_gate(
     let span = info_span!("gate_check", event_kind = event.kind(), band = gate_name);
     let mut decision = gate_runner.run(event, ctx).instrument(span).await?;
 
-    // Compute and attach the attestation CID.
-    let builder = DecisionAttestationBuilder::new(None, None);
+    // Phase 9: compute and attach the attestation CID using the runner's real identity.
+    // runner is already in scope from the registry lookup above.
+    let builder = DecisionAttestationBuilder::new(
+        runner.elohim_id.clone(),
+        runner.elohim_substance_cid.clone(),
+    );
     let (_, cid) = builder.build_with_cid(
         &decision,
         gate_name,
@@ -1328,6 +1411,262 @@ mod tests {
             decision.is_allowed(),
             "Decision must still be Allow; got: {:?}",
             decision.status
+        );
+    }
+
+    // ─── Phase 9: with_elohim_identity builder stores fields ─────────────────
+
+    #[test]
+    fn with_elohim_identity_stores_id_and_substance_cid() {
+        let runner = DagRunner::new().with_elohim_identity("agent-x", "substance-y");
+
+        assert_eq!(
+            runner.elohim_id.as_deref(),
+            Some("agent-x"),
+            "elohim_id must be stored by with_elohim_identity"
+        );
+        assert_eq!(
+            runner.elohim_substance_cid.as_deref(),
+            Some("substance-y"),
+            "elohim_substance_cid must be stored by with_elohim_identity"
+        );
+    }
+
+    #[test]
+    fn dag_runner_new_has_no_identity_fields() {
+        let runner = DagRunner::new();
+        assert!(
+            runner.elohim_id.is_none(),
+            "DagRunner::new() must have elohim_id = None (DevContext fallback)"
+        );
+        assert!(
+            runner.elohim_substance_cid.is_none(),
+            "DagRunner::new() must have elohim_substance_cid = None (DevContext fallback)"
+        );
+    }
+
+    // ─── Phase 9: with_wisdom_transport preserves elohim identity ────────────
+
+    #[test]
+    fn with_wisdom_transport_preserves_elohim_identity() {
+        let runner = DagRunner::new()
+            .with_elohim_identity("agent-persist", "substance-persist")
+            .with_wisdom_transport(WisdomTransport::Mock);
+
+        assert_eq!(
+            runner.elohim_id.as_deref(),
+            Some("agent-persist"),
+            "with_wisdom_transport must not clear elohim_id"
+        );
+        assert_eq!(
+            runner.elohim_substance_cid.as_deref(),
+            Some("substance-persist"),
+            "with_wisdom_transport must not clear elohim_substance_cid"
+        );
+    }
+
+    #[test]
+    fn with_elohim_identity_after_with_wisdom_transport_sets_both() {
+        let runner = DagRunner::new()
+            .with_wisdom_transport(WisdomTransport::Mock)
+            .with_elohim_identity("agent-after", "substance-after");
+
+        assert_eq!(runner.elohim_id.as_deref(), Some("agent-after"));
+        assert_eq!(
+            runner.elohim_substance_cid.as_deref(),
+            Some("substance-after")
+        );
+    }
+
+    // ─── Phase 9: attestation payload carries real identity ──────────────────
+    //
+    // Verify that a runner with identity produces a different attestation CID
+    // compared to a runner without identity (which uses DevContext sentinels).
+    // We do this by constructing the attestation builders that each runner would
+    // use and comparing the resulting payloads directly — this avoids the
+    // singleton OnceLock constraint.
+
+    #[tokio::test]
+    async fn runner_with_identity_produces_non_sentinel_attestation() {
+        use crate::dag::attestation::{
+            DecisionAttestationBuilder, DEV_CONTEXT_ELOHIM_ID, DEV_CONTEXT_SUBSTANCE_CID,
+        };
+        use crate::types::{ConstitutionalReasoningSummary, GateDecision, GateStatus};
+
+        let runner_with_identity =
+            DagRunner::new().with_elohim_identity("uhCAkRealAgent", "sha256-real-substance");
+
+        // Build an attestation using the runner's identity fields directly,
+        // mirroring what run_with_tracing / run_app_domain_gate do.
+        let builder_with_identity = DecisionAttestationBuilder::new(
+            runner_with_identity.elohim_id.clone(),
+            runner_with_identity.elohim_substance_cid.clone(),
+        );
+        let builder_dev = DecisionAttestationBuilder::new(None, None);
+
+        let event = content_publish_event();
+        let decision = GateDecision {
+            status: GateStatus::Allow { exempt: false },
+            reasoning: ConstitutionalReasoningSummary {
+                primary_principle: "test".to_string(),
+                summary: "test".to_string(),
+                confidence: 0.9,
+                phase_note: "test".to_string(),
+            },
+            side_effects: vec![],
+            decision_attestation_cid: None,
+            phase: crate::phase::Phase::DevContext,
+        };
+
+        let (payload_real, cid_real) = builder_with_identity.build_with_cid(
+            &decision,
+            "universal-band-v1",
+            "epr:gates:universal-band-v1",
+            &event,
+            "ctx".to_string(),
+            "uband".to_string(),
+        );
+        let (payload_dev, cid_dev) = builder_dev.build_with_cid(
+            &decision,
+            "universal-band-v1",
+            "epr:gates:universal-band-v1",
+            &event,
+            "ctx".to_string(),
+            "uband".to_string(),
+        );
+
+        // Real identity payload must carry the actual values.
+        assert_eq!(payload_real.elohim_id, "uhCAkRealAgent");
+        assert_eq!(payload_real.elohim_substance_cid, "sha256-real-substance");
+
+        // DevContext payload must carry the sentinel strings.
+        assert_eq!(payload_dev.elohim_id, DEV_CONTEXT_ELOHIM_ID);
+        assert_eq!(payload_dev.elohim_substance_cid, DEV_CONTEXT_SUBSTANCE_CID);
+
+        // CIDs must differ — identity is part of the hash input.
+        assert_ne!(
+            cid_real, cid_dev,
+            "Runner with real identity must produce a different attestation CID \
+             than a runner using DevContext sentinels"
+        );
+    }
+
+    // ─── Phase 9: runner without identity produces DevContext sentinel CID ────
+
+    #[tokio::test]
+    async fn runner_without_identity_produces_dev_context_sentinel_attestation() {
+        use crate::dag::attestation::{
+            DecisionAttestationBuilder, DEV_CONTEXT_ELOHIM_ID, DEV_CONTEXT_SUBSTANCE_CID,
+        };
+        use crate::types::{ConstitutionalReasoningSummary, GateDecision, GateStatus};
+
+        let runner = DagRunner::new(); // no identity set
+
+        // Simulate what run_with_tracing does.
+        let builder = DecisionAttestationBuilder::new(
+            runner.elohim_id.clone(),
+            runner.elohim_substance_cid.clone(),
+        );
+
+        let event = content_publish_event();
+        let decision = GateDecision {
+            status: GateStatus::Allow { exempt: false },
+            reasoning: ConstitutionalReasoningSummary {
+                primary_principle: "test".to_string(),
+                summary: "test".to_string(),
+                confidence: 0.9,
+                phase_note: "test".to_string(),
+            },
+            side_effects: vec![],
+            decision_attestation_cid: None,
+            phase: crate::phase::Phase::DevContext,
+        };
+
+        let (payload, _cid) = builder.build_with_cid(
+            &decision,
+            "universal-band-v1",
+            "epr:gates:universal-band-v1",
+            &event,
+            "ctx".to_string(),
+            "uband".to_string(),
+        );
+
+        assert_eq!(
+            payload.elohim_id, DEV_CONTEXT_ELOHIM_ID,
+            "Runner without identity must produce DevContext sentinel in attestation"
+        );
+        assert_eq!(
+            payload.elohim_substance_cid, DEV_CONTEXT_SUBSTANCE_CID,
+            "Runner without identity must produce DevContext substance sentinel in attestation"
+        );
+    }
+
+    // ─── Phase 9: configure_runner_with_config stores identity in runner fields
+
+    #[test]
+    fn configure_runner_with_config_identity_fields_are_stored() {
+        use crate::transport::{GateClientConfig, WisdomTransport};
+
+        // Construct a config with explicit identity (as configure_runner_with_config would receive).
+        let config = GateClientConfig {
+            wisdom_transport: WisdomTransport::Mock,
+            elohim_id: Some("uhCAkConfigAgent".to_string()),
+            elohim_substance_cid: Some("sha256-config-substance".to_string()),
+            ..Default::default()
+        };
+
+        // We cannot install this into the global singleton (already set in this binary),
+        // so we replicate the configure_runner_with_config construction path directly
+        // and verify the runner would carry the identity.
+        let runner = {
+            let mut r = DagRunner::new().with_wisdom_transport(config.wisdom_transport.clone());
+            if config.elohim_id.is_some() || config.elohim_substance_cid.is_some() {
+                r.elohim_id = config.elohim_id;
+                r.elohim_substance_cid = config.elohim_substance_cid;
+            }
+            r
+        };
+
+        assert_eq!(
+            runner.elohim_id.as_deref(),
+            Some("uhCAkConfigAgent"),
+            "Runner built from config must carry elohim_id"
+        );
+        assert_eq!(
+            runner.elohim_substance_cid.as_deref(),
+            Some("sha256-config-substance"),
+            "Runner built from config must carry elohim_substance_cid"
+        );
+    }
+
+    #[test]
+    fn configure_runner_with_config_none_identity_leaves_runner_none() {
+        use crate::transport::{GateClientConfig, WisdomTransport};
+
+        let config = GateClientConfig {
+            wisdom_transport: WisdomTransport::Mock,
+            elohim_id: None,
+            elohim_substance_cid: None,
+            ..Default::default()
+        };
+
+        // Replicate the construction path.
+        let runner = {
+            let mut r = DagRunner::new().with_wisdom_transport(config.wisdom_transport.clone());
+            if config.elohim_id.is_some() || config.elohim_substance_cid.is_some() {
+                r.elohim_id = config.elohim_id;
+                r.elohim_substance_cid = config.elohim_substance_cid;
+            }
+            r
+        };
+
+        assert!(
+            runner.elohim_id.is_none(),
+            "Runner built from config with no identity must have elohim_id = None"
+        );
+        assert!(
+            runner.elohim_substance_cid.is_none(),
+            "Runner built from config with no identity must have elohim_substance_cid = None"
         );
     }
 }
