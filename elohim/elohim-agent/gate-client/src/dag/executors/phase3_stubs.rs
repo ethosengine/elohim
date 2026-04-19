@@ -1,12 +1,24 @@
 //! Pull resolvers for `ContextAssembleExecutor`.
 //!
-//! Two resolvers are real (HTTP-based, honest-degradation):
+//! All four resolvers are real HTTP-based implementations with honest degradation:
 //! - [`ElohimStorageResolver`] — HTTP GET to an elohim-storage endpoint.
 //! - [`ManifestResolver`] — HTTP GET to the elohim-storage manifest endpoint.
+//! - [`SourceChainResolver`] — HTTP GET to the conductor-bridge source-chain endpoint.
+//! - [`DhtResolver`] — HTTP GET to the conductor-bridge DHT endpoint.
 //!
-//! Two resolvers remain stubs pending deeper host-binding work:
-//! - [`SourceChainResolver`] — Phase 10+ (requires conductor-bridge or HDK integration).
-//! - [`DhtResolver`] — Phase 10+ (requires conductor-bridge for DHT queries).
+//! All four are registered by `configure_runner_with_config` when
+//! `elohim_storage_base_url` is set — they share the same origin as the
+//! storage/manifest resolvers.
+//!
+//! # Conductor-bridge status (Phase 10)
+//!
+//! `SourceChainResolver` and `DhtResolver` target real HTTP endpoints in
+//! elohim-storage (`GET /db/source-chain/{agent_id}/entries` and
+//! `GET /db/dht/{entry_hash}`).  The HTTP pipes are wired end-to-end.
+//! The conductor query layer (HcClient wired into HttpServer) is deferred to
+//! Phase 11.  Until then, elohim-storage returns empty arrays / 404 responses,
+//! which these resolvers degrade to `Value::Null` — gates complete with null
+//! context rather than failing.
 //!
 //! # Honest degradation
 //!
@@ -198,80 +210,199 @@ impl PullResolver for ManifestResolver {
     }
 }
 
-// ─── SourceChainResolver (stub, Phase 10+) ────────────────────────────────────
+// ─── SourceChainResolver (real, HTTP-based) ───────────────────────────────────
 
-/// Source-chain resolver (stub — Phase 10+ deferred).
+/// Pull resolver that issues HTTP GET requests to the elohim-storage
+/// conductor-bridge source-chain endpoint.
 ///
-/// Reading from a persona's source-chain requires one of:
-/// - HDK integration from inside a zome (i.e., running gate-client inside a
-///   Holochain WASM context, which is the `gate-client-zome` pure-sync bridge
-///   work deferred to Phase 10+), OR
-/// - A conductor-bridge HTTP endpoint that exposes source-chain queries over
-///   HTTP (e.g., an `elohim-agent-service` or sidecar that holds an open
-///   app-WS connection to the conductor and accepts `GET /source-chain/{query}`
-///   requests).
+/// # Query convention
 ///
-/// Neither bridge exists yet. This resolver returns `Value::Null` with a
-/// `tracing::warn` so the gate degrades honestly rather than failing.
+/// The `query` parameter is treated as a URL path fragment appended to
+/// `{base_url}/db/source-chain`. Examples:
+/// - `/{agent_id}/entries` → all source-chain entries for an agent
+/// - `/{agent_id}/entries?filter=content-type:concept` → filtered entries
 ///
-/// # Phase 10+ migration path
+/// These paths correspond to `GET /db/source-chain/{agent_id}/entries` in
+/// elohim-storage (added Task 10.2 Phase 10).
 ///
-/// Option A — Conductor-bridge HTTP endpoint:
-/// Replace this struct with an HTTP-based resolver (similar to
-/// [`ElohimStorageResolver`]) that calls the conductor bridge at a configurable
-/// URL. Add `source_chain_bridge_url: Option<String>` to [`GateClientConfig`]
-/// and register the real resolver from `configure_runner_with_config`.
+/// # Conductor-bridge status (Phase 10)
 ///
-/// Option B — Zome-side (gate-client-zome):
-/// Run gate-client inside a Holochain coordinator zome using the pure-sync
-/// bridge. This resolver becomes irrelevant; the HDK provides source-chain
-/// access natively.
-pub(super) struct SourceChainResolver;
+/// The HTTP pipe is wired end-to-end.  The conductor query layer (zome call
+/// via HcClient) is deferred to Phase 11 — elohim-storage currently returns
+/// an empty `entries: []` array.  This resolver interprets that as a JSON
+/// object (success) and returns it; callers that need a non-null value will
+/// see `{"agentId": ..., "entries": [], "phase": "10-stub"}`.
+///
+/// # Honest degradation
+///
+/// | HTTP outcome          | Resolver response                                  |
+/// |-----------------------|----------------------------------------------------|
+/// | 200 with valid JSON   | `Ok(parsed_value)`                                 |
+/// | 200 with bad JSON     | `Err(GateError::ContextAssembly)` — caller logs    |
+/// | 404                   | `Ok(Value::Null)` with `tracing::debug`            |
+/// | Other 4xx / 5xx       | `Ok(Value::Null)` with `tracing::warn`             |
+/// | Network / TLS error   | `Ok(Value::Null)` with `tracing::warn`             |
+pub struct SourceChainResolver {
+    base_url: String,
+    http_client: reqwest::Client,
+}
+
+impl SourceChainResolver {
+    /// Construct a resolver pointing at `base_url`.
+    ///
+    /// `base_url` should be a bare origin, e.g. `"http://localhost:8090"`.
+    /// A trailing slash is stripped; the `query` parameter provides the path
+    /// fragment after `/db/source-chain`.
+    pub fn new(base_url: impl Into<String>) -> Self {
+        Self {
+            base_url: base_url.into(),
+            http_client: reqwest::Client::new(),
+        }
+    }
+}
 
 #[async_trait]
 impl PullResolver for SourceChainResolver {
     async fn resolve(&self, query: &str) -> Result<Value, GateError> {
-        warn!(
-            pull.source = "source-chain",
-            pull.query = query,
-            "source-chain resolver is a Phase 10+ stub (requires conductor-bridge \
-             or HDK integration); returning null — gate degrades honestly"
+        let url = format!(
+            "{}/db/source-chain{}",
+            self.base_url.trim_end_matches('/'),
+            query
         );
-        Ok(Value::Null)
+
+        match self.http_client.get(&url).send().await {
+            Ok(response) if response.status().is_success() => {
+                response.json::<Value>().await.map_err(|e| {
+                    GateError::ContextAssembly(format!(
+                        "source-chain resolver: JSON parse error for {url}: {e}"
+                    ))
+                })
+            }
+            Ok(response) if response.status() == reqwest::StatusCode::NOT_FOUND => {
+                debug!(
+                    pull.source = "source-chain",
+                    pull.query = query,
+                    url = %url,
+                    "source-chain: 404 not found; returning null"
+                );
+                Ok(Value::Null)
+            }
+            Ok(response) => {
+                warn!(
+                    pull.source = "source-chain",
+                    pull.query = query,
+                    url = %url,
+                    status = %response.status(),
+                    "source-chain resolver: non-success status; returning null (honest degradation)"
+                );
+                Ok(Value::Null)
+            }
+            Err(e) => {
+                warn!(
+                    pull.source = "source-chain",
+                    pull.query = query,
+                    url = %url,
+                    error = %e,
+                    "source-chain resolver: network error; returning null (honest degradation)"
+                );
+                Ok(Value::Null)
+            }
+        }
     }
 }
 
-// ─── DhtResolver (stub, Phase 10+) ────────────────────────────────────────────
+// ─── DhtResolver (real, HTTP-based) ───────────────────────────────────────────
 
-/// DHT resolver (stub — Phase 10+ deferred).
+/// Pull resolver that issues HTTP GET requests to the elohim-storage
+/// conductor-bridge DHT endpoint.
 ///
-/// Reading from the DHT requires a conductor-bridge endpoint that exposes DHT
-/// entry lookups over HTTP (i.e., an `elohim-agent-service` or sidecar that
-/// holds an open app-WS connection to the Holochain conductor and accepts DHT
-/// GET requests). This is distinct from the Holochain zome path — it is a
-/// native Rust HTTP server that proxies DHT reads from the app-WS.
+/// # Query convention
 ///
-/// This resolver returns `Value::Null` with a `tracing::warn` so the gate
-/// degrades honestly rather than failing.
+/// The `query` parameter is treated as a URL path fragment appended to
+/// `{base_url}/db/dht`. Examples:
+/// - `/{entry_hash}` → fetch a DHT entry by hash (ActionHash or EntryHash)
 ///
-/// # Phase 10+ migration path
+/// These paths correspond to `GET /db/dht/{entry_hash}` in elohim-storage
+/// (added Task 10.2 Phase 10).
 ///
-/// Add a `dht_bridge_url: Option<String>` to [`GateClientConfig`] and
-/// replace this stub with an HTTP-based resolver (similar to
-/// [`ElohimStorageResolver`]) that calls the conductor bridge. Register the
-/// real resolver from `configure_runner_with_config` when the URL is present.
-pub(super) struct DhtResolver;
+/// # Conductor-bridge status (Phase 10)
+///
+/// The HTTP pipe is wired end-to-end.  The conductor query layer (zome call
+/// via HcClient) is deferred to Phase 11 — elohim-storage currently returns
+/// 404 for all DHT queries.  This resolver maps 404 → `Value::Null` (debug
+/// log), so gates degrade honestly rather than failing.
+///
+/// # Honest degradation
+///
+/// | HTTP outcome          | Resolver response                                  |
+/// |-----------------------|----------------------------------------------------|
+/// | 200 with valid JSON   | `Ok(parsed_value)`                                 |
+/// | 200 with bad JSON     | `Err(GateError::ContextAssembly)` — caller logs    |
+/// | 404                   | `Ok(Value::Null)` with `tracing::debug`            |
+/// | Other 4xx / 5xx       | `Ok(Value::Null)` with `tracing::warn`             |
+/// | Network / TLS error   | `Ok(Value::Null)` with `tracing::warn`             |
+pub struct DhtResolver {
+    base_url: String,
+    http_client: reqwest::Client,
+}
+
+impl DhtResolver {
+    /// Construct a resolver pointing at `base_url`.
+    ///
+    /// `base_url` should be a bare origin, e.g. `"http://localhost:8090"`.
+    /// A trailing slash is stripped; the `query` parameter provides the path
+    /// fragment after `/db/dht`.
+    pub fn new(base_url: impl Into<String>) -> Self {
+        Self {
+            base_url: base_url.into(),
+            http_client: reqwest::Client::new(),
+        }
+    }
+}
 
 #[async_trait]
 impl PullResolver for DhtResolver {
     async fn resolve(&self, query: &str) -> Result<Value, GateError> {
-        warn!(
-            pull.source = "dht",
-            pull.query = query,
-            "DHT resolver is a Phase 10+ stub (requires conductor-bridge HTTP \
-             endpoint over app-WS); returning null — gate degrades honestly"
-        );
-        Ok(Value::Null)
+        let url = format!("{}/db/dht{}", self.base_url.trim_end_matches('/'), query);
+
+        match self.http_client.get(&url).send().await {
+            Ok(response) if response.status().is_success() => {
+                response.json::<Value>().await.map_err(|e| {
+                    GateError::ContextAssembly(format!(
+                        "dht resolver: JSON parse error for {url}: {e}"
+                    ))
+                })
+            }
+            Ok(response) if response.status() == reqwest::StatusCode::NOT_FOUND => {
+                debug!(
+                    pull.source = "dht",
+                    pull.query = query,
+                    url = %url,
+                    "dht resolver: 404 not found; returning null (normal for absent entries)"
+                );
+                Ok(Value::Null)
+            }
+            Ok(response) => {
+                warn!(
+                    pull.source = "dht",
+                    pull.query = query,
+                    url = %url,
+                    status = %response.status(),
+                    "dht resolver: non-success status; returning null (honest degradation)"
+                );
+                Ok(Value::Null)
+            }
+            Err(e) => {
+                warn!(
+                    pull.source = "dht",
+                    pull.query = query,
+                    url = %url,
+                    error = %e,
+                    "dht resolver: network error; returning null (honest degradation)"
+                );
+                Ok(Value::Null)
+            }
+        }
     }
 }
 
@@ -282,22 +413,30 @@ mod tests {
     use super::*;
     use serde_json::json;
 
-    // ─── SourceChainResolver: stub returns null without error ─────────────────
+    // ─── SourceChainResolver: unreachable host → Value::Null (honest degradation)
 
     #[tokio::test]
-    async fn source_chain_stub_returns_null_without_error() {
-        let resolver = SourceChainResolver;
-        let result = resolver.resolve("/any/query").await.unwrap();
-        assert_eq!(result, Value::Null);
+    async fn source_chain_resolver_network_error_returns_null() {
+        let resolver = SourceChainResolver::new("http://127.0.0.1:19998");
+        let result = resolver.resolve("/agent-xyz/entries").await.unwrap();
+        assert_eq!(
+            result,
+            Value::Null,
+            "network error must degrade to Null, not fail the gate"
+        );
     }
 
-    // ─── DhtResolver: stub returns null without error ─────────────────────────
+    // ─── DhtResolver: unreachable host → Value::Null (honest degradation) ─────
 
     #[tokio::test]
-    async fn dht_stub_returns_null_without_error() {
-        let resolver = DhtResolver;
-        let result = resolver.resolve("/dht/entry/hash").await.unwrap();
-        assert_eq!(result, Value::Null);
+    async fn dht_resolver_network_error_returns_null() {
+        let resolver = DhtResolver::new("http://127.0.0.1:19998");
+        let result = resolver.resolve("/uhC0k-some-entry-hash").await.unwrap();
+        assert_eq!(
+            result,
+            Value::Null,
+            "network error must degrade to Null, not fail the gate"
+        );
     }
 
     // ─── ElohimStorageResolver: unreachable host → Value::Null (honest degradation)
@@ -493,5 +632,201 @@ mod tests {
 
         let result2 = resolver.resolve("lamad").await.unwrap();
         assert_eq!(result2, json!({"ok": true}));
+    }
+
+    // ─── SourceChainResolver: 200 with valid JSON → parsed Value ─────────────
+
+    #[cfg(feature = "testing")]
+    #[tokio::test]
+    async fn source_chain_resolver_200_returns_parsed_value() {
+        use wiremock::matchers::{method, path};
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/db/source-chain/agent-abc/entries"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "agentId": "agent-abc",
+                "entries": [],
+                "phase": "10-stub"
+            })))
+            .mount(&server)
+            .await;
+
+        let resolver = SourceChainResolver::new(server.uri());
+        let result = resolver.resolve("/agent-abc/entries").await.unwrap();
+        assert_eq!(
+            result,
+            json!({"agentId": "agent-abc", "entries": [], "phase": "10-stub"}),
+            "200 with JSON body must return parsed Value"
+        );
+    }
+
+    // ─── SourceChainResolver: 404 → Value::Null ──────────────────────────────
+
+    #[cfg(feature = "testing")]
+    #[tokio::test]
+    async fn source_chain_resolver_404_returns_null() {
+        use wiremock::matchers::{method, path};
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/db/source-chain/missing-agent/entries"))
+            .respond_with(ResponseTemplate::new(404))
+            .mount(&server)
+            .await;
+
+        let resolver = SourceChainResolver::new(server.uri());
+        let result = resolver.resolve("/missing-agent/entries").await.unwrap();
+        assert_eq!(result, Value::Null, "source-chain 404 must degrade to Null");
+    }
+
+    // ─── SourceChainResolver: 500 → Value::Null ──────────────────────────────
+
+    #[cfg(feature = "testing")]
+    #[tokio::test]
+    async fn source_chain_resolver_500_returns_null() {
+        use wiremock::matchers::{method, path};
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/db/source-chain/agent-err/entries"))
+            .respond_with(ResponseTemplate::new(500).set_body_string("conductor unavailable"))
+            .mount(&server)
+            .await;
+
+        let resolver = SourceChainResolver::new(server.uri());
+        let result = resolver.resolve("/agent-err/entries").await.unwrap();
+        assert_eq!(result, Value::Null, "5xx must degrade to Null");
+    }
+
+    // ─── SourceChainResolver: 200 with invalid JSON → Err(GateError) ─────────
+
+    #[cfg(feature = "testing")]
+    #[tokio::test]
+    async fn source_chain_resolver_200_invalid_json_returns_err() {
+        use wiremock::matchers::{method, path};
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/db/source-chain/agent-bad/entries"))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .set_body_string("not valid json {{{{")
+                    .append_header("Content-Type", "application/json"),
+            )
+            .mount(&server)
+            .await;
+
+        let resolver = SourceChainResolver::new(server.uri());
+        let result = resolver.resolve("/agent-bad/entries").await;
+        assert!(
+            matches!(result, Err(GateError::ContextAssembly(_))),
+            "200 with invalid JSON must return Err(ContextAssembly), got: {:?}",
+            result
+        );
+    }
+
+    // ─── DhtResolver: 200 with valid JSON → parsed Value ─────────────────────
+
+    #[cfg(feature = "testing")]
+    #[tokio::test]
+    async fn dht_resolver_200_returns_parsed_value() {
+        use wiremock::matchers::{method, path};
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/db/dht/uhC0k-abc123"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "entryHash": "uhC0k-abc123",
+                "entryType": "Content",
+                "content": {"id": "content-1", "title": "Test"}
+            })))
+            .mount(&server)
+            .await;
+
+        let resolver = DhtResolver::new(server.uri());
+        let result = resolver.resolve("/uhC0k-abc123").await.unwrap();
+        assert_eq!(
+            result,
+            json!({
+                "entryHash": "uhC0k-abc123",
+                "entryType": "Content",
+                "content": {"id": "content-1", "title": "Test"}
+            }),
+            "200 with JSON body must return parsed Value"
+        );
+    }
+
+    // ─── DhtResolver: 404 → Value::Null ──────────────────────────────────────
+
+    #[cfg(feature = "testing")]
+    #[tokio::test]
+    async fn dht_resolver_404_returns_null() {
+        use wiremock::matchers::{method, path};
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/db/dht/uhC0k-missing"))
+            .respond_with(ResponseTemplate::new(404))
+            .mount(&server)
+            .await;
+
+        let resolver = DhtResolver::new(server.uri());
+        let result = resolver.resolve("/uhC0k-missing").await.unwrap();
+        assert_eq!(result, Value::Null, "dht 404 must degrade to Null");
+    }
+
+    // ─── DhtResolver: 500 → Value::Null ──────────────────────────────────────
+
+    #[cfg(feature = "testing")]
+    #[tokio::test]
+    async fn dht_resolver_500_returns_null() {
+        use wiremock::matchers::{method, path};
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/db/dht/uhC0k-err"))
+            .respond_with(ResponseTemplate::new(500).set_body_string("conductor down"))
+            .mount(&server)
+            .await;
+
+        let resolver = DhtResolver::new(server.uri());
+        let result = resolver.resolve("/uhC0k-err").await.unwrap();
+        assert_eq!(result, Value::Null, "dht 5xx must degrade to Null");
+    }
+
+    // ─── DhtResolver: 200 with invalid JSON → Err(GateError) ─────────────────
+
+    #[cfg(feature = "testing")]
+    #[tokio::test]
+    async fn dht_resolver_200_invalid_json_returns_err() {
+        use wiremock::matchers::{method, path};
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/db/dht/uhC0k-bad"))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .set_body_string("not valid json {{{{")
+                    .append_header("Content-Type", "application/json"),
+            )
+            .mount(&server)
+            .await;
+
+        let resolver = DhtResolver::new(server.uri());
+        let result = resolver.resolve("/uhC0k-bad").await;
+        assert!(
+            matches!(result, Err(GateError::ContextAssembly(_))),
+            "200 with invalid JSON must return Err(ContextAssembly), got: {:?}",
+            result
+        );
     }
 }

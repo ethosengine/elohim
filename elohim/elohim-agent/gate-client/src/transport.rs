@@ -80,15 +80,23 @@ pub struct GateClientConfig {
     /// [`DEV_CONTEXT_SUBSTANCE_CID`](crate::dag::attestation::DEV_CONTEXT_SUBSTANCE_CID).
     /// Phase 6+: inject the real substance CID here.
     pub elohim_substance_cid: Option<String>,
-    /// Base URL for the real `ElohimStorageResolver` (Phase 9+).
+    /// Base URL for the real pull resolvers (Phase 9+ / Task 10.2).
     ///
-    /// When set, `configure_runner_with_config` registers a real HTTP-based
-    /// pull resolver for the `"elohim-storage"` source name.
+    /// When set, `configure_runner_with_config` registers real HTTP-based pull
+    /// resolvers for **all four** pull sources, all sharing this origin:
+    ///
+    /// | Source name      | Path pattern                              |
+    /// |------------------|-------------------------------------------|
+    /// | `"elohim-storage"` | `GET {url}{query}`                      |
+    /// | `"manifest"`     | `GET {url}/api/v1/manifest/{query}`       |
+    /// | `"source-chain"` | `GET {url}/db/source-chain{query}`        |
+    /// | `"dht"`          | `GET {url}/db/dht{query}`                 |
     ///
     /// Example: `"http://localhost:8090"` (Tauri sidecar port).
     ///
-    /// When `None`, the `ContextAssembleExecutor` falls back to the Phase 3+
-    /// stub which returns `Value::Null` with a `tracing::warn`.
+    /// When `None`, the `ContextAssembleExecutor` falls back to warn + null for
+    /// all unregistered sources (honest degradation — gates complete, context
+    /// fields are null).
     ///
     /// Read from `ELOHIM_STORAGE_URL` env var by [`GateClientConfig::from_env`].
     pub elohim_storage_base_url: Option<String>,

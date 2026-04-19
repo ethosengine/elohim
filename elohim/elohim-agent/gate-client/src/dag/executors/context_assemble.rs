@@ -17,7 +17,9 @@ use crate::error::GateError;
 use crate::events::RelationalImpactEvent;
 
 use super::super::context::GateContext;
-use super::phase3_stubs::{DhtResolver, SourceChainResolver};
+// SourceChainResolver and DhtResolver are real HTTP resolvers (Task 10.2).
+// They are registered by configure_runner_with_config when elohim_storage_base_url
+// is set.  When not registered, the fallback match arm below emits warn + null.
 
 // ─── Pull source enum ─────────────────────────────────────────────────────────
 
@@ -127,12 +129,11 @@ impl ContextAssembleExecutor {
             } else {
                 // Route to the appropriate fallback by source name.
                 //
-                // "elohim-storage" and "manifest": real resolvers are registered
-                // by `configure_runner_with_config` when `ELOHIM_STORAGE_URL` is
-                // set.  When not registered (DevContext / no URL), warn and return
-                // null — honest degradation, gate completes with null context.
-                //
-                // "source-chain" and "dht": Phase 10+ stubs — always return null.
+                // All four named sources ("elohim-storage", "manifest",
+                // "source-chain", "dht") have real HTTP resolvers registered by
+                // `configure_runner_with_config` when `ELOHIM_STORAGE_URL` is set.
+                // When not registered (DevContext / no URL), this fallback fires:
+                // emit warn + return null — honest degradation, gate completes.
                 match pull.from.as_str() {
                     "elohim-storage" => {
                         warn!(
@@ -152,8 +153,24 @@ impl ContextAssembleExecutor {
                         );
                         Value::Null
                     }
-                    "dht" => DhtResolver.resolve(&pull.query).await?,
-                    "source-chain" => SourceChainResolver.resolve(&pull.query).await?,
+                    "source-chain" => {
+                        warn!(
+                            pull.source = "source-chain",
+                            pull.query = pull.query,
+                            "no source-chain resolver registered (set ELOHIM_STORAGE_URL \
+                             to enable real pull); returning null — honest degradation"
+                        );
+                        Value::Null
+                    }
+                    "dht" => {
+                        warn!(
+                            pull.source = "dht",
+                            pull.query = pull.query,
+                            "no dht resolver registered (set ELOHIM_STORAGE_URL \
+                             to enable real pull); returning null — honest degradation"
+                        );
+                        Value::Null
+                    }
                     other => {
                         warn!(
                             pull.source = other,

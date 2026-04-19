@@ -693,11 +693,20 @@ pub fn configure_runner(resolver: Box<dyn ContentNodeResolver>) -> Result<(), Al
 pub fn configure_runner_with_config(
     config: crate::transport::GateClientConfig,
 ) -> Result<(), AlreadyConfigured> {
-    use crate::dag::executors::phase3_stubs::{ElohimStorageResolver, ManifestResolver};
+    use crate::dag::executors::phase3_stubs::{
+        DhtResolver, ElohimStorageResolver, ManifestResolver, SourceChainResolver,
+    };
 
-    // Phase 9.2: build a ContextAssembleExecutor with real HTTP pull resolvers
-    // when URLs are configured.  When URLs are absent the executor is left with
-    // no registered resolvers; Phase 3+ stubs fire (honest-null degradation).
+    // Phase 9.2 / Task 10.2: build a ContextAssembleExecutor with real HTTP pull
+    // resolvers when URLs are configured.  When URLs are absent the executor is
+    // left with no registered resolvers; the fallback paths in
+    // ContextAssembleExecutor fire (honest-null degradation with warn).
+    //
+    // All four resolvers share the same elohim-storage origin:
+    // - "elohim-storage" → GET {url}{query}
+    // - "manifest"       → GET {url}/api/v1/manifest/{query}
+    // - "source-chain"   → GET {url}/db/source-chain{query}
+    // - "dht"            → GET {url}/db/dht{query}
     let context_assemble: Option<ContextAssembleExecutor> = {
         if config.elohim_storage_base_url.is_some() || config.manifest_base_url.is_some() {
             let mut exec = ContextAssembleExecutor::new();
@@ -707,6 +716,15 @@ pub fn configure_runner_with_config(
                     "elohim-storage",
                     Box::new(ElohimStorageResolver::new(storage_url)),
                 );
+                // Task 10.2: SourceChainResolver and DhtResolver share the same
+                // elohim-storage origin.  The conductor query layer is deferred to
+                // Phase 11 (HcClient not yet wired into HttpServer); elohim-storage
+                // returns honest empty/404 responses that these resolvers map to Null.
+                exec.register(
+                    "source-chain",
+                    Box::new(SourceChainResolver::new(storage_url)),
+                );
+                exec.register("dht", Box::new(DhtResolver::new(storage_url)));
             }
 
             // Manifest: prefer manifest_base_url; fall back to elohim_storage_base_url.

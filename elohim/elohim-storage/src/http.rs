@@ -2173,6 +2173,30 @@ impl HttpServer {
                 .await;
         }
 
+        // ── Conductor-bridge routes (Phase 10 HTTP pipes, Phase 11 full zome queries) ──
+        //
+        // These endpoints serve as the gate-client pull-resolver targets for
+        // `SourceChainResolver` and `DhtResolver`.  The HTTP pipes are real and
+        // routed end-to-end.  The conductor query layer is deferred to Phase 11
+        // (requires threading HcClient into HttpServer).  For Phase 10 the handlers
+        // return honest empty responses so gates degrade gracefully.
+        //
+        // Phase 11 migration: add `hc_client: Option<Arc<HcClient>>` to HttpServer,
+        // wire it via `with_hc_client()`, and replace the stub bodies below with
+        // actual `hc_client.call_zome(...)` invocations.
+
+        // GET /db/source-chain/{agent_id}/entries[?filter={filter}]
+        if let Some(sc_path) = resource_path.strip_prefix("source-chain/") {
+            return self
+                .handle_source_chain_entries(req, method, sc_path)
+                .await;
+        }
+
+        // GET /db/dht/{entry_hash}
+        if let Some(entry_hash) = resource_path.strip_prefix("dht/") {
+            return self.handle_dht_entry(req, method, entry_hash).await;
+        }
+
         Ok(Response::builder()
             .status(StatusCode::NOT_FOUND)
             .header(header::CONTENT_TYPE, "application/json")
@@ -4778,6 +4802,148 @@ impl HttpServer {
                 decision_id
             ))),
         }
+    }
+
+    // =========================================================================
+    // Conductor-Bridge Handlers (Phase 10 HTTP pipes, Phase 11 full zome queries)
+    // =========================================================================
+
+    /// GET /db/source-chain/{agent_id}/entries?filter={filter}
+    ///
+    /// Conductor-bridge endpoint for the gate-client `SourceChainResolver`.
+    ///
+    /// # Phase 10 status
+    ///
+    /// The HTTP pipe is real and routed end-to-end.  The conductor query layer
+    /// is deferred to Phase 11 (requires `HcClient` in `HttpServer`).  This
+    /// handler currently returns an empty array so gates degrade honestly rather
+    /// than erroring.
+    ///
+    /// # Phase 11 migration path
+    ///
+    /// 1. Add `hc_client: Option<Arc<HcClient>>` to `HttpServer`.
+    /// 2. Wire it via a new `with_hc_client()` builder method in `main.rs`.
+    /// 3. Replace the stub body below with:
+    ///    `hc_client.call_zome(role, "content_store", "query_by_content_type", filter_payload)`
+    ///    or the appropriate coordinator-zome function once it exists.
+    ///
+    /// # Gate-client convention
+    ///
+    /// `SourceChainResolver` constructs the query as:
+    /// `/{agent_id}/entries?filter={filter}`
+    /// This handler strips the leading `{agent_id}/entries` path and reads the
+    /// optional `filter` query parameter.
+    async fn handle_source_chain_entries(
+        &self,
+        req: Request<Incoming>,
+        method: Method,
+        sc_path: &str,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        if method != Method::GET {
+            return Ok(response::method_not_allowed());
+        }
+
+        // Parse agent_id from path: expect "{agent_id}/entries"
+        let agent_id = sc_path
+            .strip_suffix("/entries")
+            .unwrap_or(sc_path)
+            .trim_end_matches('/');
+
+        if agent_id.is_empty() {
+            return Ok(Response::builder()
+                .status(StatusCode::BAD_REQUEST)
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Full::new(Bytes::from(
+                    r#"{"error": "agent_id is required: GET /db/source-chain/{agent_id}/entries"}"#,
+                )))
+                .unwrap());
+        }
+
+        let filter = req
+            .uri()
+            .query()
+            .and_then(|q| serde_urlencoded::from_str::<std::collections::HashMap<String, String>>(q).ok())
+            .and_then(|m| m.get("filter").cloned())
+            .unwrap_or_default();
+
+        // Phase 10: conductor query not yet wired (Phase 11 — add HcClient to HttpServer).
+        // Return empty array so SourceChainResolver degrades to Value::Null → gate continues.
+        warn!(
+            agent_id = %agent_id,
+            filter = %filter,
+            "source-chain bridge: conductor query deferred to Phase 11 \
+             (HcClient not wired into HttpServer); returning empty entries"
+        );
+
+        Ok(response::ok(&serde_json::json!({
+            "agentId": agent_id,
+            "filter": filter,
+            "entries": [],
+            "phase": "10-stub",
+            "note": "Phase 11: wire HcClient to HttpServer and query content_store zome"
+        })))
+    }
+
+    /// GET /db/dht/{entry_hash}
+    ///
+    /// Conductor-bridge endpoint for the gate-client `DhtResolver`.
+    ///
+    /// # Phase 10 status
+    ///
+    /// The HTTP pipe is real and routed end-to-end.  The conductor query layer
+    /// is deferred to Phase 11 (requires `HcClient` in `HttpServer`).  This
+    /// handler returns 404 so `DhtResolver` degrades to `Value::Null`.
+    ///
+    /// # Phase 11 migration path
+    ///
+    /// 1. Add `hc_client: Option<Arc<HcClient>>` to `HttpServer`.
+    /// 2. Wire it via a new `with_hc_client()` builder method in `main.rs`.
+    /// 3. Replace the stub body below with:
+    ///    `hc_client.call_zome(role, "content_store", "get_content_by_id", entry_hash_payload)`
+    ///    and serialize the returned entry as JSON.
+    ///
+    /// # Gate-client convention
+    ///
+    /// `DhtResolver` constructs the query as `/{entry_hash}`.
+    /// This handler receives the stripped `{entry_hash}` segment.
+    async fn handle_dht_entry(
+        &self,
+        _req: Request<Incoming>,
+        method: Method,
+        entry_hash: &str,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        if method != Method::GET {
+            return Ok(response::method_not_allowed());
+        }
+
+        let entry_hash = entry_hash.trim();
+        if entry_hash.is_empty() {
+            return Ok(Response::builder()
+                .status(StatusCode::BAD_REQUEST)
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Full::new(Bytes::from(
+                    r#"{"error": "entry_hash is required: GET /db/dht/{entry_hash}"}"#,
+                )))
+                .unwrap());
+        }
+
+        // Phase 10: conductor query not yet wired (Phase 11 — add HcClient to HttpServer).
+        // Return 404 so DhtResolver degrades to Value::Null → gate continues.
+        warn!(
+            entry_hash = %entry_hash,
+            "dht bridge: conductor query deferred to Phase 11 \
+             (HcClient not wired into HttpServer); returning 404"
+        );
+
+        Ok(Response::builder()
+            .status(StatusCode::NOT_FOUND)
+            .header(header::CONTENT_TYPE, "application/json")
+            .body(Full::new(Bytes::from(serde_json::to_vec(&serde_json::json!({
+                "error": "DHT entry not found (conductor bridge deferred to Phase 11)",
+                "entryHash": entry_hash,
+                "phase": "10-stub"
+            })).unwrap_or_default())))
+            .unwrap())
     }
 
     // =========================================================================
@@ -8070,6 +8236,22 @@ pub fn build_manifest() -> doorway_client::DoorwayRoutes {
         .route(
             Route::get("/db/gate-decisions/{cid}")
                 .handler("get_gate_decision")
+                .auth_required()
+                .build(),
+        )
+        // ── Conductor-bridge routes (Phase 10 HTTP pipes, Phase 11 full queries) ──
+        // Gate-client pull resolvers (SourceChainResolver, DhtResolver) target these.
+        // Phase 10: returns empty/404 honest stubs.
+        // Phase 11: wire HcClient into HttpServer to serve real conductor data.
+        .route(
+            Route::get("/db/source-chain/{agent_id}/entries")
+                .handler("source_chain_entries")
+                .auth_required()
+                .build(),
+        )
+        .route(
+            Route::get("/db/dht/{entry_hash}")
+                .handler("dht_entry")
                 .auth_required()
                 .build(),
         )
