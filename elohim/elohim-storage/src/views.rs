@@ -6419,3 +6419,70 @@ pub fn load_elohim_capability_from_env() -> Option<ElohimCapabilityProfile> {
         }
     }
 }
+
+/// Committed hardware resources declared by a node in its NodeRegistration DHT entry.
+///
+/// Wire format: embedded in `NodeShapeView`.
+#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct CommittedResources {
+    pub cpu_cores: i32,
+    pub memory_gb: i32,
+    pub storage_tb: f64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bandwidth_mbps: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_custody_gb: Option<f64>,
+    pub can_steward: bool,
+    pub can_infer: bool,
+    pub can_doorway: bool,
+}
+
+/// Wire view for a node's declared shape, as projected from the infrastructure DNA DHT.
+///
+/// Wire format: `elohim/sdk/schemas/v1/views/node-shape-view.schema.json`
+#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct NodeShapeView {
+    pub node_id: String,
+    pub hostname: String,
+    pub device_archetype_id: String,
+    pub household_id: String,
+    pub role: String,
+    pub capability_level: i32,
+    pub committed: CommittedResources,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub steward_tier: Option<String>,
+    pub custodian_opt_in: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub region: Option<String>,
+    pub signature: String,
+    pub signed_at: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub dht_anchor_hash: Option<String>,
+}
+
+/// A single device entry combining node shape with live peer status (if online).
+///
+/// Wire format: embedded in `HouseholdDevicesView`.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct DeviceEntryView {
+    pub shape: NodeShapeView,
+    /// Live peer status; present when online, null when offline/unknown.
+    pub peer: Option<PeerStatusView>,
+}
+
+/// Wire view listing all devices registered under a household.
+///
+/// Wire format: `elohim/sdk/schemas/v1/views/household-devices-view.schema.json`
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct HouseholdDevicesView {
+    pub household_id: String,
+    pub devices: Vec<DeviceEntryView>,
+}

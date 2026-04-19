@@ -815,6 +815,54 @@ fn elohim_reputation_profile_view_empty_window_matches_schema() {
     validate_against_schema("views/elohim-reputation-profile-view.schema.json", &json);
 }
 
+// ── Node-shape / household-devices views ────────────────────────
+
+#[test]
+fn node_shape_view_matches_schema() {
+    use elohim_storage::{CommittedResources, NodeShapeView};
+
+    let view = NodeShapeView {
+        node_id: "uhCAkTESTNODE001".to_string(),
+        hostname: "matthew-home".to_string(),
+        device_archetype_id: "home-nuc".to_string(),
+        household_id: "household-matthew".to_string(),
+        role: "edge".to_string(),
+        capability_level: 3,
+        committed: CommittedResources {
+            cpu_cores: 4,
+            memory_gb: 16,
+            storage_tb: 2.0,
+            bandwidth_mbps: Some(1000),
+            max_custody_gb: Some(500.0),
+            can_steward: true,
+            can_infer: false,
+            can_doorway: false,
+        },
+        steward_tier: Some("guardian".to_string()),
+        custodian_opt_in: true,
+        region: Some("us-central".to_string()),
+        signature: "uhCkkSIGNATURE001".to_string(),
+        signed_at: "2026-04-19T00:00:00Z".to_string(),
+        dht_anchor_hash: None,
+    };
+
+    let json = serde_json::to_value(&view).unwrap();
+    validate_against_schema("views/node-shape-view.schema.json", &json);
+}
+
+#[test]
+fn household_devices_view_matches_schema() {
+    use elohim_storage::HouseholdDevicesView;
+
+    let view = HouseholdDevicesView {
+        household_id: "household-matthew".to_string(),
+        devices: vec![],
+    };
+
+    let json = serde_json::to_value(&view).unwrap();
+    validate_against_schema("views/household-devices-view.schema.json", &json);
+}
+
 // ── Convention enforcement ──────────────────────────────────────
 
 #[test]
