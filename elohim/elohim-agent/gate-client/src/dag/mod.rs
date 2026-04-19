@@ -20,6 +20,7 @@ use std::collections::HashMap;
 
 // ─── Sub-modules ─────────────────────────────────────────────────────────────
 
+pub mod attestation;
 pub mod context;
 pub mod discernment_gate;
 pub mod executor;

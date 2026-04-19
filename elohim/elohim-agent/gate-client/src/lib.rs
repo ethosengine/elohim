@@ -182,6 +182,12 @@ pub mod tower;
 pub mod transport;
 pub mod types;
 
+// Re-export attestation builder and constants for downstream use.
+pub use dag::attestation::{
+    DecisionAttestationBuilder, DecisionAttestationPayload, DEV_CONTEXT_ELOHIM_ID,
+    DEV_CONTEXT_SUBSTANCE_CID,
+};
+
 #[cfg(any(test, feature = "testing"))]
 pub mod testing;
 

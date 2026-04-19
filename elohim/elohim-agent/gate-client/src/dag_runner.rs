@@ -50,11 +50,13 @@ use std::sync::{Arc, OnceLock};
 use serde_json::json;
 use tracing::{info_span, Instrument};
 
+use crate::dag::attestation::DecisionAttestationBuilder;
 use crate::dag::executor::StepKind;
 use crate::dag::executors::{
     ContentNodeResolver, ContextAssembleExecutor, EmbeddedContentNodeResolver,
     EscalateToReviewExecutor, MechanicalRulesetExecutor, SynthesizeExecutor, WisdomInvokeExecutor,
 };
+use crate::dag::universal_band::{ACTIVE_UNIVERSAL_BAND_NAME, ACTIVE_UNIVERSAL_BAND_VERSION};
 use crate::dag::{
     context::GateContext, discernment_gate::default_discernment_gate_declaration,
     interpreter::DagInterpreter, universal_band::default_universal_band_declaration,
@@ -363,15 +365,27 @@ pub fn build_initial_context(event: &RelationalImpactEvent) -> GateContext {
     ctx
 }
 
+/// The canonical CID pointer for the active universal-band.
+///
+/// Format: `"{name}@{version}"` — a stable string that identifies which
+/// universal-band version ran above any given gate decision.
+fn active_universal_band_cid_pointer() -> String {
+    format!("{ACTIVE_UNIVERSAL_BAND_NAME}@{ACTIVE_UNIVERSAL_BAND_VERSION}")
+}
+
 /// Run the universal-band DAG for the given event with tracing spans.
 ///
 /// This is the hot-path entry point called from `check()`.  It:
 /// 1. Builds the initial context.
 /// 2. Wraps the DAG run in an `info_span` for the gate check as a whole.
 /// 3. Each individual DAG step will be traced inside the interpreter.
+/// 4. Attaches a `decision_attestation_cid` to the returned decision (Phase 4).
 pub async fn run_with_tracing(event: &RelationalImpactEvent) -> Result<GateDecision, GateError> {
     let runner = global_runner();
     let initial_ctx = build_initial_context(event);
+
+    // Capture the context summary CID before the DAG consumes the context.
+    let context_summary_cid = initial_ctx.to_summary_cid();
 
     let span = info_span!(
         "gate_check",
@@ -379,7 +393,22 @@ pub async fn run_with_tracing(event: &RelationalImpactEvent) -> Result<GateDecis
         band = "universal-band-v1"
     );
 
-    runner.run(event, initial_ctx).instrument(span).await
+    let mut decision = runner.run(event, initial_ctx).instrument(span).await?;
+
+    // Phase 4: compute and attach the attestation CID.
+    // The CID is computed in-process; the DHT write is Phase 6+ activation.
+    let builder = DecisionAttestationBuilder::new(None, None);
+    let (_, cid) = builder.build_with_cid(
+        &decision,
+        ACTIVE_UNIVERSAL_BAND_NAME,
+        &format!("epr:gates:{ACTIVE_UNIVERSAL_BAND_NAME}"),
+        event,
+        context_summary_cid,
+        active_universal_band_cid_pointer(),
+    );
+    decision.decision_attestation_cid = Some(cid);
+
+    Ok(decision)
 }
 
 // ─── Discernment-gate dispatch ────────────────────────────────────────────────
@@ -473,6 +502,9 @@ pub async fn run_discernment_gate(
         }
     }
 
+    // Capture the context summary CID before the DAG consumes the context.
+    let context_summary_cid = ctx.to_summary_cid();
+
     // Build the discernment-gate declaration with entrypoint set to `rules`.
     let mut effective_declaration = default_discernment_gate_declaration();
     effective_declaration.dag.entrypoint = "rules".to_string();
@@ -486,7 +518,23 @@ pub async fn run_discernment_gate(
         event_kind = event.kind(),
         band = "discernment-gate-v1-mechanical"
     );
-    discernment_runner.run(event, ctx).instrument(span).await
+    let mut decision = discernment_runner.run(event, ctx).instrument(span).await?;
+
+    // Phase 4: compute and attach the attestation CID for the discernment-gate decision.
+    // The CID is computed in-process; the DHT write is Phase 6+ activation.
+    use crate::dag::discernment_gate::DISCERNMENT_GATE_V1_CID;
+    let builder = DecisionAttestationBuilder::new(None, None);
+    let (_, cid) = builder.build_with_cid(
+        &decision,
+        "discernment-gate-v1-mechanical",
+        DISCERNMENT_GATE_V1_CID,
+        event,
+        context_summary_cid,
+        active_universal_band_cid_pointer(),
+    );
+    decision.decision_attestation_cid = Some(cid);
+
+    Ok(decision)
 }
 
 // ─── Tests ────────────────────────────────────────────────────────────────────

@@ -9,7 +9,7 @@
 //!    DAG ran through the WisdomInvoke and Synthesize executors — not the old
 //!    Phase 0 `allow_mocked()` stub which uses `"This decision carries no
 //!    reputation weight."` as its phase_note.
-//! 4. `decision_attestation_cid` is None (Phase 4 will write the attestation).
+//! 4. `decision_attestation_cid` is Some (Phase 4: CID computed, DHT write is Phase 6+).
 //! 5. The `__test_set_decision_override` short-circuit fires BEFORE the DAG.
 //! 6. Exempt space types return `Allow { exempt: true }` without running the DAG.
 
@@ -78,10 +78,17 @@ async fn content_publish_dag_reasoning_phase_note_is_wisdom_sourced() {
         decision.reasoning.primary_principle
     );
 
-    // Assertion 3: decision_attestation_cid is None — Phase 4 writes this.
+    // Assertion 3: decision_attestation_cid is Some — Phase 4 computes the CID.
+    // The CID is computed but not published to DHT (Phase 6+ activation).
     assert!(
-        decision.decision_attestation_cid.is_none(),
-        "decision_attestation_cid must be None in Phase 2; Phase 4 writes the attestation"
+        decision.decision_attestation_cid.is_some(),
+        "decision_attestation_cid must be Some in Phase 4; got: {:?}",
+        decision.decision_attestation_cid
+    );
+    let cid = decision.decision_attestation_cid.as_ref().unwrap();
+    assert!(
+        cid.starts_with("sha256-"),
+        "decision_attestation_cid must start with 'sha256-'; got: {cid}"
     );
 }
 
@@ -204,10 +211,13 @@ async fn test_override_short_circuits_before_dag() {
     );
 }
 
-// ─── E2E-4: decision_attestation_cid is None across all variants ─────────────
+// ─── E2E-4: decision_attestation_cid is Some with sha256- prefix (Phase 4) ───
+//
+// Phase 4: every non-exempt DAG decision now carries a computed attestation CID.
+// The CID is computed in-process; the DHT write is Phase 6+ activation.
 
 #[tokio::test]
-async fn decision_attestation_cid_is_none_for_all_events() {
+async fn decision_attestation_cid_is_some_with_sha256_prefix_for_all_events() {
     let events = vec![
         RelationalImpactEvent::ContentPublish {
             content_cid: "cid-attest-1".into(),
@@ -225,24 +235,106 @@ async fn decision_attestation_cid_is_none_for_all_events() {
         let kind = event.kind();
         let decision = check(event).await.unwrap_or_else(|e| panic!("{kind}: {e}"));
 
-        // Assertion 1: No attestation CID in Phase 2.
+        // Assertion 1: CID is now Some (Phase 4 computes it).
         assert!(
-            decision.decision_attestation_cid.is_none(),
-            "{kind}: decision_attestation_cid must be None in Phase 2; Phase 4 writes it"
+            decision.decision_attestation_cid.is_some(),
+            "{kind}: decision_attestation_cid must be Some in Phase 4; got: {:?}",
+            decision.decision_attestation_cid
         );
 
-        // Assertion 2: phase is DevContext.
+        // Assertion 2: CID has the expected sha256- prefix.
+        let cid = decision.decision_attestation_cid.as_ref().unwrap();
+        assert!(
+            cid.starts_with("sha256-"),
+            "{kind}: decision_attestation_cid must start with 'sha256-'; got: {cid}"
+        );
+        assert_eq!(
+            cid.len(),
+            71,
+            "{kind}: 'sha256-' + 64 hex chars = 71; got len {} for: {cid}",
+            cid.len()
+        );
+
+        // Assertion 3: phase is DevContext.
         assert_eq!(
             decision.phase,
             Phase::DevContext,
             "{kind}: phase must be DevContext"
         );
+    }
+}
 
-        // Assertion 3: Allow status.
+// ─── E2E-4b: All 8 variants produce a non-None attestation CID ───────────────
+
+#[tokio::test]
+async fn all_8_variants_produce_non_none_attestation_cid() {
+    use gate_client::events::RelationalImpactEvent;
+
+    let events: Vec<RelationalImpactEvent> = vec![
+        RelationalImpactEvent::ContentPublish {
+            content_cid: "cid-a".into(),
+            declared_reach: "public".into(),
+            author: "agent-a".into(),
+        },
+        RelationalImpactEvent::AttestationWrite {
+            subject_hash: "hash-b".into(),
+            claim_kind: "brit".into(),
+            issuer: "agent-b".into(),
+        },
+        RelationalImpactEvent::EconomicEventEmit {
+            event_kind: "transfer".into(),
+            provider: "agent-c".into(),
+            receiver: "agent-d".into(),
+            quantity: "5".into(),
+        },
+        RelationalImpactEvent::PeerMessage {
+            recipient: "agent-e".into(),
+            payload_kind: "handshake".into(),
+        },
+        RelationalImpactEvent::SyncToPeers {
+            manifest_cid: "manifest".into(),
+            item_count: 2,
+        },
+        RelationalImpactEvent::AdviceSought {
+            requester: "agent-f".into(),
+            summary_cid: "sum".into(),
+            topic: "conflict".into(),
+        },
+        RelationalImpactEvent::CapabilityInvoke {
+            capability: "translate".into(),
+            requester: "agent-g".into(),
+            request_id: "req".into(),
+        },
+        RelationalImpactEvent::PrivateToPublicCrossing {
+            source_space: "draft".into(),
+            artifact_ref: "art".into(),
+        },
+    ];
+
+    for event in events {
+        let kind = event.kind();
+        let decision = check(event)
+            .await
+            .unwrap_or_else(|e| panic!("{kind}: check() failed: {e}"));
+
+        // Assertion 1: CID is Some.
         assert!(
-            matches!(decision.status, GateStatus::Allow { exempt: false }),
-            "{kind}: status must be Allow {{ exempt: false }}; got: {:?}",
-            decision.status
+            decision.decision_attestation_cid.is_some(),
+            "{kind}: decision_attestation_cid must be Some in Phase 4"
+        );
+
+        // Assertion 2: CID has sha256- prefix.
+        let cid = decision.decision_attestation_cid.as_ref().unwrap();
+        assert!(
+            cid.starts_with("sha256-"),
+            "{kind}: CID must start with 'sha256-'; got: {cid}"
+        );
+
+        // Assertion 3: CID length is correct (7 + 64 = 71).
+        assert_eq!(
+            cid.len(),
+            71,
+            "{kind}: CID must be 71 chars (sha256- + 64 hex); got: {cid}"
         );
     }
 }

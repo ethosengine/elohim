@@ -32,6 +32,19 @@ pub struct GateClientConfig {
     pub phase_override: Option<Phase>,
     /// Path to the local inspection cache. None = in-memory only.
     pub inspection_cache_path: Option<String>,
+    /// AgentPubKey (base64-encoded) of the elohim making gate decisions.
+    ///
+    /// Phase 4 DevContext: None → falls back to
+    /// [`DEV_CONTEXT_ELOHIM_ID`](crate::dag::attestation::DEV_CONTEXT_ELOHIM_ID).
+    /// Phase 6+: inject the real elohim agent key here.
+    pub elohim_id: Option<String>,
+    /// CID of the elohim's substance declaration (model-weights + constitution
+    /// + deployment-context).
+    ///
+    /// Phase 4 DevContext: None → falls back to
+    /// [`DEV_CONTEXT_SUBSTANCE_CID`](crate::dag::attestation::DEV_CONTEXT_SUBSTANCE_CID).
+    /// Phase 6+: inject the real substance CID here.
+    pub elohim_substance_cid: Option<String>,
 }
 
 impl Default for GateClientConfig {
@@ -40,6 +53,8 @@ impl Default for GateClientConfig {
             transport: Transport::Mock,
             phase_override: Some(Phase::DevContext),
             inspection_cache_path: None,
+            elohim_id: None,
+            elohim_substance_cid: None,
         }
     }
 }

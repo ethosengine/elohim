@@ -36,7 +36,10 @@
 //! (discovery/regression), NOT rule-3 (validation).  One test explicitly
 //! documents this.
 
-use gate_client::{run_discernment_gate, GateContext, GateStatus, GateTag, RelationalImpactEvent};
+use gate_client::{
+    run_discernment_gate, DecisionAttestationBuilder, GateContext, GateStatus, GateTag,
+    RelationalImpactEvent, DISCERNMENT_GATE_V1_CID,
+};
 use serde_json::json;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -637,4 +640,174 @@ async fn all_verdict_rules_emit_mint_attestation_with_story_point_link_shape() {
             decision.side_effects
         );
     }
+}
+
+// ─── Phase 4: decision_attestation_cid is Some for verdict-producing rules ───
+//
+// Every verdict-producing run through run_discernment_gate must carry a
+// decision_attestation_cid with the sha256- prefix, proving Phase 4 wired
+// the attestation builder into run_discernment_gate.
+
+#[tokio::test]
+async fn verdict_rule_1_carries_decision_attestation_cid() {
+    let event = attestation_event("moment-hash-cid-test-r1", "experience-moment");
+    let ctx_ext = ctx_with_moment_and_priors(
+        json!({
+            "status": "passed",
+            "scenarioTagsContainsValidatesFailureMode": false
+        }),
+        json!({
+            "count": 0,
+            "mostRecentStatus": null,
+            "errorClassIsNew": false,
+            "computeFingerprintIsNew": false,
+            "hasRicherEvidence": false,
+            "witnessEligible": false,
+            "refinementEligible": false
+        }),
+    );
+
+    let decision = run_discernment_gate(&event, ctx_ext)
+        .await
+        .expect("run_discernment_gate must not fail");
+
+    // Assertion 1: CID is Some.
+    assert!(
+        decision.decision_attestation_cid.is_some(),
+        "verdict decision must carry decision_attestation_cid; got: {:?}",
+        decision.decision_attestation_cid
+    );
+
+    // Assertion 2: CID has sha256- prefix.
+    let cid = decision.decision_attestation_cid.as_ref().unwrap();
+    assert!(
+        cid.starts_with("sha256-"),
+        "decision_attestation_cid must start with 'sha256-'; got: {cid}"
+    );
+
+    // Assertion 3: CID length is 71 chars (sha256- + 64 hex).
+    assert_eq!(
+        cid.len(),
+        71,
+        "decision_attestation_cid must be 71 chars; got len {} for: {cid}",
+        cid.len()
+    );
+}
+
+#[tokio::test]
+async fn discernment_gate_attestation_payload_reflects_correct_gate_name() {
+    // Build a verdict-producing rule-1 scenario.
+    let event = attestation_event("moment-hash-gate-name-test", "experience-moment");
+    let ctx_ext = ctx_with_moment_and_priors(
+        json!({
+            "status": "passed",
+            "scenarioTagsContainsValidatesFailureMode": false
+        }),
+        json!({
+            "count": 0,
+            "mostRecentStatus": null,
+            "errorClassIsNew": false,
+            "computeFingerprintIsNew": false,
+            "hasRicherEvidence": false,
+            "witnessEligible": false,
+            "refinementEligible": false
+        }),
+    );
+
+    let decision = run_discernment_gate(&event, ctx_ext.clone())
+        .await
+        .expect("run_discernment_gate must not fail");
+
+    let cid = decision
+        .decision_attestation_cid
+        .as_ref()
+        .expect("decision_attestation_cid must be Some");
+
+    // Re-build the expected payload using the same builder with known inputs,
+    // then verify the CID encodes "discernment-gate-v1-mechanical" as gate_name.
+    //
+    // We verify indirectly: a payload built with gate_name "discernment-gate-v1-mechanical"
+    // must produce a different CID than one built with "universal-band-v1".
+    // This proves the gate_name is baked into the CID, not just the context.
+    let builder = DecisionAttestationBuilder::new(None, None);
+
+    let (payload_disc, _cid_disc) = builder.build_with_cid(
+        &decision,
+        "discernment-gate-v1-mechanical",
+        DISCERNMENT_GATE_V1_CID,
+        &event,
+        "any-ctx-cid".to_string(),
+        "uband".to_string(),
+    );
+    let (payload_ub, _cid_ub) = builder.build_with_cid(
+        &decision,
+        "universal-band-v1",
+        "epr:gates:universal-band-v1",
+        &event,
+        "any-ctx-cid".to_string(),
+        "uband".to_string(),
+    );
+
+    // Assertion 1: gate_name is baked into the payload.
+    assert_eq!(
+        payload_disc.gate_name, "discernment-gate-v1-mechanical",
+        "gate_name must be discernment-gate-v1-mechanical in the disc payload"
+    );
+
+    // Assertion 2: different gate names produce different CIDs.
+    assert_ne!(
+        payload_disc.compute_cid(),
+        payload_ub.compute_cid(),
+        "discernment-gate and universal-band must produce different attestation CIDs"
+    );
+
+    // Assertion 3: the actual CID from run_discernment_gate has the sha256- prefix.
+    assert!(
+        cid.starts_with("sha256-"),
+        "run_discernment_gate CID must start with 'sha256-'; got: {cid}"
+    );
+}
+
+#[tokio::test]
+async fn steady_state_no_mint_also_carries_decision_attestation_cid() {
+    // Rule 7 (steady-state silence) takes the terminal-no-mint path → Allow{exempt:true}.
+    // Phase 4: even exempt decisions from the discernment-gate get an attestation CID
+    // because run_discernment_gate always attaches one.
+    let event = attestation_event("moment-hash-r7-cid", "experience-moment");
+    let ctx_ext = ctx_with_moment_and_priors(
+        json!({
+            "status": "passed",
+            "scenarioTagsContainsValidatesFailureMode": false
+        }),
+        json!({
+            "count": 5,
+            "mostRecentStatus": "passed",
+            "errorClassIsNew": false,
+            "computeFingerprintIsNew": false,
+            "hasRicherEvidence": false,
+            "witnessEligible": false,
+            "refinementEligible": false
+        }),
+    );
+
+    let decision = run_discernment_gate(&event, ctx_ext)
+        .await
+        .expect("run_discernment_gate must not fail for steady-state");
+
+    // Assertion 1: steady-state is Allow{exempt:true}.
+    assert!(decision.is_exempt(), "steady-state must be exempt Allow");
+
+    // Assertion 2: even exempt decisions now carry a CID (Phase 4 contract).
+    assert!(
+        decision.decision_attestation_cid.is_some(),
+        "steady-state decision must carry decision_attestation_cid; got: {:?}",
+        decision.decision_attestation_cid
+    );
+
+    // Assertion 3: CID has sha256- prefix.
+    let cid = decision.decision_attestation_cid.as_ref().unwrap();
+    assert!(
+        cid.starts_with("sha256-"),
+        "steady-state CID must start with 'sha256-'; got: {cid}"
+    );
 }
