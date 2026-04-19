@@ -1031,6 +1031,11 @@ async fn handle_request(
             to_boxed(routes::handle_list_conductors(Arc::clone(&state)).await)
         }
 
+        // Route registry visibility — which routes are live and from which source
+        (Method::GET, "/admin/routes") => {
+            to_boxed(routes::handle_route_registry(Arc::clone(&state)).await)
+        }
+
         // Conductor agents listing
         (Method::GET, p) if p.starts_with("/admin/conductors/") && p.ends_with("/agents") => {
             let conductor_id = p
