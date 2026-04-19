@@ -80,6 +80,33 @@ pub struct GateClientConfig {
     /// [`DEV_CONTEXT_SUBSTANCE_CID`](crate::dag::attestation::DEV_CONTEXT_SUBSTANCE_CID).
     /// Phase 6+: inject the real substance CID here.
     pub elohim_substance_cid: Option<String>,
+    /// Base URL for the real `ElohimStorageResolver` (Phase 9+).
+    ///
+    /// When set, `configure_runner_with_config` registers a real HTTP-based
+    /// pull resolver for the `"elohim-storage"` source name.
+    ///
+    /// Example: `"http://localhost:8090"` (Tauri sidecar port).
+    ///
+    /// When `None`, the `ContextAssembleExecutor` falls back to the Phase 3+
+    /// stub which returns `Value::Null` with a `tracing::warn`.
+    ///
+    /// Read from `ELOHIM_STORAGE_URL` env var by [`GateClientConfig::from_env`].
+    pub elohim_storage_base_url: Option<String>,
+    /// Base URL for the real `ManifestResolver` (Phase 9+).
+    ///
+    /// When set, `configure_runner_with_config` registers a real HTTP-based
+    /// pull resolver for the `"manifest"` source name.
+    ///
+    /// Typically the same origin as `elohim_storage_base_url` since manifests
+    /// are served by elohim-storage at `/api/v1/manifest/{id}`. May be set
+    /// separately when a dedicated manifest server is used.
+    ///
+    /// When `None`, falls back to `elohim_storage_base_url` if that is set;
+    /// otherwise the stub returns `Value::Null`.
+    ///
+    /// Read from `MANIFEST_BASE_URL` env var by [`GateClientConfig::from_env`];
+    /// falls back to `ELOHIM_STORAGE_URL` when `MANIFEST_BASE_URL` is absent.
+    pub manifest_base_url: Option<String>,
 }
 
 impl Default for GateClientConfig {
@@ -91,6 +118,8 @@ impl Default for GateClientConfig {
             inspection_cache_path: None,
             elohim_id: None,
             elohim_substance_cid: None,
+            elohim_storage_base_url: None,
+            manifest_base_url: None,
         }
     }
 }
@@ -107,6 +136,13 @@ impl GateClientConfig {
     ///   runner falls back to [`DEV_CONTEXT_ELOHIM_ID`].
     /// - `ELOHIM_SUBSTANCE_CID` — optional; overrides `elohim_substance_cid`.
     ///   When absent, the runner falls back to [`DEV_CONTEXT_SUBSTANCE_CID`].
+    /// - `ELOHIM_STORAGE_URL` — optional; sets `elohim_storage_base_url`.
+    ///   When set, `configure_runner_with_config` registers a real HTTP
+    ///   `ElohimStorageResolver` for the `"elohim-storage"` pull source and
+    ///   (unless `MANIFEST_BASE_URL` overrides it) the `"manifest"` pull source.
+    ///   Example: `ELOHIM_STORAGE_URL=http://localhost:8090`.
+    /// - `MANIFEST_BASE_URL` — optional; overrides the manifest resolver origin.
+    ///   Falls back to `ELOHIM_STORAGE_URL` when absent.
     ///
     /// # Activation note
     ///
@@ -143,6 +179,16 @@ impl GateClientConfig {
             .ok()
             .filter(|v| !v.trim().is_empty());
 
+        let elohim_storage_base_url = std::env::var("ELOHIM_STORAGE_URL")
+            .ok()
+            .filter(|v| !v.trim().is_empty());
+
+        // MANIFEST_BASE_URL overrides; falls back to ELOHIM_STORAGE_URL when absent.
+        let manifest_base_url = std::env::var("MANIFEST_BASE_URL")
+            .ok()
+            .filter(|v| !v.trim().is_empty())
+            .or_else(|| elohim_storage_base_url.clone());
+
         Self {
             transport: Transport::Mock,
             wisdom_transport,
@@ -153,6 +199,8 @@ impl GateClientConfig {
             inspection_cache_path: None,
             elohim_id,
             elohim_substance_cid,
+            elohim_storage_base_url,
+            manifest_base_url,
         }
     }
 }

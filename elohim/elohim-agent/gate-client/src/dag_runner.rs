@@ -382,11 +382,19 @@ impl DagRunner {
         )
     }
 
-    /// Full internal builder — accepts dispatcher and `WisdomTransport`.
+    /// Full internal builder — accepts dispatcher, `WisdomTransport`, and an
+    /// optional pre-configured [`ContextAssembleExecutor`].
     ///
     /// All other constructors delegate here.  The `wisdom_transport` determines
     /// whether `WisdomInvokeExecutor` uses the hardcoded mock or the in-process
     /// `elohim_agent::wisdom::invoke_wisdom` function.
+    ///
+    /// `context_assemble`: when `None`, a default `ContextAssembleExecutor` with
+    /// no registered pull resolvers is used (Phase 3+ stubs fire for every pull).
+    /// When `Some`, the provided executor is used — allowing real pull resolvers
+    /// (e.g., `ElohimStorageResolver`, `ManifestResolver`) to be pre-registered
+    /// before the DAG runs.  Phase 9 activation wires real resolvers here when
+    /// `ELOHIM_STORAGE_URL` is set.
     fn build_interpreter_and_wrap_with_dispatcher_and_wisdom(
         content_resolver: Arc<dyn ContentNodeResolver>,
         attestation_resolver: Box<dyn AttestationResolver>,
@@ -394,15 +402,36 @@ impl DagRunner {
         capability_dispatcher: Option<Arc<dyn CapabilityDispatcher>>,
         wisdom_transport: WisdomTransport,
     ) -> Self {
+        Self::build_interpreter_and_wrap_full(
+            content_resolver,
+            attestation_resolver,
+            declaration,
+            capability_dispatcher,
+            wisdom_transport,
+            None,
+        )
+    }
+
+    /// Full internal builder — all parameters explicit.
+    ///
+    /// `context_assemble`: `None` → default executor with no resolvers (Phase 3+
+    /// stubs fire for every pull).  `Some(exec)` → use the provided executor,
+    /// which may have real HTTP resolvers pre-registered.
+    fn build_interpreter_and_wrap_full(
+        content_resolver: Arc<dyn ContentNodeResolver>,
+        attestation_resolver: Box<dyn AttestationResolver>,
+        declaration: GateProcessDeclaration,
+        capability_dispatcher: Option<Arc<dyn CapabilityDispatcher>>,
+        wisdom_transport: WisdomTransport,
+        context_assemble: Option<ContextAssembleExecutor>,
+    ) -> Self {
         let mut interpreter = DagInterpreter::new();
 
-        // ContextAssembleExecutor — no pre-registered pull resolvers.
-        // Phase 3+ stubs handle elohim-storage / dht / source-chain / manifest
-        // sources by returning Value::Null (with tracing::warn).
-        interpreter.register(
-            StepKind::ContextAssemble,
-            Arc::new(ContextAssembleExecutor::new()),
-        );
+        // ContextAssembleExecutor — use caller-supplied executor when provided
+        // (real HTTP pull resolvers for elohim-storage / manifest), otherwise
+        // fall back to a default executor (Phase 3+ stubs return Value::Null).
+        let ctx_exec = context_assemble.unwrap_or_else(ContextAssembleExecutor::new);
+        interpreter.register(StepKind::ContextAssemble, Arc::new(ctx_exec));
         // WisdomInvokeExecutor — transport determines mock vs in-process LLM call.
         // Phase::ElohimActive is observed from the actual call outcome, never flagged.
         interpreter.register(
@@ -664,15 +693,52 @@ pub fn configure_runner(resolver: Box<dyn ContentNodeResolver>) -> Result<(), Al
 pub fn configure_runner_with_config(
     config: crate::transport::GateClientConfig,
 ) -> Result<(), AlreadyConfigured> {
-    // Phase 9: thread elohim_id and elohim_substance_cid from config into the runner.
-    // When both are None the runner falls back to DEV_CONTEXT_* sentinels.
+    use crate::dag::executors::phase3_stubs::{ElohimStorageResolver, ManifestResolver};
+
+    // Phase 9.2: build a ContextAssembleExecutor with real HTTP pull resolvers
+    // when URLs are configured.  When URLs are absent the executor is left with
+    // no registered resolvers; Phase 3+ stubs fire (honest-null degradation).
+    let context_assemble: Option<ContextAssembleExecutor> = {
+        if config.elohim_storage_base_url.is_some() || config.manifest_base_url.is_some() {
+            let mut exec = ContextAssembleExecutor::new();
+
+            if let Some(ref storage_url) = config.elohim_storage_base_url {
+                exec.register(
+                    "elohim-storage",
+                    Box::new(ElohimStorageResolver::new(storage_url)),
+                );
+            }
+
+            // Manifest: prefer manifest_base_url; fall back to elohim_storage_base_url.
+            // If neither is set this branch is unreachable (condition above guards it).
+            let manifest_url = config
+                .manifest_base_url
+                .as_deref()
+                .or(config.elohim_storage_base_url.as_deref());
+            if let Some(murl) = manifest_url {
+                exec.register("manifest", Box::new(ManifestResolver::new(murl)));
+            }
+
+            Some(exec)
+        } else {
+            None
+        }
+    };
+
+    // Phase 9 / 9.1: thread elohim_id and elohim_substance_cid from config
+    // into the runner.  When both are None the runner falls back to
+    // DEV_CONTEXT_* sentinels.
     let runner = {
-        let mut r = DagRunner::new().with_wisdom_transport(config.wisdom_transport);
+        let mut r = DagRunner::build_interpreter_and_wrap_full(
+            Arc::new(EmbeddedContentNodeResolver::new(HashMap::new())),
+            Box::new(NullAttestationResolver),
+            default_universal_band_declaration(),
+            None,
+            config.wisdom_transport,
+            context_assemble,
+        );
         if config.elohim_id.is_some() || config.elohim_substance_cid.is_some() {
-            // Use with_elohim_identity only when at least one field is set;
-            // the builder accepts Option-flavoured values via separate assignment
-            // rather than unwrap so we use direct field assignment to preserve
-            // mixed Some/None correctly.
+            // Direct field assignment preserves mixed Some/None correctly.
             r.elohim_id = config.elohim_id;
             r.elohim_substance_cid = config.elohim_substance_cid;
         }

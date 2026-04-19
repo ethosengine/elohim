@@ -17,9 +17,7 @@ use crate::error::GateError;
 use crate::events::RelationalImpactEvent;
 
 use super::super::context::GateContext;
-use super::phase3_stubs::{
-    DhtResolver, ElohimStorageResolver, ManifestResolver, SourceChainResolver,
-};
+use super::phase3_stubs::{DhtResolver, SourceChainResolver};
 
 // ─── Pull source enum ─────────────────────────────────────────────────────────
 
@@ -127,12 +125,35 @@ impl ContextAssembleExecutor {
             let value = if let Some(resolver) = self.resolvers.get(&pull.from) {
                 resolver.resolve(&pull.query).await?
             } else {
-                // Route to the appropriate Phase 3+ stub by source name.
+                // Route to the appropriate fallback by source name.
+                //
+                // "elohim-storage" and "manifest": real resolvers are registered
+                // by `configure_runner_with_config` when `ELOHIM_STORAGE_URL` is
+                // set.  When not registered (DevContext / no URL), warn and return
+                // null — honest degradation, gate completes with null context.
+                //
+                // "source-chain" and "dht": Phase 10+ stubs — always return null.
                 match pull.from.as_str() {
-                    "elohim-storage" => ElohimStorageResolver.resolve(&pull.query).await?,
+                    "elohim-storage" => {
+                        warn!(
+                            pull.source = "elohim-storage",
+                            pull.query = pull.query,
+                            "no elohim-storage resolver registered (set ELOHIM_STORAGE_URL \
+                             to enable real pull); returning null — honest degradation"
+                        );
+                        Value::Null
+                    }
+                    "manifest" => {
+                        warn!(
+                            pull.source = "manifest",
+                            pull.query = pull.query,
+                            "no manifest resolver registered (set ELOHIM_STORAGE_URL \
+                             to enable real pull); returning null — honest degradation"
+                        );
+                        Value::Null
+                    }
                     "dht" => DhtResolver.resolve(&pull.query).await?,
                     "source-chain" => SourceChainResolver.resolve(&pull.query).await?,
-                    "manifest" => ManifestResolver.resolve(&pull.query).await?,
                     other => {
                         warn!(
                             pull.source = other,

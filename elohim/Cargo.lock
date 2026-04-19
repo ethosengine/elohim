@@ -571,6 +571,7 @@ dependencies = [
  "gate-types",
  "http",
  "http-body-util",
+ "reqwest",
  "serde",
  "serde_json",
  "serde_yaml",
@@ -582,6 +583,7 @@ dependencies = [
  "tracing",
  "ts-rs",
  "uuid",
+ "wiremock",
 ]
 
 [[package]]
