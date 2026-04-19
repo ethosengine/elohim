@@ -349,6 +349,59 @@ Refines but does not contradict `docs/superpowers/specs/2026-04-19-brit-graph-ra
 - **Shadow-mode validation** is removed from the roadmap entirely. Replaced with fixture-based regression tests against the 8 real manifests. Jenkins is requirements-gathering, not a target consumer.
 - **Phase B (DAG)** and **Phase C (change detection)** remain complete and merged.
 
+## P2P Design Gate Classification
+
+The brit/rakia stack is intentionally **outside the P2P protocol layer** — it's developer tooling that operates on git repositories, not protocol-replicated data. Per the `p2p-design-gate` skill, every entity introduced by this sprint is classified below. None require DHT entry types, attestations, or storage projections.
+
+### Entity: BuildManifest
+
+- **Classification:** Operational (C)
+- **Justification:** A build-configuration file (`build-manifest.json`) committed to the source repo. The git tree IS the source of truth. Not protocol data — developer tooling configuration. No notarization need; the manifest IS the source-code intent, version-controlled by git. Reconstructable from any git checkout.
+- **Content address strategy:** Slug/UUID (file path on disk + pipeline name)
+- **Address justification:** Manifests are files in a git repo addressed by `(commit, path)`. Brit/git compat means the git substrate handles addressing — no CID layer needed. Not content-derived (same content at different paths = different manifests). Not agent-scoped (repo-shared, not agent-private).
+- **Source of truth:** Git repository (file on disk, version-controlled)
+- **Coordinator zome:** N/A — no zome involvement; build system lives outside protocol primitives
+- **Storage projection:** N/A — parsed in-memory from disk per invocation, no SQLite
+- **HTTP route:** N/A — CLI tool, no HTTP surface
+- **Anti-pattern check:** None apply. "REST route as design starting point" doesn't apply (no HTTP). Source-of-truth is documented (git tree).
+
+### Entity: BuildPlan
+
+- **Classification:** Operational (C)
+- **Justification:** Ephemeral output of `brit plan`. Pure deterministic function of (constellation, changed_paths, baseline, head). Reconstructable on demand. Never persisted.
+- **Content address strategy:** Slug/UUID (not addressed at all — streamed to stdout for one-shot machine consumption)
+- **Address justification:** BuildPlan is never stored. The next-sprint `rakia ci` pipes it directly to the executor. No identity, no addressing.
+- **Source of truth:** Computation
+- **Coordinator zome:** N/A
+- **Storage projection:** N/A
+- **HTTP route:** N/A
+- **Anti-pattern check:** None apply.
+
+### Entity: Baseline ref (`refs/notes/rakia/baselines/{pipeline}`)
+
+- **Classification:** Operational (C)
+- **Justification:** Git ref tracking the last-known-good commit per pipeline. Git ref namespace IS the source of truth — survives executor death because it's a ref, not an artifact (which is precisely the design improvement vs Jenkins's `pipeline-baselines.json`).
+- **Content address strategy:** Slug (pipeline name → ref path). Justified because git ref naming conventions require human-readable paths.
+- **Source of truth:** Git ref namespace under `refs/notes/rakia/baselines/`
+- **Coordinator zome:** N/A
+- **Storage projection:** N/A — the git ref IS the storage
+- **HTTP route:** N/A — accessed via brit CLI which uses brit/gix
+- **Anti-pattern check:** None apply. Brit/git compat preserved (these are valid stock git refs; `git show-ref` can read them).
+
+### Design constraints discovered
+
+The classification work confirms a crisp architectural boundary:
+
+| Layer | Where data lives | Source of truth | Subject to p2p-design-gate? |
+|---|---|---|---|
+| Protocol primitives (Content, Mastery, Attestation, EconomicEvent, ...) | Holochain DHT | DHT entry types | Yes — every entity needs full classification |
+| Build/CI domain (BuildManifest, BuildPlan, baselines) | Git repo + git refs | Git tree + ref namespace (brit/git compat) | Classified once here as Category C — sprint scope is closed under "operational" |
+| Developer dev-loop (codegen artifacts, fixtures, generated_types.rs) | Files on disk | Schemas (regenerated) | N/A — derived artifacts, no entity status |
+
+This boundary mirrors the SDK CLAUDE.md test ("Could this capability be captured at scale for rent extraction?"). Build/CI cannot — anyone with a git repo can run `brit`. There is no "the build authority" to capture. So it lives outside the protocol, in developer-tooling space, and the gate's notarization machinery does not apply.
+
+**Implication for future rakia sprints:** new entities introduced by `rakia-executor` (ExecutionEvent) and the cutover work (BuildAttestation) WILL hit the gate again — BuildAttestation is Category A (notarized via the existing `Build` attestation entry type in `brit-epr/src/elohim/attestation/`), and ExecutionEvent is Category C (operational, ephemeral logs). That classification belongs to the next sprint's spec, not this one.
+
 ## Key Design Decisions
 
 1. **Schemas are rakia-owned, not sdk-owned.** Build-domain semantics are meaning-defined interpretations of EPR primitives; SDK stays focused on protocol primitives.
