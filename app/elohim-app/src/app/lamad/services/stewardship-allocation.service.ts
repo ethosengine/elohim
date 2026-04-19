@@ -18,13 +18,12 @@
  * @see ContributorService for contributor impact tracking
  */
 
+import { HttpClient } from '@angular/common/http';
 import { Injectable, signal, inject } from '@angular/core';
 
 // @coverage: 14.8% (2026-02-24)
 
 import { Observable, of, BehaviorSubject, map, catchError, tap } from 'rxjs';
-
-import { HttpClient } from '@angular/common/http';
 
 import { StorageApiService } from '@app/elohim/services/storage-api.service';
 
@@ -153,7 +152,7 @@ export class StewardshipAllocationService {
   listForHousehold(householdId: string): Observable<StewardshipAllocationView[]> {
     return this.http
       .get<StewardshipAllocationView[]>(
-        `/api/v1/households/${encodeURIComponent(householdId)}/stewardship-allocations`,
+        `/api/v1/households/${encodeURIComponent(householdId)}/stewardship-allocations`
       )
       .pipe(catchError(() => of([])));
   }

@@ -1,7 +1,19 @@
 {
   "name": "elohim-cache-core",
+  "type": "module",
+  "collaborators": [
+    "Elohim Protocol"
+  ],
+  "description": "High-performance O(log n) cache for Elohim Protocol applications",
   "version": "0.1.0",
-  "description": "Stub - built by wasm-pack from elohim-cache-core crate",
+  "files": [
+    "elohim_cache_core_bg.wasm",
+    "elohim_cache_core.js",
+    "elohim_cache_core.d.ts"
+  ],
   "main": "elohim_cache_core.js",
-  "types": "elohim_cache_core.d.ts"
+  "types": "elohim_cache_core.d.ts",
+  "sideEffects": [
+    "./snippets/*"
+  ]
 }
