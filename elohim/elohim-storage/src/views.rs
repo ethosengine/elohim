@@ -6059,3 +6059,104 @@ impl From<GateDecisionAttestationRow> for GateDecisionAttestationView {
         }
     }
 }
+
+// ============================================================================
+// Peer Status View
+// ============================================================================
+//
+// Source of truth: Holochain infrastructure DNA DHT (Notarized, Category A).
+// This view is a read-optimised SQLite projection populated by
+// `InfrastructureSignal::PeerStatusRecorded` post-commit projections.
+// If the projection and the DHT disagree, the DHT wins.
+//
+// Wire format governed by:
+//   `elohim/sdk/schemas/v1/views/peer-status-view.schema.json`
+//   `elohim/sdk/schemas/v1/views/elohim-capability-profile.schema.json`
+//
+// `elohimCapability` is operator-configured at startup (Phase 9). The field is
+// optional: a peer that does not run an elohim-agent omits it. Phase 10+ may
+// auto-detect capabilities from a live elohim-agent-service.
+
+use crate::db::peer_statuses::PeerStatusRow;
+
+/// Advertised model-level capabilities of an elohim-agent running at this peer.
+///
+/// Wire format: `elohim/sdk/schemas/v1/views/elohim-capability-profile.schema.json`
+///
+/// Operator-configured at startup. Phase 10+ may auto-detect from
+/// elohim-agent-service. All string arrays default to empty.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct ElohimCapabilityProfile {
+    /// Fully-qualified model name. E.g. `claude-opus-4-7`, `llama-3.1-70b-q4`.
+    pub model_name: String,
+    /// Model family/vendor. E.g. `claude`, `llama`, `gpt`, `mistral`.
+    pub model_family: String,
+    /// Maximum input context in tokens for this model instance.
+    #[ts(type = "number")]
+    pub context_window_tokens: u64,
+    /// CID of the constitution document. Null when no specific constitution is applied.
+    pub constitution_cid: Option<String>,
+    /// Quantization descriptor. E.g. `q4_K_M`, `bf16`, `f32`. Null for hosted/closed models.
+    pub quantization_spec: Option<String>,
+    /// Free-form host descriptor. E.g. `tauri-desktop-mac-arm64`, `elohim-node-linux-x86_64`.
+    pub deployment_context: Option<String>,
+    /// Domains this elohim is primed for. Free-form in Phase 9.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub specialties: Vec<String>,
+    /// Named gate/service capabilities this elohim can dispatch.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub skills: Vec<String>,
+    /// Observed strengths accrued from attestation history.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub strengths: Vec<String>,
+    /// ISO 8601 timestamp when this elohim instance became active at this peer.
+    pub active_since: String,
+    /// Reach of this elohim instance. Distinct from the node's overall reach. Null until attestations accrue.
+    pub reach_level: Option<String>,
+}
+
+/// Wire view for a peer's notarized status, as projected from the infrastructure DNA DHT.
+///
+/// Wire format: `elohim/sdk/schemas/v1/views/peer-status-view.schema.json`
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct PeerStatusView {
+    /// Agent pubkey of the peer (base64url encoded).
+    pub peer_id: String,
+    /// Peer availability status: "online" | "degraded" | "leaving" | "offline".
+    pub status: String,
+    /// True when this peer is available as a general-pool request target.
+    pub general_pool_member: bool,
+    /// True when this peer is accepting new stewardship reserve allocations.
+    pub accepting_stewardship_reserves: bool,
+    /// Operator-declared node archetype. E.g. home-nuc, blade, desktop, cloud-vps.
+    pub archetype_class: Option<String>,
+    /// Holochain action timestamp in microseconds since Unix epoch (u64 as string).
+    pub timestamp: String,
+    /// ActionHash of the upstream PeerStatus DHT entry — provenance anchor.
+    pub dht_anchor_hash: String,
+    /// Unix microseconds when this projection row was last written (u64 as string).
+    pub updated_at: String,
+    /// Model-level capabilities if an elohim-agent runs at this peer. None for pure storage/relay nodes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub elohim_capability: Option<ElohimCapabilityProfile>,
+}
+
+impl From<PeerStatusRow> for PeerStatusView {
+    fn from(row: PeerStatusRow) -> Self {
+        Self {
+            peer_id: row.peer_id,
+            status: row.status,
+            general_pool_member: row.general_pool_member != 0,
+            accepting_stewardship_reserves: row.accepting_stewardship_reserves != 0,
+            archetype_class: row.archetype_class,
+            timestamp: row.timestamp.to_string(),
+            dht_anchor_hash: row.dht_anchor_hash,
+            updated_at: row.updated_at.to_string(),
+            elohim_capability: None, // Phase 9: populated from operator config at startup, not from projection row
+        }
+    }
+}

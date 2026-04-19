@@ -46,6 +46,8 @@ const INTERFACE_FILES = [
   { src: 'views/gate-decision-attestation-view.ts', dest: 'gate-decision-attestation-view.ts' },
   { src: 'inputs/wisdom-invocation-input.ts', dest: 'wisdom-invocation-input.ts' },
   { src: 'views/wisdom-invocation-response.ts', dest: 'wisdom-invocation-response.ts' },
+  { src: 'views/elohim-capability-profile.ts', dest: 'elohim-capability-profile.ts' },
+  { src: 'views/peer-status-view.ts', dest: 'peer-status-view.ts' },
 ];
 
 /**

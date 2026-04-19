@@ -317,6 +317,168 @@ fn gate_decision_attestation_view_dev_context_phase() {
     validate_against_schema("views/gate-decision-attestation-view.schema.json", &json);
 }
 
+// ── Peer Status + Elohim Capability ────────────────────────────
+
+#[test]
+fn peer_status_view_no_elohim_capability_matches_schema() {
+    use elohim_storage::PeerStatusView;
+
+    let view = PeerStatusView {
+        peer_id: "uhCAkSMOKEPEER001".to_string(),
+        status: "online".to_string(),
+        general_pool_member: true,
+        accepting_stewardship_reserves: true,
+        archetype_class: Some("home-nuc".to_string()),
+        timestamp: "1700000000000000".to_string(),
+        dht_anchor_hash: "uhCkkSMOKEHASH001".to_string(),
+        updated_at: "1700000000100000".to_string(),
+        elohim_capability: None,
+    };
+
+    let json = serde_json::to_value(&view).unwrap();
+    // elohim_capability must be absent (skip_serializing_if) when None
+    assert!(
+        !json.as_object().unwrap().contains_key("elohimCapability"),
+        "elohimCapability must be absent when None (skip_serializing_if)"
+    );
+    validate_against_schema("views/peer-status-view.schema.json", &json);
+}
+
+#[test]
+fn peer_status_view_full_elohim_capability_matches_schema() {
+    use elohim_storage::{ElohimCapabilityProfile, PeerStatusView};
+
+    let view = PeerStatusView {
+        peer_id: "uhCAkFULLPEER001".to_string(),
+        status: "online".to_string(),
+        general_pool_member: true,
+        accepting_stewardship_reserves: false,
+        archetype_class: Some("blade".to_string()),
+        timestamp: "1700000000000000".to_string(),
+        dht_anchor_hash: "uhCkkFULLHASH001".to_string(),
+        updated_at: "1700000000100000".to_string(),
+        elohim_capability: Some(ElohimCapabilityProfile {
+            model_name: "claude-opus-4-7".to_string(),
+            model_family: "claude".to_string(),
+            context_window_tokens: 1_000_000,
+            constitution_cid: Some(
+                "bafyreib2vq7constitutionABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789".to_string(),
+            ),
+            quantization_spec: None,
+            deployment_context: Some("elohim-node-linux-x86_64".to_string()),
+            specialties: vec!["child-safety".to_string(), "curriculum-design".to_string()],
+            skills: vec![
+                "content-safety-review".to_string(),
+                "discernment-evaluation".to_string(),
+            ],
+            strengths: vec!["consistent-constitutional-reasoning".to_string()],
+            active_since: "2026-04-18T00:00:00Z".to_string(),
+            reach_level: Some("community".to_string()),
+        }),
+    };
+
+    let json = serde_json::to_value(&view).unwrap();
+    validate_against_schema("views/peer-status-view.schema.json", &json);
+}
+
+#[test]
+fn peer_status_view_minimal_elohim_capability_matches_schema() {
+    use elohim_storage::{ElohimCapabilityProfile, PeerStatusView};
+
+    // Only required fields on ElohimCapabilityProfile; all optional fields absent/None.
+    let view = PeerStatusView {
+        peer_id: "uhCAkMINIMALPEER01".to_string(),
+        status: "degraded".to_string(),
+        general_pool_member: false,
+        accepting_stewardship_reserves: false,
+        archetype_class: None,
+        timestamp: "1700000000000000".to_string(),
+        dht_anchor_hash: "uhCkkMINIMALHASH01".to_string(),
+        updated_at: "1700000000100000".to_string(),
+        elohim_capability: Some(ElohimCapabilityProfile {
+            model_name: "llama-3.1-8b".to_string(),
+            model_family: "llama".to_string(),
+            context_window_tokens: 128_000,
+            constitution_cid: None,
+            quantization_spec: None,
+            deployment_context: None,
+            specialties: vec![],
+            skills: vec![],
+            strengths: vec![],
+            active_since: "2026-01-01T00:00:00Z".to_string(),
+            reach_level: None,
+        }),
+    };
+
+    let json = serde_json::to_value(&view).unwrap();
+    validate_against_schema("views/peer-status-view.schema.json", &json);
+}
+
+#[test]
+fn elohim_capability_profile_rejects_additional_properties() {
+    // additionalProperties: false enforcement: inject an unknown field
+    // and verify schema validation catches it.
+    let mut profile = serde_json::json!({
+        "modelName": "claude-opus-4-7",
+        "modelFamily": "claude",
+        "contextWindowTokens": 1000000,
+        "activeSince": "2026-04-18T00:00:00Z"
+    });
+    profile["unknownField"] = serde_json::json!("should-not-be-here");
+
+    let schema = load_schema("views/elohim-capability-profile.schema.json");
+    let validator = jsonschema::validator_for(&schema).unwrap();
+    let errors: Vec<_> = validator.iter_errors(&profile).collect();
+    assert!(
+        !errors.is_empty(),
+        "Schema must reject additionalProperties on ElohimCapabilityProfile"
+    );
+}
+
+#[test]
+fn peer_status_view_rejects_additional_properties() {
+    let mut status = serde_json::json!({
+        "peerId": "uhCAkSMOKE",
+        "status": "online",
+        "generalPoolMember": true,
+        "acceptingStewardshipReserves": true,
+        "timestamp": "1700000000000000",
+        "dhtAnchorHash": "uhCkkSMOKE",
+        "updatedAt": "1700000000000000"
+    });
+    status["injectedField"] = serde_json::json!("should-fail");
+
+    let schema = load_schema("views/peer-status-view.schema.json");
+    let validator = jsonschema::validator_for(&schema).unwrap();
+    let errors: Vec<_> = validator.iter_errors(&status).collect();
+    assert!(
+        !errors.is_empty(),
+        "Schema must reject additionalProperties on PeerStatusView"
+    );
+}
+
+#[test]
+fn elohim_capability_profile_standalone_matches_schema() {
+    use elohim_storage::ElohimCapabilityProfile;
+
+    let profile = ElohimCapabilityProfile {
+        model_name: "gpt-4o".to_string(),
+        model_family: "gpt".to_string(),
+        context_window_tokens: 128_000,
+        constitution_cid: None,
+        quantization_spec: None,
+        deployment_context: Some("tauri-desktop-mac-arm64".to_string()),
+        specialties: vec![],
+        skills: vec!["content-safety-review".to_string()],
+        strengths: vec![],
+        active_since: "2026-04-18T10:00:00Z".to_string(),
+        reach_level: None,
+    };
+
+    let json = serde_json::to_value(&profile).unwrap();
+    validate_against_schema("views/elohim-capability-profile.schema.json", &json);
+}
+
 // ── Convention enforcement ──────────────────────────────────────
 
 #[test]
@@ -330,6 +492,8 @@ fn view_schemas_declare_source_of_truth() {
         "views/content-view.schema.json",
         "views/economic-event-view.schema.json",
         "views/gate-decision-attestation-view.schema.json",
+        "views/peer-status-view.schema.json",
+        "views/elohim-capability-profile.schema.json",
     ];
 
     for schema_name in &view_schemas {

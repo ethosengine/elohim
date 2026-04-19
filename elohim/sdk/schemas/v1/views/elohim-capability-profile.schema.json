@@ -1,0 +1,60 @@
+{
+  "$id": "epr:schema:view:elohim-capability-profile",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ElohimCapabilityProfile",
+  "description": "Source of truth: operator-configured at elohim-storage startup (Operational, Category C). Not auto-detected — the operator declares the model running here. Phase 10+ may derive this automatically from a live elohim-agent-service.",
+  "type": "object",
+  "required": ["modelName", "modelFamily", "contextWindowTokens", "activeSince"],
+  "properties": {
+    "modelName": {
+      "type": "string",
+      "description": "Fully-qualified model name. E.g. claude-opus-4-7, llama-3.1-70b-q4, gpt-4o"
+    },
+    "modelFamily": {
+      "type": "string",
+      "description": "Model family/vendor. E.g. claude, llama, gpt, mistral, gemini"
+    },
+    "contextWindowTokens": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Maximum input context in tokens for this model instance"
+    },
+    "constitutionCid": {
+      "type": ["string", "null"],
+      "description": "CID of the constitution document priming this elohim. Null when no specific constitution is applied (base model behavior)"
+    },
+    "quantizationSpec": {
+      "type": ["string", "null"],
+      "description": "Quantization descriptor. E.g. q4_K_M, q8_0, bf16, f32. Null for hosted/closed-weight models where quantization is not operator-visible"
+    },
+    "deploymentContext": {
+      "type": ["string", "null"],
+      "description": "Free-form host descriptor indicating where this elohim runs. E.g. tauri-desktop-mac-arm64, elohim-node-linux-x86_64, doorway-hosted-cloud"
+    },
+    "specialties": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Domains this elohim is primed for via constitution or fine-tuning. E.g. child-safety, medical, code-review, curriculum-design. Free-form in Phase 9; Phase 10+ may enumerate a controlled vocabulary"
+    },
+    "skills": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Named capabilities this elohim can dispatch. E.g. content-safety-review, discernment-evaluation, mastery-assessment. Maps to gate names or service names that gate-client uses for dispatch"
+    },
+    "strengths": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Observed strengths accrued from attestation history. Populated by the protocol over time as gate decisions accumulate; operator-initialized as empty"
+    },
+    "activeSince": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp when this elohim instance became active at this peer"
+    },
+    "reachLevel": {
+      "type": ["string", "null"],
+      "description": "Reach of this specific elohim instance. Distinct from the peer node's overall reach — an elohim running at a well-connected node may still have limited reach for certain gate decisions. Null until reach attestations accrue"
+    }
+  },
+  "additionalProperties": false
+}

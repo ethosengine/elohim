@@ -1,0 +1,61 @@
+{
+  "$id": "epr:schema:view:peer-status",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PeerStatusView",
+  "description": "Source of truth: Holochain infrastructure DNA DHT (Notarized, Category A). This view is a read-optimized projection from the peer_statuses SQLite table, itself populated by InfrastructureSignal::PeerStatusRecorded post-commit projections. If the projection and the DHT disagree, the DHT wins.",
+  "type": "object",
+  "required": [
+    "peerId",
+    "status",
+    "generalPoolMember",
+    "acceptingStewardshipReserves",
+    "timestamp",
+    "dhtAnchorHash",
+    "updatedAt"
+  ],
+  "properties": {
+    "peerId": {
+      "type": "string",
+      "description": "Agent pubkey of the peer (base64url encoded). Matches the agent_pub_key in the infrastructure DNA"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["online", "degraded", "leaving", "offline"],
+      "description": "Peer availability status as last advertised via heartbeat"
+    },
+    "generalPoolMember": {
+      "type": "boolean",
+      "description": "True when this peer is available to serve as a general-pool request target. Used by the doorway forwarder for candidate selection"
+    },
+    "acceptingStewardshipReserves": {
+      "type": "boolean",
+      "description": "True when this peer is accepting new stewardship reserve allocations"
+    },
+    "archetypeClass": {
+      "type": ["string", "null"],
+      "description": "Operator-declared node archetype. E.g. home-nuc, blade, desktop, cloud-vps. Null when the peer has not declared an archetype"
+    },
+    "timestamp": {
+      "type": "string",
+      "pattern": "^[0-9]+$",
+      "description": "Holochain action timestamp in microseconds since Unix epoch (u64 as string — exceeds JS safe integer range)"
+    },
+    "dhtAnchorHash": {
+      "type": "string",
+      "description": "ActionHash of the PeerStatus DHT entry this projection was built from (base64url). Allows callers to verify provenance against the DHT"
+    },
+    "updatedAt": {
+      "type": "string",
+      "pattern": "^[0-9]+$",
+      "description": "Unix microseconds when this projection row was last written (u64 as string)"
+    },
+    "elohimCapability": {
+      "oneOf": [
+        { "$ref": "elohim-capability-profile.schema.json" },
+        { "type": "null" }
+      ],
+      "description": "If this peer runs an elohim-agent, this block advertises its model-level capabilities. Null or absent means no elohim runs here (e.g., pure storage/relay node). Operator-configured in Phase 9; auto-detected in Phase 10+"
+    }
+  },
+  "additionalProperties": false
+}
