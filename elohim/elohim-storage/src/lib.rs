@@ -160,3 +160,4 @@ pub use views::{
 };
 pub use views::ChallengeOutcomeView;
 pub use views::GateDecisionChallengeView;
+pub use views::ElohimReputationProfileView;

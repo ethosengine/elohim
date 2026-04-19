@@ -50,6 +50,7 @@ const INTERFACE_FILES = [
   { src: 'views/wisdom-invocation-response.ts', dest: 'wisdom-invocation-response.ts' },
   { src: 'views/elohim-capability-profile.ts', dest: 'elohim-capability-profile.ts' },
   { src: 'views/peer-status-view.ts', dest: 'peer-status-view.ts' },
+  { src: 'views/elohim-reputation-profile-view.ts', dest: 'elohim-reputation-profile-view.ts' },
 ];
 
 /**

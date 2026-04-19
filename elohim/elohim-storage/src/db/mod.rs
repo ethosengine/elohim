@@ -92,6 +92,9 @@ pub mod gate_decision_attestations;
 pub mod gate_decision_challenges;
 pub mod challenge_outcomes;
 
+// Elohim reputation aggregation query (mishpat outcome graph — Phase 11 Task 11.3)
+pub mod elohim_reputation;
+
 use std::path::Path;
 use std::time::Duration;
 

@@ -758,6 +758,63 @@ fn elohim_capability_profile_unknown_strength_rejected() {
     );
 }
 
+// ── Elohim Reputation Profile ───────────────────────────────────
+
+#[test]
+fn elohim_reputation_profile_view_matches_schema() {
+    use elohim_storage::ElohimReputationProfileView;
+    use elohim_storage::views::JsonVal;
+
+    let view = ElohimReputationProfileView {
+        elohim_id: "uhCAkABCDEFGHIJKLMNOPQRSTUVWXYZ012345678901234567890123456789012".to_string(),
+        window_start: "2026-01-19T00:00:00Z".to_string(),
+        window_end: "2026-04-19T00:00:00Z".to_string(),
+        current_substance_cid: Some("bafyreib2vq7substance01234567890123456789012345678901234567".to_string()),
+        total_decisions: 42,
+        challenged_count: 3,
+        upheld_count: 1,
+        dismissed_count: 1,
+        superseded_count: 0,
+        pending_count: 1,
+        challenges_by_grounds: JsonVal(serde_json::json!({
+            "safety": 2,
+            "policy": 1
+        })),
+        outcomes_by_verdict: JsonVal(serde_json::json!({
+            "upheld": 1,
+            "dismissed": 1
+        })),
+    };
+
+    let json = serde_json::to_value(&view).unwrap();
+    validate_against_schema("views/elohim-reputation-profile-view.schema.json", &json);
+}
+
+#[test]
+fn elohim_reputation_profile_view_empty_window_matches_schema() {
+    use elohim_storage::ElohimReputationProfileView;
+    use elohim_storage::views::JsonVal;
+
+    // An elohim with no decisions in the window is a valid response (never a 404).
+    let view = ElohimReputationProfileView {
+        elohim_id: "uhCAkFRESH01234567890123456789012345678901234567890123456789012".to_string(),
+        window_start: "2026-03-20T00:00:00Z".to_string(),
+        window_end: "2026-04-19T00:00:00Z".to_string(),
+        current_substance_cid: None,
+        total_decisions: 0,
+        challenged_count: 0,
+        upheld_count: 0,
+        dismissed_count: 0,
+        superseded_count: 0,
+        pending_count: 0,
+        challenges_by_grounds: JsonVal(serde_json::json!({})),
+        outcomes_by_verdict: JsonVal(serde_json::json!({})),
+    };
+
+    let json = serde_json::to_value(&view).unwrap();
+    validate_against_schema("views/elohim-reputation-profile-view.schema.json", &json);
+}
+
 // ── Convention enforcement ──────────────────────────────────────
 
 #[test]
@@ -773,6 +830,7 @@ fn view_schemas_declare_source_of_truth() {
         "views/gate-decision-attestation-view.schema.json",
         "views/peer-status-view.schema.json",
         "views/elohim-capability-profile.schema.json",
+        "views/elohim-reputation-profile-view.schema.json",
     ];
 
     for schema_name in &view_schemas {

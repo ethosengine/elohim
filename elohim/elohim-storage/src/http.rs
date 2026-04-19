@@ -79,6 +79,7 @@ use crate::views::{
     CreateScheduleInputView,
     CreateStewardedNodeInputView,
     EconomicEventView,
+    ElohimReputationProfileView,
     EprHeadInputView,
     EprHeadView,
     ChallengeOutcomeView,
@@ -2200,6 +2201,14 @@ impl HttpServer {
         if let Some(outcome_id) = resource_path.strip_prefix("challenge-outcomes/") {
             return self
                 .handle_challenge_outcome_by_id(req, method, outcome_id, &app_ctx)
+                .await;
+        }
+
+        // Elohim reputation aggregation query (Phase 11 Task 11.3)
+        // GET /db/elohim-reputation?elohimId=<id>&windowStart=<iso>&windowEnd=<iso>
+        if resource_path == "elohim-reputation" {
+            return self
+                .handle_elohim_reputation(req, method, &app_ctx)
                 .await;
         }
 
@@ -5053,6 +5062,105 @@ impl HttpServer {
                 outcome_id
             ))),
         }
+    }
+
+    // =========================================================================
+    // Elohim Reputation Handler (Phase 11 Task 11.3 — computed aggregation)
+    // =========================================================================
+
+    /// GET /db/elohim-reputation — Compute a multi-dimensional reputation profile
+    ///
+    /// Query params:
+    ///   ?elohimId=<AgentPubKey>    — required
+    ///   ?windowStart=<ISO 8601>    — optional (default: now - 90 days)
+    ///   ?windowEnd=<ISO 8601>      — optional (default: now)
+    ///
+    /// Returns `ElohimReputationProfileView`. Never 404 — an elohim with no
+    /// decisions in the window returns a valid profile with all-zero counts.
+    /// Returns 400 on invalid ISO-8601 or missing elohimId.
+    ///
+    /// Reputation is observed, not declared. The profile is computed from the
+    /// mishpat DNA outcome graph: GateDecisionAttestations (phase=elohim-active)
+    /// -> GateDecisionChallenges -> ChallengeOutcomes.
+    async fn handle_elohim_reputation(
+        &self,
+        req: Request<Incoming>,
+        method: Method,
+        ctx: &AppContext,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        if method != Method::GET {
+            return Ok(response::method_not_allowed());
+        }
+
+        #[derive(serde::Deserialize, Default)]
+        #[serde(rename_all = "camelCase")]
+        struct ReputationQueryParams {
+            elohim_id: Option<String>,
+            window_start: Option<String>,
+            window_end: Option<String>,
+        }
+
+        let query_str = req.uri().query().unwrap_or("");
+        let params: ReputationQueryParams =
+            serde_urlencoded::from_str(query_str).unwrap_or_default();
+
+        let elohim_id = match params.elohim_id {
+            Some(id) if !id.is_empty() => id,
+            _ => {
+                return Ok(response::bad_request("Missing required query param: elohimId"));
+            }
+        };
+
+        // Default window: 90 days ending now.
+        let now = chrono::Utc::now();
+        let default_start = now - chrono::Duration::days(90);
+
+        let window_start = match params.window_start {
+            Some(ref s) => {
+                // Validate ISO-8601 by attempting a parse; we store as the
+                // original string so the view echoes what was requested.
+                if chrono::DateTime::parse_from_rfc3339(s).is_err() {
+                    return Ok(response::bad_request(&format!(
+                        "Invalid ISO-8601 for windowStart: {}",
+                        s
+                    )));
+                }
+                s.clone()
+            }
+            None => default_start.to_rfc3339_opts(chrono::SecondsFormat::Secs, true),
+        };
+
+        let window_end = match params.window_end {
+            Some(ref s) => {
+                if chrono::DateTime::parse_from_rfc3339(s).is_err() {
+                    return Ok(response::bad_request(&format!(
+                        "Invalid ISO-8601 for windowEnd: {}",
+                        s
+                    )));
+                }
+                s.clone()
+            }
+            None => now.to_rfc3339_opts(chrono::SecondsFormat::Secs, true),
+        };
+
+        let q = crate::db::elohim_reputation::ReputationQuery {
+            app_id: ctx.h_app_id.clone(),
+            elohim_id: elohim_id.clone(),
+            window_start: window_start.clone(),
+            window_end: window_end.clone(),
+        };
+
+        let mut conn = self.get_diesel_conn()?;
+        let result = crate::db::elohim_reputation::compute(&mut conn, &q)?;
+
+        let view = ElohimReputationProfileView::from_result(
+            elohim_id,
+            window_start,
+            window_end,
+            result,
+        );
+
+        Ok(response::ok(&view))
     }
 
     // =========================================================================

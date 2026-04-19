@@ -6171,6 +6171,103 @@ impl From<ChallengeOutcomeRow> for ChallengeOutcomeView {
 }
 
 // ============================================================================
+// Elohim Reputation Profile View
+// ============================================================================
+//
+// Source of truth: computed aggregation over the mishpat DNA DHT outcome graph
+// (GateDecisionAttestation + GateDecisionChallenge + ChallengeOutcome entries).
+// This is NOT a direct table projection — it is computed by
+// `crate::db::elohim_reputation::compute` at query time from the SQLite
+// projections of those DHT entries. If the projections and the DHT disagree,
+// the DHT wins.
+//
+// No scalar score is returned. Dimensions are raw counts; time-decay and
+// severity weighting are deferred to Phase 11+ and applied by consumers.
+// Wire format governed by:
+//   `elohim/sdk/schemas/v1/views/elohim-reputation-profile-view.schema.json`
+
+use crate::db::elohim_reputation::ReputationResult;
+
+/// Multi-dimensional reputation profile for an elohim agent over a time window.
+///
+/// Reputation emerges from the accumulated public record — no elohim can assert
+/// its own reputation; no protocol steward can assign it.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct ElohimReputationProfileView {
+    /// AgentPubKey (base64) of the queried elohim agent.
+    pub elohim_id: String,
+    /// ISO 8601 timestamp — start of the query window (inclusive).
+    pub window_start: String,
+    /// ISO 8601 timestamp — end of the query window (inclusive).
+    pub window_end: String,
+    /// CID of the most-recently-used ElohimSubstance in the window.
+    /// None if no decisions exist in the window.
+    pub current_substance_cid: Option<String>,
+    /// Count of GateDecisionAttestations where phase=elohim-active in the window.
+    /// Dev-context decisions are excluded; they carry no reputation weight.
+    pub total_decisions: i64,
+    /// Count of distinct decisions that attracted at least one GateDecisionChallenge.
+    pub challenged_count: i64,
+    /// Count of ChallengeOutcomes with verdict=upheld.
+    pub upheld_count: i64,
+    /// Count of ChallengeOutcomes with verdict=dismissed.
+    pub dismissed_count: i64,
+    /// Count of ChallengeOutcomes with verdict=superseded.
+    pub superseded_count: i64,
+    /// Count of challenges with no ChallengeOutcome yet (still open).
+    pub pending_count: i64,
+    /// Histogram of ChallengeGrounds values to count.
+    /// Keys: "factual-error" | "safety" | "policy" | "constitutional" | "indemnification-request".
+    /// Missing keys indicate zero challenges on those grounds.
+    pub challenges_by_grounds: JsonVal,
+    /// Histogram of ChallengeVerdict values to count.
+    /// Keys: "upheld" | "dismissed" | "superseded".
+    /// Missing keys indicate zero outcomes of that verdict.
+    pub outcomes_by_verdict: JsonVal,
+}
+
+impl ElohimReputationProfileView {
+    /// Construct from a computed aggregation result plus the query context.
+    pub fn from_result(
+        elohim_id: String,
+        window_start: String,
+        window_end: String,
+        r: ReputationResult,
+    ) -> Self {
+        use serde_json::Map;
+
+        let grounds_map: Map<String, serde_json::Value> = r
+            .challenges_by_grounds
+            .into_iter()
+            .map(|(k, v)| (k, serde_json::Value::Number(v.into())))
+            .collect();
+
+        let verdicts_map: Map<String, serde_json::Value> = r
+            .outcomes_by_verdict
+            .into_iter()
+            .map(|(k, v)| (k, serde_json::Value::Number(v.into())))
+            .collect();
+
+        Self {
+            elohim_id,
+            window_start,
+            window_end,
+            current_substance_cid: r.current_substance_cid,
+            total_decisions: r.total_decisions,
+            challenged_count: r.challenged_count,
+            upheld_count: r.upheld_count,
+            dismissed_count: r.dismissed_count,
+            superseded_count: r.superseded_count,
+            pending_count: r.pending_count,
+            challenges_by_grounds: JsonVal(serde_json::Value::Object(grounds_map)),
+            outcomes_by_verdict: JsonVal(serde_json::Value::Object(verdicts_map)),
+        }
+    }
+}
+
+// ============================================================================
 // Peer Status View
 // ============================================================================
 //
