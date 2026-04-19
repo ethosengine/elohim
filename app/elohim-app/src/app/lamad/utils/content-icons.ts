@@ -55,6 +55,12 @@ export const CONTENT_TYPE_ICONS: Record<ContentType, string> = {
   application: '🖥️',
   'experience-story': '📖',
   'experience-moment': '📸',
+  // Gate process declaration family (constitutional governance)
+  'gate-process-declaration': '⚖️',
+  'universal-band-declaration': '⚖️',
+  'gate-rules-declaration': '📜',
+  'aggregation-spec': '🧮',
+  'escalation-target-spec': '🚨',
   // App-layer extensions
   community: '👥',
   'discovery-assessment': '🔮',

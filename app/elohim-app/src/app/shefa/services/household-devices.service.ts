@@ -21,7 +21,7 @@ import { inject, Injectable } from '@angular/core';
 
 import { map, Observable, of, switchMap } from 'rxjs';
 
-import type { HouseholdDevicesView } from '../../../generated/household-devices-view';
+import type { HouseholdDevicesView } from '@app/generated/household-devices-view';
 import type { CollectiveParticipationView } from '@elohim/storage-client/generated';
 
 interface ParticipationListResponse {
