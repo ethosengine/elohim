@@ -6,6 +6,7 @@ import { Component, OnInit, OnDestroy, inject, signal, computed } from '@angular
 import { CUSTODIAN_METRICS, type CustodianMetrics, type ICustodianMetrics } from '@app/shefa';
 
 import { CustodianSelectionService } from '../../services/custodian-selection.service';
+import { NetworkHealthTabComponent } from './network-health-tab.component';
 
 /** Alert from the Shefa service */
 interface ShefaAlert {
@@ -39,7 +40,7 @@ interface ShefaRecommendation {
 @Component({
   selector: 'app-shefa-dashboard',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, NetworkHealthTabComponent],
   templateUrl: './shefa-dashboard.component.html',
   styleUrl: './shefa-dashboard.component.css',
 })
@@ -56,7 +57,9 @@ export class ShefaDashboardComponent implements OnInit, OnDestroy {
   readonly recommendations = signal<ShefaRecommendation[]>([]);
 
   // Tab state
-  readonly activeTab = signal<'overview' | 'custodians' | 'alerts' | 'performance'>('overview');
+  readonly activeTab = signal<
+    'network-health' | 'overview' | 'custodians' | 'alerts' | 'performance'
+  >('network-health');
 
   // Filter state
   readonly filterByTier = signal<1 | 2 | 3 | 4 | 'all'>('all');
@@ -225,7 +228,7 @@ export class ShefaDashboardComponent implements OnInit, OnDestroy {
     return severity === 'critical' ? '⚠️' : '⚠';
   }
 
-  setActiveTab(tab: 'overview' | 'custodians' | 'alerts' | 'performance'): void {
+  setActiveTab(tab: 'network-health' | 'overview' | 'custodians' | 'alerts' | 'performance'): void {
     this.activeTab.set(tab);
   }
 

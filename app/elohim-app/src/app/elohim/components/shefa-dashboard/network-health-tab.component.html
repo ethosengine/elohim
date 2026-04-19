@@ -1,0 +1,108 @@
+<!-- Network Health Tab — P2P mesh posture metrics -->
+<div class="network-health-tab" data-testid="network-posture-card">
+  <!-- Loading state -->
+  <div *ngIf="loading()" class="posture-loading">
+    <div class="loading-indicator">Loading network posture...</div>
+  </div>
+
+  <!-- Unavailable state: endpoint not yet deployed (F2 pending) -->
+  <div *ngIf="!loading() && posture() === null" class="posture-unavailable">
+    <div class="unavailable-icon">📡</div>
+    <p class="unavailable-message">Network posture unavailable (endpoint coming in F2)</p>
+    <p class="unavailable-hint">
+      The <code>/api/v1/network/posture</code> endpoint will be live once the F2 sprint task ships.
+    </p>
+  </div>
+
+  <!-- Live posture data -->
+  <div *ngIf="!loading() && posture() !== null" class="posture-grid">
+
+    <!-- Peer counts card -->
+    <div class="card posture-card">
+      <h3 class="posture-card-title">Peer Activity</h3>
+
+      <div class="posture-metric">
+        <span class="posture-metric-label">Active peers</span>
+        <span class="posture-metric-value" data-testid="posture-active-peers">
+          {{ posture()!.activePeers }} / {{ posture()!.totalPeers }}
+        </span>
+      </div>
+
+      <div class="metric-bar">
+        <div
+          class="metric-fill"
+          [style.width.%]="posture()!.totalPeers > 0
+            ? (posture()!.activePeers / posture()!.totalPeers) * 100
+            : 0"
+        ></div>
+      </div>
+
+      <div class="posture-metric posture-metric--secondary">
+        <span class="posture-metric-label">Stale peers</span>
+        <span class="posture-metric-value posture-metric-value--muted">
+          {{ posture()!.stalePeers }}
+        </span>
+      </div>
+    </div>
+
+    <!-- Household reciprocity card -->
+    <div class="card posture-card">
+      <h3 class="posture-card-title">Household Reciprocity</h3>
+
+      <div class="posture-metric">
+        <span class="posture-metric-label">Households reciprocating</span>
+        <span class="posture-metric-value" data-testid="posture-households-reciprocating">
+          {{ posture()!.householdsReciprocating }}
+        </span>
+      </div>
+
+      <div class="posture-metric">
+        <span class="posture-metric-label">Always-on peers</span>
+        <span class="posture-metric-value" data-testid="posture-always-on">
+          {{ posture()!.alwaysOnPeers }}
+        </span>
+      </div>
+    </div>
+
+    <!-- Compute & storage card -->
+    <div class="card posture-card">
+      <h3 class="posture-card-title">Resources</h3>
+
+      <div class="posture-metric">
+        <span class="posture-metric-label">Compute available</span>
+        <span
+          class="posture-metric-value"
+          [class.posture-value--yes]="posture()!.computeAvailable"
+          [class.posture-value--no]="!posture()!.computeAvailable"
+          data-testid="posture-compute"
+        >
+          {{ posture()!.computeAvailable ? 'Yes' : 'No' }}
+        </span>
+      </div>
+
+      <div class="posture-metric posture-metric--stacked">
+        <span class="posture-metric-label">Storage pressure</span>
+        <span class="posture-metric-value" data-testid="posture-storage-pressure">
+          {{ formatPressure(posture()!.storagePressure) }}
+        </span>
+      </div>
+
+      <!-- Storage pressure gauge -->
+      <div class="pressure-bar-track">
+        <div
+          class="pressure-bar-fill"
+          [class]="pressureClass(posture()!.storagePressure)"
+          [style.width]="formatPressure(posture()!.storagePressure)"
+          aria-label="Storage pressure gauge"
+        ></div>
+      </div>
+    </div>
+
+    <!-- Snapshot timestamp -->
+    <div class="posture-footer">
+      <span class="posture-timestamp">
+        Snapshot: {{ posture()!.computedAt | date: 'medium' }}
+      </span>
+    </div>
+  </div>
+</div>

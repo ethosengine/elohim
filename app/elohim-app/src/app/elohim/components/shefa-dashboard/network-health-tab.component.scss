@@ -1,0 +1,170 @@
+/* Network Health Tab — styles follow the shefa-dashboard.component.css palette */
+
+.network-health-tab {
+  padding: 0; /* Tab content provides its own spacing via .tab-content */
+}
+
+/* Loading state */
+.posture-loading {
+  padding: 32px;
+  text-align: center;
+}
+
+.loading-indicator {
+  color: #767676;
+  font-size: 14px;
+}
+
+/* Unavailable state */
+.posture-unavailable {
+  padding: 40px 32px;
+  text-align: center;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 10%);
+}
+
+.unavailable-icon {
+  font-size: 40px;
+  margin-bottom: 12px;
+}
+
+.unavailable-message {
+  font-size: 16px;
+  color: #333;
+  margin: 0 0 8px;
+  font-weight: 500;
+}
+
+.unavailable-hint {
+  font-size: 13px;
+  color: #767676;
+  margin: 0;
+
+  code {
+    background: #f0f0f0;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 12px;
+  }
+}
+
+/* Posture grid — three equal cards + footer */
+.posture-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
+}
+
+.posture-footer {
+  grid-column: 1 / -1; /* span full width */
+  display: flex;
+  justify-content: flex-end;
+}
+
+.posture-timestamp {
+  font-size: 12px;
+  color: #767676;
+}
+
+/* Individual posture card — extends .card from parent stylesheet */
+.posture-card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.posture-card-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: #333;
+}
+
+/* Metric row */
+.posture-metric {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.posture-metric--secondary {
+  opacity: 0.75;
+}
+
+.posture-metric--stacked {
+  margin-top: 4px;
+}
+
+.posture-metric-label {
+  font-size: 13px;
+  color: #767676;
+  font-weight: 500;
+}
+
+.posture-metric-value {
+  font-size: 20px;
+  font-weight: bold;
+  color: #333;
+}
+
+.posture-metric-value--muted {
+  font-size: 16px;
+  color: #767676;
+}
+
+/* Compute available coloring */
+.posture-value--yes {
+  color: #155724;
+}
+
+.posture-value--no {
+  color: #721c24;
+}
+
+/* Peer activity bar — reuses .metric-bar / .metric-fill from parent */
+.metric-bar {
+  height: 6px;
+  background: #e9ecef;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.metric-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #007bff, #0056b3);
+  transition: width 0.3s;
+}
+
+/* Storage pressure gauge */
+.pressure-bar-track {
+  height: 8px;
+  background: #e9ecef;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.pressure-bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.3s;
+
+  &.pressure-ok {
+    background: linear-gradient(90deg, #28a745, #1e7e34);
+  }
+
+  &.pressure-warning {
+    background: linear-gradient(90deg, #ffc107, #e0a800);
+  }
+
+  &.pressure-critical {
+    background: linear-gradient(90deg, #dc3545, #bd2130);
+  }
+}
+
+/* Responsive */
+@media (width <= 768px) {
+  .posture-grid {
+    grid-template-columns: 1fr;
+  }
+}

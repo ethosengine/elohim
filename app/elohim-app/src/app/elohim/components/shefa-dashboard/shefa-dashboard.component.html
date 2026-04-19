@@ -63,6 +63,15 @@
   <div class="tabs-navigation">
     <button
       type="button"
+      [class.active]="activeTab() === 'network-health'"
+      (click)="setActiveTab('network-health')"
+      class="tab-button"
+      data-testid="tab-network-health"
+    >
+      🌐 Network Health
+    </button>
+    <button
+      type="button"
       [class.active]="activeTab() === 'overview'"
       (click)="setActiveTab('overview')"
       class="tab-button"
@@ -93,6 +102,11 @@
     >
       📊 Performance
     </button>
+  </div>
+
+  <!-- Network Health Tab -->
+  <div *ngIf="activeTab() === 'network-health'" class="tab-content">
+    <app-network-health-tab></app-network-health-tab>
   </div>
 
   <!-- Overview Tab -->
