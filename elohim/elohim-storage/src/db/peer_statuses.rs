@@ -56,6 +56,36 @@ pub fn get_by_peer(conn: &mut SqliteConnection, peer: &str) -> QueryResult<Optio
         .optional()
 }
 
+/// List all current peer status rows (unfiltered).
+///
+/// Used by `GET /api/v1/peer-statuses` when no householdId query param is present.
+pub fn list_current(conn: &mut SqliteConnection) -> QueryResult<Vec<PeerStatusRow>> {
+    peer_statuses::table.load::<PeerStatusRow>(conn)
+}
+
+/// List peer status rows for a specific household.
+///
+/// NOTE(C3): The `stewarded_nodes.household_id` column does not exist yet — it is
+/// added by Task C3's migration. Until that migration lands this function falls
+/// back to `list_current`, returning all peers regardless of household.
+/// Once Task C3 is merged, replace the body below with:
+///
+/// ```rust,ignore
+/// use crate::db::diesel_schema::stewarded_nodes::dsl as sn;
+/// peer_statuses::table
+///     .inner_join(sn::stewarded_nodes.on(sn::id.eq(peer_statuses::peer_id)))
+///     .filter(sn::household_id.eq(household_id))
+///     .select(PeerStatusRow::as_select())
+///     .load(conn)
+/// ```
+pub fn list_by_household(
+    conn: &mut SqliteConnection,
+    _household_id: &str,
+) -> QueryResult<Vec<PeerStatusRow>> {
+    // TODO(C3): filter by household_id once diesel_schema reflects the column
+    list_current(conn)
+}
+
 /// List peers currently advertising themselves as general-pool members and
 /// either online or degraded. Consumed by the doorway forwarder's
 /// candidate-selection step.

@@ -8582,6 +8582,18 @@ pub fn build_manifest() -> doorway_client::DoorwayRoutes {
                 .build(),
         )
         // =====================================================================
+        // /api/v1/peer-statuses — PeerStatus DHT projection (infrastructure DNA)
+        // =====================================================================
+        // Read-only. Source of truth: infrastructure DNA DHT (Category A, notarized).
+        // Rows are written exclusively by `InfrastructureSignal::PeerStatusRecorded`.
+        // Optional ?householdId= filter falls back to list-all until Task C3 migration.
+        .route(
+            Route::get("/api/v1/peer-statuses")
+                .handler("list_peer_statuses")
+                .cache_ttl(30)
+                .build(),
+        )
+        // =====================================================================
         // /db/gate-decisions — Gate decision attestation projections (mishpat)
         // =====================================================================
         // Read-only. Source of truth: mishpat DNA DHT. These rows are written

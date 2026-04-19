@@ -29,6 +29,7 @@ pub mod governance;
 pub mod hazards;
 pub mod identity;
 pub mod mastery;
+pub mod peer_statuses;
 pub mod places;
 pub mod presence;
 pub mod rea_commitments;
@@ -158,6 +159,9 @@ pub async fn handle_api_request(
     } else if sub_path.starts_with("steward") && !sub_path.starts_with("stewardship") {
         let resource_path = sub_path.strip_prefix("steward").unwrap_or("");
         steward::handle(req, method, resource_path, &pool, &app_ctx).await
+    } else if sub_path.starts_with("peer-statuses") {
+        let resource_path = sub_path.strip_prefix("peer-statuses").unwrap_or("");
+        peer_statuses::handle(req, method, resource_path, &pool, &app_ctx).await
     } else if sub_path.starts_with("gate") {
         let resource_path = sub_path.strip_prefix("gate").unwrap_or("");
         gate::handle(req, method, resource_path, &pool, &app_ctx, services).await
