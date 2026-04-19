@@ -26,7 +26,9 @@ fn test_full_rs_pipeline_with_simulated_peer_failure() {
     let encoder = ShardEncoder::new(config);
 
     // 2. Encode — simulates blob ingest
-    let manifest = encoder.create_manifest(&data, "application/octet-stream", "commons").unwrap();
+    let manifest = encoder
+        .create_manifest(&data, "application/octet-stream", "commons")
+        .unwrap();
     assert_eq!(manifest.encoding, "rs-4-7");
     assert_eq!(manifest.shard_hashes.len(), 7);
 
@@ -110,7 +112,9 @@ fn test_rs_pipeline_reconstruction_threshold() {
     };
     let encoder = ShardEncoder::new(config);
 
-    let manifest = encoder.create_manifest(&data, "application/octet-stream", "commons").unwrap();
+    let manifest = encoder
+        .create_manifest(&data, "application/octet-stream", "commons")
+        .unwrap();
     assert_eq!(manifest.encoding, "rs-4-7");
     assert_eq!(manifest.data_shards, 4);
     assert_eq!(manifest.total_shards, 7);
@@ -152,7 +156,9 @@ fn test_rs_pipeline_with_mixed_shard_losses() {
     };
     let encoder = ShardEncoder::new(config);
 
-    let manifest = encoder.create_manifest(&data, "application/octet-stream", "commons").unwrap();
+    let manifest = encoder
+        .create_manifest(&data, "application/octet-stream", "commons")
+        .unwrap();
     assert_eq!(manifest.encoding, "rs-4-7");
 
     let shards = encoder.create_shards(&data, &manifest.encoding).unwrap();
@@ -193,7 +199,9 @@ fn test_rs_pipeline_all_parity_shards_lost() {
     };
     let encoder = ShardEncoder::new(config);
 
-    let manifest = encoder.create_manifest(&data, "application/octet-stream", "commons").unwrap();
+    let manifest = encoder
+        .create_manifest(&data, "application/octet-stream", "commons")
+        .unwrap();
     assert_eq!(manifest.encoding, "rs-4-7");
 
     let shards = encoder.create_shards(&data, &manifest.encoding).unwrap();
