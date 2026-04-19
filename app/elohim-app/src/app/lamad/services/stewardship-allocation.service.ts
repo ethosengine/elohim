@@ -24,6 +24,8 @@ import { Injectable, signal, inject } from '@angular/core';
 
 import { Observable, of, BehaviorSubject, map, catchError, tap } from 'rxjs';
 
+import { HttpClient } from '@angular/common/http';
+
 import { StorageApiService } from '@app/elohim/services/storage-api.service';
 
 import {
@@ -59,6 +61,7 @@ export interface StewardPortfolio {
 })
 export class StewardshipAllocationService {
   private readonly storageApi = inject(StorageApiService);
+  private readonly http = inject(HttpClient);
 
   // ============================================================================
   // Reactive State
@@ -140,6 +143,20 @@ export class StewardshipAllocationService {
   // ============================================================================
   // Steward Portfolio Queries
   // ============================================================================
+
+  /**
+   * Get all stewardship allocations for a household.
+   *
+   * Calls `GET /api/v1/households/{id}/stewardship-allocations`.
+   * Gracefully degrades to empty array if the endpoint is not yet live (Task G2).
+   */
+  listForHousehold(householdId: string): Observable<StewardshipAllocationView[]> {
+    return this.http
+      .get<StewardshipAllocationView[]>(
+        `/api/v1/households/${encodeURIComponent(householdId)}/stewardship-allocations`,
+      )
+      .pipe(catchError(() => of([])));
+  }
 
   /**
    * Get all allocations for a steward (their portfolio).
