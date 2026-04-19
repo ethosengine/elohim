@@ -1050,6 +1050,14 @@
       "governanceReach": "community",
       "peerReviewedBy": [],
       "supersedes": null
+    },
+    "reach-gate-v1": {
+      "processCid": "epr:gates:reach-gate-v1",
+      "description": "Attestation-graph-aggregated reach level for content-node subjects.",
+      "handlesEvents": ["CapabilityInvoke"],
+      "governanceReach": "community",
+      "peerReviewedBy": [],
+      "supersedes": null
     }
   }
 }

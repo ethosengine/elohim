@@ -34,6 +34,8 @@ use super::convert_side_effect_specs;
 /// - `"decline-from-wisdom"` — Decline if wisdom output's `"decision"` == `"decline"`;
 ///   otherwise falls through to Allow.
 /// - `"verdict-from-rule"` — reads `"ruleDecision"` and emits a Verdict.
+/// - `"verdict-from-reach"` — reads `"reachData.level"` and emits
+///   `Verdict(ReachLevel { level })`. Defaults to `"self-reach"` when level is null.
 pub struct SynthesizeExecutor;
 
 impl SynthesizeExecutor {
@@ -199,6 +201,30 @@ fn build_status(
                 ))
             })?;
             Ok((GateStatus::Verdict(tag), None))
+        }
+
+        "verdict-from-reach" => {
+            // Read the aggregation output key — defaults to "reachData".
+            let reach_key = params
+                .input_keys
+                .first()
+                .map(String::as_str)
+                .unwrap_or("reachData");
+            let reach_data = ctx.get(reach_key).ok_or_else(|| {
+                GateError::DagExecution(format!(
+                    "synthesize step 'verdict-from-reach' missing required context key '{reach_key}'"
+                ))
+            })?;
+
+            // Extract the `level` string from the aggregation output object.
+            // When no tier was met, `level` is null — default to "self-reach".
+            let level = reach_data
+                .get("level")
+                .and_then(|v| v.as_str())
+                .unwrap_or("self-reach")
+                .to_string();
+
+            Ok((GateStatus::Verdict(GateTag::ReachLevel { level }), None))
         }
 
         unknown => Err(GateError::DagExecution(format!(
@@ -493,6 +519,130 @@ mod tests {
         assert!(matches!(err, GateError::DagExecution(_)));
         let msg = err.to_string();
         assert!(msg.contains("wrong step kind"), "got: {msg}");
+    }
+
+    // ─── verdict-from-reach → Verdict(ReachLevel) ────────────────────────────
+
+    #[tokio::test]
+    async fn verdict_from_reach_returns_reach_level_verdict() {
+        let exec = SynthesizeExecutor::new();
+        let step = synthesize_step("verdict-from-reach", vec!["reachData".into()]);
+
+        let mut ctx = GateContext::new();
+        ctx.insert(
+            "reachData",
+            json!({ "level": "community", "count": 7, "edge_case": false, "reduction_kind": "threshold-ladder" }),
+        );
+
+        let outcome = exec.execute(&step, &mut ctx, &event()).await.unwrap();
+        let (decision, _) = match outcome {
+            StepOutcome::Terminate(d, se) => (d, se),
+            _ => panic!("expected Terminate"),
+        };
+        assert!(
+            matches!(
+                &decision.status,
+                GateStatus::Verdict(GateTag::ReachLevel { level }) if level == "community"
+            ),
+            "expected Verdict(ReachLevel{{community}}), got: {:?}",
+            decision.status
+        );
+    }
+
+    #[tokio::test]
+    async fn verdict_from_reach_protocol_level() {
+        let exec = SynthesizeExecutor::new();
+        let step = synthesize_step("verdict-from-reach", vec!["reachData".into()]);
+
+        let mut ctx = GateContext::new();
+        ctx.insert(
+            "reachData",
+            json!({ "level": "protocol", "count": 55, "edge_case": false, "reduction_kind": "threshold-ladder" }),
+        );
+
+        let outcome = exec.execute(&step, &mut ctx, &event()).await.unwrap();
+        let (decision, _) = match outcome {
+            StepOutcome::Terminate(d, se) => (d, se),
+            _ => panic!("expected Terminate"),
+        };
+        assert!(
+            matches!(
+                &decision.status,
+                GateStatus::Verdict(GateTag::ReachLevel { level }) if level == "protocol"
+            ),
+            "got: {:?}",
+            decision.status
+        );
+    }
+
+    #[tokio::test]
+    async fn verdict_from_reach_null_level_defaults_to_self_reach() {
+        let exec = SynthesizeExecutor::new();
+        let step = synthesize_step("verdict-from-reach", vec!["reachData".into()]);
+
+        let mut ctx = GateContext::new();
+        // level is null — no tier met
+        ctx.insert(
+            "reachData",
+            json!({ "level": null, "count": 2, "edge_case": false, "reduction_kind": "threshold-ladder" }),
+        );
+
+        let outcome = exec.execute(&step, &mut ctx, &event()).await.unwrap();
+        let (decision, _) = match outcome {
+            StepOutcome::Terminate(d, se) => (d, se),
+            _ => panic!("expected Terminate"),
+        };
+        assert!(
+            matches!(
+                &decision.status,
+                GateStatus::Verdict(GateTag::ReachLevel { level }) if level == "self-reach"
+            ),
+            "null level must default to self-reach, got: {:?}",
+            decision.status
+        );
+    }
+
+    #[tokio::test]
+    async fn verdict_from_reach_missing_key_returns_error() {
+        let exec = SynthesizeExecutor::new();
+        let step = synthesize_step("verdict-from-reach", vec!["reachData".into()]);
+        let mut ctx = GateContext::new(); // reachData not inserted
+
+        let result = exec.execute(&step, &mut ctx, &event()).await;
+        let err = match result {
+            Err(e) => e,
+            Ok(_) => panic!("expected Err but got Ok"),
+        };
+        assert!(matches!(err, GateError::DagExecution(_)));
+        let msg = err.to_string();
+        assert!(
+            msg.contains("reachData"),
+            "error should name the missing key, got: {msg}"
+        );
+    }
+
+    #[tokio::test]
+    async fn verdict_from_reach_missing_level_field_defaults_to_self_reach() {
+        let exec = SynthesizeExecutor::new();
+        let step = synthesize_step("verdict-from-reach", vec!["reachData".into()]);
+
+        let mut ctx = GateContext::new();
+        // reachData object present but no "level" key
+        ctx.insert("reachData", json!({ "count": 0, "edge_case": false }));
+
+        let outcome = exec.execute(&step, &mut ctx, &event()).await.unwrap();
+        let (decision, _) = match outcome {
+            StepOutcome::Terminate(d, se) => (d, se),
+            _ => panic!("expected Terminate"),
+        };
+        assert!(
+            matches!(
+                &decision.status,
+                GateStatus::Verdict(GateTag::ReachLevel { level }) if level == "self-reach"
+            ),
+            "missing level field must default to self-reach, got: {:?}",
+            decision.status
+        );
     }
 
     // ─── Side effects spec with MintAttestation ──────────────────────────────

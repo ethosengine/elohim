@@ -1,0 +1,77 @@
+{
+  "id": "reach-gate-v1",
+  "contentType": "gate-process-declaration",
+  "title": "Reach Gate v1",
+  "description": "Attestation-graph-aggregated reach level for content-node subjects. Four-node DAG: assemble → aggregate → (wisdom-edge →) synthesize. Fires on CapabilityInvoke { ReachNegotiation }. Emits Verdict(ReachLevel{ level }) with no side effects. The reach level reported (protocol / public / community / self-reach) is earned through distributed attestation recognition; callers decide promotion eligibility.",
+  "content": "# reach-gate-v1\n# See gate-client/src/dag/reach_gate_v1.yaml for the canonical embedded source.\n# This seed entry makes the reach gate discoverable as a ContentNode on the DHT.\n#\n# The authoritative YAML is embedded in the gate-client binary at compile time.\n# This seed is a reference copy for DHT-based governance lookup (Phase 6+).\n#\n# Four-node DAG:\n#   assemble (context-assemble)\n#     └─ next ──► aggregate (aggregate-attestations, spec_cid: epr:specs:reach-v1)\n#                     ├─ reachData.edge_case == true  ──► wisdom-edge (wisdom-invoke)\n#                     └─ reachData.edge_case == false ──► synthesize (synthesize, Terminate)\n#   wisdom-edge (wisdom-invoke) [Phase 5 DevContext: mocked Allow]\n#     └─ next ──► synthesize\n#   synthesize (synthesize) — verdict-from-reach builder\n#     └─ (Terminate) Verdict(ReachLevel)\n#\n# ReachLevel values:\n#   protocol   (≥50 attestations)\n#   public     (≥20 attestations)\n#   community  (≥5 attestations)\n#   self-reach (<5 attestations — default)\n\nname: \"reach-gate-v1\"\nversion: \"1.0.0\"\neventType: \"capability-invoke\"",
+  "contentFormat": "plaintext",
+  "tags": [
+    "gate",
+    "reach",
+    "reach-gate",
+    "capability-invoke",
+    "content-node",
+    "threshold-ladder",
+    "attestation"
+  ],
+  "metadata": {
+    "name": "reach-gate-v1",
+    "version": "1.0.0",
+    "eventType": "capability-invoke",
+    "supersedes": null,
+    "dag": {
+      "entrypoint": "assemble",
+      "steps": {
+        "assemble": {
+          "type": "context-assemble",
+          "params": {
+            "pulls": [
+              { "from": "event", "query": "capability-invoke.subject", "output_key": "subject" }
+            ]
+          },
+          "next": "aggregate"
+        },
+        "aggregate": {
+          "type": "aggregate-attestations",
+          "params": {
+            "aggregation_spec_cid": "epr:specs:reach-v1",
+            "subject_key": "subject",
+            "output_key": "reachData"
+          },
+          "edges": [
+            { "when": "reachData.edge_case == true",  "target": "wisdom-edge" },
+            { "when": "reachData.edge_case == false", "target": "synthesize" }
+          ]
+        },
+        "wisdom-edge": {
+          "type": "wisdom-invoke",
+          "params": {
+            "constitution_cid": "epr:constitution:v1",
+            "framing_cid": "epr:framings:reach-edge-case-v1",
+            "context_keys": ["subject", "reachData"],
+            "output_key": "edgeDecision"
+          },
+          "next": "synthesize"
+        },
+        "synthesize": {
+          "type": "synthesize",
+          "params": {
+            "input_keys": ["reachData"],
+            "decision_builder": "verdict-from-reach",
+            "side_effects": []
+          }
+        }
+      },
+      "terminals": {}
+    }
+  },
+  "createdAt": "2026-04-18T00:00:00.000Z",
+  "updatedAt": "2026-04-18T00:00:00.000Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 1.0,
+      "role": "author"
+    }
+  ]
+}

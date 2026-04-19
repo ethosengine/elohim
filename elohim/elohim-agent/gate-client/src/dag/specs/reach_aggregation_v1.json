@@ -1,0 +1,22 @@
+{
+  "specName": "reach-v1",
+  "version": "1.0.0",
+  "description": "Attestation-graph-aggregated reach level for content-node subjects. Counts qualifying attestations across four kinds (gate-decision, witness, endorsement, content-approval) within a one-year rolling window and maps the total to one of four reach tiers: protocol (≥50), public (≥20), community (≥5), or self-reach (below 5). Used by reach-gate-v1 to determine the audience tier a content node has earned through distributed recognition.",
+  "attestationKinds": [
+    "gate-decision",
+    "witness",
+    "endorsement",
+    "content-approval"
+  ],
+  "subjectScope": "content-node",
+  "timeWindow": "P365D",
+  "reduction": {
+    "kind": "threshold-ladder",
+    "tiers": [
+      { "level": "protocol",   "minCount": 50 },
+      { "level": "public",     "minCount": 20 },
+      { "level": "community",  "minCount": 5  }
+    ]
+  },
+  "outputShape": "ReachLevel"
+}

@@ -1,0 +1,42 @@
+{
+  "id": "reach-aggregation-v1",
+  "contentType": "aggregation-spec",
+  "title": "Reach Aggregation Spec v1",
+  "description": "Attestation-graph-aggregated reach level for content-node subjects. Counts qualifying attestations across four kinds (gate-decision, witness, endorsement, content-approval) within a one-year rolling window and maps the total to one of four reach tiers: protocol (≥50), public (≥20), community (≥5), or self-reach (below 5). Used by reach-gate-v1 to determine the audience tier a content node has earned through distributed recognition.",
+  "content": "# reach-aggregation-v1\n# See gate-client/src/dag/specs/reach_aggregation_v1.json for the canonical embedded source.\n# This seed entry makes the reach aggregation spec discoverable as a ContentNode on the DHT.\n#\n# The authoritative JSON is embedded in the gate-client binary at compile time.\n# This seed is a reference copy for DHT-based governance lookup (Phase 6+).\n#\n# Threshold-ladder tiers:\n#   protocol  (≥50) — existential-boundary peers\n#   public    (≥20) — open audience endorsement\n#   community (≥5)  — known community recognition\n#   self-reach (<5) — default; content accessible only to contributors\n#\n# Attestation kinds feeding this aggregation:\n#   gate-decision   — a gate verdict referencing this content node\n#   witness         — a seven-valence witness attestation on an associated experience-story\n#   endorsement     — an explicit peer endorsement attestation\n#   content-approval — a steward-consent approval attestation\n\nspecName: \"reach-v1\"\nversion: \"1.0.0\"\nsubjectScope: content-node\ntimeWindow: P365D\noutputShape: ReachLevel",
+  "contentFormat": "plaintext",
+  "tags": [
+    "gate",
+    "reach",
+    "aggregation-spec",
+    "content-node",
+    "threshold-ladder",
+    "reach-gate"
+  ],
+  "metadata": {
+    "specName": "reach-v1",
+    "version": "1.0.0",
+    "description": "Attestation-graph-aggregated reach level for content-node subjects. Counts qualifying attestations across four kinds within a one-year rolling window and maps the total to one of four reach tiers.",
+    "attestationKinds": ["gate-decision", "witness", "endorsement", "content-approval"],
+    "subjectScope": "content-node",
+    "timeWindow": "P365D",
+    "outputShape": "ReachLevel",
+    "reduction": {
+      "kind": "threshold-ladder",
+      "tiers": [
+        { "level": "protocol",  "minCount": 50 },
+        { "level": "public",    "minCount": 20 },
+        { "level": "community", "minCount": 5  }
+      ]
+    }
+  },
+  "createdAt": "2026-04-18T00:00:00.000Z",
+  "updatedAt": "2026-04-18T00:00:00.000Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 1.0,
+      "role": "author"
+    }
+  ]
+}

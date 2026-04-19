@@ -1,0 +1,114 @@
+# Reach Gate v1 — attestation-graph reach computation for content-node subjects.
+#
+# Fires on CapabilityInvoke { ReachNegotiation } — when a caller wants to know
+# the earned audience tier of a content node.  The gate queries the DHT
+# attestation graph (via AggregateAttestationsExecutor), applies the
+# threshold-ladder reduction from reach-aggregation-v1, and emits a
+# Verdict(ReachLevel{ level }) with no side effects.
+#
+# Four-node DAG:
+#
+#   assemble (context-assemble)
+#     └─ next ──► aggregate (aggregate-attestations)
+#                     ├─ reachData.edge_case == true  ──► wisdom-edge (wisdom-invoke, Allow)
+#                     └─ reachData.edge_case == false ──► synthesize (synthesize, Terminate)
+#   wisdom-edge (wisdom-invoke) — Phase 5 DevContext: mocked Allow
+#     └─ next ──► synthesize
+#   synthesize (synthesize) — verdict-from-reach builder
+#     └─ (Terminate) Verdict(ReachLevel)
+#
+# Aggregation spec CID:
+#   The aggregate step references epr:specs:reach-v1 — the embedded
+#   reach_aggregation_v1.json loaded by REACH_AGGREGATION_V1_CID in
+#   reach_aggregation.rs.  Phase 5 resolves this via
+#   EmbeddedContentNodeResolver pre-loaded with that CID → body pair.
+#
+# ReachLevel values:
+#   "protocol"    — ≥ 50 qualifying attestations (existential-boundary peers)
+#   "public"      — ≥ 20 qualifying attestations (open audience)
+#   "community"   — ≥  5 qualifying attestations (known community)
+#   "self-reach"  — < 5 (default; content is accessible only to contributors)
+#
+# Note: synthesize reads reachData.level directly.  If wisdom-edge runs first
+# it does not alter reachData, so synthesize always reads the aggregated level
+# regardless of which path preceded it.
+
+name: "reach-gate-v1"
+version: "1.0.0"
+event_type: "capability-invoke"
+
+input_schema:
+  type: "object"
+  description: "CapabilityInvoke { ReachNegotiation } carrying the content CID being evaluated"
+output_schema:
+  type: "object"
+  description: "GateDecision — Verdict(ReachLevel{level}) with the content node's earned audience tier"
+
+dag:
+  entrypoint: "assemble"
+
+  steps:
+    # ── Step 1: assemble ──────────────────────────────────────────────────────
+    # Pulls the subject (content CID) from the event into GateContext so
+    # subsequent steps can reference it by key.
+    assemble:
+      type: "context-assemble"
+      params:
+        pulls:
+          - from: "event"
+            query: "capability-invoke.subject"
+            output_key: "subject"
+      next: "aggregate"
+
+    # ── Step 2: aggregate ─────────────────────────────────────────────────────
+    # Queries the DHT attestation graph for the subject CID using the
+    # reach-aggregation-v1 spec (threshold-ladder: protocol/public/community).
+    # Writes { level, count, edge_case, reduction_kind } to "reachData".
+    #
+    # Phase 5: AggregateAttestationsExecutor resolves the spec CID via
+    # EmbeddedContentNodeResolver pre-loaded with REACH_AGGREGATION_V1_CID.
+    aggregate:
+      type: "aggregate-attestations"
+      params:
+        aggregation_spec_cid: "epr:specs:reach-v1"
+        subject_key: "subject"
+        output_key: "reachData"
+      edges:
+        - when: "reachData.edge_case == true"
+          target: "wisdom-edge"
+        - when: "reachData.edge_case == false"
+          target: "synthesize"
+
+    # ── Step 3: wisdom-edge ───────────────────────────────────────────────────
+    # Invoked only when the aggregation result is borderline (edge_case == true).
+    # Asks the constitutional elohim for judgment on boundary-entry cases.
+    # Phase 5 DevContext: WisdomInvokeExecutor returns mocked Allow decision.
+    # Output key "edgeDecision" is written but synthesize ignores it — it reads
+    # reachData.level regardless of which edge fired.
+    wisdom-edge:
+      type: "wisdom-invoke"
+      params:
+        constitution_cid: "epr:constitution:v1"
+        framing_cid: "epr:framings:reach-edge-case-v1"
+        context_keys:
+          - "subject"
+          - "reachData"
+        output_key: "edgeDecision"
+      next: "synthesize"
+
+    # ── Step 4: synthesize ────────────────────────────────────────────────────
+    # Reads reachData.level from GateContext and emits Verdict(ReachLevel{level}).
+    # No side effects — reach reporting is read-only. Callers decide what to do
+    # with the verdict (promotion eligibility, content visibility, etc.).
+    synthesize:
+      type: "synthesize"
+      params:
+        input_keys:
+          - "reachData"
+        decision_builder: "verdict-from-reach"
+        side_effects: []
+
+  # ── Terminals ─────────────────────────────────────────────────────────────
+  # reach-gate has no static-decision terminals.  All outcomes are produced
+  # by the synthesize executor (StepOutcome::Terminate with Verdict).
+  terminals: {}

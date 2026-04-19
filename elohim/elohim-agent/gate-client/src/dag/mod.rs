@@ -28,6 +28,8 @@ pub mod executor;
 pub mod executors;
 pub mod expr;
 pub mod interpreter;
+pub mod reach_aggregation;
+pub mod reach_gate;
 pub mod rule_expr;
 pub mod rules_artifact;
 pub mod seven_valence_rules;
