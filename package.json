@@ -63,6 +63,9 @@
     "qahal:codegen:verify": "node elohim/sdk/domains/qahal/scripts/codegen.mjs --verify",
     "avodah:codegen": "node elohim/sdk/domains/avodah/scripts/codegen.mjs",
     "avodah:codegen:verify": "node elohim/sdk/domains/avodah/scripts/codegen.mjs --verify",
+    "rakia:codegen:rs": "node elohim/rakia/schemas/scripts/codegen-rs.mjs",
+    "rakia:codegen:rs:verify": "node elohim/rakia/schemas/scripts/codegen-rs.mjs --verify",
+    "rakia:schema:validate": "node elohim/rakia/schemas/scripts/validate.mjs",
     "validate:manifests": "node genesis/orchestrator/validate-manifests.mjs",
     "wire-types:generate": "for d in imagodei infrastructure qahal lamad shefa avodah; do (cd elohim/sdk/domains/$d/types && RUSTFLAGS='' cargo test --features ts 2>/dev/null); done && node elohim/sdk/storage-client-ts/scripts/copy-wire-types.mjs",
     "wire-types:copy": "node elohim/sdk/storage-client-ts/scripts/copy-wire-types.mjs"
