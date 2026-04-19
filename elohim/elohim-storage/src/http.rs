@@ -1092,7 +1092,17 @@ impl HttpServer {
 
         // Create shard encoder and generate manifest
         let encoder = ShardEncoder::new(crate::sharding::ShardConfig::default());
-        let manifest = encoder.create_manifest(&data, &mime_type, "commons");
+        let manifest = match encoder.create_manifest(&data, &mime_type, "commons") {
+            Ok(m) => m,
+            Err(e) => {
+                return Ok(Response::builder()
+                    .status(StatusCode::INTERNAL_SERVER_ERROR)
+                    .body(Full::new(Bytes::from(format!(
+                        "shard encoding failed: {e}"
+                    ))))
+                    .unwrap());
+            }
+        };
 
         // Store each shard
         for (i, shard_hash) in manifest.shard_hashes.iter().enumerate() {
@@ -2365,8 +2375,19 @@ impl HttpServer {
                                 let encoder = crate::sharding::ShardEncoder::new(
                                     crate::sharding::ShardConfig::default(),
                                 );
-                                let manifest =
-                                    encoder.create_manifest(&data, &content_format, &reach);
+                                let manifest = match encoder
+                                    .create_manifest(&data, &content_format, &reach)
+                                {
+                                    Ok(m) => m,
+                                    Err(e) => {
+                                        tracing::warn!(
+                                            content_id = %content_id,
+                                            error = %e,
+                                            "shard manifest encode failed; skipping persistence"
+                                        );
+                                        return;
+                                    }
+                                };
                                 let shard_hashes_json =
                                     serde_json::to_string(&manifest.shard_hashes)
                                         .unwrap_or_else(|_| "[]".to_string());
@@ -2544,8 +2565,19 @@ impl HttpServer {
                                     let encoder = crate::sharding::ShardEncoder::new(
                                         crate::sharding::ShardConfig::default(),
                                     );
-                                    let manifest =
-                                        encoder.create_manifest(&data, &content_format, &reach);
+                                    let manifest = match encoder
+                                        .create_manifest(&data, &content_format, &reach)
+                                    {
+                                        Ok(m) => m,
+                                        Err(e) => {
+                                            tracing::warn!(
+                                                content_id = %content_id,
+                                                error = %e,
+                                                "shard manifest encode failed; skipping persistence"
+                                            );
+                                            continue;
+                                        }
+                                    };
                                     let shard_hashes_json =
                                         serde_json::to_string(&manifest.shard_hashes)
                                             .unwrap_or_else(|_| "[]".to_string());

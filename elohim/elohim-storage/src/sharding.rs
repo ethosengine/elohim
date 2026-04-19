@@ -17,11 +17,15 @@ use std::io;
 /// Default shard size (1MB)
 pub const DEFAULT_SHARD_SIZE: usize = 1024 * 1024;
 
-/// Threshold for Reed-Solomon encoding (10MB)
-pub const RS_THRESHOLD: usize = 10 * 1024 * 1024;
-
-/// Maximum blob size for single shard (16MB - Holochain limit)
+/// Maximum blob size for single shard (16MB - Holochain limit).
+/// Blobs ≤ this stay as a single shard with no encoding overhead.
 pub const SINGLE_SHARD_MAX: usize = 16 * 1024 * 1024;
+
+/// Threshold for switching from chunked to Reed-Solomon (64MB).
+/// Must be strictly greater than `SINGLE_SHARD_MAX` so the `"chunked"`
+/// band is reachable: `(SINGLE_SHARD_MAX, RS_THRESHOLD]` → chunked,
+/// `> RS_THRESHOLD` → RS-coded with parity.
+pub const RS_THRESHOLD: usize = 64 * 1024 * 1024;
 
 /// Shard manifest - matches DNA ShardManifest structure
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -109,19 +113,37 @@ impl ShardEncoder {
         Self { config }
     }
 
-    /// Determine encoding type based on blob size and config
+    /// Determine encoding type based on blob size and config.
+    ///
+    /// Three bands:
+    /// - `[0, single_shard_max]` → "none" (single shard, no overhead)
+    /// - `(single_shard_max, rs_threshold]` → "chunked" (sequential, no parity)
+    /// - `(rs_threshold, ∞)` → "rs-4-7" (Reed-Solomon with parity)
+    ///
+    /// Requires `single_shard_max < rs_threshold` in the config; the
+    /// default constants enforce this invariant.
     pub fn determine_encoding(&self, size: usize) -> &'static str {
         if size <= self.config.single_shard_max {
             "none"
-        } else if size < self.config.rs_threshold {
+        } else if size <= self.config.rs_threshold {
             "chunked"
         } else {
             "rs-4-7"
         }
     }
 
-    /// Create a manifest for a blob
-    pub fn create_manifest(&self, data: &[u8], mime_type: &str, reach: &str) -> ShardManifest {
+    /// Create a manifest for a blob.
+    ///
+    /// Returns `io::Error` if Reed-Solomon setup or encoding fails for
+    /// the "rs-4-7" path. `"none"` and `"chunked"` paths never fail
+    /// (they do no math); they still ride on the Result signature for
+    /// caller uniformity.
+    pub fn create_manifest(
+        &self,
+        data: &[u8],
+        mime_type: &str,
+        reach: &str,
+    ) -> io::Result<ShardManifest> {
         let (blob_cid, blob_hash) = BlobStore::compute_addresses(data);
         let blob_cid_str = blob_cid.to_string();
         let total_size = data.len() as u64;
@@ -153,7 +175,15 @@ impl ShardEncoder {
                     self.config.rs_data_shards as usize,
                     self.config.rs_parity_shards as usize,
                 )
-                .unwrap();
+                .map_err(|e| {
+                    io::Error::new(
+                        io::ErrorKind::InvalidInput,
+                        format!("ReedSolomon::new(data={}, parity={}): {}",
+                            self.config.rs_data_shards,
+                            self.config.rs_parity_shards,
+                            e),
+                    )
+                })?;
 
                 let shard_size = data.len().div_ceil(self.config.rs_data_shards as usize);
 
@@ -174,7 +204,12 @@ impl ShardEncoder {
                 // Encode parity
                 let mut shard_refs: Vec<&mut [u8]> =
                     shards.iter_mut().map(|s| s.as_mut_slice()).collect();
-                rs.encode(&mut shard_refs).unwrap();
+                rs.encode(&mut shard_refs).map_err(|e| {
+                    io::Error::new(
+                        io::ErrorKind::InvalidData,
+                        format!("reed-solomon encode: {}", e),
+                    )
+                })?;
 
                 // Compute hashes
                 let hashes: Vec<String> =
@@ -191,7 +226,7 @@ impl ShardEncoder {
 
         let now = chrono::Utc::now().to_rfc3339();
 
-        ShardManifest {
+        Ok(ShardManifest {
             blob_cid: blob_cid_str,
             blob_hash,
             total_size,
@@ -205,24 +240,31 @@ impl ShardEncoder {
             author_id: None,
             created_at: now.clone(),
             verified_at: Some(now),
-        }
+        })
     }
 
-    /// Create shards from data based on encoding type
-    pub fn create_shards(&self, data: &[u8], encoding: &str) -> Vec<Vec<u8>> {
+    /// Create shards from data based on encoding type.
+    ///
+    /// Returns `io::Error` if Reed-Solomon setup or encoding fails.
+    pub fn create_shards(&self, data: &[u8], encoding: &str) -> io::Result<Vec<Vec<u8>>> {
         match encoding {
-            "none" => vec![data.to_vec()],
-            "chunked" => data
+            "none" => Ok(vec![data.to_vec()]),
+            "chunked" => Ok(data
                 .chunks(self.config.shard_size)
                 .map(|chunk| chunk.to_vec())
-                .collect(),
+                .collect()),
             _ => {
                 // Reed-Solomon encoding
                 let rs = ReedSolomon::new(
                     self.config.rs_data_shards as usize,
                     self.config.rs_parity_shards as usize,
                 )
-                .unwrap();
+                .map_err(|e| {
+                    io::Error::new(
+                        io::ErrorKind::InvalidInput,
+                        format!("ReedSolomon::new: {}", e),
+                    )
+                })?;
 
                 let shard_size = data.len().div_ceil(self.config.rs_data_shards as usize);
 
@@ -243,9 +285,14 @@ impl ShardEncoder {
                 // Encode
                 let mut shard_refs: Vec<&mut [u8]> =
                     shards.iter_mut().map(|s| s.as_mut_slice()).collect();
-                rs.encode(&mut shard_refs).unwrap();
+                rs.encode(&mut shard_refs).map_err(|e| {
+                    io::Error::new(
+                        io::ErrorKind::InvalidData,
+                        format!("reed-solomon encode: {}", e),
+                    )
+                })?;
 
-                shards
+                Ok(shards)
             }
         }
     }
@@ -341,11 +388,41 @@ impl ShardEncoder {
 mod tests {
     use super::*;
 
+    /// N1: the default config used to make "chunked" unreachable because
+    /// SINGLE_SHARD_MAX (16MB) > RS_THRESHOLD (10MB, old). Prove the band
+    /// is reachable now and the three boundaries behave correctly.
+    #[test]
+    fn determine_encoding_mid_band_is_reachable_with_default_config() {
+        let enc = ShardEncoder::new(ShardConfig::default());
+        assert_eq!(enc.determine_encoding(SINGLE_SHARD_MAX), "none");
+        assert_eq!(enc.determine_encoding(SINGLE_SHARD_MAX + 1), "chunked");
+        assert_eq!(enc.determine_encoding(32 * 1024 * 1024), "chunked");
+        assert_eq!(enc.determine_encoding(RS_THRESHOLD), "chunked");
+        assert_eq!(enc.determine_encoding(RS_THRESHOLD + 1), "rs-4-7");
+    }
+
+    /// N2: impossible RS config now propagates as Err instead of panicking.
+    /// reed-solomon-erasure galois_8 supports at most 256 total shards.
+    #[test]
+    fn create_manifest_returns_err_on_impossible_rs_config() {
+        let bad = ShardConfig {
+            rs_data_shards: 200,
+            rs_parity_shards: 200,
+            rs_threshold: 8,
+            single_shard_max: 1,
+            ..ShardConfig::default()
+        };
+        let enc = ShardEncoder::new(bad);
+        let data = vec![0u8; 128];
+        let result = enc.create_manifest(&data, "application/octet-stream", "commons");
+        assert!(result.is_err(), "expected Err from 200+200 RS config");
+    }
+
     #[test]
     fn test_single_shard_manifest() {
         let encoder = ShardEncoder::new(ShardConfig::default());
         let data = b"Hello, Elohim!";
-        let manifest = encoder.create_manifest(data, "text/plain", "commons");
+        let manifest = encoder.create_manifest(data, "text/plain", "commons").unwrap();
 
         assert_eq!(manifest.encoding, "none");
         assert_eq!(manifest.data_shards, 1);
@@ -371,7 +448,7 @@ mod tests {
             *byte = (i % 256) as u8;
         }
 
-        let manifest = encoder.create_manifest(&data, "application/octet-stream", "family");
+        let manifest = encoder.create_manifest(&data, "application/octet-stream", "family").unwrap();
 
         // With shard_size=10 and 100 bytes, we get 10 chunks
         assert_eq!(manifest.encoding, "chunked");
@@ -389,13 +466,13 @@ mod tests {
         });
 
         let data: Vec<u8> = (0..100).map(|i| (i % 256) as u8).collect();
-        let manifest = encoder.create_manifest(&data, "application/octet-stream", "commons");
+        let manifest = encoder.create_manifest(&data, "application/octet-stream", "commons").unwrap();
 
         // Verify RS encoding was used
         assert_eq!(manifest.encoding, "rs-4-7");
 
         // Create shards
-        let shards = encoder.create_shards(&data, &manifest.encoding);
+        let shards = encoder.create_shards(&data, &manifest.encoding).unwrap();
         assert_eq!(shards.len(), manifest.total_shards as usize);
 
         // Reconstruct with all shards present
@@ -415,7 +492,7 @@ mod tests {
         });
 
         let data: Vec<u8> = (0..100).map(|i| (i % 256) as u8).collect();
-        let manifest = encoder.create_manifest(&data, "application/octet-stream", "commons");
+        let manifest = encoder.create_manifest(&data, "application/octet-stream", "commons").unwrap();
 
         // Verify RS encoding was used
         assert_eq!(manifest.encoding, "rs-4-7");
@@ -424,7 +501,7 @@ mod tests {
             "Expected at least 7 shards for rs-4-7"
         );
 
-        let shards = encoder.create_shards(&data, &manifest.encoding);
+        let shards = encoder.create_shards(&data, &manifest.encoding).unwrap();
 
         // Remove 2 shards (we can lose up to 3 with rs-4-7)
         let mut shard_opts: Vec<Option<Vec<u8>>> = shards.iter().map(|s| Some(s.clone())).collect();
@@ -446,8 +523,8 @@ mod tests {
         });
 
         let data: Vec<u8> = (0..200).map(|i| (i % 256) as u8).collect();
-        let manifest = encoder.create_manifest(&data, "application/octet-stream", "commons");
-        let shards = encoder.create_shards(&data, &manifest.encoding);
+        let manifest = encoder.create_manifest(&data, "application/octet-stream", "commons").unwrap();
+        let shards = encoder.create_shards(&data, &manifest.encoding).unwrap();
 
         assert_eq!(manifest.encoding, "rs-4-7");
         assert_eq!(shards.len(), 7);
@@ -476,8 +553,8 @@ mod tests {
         });
 
         let data: Vec<u8> = (0..200).map(|i| (i % 256) as u8).collect();
-        let manifest = encoder.create_manifest(&data, "application/octet-stream", "commons");
-        let shards = encoder.create_shards(&data, &manifest.encoding);
+        let manifest = encoder.create_manifest(&data, "application/octet-stream", "commons").unwrap();
+        let shards = encoder.create_shards(&data, &manifest.encoding).unwrap();
 
         // Drop 2 data shards and 1 parity shard
         let mut shard_opts: Vec<Option<Vec<u8>>> = shards.iter().map(|s| Some(s.clone())).collect();
@@ -503,8 +580,8 @@ mod tests {
         });
 
         let data: Vec<u8> = (0..200).map(|i| (i % 256) as u8).collect();
-        let manifest = encoder.create_manifest(&data, "application/octet-stream", "commons");
-        let shards = encoder.create_shards(&data, &manifest.encoding);
+        let manifest = encoder.create_manifest(&data, "application/octet-stream", "commons").unwrap();
+        let shards = encoder.create_shards(&data, &manifest.encoding).unwrap();
 
         // Drop 4 shards — only 3 remain, but we need 4 data shards minimum
         let mut shard_opts: Vec<Option<Vec<u8>>> = shards.iter().map(|s| Some(s.clone())).collect();
@@ -530,8 +607,8 @@ mod tests {
         });
 
         let data: Vec<u8> = (0..73).map(|i| (i % 256) as u8).collect();
-        let manifest = encoder.create_manifest(&data, "text/plain", "commons");
-        let shards = encoder.create_shards(&data, &manifest.encoding);
+        let manifest = encoder.create_manifest(&data, "text/plain", "commons").unwrap();
+        let shards = encoder.create_shards(&data, &manifest.encoding).unwrap();
 
         assert_eq!(manifest.encoding, "chunked");
         assert_eq!(shards.len(), 8); // 73 bytes / 10 = 8 chunks
@@ -551,8 +628,8 @@ mod tests {
         });
 
         let data: Vec<u8> = (0..73).map(|i| (i % 256) as u8).collect();
-        let manifest = encoder.create_manifest(&data, "text/plain", "commons");
-        let shards = encoder.create_shards(&data, &manifest.encoding);
+        let manifest = encoder.create_manifest(&data, "text/plain", "commons").unwrap();
+        let shards = encoder.create_shards(&data, &manifest.encoding).unwrap();
 
         let mut shard_opts: Vec<Option<Vec<u8>>> = shards.iter().map(|s| Some(s.clone())).collect();
         shard_opts[3] = None;
@@ -566,8 +643,8 @@ mod tests {
         let encoder = ShardEncoder::new(ShardConfig::default());
 
         let data = b"The fruit back on the tree.";
-        let manifest = encoder.create_manifest(data, "text/plain", "commons");
-        let shards = encoder.create_shards(data, &manifest.encoding);
+        let manifest = encoder.create_manifest(data, "text/plain", "commons").unwrap();
+        let shards = encoder.create_shards(data, &manifest.encoding).unwrap();
 
         assert_eq!(manifest.encoding, "none");
         assert_eq!(shards.len(), 1);

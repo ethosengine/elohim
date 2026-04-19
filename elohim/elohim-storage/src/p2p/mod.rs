@@ -556,8 +556,12 @@ impl P2PHandle {
         h_app_id: &str,
     ) -> Result<usize, String> {
         let encoder = crate::sharding::ShardEncoder::new(crate::sharding::ShardConfig::default());
-        let manifest = encoder.create_manifest(blob_data, "application/octet-stream", "commons");
-        let shards = encoder.create_shards(blob_data, &manifest.encoding);
+        let manifest = encoder
+            .create_manifest(blob_data, "application/octet-stream", "commons")
+            .map_err(|e| format!("shard manifest encode: {e}"))?;
+        let shards = encoder
+            .create_shards(blob_data, &manifest.encoding)
+            .map_err(|e| format!("shard data encode: {e}"))?;
 
         let peers = self.delivery_peers();
         if peers.is_empty() {
