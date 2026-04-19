@@ -390,6 +390,109 @@ pub const GATE_DECISION_PHASES: [&str; 2] = ["dev-context", "elohim-active"];
 pub const GATE_DECISION_STATUSES: [&str; 4] = ["allow", "decline", "escalate", "verdict"];
 
 // =============================================================================
+// Gate Decision Challenge — Formal challenge against a GateDecisionAttestation
+// =============================================================================
+//
+// Notarized on Mishpat DNA because a challenge is a governance event: it affects
+// the elohim's standing, the affected party's remediation, and the protocol's
+// understanding of what correct decisions look like. Centralized challenge tracking
+// would make the challenger and the challenged subject to the same party's whims.
+//
+// Source of truth: Mishpat DHT.
+// elohim-storage projection (Task 11.2) receives post-commit signal with dht_anchor_hash.
+
+/// GateDecisionChallenge — Formal challenge filed against a GateDecisionAttestation.
+///
+/// A challenge is a governance event asserting that a gate decision was wrong —
+/// factually, ethically, structurally, or constitutionally — and that the error
+/// caused or could cause harm. Challenges are themselves notarized because the
+/// community must witness them: they affect elohim standing, affected-party
+/// remediation, and the protocol's understanding of correct decisions.
+///
+/// Ref: gate-challenge-and-indemnification-design.md §2.2
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct GateDecisionChallenge {
+    /// CID of this challenge (self-addressing; content-derived from fields).
+    pub challenge_id: String,
+    /// CID of the GateDecisionAttestation being challenged.
+    pub challenged_decision_cid: String,
+    /// AgentPubKey of the challenger (base64 encoded).
+    pub challenger_id: String,
+    /// Grounds: factual-error | safety | policy | constitutional | indemnification-request
+    pub grounds: String,
+    /// Challenger's articulation of the grievance.
+    pub summary: String,
+    /// Content-addressed evidence refs (comma-separated CIDs; empty string if none).
+    /// Stored as comma-separated String in integrity; Vec<String> in wire type.
+    pub evidence_refs: String,
+    /// ISO-8601 timestamp when the challenge was filed.
+    pub filed_at: String,
+    /// Reach level: self | intimate | community | commons
+    pub reach: String,
+}
+
+/// Valid grounds for GateDecisionChallenge.
+///
+/// NOTE: These overlap with CHALLENGE_GROUNDS on the existing Challenge entry but
+/// are a distinct constant because GateDecisionChallenge adds "indemnification-request"
+/// which is gate-specific and not present on the general governance Challenge type.
+pub const GATE_CHALLENGE_GROUNDS: [&str; 5] = [
+    "factual-error",
+    "safety",
+    "policy",
+    "constitutional",
+    "indemnification-request",
+];
+
+/// Valid reach values for GateDecisionChallenge.
+pub const GATE_CHALLENGE_REACH: [&str; 4] = ["self", "intimate", "community", "commons"];
+
+// =============================================================================
+// Challenge Outcome — Verdict + indemnification after review
+// =============================================================================
+//
+// Notarized on Mishpat DHT because the outcome closes the accountability loop:
+// the community's verdict must be as public and immutable as the original decision.
+// An upheld challenge that only exists in a private database is theater, not
+// accountability.
+//
+// The indemnification actions are co-committed with the verdict — there is no
+// window where verdict exists but action is "pending".
+
+/// ChallengeOutcome — Verdict and indemnification action after challenge review.
+///
+/// Closes a GateDecisionChallenge by recording the reviewer consensus verdict.
+/// When verdict is "upheld", indemnification_actions_json MUST be a non-empty
+/// JSON array — accountability without consequence is theater.
+///
+/// Ref: gate-challenge-and-indemnification-design.md §3.2, §4.3
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct ChallengeOutcome {
+    /// CID of this outcome (self-addressing; content-derived from fields).
+    pub outcome_id: String,
+    /// CID of the GateDecisionChallenge this outcome closes.
+    pub challenge_cid: String,
+    /// Verdict: upheld | dismissed | superseded
+    pub verdict: String,
+    /// AgentPubKeys of the reviewers who reached consensus (comma-separated base64 keys).
+    pub reviewer_consensus: String,
+    /// Full ConstitutionalReasoning as JSON (same structure as GateDecisionAttestation.reasoning_json).
+    pub reasoning_json: String,
+    /// ISO-8601 timestamp when the verdict was decided.
+    pub decided_at: String,
+    /// Indemnification actions as JSON array (empty array "[]" if no action required;
+    /// MUST be non-empty when verdict = "upheld").
+    /// Stored as JSON for flexibility — Phase 11+ may harden to typed enum.
+    /// Shape: [{ "type": "ReputationDegrade", ... }, { "type": "ReparationAttestation", ... }]
+    pub indemnification_actions_json: String,
+}
+
+/// Valid verdicts for ChallengeOutcome.
+pub const CHALLENGE_VERDICTS: [&str; 3] = ["upheld", "dismissed", "superseded"];
+
+// =============================================================================
 // Anchor Entry (for link indexing)
 // =============================================================================
 
@@ -432,7 +535,9 @@ pub enum EntryTypes {
     StatementVote(StatementVote),
     Place(Place),
     StringAnchor(StringAnchor),
-    GateDecisionAttestation(GateDecisionAttestation),
+    GateDecisionAttestation(GateDecisionAttestation), // #12 (Phase 4 Task 4.1)
+    GateDecisionChallenge(GateDecisionChallenge),      // #13 (Phase 11 Task 11.1)
+    ChallengeOutcome(ChallengeOutcome),                // #14 (Phase 11 Task 11.1)
 }
 
 // ============================================================
@@ -505,6 +610,20 @@ pub enum LinkTypes {
     ElohimToGateDecisions, // Anchor(elohim_id) -> GateDecisionAttestation
     GateNameToDecisions,   // Anchor(gate_name) -> GateDecisionAttestation
     PhaseToDecisions,      // Anchor(phase) -> GateDecisionAttestation
+
+    // =========================================================================
+    // Gate Decision Challenge — Formal challenges against GateDecisionAttestations
+    // =========================================================================
+    IdToChallenge2,                     // Anchor(challenge_id) -> GateDecisionChallenge
+    ChallengedDecisionToChallenges,     // Anchor(challenged_decision_cid) -> GateDecisionChallenge
+    ChallengerToChallenges,             // Anchor(challenger_id) -> GateDecisionChallenge
+
+    // =========================================================================
+    // Challenge Outcome — Verdicts closing GateDecisionChallenges
+    // =========================================================================
+    IdToOutcome,           // Anchor(outcome_id) -> ChallengeOutcome
+    ChallengeToOutcome,    // Anchor(challenge_cid) -> ChallengeOutcome
+    VerdictToOutcomes,     // Anchor(verdict) -> ChallengeOutcome
 }
 
 // =============================================================================
@@ -558,6 +677,10 @@ fn validate_create_entry(app_entry: &EntryTypes) -> ExternResult<ValidateCallbac
         EntryTypes::GateDecisionAttestation(attestation) => {
             validate_gate_decision_attestation(attestation)
         }
+        EntryTypes::GateDecisionChallenge(challenge) => {
+            validate_gate_decision_challenge(challenge)
+        }
+        EntryTypes::ChallengeOutcome(outcome) => validate_challenge_outcome(outcome),
     }
 }
 
@@ -816,6 +939,79 @@ fn validate_gate_decision_attestation(
     Ok(ValidateCallbackResult::Valid)
 }
 
+fn validate_gate_decision_challenge(
+    challenge: &GateDecisionChallenge,
+) -> ExternResult<ValidateCallbackResult> {
+    if challenge.challenge_id.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "GateDecisionChallenge challenge_id cannot be empty".into(),
+        ));
+    }
+    if challenge.challenger_id.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "GateDecisionChallenge challenger_id cannot be empty".into(),
+        ));
+    }
+    if challenge.challenged_decision_cid.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "GateDecisionChallenge challenged_decision_cid cannot be empty".into(),
+        ));
+    }
+    if !GATE_CHALLENGE_GROUNDS.contains(&challenge.grounds.as_str()) {
+        return Ok(ValidateCallbackResult::Invalid(format!(
+            "Invalid GateDecisionChallenge grounds: {} (expected one of {:?})",
+            challenge.grounds, GATE_CHALLENGE_GROUNDS
+        )));
+    }
+    if !GATE_CHALLENGE_REACH.contains(&challenge.reach.as_str()) {
+        return Ok(ValidateCallbackResult::Invalid(format!(
+            "Invalid GateDecisionChallenge reach: {} (expected one of {:?})",
+            challenge.reach, GATE_CHALLENGE_REACH
+        )));
+    }
+    // NOTE: dangling-ref validation (challenged_decision_cid must resolve in DHT)
+    // requires must_get_entry or get() which are non-deterministic across network
+    // conditions. Full integration test with SweetConductor is deferred to
+    // Phase 11 close-out (Task 11.x integration tests).
+    Ok(ValidateCallbackResult::Valid)
+}
+
+fn validate_challenge_outcome(outcome: &ChallengeOutcome) -> ExternResult<ValidateCallbackResult> {
+    if outcome.outcome_id.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "ChallengeOutcome outcome_id cannot be empty".into(),
+        ));
+    }
+    if outcome.challenge_cid.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "ChallengeOutcome challenge_cid cannot be empty".into(),
+        ));
+    }
+    if !CHALLENGE_VERDICTS.contains(&outcome.verdict.as_str()) {
+        return Ok(ValidateCallbackResult::Invalid(format!(
+            "Invalid ChallengeOutcome verdict: {} (expected one of {:?})",
+            outcome.verdict, CHALLENGE_VERDICTS
+        )));
+    }
+    // Validate that reasoning_json is at least parseable as JSON.
+    // We do a minimal structural check — the full ConstitutionalReasoning shape
+    // is validated by the coordinator at construction time.
+    if outcome.reasoning_json.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "ChallengeOutcome reasoning_json cannot be empty".into(),
+        ));
+    }
+    // Use a simple check: must start with '{' for a JSON object.
+    // Full serde_json::from_str is not available in HDI (no_std WASM env).
+    let trimmed = outcome.reasoning_json.trim();
+    if !trimmed.starts_with('{') {
+        return Ok(ValidateCallbackResult::Invalid(
+            "ChallengeOutcome reasoning_json must be a JSON object".into(),
+        ));
+    }
+    Ok(ValidateCallbackResult::Valid)
+}
+
 // =============================================================================
 // Tests (native-compilable — no HDK WASM calls, pure logic)
 // =============================================================================
@@ -922,5 +1118,203 @@ mod tests {
         assert_eq!(decoded.elohim_id, att.elohim_id);
         assert_eq!(decoded.gate_name, att.gate_name);
         assert_eq!(decoded.decision, att.decision);
+    }
+
+    // =========================================================================
+    // GateDecisionChallenge tests
+    // =========================================================================
+
+    fn make_valid_challenge() -> GateDecisionChallenge {
+        GateDecisionChallenge {
+            challenge_id: "bafybeichallenge1".into(),
+            challenged_decision_cid: "bafybeigdecision1".into(),
+            challenger_id: "uhCAkchallenger".into(),
+            grounds: "factual-error".into(),
+            summary: "The decision rested on incorrect facts about the content format.".into(),
+            evidence_refs: "bafybeiref1,bafybeiref2".into(),
+            filed_at: "2026-04-19T10:00:00Z".into(),
+            reach: "community".into(),
+        }
+    }
+
+    #[test]
+    fn valid_challenge_passes_validation() {
+        let c = make_valid_challenge();
+        let result = validate_gate_decision_challenge(&c).unwrap();
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn all_valid_challenge_grounds_pass() {
+        for grounds in &GATE_CHALLENGE_GROUNDS {
+            let mut c = make_valid_challenge();
+            c.grounds = (*grounds).into();
+            let result = validate_gate_decision_challenge(&c).unwrap();
+            assert_eq!(
+                result,
+                ValidateCallbackResult::Valid,
+                "grounds {} should pass",
+                grounds
+            );
+        }
+    }
+
+    #[test]
+    fn all_valid_challenge_reach_values_pass() {
+        for reach in &GATE_CHALLENGE_REACH {
+            let mut c = make_valid_challenge();
+            c.reach = (*reach).into();
+            let result = validate_gate_decision_challenge(&c).unwrap();
+            assert_eq!(
+                result,
+                ValidateCallbackResult::Valid,
+                "reach {} should pass",
+                reach
+            );
+        }
+    }
+
+    #[test]
+    fn invalid_challenge_grounds_fails() {
+        let mut c = make_valid_challenge();
+        c.grounds = "made-up-grounds".into();
+        let result = validate_gate_decision_challenge(&c).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn invalid_challenge_reach_fails() {
+        let mut c = make_valid_challenge();
+        c.reach = "global".into();
+        let result = validate_gate_decision_challenge(&c).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn empty_challenge_id_fails() {
+        let mut c = make_valid_challenge();
+        c.challenge_id = "".into();
+        let result = validate_gate_decision_challenge(&c).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn empty_challenger_id_fails() {
+        let mut c = make_valid_challenge();
+        c.challenger_id = "".into();
+        let result = validate_gate_decision_challenge(&c).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn empty_challenged_decision_cid_fails() {
+        let mut c = make_valid_challenge();
+        c.challenged_decision_cid = "".into();
+        let result = validate_gate_decision_challenge(&c).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn challenge_serde_roundtrip() {
+        let c = make_valid_challenge();
+        let json = serde_json::to_string(&c).unwrap();
+        let decoded: GateDecisionChallenge = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.challenge_id, c.challenge_id);
+        assert_eq!(decoded.challenged_decision_cid, c.challenged_decision_cid);
+        assert_eq!(decoded.grounds, c.grounds);
+        assert_eq!(decoded.reach, c.reach);
+    }
+
+    // =========================================================================
+    // ChallengeOutcome tests
+    // =========================================================================
+
+    fn make_valid_outcome() -> ChallengeOutcome {
+        ChallengeOutcome {
+            outcome_id: "bafybeioutcome1".into(),
+            challenge_cid: "bafybeichallenge1".into(),
+            verdict: "upheld".into(),
+            reviewer_consensus: "uhCAkreviewerA,uhCAkreviewerB".into(),
+            reasoning_json: r#"{"summary":"Challenge was valid","rules":[]}"#.into(),
+            decided_at: "2026-04-20T09:00:00Z".into(),
+            indemnification_actions_json: r#"[{"type":"ReputationDegrade","elohim_id":"uhCAkelohim1","dimensions":["factual-accuracy"],"magnitude":0.3}]"#.into(),
+        }
+    }
+
+    #[test]
+    fn valid_outcome_passes_validation() {
+        let o = make_valid_outcome();
+        let result = validate_challenge_outcome(&o).unwrap();
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn all_valid_verdicts_pass() {
+        for verdict in &CHALLENGE_VERDICTS {
+            let mut o = make_valid_outcome();
+            o.verdict = (*verdict).into();
+            let result = validate_challenge_outcome(&o).unwrap();
+            assert_eq!(
+                result,
+                ValidateCallbackResult::Valid,
+                "verdict {} should pass",
+                verdict
+            );
+        }
+    }
+
+    #[test]
+    fn invalid_verdict_fails() {
+        let mut o = make_valid_outcome();
+        o.verdict = "maybe".into();
+        let result = validate_challenge_outcome(&o).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn empty_outcome_id_fails() {
+        let mut o = make_valid_outcome();
+        o.outcome_id = "".into();
+        let result = validate_challenge_outcome(&o).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn empty_challenge_cid_fails() {
+        let mut o = make_valid_outcome();
+        o.challenge_cid = "".into();
+        let result = validate_challenge_outcome(&o).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn empty_reasoning_json_fails() {
+        let mut o = make_valid_outcome();
+        o.reasoning_json = "".into();
+        let result = validate_challenge_outcome(&o).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn non_object_reasoning_json_fails() {
+        let mut o = make_valid_outcome();
+        o.reasoning_json = r#"["array", "not", "object"]"#.into();
+        let result = validate_challenge_outcome(&o).unwrap();
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn outcome_serde_roundtrip() {
+        let o = make_valid_outcome();
+        let json = serde_json::to_string(&o).unwrap();
+        let decoded: ChallengeOutcome = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.outcome_id, o.outcome_id);
+        assert_eq!(decoded.challenge_cid, o.challenge_cid);
+        assert_eq!(decoded.verdict, o.verdict);
+        assert_eq!(decoded.reasoning_json, o.reasoning_json);
+        assert_eq!(
+            decoded.indemnification_actions_json,
+            o.indemnification_actions_json
+        );
     }
 }

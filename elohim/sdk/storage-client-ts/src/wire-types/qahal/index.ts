@@ -1,9 +1,14 @@
 // Generated from elohim/sdk/domains/qahal/types via ts-rs. Do not hand-edit.
 
 export type { Challenge } from './Challenge';
+export type { ChallengeOutcome } from './ChallengeOutcome';
+export type { ChallengeOutcomeOutput } from './ChallengeOutcomeOutput';
 export type { ChallengeOutput } from './ChallengeOutput';
 export type { CreateChallengeInput } from './CreateChallengeInput';
+export type { CreateChallengeOutcomeInput } from './CreateChallengeOutcomeInput';
 export type { CreateDiscussionInput } from './CreateDiscussionInput';
+export type { CreateGateDecisionAttestationInput } from './CreateGateDecisionAttestationInput';
+export type { CreateGateDecisionChallengeInput } from './CreateGateDecisionChallengeInput';
 export type { CreateGovernanceReactionInput } from './CreateGovernanceReactionInput';
 export type { CreateGovernanceStateInput } from './CreateGovernanceStateInput';
 export type { CreateGraduatedFeedbackInput } from './CreateGraduatedFeedbackInput';
@@ -15,6 +20,10 @@ export type { CreateStatementVoteInput } from './CreateStatementVoteInput';
 export type { CredentialVerification } from './CredentialVerification';
 export type { Discussion } from './Discussion';
 export type { DiscussionOutput } from './DiscussionOutput';
+export type { GateDecisionAttestation } from './GateDecisionAttestation';
+export type { GateDecisionAttestationOutput } from './GateDecisionAttestationOutput';
+export type { GateDecisionChallenge } from './GateDecisionChallenge';
+export type { GateDecisionChallengeOutput } from './GateDecisionChallengeOutput';
 export type { GetGovernanceStateInput } from './GetGovernanceStateInput';
 export type { GovernanceReaction } from './GovernanceReaction';
 export type { GovernanceReactionOutput } from './GovernanceReactionOutput';
@@ -30,8 +39,11 @@ export type { Proposal } from './Proposal';
 export type { ProposalOutput } from './ProposalOutput';
 export type { ProposalVote } from './ProposalVote';
 export type { ProposalVoteOutput } from './ProposalVoteOutput';
+export type { QueryChallengeOutcomesInput } from './QueryChallengeOutcomesInput';
 export type { QueryChallengesInput } from './QueryChallengesInput';
 export type { QueryDiscussionsInput } from './QueryDiscussionsInput';
+export type { QueryGateChallengesInput } from './QueryGateChallengesInput';
+export type { QueryGateDecisionsInput } from './QueryGateDecisionsInput';
 export type { QueryGovernanceReactionsInput } from './QueryGovernanceReactionsInput';
 export type { QueryGovernanceStatesInput } from './QueryGovernanceStatesInput';
 export type { QueryGraduatedFeedbackInput } from './QueryGraduatedFeedbackInput';

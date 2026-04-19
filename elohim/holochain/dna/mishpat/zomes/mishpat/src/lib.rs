@@ -12,6 +12,14 @@ pub use qahal_types::{
     CreateDiscussionInput,
     // GateDecisionAttestation
     CreateGateDecisionAttestationInput,
+    // GateDecisionChallenge (Phase 11)
+    CreateGateDecisionChallengeInput,
+    GateDecisionChallengeOutput,
+    QueryGateChallengesInput,
+    // ChallengeOutcome (Phase 11)
+    CreateChallengeOutcomeInput,
+    ChallengeOutcomeOutput,
+    QueryChallengeOutcomesInput,
     // GovernanceReaction
     CreateGovernanceReactionInput,
     // GovernanceState
@@ -264,6 +272,35 @@ fn wire_gate_decision_attestation(
         context_summary_cid: e.context_summary_cid.clone(),
         decided_at: e.decided_at.clone(),
         universal_band_cid: e.universal_band_cid.clone(),
+    }
+}
+
+fn wire_gate_decision_challenge(
+    e: &mishpat_integrity::GateDecisionChallenge,
+) -> qahal_types::GateDecisionChallenge {
+    qahal_types::GateDecisionChallenge {
+        challenge_id: e.challenge_id.clone(),
+        challenged_decision_cid: e.challenged_decision_cid.clone(),
+        challenger_id: e.challenger_id.clone(),
+        grounds: e.grounds.clone(),
+        summary: e.summary.clone(),
+        evidence_refs: e.evidence_refs.clone(),
+        filed_at: e.filed_at.clone(),
+        reach: e.reach.clone(),
+    }
+}
+
+fn wire_challenge_outcome(
+    e: &mishpat_integrity::ChallengeOutcome,
+) -> qahal_types::ChallengeOutcome {
+    qahal_types::ChallengeOutcome {
+        outcome_id: e.outcome_id.clone(),
+        challenge_cid: e.challenge_cid.clone(),
+        verdict: e.verdict.clone(),
+        reviewer_consensus: e.reviewer_consensus.clone(),
+        reasoning_json: e.reasoning_json.clone(),
+        decided_at: e.decided_at.clone(),
+        indemnification_actions_json: e.indemnification_actions_json.clone(),
     }
 }
 
@@ -1785,10 +1822,11 @@ pub fn query_statement_votes(
 // elohim-storage (Task 4.2) receives the post-commit signal and projects
 // into SQLite with dht_anchor_hash for fast query.
 
-/// Signal emitted after a GateDecisionAttestation is committed to the DHT.
+/// Signal emitted after a notarized gate entry is committed to the DHT.
 ///
-/// elohim-storage listens for this signal and projects the entry into its
+/// elohim-storage listens for these signals and projects entries into its
 /// local SQLite index with dht_anchor_hash for downstream query.
+/// Task 11.2 adds the projection handlers for Challenge and Outcome variants.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(tag = "type", content = "payload")]
 pub enum MishpatSignal {
@@ -1796,6 +1834,22 @@ pub enum MishpatSignal {
         action_hash: ActionHash,
         entry_hash: EntryHash,
         entry: mishpat_integrity::GateDecisionAttestation,
+        author: AgentPubKey,
+    },
+    /// Emitted when a GateDecisionChallenge is committed (Phase 11 Task 11.1).
+    /// elohim-storage Task 11.2 handles projection from this signal.
+    GateDecisionChallengeCreated {
+        action_hash: ActionHash,
+        entry_hash: EntryHash,
+        entry: mishpat_integrity::GateDecisionChallenge,
+        author: AgentPubKey,
+    },
+    /// Emitted when a ChallengeOutcome is committed (Phase 11 Task 11.1).
+    /// elohim-storage Task 11.2 handles projection from this signal.
+    ChallengeOutcomeCreated {
+        action_hash: ActionHash,
+        entry_hash: EntryHash,
+        entry: mishpat_integrity::ChallengeOutcome,
         author: AgentPubKey,
     },
 }
@@ -2049,6 +2103,287 @@ pub fn get_decisions_by_phase(
     Ok(results)
 }
 
+// =============================================================================
+// Gate Decision Challenge + Outcome coordinators (Phase 11 Task 11.1)
+// =============================================================================
+
+/// Create and notarize a GateDecisionChallenge on the Mishpat DHT.
+///
+/// Indexes via three StringAnchor links so storage can query by
+/// challenge_id, challenged_decision_cid, or challenger_id.
+#[hdk_extern]
+pub fn create_gate_decision_challenge(
+    input: CreateGateDecisionChallengeInput,
+) -> ExternResult<ActionHash> {
+    let entry = mishpat_integrity::GateDecisionChallenge {
+        challenge_id: input.challenge_id.clone(),
+        challenged_decision_cid: input.challenged_decision_cid.clone(),
+        challenger_id: input.challenger_id.clone(),
+        grounds: input.grounds.clone(),
+        summary: input.summary.clone(),
+        evidence_refs: input.evidence_refs.clone(),
+        filed_at: input.filed_at.clone(),
+        reach: input.reach.clone(),
+    };
+
+    let action_hash = create_entry(&EntryTypes::GateDecisionChallenge(entry.clone()))?;
+
+    // Index by challenge_id (primary lookup — one challenge per CID)
+    let id_anchor = StringAnchor::new("gate_decision_challenge_id", &input.challenge_id);
+    let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
+    create_link(
+        id_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::IdToChallenge2,
+        (),
+    )?;
+
+    // Index by challenged_decision_cid (all challenges against a decision)
+    let decision_anchor =
+        StringAnchor::new("challenged_decision", &input.challenged_decision_cid);
+    let decision_anchor_hash = hash_entry(&EntryTypes::StringAnchor(decision_anchor))?;
+    create_link(
+        decision_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::ChallengedDecisionToChallenges,
+        (),
+    )?;
+
+    // Index by challenger_id (all challenges by an agent)
+    let challenger_anchor = StringAnchor::new("gate_challenger", &input.challenger_id);
+    let challenger_anchor_hash = hash_entry(&EntryTypes::StringAnchor(challenger_anchor))?;
+    create_link(
+        challenger_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::ChallengerToChallenges,
+        (),
+    )?;
+
+    Ok(action_hash)
+}
+
+/// Get a GateDecisionChallenge by its challenge_id CID.
+#[hdk_extern]
+pub fn get_challenge_by_id_v2(
+    challenge_id: String,
+) -> ExternResult<Option<GateDecisionChallengeOutput>> {
+    let id_anchor = StringAnchor::new("gate_decision_challenge_id", &challenge_id);
+    let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
+
+    let query = LinkQuery::try_new(id_anchor_hash, LinkTypes::IdToChallenge2)?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    if let Some(link) = links.first() {
+        let action_hash = ActionHash::try_from(link.target.clone()).map_err(|_| {
+            wasm_error!(WasmErrorInner::Guest(
+                "Invalid challenge hash".to_string()
+            ))
+        })?;
+
+        let record = get(action_hash.clone(), GetOptions::default())?;
+        if let Some(record) = record {
+            if let Some(entry) = record
+                .entry()
+                .to_app_option::<mishpat_integrity::GateDecisionChallenge>()
+                .ok()
+                .flatten()
+            {
+                return Ok(Some(GateDecisionChallengeOutput {
+                    action_hash,
+                    challenge: wire_gate_decision_challenge(&entry),
+                }));
+            }
+        }
+    }
+
+    Ok(None)
+}
+
+/// Query all challenges against a given decision CID.
+#[hdk_extern]
+pub fn get_challenges_against_decision(
+    input: QueryGateChallengesInput,
+) -> ExternResult<Vec<GateDecisionChallengeOutput>> {
+    let decision_cid = input.challenged_decision_cid.ok_or_else(|| {
+        wasm_error!(WasmErrorInner::Guest(
+            "challenged_decision_cid is required for get_challenges_against_decision".to_string()
+        ))
+    })?;
+    let limit = input.limit.unwrap_or(100) as usize;
+
+    let anchor = StringAnchor::new("challenged_decision", &decision_cid);
+    let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor))?;
+
+    let query = LinkQuery::try_new(anchor_hash, LinkTypes::ChallengedDecisionToChallenges)?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    let mut results = Vec::new();
+    for link in links.iter().take(limit) {
+        let action_hash = ActionHash::try_from(link.target.clone()).map_err(|_| {
+            wasm_error!(WasmErrorInner::Guest(
+                "Invalid challenge hash".to_string()
+            ))
+        })?;
+
+        let record = get(action_hash.clone(), GetOptions::default())?;
+        if let Some(record) = record {
+            if let Some(entry) = record
+                .entry()
+                .to_app_option::<mishpat_integrity::GateDecisionChallenge>()
+                .ok()
+                .flatten()
+            {
+                results.push(GateDecisionChallengeOutput {
+                    action_hash,
+                    challenge: wire_gate_decision_challenge(&entry),
+                });
+            }
+        }
+    }
+
+    Ok(results)
+}
+
+/// Create and notarize a ChallengeOutcome on the Mishpat DHT.
+///
+/// Indexes by outcome_id, challenge_cid (one outcome per challenge), and verdict.
+#[hdk_extern]
+pub fn create_challenge_outcome(
+    input: CreateChallengeOutcomeInput,
+) -> ExternResult<ActionHash> {
+    let entry = mishpat_integrity::ChallengeOutcome {
+        outcome_id: input.outcome_id.clone(),
+        challenge_cid: input.challenge_cid.clone(),
+        verdict: input.verdict.clone(),
+        reviewer_consensus: input.reviewer_consensus.clone(),
+        reasoning_json: input.reasoning_json.clone(),
+        decided_at: input.decided_at.clone(),
+        indemnification_actions_json: input.indemnification_actions_json.clone(),
+    };
+
+    let action_hash = create_entry(&EntryTypes::ChallengeOutcome(entry.clone()))?;
+
+    // Index by outcome_id
+    let id_anchor = StringAnchor::new("challenge_outcome_id", &input.outcome_id);
+    let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
+    create_link(
+        id_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::IdToOutcome,
+        (),
+    )?;
+
+    // Index by challenge_cid (one outcome per challenge)
+    let challenge_anchor = StringAnchor::new("outcome_for_challenge", &input.challenge_cid);
+    let challenge_anchor_hash = hash_entry(&EntryTypes::StringAnchor(challenge_anchor))?;
+    create_link(
+        challenge_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::ChallengeToOutcome,
+        (),
+    )?;
+
+    // Index by verdict (for reputation aggregation queries)
+    let verdict_anchor = StringAnchor::new("outcome_verdict", &input.verdict);
+    let verdict_anchor_hash = hash_entry(&EntryTypes::StringAnchor(verdict_anchor))?;
+    create_link(
+        verdict_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::VerdictToOutcomes,
+        (),
+    )?;
+
+    Ok(action_hash)
+}
+
+/// Get the outcome that resolved a given challenge (if any).
+#[hdk_extern]
+pub fn get_outcome_for_challenge(
+    input: QueryChallengeOutcomesInput,
+) -> ExternResult<Option<ChallengeOutcomeOutput>> {
+    let challenge_cid = input.challenge_cid.ok_or_else(|| {
+        wasm_error!(WasmErrorInner::Guest(
+            "challenge_cid is required for get_outcome_for_challenge".to_string()
+        ))
+    })?;
+
+    let anchor = StringAnchor::new("outcome_for_challenge", &challenge_cid);
+    let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor))?;
+
+    let query = LinkQuery::try_new(anchor_hash, LinkTypes::ChallengeToOutcome)?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    if let Some(link) = links.first() {
+        let action_hash = ActionHash::try_from(link.target.clone()).map_err(|_| {
+            wasm_error!(WasmErrorInner::Guest(
+                "Invalid outcome hash".to_string()
+            ))
+        })?;
+
+        let record = get(action_hash.clone(), GetOptions::default())?;
+        if let Some(record) = record {
+            if let Some(entry) = record
+                .entry()
+                .to_app_option::<mishpat_integrity::ChallengeOutcome>()
+                .ok()
+                .flatten()
+            {
+                return Ok(Some(ChallengeOutcomeOutput {
+                    action_hash,
+                    outcome: wire_challenge_outcome(&entry),
+                }));
+            }
+        }
+    }
+
+    Ok(None)
+}
+
+/// Query outcomes by verdict (upheld | dismissed | superseded).
+#[hdk_extern]
+pub fn get_outcomes_by_verdict(
+    input: QueryChallengeOutcomesInput,
+) -> ExternResult<Vec<ChallengeOutcomeOutput>> {
+    let verdict = input.verdict.ok_or_else(|| {
+        wasm_error!(WasmErrorInner::Guest(
+            "verdict is required for get_outcomes_by_verdict".to_string()
+        ))
+    })?;
+    let limit = input.limit.unwrap_or(100) as usize;
+
+    let anchor = StringAnchor::new("outcome_verdict", &verdict);
+    let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor))?;
+
+    let query = LinkQuery::try_new(anchor_hash, LinkTypes::VerdictToOutcomes)?;
+    let links = get_links(query, GetStrategy::default())?;
+
+    let mut results = Vec::new();
+    for link in links.iter().take(limit) {
+        let action_hash = ActionHash::try_from(link.target.clone()).map_err(|_| {
+            wasm_error!(WasmErrorInner::Guest(
+                "Invalid outcome hash".to_string()
+            ))
+        })?;
+
+        let record = get(action_hash.clone(), GetOptions::default())?;
+        if let Some(record) = record {
+            if let Some(entry) = record
+                .entry()
+                .to_app_option::<mishpat_integrity::ChallengeOutcome>()
+                .ok()
+                .flatten()
+            {
+                results.push(ChallengeOutcomeOutput {
+                    action_hash,
+                    outcome: wire_challenge_outcome(&entry),
+                });
+            }
+        }
+    }
+
+    Ok(results)
+}
+
 /// Post-commit hook — emits MishpatSignal::GateDecisionCreated for each
 /// committed GateDecisionAttestation so elohim-storage can project it.
 ///
@@ -2079,6 +2414,36 @@ pub fn post_commit(committed_actions: Vec<SignedActionHashed>) -> ExternResult<(
             .flatten()
         {
             let _ = emit_signal(MishpatSignal::GateDecisionCreated {
+                action_hash: action_hash.clone(),
+                entry_hash: entry_hash.clone(),
+                entry,
+                author: author.clone(),
+            });
+            continue;
+        }
+
+        if let Some(entry) = record
+            .entry()
+            .to_app_option::<mishpat_integrity::GateDecisionChallenge>()
+            .ok()
+            .flatten()
+        {
+            let _ = emit_signal(MishpatSignal::GateDecisionChallengeCreated {
+                action_hash: action_hash.clone(),
+                entry_hash: entry_hash.clone(),
+                entry,
+                author: author.clone(),
+            });
+            continue;
+        }
+
+        if let Some(entry) = record
+            .entry()
+            .to_app_option::<mishpat_integrity::ChallengeOutcome>()
+            .ok()
+            .flatten()
+        {
+            let _ = emit_signal(MishpatSignal::ChallengeOutcomeCreated {
                 action_hash,
                 entry_hash,
                 entry,

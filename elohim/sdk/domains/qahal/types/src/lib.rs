@@ -767,6 +767,133 @@ pub struct QueryGateDecisionsInput {
 }
 
 // =============================================================================
+// Gate Decision Challenge + Indemnification Types (Phase 11 Task 11.1)
+// =============================================================================
+
+/// Input for mishpat::create_gate_decision_challenge coordinator function.
+///
+/// A GateDecisionChallenge is a formal challenge filed against a prior
+/// GateDecisionAttestation. Per the Challenge + Indemnification spec
+/// (genesis/docs/superpowers/specs/2026-04-19-gate-challenge-and-indemnification-design.md).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct CreateGateDecisionChallengeInput {
+    /// CID of this challenge (self-addressing, computed by caller from content hash).
+    pub challenge_id: String,
+    /// CID of the GateDecisionAttestation being challenged.
+    pub challenged_decision_cid: String,
+    /// AgentPubKey of the challenger (base64 encoded).
+    pub challenger_id: String,
+    /// Grounds: factual-error | safety | policy | constitutional | indemnification-request
+    pub grounds: String,
+    /// Challenger's articulation of the grievance.
+    pub summary: String,
+    /// Content-addressed evidence refs (comma-separated CIDs; empty if none).
+    pub evidence_refs: String,
+    /// ISO-8601 timestamp of filing.
+    pub filed_at: String,
+    /// Reach level: self | intimate | community | commons
+    pub reach: String,
+}
+
+/// GateDecisionChallenge wire type. Field-for-field mirror of the integrity entry.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct GateDecisionChallenge {
+    pub challenge_id: String,
+    pub challenged_decision_cid: String,
+    pub challenger_id: String,
+    pub grounds: String,
+    pub summary: String,
+    pub evidence_refs: String,
+    pub filed_at: String,
+    pub reach: String,
+}
+
+/// Output from mishpat::create_gate_decision_challenge coordinator function.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct GateDecisionChallengeOutput {
+    #[cfg_attr(feature = "ts", ts(type = "string"))]
+    pub action_hash: ActionHash,
+    pub challenge: GateDecisionChallenge,
+}
+
+/// Input for mishpat::create_challenge_outcome coordinator function.
+///
+/// ChallengeOutcome records the reviewer consensus verdict closing a
+/// GateDecisionChallenge. Indemnification actions are carried as JSON to
+/// keep the integrity entry shape flat; richer typed shape is future work.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct CreateChallengeOutcomeInput {
+    /// CID of this outcome (self-addressing).
+    pub outcome_id: String,
+    /// CID of the GateDecisionChallenge this outcome closes.
+    pub challenge_cid: String,
+    /// Verdict: upheld | dismissed | superseded
+    pub verdict: String,
+    /// AgentPubKeys of the reviewers who reached consensus (comma-separated, base64).
+    pub reviewer_consensus: String,
+    /// Full ConstitutionalReasoning as JSON.
+    pub reasoning_json: String,
+    /// ISO-8601 timestamp of decision.
+    pub decided_at: String,
+    /// Indemnification actions as JSON array (empty if no action required).
+    pub indemnification_actions_json: String,
+}
+
+/// ChallengeOutcome wire type. Field-for-field mirror of the integrity entry.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct ChallengeOutcome {
+    pub outcome_id: String,
+    pub challenge_cid: String,
+    pub verdict: String,
+    pub reviewer_consensus: String,
+    pub reasoning_json: String,
+    pub decided_at: String,
+    pub indemnification_actions_json: String,
+}
+
+/// Output from mishpat::create_challenge_outcome coordinator function.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct ChallengeOutcomeOutput {
+    #[cfg_attr(feature = "ts", ts(type = "string"))]
+    pub action_hash: ActionHash,
+    pub outcome: ChallengeOutcome,
+}
+
+/// Input for querying challenge outcomes.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct QueryChallengeOutcomesInput {
+    /// When set, filter by verdict: upheld | dismissed | superseded.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub verdict: Option<String>,
+    /// When set, filter by challenge_cid (returns at most one outcome).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub challenge_cid: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub limit: Option<u32>,
+}
+
+/// Input for querying gate decision challenges.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "ts", derive(ts_rs::TS))]
+pub struct QueryGateChallengesInput {
+    /// When set, filter by challenged_decision_cid (all challenges against a decision).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub challenged_decision_cid: Option<String>,
+    /// When set, filter by challenger_id (all challenges by an agent).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub challenger_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub limit: Option<u32>,
+}
+
+// =============================================================================
 // Credential Verification Types
 // =============================================================================
 
@@ -1012,6 +1139,88 @@ mod tests {
         assert_eq!(decoded.decision, "allow");
         assert_eq!(decoded.gate_name, "discernment-gate-v1-mechanical");
     }
+
+    #[test]
+    fn create_gate_decision_challenge_input_msgpack_roundtrip() {
+        let input = CreateGateDecisionChallengeInput {
+            challenge_id: "bafybeichallenge1".into(),
+            challenged_decision_cid: "bafybeigdecision1".into(),
+            challenger_id: "uhCAk-challenger".into(),
+            grounds: "constitutional".into(),
+            summary: "Decision appears to violate P4 principle".into(),
+            evidence_refs: "bafybeievidence1,bafybeievidence2".into(),
+            filed_at: "2026-04-19T00:00:00Z".into(),
+            reach: "community".into(),
+        };
+        let bytes = rmp_serde::to_vec_named(&input).unwrap();
+        let decoded: CreateGateDecisionChallengeInput = rmp_serde::from_slice(&bytes).unwrap();
+        assert_eq!(decoded.grounds, "constitutional");
+        assert_eq!(decoded.challenged_decision_cid, "bafybeigdecision1");
+    }
+
+    #[test]
+    fn gate_decision_challenge_msgpack_roundtrip() {
+        let entry = GateDecisionChallenge {
+            challenge_id: "bafybeichallenge1".into(),
+            challenged_decision_cid: "bafybeigdecision1".into(),
+            challenger_id: "uhCAk-challenger".into(),
+            grounds: "safety".into(),
+            summary: "Concern about content safety".into(),
+            evidence_refs: String::new(),
+            filed_at: "2026-04-19T00:00:00Z".into(),
+            reach: "intimate".into(),
+        };
+        let bytes = rmp_serde::to_vec_named(&entry).unwrap();
+        let decoded: GateDecisionChallenge = rmp_serde::from_slice(&bytes).unwrap();
+        assert_eq!(decoded.grounds, "safety");
+        assert_eq!(decoded.reach, "intimate");
+    }
+
+    #[test]
+    fn create_challenge_outcome_input_msgpack_roundtrip() {
+        let input = CreateChallengeOutcomeInput {
+            outcome_id: "bafybeioutcome1".into(),
+            challenge_cid: "bafybeichallenge1".into(),
+            verdict: "upheld".into(),
+            reviewer_consensus: "uhCAk-reviewer1,uhCAk-reviewer2".into(),
+            reasoning_json: r#"{"summary":"Evidence confirms challenger's grounds"}"#.into(),
+            decided_at: "2026-04-20T00:00:00Z".into(),
+            indemnification_actions_json: r#"[{"kind":"reputation-degrade","dimensions":["appeals-sustained"],"magnitude":0.15}]"#.into(),
+        };
+        let bytes = rmp_serde::to_vec_named(&input).unwrap();
+        let decoded: CreateChallengeOutcomeInput = rmp_serde::from_slice(&bytes).unwrap();
+        assert_eq!(decoded.verdict, "upheld");
+        assert_eq!(decoded.challenge_cid, "bafybeichallenge1");
+    }
+
+    #[test]
+    fn challenge_outcome_msgpack_roundtrip() {
+        let entry = ChallengeOutcome {
+            outcome_id: "bafybeioutcome1".into(),
+            challenge_cid: "bafybeichallenge1".into(),
+            verdict: "dismissed".into(),
+            reviewer_consensus: "uhCAk-reviewer1".into(),
+            reasoning_json: r#"{"summary":"Insufficient evidence"}"#.into(),
+            decided_at: "2026-04-20T00:00:00Z".into(),
+            indemnification_actions_json: "[]".into(),
+        };
+        let bytes = rmp_serde::to_vec_named(&entry).unwrap();
+        let decoded: ChallengeOutcome = rmp_serde::from_slice(&bytes).unwrap();
+        assert_eq!(decoded.verdict, "dismissed");
+    }
+
+    #[test]
+    fn query_challenge_outcomes_input_msgpack_roundtrip() {
+        let input = QueryChallengeOutcomesInput {
+            verdict: Some("upheld".into()),
+            challenge_cid: None,
+            limit: Some(50),
+        };
+        let bytes = rmp_serde::to_vec_named(&input).unwrap();
+        let decoded: QueryChallengeOutcomesInput = rmp_serde::from_slice(&bytes).unwrap();
+        assert_eq!(decoded.verdict.as_deref(), Some("upheld"));
+        assert_eq!(decoded.limit, Some(50));
+    }
 }
 
 
@@ -1071,5 +1280,13 @@ mod ts_export {
         GateDecisionAttestation::export_all_to(&out).unwrap();
         GateDecisionAttestationOutput::export_all_to(&out).unwrap();
         QueryGateDecisionsInput::export_all_to(&out).unwrap();
+        CreateGateDecisionChallengeInput::export_all_to(&out).unwrap();
+        GateDecisionChallenge::export_all_to(&out).unwrap();
+        GateDecisionChallengeOutput::export_all_to(&out).unwrap();
+        QueryGateChallengesInput::export_all_to(&out).unwrap();
+        CreateChallengeOutcomeInput::export_all_to(&out).unwrap();
+        ChallengeOutcome::export_all_to(&out).unwrap();
+        ChallengeOutcomeOutput::export_all_to(&out).unwrap();
+        QueryChallengeOutcomesInput::export_all_to(&out).unwrap();
     }
 }
