@@ -1,0 +1,19 @@
+{
+  "$id": "network-posture-view.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "NetworkPostureView",
+  "description": "Aggregate network posture computed from live PeerStatus rows and stewarded_nodes projection. Source of truth: computed per-request (operational Category C); PeerStatus DHT entries in infrastructure DNA back the peer counts. No persistence, no new entry type.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["totalPeers","activePeers","stalePeers","alwaysOnPeers","householdsReciprocating","computeAvailable","storagePressure","computedAt"],
+  "properties": {
+    "totalPeers":              { "type": "integer", "minimum": 0, "description": "Distinct peers with a PeerStatus row." },
+    "activePeers":             { "type": "integer", "minimum": 0, "description": "Peers currently online or degraded but responding." },
+    "stalePeers":              { "type": "integer", "minimum": 0, "description": "Peers whose last update is older than 120 s." },
+    "alwaysOnPeers":           { "type": "integer", "minimum": 0, "description": "Peers in the general pool + currently active." },
+    "householdsReciprocating": { "type": "integer", "minimum": 0, "description": "Distinct households with at least one active peer." },
+    "computeAvailable":        { "type": "boolean", "description": "At least one active peer accepts stewardship reserves." },
+    "storagePressure":         { "type": "number",  "minimum": 0, "maximum": 1, "description": "Aggregate shard-locations pressure (0-1). Placeholder until shard_locations is populated." },
+    "computedAt":              { "type": "string",  "format": "date-time" }
+  }
+}

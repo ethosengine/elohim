@@ -238,6 +238,32 @@ pub fn set_dht_anchor(
     Ok(())
 }
 
+/// Count distinct households with at least one active (non-stale) peer.
+/// Used by `/api/v1/network/posture` for the reciprocation metric.
+pub fn distinct_active_households(
+    conn: &mut SqliteConnection,
+    stale_threshold_secs: i64,
+    now_secs: i64,
+) -> Result<i64, StorageError> {
+    use crate::db::diesel_schema::peer_statuses as p;
+    use crate::db::diesel_schema::stewarded_nodes as t;
+    use diesel::dsl::sql;
+    use diesel::sql_types::BigInt;
+
+    let cutoff = now_secs - stale_threshold_secs;
+
+    // COUNT(DISTINCT household_id) via a raw sql expression — diesel's
+    // .distinct().count() would count rows, not distinct values.
+    t::table
+        .inner_join(p::table.on(p::peer_id.eq(t::id)))
+        .filter(t::household_id.is_not_null())
+        .filter(p::updated_at.gt(cutoff))
+        .filter(p::status.eq_any(["online", "degraded"]))
+        .select(sql::<BigInt>("COUNT(DISTINCT stewarded_nodes.household_id)"))
+        .first::<i64>(conn)
+        .map_err(|e| StorageError::Internal(format!("distinct_active_households: {}", e)))
+}
+
 /// List household devices joining `peer_statuses` for live vitals.
 ///
 /// Returns rows as (stewarded_node, optional peer_status) tuples. Nodes with

@@ -8620,6 +8620,19 @@ pub fn build_manifest() -> doorway_client::DoorwayRoutes {
                 .build(),
         )
         // =====================================================================
+        // /api/v1/network/posture — aggregate health of the live peer fabric
+        // =====================================================================
+        // Read-only. Computed Category C projection (no persistence, no DHT
+        // writes). Aggregates peer_statuses (notarized PeerStatus entries,
+        // infrastructure DNA) plus stewarded_nodes reciprocation. Sister to
+        // the existing /p2p/status surface but household-aware.
+        .route(
+            Route::get("/api/v1/network/posture")
+                .handler("get_network_posture")
+                .cache_ttl(15)
+                .build(),
+        )
+        // =====================================================================
         // /db/gate-decisions — Gate decision attestation projections (mishpat)
         // =====================================================================
         // Read-only. Source of truth: mishpat DNA DHT. These rows are written

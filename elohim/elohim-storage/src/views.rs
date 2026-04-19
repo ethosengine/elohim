@@ -6486,3 +6486,23 @@ pub struct HouseholdDevicesView {
     pub household_id: String,
     pub devices: Vec<DeviceEntryView>,
 }
+
+/// Aggregate network posture: counts over PeerStatus projection and
+/// household reciprocation. Operational Category C — computed per-request,
+/// no persistence. Source of truth: PeerStatus DHT entries (infrastructure
+/// DNA) and stewarded_nodes / stewardship_allocations projections.
+///
+/// Wire format: `elohim/sdk/schemas/v1/views/network-posture-view.schema.json`
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct NetworkPostureView {
+    pub total_peers: i32,
+    pub active_peers: i32,
+    pub stale_peers: i32,
+    pub always_on_peers: i32,
+    pub households_reciprocating: i32,
+    pub compute_available: bool,
+    pub storage_pressure: f32,
+    pub computed_at: String,
+}
