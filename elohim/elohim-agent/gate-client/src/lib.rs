@@ -323,6 +323,66 @@ pub fn __test_set_attestation_resolver(resolver: Option<std::sync::Arc<dyn Attes
     __test_set_gate_attestation_resolver("reach-gate-v1", resolver);
 }
 
+// ─── Test-only wisdom output injection ────────────────────────────────────────
+//
+// Allows integration tests to force `WisdomInvokeExecutor` to write a specific
+// value for a given (constitution_cid, output_key) pair.  Consumed once by the
+// executor after it writes its default mock, so the injected value overwrites
+// the mock.  Scoped to the current thread so parallel tests cannot bleed.
+//
+// Usage:
+//   gate_client::__test_set_wisdom_output(
+//       "epr:constitutions:content-safety-v1",
+//       "safetyOutput",
+//       json!({"decision": "decline", ...}),
+//   );
+//   // ... call check(ContentPublish / PeerMessage / AttestationWrite) ...
+//   // Override is consumed once; subsequent calls see the default mock again.
+#[cfg(any(test, feature = "testing"))]
+thread_local! {
+    static WISDOM_OUTPUT_OVERRIDES: std::cell::RefCell<
+        std::collections::HashMap<(String, String), serde_json::Value>
+    > = std::cell::RefCell::new(std::collections::HashMap::new());
+}
+
+/// Inject a wisdom output override for a specific `(constitution_cid, output_key)` pair.
+///
+/// The value is consumed once by `WisdomInvokeExecutor` after it writes its
+/// default mock, replacing it.  Pass a new value to reset for the next call.
+///
+/// Only available in `#[cfg(test)]` or `feature = "testing"` builds.
+#[cfg(any(test, feature = "testing"))]
+pub fn __test_set_wisdom_output(
+    constitution_cid: &str,
+    output_key: &str,
+    value: serde_json::Value,
+) {
+    WISDOM_OUTPUT_OVERRIDES.with(|m| {
+        m.borrow_mut().insert(
+            (constitution_cid.to_string(), output_key.to_string()),
+            value,
+        );
+    });
+}
+
+/// Take (consume) a pending wisdom output override for `(constitution_cid, output_key)`.
+///
+/// Called by `WisdomInvokeExecutor` after writing its default mock.  Returns
+/// `Some(value)` if an override was set; `None` otherwise.
+///
+/// Only available in `#[cfg(test)]` or `feature = "testing"` builds.
+#[cfg(any(test, feature = "testing"))]
+#[doc(hidden)]
+pub fn __test_take_wisdom_output_override(
+    constitution_cid: &str,
+    output_key: &str,
+) -> Option<serde_json::Value> {
+    WISDOM_OUTPUT_OVERRIDES.with(|m| {
+        m.borrow_mut()
+            .remove(&(constitution_cid.to_string(), output_key.to_string()))
+    })
+}
+
 // Public re-exports for ergonomic use.
 pub use dag::aggregation_spec::{AggregationSpec, LadderTier, Reduction, SubjectScope};
 pub use dag::content_safety_gate::{

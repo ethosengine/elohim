@@ -98,6 +98,19 @@ impl StepExecutor for WisdomInvokeExecutor {
         let mock_output = Self::build_mock_output(params, &wisdom_context);
         ctx.insert(params.output_key.clone(), mock_output);
 
+        // Test builds only: if a wisdom output override was injected for this
+        // (constitution_cid, output_key) pair, overwrite the mock we just wrote.
+        // This is a one-shot consume — subsequent calls see the default mock again.
+        #[cfg(any(test, feature = "testing"))]
+        {
+            if let Some(override_value) = crate::__test_take_wisdom_output_override(
+                &params.constitution_cid,
+                &params.output_key,
+            ) {
+                ctx.insert(params.output_key.clone(), override_value);
+            }
+        }
+
         Ok(StepOutcome::Continue)
     }
 }

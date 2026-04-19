@@ -245,7 +245,7 @@ async fn rule_3_validates_failure_mode_validation_verdict() {
         .expect("run_discernment_gate must not fail for rule-3");
 
     // Assertion 1: Verdict with validation valence.
-    let (valence, magnitude, evidence_type) = extract_story_point(&decision);
+    let (valence, _magnitude, evidence_type) = extract_story_point(&decision);
     assert_eq!(valence, "validation", "rule-3 must emit validation valence");
 
     // Assertion 2: evidence type.
