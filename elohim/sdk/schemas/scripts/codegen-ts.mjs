@@ -51,6 +51,8 @@ const INTERFACE_FILES = [
   { src: 'views/elohim-capability-profile.ts', dest: 'elohim-capability-profile.ts' },
   { src: 'views/peer-status-view.ts', dest: 'peer-status-view.ts' },
   { src: 'views/elohim-reputation-profile-view.ts', dest: 'elohim-reputation-profile-view.ts' },
+  { src: 'views/node-shape-view.ts', dest: 'node-shape-view.ts' },
+  { src: 'views/household-devices-view.ts', dest: 'household-devices-view.ts' },
 ];
 
 /**

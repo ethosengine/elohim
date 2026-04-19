@@ -1,0 +1,38 @@
+{
+  "$id": "node-shape-view.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "NodeShapeView",
+  "description": "Durable node shape published by elohim-node at boot. Source of truth: node-registry DNA NodeRegistration entry; this view projects from stewarded_nodes SQLite table.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["nodeId","hostname","deviceArchetypeId","householdId","role","capabilityLevel","committed","signature","signedAt"],
+  "properties": {
+    "nodeId":            { "type": "string", "minLength": 1 },
+    "hostname":          { "type": "string", "minLength": 1 },
+    "deviceArchetypeId": { "type": "string", "minLength": 1 },
+    "householdId":       { "type": "string", "minLength": 1 },
+    "role":              { "enum": ["edge","archival","inference","doorway"] },
+    "capabilityLevel":   { "type": "integer", "minimum": 0, "maximum": 5 },
+    "committed": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cpuCores","memoryGb","storageTb"],
+      "properties": {
+        "cpuCores":      { "type": "integer", "minimum": 0 },
+        "memoryGb":      { "type": "integer", "minimum": 0 },
+        "storageTb":     { "type": "number",  "minimum": 0 },
+        "bandwidthMbps": { "type": "integer", "minimum": 0 },
+        "maxCustodyGb":  { "type": "number",  "minimum": 0 },
+        "canSteward":    { "type": "boolean" },
+        "canInfer":      { "type": "boolean" },
+        "canDoorway":    { "type": "boolean" }
+      }
+    },
+    "stewardTier":    { "enum": ["caretaker","guardian","steward","pioneer"] },
+    "custodianOptIn": { "type": "boolean" },
+    "region":         { "type": ["string","null"] },
+    "signature":      { "type": "string",  "minLength": 1 },
+    "signedAt":       { "type": "string",  "format": "date-time" },
+    "dhtAnchorHash":  { "type": ["string","null"] }
+  }
+}
