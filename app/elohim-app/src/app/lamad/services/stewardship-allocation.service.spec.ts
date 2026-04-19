@@ -1,3 +1,5 @@
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { of, throwError } from 'rxjs';
 import { vi } from 'vitest';
@@ -82,6 +84,8 @@ describe('StewardshipAllocationService', () => {
       providers: [
         StewardshipAllocationService,
         { provide: StorageApiService, useValue: storageApiSpy },
+        provideHttpClient(),
+        provideHttpClientTesting(),
       ],
     });
     service = TestBed.inject(StewardshipAllocationService);
