@@ -26,11 +26,11 @@ fn test_full_rs_pipeline_with_simulated_peer_failure() {
     let encoder = ShardEncoder::new(config);
 
     // 2. Encode — simulates blob ingest
-    let manifest = encoder.create_manifest(&data, "application/octet-stream", "commons");
+    let manifest = encoder.create_manifest(&data, "application/octet-stream", "commons").unwrap();
     assert_eq!(manifest.encoding, "rs-4-7");
     assert_eq!(manifest.shard_hashes.len(), 7);
 
-    let shards = encoder.create_shards(&data, &manifest.encoding);
+    let shards = encoder.create_shards(&data, &manifest.encoding).unwrap();
     assert_eq!(shards.len(), 7);
 
     // 3. Simulate distribution to 5 peers (round-robin)
@@ -110,12 +110,12 @@ fn test_rs_pipeline_reconstruction_threshold() {
     };
     let encoder = ShardEncoder::new(config);
 
-    let manifest = encoder.create_manifest(&data, "application/octet-stream", "commons");
+    let manifest = encoder.create_manifest(&data, "application/octet-stream", "commons").unwrap();
     assert_eq!(manifest.encoding, "rs-4-7");
     assert_eq!(manifest.data_shards, 4);
     assert_eq!(manifest.total_shards, 7);
 
-    let shards = encoder.create_shards(&data, &manifest.encoding);
+    let shards = encoder.create_shards(&data, &manifest.encoding).unwrap();
 
     // Test 1: Exactly 4 shards (minimum needed) - should succeed
     let mut shard_opts: Vec<Option<Vec<u8>>> = vec![None; 7];
@@ -152,10 +152,10 @@ fn test_rs_pipeline_with_mixed_shard_losses() {
     };
     let encoder = ShardEncoder::new(config);
 
-    let manifest = encoder.create_manifest(&data, "application/octet-stream", "commons");
+    let manifest = encoder.create_manifest(&data, "application/octet-stream", "commons").unwrap();
     assert_eq!(manifest.encoding, "rs-4-7");
 
-    let shards = encoder.create_shards(&data, &manifest.encoding);
+    let shards = encoder.create_shards(&data, &manifest.encoding).unwrap();
 
     // Test scenario: lose data shards [0, 1] and parity shard [4]
     // Remaining: [2, 3] (data) + [5, 6] (parity) = 4 total
@@ -193,10 +193,10 @@ fn test_rs_pipeline_all_parity_shards_lost() {
     };
     let encoder = ShardEncoder::new(config);
 
-    let manifest = encoder.create_manifest(&data, "application/octet-stream", "commons");
+    let manifest = encoder.create_manifest(&data, "application/octet-stream", "commons").unwrap();
     assert_eq!(manifest.encoding, "rs-4-7");
 
-    let shards = encoder.create_shards(&data, &manifest.encoding);
+    let shards = encoder.create_shards(&data, &manifest.encoding).unwrap();
 
     // Keep only data shards [0, 1, 2, 3], lose all parity shards [4, 5, 6]
     let mut shard_opts: Vec<Option<Vec<u8>>> = vec![None; 7];
