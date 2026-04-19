@@ -89,3 +89,11 @@ required-features = ["testing"]
 [[test]]
 name = "reach_gate_integration"
 required-features = ["testing"]
+
+# Integration test: Phase 8 activation E2E — configure_runner_with_config,
+# GateClientConfig::from_env(), and phase propagation from wisdom output.
+# Uses a separate binary so the OnceLock is fresh (not pre-initialized by other tests).
+# Requires "testing" feature for __test_set_wisdom_output injection.
+[[test]]
+name = "activation_e2e"
+required-features = ["testing"]

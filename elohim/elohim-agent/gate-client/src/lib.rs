@@ -167,6 +167,26 @@
 //! });
 //! ```
 //!
+//! # Activation
+//!
+//! Configuring the transport that routes to a live LLM is a startup concern.
+//! Call [`configure_runner_with_config`] once before the first [`check`] call:
+//!
+//! ```rust,ignore
+//! use gate_client::{configure_runner_with_config, transport::GateClientConfig};
+//!
+//! // Reads ELOHIM_AGENT_WISDOM_TRANSPORT, ELOHIM_ID, ELOHIM_SUBSTANCE_CID from env.
+//! configure_runner_with_config(GateClientConfig::from_env())
+//!     .expect("configure_runner_with_config must be called before first gate check");
+//! ```
+//!
+//! `Phase::ElohimActive` is **observed from the actual call outcome**, not set by
+//! configuration.  When `ELOHIM_AGENT_WISDOM_TRANSPORT=in-process` but no
+//! `ANTHROPIC_API_KEY` is present, the wisdom call returns a dev-context stub and
+//! decisions are stamped `Phase::DevContext` — this is correct and honest behaviour.
+//!
+//! See `gate-client/ACTIVATION.md` for the full operator runbook.
+//!
 //! # Further reading
 //!
 //! See `elohim/elohim-agent/spec/2026-04-18-gate-interface.md` for the full
@@ -408,7 +428,9 @@ pub use dag::universal_band::{
     active_universal_band_pointer, default_universal_band_declaration, default_universal_band_yaml,
     UniversalBandPointer, ACTIVE_UNIVERSAL_BAND_NAME, ACTIVE_UNIVERSAL_BAND_VERSION,
 };
-pub use dag_runner::{configure_runner, global_runner, AlreadyConfigured, DagRunner};
+pub use dag_runner::{
+    configure_runner, configure_runner_with_config, global_runner, AlreadyConfigured, DagRunner,
+};
 
 /// Run the discernment gate directly with a pre-populated context extension.
 ///
@@ -561,8 +583,29 @@ pub fn check_blocking(event: RelationalImpactEvent) -> GateResult<GateDecision> 
 }
 
 /// Configure the gate client — transport, phase override, trust assessor.
-pub fn configure(_config: GateClientConfig) {
-    // Phase 0 placeholder — configuration storage wired in Phase 1.
+///
+/// # Deprecation
+///
+/// This function is retained for backward compatibility.  Prefer
+/// [`configure_runner_with_config`] which wires the config into the process-wide
+/// [`DagRunner`] singleton and returns `Err(AlreadyConfigured)` when called
+/// after the singleton has been initialized.
+///
+/// **`configure_runner_with_config` (or `configure`) MUST be called before the
+/// first [`check`] or [`check_blocking`] call.**  Calling either function after
+/// the singleton is initialized is a no-op (the supplied config is discarded).
+///
+/// For the full operator activation procedure see `gate-client/ACTIVATION.md`.
+#[deprecated(
+    since = "0.8.0",
+    note = "Use configure_runner_with_config(GateClientConfig) instead. \
+            It wires the runner and returns AlreadyConfigured on double-call."
+)]
+pub fn configure(config: GateClientConfig) {
+    // Best-effort: wire the config into the singleton.
+    // Errors (AlreadyConfigured) are silently discarded to preserve the
+    // original no-op contract of the Phase 0 stub.
+    let _ = configure_runner_with_config(config);
 }
 
 /// Queue an escalation for steward / qahal / existential review.

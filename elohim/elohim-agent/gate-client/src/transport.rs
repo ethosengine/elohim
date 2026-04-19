@@ -94,3 +94,65 @@ impl Default for GateClientConfig {
         }
     }
 }
+
+impl GateClientConfig {
+    /// Construct a `GateClientConfig` from environment variables.
+    ///
+    /// Reads:
+    ///
+    /// - `ELOHIM_AGENT_WISDOM_TRANSPORT` — `"in-process"` selects
+    ///   [`WisdomTransport::InProcess`]; anything else (or absent) falls back
+    ///   to [`WisdomTransport::Mock`].
+    /// - `ELOHIM_ID` — optional; overrides `elohim_id`.  When absent, the
+    ///   runner falls back to [`DEV_CONTEXT_ELOHIM_ID`].
+    /// - `ELOHIM_SUBSTANCE_CID` — optional; overrides `elohim_substance_cid`.
+    ///   When absent, the runner falls back to [`DEV_CONTEXT_SUBSTANCE_CID`].
+    ///
+    /// # Activation note
+    ///
+    /// Setting `ELOHIM_AGENT_WISDOM_TRANSPORT=in-process` does **not** flip the
+    /// phase.  [`Phase::ElohimActive`] is observed from the actual wisdom-invoke
+    /// outcome; if no `ANTHROPIC_API_KEY` is set in the environment, the service
+    /// returns `phase: dev-context` regardless of this setting.  See
+    /// `ACTIVATION.md` for the full operator runbook.
+    ///
+    /// # No `ELOHIM_ACTIVE` flag
+    ///
+    /// There is deliberately no env var that forces `Phase::ElohimActive`.
+    /// Phase is a property of what **actually happened** during inference —
+    /// it cannot be asserted by configuration.
+    ///
+    /// [`DEV_CONTEXT_ELOHIM_ID`]: crate::dag::attestation::DEV_CONTEXT_ELOHIM_ID
+    /// [`DEV_CONTEXT_SUBSTANCE_CID`]: crate::dag::attestation::DEV_CONTEXT_SUBSTANCE_CID
+    pub fn from_env() -> Self {
+        let wisdom_transport = match std::env::var("ELOHIM_AGENT_WISDOM_TRANSPORT")
+            .unwrap_or_default()
+            .trim()
+            .to_ascii_lowercase()
+            .as_str()
+        {
+            "in-process" => WisdomTransport::InProcess,
+            _ => WisdomTransport::Mock,
+        };
+
+        let elohim_id = std::env::var("ELOHIM_ID")
+            .ok()
+            .filter(|v| !v.trim().is_empty());
+
+        let elohim_substance_cid = std::env::var("ELOHIM_SUBSTANCE_CID")
+            .ok()
+            .filter(|v| !v.trim().is_empty());
+
+        Self {
+            transport: Transport::Mock,
+            wisdom_transport,
+            // phase_override must remain None — phase is observed from inference,
+            // not set by configuration.  Default::default() sets Some(DevContext)
+            // which would override the service response; we clear it here.
+            phase_override: None,
+            inspection_cache_path: None,
+            elohim_id,
+            elohim_substance_cid,
+        }
+    }
+}

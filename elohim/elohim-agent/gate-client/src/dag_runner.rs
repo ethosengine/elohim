@@ -567,6 +567,45 @@ pub fn configure_runner(resolver: Box<dyn ContentNodeResolver>) -> Result<(), Al
         .map_err(|_| AlreadyConfigured)
 }
 
+/// Pre-configure the global singleton from a [`GateClientConfig`].
+///
+/// This is the **primary activation API** introduced in Phase 8.  Call this
+/// **once at process startup, before the first [`check()`](crate::check) or
+/// [`global_runner()`] call**; after that the singleton is immutable.
+///
+/// The config's `wisdom_transport` field determines whether wisdom-invoke
+/// steps use the hardcoded mock (`WisdomTransport::Mock`) or the in-process
+/// `elohim_agent::wisdom::invoke_wisdom` function (`WisdomTransport::InProcess`).
+///
+/// # Observed phase — not declared
+///
+/// Setting `WisdomTransport::InProcess` does **not** force `Phase::ElohimActive`.
+/// The phase is observed from the actual call outcome:
+///
+/// | Transport   | Backend state        | Phase in decision         |
+/// |-------------|----------------------|---------------------------|
+/// | Mock        | n/a                  | DevContext                |
+/// | InProcess   | No API key           | DevContext (honest stub)  |
+/// | InProcess   | Key set, call OK     | ElohimActive              |
+/// | InProcess   | Call failed/unparseable | DevContext             |
+///
+/// # Convenience constructor
+///
+/// ```rust,ignore
+/// use gate_client::{configure_runner_with_config, transport::GateClientConfig};
+///
+/// configure_runner_with_config(GateClientConfig::from_env())
+///     .expect("configure_runner_with_config must be called before first gate check");
+/// ```
+///
+/// Returns `Err(AlreadyConfigured)` if the singleton was already initialized.
+pub fn configure_runner_with_config(
+    config: crate::transport::GateClientConfig,
+) -> Result<(), AlreadyConfigured> {
+    let runner = DagRunner::new().with_wisdom_transport(config.wisdom_transport);
+    RUNNER.set(Arc::new(runner)).map_err(|_| AlreadyConfigured)
+}
+
 /// Return the process-global [`DagRunner`], constructing it on first call.
 ///
 /// Construction parses the embedded YAML and registers executors.  All

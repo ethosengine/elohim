@@ -756,15 +756,33 @@ Gate-shaped capabilities (`ContentSafetyReview`, `AttestationRecommendation`, `E
 
 ### 7.5 Activation path (post-rehearsal)
 
+**Phase is observed from inference, not declared by configuration.**
+
+`Phase::ElohimActive` appears in a `GateDecision` only when the wisdom call
+actually reached a live LLM and the service reported success.  If the API key
+is absent, the call fails, or the response is unparseable, the decision is
+honestly stamped `Phase::DevContext`.  There is no flag that forces the phase.
+
 When the first elohim is ready to go live:
 
-1. Replace dev-context mock wisdom-invoke with real elohim-agent-service call in `gate-client` config.
-2. Register the elohim's substance (model-weights-cid, constitution-cid, quantization, deployment-context) via imagodei.
-3. Ratify the universal-band-declaration at protocol reach (first real governance event).
-4. Flip phase-marker from `DevContext` to `ElohimActive` in gate-client config.
-5. Monitor decision-attestations; affected parties begin filing Challenges as appropriate.
+1. Set `ELOHIM_AGENT_WISDOM_TRANSPORT=in-process` in any process consuming
+   `gate-client` and call `configure_runner_with_config(GateClientConfig::from_env())`
+   once at process startup, before the first `check()` call.  This selects the
+   transport that routes to `elohim_agent::wisdom::invoke_wisdom`.
+2. Set `ANTHROPIC_API_KEY=sk-ant-...` in elohim-agent-service's environment.
+   This is what tells the service it can make real Claude calls.  gate-client
+   is transport-agnostic about the key — it does not read `ANTHROPIC_API_KEY`.
+3. Register the elohim's substance (model-weights-cid, constitution-cid,
+   quantization, deployment-context) via imagodei (`ELOHIM_ID` and
+   `ELOHIM_SUBSTANCE_CID` env vars wire the identity into attestation CIDs).
+4. Ratify the universal-band-declaration at protocol reach (first real governance event).
+5. Verify: call `check()` with any event.  `GateDecision.phase` should be
+   `Phase::ElohimActive`.  The decision attestation CID carries the same marker.
+6. Monitor decision-attestations; affected parties begin filing Challenges as appropriate.
 
 No call-site rewrite required.
+
+See `gate-client/ACTIVATION.md` for the operator runbook with rollback instructions.
 
 ---
 
