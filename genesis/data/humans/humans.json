@@ -4,6 +4,7 @@
   "humans": [
     {
       "id": "human-adam-firstman",
+      "householdId": "household-adam",
       "displayName": "Adam",
       "agencyPhase": "node",
       "category": "core-family",
@@ -152,6 +153,7 @@
     },
     {
       "id": "human-eve-firstwoman",
+      "householdId": "household-eve",
       "displayName": "Eve",
       "agencyPhase": "device",
       "category": "core-family",
@@ -175,6 +177,7 @@
     },
     {
       "id": "human-ezra-newcomer",
+      "householdId": "household-ezra",
       "displayName": "Ezra",
       "category": "newcomer",
       "profileReach": "private",
@@ -248,6 +251,7 @@
     },
     {
       "id": "human-gertrude-grandma",
+      "householdId": "household-gertrude",
       "displayName": "Gertrude",
       "category": "core-family",
       "profileReach": "familiar",
@@ -296,6 +300,7 @@
     },
     {
       "id": "human-james-son",
+      "householdId": "household-matthew",
       "displayName": "James",
       "category": "core-family",
       "profileReach": "familiar",
@@ -348,6 +353,7 @@
     },
     {
       "id": "human-jessica-spouse",
+      "householdId": "household-matthew",
       "displayName": "Jessica",
       "agencyPhase": "device",
       "category": "core-family",
@@ -525,6 +531,7 @@
     },
     {
       "id": "human-matthew-manager",
+      "householdId": "household-matthew",
       "displayName": "Matthew",
       "agencyPhase": "doorway",
       "category": "core-family",
@@ -601,6 +608,7 @@
     },
     {
       "id": "human-nancy-neighbor",
+      "householdId": "household-nancy",
       "displayName": "Nancy",
       "agencyPhase": "hosted",
       "category": "community",
@@ -645,6 +653,7 @@
     },
     {
       "id": "human-pete-pastor",
+      "householdId": "household-pete",
       "displayName": "Pete",
       "agencyPhase": "device",
       "category": "affinity",
@@ -764,6 +773,7 @@
     },
     {
       "id": "human-susan-household",
+      "householdId": "household-matthew",
       "displayName": "Susan",
       "category": "core-family",
       "profileReach": "familiar",
@@ -815,6 +825,7 @@
     },
     {
       "id": "human-timothy-tutor",
+      "householdId": "household-timothy",
       "displayName": "Timothy",
       "agencyPhase": "device",
       "category": "affinity",

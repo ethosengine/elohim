@@ -464,6 +464,94 @@
       "governanceLayer": "geographic",
       "reach": "community",
       "description": "Community governance association"
+    },
+    {
+      "id": "household-matthew",
+      "name": "Matthew's Household",
+      "governanceLayer": "family",
+      "reach": "trusted",
+      "description": "Compute shard — Matthew's household",
+      "domain": "household"
+    },
+    {
+      "id": "household-jessica",
+      "name": "Jessica's Household",
+      "governanceLayer": "family",
+      "reach": "trusted",
+      "description": "Compute shard — Jessica's household",
+      "domain": "household"
+    },
+    {
+      "id": "household-james",
+      "name": "James's Household",
+      "governanceLayer": "family",
+      "reach": "trusted",
+      "description": "Compute shard — James's household",
+      "domain": "household"
+    },
+    {
+      "id": "household-susan",
+      "name": "Susan's Household",
+      "governanceLayer": "family",
+      "reach": "trusted",
+      "description": "Compute shard — Susan's household",
+      "domain": "household"
+    },
+    {
+      "id": "household-adam",
+      "name": "Adam's Household",
+      "governanceLayer": "family",
+      "reach": "trusted",
+      "description": "Compute shard — Adam's household",
+      "domain": "household"
+    },
+    {
+      "id": "household-eve",
+      "name": "Eve's Household",
+      "governanceLayer": "family",
+      "reach": "trusted",
+      "description": "Compute shard — Eve's household",
+      "domain": "household"
+    },
+    {
+      "id": "household-pete",
+      "name": "Pete's Household",
+      "governanceLayer": "family",
+      "reach": "trusted",
+      "description": "Compute shard — Pete's household",
+      "domain": "household"
+    },
+    {
+      "id": "household-timothy",
+      "name": "Timothy's Household",
+      "governanceLayer": "family",
+      "reach": "trusted",
+      "description": "Compute shard — Timothy's household",
+      "domain": "household"
+    },
+    {
+      "id": "household-nancy",
+      "name": "Nancy's Household",
+      "governanceLayer": "family",
+      "reach": "trusted",
+      "description": "Compute shard — Nancy's household",
+      "domain": "household"
+    },
+    {
+      "id": "household-gertrude",
+      "name": "Gertrude's Household",
+      "governanceLayer": "family",
+      "reach": "trusted",
+      "description": "Compute shard — Gertrude's household",
+      "domain": "household"
+    },
+    {
+      "id": "household-ezra",
+      "name": "Ezra's Household",
+      "governanceLayer": "family",
+      "reach": "trusted",
+      "description": "Compute shard — Ezra's household",
+      "domain": "household"
     }
   ],
   "relationships": [

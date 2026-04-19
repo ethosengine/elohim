@@ -11,6 +11,11 @@
       "pattern": "^human-[a-z0-9][a-z0-9-]*[a-z0-9]$",
       "description": "Unique slug. Must match filename stem (e.g. matthew-manager.md -> human-matthew-manager)."
     },
+    "householdId": {
+      "type": ["string", "null"],
+      "pattern": "^household-[a-z0-9][a-z0-9-]*[a-z0-9]$",
+      "description": "Reference to the household collective this human belongs to. Must reference a collective id with domain: household. Cross-reference validated by companion script."
+    },
     "displayName": {
       "type": "string",
       "minLength": 1

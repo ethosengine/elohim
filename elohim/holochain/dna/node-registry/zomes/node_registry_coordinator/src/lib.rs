@@ -9,6 +9,19 @@ pub use node_registry_integrity::{
     EntryTypes, LinkTypes,
 };
 
+pub mod shape;
+pub use shape::{NodeShapeInput, register_node_shape};
+
+/// Retired: frontend should call `/api/v1/households/{id}/devices` via
+/// elohim-storage, which projects `NodeRegistration` DHT entries filtered by
+/// household. This stub returns an empty Vec so legacy callers (frontend
+/// `NodeRegistryAnchor`) don't crash during the cut-over. Remove once no
+/// caller remains.
+#[hdk_extern]
+pub fn get_my_nodes(_: ()) -> ExternResult<Vec<NodeRegistration>> {
+    Ok(vec![])
+}
+
 // ============================================================================
 // NODE LIFECYCLE FUNCTIONS
 // ============================================================================
