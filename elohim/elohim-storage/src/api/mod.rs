@@ -29,6 +29,7 @@ pub mod governance;
 pub mod hazards;
 pub mod identity;
 pub mod mastery;
+pub mod node_shape;
 pub mod peer_statuses;
 pub mod places;
 pub mod presence;
@@ -162,6 +163,12 @@ pub async fn handle_api_request(
     } else if sub_path.starts_with("peer-statuses") {
         let resource_path = sub_path.strip_prefix("peer-statuses").unwrap_or("");
         peer_statuses::handle(req, method, resource_path, &pool, &app_ctx).await
+    } else if sub_path.starts_with("nodes") {
+        let resource_path = sub_path.strip_prefix("nodes").unwrap_or("");
+        node_shape::handle_nodes(req, method, resource_path, &pool, &app_ctx).await
+    } else if sub_path.starts_with("households") {
+        let resource_path = sub_path.strip_prefix("households").unwrap_or("");
+        node_shape::handle_households(req, method, resource_path, &pool, &app_ctx).await
     } else if sub_path.starts_with("gate") {
         let resource_path = sub_path.strip_prefix("gate").unwrap_or("");
         gate::handle(req, method, resource_path, &pool, &app_ctx, services).await

@@ -8594,6 +8594,32 @@ pub fn build_manifest() -> doorway_client::DoorwayRoutes {
                 .build(),
         )
         // =====================================================================
+        // /api/v1/nodes/shape — elohim-node durable shape publish
+        // =====================================================================
+        // Write. Source of truth: node-registry DNA NodeRegistration entry
+        // (existing Category A entry type, authored by node's own agent key).
+        // This route upserts the stewarded_nodes SQLite projection; the DHT
+        // commit via register_node_shape coordinator fn happens from the node's
+        // own conductor connection (Task C7) and fills in dht_anchor_hash via
+        // post-commit signal projection. No new DHT entry types introduced.
+        .route(
+            Route::post("/api/v1/nodes/shape")
+                .handler("post_node_shape")
+                .build(),
+        )
+        // =====================================================================
+        // /api/v1/households/{id}/devices — household devices with peer vitals
+        // =====================================================================
+        // Read-only. Computed Category C projection (no persistence). Joins
+        // stewarded_nodes × peer_statuses for the specified household id.
+        // No DHT writes, no new entry types — operational visibility only.
+        .route(
+            Route::get("/api/v1/households/{id}/devices")
+                .handler("get_household_devices")
+                .cache_ttl(30)
+                .build(),
+        )
+        // =====================================================================
         // /db/gate-decisions — Gate decision attestation projections (mishpat)
         // =====================================================================
         // Read-only. Source of truth: mishpat DNA DHT. These rows are written

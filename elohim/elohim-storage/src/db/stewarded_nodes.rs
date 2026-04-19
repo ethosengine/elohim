@@ -77,6 +77,18 @@ pub fn create_stewarded_node(
         context_epr_id: input.context_epr_id,
         dht_anchor_hash: input.dht_anchor_hash,
         h_app_id: input.h_app_id,
+        // Archetype/household fields populated by Task C5 upsert_from_shape;
+        // legacy callers leave them null/default.
+        device_archetype_id: None,
+        household_id: None,
+        hostname: None,
+        node_role: None,
+        capability_level: None,
+        can_steward: 0,
+        can_infer: 0,
+        can_doorway: 0,
+        signature: None,
+        signed_at: None,
     };
 
     diesel::insert_into(stewarded_nodes::table)
@@ -129,6 +141,123 @@ pub fn list_stewarded_nodes(
         .order(stewarded_nodes::created_at.desc())
         .load::<StewardedNode>(conn)
         .map_err(|e| StorageError::Internal(format!("Failed to list stewarded nodes: {}", e)))
+}
+
+/// Upsert a stewarded node from a boot-time NodeShapeView. Preserves
+/// `dht_anchor_hash` if already present (signal projection fills it later).
+///
+/// Source of truth: the corresponding `NodeRegistration` DHT entry authored
+/// by the node's agent key. This is the operational projection.
+pub fn upsert_from_shape(
+    conn: &mut SqliteConnection,
+    view: &crate::views::NodeShapeView,
+) -> Result<StewardedNode, StorageError> {
+    use crate::db::diesel_schema::stewarded_nodes as t;
+
+    let now = current_timestamp();
+
+    if get_stewarded_node_by_id(conn, &view.node_id)?.is_some() {
+        diesel::update(t::table.filter(t::id.eq(&view.node_id)))
+            .set((
+                t::display_name.eq(&view.hostname),
+                t::hostname.eq(&view.hostname),
+                t::device_archetype_id.eq(&view.device_archetype_id),
+                t::household_id.eq(&view.household_id),
+                t::node_role.eq(&view.role),
+                t::capability_level.eq(view.capability_level),
+                t::cpu_cores.eq(view.committed.cpu_cores),
+                t::memory_gb.eq(view.committed.memory_gb),
+                t::storage_tb.eq(view.committed.storage_tb),
+                t::bandwidth_mbps.eq(view.committed.bandwidth_mbps.unwrap_or(0)),
+                t::can_steward.eq(view.committed.can_steward as i32),
+                t::can_infer.eq(view.committed.can_infer as i32),
+                t::can_doorway.eq(view.committed.can_doorway as i32),
+                t::steward_tier.eq(view.steward_tier.clone().unwrap_or_else(|| "caretaker".into())),
+                t::custodian_opt_in.eq(view.custodian_opt_in as i32),
+                t::region.eq(view.region.clone()),
+                t::signature.eq(Some(view.signature.clone())),
+                t::signed_at.eq(Some(view.signed_at.clone())),
+                t::updated_at.eq(&now),
+            ))
+            .execute(conn)
+            .map_err(|e| StorageError::Internal(format!("upsert_from_shape update: {}", e)))?;
+    } else {
+        let new_node = NewStewardedNode {
+            id: view.node_id.clone(),
+            display_name: view.hostname.clone(),
+            claim_status: "claimed".into(),
+            cpu_cores: view.committed.cpu_cores,
+            memory_gb: view.committed.memory_gb,
+            storage_tb: view.committed.storage_tb,
+            bandwidth_mbps: view.committed.bandwidth_mbps.unwrap_or(0),
+            steward_tier: view.steward_tier.clone().unwrap_or_else(|| "caretaker".into()),
+            custodian_opt_in: view.custodian_opt_in as i32,
+            region: view.region.clone(),
+            context_epr_id: None,
+            dht_anchor_hash: view.dht_anchor_hash.clone(),
+            h_app_id: "elohim".into(),
+            device_archetype_id: Some(view.device_archetype_id.clone()),
+            household_id: Some(view.household_id.clone()),
+            hostname: Some(view.hostname.clone()),
+            node_role: Some(view.role.clone()),
+            capability_level: Some(view.capability_level),
+            can_steward: view.committed.can_steward as i32,
+            can_infer: view.committed.can_infer as i32,
+            can_doorway: view.committed.can_doorway as i32,
+            signature: Some(view.signature.clone()),
+            signed_at: Some(view.signed_at.clone()),
+        };
+        diesel::insert_into(stewarded_nodes::table)
+            .values(&new_node)
+            .execute(conn)
+            .map_err(|e| StorageError::Internal(format!("upsert_from_shape insert: {}", e)))?;
+        diesel::update(t::table.filter(t::id.eq(&view.node_id)))
+            .set((t::created_at.eq(&now), t::updated_at.eq(&now)))
+            .execute(conn)
+            .map_err(|e| StorageError::Internal(format!("upsert_from_shape timestamps: {}", e)))?;
+    }
+
+    get_stewarded_node_by_id(conn, &view.node_id)?
+        .ok_or_else(|| StorageError::Internal("Row missing after upsert".into()))
+}
+
+/// Persist the DHT anchor hash after the zome commit completes.
+pub fn set_dht_anchor(
+    conn: &mut SqliteConnection,
+    node_id: &str,
+    anchor_hash: &str,
+) -> Result<(), StorageError> {
+    use crate::db::diesel_schema::stewarded_nodes as t;
+    diesel::update(t::table.filter(t::id.eq(node_id)))
+        .set((
+            t::dht_anchor_hash.eq(Some(anchor_hash.to_string())),
+            t::updated_at.eq(current_timestamp()),
+        ))
+        .execute(conn)
+        .map_err(|e| StorageError::Internal(format!("set_dht_anchor: {}", e)))?;
+    Ok(())
+}
+
+/// List household devices joining `peer_statuses` for live vitals.
+///
+/// Returns rows as (stewarded_node, optional peer_status) tuples. Nodes with
+/// no recent PeerStatus publication render as "offline" in the view.
+pub fn list_by_household_with_peer_status(
+    conn: &mut SqliteConnection,
+    household_id: &str,
+) -> Result<
+    Vec<(StewardedNode, Option<crate::db::peer_statuses::PeerStatusRow>)>,
+    StorageError,
+> {
+    use crate::db::diesel_schema::peer_statuses as p;
+    use crate::db::diesel_schema::stewarded_nodes as t;
+
+    t::table
+        .left_join(p::table.on(p::peer_id.eq(t::id)))
+        .filter(t::household_id.eq(household_id))
+        .select((StewardedNode::as_select(), p::all_columns.nullable()))
+        .load::<(StewardedNode, Option<crate::db::peer_statuses::PeerStatusRow>)>(conn)
+        .map_err(|e| StorageError::Internal(format!("list_by_household_with_peer_status: {}", e)))
 }
 
 // ============================================================================
