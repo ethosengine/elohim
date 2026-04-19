@@ -860,6 +860,16 @@ diesel::table! {
         h_app_id -> Text,
         created_at -> Text,
         updated_at -> Text,
+        device_archetype_id -> Nullable<Text>,
+        household_id -> Nullable<Text>,
+        hostname -> Nullable<Text>,
+        node_role -> Nullable<Text>,
+        capability_level -> Nullable<Integer>,
+        can_steward -> Integer,
+        can_infer -> Integer,
+        can_doorway -> Integer,
+        signature -> Nullable<Text>,
+        signed_at -> Nullable<Text>,
     }
 }
 

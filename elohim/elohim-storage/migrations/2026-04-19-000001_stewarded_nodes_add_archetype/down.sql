@@ -1,0 +1,12 @@
+DROP INDEX IF EXISTS idx_stewarded_nodes_archetype;
+DROP INDEX IF EXISTS idx_stewarded_nodes_household;
+ALTER TABLE stewarded_nodes DROP COLUMN signed_at;
+ALTER TABLE stewarded_nodes DROP COLUMN signature;
+ALTER TABLE stewarded_nodes DROP COLUMN can_doorway;
+ALTER TABLE stewarded_nodes DROP COLUMN can_infer;
+ALTER TABLE stewarded_nodes DROP COLUMN can_steward;
+ALTER TABLE stewarded_nodes DROP COLUMN capability_level;
+ALTER TABLE stewarded_nodes DROP COLUMN node_role;
+ALTER TABLE stewarded_nodes DROP COLUMN hostname;
+ALTER TABLE stewarded_nodes DROP COLUMN household_id;
+ALTER TABLE stewarded_nodes DROP COLUMN device_archetype_id;

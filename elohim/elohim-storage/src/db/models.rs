@@ -1909,6 +1909,10 @@ pub struct NewAgreement<'a> {
 // ============================================================================
 
 /// A physical node registered on the DHT and projected to storage.
+///
+/// Source of truth: `NodeRegistration` DHT entry (node-registry DNA). This
+/// row is the operational projection — see `dht_anchor_hash` for the link
+/// back to the notarized entry.
 #[derive(Debug, Clone, Queryable, Selectable, Serialize, Deserialize)]
 #[diesel(table_name = stewarded_nodes)]
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
@@ -1928,6 +1932,16 @@ pub struct StewardedNode {
     pub h_app_id: String,
     pub created_at: String,
     pub updated_at: String,
+    pub device_archetype_id: Option<String>,
+    pub household_id: Option<String>,
+    pub hostname: Option<String>,
+    pub node_role: Option<String>,
+    pub capability_level: Option<i32>,
+    pub can_steward: i32,
+    pub can_infer: i32,
+    pub can_doorway: i32,
+    pub signature: Option<String>,
+    pub signed_at: Option<String>,
 }
 
 #[derive(Debug, Clone, Insertable)]
@@ -1946,6 +1960,16 @@ pub struct NewStewardedNode {
     pub context_epr_id: Option<String>,
     pub dht_anchor_hash: Option<String>,
     pub h_app_id: String,
+    pub device_archetype_id: Option<String>,
+    pub household_id: Option<String>,
+    pub hostname: Option<String>,
+    pub node_role: Option<String>,
+    pub capability_level: Option<i32>,
+    pub can_steward: i32,
+    pub can_infer: i32,
+    pub can_doorway: i32,
+    pub signature: Option<String>,
+    pub signed_at: Option<String>,
 }
 
 /// Stewardship relationship between a node and a human.
