@@ -32,6 +32,7 @@
 //! For production, a DHT-backed resolver will be injected here.
 
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use async_trait::async_trait;
 use serde_json::{json, Value};
@@ -72,6 +73,21 @@ pub trait ContentNodeResolver: Send + Sync {
     /// Returns `Err(GateError::DagExecution(_))` if the CID cannot be resolved
     /// (not found, network error, etc.).
     async fn resolve_body(&self, cid: &str) -> Result<Value, GateError>;
+}
+
+/// Allow `Arc<dyn ContentNodeResolver>` to be used directly as a resolver.
+///
+/// This enables sharing a single resolver across multiple executors (e.g.,
+/// `MechanicalRulesetExecutor` and `AggregateAttestationsExecutor`) in the
+/// `DagRunner::with_resolvers` builder without cloning the underlying resolver.
+///
+/// Usage: wrap the resolver in `Arc`, then call `.clone()` to hand the same
+/// resolver to each executor constructor as `Box<Arc<...>>`.
+#[async_trait]
+impl ContentNodeResolver for Arc<dyn ContentNodeResolver> {
+    async fn resolve_body(&self, cid: &str) -> Result<Value, GateError> {
+        self.as_ref().resolve_body(cid).await
+    }
 }
 
 // ─── EmbeddedContentNodeResolver ─────────────────────────────────────────────

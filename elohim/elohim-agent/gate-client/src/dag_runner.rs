@@ -53,8 +53,9 @@ use tracing::{info_span, Instrument};
 use crate::dag::attestation::DecisionAttestationBuilder;
 use crate::dag::executor::StepKind;
 use crate::dag::executors::{
-    ContentNodeResolver, ContextAssembleExecutor, EmbeddedContentNodeResolver,
-    EscalateToReviewExecutor, MechanicalRulesetExecutor, SynthesizeExecutor, WisdomInvokeExecutor,
+    AggregateAttestationsExecutor, AttestationResolver, ContentNodeResolver,
+    ContextAssembleExecutor, EmbeddedContentNodeResolver, EscalateToReviewExecutor,
+    MechanicalRulesetExecutor, NullAttestationResolver, SynthesizeExecutor, WisdomInvokeExecutor,
 };
 use crate::dag::universal_band::{ACTIVE_UNIVERSAL_BAND_NAME, ACTIVE_UNIVERSAL_BAND_VERSION};
 use crate::dag::{
@@ -83,21 +84,26 @@ pub struct DagRunner {
 // - GateProcessDeclaration is plain-data Serialize/Deserialize.
 
 impl DagRunner {
-    /// Construct a runner with all Phase 2+3 executors registered.
+    /// Construct a runner with all Phase 2+3+5 executors registered.
     ///
     /// `MechanicalRulesetExecutor` is injected with an empty
     /// [`EmbeddedContentNodeResolver`] — if a `mechanical-ruleset` step is
     /// reached with a real CID, it will return `GateError::DagExecution`.
-    /// Sufficient for the universal-band DAG (no mechanical-ruleset steps).
+    /// `AggregateAttestationsExecutor` is injected with a
+    /// [`NullAttestationResolver`] — returns empty Vec with tracing::warn.
+    /// Sufficient for the universal-band DAG (no such steps).
     fn new() -> Self {
-        Self::with_content_resolver(Box::new(EmbeddedContentNodeResolver::new(HashMap::new())))
+        Self::with_resolvers(
+            Box::new(EmbeddedContentNodeResolver::new(HashMap::new())),
+            Box::new(NullAttestationResolver),
+        )
     }
 
     /// Construct a runner with a caller-supplied [`ContentNodeResolver`].
     ///
-    /// Use this when the DAG being run includes `mechanical-ruleset` steps
-    /// that need to resolve real CIDs (e.g., for app-domain gates or unit
-    /// tests against hand-constructed rule artifacts).
+    /// Uses a [`NullAttestationResolver`] for the `AggregateAttestations` step.
+    /// Use [`DagRunner::with_resolvers`] when the DAG also includes
+    /// `aggregate-attestations` steps.
     ///
     /// The runner uses the **universal-band** declaration.  To run an
     /// app-domain gate (e.g., the discernment-gate), use
@@ -117,6 +123,73 @@ impl DagRunner {
     /// let runner = DagRunner::with_content_resolver(Box::new(resolver));
     /// ```
     pub fn with_content_resolver(resolver: Box<dyn ContentNodeResolver>) -> Self {
+        Self::with_resolvers(
+            resolver,
+            Box::new(NullAttestationResolver) as Box<dyn AttestationResolver>,
+        )
+    }
+
+    /// Construct a runner with both a [`ContentNodeResolver`] and an
+    /// [`AttestationResolver`].
+    ///
+    /// Use this when the DAG includes `aggregate-attestations` steps that need
+    /// real subject→records resolution (e.g., reach-gate or unit tests with
+    /// fixture attestations).
+    ///
+    /// The runner uses the **universal-band** declaration. To also supply a
+    /// custom [`GateProcessDeclaration`], use
+    /// [`DagRunner::with_resolvers_and_declaration`].
+    pub fn with_resolvers(
+        content_resolver: Box<dyn ContentNodeResolver>,
+        attestation_resolver: Box<dyn AttestationResolver>,
+    ) -> Self {
+        let declaration = default_universal_band_declaration();
+        let shared: Arc<dyn ContentNodeResolver> = Arc::from(content_resolver);
+        Self::build_interpreter_and_wrap(shared, attestation_resolver, declaration)
+    }
+
+    /// Construct a runner with a caller-supplied [`ContentNodeResolver`] **and**
+    /// a specific [`GateProcessDeclaration`].
+    ///
+    /// Uses a [`NullAttestationResolver`]. For gates that also need
+    /// `aggregate-attestations`, use [`DagRunner::with_resolvers_and_declaration`].
+    ///
+    /// # Phase 3 usage
+    ///
+    /// `run_discernment_gate` uses this constructor to build a runner for the
+    /// discernment-gate DAG with the seven-valence rules loaded into the resolver.
+    pub fn with_content_resolver_and_declaration(
+        resolver: Box<dyn ContentNodeResolver>,
+        declaration: GateProcessDeclaration,
+    ) -> Self {
+        let shared: Arc<dyn ContentNodeResolver> = Arc::from(resolver);
+        Self::build_interpreter_and_wrap(shared, Box::new(NullAttestationResolver), declaration)
+    }
+
+    /// Construct a runner with both resolvers **and** a specific
+    /// [`GateProcessDeclaration`].
+    ///
+    /// Use this for app-domain gates (e.g., `reach-gate`) that include both
+    /// `mechanical-ruleset` and `aggregate-attestations` steps.
+    pub fn with_resolvers_and_declaration(
+        content_resolver: Box<dyn ContentNodeResolver>,
+        attestation_resolver: Box<dyn AttestationResolver>,
+        declaration: GateProcessDeclaration,
+    ) -> Self {
+        let shared: Arc<dyn ContentNodeResolver> = Arc::from(content_resolver);
+        Self::build_interpreter_and_wrap(shared, attestation_resolver, declaration)
+    }
+
+    /// Internal: build the interpreter with all Phase 2+3+5 executors and wrap it.
+    ///
+    /// Takes `Arc<dyn ContentNodeResolver>` so it can be shared between both
+    /// `MechanicalRulesetExecutor` (spec lookup) and `AggregateAttestationsExecutor`
+    /// (aggregation-spec lookup) without a second Box move.
+    fn build_interpreter_and_wrap(
+        content_resolver: Arc<dyn ContentNodeResolver>,
+        attestation_resolver: Box<dyn AttestationResolver>,
+        declaration: GateProcessDeclaration,
+    ) -> Self {
         let mut interpreter = DagInterpreter::new();
 
         // ContextAssembleExecutor — no pre-registered pull resolvers.
@@ -131,58 +204,28 @@ impl DagRunner {
             Arc::new(WisdomInvokeExecutor::new()),
         );
         // Phase 3: MechanicalRulesetExecutor with injected ContentNodeResolver.
+        // The content_resolver is an Arc so we can share it with the
+        // AggregateAttestationsExecutor below without a second Box move.
         interpreter.register(
             StepKind::MechanicalRuleset,
-            Arc::new(MechanicalRulesetExecutor::new(resolver)),
+            Arc::new(MechanicalRulesetExecutor::new(Box::new(
+                content_resolver.clone(),
+            ))),
         );
         interpreter.register(StepKind::Synthesize, Arc::new(SynthesizeExecutor::new()));
         interpreter.register(
             StepKind::EscalateToReview,
             Arc::new(EscalateToReviewExecutor::new()),
         );
-
-        let declaration = default_universal_band_declaration();
-
-        Self {
-            interpreter,
-            declaration,
-        }
-    }
-
-    /// Construct a runner with a caller-supplied [`ContentNodeResolver`] **and**
-    /// a specific [`GateProcessDeclaration`].
-    ///
-    /// Use this to run app-domain gates (e.g., `discernment-gate-v1-mechanical`)
-    /// that have their own DAG topology and resolver requirements.  The
-    /// universal-band declaration is NOT used; the caller supplies the target gate
-    /// declaration directly.
-    ///
-    /// # Phase 3 usage
-    ///
-    /// `run_discernment_gate` uses this constructor to build a runner for the
-    /// discernment-gate DAG with the seven-valence rules loaded into the resolver.
-    pub fn with_content_resolver_and_declaration(
-        resolver: Box<dyn ContentNodeResolver>,
-        declaration: GateProcessDeclaration,
-    ) -> Self {
-        let mut interpreter = DagInterpreter::new();
-
+        // Phase 5: AggregateAttestationsExecutor — shares the same
+        // ContentNodeResolver (via Arc clone) and takes its own
+        // AttestationResolver for DHT graph queries.
         interpreter.register(
-            StepKind::ContextAssemble,
-            Arc::new(ContextAssembleExecutor::new()),
-        );
-        interpreter.register(
-            StepKind::WisdomInvoke,
-            Arc::new(WisdomInvokeExecutor::new()),
-        );
-        interpreter.register(
-            StepKind::MechanicalRuleset,
-            Arc::new(MechanicalRulesetExecutor::new(resolver)),
-        );
-        interpreter.register(StepKind::Synthesize, Arc::new(SynthesizeExecutor::new()));
-        interpreter.register(
-            StepKind::EscalateToReview,
-            Arc::new(EscalateToReviewExecutor::new()),
+            StepKind::AggregateAttestations,
+            Arc::new(AggregateAttestationsExecutor::new(
+                Box::new(content_resolver),
+                attestation_resolver,
+            )),
         );
 
         Self {

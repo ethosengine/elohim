@@ -9,7 +9,11 @@
 //! Phase 3 adds:
 //! - [`MechanicalRulesetExecutor`] — applies a CID-addressed declarative rule set.
 //!
-//! Phase 5+ will add `AggregateAttestationsExecutor` and `SkillInvokeExecutor`.
+//! Phase 5 adds:
+//! - [`AggregateAttestationsExecutor`] — queries attestations, applies a reduction,
+//!   writes a structured scalar outcome to GateContext.
+//!
+//! Phase 5+ will add `SkillInvokeExecutor`.
 //!
 //! ## Side-effect conversion
 //!
@@ -18,6 +22,7 @@
 //! `Vec<SideEffect>` values. Used by both `SynthesizeExecutor` and
 //! `terminal_to_decision` in the interpreter.
 
+pub mod aggregate_attestations;
 pub mod context_assemble;
 pub mod escalate_to_review;
 pub mod mechanical_ruleset;
@@ -27,6 +32,10 @@ pub mod phase3_stubs;
 pub mod synthesize;
 pub mod wisdom_invoke;
 
+pub use aggregate_attestations::{
+    AggregateAttestationsExecutor, AttestationRecord, AttestationResolver, NullAttestationResolver,
+    StubAttestationResolver,
+};
 pub use context_assemble::ContextAssembleExecutor;
 pub use escalate_to_review::EscalateToReviewExecutor;
 pub use mechanical_ruleset::{

@@ -20,6 +20,7 @@ use std::collections::HashMap;
 
 // ─── Sub-modules ─────────────────────────────────────────────────────────────
 
+pub mod aggregation_spec;
 pub mod attestation;
 pub mod context;
 pub mod discernment_gate;
@@ -34,11 +35,14 @@ pub mod universal_band;
 
 // ─── Public re-exports ────────────────────────────────────────────────────────
 
+pub use aggregation_spec::AggregationSpec;
 pub use context::GateContext;
 pub use executor::{ArcExecutor, StepExecutor, StepKind, StepOutcome};
 pub use executors::{
-    ContentNodeResolver, ContextAssembleExecutor, EmbeddedContentNodeResolver,
-    EscalateToReviewExecutor, MechanicalRulesetExecutor, SynthesizeExecutor, WisdomInvokeExecutor,
+    AggregateAttestationsExecutor, AttestationRecord, AttestationResolver, ContentNodeResolver,
+    ContextAssembleExecutor, EmbeddedContentNodeResolver, EscalateToReviewExecutor,
+    MechanicalRulesetExecutor, NullAttestationResolver, StubAttestationResolver,
+    SynthesizeExecutor, WisdomInvokeExecutor,
 };
 pub use interpreter::DagInterpreter;
 

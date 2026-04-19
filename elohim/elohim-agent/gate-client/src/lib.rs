@@ -245,13 +245,16 @@ pub fn __test_set_discernment_ctx(ctx: Option<GateContext>) {
 }
 
 // Public re-exports for ergonomic use.
+pub use dag::aggregation_spec::{AggregationSpec, LadderTier, Reduction, SubjectScope};
 pub use dag::context::GateContext;
 pub use dag::discernment_gate::{
     default_discernment_gate_declaration, default_discernment_gate_yaml, DISCERNMENT_GATE_V1_CID,
 };
 pub use dag::executors::{
-    ContentNodeResolver, ContextAssembleExecutor, EmbeddedContentNodeResolver,
-    EscalateToReviewExecutor, MechanicalRulesetExecutor, SynthesizeExecutor, WisdomInvokeExecutor,
+    AggregateAttestationsExecutor, AttestationRecord, AttestationResolver, ContentNodeResolver,
+    ContextAssembleExecutor, EmbeddedContentNodeResolver, EscalateToReviewExecutor,
+    MechanicalRulesetExecutor, NullAttestationResolver, StubAttestationResolver,
+    SynthesizeExecutor, WisdomInvokeExecutor,
 };
 pub use dag::seven_valence_rules::{
     default_seven_valence_rules, SEVEN_VALENCE_RULES_V1_BODY, SEVEN_VALENCE_RULES_V1_CID,
