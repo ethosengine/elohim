@@ -411,6 +411,78 @@ pub async fn run_with_tracing(event: &RelationalImpactEvent) -> Result<GateDecis
     Ok(decision)
 }
 
+// ─── App-domain gate dispatch table ──────────────────────────────────────────
+
+/// The dispatch table for app-domain gates in Phase 4 DevContext.
+///
+/// Each entry maps an event kind (kebab-case string) to the name of the
+/// app-domain gate that should fire AFTER the universal band allows.
+///
+/// # Phase 5+ TODO
+///
+/// This table is hardcoded for Phase 4 DevContext.  In Phase 5, when multiple
+/// app-domain gates ship (reach-gate, content-safety-gate, etc.), this will be
+/// replaced by manifest-driven dispatch — reading the `gates` section of
+/// `lamad/manifest.json` at runtime to determine which gates apply to each
+/// event kind.  The table structure here makes it trivial to add a second entry:
+///
+/// ```ignore
+/// const DOMAIN_GATE_DISPATCH: &[(&str, &str)] = &[
+///     ("attestation-write", "discernment-gate-v1-mechanical"),
+///     ("content-publish",   "reach-gate-v1"),  // Phase 5
+/// ];
+/// ```
+const DOMAIN_GATE_DISPATCH: &[(&str, &str)] =
+    &[("attestation-write", "discernment-gate-v1-mechanical")];
+
+/// Determine which app-domain gate (if any) should run for the given event kind.
+///
+/// Returns `Some(gate_name)` if a domain gate should fire, `None` if the event
+/// should be handled by the universal band only.
+pub(crate) fn domain_gate_for_event(event: &RelationalImpactEvent) -> Option<&'static str> {
+    let kind = event.kind();
+    DOMAIN_GATE_DISPATCH
+        .iter()
+        .find_map(|(k, g)| if *k == kind { Some(*g) } else { None })
+}
+
+/// Run the universal-band DAG followed by the appropriate app-domain gate (if
+/// any) for the given event.
+///
+/// This is the internal entry point used by `check()` and `check_blocking()`.
+/// It embeds the full dispatch logic:
+///
+/// 1. Run the universal-band DAG.  If it does NOT return Allow, short-circuit.
+/// 2. Determine whether an app-domain gate applies (Phase 4: AttestationWrite →
+///    discernment-gate).
+/// 3. If a domain gate applies, run it and return its decision.  Otherwise,
+///    return the universal-band decision.
+///
+/// The optional `ctx_extension` parameter allows test callers (via the
+/// `#[cfg(any(test, feature = "testing"))]` thread-local in `lib.rs`) to inject
+/// pre-populated context fields (e.g., `moment`, `priorAttestations`) that would
+/// normally be populated by the `assemble` step's real resolvers in Phase 5+.
+pub(crate) async fn run_unified(
+    event: &RelationalImpactEvent,
+    ctx_extension: Option<GateContext>,
+) -> Result<GateDecision, GateError> {
+    // Step 1: universal-band must Allow first.
+    let universal_decision = run_with_tracing(event).await?;
+    if !universal_decision.is_allowed() {
+        return Ok(universal_decision);
+    }
+
+    // Step 2: check if an app-domain gate applies.
+    let Some(_gate_name) = domain_gate_for_event(event) else {
+        // No domain gate → return the universal-band decision as-is.
+        return Ok(universal_decision);
+    };
+
+    // Step 3: run the app-domain gate.  For Phase 4 DevContext the only gate
+    // is discernment-gate-v1-mechanical (triggered by AttestationWrite).
+    run_discernment_gate(event, ctx_extension.unwrap_or_default()).await
+}
+
 // ─── Discernment-gate dispatch ────────────────────────────────────────────────
 
 /// Run both the universal-band DAG **and** the discernment-gate DAG for an
@@ -419,10 +491,11 @@ pub async fn run_with_tracing(event: &RelationalImpactEvent) -> Result<GateDecis
 /// # Phase 3 contract
 ///
 /// Phase 3 routes ALL `AttestationWrite` events through the discernment-gate.
-/// Phase 4 will use a manifest-driven content-type dispatch table to route only
-/// `experience-moment` attestations here, while other attestation types skip
-/// the discernment-gate.  For Phase 3, the simpler all-or-nothing approach is
-/// intentional — see task description §Choice C.
+/// Phase 4 folds this dispatch into `check()` via `run_unified()`.  This
+/// function is retained as `pub(crate)` for:
+/// - Per-rule integration tests in `tests/discernment_gate_integration.rs`
+///   (which need pre-populated context injection).
+/// - Explicit manual dispatch in unit tests that need fine-grained control.
 ///
 /// # Context injection
 ///
@@ -440,7 +513,7 @@ pub async fn run_with_tracing(event: &RelationalImpactEvent) -> Result<GateDecis
 ///    pre-loaded into its `EmbeddedContentNodeResolver`.
 /// 3. Merge `gate_context_extension` into the initial context.
 /// 4. Run the discernment-gate DAG and return its decision.
-pub async fn run_discernment_gate(
+pub(crate) async fn run_discernment_gate(
     event: &RelationalImpactEvent,
     gate_context_extension: GateContext,
 ) -> Result<GateDecision, GateError> {

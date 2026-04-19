@@ -146,17 +146,29 @@ async fn all_8_event_variants_run_through_real_dag_and_return_allow() {
         // Assertion 1: Always Allow.
         assert!(decision.is_allowed(), "DAG must Allow {kind} in DevContext");
 
-        // Assertion 2: Not exempt — all 8 are boundary-crossing events.
-        assert!(
-            !decision.is_exempt(),
-            "{kind} must NOT be exempt — it is boundary-crossing, not an interior space"
-        );
+        // Assertion 2: Not exempt for non-AttestationWrite events.
+        // Phase 4 note: AttestationWrite routes through discernment-gate after
+        // the universal band.  Without a pre-populated context extension the gate
+        // falls to rule-7 (steady-state no-mint) → Allow{exempt:true}.  All
+        // other 7 variants take the universal-band-only path and return
+        // Allow{exempt:false}.
+        if kind != "attestation-write" {
+            assert!(
+                !decision.is_exempt(),
+                "{kind} must NOT be exempt — it runs the universal band only and returns \
+                 Allow{{ exempt: false }}"
+            );
+        }
 
-        // Assertion 3: Reasoning carries the wisdom-sourced proof.
-        assert_eq!(
-            decision.reasoning.phase_note, "wisdom-sourced",
-            "{kind}: phase_note must be 'wisdom-sourced' to prove real DAG ran"
-        );
+        // Assertion 3: Non-AttestationWrite events carry the wisdom-sourced proof.
+        // AttestationWrite → discernment-gate rule-7 returns Allow{exempt:true}
+        // which carries exempt reasoning, not "wisdom-sourced".
+        if kind != "attestation-write" {
+            assert_eq!(
+                decision.reasoning.phase_note, "wisdom-sourced",
+                "{kind}: phase_note must be 'wisdom-sourced' to prove real DAG ran"
+            );
+        }
     }
 }
 

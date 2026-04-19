@@ -216,6 +216,34 @@ pub fn __test_set_decision_override(decision: Option<GateDecision>) {
     });
 }
 
+// ─── Test-only discernment context extension ──────────────────────────────────
+//
+// Allows integration tests to pre-populate `moment` and `priorAttestations`
+// context fields that would normally come from the `assemble` step's real
+// source-chain and DHT resolvers (Phase 5+).  Without this, an
+// `AttestationWrite` event through `check()` hits the discernment-gate with a
+// null context and falls to rule-7 (steady-state no-mint).
+//
+// Usage in tests:
+//   gate_client::__test_set_discernment_ctx(Some(ctx_ext));
+//   // ... call check(AttestationWrite) ...
+//   gate_client::__test_set_discernment_ctx(None); // restore (auto-consumed)
+#[cfg(any(test, feature = "testing"))]
+thread_local! {
+    static DISCERNMENT_CTX: std::cell::RefCell<Option<GateContext>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+/// Set a one-shot discernment context extension for the next `check()` call on
+/// this thread that routes to the discernment gate.  Only available in
+/// `#[cfg(test)]` or `feature = "testing"` builds.
+#[cfg(any(test, feature = "testing"))]
+pub fn __test_set_discernment_ctx(ctx: Option<GateContext>) {
+    DISCERNMENT_CTX.with(|cell| {
+        *cell.borrow_mut() = ctx;
+    });
+}
+
 // Public re-exports for ergonomic use.
 pub use dag::context::GateContext;
 pub use dag::discernment_gate::{
@@ -233,9 +261,27 @@ pub use dag::universal_band::{
     active_universal_band_pointer, default_universal_band_declaration, default_universal_band_yaml,
     UniversalBandPointer, ACTIVE_UNIVERSAL_BAND_NAME, ACTIVE_UNIVERSAL_BAND_VERSION,
 };
-pub use dag_runner::{
-    configure_runner, global_runner, run_discernment_gate, AlreadyConfigured, DagRunner,
-};
+pub use dag_runner::{configure_runner, global_runner, AlreadyConfigured, DagRunner};
+
+/// Run the discernment gate directly with a pre-populated context extension.
+///
+/// Available only in `#[cfg(test)]` or `feature = "testing"` builds.
+///
+/// This is a testing helper that exposes the `pub(crate)` `dag_runner::run_discernment_gate`
+/// to integration tests in `tests/`.  It exists so that Phase 3 per-rule integration
+/// tests can continue injecting pre-populated `moment` and `priorAttestations` context
+/// fields — which would otherwise require real Phase 5+ `assemble` resolvers.
+///
+/// **Production callers MUST use `check()`** — the unified public entry point.
+/// Phase 5+ will remove this helper once real `assemble` resolvers are wired and
+/// context injection can happen transparently inside `check()`.
+#[cfg(any(test, feature = "testing"))]
+pub async fn run_discernment_gate(
+    event: &RelationalImpactEvent,
+    gate_context_extension: GateContext,
+) -> GateResult<GateDecision> {
+    dag_runner::run_discernment_gate(event, gate_context_extension).await
+}
 pub use error::{GateError, GateResult};
 pub use events::RelationalImpactEvent;
 pub use phase::Phase;
@@ -256,12 +302,18 @@ pub use types::{
 /// # Execution order
 ///
 /// 1. If a `__test_set_decision_override` is set (test builds only), consume and
-///    return it — the DAG does NOT run.
+///    return it — neither DAG runs.
 /// 2. If the event's space-type is exempt (offline / private-drafting-interior /
 ///    play-interior / roleplay-interior), return `Allow { exempt: true }` without
-///    running the DAG.
-/// 3. Otherwise, run the universal-band DAG via the global `DagRunner` with
-///    tracing spans (spec §6.3).
+///    running any DAG.
+/// 3. Run the universal-band DAG. If it declines or escalates, short-circuit.
+/// 4. If an app-domain gate applies for this event kind (Phase 4: `AttestationWrite`
+///    → `discernment-gate-v1-mechanical`), run it and return its decision.
+///    Otherwise return the universal-band decision.
+///
+/// The manifest-driven dispatch table is hardcoded for Phase 4 DevContext.
+/// Phase 5+ will read the `gates` section of `lamad/manifest.json` at runtime.
+/// See `dag_runner::DOMAIN_GATE_DISPATCH`.
 pub async fn check(event: RelationalImpactEvent) -> GateResult<GateDecision> {
     // Test-only: consume a one-shot decision override if one is set.
     #[cfg(any(test, feature = "testing"))]
@@ -278,8 +330,14 @@ pub async fn check(event: RelationalImpactEvent) -> GateResult<GateDecision> {
         return Ok(GateDecision::allow_exempt(Phase::DevContext));
     }
 
-    // Phase 2: run the universal-band DAG with observability spans.
-    dag_runner::run_with_tracing(&event).await
+    // Phase 4: unified dispatch — universal band first, then app-domain gate.
+    // Consume the one-shot context extension if one is set (test builds only).
+    #[cfg(any(test, feature = "testing"))]
+    let ctx_ext = DISCERNMENT_CTX.with(|cell| cell.borrow_mut().take());
+    #[cfg(not(any(test, feature = "testing")))]
+    let ctx_ext: Option<GateContext> = None;
+
+    dag_runner::run_unified(&event, ctx_ext).await
 }
 
 /// Synchronous variant for zome coordinator contexts (Holochain WASM).
@@ -295,17 +353,27 @@ pub async fn check(event: RelationalImpactEvent) -> GateResult<GateDecision> {
 /// with "Cannot start a runtime from within a runtime." Async callers should
 /// use [`check`] with `.await` instead. Phase 3+ may add a `block_in_place`
 /// bridge path if a legitimate nested-runtime use case emerges.
+///
+/// Includes the same Phase 4 unified dispatch as [`check`]: `AttestationWrite`
+/// events route through `discernment-gate-v1-mechanical` after the universal
+/// band allows.
 pub fn check_blocking(event: RelationalImpactEvent) -> GateResult<GateDecision> {
     let space = space::detect_from_event(&event);
     if space.is_exempt() {
         return Ok(GateDecision::allow_exempt(Phase::DevContext));
     }
 
+    // Consume the test-only context extension if present.
+    #[cfg(any(test, feature = "testing"))]
+    let ctx_ext = DISCERNMENT_CTX.with(|cell| cell.borrow_mut().take());
+    #[cfg(not(any(test, feature = "testing")))]
+    let ctx_ext: Option<GateContext> = None;
+
     tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
         .map_err(|e| GateError::DagExecution(format!("runtime build error: {e}")))?
-        .block_on(dag_runner::run_with_tracing(&event))
+        .block_on(dag_runner::run_unified(&event, ctx_ext))
 }
 
 /// Configure the gate client — transport, phase override, trust assessor.
@@ -401,18 +469,32 @@ mod check_tests {
 
     #[tokio::test]
     async fn check_all_events_return_non_exempt_allow_in_dev_context() {
-        // None of the 8 events are exempt interiors — the `allow_mocked` path
-        // fires, not `allow_exempt`.
+        // Phase 4 note: AttestationWrite now routes through the discernment-gate
+        // after the universal band.  Without pre-populated context, the gate falls
+        // to rule-7 (steady-state no-mint) and returns Allow{exempt:true}.
+        // This is architecturally correct: the discernment gate's terminal-no-mint
+        // path deliberately uses Allow{exempt:true} to signal "no story-point minted".
+        // All other 7 events are still non-exempt (universal-band-only path).
         for event in all_events() {
             let kind = event.kind();
-            // Skip PrivateToPublicCrossing if it were somehow exempt (it is not,
-            // but this loop documents the invariant for all 8).
             let decision = check(event).await.unwrap();
-            assert!(
-                !decision.is_exempt(),
-                "check() must NOT return exempt Allow for {kind}; \
-                 all 8 current variants are boundary-crossing or public"
-            );
+            if kind == "attestation-write" {
+                // AttestationWrite → discernment-gate rule-7 → Allow{exempt:true}
+                // (no context extension provided — steady-state silence).
+                assert!(
+                    decision.is_allowed(),
+                    "check() must return Allow for {kind} in DevContext; got: {:?}",
+                    decision.status
+                );
+                // is_exempt is true here because discernment-gate terminal-no-mint
+                // returns Allow{exempt:true} — this is the expected Phase 4 shape.
+            } else {
+                assert!(
+                    !decision.is_exempt(),
+                    "check() must NOT return exempt Allow for {kind}; \
+                     non-AttestationWrite variants run universal-band only"
+                );
+            }
         }
     }
 
@@ -449,6 +531,9 @@ mod check_tests {
 
     #[test]
     fn check_blocking_all_events_return_allow_in_dev_context() {
+        // Phase 4 note: AttestationWrite routes through discernment-gate rule-7
+        // (no context → steady-state no-mint → Allow{exempt:true}).
+        // All other 7 events remain non-exempt via the universal-band-only path.
         for event in all_events() {
             let kind = event.kind();
             let result = check_blocking(event);
@@ -458,10 +543,13 @@ mod check_tests {
                 decision.is_allowed(),
                 "check_blocking() must return Allow for {kind} in DevContext"
             );
-            assert!(
-                !decision.is_exempt(),
-                "check_blocking() must return non-exempt Allow for {kind}"
-            );
+            if kind != "attestation-write" {
+                assert!(
+                    !decision.is_exempt(),
+                    "check_blocking() must return non-exempt Allow for {kind} \
+                     (universal-band-only path)"
+                );
+            }
         }
     }
 
