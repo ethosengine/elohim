@@ -69,6 +69,10 @@ pub fn create_human(
         location: input.location,
         profile_photo_url: input.profile_photo_url,
         h_app_id: input.h_app_id,
+        // household_id populated by D3 seeder pipeline (humans.json fixture
+        // carries householdId; import path fills the projection). Legacy
+        // callers that predate households leave this None.
+        household_id: None,
     };
 
     diesel::insert_into(humans::table)

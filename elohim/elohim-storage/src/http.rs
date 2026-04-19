@@ -8626,6 +8626,19 @@ pub fn build_manifest() -> doorway_client::DoorwayRoutes {
                 .build(),
         )
         // =====================================================================
+        // /api/v1/households/{id}/stewardship-allocations — stewarded content
+        // =====================================================================
+        // Read-only. Joins stewardship_allocations × humans on household_id
+        // to list content a household actively stewards. Source of truth:
+        // Agreement DHT entries with stewardship-allocation link metadata
+        // (Category A2). No new DHT entry types.
+        .route(
+            Route::get("/api/v1/households/{id}/stewardship-allocations")
+                .handler("get_household_stewardship_allocations")
+                .cache_ttl(15)
+                .build(),
+        )
+        // =====================================================================
         // /api/v1/network/posture — aggregate health of the live peer fabric
         // =====================================================================
         // Read-only. Computed Category C projection (no persistence, no DHT

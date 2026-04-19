@@ -559,6 +559,9 @@ pub struct Human {
     pub updated_at: String,
     /// Source of truth: DHT (Human entry in imagodei DNA). NULL for pre-coherence rows.
     pub dht_anchor_hash: Option<String>,
+    /// Household collective id (projection of collectives DHT entry with
+    /// kind:household). NULL for humans outside a household grouping.
+    pub household_id: Option<String>,
 }
 
 /// New human for INSERT
@@ -574,6 +577,7 @@ pub struct NewHuman {
     pub location: Option<String>,
     pub profile_photo_url: Option<String>,
     pub h_app_id: String,
+    pub household_id: Option<String>,
 }
 
 // ============================================================================

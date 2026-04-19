@@ -507,6 +507,7 @@ diesel::table! {
         created_at -> Text,
         updated_at -> Text,
         dht_anchor_hash -> Nullable<Text>,
+        household_id -> Nullable<Text>,
     }
 }
 

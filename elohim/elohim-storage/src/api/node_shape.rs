@@ -43,21 +43,28 @@ pub async fn handle_nodes(
     })
 }
 
-/// Dispatch for `/api/v1/households/*` — currently just `GET /{id}/devices`.
+/// Dispatch for `/api/v1/households/*` — household-scoped read endpoints.
 pub async fn handle_households(
     req: Request<Incoming>,
     method: Method,
     resource_path: &str,
     pool: &DbPool,
-    _ctx: &AppContext,
+    ctx: &AppContext,
 ) -> Result<Response<Full<Bytes>>, StorageError> {
     let path = resource_path.trim_start_matches('/');
     let _ = req;
 
-    // Parse `{id}/devices` — the household id may contain any URL-safe chars.
+    // GET /{id}/devices — stewarded_nodes joined with live peer vitals
     if let Some(id) = path.strip_suffix("/devices") {
         if method == Method::GET && !id.is_empty() {
             return Ok(handle_get_household_devices(id, pool).await);
+        }
+    }
+
+    // GET /{id}/stewardship-allocations — allocations filtered by household
+    if let Some(id) = path.strip_suffix("/stewardship-allocations") {
+        if method == Method::GET && !id.is_empty() {
+            return Ok(handle_get_household_stewardship(id, pool, ctx).await);
         }
     }
 
@@ -85,6 +92,28 @@ async fn handle_post_shape(req: Request<Incoming>, pool: &DbPool) -> Response<Fu
             "stored": true,
         })),
         Err(e) => response::internal_error(&format!("upsert_from_shape: {e}")),
+    }
+}
+
+/// GET /api/v1/households/{id}/stewardship-allocations — stewardship
+/// allocations filtered by the household via humans.household_id join.
+///
+/// Source of truth: Agreement DHT entries with stewardship-allocation link
+/// metadata (Category A2). This route reads the `stewardship_allocations`
+/// projection filtered by household membership. No new DHT entry types.
+async fn handle_get_household_stewardship(
+    household_id: &str,
+    pool: &DbPool,
+    ctx: &AppContext,
+) -> Response<Full<Bytes>> {
+    let mut conn = match get_conn(pool) {
+        Ok(c) => c,
+        Err(_) => return response::internal_error("pool unavailable"),
+    };
+
+    match crate::db::stewardship_allocations::list_by_household(&mut conn, ctx, household_id) {
+        Ok(allocations) => response::ok(&allocations),
+        Err(e) => response::internal_error(&format!("list_by_household: {e}")),
     }
 }
 

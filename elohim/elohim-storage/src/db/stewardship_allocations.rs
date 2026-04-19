@@ -199,6 +199,36 @@ pub fn list_allocations(
         .map_err(|e| StorageError::Internal(format!("Failed to list allocations: {}", e)))
 }
 
+/// List active allocations where the steward belongs to the given household.
+///
+/// Joins `stewardship_allocations` × `humans` on `steward_presence_id = humans.id`
+/// and filters by `humans.household_id`. Ordered by allocation_ratio descending.
+///
+/// Source of truth stays the Agreement DHT entry (allocations are link metadata
+/// on Agreement entries, Category A2). This is the read-optimized projection.
+pub fn list_by_household(
+    conn: &mut SqliteConnection,
+    ctx: &AppContext,
+    household_id: &str,
+) -> Result<Vec<StewardshipAllocation>, StorageError> {
+    use super::diesel_schema::humans;
+    stewardship_allocations::table
+        .inner_join(humans::table.on(humans::id.eq(stewardship_allocations::steward_presence_id)))
+        .filter(stewardship_allocations::h_app_id.eq(ctx.h_app_id()))
+        .filter(humans::household_id.eq(household_id))
+        .filter(
+            stewardship_allocations::governance_state
+                .eq(allocation_governance_states::ACTIVE),
+        )
+        .filter(stewardship_allocations::effective_until.is_null())
+        .select(StewardshipAllocation::as_select())
+        .order(stewardship_allocations::allocation_ratio.desc())
+        .load::<StewardshipAllocation>(conn)
+        .map_err(|e| {
+            StorageError::Internal(format!("list_by_household allocations: {}", e))
+        })
+}
+
 /// Get all allocations for a content piece
 pub fn get_allocations_for_content(
     conn: &mut SqliteConnection,
