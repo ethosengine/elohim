@@ -8,12 +8,26 @@
 //! - [`executor`] — [`StepExecutor`] trait, [`StepKind`], [`StepOutcome`].
 //! - [`expr`] — minimal conditional-edge expression parser + evaluator.
 //! - [`interpreter`] — [`DagInterpreter`]: the DAG walk engine.
+//! - [`migration_guide`] — pure-rustdoc reference for
+//!   [**capability-to-gate migration**](migration_guide#capability-to-gate-migration-pattern).
+//! - [`content_safety_gate`] — the canonical worked migration example.
 //!
 //! # Phase note
 //!
 //! Phase 0 landed the type stubs below. Phase 2 Task 2.1 adds the interpreter
 //! engine (context, executor trait, expression language, and the interpreter
 //! itself). Phase 2 Task 2.2 implements the seven concrete step executors.
+//!
+//! # Capability-to-Gate Migration Pattern
+//!
+//! Several gates in this module are migrations of pre-existing
+//! [`ElohimCapability`] handlers into protocol-governed, declarative gate
+//! declarations.  See the [`migration_guide`] module for the full pattern —
+//! when to migrate, the ten-step recipe, and how the Phase 7+ activation
+//! replaces a DevContext `wisdom-invoke` mock with a real `skill-invoke`
+//! dispatch to the existing capability handler.
+//!
+//! [`ElohimCapability`]: https://docs.rs/elohim-agent-service/latest/elohim_agent_service/capability/enum.ElohimCapability.html
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -29,6 +43,7 @@ pub mod executor;
 pub mod executors;
 pub mod expr;
 pub mod interpreter;
+pub mod migration_guide;
 pub mod reach_aggregation;
 pub mod reach_gate;
 pub mod rule_expr;

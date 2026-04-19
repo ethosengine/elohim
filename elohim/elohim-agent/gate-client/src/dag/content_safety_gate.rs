@@ -4,6 +4,48 @@
 //! time and exposes it as a [`GateProcessDeclaration`] via
 //! [`default_content_safety_gate_declaration`].
 //!
+//! # What this gate does
+//!
+//! `content-safety-gate-v1` is a **wide protocol gate** — it fires on multiple
+//! event kinds (`ContentPublish`, `AttestationWrite`, `PeerMessage`) rather
+//! than scoping to one.  For each such event it wraps a `wisdom-invoke` call
+//! primed by the content-safety constitution, reads a single `safetyOutput`
+//! context key, and synthesises either an
+//! [`Allow`](crate::GateStatus::Allow) or a
+//! [`Decline`](crate::GateStatus::Decline) with
+//! `category: "content-safety"`.  The gate is read-only: declines short-circuit
+//! the call-site write path; no attestations, no economic events.
+//!
+//! # The canonical capability-to-gate migration
+//!
+//! This gate is the **worked example** for the
+//! [`migration_guide`](super::migration_guide) —
+//! see §[Capability-to-Gate Migration Pattern](super::migration_guide#capability-to-gate-migration-pattern)
+//! for the full recipe.  Its relationship to the original capability:
+//!
+//! - **Original:** [`ElohimCapability::ContentSafetyReview`] — a
+//!   wisdom-backed classifier defined in
+//!   `elohim-agent/elohim-agent-service/src/capability/types.rs` which reads
+//!   content + context and returns a safety classification with reasoning.
+//! - **Migration:** wrapped in `content-safety-gate-v1`; the LLM call is
+//!   primed by `epr:constitutions:content-safety-v1` and the
+//!   `epr:framings:content-safety-v1` framing CID.
+//! - **DevContext (today):** the `wisdom-safety` step runs the
+//!   [`WisdomInvokeExecutor`] mock, which writes `{"decision":"allow"}` to
+//!   `safetyOutput`.  No content is blocked; every call site still emits a
+//!   decision attestation so the rehearsal record accumulates real shape.
+//! - **Phase 7+ activation:** replace the `wisdom-safety` step with a
+//!   [`SkillInvoke`](super::StepType::SkillInvoke) step whose `capability`
+//!   is `"content-safety-review"`, `request_from_keys` are
+//!   `["contentSubject", "contentBody"]`, and `output_key` is
+//!   `"safetyOutput"`.  Dispatch flows through `elohim-agent-service` to the
+//!   existing `ContentSafetyReview` handler — no new handler code, no
+//!   call-site changes, no registry re-wire.  The synthesize step reads
+//!   `safetyOutput` either way.
+//!
+//! [`ElohimCapability::ContentSafetyReview`]: https://docs.rs/elohim-agent-service/latest/elohim_agent_service/capability/enum.ElohimCapability.html#variant.ContentSafetyReview
+//! [`WisdomInvokeExecutor`]: super::executors::WisdomInvokeExecutor
+//!
 //! # CID reference
 //!
 //! The gate declaration is addressed at runtime by [`CONTENT_SAFETY_GATE_V1_CID`].
