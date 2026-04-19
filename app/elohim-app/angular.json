@@ -32,7 +32,7 @@
               },
               {
                 "glob": "**/*",
-                "input": "node_modules/elohim-cache-core",
+                "input": "../../elohim/elohim-cache-core/pkg",
                 "output": "/wasm/elohim-cache-core"
               },
               {
