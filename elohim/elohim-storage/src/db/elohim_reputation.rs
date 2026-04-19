@@ -114,7 +114,11 @@ fn bulk_in_query_challenges(
     if decision_ids.is_empty() {
         return Ok(Vec::new());
     }
-    let placeholders = decision_ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+    let placeholders = decision_ids
+        .iter()
+        .map(|_| "?")
+        .collect::<Vec<_>>()
+        .join(",");
     let sql = format!(
         "SELECT challenge_id, challenged_decision_cid, grounds \
          FROM gate_decision_challenges \
@@ -139,7 +143,11 @@ fn bulk_in_query_outcomes(
     if challenge_ids.is_empty() {
         return Ok(Vec::new());
     }
-    let placeholders = challenge_ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+    let placeholders = challenge_ids
+        .iter()
+        .map(|_| "?")
+        .collect::<Vec<_>>()
+        .join(",");
     let sql = format!(
         "SELECT challenge_cid, verdict \
          FROM challenge_outcomes \
@@ -282,8 +290,7 @@ mod tests {
     use diesel::connection::SimpleConnection;
 
     fn setup_db() -> SqliteConnection {
-        let mut conn =
-            SqliteConnection::establish(":memory:").expect("in-memory SQLite");
+        let mut conn = SqliteConnection::establish(":memory:").expect("in-memory SQLite");
 
         conn.batch_execute(
             r#"
@@ -557,7 +564,10 @@ mod tests {
         assert_eq!(result.challenges_by_grounds.get("safety").copied(), Some(2));
         assert_eq!(result.challenges_by_grounds.get("policy").copied(), Some(1));
         assert_eq!(result.outcomes_by_verdict.get("upheld").copied(), Some(1));
-        assert_eq!(result.outcomes_by_verdict.get("dismissed").copied(), Some(1));
+        assert_eq!(
+            result.outcomes_by_verdict.get("dismissed").copied(),
+            Some(1)
+        );
     }
 
     // -------------------------------------------------------------------------
@@ -586,10 +596,7 @@ mod tests {
         let result = compute(&mut conn, &default_query()).unwrap();
 
         assert_eq!(result.total_decisions, 1);
-        assert_eq!(
-            result.current_substance_cid.as_deref(),
-            Some("bafySUBACT")
-        );
+        assert_eq!(result.current_substance_cid.as_deref(), Some("bafySUBACT"));
     }
 
     // -------------------------------------------------------------------------
@@ -626,9 +633,6 @@ mod tests {
         let result = compute(&mut conn, &default_query()).unwrap();
 
         assert_eq!(result.total_decisions, 1);
-        assert_eq!(
-            result.current_substance_cid.as_deref(),
-            Some("bafySUB_NEW")
-        );
+        assert_eq!(result.current_substance_cid.as_deref(), Some("bafySUB_NEW"));
     }
 }

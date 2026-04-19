@@ -48,10 +48,7 @@ pub struct GateDecisionChallengeRow {
 /// Uses `INSERT OR REPLACE` semantics so that a re-delivered signal is
 /// idempotent. The primary key is `(app_id, challenge_id)` — `challenge_id`
 /// is a CID so collisions indicate a true duplicate, not a logical conflict.
-pub fn upsert(
-    conn: &mut SqliteConnection,
-    row: &GateDecisionChallengeRow,
-) -> QueryResult<usize> {
+pub fn upsert(conn: &mut SqliteConnection, row: &GateDecisionChallengeRow) -> QueryResult<usize> {
     diesel::insert_into(gate_decision_challenges::table)
         .values(row)
         .on_conflict((
@@ -101,9 +98,7 @@ pub fn find_by_challenged_decision(
 ) -> QueryResult<Vec<GateDecisionChallengeRow>> {
     gate_decision_challenges::table
         .filter(gate_decision_challenges::app_id.eq(app_id))
-        .filter(
-            gate_decision_challenges::challenged_decision_cid.eq(challenged_decision_cid),
-        )
+        .filter(gate_decision_challenges::challenged_decision_cid.eq(challenged_decision_cid))
         .order(gate_decision_challenges::filed_at.desc())
         .load::<GateDecisionChallengeRow>(conn)
 }
@@ -174,12 +169,7 @@ mod tests {
     #[test]
     fn upsert_then_find_by_id() {
         let mut conn = setup_test_db();
-        let row = make_row(
-            "bafyCHAL1",
-            "bafyDEC1",
-            "uhCAkCHALLENGER",
-            "constitutional",
-        );
+        let row = make_row("bafyCHAL1", "bafyDEC1", "uhCAkCHALLENGER", "constitutional");
         upsert(&mut conn, &row).unwrap();
 
         let found = find_by_id(&mut conn, "test-app", "bafyCHAL1")
@@ -199,7 +189,11 @@ mod tests {
         upsert(&mut conn, &row).unwrap();
 
         let rows = find_by_challenger(&mut conn, "test-app", "uhCAkCHALLENGER").unwrap();
-        assert_eq!(rows.len(), 1, "Re-delivered signal must not duplicate the row");
+        assert_eq!(
+            rows.len(),
+            1,
+            "Re-delivered signal must not duplicate the row"
+        );
     }
 
     #[test]
@@ -227,8 +221,7 @@ mod tests {
         upsert(&mut conn, &row_b).unwrap();
         upsert(&mut conn, &row_c).unwrap();
 
-        let challenges =
-            find_by_challenged_decision(&mut conn, "test-app", "bafyDEC1").unwrap();
+        let challenges = find_by_challenged_decision(&mut conn, "test-app", "bafyDEC1").unwrap();
         assert_eq!(challenges.len(), 2);
         assert!(challenges
             .iter()

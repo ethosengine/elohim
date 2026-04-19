@@ -57,6 +57,7 @@ use crate::views::{
     AccountPackageView,
     BeginObservationInputView,
     BeginObservationResponseView,
+    ChallengeOutcomeView,
     CollectiveParticipationView,
     CollectiveSeedView,
     CollectiveView,
@@ -82,7 +83,6 @@ use crate::views::{
     ElohimReputationProfileView,
     EprHeadInputView,
     EprHeadView,
-    ChallengeOutcomeView,
     GateDecisionAttestationView,
     GateDecisionChallengeView,
     HumanView,
@@ -2217,9 +2217,7 @@ impl HttpServer {
         // Elohim reputation aggregation query (Phase 11 Task 11.3)
         // GET /db/elohim-reputation?elohimId=<id>&windowStart=<iso>&windowEnd=<iso>
         if resource_path == "elohim-reputation" {
-            return self
-                .handle_elohim_reputation(req, method, &app_ctx)
-                .await;
+            return self.handle_elohim_reputation(req, method, &app_ctx).await;
         }
 
         // ── Conductor-bridge routes (Phase 10 HTTP pipes, Phase 11 full zome queries) ──
@@ -2236,9 +2234,7 @@ impl HttpServer {
 
         // GET /db/source-chain/{agent_id}/entries[?filter={filter}]
         if let Some(sc_path) = resource_path.strip_prefix("source-chain/") {
-            return self
-                .handle_source_chain_entries(req, method, sc_path)
-                .await;
+            return self.handle_source_chain_entries(req, method, sc_path).await;
         }
 
         // GET /db/dht/{entry_hash}
@@ -2375,19 +2371,18 @@ impl HttpServer {
                                 let encoder = crate::sharding::ShardEncoder::new(
                                     crate::sharding::ShardConfig::default(),
                                 );
-                                let manifest = match encoder
-                                    .create_manifest(&data, &content_format, &reach)
-                                {
-                                    Ok(m) => m,
-                                    Err(e) => {
-                                        tracing::warn!(
-                                            content_id = %content_id,
-                                            error = %e,
-                                            "shard manifest encode failed; skipping persistence"
-                                        );
-                                        return;
-                                    }
-                                };
+                                let manifest =
+                                    match encoder.create_manifest(&data, &content_format, &reach) {
+                                        Ok(m) => m,
+                                        Err(e) => {
+                                            tracing::warn!(
+                                                content_id = %content_id,
+                                                error = %e,
+                                                "shard manifest encode failed; skipping persistence"
+                                            );
+                                            return;
+                                        }
+                                    };
                                 let shard_hashes_json =
                                     serde_json::to_string(&manifest.shard_hashes)
                                         .unwrap_or_else(|_| "[]".to_string());
@@ -2565,9 +2560,11 @@ impl HttpServer {
                                     let encoder = crate::sharding::ShardEncoder::new(
                                         crate::sharding::ShardConfig::default(),
                                     );
-                                    let manifest = match encoder
-                                        .create_manifest(&data, &content_format, &reach)
-                                    {
+                                    let manifest = match encoder.create_manifest(
+                                        &data,
+                                        &content_format,
+                                        &reach,
+                                    ) {
                                         Ok(m) => m,
                                         Err(e) => {
                                             tracing::warn!(
@@ -4917,13 +4914,11 @@ impl HttpServer {
         let mut conn = self.get_diesel_conn()?;
 
         let rows = match (&query.challenger_id, &query.challenged_decision_cid) {
-            (Some(challenger_id), _) => {
-                crate::db::gate_decision_challenges::find_by_challenger(
-                    &mut conn,
-                    &ctx.h_app_id,
-                    challenger_id,
-                )?
-            }
+            (Some(challenger_id), _) => crate::db::gate_decision_challenges::find_by_challenger(
+                &mut conn,
+                &ctx.h_app_id,
+                challenger_id,
+            )?,
             (_, Some(challenged_decision_cid)) => {
                 crate::db::gate_decision_challenges::find_by_challenged_decision(
                     &mut conn,
@@ -5038,11 +5033,9 @@ impl HttpServer {
                 .into_iter()
                 .collect()
             }
-            (_, Some(verdict)) => crate::db::challenge_outcomes::find_by_verdict(
-                &mut conn,
-                &ctx.h_app_id,
-                verdict,
-            )?,
+            (_, Some(verdict)) => {
+                crate::db::challenge_outcomes::find_by_verdict(&mut conn, &ctx.h_app_id, verdict)?
+            }
             _ => {
                 use crate::db::diesel_schema::challenge_outcomes::dsl;
                 use diesel::prelude::*;
@@ -5083,11 +5076,7 @@ impl HttpServer {
 
         let mut conn = self.get_diesel_conn()?;
 
-        match crate::db::challenge_outcomes::find_by_id(
-            &mut conn,
-            &ctx.h_app_id,
-            outcome_id,
-        )? {
+        match crate::db::challenge_outcomes::find_by_id(&mut conn, &ctx.h_app_id, outcome_id)? {
             Some(row) => Ok(response::ok(&ChallengeOutcomeView::from(row))),
             None => Ok(response::not_found(&format!(
                 "Challenge outcome not found: {}",
@@ -5141,7 +5130,9 @@ impl HttpServer {
         let elohim_id = match params.elohim_id {
             Some(id) if !id.is_empty() => id,
             _ => {
-                return Ok(response::bad_request("Missing required query param: elohimId"));
+                return Ok(response::bad_request(
+                    "Missing required query param: elohimId",
+                ));
             }
         };
 
@@ -5187,12 +5178,8 @@ impl HttpServer {
         let mut conn = self.get_diesel_conn()?;
         let result = crate::db::elohim_reputation::compute(&mut conn, &q)?;
 
-        let view = ElohimReputationProfileView::from_result(
-            elohim_id,
-            window_start,
-            window_end,
-            result,
-        );
+        let view =
+            ElohimReputationProfileView::from_result(elohim_id, window_start, window_end, result);
 
         Ok(response::ok(&view))
     }
@@ -5255,7 +5242,9 @@ impl HttpServer {
         let filter = req
             .uri()
             .query()
-            .and_then(|q| serde_urlencoded::from_str::<std::collections::HashMap<String, String>>(q).ok())
+            .and_then(|q| {
+                serde_urlencoded::from_str::<std::collections::HashMap<String, String>>(q).ok()
+            })
             .and_then(|m| m.get("filter").cloned())
             .unwrap_or_default();
 
@@ -5331,11 +5320,14 @@ impl HttpServer {
         Ok(Response::builder()
             .status(StatusCode::NOT_FOUND)
             .header(header::CONTENT_TYPE, "application/json")
-            .body(Full::new(Bytes::from(serde_json::to_vec(&serde_json::json!({
-                "error": "DHT entry not found (conductor bridge deferred to Phase 11)",
-                "entryHash": entry_hash,
-                "phase": "10-stub"
-            })).unwrap_or_default())))
+            .body(Full::new(Bytes::from(
+                serde_json::to_vec(&serde_json::json!({
+                    "error": "DHT entry not found (conductor bridge deferred to Phase 11)",
+                    "entryHash": entry_hash,
+                    "phase": "10-stub"
+                }))
+                .unwrap_or_default(),
+            )))
             .unwrap())
     }
 

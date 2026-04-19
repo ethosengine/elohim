@@ -340,9 +340,11 @@ async fn async_main(
         // Use the config storage_dir as an agent-pubkey hint until the
         // conductor connection provides the real pubkey (later path).
         let agent_hint = format!("{}-boot", config.storage_dir.display());
-        if let Err(e) =
-            elohim_storage::services::boot_registration::register_at_boot(pool, &config, &agent_hint)
-        {
+        if let Err(e) = elohim_storage::services::boot_registration::register_at_boot(
+            pool,
+            &config,
+            &agent_hint,
+        ) {
             warn!(error = %e, "node-shape self-registration failed (non-fatal)");
         }
     }

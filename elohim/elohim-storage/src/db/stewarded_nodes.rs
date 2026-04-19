@@ -172,7 +172,10 @@ pub fn upsert_from_shape(
                 t::can_steward.eq(view.committed.can_steward as i32),
                 t::can_infer.eq(view.committed.can_infer as i32),
                 t::can_doorway.eq(view.committed.can_doorway as i32),
-                t::steward_tier.eq(view.steward_tier.clone().unwrap_or_else(|| "caretaker".into())),
+                t::steward_tier.eq(view
+                    .steward_tier
+                    .clone()
+                    .unwrap_or_else(|| "caretaker".into())),
                 t::custodian_opt_in.eq(view.custodian_opt_in as i32),
                 t::region.eq(view.region.clone()),
                 t::signature.eq(Some(view.signature.clone())),
@@ -190,7 +193,10 @@ pub fn upsert_from_shape(
             memory_gb: view.committed.memory_gb,
             storage_tb: view.committed.storage_tb,
             bandwidth_mbps: view.committed.bandwidth_mbps.unwrap_or(0),
-            steward_tier: view.steward_tier.clone().unwrap_or_else(|| "caretaker".into()),
+            steward_tier: view
+                .steward_tier
+                .clone()
+                .unwrap_or_else(|| "caretaker".into()),
             custodian_opt_in: view.custodian_opt_in as i32,
             region: view.region.clone(),
             context_epr_id: None,
@@ -259,7 +265,9 @@ pub fn distinct_active_households(
         .filter(t::household_id.is_not_null())
         .filter(p::updated_at.gt(cutoff))
         .filter(p::status.eq_any(["online", "degraded"]))
-        .select(sql::<BigInt>("COUNT(DISTINCT stewarded_nodes.household_id)"))
+        .select(sql::<BigInt>(
+            "COUNT(DISTINCT stewarded_nodes.household_id)",
+        ))
         .first::<i64>(conn)
         .map_err(|e| StorageError::Internal(format!("distinct_active_households: {}", e)))
 }
@@ -272,7 +280,10 @@ pub fn list_by_household_with_peer_status(
     conn: &mut SqliteConnection,
     household_id: &str,
 ) -> Result<
-    Vec<(StewardedNode, Option<crate::db::peer_statuses::PeerStatusRow>)>,
+    Vec<(
+        StewardedNode,
+        Option<crate::db::peer_statuses::PeerStatusRow>,
+    )>,
     StorageError,
 > {
     use crate::db::diesel_schema::peer_statuses as p;
@@ -282,7 +293,10 @@ pub fn list_by_household_with_peer_status(
         .left_join(p::table.on(p::peer_id.eq(t::id)))
         .filter(t::household_id.eq(household_id))
         .select((StewardedNode::as_select(), p::all_columns.nullable()))
-        .load::<(StewardedNode, Option<crate::db::peer_statuses::PeerStatusRow>)>(conn)
+        .load::<(
+            StewardedNode,
+            Option<crate::db::peer_statuses::PeerStatusRow>,
+        )>(conn)
         .map_err(|e| StorageError::Internal(format!("list_by_household_with_peer_status: {}", e)))
 }
 

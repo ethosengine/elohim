@@ -216,17 +216,12 @@ pub fn list_by_household(
         .inner_join(humans::table.on(humans::id.eq(stewardship_allocations::steward_presence_id)))
         .filter(stewardship_allocations::h_app_id.eq(ctx.h_app_id()))
         .filter(humans::household_id.eq(household_id))
-        .filter(
-            stewardship_allocations::governance_state
-                .eq(allocation_governance_states::ACTIVE),
-        )
+        .filter(stewardship_allocations::governance_state.eq(allocation_governance_states::ACTIVE))
         .filter(stewardship_allocations::effective_until.is_null())
         .select(StewardshipAllocation::as_select())
         .order(stewardship_allocations::allocation_ratio.desc())
         .load::<StewardshipAllocation>(conn)
-        .map_err(|e| {
-            StorageError::Internal(format!("list_by_household allocations: {}", e))
-        })
+        .map_err(|e| StorageError::Internal(format!("list_by_household allocations: {}", e)))
 }
 
 /// Get all allocations for a content piece

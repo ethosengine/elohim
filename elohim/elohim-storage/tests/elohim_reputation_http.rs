@@ -40,8 +40,7 @@ use elohim_storage::ElohimReputationProfileView;
 // ---------------------------------------------------------------------------
 
 fn setup_db() -> SqliteConnection {
-    let mut conn =
-        SqliteConnection::establish(":memory:").expect("in-memory SQLite");
+    let mut conn = SqliteConnection::establish(":memory:").expect("in-memory SQLite");
 
     conn.batch_execute(
         r#"
@@ -232,10 +231,7 @@ fn fresh_elohim_all_zeros_no_substance() {
     // Empty histograms should be JSON objects (not null/array)
     assert!(view.challenges_by_grounds.0.is_object());
     assert!(view.outcomes_by_verdict.0.is_object());
-    assert_eq!(
-        view.challenges_by_grounds.0.as_object().unwrap().len(),
-        0
-    );
+    assert_eq!(view.challenges_by_grounds.0.as_object().unwrap().len(), 0);
     assert_eq!(view.outcomes_by_verdict.0.as_object().unwrap().len(), 0);
 }
 
@@ -271,10 +267,7 @@ fn decisions_without_challenges_zero_challenge_counts() {
     assert_eq!(view.dismissed_count, 0);
     assert_eq!(view.pending_count, 0);
     // Most recent substance is from bafyDEC2 (latest decided_at)
-    assert_eq!(
-        view.current_substance_cid.as_deref(),
-        Some("bafySUB2")
-    );
+    assert_eq!(view.current_substance_cid.as_deref(), Some("bafySUB2"));
 }
 
 // ---------------------------------------------------------------------------
@@ -441,10 +434,7 @@ fn decisions_outside_window_excluded_from_view() {
         view.total_decisions, 1,
         "only the in-window decision should count"
     );
-    assert_eq!(
-        view.current_substance_cid.as_deref(),
-        Some("bafySUBNEW")
-    );
+    assert_eq!(view.current_substance_cid.as_deref(), Some("bafySUBNEW"));
 }
 
 // ---------------------------------------------------------------------------

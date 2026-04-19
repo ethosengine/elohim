@@ -31,8 +31,9 @@ pub fn compute(
         .get()
         .map_err(|e| StorageError::Internal(format!("pool: {e}")))?;
 
-    let allocations =
-        crate::db::stewardship_allocations::get_allocations_for_content(&mut conn, ctx, content_id)?;
+    let allocations = crate::db::stewardship_allocations::get_allocations_for_content(
+        &mut conn, ctx, content_id,
+    )?;
 
     // Stage 1: household reducer. Until humans.household_id projection
     // lands, we use presence_id as a household proxy. Swap in the real

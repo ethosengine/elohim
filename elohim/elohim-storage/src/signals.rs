@@ -791,13 +791,10 @@ mod mishpat_signal_tests {
         let signal = make_challenge_signal("bafyChal001", "constitutional");
         handle_mishpat_signal(&mut conn, "test-app", signal).unwrap();
 
-        let row = crate::db::gate_decision_challenges::find_by_id(
-            &mut conn,
-            "test-app",
-            "bafyChal001",
-        )
-        .unwrap()
-        .expect("Row must be present after signal");
+        let row =
+            crate::db::gate_decision_challenges::find_by_id(&mut conn, "test-app", "bafyChal001")
+                .unwrap()
+                .expect("Row must be present after signal");
 
         assert_eq!(row.grounds, "constitutional");
         assert_eq!(row.challenged_decision_cid, "bafyDec001");
@@ -848,7 +845,9 @@ mod mishpat_signal_tests {
 
         let signal: MishpatSignal = serde_json::from_value(wire).unwrap();
         match signal {
-            MishpatSignal::GateDecisionChallengeCreated { action_hash, entry, .. } => {
+            MishpatSignal::GateDecisionChallengeCreated {
+                action_hash, entry, ..
+            } => {
                 assert_eq!(action_hash, "uhCkkCHAL");
                 assert_eq!(entry.grounds, "constitutional");
                 assert_eq!(entry.reach, "community");
@@ -911,13 +910,9 @@ mod mishpat_signal_tests {
         let signal = make_outcome_signal("bafyOut001", "upheld");
         handle_mishpat_signal(&mut conn, "test-app", signal).unwrap();
 
-        let row = crate::db::challenge_outcomes::find_by_id(
-            &mut conn,
-            "test-app",
-            "bafyOut001",
-        )
-        .unwrap()
-        .expect("Row must be present after signal");
+        let row = crate::db::challenge_outcomes::find_by_id(&mut conn, "test-app", "bafyOut001")
+            .unwrap()
+            .expect("Row must be present after signal");
 
         assert_eq!(row.verdict, "upheld");
         assert_eq!(row.challenge_cid, "bafyChal001");
@@ -964,7 +959,9 @@ mod mishpat_signal_tests {
 
         let signal: MishpatSignal = serde_json::from_value(wire).unwrap();
         match signal {
-            MishpatSignal::ChallengeOutcomeCreated { action_hash, entry, .. } => {
+            MishpatSignal::ChallengeOutcomeCreated {
+                action_hash, entry, ..
+            } => {
                 assert_eq!(action_hash, "uhCkkOUT");
                 assert_eq!(entry.verdict, "upheld");
                 assert_eq!(entry.challenge_cid, "bafyChal");

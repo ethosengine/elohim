@@ -21,9 +21,8 @@
 
 pub mod agreement_service;
 pub mod anomaly_detection;
-pub mod boot_registration;
-pub mod household_resilience;
 pub mod behavioral_trust;
+pub mod boot_registration;
 pub mod content_service;
 pub mod disposition_service;
 pub mod distribution;
@@ -33,6 +32,7 @@ pub mod events;
 pub mod exchange_service;
 pub mod governance_health;
 pub mod hazard;
+pub mod household_resilience;
 pub mod inference_engine;
 pub mod inference_router;
 pub mod knowledge_service;

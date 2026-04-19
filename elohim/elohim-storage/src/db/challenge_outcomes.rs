@@ -55,10 +55,7 @@ pub struct ChallengeOutcomeRow {
 pub fn upsert(conn: &mut SqliteConnection, row: &ChallengeOutcomeRow) -> QueryResult<usize> {
     diesel::insert_into(challenge_outcomes::table)
         .values(row)
-        .on_conflict((
-            challenge_outcomes::app_id,
-            challenge_outcomes::outcome_id,
-        ))
+        .on_conflict((challenge_outcomes::app_id, challenge_outcomes::outcome_id))
         .do_update()
         .set(row)
         .execute(conn)
@@ -148,11 +145,7 @@ mod tests {
         conn
     }
 
-    fn make_row(
-        outcome_id: &str,
-        challenge_cid: &str,
-        verdict: &str,
-    ) -> ChallengeOutcomeRow {
+    fn make_row(outcome_id: &str, challenge_cid: &str, verdict: &str) -> ChallengeOutcomeRow {
         ChallengeOutcomeRow {
             app_id: "test-app".into(),
             outcome_id: outcome_id.into(),
@@ -191,7 +184,11 @@ mod tests {
         upsert(&mut conn, &row).unwrap();
 
         let rows = find_by_verdict(&mut conn, "test-app", "upheld").unwrap();
-        assert_eq!(rows.len(), 1, "Re-delivered signal must not duplicate the row");
+        assert_eq!(
+            rows.len(),
+            1,
+            "Re-delivered signal must not duplicate the row"
+        );
     }
 
     #[test]

@@ -38,14 +38,11 @@ pub async fn handle(
 
 async fn handle_list(req: Request<Incoming>, pool: &DbPool) -> Response<Full<Bytes>> {
     // Parse optional ?householdId= query param
-    let household = req
-        .uri()
-        .query()
-        .and_then(|q| {
-            url::form_urlencoded::parse(q.as_bytes())
-                .find(|(k, _)| k == "householdId")
-                .map(|(_, v)| v.into_owned())
-        });
+    let household = req.uri().query().and_then(|q| {
+        url::form_urlencoded::parse(q.as_bytes())
+            .find(|(k, _)| k == "householdId")
+            .map(|(_, v)| v.into_owned())
+    });
 
     let mut conn = match get_conn(pool) {
         Ok(c) => c,

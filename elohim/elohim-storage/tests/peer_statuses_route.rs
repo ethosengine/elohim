@@ -19,9 +19,7 @@ use diesel::connection::SimpleConnection;
 use diesel::prelude::*;
 use diesel::sqlite::SqliteConnection;
 
-use elohim_storage::db::peer_statuses::{
-    list_by_household, list_current, upsert, PeerStatusRow,
-};
+use elohim_storage::db::peer_statuses::{list_by_household, list_current, upsert, PeerStatusRow};
 use elohim_storage::views::PeerStatusView;
 
 // ---------------------------------------------------------------------------

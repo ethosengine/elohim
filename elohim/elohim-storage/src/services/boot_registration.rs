@@ -133,7 +133,10 @@ fn build_shape(
 
 fn sign_shape(node_id: &str, agent_pubkey: &str, archetype_id: &str, signed_at: &str) -> String {
     use sha2::{Digest, Sha256};
-    let payload = format!("{}|{}|{}|{}", node_id, agent_pubkey, archetype_id, signed_at);
+    let payload = format!(
+        "{}|{}|{}|{}",
+        node_id, agent_pubkey, archetype_id, signed_at
+    );
     let h = Sha256::digest(payload.as_bytes());
     hex::encode(h)
 }

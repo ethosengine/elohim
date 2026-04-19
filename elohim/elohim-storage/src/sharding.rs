@@ -178,10 +178,10 @@ impl ShardEncoder {
                 .map_err(|e| {
                     io::Error::new(
                         io::ErrorKind::InvalidInput,
-                        format!("ReedSolomon::new(data={}, parity={}): {}",
-                            self.config.rs_data_shards,
-                            self.config.rs_parity_shards,
-                            e),
+                        format!(
+                            "ReedSolomon::new(data={}, parity={}): {}",
+                            self.config.rs_data_shards, self.config.rs_parity_shards, e
+                        ),
                     )
                 })?;
 
@@ -422,7 +422,9 @@ mod tests {
     fn test_single_shard_manifest() {
         let encoder = ShardEncoder::new(ShardConfig::default());
         let data = b"Hello, Elohim!";
-        let manifest = encoder.create_manifest(data, "text/plain", "commons").unwrap();
+        let manifest = encoder
+            .create_manifest(data, "text/plain", "commons")
+            .unwrap();
 
         assert_eq!(manifest.encoding, "none");
         assert_eq!(manifest.data_shards, 1);
@@ -448,7 +450,9 @@ mod tests {
             *byte = (i % 256) as u8;
         }
 
-        let manifest = encoder.create_manifest(&data, "application/octet-stream", "family").unwrap();
+        let manifest = encoder
+            .create_manifest(&data, "application/octet-stream", "family")
+            .unwrap();
 
         // With shard_size=10 and 100 bytes, we get 10 chunks
         assert_eq!(manifest.encoding, "chunked");
@@ -466,7 +470,9 @@ mod tests {
         });
 
         let data: Vec<u8> = (0..100).map(|i| (i % 256) as u8).collect();
-        let manifest = encoder.create_manifest(&data, "application/octet-stream", "commons").unwrap();
+        let manifest = encoder
+            .create_manifest(&data, "application/octet-stream", "commons")
+            .unwrap();
 
         // Verify RS encoding was used
         assert_eq!(manifest.encoding, "rs-4-7");
@@ -492,7 +498,9 @@ mod tests {
         });
 
         let data: Vec<u8> = (0..100).map(|i| (i % 256) as u8).collect();
-        let manifest = encoder.create_manifest(&data, "application/octet-stream", "commons").unwrap();
+        let manifest = encoder
+            .create_manifest(&data, "application/octet-stream", "commons")
+            .unwrap();
 
         // Verify RS encoding was used
         assert_eq!(manifest.encoding, "rs-4-7");
@@ -523,7 +531,9 @@ mod tests {
         });
 
         let data: Vec<u8> = (0..200).map(|i| (i % 256) as u8).collect();
-        let manifest = encoder.create_manifest(&data, "application/octet-stream", "commons").unwrap();
+        let manifest = encoder
+            .create_manifest(&data, "application/octet-stream", "commons")
+            .unwrap();
         let shards = encoder.create_shards(&data, &manifest.encoding).unwrap();
 
         assert_eq!(manifest.encoding, "rs-4-7");
@@ -553,7 +563,9 @@ mod tests {
         });
 
         let data: Vec<u8> = (0..200).map(|i| (i % 256) as u8).collect();
-        let manifest = encoder.create_manifest(&data, "application/octet-stream", "commons").unwrap();
+        let manifest = encoder
+            .create_manifest(&data, "application/octet-stream", "commons")
+            .unwrap();
         let shards = encoder.create_shards(&data, &manifest.encoding).unwrap();
 
         // Drop 2 data shards and 1 parity shard
@@ -580,7 +592,9 @@ mod tests {
         });
 
         let data: Vec<u8> = (0..200).map(|i| (i % 256) as u8).collect();
-        let manifest = encoder.create_manifest(&data, "application/octet-stream", "commons").unwrap();
+        let manifest = encoder
+            .create_manifest(&data, "application/octet-stream", "commons")
+            .unwrap();
         let shards = encoder.create_shards(&data, &manifest.encoding).unwrap();
 
         // Drop 4 shards — only 3 remain, but we need 4 data shards minimum
@@ -607,7 +621,9 @@ mod tests {
         });
 
         let data: Vec<u8> = (0..73).map(|i| (i % 256) as u8).collect();
-        let manifest = encoder.create_manifest(&data, "text/plain", "commons").unwrap();
+        let manifest = encoder
+            .create_manifest(&data, "text/plain", "commons")
+            .unwrap();
         let shards = encoder.create_shards(&data, &manifest.encoding).unwrap();
 
         assert_eq!(manifest.encoding, "chunked");
@@ -628,7 +644,9 @@ mod tests {
         });
 
         let data: Vec<u8> = (0..73).map(|i| (i % 256) as u8).collect();
-        let manifest = encoder.create_manifest(&data, "text/plain", "commons").unwrap();
+        let manifest = encoder
+            .create_manifest(&data, "text/plain", "commons")
+            .unwrap();
         let shards = encoder.create_shards(&data, &manifest.encoding).unwrap();
 
         let mut shard_opts: Vec<Option<Vec<u8>>> = shards.iter().map(|s| Some(s.clone())).collect();
@@ -643,7 +661,9 @@ mod tests {
         let encoder = ShardEncoder::new(ShardConfig::default());
 
         let data = b"The fruit back on the tree.";
-        let manifest = encoder.create_manifest(data, "text/plain", "commons").unwrap();
+        let manifest = encoder
+            .create_manifest(data, "text/plain", "commons")
+            .unwrap();
         let shards = encoder.create_shards(data, &manifest.encoding).unwrap();
 
         assert_eq!(manifest.encoding, "none");

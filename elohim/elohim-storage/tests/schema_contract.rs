@@ -351,15 +351,14 @@ fn gate_decision_challenge_view_empty_evidence_refs() {
         challenge_id: "bafyreib2vq7challenge-safety-01234567890123456789012345678".to_string(),
         challenged_decision_cid: "bafyreib2vq7decision-safety-0123456789012345678901234567"
             .to_string(),
-        challenger_id: "uhCAkCHALLENGER2ABCDEFGHIJKLMNOPQRSTUVWXYZ01234567890123456789"
-            .to_string(),
+        challenger_id: "uhCAkCHALLENGER2ABCDEFGHIJKLMNOPQRSTUVWXYZ01234567890123456789".to_string(),
         grounds: "safety".to_string(),
-        summary: "Content safety concern — no external evidence available at filing time".to_string(),
+        summary: "Content safety concern — no external evidence available at filing time"
+            .to_string(),
         evidence_refs: String::new(),
         filed_at: "2026-04-19T11:00:00Z".to_string(),
         reach: "intimate".to_string(),
-        dht_anchor_hash: "uhCkkSAFETYANCHOR0123456789012345678901234567890123456789012"
-            .to_string(),
+        dht_anchor_hash: "uhCkkSAFETYANCHOR0123456789012345678901234567890123456789012".to_string(),
         created_at: "2026-04-19T11:00:01Z".to_string(),
     };
 
@@ -401,19 +400,16 @@ fn challenge_outcome_view_dismissed_no_indemnification() {
     use elohim_storage::ChallengeOutcomeView;
 
     let view = ChallengeOutcomeView {
-        outcome_id: "bafyreib2vq7outcome-dismissed-0123456789012345678901234567890"
-            .to_string(),
-        challenge_cid: "bafyreib2vq7challenge-dismissed-01234567890123456789012345678"
-            .to_string(),
+        outcome_id: "bafyreib2vq7outcome-dismissed-0123456789012345678901234567890".to_string(),
+        challenge_cid: "bafyreib2vq7challenge-dismissed-01234567890123456789012345678".to_string(),
         verdict: "dismissed".to_string(),
-        reviewer_consensus:
-            "uhCAkREVIEWERSINGLE01234567890123456789012345678901234567890123456".to_string(),
+        reviewer_consensus: "uhCAkREVIEWERSINGLE01234567890123456789012345678901234567890123456"
+            .to_string(),
         reasoning_json: r#"{"summary":"Insufficient evidence to sustain challenge","steps":[]}"#
             .to_string(),
         decided_at: "2026-04-20T14:00:00Z".to_string(),
         indemnification_actions_json: "[]".to_string(),
-        dht_anchor_hash: "uhCkkDISMISSEDANCHOR0123456789012345678901234567890123456789"
-            .to_string(),
+        dht_anchor_hash: "uhCkkDISMISSEDANCHOR0123456789012345678901234567890123456789".to_string(),
         created_at: "2026-04-20T14:00:01Z".to_string(),
     };
 
@@ -762,14 +758,16 @@ fn elohim_capability_profile_unknown_strength_rejected() {
 
 #[test]
 fn elohim_reputation_profile_view_matches_schema() {
-    use elohim_storage::ElohimReputationProfileView;
     use elohim_storage::views::JsonVal;
+    use elohim_storage::ElohimReputationProfileView;
 
     let view = ElohimReputationProfileView {
         elohim_id: "uhCAkABCDEFGHIJKLMNOPQRSTUVWXYZ012345678901234567890123456789012".to_string(),
         window_start: "2026-01-19T00:00:00Z".to_string(),
         window_end: "2026-04-19T00:00:00Z".to_string(),
-        current_substance_cid: Some("bafyreib2vq7substance01234567890123456789012345678901234567".to_string()),
+        current_substance_cid: Some(
+            "bafyreib2vq7substance01234567890123456789012345678901234567".to_string(),
+        ),
         total_decisions: 42,
         challenged_count: 3,
         upheld_count: 1,
@@ -792,8 +790,8 @@ fn elohim_reputation_profile_view_matches_schema() {
 
 #[test]
 fn elohim_reputation_profile_view_empty_window_matches_schema() {
-    use elohim_storage::ElohimReputationProfileView;
     use elohim_storage::views::JsonVal;
+    use elohim_storage::ElohimReputationProfileView;
 
     // An elohim with no decisions in the window is a valid response (never a 404).
     let view = ElohimReputationProfileView {

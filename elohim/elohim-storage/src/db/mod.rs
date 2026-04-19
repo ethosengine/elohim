@@ -89,8 +89,8 @@ pub mod peer_statuses;
 pub mod gate_decision_attestations;
 
 // Gate decision challenge + outcome projections (mishpat DNA — Phase 11 Task 11.2)
-pub mod gate_decision_challenges;
 pub mod challenge_outcomes;
+pub mod gate_decision_challenges;
 
 // Elohim reputation aggregation query (mishpat outcome graph — Phase 11 Task 11.3)
 pub mod elohim_reputation;
