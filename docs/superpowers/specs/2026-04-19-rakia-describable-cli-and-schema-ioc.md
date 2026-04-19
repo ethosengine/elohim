@@ -13,6 +13,8 @@ The end-of-sprint artifact is a single `docs/superpowers/sprint-results/2026-04-
 
 This sprint replaces shadow-mode validation. Jenkins is not a target consumer — it's legacy reference documentation for what problems rakia must solve. The upgrade path is rakia replacing Jenkins, not rakia plugging into Jenkins.
 
+**Architectural placement:** Brit (the local CLI fork of gitoxide) sits outside the P2P layer. Rakia (the build/CI application that brit-cli surfaces) IS in the P2P layer — its long-term form is peer-dispatched builds with threshold attestations across the swarm. This sprint ships local-only describability, but the schemas it locks in are the durable wire contracts that future peer dispatch will gossip. Designing them as casual local artifacts now would force breaking re-design later. See the **P2P Design Gate Classification** section for per-entity classification at both this-sprint and Stage 2 horizons.
+
 ## The Sprint Cadence Pattern (Standing Discipline)
 
 Every rakia sprint follows this rhythm, not just this one:
@@ -338,6 +340,8 @@ Required sections:
 | Peer dispatch of build steps | Requires steward swarm integration | Stage 2 |
 | Threshold attestation across builders | Requires multiple builders | Stage 2 |
 | Brit `ContentNode` adapter for git objects | Independent brit Phase 2 work | Parallel track, no dependency |
+| `planFingerprint: BritCid` field on `BuildPlan` (content-addressed plan identity for peer dispatch) | Schema designed to accommodate it (instance metadata already separated from identity fields), but not load-bearing until peer dispatch lands | Rakia-peer (Stage 2) |
+| Threshold attestation envelope around baseline writes | Single-node baselines work fine today; threshold required only for multi-builder swarm | Rakia-peer (Stage 2) |
 
 ## Relationship to Predecessor Spec
 
@@ -351,56 +355,65 @@ Refines but does not contradict `docs/superpowers/specs/2026-04-19-brit-graph-ra
 
 ## P2P Design Gate Classification
 
-The brit/rakia stack is intentionally **outside the P2P protocol layer** — it's developer tooling that operates on git repositories, not protocol-replicated data. Per the `p2p-design-gate` skill, every entity introduced by this sprint is classified below. None require DHT entry types, attestations, or storage projections.
+**Architectural boundary:** Brit is a local CLI on the git substrate (outside the P2P layer). Rakia IS in the P2P layer — its long-term architecture is peer-dispatched builds with threshold attestations across the swarm. This sprint ships local-only describability, but every schema we author here is the durable wire contract that peers will eventually exchange. Designing them as casual local artifacts now would force a breaking re-design when peer dispatch lands.
+
+Every entity is classified at two horizons: **this sprint** (local CLI artifacts) and **rakia-peer (Stage 2)** (P2P dispatch + threshold attestation). The classification at "this sprint" tells us what we ship; the classification at "Stage 2" constrains how we shape the schemas now.
 
 ### Entity: BuildManifest
 
-- **Classification:** Operational (C)
-- **Justification:** A build-configuration file (`build-manifest.json`) committed to the source repo. The git tree IS the source of truth. Not protocol data — developer tooling configuration. No notarization need; the manifest IS the source-code intent, version-controlled by git. Reconstructable from any git checkout.
-- **Content address strategy:** Slug/UUID (file path on disk + pipeline name)
-- **Address justification:** Manifests are files in a git repo addressed by `(commit, path)`. Brit/git compat means the git substrate handles addressing — no CID layer needed. Not content-derived (same content at different paths = different manifests). Not agent-scoped (repo-shared, not agent-private).
-- **Source of truth:** Git repository (file on disk, version-controlled)
-- **Coordinator zome:** N/A — no zome involvement; build system lives outside protocol primitives
-- **Storage projection:** N/A — parsed in-memory from disk per invocation, no SQLite
-- **HTTP route:** N/A — CLI tool, no HTTP surface
-- **Anti-pattern check:** None apply. "REST route as design starting point" doesn't apply (no HTTP). Source-of-truth is documented (git tree).
+- **This sprint classification:** Operational (C) — a file in the git repo, parsed locally per invocation.
+- **Stage 2 classification:** Operational (C) still — manifests stay in the git repo. The git tree IS the source of truth, and brit/git compat means peers fetch them via standard git operations (clone/fetch). Manifests are SHARED inputs that all peers see consistently because they share the git substrate.
+- **Justification:** No notarization need — the git commit hash addresses the manifest unambiguously. Two peers looking at the same `(commit, path)` see the same manifest. The git layer below provides P2P-safe sharing.
+- **Content address strategy:** Slug-by-path within a git tree. The git commit hash provides the cryptographic addressing.
+- **Source of truth:** Git repository (which itself is P2P-replicable via brit/git)
+- **Wire format implication:** `build-manifest.schema.json` is the contract for what every peer expects to find when parsing this file. The schema is the agreement.
+- **Anti-pattern check:** None apply. Source-of-truth documented (git tree).
 
 ### Entity: BuildPlan
 
-- **Classification:** Operational (C)
-- **Justification:** Ephemeral output of `brit plan`. Pure deterministic function of (constellation, changed_paths, baseline, head). Reconstructable on demand. Never persisted.
-- **Content address strategy:** Slug/UUID (not addressed at all — streamed to stdout for one-shot machine consumption)
-- **Address justification:** BuildPlan is never stored. The next-sprint `rakia ci` pipes it directly to the executor. No identity, no addressing.
-- **Source of truth:** Computation
-- **Coordinator zome:** N/A
-- **Storage projection:** N/A
-- **HTTP route:** N/A
-- **Anti-pattern check:** None apply.
+- **This sprint classification:** Operational (C) — ephemeral CLI output, never persisted, never sent over the wire.
+- **Stage 2 classification:** Notarized-attestation candidate (A2) — the BuildPlan IS the agreement that peers dispatch against. Multiple peers receiving the same plan must compute identical results to attest. The plan itself is content-addressable (deterministic function of constellation + baseline + head + changed_paths).
+- **Justification:** Today it's local computation. Tomorrow it's the gossip message that announces "I want these steps built; here are the fingerprints; here's my baseline." Designing the schema casually now means re-designing the wire format later.
+- **Content address strategy (today):** Slug/UUID (not addressed — stdout pipe to next process).
+- **Content address strategy (Stage 2):** Content-derived (`planFingerprint: BritCid`) — hash of the deterministic identity fields (`baseline`, `head`, `levels[].fingerprint`, `levels[].depends`). Excludes `generatedAt` and `tool.version` (instance metadata, not identity). Two peers computing the same plan from the same inputs MUST produce identical fingerprints — that's the dispatch coordination primitive.
+- **Source of truth (today):** Computation. **Source of truth (Stage 2):** Computation, with optional notarization via attestation when the plan becomes a peer-shared agreement.
+- **Wire format implication:** This sprint's schema choices ARE the future wire contract. Specifically: the schema must remain deterministically serializable (sorted maps, no insertion-order deps, no host-specific metadata in identity-relevant fields). The current schema satisfies this — the `generatedAt` and `tool` fields are intentionally separate from identity fields.
+- **Sprint-scope deferred work:** Adding `planFingerprint: BritCid` field to `BuildPlan`. Not blocking describability. Carry-over for the rakia-peer sprint where the field becomes load-bearing.
+- **Anti-pattern check:** None apply, given the schema separates instance metadata (`generatedAt`, `tool`) from identity-relevant fields.
 
 ### Entity: Baseline ref (`refs/notes/rakia/baselines/{pipeline}`)
 
-- **Classification:** Operational (C)
-- **Justification:** Git ref tracking the last-known-good commit per pipeline. Git ref namespace IS the source of truth — survives executor death because it's a ref, not an artifact (which is precisely the design improvement vs Jenkins's `pipeline-baselines.json`).
-- **Content address strategy:** Slug (pipeline name → ref path). Justified because git ref naming conventions require human-readable paths.
-- **Source of truth:** Git ref namespace under `refs/notes/rakia/baselines/`
-- **Coordinator zome:** N/A
-- **Storage projection:** N/A — the git ref IS the storage
-- **HTTP route:** N/A — accessed via brit CLI which uses brit/gix
-- **Anti-pattern check:** None apply. Brit/git compat preserved (these are valid stock git refs; `git show-ref` can read them).
+- **This sprint classification:** Operational (C) — git ref read/written locally; brit/git compat preserved.
+- **Stage 2 classification:** Notarized via attestation (A2) — when the network advances a baseline, peers need verifiable agreement that "commit X is the new baseline for pipeline Y." This will use the existing `Build` attestation entry type in `brit-epr/src/elohim/attestation/`. The git ref remains the local cache; the attestation is the network truth.
+- **Justification today:** Single-node CI. The git ref is sufficient. **Justification Stage 2:** Multi-builder swarm. A baseline change must be witnessed by enough peers (threshold) to prevent a rogue node from rolling baselines back or skipping pipelines.
+- **Content address strategy:** Slug (pipeline name → ref path) for the local cache. Stage 2 attestation is content-addressed by BritCid of the attestation envelope.
+- **Source of truth (today):** Git ref namespace. **Source of truth (Stage 2):** Threshold attestation set; git ref is the local materialization.
+- **Wire format implication:** None this sprint. Attestation envelope schema is brit-epr's existing contract.
+- **Anti-pattern check:** None apply.
 
-### Design constraints discovered
+### Design constraints surfaced by the gate
 
-The classification work confirms a crisp architectural boundary:
-
-| Layer | Where data lives | Source of truth | Subject to p2p-design-gate? |
+| Layer | Source of truth (this sprint) | Source of truth (Stage 2) | P2P transport |
 |---|---|---|---|
-| Protocol primitives (Content, Mastery, Attestation, EconomicEvent, ...) | Holochain DHT | DHT entry types | Yes — every entity needs full classification |
-| Build/CI domain (BuildManifest, BuildPlan, baselines) | Git repo + git refs | Git tree + ref namespace (brit/git compat) | Classified once here as Category C — sprint scope is closed under "operational" |
-| Developer dev-loop (codegen artifacts, fixtures, generated_types.rs) | Files on disk | Schemas (regenerated) | N/A — derived artifacts, no entity status |
+| BuildManifest | Git tree | Git tree (unchanged) | brit/git replication |
+| BuildPlan | Local computation | Same computation, optionally + threshold attestation envelope | libp2p direct dispatch (gossip the plan, peers attest results) |
+| Baseline | Git ref (local) | Threshold attestation set; git ref is local cache | brit-epr Build attestation |
+| BuildAttestation (next sprint) | N/A — doesn't exist yet | Notarized (A) via existing brit-epr `Build` attestation entry type | brit-epr attestation transport |
+| ExecutionEvent (next sprint) | N/A | Operational (C) — ephemeral logs, agent-scoped | None — local to executor |
+| BuilderPresence (next sprint) | N/A | Agent-scoped + attestation (B2) — "I'm available to build" presence | libp2p gossip / brit-epr presence |
 
-This boundary mirrors the SDK CLAUDE.md test ("Could this capability be captured at scale for rent extraction?"). Build/CI cannot — anyone with a git repo can run `brit`. There is no "the build authority" to capture. So it lives outside the protocol, in developer-tooling space, and the gate's notarization machinery does not apply.
+**Why this matters for rakia-vs-brit and rakia-vs-SDK separation:**
 
-**Implication for future rakia sprints:** new entities introduced by `rakia-executor` (ExecutionEvent) and the cutover work (BuildAttestation) WILL hit the gate again — BuildAttestation is Category A (notarized via the existing `Build` attestation entry type in `brit-epr/src/elohim/attestation/`), and ExecutionEvent is Category C (operational, ephemeral logs). That classification belongs to the next sprint's spec, not this one.
+Rakia composes protocol primitives (brit-epr `Build` attestation, agent presence, etc.) into build-domain semantics. It doesn't add new protocol primitives — it consumes them. That's why the schemas stay rakia-owned (build-domain meaning) even though rakia operates over the P2P network. The SDK still owns the protocol-core primitives; rakia is the application that uses them for build/CI.
+
+The brit/rakia split is now precisely: **brit is the local substrate (git + EPR primitives, including attestation)**, **rakia is the distributed application that orchestrates builds across the network using those primitives**. Brit-cli is local because the operator surface is local; the network behavior happens through rakia's executor (next sprint) and rakia-peer (Stage 2).
+
+**Implication for this sprint's schema design:**
+
+1. **BuildPlan schema MUST remain deterministically serializable** — no insertion-order maps, no host-specific identity fields. ✓ (Already designed this way.)
+2. **`generatedAt` and `tool.version` are explicitly outside the future plan-identity hash** — documented above as instance metadata. ✓ (Already separated.)
+3. **`planFingerprint: BritCid` field is a known future extension** — added to spec carry-overs.
+4. **No premature P2P infrastructure** — we don't add gossip, attestation envelopes, or builder presence this sprint. Those land when the executor sprint produces real build outputs to attest about.
 
 ## Key Design Decisions
 
