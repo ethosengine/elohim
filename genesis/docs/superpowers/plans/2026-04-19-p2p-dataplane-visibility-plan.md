@@ -2623,6 +2623,152 @@ git commit -m "fix(build): ship elohim-cache-core WASM bundle under /wasm/ in ap
 
 ---
 
+## Module N — Reed-Solomon sharding cleanup (discovered during sprint)
+
+Discovered while auditing RS maturity: `elohim/elohim-storage/src/sharding.rs` is otherwise sound (reed-solomon-erasure = "6", galois_8, RS 4+3, ShardEncoder with encode + reconstruct + 10 unit tests) but has two latent defects and a wiring gap that are cheap to address in-sprint. Full Sprint-C of the p2p-resilience-proof design (auto-distribution on ingest, periodic verification, reconstruction-verify endpoint) stays deferred — only the narrow defects land here. Source-of-truth classification: shard manifests + shard locations remain Category C (operational, local projection) per the 2026-04-04 p2p-resilience-proof design gate; no new DHT entry types added.
+
+### Task N1: Fix chunked-mode unreachable threshold logic
+
+**Files:**
+- Modify: `elohim/elohim-storage/src/sharding.rs` (`determine_encoding`)
+
+**The defect:** In `determine_encoding` (~line 113), `single_shard_max` (16MB) > `rs_threshold` (10MB), so the first arm (`size <= single_shard_max`) swallows everything ≤16MB and the `"chunked"` branch is unreachable. Net: blobs >16MB always go straight to RS; chunked mode never fires.
+
+**The fix:** Swap the ordering so the middle band is a real interval: `[0, single_shard_max] → none`; `(single_shard_max, rs_threshold] → chunked`; `(rs_threshold, ∞) → rs-4-7`. Constants need to be re-ordered too: `single_shard_max = 16MB` (stays), `rs_threshold = 64MB` (grows — becomes the threshold for switching to RS). A blob between 16MB and 64MB is chunked (no redundancy but split across shards); above 64MB is RS-coded.
+
+- [ ] **Step 1: Write failing test**
+
+In the `#[cfg(test)] mod tests` block of `sharding.rs` add:
+
+```rust
+#[test]
+fn determine_encoding_returns_chunked_for_mid_band() {
+    let enc = ShardEncoder::new(ShardConfig::default());
+    // 16MB + 1 byte → should be chunked (bigger than single-shard, smaller than RS threshold)
+    assert_eq!(enc.determine_encoding(SINGLE_SHARD_MAX + 1), "chunked");
+    // 32MB → should be chunked
+    assert_eq!(enc.determine_encoding(32 * 1024 * 1024), "chunked");
+    // 100MB → should be rs-4-7
+    assert_eq!(enc.determine_encoding(100 * 1024 * 1024), "rs-4-7");
+    // 16MB → should be none (boundary)
+    assert_eq!(enc.determine_encoding(SINGLE_SHARD_MAX), "none");
+}
+```
+
+- [ ] **Step 2: Run — expect FAIL**
+
+```bash
+cd elohim/elohim-storage && RUSTFLAGS='--cfg getrandom_backend="custom"' cargo test --lib sharding::tests::determine_encoding_returns_chunked_for_mid_band
+```
+Expected: FAIL — current logic returns "rs-4-7" or unreachable for the mid-band assertions.
+
+- [ ] **Step 3: Apply the fix**
+
+Change `RS_THRESHOLD` from `10 * 1024 * 1024` to `64 * 1024 * 1024`. Change `determine_encoding` to:
+
+```rust
+pub fn determine_encoding(&self, size: usize) -> &'static str {
+    if size <= self.config.single_shard_max {
+        "none"
+    } else if size <= self.config.rs_threshold {
+        "chunked"
+    } else {
+        "rs-4-7"
+    }
+}
+```
+
+Note `<=` on the `rs_threshold` branch — makes the boundary tests deterministic.
+
+- [ ] **Step 4: Run — expect PASS**
+
+```bash
+cd elohim/elohim-storage && RUSTFLAGS='--cfg getrandom_backend="custom"' cargo test --lib sharding
+```
+Expected: PASS for the new test plus all 10 existing sharding tests.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add elohim/elohim-storage/src/sharding.rs
+git commit -m "fix(sharding): reachable chunked-mode threshold (16MB<size<=64MB → chunked)"
+```
+
+### Task N2: Propagate Reed-Solomon encode errors instead of panicking
+
+**Files:**
+- Modify: `elohim/elohim-storage/src/sharding.rs`
+
+**The defect:** `ReedSolomon::new(...)` and `.encode(...)` calls at lines 156, 177, 225, 246 use `.unwrap()`. A malformed config or encode error crashes the process. Public API (`create_manifest`, `create_shards`) swallows the panic without a result.
+
+**The fix:** Change `create_manifest` and `create_shards` signatures to return `Result<_, io::Error>` and propagate RS errors with `io::Error::new(io::ErrorKind::InvalidData, e.to_string())`. Update call-sites (typically blob_store.rs).
+
+- [ ] **Step 1: Find callers**
+
+```bash
+grep -rn "create_manifest\|create_shards" elohim/elohim-storage/src/
+```
+Note each call-site. They'll need `?` propagation after the change.
+
+- [ ] **Step 2: Write failing test**
+
+```rust
+#[test]
+fn create_manifest_returns_err_on_rs_config_failure() {
+    // RS panic case: data_shards + parity_shards > 256 in galois_8
+    let bad_config = ShardConfig {
+        rs_data_shards: 200,
+        rs_parity_shards: 200,
+        ..ShardConfig::default()
+    };
+    let enc = ShardEncoder::new(bad_config);
+    let data = vec![0u8; 100 * 1024 * 1024];  // force RS path
+    let result = enc.create_manifest(&data, "application/octet-stream", "commons");
+    assert!(result.is_err(), "expected Err from impossible RS config, got {:?}", result);
+}
+```
+
+(This test currently panics — step 3's fix changes that to Err.)
+
+- [ ] **Step 3: Run — expect panic or build fail**
+
+```bash
+cd elohim/elohim-storage && RUSTFLAGS='--cfg getrandom_backend="custom"' cargo test --lib sharding::tests::create_manifest_returns_err_on_rs_config_failure
+```
+Expected: FAIL with panic OR build error (test signature expects Result).
+
+- [ ] **Step 4: Refactor signatures**
+
+Change `create_manifest` signature to:
+
+```rust
+pub fn create_manifest(&self, data: &[u8], mime_type: &str, reach: &str)
+    -> Result<ShardManifest, io::Error>
+```
+
+Replace `.unwrap()` on `ReedSolomon::new(...)` and `.encode(...)` with `.map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e.to_string()))?`. Wrap the struct literal in `Ok(...)` at the end.
+
+Do the same for `create_shards` — return `Result<Vec<Vec<u8>>, io::Error>`.
+
+Update all callers grep'd in Step 1 to propagate the Result with `?`.
+
+- [ ] **Step 5: Run full sharding + blob_store tests**
+
+```bash
+cd elohim/elohim-storage && RUSTFLAGS='--cfg getrandom_backend="custom"' cargo test --lib sharding blob_store
+RUSTFLAGS='--cfg getrandom_backend="custom"' cargo clippy -- -D warnings
+```
+Expected: all PASS, no new clippy warnings.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add elohim/elohim-storage/src/sharding.rs elohim/elohim-storage/src/blob_store.rs
+git commit -m "fix(sharding): propagate Reed-Solomon errors as io::Error instead of panicking"
+```
+
+---
+
 ## Self-review
 
 **Spec coverage:**
