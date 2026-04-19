@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://elohim.protocol/schemas/a2o/sprint-report.schema.json",
+  "title": "A2oSprintReport",
+  "description": "Aggregated sprint-planning report from an a2o run: deduplicated defects ranked by frequency.",
+  "type": "object",
+  "required": ["generatedAt", "runId", "profile", "summary", "findings"],
+  "additionalProperties": false,
+  "properties": {
+    "generatedAt": { "type": "string", "format": "date-time" },
+    "runId": { "type": "string", "description": "CI run identifier or timestamp for local runs" },
+    "profile": { "type": "string", "description": "cucumber profile (alpha, local, browser, delivery, ...)" },
+    "doorway": { "type": "string", "description": "Doorway base URL the run targeted" },
+    "summary": {
+      "type": "object",
+      "required": ["scenarios", "findings"],
+      "additionalProperties": false,
+      "properties": {
+        "scenarios": {
+          "type": "object",
+          "required": ["total", "passed", "failed", "skipped", "pending"],
+          "additionalProperties": false,
+          "properties": {
+            "total":   { "type": "integer", "minimum": 0 },
+            "passed":  { "type": "integer", "minimum": 0 },
+            "failed":  { "type": "integer", "minimum": 0 },
+            "skipped": { "type": "integer", "minimum": 0 },
+            "pending": { "type": "integer", "minimum": 0 }
+          }
+        },
+        "findings": {
+          "type": "object",
+          "required": ["total", "bySource", "byPillar"],
+          "additionalProperties": false,
+          "properties": {
+            "total":    { "type": "integer", "minimum": 0 },
+            "bySource": { "type": "object", "additionalProperties": { "type": "integer", "minimum": 0 } },
+            "byPillar": { "type": "object", "additionalProperties": { "type": "integer", "minimum": 0 } }
+          }
+        }
+      }
+    },
+    "findings": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/Finding" }
+    }
+  },
+  "$defs": {
+    "Finding": {
+      "type": "object",
+      "required": ["fingerprint", "source", "pillar", "message", "occurrences", "scenarios"],
+      "additionalProperties": false,
+      "properties": {
+        "fingerprint": { "type": "string", "description": "Stable hash over the normalized message" },
+        "source":      { "type": "string", "enum": ["console-error", "page-error", "failed-request", "scenario-failure", "pending-step", "coverage-gap"] },
+        "pillar":      { "type": "string", "description": "lamad | imagodei | elohim | federation | delivery | browser | content | deployment | qahal | shefa | unknown" },
+        "peer":        { "type": "string", "description": "Target-peer slug (e.g., 'timothy-household', 'shem'). Populated by Plan B once request-ID/peer routing is live; absent for local-only runs." },
+        "severity":    { "type": "string", "enum": ["error", "warning", "info"], "default": "error" },
+        "message":     { "type": "string" },
+        "firstSeenUrl":{ "type": "string", "format": "uri" },
+        "occurrences": { "type": "integer", "minimum": 1 },
+        "scenarios":   {
+          "type": "array",
+          "minItems": 1,
+          "items":   {
+            "type": "object",
+            "required": ["name", "feature"],
+            "additionalProperties": false,
+            "properties": {
+              "name":    { "type": "string" },
+              "feature": { "type": "string" },
+              "human":   { "type": "string" }
+            }
+          }
+        },
+        "suggestedObjective": { "type": "string", "description": "One-line headline for /shift Objective seeding" }
+      }
+    }
+  }
+}
