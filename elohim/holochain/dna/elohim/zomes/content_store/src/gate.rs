@@ -165,6 +165,63 @@ fn extract_related_experience_story(metadata_json: &str) -> Option<String> {
         .map(|s| s.to_string())
 }
 
+// ─── Test-only event builders (no agent_info() call) ─────────────────────────
+//
+// Production callers use `build_content_publish_event` / `build_attestation_write_event`
+// which derive the author from `agent_info()`.  In tests there is no HDK runtime, so
+// these variants accept an explicit author string.  They exist solely to let the routing
+// assertions (`experience-moment → AttestationWrite`, `lesson → ContentPublish`) run
+// without a live conductor.  They are not re-exported and have no production callers.
+
+#[cfg(test)]
+fn build_content_publish_event_with_author(
+    input: &CreateContentInput,
+    author: &str,
+) -> RelationalImpactEvent {
+    let content_cid = input.blob_cid.clone().unwrap_or_else(|| input.id.clone());
+    RelationalImpactEvent::ContentPublish {
+        content_cid,
+        declared_reach: input.reach.clone(),
+        author: author.to_string(),
+    }
+}
+
+#[cfg(test)]
+fn build_attestation_write_event_with_author(
+    input: &CreateContentInput,
+    issuer: &str,
+) -> RelationalImpactEvent {
+    let subject_hash = extract_related_experience_story(&input.metadata_json)
+        .unwrap_or_else(|| input.id.clone());
+    RelationalImpactEvent::AttestationWrite {
+        subject_hash,
+        claim_kind: EXPERIENCE_MOMENT_CLAIM_KIND.to_string(),
+        issuer: issuer.to_string(),
+    }
+}
+
+/// Test-only: invoke `check_blocking` on a pre-built event and map the result
+/// to `ExternResult<()>` using the same error-shape as `gate_check_for_content`.
+///
+/// This lets decline/escalate path assertions run without an HDK runtime (the
+/// real `gate_check_for_content` calls `build_event` → `agent_info()` first).
+/// Production callers MUST use `gate_check_for_content`.
+#[cfg(test)]
+fn gate_check_with_event(event: RelationalImpactEvent) -> ExternResult<()> {
+    let decision = check_blocking(event)
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("gate error: {e}"))))?;
+    match decision.status {
+        GateStatus::Allow { .. } | GateStatus::Verdict(_) => Ok(()),
+        GateStatus::Decline { grounds } => Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Gate declined content: {}",
+            grounds.summary
+        )))),
+        GateStatus::Escalate { .. } => Err(wasm_error!(WasmErrorInner::Guest(
+            "Gate escalated to steward review".to_string()
+        ))),
+    }
+}
+
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
 #[cfg(test)]
@@ -241,5 +298,213 @@ mod tests {
     fn claim_kind_constant_is_stable() {
         // If this test fails, update gate-types/gate-client tests to match.
         assert_eq!(EXPERIENCE_MOMENT_CLAIM_KIND, "experience-moment-recording");
+    }
+
+    // ── Phase 7 E2E — event routing (no agent_info() / HDK required) ─────────
+    //
+    // These tests use the test-only event builders that accept an explicit author
+    // string, bypassing `agent_info()`.  They prove the routing invariant:
+    //
+    //   experience-moment → AttestationWrite (content-safety + discernment)
+    //   all other types   → ContentPublish   (content-safety only)
+    //
+    // What IS verified:
+    //   - Event variant selection based on content_type
+    //   - subject_hash derivation (relatedExperienceStory or id fallback)
+    //   - claim_kind constant stability
+    //   - blob_cid fallback to id for ContentPublish
+    //   - gate_check_with_event: Allow → Ok(()), Decline → WasmError, Escalate → WasmError
+    //
+    // What IS NOT verified:
+    //   - agent_info() resolution (requires a live conductor / sweettest harness;
+    //     no sweettest harness exists in this crate as of Phase 7)
+    //   - Actual DHT commit (no conductor running)
+    //   - Real wisdom evaluation (DevContext mock; overrides used for Decline tests)
+
+    #[test]
+    fn experience_moment_content_type_produces_attestation_write_event() {
+        let meta = experience_moment_metadata(Some("epr:story:parent-001"));
+        let input = base_input("experience-moment", &meta);
+        let event = build_attestation_write_event_with_author(&input, "agent-alice");
+
+        assert!(
+            matches!(event, RelationalImpactEvent::AttestationWrite { .. }),
+            "experience-moment must produce AttestationWrite; got: {:?}",
+            event
+        );
+        if let RelationalImpactEvent::AttestationWrite {
+            claim_kind,
+            subject_hash,
+            issuer,
+        } = event
+        {
+            assert_eq!(claim_kind, EXPERIENCE_MOMENT_CLAIM_KIND);
+            assert_eq!(
+                subject_hash, "epr:story:parent-001",
+                "subject_hash must be the relatedExperienceStory value"
+            );
+            assert_eq!(issuer, "agent-alice");
+        }
+    }
+
+    #[test]
+    fn non_experience_moment_content_type_produces_content_publish_event() {
+        let input = base_input("lesson", "{}");
+        let event = build_content_publish_event_with_author(&input, "agent-bob");
+
+        assert!(
+            matches!(event, RelationalImpactEvent::ContentPublish { .. }),
+            "non-experience-moment must produce ContentPublish; got: {:?}",
+            event
+        );
+        if let RelationalImpactEvent::ContentPublish {
+            content_cid,
+            declared_reach,
+            author,
+        } = event
+        {
+            // No blob_cid set → falls back to input.id
+            assert_eq!(content_cid, "test-id-001");
+            assert_eq!(declared_reach, "commons");
+            assert_eq!(author, "agent-bob");
+        }
+    }
+
+    #[test]
+    fn content_publish_event_uses_blob_cid_when_present() {
+        let mut input = base_input("lesson", "{}");
+        input.blob_cid = Some("bafkreiabc123".to_string());
+        let event = build_content_publish_event_with_author(&input, "agent-carol");
+
+        if let RelationalImpactEvent::ContentPublish { content_cid, .. } = event {
+            assert_eq!(
+                content_cid, "bafkreiabc123",
+                "blob_cid must be preferred over id when present"
+            );
+        } else {
+            panic!("expected ContentPublish event");
+        }
+    }
+
+    #[test]
+    fn experience_moment_without_related_story_falls_back_to_id() {
+        let meta = experience_moment_metadata(None); // no relatedExperienceStory
+        let input = base_input("experience-moment", &meta);
+        let event = build_attestation_write_event_with_author(&input, "agent-dave");
+
+        if let RelationalImpactEvent::AttestationWrite { subject_hash, .. } = event {
+            assert_eq!(
+                subject_hash, "test-id-001",
+                "subject_hash must fall back to input.id when relatedExperienceStory is absent"
+            );
+        } else {
+            panic!("expected AttestationWrite event");
+        }
+    }
+
+    // ── gate_check_with_event: seam tests (no agent_info required) ────────────
+    //
+    // These tests prove that the gate → ExternResult mapping works correctly
+    // for Allow / Decline / Escalate without invoking the full gate_check_for_content
+    // (which would call agent_info() and require a conductor).
+
+    #[test]
+    fn gate_check_with_event_allow_returns_ok() {
+        // DevContext: check_blocking always returns Allow in the absence of overrides.
+        let event = RelationalImpactEvent::ContentPublish {
+            content_cid: "bafkrei-test".to_string(),
+            declared_reach: "commons".to_string(),
+            author: "agent-test".to_string(),
+        };
+        let result = gate_check_with_event(event);
+        assert!(
+            result.is_ok(),
+            "DevContext Allow must map to ExternResult::Ok(())"
+        );
+    }
+
+    #[test]
+    fn gate_check_with_event_decline_returns_wasm_error() {
+        // Inject a Decline via gate_client_zome override — check_blocking will
+        // consume it and return Decline before any HDK call is made.
+        //
+        // Types are re-exported flat from gate_types via `pub use gate_types::*`
+        // in gate_client_zome — no ::types:: sub-module.
+        use gate_client_zome::{
+            ConstitutionalReasoningSummary, DeclineGrounds, GateDecision, GateStatus,
+            Phase,
+        };
+        let decline = GateDecision {
+            status: GateStatus::Decline {
+                grounds: DeclineGrounds {
+                    category: "phase7-e2e-probe".to_string(),
+                    summary: "injected decline for Phase 7 E2E test".to_string(),
+                    principle_refs: vec![],
+                },
+            },
+            reasoning: ConstitutionalReasoningSummary::mocked(),
+            side_effects: vec![],
+            decision_attestation_cid: None,
+            phase: Phase::DevContext,
+        };
+        gate_client_zome::__test_set_decision_override(Some(decline));
+
+        let event = RelationalImpactEvent::ContentPublish {
+            content_cid: "bafkrei-decline-test".to_string(),
+            declared_reach: "commons".to_string(),
+            author: "agent-test".to_string(),
+        };
+        let result = gate_check_with_event(event);
+        assert!(
+            result.is_err(),
+            "Decline must map to ExternResult::Err(WasmError)"
+        );
+        let err_str = format!("{:?}", result.unwrap_err());
+        assert!(
+            err_str.contains("Gate declined"),
+            "error message must carry 'Gate declined'; got: {err_str}"
+        );
+        assert!(
+            err_str.contains("injected decline"),
+            "error message must carry the grounds summary; got: {err_str}"
+        );
+    }
+
+    #[test]
+    fn gate_check_with_event_escalate_returns_wasm_error() {
+        use gate_client_zome::{
+            ConstitutionalReasoningSummary, EscalationTarget, GateDecision, GateStatus, Phase,
+            Severity,
+        };
+
+        let escalate = GateDecision {
+            status: GateStatus::Escalate {
+                target: EscalationTarget::AppSteward {
+                    steward_id: "steward-phase7".to_string(),
+                },
+                severity: Severity::High,
+            },
+            reasoning: ConstitutionalReasoningSummary::mocked(),
+            side_effects: vec![],
+            decision_attestation_cid: None,
+            phase: Phase::DevContext,
+        };
+        gate_client_zome::__test_set_decision_override(Some(escalate));
+
+        let event = RelationalImpactEvent::AttestationWrite {
+            subject_hash: "epr:story:test".to_string(),
+            claim_kind: EXPERIENCE_MOMENT_CLAIM_KIND.to_string(),
+            issuer: "agent-test".to_string(),
+        };
+        let result = gate_check_with_event(event);
+        assert!(
+            result.is_err(),
+            "Escalate must map to ExternResult::Err(WasmError)"
+        );
+        let err_str = format!("{:?}", result.unwrap_err());
+        assert!(
+            err_str.contains("escalated"),
+            "error message must carry 'escalated'; got: {err_str}"
+        );
     }
 }

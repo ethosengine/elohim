@@ -19,3 +19,7 @@ lamad-types = { path = "../../../../../sdk/domains/lamad/types" }
 shefa-types = { path = "../../../../../sdk/domains/shefa/types" }
 avodah-types = { path = "../../../../../sdk/domains/avodah/types" }
 gate-client-zome = { version = "0.1.0", path = "../../../../../elohim-agent/gate-client-zome" }
+
+[dev-dependencies]
+# Enable testing shims (__test_set_decision_override) in test builds only.
+gate-client-zome = { version = "0.1.0", path = "../../../../../elohim-agent/gate-client-zome", features = ["testing"] }

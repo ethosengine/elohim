@@ -1500,6 +1500,7 @@ dependencies = [
  "chrono",
  "elohim-agent",
  "futures",
+ "gate-types",
  "http",
  "serde",
  "serde_json",
@@ -1510,6 +1511,15 @@ dependencies = [
  "tower",
  "tracing",
  "uuid 1.18.1",
+]
+
+[[package]]
+name = "gate-types"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "thiserror 2.0.17",
 ]
 
 [[package]]

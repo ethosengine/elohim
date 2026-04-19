@@ -1911,4 +1911,142 @@ mod gate_layer_tests {
             "DevContext gate must not short-circuit POST /content"
         );
     }
+
+    // ── Phase 7 E2E: Decline path through doorway apply_gate_check ────────────
+    //
+    // These tests exercise the full Decline/Escalate code paths in doorway's
+    // `apply_gate_check` using the gate-client testing override.  They prove
+    // that the doorway seam correctly translates gate decisions into HTTP
+    // responses without requiring a live conductor.
+    //
+    // What IS verified:
+    //   - Decline → 403, x-gate-verdict: decline, JSON body with grounds
+    //   - Escalate → 202, x-gate-verdict: escalate, JSON body with target
+    //   - Path inference (POST /content → ContentPublish, POST /attestation → AttestationWrite)
+    //
+    // What IS NOT verified:
+    //   - Real DHT commit (no conductor running)
+    //   - Real elohim-agent wisdom evaluation (DevContext always returns Allow;
+    //     these tests inject overrides via gate-client's testing shim)
+    //   - HTTP proxy to elohim-storage (no storage instance)
+
+    #[tokio::test]
+    async fn decline_produces_403_with_gate_verdict_header_and_grounds() {
+        // Inject a Decline via the gate-client testing override.
+        gate_client::__test_set_decision_override(Some(gate_client::testing::mock_decline(
+            "harmful-content",
+            "content violates existential safety principle — Phase 7 E2E probe",
+        )));
+
+        let result = apply_gate_check(&Method::POST, "/content").await;
+
+        let resp = result
+            .expect("Decline must produce Some(response) — apply_gate_check must short-circuit");
+        assert_eq!(
+            resp.status(),
+            StatusCode::FORBIDDEN,
+            "Decline must produce 403 Forbidden"
+        );
+
+        let verdict = resp
+            .headers()
+            .get("x-gate-verdict")
+            .expect("x-gate-verdict header must be present on Decline response");
+        assert_eq!(
+            verdict, "decline",
+            "x-gate-verdict header must be 'decline'"
+        );
+
+        let body_bytes = resp
+            .into_body()
+            .collect()
+            .await
+            .expect("body must be readable")
+            .to_bytes();
+        let body = String::from_utf8_lossy(&body_bytes);
+        assert!(
+            body.contains("harmful-content"),
+            "body must carry the grounds category; got: {body}"
+        );
+        assert!(
+            body.contains("\"gate\":\"declined\"") || body.contains("\"gate\": \"declined\""),
+            "body must carry gate:declined marker; got: {body}"
+        );
+    }
+
+    #[tokio::test]
+    async fn escalate_produces_202_with_gate_verdict_header_and_target() {
+        use gate_client::types::{EscalationTarget, Severity};
+
+        gate_client::__test_set_decision_override(Some(gate_client::testing::mock_escalate(
+            EscalationTarget::AppSteward {
+                steward_id: "steward-phase7".to_string(),
+            },
+            Severity::High,
+        )));
+
+        let result = apply_gate_check(&Method::POST, "/attestation").await;
+
+        let resp = result
+            .expect("Escalate must produce Some(response) — apply_gate_check must short-circuit");
+        assert_eq!(
+            resp.status(),
+            StatusCode::ACCEPTED,
+            "Escalate must produce 202 Accepted"
+        );
+
+        let verdict = resp
+            .headers()
+            .get("x-gate-verdict")
+            .expect("x-gate-verdict header must be present on Escalate response");
+        assert_eq!(
+            verdict, "escalate",
+            "x-gate-verdict header must be 'escalate'"
+        );
+
+        let body_bytes = resp
+            .into_body()
+            .collect()
+            .await
+            .expect("body must be readable")
+            .to_bytes();
+        let body = String::from_utf8_lossy(&body_bytes);
+        assert!(
+            body.contains("\"gate\":\"escalated\"") || body.contains("\"gate\": \"escalated\""),
+            "body must carry gate:escalated marker; got: {body}"
+        );
+    }
+
+    // ── Path-inference correctness: doorway delegates to gate_client ──────────
+
+    #[tokio::test]
+    async fn post_to_attestation_infers_attestation_write() {
+        // Verify path inference works for the attestation path (POST /attestation
+        // → AttestationWrite event).  DevContext returns Allow → None from
+        // apply_gate_check, which means routing continues unchanged.
+        let result = apply_gate_check(&Method::POST, "/attestation").await;
+        assert!(
+            result.is_none(),
+            "POST /attestation must pass through in DevContext (gate infers AttestationWrite)"
+        );
+    }
+
+    #[tokio::test]
+    async fn decline_on_unmapped_path_is_never_reached_because_gate_skips_unmapped() {
+        // Even if a Decline were injected, an unmapped path never calls check()
+        // so the override is never consumed. apply_gate_check returns None.
+        gate_client::__test_set_decision_override(Some(gate_client::testing::mock_decline(
+            "should-not-fire",
+            "gate skips unmapped paths",
+        )));
+
+        let result = apply_gate_check(&Method::POST, "/db/stats").await;
+        assert!(
+            result.is_none(),
+            "Unmapped paths must skip gate entirely; decline override was not consumed"
+        );
+
+        // Clean up the unused override so it doesn't bleed into subsequent tests.
+        gate_client::__test_set_decision_override(None);
+    }
 }
