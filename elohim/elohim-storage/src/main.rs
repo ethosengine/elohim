@@ -349,6 +349,32 @@ async fn async_main(
         }
     }
 
+    // One-shot household_id backfill — populates legacy null rows from DHT
+    // humans entries. Tolerates DHT unavailability; logs and continues.
+    // The replayer currently stubs an empty mapping; it will be wired to real
+    // DHT reads when the DHT reader hook lands (no-op backfill is correct).
+    if let Some(pool) = db_pool.as_ref() {
+        let pool_clone = pool.clone();
+        tokio::spawn(async move {
+            match elohim_storage::services::holochain_humans_replayer::snapshot_household_ids(
+                &(),
+            )
+            .await
+            {
+                Ok(mapping) => {
+                    if let Err(e) =
+                        elohim_storage::services::household_backfill::run_once(&pool_clone, mapping)
+                    {
+                        warn!(error = %e, "household_backfill failed (non-fatal)");
+                    }
+                }
+                Err(e) => {
+                    warn!(error = %e, "household_backfill snapshot failed (non-fatal)");
+                }
+            }
+        });
+    }
+
     // --- Embedded conductor mode ---
     // When enabled, spawn the holochain conductor as a child process and
     // install the hApp before starting storage services. The manager is held

@@ -110,6 +110,9 @@ pub mod heartbeat;
 // TCP forwarder — external-facing listener piped to localhost conductor
 pub mod forwarder;
 
+// Test utilities (public for integration test binaries in tests/)
+pub mod test_util;
+
 // Re-exports
 pub use blob_store::BlobStore;
 pub use config::Config;

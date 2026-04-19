@@ -28,6 +28,10 @@ pub struct CreateHumanInput {
     pub location: Option<String>,
     pub profile_photo_url: Option<String>,
     pub h_app_id: String,
+    /// Household collective id (projection of collectives DHT entry with
+    /// kind:household). None for humans outside a household grouping or
+    /// where the source does not carry household signal.
+    pub household_id: Option<String>,
 }
 
 /// Input for updating mutable profile fields (all optional)
@@ -69,10 +73,7 @@ pub fn create_human(
         location: input.location,
         profile_photo_url: input.profile_photo_url,
         h_app_id: input.h_app_id,
-        // household_id populated by D3 seeder pipeline (humans.json fixture
-        // carries householdId; import path fills the projection). Legacy
-        // callers that predate households leave this None.
-        household_id: None,
+        household_id: input.household_id,
     };
 
     diesel::insert_into(humans::table)

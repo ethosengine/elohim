@@ -32,6 +32,8 @@ pub mod events;
 pub mod exchange_service;
 pub mod governance_health;
 pub mod hazard;
+pub mod holochain_humans_replayer;
+pub mod household_backfill;
 pub mod household_resilience;
 pub mod inference_engine;
 pub mod inference_router;
