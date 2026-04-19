@@ -216,32 +216,61 @@ pub fn __test_set_decision_override(decision: Option<GateDecision>) {
     });
 }
 
-// ─── Test-only discernment context extension ──────────────────────────────────
+// ─── Test-only per-gate context injection ─────────────────────────────────────
 //
-// Allows integration tests to pre-populate `moment` and `priorAttestations`
-// context fields that would normally come from the `assemble` step's real
-// source-chain and DHT resolvers (Phase 5+).  Without this, an
-// `AttestationWrite` event through `check()` hits the discernment-gate with a
-// null context and falls to rule-7 (steady-state no-mint).
+// Allows integration tests to pre-populate context fields for a specific gate
+// by name.  Consumed once by `check()` → `run_unified()`.
 //
-// Usage in tests:
-//   gate_client::__test_set_discernment_ctx(Some(ctx_ext));
+// Usage:
+//   gate_client::__test_set_gate_ctx("discernment-gate-v1-mechanical", Some(ctx_ext));
 //   // ... call check(AttestationWrite) ...
-//   gate_client::__test_set_discernment_ctx(None); // restore (auto-consumed)
+//   // ctx is auto-consumed; call again with None to clear if needed.
+//
+//   gate_client::__test_set_gate_ctx("reach-gate-v1", Some(reach_ctx));
+//   // ... call check(CapabilityInvoke{capability:"reach-negotiation"}) ...
 #[cfg(any(test, feature = "testing"))]
 thread_local! {
-    static DISCERNMENT_CTX: std::cell::RefCell<Option<GateContext>> =
-        const { std::cell::RefCell::new(None) };
+    static GATE_CTXS: std::cell::RefCell<std::collections::HashMap<String, GateContext>> =
+        std::cell::RefCell::new(std::collections::HashMap::new());
+}
+
+/// Set a one-shot context extension for the named gate.
+///
+/// The extension is consumed by the next `check()` call on this thread that
+/// routes to that gate.  Pass `None` to clear any pending extension.
+///
+/// Only available in `#[cfg(test)]` or `feature = "testing"` builds.
+#[cfg(any(test, feature = "testing"))]
+pub fn __test_set_gate_ctx(gate_name: &str, ctx: Option<GateContext>) {
+    GATE_CTXS.with(|cell| {
+        let mut map = cell.borrow_mut();
+        match ctx {
+            Some(c) => {
+                map.insert(gate_name.to_string(), c);
+            }
+            None => {
+                map.remove(gate_name);
+            }
+        }
+    });
 }
 
 /// Set a one-shot discernment context extension for the next `check()` call on
-/// this thread that routes to the discernment gate.  Only available in
-/// `#[cfg(test)]` or `feature = "testing"` builds.
+/// this thread that routes to the discernment gate.
+///
+/// # Deprecation
+///
+/// Prefer [`__test_set_gate_ctx`]`("discernment-gate-v1-mechanical", Some(ctx))`.
+/// This shim is retained for backward compatibility with existing Phase 3/4 tests.
+///
+/// Only available in `#[cfg(test)]` or `feature = "testing"` builds.
 #[cfg(any(test, feature = "testing"))]
+#[deprecated(
+    since = "0.5.0",
+    note = "Use __test_set_gate_ctx(\"discernment-gate-v1-mechanical\", ctx) instead"
+)]
 pub fn __test_set_discernment_ctx(ctx: Option<GateContext>) {
-    DISCERNMENT_CTX.with(|cell| {
-        *cell.borrow_mut() = ctx;
-    });
+    __test_set_gate_ctx("discernment-gate-v1-mechanical", ctx);
 }
 
 // Public re-exports for ergonomic use.
@@ -310,13 +339,12 @@ pub use types::{
 ///    play-interior / roleplay-interior), return `Allow { exempt: true }` without
 ///    running any DAG.
 /// 3. Run the universal-band DAG. If it declines or escalates, short-circuit.
-/// 4. If an app-domain gate applies for this event kind (Phase 4: `AttestationWrite`
-///    → `discernment-gate-v1-mechanical`), run it and return its decision.
+/// 4. If an app-domain gate applies for this event (Phase 5: `AttestationWrite`
+///    → `discernment-gate-v1-mechanical`; `CapabilityInvoke{reach-negotiation}`
+///    → `reach-gate-v1`), run it and return its decision.
 ///    Otherwise return the universal-band decision.
 ///
-/// The manifest-driven dispatch table is hardcoded for Phase 4 DevContext.
-/// Phase 5+ will read the `gates` section of `lamad/manifest.json` at runtime.
-/// See `dag_runner::DOMAIN_GATE_DISPATCH`.
+/// See [`dag_runner::domain_gate_for_event`] for the full dispatch rules.
 pub async fn check(event: RelationalImpactEvent) -> GateResult<GateDecision> {
     // Test-only: consume a one-shot decision override if one is set.
     #[cfg(any(test, feature = "testing"))]
@@ -333,14 +361,17 @@ pub async fn check(event: RelationalImpactEvent) -> GateResult<GateDecision> {
         return Ok(GateDecision::allow_exempt(Phase::DevContext));
     }
 
-    // Phase 4: unified dispatch — universal band first, then app-domain gate.
-    // Consume the one-shot context extension if one is set (test builds only).
+    // Phase 5: unified dispatch — universal band first, then app-domain gate.
+    // Consume all pending per-gate context extensions (test builds only).
     #[cfg(any(test, feature = "testing"))]
-    let ctx_ext = DISCERNMENT_CTX.with(|cell| cell.borrow_mut().take());
+    let ctx_exts = GATE_CTXS.with(|cell| {
+        let mut map = cell.borrow_mut();
+        std::mem::take(&mut *map)
+    });
     #[cfg(not(any(test, feature = "testing")))]
-    let ctx_ext: Option<GateContext> = None;
+    let ctx_exts: std::collections::HashMap<String, GateContext> = std::collections::HashMap::new();
 
-    dag_runner::run_unified(&event, ctx_ext).await
+    dag_runner::run_unified(&event, ctx_exts).await
 }
 
 /// Synchronous variant for zome coordinator contexts (Holochain WASM).
@@ -357,26 +388,30 @@ pub async fn check(event: RelationalImpactEvent) -> GateResult<GateDecision> {
 /// use [`check`] with `.await` instead. Phase 3+ may add a `block_in_place`
 /// bridge path if a legitimate nested-runtime use case emerges.
 ///
-/// Includes the same Phase 4 unified dispatch as [`check`]: `AttestationWrite`
-/// events route through `discernment-gate-v1-mechanical` after the universal
-/// band allows.
+/// Includes the same Phase 5 unified dispatch as [`check`]: `AttestationWrite`
+/// routes through `discernment-gate-v1-mechanical` and
+/// `CapabilityInvoke{capability:"reach-negotiation"}` routes through
+/// `reach-gate-v1`, both after the universal band allows.
 pub fn check_blocking(event: RelationalImpactEvent) -> GateResult<GateDecision> {
     let space = space::detect_from_event(&event);
     if space.is_exempt() {
         return Ok(GateDecision::allow_exempt(Phase::DevContext));
     }
 
-    // Consume the test-only context extension if present.
+    // Consume all pending per-gate context extensions (test builds only).
     #[cfg(any(test, feature = "testing"))]
-    let ctx_ext = DISCERNMENT_CTX.with(|cell| cell.borrow_mut().take());
+    let ctx_exts = GATE_CTXS.with(|cell| {
+        let mut map = cell.borrow_mut();
+        std::mem::take(&mut *map)
+    });
     #[cfg(not(any(test, feature = "testing")))]
-    let ctx_ext: Option<GateContext> = None;
+    let ctx_exts: std::collections::HashMap<String, GateContext> = std::collections::HashMap::new();
 
     tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
         .map_err(|e| GateError::DagExecution(format!("runtime build error: {e}")))?
-        .block_on(dag_runner::run_unified(&event, ctx_ext))
+        .block_on(dag_runner::run_unified(&event, ctx_exts))
 }
 
 /// Configure the gate client — transport, phase override, trust assessor.

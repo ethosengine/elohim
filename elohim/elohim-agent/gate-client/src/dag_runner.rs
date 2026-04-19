@@ -2,7 +2,7 @@
 //!
 //! This module owns the singleton that `check()` delegates to.  It:
 //!
-//! 1. Constructs a [`DagInterpreter`] with all five Phase 2+3 executors registered.
+//! 1. Constructs a [`DagInterpreter`] with all five Phase 2+3+5 executors registered.
 //! 2. Parses the embedded universal-band v1 declaration once at startup.
 //! 3. Exposes a `run()` method that accepts a [`RelationalImpactEvent`] plus a
 //!    pre-populated initial [`GateContext`] and drives the DAG to completion.
@@ -35,6 +35,18 @@
 //! singleton is already initialized when `configure_runner` is called, the call
 //! is a no-op (the singleton is immutable once set).
 //!
+//! # App-domain gate dispatch (Phase 5)
+//!
+//! After the universal-band allows, [`domain_gate_for_event`] inspects the event
+//! variant and its fields to pick the right app-domain gate:
+//!
+//! - `AttestationWrite` → `"discernment-gate-v1-mechanical"`
+//! - `CapabilityInvoke { capability: "reach-negotiation", .. }` → `"reach-gate-v1"`
+//! - All other variants → no domain gate (universal-band decision returned as-is)
+//!
+//! Both gates are loaded eagerly at [`DagRunner`] construction via
+//! [`GateRegistry`] so the hot path does no parsing.
+//!
 //! # ContextAssemble resolvers
 //!
 //! The universal-band DAG's `authorize` and `assemble-context` steps pull from
@@ -60,22 +72,111 @@ use crate::dag::executors::{
 use crate::dag::universal_band::{ACTIVE_UNIVERSAL_BAND_NAME, ACTIVE_UNIVERSAL_BAND_VERSION};
 use crate::dag::{
     context::GateContext, discernment_gate::default_discernment_gate_declaration,
-    interpreter::DagInterpreter, universal_band::default_universal_band_declaration,
-    GateProcessDeclaration,
+    interpreter::DagInterpreter, reach_gate::default_reach_gate_declaration,
+    universal_band::default_universal_band_declaration, GateProcessDeclaration,
 };
 use crate::error::GateError;
 use crate::events::RelationalImpactEvent;
 use crate::space;
 use crate::types::GateDecision;
 
+// ─── GateRegistry ─────────────────────────────────────────────────────────────
+
+/// A registry entry pairing a gate's [`GateProcessDeclaration`] with its
+/// pre-built [`ContentNodeResolver`] (for `mechanical-ruleset` steps) and
+/// the CID string used in attestation building.
+struct GateEntry {
+    declaration: GateProcessDeclaration,
+    /// The EmbeddedContentNodeResolver pre-loaded with all CID→body pairs this
+    /// gate needs.  Stored as Arc so the interpreter can clone cheaply.
+    content_resolver: Arc<dyn ContentNodeResolver>,
+    gate_cid: &'static str,
+}
+
+/// Eager registry of all known app-domain gates.
+///
+/// Built once at [`DagRunner`] construction.  [`run_app_domain_gate`] looks up
+/// the gate name returned by [`domain_gate_for_event`] to find the right entry.
+struct GateRegistry {
+    gates: HashMap<&'static str, GateEntry>,
+}
+
+impl GateRegistry {
+    /// Build the registry, eagerly loading discernment-gate and reach-gate.
+    fn build() -> Self {
+        use crate::dag::discernment_gate::DISCERNMENT_GATE_V1_CID;
+        use crate::dag::reach_aggregation::{REACH_AGGREGATION_V1_BODY, REACH_AGGREGATION_V1_CID};
+        use crate::dag::reach_gate::REACH_GATE_V1_CID;
+        use crate::dag::seven_valence_rules::{
+            SEVEN_VALENCE_RULES_V1_BODY, SEVEN_VALENCE_RULES_V1_CID,
+        };
+
+        let mut gates: HashMap<&'static str, GateEntry> = HashMap::new();
+
+        // ── discernment-gate-v1-mechanical ────────────────────────────────────
+        {
+            let rules_body: serde_json::Value = serde_json::from_str(SEVEN_VALENCE_RULES_V1_BODY)
+                .expect("embedded seven_valence_v1.json must parse at startup");
+            let mut cid_map = HashMap::new();
+            cid_map.insert(SEVEN_VALENCE_RULES_V1_CID.to_string(), rules_body);
+            let resolver =
+                Arc::new(EmbeddedContentNodeResolver::new(cid_map)) as Arc<dyn ContentNodeResolver>;
+
+            let mut decl = default_discernment_gate_declaration();
+            // Phase 3/4 DevContext: skip `assemble`; start at `rules` so the
+            // pre-injected context fields are not overwritten by Phase 3 stubs.
+            decl.dag.entrypoint = "rules".to_string();
+
+            gates.insert(
+                "discernment-gate-v1-mechanical",
+                GateEntry {
+                    declaration: decl,
+                    content_resolver: resolver,
+                    gate_cid: DISCERNMENT_GATE_V1_CID,
+                },
+            );
+        }
+
+        // ── reach-gate-v1 ─────────────────────────────────────────────────────
+        {
+            let agg_body: serde_json::Value = serde_json::from_str(REACH_AGGREGATION_V1_BODY)
+                .expect("embedded reach_aggregation_v1.json must parse at startup");
+            let mut cid_map = HashMap::new();
+            cid_map.insert(REACH_AGGREGATION_V1_CID.to_string(), agg_body);
+            let resolver =
+                Arc::new(EmbeddedContentNodeResolver::new(cid_map)) as Arc<dyn ContentNodeResolver>;
+
+            gates.insert(
+                "reach-gate-v1",
+                GateEntry {
+                    declaration: default_reach_gate_declaration(),
+                    content_resolver: resolver,
+                    gate_cid: REACH_GATE_V1_CID,
+                },
+            );
+        }
+
+        Self { gates }
+    }
+
+    fn get(&self, gate_name: &str) -> Option<&GateEntry> {
+        self.gates.get(gate_name)
+    }
+}
+
 // ─── DagRunner ────────────────────────────────────────────────────────────────
 
 /// Orchestrates a single run of the universal-band DAG.
 ///
 /// Constructed once via [`global_runner()`]; reused for every [`run()`] call.
+///
+/// Phase 5: also owns a [`GateRegistry`] with eagerly-loaded app-domain gate
+/// declarations for discernment-gate and reach-gate.
 pub struct DagRunner {
     interpreter: DagInterpreter,
     declaration: GateProcessDeclaration,
+    /// Eager registry of app-domain gates (discernment-gate + reach-gate).
+    registry: GateRegistry,
 }
 
 // DagRunner auto-derives Send + Sync because:
@@ -231,6 +332,7 @@ impl DagRunner {
         Self {
             interpreter,
             declaration,
+            registry: GateRegistry::build(),
         }
     }
 
@@ -454,39 +556,33 @@ pub async fn run_with_tracing(event: &RelationalImpactEvent) -> Result<GateDecis
     Ok(decision)
 }
 
-// ─── App-domain gate dispatch table ──────────────────────────────────────────
+// ─── App-domain gate dispatch ─────────────────────────────────────────────────
 
-/// The dispatch table for app-domain gates in Phase 4 DevContext.
+/// Determine which app-domain gate (if any) should run for the given event.
 ///
-/// Each entry maps an event kind (kebab-case string) to the name of the
-/// app-domain gate that should fire AFTER the universal band allows.
+/// Returns `Some(gate_name)` if a domain gate should fire after the universal
+/// band allows, `None` if the event should be handled by the universal band only.
 ///
-/// # Phase 5+ TODO
+/// # Dispatch rules (Phase 5)
 ///
-/// This table is hardcoded for Phase 4 DevContext.  In Phase 5, when multiple
-/// app-domain gates ship (reach-gate, content-safety-gate, etc.), this will be
-/// replaced by manifest-driven dispatch — reading the `gates` section of
-/// `lamad/manifest.json` at runtime to determine which gates apply to each
-/// event kind.  The table structure here makes it trivial to add a second entry:
+/// | Event variant                                              | Gate                           |
+/// |------------------------------------------------------------|--------------------------------|
+/// | `AttestationWrite`                                         | `discernment-gate-v1-mechanical` |
+/// | `CapabilityInvoke { capability: "reach-negotiation", .. }` | `reach-gate-v1`                |
+/// | All other variants                                         | (none)                         |
 ///
-/// ```ignore
-/// const DOMAIN_GATE_DISPATCH: &[(&str, &str)] = &[
-///     ("attestation-write", "discernment-gate-v1-mechanical"),
-///     ("content-publish",   "reach-gate-v1"),  // Phase 5
-/// ];
-/// ```
-const DOMAIN_GATE_DISPATCH: &[(&str, &str)] =
-    &[("attestation-write", "discernment-gate-v1-mechanical")];
-
-/// Determine which app-domain gate (if any) should run for the given event kind.
-///
-/// Returns `Some(gate_name)` if a domain gate should fire, `None` if the event
-/// should be handled by the universal band only.
+/// The `CapabilityInvoke` variant routes only when `capability == "reach-negotiation"`.
+/// Other capability values (e.g., `"translate"`) pass through the universal band only.
 pub(crate) fn domain_gate_for_event(event: &RelationalImpactEvent) -> Option<&'static str> {
-    let kind = event.kind();
-    DOMAIN_GATE_DISPATCH
-        .iter()
-        .find_map(|(k, g)| if *k == kind { Some(*g) } else { None })
+    match event {
+        RelationalImpactEvent::AttestationWrite { .. } => Some("discernment-gate-v1-mechanical"),
+        RelationalImpactEvent::CapabilityInvoke { capability, .. }
+            if capability == "reach-negotiation" =>
+        {
+            Some("reach-gate-v1")
+        }
+        _ => None,
+    }
 }
 
 /// Run the universal-band DAG followed by the appropriate app-domain gate (if
@@ -496,18 +592,20 @@ pub(crate) fn domain_gate_for_event(event: &RelationalImpactEvent) -> Option<&'s
 /// It embeds the full dispatch logic:
 ///
 /// 1. Run the universal-band DAG.  If it does NOT return Allow, short-circuit.
-/// 2. Determine whether an app-domain gate applies (Phase 4: AttestationWrite →
-///    discernment-gate).
-/// 3. If a domain gate applies, run it and return its decision.  Otherwise,
-///    return the universal-band decision.
+/// 2. Determine whether an app-domain gate applies via [`domain_gate_for_event`].
+///    - Phase 4/5: `AttestationWrite` → `discernment-gate-v1-mechanical`
+///    - Phase 5: `CapabilityInvoke{capability:"reach-negotiation"}` → `reach-gate-v1`
+/// 3. If a domain gate applies, look up the gate context from the keyed
+///    thread-local map (test builds) and run the gate.  Otherwise, return the
+///    universal-band decision.
 ///
-/// The optional `ctx_extension` parameter allows test callers (via the
-/// `#[cfg(any(test, feature = "testing"))]` thread-local in `lib.rs`) to inject
-/// pre-populated context fields (e.g., `moment`, `priorAttestations`) that would
-/// normally be populated by the `assemble` step's real resolvers in Phase 5+.
+/// The keyed thread-local (see `lib.rs`: `GATE_CTXS`) allows test callers to
+/// inject pre-populated context fields per gate name without changing this
+/// function's signature.  In production builds, the map is always empty and the
+/// context extension defaults to an empty `GateContext`.
 pub(crate) async fn run_unified(
     event: &RelationalImpactEvent,
-    ctx_extension: Option<GateContext>,
+    ctx_extensions: HashMap<String, GateContext>,
 ) -> Result<GateDecision, GateError> {
     // Step 1: universal-band must Allow first.
     let universal_decision = run_with_tracing(event).await?;
@@ -516,134 +614,81 @@ pub(crate) async fn run_unified(
     }
 
     // Step 2: check if an app-domain gate applies.
-    let Some(_gate_name) = domain_gate_for_event(event) else {
+    let Some(gate_name) = domain_gate_for_event(event) else {
         // No domain gate → return the universal-band decision as-is.
         return Ok(universal_decision);
     };
 
-    // Step 3: run the app-domain gate.  For Phase 4 DevContext the only gate
-    // is discernment-gate-v1-mechanical (triggered by AttestationWrite).
-    run_discernment_gate(event, ctx_extension.unwrap_or_default()).await
+    // Step 3: look up the context extension for this gate (may be empty).
+    let ctx_extension = ctx_extensions.get(gate_name).cloned().unwrap_or_default();
+
+    // Step 4: run the dispatched app-domain gate.
+    run_app_domain_gate(gate_name, event, ctx_extension).await
 }
 
-// ─── Discernment-gate dispatch ────────────────────────────────────────────────
+// ─── Generic app-domain gate runner ──────────────────────────────────────────
 
-/// Run both the universal-band DAG **and** the discernment-gate DAG for an
-/// `AttestationWrite` event, returning the discernment-gate's `GateDecision`.
+/// Run a named app-domain gate for the given event.
 ///
-/// # Phase 3 contract
+/// Looks up the gate declaration in the process-global [`DagRunner`]'s registry
+/// and executes the gate DAG with the supplied context extension.  Both
+/// `discernment-gate-v1-mechanical` and `reach-gate-v1` delegate through here.
 ///
-/// Phase 3 routes ALL `AttestationWrite` events through the discernment-gate.
-/// Phase 4 folds this dispatch into `check()` via `run_unified()`.  This
-/// function is retained as `pub(crate)` for:
-/// - Per-rule integration tests in `tests/discernment_gate_integration.rs`
-///   (which need pre-populated context injection).
-/// - Explicit manual dispatch in unit tests that need fine-grained control.
+/// `run_discernment_gate` is a thin convenience shim over this function that
+/// pre-populates context fields specific to the discernment-gate (`momentEntryHash`).
 ///
-/// # Context injection
+/// # Errors
 ///
-/// The discernment-gate's `assemble` step pulls `moment` and `priorAttestations`
-/// via Phase 3 stubs (returns `Value::Null` with a warn log).  For testing, the
-/// caller MUST pre-populate these keys in `gate_context_extension` before calling
-/// this function.  The extension map is merged into the initial context AFTER the
-/// universal-band fields are set but BEFORE the discernment-gate DAG runs.
-///
-/// # Execution order
-///
-/// 1. Run the universal-band DAG (same as `check()`).  If it does NOT return
-///    Allow, short-circuit and return that decision.
-/// 2. Build the discernment-gate runner with the embedded seven-valence rules
-///    pre-loaded into its `EmbeddedContentNodeResolver`.
-/// 3. Merge `gate_context_extension` into the initial context.
-/// 4. Run the discernment-gate DAG and return its decision.
-pub(crate) async fn run_discernment_gate(
+/// Returns `GateError::DagExecution` if `gate_name` is not in the registry.
+pub(crate) async fn run_app_domain_gate(
+    gate_name: &str,
     event: &RelationalImpactEvent,
     gate_context_extension: GateContext,
 ) -> Result<GateDecision, GateError> {
-    use crate::dag::seven_valence_rules::SEVEN_VALENCE_RULES_V1_BODY;
-    use crate::dag::seven_valence_rules::SEVEN_VALENCE_RULES_V1_CID;
+    let runner = global_runner();
+    let entry = runner.registry.get(gate_name).ok_or_else(|| {
+        GateError::DagExecution(format!(
+            "no gate entry for '{gate_name}' in GateRegistry; \
+             known gates: discernment-gate-v1-mechanical, reach-gate-v1"
+        ))
+    })?;
 
-    // Step 1: universal-band must Allow first.
-    let universal_decision = run_with_tracing(event).await?;
-    if !universal_decision.is_allowed() {
-        return Ok(universal_decision);
-    }
-
-    // Step 2: build the embedded resolver with the seven-valence rules.
-    //
-    // The rules JSON is embedded at compile time via `include_str!`.
-    let rules_body: serde_json::Value =
-        serde_json::from_str(SEVEN_VALENCE_RULES_V1_BODY).map_err(|e| {
-            GateError::DagExecution(format!(
-                "failed to parse embedded seven_valence_v1.json: {e}"
-            ))
-        })?;
-
-    let mut cid_map = std::collections::HashMap::new();
-    cid_map.insert(SEVEN_VALENCE_RULES_V1_CID.to_string(), rules_body);
-    let resolver = Box::new(EmbeddedContentNodeResolver::new(cid_map));
-
-    // Step 3: build initial context and pre-populate it with the extension.
-    //
-    // Phase 3 context injection strategy:
-    //
-    // The discernment-gate's `assemble` step pulls `moment` and `priorAttestations`
-    // via Phase 3 stubs (returns null) because real elohim-storage and source-chain
-    // resolvers are not yet wired.  If the DAG ran the `assemble` step, it would
-    // overwrite any pre-populated context keys with null — defeating the purpose
-    // of the extension.
-    //
-    // To avoid this, `run_discernment_gate` skips the `assemble` step by using a
-    // modified declaration whose entrypoint is `rules` (not `assemble`).  The
-    // caller supplies the moment and priorAttestations context directly via the
-    // `gate_context_extension` parameter.
-    //
-    // Phase 4 will wire real resolvers into ContextAssembleExecutor so `assemble`
-    // can pull from DHT and elohim-storage.  At that point, the DAG will run from
-    // `assemble` again and the context extension parameter will be removed.
+    // Build initial context and merge the caller-supplied extension.
     let mut ctx = build_initial_context(event);
-    ctx.merge(gate_context_extension);
 
-    // The `synthesize` step's MintAttestation side effect requires `momentEntryHash`
-    // to be in the context.  This would normally be populated by the `assemble`
-    // step pulling the entry hash from the source chain.  Since Phase 3 skips the
-    // `assemble` step, we derive it from the event's `subject_hash` field — which
-    // carries the entry hash of the experience-moment being attested.
-    //
-    // Phase 4: once the `assemble` step is wired to the real source-chain resolver,
-    // this explicit insertion will be removed.
-    if let RelationalImpactEvent::AttestationWrite { subject_hash, .. } = event {
-        if !ctx.contains("momentEntryHash") {
-            ctx.insert("momentEntryHash", json!(subject_hash));
+    // discernment-gate-specific: inject `momentEntryHash` from `subject_hash`
+    // so the `synthesize` step's MintAttestation side effect has the entry hash.
+    // This would normally come from the `assemble` step's source-chain resolver.
+    // Retained until Phase 6+ wires real resolvers.
+    if gate_name == "discernment-gate-v1-mechanical" {
+        if let RelationalImpactEvent::AttestationWrite { subject_hash, .. } = event {
+            if !ctx.contains("momentEntryHash") {
+                ctx.insert("momentEntryHash", json!(subject_hash));
+            }
         }
     }
 
-    // Capture the context summary CID before the DAG consumes the context.
+    ctx.merge(gate_context_extension);
+
     let context_summary_cid = ctx.to_summary_cid();
 
-    // Build the discernment-gate declaration with entrypoint set to `rules`.
-    let mut effective_declaration = default_discernment_gate_declaration();
-    effective_declaration.dag.entrypoint = "rules".to_string();
-
-    let discernment_runner =
-        DagRunner::with_content_resolver_and_declaration(resolver, effective_declaration);
-
-    // Step 4: run the discernment-gate DAG starting at `rules`.
-    let span = info_span!(
-        "gate_check",
-        event_kind = event.kind(),
-        band = "discernment-gate-v1-mechanical"
+    // Build a one-off DagRunner for this gate, re-using the registry's resolver.
+    // The registry's declaration has the right entrypoint already set.
+    let gate_runner = DagRunner::build_interpreter_and_wrap(
+        entry.content_resolver.clone(),
+        Box::new(NullAttestationResolver),
+        entry.declaration.clone(),
     );
-    let mut decision = discernment_runner.run(event, ctx).instrument(span).await?;
 
-    // Phase 4: compute and attach the attestation CID for the discernment-gate decision.
-    // The CID is computed in-process; the DHT write is Phase 6+ activation.
-    use crate::dag::discernment_gate::DISCERNMENT_GATE_V1_CID;
+    let span = info_span!("gate_check", event_kind = event.kind(), band = gate_name);
+    let mut decision = gate_runner.run(event, ctx).instrument(span).await?;
+
+    // Compute and attach the attestation CID.
     let builder = DecisionAttestationBuilder::new(None, None);
     let (_, cid) = builder.build_with_cid(
         &decision,
-        "discernment-gate-v1-mechanical",
-        DISCERNMENT_GATE_V1_CID,
+        gate_name,
+        entry.gate_cid,
         event,
         context_summary_cid,
         active_universal_band_cid_pointer(),
@@ -651,6 +696,40 @@ pub(crate) async fn run_discernment_gate(
     decision.decision_attestation_cid = Some(cid);
 
     Ok(decision)
+}
+
+// ─── Discernment-gate convenience shim ───────────────────────────────────────
+
+/// Run both the universal-band DAG **and** the discernment-gate DAG for an
+/// `AttestationWrite` event, returning the discernment-gate's `GateDecision`.
+///
+/// # Contract
+///
+/// This function runs the universal-band first, short-circuits on non-Allow, and
+/// then delegates to [`run_app_domain_gate`] for the discernment-gate.
+///
+/// Retained as `pub(crate)` for:
+/// - Per-rule integration tests in `tests/discernment_gate_integration.rs`
+///   (which need pre-populated context injection).
+/// - The `pub` testing re-export in `lib.rs` (`run_discernment_gate`).
+///
+/// Production callers use `check()` → `run_unified()` → `run_app_domain_gate()`.
+pub(crate) async fn run_discernment_gate(
+    event: &RelationalImpactEvent,
+    gate_context_extension: GateContext,
+) -> Result<GateDecision, GateError> {
+    // Step 1: universal-band must Allow first.
+    let universal_decision = run_with_tracing(event).await?;
+    if !universal_decision.is_allowed() {
+        return Ok(universal_decision);
+    }
+
+    run_app_domain_gate(
+        "discernment-gate-v1-mechanical",
+        event,
+        gate_context_extension,
+    )
+    .await
 }
 
 // ─── Tests ────────────────────────────────────────────────────────────────────

@@ -173,7 +173,7 @@
           "governance": {
             "defaultReach": "self",
             "governanceModel": "agent-scoped",
-            "gates": ["discernment-gate-v1-mechanical"]
+            "gates": ["discernment-gate-v1-mechanical", "reach-gate-v1"]
           },
           "claims": [
             {
