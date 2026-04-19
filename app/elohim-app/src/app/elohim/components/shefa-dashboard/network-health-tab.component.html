@@ -90,8 +90,7 @@
       <!-- Storage pressure gauge -->
       <div class="pressure-bar-track">
         <div
-          class="pressure-bar-fill"
-          [class]="pressureClass(posture()!.storagePressure)"
+          [ngClass]="['pressure-bar-fill', pressureClass(posture()!.storagePressure)]"
           [style.width]="formatPressure(posture()!.storagePressure)"
           aria-label="Storage pressure gauge"
         ></div>

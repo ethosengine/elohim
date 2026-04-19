@@ -148,7 +148,7 @@ async function generateFromDir(subdir, refMap) {
 
     try {
       let ts = await compile(schema, schema.title || name, {
-        bannerComment: `/* Generated from protocol schema: ${subdir}/${file} -- DO NOT EDIT */`,
+        bannerComment: `/* eslint-disable @typescript-eslint/consistent-indexed-object-style */\n/* Generated from protocol schema: ${subdir}/${file} -- DO NOT EDIT */`,
         additionalProperties: false,
         style: { singleQuote: true, trailingComma: 'all' },
       });

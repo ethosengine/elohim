@@ -3,7 +3,7 @@ import { Component, OnInit, OnDestroy, inject, signal, computed } from '@angular
 
 // @coverage: 26.7% (2026-02-24)
 
-import { CUSTODIAN_METRICS, type CustodianMetrics, type ICustodianMetrics } from '@app/shefa';
+import { CUSTODIAN_METRICS, type CustodianMetrics } from '@app/shefa';
 
 import { CustodianSelectionService } from '../../services/custodian-selection.service';
 import { NetworkHealthTabComponent } from './network-health-tab.component';
