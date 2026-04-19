@@ -53,6 +53,9 @@ export { ResilienceApiService } from './resilience-api.service';
 // Node topology API (stewarded node CRUD + availability aggregation)
 export { NodeTopologyApiService } from './node-topology-api.service';
 
+// Household devices API (P2P dataplane visibility — /api/v1/households/{id}/devices)
+export { HouseholdDevicesService } from './household-devices.service';
+
 // Economic events API (thin HTTP client for hREA economic events)
 export { EconomicEventsApiService } from './economic-events-api.service';
 

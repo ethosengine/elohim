@@ -2,7 +2,7 @@ import { CommonModule } from '@angular/common';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { RouterModule } from '@angular/router';
 
-// @coverage: 100.0% (2026-02-24)
+// @coverage: 88.0% (2026-04-19)
 
 import { AGENCY_STAGES, getNextStage } from '@app/imagodei/models/agency.model';
 import { IdentityService } from '@app/imagodei/services/identity.service';
@@ -17,7 +17,9 @@ import {
 } from '../../models/device-stewardship.model';
 import { getNodeTypeDisplay } from '../../models/shefa-dashboard.model';
 import { DeviceStewardshipService } from '../../services/device-stewardship.service';
+import { HouseholdDevicesService } from '../../services/household-devices.service';
 
+import type { HouseholdDevicesView } from '../../../generated/household-devices-view';
 import type { StewardedDevice, DeviceStatus } from '../../models/device-stewardship.model';
 import type { LamadPointTrigger } from '@app/lamad/models/learning-points.model';
 
@@ -39,8 +41,14 @@ import type { LamadPointTrigger } from '@app/lamad/models/learning-points.model'
           <h1>Your Stewardship</h1>
           <p class="subtitle">Track your participation and resources</p>
         </div>
-        <button class="refresh-btn" (click)="refresh()" [disabled]="service.isLoading()">
-          <span class="material-icons">refresh</span>
+        <button
+          class="refresh-btn"
+          (click)="refresh()"
+          [disabled]="service.isLoading() || householdDevicesLoading()"
+          data-testid="refresh-btn"
+          aria-label="Refresh stewardship data"
+        >
+          <span class="material-icons" aria-hidden="true">refresh</span>
           Refresh
         </button>
       </div>
@@ -51,19 +59,21 @@ import type { LamadPointTrigger } from '@app/lamad/models/learning-points.model'
           class="tab-btn"
           [class.active]="activeTab() === 'activity'"
           (click)="selectTab('activity')"
+          data-testid="tab-activity"
         >
-          <span class="material-icons tab-icon">trending_up</span>
+          <span class="material-icons tab-icon" aria-hidden="true">trending_up</span>
           Activity
         </button>
         <button
           class="tab-btn"
           [class.active]="activeTab() === 'devices'"
           (click)="selectTab('devices')"
+          data-testid="tab-devices"
         >
-          <span class="material-icons tab-icon">devices</span>
+          <span class="material-icons tab-icon" aria-hidden="true">devices</span>
           Devices
-          <span class="lock-icon" *ngIf="!isSteward()">
-            <span class="material-icons">lock</span>
+          <span class="lock-icon" *ngIf="!isSteward()" aria-label="Requires steward access">
+            <span class="material-icons" aria-hidden="true">lock</span>
           </span>
         </button>
       </div>
@@ -175,8 +185,13 @@ import type { LamadPointTrigger } from '@app/lamad/models/learning-points.model'
             </ul>
           </div>
 
-          <button class="upgrade-cta" disabled>
-            <span class="material-icons">download</span>
+          <button
+            class="upgrade-cta"
+            disabled
+            data-testid="upgrade-cta"
+            aria-label="Download the Desktop App (coming soon)"
+          >
+            <span class="material-icons" aria-hidden="true">download</span>
             Download the Desktop App
           </button>
           <p class="cta-note">Coming soon</p>
@@ -185,193 +200,131 @@ import type { LamadPointTrigger } from '@app/lamad/models/learning-points.model'
         <!-- Steward Device Content -->
         <ng-container *ngIf="isSteward()">
           <!-- Loading State -->
-          <div class="loading-overlay" *ngIf="service.isLoading()">
+          <div
+            class="loading-overlay"
+            *ngIf="householdDevicesLoading()"
+            data-testid="devices-loading"
+          >
             <div class="spinner"></div>
             <p>Discovering devices...</p>
           </div>
 
-          <!-- Summary Strip -->
-          <div class="summary-strip" *ngIf="!service.isLoading() && service.totalDevices() > 0">
-            <div class="summary-badge connected">
-              <span class="badge-dot"></span>
-              {{ service.connectedCount() }} Connected
-            </div>
-            <div class="summary-badge seen" *ngIf="service.seenCount() > 0">
-              <span class="badge-dot"></span>
-              {{ service.seenCount() }} Seen
-            </div>
-            <div class="summary-badge offline" *ngIf="service.offlineCount() > 0">
-              <span class="badge-dot"></span>
-              {{ service.offlineCount() }} Offline
-            </div>
-            <div class="summary-total">{{ service.totalDevices() }} total</div>
+          <!-- Error State -->
+          <div
+            class="error-banner"
+            *ngIf="householdDevicesError() && !householdDevicesLoading()"
+            data-testid="devices-error"
+          >
+            <span class="material-icons">warning</span>
+            {{ householdDevicesError() }}
+            <button
+              class="dismiss-btn"
+              (click)="retryHouseholdDevices()"
+              data-testid="devices-retry-btn"
+              aria-label="Retry loading devices"
+            >
+              Retry
+            </button>
           </div>
 
           <!-- Device Content -->
-          <div class="device-content" *ngIf="!service.isLoading()">
-            <!-- Current Device (highlighted) -->
-            <div class="current-device-section" *ngIf="service.currentDevice() as current">
-              <div class="device-card current">
+          <div
+            class="device-content"
+            *ngIf="!householdDevicesLoading() && !householdDevicesError()"
+          >
+            <!-- Household summary strip -->
+            <div
+              class="summary-strip"
+              *ngIf="householdDevices() as hd"
+              data-testid="device-summary"
+            >
+              <div class="summary-total">
+                {{ hd.devices.length }} device{{ hd.devices.length !== 1 ? 's' : '' }} in
+                <span class="mono">{{ hd.householdId }}</span>
+              </div>
+            </div>
+
+            <!-- Device list -->
+            <div class="device-grid" *ngIf="householdDevices() as hd" data-testid="device-list">
+              <div
+                class="device-card"
+                *ngFor="let entry of hd.devices"
+                [attr.data-testid]="'device-' + entry.shape.nodeId"
+              >
                 <div class="card-header">
                   <span class="material-icons device-icon">
-                    {{ getPlatformDisplay(current).icon }}
+                    {{ getArchetypeIcon(entry.shape.deviceArchetypeId) }}
                   </span>
                   <div class="card-title">
-                    <h3>{{ current.displayName }}</h3>
-                    <span class="current-badge">You are here</span>
+                    <h3>{{ entry.shape.hostname }}</h3>
+                    <span class="node-type">
+                      {{ getArchetypeLabel(entry.shape.deviceArchetypeId) }}
+                    </span>
                   </div>
                   <span
                     class="status-indicator"
-                    [style.background]="getStatusDisplay(current.status).color"
+                    [style.background]="getPeerStatusColor(entry.peer?.status)"
+                    [title]="getPeerStatusLabel(entry.peer?.status)"
                   ></span>
                 </div>
+
                 <div class="card-details">
                   <div class="detail-row">
-                    <span class="detail-label">Platform</span>
-                    <span class="detail-value">{{ getPlatformDisplay(current).label }}</span>
-                  </div>
-                  <div class="detail-row">
-                    <span class="detail-label">Category</span>
-                    <span class="detail-value">{{ getCategoryDisplay(current).label }}</span>
-                  </div>
-                  <div class="detail-row">
-                    <span class="detail-label">Agency</span>
-                    <span class="detail-value agency-badge">{{ agencyLabel() }}</span>
-                  </div>
-                  <div class="detail-row" *ngIf="current.doorwayUrl">
-                    <span class="detail-label">Conductor</span>
-                    <span class="detail-value mono">{{ current.doorwayUrl }}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- Node Steward Section -->
-            <div class="section" *ngIf="service.nodeStewardDevices().length > 0">
-              <div class="section-header">
-                <span class="material-icons">dns</span>
-                <h2>Infrastructure Nodes</h2>
-                <span class="section-count">{{ service.nodeStewardDevices().length }}</span>
-              </div>
-
-              <div class="device-grid">
-                <div
-                  class="device-card"
-                  *ngFor="let device of service.nodeStewardDevices()"
-                  [class.current]="device.isCurrentDevice"
-                >
-                  <div class="card-header">
-                    <span class="material-icons device-icon">
-                      {{ getNodeIcon(device) }}
-                    </span>
-                    <div class="card-title">
-                      <h3>{{ device.displayName }}</h3>
-                      <span class="node-type">{{ getNodeLabel(device) }}</span>
-                    </div>
-                    <span
-                      class="status-indicator"
-                      [style.background]="getStatusDisplay(device.status).color"
-                      [title]="getStatusDisplay(device.status).label"
-                    ></span>
-                  </div>
-
-                  <div class="card-details">
-                    <div class="detail-row" *ngIf="device.location">
-                      <span class="detail-label">Location</span>
-                      <span class="detail-value">{{ device.location!.label }}</span>
-                    </div>
-
-                    <!-- Resource Bars -->
-                    <div class="resource-bars" *ngIf="device.resources">
-                      <div class="resource-bar">
-                        <span class="bar-label">CPU</span>
-                        <div class="bar-track">
-                          <div
-                            class="bar-fill"
-                            [style.width.%]="device.resources!.cpuPercent"
-                            [class.high]="device.resources!.cpuPercent > 80"
-                          ></div>
-                        </div>
-                        <span class="bar-value">{{ device.resources!.cpuPercent }}%</span>
-                      </div>
-                      <div class="resource-bar">
-                        <span class="bar-label">Mem</span>
-                        <div class="bar-track">
-                          <div
-                            class="bar-fill"
-                            [style.width.%]="device.resources!.memoryPercent"
-                            [class.high]="device.resources!.memoryPercent > 80"
-                          ></div>
-                        </div>
-                        <span class="bar-value">{{ device.resources!.memoryPercent }}%</span>
-                      </div>
-                      <div class="resource-bar">
-                        <span class="bar-label">Disk</span>
-                        <div class="bar-track">
-                          <div
-                            class="bar-fill"
-                            [style.width.%]="storagePercent(device)"
-                            [class.high]="storagePercent(device) > 80"
-                          ></div>
-                        </div>
-                        <span class="bar-value">
-                          {{ device.resources!.storageUsedGB }}/{{
-                            device.resources!.storageTotalGB
-                          }}GB
-                        </span>
-                      </div>
-                    </div>
-
-                    <!-- Roles -->
-                    <div class="roles-row" *ngIf="device.roles && device.roles.length > 0">
-                      <span class="role-chip" *ngFor="let role of device.roles">
-                        {{ role.role }}
+                    <span class="detail-label">Role</span>
+                    <span class="detail-value">
+                      <span class="material-icons" style="font-size:0.9rem;vertical-align:middle">
+                        {{ getRoleIcon(entry.shape.role) }}
                       </span>
-                    </div>
-
-                    <div class="detail-row" *ngIf="device.isPrimaryNode">
-                      <span class="primary-badge">Primary Node</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- App Steward Section (non-current devices, for future multi-device) -->
-            <div class="section" *ngIf="nonCurrentAppDevices().length > 0">
-              <div class="section-header">
-                <span class="material-icons">smartphone</span>
-                <h2>Personal Devices</h2>
-                <span class="section-count">{{ nonCurrentAppDevices().length }}</span>
-              </div>
-              <div class="device-grid">
-                <div class="device-card" *ngFor="let device of nonCurrentAppDevices()">
-                  <div class="card-header">
-                    <span class="material-icons device-icon">
-                      {{ getPlatformDisplay(device).icon }}
+                      {{ entry.shape.role }}
                     </span>
-                    <div class="card-title">
-                      <h3>{{ device.displayName }}</h3>
-                    </div>
+                  </div>
+                  <div class="detail-row">
+                    <span class="detail-label">Capability</span>
+                    <span class="detail-value">L{{ entry.shape.capabilityLevel }}</span>
+                  </div>
+                  <div class="detail-row" *ngIf="entry.shape.stewardTier">
+                    <span class="detail-label">Tier</span>
+                    <span class="detail-value" style="text-transform:capitalize">
+                      {{ entry.shape.stewardTier }}
+                    </span>
+                  </div>
+                  <div class="detail-row" *ngIf="entry.shape.region">
+                    <span class="detail-label">Region</span>
+                    <span class="detail-value">{{ entry.shape.region }}</span>
+                  </div>
+                  <div class="detail-row">
+                    <span class="detail-label">Status</span>
                     <span
-                      class="status-indicator"
-                      [style.background]="getStatusDisplay(device.status).color"
-                    ></span>
+                      class="detail-value"
+                      [style.color]="getPeerStatusColor(entry.peer?.status)"
+                    >
+                      {{ getPeerStatusLabel(entry.peer?.status) }}
+                    </span>
+                  </div>
+                  <div class="detail-row">
+                    <span class="detail-label">CPU / Mem / Storage</span>
+                    <span class="detail-value">
+                      {{ entry.shape.committed.cpuCores }}c &middot;
+                      {{ entry.shape.committed.memoryGb }}GB &middot;
+                      {{ entry.shape.committed.storageTb }}TB
+                    </span>
                   </div>
                 </div>
               </div>
             </div>
 
             <!-- Empty State -->
-            <div class="empty-state" *ngIf="service.totalDevices() === 0 && !service.error()">
+            <div
+              class="empty-state"
+              *ngIf="!householdDevices() || householdDevices()!.devices.length === 0"
+              data-testid="devices-empty"
+            >
               <span class="material-icons empty-icon">devices</span>
-              <h2>No Stewarded Devices</h2>
+              <h2>No Devices Registered</h2>
               <p>
-                Devices appear here once you progress beyond hosted access. As an
-                <strong>App Steward</strong>
-                , your desktop app runs a local Holochain conductor. As a
-                <strong>Node Steward</strong>
-                , you run always-on infrastructure for the network.
+                Devices appear here once an elohim-node publishes a NodeRegistration to the DHT. Run
+                <code>elohim-node start</code>
+                on your infrastructure to register a device.
               </p>
               <a routerLink="/imagodei/agency" class="action-link">
                 <span class="material-icons">arrow_forward</span>
@@ -386,7 +339,14 @@ import type { LamadPointTrigger } from '@app/lamad/models/learning-points.model'
       <div class="error-banner" *ngIf="service.error()">
         <span class="material-icons">warning</span>
         {{ service.error() }}
-        <button class="dismiss-btn" (click)="refresh()">Retry</button>
+        <button
+          class="dismiss-btn"
+          (click)="refresh()"
+          data-testid="error-retry-btn"
+          aria-label="Retry loading data"
+        >
+          Retry
+        </button>
       </div>
     </div>
   `,
@@ -1093,6 +1053,12 @@ export class DeviceStewardshipComponent implements OnInit {
   private readonly identityService = inject(IdentityService);
   private readonly pointsService = inject(PointsService);
   private readonly masteryService = inject(MasteryService);
+  private readonly householdDevicesService = inject(HouseholdDevicesService);
+
+  // Household devices state (new P2P dataplane path)
+  readonly householdDevices = signal<HouseholdDevicesView | null>(null);
+  readonly householdDevicesLoading = signal(false);
+  readonly householdDevicesError = signal<string | null>(null);
 
   // Tab state
   readonly activeTab = signal<'activity' | 'devices'>('activity');
@@ -1165,10 +1131,15 @@ export class DeviceStewardshipComponent implements OnInit {
     void this.service.loadDevices();
     this.loadPointsData();
     this.loadMasteryData();
+    this.loadHouseholdDevices();
   }
 
   refresh(): void {
     this.ngOnInit();
+  }
+
+  retryHouseholdDevices(): void {
+    this.loadHouseholdDevices();
   }
 
   selectTab(tab: 'activity' | 'devices'): void {
@@ -1206,7 +1177,94 @@ export class DeviceStewardshipComponent implements OnInit {
     return Math.round((r.storageUsedGB / r.storageTotalGB) * 100);
   }
 
+  // Household devices display helpers
+  getPeerStatusColor(status: string | undefined): string {
+    switch (status) {
+      case 'online':
+        return '#22c55e';
+      case 'degraded':
+        return '#f59e0b';
+      case 'leaving':
+        return '#f59e0b';
+      case 'offline':
+        return '#ef4444';
+      default:
+        return '#64748b';
+    }
+  }
+
+  getPeerStatusLabel(status: string | undefined): string {
+    switch (status) {
+      case 'online':
+        return 'Online';
+      case 'degraded':
+        return 'Degraded';
+      case 'leaving':
+        return 'Leaving';
+      case 'offline':
+        return 'Offline';
+      default:
+        return 'Unknown';
+    }
+  }
+
+  getArchetypeLabel(archetypeId: string): string {
+    const labels: Record<string, string> = {
+      'home-nuc': 'Home NUC',
+      blade: 'Blade',
+      desktop: 'Desktop',
+      'cloud-vps': 'Cloud VPS',
+      laptop: 'Laptop',
+      mobile: 'Mobile',
+      'raspberry-pi': 'Raspberry Pi',
+    };
+    return labels[archetypeId] ?? archetypeId;
+  }
+
+  getArchetypeIcon(archetypeId: string): string {
+    const icons: Record<string, string> = {
+      'home-nuc': 'dns',
+      blade: 'developer_board',
+      desktop: 'computer',
+      'cloud-vps': 'cloud',
+      laptop: 'laptop',
+      mobile: 'smartphone',
+      'raspberry-pi': 'memory',
+    };
+    return icons[archetypeId] ?? 'devices';
+  }
+
+  getRoleIcon(role: string): string {
+    const icons: Record<string, string> = {
+      edge: 'router',
+      archival: 'archive',
+      inference: 'psychology',
+      doorway: 'door_front',
+    };
+    return icons[role] ?? 'device_hub';
+  }
+
   // Private loading methods
+  private loadHouseholdDevices(): void {
+    const humanId = this.identityService.identity().humanId;
+    if (!humanId) return;
+
+    this.householdDevicesLoading.set(true);
+    this.householdDevicesError.set(null);
+
+    this.householdDevicesService.listForHuman(humanId).subscribe({
+      next: view => {
+        this.householdDevices.set(view);
+        this.householdDevicesLoading.set(false);
+      },
+      error: (err: unknown) => {
+        const message = err instanceof Error ? err.message : 'Failed to load household devices';
+        this.householdDevicesError.set(message);
+        this.householdDevicesLoading.set(false);
+      },
+    });
+  }
+
   private loadPointsData(): void {
     this.pointsService.getBalance$().subscribe(balance => {
       this.pointsBalance.set(balance);
