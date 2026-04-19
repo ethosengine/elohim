@@ -100,6 +100,125 @@ pub const ALL_CONTENT_TYPES: &[&str] = &[
     "work-project",
     "issue-report",
     "application",
+    "gate-process-declaration",
+    "universal-band-declaration",
+    "gate-rules-declaration",
+    "aggregation-spec",
+    "escalation-target-spec",
+];
+
+/// Core elohimskill — Gate-shaped skills with active registered gate interfaces: content-safety-gate, discernment-gate-v1-mechanical, reach-gate-v1. These 8 skills are wired to protocol gate invocation paths. Phase 4 Section 6.3 gate primitives. DNA-notarized for dispatch validation.
+pub const CORE_ELOHIM_SKILLS: &[&str] = &[
+    "content-safety-review",
+    "discernment-evaluation",
+    "reach-negotiation",
+    "attestation-recommendation",
+    "spiral-detection",
+    "care-connection",
+    "graduated-intervention",
+    "constitutional-verification",
+];
+
+/// All elohimskill — includes storage-only and extensible.
+pub const ALL_ELOHIM_SKILLS: &[&str] = &[
+    "content-safety-review",
+    "discernment-evaluation",
+    "reach-negotiation",
+    "attestation-recommendation",
+    "spiral-detection",
+    "care-connection",
+    "graduated-intervention",
+    "constitutional-verification",
+    "accuracy-verification",
+    "knowledge-map-synthesis",
+    "affinity-analysis",
+    "path-recommendation",
+    "cross-layer-validation",
+    "existential-boundary-enforcement",
+    "governance-ratification",
+    "path-analysis",
+    "learning-objective-validation",
+    "prerequisite-verification",
+    "mastery-assessment-design",
+    "family-value-alignment",
+    "personal-agent-support",
+    "feedback-profile-negotiation",
+    "feedback-profile-enforcement",
+    "feedback-profile-upgrade",
+    "feedback-profile-downgrade",
+    "place-attestation",
+    "place-naming-governance",
+    "geographic-reach-assignment",
+    "bioregional-enforcement",
+];
+
+/// Core elohimspecialty — Protocol-known specialties that affect gate dispatch routing. An elohim declaring child-safety, medical, or crisis receives specific gate invocations the protocol itself orchestrates. DNA-notarized for validation at imagodei layer.
+pub const CORE_ELOHIM_SPECIALTIES: &[&str] = &[
+    "child-safety",
+    "family-dynamics",
+    "content-safety",
+    "discernment",
+    "reach-evaluation",
+    "medical",
+    "legal",
+    "crisis",
+];
+
+/// All elohimspecialty — includes storage-only and extensible.
+pub const ALL_ELOHIM_SPECIALTIES: &[&str] = &[
+    "child-safety",
+    "family-dynamics",
+    "content-safety",
+    "discernment",
+    "reach-evaluation",
+    "medical",
+    "legal",
+    "crisis",
+    "education",
+    "code-review",
+    "financial-advice",
+    "creative-writing",
+    "technical-documentation",
+    "translation",
+    "poetry",
+    "philosophy",
+    "governance",
+    "conflict-resolution",
+    "curriculum-design",
+    "counseling",
+    "theology",
+    "science",
+    "mathematics",
+    "history",
+    "language-learning",
+    "mental-health",
+    "disability-support",
+    "elder-care",
+    "research",
+    "journalism",
+];
+
+/// Core elohimstrength — Protocol-named attestation-history dimensions. high-confidence-judgments: decisions made confidently and upheld. appeals-sustained: appeals that overturned prior decisions (surfaces calibration gaps). consensus-alignment: agreement with peer elohim on same inputs. novel-pattern-detection: surfaced new attestation classes. steady-baseline: consistent no-mint steady-state. These five dimensions directly inform peer-diversity selection and elohim trust scoring in Phase 11+.
+pub const CORE_ELOHIM_STRENGTHS: &[&str] = &[
+    "high-confidence-judgments",
+    "appeals-sustained",
+    "consensus-alignment",
+    "novel-pattern-detection",
+    "steady-baseline",
+];
+
+/// All elohimstrength — includes storage-only and extensible.
+pub const ALL_ELOHIM_STRENGTHS: &[&str] = &[
+    "high-confidence-judgments",
+    "appeals-sustained",
+    "consensus-alignment",
+    "novel-pattern-detection",
+    "steady-baseline",
+    "consistent-constitutional-reasoning",
+    "low-false-positive-rate",
+    "fast-resolution",
+    "cross-context-consistency",
+    "escalation-accuracy",
 ];
 
 /// Core engagementtype — All engagement types are protocol-level — they drive recognition flows and couple knowledge+value+governance.
