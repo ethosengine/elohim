@@ -1,0 +1,64 @@
+{
+  "$id": "epr:schema:view:gate-decision-challenge",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "GateDecisionChallengeView",
+  "description": "Source of truth: DHT (mishpat DNA, GateDecisionChallenge entry, Notarized, Category A). A formal challenge filed against a GateDecisionAttestation. This record is a read-optimised projection populated by the MishpatSignal::GateDecisionChallengeCreated post-commit signal. If this projection and the DHT disagree, the DHT wins.",
+  "type": "object",
+  "required": [
+    "challengeId",
+    "challengedDecisionCid",
+    "challengerId",
+    "grounds",
+    "summary",
+    "evidenceRefs",
+    "filedAt",
+    "reach",
+    "dhtAnchorHash",
+    "createdAt"
+  ],
+  "properties": {
+    "challengeId": {
+      "type": "string",
+      "description": "CID of this challenge (self-addressing, globally unique)"
+    },
+    "challengedDecisionCid": {
+      "type": "string",
+      "description": "CID of the GateDecisionAttestation being challenged"
+    },
+    "challengerId": {
+      "type": "string",
+      "description": "AgentPubKey (base64) of the challenger"
+    },
+    "grounds": {
+      "type": "string",
+      "enum": ["factual-error", "safety", "policy", "constitutional", "indemnification-request"],
+      "description": "Grounds on which the challenge is filed"
+    },
+    "summary": {
+      "type": "string",
+      "description": "Challenger's articulation of the grievance"
+    },
+    "evidenceRefs": {
+      "type": "string",
+      "description": "Content-addressed evidence refs (comma-separated CIDs; empty string if none)"
+    },
+    "filedAt": {
+      "type": "string",
+      "description": "ISO 8601 timestamp of when the challenge was filed"
+    },
+    "reach": {
+      "type": "string",
+      "enum": ["self", "intimate", "community", "commons"],
+      "description": "Reach level of the challenged decision's impact"
+    },
+    "dhtAnchorHash": {
+      "type": "string",
+      "description": "ActionHash (base64) of the upstream DHT entry — client can use this to verify provenance"
+    },
+    "createdAt": {
+      "type": "string",
+      "description": "ISO 8601 timestamp of when this projection row was inserted"
+    }
+  },
+  "additionalProperties": false
+}

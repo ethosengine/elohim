@@ -442,6 +442,33 @@ pub struct GateDecisionAttestationEntry {
     pub universal_band_cid: String,
 }
 
+/// Storage-side mirror of the GateDecisionChallenge entry fields as they
+/// arrive in the signal payload.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GateDecisionChallengeEntry {
+    pub challenge_id: String,
+    pub challenged_decision_cid: String,
+    pub challenger_id: String,
+    pub grounds: String,
+    pub summary: String,
+    pub evidence_refs: String,
+    pub filed_at: String,
+    pub reach: String,
+}
+
+/// Storage-side mirror of the ChallengeOutcome entry fields as they
+/// arrive in the signal payload.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ChallengeOutcomeEntry {
+    pub outcome_id: String,
+    pub challenge_cid: String,
+    pub verdict: String,
+    pub reviewer_consensus: String,
+    pub reasoning_json: String,
+    pub decided_at: String,
+    pub indemnification_actions_json: String,
+}
+
 /// Storage-side mirror of the DNA `MishpatSignal` enum.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", content = "payload")]
@@ -452,6 +479,20 @@ pub enum MishpatSignal {
         entry_hash: String,
         author: String,
         entry: GateDecisionAttestationEntry,
+    },
+    /// GateDecisionChallenge DHT entry was recorded — project into SQLite.
+    GateDecisionChallengeCreated {
+        action_hash: String,
+        entry_hash: String,
+        author: String,
+        entry: GateDecisionChallengeEntry,
+    },
+    /// ChallengeOutcome DHT entry was recorded — project into SQLite.
+    ChallengeOutcomeCreated {
+        action_hash: String,
+        entry_hash: String,
+        author: String,
+        entry: ChallengeOutcomeEntry,
     },
 }
 
@@ -504,6 +545,53 @@ pub fn handle_mishpat_signal(
                 updated_at: now,
             };
             crate::db::gate_decision_attestations::upsert(conn, &row)?;
+            Ok(())
+        }
+        MishpatSignal::GateDecisionChallengeCreated {
+            action_hash,
+            entry_hash: _,
+            author: _,
+            entry,
+        } => {
+            let now = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
+            let row = crate::db::gate_decision_challenges::GateDecisionChallengeRow {
+                app_id: app_id.to_string(),
+                challenge_id: entry.challenge_id,
+                challenged_decision_cid: entry.challenged_decision_cid,
+                challenger_id: entry.challenger_id,
+                grounds: entry.grounds,
+                summary: entry.summary,
+                evidence_refs: entry.evidence_refs,
+                filed_at: entry.filed_at,
+                reach: entry.reach,
+                dht_anchor_hash: action_hash,
+                created_at: now.clone(),
+                updated_at: now,
+            };
+            crate::db::gate_decision_challenges::upsert(conn, &row)?;
+            Ok(())
+        }
+        MishpatSignal::ChallengeOutcomeCreated {
+            action_hash,
+            entry_hash: _,
+            author: _,
+            entry,
+        } => {
+            let now = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
+            let row = crate::db::challenge_outcomes::ChallengeOutcomeRow {
+                app_id: app_id.to_string(),
+                outcome_id: entry.outcome_id,
+                challenge_cid: entry.challenge_cid,
+                verdict: entry.verdict,
+                reviewer_consensus: entry.reviewer_consensus,
+                reasoning_json: entry.reasoning_json,
+                decided_at: entry.decided_at,
+                indemnification_actions_json: entry.indemnification_actions_json,
+                dht_anchor_hash: action_hash,
+                created_at: now.clone(),
+                updated_at: now,
+            };
+            crate::db::challenge_outcomes::upsert(conn, &row)?;
             Ok(())
         }
     }
@@ -643,6 +731,245 @@ mod mishpat_signal_tests {
                 assert_eq!(entry.decision, "allow");
                 assert_eq!(entry.phase, "elohim-active");
             }
+            _ => panic!("Expected GateDecisionCreated variant"),
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // GateDecisionChallengeCreated tests
+    // -------------------------------------------------------------------------
+
+    fn setup_challenge_conn() -> SqliteConnection {
+        let mut conn =
+            SqliteConnection::establish(":memory:").expect("Failed to create in-memory SQLite");
+
+        conn.batch_execute(
+            r#"
+            CREATE TABLE gate_decision_challenges (
+                app_id TEXT NOT NULL,
+                challenge_id TEXT NOT NULL,
+                challenged_decision_cid TEXT NOT NULL,
+                challenger_id TEXT NOT NULL,
+                grounds TEXT NOT NULL,
+                summary TEXT NOT NULL,
+                evidence_refs TEXT NOT NULL,
+                filed_at TEXT NOT NULL,
+                reach TEXT NOT NULL,
+                dht_anchor_hash TEXT NOT NULL,
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+                PRIMARY KEY (app_id, challenge_id)
+            );
+            "#,
+        )
+        .expect("Failed to create test table");
+
+        conn
+    }
+
+    fn make_challenge_signal(challenge_id: &str, grounds: &str) -> MishpatSignal {
+        MishpatSignal::GateDecisionChallengeCreated {
+            action_hash: "uhCkkCHALABC".to_string(),
+            entry_hash: "uhCEkCHALABC".to_string(),
+            author: "uhCAkCHALLENGER".to_string(),
+            entry: GateDecisionChallengeEntry {
+                challenge_id: challenge_id.to_string(),
+                challenged_decision_cid: "bafyDec001".to_string(),
+                challenger_id: "uhCAkCHALLENGER".to_string(),
+                grounds: grounds.to_string(),
+                summary: "Decision violated constitutional principle P4".to_string(),
+                evidence_refs: "bafyEvidence1".to_string(),
+                filed_at: "2026-04-19T10:00:00Z".to_string(),
+                reach: "community".to_string(),
+            },
+        }
+    }
+
+    #[test]
+    fn gate_decision_challenge_created_projects_row() {
+        let mut conn = setup_challenge_conn();
+        let signal = make_challenge_signal("bafyChal001", "constitutional");
+        handle_mishpat_signal(&mut conn, "test-app", signal).unwrap();
+
+        let row = crate::db::gate_decision_challenges::find_by_id(
+            &mut conn,
+            "test-app",
+            "bafyChal001",
+        )
+        .unwrap()
+        .expect("Row must be present after signal");
+
+        assert_eq!(row.grounds, "constitutional");
+        assert_eq!(row.challenged_decision_cid, "bafyDec001");
+        assert_eq!(row.dht_anchor_hash, "uhCkkCHALABC");
+        assert_eq!(row.reach, "community");
+    }
+
+    #[test]
+    fn gate_decision_challenge_created_is_idempotent() {
+        let mut conn = setup_challenge_conn();
+        let signal = make_challenge_signal("bafyChal002", "safety");
+        handle_mishpat_signal(&mut conn, "test-app", signal.clone()).unwrap();
+        handle_mishpat_signal(&mut conn, "test-app", signal).unwrap();
+
+        let rows = crate::db::gate_decision_challenges::find_by_challenger(
+            &mut conn,
+            "test-app",
+            "uhCAkCHALLENGER",
+        )
+        .unwrap();
+        assert_eq!(
+            rows.len(),
+            1,
+            "Re-delivered signal must not duplicate the row"
+        );
+    }
+
+    #[test]
+    fn gate_decision_challenge_serde_tag_matches_dna_wire_format() {
+        let wire = serde_json::json!({
+            "type": "GateDecisionChallengeCreated",
+            "payload": {
+                "action_hash": "uhCkkCHAL",
+                "entry_hash": "uhCEkCHAL",
+                "author": "uhCAkCHAL",
+                "entry": {
+                    "challenge_id": "bafyChal",
+                    "challenged_decision_cid": "bafyDec",
+                    "challenger_id": "uhCAkCHAL",
+                    "grounds": "constitutional",
+                    "summary": "Grievance details",
+                    "evidence_refs": "",
+                    "filed_at": "2026-04-19T00:00:00Z",
+                    "reach": "community",
+                }
+            }
+        });
+
+        let signal: MishpatSignal = serde_json::from_value(wire).unwrap();
+        match signal {
+            MishpatSignal::GateDecisionChallengeCreated { action_hash, entry, .. } => {
+                assert_eq!(action_hash, "uhCkkCHAL");
+                assert_eq!(entry.grounds, "constitutional");
+                assert_eq!(entry.reach, "community");
+            }
+            _ => panic!("Expected GateDecisionChallengeCreated variant"),
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // ChallengeOutcomeCreated tests
+    // -------------------------------------------------------------------------
+
+    fn setup_outcome_conn() -> SqliteConnection {
+        let mut conn =
+            SqliteConnection::establish(":memory:").expect("Failed to create in-memory SQLite");
+
+        conn.batch_execute(
+            r#"
+            CREATE TABLE challenge_outcomes (
+                app_id TEXT NOT NULL,
+                outcome_id TEXT NOT NULL,
+                challenge_cid TEXT NOT NULL,
+                verdict TEXT NOT NULL,
+                reviewer_consensus TEXT NOT NULL,
+                reasoning_json TEXT NOT NULL,
+                decided_at TEXT NOT NULL,
+                indemnification_actions_json TEXT NOT NULL,
+                dht_anchor_hash TEXT NOT NULL,
+                created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+                PRIMARY KEY (app_id, outcome_id)
+            );
+            "#,
+        )
+        .expect("Failed to create test table");
+
+        conn
+    }
+
+    fn make_outcome_signal(outcome_id: &str, verdict: &str) -> MishpatSignal {
+        MishpatSignal::ChallengeOutcomeCreated {
+            action_hash: "uhCkkOUTABC".to_string(),
+            entry_hash: "uhCEkOUTABC".to_string(),
+            author: "uhCAkREVIEWER".to_string(),
+            entry: ChallengeOutcomeEntry {
+                outcome_id: outcome_id.to_string(),
+                challenge_cid: "bafyChal001".to_string(),
+                verdict: verdict.to_string(),
+                reviewer_consensus: "uhCAkREVIEWER1,uhCAkREVIEWER2".to_string(),
+                reasoning_json: r#"{"summary":"Evidence reviewed","steps":[]}"#.to_string(),
+                decided_at: "2026-04-20T10:00:00Z".to_string(),
+                indemnification_actions_json: "[]".to_string(),
+            },
+        }
+    }
+
+    #[test]
+    fn challenge_outcome_created_projects_row() {
+        let mut conn = setup_outcome_conn();
+        let signal = make_outcome_signal("bafyOut001", "upheld");
+        handle_mishpat_signal(&mut conn, "test-app", signal).unwrap();
+
+        let row = crate::db::challenge_outcomes::find_by_id(
+            &mut conn,
+            "test-app",
+            "bafyOut001",
+        )
+        .unwrap()
+        .expect("Row must be present after signal");
+
+        assert_eq!(row.verdict, "upheld");
+        assert_eq!(row.challenge_cid, "bafyChal001");
+        assert_eq!(row.dht_anchor_hash, "uhCkkOUTABC");
+        assert_eq!(row.reviewer_consensus, "uhCAkREVIEWER1,uhCAkREVIEWER2");
+    }
+
+    #[test]
+    fn challenge_outcome_created_is_idempotent() {
+        let mut conn = setup_outcome_conn();
+        let signal = make_outcome_signal("bafyOut002", "dismissed");
+        handle_mishpat_signal(&mut conn, "test-app", signal.clone()).unwrap();
+        handle_mishpat_signal(&mut conn, "test-app", signal).unwrap();
+
+        let rows =
+            crate::db::challenge_outcomes::find_by_verdict(&mut conn, "test-app", "dismissed")
+                .unwrap();
+        assert_eq!(
+            rows.len(),
+            1,
+            "Re-delivered signal must not duplicate the row"
+        );
+    }
+
+    #[test]
+    fn challenge_outcome_serde_tag_matches_dna_wire_format() {
+        let wire = serde_json::json!({
+            "type": "ChallengeOutcomeCreated",
+            "payload": {
+                "action_hash": "uhCkkOUT",
+                "entry_hash": "uhCEkOUT",
+                "author": "uhCAkOUT",
+                "entry": {
+                    "outcome_id": "bafyOut",
+                    "challenge_cid": "bafyChal",
+                    "verdict": "upheld",
+                    "reviewer_consensus": "uhCAkR1,uhCAkR2",
+                    "reasoning_json": "{}",
+                    "decided_at": "2026-04-20T00:00:00Z",
+                    "indemnification_actions_json": "[]",
+                }
+            }
+        });
+
+        let signal: MishpatSignal = serde_json::from_value(wire).unwrap();
+        match signal {
+            MishpatSignal::ChallengeOutcomeCreated { action_hash, entry, .. } => {
+                assert_eq!(action_hash, "uhCkkOUT");
+                assert_eq!(entry.verdict, "upheld");
+                assert_eq!(entry.challenge_cid, "bafyChal");
+            }
+            _ => panic!("Expected ChallengeOutcomeCreated variant"),
         }
     }
 }

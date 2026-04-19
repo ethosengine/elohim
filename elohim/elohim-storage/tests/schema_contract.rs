@@ -317,6 +317,110 @@ fn gate_decision_attestation_view_dev_context_phase() {
     validate_against_schema("views/gate-decision-attestation-view.schema.json", &json);
 }
 
+// ── Gate Decision Challenge ─────────────────────────────────────
+
+#[test]
+fn gate_decision_challenge_view_matches_schema() {
+    use elohim_storage::GateDecisionChallengeView;
+
+    let view = GateDecisionChallengeView {
+        challenge_id: "bafyreib2vq7challenge01234567890123456789012345678901234567".to_string(),
+        challenged_decision_cid: "bafyreib2vq7decision0123456789012345678901234567890123456"
+            .to_string(),
+        challenger_id: "uhCAkCHALLENGERABCDEFGHIJKLMNOPQRSTUVWXYZ01234567890123456789012"
+            .to_string(),
+        grounds: "constitutional".to_string(),
+        summary: "Decision appears to violate the P4 principle of graduated capability".to_string(),
+        evidence_refs: "bafyreib2vq7evidence1,bafyreib2vq7evidence2".to_string(),
+        filed_at: "2026-04-19T10:00:00Z".to_string(),
+        reach: "community".to_string(),
+        dht_anchor_hash: "uhCkkCHALANCHOR01234567890123456789012345678901234567890123456"
+            .to_string(),
+        created_at: "2026-04-19T10:00:01Z".to_string(),
+    };
+
+    let json = serde_json::to_value(&view).unwrap();
+    validate_against_schema("views/gate-decision-challenge-view.schema.json", &json);
+}
+
+#[test]
+fn gate_decision_challenge_view_empty_evidence_refs() {
+    use elohim_storage::GateDecisionChallengeView;
+
+    let view = GateDecisionChallengeView {
+        challenge_id: "bafyreib2vq7challenge-safety-01234567890123456789012345678".to_string(),
+        challenged_decision_cid: "bafyreib2vq7decision-safety-0123456789012345678901234567"
+            .to_string(),
+        challenger_id: "uhCAkCHALLENGER2ABCDEFGHIJKLMNOPQRSTUVWXYZ01234567890123456789"
+            .to_string(),
+        grounds: "safety".to_string(),
+        summary: "Content safety concern — no external evidence available at filing time".to_string(),
+        evidence_refs: String::new(),
+        filed_at: "2026-04-19T11:00:00Z".to_string(),
+        reach: "intimate".to_string(),
+        dht_anchor_hash: "uhCkkSAFETYANCHOR0123456789012345678901234567890123456789012"
+            .to_string(),
+        created_at: "2026-04-19T11:00:01Z".to_string(),
+    };
+
+    let json = serde_json::to_value(&view).unwrap();
+    validate_against_schema("views/gate-decision-challenge-view.schema.json", &json);
+}
+
+// ── Challenge Outcome ───────────────────────────────────────────
+
+#[test]
+fn challenge_outcome_view_upheld_matches_schema() {
+    use elohim_storage::ChallengeOutcomeView;
+
+    let view = ChallengeOutcomeView {
+        outcome_id: "bafyreib2vq7outcome01234567890123456789012345678901234567890"
+            .to_string(),
+        challenge_cid: "bafyreib2vq7challenge01234567890123456789012345678901234567"
+            .to_string(),
+        verdict: "upheld".to_string(),
+        reviewer_consensus:
+            "uhCAkREVIEWER1ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789,uhCAkREVIEWER2ABCDEFGHIJK"
+                .to_string(),
+        reasoning_json: r#"{"summary":"Evidence confirms challenger's grounds","steps":[],"constitutional_basis":["P4"]}"#
+            .to_string(),
+        decided_at: "2026-04-20T10:00:00Z".to_string(),
+        indemnification_actions_json: r#"[{"kind":"reputation-degrade","dimensions":["appeals-sustained"],"magnitude":0.15}]"#
+            .to_string(),
+        dht_anchor_hash: "uhCkkOUTCOMEANCHOR01234567890123456789012345678901234567890"
+            .to_string(),
+        created_at: "2026-04-20T10:00:01Z".to_string(),
+    };
+
+    let json = serde_json::to_value(&view).unwrap();
+    validate_against_schema("views/challenge-outcome-view.schema.json", &json);
+}
+
+#[test]
+fn challenge_outcome_view_dismissed_no_indemnification() {
+    use elohim_storage::ChallengeOutcomeView;
+
+    let view = ChallengeOutcomeView {
+        outcome_id: "bafyreib2vq7outcome-dismissed-0123456789012345678901234567890"
+            .to_string(),
+        challenge_cid: "bafyreib2vq7challenge-dismissed-01234567890123456789012345678"
+            .to_string(),
+        verdict: "dismissed".to_string(),
+        reviewer_consensus:
+            "uhCAkREVIEWERSINGLE01234567890123456789012345678901234567890123456".to_string(),
+        reasoning_json: r#"{"summary":"Insufficient evidence to sustain challenge","steps":[]}"#
+            .to_string(),
+        decided_at: "2026-04-20T14:00:00Z".to_string(),
+        indemnification_actions_json: "[]".to_string(),
+        dht_anchor_hash: "uhCkkDISMISSEDANCHOR0123456789012345678901234567890123456789"
+            .to_string(),
+        created_at: "2026-04-20T14:00:01Z".to_string(),
+    };
+
+    let json = serde_json::to_value(&view).unwrap();
+    validate_against_schema("views/challenge-outcome-view.schema.json", &json);
+}
+
 // ── Peer Status + Elohim Capability ────────────────────────────
 
 #[test]

@@ -158,3 +158,5 @@ pub use views::{
     build_peer_status_view, load_elohim_capability_from_env, ElohimCapabilityProfile,
     PeerStatusView,
 };
+pub use views::ChallengeOutcomeView;
+pub use views::GateDecisionChallengeView;

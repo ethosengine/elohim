@@ -259,6 +259,39 @@ diesel::table! {
 }
 
 diesel::table! {
+    gate_decision_challenges (app_id, challenge_id) {
+        app_id -> Text,
+        challenge_id -> Text,
+        challenged_decision_cid -> Text,
+        challenger_id -> Text,
+        grounds -> Text,
+        summary -> Text,
+        evidence_refs -> Text,
+        filed_at -> Text,
+        reach -> Text,
+        dht_anchor_hash -> Text,
+        created_at -> Text,
+        updated_at -> Text,
+    }
+}
+
+diesel::table! {
+    challenge_outcomes (app_id, outcome_id) {
+        app_id -> Text,
+        outcome_id -> Text,
+        challenge_cid -> Text,
+        verdict -> Text,
+        reviewer_consensus -> Text,
+        reasoning_json -> Text,
+        decided_at -> Text,
+        indemnification_actions_json -> Text,
+        dht_anchor_hash -> Text,
+        created_at -> Text,
+        updated_at -> Text,
+    }
+}
+
+diesel::table! {
     peer_statuses (peer_id) {
         peer_id -> Text,
         status -> Text,
@@ -1083,6 +1116,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     agreements,
     appeals,
     apps,
+    challenge_outcomes,
     challenges,
     comments,
     collective_participations,
@@ -1099,6 +1133,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     economic_events,
     enum_registry,
     gate_decision_attestations,
+    gate_decision_challenges,
     governance_dispositions,
     governance_signals,
     governance_states,

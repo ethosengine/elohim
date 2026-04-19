@@ -1,0 +1,58 @@
+{
+  "$id": "epr:schema:view:challenge-outcome",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ChallengeOutcomeView",
+  "description": "Source of truth: DHT (mishpat DNA, ChallengeOutcome entry, Notarized, Category A). Records the reviewer consensus verdict that closes a GateDecisionChallenge. This record is a read-optimised projection populated by the MishpatSignal::ChallengeOutcomeCreated post-commit signal. If this projection and the DHT disagree, the DHT wins.",
+  "type": "object",
+  "required": [
+    "outcomeId",
+    "challengeCid",
+    "verdict",
+    "reviewerConsensus",
+    "reasoningJson",
+    "decidedAt",
+    "indemnificationActionsJson",
+    "dhtAnchorHash",
+    "createdAt"
+  ],
+  "properties": {
+    "outcomeId": {
+      "type": "string",
+      "description": "CID of this outcome (self-addressing, globally unique)"
+    },
+    "challengeCid": {
+      "type": "string",
+      "description": "CID of the GateDecisionChallenge this outcome closes"
+    },
+    "verdict": {
+      "type": "string",
+      "enum": ["upheld", "dismissed", "superseded"],
+      "description": "Verdict closing the challenge"
+    },
+    "reviewerConsensus": {
+      "type": "string",
+      "description": "AgentPubKeys (base64, comma-separated) of reviewers who reached consensus"
+    },
+    "reasoningJson": {
+      "type": "string",
+      "description": "Full ConstitutionalReasoning (opaque JSON string)"
+    },
+    "decidedAt": {
+      "type": "string",
+      "description": "ISO 8601 timestamp of when the verdict was decided"
+    },
+    "indemnificationActionsJson": {
+      "type": "string",
+      "description": "Indemnification actions as JSON array (empty array '[]' if no action required)"
+    },
+    "dhtAnchorHash": {
+      "type": "string",
+      "description": "ActionHash (base64) of the upstream DHT entry — client can use this to verify provenance"
+    },
+    "createdAt": {
+      "type": "string",
+      "description": "ISO 8601 timestamp of when this projection row was inserted"
+    }
+  },
+  "additionalProperties": false
+}

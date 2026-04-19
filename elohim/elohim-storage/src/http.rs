@@ -81,7 +81,9 @@ use crate::views::{
     EconomicEventView,
     EprHeadInputView,
     EprHeadView,
+    ChallengeOutcomeView,
     GateDecisionAttestationView,
+    GateDecisionChallengeView,
     HumanView,
     InitiateClaimInputView,
     LocalSessionView,
@@ -2170,6 +2172,34 @@ impl HttpServer {
         if let Some(decision_id) = resource_path.strip_prefix("gate-decisions/") {
             return self
                 .handle_gate_decision_by_id(req, method, decision_id, &app_ctx)
+                .await;
+        }
+
+        // Gate decision challenge routes (Diesel projection of mishpat DHT)
+        // Source of truth: mishpat DNA DHT. These are read-only projections.
+        if resource_path == "gate-decision-challenges" {
+            return self
+                .handle_gate_decision_challenges_list(req, method, &app_ctx)
+                .await;
+        }
+
+        if let Some(challenge_id) = resource_path.strip_prefix("gate-decision-challenges/") {
+            return self
+                .handle_gate_decision_challenge_by_id(req, method, challenge_id, &app_ctx)
+                .await;
+        }
+
+        // Challenge outcome routes (Diesel projection of mishpat DHT)
+        // Source of truth: mishpat DNA DHT. These are read-only projections.
+        if resource_path == "challenge-outcomes" {
+            return self
+                .handle_challenge_outcomes_list(req, method, &app_ctx)
+                .await;
+        }
+
+        if let Some(outcome_id) = resource_path.strip_prefix("challenge-outcomes/") {
+            return self
+                .handle_challenge_outcome_by_id(req, method, outcome_id, &app_ctx)
                 .await;
         }
 
@@ -4800,6 +4830,221 @@ impl HttpServer {
             None => Ok(response::not_found(&format!(
                 "Gate decision not found: {}",
                 decision_id
+            ))),
+        }
+    }
+
+    // =========================================================================
+    // Gate Decision Challenge Handlers (mishpat DHT projection, read-only)
+    // =========================================================================
+
+    /// GET /db/gate-decision-challenges — List challenges with optional filters
+    ///
+    /// Query params (all optional):
+    ///   ?challengerId=...             — filter by challenger AgentPubKey
+    ///   ?challengedDecisionCid=...    — filter by challenged decision CID
+    ///   ?limit={n}                    — max results (default 50, max 500)
+    ///
+    /// Returns `{ items: GateDecisionChallengeView[], count: number }`.
+    /// Source of truth is the mishpat DNA DHT; this serves the read-optimised
+    /// SQLite projection populated by `MishpatSignal::GateDecisionChallengeCreated`.
+    async fn handle_gate_decision_challenges_list(
+        &self,
+        req: Request<Incoming>,
+        method: Method,
+        ctx: &AppContext,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        if method != Method::GET {
+            return Ok(response::method_not_allowed());
+        }
+
+        #[derive(serde::Deserialize, Default)]
+        #[serde(rename_all = "camelCase")]
+        struct ChallengeQuery {
+            challenger_id: Option<String>,
+            challenged_decision_cid: Option<String>,
+            limit: Option<i64>,
+        }
+
+        let uri = req.uri();
+        let query: ChallengeQuery = uri
+            .query()
+            .and_then(|q| serde_urlencoded::from_str(q).ok())
+            .unwrap_or_default();
+
+        let raw_limit = query.limit.unwrap_or(50).min(500);
+        let mut conn = self.get_diesel_conn()?;
+
+        let rows = match (&query.challenger_id, &query.challenged_decision_cid) {
+            (Some(challenger_id), _) => {
+                crate::db::gate_decision_challenges::find_by_challenger(
+                    &mut conn,
+                    &ctx.h_app_id,
+                    challenger_id,
+                )?
+            }
+            (_, Some(challenged_decision_cid)) => {
+                crate::db::gate_decision_challenges::find_by_challenged_decision(
+                    &mut conn,
+                    &ctx.h_app_id,
+                    challenged_decision_cid,
+                )?
+            }
+            _ => {
+                use crate::db::diesel_schema::gate_decision_challenges::dsl;
+                use diesel::prelude::*;
+                dsl::gate_decision_challenges
+                    .filter(dsl::app_id.eq(&ctx.h_app_id))
+                    .order(dsl::filed_at.desc())
+                    .limit(raw_limit)
+                    .load::<crate::db::gate_decision_challenges::GateDecisionChallengeRow>(
+                        &mut conn,
+                    )?
+            }
+        };
+
+        let views: Vec<GateDecisionChallengeView> =
+            rows.into_iter().map(GateDecisionChallengeView::from).collect();
+        let count = views.len();
+        Ok(response::ok(&serde_json::json!({
+            "items": views,
+            "count": count,
+        })))
+    }
+
+    /// GET /db/gate-decision-challenges/{cid} — Fetch a single challenge by its CID
+    ///
+    /// Returns `GateDecisionChallengeView` on hit, 404 on miss.
+    /// The `{cid}` segment is the `challenge_id` field (a self-addressing CID).
+    async fn handle_gate_decision_challenge_by_id(
+        &self,
+        _req: Request<Incoming>,
+        method: Method,
+        challenge_id: &str,
+        ctx: &AppContext,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        if method != Method::GET {
+            return Ok(response::method_not_allowed());
+        }
+
+        let mut conn = self.get_diesel_conn()?;
+
+        match crate::db::gate_decision_challenges::find_by_id(
+            &mut conn,
+            &ctx.h_app_id,
+            challenge_id,
+        )? {
+            Some(row) => Ok(response::ok(&GateDecisionChallengeView::from(row))),
+            None => Ok(response::not_found(&format!(
+                "Gate decision challenge not found: {}",
+                challenge_id
+            ))),
+        }
+    }
+
+    // =========================================================================
+    // Challenge Outcome Handlers (mishpat DHT projection, read-only)
+    // =========================================================================
+
+    /// GET /db/challenge-outcomes — List challenge outcomes with optional filters
+    ///
+    /// Query params (all optional):
+    ///   ?challengeCid=...   — filter by challenge CID (returns at most one outcome)
+    ///   ?verdict=...        — filter by verdict: upheld | dismissed | superseded
+    ///   ?limit={n}          — max results (default 50, max 500)
+    ///
+    /// Returns `{ items: ChallengeOutcomeView[], count: number }`.
+    /// Source of truth is the mishpat DNA DHT; this serves the read-optimised
+    /// SQLite projection populated by `MishpatSignal::ChallengeOutcomeCreated`.
+    async fn handle_challenge_outcomes_list(
+        &self,
+        req: Request<Incoming>,
+        method: Method,
+        ctx: &AppContext,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        if method != Method::GET {
+            return Ok(response::method_not_allowed());
+        }
+
+        #[derive(serde::Deserialize, Default)]
+        #[serde(rename_all = "camelCase")]
+        struct OutcomeQuery {
+            challenge_cid: Option<String>,
+            verdict: Option<String>,
+            limit: Option<i64>,
+        }
+
+        let uri = req.uri();
+        let query: OutcomeQuery = uri
+            .query()
+            .and_then(|q| serde_urlencoded::from_str(q).ok())
+            .unwrap_or_default();
+
+        let raw_limit = query.limit.unwrap_or(50).min(500);
+        let mut conn = self.get_diesel_conn()?;
+
+        let rows = match (&query.challenge_cid, &query.verdict) {
+            (Some(challenge_cid), _) => {
+                // challenge_cid lookup returns at most one row
+                crate::db::challenge_outcomes::find_by_challenge(
+                    &mut conn,
+                    &ctx.h_app_id,
+                    challenge_cid,
+                )?
+                .into_iter()
+                .collect::<Vec<_>>()
+            }
+            (_, Some(verdict)) => crate::db::challenge_outcomes::find_by_verdict(
+                &mut conn,
+                &ctx.h_app_id,
+                verdict,
+            )?,
+            _ => {
+                use crate::db::diesel_schema::challenge_outcomes::dsl;
+                use diesel::prelude::*;
+                dsl::challenge_outcomes
+                    .filter(dsl::app_id.eq(&ctx.h_app_id))
+                    .order(dsl::decided_at.desc())
+                    .limit(raw_limit)
+                    .load::<crate::db::challenge_outcomes::ChallengeOutcomeRow>(&mut conn)?
+            }
+        };
+
+        let views: Vec<ChallengeOutcomeView> =
+            rows.into_iter().map(ChallengeOutcomeView::from).collect();
+        let count = views.len();
+        Ok(response::ok(&serde_json::json!({
+            "items": views,
+            "count": count,
+        })))
+    }
+
+    /// GET /db/challenge-outcomes/{cid} — Fetch a single outcome by its CID
+    ///
+    /// Returns `ChallengeOutcomeView` on hit, 404 on miss.
+    /// The `{cid}` segment is the `outcome_id` field (a self-addressing CID).
+    async fn handle_challenge_outcome_by_id(
+        &self,
+        _req: Request<Incoming>,
+        method: Method,
+        outcome_id: &str,
+        ctx: &AppContext,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        if method != Method::GET {
+            return Ok(response::method_not_allowed());
+        }
+
+        let mut conn = self.get_diesel_conn()?;
+
+        match crate::db::challenge_outcomes::find_by_id(
+            &mut conn,
+            &ctx.h_app_id,
+            outcome_id,
+        )? {
+            Some(row) => Ok(response::ok(&ChallengeOutcomeView::from(row))),
+            None => Ok(response::not_found(&format!(
+                "Challenge outcome not found: {}",
+                outcome_id
             ))),
         }
     }
@@ -8239,6 +8484,43 @@ pub fn build_manifest() -> doorway_client::DoorwayRoutes {
                 .auth_required()
                 .build(),
         )
+        // =====================================================================
+        // /db/gate-decision-challenges — Challenge projections (mishpat)
+        // =====================================================================
+        // Read-only. Source of truth: mishpat DNA DHT. These rows are written
+        // exclusively by `MishpatSignal::GateDecisionChallengeCreated` signal projection.
+        // Auth required because challenges carry constitutional grievance details.
+        .route(
+            Route::get("/db/gate-decision-challenges")
+                .handler("list_gate_decision_challenges")
+                .auth_required()
+                .build(),
+        )
+        .route(
+            Route::get("/db/gate-decision-challenges/{cid}")
+                .handler("get_gate_decision_challenge")
+                .auth_required()
+                .build(),
+        )
+        // =====================================================================
+        // /db/challenge-outcomes — Outcome projections (mishpat)
+        // =====================================================================
+        // Read-only. Source of truth: mishpat DNA DHT. These rows are written
+        // exclusively by `MishpatSignal::ChallengeOutcomeCreated` signal projection.
+        // Auth required because outcomes carry constitutional reasoning and
+        // indemnification actions.
+        .route(
+            Route::get("/db/challenge-outcomes")
+                .handler("list_challenge_outcomes")
+                .auth_required()
+                .build(),
+        )
+        .route(
+            Route::get("/db/challenge-outcomes/{cid}")
+                .handler("get_challenge_outcome")
+                .auth_required()
+                .build(),
+        )
         // ── Conductor-bridge routes (Phase 10 HTTP pipes, Phase 11 full queries) ──
         // Gate-client pull resolvers (SourceChainResolver, DhtResolver) target these.
         // Phase 10: returns empty/404 honest stubs.
@@ -8307,6 +8589,24 @@ mod tests {
         assert!(
             paths.contains(&"/db/gate-decisions/{cid}"),
             "missing /db/gate-decisions/{{cid}}"
+        );
+        // Gate decision challenge routes (mishpat DHT projection — Phase 11 Task 11.2)
+        assert!(
+            paths.contains(&"/db/gate-decision-challenges"),
+            "missing /db/gate-decision-challenges"
+        );
+        assert!(
+            paths.contains(&"/db/gate-decision-challenges/{cid}"),
+            "missing /db/gate-decision-challenges/{{cid}}"
+        );
+        // Challenge outcome routes (mishpat DHT projection — Phase 11 Task 11.2)
+        assert!(
+            paths.contains(&"/db/challenge-outcomes"),
+            "missing /db/challenge-outcomes"
+        );
+        assert!(
+            paths.contains(&"/db/challenge-outcomes/{cid}"),
+            "missing /db/challenge-outcomes/{{cid}}"
         );
         // Ensure infrastructure routes are NOT in the manifest
         assert!(

@@ -6061,6 +6061,116 @@ impl From<GateDecisionAttestationRow> for GateDecisionAttestationView {
 }
 
 // ============================================================================
+// Gate Decision Challenge View
+// ============================================================================
+//
+// Source of truth: DHT (mishpat DNA, GateDecisionChallenge entry, Category A).
+// This view is served from the read-optimised SQLite projection populated by
+// `MishpatSignal::GateDecisionChallengeCreated`. If the projection and the DHT
+// disagree, the DHT wins.
+
+use crate::db::gate_decision_challenges::GateDecisionChallengeRow;
+
+/// Wire view for a notarized gate decision challenge.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct GateDecisionChallengeView {
+    /// CID of this challenge (self-addressing, globally unique).
+    pub challenge_id: String,
+    /// CID of the GateDecisionAttestation being challenged.
+    pub challenged_decision_cid: String,
+    /// AgentPubKey (base64) of the challenger.
+    pub challenger_id: String,
+    /// Grounds: "factual-error" | "safety" | "policy" | "constitutional" | "indemnification-request".
+    pub grounds: String,
+    /// Challenger's articulation of the grievance.
+    pub summary: String,
+    /// Comma-separated CIDs of evidence refs (empty string if none).
+    pub evidence_refs: String,
+    /// ISO 8601 timestamp of when the challenge was filed.
+    pub filed_at: String,
+    /// Reach level: "self" | "intimate" | "community" | "commons".
+    pub reach: String,
+    /// ActionHash (base64) of the upstream DHT entry — provenance anchor.
+    pub dht_anchor_hash: String,
+    /// ISO 8601 timestamp of when this projection row was inserted.
+    pub created_at: String,
+}
+
+impl From<GateDecisionChallengeRow> for GateDecisionChallengeView {
+    fn from(row: GateDecisionChallengeRow) -> Self {
+        Self {
+            challenge_id: row.challenge_id,
+            challenged_decision_cid: row.challenged_decision_cid,
+            challenger_id: row.challenger_id,
+            grounds: row.grounds,
+            summary: row.summary,
+            evidence_refs: row.evidence_refs,
+            filed_at: row.filed_at,
+            reach: row.reach,
+            dht_anchor_hash: row.dht_anchor_hash,
+            created_at: row.created_at,
+        }
+    }
+}
+
+// ============================================================================
+// Challenge Outcome View
+// ============================================================================
+//
+// Source of truth: DHT (mishpat DNA, ChallengeOutcome entry, Category A).
+// This view is served from the read-optimised SQLite projection populated by
+// `MishpatSignal::ChallengeOutcomeCreated`. If the projection and the DHT
+// disagree, the DHT wins.
+//
+// JSON fields (reasoningJson, indemnificationActionsJson) are surfaced as
+// opaque strings — the gate client owns parsing of those payloads.
+
+use crate::db::challenge_outcomes::ChallengeOutcomeRow;
+
+/// Wire view for a notarized challenge outcome.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct ChallengeOutcomeView {
+    /// CID of this outcome (self-addressing, globally unique).
+    pub outcome_id: String,
+    /// CID of the GateDecisionChallenge closed by this outcome.
+    pub challenge_cid: String,
+    /// Verdict: "upheld" | "dismissed" | "superseded".
+    pub verdict: String,
+    /// Comma-separated AgentPubKeys (base64) of reviewers who reached consensus.
+    pub reviewer_consensus: String,
+    /// Full ConstitutionalReasoning (opaque JSON string).
+    pub reasoning_json: String,
+    /// ISO 8601 timestamp of when the verdict was decided.
+    pub decided_at: String,
+    /// Indemnification actions as JSON array (empty array "[]" if no action required).
+    pub indemnification_actions_json: String,
+    /// ActionHash (base64) of the upstream DHT entry — provenance anchor.
+    pub dht_anchor_hash: String,
+    /// ISO 8601 timestamp of when this projection row was inserted.
+    pub created_at: String,
+}
+
+impl From<ChallengeOutcomeRow> for ChallengeOutcomeView {
+    fn from(row: ChallengeOutcomeRow) -> Self {
+        Self {
+            outcome_id: row.outcome_id,
+            challenge_cid: row.challenge_cid,
+            verdict: row.verdict,
+            reviewer_consensus: row.reviewer_consensus,
+            reasoning_json: row.reasoning_json,
+            decided_at: row.decided_at,
+            indemnification_actions_json: row.indemnification_actions_json,
+            dht_anchor_hash: row.dht_anchor_hash,
+            created_at: row.created_at,
+        }
+    }
+}
+
+// ============================================================================
 // Peer Status View
 // ============================================================================
 //
