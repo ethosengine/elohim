@@ -18,8 +18,8 @@
 //!
 //! - **E2E-1** — `ContentPublish` through universal-band only, no domain gate.
 //! - **E2E-2** — `AttestationWrite` → universal-band → discernment-gate → Verdict
-//!   (rule-1, first-pass-green).  Uses `__test_set_discernment_ctx` to inject
-//!   pre-populated context fields that would normally come from `assemble`.
+//!   (rule-1, first-pass-green).  Uses `__test_set_gate_ctx("discernment-gate-v1-mechanical", …)`
+//!   to inject pre-populated context fields that would normally come from `assemble`.
 //! - **E2E-3** — Override short-circuits the unified path; neither DAG runs.
 //! - **E2E-4** — Exempt-space AttestationWrite bypasses even the discernment-gate.
 //! - **E2E-5** — AttestationWrite without context injection hits rule-7
@@ -137,7 +137,7 @@ async fn e2e_1_content_publish_universal_band_only_no_domain_gate() {
 // ─── E2E-2 — AttestationWrite → discernment-gate → Verdict (rule-1) ──────────
 //
 // `check(AttestationWrite)` with a rule-1 context extension injected via the
-// test-only `__test_set_discernment_ctx` thread-local.  This simulates what
+// test-only `__test_set_gate_ctx` thread-local.  This simulates what
 // will happen in Phase 5+ when real `assemble` resolvers populate the context.
 //
 // Execution path verified:
@@ -150,7 +150,7 @@ async fn e2e_1_content_publish_universal_band_only_no_domain_gate() {
 #[tokio::test]
 async fn e2e_2_attestation_write_via_check_routes_to_discernment_gate_rule1() {
     // Inject rule-1 context before calling check().
-    gate_client::__test_set_discernment_ctx(Some(rule_1_ctx_ext()));
+    gate_client::__test_set_gate_ctx("discernment-gate-v1-mechanical", Some(rule_1_ctx_ext()));
 
     let event = attestation_event("moment-hash-e2e-rule1");
     let decision = check(event)
@@ -349,7 +349,7 @@ async fn e2e_4b_exempt_event_bypasses_all_gate_logic() {
 
 // ─── E2E-5 — AttestationWrite without context → rule-7 (steady-state no-mint) ─
 //
-// Without a `__test_set_discernment_ctx` extension, the discernment gate's
+// Without a `__test_set_gate_ctx` extension, the discernment gate's
 // `assemble` step returns null for `moment` and `priorAttestations` (Phase 3+
 // stubs).  The mechanical ruleset falls through to rule-7 → terminal-no-mint →
 // Allow{exempt:true}.
@@ -403,8 +403,8 @@ async fn e2e_6_check_dispatch_structurally_equivalent_to_direct_run_discernment_
     let event = attestation_event("moment-hash-e2e-equivalence");
     let ctx_ext = rule_1_ctx_ext();
 
-    // Path A: via check() with context extension.
-    gate_client::__test_set_discernment_ctx(Some(ctx_ext.clone()));
+    // Path A: via check() with context extension (uses new keyed API).
+    gate_client::__test_set_gate_ctx("discernment-gate-v1-mechanical", Some(ctx_ext.clone()));
     let check_decision = check(event.clone()).await.expect("check() must not fail");
 
     // Path B: via run_discernment_gate() directly.

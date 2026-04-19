@@ -13,7 +13,8 @@
 //! - [`AggregateAttestationsExecutor`] — queries attestations, applies a reduction,
 //!   writes a structured scalar outcome to GateContext.
 //!
-//! Phase 5+ will add `SkillInvokeExecutor`.
+//! Phase 6 adds:
+//! - [`SkillInvokeExecutor`] — dispatches to a named ElohimCapability as a sub-step.
 //!
 //! ## Side-effect conversion
 //!
@@ -29,6 +30,7 @@ pub mod mechanical_ruleset;
 /// Phase 3+ pull resolver stubs — return `Value::Null` with a warn log until
 /// real elohim-storage, DHT, source-chain, and manifest wiring lands.
 pub mod phase3_stubs;
+pub mod skill_invoke;
 pub mod synthesize;
 pub mod wisdom_invoke;
 
@@ -41,6 +43,7 @@ pub use escalate_to_review::EscalateToReviewExecutor;
 pub use mechanical_ruleset::{
     ContentNodeResolver, EmbeddedContentNodeResolver, MechanicalRulesetExecutor,
 };
+pub use skill_invoke::{CapabilityDispatcher, MockCapabilityDispatcher, SkillInvokeExecutor};
 pub use synthesize::SynthesizeExecutor;
 pub use wisdom_invoke::WisdomInvokeExecutor;
 

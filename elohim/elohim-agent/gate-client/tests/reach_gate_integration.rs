@@ -17,8 +17,8 @@
 //!
 //! 1. `__test_set_gate_ctx("reach-gate-v1", ctx_with_subject)` — sets the
 //!    `subject` key that the `aggregate` step reads.
-//! 2. `__test_set_attestation_resolver(Some(Arc::new(stub)))` — injects a
-//!    `StubAttestationResolver` with fixture attestation records for that subject.
+//! 2. `__test_set_gate_attestation_resolver("reach-gate-v1", Some(Arc::new(stub)))` —
+//!    injects a `StubAttestationResolver` with fixture attestation records for that subject.
 //!
 //! # Reach levels (from reach-aggregation-v1 threshold-ladder)
 //!
@@ -78,11 +78,12 @@ fn setup_reach_gate_test(subject: &str, attestation_records: Vec<AttestationReco
     gate_client::__test_set_gate_ctx("reach-gate-v1", Some(ctx));
 
     // Attestation resolver: stub returns the fixture records for this subject.
+    // Uses the new gate-keyed API (Phase 6+) to avoid cross-gate contamination.
     let resolver = Arc::new(StubAttestationResolver::single(
         subject,
         attestation_records,
     ));
-    gate_client::__test_set_attestation_resolver(Some(resolver));
+    gate_client::__test_set_gate_attestation_resolver("reach-gate-v1", Some(resolver));
 }
 
 /// Build a `CapabilityInvoke` event for reach-negotiation.
@@ -101,7 +102,7 @@ fn extract_reach_level(decision: &gate_client::GateDecision) -> &str {
         GateStatus::Verdict(GateTag::ReachLevel { level }) => level.as_str(),
         other => panic!(
             "expected Verdict(ReachLevel {{..}}), got: {other:?}\n\
-             Hint: check that __test_set_gate_ctx and __test_set_attestation_resolver were set."
+             Hint: check that __test_set_gate_ctx and __test_set_gate_attestation_resolver were set."
         ),
     }
 }

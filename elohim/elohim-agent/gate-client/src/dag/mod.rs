@@ -41,10 +41,11 @@ pub use aggregation_spec::AggregationSpec;
 pub use context::GateContext;
 pub use executor::{ArcExecutor, StepExecutor, StepKind, StepOutcome};
 pub use executors::{
-    AggregateAttestationsExecutor, AttestationRecord, AttestationResolver, ContentNodeResolver,
-    ContextAssembleExecutor, EmbeddedContentNodeResolver, EscalateToReviewExecutor,
-    MechanicalRulesetExecutor, NullAttestationResolver, StubAttestationResolver,
-    SynthesizeExecutor, WisdomInvokeExecutor,
+    AggregateAttestationsExecutor, AttestationRecord, AttestationResolver, CapabilityDispatcher,
+    ContentNodeResolver, ContextAssembleExecutor, EmbeddedContentNodeResolver,
+    EscalateToReviewExecutor, MechanicalRulesetExecutor, MockCapabilityDispatcher,
+    NullAttestationResolver, SkillInvokeExecutor, StubAttestationResolver, SynthesizeExecutor,
+    WisdomInvokeExecutor,
 };
 pub use interpreter::DagInterpreter;
 

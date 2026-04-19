@@ -67,9 +67,10 @@ use crate::dag::attestation::DecisionAttestationBuilder;
 use crate::dag::executor::StepKind;
 use crate::dag::executors::aggregate_attestations::AttestationRecord;
 use crate::dag::executors::{
-    AggregateAttestationsExecutor, AttestationResolver, ContentNodeResolver,
+    AggregateAttestationsExecutor, AttestationResolver, CapabilityDispatcher, ContentNodeResolver,
     ContextAssembleExecutor, EmbeddedContentNodeResolver, EscalateToReviewExecutor,
-    MechanicalRulesetExecutor, NullAttestationResolver, SynthesizeExecutor, WisdomInvokeExecutor,
+    MechanicalRulesetExecutor, MockCapabilityDispatcher, NullAttestationResolver,
+    SkillInvokeExecutor, SynthesizeExecutor, WisdomInvokeExecutor,
 };
 use crate::dag::universal_band::{ACTIVE_UNIVERSAL_BAND_NAME, ACTIVE_UNIVERSAL_BAND_VERSION};
 use crate::dag::{
@@ -290,15 +291,36 @@ impl DagRunner {
         Self::build_interpreter_and_wrap(shared, attestation_resolver, declaration)
     }
 
-    /// Internal: build the interpreter with all Phase 2+3+5 executors and wrap it.
+    /// Internal: build the interpreter with all Phase 2+3+5+6 executors and wrap it.
     ///
     /// Takes `Arc<dyn ContentNodeResolver>` so it can be shared between both
     /// `MechanicalRulesetExecutor` (spec lookup) and `AggregateAttestationsExecutor`
     /// (aggregation-spec lookup) without a second Box move.
+    ///
+    /// `capability_dispatcher` defaults to `MockCapabilityDispatcher` when `None`.
     fn build_interpreter_and_wrap(
         content_resolver: Arc<dyn ContentNodeResolver>,
         attestation_resolver: Box<dyn AttestationResolver>,
         declaration: GateProcessDeclaration,
+    ) -> Self {
+        Self::build_interpreter_and_wrap_with_dispatcher(
+            content_resolver,
+            attestation_resolver,
+            declaration,
+            None,
+        )
+    }
+
+    /// Like `build_interpreter_and_wrap` but accepts an optional
+    /// `CapabilityDispatcher` override for the `SkillInvoke` step.
+    ///
+    /// `None` → `MockCapabilityDispatcher` (DevContext / tests).
+    /// `Some(d)` → the supplied dispatcher (Phase 7+ activation).
+    fn build_interpreter_and_wrap_with_dispatcher(
+        content_resolver: Arc<dyn ContentNodeResolver>,
+        attestation_resolver: Box<dyn AttestationResolver>,
+        declaration: GateProcessDeclaration,
+        capability_dispatcher: Option<Arc<dyn CapabilityDispatcher>>,
     ) -> Self {
         let mut interpreter = DagInterpreter::new();
 
@@ -337,12 +359,50 @@ impl DagRunner {
                 attestation_resolver,
             )),
         );
+        // Phase 6: SkillInvokeExecutor — dispatches to a named ElohimCapability.
+        // MockCapabilityDispatcher is the default; Phase 7+ activation injects
+        // the real capability handler via `with_capability_dispatcher`.
+        let dispatcher = capability_dispatcher
+            .unwrap_or_else(|| Arc::new(MockCapabilityDispatcher) as Arc<dyn CapabilityDispatcher>);
+        interpreter.register(
+            StepKind::SkillInvoke,
+            Arc::new(SkillInvokeExecutor::new(dispatcher)),
+        );
 
         Self {
             interpreter,
             declaration,
             registry: GateRegistry::build(),
         }
+    }
+
+    /// Builder: replace the `MockCapabilityDispatcher` with a real dispatcher.
+    ///
+    /// Use this at process startup (Phase 7+) to wire in the elohim-agent-service
+    /// capability handler before the first gate check runs.
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// use gate_client::dag_runner::DagRunner;
+    ///
+    /// let runner = DagRunner::new().with_capability_dispatcher(Arc::new(my_dispatcher));
+    /// ```
+    pub fn with_capability_dispatcher(self, dispatcher: Arc<dyn CapabilityDispatcher>) -> Self {
+        // Re-build the interpreter to swap in the new dispatcher.  The registry
+        // is rebuilt too; GateRegistry::build() is cheap (just HashMap + YAML).
+        Self::build_interpreter_and_wrap_with_dispatcher(
+            // We cannot recover the content_resolver from the existing interpreter,
+            // so default to an empty EmbeddedContentNodeResolver.  Callers who need
+            // both a real content resolver AND a real capability dispatcher should
+            // use the full constructor path instead.
+            Arc::new(EmbeddedContentNodeResolver::new(
+                std::collections::HashMap::new(),
+            )),
+            Box::new(NullAttestationResolver),
+            self.declaration,
+            Some(dispatcher),
+        )
     }
 
     /// Execute the universal-band DAG for the given event and return the
@@ -613,13 +673,15 @@ pub(crate) fn domain_gate_for_event(event: &RelationalImpactEvent) -> Option<&'s
 /// function's signature.  In production builds, the map is always empty and the
 /// context extension defaults to an empty `GateContext`.
 ///
-/// `attestation_resolver_override`: when `Some`, the resolver replaces
-/// `NullAttestationResolver` inside `run_app_domain_gate`. Used by test builds
-/// to inject fixture attestation records for reach-gate E2E tests.
+/// `attestation_resolver_overrides`: a map from gate name → resolver, consumed
+/// once per call.  The resolver for the dispatched gate (if any) is looked up by
+/// name and passed to `run_app_domain_gate`.  Gates not present in the map fall
+/// back to `NullAttestationResolver`.  In production builds the map is always
+/// empty.  Used by test builds to inject fixture attestation records per gate.
 pub(crate) async fn run_unified(
     event: &RelationalImpactEvent,
     ctx_extensions: HashMap<String, GateContext>,
-    attestation_resolver_override: Option<Arc<dyn AttestationResolver>>,
+    attestation_resolver_overrides: HashMap<String, Arc<dyn AttestationResolver>>,
 ) -> Result<GateDecision, GateError> {
     // Step 1: universal-band must Allow first.
     let universal_decision = run_with_tracing(event).await?;
@@ -636,7 +698,10 @@ pub(crate) async fn run_unified(
     // Step 3: look up the context extension for this gate (may be empty).
     let ctx_extension = ctx_extensions.get(gate_name).cloned().unwrap_or_default();
 
-    // Step 4: run the dispatched app-domain gate.
+    // Step 4: look up the attestation resolver for this gate (may be absent).
+    let attestation_resolver_override = attestation_resolver_overrides.get(gate_name).cloned();
+
+    // Step 5: run the dispatched app-domain gate.
     run_app_domain_gate(
         gate_name,
         event,
