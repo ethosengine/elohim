@@ -10,9 +10,11 @@ import { PointsService } from '@app/lamad/services/points.service';
 import { MasteryService } from '@app/lamad/services/mastery.service';
 
 import { DeviceStewardshipService } from '../../services/device-stewardship.service';
+import { HouseholdDevicesService } from '../../services/household-devices.service';
 
 import type { StewardedDevice } from '../../models/device-stewardship.model';
 import type { LearnerPointBalance } from '@app/lamad/models/learning-points.model';
+import type { HouseholdDevicesView } from '../../../generated/household-devices-view';
 
 import { DeviceStewardshipComponent } from './device-stewardship.component';
 import { vi, Mock } from 'vitest';
@@ -91,8 +93,66 @@ const MOCK_BALANCE: LearnerPointBalance = {
 };
 
 // =============================================================================
+// Mock Household Devices Data
+// =============================================================================
+
+const MOCK_HOUSEHOLD_DEVICES: HouseholdDevicesView = {
+  householdId: 'household-matthew',
+  devices: [
+    {
+      shape: {
+        nodeId: 'node-nuc-01',
+        hostname: 'living-room-nuc',
+        deviceArchetypeId: 'home-nuc',
+        householdId: 'household-matthew',
+        role: 'edge',
+        capabilityLevel: 3,
+        committed: { cpuCores: 4, memoryGb: 16, storageTb: 2 },
+        stewardTier: 'steward',
+        region: 'us-east-1',
+        signature: 'sig-abc',
+        signedAt: new Date().toISOString(),
+      },
+      peer: {
+        peerId: 'peer-pub-key-abc',
+        status: 'online',
+        generalPoolMember: true,
+        acceptingStewardshipReserves: false,
+        archetypeClass: 'home-nuc',
+        timestamp: String(Date.now() * 1000),
+        dhtAnchorHash: 'uhCkk-abc',
+        updatedAt: String(Date.now() * 1000),
+      },
+    },
+    {
+      shape: {
+        nodeId: 'node-blade-02',
+        hostname: 'rack-blade-02',
+        deviceArchetypeId: 'blade',
+        householdId: 'household-matthew',
+        role: 'archival',
+        capabilityLevel: 5,
+        committed: { cpuCores: 16, memoryGb: 64, storageTb: 20 },
+        stewardTier: 'pioneer',
+        signature: 'sig-def',
+        signedAt: new Date().toISOString(),
+      },
+      peer: null,
+    },
+  ],
+};
+
+// =============================================================================
 // Mock Service Factories
 // =============================================================================
+
+function createMockHouseholdDevicesService(view: HouseholdDevicesView | null = null) {
+  return {
+    list: vi.fn().mockReturnValue(of(view)),
+    resolveHouseholdId: vi.fn().mockReturnValue(of(view ? view.householdId : null)),
+    listForHuman: vi.fn().mockReturnValue(of(view)),
+  };
+}
 
 function createMockDeviceStewardshipService() {
   return {
@@ -209,15 +269,18 @@ describe('DeviceStewardshipComponent', () => {
   let mockIdentityService: ReturnType<typeof createMockIdentityService>;
   let mockPointsService: ReturnType<typeof createMockPointsService>;
   let mockMasteryService: ReturnType<typeof createMockMasteryService>;
+  let mockHouseholdDevicesService: ReturnType<typeof createMockHouseholdDevicesService>;
 
   function setupTestBed(
     agencyStage: IdentityState['agencyStage'] = 'visitor',
-    balance: LearnerPointBalance | null = null
+    balance: LearnerPointBalance | null = null,
+    householdDevices: HouseholdDevicesView | null = null
   ) {
     mockService = createMockDeviceStewardshipService();
     mockIdentityService = createMockIdentityService(agencyStage);
     mockPointsService = createMockPointsService(balance);
     mockMasteryService = createMockMasteryService();
+    mockHouseholdDevicesService = createMockHouseholdDevicesService(householdDevices);
 
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({
@@ -228,6 +291,7 @@ describe('DeviceStewardshipComponent', () => {
         { provide: IdentityService, useValue: mockIdentityService },
         { provide: PointsService, useValue: mockPointsService },
         { provide: MasteryService, useValue: mockMasteryService },
+        { provide: HouseholdDevicesService, useValue: mockHouseholdDevicesService },
       ],
     });
 
@@ -474,9 +538,11 @@ describe('DeviceStewardshipComponent', () => {
       expect(prompt).toBeNull();
     });
 
-    it('should show loading state in devices tab', () => {
+    it('should show loading state in devices tab while household devices load', () => {
+      // householdDevicesLoading starts true until listForHuman emits
+      component.householdDevicesLoading.set(true);
       fixture.detectChanges();
-      const loading = fixture.nativeElement.querySelector('.loading-overlay');
+      const loading = fixture.nativeElement.querySelector('[data-testid="devices-loading"]');
       expect(loading).toBeTruthy();
       expect(loading.textContent).toContain('Discovering devices');
     });
@@ -504,107 +570,36 @@ describe('DeviceStewardshipComponent', () => {
   });
 
   // ==========================================================================
-  // Current Device Rendering (Devices Tab)
+  // Device Cards Rendering (Devices Tab) — now driven by HouseholdDevicesView
   // ==========================================================================
 
-  describe('Current Device', () => {
+  describe('Device Cards Rendering', () => {
     beforeEach(() => {
-      setupTestBed('app-steward');
-      mockService.isLoading.set(false);
-      mockService.totalDevices.set(1);
-      mockService.connectedCount.set(1);
-      mockService.currentDevice.set(MOCK_CURRENT_DEVICE);
+      setupTestBed('node-steward', null, MOCK_HOUSEHOLD_DEVICES);
       component.selectTab('devices');
-    });
-
-    it('should render current device card with highlight', () => {
       fixture.detectChanges();
-      const card = fixture.nativeElement.querySelector('.device-card.current');
-      expect(card).toBeTruthy();
     });
 
-    it('should show "You are here" badge', () => {
-      fixture.detectChanges();
-      const badge = fixture.nativeElement.querySelector('.current-badge');
-      expect(badge).toBeTruthy();
-      expect(badge.textContent).toContain('You are here');
+    it('should render device grid with household devices', () => {
+      const grid = fixture.nativeElement.querySelector('[data-testid="device-list"]');
+      expect(grid).toBeTruthy();
     });
 
-    it('should display device name', () => {
-      fixture.detectChanges();
-      const title = fixture.nativeElement.querySelector('.current-device-section .card-title h3');
-      expect(title.textContent).toContain('My Mac');
-    });
-
-    it('should show agency stage label', () => {
-      fixture.detectChanges();
-      const badge = fixture.nativeElement.querySelector('.agency-badge');
-      expect(badge.textContent).toContain('App Steward');
-    });
-  });
-
-  // ==========================================================================
-  // Node List Rendering (Devices Tab)
-  // ==========================================================================
-
-  describe('Node Steward Devices', () => {
-    beforeEach(() => {
-      setupTestBed('app-steward');
-      mockService.isLoading.set(false);
-      mockService.totalDevices.set(2);
-      mockService.connectedCount.set(1);
-      mockService.offlineCount.set(1);
-      mockService.nodeStewardDevices.set([MOCK_NODE_DEVICE, MOCK_OFFLINE_NODE]);
-      component.selectTab('devices');
-    });
-
-    it('should render node steward section', () => {
-      fixture.detectChanges();
-      const headers = fixture.nativeElement.querySelectorAll('.section-header h2');
-      const infraHeader = Array.from(headers as NodeListOf<HTMLElement>).find(h =>
-        h.textContent?.includes('Infrastructure Nodes')
+    it('should render two device cards', () => {
+      const cards = fixture.nativeElement.querySelectorAll(
+        '[data-testid="device-node-nuc-01"], [data-testid="device-node-blade-02"]'
       );
-      expect(infraHeader).toBeTruthy();
-    });
-
-    it('should render correct number of node cards', () => {
-      fixture.detectChanges();
-      const cards = fixture.nativeElement.querySelectorAll('.device-grid .device-card');
       expect(cards.length).toBe(2);
     });
 
-    it('should display node name', () => {
-      fixture.detectChanges();
-      const titles = fixture.nativeElement.querySelectorAll('.device-grid .card-title h3');
-      expect(titles[0].textContent).toContain('Living Room HoloPort');
+    it('should display hostname in card', () => {
+      const card = fixture.nativeElement.querySelector('[data-testid="device-node-nuc-01"]');
+      expect(card.textContent).toContain('living-room-nuc');
     });
 
-    it('should show resource bars for nodes with resources', () => {
-      fixture.detectChanges();
-      const bars = fixture.nativeElement.querySelectorAll('.resource-bar');
-      expect(bars.length).toBeGreaterThan(0);
-    });
-
-    it('should show role chips', () => {
-      fixture.detectChanges();
-      const chips = fixture.nativeElement.querySelectorAll('.role-chip');
-      expect(chips.length).toBe(2);
-      expect(chips[0].textContent).toContain('storage');
-    });
-
-    it('should show primary node badge', () => {
-      fixture.detectChanges();
-      const badge = fixture.nativeElement.querySelector('.primary-badge');
-      expect(badge).toBeTruthy();
-      expect(badge.textContent).toContain('Primary Node');
-    });
-
-    it('should display location when available', () => {
-      fixture.detectChanges();
-      const locationValue = fixture.nativeElement.querySelector(
-        '.device-grid .device-card .detail-value'
-      );
-      expect(locationValue.textContent).toContain('Home Office');
+    it('should show capability level', () => {
+      const card = fixture.nativeElement.querySelector('[data-testid="device-node-nuc-01"]');
+      expect(card.textContent).toContain('L3');
     });
   });
 
@@ -831,6 +826,199 @@ describe('DeviceStewardshipComponent', () => {
         agencyStage: 'hosted',
       });
       expect(component.isSteward()).toBe(false);
+    });
+  });
+
+  // ==========================================================================
+  // Household Devices Tab (P2P Dataplane Visibility)
+  // ==========================================================================
+
+  describe('Household Devices Tab', () => {
+    describe('Loading state', () => {
+      it('should show loading overlay while fetching devices', () => {
+        setupTestBed('node-steward', null, null);
+        component.selectTab('devices');
+        // Manually set loading state to simulate in-flight request
+        component.householdDevicesLoading.set(true);
+        fixture.detectChanges();
+
+        expect(component.householdDevicesLoading()).toBe(true);
+        const loadingEl = fixture.nativeElement.querySelector('[data-testid="devices-loading"]');
+        expect(loadingEl).toBeTruthy();
+        expect(loadingEl.textContent).toContain('Discovering devices');
+      });
+    });
+
+    describe('Happy path — devices rendered', () => {
+      beforeEach(() => {
+        setupTestBed('node-steward', null, MOCK_HOUSEHOLD_DEVICES);
+        component.selectTab('devices');
+        fixture.detectChanges();
+      });
+
+      it('should not show loading overlay after data arrives', () => {
+        expect(component.householdDevicesLoading()).toBe(false);
+        expect(fixture.nativeElement.querySelector('[data-testid="devices-loading"]')).toBeNull();
+      });
+
+      it('should render device-list container', () => {
+        const list = fixture.nativeElement.querySelector('[data-testid="device-list"]');
+        expect(list).toBeTruthy();
+      });
+
+      it('should render a card for each device', () => {
+        // Use attribute selector that exactly matches the node-id pattern
+        const cards = fixture.nativeElement.querySelectorAll(
+          '[data-testid="device-node-nuc-01"], [data-testid="device-node-blade-02"]'
+        );
+        expect(cards.length).toBe(2);
+      });
+
+      it('should set data-testid with nodeId for each device card', () => {
+        const card1 = fixture.nativeElement.querySelector('[data-testid="device-node-nuc-01"]');
+        const card2 = fixture.nativeElement.querySelector('[data-testid="device-node-blade-02"]');
+        expect(card1).toBeTruthy();
+        expect(card2).toBeTruthy();
+      });
+
+      it('should display device hostname', () => {
+        const card = fixture.nativeElement.querySelector('[data-testid="device-node-nuc-01"]');
+        expect(card.textContent).toContain('living-room-nuc');
+      });
+
+      it('should display archetype label', () => {
+        const card = fixture.nativeElement.querySelector('[data-testid="device-node-nuc-01"]');
+        expect(card.textContent).toContain('Home NUC');
+      });
+
+      it('should display capability level', () => {
+        const card = fixture.nativeElement.querySelector('[data-testid="device-node-nuc-01"]');
+        expect(card.textContent).toContain('L3');
+      });
+
+      it('should display role', () => {
+        const card = fixture.nativeElement.querySelector('[data-testid="device-node-nuc-01"]');
+        expect(card.textContent).toContain('edge');
+      });
+
+      it('should display online status for peer with status online', () => {
+        const card = fixture.nativeElement.querySelector('[data-testid="device-node-nuc-01"]');
+        expect(card.textContent).toContain('Online');
+      });
+
+      it('should display Unknown status for device with null peer', () => {
+        const card = fixture.nativeElement.querySelector('[data-testid="device-node-blade-02"]');
+        expect(card.textContent).toContain('Unknown');
+      });
+
+      it('should show household ID in summary strip', () => {
+        const summary = fixture.nativeElement.querySelector('[data-testid="device-summary"]');
+        expect(summary).toBeTruthy();
+        expect(summary.textContent).toContain('household-matthew');
+      });
+
+      it('should call listForHuman with humanId from identity', () => {
+        expect(mockHouseholdDevicesService.listForHuman).toHaveBeenCalledWith('human-123');
+      });
+    });
+
+    describe('Empty state', () => {
+      it('should show empty state when household has no devices', () => {
+        setupTestBed('node-steward', null, { householdId: 'household-matthew', devices: [] });
+        component.selectTab('devices');
+        fixture.detectChanges();
+
+        const emptyEl = fixture.nativeElement.querySelector('[data-testid="devices-empty"]');
+        expect(emptyEl).toBeTruthy();
+        expect(emptyEl.textContent).toContain('No Devices Registered');
+      });
+
+      it('should show empty state when human has no household', () => {
+        setupTestBed('node-steward', null, null);
+        component.selectTab('devices');
+        fixture.detectChanges();
+
+        const emptyEl = fixture.nativeElement.querySelector('[data-testid="devices-empty"]');
+        expect(emptyEl).toBeTruthy();
+      });
+    });
+
+    describe('Error state', () => {
+      it('should show error banner when fetch fails', () => {
+        setupTestBed('node-steward', null, null);
+        const { throwError } = require('rxjs');
+        mockHouseholdDevicesService.listForHuman.mockReturnValue(
+          throwError(() => new Error('Network error'))
+        );
+
+        component.selectTab('devices');
+        fixture.detectChanges();
+
+        expect(component.householdDevicesError()).toBe('Network error');
+        const errorEl = fixture.nativeElement.querySelector('[data-testid="devices-error"]');
+        expect(errorEl).toBeTruthy();
+        expect(errorEl.textContent).toContain('Network error');
+      });
+
+      it('should retry on retry button click', () => {
+        setupTestBed('node-steward', null, MOCK_HOUSEHOLD_DEVICES);
+        component.selectTab('devices');
+        // Set error state so the retry button renders
+        component.householdDevicesError.set('Some error');
+        component.householdDevicesLoading.set(false);
+        fixture.detectChanges();
+
+        const retryBtn = fixture.nativeElement.querySelector('[data-testid="devices-retry-btn"]');
+        expect(retryBtn).toBeTruthy();
+        mockHouseholdDevicesService.listForHuman.mockClear();
+        retryBtn.click();
+
+        expect(mockHouseholdDevicesService.listForHuman).toHaveBeenCalled();
+      });
+    });
+
+    describe('Display helpers', () => {
+      beforeEach(() => setupTestBed('node-steward'));
+
+      it('should return green color for online peer status', () => {
+        expect(component.getPeerStatusColor('online')).toBe('#22c55e');
+      });
+
+      it('should return amber color for degraded peer status', () => {
+        expect(component.getPeerStatusColor('degraded')).toBe('#f59e0b');
+      });
+
+      it('should return red color for offline peer status', () => {
+        expect(component.getPeerStatusColor('offline')).toBe('#ef4444');
+      });
+
+      it('should return grey for unknown peer status', () => {
+        expect(component.getPeerStatusColor(undefined)).toBe('#64748b');
+      });
+
+      it('should return correct label for online status', () => {
+        expect(component.getPeerStatusLabel('online')).toBe('Online');
+      });
+
+      it('should return Unknown for undefined status', () => {
+        expect(component.getPeerStatusLabel(undefined)).toBe('Unknown');
+      });
+
+      it('should map home-nuc archetype to readable label', () => {
+        expect(component.getArchetypeLabel('home-nuc')).toBe('Home NUC');
+      });
+
+      it('should return raw id for unknown archetype', () => {
+        expect(component.getArchetypeLabel('custom-thing')).toBe('custom-thing');
+      });
+
+      it('should map edge role to router icon', () => {
+        expect(component.getRoleIcon('edge')).toBe('router');
+      });
+
+      it('should map inference role to psychology icon', () => {
+        expect(component.getRoleIcon('inference')).toBe('psychology');
+      });
     });
   });
 });

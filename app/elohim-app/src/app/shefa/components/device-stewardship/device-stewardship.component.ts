@@ -1253,7 +1253,7 @@ export class DeviceStewardshipComponent implements OnInit {
     this.householdDevicesError.set(null);
 
     this.householdDevicesService.listForHuman(humanId).subscribe({
-      next: view => {
+      next: (view: HouseholdDevicesView | null) => {
         this.householdDevices.set(view);
         this.householdDevicesLoading.set(false);
       },
