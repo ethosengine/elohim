@@ -88,6 +88,7 @@ use crate::dag::{
 use crate::error::GateError;
 use crate::events::RelationalImpactEvent;
 use crate::space;
+use crate::transport::WisdomTransport;
 use crate::types::GateDecision;
 
 // ─── GateRegistry ─────────────────────────────────────────────────────────────
@@ -214,11 +215,17 @@ impl GateRegistry {
 ///
 /// Phase 6: also owns a [`GateRegistry`] with eagerly-loaded app-domain gate
 /// declarations for discernment-gate, reach-gate, and content-safety-gate.
+///
+/// Phase 8: holds a `WisdomTransport` that determines whether wisdom-invoke
+/// steps use the hardcoded mock or the in-process `elohim_agent::wisdom`
+/// function.  The default (`Mock`) preserves all existing DevContext behaviour.
 pub struct DagRunner {
     interpreter: DagInterpreter,
     declaration: GateProcessDeclaration,
     /// Eager registry of app-domain gates (content-safety-gate + discernment-gate + reach-gate).
     registry: GateRegistry,
+    /// How wisdom-invoke steps reach the wisdom engine.
+    wisdom_transport: WisdomTransport,
 }
 
 // DagRunner auto-derives Send + Sync because:
@@ -354,6 +361,27 @@ impl DagRunner {
         declaration: GateProcessDeclaration,
         capability_dispatcher: Option<Arc<dyn CapabilityDispatcher>>,
     ) -> Self {
+        Self::build_interpreter_and_wrap_with_dispatcher_and_wisdom(
+            content_resolver,
+            attestation_resolver,
+            declaration,
+            capability_dispatcher,
+            WisdomTransport::Mock,
+        )
+    }
+
+    /// Full internal builder — accepts dispatcher and `WisdomTransport`.
+    ///
+    /// All other constructors delegate here.  The `wisdom_transport` determines
+    /// whether `WisdomInvokeExecutor` uses the hardcoded mock or the in-process
+    /// `elohim_agent::wisdom::invoke_wisdom` function.
+    fn build_interpreter_and_wrap_with_dispatcher_and_wisdom(
+        content_resolver: Arc<dyn ContentNodeResolver>,
+        attestation_resolver: Box<dyn AttestationResolver>,
+        declaration: GateProcessDeclaration,
+        capability_dispatcher: Option<Arc<dyn CapabilityDispatcher>>,
+        wisdom_transport: WisdomTransport,
+    ) -> Self {
         let mut interpreter = DagInterpreter::new();
 
         // ContextAssembleExecutor — no pre-registered pull resolvers.
@@ -363,9 +391,11 @@ impl DagRunner {
             StepKind::ContextAssemble,
             Arc::new(ContextAssembleExecutor::new()),
         );
+        // WisdomInvokeExecutor — transport determines mock vs in-process LLM call.
+        // Phase::ElohimActive is observed from the actual call outcome, never flagged.
         interpreter.register(
             StepKind::WisdomInvoke,
-            Arc::new(WisdomInvokeExecutor::new()),
+            Arc::new(WisdomInvokeExecutor::new(wisdom_transport.clone())),
         );
         // Phase 3: MechanicalRulesetExecutor with injected ContentNodeResolver.
         // The content_resolver is an Arc so we can share it with the
@@ -405,6 +435,7 @@ impl DagRunner {
             interpreter,
             declaration,
             registry: GateRegistry::build(),
+            wisdom_transport,
         }
     }
 
@@ -423,7 +454,9 @@ impl DagRunner {
     pub fn with_capability_dispatcher(self, dispatcher: Arc<dyn CapabilityDispatcher>) -> Self {
         // Re-build the interpreter to swap in the new dispatcher.  The registry
         // is rebuilt too; GateRegistry::build() is cheap (just HashMap + YAML).
-        Self::build_interpreter_and_wrap_with_dispatcher(
+        // Preserve the existing wisdom_transport so callers who set InProcess
+        // don't lose it when swapping the dispatcher.
+        Self::build_interpreter_and_wrap_with_dispatcher_and_wisdom(
             // We cannot recover the content_resolver from the existing interpreter,
             // so default to an empty EmbeddedContentNodeResolver.  Callers who need
             // both a real content resolver AND a real capability dispatcher should
@@ -434,6 +467,36 @@ impl DagRunner {
             Box::new(NullAttestationResolver),
             self.declaration,
             Some(dispatcher),
+            self.wisdom_transport,
+        )
+    }
+
+    /// Builder: set the `WisdomTransport` for this runner.
+    ///
+    /// Use `WisdomTransport::InProcess` at process startup (Phase 8+) to enable
+    /// real LLM inference via `elohim_agent::wisdom::invoke_wisdom`.
+    ///
+    /// The `Phase::ElohimActive` marker is **observed from the actual call outcome**,
+    /// not from a config flag.  If no API key is set, the service returns
+    /// `phase: dev-context` regardless of this setting.
+    ///
+    /// # Example (Phase 8 activation)
+    ///
+    /// ```rust,ignore
+    /// use gate_client::dag_runner::DagRunner;
+    /// use gate_client::transport::WisdomTransport;
+    ///
+    /// let runner = DagRunner::new().with_wisdom_transport(WisdomTransport::InProcess);
+    /// ```
+    pub fn with_wisdom_transport(self, wisdom_transport: WisdomTransport) -> Self {
+        Self::build_interpreter_and_wrap_with_dispatcher_and_wisdom(
+            Arc::new(EmbeddedContentNodeResolver::new(
+                std::collections::HashMap::new(),
+            )),
+            Box::new(NullAttestationResolver),
+            self.declaration,
+            None,
+            wisdom_transport,
         )
     }
 
@@ -1121,5 +1184,111 @@ mod tests {
                 .unwrap_or_else(|e| panic!("DAG run failed for {kind}: {e}"));
             assert!(decision.is_allowed(), "DAG must Allow {kind} in DevContext");
         }
+    }
+
+    // ─── Phase 8: WisdomTransport::Mock → DevContext in GateDecision ─────────
+
+    #[tokio::test]
+    async fn mock_transport_produces_dev_context_in_gate_decision() {
+        let runner = DagRunner::new(); // default: WisdomTransport::Mock
+        let event = content_publish_event();
+        let ctx = build_initial_context(&event);
+
+        let decision = runner.run(&event, ctx).await.unwrap();
+
+        assert!(
+            decision.phase.is_dev_context(),
+            "Mock transport must produce Phase::DevContext in GateDecision; got: {:?}",
+            decision.phase
+        );
+    }
+
+    // ─── Phase 8: with_wisdom_transport builder preserves Mock default ────────
+
+    #[tokio::test]
+    async fn with_wisdom_transport_mock_produces_dev_context() {
+        let runner = DagRunner::new().with_wisdom_transport(WisdomTransport::Mock);
+        let event = content_publish_event();
+        let ctx = build_initial_context(&event);
+
+        let decision = runner.run(&event, ctx).await.unwrap();
+
+        assert!(
+            decision.phase.is_dev_context(),
+            "with_wisdom_transport(Mock) must produce DevContext; got: {:?}",
+            decision.phase
+        );
+    }
+
+    // ─── Phase 8: canned elohim-active output → ElohimActive in GateDecision ──
+    //
+    // Injects a pre-cooked elohim-active wisdom output via the test override
+    // mechanism and verifies the phase propagates all the way to GateDecision.
+    // This exercises the full wisdom-output → SynthesizeExecutor → GateDecision
+    // phase propagation path without needing a real LLM backend.
+
+    #[tokio::test]
+    async fn canned_elohim_active_wisdom_output_propagates_to_gate_decision() {
+        use serde_json::json;
+
+        // The universal-band wisdom step uses constitution_cid="epr:constitutions:elohim-v1"
+        // (from the embedded universal-band YAML) and output_key="wisdomOutput".
+        // We need to find the right constitution_cid; use the YAML constant.
+        let decl = default_universal_band_declaration();
+
+        // Find the WisdomInvoke step to get the actual constitution_cid.
+        let wisdom_step = decl
+            .dag
+            .steps
+            .values()
+            .find(|s| matches!(s.step, crate::dag::StepType::WisdomInvoke { .. }));
+
+        let (constitution_cid, output_key) = match wisdom_step.map(|s| &s.step) {
+            Some(crate::dag::StepType::WisdomInvoke { params }) => {
+                (params.constitution_cid.clone(), params.output_key.clone())
+            }
+            _ => {
+                // Universal band may not have a wisdom step in all configurations;
+                // skip this test if no wisdom step found.
+                return;
+            }
+        };
+
+        // Inject an elohim-active wisdom output for the wisdom step's key pair.
+        crate::__test_set_wisdom_output(
+            &constitution_cid,
+            &output_key,
+            json!({
+                "decision": "allow",
+                "reasoning": {
+                    "primary_principle": "elohim-active-test",
+                    "confidence": 0.95,
+                    "summary": "Real inference confirmed allowance.",
+                    "phase_note": "real-llm"
+                },
+                "wisdomContext": {},
+                "constitutionCid": constitution_cid,
+                "framingCid": "bafyframing",
+                "phase": "elohim-active"
+            }),
+        );
+
+        let runner = DagRunner::new();
+        let event = content_publish_event();
+        let ctx = build_initial_context(&event);
+
+        let decision = runner.run(&event, ctx).await.unwrap();
+
+        assert!(
+            decision.phase.is_elohim_active(),
+            "Canned elohim-active wisdom output must propagate to Phase::ElohimActive \
+             in the final GateDecision; got: {:?}",
+            decision.phase
+        );
+        assert!(
+            decision.is_allowed(),
+            "Decision must still be Allow; got: {:?}",
+            decision.status
+        );
     }
 }

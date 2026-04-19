@@ -65,7 +65,7 @@ impl StepExecutor for SynthesizeExecutor {
             "SynthesizeExecutor: building decision"
         );
 
-        let (status, reasoning_override) = build_status(params, ctx)?;
+        let (status, reasoning_override, observed_phase) = build_status(params, ctx)?;
         let side_effects = convert_side_effect_specs(&params.side_effects, ctx)?;
 
         let decision = GateDecision {
@@ -73,33 +73,57 @@ impl StepExecutor for SynthesizeExecutor {
             reasoning: reasoning_override.unwrap_or_else(ConstitutionalReasoningSummary::mocked),
             side_effects,
             decision_attestation_cid: None,
-            phase: Phase::DevContext,
+            phase: observed_phase,
         };
 
         Ok(StepOutcome::Terminate(decision, vec![]))
     }
 }
 
-/// Apply the `decision_builder` selector and return the appropriate `GateStatus`
-/// plus an optional `ConstitutionalReasoningSummary` override.
+/// Read the `phase` field from a wisdom output value and convert it to a `Phase`.
 ///
-/// When the override is `None`, the caller uses `ConstitutionalReasoningSummary::mocked()`.
+/// Returns `Phase::ElohimActive` when the field is `"elohim-active"`, and
+/// `Phase::DevContext` for all other values (including absent).
+fn read_wisdom_phase(wisdom_val: Option<&serde_json::Value>) -> Phase {
+    match wisdom_val
+        .and_then(|v| v.get("phase"))
+        .and_then(|p| p.as_str())
+    {
+        Some("elohim-active") => Phase::ElohimActive,
+        _ => Phase::DevContext,
+    }
+}
+
+/// Apply the `decision_builder` selector and return the appropriate `GateStatus`,
+/// an optional `ConstitutionalReasoningSummary` override, and the observed `Phase`.
+///
+/// The `Phase` is read from the wisdom output's `phase` field (if present in
+/// context).  Builders that do not read from a wisdom output always return
+/// `Phase::DevContext` — mechanical gates are not wisdom-active.
+///
+/// When the `ConstitutionalReasoningSummary` override is `None`, the caller uses
+/// `ConstitutionalReasoningSummary::mocked()`.
 ///
 /// Supported `decision_builder` values:
-/// - `"allow-passthrough"` — always Allow { exempt: false } with mocked reasoning.
-/// - `"allow-with-wisdom"` — Allow with reasoning pulled from the wisdom output.
-/// - `"decline-from-wisdom"` — Decline if wisdom says "decline"; otherwise Allow.
+/// - `"allow-passthrough"` — always Allow { exempt: false } with mocked reasoning
+///   and `Phase::DevContext` (no wisdom call involved).
+/// - `"allow-with-wisdom"` — Allow with reasoning pulled from the wisdom output;
+///   phase observed from wisdom output's `phase` field.
+/// - `"decline-from-wisdom"` — Decline if wisdom says "decline"; otherwise Allow;
+///   phase observed from wisdom output's `phase` field.
 /// - `"allow-or-decline-from-wisdom"` — Same as `decline-from-wisdom` but with
-///   category `"content-safety"` on the Decline path.  Used by content-safety-gate.
-/// - `"verdict-from-rule"` — reads `"ruleDecision"` and emits a Verdict.
+///   category `"content-safety"` on the Decline path;
+///   phase observed from wisdom output's `phase` field.
+/// - `"verdict-from-rule"` — reads `"ruleDecision"` and emits a Verdict;
+///   `Phase::DevContext` (mechanical rule, no wisdom).
 /// - `"verdict-from-reach"` — reads `"reachData.level"` and emits
-///   `Verdict(ReachLevel { level })`.
+///   `Verdict(ReachLevel { level })`; `Phase::DevContext` (mechanical, no wisdom).
 fn build_status(
     params: &SynthesizeParams,
     ctx: &GateContext,
-) -> Result<(GateStatus, Option<ConstitutionalReasoningSummary>), GateError> {
+) -> Result<(GateStatus, Option<ConstitutionalReasoningSummary>, Phase), GateError> {
     match params.decision_builder.as_str() {
-        "allow-passthrough" => Ok((GateStatus::Allow { exempt: false }, None)),
+        "allow-passthrough" => Ok((GateStatus::Allow { exempt: false }, None, Phase::DevContext)),
 
         "allow-with-wisdom" => {
             // Read wisdom output — default key is "wisdomOutput".
@@ -143,7 +167,12 @@ fn build_status(
                 phase_note: "wisdom-sourced".to_string(),
             });
 
-            Ok((GateStatus::Allow { exempt: false }, reasoning_override))
+            let phase = read_wisdom_phase(Some(wisdom));
+            Ok((
+                GateStatus::Allow { exempt: false },
+                reasoning_override,
+                phase,
+            ))
         }
 
         "decline-from-wisdom" => {
@@ -153,6 +182,8 @@ fn build_status(
                 .map(String::as_str)
                 .unwrap_or("wisdomOutput");
             let wisdom = ctx.get(wisdom_key);
+
+            let phase = read_wisdom_phase(wisdom);
 
             // If wisdom output says "decline", emit Decline; otherwise Allow.
             let is_decline = wisdom
@@ -178,9 +209,10 @@ fn build_status(
                         },
                     },
                     None,
+                    phase,
                 ))
             } else {
-                Ok((GateStatus::Allow { exempt: false }, None))
+                Ok((GateStatus::Allow { exempt: false }, None, phase))
             }
         }
 
@@ -212,6 +244,8 @@ fn build_status(
                 .and_then(|v| v.as_str())
                 .unwrap_or("allow");
 
+            let phase = read_wisdom_phase(Some(wisdom));
+
             if decision_str == "decline" {
                 let summary = wisdom
                     .get("reasoning")
@@ -229,6 +263,7 @@ fn build_status(
                         },
                     },
                     None,
+                    phase,
                 ))
             } else {
                 // Allow path — propagate wisdom reasoning so phase_note is
@@ -260,7 +295,11 @@ fn build_status(
                     phase_note: "wisdom-sourced".to_string(),
                 });
 
-                Ok((GateStatus::Allow { exempt: false }, reasoning_override))
+                Ok((
+                    GateStatus::Allow { exempt: false },
+                    reasoning_override,
+                    phase,
+                ))
             }
         }
 
@@ -282,7 +321,8 @@ fn build_status(
                     "synthesize step 'verdict-from-rule': could not parse ruleDecision as GateTag: {e}"
                 ))
             })?;
-            Ok((GateStatus::Verdict(tag), None))
+            // Mechanical rule — no wisdom call involved, always DevContext.
+            Ok((GateStatus::Verdict(tag), None, Phase::DevContext))
         }
 
         "verdict-from-reach" => {
@@ -306,7 +346,12 @@ fn build_status(
                 .unwrap_or("self-reach")
                 .to_string();
 
-            Ok((GateStatus::Verdict(GateTag::ReachLevel { level }), None))
+            // Mechanical aggregation — no wisdom call involved, always DevContext.
+            Ok((
+                GateStatus::Verdict(GateTag::ReachLevel { level }),
+                None,
+                Phase::DevContext,
+            ))
         }
 
         unknown => Err(GateError::DagExecution(format!(

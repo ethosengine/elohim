@@ -8,6 +8,34 @@ use serde::{Deserialize, Serialize};
 
 use crate::phase::Phase;
 
+// ─── WisdomTransport ──────────────────────────────────────────────────────────
+
+/// How `WisdomInvokeExecutor` obtains wisdom.
+///
+/// # Phase observation rule
+///
+/// `Phase::ElohimActive` is **observed from the actual call outcome**, never
+/// from a config flag.  The response phase field is authoritative:
+///
+/// | Transport        | Backend available? | Phase result       |
+/// |------------------|--------------------|--------------------|
+/// | `Mock`           | n/a (no call)      | `DevContext`       |
+/// | `InProcess`      | No API key         | `DevContext`       |
+/// | `InProcess`      | Key set, call OK   | `ElohimActive`     |
+/// | `InProcess`      | Call failed/unparseable | `DevContext` |
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum WisdomTransport {
+    /// Return hardcoded Allow + `Phase::DevContext`. Used when no wisdom service
+    /// is wired or when `check_blocking` is called in sync zome contexts.
+    #[default]
+    Mock,
+    /// In-process call to `elohim_agent::wisdom::invoke_wisdom`.
+    /// `Phase::ElohimActive` ONLY if the underlying LLM call actually succeeded;
+    /// `elohim-agent-service`'s response phase is authoritative.
+    InProcess,
+}
+
 /// How the gate-client reaches the elohim-agent-service for wisdom invocation.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "kebab-case")]
@@ -27,6 +55,13 @@ pub enum Transport {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GateClientConfig {
     pub transport: Transport,
+    /// How the `WisdomInvokeExecutor` reaches the wisdom engine.
+    ///
+    /// Default: `WisdomTransport::Mock` — hardcoded Allow + `Phase::DevContext`.
+    /// Set to `WisdomTransport::InProcess` to enable real LLM inference via
+    /// `elohim_agent::wisdom::invoke_wisdom` (requires an API key env var).
+    #[serde(default)]
+    pub wisdom_transport: WisdomTransport,
     /// If set, forces the phase regardless of live-elohim availability.
     /// Used in tests to assert dev-context behavior.
     pub phase_override: Option<Phase>,
@@ -51,6 +86,7 @@ impl Default for GateClientConfig {
     fn default() -> Self {
         Self {
             transport: Transport::Mock,
+            wisdom_transport: WisdomTransport::Mock,
             phase_override: Some(Phase::DevContext),
             inspection_cache_path: None,
             elohim_id: None,
