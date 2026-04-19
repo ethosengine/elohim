@@ -1,6 +1,6 @@
 use diesel::RunQueryDsl;
 use elohim_storage::db;
-use elohim_storage::db::models::{NewHuman, NewShardLocation};
+use elohim_storage::db::models::{NewHuman, NewShardLocation, NewShardManifest};
 use elohim_storage::services::household_resilience;
 use elohim_storage::test_util::test_pool;
 
@@ -23,6 +23,24 @@ fn seed_shard_location(conn: &mut diesel::SqliteConnection, shard_hash: &str, pe
     db::shard_locations::upsert_location(conn, &loc).unwrap();
 }
 
+fn seed_shard_manifest(conn: &mut diesel::SqliteConnection, content_id: &str, shard_hashes_json: &str) {
+    let manifest = NewShardManifest {
+        content_id,
+        h_app_id: "lamad",
+        blob_hash: "blob-hash-stub",
+        blob_cid: None,
+        encoding: "identity",
+        data_shard_count: 1,
+        parity_shard_count: 0,
+        shard_hashes_json,
+        total_size_bytes: 0,
+        shard_size_bytes: 0,
+        mime_type: "application/octet-stream",
+        reach: "commons",
+    };
+    db::shard_manifests::upsert_manifest(conn, &manifest).unwrap();
+}
+
 #[test]
 fn distinct_households_counted_from_shard_locations() {
     let pool = test_pool();
@@ -37,6 +55,12 @@ fn distinct_households_counted_from_shard_locations() {
     seed_shard_location(&mut conn, "shard-x", "agent-alpha-2");
     seed_shard_location(&mut conn, "shard-x", "agent-beta-1");
     seed_shard_location(&mut conn, "shard-x", "agent-ghost");
+
+    // Seed the manifest so compute() follows the two-step manifest path:
+    // get_manifest -> parse shard_hashes_json -> filter shard_locations by eq_any.
+    // Without this, the prior fallback would aggregate across all shard_locations
+    // for the h_app_id (inflated count), not the shards belonging to this content.
+    seed_shard_manifest(&mut conn, "content-via-shard-x", r#"["shard-x"]"#);
 
     // Minimal ctx + content: most real services take AppContext + content_id.
     // The function under test should aggregate distinct households for content

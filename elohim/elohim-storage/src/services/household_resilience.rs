@@ -10,7 +10,7 @@ use std::collections::HashSet;
 
 use diesel::prelude::*;
 
-use crate::db::{peer_statuses, stewarded_nodes, AppContext, DbPool};
+use crate::db::{peer_statuses, AppContext, DbPool};
 use crate::error::StorageError;
 use crate::views::{HouseholdResilienceDetails, HouseholdResilienceView};
 
@@ -34,15 +34,36 @@ pub fn compute(
     // then filter shard_locations by eq_any(&shard_hashes). This is required
     // because diesel cannot filter on a JSON-encoded column directly.
     let manifest = crate::db::shard_manifests::get_manifest(&mut conn, &ctx.h_app_id, content_id)?;
-    let shard_hashes: Vec<String> = match &manifest {
-        Some(m) => serde_json::from_str(&m.shard_hashes_json).unwrap_or_default(),
-        None => vec![],
+
+    // When no manifest exists for this content_id, return a degenerate
+    // at-risk view immediately — do NOT fall back to aggregating across all
+    // shard_locations for the h_app_id, which would inflate household counts
+    // for orphaned content in any multi-content production database.
+    let shard_hashes: Vec<String> = match manifest {
+        None => {
+            return Ok(HouseholdResilienceView {
+                content_id: content_id.to_string(),
+                households_stewarding: 0,
+                households_reciprocated: 0,
+                protection_status: "at-risk".to_string(),
+                details: HouseholdResilienceDetails {
+                    steward_households: vec![],
+                    online_peer_count: 0,
+                    health_score: 0.0,
+                },
+            });
+        }
+        Some(m) => serde_json::from_str(&m.shard_hashes_json).map_err(|e| {
+            StorageError::Internal(format!(
+                "shard manifest for content_id={content_id} has malformed shard_hashes_json: {e}"
+            ))
+        })?,
     };
 
     use crate::db::diesel_schema::{humans, shard_locations};
 
     let steward_households: HashSet<String> = {
-        let base = shard_locations::table
+        let raw_households: Vec<Option<String>> = shard_locations::table
             .inner_join(
                 humans::table.on(
                     humans::agent_pub_key
@@ -50,20 +71,11 @@ pub fn compute(
                 ),
             )
             .filter(shard_locations::h_app_id.eq(&ctx.h_app_id))
-            .filter(humans::household_id.is_not_null());
-
-        let raw_households: Vec<Option<String>> = if shard_hashes.is_empty() {
-            // No manifest found for this content_id — aggregate across all
-            // shard_locations for this h_app_id as a conservative estimate.
-            base.select(humans::household_id)
-                .load::<Option<String>>(&mut conn)
-                .map_err(|e| StorageError::Internal(format!("household query: {e}")))?
-        } else {
-            base.filter(shard_locations::shard_hash.eq_any(&shard_hashes))
-                .select(humans::household_id)
-                .load::<Option<String>>(&mut conn)
-                .map_err(|e| StorageError::Internal(format!("household query: {e}")))?
-        };
+            .filter(humans::household_id.is_not_null())
+            .filter(shard_locations::shard_hash.eq_any(&shard_hashes))
+            .select(humans::household_id)
+            .load::<Option<String>>(&mut conn)
+            .map_err(|e| StorageError::Internal(format!("household query: {e}")))?;
 
         raw_households.into_iter().flatten().collect()
     };
@@ -129,9 +141,5 @@ fn count_online_peers_in_households(
             }
         }
     }
-    // Also check stewarded_nodes projection for the household and count
-    // nodes whose presence is active — harmless no-op when the join column
-    // is still absent in the projection (pre-C3 rows).
-    let _ = stewarded_nodes::list_by_household_with_peer_status; // keep referenced
     Ok(count)
 }
