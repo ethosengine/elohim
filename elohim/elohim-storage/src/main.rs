@@ -282,9 +282,26 @@ async fn async_main(
         config.peer_policy_path = path;
     }
 
+    // Apply env-var overrides for node-shape self-registration (Task C7).
+    // When all four are set, the node publishes its shape at boot.
+    if let Ok(v) = std::env::var("DEVICE_ARCHETYPE") {
+        config.device_archetype = Some(v);
+    }
+    if let Ok(v) = std::env::var("HOUSEHOLD_ID") {
+        config.household_id = Some(v);
+    }
+    if let Ok(v) = std::env::var("NODE_ROLE") {
+        config.node_role = Some(v);
+    }
+    if let Ok(v) = std::env::var("REGION") {
+        config.region = Some(v);
+    }
+
     info!(
         storage_dir = %config.storage_dir.display(),
         http_port = config.http_port,
+        device_archetype = ?config.device_archetype,
+        household_id = ?config.household_id,
         "Starting elohim-storage"
     );
 
@@ -316,6 +333,19 @@ async fn async_main(
             None
         }
     };
+
+    // Task C7: self-register this node's durable shape from DEVICE_ARCHETYPE
+    // + HOUSEHOLD_ID + NODE_ROLE + REGION env vars. No-op when any is unset.
+    if let Some(pool) = db_pool.as_ref() {
+        // Use the config storage_dir as an agent-pubkey hint until the
+        // conductor connection provides the real pubkey (later path).
+        let agent_hint = format!("{}-boot", config.storage_dir.display());
+        if let Err(e) =
+            elohim_storage::services::boot_registration::register_at_boot(pool, &config, &agent_hint)
+        {
+            warn!(error = %e, "node-shape self-registration failed (non-fatal)");
+        }
+    }
 
     // --- Embedded conductor mode ---
     // When enabled, spawn the holochain conductor as a child process and
@@ -405,9 +435,15 @@ async fn async_main(
                             blob_store.clone(),
                             hc.clone(),
                         );
-                        let heartbeat = elohim_storage::heartbeat::HeartbeatTask::new(
+                        let mut heartbeat = elohim_storage::heartbeat::HeartbeatTask::new(
                             policy_cfg, publisher, probe,
                         );
+                        // Task C8: pipe DEVICE_ARCHETYPE through to PeerStatus
+                        // so consumers (/shefa/devices, /shefa/dashboard) can
+                        // correlate peer vitals with hardware archetype.
+                        if let Some(archetype) = config.device_archetype.clone() {
+                            heartbeat = heartbeat.with_archetype_class(archetype);
+                        }
                         let hb_shutdown = shutdown_tx.subscribe();
                         tokio::spawn(async move {
                             heartbeat.run(hb_shutdown).await;

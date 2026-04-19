@@ -59,6 +59,7 @@ reqwest = { version = "0.12", default-features = false, features = ["json", "rus
 sha2 = "0.10"
 hex = "0.4"
 base64 = "0.22"
+hostname = "0.4"  # gethostname() for node-shape self-registration at boot
 url = "2"  # Query string parsing for HTTP sync API
 
 # CID (Content Identifiers) - IPFS-compatible content addressing

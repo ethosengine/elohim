@@ -74,6 +74,26 @@ pub struct Config {
     /// (heartbeat cadence, conductor forwarder settings, etc.)
     #[serde(default = "default_peer_policy_path")]
     pub peer_policy_path: PathBuf,
+
+    /// Device archetype id for this node (e.g. "home-nuc", "laptop",
+    /// "chromebook-edu"). Loaded from env `DEVICE_ARCHETYPE` at boot.
+    /// When set, triggers the node-shape self-registration at startup.
+    #[serde(default)]
+    pub device_archetype: Option<String>,
+
+    /// Household collective id this node belongs to (e.g. "household-matthew").
+    /// Loaded from env `HOUSEHOLD_ID` at boot. Projects into `stewarded_nodes.household_id`.
+    #[serde(default)]
+    pub household_id: Option<String>,
+
+    /// Node role within the household fabric. Loaded from env `NODE_ROLE`.
+    /// One of: edge | archival | inference | doorway.
+    #[serde(default)]
+    pub node_role: Option<String>,
+
+    /// Geographic region label. Loaded from env `REGION`.
+    #[serde(default)]
+    pub region: Option<String>,
 }
 
 fn default_peer_policy_path() -> PathBuf {
@@ -134,6 +154,10 @@ impl Default for Config {
             enable_mdns: true,
             extraction_cache: elohim_cache_core::extraction::ExtractionCacheConfig::default(),
             peer_policy_path: default_peer_policy_path(),
+            device_archetype: None,
+            household_id: None,
+            node_role: None,
+            region: None,
         }
     }
 }
