@@ -1,0 +1,67 @@
+{
+  "id": "content-safety-gate-v1",
+  "contentType": "gate-process-declaration",
+  "title": "Content Safety Gate v1",
+  "description": "Wide protocol gate that evaluates content body / artifact payload safety for ContentPublish, AttestationWrite, and PeerMessage events. Three-node DAG: assemble → wisdom-safety → synthesize. Fires before specialised domain gates (discernment, reach). Emits Allow or Decline{category:content-safety}. No side effects — read-only governance check. Phase 6 DevContext: mocked Allow (no content blocked in rehearsal). Phase 7+ activation calls ContentSafetyReview capability via skill-invoke.",
+  "content": "# content-safety-gate-v1\n# See gate-client/src/dag/content_safety_gate_v1.yaml for the canonical embedded source.\n# This seed entry makes the content safety gate discoverable as a ContentNode on the DHT.\n#\n# The authoritative YAML is embedded in the gate-client binary at compile time.\n# This seed is a reference copy for DHT-based governance lookup (Phase 7+).\n#\n# Three-node DAG:\n#   assemble (context-assemble)\n#     └─ next ──► wisdom-safety (wisdom-invoke, constitution: epr:constitutions:content-safety-v1)\n#                     └─ next ──► synthesize (synthesize, Terminate)\n#   synthesize — allow-or-decline-from-wisdom builder\n#     └─ (Terminate) Allow | Decline{category:\"content-safety\"}\n#\n# governanceReach: protocol\n# handlesEvents: ContentPublish, AttestationWrite, PeerMessage\n# Runs BEFORE domain-specific gates (discernment-gate, reach-gate)\n\nname: \"content-safety-gate-v1\"\nversion: \"1.0.0\"\nevent_type: \"*\"",
+  "contentFormat": "plaintext",
+  "tags": [
+    "gate",
+    "content-safety",
+    "governance",
+    "protocol-core",
+    "wide-gate",
+    "wisdom-invoke"
+  ],
+  "metadata": {
+    "name": "content-safety-gate-v1",
+    "version": "1.0.0",
+    "eventType": "*",
+    "supersedes": null,
+    "governanceReach": "protocol",
+    "handlesEvents": ["ContentPublish", "AttestationWrite", "PeerMessage"],
+    "dag": {
+      "entrypoint": "assemble",
+      "steps": {
+        "assemble": {
+          "type": "context-assemble",
+          "params": {
+            "pulls": [
+              { "from": "event", "query": "content.body", "output_key": "contentBody" },
+              { "from": "event", "query": "content.subject", "output_key": "contentSubject" }
+            ]
+          },
+          "next": "wisdom-safety"
+        },
+        "wisdom-safety": {
+          "type": "wisdom-invoke",
+          "params": {
+            "constitution_cid": "epr:constitutions:content-safety-v1",
+            "framing_cid": "epr:framings:content-safety-v1",
+            "context_keys": ["contentSubject", "contentBody"],
+            "output_key": "safetyOutput"
+          },
+          "next": "synthesize"
+        },
+        "synthesize": {
+          "type": "synthesize",
+          "params": {
+            "input_keys": ["safetyOutput"],
+            "decision_builder": "allow-or-decline-from-wisdom",
+            "side_effects": []
+          }
+        }
+      },
+      "terminals": {}
+    }
+  },
+  "createdAt": "2026-04-18T00:00:00.000Z",
+  "updatedAt": "2026-04-18T00:00:00.000Z",
+  "stewardedBy": [
+    {
+      "humanId": "human-matthew-manager",
+      "affinity": 1.0,
+      "role": "author"
+    }
+  ]
+}

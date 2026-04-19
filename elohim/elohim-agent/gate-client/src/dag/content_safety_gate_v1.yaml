@@ -1,0 +1,92 @@
+# Content Safety Gate v1 — wide protocol gate for content body / payload safety.
+#
+# Spec §6.2.  This gate fires on multiple event kinds: ContentPublish,
+# AttestationWrite, and PeerMessage.  It is a governance-level gate (protocol
+# reach) that runs BEFORE more specialised domain gates (discernment, reach).
+#
+# event_type: "*"
+#   Content-safety is a wide gate — it is not scoped to a single event kind.
+#   We represent "applies to all events" with the same "*" sentinel used by
+#   the universal band.  The dispatcher filters which events actually route here.
+#
+# Three-node DAG:
+#   assemble (context-assemble)
+#     └─ next ──► wisdom-safety (wisdom-invoke)
+#   wisdom-safety (wisdom-invoke) [Phase 6 DevContext: mocked Allow]
+#     └─ next ──► synthesize (synthesize, Terminate)
+#   synthesize — allow-or-decline-from-wisdom builder
+#     └─ (Terminate) Allow | Decline{category:"content-safety"}
+#
+# Phase 7+ activation:
+#   The wisdom-safety step will call ContentSafetyReview via skill-invoke.
+#   For Phase 6 (DevContext) the WisdomInvokeExecutor returns a mocked Allow,
+#   so no content is blocked in rehearsal.
+#
+# Side effects:
+#   None.  Content-safety is a read-only gate — it either allows or declines.
+#   No attestations, no economic events.
+
+name: "content-safety-gate-v1"
+version: "1.0.0"
+event_type: "*"
+
+input_schema:
+  type: "object"
+  description: "RelationalImpactEvent fields assembled into contentSubject + contentBody"
+output_schema:
+  type: "object"
+  description: "GateDecision: Allow or Decline{category:content-safety}"
+
+dag:
+  entrypoint: "assemble"
+
+  steps:
+    # ── Step 1: assemble ──────────────────────────────────────────────────────
+    # context-assemble step.  Pulls content body / artifact-ref / payload from
+    # the event so the wisdom step has something to reason about.
+    # Phase 6: all pulls return null via Phase 3+ stubs — the context keys are
+    # present but null.  The wisdom step receives null context values but still
+    # produces its mock Allow.
+    assemble:
+      type: "context-assemble"
+      params:
+        pulls:
+          - from: "event"
+            query: "content.body"
+            output_key: "contentBody"
+          - from: "event"
+            query: "content.subject"
+            output_key: "contentSubject"
+      next: "wisdom-safety"
+
+    # ── Step 2: wisdom-safety ─────────────────────────────────────────────────
+    # wisdom-invoke step.  Constitution primed for content safety evaluation.
+    # Phase 6 DevContext: WisdomInvokeExecutor writes {"decision":"allow",...}
+    # to "safetyOutput" — the synthesize step's decline branch will NOT fire.
+    # Phase 7+ activation: replace with skill-invoke calling ContentSafetyReview.
+    wisdom-safety:
+      type: "wisdom-invoke"
+      params:
+        constitution_cid: "epr:constitutions:content-safety-v1"
+        framing_cid: "epr:framings:content-safety-v1"
+        context_keys:
+          - "contentSubject"
+          - "contentBody"
+        output_key: "safetyOutput"
+      next: "synthesize"
+
+    # ── Step 3: synthesize ────────────────────────────────────────────────────
+    # synthesize step.  allow-or-decline-from-wisdom builder reads safetyOutput:
+    #   - decision == "decline" → GateStatus::Decline{category:"content-safety"}
+    #   - otherwise             → GateStatus::Allow{exempt:false}
+    synthesize:
+      type: "synthesize"
+      params:
+        input_keys:
+          - "safetyOutput"
+        decision_builder: "allow-or-decline-from-wisdom"
+        side_effects: []
+
+  # terminals map — empty for this DAG.
+  # All terminal behaviour is produced by the synthesize executor.
+  terminals: {}

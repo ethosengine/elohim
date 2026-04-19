@@ -22,6 +22,7 @@ use std::collections::HashMap;
 
 pub mod aggregation_spec;
 pub mod attestation;
+pub mod content_safety_gate;
 pub mod context;
 pub mod discernment_gate;
 pub mod executor;

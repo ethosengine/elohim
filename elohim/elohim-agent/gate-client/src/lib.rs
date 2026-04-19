@@ -268,7 +268,7 @@ pub fn __test_set_gate_ctx(gate_name: &str, ctx: Option<GateContext>) {
 //   // ... call check(CapabilityInvoke{capability:"reach-negotiation"}) ...
 //   // resolver is auto-consumed; call with None to clear if needed.
 //
-// The gate name is the key returned by `domain_gate_for_event`.
+// The gate name is one of the keys returned by `domain_gates_for_event`.
 #[cfg(any(test, feature = "testing"))]
 thread_local! {
     static GATE_ATTESTATION_RESOLVERS: std::cell::RefCell<
@@ -282,7 +282,7 @@ thread_local! {
 /// called from this thread for that gate.  Pass `None` to remove any pending
 /// resolver for that gate.
 ///
-/// The `gate_name` must match the name returned by `domain_gate_for_event`
+/// The `gate_name` must match one of the names returned by `domain_gates_for_event`
 /// (currently only `"reach-gate-v1"` has an `aggregate-attestations` step).
 ///
 /// Only available in `#[cfg(test)]` or `feature = "testing"` builds.
@@ -325,6 +325,10 @@ pub fn __test_set_attestation_resolver(resolver: Option<std::sync::Arc<dyn Attes
 
 // Public re-exports for ergonomic use.
 pub use dag::aggregation_spec::{AggregationSpec, LadderTier, Reduction, SubjectScope};
+pub use dag::content_safety_gate::{
+    default_content_safety_gate_declaration, default_content_safety_gate_yaml,
+    CONTENT_SAFETY_GATE_V1_CID,
+};
 pub use dag::context::GateContext;
 pub use dag::discernment_gate::{
     default_discernment_gate_declaration, default_discernment_gate_yaml, DISCERNMENT_GATE_V1_CID,
@@ -390,12 +394,14 @@ pub use types::{
 ///    play-interior / roleplay-interior), return `Allow { exempt: true }` without
 ///    running any DAG.
 /// 3. Run the universal-band DAG. If it declines or escalates, short-circuit.
-/// 4. If an app-domain gate applies for this event (Phase 5: `AttestationWrite`
-///    → `discernment-gate-v1-mechanical`; `CapabilityInvoke{reach-negotiation}`
-///    → `reach-gate-v1`), run it and return its decision.
-///    Otherwise return the universal-band decision.
+/// 4. Run all applicable app-domain gates in declaration order (spec §3.3).
+///    Any Decline/Escalate short-circuits the remaining gates.
+///    Phase 6 gates: `ContentPublish` / `AttestationWrite` / `PeerMessage` →
+///    `content-safety-gate-v1` first; `AttestationWrite` also runs
+///    `discernment-gate-v1-mechanical`; `CapabilityInvoke{reach-negotiation}` →
+///    `reach-gate-v1`. Events with no domain gates return the universal-band decision.
 ///
-/// See [`dag_runner::domain_gate_for_event`] for the full dispatch rules.
+/// See [`dag_runner::domain_gates_for_event`] for the full dispatch rules.
 pub async fn check(event: RelationalImpactEvent) -> GateResult<GateDecision> {
     // Test-only: consume a one-shot decision override if one is set.
     #[cfg(any(test, feature = "testing"))]
@@ -451,10 +457,11 @@ pub async fn check(event: RelationalImpactEvent) -> GateResult<GateDecision> {
 /// use [`check`] with `.await` instead. Phase 3+ may add a `block_in_place`
 /// bridge path if a legitimate nested-runtime use case emerges.
 ///
-/// Includes the same Phase 5 unified dispatch as [`check`]: `AttestationWrite`
-/// routes through `discernment-gate-v1-mechanical` and
+/// Includes the same Phase 6 unified dispatch as [`check`]: `ContentPublish`,
+/// `AttestationWrite`, and `PeerMessage` route through `content-safety-gate-v1`
+/// first; `AttestationWrite` also routes through `discernment-gate-v1-mechanical`;
 /// `CapabilityInvoke{capability:"reach-negotiation"}` routes through
-/// `reach-gate-v1`, both after the universal band allows.
+/// `reach-gate-v1`; all after the universal band allows.
 pub fn check_blocking(event: RelationalImpactEvent) -> GateResult<GateDecision> {
     let space = space::detect_from_event(&event);
     if space.is_exempt() {

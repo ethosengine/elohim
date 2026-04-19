@@ -27,15 +27,7 @@ use super::convert_side_effect_specs;
 /// converts `side_effects` specs to concrete `SideEffect`s, and terminates
 /// the DAG with `StepOutcome::Terminate`.
 ///
-/// Supported `decision_builder` values:
-/// - `"allow-passthrough"` — always Allow { exempt: false } with mocked reasoning.
-/// - `"allow-with-wisdom"` — Allow with reasoning pulled from the wisdom output
-///   (reads `"wisdomOutput"` key by default).
-/// - `"decline-from-wisdom"` — Decline if wisdom output's `"decision"` == `"decline"`;
-///   otherwise falls through to Allow.
-/// - `"verdict-from-rule"` — reads `"ruleDecision"` and emits a Verdict.
-/// - `"verdict-from-reach"` — reads `"reachData.level"` and emits
-///   `Verdict(ReachLevel { level })`. Defaults to `"self-reach"` when level is null.
+/// For supported `decision_builder` values see [`build_status`].
 pub struct SynthesizeExecutor;
 
 impl SynthesizeExecutor {
@@ -92,6 +84,16 @@ impl StepExecutor for SynthesizeExecutor {
 /// plus an optional `ConstitutionalReasoningSummary` override.
 ///
 /// When the override is `None`, the caller uses `ConstitutionalReasoningSummary::mocked()`.
+///
+/// Supported `decision_builder` values:
+/// - `"allow-passthrough"` — always Allow { exempt: false } with mocked reasoning.
+/// - `"allow-with-wisdom"` — Allow with reasoning pulled from the wisdom output.
+/// - `"decline-from-wisdom"` — Decline if wisdom says "decline"; otherwise Allow.
+/// - `"allow-or-decline-from-wisdom"` — Same as `decline-from-wisdom` but with
+///   category `"content-safety"` on the Decline path.  Used by content-safety-gate.
+/// - `"verdict-from-rule"` — reads `"ruleDecision"` and emits a Verdict.
+/// - `"verdict-from-reach"` — reads `"reachData.level"` and emits
+///   `Verdict(ReachLevel { level })`.
 fn build_status(
     params: &SynthesizeParams,
     ctx: &GateContext,
@@ -179,6 +181,86 @@ fn build_status(
                 ))
             } else {
                 Ok((GateStatus::Allow { exempt: false }, None))
+            }
+        }
+
+        // ── allow-or-decline-from-wisdom (content-safety-gate) ───────────────
+        // Like decline-from-wisdom but with category "content-safety" on the
+        // Decline path, and propagates wisdom reasoning on the Allow path.
+        //
+        // Reads the first input key (defaults to "safetyOutput").
+        // - decision == "decline" → Decline { category: "content-safety", summary }
+        // - anything else         → Allow { exempt: false } with wisdom reasoning
+        //
+        // Missing key is a hard error (the synthesize step must always have output
+        // from the preceding wisdom-safety step).
+        "allow-or-decline-from-wisdom" => {
+            let wisdom_key = params
+                .input_keys
+                .first()
+                .map(String::as_str)
+                .unwrap_or("safetyOutput");
+            let wisdom = ctx.get(wisdom_key).ok_or_else(|| {
+                GateError::DagExecution(format!(
+                    "allow-or-decline-from-wisdom builder: missing required context key \
+                     '{wisdom_key}'"
+                ))
+            })?;
+
+            let decision_str = wisdom
+                .get("decision")
+                .and_then(|v| v.as_str())
+                .unwrap_or("allow");
+
+            if decision_str == "decline" {
+                let summary = wisdom
+                    .get("reasoning")
+                    .and_then(|v| v.get("summary"))
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("declined by content safety")
+                    .to_string();
+
+                Ok((
+                    GateStatus::Decline {
+                        grounds: DeclineGrounds {
+                            category: "content-safety".to_string(),
+                            summary,
+                            principle_refs: vec![],
+                        },
+                    },
+                    None,
+                ))
+            } else {
+                // Allow path — propagate wisdom reasoning so phase_note is
+                // "wisdom-sourced" (consistent with allow-with-wisdom).
+                let reasoning_val = wisdom.get("reasoning");
+                if reasoning_val.is_none() {
+                    warn!(
+                        wisdom_key,
+                        "allow-or-decline-from-wisdom: wisdom output missing 'reasoning' \
+                         sub-object; falling back to mocked ConstitutionalReasoningSummary"
+                    );
+                }
+                let reasoning_override = reasoning_val.map(|r| ConstitutionalReasoningSummary {
+                    primary_principle: r
+                        .get("primary_principle")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("dev-context-mock")
+                        .to_string(),
+                    confidence: r
+                        .get("confidence")
+                        .and_then(|v| v.as_f64())
+                        .map(|f| f as f32)
+                        .unwrap_or(0.0),
+                    summary: r
+                        .get("summary")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("wisdom-sourced")
+                        .to_string(),
+                    phase_note: "wisdom-sourced".to_string(),
+                });
+
+                Ok((GateStatus::Allow { exempt: false }, reasoning_override))
             }
         }
 
@@ -641,6 +723,147 @@ mod tests {
                 GateStatus::Verdict(GateTag::ReachLevel { level }) if level == "self-reach"
             ),
             "missing level field must default to self-reach, got: {:?}",
+            decision.status
+        );
+    }
+
+    // ─── allow-or-decline-from-wisdom → Allow path ───────────────────────────
+
+    #[tokio::test]
+    async fn allow_or_decline_from_wisdom_allow_path_returns_allow() {
+        let exec = SynthesizeExecutor::new();
+        let step = synthesize_step("allow-or-decline-from-wisdom", vec!["safetyOutput".into()]);
+
+        let mut ctx = GateContext::new();
+        ctx.insert(
+            "safetyOutput",
+            json!({
+                "decision": "allow",
+                "reasoning": {
+                    "primary_principle": "content-safety-mock",
+                    "confidence": 0.0,
+                    "summary": "content passed safety review"
+                }
+            }),
+        );
+
+        let outcome = exec.execute(&step, &mut ctx, &event()).await.unwrap();
+        let (decision, _) = match outcome {
+            StepOutcome::Terminate(d, se) => (d, se),
+            _ => panic!("expected Terminate"),
+        };
+        assert!(
+            matches!(decision.status, GateStatus::Allow { exempt: false }),
+            "allow-or-decline-from-wisdom with allow input must return Allow{{exempt:false}}; \
+             got: {:?}",
+            decision.status
+        );
+        // Reasoning propagated from wisdom output.
+        assert_eq!(
+            decision.reasoning.phase_note, "wisdom-sourced",
+            "phase_note must be 'wisdom-sourced' on allow path; got: {:?}",
+            decision.reasoning.phase_note
+        );
+        assert_eq!(
+            decision.reasoning.summary, "content passed safety review",
+            "reasoning.summary should be propagated from safety output; got: {:?}",
+            decision.reasoning.summary
+        );
+    }
+
+    // ─── allow-or-decline-from-wisdom → Decline path ─────────────────────────
+
+    #[tokio::test]
+    async fn allow_or_decline_from_wisdom_decline_path_returns_content_safety_decline() {
+        let exec = SynthesizeExecutor::new();
+        let step = synthesize_step("allow-or-decline-from-wisdom", vec!["safetyOutput".into()]);
+
+        let mut ctx = GateContext::new();
+        ctx.insert(
+            "safetyOutput",
+            json!({
+                "decision": "decline",
+                "reasoning": {
+                    "summary": "content violates existential safety principle"
+                }
+            }),
+        );
+
+        let outcome = exec.execute(&step, &mut ctx, &event()).await.unwrap();
+        let (decision, _) = match outcome {
+            StepOutcome::Terminate(d, se) => (d, se),
+            _ => panic!("expected Terminate"),
+        };
+        assert!(
+            !decision.is_allowed(),
+            "allow-or-decline-from-wisdom with decline input must return Decline; got: {:?}",
+            decision.status
+        );
+        assert!(
+            matches!(
+                &decision.status,
+                GateStatus::Decline { grounds } if grounds.category == "content-safety"
+            ),
+            "Decline category must be 'content-safety', got: {:?}",
+            decision.status
+        );
+        if let GateStatus::Decline { grounds } = &decision.status {
+            assert!(
+                grounds.summary.contains("existential safety"),
+                "summary must carry the wisdom reasoning; got: {:?}",
+                grounds.summary
+            );
+            assert!(
+                grounds.principle_refs.is_empty(),
+                "principle_refs must be empty in Phase 6; got: {:?}",
+                grounds.principle_refs
+            );
+        }
+    }
+
+    // ─── allow-or-decline-from-wisdom → missing key → error ──────────────────
+
+    #[tokio::test]
+    async fn allow_or_decline_from_wisdom_missing_key_returns_error() {
+        let exec = SynthesizeExecutor::new();
+        let step = synthesize_step("allow-or-decline-from-wisdom", vec!["safetyOutput".into()]);
+        let mut ctx = GateContext::new(); // safetyOutput not inserted
+
+        let result = exec.execute(&step, &mut ctx, &event()).await;
+        let err = match result {
+            Err(e) => e,
+            Ok(_) => panic!("expected Err but got Ok"),
+        };
+        assert!(matches!(err, GateError::DagExecution(_)));
+        let msg = err.to_string();
+        assert!(
+            msg.contains("safetyOutput"),
+            "error must name the missing key; got: {msg}"
+        );
+    }
+
+    // ─── allow-or-decline-from-wisdom → missing decision field → Allow ────────
+
+    #[tokio::test]
+    async fn allow_or_decline_from_wisdom_missing_decision_field_defaults_to_allow() {
+        // When the decision field is absent, default is "allow".
+        let exec = SynthesizeExecutor::new();
+        let step = synthesize_step("allow-or-decline-from-wisdom", vec!["safetyOutput".into()]);
+
+        let mut ctx = GateContext::new();
+        ctx.insert(
+            "safetyOutput",
+            json!({"reasoning": {"summary": "no decision field"}}),
+        );
+
+        let outcome = exec.execute(&step, &mut ctx, &event()).await.unwrap();
+        let (decision, _) = match outcome {
+            StepOutcome::Terminate(d, se) => (d, se),
+            _ => panic!("expected Terminate"),
+        };
+        assert!(
+            decision.is_allowed(),
+            "missing decision field must default to Allow; got: {:?}",
             decision.status
         );
     }

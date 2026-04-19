@@ -35,16 +35,22 @@
 //! singleton is already initialized when `configure_runner` is called, the call
 //! is a no-op (the singleton is immutable once set).
 //!
-//! # App-domain gate dispatch (Phase 5)
+//! # App-domain gate dispatch (Phase 6)
 //!
-//! After the universal-band allows, [`domain_gate_for_event`] inspects the event
-//! variant and its fields to pick the right app-domain gate:
+//! After the universal-band allows, [`domain_gates_for_event`] inspects the event
+//! variant and its fields and returns an **ordered Vec** of gate names to run.
+//! Multiple gates may apply per event; they run in declaration order with
+//! short-circuit on Decline or Escalate (spec §3.3):
 //!
-//! - `AttestationWrite` → `"discernment-gate-v1-mechanical"`
-//! - `CapabilityInvoke { capability: "reach-negotiation", .. }` → `"reach-gate-v1"`
-//! - All other variants → no domain gate (universal-band decision returned as-is)
+//! | Event variant                                              | Gates (in order)                                        |
+//! |------------------------------------------------------------|--------------------------------------------------------|
+//! | `ContentPublish`                                           | `["content-safety-gate-v1"]`                           |
+//! | `AttestationWrite`                                         | `["content-safety-gate-v1", "discernment-gate-v1-mechanical"]` |
+//! | `PeerMessage`                                              | `["content-safety-gate-v1"]`                           |
+//! | `CapabilityInvoke { capability: "reach-negotiation", .. }` | `["reach-gate-v1"]`                                    |
+//! | All other variants                                         | `[]` (universal-band decision returned as-is)          |
 //!
-//! Both gates are loaded eagerly at [`DagRunner`] construction via
+//! All three gates are loaded eagerly at [`DagRunner`] construction via
 //! [`GateRegistry`] so the hot path does no parsing.
 //!
 //! # ContextAssemble resolvers
@@ -74,9 +80,10 @@ use crate::dag::executors::{
 };
 use crate::dag::universal_band::{ACTIVE_UNIVERSAL_BAND_NAME, ACTIVE_UNIVERSAL_BAND_VERSION};
 use crate::dag::{
-    context::GateContext, discernment_gate::default_discernment_gate_declaration,
-    interpreter::DagInterpreter, reach_gate::default_reach_gate_declaration,
-    universal_band::default_universal_band_declaration, GateProcessDeclaration,
+    content_safety_gate::default_content_safety_gate_declaration, context::GateContext,
+    discernment_gate::default_discernment_gate_declaration, interpreter::DagInterpreter,
+    reach_gate::default_reach_gate_declaration, universal_band::default_universal_band_declaration,
+    GateProcessDeclaration,
 };
 use crate::error::GateError;
 use crate::events::RelationalImpactEvent;
@@ -99,14 +106,16 @@ struct GateEntry {
 /// Eager registry of all known app-domain gates.
 ///
 /// Built once at [`DagRunner`] construction.  [`run_app_domain_gate`] looks up
-/// the gate name returned by [`domain_gate_for_event`] to find the right entry.
+/// each gate name returned by [`domain_gates_for_event`] to find the right entry.
 struct GateRegistry {
     gates: HashMap<&'static str, GateEntry>,
 }
 
 impl GateRegistry {
-    /// Build the registry, eagerly loading discernment-gate and reach-gate.
+    /// Build the registry, eagerly loading discernment-gate, reach-gate, and
+    /// content-safety-gate.
     fn build() -> Self {
+        use crate::dag::content_safety_gate::CONTENT_SAFETY_GATE_V1_CID;
         use crate::dag::discernment_gate::DISCERNMENT_GATE_V1_CID;
         use crate::dag::reach_aggregation::{REACH_AGGREGATION_V1_BODY, REACH_AGGREGATION_V1_CID};
         use crate::dag::reach_gate::REACH_GATE_V1_CID;
@@ -166,6 +175,29 @@ impl GateRegistry {
             );
         }
 
+        // ── content-safety-gate-v1 ────────────────────────────────────────────
+        // Wide governance gate — fires on ContentPublish, AttestationWrite, and
+        // PeerMessage.  No CID-addressed rules or aggregation spec needed; the
+        // wisdom-safety step is backed by WisdomInvokeExecutor (mock Allow in
+        // DevContext; real ContentSafetyReview in Phase 7+ activation).
+        {
+            // Empty content resolver — content-safety-gate has no mechanical-ruleset
+            // or aggregate-attestations steps that need CID lookups.
+            let resolver = Arc::new(EmbeddedContentNodeResolver::new(HashMap::new()))
+                as Arc<dyn ContentNodeResolver>;
+
+            let decl = default_content_safety_gate_declaration();
+
+            gates.insert(
+                "content-safety-gate-v1",
+                GateEntry {
+                    declaration: decl,
+                    content_resolver: resolver,
+                    gate_cid: CONTENT_SAFETY_GATE_V1_CID,
+                },
+            );
+        }
+
         Self { gates }
     }
 
@@ -180,12 +212,12 @@ impl GateRegistry {
 ///
 /// Constructed once via [`global_runner()`]; reused for every [`run()`] call.
 ///
-/// Phase 5: also owns a [`GateRegistry`] with eagerly-loaded app-domain gate
-/// declarations for discernment-gate and reach-gate.
+/// Phase 6: also owns a [`GateRegistry`] with eagerly-loaded app-domain gate
+/// declarations for discernment-gate, reach-gate, and content-safety-gate.
 pub struct DagRunner {
     interpreter: DagInterpreter,
     declaration: GateProcessDeclaration,
-    /// Eager registry of app-domain gates (discernment-gate + reach-gate).
+    /// Eager registry of app-domain gates (content-safety-gate + discernment-gate + reach-gate).
     registry: GateRegistry,
 }
 
@@ -627,46 +659,74 @@ pub async fn run_with_tracing(event: &RelationalImpactEvent) -> Result<GateDecis
 
 // ─── App-domain gate dispatch ─────────────────────────────────────────────────
 
-/// Determine which app-domain gate (if any) should run for the given event.
+/// Determine which app-domain gates should run (in order) for the given event.
 ///
-/// Returns `Some(gate_name)` if a domain gate should fire after the universal
-/// band allows, `None` if the event should be handled by the universal band only.
+/// Returns a `Vec` of gate names.  An empty Vec means the event is handled by
+/// the universal band only.  Multiple names means the gates run in the returned
+/// order; any Decline or Escalate short-circuits the remainder (spec §3.3).
 ///
-/// # Dispatch rules (Phase 5)
+/// # Dispatch rules (Phase 6)
 ///
-/// | Event variant                                              | Gate                           |
-/// |------------------------------------------------------------|--------------------------------|
-/// | `AttestationWrite`                                         | `discernment-gate-v1-mechanical` |
-/// | `CapabilityInvoke { capability: "reach-negotiation", .. }` | `reach-gate-v1`                |
-/// | All other variants                                         | (none)                         |
+/// | Event variant                                              | Gates (ordered)                                          |
+/// |------------------------------------------------------------|----------------------------------------------------------|
+/// | `ContentPublish`                                           | `["content-safety-gate-v1"]`                             |
+/// | `AttestationWrite`                                         | `["content-safety-gate-v1", "discernment-gate-v1-mechanical"]` |
+/// | `PeerMessage`                                              | `["content-safety-gate-v1"]`                             |
+/// | `CapabilityInvoke { capability: "reach-negotiation", .. }` | `["reach-gate-v1"]`                                      |
+/// | All other variants                                         | `[]`                                                     |
 ///
-/// The `CapabilityInvoke` variant routes only when `capability == "reach-negotiation"`.
-/// Other capability values (e.g., `"translate"`) pass through the universal band only.
-pub(crate) fn domain_gate_for_event(event: &RelationalImpactEvent) -> Option<&'static str> {
+/// Governance-level gates (content-safety) run before more specialised domain
+/// gates (discernment, reach).
+pub(crate) fn domain_gates_for_event(event: &RelationalImpactEvent) -> Vec<&'static str> {
     match event {
-        RelationalImpactEvent::AttestationWrite { .. } => Some("discernment-gate-v1-mechanical"),
+        RelationalImpactEvent::ContentPublish { .. } => vec!["content-safety-gate-v1"],
+        RelationalImpactEvent::AttestationWrite { .. } => {
+            vec!["content-safety-gate-v1", "discernment-gate-v1-mechanical"]
+        }
+        RelationalImpactEvent::PeerMessage { .. } => vec!["content-safety-gate-v1"],
         RelationalImpactEvent::CapabilityInvoke { capability, .. }
             if capability == "reach-negotiation" =>
         {
-            Some("reach-gate-v1")
+            vec!["reach-gate-v1"]
         }
-        _ => None,
+        _ => vec![],
     }
 }
 
-/// Run the universal-band DAG followed by the appropriate app-domain gate (if
-/// any) for the given event.
+/// Run the universal-band DAG followed by all applicable app-domain gates for
+/// the given event.
 ///
 /// This is the internal entry point used by `check()` and `check_blocking()`.
-/// It embeds the full dispatch logic:
+/// It embeds the full Phase 6 dispatch logic:
 ///
 /// 1. Run the universal-band DAG.  If it does NOT return Allow, short-circuit.
-/// 2. Determine whether an app-domain gate applies via [`domain_gate_for_event`].
-///    - Phase 4/5: `AttestationWrite` → `discernment-gate-v1-mechanical`
-///    - Phase 5: `CapabilityInvoke{capability:"reach-negotiation"}` → `reach-gate-v1`
-/// 3. If a domain gate applies, look up the gate context from the keyed
-///    thread-local map (test builds) and run the gate.  Otherwise, return the
-///    universal-band decision.
+/// 2. Determine which app-domain gates apply via [`domain_gates_for_event`].
+///    Gates are run in declaration order (spec §3.3: governance-level first):
+///    - `ContentPublish` → `["content-safety-gate-v1"]`
+///    - `AttestationWrite` → `["content-safety-gate-v1", "discernment-gate-v1-mechanical"]`
+///    - `PeerMessage` → `["content-safety-gate-v1"]`
+///    - `CapabilityInvoke{capability:"reach-negotiation"}` → `["reach-gate-v1"]`
+///    - Other events → `[]` (universal-band decision returned as-is)
+/// 3. For each gate in order:
+///    - Run the gate.
+///    - If result is Decline or Escalate: short-circuit immediately; discard any
+///      side effects accumulated from prior gates in this run.
+///    - If result is Verdict: keep the decision but continue to the next gate
+///      (subsequent gates may further refine the outcome).
+///    - If result is Allow: continue to the next gate.
+/// 4. Return the last gate's decision; or the universal-band Allow if no gates
+///    matched.
+///
+/// # Side effect accumulation
+///
+/// Side effects accumulate across gates UNLESS a later gate Declines/Escalates.
+/// If gate A produces a side effect (e.g., MintAttestation) and gate B then
+/// Declines, gate B's decision is returned and gate A's side effects are
+/// discarded — Decline means "don't proceed", so no side effects should fire.
+///
+/// In Phase 6 DevContext, content-safety-gate always returns Allow (mock),
+/// so existing Phase 3/4/5 test paths continue to receive their expected
+/// Verdict / Allow outcomes unchanged.
 ///
 /// The keyed thread-local (see `lib.rs`: `GATE_CTXS`) allows test callers to
 /// inject pre-populated context fields per gate name without changing this
@@ -674,10 +734,8 @@ pub(crate) fn domain_gate_for_event(event: &RelationalImpactEvent) -> Option<&'s
 /// context extension defaults to an empty `GateContext`.
 ///
 /// `attestation_resolver_overrides`: a map from gate name → resolver, consumed
-/// once per call.  The resolver for the dispatched gate (if any) is looked up by
-/// name and passed to `run_app_domain_gate`.  Gates not present in the map fall
-/// back to `NullAttestationResolver`.  In production builds the map is always
-/// empty.  Used by test builds to inject fixture attestation records per gate.
+/// once per call.  Gates not present in the map fall back to
+/// `NullAttestationResolver`.  In production builds the map is always empty.
 pub(crate) async fn run_unified(
     event: &RelationalImpactEvent,
     ctx_extensions: HashMap<String, GateContext>,
@@ -689,26 +747,48 @@ pub(crate) async fn run_unified(
         return Ok(universal_decision);
     }
 
-    // Step 2: check if an app-domain gate applies.
-    let Some(gate_name) = domain_gate_for_event(event) else {
-        // No domain gate → return the universal-band decision as-is.
+    // Step 2: collect the ordered list of applicable domain gates.
+    let gate_names = domain_gates_for_event(event);
+    if gate_names.is_empty() {
+        // No domain gates → return the universal-band decision as-is.
         return Ok(universal_decision);
-    };
+    }
 
-    // Step 3: look up the context extension for this gate (may be empty).
-    let ctx_extension = ctx_extensions.get(gate_name).cloned().unwrap_or_default();
+    // Step 3: run gates in order with short-circuit on Decline / Escalate.
+    //
+    // `last_decision` tracks the most recent non-short-circuit gate decision.
+    // Accumulated side effects from prior gates are discarded if any gate
+    // Declines or Escalates.
+    let mut last_decision: Option<GateDecision> = None;
 
-    // Step 4: look up the attestation resolver for this gate (may be absent).
-    let attestation_resolver_override = attestation_resolver_overrides.get(gate_name).cloned();
+    for gate_name in gate_names {
+        let ctx_extension = ctx_extensions.get(gate_name).cloned().unwrap_or_default();
+        let attestation_resolver_override = attestation_resolver_overrides.get(gate_name).cloned();
 
-    // Step 5: run the dispatched app-domain gate.
-    run_app_domain_gate(
-        gate_name,
-        event,
-        ctx_extension,
-        attestation_resolver_override,
-    )
-    .await
+        let gate_decision = run_app_domain_gate(
+            gate_name,
+            event,
+            ctx_extension,
+            attestation_resolver_override,
+        )
+        .await?;
+
+        match &gate_decision.status {
+            // Decline or Escalate: short-circuit; discard prior side effects.
+            crate::types::GateStatus::Decline { .. }
+            | crate::types::GateStatus::Escalate { .. } => {
+                return Ok(gate_decision);
+            }
+            // Verdict or Allow: store as the current best decision; continue.
+            crate::types::GateStatus::Verdict(_) | crate::types::GateStatus::Allow { .. } => {
+                last_decision = Some(gate_decision);
+            }
+        }
+    }
+
+    // Step 4: return the last gate's decision (or universal-band Allow if no
+    // gates ran — which cannot happen here since gate_names was non-empty).
+    Ok(last_decision.unwrap_or(universal_decision))
 }
 
 // ─── Arc<dyn AttestationResolver> adapter ────────────────────────────────────
@@ -762,7 +842,7 @@ pub(crate) async fn run_app_domain_gate(
     let entry = runner.registry.get(gate_name).ok_or_else(|| {
         GateError::DagExecution(format!(
             "no gate entry for '{gate_name}' in GateRegistry; \
-             known gates: discernment-gate-v1-mechanical, reach-gate-v1"
+             known gates: content-safety-gate-v1, discernment-gate-v1-mechanical, reach-gate-v1"
         ))
     })?;
 
@@ -837,6 +917,7 @@ pub(crate) async fn run_app_domain_gate(
 /// - The `pub` testing re-export in `lib.rs` (`run_discernment_gate`).
 ///
 /// Production callers use `check()` → `run_unified()` → `run_app_domain_gate()`.
+#[cfg(any(test, feature = "testing"))]
 pub(crate) async fn run_discernment_gate(
     event: &RelationalImpactEvent,
     gate_context_extension: GateContext,
