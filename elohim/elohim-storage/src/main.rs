@@ -640,8 +640,20 @@ async fn async_main(
 
     // Start HTTP server for shard API
     let http_addr: SocketAddr = format!("0.0.0.0:{}", config.http_port).parse()?;
-    let mut http_server =
-        HttpServer::new(blob_store.clone(), http_addr).with_progress_hub(Arc::clone(&progress_hub));
+
+    // Load operator-configured elohim capability once at startup (Category C — operational).
+    // None = no ELOHIM_CAPABILITY_CONFIG_FILE set, or file unreadable/invalid.
+    // Warnings are emitted by load_elohim_capability_from_env() so operators see diagnostics.
+    let elohim_capability = elohim_storage::load_elohim_capability_from_env();
+    if elohim_capability.is_some() {
+        info!("Elohim capability profile loaded from ELOHIM_CAPABILITY_CONFIG_FILE");
+    } else {
+        info!("No elohim capability profile — node operates as storage/relay only (set ELOHIM_CAPABILITY_CONFIG_FILE to enable)");
+    }
+
+    let mut http_server = HttpServer::new(blob_store.clone(), http_addr)
+        .with_progress_hub(Arc::clone(&progress_hub))
+        .with_elohim_capability(elohim_capability);
 
     if args.embedded_conductor {
         http_server = http_server.with_embedded_conductor();

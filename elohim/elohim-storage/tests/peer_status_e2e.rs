@@ -53,6 +53,9 @@ use diesel::sqlite::SqliteConnection;
 
 use elohim_storage::db::peer_statuses::get_by_peer;
 use elohim_storage::signals::{handle_signal, InfrastructureSignal};
+use elohim_storage::{
+    build_peer_status_view, load_elohim_capability_from_env, ElohimCapabilityProfile,
+};
 
 /// Create an in-memory SQLite connection pre-populated with the
 /// `peer_statuses` schema that the production migration emits.
@@ -167,4 +170,146 @@ async fn peer_publishes_status_within_one_minute() {
     //       .unwrap();
     //   assert_eq!(row.status, "leaving");
     panic!("placeholder — see module docs for Phase 2 plan");
+}
+
+// =============================================================================
+// Task 10.1 — operator-config hydration for elohim_capability (Phase 10)
+// =============================================================================
+
+/// Helper: build a minimal PeerStatusRow for view construction tests.
+fn smoke_row() -> elohim_storage::db::peer_statuses::PeerStatusRow {
+    elohim_storage::db::peer_statuses::PeerStatusRow {
+        peer_id: "uhCAkSMOKE".to_string(),
+        status: "online".to_string(),
+        general_pool_member: 1,
+        accepting_stewardship_reserves: 1,
+        archetype_class: Some("home-nuc".to_string()),
+        timestamp: 1_700_000_000_000_000,
+        dht_anchor_hash: "uhCkkSMOKE".to_string(),
+        updated_at: 1_700_000_000_000_000,
+    }
+}
+
+/// Helper: build a minimal ElohimCapabilityProfile for hydration tests.
+fn sample_capability() -> ElohimCapabilityProfile {
+    ElohimCapabilityProfile {
+        model_name: "claude-opus-4-7".to_string(),
+        model_family: "claude".to_string(),
+        context_window_tokens: 200_000,
+        constitution_cid: Some("epr:constitutions:family-stewardship-v1".to_string()),
+        quantization_spec: None,
+        deployment_context: Some("elohim-node-linux-x86_64".to_string()),
+        specialties: vec!["child-safety".to_string()],
+        skills: vec!["discernment-evaluation".to_string()],
+        strengths: vec![],
+        active_since: "2026-04-19T00:00:00Z".to_string(),
+        reach_level: None,
+    }
+}
+
+/// `build_peer_status_view` with Some(capability) layers the profile onto the view.
+#[test]
+fn build_peer_status_view_with_capability() {
+    let cap = sample_capability();
+    let view = build_peer_status_view(smoke_row(), Some(&cap));
+
+    assert_eq!(view.peer_id, "uhCAkSMOKE");
+    assert_eq!(view.status, "online");
+    let hydrated = view.elohim_capability.expect("capability must be present");
+    assert_eq!(hydrated.model_name, "claude-opus-4-7");
+    assert_eq!(hydrated.model_family, "claude");
+    assert_eq!(hydrated.context_window_tokens, 200_000);
+}
+
+/// `build_peer_status_view` with None leaves elohim_capability as None.
+#[test]
+fn build_peer_status_view_without_capability() {
+    let view = build_peer_status_view(smoke_row(), None);
+    assert!(
+        view.elohim_capability.is_none(),
+        "no capability for storage/relay nodes"
+    );
+}
+
+/// `load_elohim_capability_from_env` returns None when env var is unset.
+#[test]
+fn load_capability_unset_env_returns_none() {
+    // Guard: remove the env var for this test (may be set in CI).
+    // Safety: single-threaded test; env mutation is local to this process.
+    std::env::remove_var("ELOHIM_CAPABILITY_CONFIG_FILE");
+    assert!(load_elohim_capability_from_env().is_none());
+}
+
+/// `load_elohim_capability_from_env` returns None when the file does not exist.
+#[test]
+fn load_capability_missing_file_returns_none() {
+    std::env::set_var(
+        "ELOHIM_CAPABILITY_CONFIG_FILE",
+        "/tmp/elohim-capability-does-not-exist-xyzzy.json",
+    );
+    assert!(load_elohim_capability_from_env().is_none());
+    std::env::remove_var("ELOHIM_CAPABILITY_CONFIG_FILE");
+}
+
+/// `load_elohim_capability_from_env` returns None when the file contains malformed JSON.
+#[test]
+fn load_capability_malformed_json_returns_none() {
+    let mut tmp = tempfile::NamedTempFile::new().expect("temp file");
+    use std::io::Write;
+    write!(tmp, "{{ this is not valid json }}").unwrap();
+    std::env::set_var("ELOHIM_CAPABILITY_CONFIG_FILE", tmp.path());
+    assert!(load_elohim_capability_from_env().is_none());
+    std::env::remove_var("ELOHIM_CAPABILITY_CONFIG_FILE");
+}
+
+/// `load_elohim_capability_from_env` returns Some(profile) when pointed at a valid JSON file.
+#[test]
+fn load_capability_valid_file_returns_some() {
+    let profile_json = serde_json::json!({
+        "modelName": "claude-opus-4-7",
+        "modelFamily": "claude",
+        "contextWindowTokens": 200000,
+        "constitutionCid": "epr:constitutions:family-stewardship-v1",
+        "quantizationSpec": null,
+        "deploymentContext": "elohim-node-linux-x86_64",
+        "specialties": ["child-safety"],
+        "skills": ["discernment-evaluation"],
+        "strengths": [],
+        "activeSince": "2026-04-19T00:00:00Z",
+        "reachLevel": null
+    });
+    let mut tmp = tempfile::NamedTempFile::new().expect("temp file");
+    use std::io::Write;
+    write!(tmp, "{}", profile_json).unwrap();
+    std::env::set_var("ELOHIM_CAPABILITY_CONFIG_FILE", tmp.path());
+
+    let profile = load_elohim_capability_from_env().expect("must return Some for valid file");
+    assert_eq!(profile.model_name, "claude-opus-4-7");
+    assert_eq!(profile.context_window_tokens, 200_000);
+    assert_eq!(profile.specialties, vec!["child-safety".to_string()]);
+
+    std::env::remove_var("ELOHIM_CAPABILITY_CONFIG_FILE");
+}
+
+/// Integration: when AppState holds Some(capability), build_peer_status_view reflects it.
+/// When AppState holds None, elohim_capability is None.
+#[test]
+fn capability_hydration_mirrors_app_state() {
+    // Simulates the pattern used in HTTP route handlers:
+    // let view = build_peer_status_view(row, self.elohim_capability.as_ref());
+    let cap = sample_capability();
+
+    // AppState-with-capability path
+    let state_capability: Option<ElohimCapabilityProfile> = Some(cap.clone());
+    let view_with = build_peer_status_view(smoke_row(), state_capability.as_ref());
+    assert!(view_with.elohim_capability.is_some());
+    assert_eq!(
+        view_with.elohim_capability.as_ref().unwrap().model_name,
+        "claude-opus-4-7"
+    );
+
+    // AppState-without-capability path
+    let state_none: Option<ElohimCapabilityProfile> = None;
+    let view_without = build_peer_status_view(smoke_row(), state_none.as_ref());
+    assert!(view_without.elohim_capability.is_none());
 }

@@ -1,0 +1,13 @@
+{
+  "modelName": "claude-opus-4-7",
+  "modelFamily": "claude",
+  "contextWindowTokens": 200000,
+  "constitutionCid": "epr:constitutions:family-stewardship-v1",
+  "quantizationSpec": null,
+  "deploymentContext": "elohim-node-linux-x86_64",
+  "specialties": ["child-safety", "family-dynamics"],
+  "skills": ["content-safety-review", "discernment-evaluation"],
+  "strengths": [],
+  "activeSince": "2026-04-19T00:00:00Z",
+  "reachLevel": null
+}

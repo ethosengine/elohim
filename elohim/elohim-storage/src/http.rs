@@ -159,6 +159,9 @@ pub struct HttpServer {
     request_semaphore: Arc<Semaphore>,
     /// Whether the conductor is managed as an embedded child process
     embedded_conductor: bool,
+    /// Operator-configured elohim capability profile (Category C — operational, not DHT-derived).
+    /// Loaded once at startup from ELOHIM_CAPABILITY_CONFIG_FILE. None for storage/relay-only nodes.
+    elohim_capability: Option<crate::views::ElohimCapabilityProfile>,
 }
 
 /// Extract X-Schema-Version header from request and validate it.
@@ -213,7 +216,20 @@ impl HttpServer {
             slug_index: Arc::new(RwLock::new(std::collections::HashMap::new())),
             request_semaphore: Arc::new(Semaphore::new(MAX_CONCURRENT_REQUESTS)),
             embedded_conductor: false,
+            elohim_capability: None,
         }
+    }
+
+    /// Set the operator-configured elohim capability profile (Category C — operational).
+    ///
+    /// Call with the result of `load_elohim_capability_from_env()` at startup.
+    /// None means this node declares no elohim capability (pure storage/relay).
+    pub fn with_elohim_capability(
+        mut self,
+        capability: Option<crate::views::ElohimCapabilityProfile>,
+    ) -> Self {
+        self.elohim_capability = capability;
+        self
     }
 
     /// Mark this server as running in embedded conductor mode

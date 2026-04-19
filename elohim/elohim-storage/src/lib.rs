@@ -154,4 +154,7 @@ pub use services::{
 
 // View re-exports (used by schema contract tests and external callers)
 pub use views::GateDecisionAttestationView;
-pub use views::{ElohimCapabilityProfile, PeerStatusView};
+pub use views::{
+    build_peer_status_view, load_elohim_capability_from_env, ElohimCapabilityProfile,
+    PeerStatusView,
+};

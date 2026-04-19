@@ -6156,7 +6156,59 @@ impl From<PeerStatusRow> for PeerStatusView {
             timestamp: row.timestamp.to_string(),
             dht_anchor_hash: row.dht_anchor_hash,
             updated_at: row.updated_at.to_string(),
-            elohim_capability: None, // Phase 9: populated from operator config at startup, not from projection row
+            elohim_capability: None, // Layered post-construction via build_peer_status_view()
+        }
+    }
+}
+
+/// Build a `PeerStatusView` from a projection row plus the operator-configured capability.
+///
+/// The capability is Category C — operational, local state, not stored in the projection
+/// table. It is loaded once at startup from `ELOHIM_CAPABILITY_CONFIG_FILE` and layered
+/// here so that all construction sites stay consistent.
+///
+/// Use this instead of `PeerStatusView::from(row)` in handlers and tests.
+pub fn build_peer_status_view(
+    row: PeerStatusRow,
+    capability: Option<&ElohimCapabilityProfile>,
+) -> PeerStatusView {
+    let mut view = PeerStatusView::from(row);
+    view.elohim_capability = capability.cloned();
+    view
+}
+
+/// Load the operator-configured `ElohimCapabilityProfile` from the path
+/// given in `ELOHIM_CAPABILITY_CONFIG_FILE`.
+///
+/// Returns `None` (honest degradation) when:
+/// - The env var is unset
+/// - The file does not exist or is not readable
+/// - The file contains invalid JSON or does not match the profile shape
+///
+/// Logged at `WARN` level on file/JSON errors so operators see actionable
+/// diagnostics without aborting startup.
+pub fn load_elohim_capability_from_env() -> Option<ElohimCapabilityProfile> {
+    let path = std::env::var("ELOHIM_CAPABILITY_CONFIG_FILE").ok()?;
+    let contents = match std::fs::read_to_string(&path) {
+        Ok(s) => s,
+        Err(e) => {
+            tracing::warn!(
+                path = %path,
+                error = %e,
+                "ELOHIM_CAPABILITY_CONFIG_FILE unreadable — elohim_capability will be None"
+            );
+            return None;
+        }
+    };
+    match serde_json::from_str::<ElohimCapabilityProfile>(&contents) {
+        Ok(profile) => Some(profile),
+        Err(e) => {
+            tracing::warn!(
+                path = %path,
+                error = %e,
+                "ELOHIM_CAPABILITY_CONFIG_FILE contains invalid JSON — elohim_capability will be None"
+            );
+            None
         }
     }
 }
