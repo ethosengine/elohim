@@ -12,6 +12,7 @@
 //! Design principles:
 //! - Phase filter is mandatory: dev-context decisions carry no reputation weight.
 //! - No scalar score is produced. Dimensions are raw counts; weighting is deferred.
+//! - Bulk IN (...) queries collapse Steps 2 and 3 to avoid N+1 patterns.
 //! - In-memory accumulation is used for histograms because the working set is
 //!   small (an elohim's decisions over a 90-day window, typically < 1000 rows).
 
@@ -95,6 +96,65 @@ pub struct ReputationResult {
 }
 
 // ---------------------------------------------------------------------------
+// Bulk IN helpers
+//
+// Diesel's sql_query().bind() chain produces a growing generic type
+// (UncheckedBind<Inner, V, ST>) that cannot be reassigned in a loop.
+// We use into_boxed::<Sqlite>() to type-erase after the fixed binds, then
+// add the dynamic per-ID binds using BoxedSqlQuery::bind().
+// ---------------------------------------------------------------------------
+
+/// Load all gate_decision_challenges whose challenged_decision_cid is in `decision_ids`.
+/// Returns an empty Vec when `decision_ids` is empty (guarding against invalid `IN ()`).
+fn bulk_in_query_challenges(
+    conn: &mut SqliteConnection,
+    app_id: &str,
+    decision_ids: &[String],
+) -> QueryResult<Vec<ChallengeRow>> {
+    if decision_ids.is_empty() {
+        return Ok(Vec::new());
+    }
+    let placeholders = decision_ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+    let sql = format!(
+        "SELECT challenge_id, challenged_decision_cid, grounds \
+         FROM gate_decision_challenges \
+         WHERE app_id = ? AND challenged_decision_cid IN ({placeholders})"
+    );
+    let mut q = diesel::sql_query(sql)
+        .into_boxed::<diesel::sqlite::Sqlite>()
+        .bind::<diesel::sql_types::Text, _>(app_id.to_owned());
+    for id in decision_ids {
+        q = q.bind::<diesel::sql_types::Text, _>(id.clone());
+    }
+    q.load(conn)
+}
+
+/// Load all challenge_outcomes whose challenge_cid is in `challenge_ids`.
+/// Returns an empty Vec when `challenge_ids` is empty (guarding against invalid `IN ()`).
+fn bulk_in_query_outcomes(
+    conn: &mut SqliteConnection,
+    app_id: &str,
+    challenge_ids: &[String],
+) -> QueryResult<Vec<OutcomeRow>> {
+    if challenge_ids.is_empty() {
+        return Ok(Vec::new());
+    }
+    let placeholders = challenge_ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+    let sql = format!(
+        "SELECT challenge_cid, verdict \
+         FROM challenge_outcomes \
+         WHERE app_id = ? AND challenge_cid IN ({placeholders})"
+    );
+    let mut q = diesel::sql_query(sql)
+        .into_boxed::<diesel::sqlite::Sqlite>()
+        .bind::<diesel::sql_types::Text, _>(app_id.to_owned());
+    for id in challenge_ids {
+        q = q.bind::<diesel::sql_types::Text, _>(id.clone());
+    }
+    q.load(conn)
+}
+
+// ---------------------------------------------------------------------------
 // Query implementation
 // ---------------------------------------------------------------------------
 
@@ -150,52 +210,40 @@ pub fn compute(conn: &mut SqliteConnection, q: &ReputationQuery) -> QueryResult<
     // Step 2: Load all challenges whose challenged_decision_cid is one of
     // the decisions we just found.
     //
-    // Diesel does not natively bind Vec<String> as an IN list in raw SQL,
-    // so we iterate with one query per decision_id. For typical window sizes
-    // (tens to low hundreds of decisions) this is fine.
+    // Bulk IN (...) query — avoids N+1 (one query per decision_id).
+    // Empty guard is required: `IN ()` is invalid SQL.
     // ------------------------------------------------------------------
+    let all_challenges: Vec<ChallengeRow> =
+        bulk_in_query_challenges(conn, &q.app_id, &decision_ids)?;
+
     let mut all_challenge_ids: Vec<String> = Vec::new();
     let mut challenged_decision_set: std::collections::HashSet<String> =
         std::collections::HashSet::new();
     let mut challenges_by_grounds: HashMap<String, i64> = HashMap::new();
 
-    for decision_id in &decision_ids {
-        let challenges: Vec<ChallengeRow> = diesel::sql_query(
-            "SELECT challenge_id, challenged_decision_cid, grounds \
-             FROM gate_decision_challenges \
-             WHERE app_id = ? AND challenged_decision_cid = ?",
-        )
-        .bind::<diesel::sql_types::Text, _>(&q.app_id)
-        .bind::<diesel::sql_types::Text, _>(decision_id)
-        .load(conn)?;
-
-        for c in challenges {
-            challenged_decision_set.insert(c.challenged_decision_cid.clone());
-            *challenges_by_grounds.entry(c.grounds.clone()).or_insert(0) += 1;
-            all_challenge_ids.push(c.challenge_id);
-        }
+    for c in all_challenges {
+        challenged_decision_set.insert(c.challenged_decision_cid.clone());
+        *challenges_by_grounds.entry(c.grounds.clone()).or_insert(0) += 1;
+        all_challenge_ids.push(c.challenge_id);
     }
 
     let challenged_count = challenged_decision_set.len() as i64;
 
     // ------------------------------------------------------------------
     // Step 3: Load ChallengeOutcomes for all challenge_ids found above.
+    //
+    // Bulk IN (...) query — avoids N+1 (one query per challenge_id).
+    // Empty guard: if no challenges were found, skip the query entirely.
     // ------------------------------------------------------------------
     let mut outcomes_by_verdict: HashMap<String, i64> = HashMap::new();
     let mut resolved_challenge_set: std::collections::HashSet<String> =
         std::collections::HashSet::new();
 
-    for challenge_id in &all_challenge_ids {
-        let outcomes: Vec<OutcomeRow> = diesel::sql_query(
-            "SELECT challenge_cid, verdict \
-             FROM challenge_outcomes \
-             WHERE app_id = ? AND challenge_cid = ?",
-        )
-        .bind::<diesel::sql_types::Text, _>(&q.app_id)
-        .bind::<diesel::sql_types::Text, _>(challenge_id)
-        .load(conn)?;
+    if !all_challenge_ids.is_empty() {
+        let all_outcomes: Vec<OutcomeRow> =
+            bulk_in_query_outcomes(conn, &q.app_id, &all_challenge_ids)?;
 
-        for o in outcomes {
+        for o in all_outcomes {
             *outcomes_by_verdict.entry(o.verdict.clone()).or_insert(0) += 1;
             resolved_challenge_set.insert(o.challenge_cid);
         }

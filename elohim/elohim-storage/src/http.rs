@@ -5100,9 +5100,11 @@ impl HttpServer {
             window_end: Option<String>,
         }
 
-        let query_str = req.uri().query().unwrap_or("");
-        let params: ReputationQueryParams =
-            serde_urlencoded::from_str(query_str).unwrap_or_default();
+        let params: ReputationQueryParams = req
+            .uri()
+            .query()
+            .and_then(|q| serde_urlencoded::from_str(q).ok())
+            .unwrap_or_default();
 
         let elohim_id = match params.elohim_id {
             Some(id) if !id.is_empty() => id,
