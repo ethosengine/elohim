@@ -539,8 +539,10 @@ describe('DeviceStewardshipComponent', () => {
     });
 
     it('should show loading state in devices tab while household devices load', () => {
-      // householdDevicesLoading starts true until listForHuman emits
+      // Simulate in-flight state by setting loading signal after detectChanges
+      fixture.detectChanges();
       component.householdDevicesLoading.set(true);
+      component.householdDevicesError.set(null);
       fixture.detectChanges();
       const loading = fixture.nativeElement.querySelector('[data-testid="devices-loading"]');
       expect(loading).toBeTruthy();
@@ -604,57 +606,48 @@ describe('DeviceStewardshipComponent', () => {
   });
 
   // ==========================================================================
-  // Summary Strip (Devices Tab)
+  // Summary Strip (Devices Tab) — now shows household id + device count
   // ==========================================================================
 
   describe('Summary Strip', () => {
     beforeEach(() => {
-      setupTestBed('app-steward');
+      setupTestBed('node-steward', null, MOCK_HOUSEHOLD_DEVICES);
       component.selectTab('devices');
+      fixture.detectChanges();
     });
 
-    it('should show connected count', () => {
-      mockService.isLoading.set(false);
-      mockService.totalDevices.set(3);
-      mockService.connectedCount.set(2);
-      mockService.offlineCount.set(1);
-      fixture.detectChanges();
-
-      const connectedBadge = fixture.nativeElement.querySelector('.summary-badge.connected');
-      expect(connectedBadge.textContent).toContain('2 Connected');
+    it('should show device count in summary', () => {
+      const summary = fixture.nativeElement.querySelector('[data-testid="device-summary"]');
+      expect(summary).toBeTruthy();
+      expect(summary.textContent).toContain('2 devices');
     });
 
-    it('should show offline count when > 0', () => {
-      mockService.isLoading.set(false);
-      mockService.totalDevices.set(2);
-      mockService.connectedCount.set(1);
-      mockService.offlineCount.set(1);
-      fixture.detectChanges();
-
-      const offlineBadge = fixture.nativeElement.querySelector('.summary-badge.offline');
-      expect(offlineBadge).toBeTruthy();
-      expect(offlineBadge.textContent).toContain('1 Offline');
+    it('should show household id in summary', () => {
+      const summary = fixture.nativeElement.querySelector('[data-testid="device-summary"]');
+      expect(summary.textContent).toContain('household-matthew');
     });
 
-    it('should hide seen badge when count is 0', () => {
-      mockService.isLoading.set(false);
-      mockService.totalDevices.set(1);
-      mockService.connectedCount.set(1);
-      mockService.seenCount.set(0);
+    it('should show singular "device" for single-device household', () => {
+      const singleDeviceView = {
+        householdId: 'household-adam',
+        devices: [MOCK_HOUSEHOLD_DEVICES.devices[0]],
+      };
+      setupTestBed('node-steward', null, singleDeviceView);
+      component.selectTab('devices');
       fixture.detectChanges();
 
-      const seenBadge = fixture.nativeElement.querySelector('.summary-badge.seen');
-      expect(seenBadge).toBeNull();
+      const summary = fixture.nativeElement.querySelector('[data-testid="device-summary"]');
+      expect(summary.textContent).toContain('1 device');
+      expect(summary.textContent).not.toContain('1 devices');
     });
 
-    it('should show total count', () => {
-      mockService.isLoading.set(false);
-      mockService.totalDevices.set(3);
-      mockService.connectedCount.set(3);
+    it('should not show summary strip when no household data', () => {
+      setupTestBed('node-steward', null, null);
+      component.selectTab('devices');
       fixture.detectChanges();
 
-      const total = fixture.nativeElement.querySelector('.summary-total');
-      expect(total.textContent).toContain('3 total');
+      const summary = fixture.nativeElement.querySelector('[data-testid="device-summary"]');
+      expect(summary).toBeNull();
     });
   });
 
@@ -838,8 +831,10 @@ describe('DeviceStewardshipComponent', () => {
       it('should show loading overlay while fetching devices', () => {
         setupTestBed('node-steward', null, null);
         component.selectTab('devices');
-        // Manually set loading state to simulate in-flight request
+        fixture.detectChanges();
+        // Simulate in-flight state after initial render
         component.householdDevicesLoading.set(true);
+        component.householdDevicesError.set(null);
         fixture.detectChanges();
 
         expect(component.householdDevicesLoading()).toBe(true);
@@ -963,7 +958,8 @@ describe('DeviceStewardshipComponent', () => {
       it('should retry on retry button click', () => {
         setupTestBed('node-steward', null, MOCK_HOUSEHOLD_DEVICES);
         component.selectTab('devices');
-        // Set error state so the retry button renders
+        fixture.detectChanges();
+        // After initial render, force error state so retry button appears
         component.householdDevicesError.set('Some error');
         component.householdDevicesLoading.set(false);
         fixture.detectChanges();
