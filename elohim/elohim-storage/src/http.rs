@@ -81,6 +81,7 @@ use crate::views::{
     EconomicEventView,
     EprHeadInputView,
     EprHeadView,
+    GateDecisionAttestationView,
     HumanView,
     InitiateClaimInputView,
     LocalSessionView,
@@ -2141,6 +2142,18 @@ impl HttpServer {
             // /db/nodes/{id}
             return self
                 .handle_node_by_id(req, method, node_path, &app_ctx)
+                .await;
+        }
+
+        // Gate decision attestation routes (Diesel projection of mishpat DHT)
+        // Source of truth: mishpat DNA DHT. These are read-only projections.
+        if resource_path == "gate-decisions" {
+            return self.handle_gate_decisions_list(req, method, &app_ctx).await;
+        }
+
+        if let Some(decision_id) = resource_path.strip_prefix("gate-decisions/") {
+            return self
+                .handle_gate_decision_by_id(req, method, decision_id, &app_ctx)
                 .await;
         }
 
@@ -4630,6 +4643,124 @@ impl HttpServer {
                 }
             }
             _ => Ok(response::method_not_allowed()),
+        }
+    }
+
+    // =========================================================================
+    // Gate Decision Attestation Handlers (mishpat DHT projection, read-only)
+    // =========================================================================
+
+    /// GET /db/gate-decisions — List gate decisions with optional filters
+    ///
+    /// Query params (all optional):
+    ///   ?elohim={id}   — filter by elohim agent public key
+    ///   ?gate={name}   — filter by gate name
+    ///   ?phase={phase} — filter by deployment phase
+    ///   ?limit={n}     — max results (default 50, max 500)
+    ///
+    /// Returns `{ items: GateDecisionAttestationView[], count: number }`.
+    /// Source of truth is the mishpat DNA DHT; this serves the read-optimised
+    /// SQLite projection populated by `MishpatSignal::GateDecisionCreated`.
+    async fn handle_gate_decisions_list(
+        &self,
+        req: Request<Incoming>,
+        method: Method,
+        ctx: &AppContext,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        if method != Method::GET {
+            return Ok(response::method_not_allowed());
+        }
+
+        #[derive(serde::Deserialize, Default)]
+        #[serde(rename_all = "camelCase")]
+        struct GateDecisionQuery {
+            elohim: Option<String>,
+            gate: Option<String>,
+            phase: Option<String>,
+            limit: Option<i64>,
+        }
+
+        let query_str = req.uri().query().unwrap_or("");
+        let query: GateDecisionQuery = serde_urlencoded::from_str(query_str).unwrap_or_default();
+
+        let raw_limit = query.limit.unwrap_or(50).clamp(1, 500);
+
+        let mut conn = self.get_diesel_conn()?;
+
+        // Apply the most-selective filter available, then enforce limit in Rust
+        // (the individual find_by_* functions don't take a limit parameter — we
+        // keep the DB queries simple and trim in application code because the
+        // gate-decisions table will remain small — one row per gate evaluation).
+        let rows = match (&query.elohim, &query.gate, &query.phase) {
+            (Some(elohim_id), _, _) => crate::db::gate_decision_attestations::find_by_elohim(
+                &mut conn,
+                &ctx.h_app_id,
+                elohim_id,
+            )?,
+            (_, Some(gate_name), _) => crate::db::gate_decision_attestations::find_by_gate(
+                &mut conn,
+                &ctx.h_app_id,
+                gate_name,
+            )?,
+            (_, _, Some(phase)) => crate::db::gate_decision_attestations::find_by_phase(
+                &mut conn,
+                &ctx.h_app_id,
+                phase,
+            )?,
+            _ => {
+                // No filter — return all, ordered by decided_at desc, limited
+                use crate::db::diesel_schema::gate_decision_attestations::dsl;
+                use diesel::prelude::*;
+                dsl::gate_decision_attestations
+                    .filter(dsl::app_id.eq(&ctx.h_app_id))
+                    .order(dsl::decided_at.desc())
+                    .limit(raw_limit)
+                    .load::<crate::db::gate_decision_attestations::GateDecisionAttestationRow>(
+                        &mut conn,
+                    )?
+            }
+        };
+
+        let views: Vec<GateDecisionAttestationView> = rows
+            .into_iter()
+            .take(raw_limit as usize)
+            .map(GateDecisionAttestationView::from)
+            .collect();
+
+        let count = views.len();
+        Ok(response::ok(&serde_json::json!({
+            "items": views,
+            "count": count,
+        })))
+    }
+
+    /// GET /db/gate-decisions/{cid} — Fetch a single decision by its CID
+    ///
+    /// Returns `GateDecisionAttestationView` on hit, 404 on miss.
+    /// The `{cid}` segment is the `decision_id` field (a self-addressing CID).
+    async fn handle_gate_decision_by_id(
+        &self,
+        _req: Request<Incoming>,
+        method: Method,
+        decision_id: &str,
+        ctx: &AppContext,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        if method != Method::GET {
+            return Ok(response::method_not_allowed());
+        }
+
+        let mut conn = self.get_diesel_conn()?;
+
+        match crate::db::gate_decision_attestations::find_by_id(
+            &mut conn,
+            &ctx.h_app_id,
+            decision_id,
+        )? {
+            Some(row) => Ok(response::ok(&GateDecisionAttestationView::from(row))),
+            None => Ok(response::not_found(&format!(
+                "Gate decision not found: {}",
+                decision_id
+            ))),
         }
     }
 
@@ -7907,6 +8038,25 @@ pub fn build_manifest() -> doorway_client::DoorwayRoutes {
                 .handler("account_export")
                 .build(),
         )
+        // =====================================================================
+        // /db/gate-decisions — Gate decision attestation projections (mishpat)
+        // =====================================================================
+        // Read-only. Source of truth: mishpat DNA DHT. These rows are written
+        // exclusively by `MishpatSignal::GateDecisionCreated` signal projection.
+        // Auth required because gate decisions carry constitutional reasoning
+        // that should not be visible to anonymous visitors.
+        .route(
+            Route::get("/db/gate-decisions")
+                .handler("list_gate_decisions")
+                .auth_required()
+                .build(),
+        )
+        .route(
+            Route::get("/db/gate-decisions/{cid}")
+                .handler("get_gate_decision")
+                .auth_required()
+                .build(),
+        )
         // Blob proxy: doorway caches blobs from /blob/{hash}
         .with_blobs_at("/blob")
         .build()
@@ -7950,6 +8100,15 @@ mod tests {
         assert!(
             paths.contains(&"/account/export/{human_id}"),
             "missing /account/export/{{human_id}} (recovery regression)"
+        );
+        // Gate decision attestation routes (mishpat DHT projection)
+        assert!(
+            paths.contains(&"/db/gate-decisions"),
+            "missing /db/gate-decisions"
+        );
+        assert!(
+            paths.contains(&"/db/gate-decisions/{cid}"),
+            "missing /db/gate-decisions/{{cid}}"
         );
         // Ensure infrastructure routes are NOT in the manifest
         assert!(

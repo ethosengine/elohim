@@ -460,6 +460,18 @@ pub enum MishpatSignal {
 /// New variants add a match arm here and a call into the corresponding
 /// `db::*` module. Keep this function thin — the per-entity projection
 /// logic belongs next to its Diesel model.
+///
+/// ## Doorway signal-absorption verdict (Task 4.3)
+///
+/// Doorway's `ProjectionEngine` (`doorway/doorway-service/src/projection/engine.rs`)
+/// is type-agnostic — it processes `ProjectionSignal` (doc_type, id, data, search_tokens,
+/// invalidates, ttl_secs) from the Holochain conductor app WebSocket. It has zero
+/// knowledge of "GateDecisionAttestation" or any other specific entry type.
+///
+/// The `MishpatSignal` enum is elohim-storage's own internal relay format. This
+/// function writes gate decisions directly into SQLite. Doorway's projection cache
+/// (MongoDB) is a separate, parallel pathway for DHT content reads — it does NOT
+/// need extending to absorb mishpat signals. No doorway code changes are required.
 pub fn handle_mishpat_signal(
     conn: &mut diesel::sqlite::SqliteConnection,
     app_id: &str,
