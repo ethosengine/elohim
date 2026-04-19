@@ -18,10 +18,13 @@ import { catchError, takeUntil } from 'rxjs/operators';
 
 import { Subject, Subscription, forkJoin, of } from 'rxjs';
 
-import { TrustBadge } from '@app/elohim/models/trust-badge.model';
-import type { EprRelationship } from '@app/elohim/models/epr-head.model';
+import { ContentAnalyticsComponent } from '@app/elohim/components/content-analytics/content-analytics.component';
 import { EprRelationshipsPanelComponent } from '@app/elohim/components/epr-relationships-panel/epr-relationships-panel.component';
-import { EprResolverService } from '@app/elohim/services/epr-resolver.service';
+import {
+  ProtocolOmnibarComponent,
+  OmnibarSteward,
+} from '@app/elohim/components/protocol-omnibar/protocol-omnibar.component';
+import { TrustBadge } from '@app/elohim/models/trust-badge.model';
 import { AffinityTrackingService } from '@app/elohim/services/affinity-tracking.service';
 import { AgentService } from '@app/elohim/services/agent.service';
 import {
@@ -30,6 +33,7 @@ import {
   DiscussionRecord,
   GovernanceStateRecord,
 } from '@app/elohim/services/data-loader.service';
+import { EprResolverService } from '@app/elohim/services/epr-resolver.service';
 import {
   AggregatedSignals,
   GovernanceSignalService,
@@ -42,22 +46,16 @@ import {
   FeedbackProfile,
   createProfileFromTemplate,
 } from '@app/lamad/models/feedback-profile.model';
+import { FeedbackMechanismGatewayComponent } from '@app/qahal';
 import {
   FeedbackContext,
   GraduatedFeedbackComponent,
 } from '@app/qahal/components/graduated-feedback/graduated-feedback.component';
-import { FeedbackMechanismGatewayComponent } from '@app/qahal';
 import { ReactionBarComponent } from '@app/qahal/components/reaction-bar/reaction-bar.component';
-
 import { AttentionTrackerService } from '@app/shefa/services/attention-tracker.service';
-import { SignalHarnessService } from '../../services/signal-harness.service';
-import {
-  ResilienceService,
-  type ResilienceView,
-  type VerificationResultView,
-} from '../../services/resilience.service';
-import { StewardshipAllocationService } from '../../services/stewardship-allocation.service';
+
 import type { ContentStewardshipView } from '@elohim/storage-client/generated';
+
 import { SeoService } from '../../../services/seo.service';
 import { ContentDownloadComponent } from '../../content-io/components/content-download/content-download.component';
 import { ContentEditorService } from '../../content-io/services/content-editor.service';
@@ -69,14 +67,20 @@ import {
   RendererRegistryService,
 } from '../../renderers/renderer-registry.service';
 import { ContentService } from '../../services/content.service';
+import { HouseholdResilienceService } from '../../services/household-resilience.service';
 import { PathContextService } from '../../services/path-context.service';
 import {
-  ProtocolOmnibarComponent,
-  OmnibarSteward,
-} from '@app/elohim/components/protocol-omnibar/protocol-omnibar.component';
-import { ContentAnalyticsComponent } from '@app/elohim/components/content-analytics/content-analytics.component';
+  ResilienceService,
+  type ResilienceView,
+  type VerificationResultView,
+} from '../../services/resilience.service';
+import { SignalHarnessService } from '../../services/signal-harness.service';
+import { StewardshipAllocationService } from '../../services/stewardship-allocation.service';
 import { FocusedViewToggleComponent } from '../focused-view-toggle/focused-view-toggle.component';
 import { MiniGraphComponent } from '../mini-graph/mini-graph.component';
+
+import type { HouseholdResilienceView } from '../../../generated/household-resilience-view';
+import type { EprRelationship } from '@app/elohim/models/epr-head.model';
 
 @Component({
   selector: 'app-content-viewer',
@@ -116,6 +120,7 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
 
   // Resilience data
   resilience: ResilienceView | null = null;
+  householdResilience: HouseholdResilienceView | null = null;
   verificationResult: VerificationResultView | null = null;
   isVerifying = false;
 
@@ -184,6 +189,7 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
   private readonly signalHarness = inject(SignalHarnessService);
   private readonly stewardshipService = inject(StewardshipAllocationService);
   private readonly resilienceService = inject(ResilienceService);
+  private readonly householdResilienceService = inject(HouseholdResilienceService);
   private readonly attentionTracker = inject(AttentionTrackerService);
   private readonly eprResolver = inject(EprResolverService);
 
@@ -381,7 +387,7 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
           // Populate protocol omnibar data (shown in focused view)
           this.omnibarContentAddress = contentNode.id;
           this.omnibarReach = (contentNode.reach as string) || 'commons';
-          this.omnibarDeliverySource = window.location.hostname;
+          this.omnibarDeliverySource = globalThis.location.hostname;
           // Omnibar stewards populated from allocation data in loadStewardship()
           this.omnibarStewards = [];
 
@@ -515,6 +521,7 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
 
   /**
    * Load resilience data for the Network tab.
+   * Fires both shard-level and household-level requests in parallel.
    */
   private loadResilience(nodeId: string): void {
     this.resilienceService
@@ -526,6 +533,18 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
         },
         error: () => {
           // Resilience is supplemental — don't block on failure
+        },
+      });
+
+    this.householdResilienceService
+      .get(nodeId)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: hr => {
+          this.householdResilience = hr;
+        },
+        error: () => {
+          // Household resilience is supplemental — don't block on failure
         },
       });
   }
@@ -1024,52 +1043,44 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
   }
 
   /**
-   * Resilience icon — indicates stewardship health.
+   * Resilience icon — household-first protection status indicator.
    */
   getResilienceIcon(): string {
-    const stewardCount = this.stewardship?.allocations?.length || 0;
-    if (stewardCount >= 3) return '\u{1F7E2}'; // green circle
-    if (stewardCount >= 1) return '\u{1F7E1}'; // yellow circle
-    if (this.stewardship === null) return '\u{1F504}'; // loading (arrows)
-    return '\u{26AA}'; // white circle (no stewards)
+    const s = this.householdResilience?.protectionStatus;
+    switch (s) {
+      case 'protected':
+        return '\u{1F7E2}'; // green circle
+      case 'partial':
+        return '\u{1F7E1}'; // yellow circle
+      case 'at-risk':
+        return '\u{1F534}'; // red circle
+      default:
+        return '\u{1F504}'; // loading (arrows)
+    }
   }
 
   /**
-   * Resilience tooltip — stewardship and trust data for this content.
+   * Resilience tooltip — household-first with shard-level data as supplement.
    */
   getResilienceTooltip(): string {
-    if (!this.node) return '';
-    if (this.stewardship === null) return 'Loading stewardship data...';
-
-    const lines: string[] = [];
-
-    const allocs = this.stewardship?.allocations || [];
-    if (allocs.length > 0) {
-      const stewards = allocs
-        .sort(
-          (a, b) =>
-            (b.allocationRatio ?? 0) - (a.allocationRatio ?? 0),
-        )
-        .map((a) => {
-          const name =
-            a.steward?.displayName || a.stewardPresenceId || 'Unknown';
-          const pct = Math.round((a.allocationRatio ?? 0) * 100);
-          const type = a.contributionType || 'steward';
-          return `${name} (${type}, ${pct}%)`;
-        })
-        .join(', ');
-      lines.push(`Stewards: ${stewards}`);
-    } else {
-      lines.push('No stewards assigned');
+    if (!this.householdResilience) return 'Loading resilience\u2026';
+    const hr = this.householdResilience;
+    const lines: string[] = [`Households stewarding: ${hr.householdsStewarding}`];
+    if (hr.householdsReciprocated > 0) {
+      lines.push(`Reciprocated: ${hr.householdsReciprocated}`);
     }
-
-    if (this.node.trustScore != null) {
-      lines.push(`Trust: ${Math.round(this.node.trustScore * 100)}%`);
+    lines.push(`Protection: ${hr.protectionStatus}`);
+    if (this.resilience?.encoding) {
+      lines.push(`Encoding: ${this.resilience.encoding.strategy}`);
     }
-
-    lines.push(`Reach: ${this.node.reach || 'commons'}`);
-
-    return lines.join('\n') || 'No resilience data available';
+    if (this.resilience?.distribution) {
+      lines.push(`Peers online: ${this.resilience.distribution.distinctPeers}`);
+    }
+    const healthScore = this.resilience?.health?.score;
+    if (healthScore !== undefined) {
+      lines.push(`Health: ${Math.round(healthScore * 100)}%`);
+    }
+    return lines.join('\n');
   }
 
   // =========================================================================
@@ -1082,8 +1093,8 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
 
   getFlagLabel(type: string): string {
     const labels: Record<string, string> = {
-      'disputed': 'Disputed',
-      'outdated': 'Outdated',
+      disputed: 'Disputed',
+      outdated: 'Outdated',
       'appeal-pending': 'Appeal Pending',
       'under-review': 'Under Review',
       'partial-revocation': 'Partial Revocation',
