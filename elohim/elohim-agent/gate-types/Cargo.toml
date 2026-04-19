@@ -1,0 +1,19 @@
+[package]
+name = "gate-types"
+description = "Pure data types for the Elohim Protocol gate interface. Zero native deps; compiles for wasm32-unknown-unknown."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[dependencies]
+serde = { workspace = true }
+thiserror = { workspace = true }
+serde_json = { workspace = true }
+
+# Optional: TypeScript export (same import-esm feature as gate-client)
+ts-rs = { workspace = true, optional = true, features = ["import-esm"] }
+
+[features]
+default = []
+typescript = ["ts-rs"]

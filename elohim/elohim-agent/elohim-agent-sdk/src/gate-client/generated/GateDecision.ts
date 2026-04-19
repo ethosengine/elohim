@@ -7,8 +7,23 @@ import type { SideEffect } from "./SideEffect.js";
 /**
  * The decision emitted from a gate invocation.
  *
- * Every relational-impact write path receives one of these. The status
- * determines whether the caller may proceed; side effects declare work the
- * caller must perform (mint attestation, emit economic event, etc.).
+ * Every relational-impact write path receives one of these. The decision has
+ * four structural parts:
+ *
+ * - [`status`](Self::status) — one of four outcomes (Allow, Decline, Escalate,
+ *   Verdict), see [`GateStatus`]. This is the caller-observable branch.
+ * - [`reasoning`](Self::reasoning) — a [`ConstitutionalReasoningSummary`]
+ *   describing the primary principle applied, a summary, and a confidence
+ *   score. In DevContext the summary is the placeholder `dev-context-mock`.
+ * - [`side_effects`](Self::side_effects) — a list of [`SideEffect`]s the
+ *   caller must execute after the gate returns. Per spec §1.3: "the caller
+ *   executes side effects after the gate returns. The gate library does not
+ *   reach into conductor/DHT itself."
+ * - [`phase`](Self::phase) — the [`Phase`] marker distinguishing rehearsal
+ *   (DevContext) from post-activation (ElohimActive) decisions, so
+ *   reputation aggregation can filter out non-load-bearing decisions.
+ *
+ * `decision_attestation_cid` is populated when the decision has been
+ * persisted as a `GateDecisionAttestation` on the DHT — empty in DevContext.
  */
 export type GateDecision = { status: GateStatus, reasoning: ConstitutionalReasoningSummary, sideEffects: Array<SideEffect>, decisionAttestationCid: string | null, phase: Phase, };

@@ -7,8 +7,18 @@ import type { Severity } from "./Severity.js";
 /**
  * The four possible outcomes of a gate invocation.
  *
- * Mirrors spec §1.3: Allow lets the caller proceed; Decline short-circuits;
- * Escalate routes to human review; Verdict emits a typed classification (e.g.,
- * StoryPointTag from the discernment gate).
+ * Mirrors spec §1.3. Each variant has a distinct caller contract:
+ *
+ * - [`Allow`](Self::Allow) — caller proceeds with the relational-impact
+ *   write. `exempt: true` means the gate never ran (interior space);
+ *   `exempt: false` means wisdom actively allowed the event.
+ * - [`Decline`](Self::Decline) — caller must not proceed. `grounds` carries
+ *   the category and rationale. Tower layer maps this to HTTP 403.
+ * - [`Escalate`](Self::Escalate) — caller must not proceed; decision is
+ *   routed to a reviewer (app-steward, qahal, or existential-boundary).
+ *   Tower layer maps this to HTTP 202 with a review target in the body.
+ * - [`Verdict`](Self::Verdict) — evaluator-shape gates (discernment,
+ *   reach, content-safety) emit a typed classification instead of a
+ *   binary allow/decline. Caller proceeds but must also act on the tag.
  */
 export type GateStatus = { "status": "allow", exempt: boolean, } | { "status": "decline", grounds: DeclineGrounds, } | { "status": "escalate", target: EscalationTarget, severity: Severity, } | { "status": "verdict" } & GateTag;

@@ -4,6 +4,8 @@ members = [
     "constitution",
     "elohim-agent/elohim-agent-service",
     "elohim-agent/gate-client",
+    "elohim-agent/gate-types",
+    "elohim-agent/gate-client-zome",
     "eae",
     "elohim-compute",
     "elohim-token",
@@ -70,4 +72,6 @@ dashmap = "6.1"
 constitution = { path = "constitution" }
 elohim-agent = { path = "elohim-agent/elohim-agent-service" }
 gate-client = { path = "elohim-agent/gate-client" }
+gate-types = { path = "elohim-agent/gate-types" }
+gate-client-zome = { path = "elohim-agent/gate-client-zome" }
 eae = { path = "eae" }

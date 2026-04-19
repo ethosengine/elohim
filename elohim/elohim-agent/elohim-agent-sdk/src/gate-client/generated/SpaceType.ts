@@ -3,7 +3,31 @@
 /**
  * The space in which an event is occurring.
  *
+ * Space-types split into three groups:
+ *
+ * - **Exempt interiors** — the gate does **not** fire. These are architectural
+ *   primitives, not wisdom judgments: a gate that watched every keystroke
+ *   inside a private journal would be a panopticon. Exempt variants:
+ *   [`Offline`](SpaceType::Offline),
+ *   [`PrivateDraftingInterior`](SpaceType::PrivateDraftingInterior),
+ *   [`PlayInterior`](SpaceType::PlayInterior),
+ *   [`RoleplayInterior`](SpaceType::RoleplayInterior).
+ * - **Boundary-crossing** — the gate fires, and a summarization primitive
+ *   applies to any private context being surfaced. Variants:
+ *   [`PrivateDraftingCrossing`](SpaceType::PrivateDraftingCrossing),
+ *   [`PlayExiting`](SpaceType::PlayExiting),
+ *   [`RoleplayExiting`](SpaceType::RoleplayExiting),
+ *   [`SyncAfterOffline`](SpaceType::SyncAfterOffline),
+ *   [`AdviceSeeking`](SpaceType::AdviceSeeking).
+ * - **Normal public activity** — the gate fires with full wisdom. Variant:
+ *   [`Public`](SpaceType::Public).
+ *
+ * Space-type is primarily a **context signal fed into wisdom**, not a
+ * gate-control mechanism. Wisdom reads space-type the way humans read a
+ * conversation's setting. Only the explicit exempt interiors short-circuit
+ * the gate.
+ *
  * See spec §P1.5 (Privacy, Drafting, Play, and Roleplay as Architectural
- * Primitives).
+ * Primitives) and §1.5 (Space-type detection).
  */
 export type SpaceType = "public" | "private-drafting-crossing" | "play-exiting" | "roleplay-exiting" | "sync-after-offline" | "advice-seeking" | "offline" | "private-drafting-interior" | "play-interior" | "roleplay-interior";

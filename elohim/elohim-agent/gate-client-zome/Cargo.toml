@@ -1,0 +1,20 @@
+[package]
+name = "gate-client-zome"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "Synchronous gate invocation for Holochain WASM zome coordinators. DevContext: returns Allow mock. Phase 8+: HDK remote_signal bridge to elohim-agent-service."
+
+[dependencies]
+gate-types = { workspace = true }
+serde = { workspace = true }
+
+# NO tokio, reqwest, async-trait, sha2 — must compile for wasm32-unknown-unknown
+
+[dev-dependencies]
+serde_json = { workspace = true }
+
+[features]
+default = []
+testing = []

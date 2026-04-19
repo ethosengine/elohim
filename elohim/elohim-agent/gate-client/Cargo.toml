@@ -39,6 +39,7 @@ bytes.workspace = true
 
 # Internal
 elohim-agent.workspace = true
+gate-types = { workspace = true }
 
 # Optional: TypeScript export
 # import-esm makes generated imports use ".js" extensions, compatible with
@@ -52,7 +53,7 @@ default = []
 # do not reference any elohim-agent types — ConstitutionalReasoningSummary is a
 # local placeholder owned by this crate. Enabling elohim-agent/typescript would
 # cascade into constitution/typescript, which has un-bridged DateTime<Utc> fields.
-typescript = ["ts-rs"]
+typescript = ["ts-rs", "gate-types/typescript"]
 # Exposes testing helpers (mock_allow/mock_decline/etc.) and the
 # __test_set_decision_override mechanism to integration tests and downstream
 # test crates.  Never enable in production builds.

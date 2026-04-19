@@ -1,41 +1,6 @@
 //! Error types for the gate-client.
+//!
+//! All definitions live in `gate-types::error`; this module re-exports them
+//! for backward compatibility with any code importing `gate_client::error::*`.
 
-use thiserror::Error;
-
-pub type GateResult<T> = Result<T, GateError>;
-
-/// Errors that can occur during gate invocation.
-#[derive(Debug, Error)]
-pub enum GateError {
-    /// A step type or feature is not yet implemented in this phase.
-    #[error("not yet implemented: {0}")]
-    NotYetImplemented(String),
-
-    /// Context assembly failed — a required pull could not resolve.
-    #[error("context assembly failed: {0}")]
-    ContextAssembly(String),
-
-    /// Manifest resolution failed — gate name did not resolve to a process CID.
-    #[error("manifest resolution failed: {0}")]
-    ManifestResolution(String),
-
-    /// Manifest inspection rejected the DAG as unsafe or uninspectable.
-    #[error("manifest inspection rejected: {0}")]
-    InspectionRejected(String),
-
-    /// DAG execution encountered an invalid step or edge.
-    #[error("DAG execution error: {0}")]
-    DagExecution(String),
-
-    /// Wisdom invocation failed — elohim-agent-service unreachable or errored.
-    #[error("wisdom invocation failed: {0}")]
-    WisdomInvocation(String),
-
-    /// Transport-level error (HTTP, IPC, serialization).
-    #[error("transport error: {0}")]
-    Transport(String),
-
-    /// Serialization error.
-    #[error("serialization error: {0}")]
-    Serialization(#[from] serde_json::Error),
-}
+pub use gate_types::error::{GateError, GateResult};

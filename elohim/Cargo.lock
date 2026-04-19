@@ -568,6 +568,7 @@ dependencies = [
  "chrono",
  "elohim-agent",
  "futures",
+ "gate-types",
  "http",
  "http-body-util",
  "serde",
@@ -581,6 +582,25 @@ dependencies = [
  "tracing",
  "ts-rs",
  "uuid",
+]
+
+[[package]]
+name = "gate-client-zome"
+version = "0.1.0"
+dependencies = [
+ "gate-types",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "gate-types"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "thiserror 2.0.17",
+ "ts-rs",
 ]
 
 [[package]]
