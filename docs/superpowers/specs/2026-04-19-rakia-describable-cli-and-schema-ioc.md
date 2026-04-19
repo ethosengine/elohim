@@ -413,7 +413,59 @@ The brit/rakia split is now precisely: **brit is the local substrate (git + EPR 
 1. **BuildPlan schema MUST remain deterministically serializable** — no insertion-order maps, no host-specific identity fields. ✓ (Already designed this way.)
 2. **`generatedAt` and `tool.version` are explicitly outside the future plan-identity hash** — documented above as instance metadata. ✓ (Already separated.)
 3. **`planFingerprint: BritCid` field is a known future extension** — added to spec carry-overs.
-4. **No premature P2P infrastructure** — we don't add gossip, attestation envelopes, or builder presence this sprint. Those land when the executor sprint produces real build outputs to attest about.
+4. **`executor.kind` must remain an extensible discriminated union**, NOT a closed enum locked to today's five kinds. Stage 2 and beyond will add at minimum `experienceStory` (a2o BDD scenarios), and likely `containerImage`, `composition` (multi-peer choreography), others. Closing the enum now would force a schema-version bump per new execution kind, fragmenting the contract. **Action this sprint:** use the discriminated-union pattern (`kind` + kind-specific fields), but leave `kind` as `type: string` without an `enum` constraint — OR include the enum with an explicit comment that it's extensible and peers tolerating unknown kinds is the expected behavior. The planner task that refines the executor definition (Task 3.4 in the plan) should favor extensibility over closure.
+5. **No premature P2P infrastructure** — we don't add gossip, attestation envelopes, builder presence, peer-diversity fields, or compensation fields this sprint. Those land when the executor sprint produces real build outputs to attest about and when multi-peer dispatch becomes the execution path.
+
+## Rakia Trajectory (Forward Context, Non-Binding)
+
+This section documents the long-term vision that rakia's schema design must not paint itself out of. None of it is in scope for this sprint, but every decision here is checked against "does this close a door we'll want open later?"
+
+### Execution modes, weakest to strongest
+
+| Mode | Peers involved | Dispatch | Compensation | Protocol primitives composed |
+|---|---|---|---|---|
+| **Local** (this sprint + next) | 1 (you) | None — brit-cli local, rakia-executor local | N/A | None beyond brit/git and brit-epr attestations |
+| **Same-work threshold** | N peers run the SAME step, results compared | `BuildPlan` gossiped; any willing peer accepts | Free-in-kind (reciprocal) | `Build` attestation + peer presence + compute substrate signal |
+| **Distributed choreography** | N peers cooperate in ONE logical run (e.g., a2o P2P-sync scenario needs 2 peers by definition of the test) | Role-assigned by plan | Free-in-kind OR mutual credit | Agreement + Commitment + `compute` signal + attestation |
+| **Contracted compute** | Any peers honoring an Agreement | Open bid OR directed assignment | Unyt / shefa REA flows | Full REA: Agreement → Commitment → EconomicEvent + substrate signal + fulfillment attestation |
+
+### Experience-stories as first-class execution units
+
+The a2o BDD scenarios in `genesis/a2o/features/**/*.feature` are not just tests — they are **the meaningful unit of work** rakia eventually dispatches. A story may require a single peer (unit-like test), multiple identical peers (hardware-profile diversity), or multiple role-differentiated peers (choreography). The `BuildStep` abstraction generalizes: a step is a work unit with inputs, outputs, executor, and (eventually) participation requirements. Builds and stories share the plan/dispatch/attest machinery; they differ in executor kind.
+
+### Rakia as shefa/REA participant
+
+Running a build or story consumes **compute** — one of the seven substrate signals (`attention, compute, storage, bandwidth, energy, time, resource`). When a peer executes a rakia job, they emit a compute substrate signal that feeds into shefa's economic accounting. Paid execution is mediated by an `Agreement` (REA primitive) with `Commitment`s from willing executors; fulfillment produces `EconomicEvent`s and a `Build` attestation. Free-in-kind execution is the same machinery with a null compensation leg — reciprocity tracked but uncontracted.
+
+### Attestation flow: "artifact X verified by N peers"
+
+The verification model composes brit-epr primitives that already exist; rakia adds NO new attestation type. The flow:
+
+1. **Per-peer execution** — each willing peer runs the step against the same inputs and produces an outcome (artifact CID, test result, log fingerprint).
+2. **Per-peer attestation** — each peer emits a `Build` attestation: "I, peer P, executed step S of plan Π and obtained outcome O at time T." Schema: existing `brit-epr/src/elohim/attestation/build.rs`. Signed by the peer's `AgentKey`. Anchored on the git commit (head) being built.
+3. **Convergence check** — outcomes are compared; peers that disagree fork the attestation set (an Inflexionable signal — "we built the same thing and got different answers" is information).
+4. **Reach computation** — `brit-epr/src/elohim/attestation/reach.rs` already computes reach (private → self → intimate → ... → commons) over an attestation set. "Verified by N peers" is just reach-of-N at some level.
+5. **Composite witness** — when reach reaches the threshold the plan declared (e.g., `quorum: { peers: 3, profiles: ["browser","steward"] }`), a composite attestation references the underlying per-peer attestations: "Artifact X verified at reach R by attestations [A1, A2, A3]." This composite is what advances the baseline (`brit baseline write` → `rakia baseline advance` at Stage 2).
+6. **Disputes** — divergent outcomes don't get a composite. The plan re-dispatches, or the divergence becomes a signal (probably a discernment-gate trigger: "this artifact is contested across peers, route to humans").
+
+What this means today: **nothing new for THIS sprint.** The brit-epr Build-attestation + reach machinery already exists. This sprint's BuildPlan schema must carry enough plan-identity information (`planFingerprint`, `levels[].fingerprint`, baseline/head commits) that future per-peer attestations can reference *which plan they were honoring*. The current schema satisfies this. Next sprint (rakia-executor) emits the single-peer attestation; Stage 2 (rakia-peer) adds threshold composition.
+
+What this means for plan design: a `BuildPlan` IS a peer-shareable contract. Every peer accepting a step from the plan is committing to honor the plan-as-stated. The plan's `planFingerprint` (Stage 2 field) is the handle on which attestations anchor. If we sloppy the schema now, we sloppy the future attestation graph.
+
+### What this forces on the schema design NOW
+
+- `executor.kind` extensible (see implication 4 above)
+- `BuildStep` shape must allow future optional fields for participation requirements (`peerDiversity`, `compensation`, `quorum`) without breaking today's manifests — meaning `additionalProperties` on step and executor stays `false` BUT the schema is versioned (bump `manifestVersion` when extending)
+- `BuildPlan` identity fields deterministic (already ✓) so peers compute identical fingerprints when dispatching the same plan
+- No field today claims authority that Stage 2 will need to displace — e.g., baseline advancement is a local git-ref write today, but the CLI surface doesn't lock out future threshold-attestation-witnessed advancement (`brit baseline write` stays, Stage 2 adds `rakia baseline advance` with attestation wrapping)
+
+### What this forces on next sprint's design
+
+- `rakia-executor` must implement `executor.kind` as an extensible dispatch table (new kinds plug in without refactoring)
+- `ExecutionEvent` schema (next sprint's IoC pass) needs to carry enough metadata to become the compute substrate signal envelope at Stage 2
+- `BuildAttestation` schema (next sprint's IoC pass) is the bridge to brit-epr's existing `Build` attestation primitive — hand off to the primitive, don't re-invent
+
+None of this is work for this sprint. It is the frame against which this sprint's decisions are checked.
 
 ## Key Design Decisions
 
