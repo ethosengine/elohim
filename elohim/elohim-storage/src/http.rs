@@ -4872,7 +4872,7 @@ impl HttpServer {
             .and_then(|q| serde_urlencoded::from_str(q).ok())
             .unwrap_or_default();
 
-        let raw_limit = query.limit.unwrap_or(50).min(500);
+        let raw_limit = query.limit.unwrap_or(50).clamp(1, 500);
         let mut conn = self.get_diesel_conn()?;
 
         let rows = match (&query.challenger_id, &query.challenged_decision_cid) {
@@ -4903,8 +4903,11 @@ impl HttpServer {
             }
         };
 
-        let views: Vec<GateDecisionChallengeView> =
-            rows.into_iter().map(GateDecisionChallengeView::from).collect();
+        let views: Vec<GateDecisionChallengeView> = rows
+            .into_iter()
+            .take(raw_limit as usize)
+            .map(GateDecisionChallengeView::from)
+            .collect();
         let count = views.len();
         Ok(response::ok(&serde_json::json!({
             "items": views,
@@ -4980,7 +4983,7 @@ impl HttpServer {
             .and_then(|q| serde_urlencoded::from_str(q).ok())
             .unwrap_or_default();
 
-        let raw_limit = query.limit.unwrap_or(50).min(500);
+        let raw_limit = query.limit.unwrap_or(50).clamp(1, 500);
         let mut conn = self.get_diesel_conn()?;
 
         let rows = match (&query.challenge_cid, &query.verdict) {
@@ -4992,7 +4995,7 @@ impl HttpServer {
                     challenge_cid,
                 )?
                 .into_iter()
-                .collect::<Vec<_>>()
+                .collect()
             }
             (_, Some(verdict)) => crate::db::challenge_outcomes::find_by_verdict(
                 &mut conn,
@@ -5010,8 +5013,11 @@ impl HttpServer {
             }
         };
 
-        let views: Vec<ChallengeOutcomeView> =
-            rows.into_iter().map(ChallengeOutcomeView::from).collect();
+        let views: Vec<ChallengeOutcomeView> = rows
+            .into_iter()
+            .take(raw_limit as usize)
+            .map(ChallengeOutcomeView::from)
+            .collect();
         let count = views.len();
         Ok(response::ok(&serde_json::json!({
             "items": views,
