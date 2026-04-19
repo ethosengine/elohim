@@ -768,63 +768,16 @@ async fn apply_gate_check(method: &Method, path: &str) -> Option<Response<BoxBod
     }
 }
 
-/// Infer a [`RelationalImpactEvent`] from an HTTP path for the gate check.
+/// Infer a [`gate_client::RelationalImpactEvent`] from an HTTP path for the gate check.
 ///
-/// Mirrors `gate_client::tower::infer_event_from_path`. Matches on the first path
-/// segment only — never on prefix — to avoid false matches (e.g. `/contentious`
-/// must NOT match `/content`).
+/// Delegates to [`gate_client::infer_event_from_path`], which is the authoritative
+/// source for path-to-event mapping shared by both the tower layer and this hyper
+/// `service_fn` proxy. The mapping table lives in exactly one place.
 ///
 /// Returns `None` for unmapped paths. Unknown paths fall through to the inner
 /// handler without a gate check (Phase 1 contract).
 fn infer_gate_event(path: &str) -> Option<gate_client::RelationalImpactEvent> {
-    use gate_client::RelationalImpactEvent;
-
-    let trimmed = path.trim_start_matches('/');
-    let mut segments = trimmed.split('/');
-    let first = segments.next();
-    let second = segments.next();
-
-    match (first, second) {
-        (Some("content"), _) => Some(RelationalImpactEvent::ContentPublish {
-            content_cid: "inferred".to_string(),
-            declared_reach: "public".to_string(),
-            author: "unknown".to_string(),
-        }),
-        (Some("attestation"), _) => Some(RelationalImpactEvent::AttestationWrite {
-            subject_hash: "inferred".to_string(),
-            claim_kind: "inferred".to_string(),
-            issuer: "unknown".to_string(),
-        }),
-        (Some("economic-event"), _) => Some(RelationalImpactEvent::EconomicEventEmit {
-            event_kind: "inferred".to_string(),
-            provider: "unknown".to_string(),
-            receiver: "unknown".to_string(),
-            quantity: "0".to_string(),
-        }),
-        (Some("peer-message"), _) => Some(RelationalImpactEvent::PeerMessage {
-            recipient: "unknown".to_string(),
-            payload_kind: "inferred".to_string(),
-        }),
-        (Some("sync"), _) => Some(RelationalImpactEvent::SyncToPeers {
-            manifest_cid: "inferred".to_string(),
-            item_count: 0,
-        }),
-        (Some("advice"), _) => Some(RelationalImpactEvent::AdviceSought {
-            requester: "unknown".to_string(),
-            summary_cid: "inferred".to_string(),
-            topic: "inferred".to_string(),
-        }),
-        (Some("agent"), Some("invoke")) => Some(RelationalImpactEvent::CapabilityInvoke {
-            capability: "inferred".to_string(),
-            requester: "unknown".to_string(),
-            request_id: "inferred".to_string(),
-        }),
-        (Some("crossing"), _) => Some(RelationalImpactEvent::PrivateToPublicCrossing {
-            source_space: "inferred".to_string(),
-            artifact_ref: "inferred".to_string(),
-        }),
-        _ => None,
-    }
+    gate_client::infer_event_from_path(path)
 }
 
 /// Route incoming HTTP requests
@@ -1903,56 +1856,8 @@ fn bad_request_response(message: &str) -> Response<Full<Bytes>> {
 mod gate_layer_tests {
     use super::*;
 
-    // ── infer_gate_event: path-segment matching ───────────────────────────────
-
-    #[test]
-    fn registered_paths_produce_events() {
-        let cases = [
-            "/content",
-            "/content/bulk",
-            "/attestation",
-            "/economic-event",
-            "/peer-message",
-            "/sync",
-            "/advice",
-            "/agent/invoke",
-            "/crossing",
-        ];
-        for path in &cases {
-            assert!(
-                infer_gate_event(path).is_some(),
-                "expected event for path '{path}'"
-            );
-        }
-    }
-
-    #[test]
-    fn unregistered_paths_return_none() {
-        let cases = [
-            "/",
-            "",
-            "/health",
-            "/api/v1/content",  // prefixed — not first-segment "content"
-            "/contentious",     // must NOT match "/content"
-            "/db/content/bulk", // first segment is "db"
-            "/admin",
-            "/import/content", // first segment is "import"
-        ];
-        for path in &cases {
-            assert!(
-                infer_gate_event(path).is_none(),
-                "expected no event for path '{path}'"
-            );
-        }
-    }
-
-    #[test]
-    fn agent_invoke_requires_second_segment() {
-        assert!(infer_gate_event("/agent/invoke").is_some());
-        assert!(infer_gate_event("/agent/invoke/extra").is_some());
-        assert!(infer_gate_event("/agent").is_none());
-        assert!(infer_gate_event("/agent/other").is_none());
-    }
+    // Path-inference correctness tests live in gate_client::tower::path_tests.
+    // doorway delegates to gate_client::infer_event_from_path — no duplication needed.
 
     // ── apply_gate_check: transparency in DevContext ──────────────────────────
 

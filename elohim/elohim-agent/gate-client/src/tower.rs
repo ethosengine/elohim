@@ -264,6 +264,11 @@ where
 
 /// Infer a `RelationalImpactEvent` from an HTTP path.
 ///
+/// This is the **authoritative source** for path-to-event inference in the
+/// Elohim Protocol. Both the tower layer and external HTTP proxies (e.g.
+/// doorway's hyper `service_fn`) call this function so the mapping table
+/// lives in exactly one place.
+///
 /// Matches on the **first path segment** (not a prefix) to avoid false matches
 /// (e.g. `/contentious` must NOT match `/content`).
 ///
@@ -276,7 +281,7 @@ where
 ///
 /// Phase 7: body parsing replaces path inference. Consumers MUST NOT read field
 /// values from path-inferred events as reliable — only the variant kind.
-fn infer_event_from_path(path: &str) -> Option<RelationalImpactEvent> {
+pub fn infer_event_from_path(path: &str) -> Option<RelationalImpactEvent> {
     // Strip leading slash, then split into segments. Match on first (and
     // optionally second) segment — no prefix matching to avoid over-matching.
     let trimmed = path.trim_start_matches('/');

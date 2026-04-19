@@ -433,7 +433,7 @@ pub use error::{GateError, GateResult};
 pub use events::RelationalImpactEvent;
 pub use phase::Phase;
 pub use space::{SpaceContext, SpaceType};
-pub use tower::{tower_layer, GateLayer};
+pub use tower::{infer_event_from_path, tower_layer, GateLayer};
 pub use transport::{GateClientConfig, Transport};
 pub use types::{
     DeclineGrounds, EscalationTarget, GateDecision, GateStatus, GateTag, Severity, SideEffect,
