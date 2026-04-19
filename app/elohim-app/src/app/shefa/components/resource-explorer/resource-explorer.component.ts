@@ -1,5 +1,5 @@
-import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
+import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 
 import { firstValueFrom } from 'rxjs';
@@ -16,9 +16,9 @@ import { ExplorerGridComponent } from './explorer-grid.component';
 import { ExplorerSidebarComponent } from './explorer-sidebar.component';
 import { LensSwitcherComponent } from './lens-switcher.component';
 
+import type { HouseholdResilienceView } from '@app/generated/household-resilience-view';
 import type { ExplorerBreadcrumb, ExplorerNode, LensDefinition } from '@app/shefa/models';
 import type { StewardshipAllocationView } from '@elohim/storage-client/generated';
-import type { HouseholdResilienceView } from '@app/generated/household-resilience-view';
 
 const DEFAULT_LENS = 'folders';
 const ROOT_BREADCRUMB: ExplorerBreadcrumb = { id: null, title: 'My Resources' };
@@ -100,14 +100,9 @@ const ROOT_BREADCRUMB: ExplorerBreadcrumb = { id: null, title: 'My Resources' };
             } @else {
               <div class="stewarded-list" data-testid="stewarded-content-list">
                 @for (item of stewardedItems(); track item.contentId) {
-                  <div
-                    class="stewarded-item"
-                    [attr.data-testid]="'stewarded-' + item.contentId"
-                  >
+                  <div class="stewarded-item" [attr.data-testid]="'stewarded-' + item.contentId">
                     <span class="title">{{ item.contentId }}</span>
-                    <span class="ratio"
-                      >{{ item.allocationRatio * 100 | number: '1.0-0' }}%</span
-                    >
+                    <span class="ratio">{{ item.allocationRatio * 100 | number: '1.0-0' }}%</span>
                     @let r = resilienceByContent()[item.contentId];
                     @if (r) {
                       <span
@@ -213,9 +208,7 @@ export class ResourceExplorerComponent implements OnInit {
       return;
     }
 
-    const items = await firstValueFrom(
-      this.stewardshipAllocation.listForHousehold(householdId),
-    );
+    const items = await firstValueFrom(this.stewardshipAllocation.listForHousehold(householdId));
     this.stewardedItems.set(items);
     this.isLoading.set(false);
 

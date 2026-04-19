@@ -151,9 +151,9 @@ export class StewardshipAllocationService {
    */
   listForHousehold(householdId: string): Observable<StewardshipAllocationView[]> {
     return this.http
-      .get<StewardshipAllocationView[]>(
-        `/api/v1/households/${encodeURIComponent(householdId)}/stewardship-allocations`
-      )
+      .get<
+        StewardshipAllocationView[]
+      >(`/api/v1/households/${encodeURIComponent(householdId)}/stewardship-allocations`)
       .pipe(catchError(() => of([])));
   }
 
