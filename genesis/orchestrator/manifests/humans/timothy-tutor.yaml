@@ -252,6 +252,15 @@ spec:
             # K8s pods act as relay servers for desktop stewards behind NAT
             - name: RELAY_MODE
               value: "server"
+            # Node-shape self-registration at boot (Task C7)
+            - name: DEVICE_ARCHETYPE
+              value: "chromebook-edu"
+            - name: HOUSEHOLD_ID
+              value: "household-timothy"
+            - name: NODE_ROLE
+              value: "edge"
+            - name: REGION
+              value: "us-central"
           ports:
             - name: storage-http
               containerPort: 8090
