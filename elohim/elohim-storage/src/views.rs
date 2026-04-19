@@ -6506,3 +6506,31 @@ pub struct NetworkPostureView {
     pub storage_pressure: f32,
     pub computed_at: String,
 }
+
+/// Per-content household-first resilience claim. Source of truth:
+/// computed projection over stewardship_allocations (Category A2 link
+/// metadata on Agreement DHT entries), peer_statuses (PeerStatus DHT
+/// entries), and stewarded_nodes (NodeRegistration projection). Category C
+/// operational view — no persistence, no new entry types.
+///
+/// Wire format: `elohim/sdk/schemas/v1/views/household-resilience-view.schema.json`
+#[derive(Debug, Clone, Serialize, Default, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct HouseholdResilienceView {
+    pub content_id: String,
+    pub households_stewarding: i32,
+    pub households_reciprocated: i32,
+    pub protection_status: String,
+    pub details: HouseholdResilienceDetails,
+}
+
+#[derive(Debug, Clone, Serialize, Default, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct HouseholdResilienceDetails {
+    #[serde(default)]
+    pub steward_households: Vec<String>,
+    pub online_peer_count: i32,
+    pub health_score: f32,
+}

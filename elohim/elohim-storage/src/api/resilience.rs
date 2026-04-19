@@ -15,7 +15,7 @@ use crate::views::*;
 use super::get_conn;
 
 pub async fn handle(
-    _req: Request<hyper::body::Incoming>,
+    req: Request<hyper::body::Incoming>,
     method: Method,
     resource_path: &str,
     pool: &DbPool,
@@ -29,6 +29,11 @@ pub async fn handle(
             let content_id = p.strip_suffix("/verify").unwrap_or("");
             handle_verify_resilience(content_id, pool, ctx).await
         }
+        // GET /api/v1/resilience/{content_id}/household — household-first resilience (E1)
+        (&Method::GET, p) if p.ends_with("/household") => {
+            let content_id = p.strip_suffix("/household").unwrap_or("");
+            handle_get_household_resilience(content_id, pool, ctx, &req).await
+        }
         // GET /api/v1/resilience/{content_id}
         (&Method::GET, content_id) if !content_id.is_empty() && !content_id.contains('/') => {
             handle_get_resilience(content_id, pool, ctx).await
@@ -36,6 +41,33 @@ pub async fn handle(
         _ => Ok(response::not_found(&format!(
             "Unknown resilience route: /api/v1/resilience/{}",
             path
+        ))),
+    }
+}
+
+/// Household-first resilience for a given content id. Optional
+/// `?viewerHouseholdId=<id>` query param enables reciprocation counting.
+async fn handle_get_household_resilience(
+    content_id: &str,
+    pool: &DbPool,
+    ctx: &AppContext,
+    req: &Request<hyper::body::Incoming>,
+) -> Result<Response<Full<Bytes>>, StorageError> {
+    let viewer_household = req.uri().query().and_then(|q| {
+        url::form_urlencoded::parse(q.as_bytes())
+            .find(|(k, _)| k == "viewerHouseholdId")
+            .map(|(_, v)| v.into_owned())
+    });
+
+    match crate::services::household_resilience::compute(
+        pool,
+        ctx,
+        content_id,
+        viewer_household.as_deref(),
+    ) {
+        Ok(view) => Ok(response::ok(&view)),
+        Err(e) => Ok(response::internal_error(&format!(
+            "household_resilience: {e}"
         ))),
     }
 }

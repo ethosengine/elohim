@@ -22,6 +22,7 @@
 pub mod agreement_service;
 pub mod anomaly_detection;
 pub mod boot_registration;
+pub mod household_resilience;
 pub mod behavioral_trust;
 pub mod content_service;
 pub mod disposition_service;

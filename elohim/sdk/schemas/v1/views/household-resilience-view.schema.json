@@ -1,0 +1,24 @@
+{
+  "$id": "household-resilience-view.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "HouseholdResilienceView",
+  "description": "Per-content household-first resilience claim. Source of truth: computed projection aggregating stewardship_allocations (derived from Agreement DHT entries via stewardship-allocation link metadata, Category A2), peer_statuses (PeerStatus DHT entries in infrastructure DNA, Category A), and stewarded_nodes (NodeRegistration projection). Operational Category C — no persistence, no new DHT entry types.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["contentId", "householdsStewarding", "householdsReciprocated", "protectionStatus", "details"],
+  "properties": {
+    "contentId":               { "type": "string" },
+    "householdsStewarding":    { "type": "integer", "minimum": 0, "description": "Distinct households with at least one steward for this content." },
+    "householdsReciprocated":  { "type": "integer", "minimum": 0, "description": "Households that both steward this and are stewarded by the viewer's household." },
+    "protectionStatus":        { "enum": ["at-risk", "partial", "protected"] },
+    "details": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "stewardHouseholds": { "type": "array", "items": { "type": "string" } },
+        "onlinePeerCount":   { "type": "integer", "minimum": 0 },
+        "healthScore":       { "type": "number",  "minimum": 0, "maximum": 1 }
+      }
+    }
+  }
+}

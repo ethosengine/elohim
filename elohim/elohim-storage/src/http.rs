@@ -7587,6 +7587,12 @@ pub fn build_manifest() -> doorway_client::DoorwayRoutes {
         // /api/v1/resilience — Content resilience projection
         // =====================================================================
         .route(
+            Route::get("/api/v1/resilience/{content_id}/household")
+                .handler("get_household_resilience")
+                .cache_ttl(30)
+                .build(),
+        )
+        .route(
             Route::get("/api/v1/resilience/{content_id}")
                 .handler("get_resilience")
                 .cache_ttl(30)

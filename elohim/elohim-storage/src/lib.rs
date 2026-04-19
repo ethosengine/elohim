@@ -156,8 +156,8 @@ pub use services::{
 pub use views::GateDecisionAttestationView;
 pub use views::{
     build_peer_status_view, load_elohim_capability_from_env, CommittedResources, DeviceEntryView,
-    ElohimCapabilityProfile, HouseholdDevicesView, NetworkPostureView, NodeShapeView,
-    PeerStatusView,
+    ElohimCapabilityProfile, HouseholdDevicesView, HouseholdResilienceDetails,
+    HouseholdResilienceView, NetworkPostureView, NodeShapeView, PeerStatusView,
 };
 pub use views::ChallengeOutcomeView;
 pub use views::GateDecisionChallengeView;
