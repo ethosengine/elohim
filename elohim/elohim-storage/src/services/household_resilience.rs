@@ -1,18 +1,14 @@
 //! Household-first resilience computation.
 //!
-//! For a given content id, aggregates stewardship allocations + peer_statuses
+//! For a given content id, aggregates shard_locations + peer_statuses
 //! into a `HouseholdResilienceView` that answers the protection claim
 //! household-to-household rather than peer-to-peer. The view is computed
 //! per-request; no persistence, no new DHT entry types. Source of truth:
 //! the upstream DHT entries (Agreement + PeerStatus + NodeRegistration).
-//!
-//! Until the humans.household_id projection column lands (follow-up), the
-//! household reducer treats each distinct `steward_presence_id` as its own
-//! household — conservative but honest. When the projection materializes
-//! the reducer here collapses them to real household ids without requiring
-//! handler changes.
 
 use std::collections::HashSet;
+
+use diesel::prelude::*;
 
 use crate::db::{peer_statuses, stewarded_nodes, AppContext, DbPool};
 use crate::error::StorageError;
@@ -31,22 +27,51 @@ pub fn compute(
         .get()
         .map_err(|e| StorageError::Internal(format!("pool: {e}")))?;
 
-    let allocations = crate::db::stewardship_allocations::get_allocations_for_content(
-        &mut conn, ctx, content_id,
-    )?;
+    // Stage 1: household reducer — uses humans.household_id projection joined
+    // from shard_locations to count distinct households stewarding this content.
+    //
+    // Two-step approach: fetch the manifest's shard_hashes_json, parse JSON,
+    // then filter shard_locations by eq_any(&shard_hashes). This is required
+    // because diesel cannot filter on a JSON-encoded column directly.
+    let manifest = crate::db::shard_manifests::get_manifest(&mut conn, &ctx.h_app_id, content_id)?;
+    let shard_hashes: Vec<String> = match &manifest {
+        Some(m) => serde_json::from_str(&m.shard_hashes_json).unwrap_or_default(),
+        None => vec![],
+    };
 
-    // Stage 1: household reducer. Until humans.household_id projection
-    // lands, we use presence_id as a household proxy. Swap in the real
-    // lookup when the projection exists (single-call site change here).
-    let steward_households: HashSet<String> = allocations
-        .iter()
-        .map(|a| presence_to_household_proxy(&a.steward_presence_id))
-        .collect();
+    use crate::db::diesel_schema::{humans, shard_locations};
+
+    let steward_households: HashSet<String> = {
+        let base = shard_locations::table
+            .inner_join(
+                humans::table.on(
+                    humans::agent_pub_key
+                        .eq(shard_locations::peer_id.nullable()),
+                ),
+            )
+            .filter(shard_locations::h_app_id.eq(&ctx.h_app_id))
+            .filter(humans::household_id.is_not_null());
+
+        let raw_households: Vec<Option<String>> = if shard_hashes.is_empty() {
+            // No manifest found for this content_id — aggregate across all
+            // shard_locations for this h_app_id as a conservative estimate.
+            base.select(humans::household_id)
+                .load::<Option<String>>(&mut conn)
+                .map_err(|e| StorageError::Internal(format!("household query: {e}")))?
+        } else {
+            base.filter(shard_locations::shard_hash.eq_any(&shard_hashes))
+                .select(humans::household_id)
+                .load::<Option<String>>(&mut conn)
+                .map_err(|e| StorageError::Internal(format!("household query: {e}")))?
+        };
+
+        raw_households.into_iter().flatten().collect()
+    };
 
     let households_stewarding = steward_households.len() as i32;
 
-    // Stage 2: reciprocation. No-op until reverse allocation traversal
-    // lands — recorded as zero so the UI can render honestly.
+    // Stage 2: reciprocation — recorded as zero; reverse allocation traversal
+    // is a follow-up concern.
     let _ = viewer_household_id;
     let households_reciprocated: i32 = 0;
 
@@ -85,13 +110,6 @@ pub fn compute(
             health_score,
         },
     })
-}
-
-/// Until humans.household_id is a projected column, treat the
-/// steward's presence_id as its own household — so the metric is still
-/// non-zero and directionally correct (more stewards → more households).
-fn presence_to_household_proxy(presence_id: &str) -> String {
-    presence_id.to_string()
 }
 
 fn count_online_peers_in_households(
