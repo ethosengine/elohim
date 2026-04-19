@@ -125,6 +125,10 @@ infrastructure-types = { path = "../../elohim/sdk/domains/infrastructure/types" 
 # Shared compute reporting types
 elohim-compute = { path = "../../elohim/elohim-compute" }
 
+# Wisdom-as-system-auth gate: fires on every state-changing write path.
+# default-features = false excludes ts-rs and the testing shims.
+gate-client = { path = "../../elohim/elohim-agent/gate-client", default-features = false }
+
 [dev-dependencies]
 tokio-test = "0.4"
 

@@ -685,6 +685,148 @@ pub async fn run(state: Arc<AppState>) -> Result<(), DoorwayError> {
     }
 }
 
+/// Wisdom-as-system-auth gate check for every state-changing HTTP request.
+///
+/// Mirrors the logic in `gate_client::tower_layer()` (which is axum-native) for
+/// doorway's hyper `service_fn` architecture. Returns:
+/// - `None`                  → gate allows or path is unmapped; caller continues routing.
+/// - `Some(Response<BoxBody>)` → gate declined or escalated; caller must short-circuit.
+///
+/// GET/HEAD/OPTIONS always return `None` (read-only, exempt from gate).
+/// POST/PUT/PATCH/DELETE are checked; unmapped paths fall through (Phase 1 contract).
+///
+/// In DevContext the gate always returns Allow, so this function always returns `None`
+/// for real traffic until ElohimActive phase is enabled.
+async fn apply_gate_check(method: &Method, path: &str) -> Option<Response<BoxBody>> {
+    use gate_client::{check, GateStatus};
+
+    // Only gate state-changing verbs.
+    let is_state_changing = matches!(
+        method,
+        &Method::POST | &Method::PUT | &Method::PATCH | &Method::DELETE
+    );
+    if !is_state_changing {
+        return None;
+    }
+
+    // Path-based event inference (Phase 1 — see gate_client::tower module).
+    // Unmapped paths fall through without a gate check.
+    let event = infer_gate_event(path)?;
+
+    let decision = match check(event).await {
+        Ok(d) => d,
+        Err(e) => {
+            // Gate transport error — fail open with a log (Phase 2 will make this
+            // configurable as fail-open vs fail-closed).
+            tracing::warn!(error = %e, "gate-client transport error; failing open");
+            return None;
+        }
+    };
+
+    match &decision.status {
+        GateStatus::Allow { .. } | GateStatus::Verdict(_) => {
+            // Pass-through — caller adds x-gate-verdict header after routing.
+            None
+        }
+
+        GateStatus::Decline { grounds } => {
+            let body_json = serde_json::json!({
+                "gate": "declined",
+                "grounds": {
+                    "category": grounds.category,
+                    "summary": grounds.summary,
+                    "principleRefs": grounds.principle_refs,
+                }
+            });
+            let body_bytes = serde_json::to_vec(&body_json).unwrap_or_else(|_| b"{}".to_vec());
+            Some(to_boxed(
+                Response::builder()
+                    .status(StatusCode::FORBIDDEN)
+                    .header("content-type", "application/json")
+                    .header("x-gate-verdict", "decline")
+                    .body(Full::new(Bytes::from(body_bytes)))
+                    .expect("infallible 403 gate response"),
+            ))
+        }
+
+        GateStatus::Escalate { target, severity } => {
+            let body_json = serde_json::json!({
+                "gate": "escalated",
+                "target": target,
+                "severity": severity,
+            });
+            let body_bytes = serde_json::to_vec(&body_json).unwrap_or_else(|_| b"{}".to_vec());
+            Some(to_boxed(
+                Response::builder()
+                    .status(StatusCode::ACCEPTED)
+                    .header("content-type", "application/json")
+                    .header("x-gate-verdict", "escalate")
+                    .body(Full::new(Bytes::from(body_bytes)))
+                    .expect("infallible 202 gate response"),
+            ))
+        }
+    }
+}
+
+/// Infer a [`RelationalImpactEvent`] from an HTTP path for the gate check.
+///
+/// Mirrors `gate_client::tower::infer_event_from_path`. Matches on the first path
+/// segment only — never on prefix — to avoid false matches (e.g. `/contentious`
+/// must NOT match `/content`).
+///
+/// Returns `None` for unmapped paths. Unknown paths fall through to the inner
+/// handler without a gate check (Phase 1 contract).
+fn infer_gate_event(path: &str) -> Option<gate_client::RelationalImpactEvent> {
+    use gate_client::RelationalImpactEvent;
+
+    let trimmed = path.trim_start_matches('/');
+    let mut segments = trimmed.split('/');
+    let first = segments.next();
+    let second = segments.next();
+
+    match (first, second) {
+        (Some("content"), _) => Some(RelationalImpactEvent::ContentPublish {
+            content_cid: "inferred".to_string(),
+            declared_reach: "public".to_string(),
+            author: "unknown".to_string(),
+        }),
+        (Some("attestation"), _) => Some(RelationalImpactEvent::AttestationWrite {
+            subject_hash: "inferred".to_string(),
+            claim_kind: "inferred".to_string(),
+            issuer: "unknown".to_string(),
+        }),
+        (Some("economic-event"), _) => Some(RelationalImpactEvent::EconomicEventEmit {
+            event_kind: "inferred".to_string(),
+            provider: "unknown".to_string(),
+            receiver: "unknown".to_string(),
+            quantity: "0".to_string(),
+        }),
+        (Some("peer-message"), _) => Some(RelationalImpactEvent::PeerMessage {
+            recipient: "unknown".to_string(),
+            payload_kind: "inferred".to_string(),
+        }),
+        (Some("sync"), _) => Some(RelationalImpactEvent::SyncToPeers {
+            manifest_cid: "inferred".to_string(),
+            item_count: 0,
+        }),
+        (Some("advice"), _) => Some(RelationalImpactEvent::AdviceSought {
+            requester: "unknown".to_string(),
+            summary_cid: "inferred".to_string(),
+            topic: "inferred".to_string(),
+        }),
+        (Some("agent"), Some("invoke")) => Some(RelationalImpactEvent::CapabilityInvoke {
+            capability: "inferred".to_string(),
+            requester: "unknown".to_string(),
+            request_id: "inferred".to_string(),
+        }),
+        (Some("crossing"), _) => Some(RelationalImpactEvent::PrivateToPublicCrossing {
+            source_space: "inferred".to_string(),
+            artifact_ref: "inferred".to_string(),
+        }),
+        _ => None,
+    }
+}
+
 /// Route incoming HTTP requests
 async fn handle_request(
     state: Arc<AppState>,
@@ -694,6 +836,15 @@ async fn handle_request(
     let method = req.method().clone();
     let method_str = method.to_string();
     let path = req.uri().path().to_string();
+
+    // ── Wisdom-as-system-auth gate ─────────────────────────────────────────────
+    // Fires before any routing for state-changing methods on gate-mapped paths.
+    // In DevContext (Phase 1) the gate always allows — this is transparent to
+    // existing callers. In ElohimActive phase it enforces relational wisdom on
+    // every write that carries impact on others.
+    if let Some(gate_resp) = apply_gate_check(&method, &path).await {
+        return Ok(gate_resp);
+    }
 
     // Extract observation session ID before req is consumed by the match block.
     // Used to fire-and-forget doorway-originated error contributions to storage.
@@ -1744,4 +1895,115 @@ fn bad_request_response(message: &str) -> Response<Full<Bytes>> {
         .header("Content-Type", "application/json")
         .body(Full::new(Bytes::from(body.to_string())))
         .unwrap()
+}
+
+// ─── Gate layer tests ─────────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod gate_layer_tests {
+    use super::*;
+
+    // ── infer_gate_event: path-segment matching ───────────────────────────────
+
+    #[test]
+    fn registered_paths_produce_events() {
+        let cases = [
+            "/content",
+            "/content/bulk",
+            "/attestation",
+            "/economic-event",
+            "/peer-message",
+            "/sync",
+            "/advice",
+            "/agent/invoke",
+            "/crossing",
+        ];
+        for path in &cases {
+            assert!(
+                infer_gate_event(path).is_some(),
+                "expected event for path '{path}'"
+            );
+        }
+    }
+
+    #[test]
+    fn unregistered_paths_return_none() {
+        let cases = [
+            "/",
+            "",
+            "/health",
+            "/api/v1/content",  // prefixed — not first-segment "content"
+            "/contentious",     // must NOT match "/content"
+            "/db/content/bulk", // first segment is "db"
+            "/admin",
+            "/import/content", // first segment is "import"
+        ];
+        for path in &cases {
+            assert!(
+                infer_gate_event(path).is_none(),
+                "expected no event for path '{path}'"
+            );
+        }
+    }
+
+    #[test]
+    fn agent_invoke_requires_second_segment() {
+        assert!(infer_gate_event("/agent/invoke").is_some());
+        assert!(infer_gate_event("/agent/invoke/extra").is_some());
+        assert!(infer_gate_event("/agent").is_none());
+        assert!(infer_gate_event("/agent/other").is_none());
+    }
+
+    // ── apply_gate_check: transparency in DevContext ──────────────────────────
+
+    #[tokio::test]
+    async fn get_requests_bypass_gate() {
+        // GET is read-only — gate must never fire.
+        let result = apply_gate_check(&Method::GET, "/content").await;
+        assert!(
+            result.is_none(),
+            "GET /content must pass through gate (read-only)"
+        );
+    }
+
+    #[tokio::test]
+    async fn post_to_unmapped_path_passes_through() {
+        // POST on a path the gate does not recognise falls through (Phase 1 contract).
+        let result = apply_gate_check(&Method::POST, "/db/content/bulk").await;
+        assert!(
+            result.is_none(),
+            "POST to unmapped path must fall through gate"
+        );
+    }
+
+    #[tokio::test]
+    async fn post_to_mapped_path_passes_through_in_dev_context() {
+        // In DevContext the gate always returns Allow.
+        // apply_gate_check must return None so routing continues unchanged.
+        let result = apply_gate_check(&Method::POST, "/content").await;
+        assert!(
+            result.is_none(),
+            "POST /content must pass through in DevContext (gate always allows)"
+        );
+    }
+
+    #[tokio::test]
+    async fn put_to_mapped_path_passes_through_in_dev_context() {
+        let result = apply_gate_check(&Method::PUT, "/attestation").await;
+        assert!(
+            result.is_none(),
+            "PUT /attestation must pass through in DevContext"
+        );
+    }
+
+    #[tokio::test]
+    async fn post_to_content_does_not_short_circuit_in_dev_context() {
+        // Regression: the gate must not produce a 403 for normal writes in DevContext.
+        // This is the key transparency assertion — existing callers are unaffected.
+        let result = apply_gate_check(&Method::POST, "/content").await;
+        assert!(
+            result.is_none(),
+            "DevContext gate must not short-circuit POST /content"
+        );
+    }
 }
