@@ -6,4 +6,4 @@
 
 export { ResilienceService } from './resilience/resilience.service';
 export { ResilienceSnapshotComponent } from './resilience/resilience-snapshot/resilience-snapshot.component';
-export { ResilienceSnapshotDensity } from './resilience/resilience-snapshot/resilience-snapshot.types';
+export type { ResilienceSnapshotDensity } from './resilience/resilience-snapshot/resilience-snapshot.types';
