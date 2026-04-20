@@ -948,6 +948,17 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                             }
                         }
 
+                        // --- Sprint-report aggregator ---
+                        // Always runs (pass or fail). Non-blocking: report is informational, not a gate.
+                        sh """
+                          cd genesis/a2o
+                          pnpm run build:sprint-report -- \\
+                            --run-id \"${env.BUILD_TAG}\" \\
+                            --profile \"\${CUCUMBER_PROFILE:-alpha}\" \\
+                            --doorway \"\${E2E_DOORWAY_ALPHA:-}\" \\
+                            || echo 'Sprint-report aggregator failed (non-blocking)'
+                        """
+
                         // Archive reports
                         archiveArtifacts(
                             artifacts: 'genesis/a2o/reports/**',
