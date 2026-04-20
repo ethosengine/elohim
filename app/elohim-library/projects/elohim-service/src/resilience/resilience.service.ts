@@ -1,8 +1,9 @@
-import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
+import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
-import { ResilienceSnapshotView } from '../generated/resilience-snapshot-view';
+
 import { PlacementGapView } from '../generated/placement-gap-view';
+import { ResilienceSnapshotView } from '../generated/resilience-snapshot-view';
 
 @Injectable({ providedIn: 'root' })
 export class ResilienceService {
@@ -13,16 +14,15 @@ export class ResilienceService {
     if (viewerHouseholdId) params = params.set('viewerHouseholdId', viewerHouseholdId);
     return this.http.get<ResilienceSnapshotView>(
       `/api/v1/resilience/${encodeURIComponent(contentId)}/household`,
-      { params },
+      { params }
     );
   }
 
   listPlacementGaps(kind?: string): Observable<{ items: PlacementGapView[]; total: number }> {
     let params = new HttpParams();
     if (kind) params = params.set('kind', kind);
-    return this.http.get<{ items: PlacementGapView[]; total: number }>(
-      '/api/v1/placement-gaps',
-      { params },
-    );
+    return this.http.get<{ items: PlacementGapView[]; total: number }>('/api/v1/placement-gaps', {
+      params,
+    });
   }
 }
