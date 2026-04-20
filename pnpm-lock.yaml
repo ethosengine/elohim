@@ -558,6 +558,12 @@ importers:
       '@cucumber/cucumber':
         specifier: ^11.2.0
         version: 11.3.0
+      ajv:
+        specifier: ^8.17.1
+        version: 8.18.0
+      ajv-formats:
+        specifier: ^3.0.1
+        version: 3.0.1(ajv@8.18.0)
       playwright:
         specifier: ^1.50.0
         version: 1.58.2
@@ -571,12 +577,6 @@ importers:
       '@types/node':
         specifier: ^22.0.0
         version: 22.19.13
-      ajv:
-        specifier: ^8.17.1
-        version: 8.18.0
-      ajv-formats:
-        specifier: ^3.0.1
-        version: 3.0.1(ajv@8.18.0)
       eslint:
         specifier: ^9.39.2
         version: 9.39.3(jiti@1.21.7)
