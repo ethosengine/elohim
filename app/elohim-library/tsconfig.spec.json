@@ -12,6 +12,8 @@
   "include": [
     "src/**/*.spec.ts",
     "src/**/*.d.ts",
-    "src/test-setup.ts"
+    "src/test-setup.ts",
+    "projects/elohim-service/src/resilience/**/*.spec.ts",
+    "projects/elohim-service/src/resilience/**/*.ts"
   ]
 }

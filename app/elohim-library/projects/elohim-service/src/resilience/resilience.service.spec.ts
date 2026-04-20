@@ -2,7 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { HttpClientTestingModule, HttpTestingController } from '@angular/common/http/testing';
 import { firstValueFrom } from 'rxjs';
 import { ResilienceService } from './resilience.service';
-import { ResilienceSnapshotView } from '../../projects/elohim-service/src/generated/resilience-snapshot-view';
+import { ResilienceSnapshotView } from '../generated/resilience-snapshot-view';
 
 describe('ResilienceService', () => {
   let service: ResilienceService;

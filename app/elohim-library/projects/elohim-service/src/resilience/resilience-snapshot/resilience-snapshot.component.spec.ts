@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { ResilienceSnapshotComponent } from './resilience-snapshot.component';
-import { ResilienceSnapshotView } from '../../../projects/elohim-service/src/generated/resilience-snapshot-view';
+import { ResilienceSnapshotView } from '../../generated/resilience-snapshot-view';
 
 const sampleProtected: ResilienceSnapshotView = {
   contentId: 'c1',

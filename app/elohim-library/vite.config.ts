@@ -9,8 +9,11 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom',
     setupFiles: ['src/test-setup.ts'],
-    include: ['src/**/*.spec.ts'],
-    exclude: ['node_modules', 'dist', 'projects/elohim-service/**'],
+    include: [
+      'src/**/*.spec.ts',
+      'projects/elohim-service/src/resilience/**/*.spec.ts',
+    ],
+    exclude: ['node_modules', 'dist'],
     pool: 'forks',
     poolOptions: {
       forks: {
