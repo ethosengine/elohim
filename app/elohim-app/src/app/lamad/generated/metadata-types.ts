@@ -78,13 +78,7 @@ export interface ExperienceMomentMetadata {
   /** Present when status=failed; classifies the error (e.g., 'AssertionError/timeout', 'NetworkError/503'). */
   errorClass?: string;
   /** References to test artifacts (CIDs or paths). */
-  sidecarArtifacts?: {
-    cucumber?: string;
-    observation?: string;
-    screenshot?: string;
-    trace?: string;
-    console?: string;
-  };
+  sidecarArtifacts?: { cucumber?: string; observation?: string; screenshot?: string; trace?: string; console?: string };
   /** CID or slug reference to the parent experience-story ContentNode. */
   relatedExperienceStory?: string;
 }
@@ -118,14 +112,7 @@ export interface ProcessDag {
 
 export interface StepNode {
   /** One of the seven v1 protocol-governed step types (spec §2.1). */
-  type:
-    | 'context-assemble'
-    | 'wisdom-invoke'
-    | 'mechanical-ruleset'
-    | 'aggregate-attestations'
-    | 'skill-invoke'
-    | 'synthesize'
-    | 'escalate-to-review';
+  type: 'context-assemble' | 'wisdom-invoke' | 'mechanical-ruleset' | 'aggregate-attestations' | 'skill-invoke' | 'synthesize' | 'escalate-to-review';
   /** Step-type-specific parameters. Shape depends on type. CID references may point to gate-rules-declaration, aggregation-spec, or escalation-target-spec ContentNodes. */
   params: Record<string, unknown>;
   /** Unconditional next step or terminal id. */
@@ -163,15 +150,7 @@ export interface GateProcessDeclarationMetadata {
   /** Semantic version of this gate process declaration. */
   version: string;
   /** Which RelationalImpactEvent variant this gate handles (kebab-case). */
-  eventType:
-    | 'content-publish'
-    | 'attestation-write'
-    | 'economic-event-emit'
-    | 'peer-message'
-    | 'sync-to-peers'
-    | 'advice-sought'
-    | 'capability-invoke'
-    | 'private-to-public-crossing';
+  eventType: 'content-publish' | 'attestation-write' | 'economic-event-emit' | 'peer-message' | 'sync-to-peers' | 'advice-sought' | 'capability-invoke' | 'private-to-public-crossing';
   /** CID or $ref to a JSON schema describing the gate's input GateContext shape. */
   inputSchemaRef?: string;
   /** CID or $ref to a JSON schema describing the gate's output decision + side-effect shape. */
@@ -225,7 +204,8 @@ export interface GateRulesDeclarationMetadata {
   rules: Rule[];
 }
 
-export interface Reduction {}
+export interface Reduction {
+}
 
 export interface AggregationSpecMetadata {
   /** Kebab-case aggregation spec name (e.g., reach-level-v1). */
@@ -255,7 +235,8 @@ export interface EscalationTier {
   timeoutSeconds?: number;
 }
 
-export interface Target {}
+export interface Target {
+}
 
 export interface EscalationTargetSpecMetadata {
   /** Kebab-case escalation-target spec name. */
