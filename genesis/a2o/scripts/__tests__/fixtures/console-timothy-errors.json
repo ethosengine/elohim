@@ -1,0 +1,15 @@
+{
+  "consoleErrors": [
+    {
+      "level": "error",
+      "text": "ReferenceError: Sophia is not defined",
+      "url": "https://doorway-alpha.elohim.host/assets/sophia-element.umd.js"
+    },
+    {
+      "level": "error",
+      "text": "Failed to load resource: the server responded with a status of 404",
+      "url": "https://doorway-alpha.elohim.host/api/v1/cache/missing-cid"
+    }
+  ],
+  "pageErrors": []
+}

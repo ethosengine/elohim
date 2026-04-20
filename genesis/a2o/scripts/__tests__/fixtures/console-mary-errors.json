@@ -1,0 +1,12 @@
+{
+  "consoleErrors": [
+    {
+      "level": "error",
+      "text": "ReferenceError: Sophia is not defined",
+      "url": "https://doorway-alpha.elohim.host/assets/sophia-element.umd.js"
+    }
+  ],
+  "pageErrors": [
+    { "message": "Uncaught (in promise) TypeError: Cannot read properties of null (reading 'token')", "url": "https://doorway-alpha.elohim.host/login" }
+  ]
+}
