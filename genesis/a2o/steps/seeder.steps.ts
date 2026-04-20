@@ -73,6 +73,9 @@ const KNOWN_HUMAN_IDS: Record<string, string> = {
   frank: 'human-frank-farmer',
   charlie: 'human-charlie-challenged',
   eve: 'human-eve-firstwoman',
+  // Synthetic orphan used by the "Registry entry without a package" scenario;
+  // kept as-is so the seeder warning references the scenario's literal id.
+  'ghost-human': 'ghost-human',
 };
 
 function toHumanId(shortName: string): string {
