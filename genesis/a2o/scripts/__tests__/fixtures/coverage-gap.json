@@ -1,0 +1,15 @@
+{
+  "generatedAt": "2026-04-19T10:00:00Z",
+  "gaps": [
+    {
+      "feature": "features/lamad/path-adaptation.feature",
+      "missing": "Scenario: Timothy's path reorders after rapid mastery",
+      "severity": "high"
+    },
+    {
+      "feature": "features/elohim/presence.feature",
+      "missing": "Scenario: presence claim expires and resurrects on reconnect",
+      "severity": "medium"
+    }
+  ]
+}
