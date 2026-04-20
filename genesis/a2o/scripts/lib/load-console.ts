@@ -23,7 +23,7 @@ const FILENAME_RE = /^(.+)-([^-]+)-errors\.json$/;
 export function parseScenarioHumanFromFilename(
   filename: string
 ): { scenario: string; human: string } | null {
-  const m = filename.match(FILENAME_RE);
+  const m = FILENAME_RE.exec(filename);
   if (!m) return null;
   return { scenario: m[1], human: m[2] };
 }

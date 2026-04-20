@@ -1,8 +1,9 @@
 import { fingerprint, normalizeMessage } from './fingerprint.js';
 import { pillarFromFeature } from './pillar-from-feature.js';
-import type { ScenarioResult } from './load-cucumber.js';
+
 import type { ConsoleArtifact } from './load-console.js';
 import type { GapFinding } from './load-coverage-gap.js';
+import type { ScenarioResult } from './load-cucumber.js';
 
 export type FindingSource =
   | 'console-error'
@@ -78,11 +79,9 @@ function suggestObjective(source: FindingSource, message: string): string {
   }
 }
 
-export function aggregate(input: AggregateInput): SprintReport {
+function buildScenarioRaws(scenarios: ScenarioResult[]): RawFinding[] {
   const raws: RawFinding[] = [];
-
-  // Scenario-level
-  for (const s of input.scenarios) {
+  for (const s of scenarios) {
     if (s.status === 'failed' && s.failureMessage) {
       raws.push({
         source: 'scenario-failure',
@@ -101,9 +100,12 @@ export function aggregate(input: AggregateInput): SprintReport {
       });
     }
   }
+  return raws;
+}
 
-  // Console / page / network
-  for (const art of input.consoleArtifacts) {
+function buildConsoleRaws(artifacts: ConsoleArtifact[]): RawFinding[] {
+  const raws: RawFinding[] = [];
+  for (const art of artifacts) {
     for (const e of art.consoleErrors) {
       raws.push({
         source: 'console-error',
@@ -125,20 +127,20 @@ export function aggregate(input: AggregateInput): SprintReport {
       });
     }
   }
+  return raws;
+}
 
-  // Coverage gaps
-  for (const g of input.gaps) {
-    raws.push({
-      source: 'coverage-gap',
-      pillar: pillarFromFeature(g.feature),
-      severity: g.severity === 'high' ? 'error' : 'warning',
-      rawMessage: g.missing,
-      scenario: { name: g.missing, feature: g.feature },
-    });
-  }
+function buildGapRaws(gaps: GapFinding[]): RawFinding[] {
+  return gaps.map(g => ({
+    source: 'coverage-gap' as FindingSource,
+    pillar: pillarFromFeature(g.feature),
+    severity: g.severity === 'high' ? ('error' as const) : ('warning' as const),
+    rawMessage: g.missing,
+    scenario: { name: g.missing, feature: g.feature },
+  }));
+}
 
-  // Group by (source + fingerprint) — keep sources separate so the same normalized
-  // text from two different sources doesn't collapse unexpectedly.
+function groupIntoFindings(raws: RawFinding[]): Finding[] {
   const groups = new Map<string, Finding>();
   for (const r of raws) {
     const fp = fingerprint(r.rawMessage);
@@ -165,14 +167,15 @@ export function aggregate(input: AggregateInput): SprintReport {
       });
     }
   }
-
-  const findings = [...groups.values()].sort((a, b) => {
+  return [...groups.values()].sort((a, b) => {
     if (b.occurrences !== a.occurrences) return b.occurrences - a.occurrences;
     return a.fingerprint.localeCompare(b.fingerprint);
   });
+}
 
+function computeSummary(scenarios: ScenarioResult[], findings: Finding[]): SprintReport['summary'] {
   const scenarioCounts = { total: 0, passed: 0, failed: 0, skipped: 0, pending: 0 };
-  for (const s of input.scenarios) {
+  for (const s of scenarios) {
     scenarioCounts.total += 1;
     const status = (s.status === 'undefined' ? 'pending' : s.status) as keyof typeof scenarioCounts;
     if (status !== 'total') scenarioCounts[status] += 1;
@@ -186,14 +189,27 @@ export function aggregate(input: AggregateInput): SprintReport {
   }
 
   return {
+    scenarios: scenarioCounts,
+    findings: { total: findings.length, bySource, byPillar },
+  };
+}
+
+export function aggregate(input: AggregateInput): SprintReport {
+  const raws = [
+    ...buildScenarioRaws(input.scenarios),
+    ...buildConsoleRaws(input.consoleArtifacts),
+    ...buildGapRaws(input.gaps),
+  ];
+
+  const findings = groupIntoFindings(raws);
+  const summary = computeSummary(input.scenarios, findings);
+
+  return {
     generatedAt: new Date().toISOString(),
     runId: input.runId,
     profile: input.profile,
     doorway: input.doorway,
-    summary: {
-      scenarios: scenarioCounts,
-      findings: { total: findings.length, bySource, byPillar },
-    },
+    summary,
     findings,
   };
 }

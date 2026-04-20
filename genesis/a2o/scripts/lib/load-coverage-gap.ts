@@ -7,7 +7,7 @@ export interface GapFinding {
 }
 
 interface GapFileShape {
-  gaps?: Array<{ feature: string; missing: string; severity?: string }>;
+  gaps?: { feature: string; missing: string; severity?: string }[];
 }
 
 export function loadCoverageGap(path: string): GapFinding[] {

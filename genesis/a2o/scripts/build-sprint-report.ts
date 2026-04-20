@@ -1,22 +1,28 @@
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+
 import * as AjvNs from 'ajv/dist/2020.js';
 import * as addFormatsNs from 'ajv-formats';
 
 // AJV v8 dual-CJS/ESM packaging means the default export is sometimes wrapped.
 // Unwrap both at runtime using namespace imports to avoid TypeScript's
 // "no construct signatures" error on default imports from CJS modules.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const AjvCtor: new (opts: { strict: boolean; allErrors: boolean }) => AjvNs.default =
-  (AjvNs as any).default ?? AjvNs;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const addFormatsFn: (ajv: AjvNs.default) => void = (addFormatsNs as any).default ?? addFormatsNs;
+  (
+    AjvNs as unknown as {
+      default: new (opts: { strict: boolean; allErrors: boolean }) => AjvNs.default;
+    }
+  ).default ??
+  (AjvNs as unknown as new (opts: { strict: boolean; allErrors: boolean }) => AjvNs.default);
+const addFormatsFn: (ajv: AjvNs.default) => void =
+  (addFormatsNs as unknown as { default: (ajv: AjvNs.default) => void }).default ??
+  (addFormatsNs as unknown as (ajv: AjvNs.default) => void);
 
-import { loadCucumber } from './lib/load-cucumber.js';
+import { aggregate } from './lib/aggregate.js';
 import { loadConsoleArtifacts } from './lib/load-console.js';
 import { loadCoverageGap } from './lib/load-coverage-gap.js';
-import { aggregate } from './lib/aggregate.js';
+import { loadCucumber } from './lib/load-cucumber.js';
 import { renderMarkdown } from './lib/render-markdown.js';
 
 interface Args {

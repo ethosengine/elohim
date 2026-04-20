@@ -42,13 +42,13 @@
   },
   "dependencies": {
     "@cucumber/cucumber": "^11.2.0",
+    "ajv": "^8.17.1",
+    "ajv-formats": "^3.0.1",
     "playwright": "^1.50.0",
     "undici": "^7.3.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.2",
-    "ajv": "^8.17.1",
-    "ajv-formats": "^3.0.1",
     "@types/node": "^22.0.0",
     "eslint": "^9.39.2",
     "eslint-config-prettier": "^10.1.8",
