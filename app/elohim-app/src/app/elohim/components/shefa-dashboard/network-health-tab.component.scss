@@ -168,3 +168,149 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* Household-grouped peer breakdown */
+.household-breakdown {
+  margin-top: 28px;
+}
+
+.breakdown-header {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.breakdown-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: #333;
+}
+
+.breakdown-subline {
+  font-size: 12px;
+  color: #767676;
+}
+
+.groups-loading,
+.groups-empty {
+  padding: 16px;
+  color: #767676;
+  font-size: 13px;
+
+  p {
+    margin: 0;
+  }
+}
+
+/* Household list */
+.households {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.household-row {
+  background: white;
+  border: 1px solid #e9ecef;
+  border-radius: 8px;
+  padding: 14px 16px;
+}
+
+.household-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.household-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+  flex: 1;
+}
+
+.peer-count {
+  font-size: 12px;
+  color: #007bff;
+  font-weight: 500;
+}
+
+.commitment-count {
+  font-size: 12px;
+  color: #28a745;
+  font-weight: 500;
+}
+
+/* Peer sub-list */
+.household-peers {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.peer-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  background: #f8f9fa;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.peer-id {
+  font-family: monospace;
+  color: #495057;
+  flex: 1;
+}
+
+.peer-archetype {
+  color: #6c757d;
+  font-size: 11px;
+  background: #e9ecef;
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+
+.peer-lifecycle {
+  font-size: 11px;
+  font-weight: 500;
+  padding: 2px 6px;
+  border-radius: 3px;
+
+  &.lifecycle-online {
+    background: #d4edda;
+    color: #155724;
+  }
+
+  &.lifecycle-degraded {
+    background: #fff3cd;
+    color: #856404;
+  }
+
+  &.lifecycle-leaving {
+    background: #d1ecf1;
+    color: #0c5460;
+  }
+
+  &.lifecycle-offline {
+    background: #f8d7da;
+    color: #721c24;
+  }
+}
+
+.household-no-peers {
+  font-size: 12px;
+  color: #767676;
+  margin: 0;
+  font-style: italic;
+}

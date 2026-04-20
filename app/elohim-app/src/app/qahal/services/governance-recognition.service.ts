@@ -42,7 +42,7 @@ export class GovernanceRecognitionService {
     4: 0.7, // ranked-choice voting
     5: 0.7, // score voting
     6: 0.8, // consent-based decision
-    7: 1.0, // deliberation (highest friction)
+    7: 1, // deliberation (highest friction)
   };
 
   /**

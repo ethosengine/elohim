@@ -1,5 +1,6 @@
-import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
+import { Injectable, inject } from '@angular/core';
+
 import { Observable } from 'rxjs';
 
 import type {
@@ -22,9 +23,7 @@ export class SpatialContextApiService {
   }
 
   getForEntity(entityType: string, entityId: string): Observable<SpatialContextView[]> {
-    const params = new HttpParams()
-      .set('entityType', entityType)
-      .set('entityId', entityId);
+    const params = new HttpParams().set('entityType', entityType).set('entityId', entityId);
     return this.http.get<SpatialContextView[]>(`${this.baseUrl}/api/v1/spatial-contexts`, {
       params,
     });
@@ -45,10 +44,13 @@ export class SpatialContextApiService {
     });
   }
 
-  update(id: string, patch: Partial<UpdateSpatialContextInputView>): Observable<SpatialContextView> {
+  update(
+    id: string,
+    patch: Partial<UpdateSpatialContextInputView>
+  ): Observable<SpatialContextView> {
     return this.http.patch<SpatialContextView>(
       `${this.baseUrl}/api/v1/spatial-contexts/${id}`,
-      patch,
+      patch
     );
   }
 
@@ -59,7 +61,7 @@ export class SpatialContextApiService {
   /** Get full spatial history for an entity (current + all past positions), newest first */
   getHistory(entityType: string, entityId: string): Observable<SpatialContextView[]> {
     return this.http.get<SpatialContextView[]>(
-      `${this.baseUrl}/api/v1/spatial-contexts/history/${entityType}/${entityId}`,
+      `${this.baseUrl}/api/v1/spatial-contexts/history/${entityType}/${entityId}`
     );
   }
 }

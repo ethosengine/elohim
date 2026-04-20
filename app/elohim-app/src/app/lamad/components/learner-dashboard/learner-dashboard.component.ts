@@ -16,8 +16,8 @@ import {
 import { ContentMasteryService } from '../../services/content-mastery.service';
 import { MasteryStatsService } from '../../services/mastery-stats.service';
 import { PathService } from '../../services/path.service';
-
 import { AttentionFlowComponent } from '../attention-flow/attention-flow.component';
+
 import { RefreshQueueComponent } from './refresh-queue/refresh-queue.component';
 import { StatsRowComponent } from './stats-row/stats-row.component';
 
@@ -46,7 +46,13 @@ import type {
 @Component({
   selector: 'app-learner-dashboard',
   standalone: true,
-  imports: [CommonModule, RouterModule, AttentionFlowComponent, StatsRowComponent, RefreshQueueComponent],
+  imports: [
+    CommonModule,
+    RouterModule,
+    AttentionFlowComponent,
+    StatsRowComponent,
+    RefreshQueueComponent,
+  ],
   templateUrl: './learner-dashboard.component.html',
   styleUrls: ['./learner-dashboard.component.css'],
 })

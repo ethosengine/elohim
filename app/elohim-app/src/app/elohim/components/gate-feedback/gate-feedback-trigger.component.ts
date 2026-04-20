@@ -8,6 +8,7 @@ import {
 } from '@angular/core';
 
 import { GateFeedbackModalComponent, type FeedbackType } from './gate-feedback-modal.component';
+
 import type { ReachTier } from '../../services/gate-interaction.service';
 
 interface MenuItem {
@@ -34,7 +35,9 @@ const MENU_ITEMS: MenuItem[] = [
         data-testid="feedback-trigger-btn"
         aria-label="Governance feedback"
         (click)="toggleMenu()"
-      >&#x22EE;</button>
+      >
+        &#x22EE;
+      </button>
 
       @if (menuOpen()) {
         <div class="trigger-menu" data-testid="feedback-trigger-menu">
@@ -43,7 +46,9 @@ const MENU_ITEMS: MenuItem[] = [
               class="menu-item"
               [attr.data-testid]="'feedback-menu-item-' + item.type"
               (click)="openModal(item.type)"
-            >{{ item.label }}</button>
+            >
+              {{ item.label }}
+            </button>
           }
         </div>
       }
@@ -127,7 +132,7 @@ export class GateFeedbackTriggerComponent {
   readonly menuItems = MENU_ITEMS;
 
   toggleMenu(): void {
-    this.menuOpen.update((v) => !v);
+    this.menuOpen.update(v => !v);
   }
 
   openModal(type: FeedbackType): void {

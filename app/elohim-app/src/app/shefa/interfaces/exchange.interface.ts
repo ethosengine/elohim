@@ -29,11 +29,7 @@ import { ExchangeApiService } from '../services/exchange-api.service';
 
 import type { EconomicEvent } from '@app/elohim/models/economic-event.model';
 import type { Intent } from '@app/elohim/models/rea-bridge.model';
-import type {
-  ServiceRequest,
-  ServiceOffer,
-  ServiceMatch,
-} from '@app/shefa/models/exchange.model';
+import type { ServiceRequest, ServiceOffer, ServiceMatch } from '@app/shefa/models/exchange.model';
 
 /**
  * Abstract exchange coordinator -- manages the lifecycle of service

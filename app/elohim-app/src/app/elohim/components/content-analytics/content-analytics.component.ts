@@ -31,8 +31,8 @@ import { EventService } from '@app/shefa/services/event.service';
       </div>
 
       <p class="analytics-note">
-        Metrics are protocol-native economic events, not external analytics.
-        Views are recorded after 3 seconds of engagement.
+        Metrics are protocol-native economic events, not external analytics. Views are recorded
+        after 3 seconds of engagement.
       </p>
     </div>
   `,

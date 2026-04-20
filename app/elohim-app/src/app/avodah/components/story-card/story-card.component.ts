@@ -228,9 +228,7 @@ export class StoryCardComponent {
   readonly story = input.required<ContentNode>();
   readonly cardClick = output<ContentNode>();
 
-  readonly meta = computed<WorkStoryMeta>(() =>
-    parseWorkStoryMeta(this.story().metadata)
-  );
+  readonly meta = computed<WorkStoryMeta>(() => parseWorkStoryMeta(this.story().metadata));
 
   readonly shortId = computed<string>(() => {
     const id = this.story().id;

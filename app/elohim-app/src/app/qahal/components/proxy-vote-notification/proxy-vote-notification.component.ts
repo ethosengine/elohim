@@ -16,25 +16,21 @@ import type { RankedVoteView } from '@elohim/storage-client/generated';
   standalone: true,
   template: `
     <div class="proxy-notification-card">
-      <p class="notification-heading">
-        Your elohim voted on '{{ proposalTitle() }}'
-      </p>
+      <p class="notification-heading">Your elohim voted on '{{ proposalTitle() }}'</p>
 
       @if (proxyVote().reasoning) {
         <p class="justification">{{ proxyVote().reasoning }}</p>
       }
 
       <div class="notification-actions">
-        <button
-          class="btn btn-confirm"
-          data-testid="proxy-confirm-btn"
-          (click)="confirmed.emit()">
+        <button class="btn btn-confirm" data-testid="proxy-confirm-btn" (click)="confirmed.emit()">
           Looks right
         </button>
         <button
           class="btn btn-override"
           data-testid="proxy-override-btn"
-          (click)="overrideRequested.emit(proxyVote())">
+          (click)="overrideRequested.emit(proxyVote())"
+        >
           I disagree
         </button>
       </div>

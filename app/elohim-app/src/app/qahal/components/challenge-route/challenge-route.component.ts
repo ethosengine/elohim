@@ -9,12 +9,12 @@
  */
 
 import { Component, computed, inject } from '@angular/core';
-import { ActivatedRoute, Router } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
-
-import type { ChallengeView } from '@elohim/storage-client/generated';
+import { ActivatedRoute, Router } from '@angular/router';
 
 import { FileChallengeComponent } from '../file-challenge/file-challenge.component';
+
+import type { ChallengeView } from '@elohim/storage-client/generated';
 
 @Component({
   selector: 'qahal-challenge-route',
@@ -26,14 +26,15 @@ import { FileChallengeComponent } from '../file-challenge/file-challenge.compone
         <qahal-file-challenge
           [entityType]="entityType()!"
           [entityId]="entityId()!"
-          (challengeFiled)="onChallengeFiled($event)" />
+          (challengeFiled)="onChallengeFiled($event)"
+        />
       </div>
     } @else {
       <div class="challenge-route-error">
         <h3>Missing Parameters</h3>
         <p>
-          A challenge requires an entity to challenge.
-          Please use the context menu on content to file a challenge.
+          A challenge requires an entity to challenge. Please use the context menu on content to
+          file a challenge.
         </p>
       </div>
     }

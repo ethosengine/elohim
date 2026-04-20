@@ -861,6 +861,116 @@ fn household_devices_view_matches_schema() {
     validate_against_schema("views/household-devices-view.schema.json", &json);
 }
 
+// ── Placement Gap + Resilience Snapshot ────────────────────────
+
+#[test]
+fn placement_gap_view_matches_schema() {
+    use elohim_storage::PlacementGapView;
+
+    let view = PlacementGapView {
+        id: "gap-uuid-001".to_string(),
+        content_id: "content-abc-001".to_string(),
+        shard_hash: "bafyreib2vq7shardABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789012345".to_string(),
+        requested_steward_count: 4,
+        achieved_steward_count: 2,
+        contract_coverage: 0.5,
+        gap_kind: "under-committed".to_string(),
+        first_seen_at: "2026-04-19T10:00:00Z".to_string(),
+        last_seen_at: "2026-04-20T10:00:00Z".to_string(),
+    };
+
+    let json = serde_json::to_value(&view).unwrap();
+    validate_against_schema("views/placement-gap-view.schema.json", &json);
+}
+
+#[test]
+fn resilience_snapshot_view_matches_schema() {
+    use elohim_storage::{
+        PlacementGapView, RegionalDistributionView, ResilienceSnapshotDetailsView,
+        ResilienceSnapshotView, StewardingCollectiveEntry,
+    };
+
+    let view = ResilienceSnapshotView {
+        content_id: "content-abc-001".to_string(),
+        stewarding_collectives: 3,
+        commitment_backed_collectives: 2,
+        diversity_score: 0.75,
+        regional_distribution: RegionalDistributionView {
+            local: 2,
+            regional: 1,
+            global: 0,
+            unknown: 0,
+        },
+        placement_gaps: vec![PlacementGapView {
+            id: "gap-uuid-002".to_string(),
+            content_id: "content-abc-001".to_string(),
+            shard_hash: "bafyreib2vq7shardXYZ0123456789012345678901234567890123456789".to_string(),
+            requested_steward_count: 4,
+            achieved_steward_count: 3,
+            contract_coverage: 0.75,
+            gap_kind: "peers-unavailable".to_string(),
+            first_seen_at: "2026-04-19T08:00:00Z".to_string(),
+            last_seen_at: "2026-04-20T08:00:00Z".to_string(),
+        }],
+        protection_status: "partial".to_string(),
+        reciprocating_collectives: Some(1),
+        details: Some(ResilienceSnapshotDetailsView {
+            stewarding_collectives: vec![
+                StewardingCollectiveEntry {
+                    id: "household-matthew".to_string(),
+                    kind: "household".to_string(),
+                    label: Some("Matthew's Home".to_string()),
+                },
+                StewardingCollectiveEntry {
+                    id: "church-bethel".to_string(),
+                    kind: "church".to_string(),
+                    label: None,
+                },
+            ],
+            online_peer_count: 5,
+            health_score: 0.8,
+        }),
+    };
+
+    let json = serde_json::to_value(&view).unwrap();
+    validate_against_schema("views/resilience-snapshot-view.schema.json", &json);
+}
+
+#[test]
+fn resilience_snapshot_view_minimal_matches_schema() {
+    use elohim_storage::{RegionalDistributionView, ResilienceSnapshotView};
+
+    // Minimal: no reciprocating_collectives, no details, empty gaps
+    let view = ResilienceSnapshotView {
+        content_id: "content-minimal-001".to_string(),
+        stewarding_collectives: 1,
+        commitment_backed_collectives: 1,
+        diversity_score: 1.0,
+        regional_distribution: RegionalDistributionView {
+            local: 1,
+            regional: 0,
+            global: 0,
+            unknown: 0,
+        },
+        placement_gaps: vec![],
+        protection_status: "protected".to_string(),
+        reciprocating_collectives: None,
+        details: None,
+    };
+
+    let json = serde_json::to_value(&view).unwrap();
+    // Optional fields must be absent when None (skip_serializing_if)
+    assert!(
+        !json.as_object().unwrap().contains_key("reciprocatingCollectives"),
+        "reciprocatingCollectives must be absent when None"
+    );
+    assert!(
+        !json.as_object().unwrap().contains_key("details"),
+        "details must be absent when None"
+    );
+    validate_against_schema("views/resilience-snapshot-view.schema.json", &json);
+}
+
 // ── Convention enforcement ──────────────────────────────────────
 
 #[test]

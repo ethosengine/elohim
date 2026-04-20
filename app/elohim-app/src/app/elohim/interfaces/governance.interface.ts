@@ -39,10 +39,7 @@ export interface IGovernance {
   ): Promise<ProposalOptionView[]>;
 
   // Ranked Votes (multi-mechanism)
-  castRankedVotes(
-    proposalId: string,
-    ballot: CastRankedVoteInputView
-  ): Promise<RankedVoteView[]>;
+  castRankedVotes(proposalId: string, ballot: CastRankedVoteInputView): Promise<RankedVoteView[]>;
   getRankedVotes(proposalId: string): Promise<RankedVoteView[]>;
 
   // Tally

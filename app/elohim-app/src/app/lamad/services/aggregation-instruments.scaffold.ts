@@ -101,18 +101,13 @@ interface StewardshipState {
  * Event filter: action=produce, resourceConformsTo=contribution
  * (matches article.coupling.value.onContribute from manifest)
  */
-class _StewardshipInstrument
-  implements AggregationInstrument<StewardshipState>
-{
+class _StewardshipInstrument implements AggregationInstrument<StewardshipState> {
   readonly eventFilter = {
     action: 'produce',
     resourceConformsTo: 'contribution',
   };
 
-  aggregate(
-    event: EconomicEventShape,
-    state: StewardshipState,
-  ): StewardshipState {
+  aggregate(event: EconomicEventShape, state: StewardshipState): StewardshipState {
     return {
       ...state,
       contributions: state.contributions + 1,
@@ -149,14 +144,11 @@ interface _ManifestGovernance {
   /** Governance process reviews and decides */
   resolveChallenge(
     challengeId: string,
-    decision: 'uphold' | 'revoke' | 'require-update',
+    decision: 'uphold' | 'revoke' | 'require-update'
   ): { resolved: boolean };
 
   /** Force minimum version — nodes must upgrade or stop serving */
-  requireMinimumVersion(
-    manifestName: string,
-    minimumVersion: string,
-  ): { decreed: boolean };
+  requireMinimumVersion(manifestName: string, minimumVersion: string): { decreed: boolean };
 }
 
 // Suppress unused warnings — this file is documentation, not production code

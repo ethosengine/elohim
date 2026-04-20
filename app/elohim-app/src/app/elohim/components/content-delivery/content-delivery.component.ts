@@ -11,8 +11,9 @@ import {
 } from '@angular/core';
 import { ActivatedRoute, RouterModule } from '@angular/router';
 
-import { Subject, Subscription } from 'rxjs';
 import { takeUntil } from 'rxjs/operators';
+
+import { Subject, Subscription } from 'rxjs';
 
 import { ContentNode } from '@app/lamad/models/content-node.model';
 import {
@@ -20,6 +21,7 @@ import {
   RendererRegistryService,
 } from '@app/lamad/renderers/renderer-registry.service';
 import { ContentService } from '@app/lamad/services/content.service';
+
 import { SeoService } from '../../../services/seo.service';
 import {
   ProtocolOmnibarComponent,
@@ -67,8 +69,8 @@ export class ContentDeliveryComponent implements OnInit, OnDestroy, AfterViewChe
 
   ngOnInit(): void {
     // Derive delivery source from current hostname
-    if (typeof window !== 'undefined') {
-      this.deliverySource = `doorway ${window.location.hostname}`;
+    if (globalThis.window !== undefined) {
+      this.deliverySource = `doorway ${globalThis.location.hostname}`;
     }
 
     this.route.params.pipe(takeUntil(this.destroy$)).subscribe(params => {

@@ -8,16 +8,25 @@
  * - Shows unavailable state when service returns null
  * - data-testids present for all expected metrics
  * - formatPressure and pressureClass helpers
+ * - Household-grouped breakdown renders household rows
+ * - Household rows show peer count and commitment count
  */
 
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { NO_ERRORS_SCHEMA } from '@angular/core';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideHttpClient } from '@angular/common/http';
-import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { of } from 'rxjs';
 
 import { NetworkHealthTabComponent } from './network-health-tab.component';
-import { NetworkPostureService, type NetworkPostureView } from '../../services/network-posture.service';
+import {
+  NetworkPostureService,
+  type NetworkPostureView,
+} from '../../services/network-posture.service';
+import { HouseholdDevicesService } from '@app/shefa/services/household-devices.service';
+import { CollectiveService } from '@app/qahal/services/collective.service';
+import type { HouseholdDevicesView } from '@app/generated/household-devices-view';
+import type { CollectiveView } from '@elohim/storage-client/generated';
 
 const MOCK_POSTURE: NetworkPostureView = {
   totalPeers: 50,
@@ -30,10 +39,62 @@ const MOCK_POSTURE: NetworkPostureView = {
   computedAt: '2026-04-19T10:00:00.000Z',
 };
 
+const MOCK_COLLECTIVES: CollectiveView[] = [
+  {
+    id: 'household-matthew',
+    name: 'Matthew Household',
+    description: null,
+    governanceLayer: 'household',
+    constitutionalParentId: null,
+    reach: 'local',
+    metadata: null,
+    createdBy: null,
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+    dissolvedAt: null,
+  },
+];
+
+const MOCK_HOUSEHOLD_DEVICES: HouseholdDevicesView = {
+  householdId: 'household-matthew',
+  devices: [
+    {
+      shape: {
+        nodeId: 'uhCAkABC123',
+        hostname: 'matthew-nuc',
+        deviceArchetypeId: 'home-nuc',
+        householdId: 'household-matthew',
+        role: 'edge',
+        capabilityLevel: 3,
+        committed: {
+          cpuCores: 8,
+          memoryGb: 16,
+          storageTb: 2,
+        },
+        signature: 'sig',
+        signedAt: '2026-01-01T00:00:00.000Z',
+      },
+      peer: {
+        peerId: 'uhCAkABC123',
+        status: 'online',
+        generalPoolMember: true,
+        acceptingStewardshipReserves: true,
+        archetypeClass: 'home-nuc',
+        timestamp: '1700000000000000',
+        dhtAnchorHash: 'hash123',
+        updatedAt: '1700000000000000',
+      },
+    },
+  ],
+};
+
 describe('NetworkHealthTabComponent', () => {
   let component: NetworkHealthTabComponent;
   let fixture: ComponentFixture<NetworkHealthTabComponent>;
+  let httpMock: HttpTestingController;
   let networkPostureMock: { get: () => ReturnType<NetworkPostureService['get']> };
+  let collectiveMock: { listCollectives: () => ReturnType<CollectiveService['listCollectives']> };
+  let householdDevicesMock: { list: (id: string) => ReturnType<HouseholdDevicesService['list']> };
 
   function buildFixture(): Promise<void> {
     return TestBed.configureTestingModule({
@@ -42,6 +103,8 @@ describe('NetworkHealthTabComponent', () => {
         provideHttpClient(),
         provideHttpClientTesting(),
         { provide: NetworkPostureService, useValue: networkPostureMock },
+        { provide: CollectiveService, useValue: collectiveMock },
+        { provide: HouseholdDevicesService, useValue: householdDevicesMock },
       ],
       schemas: [NO_ERRORS_SCHEMA],
     })
@@ -49,8 +112,21 @@ describe('NetworkHealthTabComponent', () => {
       .then(() => {
         fixture = TestBed.createComponent(NetworkHealthTabComponent);
         component = fixture.componentInstance;
+        httpMock = TestBed.inject(HttpTestingController);
       });
   }
+
+  afterEach(() => {
+    // Flush any pending commitments call before verify() to avoid spurious failures.
+    // The commitments endpoint is always called during ngOnInit regardless of collective count.
+    try {
+      const pending = httpMock.match(req => req.url.includes('/api/v1/commitments'));
+      pending.forEach(req => req.flush({ items: [], total: 0 }));
+    } catch {
+      // httpMock may not be initialised in every beforeEach
+    }
+    httpMock?.verify();
+  });
 
   // =========================================================================
   // Creation
@@ -59,6 +135,8 @@ describe('NetworkHealthTabComponent', () => {
   describe('component creation', () => {
     beforeEach(async () => {
       networkPostureMock = { get: () => of(MOCK_POSTURE) };
+      collectiveMock = { listCollectives: () => of(MOCK_COLLECTIVES) };
+      householdDevicesMock = { list: () => of(MOCK_HOUSEHOLD_DEVICES) };
       await buildFixture();
     });
 
@@ -80,6 +158,8 @@ describe('NetworkHealthTabComponent', () => {
   describe('when service returns posture data', () => {
     beforeEach(async () => {
       networkPostureMock = { get: () => of(MOCK_POSTURE) };
+      collectiveMock = { listCollectives: () => of(MOCK_COLLECTIVES) };
+      householdDevicesMock = { list: () => of(MOCK_HOUSEHOLD_DEVICES) };
       await buildFixture();
       fixture.detectChanges();
     });
@@ -133,6 +213,8 @@ describe('NetworkHealthTabComponent', () => {
   describe('when service returns null', () => {
     beforeEach(async () => {
       networkPostureMock = { get: () => of(null) };
+      collectiveMock = { listCollectives: () => of([]) };
+      householdDevicesMock = { list: () => of(MOCK_HOUSEHOLD_DEVICES) };
       await buildFixture();
       fixture.detectChanges();
     });
@@ -160,6 +242,8 @@ describe('NetworkHealthTabComponent', () => {
   describe('when compute is unavailable', () => {
     beforeEach(async () => {
       networkPostureMock = { get: () => of({ ...MOCK_POSTURE, computeAvailable: false }) };
+      collectiveMock = { listCollectives: () => of(MOCK_COLLECTIVES) };
+      householdDevicesMock = { list: () => of(MOCK_HOUSEHOLD_DEVICES) };
       await buildFixture();
       fixture.detectChanges();
     });
@@ -172,12 +256,80 @@ describe('NetworkHealthTabComponent', () => {
   });
 
   // =========================================================================
+  // Household grouping
+  // =========================================================================
+
+  describe('household-grouped breakdown', () => {
+    beforeEach(async () => {
+      networkPostureMock = { get: () => of(MOCK_POSTURE) };
+      collectiveMock = { listCollectives: () => of(MOCK_COLLECTIVES) };
+      householdDevicesMock = { list: () => of(MOCK_HOUSEHOLD_DEVICES) };
+      await buildFixture();
+      fixture.detectChanges();
+      // Flush active-commitments so the forkJoin + switchMap resolves
+      httpMock
+        .expectOne(req => req.url.includes('/api/v1/commitments'))
+        .flush({ items: [], total: 0 });
+      fixture.detectChanges();
+    });
+
+    it('should render the household-breakdown section', () => {
+      const el: HTMLElement = fixture.nativeElement;
+      expect(el.querySelector('[data-testid="household-breakdown"]')).toBeTruthy();
+    });
+
+    it('should render a household-row for household-matthew', () => {
+      const el: HTMLElement = fixture.nativeElement;
+      expect(el.querySelector('[data-testid="household-row-household-matthew"]')).toBeTruthy();
+    });
+
+    it('should render a peer-row for the peer in the household', () => {
+      const el: HTMLElement = fixture.nativeElement;
+      expect(el.querySelector('[data-testid="peer-row-uhCAkABC123"]')).toBeTruthy();
+    });
+
+    it('should report householdCount = 1', () => {
+      expect(component.householdCount).toBe(1);
+    });
+  });
+
+  // =========================================================================
+  // Household grouping — empty collectives
+  // =========================================================================
+
+  describe('when no households are registered', () => {
+    beforeEach(async () => {
+      networkPostureMock = { get: () => of(MOCK_POSTURE) };
+      collectiveMock = { listCollectives: () => of([]) };
+      householdDevicesMock = { list: () => of(MOCK_HOUSEHOLD_DEVICES) };
+      await buildFixture();
+      fixture.detectChanges();
+      // combineLatest fires commitments even with empty collectives
+      httpMock
+        .expectOne(req => req.url.includes('/api/v1/commitments'))
+        .flush({ items: [], total: 0 });
+      fixture.detectChanges();
+    });
+
+    it('should show empty state message', () => {
+      const el: HTMLElement = fixture.nativeElement;
+      expect(el.querySelector('[data-testid="household-groups-empty"]')).toBeTruthy();
+    });
+
+    it('should report householdCount = 0', () => {
+      expect(component.householdCount).toBe(0);
+    });
+  });
+
+  // =========================================================================
   // Helper methods
   // =========================================================================
 
   describe('formatPressure()', () => {
     beforeEach(async () => {
       networkPostureMock = { get: () => of(MOCK_POSTURE) };
+      collectiveMock = { listCollectives: () => of([]) };
+      householdDevicesMock = { list: () => of(MOCK_HOUSEHOLD_DEVICES) };
       await buildFixture();
     });
 
@@ -201,6 +353,8 @@ describe('NetworkHealthTabComponent', () => {
   describe('pressureClass()', () => {
     beforeEach(async () => {
       networkPostureMock = { get: () => of(MOCK_POSTURE) };
+      collectiveMock = { listCollectives: () => of([]) };
+      householdDevicesMock = { list: () => of(MOCK_HOUSEHOLD_DEVICES) };
       await buildFixture();
     });
 
@@ -232,6 +386,8 @@ describe('NetworkHealthTabComponent', () => {
   describe('lifecycle', () => {
     beforeEach(async () => {
       networkPostureMock = { get: () => of(MOCK_POSTURE) };
+      collectiveMock = { listCollectives: () => of([]) };
+      householdDevicesMock = { list: () => of(MOCK_HOUSEHOLD_DEVICES) };
       await buildFixture();
     });
 

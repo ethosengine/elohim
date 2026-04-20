@@ -8,23 +8,21 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 
 import { catchError } from 'rxjs/operators';
+
 import { firstValueFrom, of } from 'rxjs';
 
+import type { IContentAttestation } from '../interfaces/content-attestation.interface';
 import type {
   ContentAttestationView,
   CreateAttestationInputView,
 } from '@elohim/storage-client/generated';
-
-import type { IContentAttestation } from '../interfaces/content-attestation.interface';
 
 @Injectable({ providedIn: 'root' })
 export class ContentAttestationApiService implements IContentAttestation {
   private readonly http = inject(HttpClient);
 
   async createAttestation(input: CreateAttestationInputView): Promise<ContentAttestationView> {
-    return firstValueFrom(
-      this.http.post<ContentAttestationView>('/api/v1/attestations', input)
-    );
+    return firstValueFrom(this.http.post<ContentAttestationView>('/api/v1/attestations', input));
   }
 
   async revokeAttestation(id: string, revocation?: Record<string, unknown>): Promise<void> {

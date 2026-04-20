@@ -110,6 +110,9 @@ pub mod heartbeat;
 // TCP forwarder — external-facing listener piped to localhost conductor
 pub mod forwarder;
 
+// Test utilities (public for integration test binaries in tests/)
+pub mod test_util;
+
 // Re-exports
 pub use blob_store::BlobStore;
 pub use config::Config;
@@ -161,4 +164,8 @@ pub use views::{
     build_peer_status_view, load_elohim_capability_from_env, CommittedResources, DeviceEntryView,
     ElohimCapabilityProfile, HouseholdDevicesView, HouseholdResilienceDetails,
     HouseholdResilienceView, NetworkPostureView, NodeShapeView, PeerStatusView,
+};
+pub use views::{
+    PlacementGapView, RegionalDistributionView, ResilienceSnapshotDetailsView,
+    ResilienceSnapshotView, StewardingCollectiveEntry,
 };

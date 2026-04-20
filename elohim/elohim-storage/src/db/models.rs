@@ -18,7 +18,8 @@ use super::diesel_schema::{
     contributor_presences, custodian_metrics, device_policies, discussions, economic_events,
     enum_registry, governance_dispositions, governance_signals, governance_states, hazards,
     human_relationships, humans, imagodei_observations, knowledge_maps, local_sessions,
-    node_stewardship, observation_entries, observation_sessions, places, precedents, premium_gates,
+    node_stewardship, observation_entries, observation_sessions, placement_gaps, places, precedents,
+    premium_gates,
     proposal_options, proposals, ranked_votes, rea_commitments, relationships,
     responsibility_demand_configs, risk_alerts, schedules, shard_locations, shard_manifests,
     spatial_contexts, statement_votes, statements, steward_credentials, stewarded_nodes,
@@ -1080,6 +1081,7 @@ pub struct Collective {
     pub created_at: String,
     pub updated_at: String,
     pub dissolved_at: Option<String>,
+    pub region: Option<String>,
 }
 
 /// New collective for INSERT
@@ -2816,4 +2818,45 @@ pub struct NewObservationEntry<'a> {
     pub status_code: Option<i32>,
     pub message: &'a str,
     pub context_json: Option<&'a str>,
+}
+
+// ============================================================================
+// Placement Gaps (Operational — Category C)
+// ============================================================================
+
+/// A detected gap between desired and achieved shard placement across households.
+/// Category C (operational): rebuilt from shard_locations + rea_commitments +
+/// humans.household_id at startup. NO dht_anchor_hash — this is derivable, not
+/// notarized. gap_kind values for Plan 1: 'under-committed', 'contracts-short',
+/// 'peers-unavailable'. Plans 3-4 add 'unrecoverable', 'attested-breach'.
+#[derive(Debug, Clone, Queryable, Selectable, Identifiable)]
+#[diesel(table_name = placement_gaps)]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+pub struct PlacementGapRow {
+    pub id: String,
+    pub content_id: String,
+    pub shard_hash: String,
+    pub h_app_id: String,
+    pub requested_steward_count: i32,
+    pub achieved_steward_count: i32,
+    pub contract_coverage: f32,
+    pub gap_kind: String,
+    pub first_seen_at: String,
+    pub last_seen_at: String,
+}
+
+/// New placement gap for INSERT (upsert via ON CONFLICT).
+#[derive(Debug, Clone, Insertable)]
+#[diesel(table_name = placement_gaps)]
+pub struct NewPlacementGap<'a> {
+    pub id: &'a str,
+    pub content_id: &'a str,
+    pub shard_hash: &'a str,
+    pub h_app_id: &'a str,
+    pub requested_steward_count: i32,
+    pub achieved_steward_count: i32,
+    pub contract_coverage: f32,
+    pub gap_kind: &'a str,
+    pub first_seen_at: &'a str,
+    pub last_seen_at: &'a str,
 }

@@ -1731,16 +1731,11 @@ export interface ExpectedResourceSchedule {
  * Cascading resources need degradation check schedules (cascade triggers).
  * Regenerative resources benefit from maintenance schedules (stewardship incentives).
  */
-export function expectedSchedulesForNature(
-  nature: ResourceNature,
-): ExpectedResourceSchedule[] {
+export function expectedSchedulesForNature(nature: ResourceNature): ExpectedResourceSchedule[] {
   const schedules: ExpectedResourceSchedule[] = [];
 
   // Renewable + flow → requires replenishment schedule for conservation constraints
-  if (
-    nature.depletability === 'renewable' &&
-    nature.capacityModel === 'flow'
-  ) {
+  if (nature.depletability === 'renewable' && nature.capacityModel === 'flow') {
     schedules.push({
       entityType: RESOURCE_SCHEDULE_TYPES.REPLENISHMENT,
       required: true,

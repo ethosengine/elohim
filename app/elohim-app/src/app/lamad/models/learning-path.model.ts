@@ -9,6 +9,7 @@
  */
 
 import { ContentNode, ContentMetadata } from './content-node.model';
+
 import type { Section, Item, EprCompositeBody } from '../generated/body-types';
 import type { PathMetadata } from '../generated/metadata-types';
 
@@ -487,9 +488,7 @@ function enrichSection(raw: Section, index: number): PathSection {
     })
   );
 
-  const childSections = (raw.sections ?? []).map((s: Section, i: number) =>
-    enrichSection(s, i)
-  );
+  const childSections = (raw.sections ?? []).map((s: Section, i: number) => enrichSection(s, i));
 
   // Flatten concept IDs from items + child sections
   const conceptIds = [
@@ -507,9 +506,7 @@ function enrichSection(raw: Section, index: number): PathSection {
       stepNarrative: item.narrative ?? '',
       learningObjectives: item.learningObjectives ?? [],
       optional: false,
-      completionCriteria: item.completionCriteria
-        ? [JSON.stringify(item.completionCriteria)]
-        : [],
+      completionCriteria: item.completionCriteria ? [JSON.stringify(item.completionCriteria)] : [],
     })
   );
 
@@ -542,9 +539,8 @@ function sectionsToChapters(sections: PathSection[]): PathChapter[] {
         title: childSection.title,
         description: childSection.description,
         order: j,
-        sections: (childSection.sections?.length ?? 0) > 0
-          ? childSection.sections!
-          : [childSection],
+        sections:
+          (childSection.sections?.length ?? 0) > 0 ? childSection.sections! : [childSection],
         estimatedDuration: childSection.estimatedDuration,
         learningObjectives: [],
       })
@@ -604,9 +600,8 @@ export function parsePathView(node: ContentNode): PathView {
     estimatedDuration: meta.estimatedDuration ?? undefined,
     // Prefer resolved thumbnailUrl from ContentService (set at runtime on the node)
     // over raw metadata value (which is an unresolved /blob/sha256-... path)
-    thumbnailUrl: (node as unknown as Record<string, string>)['thumbnailUrl']
-      ?? meta.thumbnailUrl
-      ?? undefined,
+    thumbnailUrl:
+      (node as unknown as Record<string, string>)['thumbnailUrl'] ?? meta.thumbnailUrl ?? undefined,
     thumbnailAlt: meta.thumbnailAlt ?? undefined,
     sections,
 

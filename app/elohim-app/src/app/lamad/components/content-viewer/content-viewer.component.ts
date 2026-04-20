@@ -14,9 +14,9 @@ import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 
 // @coverage: 90.5% (2026-03-03)
 
-import { catchError, takeUntil } from 'rxjs/operators';
+import { catchError, switchMap, takeUntil } from 'rxjs/operators';
 
-import { Subject, Subscription, forkJoin, of } from 'rxjs';
+import { BehaviorSubject, Observable, Subject, Subscription, forkJoin, of } from 'rxjs';
 
 import { ContentAnalyticsComponent } from '@app/elohim/components/content-analytics/content-analytics.component';
 import { EprRelationshipsPanelComponent } from '@app/elohim/components/epr-relationships-panel/epr-relationships-panel.component';
@@ -54,7 +54,10 @@ import {
 import { ReactionBarComponent } from '@app/qahal/components/reaction-bar/reaction-bar.component';
 import { AttentionTrackerService } from '@app/shefa/services/attention-tracker.service';
 
-import type { ContentStewardshipView } from '@elohim/storage-client/generated';
+import {
+  ResilienceService as LibResilienceService,
+  ResilienceSnapshotComponent,
+} from '@elohim/service/public-api';
 
 import { SeoService } from '../../../services/seo.service';
 import { ContentDownloadComponent } from '../../content-io/components/content-download/content-download.component';
@@ -80,7 +83,9 @@ import { FocusedViewToggleComponent } from '../focused-view-toggle/focused-view-
 import { MiniGraphComponent } from '../mini-graph/mini-graph.component';
 
 import type { HouseholdResilienceView } from '../../../generated/household-resilience-view';
+import type { ResilienceSnapshotView } from '../../../generated/resilience-snapshot-view';
 import type { EprRelationship } from '@app/elohim/models/epr-head.model';
+import type { ContentStewardshipView } from '@elohim/storage-client/generated';
 
 @Component({
   selector: 'app-content-viewer',
@@ -97,6 +102,7 @@ import type { EprRelationship } from '@app/elohim/models/epr-head.model';
     ContentAnalyticsComponent,
     ProtocolOmnibarComponent,
     EprRelationshipsPanelComponent,
+    ResilienceSnapshotComponent,
   ],
   templateUrl: './content-viewer.component.html',
   styleUrls: ['./content-viewer.component.css'],
@@ -172,6 +178,12 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
 
   private readonly destroy$ = new Subject<void>();
   private nodeId: string | null = null;
+  private readonly nodeId$ = new BehaviorSubject<string | null>(null);
+
+  readonly resilienceSnapshot$: Observable<ResilienceSnapshotView | null> = this.nodeId$.pipe(
+    switchMap(id => (id ? this.libResilience.getSnapshot(id) : of(null)))
+  );
+
   private readonly seoService = inject(SeoService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
@@ -189,6 +201,7 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
   private readonly signalHarness = inject(SignalHarnessService);
   private readonly stewardshipService = inject(StewardshipAllocationService);
   private readonly resilienceService = inject(ResilienceService);
+  private readonly libResilience = inject(LibResilienceService);
   private readonly householdResilienceService = inject(HouseholdResilienceService);
   private readonly attentionTracker = inject(AttentionTrackerService);
   private readonly eprResolver = inject(EprResolverService);
@@ -211,6 +224,7 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
           this.attentionTracker.trackContentLeave(this.nodeId);
         }
         this.nodeId = resourceId;
+        this.nodeId$.next(resourceId);
         this.loadContent(resourceId);
       }
     });
@@ -1040,47 +1054,6 @@ export class ContentViewerComponent implements OnInit, OnDestroy, AfterViewCheck
       invited: 'Invited — explicitly invited individuals',
     };
     return descriptions[reach] || `Reach: ${reach}`;
-  }
-
-  /**
-   * Resilience icon — household-first protection status indicator.
-   */
-  getResilienceIcon(): string {
-    const s = this.householdResilience?.protectionStatus;
-    switch (s) {
-      case 'protected':
-        return '\u{1F7E2}'; // green circle
-      case 'partial':
-        return '\u{1F7E1}'; // yellow circle
-      case 'at-risk':
-        return '\u{1F534}'; // red circle
-      default:
-        return '\u{1F504}'; // loading (arrows)
-    }
-  }
-
-  /**
-   * Resilience tooltip — household-first with shard-level data as supplement.
-   */
-  getResilienceTooltip(): string {
-    if (!this.householdResilience) return 'Loading resilience\u2026';
-    const hr = this.householdResilience;
-    const lines: string[] = [`Households stewarding: ${hr.householdsStewarding}`];
-    if (hr.householdsReciprocated > 0) {
-      lines.push(`Reciprocated: ${hr.householdsReciprocated}`);
-    }
-    lines.push(`Protection: ${hr.protectionStatus}`);
-    if (this.resilience?.encoding) {
-      lines.push(`Encoding: ${this.resilience.encoding.strategy}`);
-    }
-    if (this.resilience?.distribution) {
-      lines.push(`Peers online: ${this.resilience.distribution.distinctPeers}`);
-    }
-    const healthScore = this.resilience?.health?.score;
-    if (healthScore !== undefined) {
-      lines.push(`Health: ${Math.round(healthScore * 100)}%`);
-    }
-    return lines.join('\n');
   }
 
   // =========================================================================

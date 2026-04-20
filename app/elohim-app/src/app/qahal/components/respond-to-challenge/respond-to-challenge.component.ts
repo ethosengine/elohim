@@ -9,9 +9,9 @@
 import { Component, computed, inject, input, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
-import type { ChallengeView, RespondToChallengeInputView } from '@elohim/storage-client/generated';
-
 import { GovernanceApiService } from '@app/elohim/services/governance-api.service';
+
+import type { ChallengeView, RespondToChallengeInputView } from '@elohim/storage-client/generated';
 
 /** Outcome radio options. */
 const OUTCOME_OPTIONS = [
@@ -40,7 +40,8 @@ const OUTCOME_OPTIONS = [
                 [value]="opt.value"
                 [ngModel]="outcome()"
                 (ngModelChange)="outcome.set($event)"
-                data-testid="outcome-radio" />
+                data-testid="outcome-radio"
+              />
               {{ opt.label }}
             </label>
           }
@@ -90,7 +91,8 @@ const OUTCOME_OPTIONS = [
           [ngModel]="setsPrecedent()"
           (ngModelChange)="setsPrecedent.set($event)"
           name="setsPrecedent"
-          data-testid="sets-precedent-checkbox" />
+          data-testid="sets-precedent-checkbox"
+        />
         <span>This response sets a precedent for future challenges</span>
       </label>
 
@@ -102,7 +104,8 @@ const OUTCOME_OPTIONS = [
         type="submit"
         class="submit-btn"
         [disabled]="!canSubmit() || submitting()"
-        data-testid="submit-response-btn">
+        data-testid="submit-response-btn"
+      >
         @if (submitting()) {
           Submitting...
         } @else {

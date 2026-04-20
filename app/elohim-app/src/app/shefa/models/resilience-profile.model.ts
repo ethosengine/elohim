@@ -20,8 +20,8 @@
  *   temporary or signals network attrition.
  */
 
-import type { ReachLevel } from '@app/elohim/models/protocol-core.model';
 import type { AgentRef } from '@app/elohim/models/coordination-envelope.model';
+import type { ReachLevel } from '@app/elohim/models/protocol-core.model';
 
 // =============================================================================
 // Core Profile

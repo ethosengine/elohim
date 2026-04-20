@@ -72,6 +72,10 @@ async fn register_human(
         location: body.location,
         profile_photo_url: body.profile_photo_url,
         h_app_id: "imagodei".to_string(),
+        // Registration via HTTP API does not carry household signal at this
+        // point; household membership is populated by the seeder pipeline or
+        // the household_backfill startup pass.
+        household_id: None,
     };
 
     let mut conn = get_conn(pool)?;

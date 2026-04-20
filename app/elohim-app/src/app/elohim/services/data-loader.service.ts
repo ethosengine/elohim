@@ -24,7 +24,12 @@ import {
   KnowledgeMapType,
   KnowledgeNode,
 } from '../../lamad/models/knowledge-map.model';
-import { LearningPath, PathIndex, PathIndexEntry, parsePathView } from '../../lamad/models/learning-path.model';
+import {
+  LearningPath,
+  PathIndex,
+  PathIndexEntry,
+  parsePathView,
+} from '../../lamad/models/learning-path.model';
 import {
   PathExtensionIndex,
   PathExtension,
@@ -36,19 +41,23 @@ import {
   UpstreamProposal,
   ExtensionStats,
 } from '../../lamad/models/path-extension.model';
+import { CONTENT_ATTESTATION } from '../interfaces/content-attestation.interface';
+import { GOVERNANCE } from '../interfaces/governance.interface';
 import { Agent, AgentProgress, AgentAttestation } from '../models/agent.model';
 
 import { ContentResolverService } from './content-resolver.service';
 import { ContentService } from './content.service';
-import { GOVERNANCE } from '../interfaces/governance.interface';
-import { CONTENT_ATTESTATION } from '../interfaces/content-attestation.interface';
-
-import type { IGovernance } from '../interfaces/governance.interface';
-import type { IContentAttestation } from '../interfaces/content-attestation.interface';
-import type { GovernanceStateView, ChallengeView, DiscussionView } from '@elohim/storage-client/generated';
 import { IndexedDBCacheService } from './indexeddb-cache.service';
 import { LoggerService } from './logger.service';
 import { ProjectionAPIService } from './projection-api.service';
+
+import type { IContentAttestation } from '../interfaces/content-attestation.interface';
+import type { IGovernance } from '../interfaces/governance.interface';
+import type {
+  GovernanceStateView,
+  ChallengeView,
+  DiscussionView,
+} from '@elohim/storage-client/generated';
 
 // Content index types
 export interface ContentIndexEntry {
@@ -306,7 +315,8 @@ export class DataLoaderService {
         if (!node || node.contentType === 'placeholder') {
           // Distinguish true 404 from network-error placeholders:
           // Placeholders from network errors contain the original error in description
-          const isNetworkError = node?.description?.includes('Error') ||
+          const isNetworkError =
+            node?.description?.includes('Error') ||
             node?.description?.includes('timeout') ||
             node?.description?.includes('could not be loaded');
           if (isNetworkError) {
@@ -401,9 +411,8 @@ export class DataLoaderService {
     const source$ = this.projectionApi.enabled
       ? this.projectionApi.getContentNode(resourceId).pipe(
           timeout(3000),
-          switchMap(content => content
-            ? of(content)
-            : this.contentService.getContent(resourceId)
+          switchMap(content =>
+            content ? of(content) : this.contentService.getContent(resourceId)
           ),
           catchError(() => this.contentService.getContent(resourceId))
         )
@@ -958,7 +967,6 @@ export class DataLoaderService {
     return of([]);
   }
 
-
   /**
    * Get attestations for a specific content node.
    * Uses dedicated Holochain query for efficiency.
@@ -975,8 +983,13 @@ export class DataLoaderService {
           id: r.id,
           contentId: r.contentId,
           attestationType: r.attestationType as ContentAttestation['attestationType'],
-          reachGranted: (r as Record<string, unknown>)['reachGranted'] as ContentAttestation['reachGranted'] ?? 'commons',
-          grantedBy: (r as Record<string, unknown>)['grantedBy'] as ContentAttestation['grantedBy'] ?? { type: 'system', grantorId: 'unknown' },
+          reachGranted:
+            ((r as Record<string, unknown>)[
+              'reachGranted'
+            ] as ContentAttestation['reachGranted']) ?? 'commons',
+          grantedBy: ((r as Record<string, unknown>)[
+            'grantedBy'
+          ] as ContentAttestation['grantedBy']) ?? { type: 'system', grantorId: 'unknown' },
           grantedAt: r.createdAt,
           status: (r.isRevoked ? 'revoked' : 'active') as ContentAttestation['status'],
           metadata: {} as ContentAttestation['metadata'],
@@ -1019,7 +1032,8 @@ export class DataLoaderService {
    * Load the knowledge map index from content service.
    */
   getKnowledgeMapIndex(): Observable<KnowledgeMapIndex> {
-    if (false) { // TODO: Remove dead availability guards after migration verified
+    if (false) {
+      // TODO: Remove dead availability guards after migration verified
       return of({ maps: [], totalCount: 0, lastUpdated: new Date().toISOString() });
     }
 
@@ -1039,7 +1053,8 @@ export class DataLoaderService {
    * Load a specific knowledge map from content service.
    */
   getKnowledgeMap(mapId: string): Observable<KnowledgeMap | null> {
-    if (false) { // TODO: Remove dead availability guards after migration verified
+    if (false) {
+      // TODO: Remove dead availability guards after migration verified
       return of(null);
     }
 
@@ -1181,7 +1196,8 @@ export class DataLoaderService {
    * Load a specific path extension from content service.
    */
   getPathExtension(extensionId: string): Observable<PathExtension | null> {
-    if (false) { // TODO: Remove dead availability guards after migration verified
+    if (false) {
+      // TODO: Remove dead availability guards after migration verified
       return of(null);
     }
 
@@ -1341,7 +1357,8 @@ export class DataLoaderService {
    */
   getGraph(): Observable<ContentGraph> {
     if (!this.graphCache$) {
-      if (true) { // Content graph served from projection tier
+      if (true) {
+        // Content graph served from projection tier
         // Build graph from Holochain relationships
         this.graphCache$ = this.buildGraphFromHolochain().pipe(
           shareReplay(1),
@@ -1403,7 +1420,8 @@ export class DataLoaderService {
     contentId: string,
     direction: 'outgoing' | 'incoming' | 'both'
   ): Observable<ContentRelationship[]> {
-    if (false) { // TODO: Remove dead availability guards after migration verified
+    if (false) {
+      // TODO: Remove dead availability guards after migration verified
       return of([]);
     }
 
@@ -1606,7 +1624,8 @@ export class DataLoaderService {
    * Builds from Content entries with assessment contentType.
    */
   getAssessmentIndex(): Observable<AssessmentIndex> {
-    if (false) { // TODO: Remove dead availability guards after migration verified
+    if (false) {
+      // TODO: Remove dead availability guards after migration verified
       return of({ assessments: [], totalCount: 0, lastUpdated: new Date().toISOString() });
     }
 
@@ -1661,7 +1680,8 @@ export class DataLoaderService {
    * Aggregates counts from all governance entity types.
    */
   getGovernanceIndex(): Observable<GovernanceIndex> {
-    if (false) { // TODO: Remove dead availability guards after migration verified
+    if (false) {
+      // TODO: Remove dead availability guards after migration verified
       return of({
         lastUpdated: new Date().toISOString(),
         challengeCount: 0,
@@ -1704,7 +1724,8 @@ export class DataLoaderService {
    * Load all challenges from Holochain.
    */
   getChallenges(): Observable<ChallengeRecord[]> {
-    if (false) { // TODO: Remove dead availability guards after migration verified
+    if (false) {
+      // TODO: Remove dead availability guards after migration verified
       return of([]);
     }
 
@@ -1720,13 +1741,12 @@ export class DataLoaderService {
    * Get challenges for a specific entity.
    */
   getChallengesForEntity(entityType: string, entityId: string): Observable<ChallengeRecord[]> {
-    if (false) { // TODO: Remove dead availability guards after migration verified
+    if (false) {
+      // TODO: Remove dead availability guards after migration verified
       return of([]);
     }
 
-    return defer(() =>
-      from(this.governance.queryChallenges(entityId))
-    ).pipe(
+    return defer(() => from(this.governance.queryChallenges(entityId))).pipe(
       map(results => results.map(r => this.transformChallengeView(r))),
       catchError(_err => {
         return of([]);
@@ -1770,7 +1790,8 @@ export class DataLoaderService {
    * Load all proposals from Holochain.
    */
   getProposals(): Observable<ProposalRecord[]> {
-    if (false) { // TODO: Remove dead availability guards after migration verified
+    if (false) {
+      // TODO: Remove dead availability guards after migration verified
       return of([]);
     }
 
@@ -1786,14 +1807,17 @@ export class DataLoaderService {
    * Get proposals by status (voting, discussion, decided).
    */
   getProposalsByStatus(status: string): Observable<ProposalRecord[]> {
-    if (false) { // TODO: Remove dead availability guards after migration verified
+    if (false) {
+      // TODO: Remove dead availability guards after migration verified
       return of([]);
     }
 
     return defer(() => from(this.governance.queryGovernanceStates('proposal'))).pipe(
-      map(results => results
-        .filter(r => (r as Record<string, unknown>)['status'] === status)
-        .map(r => this.transformGovernanceStateToProposal(r))),
+      map(results =>
+        results
+          .filter(r => (r as Record<string, unknown>)['status'] === status)
+          .map(r => this.transformGovernanceStateToProposal(r))
+      ),
       catchError(_err => {
         return of([]);
       })
@@ -1820,7 +1844,8 @@ export class DataLoaderService {
    * Load all precedents from Holochain.
    */
   getPrecedents(): Observable<PrecedentRecord[]> {
-    if (false) { // TODO: Remove dead availability guards after migration verified
+    if (false) {
+      // TODO: Remove dead availability guards after migration verified
       return of([]);
     }
 
@@ -1836,14 +1861,17 @@ export class DataLoaderService {
    * Get precedents by binding level (constitutional, binding-network, binding-local, persuasive).
    */
   getPrecedentsByBinding(binding: string): Observable<PrecedentRecord[]> {
-    if (false) { // TODO: Remove dead availability guards after migration verified
+    if (false) {
+      // TODO: Remove dead availability guards after migration verified
       return of([]);
     }
 
     return defer(() => from(this.governance.queryGovernanceStates('precedent'))).pipe(
-      map(results => results
-        .filter(r => (r as Record<string, unknown>)['binding'] === binding)
-        .map(r => this.transformGovernanceStateToPrecedent(r))),
+      map(results =>
+        results
+          .filter(r => (r as Record<string, unknown>)['binding'] === binding)
+          .map(r => this.transformGovernanceStateToPrecedent(r))
+      ),
       catchError(_err => {
         return of([]);
       })
@@ -1870,7 +1898,8 @@ export class DataLoaderService {
    * Load all discussion threads from Holochain.
    */
   getDiscussions(): Observable<DiscussionRecord[]> {
-    if (false) { // TODO: Remove dead availability guards after migration verified
+    if (false) {
+      // TODO: Remove dead availability guards after migration verified
       return of([]);
     }
 
@@ -1886,13 +1915,12 @@ export class DataLoaderService {
    * Get discussions for a specific entity.
    */
   getDiscussionsForEntity(entityType: string, entityId: string): Observable<DiscussionRecord[]> {
-    if (false) { // TODO: Remove dead availability guards after migration verified
+    if (false) {
+      // TODO: Remove dead availability guards after migration verified
       return of([]);
     }
 
-    return defer(() =>
-      from(this.governance.queryDiscussions(entityId))
-    ).pipe(
+    return defer(() => from(this.governance.queryDiscussions(entityId))).pipe(
       map(results => results.map(r => this.transformDiscussionView(r))),
       catchError(_err => {
         return of([]);
@@ -1926,7 +1954,15 @@ export class DataLoaderService {
       entityId: view.contentId,
       category: '',
       title: '',
-      messages: [{ id: view.id, authorId: view.authorPresenceId, authorName: '', content: view.body, createdAt: view.createdAt }] as DiscussionRecord['messages'],
+      messages: [
+        {
+          id: view.id,
+          authorId: view.authorPresenceId,
+          authorName: '',
+          content: view.body,
+          createdAt: view.createdAt,
+        },
+      ] as DiscussionRecord['messages'],
       status: 'open',
       messageCount: 1,
     };
@@ -1939,16 +1975,13 @@ export class DataLoaderService {
     entityType: string,
     entityId: string
   ): Observable<GovernanceStateRecord | null> {
-    if (false) { // TODO: Remove dead availability guards after migration verified
+    if (false) {
+      // TODO: Remove dead availability guards after migration verified
       return of(null);
     }
 
-    return defer(() =>
-      from(this.governance.getGovernanceState(entityType, entityId))
-    ).pipe(
-      map(result =>
-        result ? this.transformGovernanceStateView(result) : null
-      ),
+    return defer(() => from(this.governance.getGovernanceState(entityType, entityId))).pipe(
+      map(result => (result ? this.transformGovernanceStateView(result) : null)),
       catchError(_err => {
         return of(null);
       })

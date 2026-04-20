@@ -1,0 +1,33 @@
+<section class="signals-card" data-testid="shefa-signals-card">
+  <header>
+    <h3>Signals</h3>
+    <span class="subline" *ngIf="!loading">
+      {{ totalGaps }} placement gap{{ totalGaps === 1 ? '' : 's' }}
+    </span>
+  </header>
+
+  <ng-container *ngIf="loading">Loading…</ng-container>
+  <ng-container *ngIf="error">Signals unavailable: {{ error }}</ng-container>
+
+  <ng-container *ngIf="!loading && !error">
+    <div *ngIf="totalGaps === 0" class="empty">All distribution is within contract bounds.</div>
+
+    <div *ngIf="byKind('peers-unavailable').length > 0" class="signal signal-peers-unavailable">
+      <strong>{{ byKind('peers-unavailable').length }}</strong>
+      shards need more online peers
+      <small>(recruit — peers with commitments are offline)</small>
+    </div>
+
+    <div *ngIf="byKind('contracts-short').length > 0" class="signal signal-contracts-short">
+      <strong>{{ byKind('contracts-short').length }}</strong>
+      shards lack matching commitments
+      <small>(propose contracts — coverage is insufficient)</small>
+    </div>
+
+    <div *ngIf="byKind('under-committed').length > 0" class="signal signal-under-committed">
+      <strong>{{ byKind('under-committed').length }}</strong>
+      shards placed but diversity-short
+      <small>(subsidize — commitments exist but households are concentrated)</small>
+    </div>
+  </ng-container>
+</section>

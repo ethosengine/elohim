@@ -21,7 +21,6 @@ import { Injectable, inject } from '@angular/core';
 
 // @coverage: 33.6% (2026-02-24)
 
-
 import { EconomicEvent } from '@app/elohim/models/economic-event.model';
 import {
   CommonsPool,
@@ -39,6 +38,7 @@ import {
 } from '@app/shefa/models/insurance-mutual.model';
 
 import { ECONOMIC_EVENT_FACTORY, type IEconomicEventFactory } from '../interfaces';
+
 import type { AgreementMetadata } from '../generated/metadata-types';
 
 /**
@@ -179,15 +179,15 @@ export class InsuranceMutualService {
 
     // Step 5: Create immutable enrollment event
     const enrollmentEvent = await this.economicService.createEconomicEvent({
-        action: 'deliver-service',
-        providerId: memberId,
-        receiverId: ELOHIM_MUTUAL,
-        resourceClassifiedAs: ['stewardship', 'membership'],
-        note: `Member ${memberId} enrolled in ${qahalId} mutual. Risk tier: ${
-          riskProfile.riskTier
-        }. Coverage level: community.`,
-        lamadEventType: 'coverage-decision',
-      });
+      action: 'deliver-service',
+      providerId: memberId,
+      receiverId: ELOHIM_MUTUAL,
+      resourceClassifiedAs: ['stewardship', 'membership'],
+      note: `Member ${memberId} enrolled in ${qahalId} mutual. Risk tier: ${
+        riskProfile.riskTier
+      }. Coverage level: community.`,
+      lamadEventType: 'coverage-decision',
+    });
 
     // Step 6: Link policy and risk profile to event
     riskProfile.assessmentEventIds.push(enrollmentEvent.id);
@@ -365,13 +365,13 @@ export class InsuranceMutualService {
 
     // Step 10: Create assessment event
     const assessmentEvent = await this.economicService.createEconomicEvent({
-        action: 'raise',
-        providerId: ELOHIM_MUTUAL,
-        receiverId: memberId,
-        resourceClassifiedAs: ['risk-assessment', 'behavioral-observation'],
-        note: `Risk assessment for ${_riskType}. New score: ${newRiskScore} (tier: ${newRiskTier}). Trend: ${riskTrend}. Evidence: ${careEventCount} care events, ${communityEventCount} community events, ${claimsEventCount} claims.`,
-        lamadEventType: EVENT_TYPE_PREVENTIVE_CARE,
-      });
+      action: 'raise',
+      providerId: ELOHIM_MUTUAL,
+      receiverId: memberId,
+      resourceClassifiedAs: ['risk-assessment', 'behavioral-observation'],
+      note: `Risk assessment for ${_riskType}. New score: ${newRiskScore} (tier: ${newRiskTier}). Trend: ${riskTrend}. Evidence: ${careEventCount} care events, ${communityEventCount} community events, ${claimsEventCount} claims.`,
+      lamadEventType: EVENT_TYPE_PREVENTIVE_CARE,
+    });
 
     // Step 11: Link event to profile
     updatedProfile.assessmentEventIds.push(assessmentEvent.id);
@@ -518,19 +518,19 @@ export class InsuranceMutualService {
 
     // Step 5: Create EVENT_TYPE_CLAIM_FILED EconomicEvent
     const claimFiledEvent = await this.economicService.createEconomicEvent({
-        action: 'work',
-        providerId: memberId,
-        receiverId: ELOHIM_MUTUAL,
-        resourceConformsTo: lossDetails.lossType,
-        resourceQuantityValue: lossDetails.estimatedLossAmount.hasNumericalValue,
-        resourceQuantityUnit: lossDetails.estimatedLossAmount.hasUnit,
-        note: `Member filed claim for ${lossDetails.lossType}. Loss date: ${
-          lossDetails.lossDate
-        }. Description: ${lossDetails.description}. Observer attestations: ${
-          lossDetails.observerAttestationIds.length
-        }`,
-        lamadEventType: EVENT_TYPE_CLAIM_FILED,
-      });
+      action: 'work',
+      providerId: memberId,
+      receiverId: ELOHIM_MUTUAL,
+      resourceConformsTo: lossDetails.lossType,
+      resourceQuantityValue: lossDetails.estimatedLossAmount.hasNumericalValue,
+      resourceQuantityUnit: lossDetails.estimatedLossAmount.hasUnit,
+      note: `Member filed claim for ${lossDetails.lossType}. Loss date: ${
+        lossDetails.lossDate
+      }. Description: ${lossDetails.description}. Observer attestations: ${
+        lossDetails.observerAttestationIds.length
+      }`,
+      lamadEventType: EVENT_TYPE_CLAIM_FILED,
+    });
 
     // Step 6: Link event to claim
     claim.eventIds.filedEventId = claimFiledEvent.id;
@@ -856,8 +856,7 @@ export class InsuranceMutualService {
       coverageLimit &&
       finalApprovedAmount &&
       typeof coverageLimit.hasNumericalValue === 'number' &&
-      finalApprovedAmount.hasNumericalValue >
-        coverageLimit.hasNumericalValue * 0.8
+      finalApprovedAmount.hasNumericalValue > coverageLimit.hasNumericalValue * 0.8
     ) {
       flagForGovernance = true;
       flagReason = 'large-claim';
@@ -883,12 +882,12 @@ export class InsuranceMutualService {
 
     // Step 7: Create 'claim-adjusted' EconomicEvent
     const adjustedEvent = await this.economicService.createEconomicEvent({
-        action: 'modify',
-        providerId: _adjusterId,
-        receiverId: claim.memberId,
-        note: `Claim adjusted. ${reasoning.plainLanguageExplanation}`,
-        lamadEventType: 'claim-adjusted',
-      });
+      action: 'modify',
+      providerId: _adjusterId,
+      receiverId: claim.memberId,
+      note: `Claim adjusted. ${reasoning.plainLanguageExplanation}`,
+      lamadEventType: 'claim-adjusted',
+    });
 
     // Update event reference in claim
     claim.eventIds.adjustedEventId = adjustedEvent.id;
@@ -986,15 +985,15 @@ export class InsuranceMutualService {
 
     // Step 3: Create 'claim-settled' EconomicEvent (transfer)
     const settlementEvent = await this.economicService.createEconomicEvent({
-        action: 'transfer',
-        providerId: ELOHIM_MUTUAL,
-        receiverId: claim.memberId,
-        resourceConformsTo: 'settlement-payment',
-        resourceQuantityValue: netPaymentToMember,
-        resourceQuantityUnit: settledAmount.hasUnit ?? UNIT_TOKEN,
-        note: `Claim settlement. Gross: ${settledAmount.hasNumericalValue}. Deductible: -${deductibleAmount}. Coinsurance: -${coinsuranceAmount}. Net to member: ${netPaymentToMember}`,
-        lamadEventType: 'claim-settled',
-      });
+      action: 'transfer',
+      providerId: ELOHIM_MUTUAL,
+      receiverId: claim.memberId,
+      resourceConformsTo: 'settlement-payment',
+      resourceQuantityValue: netPaymentToMember,
+      resourceQuantityUnit: settledAmount.hasUnit ?? UNIT_TOKEN,
+      note: `Claim settlement. Gross: ${settledAmount.hasNumericalValue}. Deductible: -${deductibleAmount}. Coinsurance: -${coinsuranceAmount}. Net to member: ${netPaymentToMember}`,
+      lamadEventType: 'claim-settled',
+    });
 
     // Step 4: Create AttributionClaim for member against CommonsPool
     // This records the member's claim on the pool's reserves

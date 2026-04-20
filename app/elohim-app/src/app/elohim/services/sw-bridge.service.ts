@@ -6,10 +6,8 @@ import { Injectable } from '@angular/core';
  */
 @Injectable({ providedIn: 'root' })
 export class SwBridgeService {
-  private channel: BroadcastChannel | null =
-    typeof BroadcastChannel !== 'undefined'
-      ? new BroadcastChannel('apps-sw')
-      : null;
+  private readonly channel: BroadcastChannel | null =
+    typeof BroadcastChannel === 'undefined' ? null : new BroadcastChannel('apps-sw');
 
   /** Tell the SW to evict all cached files for an app */
   invalidateApp(slug: string): void {

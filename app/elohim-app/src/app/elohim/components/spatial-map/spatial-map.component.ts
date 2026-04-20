@@ -1,3 +1,4 @@
+import { CommonModule } from '@angular/common';
 import {
   Component,
   ChangeDetectionStrategy,
@@ -9,13 +10,14 @@ import {
   computed,
   inject,
 } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { Subject, takeUntil } from 'rxjs';
-import maplibregl from 'maplibre-gl';
 
-import type { PlaceView, SpatialDashboardView, PlaceDashboardEntry } from '@elohim/storage-client';
+import maplibregl from 'maplibre-gl';
+import { Subject, takeUntil } from 'rxjs';
+
 import { PlacesApiService } from '../../services/places-api.service';
 import { SpatialDashboardApiService } from '../../services/spatial-dashboard-api.service';
+
+import type { PlaceView, SpatialDashboardView, PlaceDashboardEntry } from '@elohim/storage-client';
 
 /** Color mapping for constitutional layers */
 const LAYER_COLORS: Record<string, string> = {
@@ -62,7 +64,14 @@ const HAZARD_SEVERITY_COLORS: Record<string, string> = {
 
       @if (selectedPlace()) {
         <div class="place-panel">
-          <button class="close-btn" data-testid="close-place-panel" aria-label="Close place panel" (click)="selectedPlace.set(null)">&times;</button>
+          <button
+            class="close-btn"
+            data-testid="close-place-panel"
+            aria-label="Close place panel"
+            (click)="selectedPlace.set(null)"
+          >
+            &times;
+          </button>
           <h3>{{ selectedPlace()!.name }}</h3>
           <div class="badges">
             <span class="badge type">{{ selectedPlace()!.placeType }}</span>
@@ -99,7 +108,12 @@ const HAZARD_SEVERITY_COLORS: Record<string, string> = {
           <!-- Layer selector -->
           <div class="layer-selector">
             <label for="layer-select">Scope</label>
-            <select id="layer-select" data-testid="layer-select" [value]="selectedLayer()" (change)="onLayerChange($event)">
+            <select
+              id="layer-select"
+              data-testid="layer-select"
+              [value]="selectedLayer()"
+              (change)="onLayerChange($event)"
+            >
               <option value="">All layers</option>
               <option value="global">Global</option>
               <option value="bioregional">Bioregional</option>
@@ -129,21 +143,46 @@ const HAZARD_SEVERITY_COLORS: Record<string, string> = {
           <!-- Risk distribution bar -->
           <div class="risk-bar">
             <div class="risk-segment low" [style.flex]="data.summary.placesByRiskTier.low"></div>
-            <div class="risk-segment moderate" [style.flex]="data.summary.placesByRiskTier.moderate"></div>
-            <div class="risk-segment elevated" [style.flex]="data.summary.placesByRiskTier.elevated"></div>
-            <div class="risk-segment critical" [style.flex]="data.summary.placesByRiskTier.critical"></div>
+            <div
+              class="risk-segment moderate"
+              [style.flex]="data.summary.placesByRiskTier.moderate"
+            ></div>
+            <div
+              class="risk-segment elevated"
+              [style.flex]="data.summary.placesByRiskTier.elevated"
+            ></div>
+            <div
+              class="risk-segment critical"
+              [style.flex]="data.summary.placesByRiskTier.critical"
+            ></div>
           </div>
           <div class="risk-legend">
-            <span class="legend-item"><span class="dot low"></span> Low</span>
-            <span class="legend-item"><span class="dot moderate"></span> Moderate</span>
-            <span class="legend-item"><span class="dot elevated"></span> Elevated</span>
-            <span class="legend-item"><span class="dot critical"></span> Critical</span>
+            <span class="legend-item">
+              <span class="dot low"></span>
+              Low
+            </span>
+            <span class="legend-item">
+              <span class="dot moderate"></span>
+              Moderate
+            </span>
+            <span class="legend-item">
+              <span class="dot elevated"></span>
+              Elevated
+            </span>
+            <span class="legend-item">
+              <span class="dot critical"></span>
+              Critical
+            </span>
           </div>
 
           <!-- Place list sorted by risk -->
           <div class="place-list">
             @for (entry of sortedPlaces(); track entry.id) {
-              <button class="place-list-item" (click)="flyToPlace(entry)" data-testid="place-list-item">
+              <button
+                class="place-list-item"
+                (click)="flyToPlace(entry)"
+                data-testid="place-list-item"
+              >
                 <span class="place-name">{{ entry.name }}</span>
                 <div class="place-indicators">
                   @if (entry.vulnerability) {
@@ -173,13 +212,20 @@ const HAZARD_SEVERITY_COLORS: Record<string, string> = {
         aria-label="Toggle dashboard mode"
       >
         <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/>
+          <path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z" />
         </svg>
       </button>
 
-      <button class="locate-btn" data-testid="geolocate-btn" aria-label="Show my location" (click)="geolocate()">
+      <button
+        class="locate-btn"
+        data-testid="geolocate-btn"
+        aria-label="Show my location"
+        (click)="geolocate()"
+      >
         <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3A8.994 8.994 0 0013 3.06V1h-2v2.06A8.994 8.994 0 003.06 11H1v2h2.06A8.994 8.994 0 0011 20.94V23h2v-2.06A8.994 8.994 0 0020.94 13H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/>
+          <path
+            d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3A8.994 8.994 0 0013 3.06V1h-2v2.06A8.994 8.994 0 003.06 11H1v2h2.06A8.994 8.994 0 0011 20.94V23h2v-2.06A8.994 8.994 0 0020.94 13H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"
+          />
         </svg>
       </button>
     </div>
@@ -225,7 +271,7 @@ export class SpatialMapComponent implements AfterViewInit, OnDestroy {
   }
 
   toggleDashboardMode(): void {
-    this.dashboardMode.update((v) => !v);
+    this.dashboardMode.update(v => !v);
     if (this.dashboardMode()) {
       this.loadDashboard();
     } else {
@@ -249,7 +295,7 @@ export class SpatialMapComponent implements AfterViewInit, OnDestroy {
     if (!navigator.geolocation) return;
 
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
+      pos => {
         const { latitude, longitude } = pos.coords;
         this.map.flyTo({ center: [longitude, latitude], zoom: 14 });
 
@@ -275,13 +321,13 @@ export class SpatialMapComponent implements AfterViewInit, OnDestroy {
           });
         }
       },
-      (err) => console.warn('Geolocation failed:', err.message),
-      { enableHighAccuracy: true },
+      err => console.warn('Geolocation failed:', err.message),
+      { enableHighAccuracy: true }
     );
   }
 
   /** Helper to safely cast carrying capacity JSON to array */
-  asArray(val: unknown): Array<{ resourceCategory: string; currentUtilization: number }> {
+  asArray(val: unknown): { resourceCategory: string; currentUtilization: number }[] {
     return Array.isArray(val) ? val : [];
   }
 
@@ -299,7 +345,8 @@ export class SpatialMapComponent implements AfterViewInit, OnDestroy {
             type: 'raster',
             tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
             tileSize: 256,
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+            attribution:
+              '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
           },
         },
         layers: [
@@ -325,7 +372,7 @@ export class SpatialMapComponent implements AfterViewInit, OnDestroy {
         this.placesApi
           .getById(props?.['id'] as string)
           .pipe(takeUntil(this.destroy$))
-          .subscribe((place) => this.selectedPlace.set(place));
+          .subscribe(place => this.selectedPlace.set(place));
       }
     });
 
@@ -342,7 +389,7 @@ export class SpatialMapComponent implements AfterViewInit, OnDestroy {
     this.placesApi
       .list({ status: 'active' })
       .pipe(takeUntil(this.destroy$))
-      .subscribe((places) => {
+      .subscribe(places => {
         if (!places.length) return;
         this.addPlaceLayers(places);
       });
@@ -350,8 +397,8 @@ export class SpatialMapComponent implements AfterViewInit, OnDestroy {
 
   private addPlaceLayers(places: PlaceView[]): void {
     const features = places
-      .filter((p) => p.geometryJson)
-      .map((p) => ({
+      .filter(p => p.geometryJson)
+      .map(p => ({
         type: 'Feature' as const,
         properties: {
           id: p.id,
@@ -370,7 +417,10 @@ export class SpatialMapComponent implements AfterViewInit, OnDestroy {
     const addLayers = () => {
       if (this.map.getSource('places')) return;
 
-      this.map.addSource('places', { type: 'geojson', data: geojson as unknown as GeoJSON.FeatureCollection });
+      this.map.addSource('places', {
+        type: 'geojson',
+        data: geojson as unknown as GeoJSON.FeatureCollection,
+      });
 
       this.map.addLayer({
         id: 'place-fills',
@@ -426,12 +476,12 @@ export class SpatialMapComponent implements AfterViewInit, OnDestroy {
       .getDashboard(query)
       .pipe(takeUntil(this.destroy$))
       .subscribe({
-        next: (data) => {
+        next: data => {
           this.dashboardData.set(data);
           this.addDashboardLayers(data);
           this.loading.set(false);
         },
-        error: (err) => {
+        error: err => {
           console.error('[SpatialMapComponent] Dashboard load failed:', err);
           this.loading.set(false);
         },
@@ -445,8 +495,8 @@ export class SpatialMapComponent implements AfterViewInit, OnDestroy {
 
       // Build GeoJSON features with risk tier in properties
       const features = data.places
-        .filter((p) => p.geometryJson)
-        .map((p) => ({
+        .filter(p => p.geometryJson)
+        .map(p => ({
           type: 'Feature' as const,
           properties: {
             id: p.id,
@@ -464,7 +514,10 @@ export class SpatialMapComponent implements AfterViewInit, OnDestroy {
 
       const geojson = { type: 'FeatureCollection' as const, features };
 
-      this.map.addSource('places', { type: 'geojson', data: geojson as unknown as GeoJSON.FeatureCollection });
+      this.map.addSource('places', {
+        type: 'geojson',
+        data: geojson as unknown as GeoJSON.FeatureCollection,
+      });
 
       // Fill layer with data-driven risk tier colors
       this.map.addLayer({
@@ -475,10 +528,14 @@ export class SpatialMapComponent implements AfterViewInit, OnDestroy {
           'fill-color': [
             'match',
             ['get', 'riskTier'],
-            'low', RISK_TIER_COLORS['low'],
-            'moderate', RISK_TIER_COLORS['moderate'],
-            'elevated', RISK_TIER_COLORS['elevated'],
-            'critical', RISK_TIER_COLORS['critical'],
+            'low',
+            RISK_TIER_COLORS['low'],
+            'moderate',
+            RISK_TIER_COLORS['moderate'],
+            'elevated',
+            RISK_TIER_COLORS['elevated'],
+            'critical',
+            RISK_TIER_COLORS['critical'],
             '#9E9E9E', // unknown/default
           ],
           'fill-opacity': 0.25,
@@ -514,8 +571,8 @@ export class SpatialMapComponent implements AfterViewInit, OnDestroy {
 
       // Hazard markers — circle layer for places with active hazards
       const hazardFeatures = data.places
-        .filter((p) => (p.hazards?.activeCount ?? 0) > 0)
-        .map((p) => ({
+        .filter(p => (p.hazards?.activeCount ?? 0) > 0)
+        .map(p => ({
           type: 'Feature' as const,
           properties: {
             id: p.id,
@@ -549,16 +606,22 @@ export class SpatialMapComponent implements AfterViewInit, OnDestroy {
               'interpolate',
               ['linear'],
               ['min', ['get', 'activeCount'], 20],
-              1, 8,
-              20, 14,
+              1,
+              8,
+              20,
+              14,
             ],
             'circle-color': [
               'match',
               ['get', 'worstSeverity'],
-              'emergency', HAZARD_SEVERITY_COLORS['emergency'],
-              'warning', HAZARD_SEVERITY_COLORS['warning'],
-              'advisory', HAZARD_SEVERITY_COLORS['advisory'],
-              'watch', HAZARD_SEVERITY_COLORS['watch'],
+              'emergency',
+              HAZARD_SEVERITY_COLORS['emergency'],
+              'warning',
+              HAZARD_SEVERITY_COLORS['warning'],
+              'advisory',
+              HAZARD_SEVERITY_COLORS['advisory'],
+              'watch',
+              HAZARD_SEVERITY_COLORS['watch'],
               '#9E9E9E',
             ],
             'circle-stroke-width': 2,

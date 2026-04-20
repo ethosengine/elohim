@@ -174,7 +174,7 @@ async function main() {
   assert(
     viewValidate({
       id: 'test',
-      appId: 'app1',
+      hAppId: 'app1',
       title: 'Test',
       contentType: 'concept',
       contentFormat: 'markdown',
@@ -199,7 +199,7 @@ async function main() {
   assert(
     viewValidate({
       id: 'test',
-      appId: 'app1',
+      hAppId: 'app1',
       title: 'Test',
       contentType: 'concept',
       contentFormat: 'markdown',

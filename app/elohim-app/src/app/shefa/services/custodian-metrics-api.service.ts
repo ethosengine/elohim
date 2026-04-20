@@ -31,21 +31,16 @@ export class CustodianMetricsApiService implements ICustodianMetrics {
     return firstValueFrom(this.http.get<CustodianMetrics[]>('/api/v1/custodians/metrics'));
   }
 
-  async reportMetrics(
-    metrics: CustodianMetrics
-  ): Promise<{ success: boolean; error?: string }> {
+  async reportMetrics(metrics: CustodianMetrics): Promise<{ success: boolean; error?: string }> {
     return firstValueFrom(
-      this.http.post<{ success: boolean; error?: string }>(
-        '/api/v1/custodians/metrics',
-        metrics
-      )
+      this.http.post<{ success: boolean; error?: string }>('/api/v1/custodians/metrics', metrics)
     );
   }
 
   async getRankedByHealth(limit?: number): Promise<CustodianMetrics[]> {
     return firstValueFrom(
       this.http.get<CustodianMetrics[]>('/api/v1/custodians/metrics', {
-        params: { rank: 'health', ...(limit != null ? { limit: limit.toString() } : {}) },
+        params: { rank: 'health', ...(limit == null ? {} : { limit: limit.toString() }) },
       })
     );
   }
@@ -53,7 +48,7 @@ export class CustodianMetricsApiService implements ICustodianMetrics {
   async getRankedBySpeed(limit?: number): Promise<CustodianMetrics[]> {
     return firstValueFrom(
       this.http.get<CustodianMetrics[]>('/api/v1/custodians/metrics', {
-        params: { rank: 'speed', ...(limit != null ? { limit: limit.toString() } : {}) },
+        params: { rank: 'speed', ...(limit == null ? {} : { limit: limit.toString() }) },
       })
     );
   }
@@ -61,7 +56,7 @@ export class CustodianMetricsApiService implements ICustodianMetrics {
   async getRankedByReputation(limit?: number): Promise<CustodianMetrics[]> {
     return firstValueFrom(
       this.http.get<CustodianMetrics[]>('/api/v1/custodians/metrics', {
-        params: { rank: 'reputation', ...(limit != null ? { limit: limit.toString() } : {}) },
+        params: { rank: 'reputation', ...(limit == null ? {} : { limit: limit.toString() }) },
       })
     );
   }
@@ -75,16 +70,12 @@ export class CustodianMetricsApiService implements ICustodianMetrics {
   }
 
   async getAlerts(): Promise<CustodianAlert[]> {
-    return firstValueFrom(
-      this.http.get<CustodianAlert[]>('/api/v1/custodians/metrics/alerts')
-    );
+    return firstValueFrom(this.http.get<CustodianAlert[]>('/api/v1/custodians/metrics/alerts'));
   }
 
   async getRecommendations(): Promise<CustodianRecommendation[]> {
     return firstValueFrom(
-      this.http.get<CustodianRecommendation[]>(
-        '/api/v1/custodians/metrics/recommendations'
-      )
+      this.http.get<CustodianRecommendation[]>('/api/v1/custodians/metrics/recommendations')
     );
   }
 

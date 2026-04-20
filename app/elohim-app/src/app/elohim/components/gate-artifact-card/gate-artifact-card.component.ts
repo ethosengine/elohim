@@ -8,6 +8,7 @@ import {
   inject,
   signal,
 } from '@angular/core';
+
 import { Observable } from 'rxjs';
 
 import {
@@ -71,27 +72,16 @@ const REACH_LABELS: Record<ReachTier, string> = {
             {{ interaction.draftText() }}
           </div>
           <div class="affirm-bar">
-            <span
-              class="reach-badge"
-              [title]="reachLabel()"
-              data-testid="reach-badge"
-            >
+            <span class="reach-badge" [title]="reachLabel()" data-testid="reach-badge">
               {{ reachIcon() }} {{ reachLabel() }}
             </span>
-            <button
-              class="btn-affirm"
-              (click)="onAffirm()"
-              data-testid="artifact-affirm"
-            >
+            <button class="btn-affirm" (click)="onAffirm()" data-testid="artifact-affirm">
               Affirm &amp; Post
             </button>
           </div>
         }
         @case ('dialogue') {
-          <div
-            class="dialogue-prompt"
-            data-testid="dialogue-prompt"
-          >
+          <div class="dialogue-prompt" data-testid="dialogue-prompt">
             {{ interaction.gateResult()?.pausePrompt }}
           </div>
           <textarea
@@ -134,10 +124,7 @@ const REACH_LABELS: Record<ReachTier, string> = {
           <div class="artifact-preview" data-testid="artifact-preview">
             {{ interaction.draftText() }}
           </div>
-          <span
-            class="reach-badge posted-badge"
-            data-testid="reach-badge"
-          >
+          <span class="reach-badge posted-badge" data-testid="reach-badge">
             {{ reachIcon() }} {{ reachLabel() }}
           </span>
         }
@@ -381,7 +368,12 @@ export class GateArtifactCardComponent {
     const text = this.localText().trim();
     if (!text) return;
     if (this.gateApiCall) {
-      this.interaction.submitWithApi(text, this.mutationType, this.contextMetadata, this.gateApiCall);
+      this.interaction.submitWithApi(
+        text,
+        this.mutationType,
+        this.contextMetadata,
+        this.gateApiCall
+      );
     } else {
       this.interaction.submit(text, this.mutationType, this.contextMetadata);
     }
@@ -395,7 +387,12 @@ export class GateArtifactCardComponent {
     const text = this.localText().trim();
     if (!text) return;
     if (this.gateApiCall) {
-      this.interaction.submitWithApi(text, this.mutationType, this.contextMetadata, this.gateApiCall);
+      this.interaction.submitWithApi(
+        text,
+        this.mutationType,
+        this.contextMetadata,
+        this.gateApiCall
+      );
     } else {
       this.interaction.submit(text, this.mutationType, this.contextMetadata);
     }

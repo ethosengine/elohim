@@ -617,7 +617,9 @@ export class ShefaHomeComponent implements OnInit {
       const [providerEvents, receiverEvents, appreciations] = await Promise.all([
         this.economicService.getEventsByProvider('current').catch(() => [] as EconomicEvent[]),
         this.economicService.getEventsByReceiver('current').catch(() => [] as EconomicEvent[]),
-        this.economicService.getAppreciationsFor('current').catch(() => [] as AppreciationDisplay[]),
+        this.economicService
+          .getAppreciationsFor('current')
+          .catch(() => [] as AppreciationDisplay[]),
       ]);
 
       const events = [...providerEvents, ...receiverEvents];

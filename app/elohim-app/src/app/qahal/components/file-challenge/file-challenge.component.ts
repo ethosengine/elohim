@@ -9,9 +9,9 @@
 import { Component, computed, inject, input, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
-import type { ChallengeView, FileChallengeInputView } from '@elohim/storage-client/generated';
-
 import { GovernanceApiService } from '@app/elohim/services/governance-api.service';
+
+import type { ChallengeView, FileChallengeInputView } from '@elohim/storage-client/generated';
 
 /** Challenge grounds options matching the protocol's governance model. */
 const GROUNDS_OPTIONS = [
@@ -51,11 +51,7 @@ const OUTCOME_OPTIONS = [
 
       <label class="field">
         <span class="field-label">Grounds</span>
-        <select
-          [ngModel]="grounds()"
-          (ngModelChange)="grounds.set($event)"
-          name="grounds"
-          required>
+        <select [ngModel]="grounds()" (ngModelChange)="grounds.set($event)" name="grounds" required>
           <option value="" disabled>Select grounds for challenge</option>
           @for (opt of groundsOptions; track opt.value) {
             <option [value]="opt.value">{{ opt.label }}</option>
@@ -87,7 +83,8 @@ const OUTCOME_OPTIONS = [
           [ngModel]="standingBasis()"
           (ngModelChange)="standingBasis.set($event)"
           name="standingBasis"
-          required>
+          required
+        >
           <option value="" disabled>How do you have standing to file?</option>
           @for (opt of standingOptions; track opt.value) {
             <option [value]="opt.value">{{ opt.label }}</option>
@@ -100,7 +97,8 @@ const OUTCOME_OPTIONS = [
         <select
           [ngModel]="requestedOutcome()"
           (ngModelChange)="requestedOutcome.set($event)"
-          name="requestedOutcome">
+          name="requestedOutcome"
+        >
           @for (opt of outcomeOptions; track opt.value) {
             <option [value]="opt.value">{{ opt.label }}</option>
           }
@@ -111,10 +109,7 @@ const OUTCOME_OPTIONS = [
         <div class="form-error">{{ errorMessage() }}</div>
       }
 
-      <button
-        type="submit"
-        class="submit-btn"
-        [disabled]="!canSubmit() || submitting()">
+      <button type="submit" class="submit-btn" [disabled]="!canSubmit() || submitting()">
         @if (submitting()) {
           Filing...
         } @else {

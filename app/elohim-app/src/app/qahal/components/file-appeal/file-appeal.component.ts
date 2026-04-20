@@ -9,9 +9,9 @@
 import { Component, computed, inject, input, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
-import type { AppealView, FileAppealInputView } from '@elohim/storage-client/generated';
-
 import { GovernanceApiService } from '@app/elohim/services/governance-api.service';
+
+import type { AppealView, FileAppealInputView } from '@elohim/storage-client/generated';
 
 /** Appeal grounds options matching the protocol's governance model. */
 const APPEAL_GROUNDS_OPTIONS = [
@@ -35,7 +35,8 @@ const APPEAL_GROUNDS_OPTIONS = [
           (ngModelChange)="grounds.set($event)"
           name="grounds"
           required
-          data-testid="appeal-grounds-select">
+          data-testid="appeal-grounds-select"
+        >
           <option value="" disabled>Select grounds for appeal</option>
           @for (opt of groundsOptions; track opt.value) {
             <option [value]="opt.value">{{ opt.label }}</option>
@@ -63,7 +64,8 @@ const APPEAL_GROUNDS_OPTIONS = [
         type="submit"
         class="submit-btn"
         [disabled]="!canSubmit() || submitting()"
-        data-testid="submit-appeal-btn">
+        data-testid="submit-appeal-btn"
+      >
         @if (submitting()) {
           Filing...
         } @else {

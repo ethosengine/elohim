@@ -368,7 +368,9 @@ export class HumanConsentService {
 
     // Check if current user is in participantIds (from node metadata or invitedAgentIds)
     // participantIds is a legacy metadata field, accessed via ContentMetadata index signature
-    const participantIds = (path.node?.invitedAgentIds ?? path.node?.metadata?.['participantIds'] as string[] | undefined);
+    const participantIds =
+      path.node?.invitedAgentIds ??
+      (path.node?.metadata?.['participantIds'] as string[] | undefined);
     if (participantIds?.includes(currentAgentId)) {
       // For intimate paths, also check attestations if required
       // Note: Attestation service integration pending (Phase 6)

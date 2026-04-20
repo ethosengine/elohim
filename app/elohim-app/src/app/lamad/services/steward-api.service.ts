@@ -8,8 +8,10 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 
 import { catchError, map } from 'rxjs/operators';
+
 import { firstValueFrom, of } from 'rxjs';
 
+import type { ISteward } from '../interfaces/steward.interface';
 import type {
   StewardCredentialView,
   PremiumGateView,
@@ -19,8 +21,6 @@ import type {
   CreateGateInputView,
   CreateGrantInputView,
 } from '@elohim/storage-client/generated';
-
-import type { ISteward } from '../interfaces/steward.interface';
 
 @Injectable({ providedIn: 'root' })
 export class StewardApiService implements ISteward {
@@ -114,7 +114,7 @@ export class StewardApiService implements ISteward {
           },
         })
         .pipe(
-          map((response) => response.hasAccess),
+          map(response => response.hasAccess),
           catchError(() => of(false))
         )
     );

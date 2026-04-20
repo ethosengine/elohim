@@ -1,13 +1,11 @@
 import { Injectable, inject } from '@angular/core';
 
 import { AgentService } from '@app/elohim/services/agent.service';
-import type { REAAction, LamadEventType } from '@app/elohim/models';
+import { LAMAD_COUPLING_MAP, type ContentTypeCoupling } from '@app/lamad/generated/coupling-map';
 import { EconomicEventsApiService, type CreateEconomicEventInput } from '@app/shefa';
+
 import type { RendererCompletionEvent } from '../renderers/renderer-registry.service';
-import {
-  LAMAD_COUPLING_MAP,
-  type ContentTypeCoupling,
-} from '@app/lamad/generated/coupling-map';
+import type { REAAction, LamadEventType } from '@app/elohim/models';
 
 /**
  * SignalHarnessService — bridge between renderer output and protocol input.
@@ -25,7 +23,7 @@ export class SignalHarnessService {
   /** Minimal shape required from a content node for signal translation. */
   async onRendererComplete(
     node: { id: string; contentType: string; contentFormat: string },
-    event: RendererCompletionEvent,
+    event: RendererCompletionEvent
   ): Promise<void> {
     const agentId = this.agentService.getCurrentAgentId();
     const coupling = this.getCoupling(node.contentType);
@@ -52,19 +50,12 @@ export class SignalHarnessService {
     return LAMAD_COUPLING_MAP[contentType];
   }
 
-  private getSignalType(
-    coupling: ContentTypeCoupling,
-    lifecycle: string,
-  ): string | undefined {
+  private getSignalType(coupling: ContentTypeCoupling, lifecycle: string): string | undefined {
     const signalTypes = coupling.governance?.signalTypes ?? [];
     if (lifecycle === 'onComplete') {
-      return signalTypes.find(
-        s => s.includes('mastery') || s.includes('completed'),
-      );
+      return signalTypes.find(s => s.includes('mastery') || s.includes('completed'));
     }
-    return signalTypes.find(
-      s => s.includes('learning') || s.includes('engagement'),
-    );
+    return signalTypes.find(s => s.includes('learning') || s.includes('engagement'));
   }
 
   private inferLamadEventType(event: RendererCompletionEvent): LamadEventType {

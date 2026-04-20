@@ -440,6 +440,71 @@ impl P2PHandle {
         }
     }
 
+    /// Construct a minimal `P2PHandle` for unit/integration tests.
+    ///
+    /// The returned handle has an empty delivery-peer registry and a stub
+    /// command channel — all `push_shard` / `fetch_shard` / `resolve_epr`
+    /// calls will return `Err("stub: no P2P swarm in test")`.  This is
+    /// intentional: tests that exercise placement_gaps recording do not need
+    /// live P2P connectivity; they only need the DB-side selector to run.
+    ///
+    /// Tests that require actual shard delivery (e.g. household-diversity
+    /// verification via shard_locations) must use a live harness — see
+    /// Task 17 (live integration coverage).
+    ///
+    /// Intended for test utilities only — not for production use.
+    #[doc(hidden)]
+    pub fn for_testing() -> Self {
+        use tokio::sync::{mpsc, watch};
+
+        let (command_tx, mut command_rx) = mpsc::channel::<P2PCommand>(32);
+        // Spawn a task that drains commands and responds with stub errors,
+        // preventing the channel from blocking callers.
+        tokio::spawn(async move {
+            while let Some(cmd) = command_rx.recv().await {
+                match cmd {
+                    P2PCommand::PushShard { reply, .. } => {
+                        let _ = reply.send(Err("stub: no P2P swarm in test".to_string()));
+                    }
+                    P2PCommand::FetchShard { reply, .. } => {
+                        let _ = reply.send(None);
+                    }
+                    P2PCommand::ResolveEpr { reply, .. } => {
+                        let _ = reply.send(None);
+                    }
+                    P2PCommand::ListPeers { reply } => {
+                        let _ = reply.send(vec![]);
+                    }
+                    P2PCommand::PublishEprHead { .. } => {} // fire-and-forget
+                }
+            }
+        });
+        let initial_status = P2PStatusInfo {
+            peer_id: "stub-peer".to_string(),
+            listen_addresses: vec![],
+            connected_peers: 0,
+            bootstrap_nodes: vec![],
+            sync_documents: 0,
+            nat_status: "unknown".to_string(),
+            relay_reservations: 0,
+            announce_addresses: vec![],
+            relay_mode: "client".to_string(),
+            replication: crate::p2p::replication::ReplicationStatus::default(),
+            drain: None,
+            sync_paused: false,
+        };
+        let (status_tx, status_rx) = watch::channel(initial_status);
+        // Keep sender alive so the receiver never sees "sender dropped"
+        std::mem::forget(status_tx);
+        P2PHandle {
+            status_rx,
+            command_tx,
+            agent_pubkey: "stub-agent".to_string(),
+            delivery_peers: Arc::new(DashMap::new()),
+            sync_paused: Arc::new(AtomicBool::new(false)),
+        }
+    }
+
     /// Get all known delivery peers with their capabilities.
     /// Used by the /api/v1/peers/delivery HTTP endpoint.
     pub fn delivery_peers(&self) -> Vec<DeliveryPeer> {
@@ -547,7 +612,17 @@ impl P2PHandle {
     }
 
     /// Distribute all shards of a blob to delivery peers.
-    /// Returns the number of shards successfully distributed.
+    ///
+    /// Uses the contract-aware diverse selector (`PeerSelection`) to rank peers
+    /// by household + archetype diversity before distribution. Falls back to
+    /// round-robin over the selected set when there are fewer selected peers
+    /// than shards.
+    ///
+    /// On full placement  → clears any stale `placement_gaps` rows for this content.
+    /// On short placement → writes one `placement_gaps` row per shard, so the
+    ///   shefa signal reflects per-shard reality.
+    ///
+    /// Returns the number of shards successfully pushed (0 if no peers were selected).
     pub async fn distribute_shards(
         &self,
         content_id: &str,
@@ -563,24 +638,50 @@ impl P2PHandle {
             .create_shards(blob_data, &manifest.encoding)
             .map_err(|e| format!("shard data encode: {e}"))?;
 
-        let peers = self.delivery_peers();
-        if peers.is_empty() {
-            tracing::info!(content_id, "No delivery peers for shard distribution");
-            return Ok(0);
-        }
+        let total_shards = shards.len();
+
+        // Run the contract-aware diverse selector.
+        let sel = crate::services::peer_selection::PeerSelection::new(pool.clone());
+        let outcome = sel
+            .select(&crate::services::peer_selection::SelectionInput {
+                h_app_id,
+                content_id,
+                content_reach: "commons", // TODO(plan-1-followup): derive from content manifest
+                desired_count: total_shards,
+            })
+            .map_err(|e| format!("peer selection: {e}"))?;
+
+        let (selected, gap_kind_opt, achieved, requested) = match outcome {
+            crate::services::peer_selection::SelectionOutcome::Ok(peers) => {
+                (peers, None, total_shards as i32, total_shards as i32)
+            }
+            crate::services::peer_selection::SelectionOutcome::Short {
+                peers,
+                gap_kind,
+                achieved,
+                requested,
+            } => (peers, Some(gap_kind), achieved, requested),
+        };
 
         let mut distributed = 0usize;
+        let now = chrono::Utc::now().to_rfc3339();
 
         for (i, shard_data) in shards.iter().enumerate() {
             let hash = &manifest.shard_hashes[i];
-            let peer = &peers[i % peers.len()];
+            if selected.is_empty() {
+                break;
+            }
+            let peer = &selected[i % selected.len()];
 
-            match self
-                .push_shard(&peer.peer_id, hash, shard_data.clone())
-                .await
-            {
+            match self.push_shard(&peer.peer_id, hash, shard_data.clone()).await {
                 Ok(()) => {
-                    tracing::info!(content_id, shard_index = i, peer = %peer.peer_id, "Shard distributed");
+                    tracing::info!(
+                        content_id,
+                        shard_index = i,
+                        peer = %peer.peer_id,
+                        household = ?peer.household_id,
+                        "Shard distributed"
+                    );
                     if let Ok(mut conn) = pool.get() {
                         let location = crate::db::models::NewShardLocation {
                             shard_hash: hash,
@@ -593,8 +694,47 @@ impl P2PHandle {
                     distributed += 1;
                 }
                 Err(e) => {
-                    tracing::warn!(content_id, shard_index = i, peer = %peer.peer_id, error = %e, "Shard push failed");
+                    tracing::warn!(
+                        content_id,
+                        shard_index = i,
+                        peer = %peer.peer_id,
+                        error = %e,
+                        "Shard push failed"
+                    );
                 }
+            }
+        }
+
+        // Record placement gaps when selection was short — one row per shard hash
+        // so the shefa signal reflects per-shard reality.
+        if let Some(gap_kind) = gap_kind_opt {
+            if let Ok(mut conn) = pool.get() {
+                let coverage = if requested == 0 {
+                    0.0_f32
+                } else {
+                    achieved as f32 / requested as f32
+                };
+                for hash in &manifest.shard_hashes {
+                    let id = uuid::Uuid::new_v4().to_string();
+                    let gap = crate::db::models::NewPlacementGap {
+                        id: &id,
+                        content_id,
+                        shard_hash: hash,
+                        h_app_id,
+                        requested_steward_count: requested,
+                        achieved_steward_count: achieved,
+                        contract_coverage: coverage,
+                        gap_kind,
+                        first_seen_at: &now,
+                        last_seen_at: &now,
+                    };
+                    let _ = crate::db::placement_gaps::upsert_gap(&mut conn, &gap);
+                }
+            }
+        } else {
+            // Full placement — clear any stale gaps for this content.
+            if let Ok(mut conn) = pool.get() {
+                let _ = crate::db::placement_gaps::clear_for_content(&mut conn, h_app_id, content_id);
             }
         }
 

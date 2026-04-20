@@ -457,7 +457,13 @@ export class ContentService {
    * Queries content by type 'path', then parses each via parsePathView().
    */
   queryPaths(filters: PathFilters): Observable<LearningPath[]> {
-    return this.queryContent({ contentType: 'path', tags: filters.tags, search: filters.search, limit: filters.limit, offset: filters.offset }).pipe(
+    return this.queryContent({
+      contentType: 'path',
+      tags: filters.tags,
+      search: filters.search,
+      limit: filters.limit,
+      offset: filters.offset,
+    }).pipe(
       map(nodes => nodes.map(n => parsePathView(n))),
       map(items => this.applyPathFilters(items, filters)),
       catchError(_err => {
@@ -681,7 +687,7 @@ export class ContentService {
   private transformContent(data: RawContentData): ContentNode {
     const contentFormat = data.contentFormat ?? 'markdown';
     const rawContent = data.contentBody ?? data.content ?? '';
-    const metadata = (data.metadata ?? {}) as Record<string, unknown>;
+    const metadata = data.metadata ?? {};
 
     return {
       id: data.id ?? data.docId,

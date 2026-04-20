@@ -26,12 +26,12 @@ import {
   AlertAction,
   AlertSeverity,
 } from '../../../shared/components/alert-banner/alert-banner.component';
+import { COMPUTE_DASHBOARD, type IComputeDashboard } from '../../interfaces';
 import {
   OfflineNodeAlert,
   NodeTopologyState,
   ComputeNeedsAssessment,
 } from '../../models/shefa-dashboard.model';
-import { COMPUTE_DASHBOARD, type IComputeDashboard } from '../../interfaces';
 
 @Component({
   selector: 'app-offline-node-alert',

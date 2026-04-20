@@ -33,12 +33,7 @@ import { Component, input, output } from '@angular/core';
         <ul class="menu-dropdown" role="menu">
           @for (action of actions; track action.id) {
             <li role="none">
-              <button
-                class="menu-item"
-                type="button"
-                role="menuitem"
-                (click)="onAction(action)"
-              >
+              <button class="menu-item" type="button" role="menuitem" (click)="onAction(action)">
                 <span class="menu-icon" aria-hidden="true">{{ action.icon }}</span>
                 <div class="menu-text">
                   <span class="menu-label">{{ action.label }}</span>

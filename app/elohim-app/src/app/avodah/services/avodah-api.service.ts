@@ -86,12 +86,14 @@ export class AvodahApiService {
     return toContentNode(view);
   }
 
-  async getAttachments(storyId: string): Promise<{ relationshipId: string; content: ContentNode }[]> {
+  async getAttachments(
+    storyId: string
+  ): Promise<{ relationshipId: string; content: ContentNode }[]> {
     const relationships = await firstValueFrom(
       this.storageApi.getRelationships({
         sourceId: storyId,
         relationshipType: ContentRelationshipType.ATTACHED_TO,
-      }),
+      })
     );
     if (relationships.length === 0) return [];
 
@@ -111,7 +113,7 @@ export class AvodahApiService {
         relationshipType: ContentRelationshipType.ATTACHED_TO,
         confidence: 1,
         inferenceSource: 'author',
-      }),
+      })
     );
   }
 

@@ -9,9 +9,10 @@ import {
 
 import { Observable } from 'rxjs';
 
-import { GateArtifactCardComponent } from '../gate-artifact-card/gate-artifact-card.component';
-import type { MutationContext, ReachTier } from '../../services/gate-interaction.service';
 import { StorageApiService } from '../../services/storage-api.service';
+import { GateArtifactCardComponent } from '../gate-artifact-card/gate-artifact-card.component';
+
+import type { MutationContext, ReachTier } from '../../services/gate-interaction.service';
 
 @Component({
   selector: 'app-gate-comment',

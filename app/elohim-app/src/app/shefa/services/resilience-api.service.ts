@@ -19,6 +19,7 @@ import {
   timer,
 } from 'rxjs';
 
+import type { IResilience } from '../interfaces/resilience.interface';
 import type {
   ContentRiskBucket,
   ElohimResilienceAssessment,
@@ -26,7 +27,6 @@ import type {
   ResilienceAction,
   ResilienceProfile,
 } from '../models/resilience-profile.model';
-import type { IResilience } from '../interfaces/resilience.interface';
 
 @Injectable({ providedIn: 'root' })
 export class ResilienceApiService implements IResilience {
@@ -52,10 +52,8 @@ export class ResilienceApiService implements IResilience {
     this.pollingSubscription?.unsubscribe();
 
     const poll$ = timer(0, refreshInterval).pipe(
-      switchMap(() =>
-        this.http.get<ResilienceProfile>(`/api/v1/resilience/${humanId}/profile`)
-      ),
-      tap((profile) => this.profile$.next(profile))
+      switchMap(() => this.http.get<ResilienceProfile>(`/api/v1/resilience/${humanId}/profile`)),
+      tap(profile => this.profile$.next(profile))
     );
 
     this.pollingSubscription = poll$.subscribe();

@@ -33,8 +33,8 @@ import { RouterModule } from '@angular/router';
 
 import { Subject } from 'rxjs';
 
-import { ContentNode } from '../../../models/content-node.model';
 import { isAssessmentNode } from '../../../generated/content-node-types';
+import { ContentNode } from '../../../models/content-node.model';
 import { AssessmentCompletionSummaryComponent } from '../../../quiz-engine/components/assessment-completion-summary/assessment-completion-summary.component';
 import { MasteryStatsService } from '../../../services/mastery-stats.service';
 import {

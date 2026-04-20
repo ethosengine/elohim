@@ -1,0 +1,62 @@
+{
+  "$id": "resilience-snapshot-view.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ResilienceSnapshotView",
+  "description": "Resilience claim consumed by <elohim-resilience-snapshot>. Collective-general: stewards of the content can be any collective kind (household, church, patron-circle, DAO, …) — any group that holds DHT-notarized REA commitments under the social-compute epic. Source of truth: computed projection. Operational Category C.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contentId",
+    "stewardingCollectives",
+    "commitmentBackedCollectives",
+    "diversityScore",
+    "regionalDistribution",
+    "placementGaps",
+    "protectionStatus"
+  ],
+  "properties": {
+    "contentId":                   { "type": "string" },
+    "stewardingCollectives":       { "type": "integer", "minimum": 0, "description": "Distinct collectives (of any kind) with at least one peer holding this content." },
+    "commitmentBackedCollectives": { "type": "integer", "minimum": 0, "description": "Distinct collectives with an active REA commitment covering this content." },
+    "diversityScore":              { "type": "number",  "minimum": 0, "maximum": 1, "description": "0..1 — ratio of achieved distinct-collective placements to requested." },
+    "regionalDistribution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["local", "regional", "global", "unknown"],
+      "properties": {
+        "local":    { "type": "integer", "minimum": 0 },
+        "regional": { "type": "integer", "minimum": 0 },
+        "global":   { "type": "integer", "minimum": 0 },
+        "unknown":  { "type": "integer", "minimum": 0 }
+      }
+    },
+    "placementGaps": {
+      "type": "array",
+      "items": { "$ref": "placement-gap-view.schema.json" }
+    },
+    "protectionStatus": { "enum": ["at-risk", "partial", "protected"] },
+    "reciprocatingCollectives": { "type": "integer", "minimum": 0, "description": "Collectives that both steward this content AND are stewarded by the viewer's collective (mutual reciprocation). Optional; omitted when no viewer context is supplied." },
+    "details": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "stewardingCollectives": {
+          "type": "array",
+          "description": "Collectives currently stewarding this content, with their kind so the UI can label per-kind ('household', 'church', 'patron-circle', etc.).",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "kind"],
+            "properties": {
+              "id":   { "type": "string" },
+              "kind": { "type": "string", "description": "Collective kind: 'household', 'church', 'patron-circle', 'dao', or any future collective kind declared in the collectives table." },
+              "label": { "type": "string", "description": "Optional human-readable display label." }
+            }
+          }
+        },
+        "onlinePeerCount": { "type": "integer", "minimum": 0 },
+        "healthScore":     { "type": "number",  "minimum": 0, "maximum": 1 }
+      }
+    }
+  }
+}

@@ -23,8 +23,8 @@ import { environment } from '../../../environments/environment';
 import { CONNECTION_STRATEGY } from '../providers/connection-strategy.provider';
 
 import type { ListResponse, BulkCreateResult } from '../models/storage-response.model';
-import type { ConnectionConfig } from '@elohim/service/connection';
 import type { ContentType, ContentFormat, Reach } from '@app/generated/schema-enums';
+import type { ConnectionConfig } from '@elohim/service/connection';
 
 /** Content node from storage (matches backend ContentWithTags) */
 export interface StorageContentNode {

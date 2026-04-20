@@ -1,6 +1,7 @@
 // schedule.service.ts
-import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
+import { Injectable, inject } from '@angular/core';
+
 import { Observable } from 'rxjs';
 
 import type {
@@ -15,9 +16,7 @@ export class ScheduleService {
   private readonly baseUrl = '';
 
   getSchedule(entityType: string, entityId: string): Observable<ScheduleView> {
-    const params = new HttpParams()
-      .set('entityType', entityType)
-      .set('entityId', entityId);
+    const params = new HttpParams().set('entityType', entityType).set('entityId', entityId);
     return this.http.get<ScheduleView>(`${this.baseUrl}/api/v1/schedules`, { params });
   }
 
@@ -38,9 +37,6 @@ export class ScheduleService {
   }
 
   advanceOccurrence(id: string): Observable<ScheduleView> {
-    return this.http.post<ScheduleView>(
-      `${this.baseUrl}/api/v1/schedules/${id}/advance`,
-      {},
-    );
+    return this.http.post<ScheduleView>(`${this.baseUrl}/api/v1/schedules/${id}/advance`, {});
   }
 }

@@ -1,6 +1,8 @@
 import { Injectable, OnDestroy } from '@angular/core';
-import { Observable, Subject } from 'rxjs';
+
 import { filter, map, takeUntil } from 'rxjs/operators';
+
+import { Observable, Subject } from 'rxjs';
 
 interface SseEvent {
   type: string;
@@ -12,7 +14,7 @@ export class EventStreamService implements OnDestroy {
   private eventSource: EventSource | null = null;
   private readonly events$ = new Subject<SseEvent>();
   private readonly destroy$ = new Subject<void>();
-  private activeListeners: Array<{ type: string; listener: (e: MessageEvent) => void }> = [];
+  private activeListeners: { type: string; listener: (e: MessageEvent) => void }[] = [];
 
   connect(url: string): void {
     if (this.eventSource) return;
@@ -35,7 +37,7 @@ export class EventStreamService implements OnDestroy {
 
   on<T = unknown>(eventType: string): Observable<T> {
     if (!this.eventSource) {
-      return new Observable<T>((subscriber) => subscriber.complete());
+      return new Observable<T>(subscriber => subscriber.complete());
     }
 
     const listener = (event: MessageEvent) => {
@@ -52,8 +54,8 @@ export class EventStreamService implements OnDestroy {
 
     return this.events$.pipe(
       takeUntil(this.destroy$),
-      filter((e) => e.type === eventType),
-      map((e) => e.data as T),
+      filter(e => e.type === eventType),
+      map(e => e.data as T)
     );
   }
 

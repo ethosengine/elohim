@@ -1,5 +1,6 @@
-import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
+import { Injectable, inject } from '@angular/core';
+
 import { Observable } from 'rxjs';
 
 import type {
@@ -21,7 +22,7 @@ export class RoutingApiService {
   computeDistribution(input: DistributionRequestView): Observable<DistributionPlanView> {
     return this.http.post<DistributionPlanView>(
       `${this.baseUrl}/api/v1/routing/distribution`,
-      input,
+      input
     );
   }
 }

@@ -21,11 +21,7 @@
 </div>
 
 <!-- === EXPANDED STATE === -->
-<div
-  *ngIf="state === 'expanded'"
-  class="omnibar-expanded"
-  data-testid="omnibar-expanded"
->
+<div *ngIf="state === 'expanded'" class="omnibar-expanded" data-testid="omnibar-expanded">
   <div class="omnibar-main">
     <!-- EPR Address (clickable -> inspect) -->
     <a
@@ -52,9 +48,7 @@
     <span class="divider"></span>
 
     <!-- Reach badge -->
-    <span class="omnibar-reach" data-testid="omnibar-reach">
-      {{ reachIcon }} {{ reach }}
-    </span>
+    <span class="omnibar-reach" data-testid="omnibar-reach">{{ reachIcon }} {{ reach }}</span>
 
     <!-- Stewards (compact) -->
     <span
@@ -67,9 +61,7 @@
     </span>
 
     <!-- Delivery source (subtle) -->
-    <span class="omnibar-source" data-testid="omnibar-source">
-      via {{ deliverySource }}
-    </span>
+    <span class="omnibar-source" data-testid="omnibar-source">via {{ deliverySource }}</span>
   </div>
 
   <div class="omnibar-actions-area">
@@ -106,18 +98,22 @@
   </div>
 
   <!-- Actions dropdown -->
-  <div
-    *ngIf="showActions"
-    class="omnibar-dropdown"
-    data-testid="omnibar-dropdown"
-  >
+  <div *ngIf="showActions" class="omnibar-dropdown" data-testid="omnibar-dropdown">
     <a [routerLink]="inspectRoute" class="dropdown-item" data-testid="omnibar-inspect">
       Inspect EPR
     </a>
-    <button class="dropdown-item" (click)="feedbackRequested.emit(); showActions = false" data-testid="omnibar-feedback">
+    <button
+      class="dropdown-item"
+      (click)="feedbackRequested.emit(); showActions = false"
+      data-testid="omnibar-feedback"
+    >
       Give feedback
     </button>
-    <button class="dropdown-item" (click)="reportRequested.emit(); showActions = false" data-testid="omnibar-report">
+    <button
+      class="dropdown-item"
+      (click)="reportRequested.emit(); showActions = false"
+      data-testid="omnibar-report"
+    >
       Report content
     </button>
   </div>

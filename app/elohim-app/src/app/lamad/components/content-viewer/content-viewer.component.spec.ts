@@ -19,6 +19,7 @@ import { StewardshipAllocationService } from '../../services/stewardship-allocat
 import { SignalHarnessService } from '../../services/signal-harness.service';
 import { EprResolverService } from '@app/elohim/services/epr-resolver.service';
 import { HouseholdResilienceService } from '../../services/household-resilience.service';
+import { ResilienceService as LibResilienceService } from '@elohim/service/public-api';
 import { vi, Mock } from 'vitest';
 
 describe('ContentViewerComponent', () => {
@@ -152,6 +153,19 @@ describe('ContentViewerComponent', () => {
       })),
     };
 
+    const libResilienceSpyObj = {
+      getSnapshot: vi.fn().mockReturnValue(of({
+        contentId: 'test-content-1',
+        stewardingCollectives: 2,
+        commitmentBackedCollectives: 1,
+        diversityScore: 0.8,
+        regionalDistribution: { local: 1, regional: 1, global: 0, unknown: 0 },
+        placementGaps: [],
+        protectionStatus: 'protected',
+      })),
+      listPlacementGaps: vi.fn().mockReturnValue(of({ items: [] })),
+    };
+
     await TestBed.configureTestingModule({
       imports: [ContentViewerComponent],
       providers: [
@@ -170,6 +184,7 @@ describe('ContentViewerComponent', () => {
         { provide: GovernanceSignalService, useValue: governanceSignalSpyObj },
         { provide: StewardshipAllocationService, useValue: stewardshipSpyObj },
         { provide: HouseholdResilienceService, useValue: householdResilienceSpyObj },
+        { provide: LibResilienceService, useValue: libResilienceSpyObj },
         { provide: SignalHarnessService, useValue: { onRendererComplete: vi.fn().mockResolvedValue(undefined) } },
         {
           provide: EprResolverService,
@@ -1033,115 +1048,6 @@ describe('ContentViewerComponent', () => {
 
       expect(component.canEditContent).toBe(false);
     }));
-  });
-
-  describe('getResilienceIcon()', () => {
-    it('returns green circle for protected status', () => {
-      component.householdResilience = {
-        contentId: 'c1',
-        householdsStewarding: 3,
-        householdsReciprocated: 1,
-        protectionStatus: 'protected',
-        details: {},
-      };
-      expect(component.getResilienceIcon()).toBe('\u{1F7E2}');
-    });
-
-    it('returns yellow circle for partial status', () => {
-      component.householdResilience = {
-        contentId: 'c1',
-        householdsStewarding: 1,
-        householdsReciprocated: 0,
-        protectionStatus: 'partial',
-        details: {},
-      };
-      expect(component.getResilienceIcon()).toBe('\u{1F7E1}');
-    });
-
-    it('returns red circle for at-risk status', () => {
-      component.householdResilience = {
-        contentId: 'c1',
-        householdsStewarding: 0,
-        householdsReciprocated: 0,
-        protectionStatus: 'at-risk',
-        details: {},
-      };
-      expect(component.getResilienceIcon()).toBe('\u{1F534}');
-    });
-
-    it('returns loading spinner when householdResilience is null', () => {
-      component.householdResilience = null;
-      expect(component.getResilienceIcon()).toBe('\u{1F504}');
-    });
-  });
-
-  describe('getResilienceTooltip()', () => {
-    it('returns loading text when householdResilience is null', () => {
-      component.householdResilience = null;
-      expect(component.getResilienceTooltip()).toBe('Loading resilience\u2026');
-    });
-
-    it('includes household stewarding count and protection status', () => {
-      component.householdResilience = {
-        contentId: 'c1',
-        householdsStewarding: 3,
-        householdsReciprocated: 0,
-        protectionStatus: 'protected',
-        details: {},
-      };
-      component.resilience = null;
-      const tooltip = component.getResilienceTooltip();
-      expect(tooltip).toContain('Households stewarding: 3');
-      expect(tooltip).toContain('Protection: protected');
-    });
-
-    it('includes reciprocated count when non-zero', () => {
-      component.householdResilience = {
-        contentId: 'c1',
-        householdsStewarding: 2,
-        householdsReciprocated: 1,
-        protectionStatus: 'partial',
-        details: {},
-      };
-      component.resilience = null;
-      const tooltip = component.getResilienceTooltip();
-      expect(tooltip).toContain('Reciprocated: 1');
-    });
-
-    it('omits reciprocated line when zero', () => {
-      component.householdResilience = {
-        contentId: 'c1',
-        householdsStewarding: 1,
-        householdsReciprocated: 0,
-        protectionStatus: 'at-risk',
-        details: {},
-      };
-      component.resilience = null;
-      const tooltip = component.getResilienceTooltip();
-      expect(tooltip).not.toContain('Reciprocated');
-    });
-
-    it('appends shard-level data when resilience is available', () => {
-      component.householdResilience = {
-        contentId: 'c1',
-        householdsStewarding: 3,
-        householdsReciprocated: 2,
-        protectionStatus: 'protected',
-        details: {},
-      };
-      component.resilience = {
-        contentId: 'c1',
-        encoding: { strategy: 'reed-solomon', dataShards: 4, parityShards: 2, totalSizeBytes: 1024, shardSizeBytes: 256 },
-        distribution: { totalShards: 6, shardsWithLocations: 6, distinctPeers: 5, shards: [] },
-        stewardship: { stewardCount: 3, allocations: [] },
-        commitments: { activePeers: 5, totalCommittedBytes: 2048, totalUsedBytes: 512 },
-        health: { score: 0.95, canSurviveFailures: 2, status: 'healthy' },
-      };
-      const tooltip = component.getResilienceTooltip();
-      expect(tooltip).toContain('Encoding: reed-solomon');
-      expect(tooltip).toContain('Peers online: 5');
-      expect(tooltip).toContain('Health: 95%');
-    });
   });
 
   describe('EPR relationships', () => {

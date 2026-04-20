@@ -1,0 +1,78 @@
+<ng-container [ngSwitch]="density">
+
+  <!-- icon + tooltip density -->
+  <span *ngSwitchCase="'icon'" class="resilience-icon-wrap">
+    <span
+      data-testid="resilience-icon"
+      class="resilience-icon"
+      [ngClass]="statusClass"
+      [attr.aria-label]="'Resilience: ' + snapshot.protectionStatus"
+    >
+      ●
+    </span>
+    <span data-testid="resilience-tooltip" class="resilience-tooltip">
+      {{ snapshot.stewardingCollectives }} collectives
+      · {{ regionSummary || 'no region data' }}
+      · {{ snapshot.protectionStatus }}
+    </span>
+  </span>
+
+  <!-- context-menu panel density -->
+  <div *ngSwitchCase="'context'" class="resilience-context-panel" [ngClass]="statusClass">
+    <header>
+      <span data-testid="resilience-icon" class="resilience-icon" [ngClass]="statusClass">●</span>
+      <strong>{{ snapshot.protectionStatus }}</strong>
+    </header>
+    <dl>
+      <dt>Stewarding collectives</dt>
+      <dd>{{ snapshot.stewardingCollectives }}</dd>
+      <dt>Commitment-backed</dt>
+      <dd>{{ snapshot.commitmentBackedCollectives }}</dd>
+      <dt>Diversity score</dt>
+      <dd>{{ snapshot.diversityScore | percent }}</dd>
+      <dt>Geographic distribution</dt>
+      <dd>{{ regionSummary || 'no region data' }}</dd>
+      <dt>Placement gaps</dt>
+      <dd data-testid="resilience-gap-count">{{ snapshot.placementGaps.length }}</dd>
+    </dl>
+  </div>
+
+  <!-- full card density -->
+  <section *ngSwitchCase="'full'" class="resilience-full-card" [ngClass]="statusClass">
+    <header>
+      <h3>Resilience snapshot</h3>
+      <span data-testid="resilience-icon" class="resilience-icon" [ngClass]="statusClass">●</span>
+      <span class="status-pill">{{ snapshot.protectionStatus }}</span>
+    </header>
+
+    <dl class="summary-grid">
+      <dt>Stewarding collectives</dt>  <dd>{{ snapshot.stewardingCollectives }}</dd>
+      <dt>Commitment-backed</dt>      <dd>{{ snapshot.commitmentBackedCollectives }}</dd>
+      <dt>Diversity score</dt>        <dd>{{ snapshot.diversityScore | percent }}</dd>
+      <dt>Geographic distribution</dt><dd>{{ regionSummary || 'no region data' }}</dd>
+    </dl>
+
+    <ng-container *ngIf="snapshot.details as details">
+      <h4>Steward collectives</h4>
+      <ul class="collective-list">
+        <li *ngFor="let c of details.stewardingCollectives"
+            [attr.data-testid]="'resilience-collective-' + c.id">
+          <span class="collective-label">{{ c.label || c.id }}</span>
+          <span class="collective-kind" *ngIf="c.kind">{{ c.kind }}</span>
+        </li>
+      </ul>
+    </ng-container>
+
+    <ng-container *ngIf="snapshot.placementGaps.length > 0">
+      <h4>Gaps</h4>
+      <ul class="gap-list">
+        <li *ngFor="let gap of snapshot.placementGaps">
+          <strong>{{ gap.gapKind }}</strong>
+          — {{ gap.achievedStewardCount }} of {{ gap.requestedStewardCount }} collectives
+          ({{ gap.contractCoverage | percent }} contract coverage)
+        </li>
+      </ul>
+    </ng-container>
+  </section>
+
+</ng-container>

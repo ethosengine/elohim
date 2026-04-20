@@ -1,4 +1,4 @@
-<!-- Network Health Tab — P2P mesh posture metrics -->
+<!-- Network Health Tab — P2P mesh posture metrics + household-grouped peer breakdown -->
 <div class="network-health-tab" data-testid="network-posture-card">
   <!-- Loading state -->
   <div *ngIf="loading()" class="posture-loading">
@@ -10,13 +10,14 @@
     <div class="unavailable-icon">📡</div>
     <p class="unavailable-message">Network posture unavailable (endpoint coming in F2)</p>
     <p class="unavailable-hint">
-      The <code>/api/v1/network/posture</code> endpoint will be live once the F2 sprint task ships.
+      The
+      <code>/api/v1/network/posture</code>
+      endpoint will be live once the F2 sprint task ships.
     </p>
   </div>
 
   <!-- Live posture data -->
   <div *ngIf="!loading() && posture() !== null" class="posture-grid">
-
     <!-- Peer counts card -->
     <div class="card posture-card">
       <h3 class="posture-card-title">Peer Activity</h3>
@@ -31,9 +32,9 @@
       <div class="metric-bar">
         <div
           class="metric-fill"
-          [style.width.%]="posture()!.totalPeers > 0
-            ? (posture()!.activePeers / posture()!.totalPeers) * 100
-            : 0"
+          [style.width.%]="
+            posture()!.totalPeers > 0 ? (posture()!.activePeers / posture()!.totalPeers) * 100 : 0
+          "
         ></div>
       </div>
 
@@ -99,9 +100,74 @@
 
     <!-- Snapshot timestamp -->
     <div class="posture-footer">
-      <span class="posture-timestamp">
-        Snapshot: {{ posture()!.computedAt | date: 'medium' }}
-      </span>
+      <span class="posture-timestamp">Snapshot: {{ posture()!.computedAt | date: 'medium' }}</span>
     </div>
   </div>
+
+  <!-- Household-grouped peer breakdown -->
+  <section class="household-breakdown" data-testid="household-breakdown">
+    <header class="breakdown-header">
+      <h3 class="breakdown-title">Peers by Household</h3>
+      <span class="breakdown-subline" *ngIf="!groupsLoading()">
+        {{ householdCount }} household{{ householdCount === 1 ? '' : 's' }}
+      </span>
+    </header>
+
+    <!-- Groups loading -->
+    <div *ngIf="groupsLoading()" class="groups-loading">
+      <span class="loading-indicator">Loading household groups...</span>
+    </div>
+
+    <!-- No households found -->
+    <div
+      *ngIf="!groupsLoading() && householdGroups() !== null && householdGroups()!.length === 0"
+      class="groups-empty"
+      data-testid="household-groups-empty"
+    >
+      <p>
+        No household groups found. Peers will appear here once nodes register their household
+        binding.
+      </p>
+    </div>
+
+    <!-- Household rows -->
+    <ul
+      class="households"
+      *ngIf="!groupsLoading() && householdGroups() !== null && householdGroups()!.length > 0"
+    >
+      <li
+        *ngFor="let hh of householdGroups()"
+        class="household-row"
+        [attr.data-testid]="'household-row-' + hh.householdId"
+      >
+        <header class="household-header">
+          <strong class="household-label">{{ hh.label }}</strong>
+          <span class="peer-count">{{ hh.peerCount }} peer{{ hh.peerCount === 1 ? '' : 's' }}</span>
+          <span class="commitment-count" *ngIf="hh.activeCommitments > 0">
+            {{ hh.activeCommitments }} active commitment{{ hh.activeCommitments === 1 ? '' : 's' }}
+          </span>
+        </header>
+
+        <ul class="household-peers" *ngIf="hh.peers.length > 0">
+          <li
+            *ngFor="let peer of hh.peers"
+            class="peer-row"
+            [attr.data-testid]="'peer-row-' + peer.peerId"
+          >
+            <span class="peer-id" title="{{ peer.peerId }}">
+              {{ peer.peerId | slice: 0 : 12 }}…
+            </span>
+            <span class="peer-archetype" *ngIf="peer.archetype">{{ peer.archetype }}</span>
+            <span class="peer-lifecycle" [ngClass]="'lifecycle-' + peer.lifecycleState">
+              {{ peer.lifecycleState }}
+            </span>
+          </li>
+        </ul>
+
+        <p class="household-no-peers" *ngIf="hh.peers.length === 0">
+          No active peers in this household.
+        </p>
+      </li>
+    </ul>
+  </section>
 </div>

@@ -6,8 +6,9 @@
  * carry a dht_anchor_hash. This service is read-only by design.
  */
 
-import { inject, Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
+import { inject, Injectable } from '@angular/core';
+
 import { Observable } from 'rxjs';
 
 import {

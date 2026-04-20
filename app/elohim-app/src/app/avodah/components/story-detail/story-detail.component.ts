@@ -42,11 +42,7 @@ import { AvodahApiService } from '../../services/avodah-api.service';
               (blur)="saveTitle($event)"
             />
           } @else {
-            <h1
-              class="story-title"
-              data-testid="story-title"
-              (click)="editingTitle.set(true)"
-            >
+            <h1 class="story-title" data-testid="story-title" (click)="editingTitle.set(true)">
               {{ story.title }}
             </h1>
           }
@@ -61,11 +57,7 @@ import { AvodahApiService } from '../../services/avodah-api.service';
               (blur)="saveDescription($event)"
             ></textarea>
           } @else {
-            <p
-              class="story-desc"
-              data-testid="story-desc"
-              (click)="editingDescription.set(true)"
-            >
+            <p class="story-desc" data-testid="story-desc" (click)="editingDescription.set(true)">
               {{ story.description || 'Click to add a description...' }}
             </p>
           }
@@ -115,9 +107,9 @@ import { AvodahApiService } from '../../services/avodah-api.service';
           <div class="meta-row">
             <div class="meta-card">
               <label>Assigned</label>
-              <span class="meta-value">{{
-                meta().assigneeId ? '@' + meta().assigneeId : 'Unassigned'
-              }}</span>
+              <span class="meta-value">
+                {{ meta().assigneeId ? '@' + meta().assigneeId : 'Unassigned' }}
+              </span>
             </div>
             <div class="meta-card">
               <label>Story Points</label>
@@ -142,7 +134,10 @@ import { AvodahApiService } from '../../services/avodah-api.service';
             @if (meta().cadence) {
               <span class="meta-value">
                 {{ meta().cadence!.interval }}
-                — next: {{ meta().cadence!.nextOccurrence ? formatDate(meta().cadence!.nextOccurrence!) : '—' }}
+                — next:
+                {{
+                  meta().cadence!.nextOccurrence ? formatDate(meta().cadence!.nextOccurrence!) : '—'
+                }}
               </span>
             } @else {
               <span class="empty-hint">One-time story (no recurrence)</span>
@@ -175,7 +170,9 @@ import { AvodahApiService } from '../../services/avodah-api.service';
                       (click)="removeAttachment(att.relationshipId)"
                       data-testid="remove-attachment"
                       aria-label="Remove attachment"
-                    >✕</button>
+                    >
+                      ✕
+                    </button>
                   </li>
                 }
               </ul>
@@ -196,7 +193,9 @@ import { AvodahApiService } from '../../services/avodah-api.service';
                 class="attach-btn"
                 data-testid="add-attachment-btn"
                 (click)="addingAttachment = true"
-              >+ Attach content</button>
+              >
+                + Attach content
+              </button>
             }
           </div>
         </main>
@@ -351,16 +350,67 @@ import { AvodahApiService } from '../../services/avodah-api.service';
         padding: 0.25rem 0;
         color: #a78bfa;
       }
-      .attachment-list { list-style: none; padding: 0; margin: 0 0 0.5rem; }
-      .attachment-item { display: flex; align-items: center; gap: 0.5rem; padding: 0.375rem 0.5rem; border-radius: 6px; font-size: 0.85rem; }
-      .attachment-item:hover { background: rgba(99, 102, 241, 0.06); }
-      .att-icon { font-size: 1rem; }
-      .att-title { flex: 1; color: var(--lamad-text-secondary, #e2e8f0); }
-      .att-remove { background: none; border: none; color: var(--lamad-text-muted, #64748b); cursor: pointer; font-size: 0.75rem; padding: 0.125rem 0.375rem; border-radius: 4px; }
-      .att-remove:hover { background: rgba(239, 68, 68, 0.15); color: #f87171; }
-      .attach-input { width: 100%; background: rgba(15, 15, 26, 0.8); border: 1px solid var(--lamad-accent-primary, #6366f1); border-radius: 6px; padding: 0.4rem 0.75rem; font-size: 0.8rem; color: var(--lamad-text-secondary, #e2e8f0); outline: none; box-sizing: border-box; }
-      .attach-btn { background: none; border: 1px dashed rgba(99, 102, 241, 0.25); border-radius: 6px; color: var(--lamad-text-muted, #64748b); padding: 0.375rem 0.75rem; font-size: 0.8rem; cursor: pointer; width: 100%; }
-      .attach-btn:hover { border-color: var(--lamad-accent-primary, #6366f1); color: var(--lamad-accent-primary, #6366f1); }
+      .attachment-list {
+        list-style: none;
+        padding: 0;
+        margin: 0 0 0.5rem;
+      }
+      .attachment-item {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.375rem 0.5rem;
+        border-radius: 6px;
+        font-size: 0.85rem;
+      }
+      .attachment-item:hover {
+        background: rgba(99, 102, 241, 0.06);
+      }
+      .att-icon {
+        font-size: 1rem;
+      }
+      .att-title {
+        flex: 1;
+        color: var(--lamad-text-secondary, #e2e8f0);
+      }
+      .att-remove {
+        background: none;
+        border: none;
+        color: var(--lamad-text-muted, #64748b);
+        cursor: pointer;
+        font-size: 0.75rem;
+        padding: 0.125rem 0.375rem;
+        border-radius: 4px;
+      }
+      .att-remove:hover {
+        background: rgba(239, 68, 68, 0.15);
+        color: #f87171;
+      }
+      .attach-input {
+        width: 100%;
+        background: rgba(15, 15, 26, 0.8);
+        border: 1px solid var(--lamad-accent-primary, #6366f1);
+        border-radius: 6px;
+        padding: 0.4rem 0.75rem;
+        font-size: 0.8rem;
+        color: var(--lamad-text-secondary, #e2e8f0);
+        outline: none;
+        box-sizing: border-box;
+      }
+      .attach-btn {
+        background: none;
+        border: 1px dashed rgba(99, 102, 241, 0.25);
+        border-radius: 6px;
+        color: var(--lamad-text-muted, #64748b);
+        padding: 0.375rem 0.75rem;
+        font-size: 0.8rem;
+        cursor: pointer;
+        width: 100%;
+      }
+      .attach-btn:hover {
+        border-color: var(--lamad-accent-primary, #6366f1);
+        color: var(--lamad-accent-primary, #6366f1);
+      }
       .loading {
         text-align: center;
         padding: 3rem;
@@ -418,8 +468,7 @@ export class StoryDetailComponent implements OnInit {
   }
 
   async changeVisibility(event: Event): Promise<void> {
-    const visibility = (event.target as HTMLSelectElement)
-      .value as WorkVisibility;
+    const visibility = (event.target as HTMLSelectElement).value as WorkVisibility;
     if (!this.story) return;
     await this.api.updateStoryField(this.story.id, {
       metadata: { visibility },
@@ -469,16 +518,12 @@ export class StoryDetailComponent implements OnInit {
     this.projectId = this.route.snapshot.params['id'] as string;
     const storyId = this.route.snapshot.params['storyId'] as string;
     const projects = await this.api.getProjects();
-    const project = projects.find((p) => p.id === this.projectId);
+    const project = projects.find(p => p.id === this.projectId);
     this.projectTitle = project?.title ?? 'Project';
     const stories = await this.api.getStoriesForProject(this.projectId);
-    this.story = stories.find((s) => s.id === storyId) ?? null;
+    this.story = stories.find(s => s.id === storyId) ?? null;
     if (!this.story) {
-      void this.router.navigate([
-        '/avodah/projects',
-        this.projectId,
-        'board',
-      ]);
+      void this.router.navigate(['/avodah/projects', this.projectId, 'board']);
     }
     if (this.story) {
       this.attachments = await this.api.getAttachments(this.story.id);

@@ -22,10 +22,18 @@ export interface ContentTypeCoupling {
 }
 
 export const LAMAD_COUPLING_MAP: Record<string, ContentTypeCoupling> = {
-  'concept': {
+  concept: {
     value: {
-      onConsume: { action: 'use', resourceConformsTo: 'learning-content', recognition: 'mastery-credit' },
-      onComplete: { action: 'produce', resourceConformsTo: 'mastery-attestation', recognition: 'mastery-credit' },
+      onConsume: {
+        action: 'use',
+        resourceConformsTo: 'learning-content',
+        recognition: 'mastery-credit',
+      },
+      onComplete: {
+        action: 'produce',
+        resourceConformsTo: 'mastery-attestation',
+        recognition: 'mastery-credit',
+      },
     },
     governance: {
       defaultReach: 'commons',
@@ -34,10 +42,18 @@ export const LAMAD_COUPLING_MAP: Record<string, ContentTypeCoupling> = {
       signalTypes: ['learning-signal', 'mastery-achieved'],
     },
   },
-  'lesson': {
+  lesson: {
     value: {
-      onConsume: { action: 'use', resourceConformsTo: 'learning-content', recognition: 'mastery-credit' },
-      onComplete: { action: 'produce', resourceConformsTo: 'mastery-attestation', recognition: 'mastery-credit' },
+      onConsume: {
+        action: 'use',
+        resourceConformsTo: 'learning-content',
+        recognition: 'mastery-credit',
+      },
+      onComplete: {
+        action: 'produce',
+        resourceConformsTo: 'mastery-attestation',
+        recognition: 'mastery-credit',
+      },
     },
     governance: {
       defaultReach: 'commons',
@@ -46,10 +62,14 @@ export const LAMAD_COUPLING_MAP: Record<string, ContentTypeCoupling> = {
       signalTypes: ['learning-signal', 'mastery-achieved'],
     },
   },
-  'assessment': {
+  assessment: {
     value: {
       onConsume: { action: 'use', resourceConformsTo: 'evaluation', recognition: 'mastery-credit' },
-      onComplete: { action: 'produce', resourceConformsTo: 'mastery-attestation', recognition: 'mastery-credit' },
+      onComplete: {
+        action: 'produce',
+        resourceConformsTo: 'mastery-attestation',
+        recognition: 'mastery-credit',
+      },
     },
     governance: {
       defaultReach: 'commons',
@@ -58,7 +78,7 @@ export const LAMAD_COUPLING_MAP: Record<string, ContentTypeCoupling> = {
       signalTypes: ['assessment-completed', 'mastery-achieved'],
     },
   },
-  'exercise': {
+  exercise: {
     value: {
       onConsume: { action: 'use', resourceConformsTo: 'practice', recognition: 'mastery-credit' },
     },
@@ -70,9 +90,7 @@ export const LAMAD_COUPLING_MAP: Record<string, ContentTypeCoupling> = {
     },
   },
   'experience-story': {
-    value: {
-
-    },
+    value: {},
     governance: {
       defaultReach: 'self',
       minimumReach: 'community',
@@ -81,9 +99,7 @@ export const LAMAD_COUPLING_MAP: Record<string, ContentTypeCoupling> = {
     },
   },
   'experience-moment': {
-    value: {
-
-    },
+    value: {},
     governance: {
       defaultReach: 'self',
       minimumReach: 'community',
@@ -91,9 +107,13 @@ export const LAMAD_COUPLING_MAP: Record<string, ContentTypeCoupling> = {
       signalTypes: [],
     },
   },
-  'reflection': {
+  reflection: {
     value: {
-      onConsume: { action: 'use', resourceConformsTo: 'learning-content', recognition: 'mastery-credit' },
+      onConsume: {
+        action: 'use',
+        resourceConformsTo: 'learning-content',
+        recognition: 'mastery-credit',
+      },
     },
     governance: {
       defaultReach: 'commons',
@@ -102,10 +122,18 @@ export const LAMAD_COUPLING_MAP: Record<string, ContentTypeCoupling> = {
       signalTypes: ['learning-signal'],
     },
   },
-  'discussion': {
+  discussion: {
     value: {
-      onConsume: { action: 'use', resourceConformsTo: 'learning-content', recognition: 'mastery-credit' },
-      onContribute: { action: 'produce', resourceConformsTo: 'contribution', recognition: 'contribution-record' },
+      onConsume: {
+        action: 'use',
+        resourceConformsTo: 'learning-content',
+        recognition: 'mastery-credit',
+      },
+      onContribute: {
+        action: 'produce',
+        resourceConformsTo: 'contribution',
+        recognition: 'contribution-record',
+      },
     },
     governance: {
       defaultReach: 'community',
@@ -114,10 +142,18 @@ export const LAMAD_COUPLING_MAP: Record<string, ContentTypeCoupling> = {
       signalTypes: ['learning-signal', 'contribution-created'],
     },
   },
-  'article': {
+  article: {
     value: {
-      onConsume: { action: 'use', resourceConformsTo: 'learning-content', recognition: 'mastery-credit' },
-      onContribute: { action: 'produce', resourceConformsTo: 'contribution', recognition: 'stewardship-standing' },
+      onConsume: {
+        action: 'use',
+        resourceConformsTo: 'learning-content',
+        recognition: 'mastery-credit',
+      },
+      onContribute: {
+        action: 'produce',
+        resourceConformsTo: 'contribution',
+        recognition: 'stewardship-standing',
+      },
     },
     governance: {
       defaultReach: 'commons',
@@ -126,11 +162,23 @@ export const LAMAD_COUPLING_MAP: Record<string, ContentTypeCoupling> = {
       signalTypes: ['learning-signal', 'contribution-created'],
     },
   },
-  'path': {
+  path: {
     value: {
-      onConsume: { action: 'use', resourceConformsTo: 'learning-content', recognition: 'mastery-credit' },
-      onComplete: { action: 'produce', resourceConformsTo: 'path-completion', recognition: 'mastery-credit' },
-      onContribute: { action: 'produce', resourceConformsTo: 'contribution', recognition: 'stewardship-standing' },
+      onConsume: {
+        action: 'use',
+        resourceConformsTo: 'learning-content',
+        recognition: 'mastery-credit',
+      },
+      onComplete: {
+        action: 'produce',
+        resourceConformsTo: 'path-completion',
+        recognition: 'mastery-credit',
+      },
+      onContribute: {
+        action: 'produce',
+        resourceConformsTo: 'contribution',
+        recognition: 'stewardship-standing',
+      },
     },
     governance: {
       defaultReach: 'commons',
@@ -139,9 +187,13 @@ export const LAMAD_COUPLING_MAP: Record<string, ContentTypeCoupling> = {
       signalTypes: ['path-completed', 'learning-signal'],
     },
   },
-  'epic': {
+  epic: {
     value: {
-      onConsume: { action: 'use', resourceConformsTo: 'learning-content', recognition: 'mastery-credit' },
+      onConsume: {
+        action: 'use',
+        resourceConformsTo: 'learning-content',
+        recognition: 'mastery-credit',
+      },
     },
     governance: {
       defaultReach: 'commons',
@@ -150,9 +202,13 @@ export const LAMAD_COUPLING_MAP: Record<string, ContentTypeCoupling> = {
       signalTypes: ['learning-signal'],
     },
   },
-  'scenario': {
+  scenario: {
     value: {
-      onConsume: { action: 'use', resourceConformsTo: 'learning-content', recognition: 'mastery-credit' },
+      onConsume: {
+        action: 'use',
+        resourceConformsTo: 'learning-content',
+        recognition: 'mastery-credit',
+      },
     },
     governance: {
       defaultReach: 'commons',
@@ -164,7 +220,11 @@ export const LAMAD_COUPLING_MAP: Record<string, ContentTypeCoupling> = {
   'discovery-assessment': {
     value: {
       onConsume: { action: 'use', resourceConformsTo: 'evaluation', recognition: 'mastery-credit' },
-      onComplete: { action: 'produce', resourceConformsTo: 'self-knowledge', recognition: 'mastery-credit' },
+      onComplete: {
+        action: 'produce',
+        resourceConformsTo: 'self-knowledge',
+        recognition: 'mastery-credit',
+      },
     },
     governance: {
       defaultReach: 'commons',
@@ -173,9 +233,13 @@ export const LAMAD_COUPLING_MAP: Record<string, ContentTypeCoupling> = {
       signalTypes: ['assessment-completed', 'learning-signal'],
     },
   },
-  'instrument': {
+  instrument: {
     value: {
-      onContribute: { action: 'produce', resourceConformsTo: 'contribution', recognition: 'stewardship-standing' },
+      onContribute: {
+        action: 'produce',
+        resourceConformsTo: 'contribution',
+        recognition: 'stewardship-standing',
+      },
     },
     governance: {
       defaultReach: 'commons',
@@ -184,10 +248,14 @@ export const LAMAD_COUPLING_MAP: Record<string, ContentTypeCoupling> = {
       signalTypes: ['contribution-created'],
     },
   },
-  'quiz': {
+  quiz: {
     value: {
       onConsume: { action: 'use', resourceConformsTo: 'evaluation', recognition: 'mastery-credit' },
-      onComplete: { action: 'produce', resourceConformsTo: 'mastery-attestation', recognition: 'mastery-credit' },
+      onComplete: {
+        action: 'produce',
+        resourceConformsTo: 'mastery-attestation',
+        recognition: 'mastery-credit',
+      },
     },
     governance: {
       defaultReach: 'commons',
@@ -198,8 +266,16 @@ export const LAMAD_COUPLING_MAP: Record<string, ContentTypeCoupling> = {
   },
   'course-module': {
     value: {
-      onConsume: { action: 'use', resourceConformsTo: 'learning-content', recognition: 'mastery-credit' },
-      onComplete: { action: 'produce', resourceConformsTo: 'mastery-attestation', recognition: 'mastery-credit' },
+      onConsume: {
+        action: 'use',
+        resourceConformsTo: 'learning-content',
+        recognition: 'mastery-credit',
+      },
+      onComplete: {
+        action: 'produce',
+        resourceConformsTo: 'mastery-attestation',
+        recognition: 'mastery-credit',
+      },
     },
     governance: {
       defaultReach: 'commons',
@@ -208,9 +284,13 @@ export const LAMAD_COUPLING_MAP: Record<string, ContentTypeCoupling> = {
       signalTypes: ['learning-signal', 'mastery-achieved'],
     },
   },
-  'module': {
+  module: {
     value: {
-      onConsume: { action: 'use', resourceConformsTo: 'learning-content', recognition: 'mastery-credit' },
+      onConsume: {
+        action: 'use',
+        resourceConformsTo: 'learning-content',
+        recognition: 'mastery-credit',
+      },
     },
     governance: {
       defaultReach: 'commons',
@@ -219,9 +299,13 @@ export const LAMAD_COUPLING_MAP: Record<string, ContentTypeCoupling> = {
       signalTypes: ['learning-signal'],
     },
   },
-  'community': {
+  community: {
     value: {
-      onContribute: { action: 'produce', resourceConformsTo: 'contribution', recognition: 'stewardship-standing' },
+      onContribute: {
+        action: 'produce',
+        resourceConformsTo: 'contribution',
+        recognition: 'stewardship-standing',
+      },
     },
     governance: {
       defaultReach: 'community',
@@ -230,9 +314,13 @@ export const LAMAD_COUPLING_MAP: Record<string, ContentTypeCoupling> = {
       signalTypes: ['contribution-created'],
     },
   },
-  'tool': {
+  tool: {
     value: {
-      onConsume: { action: 'use', resourceConformsTo: 'learning-content', recognition: 'mastery-credit' },
+      onConsume: {
+        action: 'use',
+        resourceConformsTo: 'learning-content',
+        recognition: 'mastery-credit',
+      },
     },
     governance: {
       defaultReach: 'commons',
@@ -241,10 +329,8 @@ export const LAMAD_COUPLING_MAP: Record<string, ContentTypeCoupling> = {
       signalTypes: ['learning-signal'],
     },
   },
-  'placeholder': {
-    value: {
-
-    },
+  placeholder: {
+    value: {},
     governance: {
       defaultReach: 'private',
       minimumReach: 'private',
@@ -252,10 +338,18 @@ export const LAMAD_COUPLING_MAP: Record<string, ContentTypeCoupling> = {
       signalTypes: [],
     },
   },
-  'simulation': {
+  simulation: {
     value: {
-      onConsume: { action: 'use', resourceConformsTo: 'learning-content', recognition: 'mastery-credit' },
-      onComplete: { action: 'produce', resourceConformsTo: 'mastery-attestation', recognition: 'mastery-credit' },
+      onConsume: {
+        action: 'use',
+        resourceConformsTo: 'learning-content',
+        recognition: 'mastery-credit',
+      },
+      onComplete: {
+        action: 'produce',
+        resourceConformsTo: 'mastery-attestation',
+        recognition: 'mastery-credit',
+      },
     },
     governance: {
       defaultReach: 'commons',
@@ -264,9 +358,13 @@ export const LAMAD_COUPLING_MAP: Record<string, ContentTypeCoupling> = {
       signalTypes: ['practice-engagement', 'learning-signal'],
     },
   },
-  'feature': {
+  feature: {
     value: {
-      onConsume: { action: 'use', resourceConformsTo: 'learning-content', recognition: 'mastery-credit' },
+      onConsume: {
+        action: 'use',
+        resourceConformsTo: 'learning-content',
+        recognition: 'mastery-credit',
+      },
     },
     governance: {
       defaultReach: 'commons',
@@ -275,10 +373,14 @@ export const LAMAD_COUPLING_MAP: Record<string, ContentTypeCoupling> = {
       signalTypes: ['learning-signal'],
     },
   },
-  'practice': {
+  practice: {
     value: {
       onConsume: { action: 'use', resourceConformsTo: 'practice', recognition: 'mastery-credit' },
-      onComplete: { action: 'produce', resourceConformsTo: 'mastery-attestation', recognition: 'mastery-credit' },
+      onComplete: {
+        action: 'produce',
+        resourceConformsTo: 'mastery-attestation',
+        recognition: 'mastery-credit',
+      },
     },
     governance: {
       defaultReach: 'commons',
@@ -288,9 +390,7 @@ export const LAMAD_COUPLING_MAP: Record<string, ContentTypeCoupling> = {
     },
   },
   'gate-process-declaration': {
-    value: {
-
-    },
+    value: {},
     governance: {
       defaultReach: 'commons',
       minimumReach: 'community',
@@ -299,9 +399,7 @@ export const LAMAD_COUPLING_MAP: Record<string, ContentTypeCoupling> = {
     },
   },
   'universal-band-declaration': {
-    value: {
-
-    },
+    value: {},
     governance: {
       defaultReach: 'commons',
       minimumReach: 'commons',
@@ -310,9 +408,7 @@ export const LAMAD_COUPLING_MAP: Record<string, ContentTypeCoupling> = {
     },
   },
   'gate-rules-declaration': {
-    value: {
-
-    },
+    value: {},
     governance: {
       defaultReach: 'commons',
       minimumReach: 'community',
@@ -321,9 +417,7 @@ export const LAMAD_COUPLING_MAP: Record<string, ContentTypeCoupling> = {
     },
   },
   'aggregation-spec': {
-    value: {
-
-    },
+    value: {},
     governance: {
       defaultReach: 'commons',
       minimumReach: 'community',
@@ -332,9 +426,7 @@ export const LAMAD_COUPLING_MAP: Record<string, ContentTypeCoupling> = {
     },
   },
   'escalation-target-spec': {
-    value: {
-
-    },
+    value: {},
     governance: {
       defaultReach: 'commons',
       minimumReach: 'community',

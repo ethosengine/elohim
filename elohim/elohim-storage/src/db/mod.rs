@@ -95,6 +95,9 @@ pub mod gate_decision_challenges;
 // Elohim reputation aggregation query (mishpat outcome graph — Phase 11 Task 11.3)
 pub mod elohim_reputation;
 
+// Placement gap CRUD — shefa signal surface (self-healing Plan 1 Task 4)
+pub mod placement_gaps;
+
 use std::path::Path;
 use std::time::Duration;
 

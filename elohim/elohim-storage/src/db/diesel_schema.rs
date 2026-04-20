@@ -38,6 +38,7 @@ diesel::table! {
         created_at -> Text,
         updated_at -> Text,
         dissolved_at -> Nullable<Text>,
+        region -> Nullable<Text>,
     }
 }
 
@@ -1116,6 +1117,21 @@ diesel::table! {
 
 diesel::joinable!(observation_entries -> observation_sessions (session_id));
 
+diesel::table! {
+    placement_gaps (id) {
+        id -> Text,
+        content_id -> Text,
+        shard_hash -> Text,
+        h_app_id -> Text,
+        requested_steward_count -> Integer,
+        achieved_steward_count -> Integer,
+        contract_coverage -> Float,
+        gap_kind -> Text,
+        first_seen_at -> Text,
+        last_seen_at -> Text,
+    }
+}
+
 diesel::joinable!(statement_votes -> statements (statement_id));
 diesel::joinable!(collective_participations -> collectives (collective_id));
 diesel::joinable!(content_tags -> content (content_id));
@@ -1158,6 +1174,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     observation_entries,
     observation_sessions,
     peer_statuses,
+    placement_gaps,
     precedents,
     premium_gates,
     proposal_options,

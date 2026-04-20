@@ -3,6 +3,7 @@ import { Injectable, OnDestroy, inject } from '@angular/core';
 import { Subscription } from 'rxjs';
 
 import { AgentService } from '@app/elohim/services/agent.service';
+
 import { EventService } from './event.service';
 
 /** Minimum milliseconds on content before recording a view event. */

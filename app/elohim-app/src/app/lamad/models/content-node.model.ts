@@ -39,11 +39,21 @@ import {
 import type { LamadContentType } from '../generated/manifest-types';
 
 // Re-export blob/stewardship types (moved to content-extensions.model.ts)
-export type { ContentBlob, ContentBlobVariant, ContentBlobCaption, ContentSteward, StewardshipRole } from './content-extensions.model';
+export type {
+  ContentBlob,
+  ContentBlobVariant,
+  ContentBlobCaption,
+  ContentSteward,
+  StewardshipRole,
+} from './content-extensions.model';
 import type { ContentBlob, ContentSteward } from './content-extensions.model';
 
 // Re-export generated typed metadata and type guards
-export type { ConceptMetadata, AssessmentMetadata, PathMetadata } from '../generated/metadata-types';
+export type {
+  ConceptMetadata,
+  AssessmentMetadata,
+  PathMetadata,
+} from '../generated/metadata-types';
 export type { TypedContentNode } from '../generated/content-node-types';
 export { isConceptNode, isAssessmentNode, isPathNode } from '../generated/content-node-types';
 

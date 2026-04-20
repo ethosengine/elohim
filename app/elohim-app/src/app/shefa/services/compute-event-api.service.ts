@@ -29,10 +29,8 @@ import { BehaviorSubject, Observable, Subject, interval, of, from } from 'rxjs';
 
 import { LamadEventType } from '@app/elohim/models/economic-event.model';
 
-import { ECONOMIC_EVENT_FACTORY } from '../interfaces';
+import { ECONOMIC_EVENT_FACTORY, COMPUTE_DASHBOARD } from '../interfaces';
 import { AllocationSnapshot, ComputeMetrics } from '../models/shefa-dashboard.model';
-
-import { COMPUTE_DASHBOARD } from '../interfaces';
 
 import type {
   IComputeEvent,

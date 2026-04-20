@@ -155,9 +155,7 @@ export class OpinionClusterComponent implements OnInit, OnChanges, AfterViewInit
         this.totalParticipants = result.totalParticipants;
 
         // Use PCA-projected positions from backend
-        this.participants = result.participantPositions.map(p =>
-          mapParticipantPositionToLocal(p)
-        );
+        this.participants = result.participantPositions.map(p => mapParticipantPositionToLocal(p));
 
         // Also load statements/votes for the statement list display
         this.statements = result.bridgingStatements
@@ -835,9 +833,7 @@ function mapOpinionClusterViewToCluster(cv: OpinionClusterView, index: number): 
  * Map a ParticipantPositionView (PCA-projected by the backend) to the
  * component's local ParticipantPosition type.
  */
-function mapParticipantPositionToLocal(
-  pp: ParticipantPositionView,
-): ParticipantPosition {
+function mapParticipantPositionToLocal(pp: ParticipantPositionView): ParticipantPosition {
   return {
     participantId: pp.humanId,
     x: pp.x,

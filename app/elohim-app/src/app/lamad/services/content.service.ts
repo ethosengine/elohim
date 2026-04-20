@@ -499,9 +499,7 @@ export class ContentService {
         organizations: previews.filter(
           p => p.contentType === 'collective' && p.tags?.includes('organization')
         ),
-        books: previews.filter(
-          p => p.contentType === 'reference' && p.tags?.includes('book')
-        ),
+        books: previews.filter(p => p.contentType === 'reference' && p.tags?.includes('book')),
         tools: previews.filter(p => p.contentType === 'tool'),
       }))
     );

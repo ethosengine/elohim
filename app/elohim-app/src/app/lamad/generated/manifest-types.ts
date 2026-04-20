@@ -75,12 +75,12 @@ export const LAMAD_SIGNALS = [
 export type LamadSignal = (typeof LAMAD_SIGNALS)[number];
 
 export const LAMAD_RENDERER_MAP: Record<string, string> = {
-  'markdown': 'MarkdownRendererComponent',
-  'html': 'MarkdownRendererComponent',
-  'plaintext': 'MarkdownRendererComponent',
-  'gherkin': 'GherkinRendererComponent',
+  markdown: 'MarkdownRendererComponent',
+  html: 'MarkdownRendererComponent',
+  plaintext: 'MarkdownRendererComponent',
+  gherkin: 'GherkinRendererComponent',
   'sophia-quiz-json': 'SophiaRendererComponent',
-  'sophia': 'SophiaRendererComponent',
+  sophia: 'SophiaRendererComponent',
   'perseus-quiz-json': 'SophiaRendererComponent',
   'html5-app': 'IframeRendererComponent',
   'video-embed': 'IframeRendererComponent',

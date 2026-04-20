@@ -37,8 +37,8 @@
 ### Entity: placement_gaps (new local table, Category C; shefa signal)
 - Classification: Operational — derivable from shard_locations × rea_commitments diff.
   Persisting the history gives shefa a queryable signal surface.
-- Fields: id (uuid), content_id, shard_hash, requested_household_count,
-  achieved_household_count, contract_coverage (float), gap_kind (enum),
+- Fields: id (uuid), content_id, shard_hash, requested_steward_count,
+  achieved_steward_count, contract_coverage (float), gap_kind (enum),
   first_seen_at, last_seen_at.
 - gap_kind values for Plan 1: "under-committed", "contracts-short", "peers-unavailable".
   (Plans 3-4 will add "unrecoverable" and "attested-breach".)
@@ -173,20 +173,20 @@ Create `elohim/sdk/schemas/v1/views/placement-gap-view.schema.json`:
   "$id": "placement-gap-view.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "PlacementGapView",
-  "description": "Structured shefa signal: a content item's achieved placement falls short of its requested household diversity. Source of truth: computed projection from shard_locations + rea_commitments + humans.household_id. Operational Category C — no DHT entry.",
+  "description": "Structured shefa signal: a content item's achieved placement falls short of its requested stewarding-collective diversity. The 'steward' can be any collective kind (household, church, patron-circle, DAO, …) — any group that can hold DHT-notarized REA commitments. Source of truth: computed projection from shard_locations + rea_commitments + humans → collectives. Operational Category C — no DHT entry.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["id", "contentId", "shardHash", "requestedHouseholdCount", "achievedHouseholdCount", "contractCoverage", "gapKind", "firstSeenAt", "lastSeenAt"],
+  "required": ["id", "contentId", "shardHash", "requestedStewardCount", "achievedStewardCount", "contractCoverage", "gapKind", "firstSeenAt", "lastSeenAt"],
   "properties": {
-    "id":                       { "type": "string", "description": "UUID of this gap record." },
-    "contentId":                { "type": "string" },
-    "shardHash":                { "type": "string" },
-    "requestedHouseholdCount":  { "type": "integer", "minimum": 0 },
-    "achievedHouseholdCount":   { "type": "integer", "minimum": 0 },
-    "contractCoverage":         { "type": "number",  "minimum": 0, "maximum": 1, "description": "Fraction of requested diversity backed by active REA commitments." },
-    "gapKind":                  { "enum": ["under-committed", "contracts-short", "peers-unavailable"] },
-    "firstSeenAt":              { "type": "string", "format": "date-time" },
-    "lastSeenAt":               { "type": "string", "format": "date-time" }
+    "id":                    { "type": "string", "description": "UUID of this gap record." },
+    "contentId":             { "type": "string" },
+    "shardHash":             { "type": "string" },
+    "requestedStewardCount": { "type": "integer", "minimum": 0, "description": "Target number of distinct stewarding collectives (any kind) the placement should reach." },
+    "achievedStewardCount":  { "type": "integer", "minimum": 0, "description": "Actual number of distinct stewarding collectives that accepted the shard." },
+    "contractCoverage":      { "type": "number",  "minimum": 0, "maximum": 1, "description": "Fraction of requested diversity backed by active REA commitments." },
+    "gapKind":               { "enum": ["under-committed", "contracts-short", "peers-unavailable"] },
+    "firstSeenAt":           { "type": "string", "format": "date-time" },
+    "lastSeenAt":            { "type": "string", "format": "date-time" }
   }
 }
 ```
@@ -200,13 +200,13 @@ Create `elohim/sdk/schemas/v1/views/resilience-snapshot-view.schema.json`:
   "$id": "resilience-snapshot-view.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "ResilienceSnapshotView",
-  "description": "Enriched household-first resilience claim consumed by <elohim-resilience-snapshot>. Extends HouseholdResilienceView with commitment-backed counts, diversity score, regional distribution, and placement-gap rollup. Source of truth: computed projection. Operational Category C.",
+  "description": "Resilience claim consumed by <elohim-resilience-snapshot>. Collective-general: stewards of the content can be any collective kind (household, church, patron-circle, DAO, …) — any group that holds DHT-notarized REA commitments under the social-compute epic. Source of truth: computed projection. Operational Category C.",
   "type": "object",
   "additionalProperties": false,
   "required": [
     "contentId",
-    "householdsStewarding",
-    "commitmentBackedHouseholds",
+    "stewardingCollectives",
+    "commitmentBackedCollectives",
     "diversityScore",
     "regionalDistribution",
     "placementGaps",
@@ -214,9 +214,9 @@ Create `elohim/sdk/schemas/v1/views/resilience-snapshot-view.schema.json`:
   ],
   "properties": {
     "contentId":                  { "type": "string" },
-    "householdsStewarding":       { "type": "integer", "minimum": 0 },
-    "commitmentBackedHouseholds": { "type": "integer", "minimum": 0, "description": "Households with an active REA commitment covering this content." },
-    "diversityScore":             { "type": "number",  "minimum": 0, "maximum": 1, "description": "0..1 — ratio of achieved distinct-household placements to requested." },
+    "stewardingCollectives":       { "type": "integer", "minimum": 0, "description": "Distinct collectives (of any kind) with at least one peer holding this content." },
+    "commitmentBackedCollectives": { "type": "integer", "minimum": 0, "description": "Distinct collectives with an active REA commitment covering this content." },
+    "diversityScore":              { "type": "number",  "minimum": 0, "maximum": 1, "description": "0..1 — ratio of achieved distinct-collective placements to requested." },
     "regionalDistribution": {
       "type": "object",
       "additionalProperties": false,
@@ -233,14 +233,27 @@ Create `elohim/sdk/schemas/v1/views/resilience-snapshot-view.schema.json`:
       "items": { "$ref": "placement-gap-view.schema.json" }
     },
     "protectionStatus": { "enum": ["at-risk", "partial", "protected"] },
-    "householdsReciprocated": { "type": "integer", "minimum": 0 },
+    "reciprocatingCollectives": { "type": "integer", "minimum": 0, "description": "Collectives that both steward this content AND are stewarded by the viewer's collective (mutual reciprocation). Optional; omitted when no viewer context is supplied." },
     "details": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "stewardHouseholds": { "type": "array", "items": { "type": "string" } },
-        "onlinePeerCount":   { "type": "integer", "minimum": 0 },
-        "healthScore":       { "type": "number",  "minimum": 0, "maximum": 1 }
+        "stewardingCollectives": {
+          "type": "array",
+          "description": "Collectives currently stewarding this content, with their kind so the UI can label per-kind ('household', 'church', 'patron-circle', etc.).",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "kind"],
+            "properties": {
+              "id":   { "type": "string" },
+              "kind": { "type": "string", "description": "Collective kind: 'household', 'church', 'patron-circle', 'dao', or any future collective kind declared in the collectives table." },
+              "label": { "type": "string", "description": "Optional human-readable display label." }
+            }
+          }
+        },
+        "onlinePeerCount": { "type": "integer", "minimum": 0 },
+        "healthScore":     { "type": "number",  "minimum": 0, "maximum": 1 }
       }
     }
   }
@@ -316,8 +329,8 @@ CREATE TABLE IF NOT EXISTS placement_gaps (
     content_id                  TEXT NOT NULL,
     shard_hash                  TEXT NOT NULL,
     h_app_id                    TEXT NOT NULL,
-    requested_household_count   INTEGER NOT NULL,
-    achieved_household_count    INTEGER NOT NULL,
+    requested_steward_count   INTEGER NOT NULL,
+    achieved_steward_count    INTEGER NOT NULL,
     contract_coverage           REAL NOT NULL,
     gap_kind                    TEXT NOT NULL,
     first_seen_at               TEXT NOT NULL,
@@ -381,8 +394,8 @@ pub struct PlacementGapRow {
     pub content_id: String,
     pub shard_hash: String,
     pub h_app_id: String,
-    pub requested_household_count: i32,
-    pub achieved_household_count: i32,
+    pub requested_steward_count: i32,
+    pub achieved_steward_count: i32,
     pub contract_coverage: f32,
     pub gap_kind: String,
     pub first_seen_at: String,
@@ -396,8 +409,8 @@ pub struct NewPlacementGap<'a> {
     pub content_id: &'a str,
     pub shard_hash: &'a str,
     pub h_app_id: &'a str,
-    pub requested_household_count: i32,
-    pub achieved_household_count: i32,
+    pub requested_steward_count: i32,
+    pub achieved_steward_count: i32,
     pub contract_coverage: f32,
     pub gap_kind: &'a str,
     pub first_seen_at: &'a str,
@@ -451,8 +464,8 @@ fn upsert_new_row_inserts() {
         content_id: "content-alpha",
         shard_hash: "shard-h1",
         h_app_id: "lamad",
-        requested_household_count: 3,
-        achieved_household_count: 1,
+        requested_steward_count: 3,
+        achieved_steward_count: 1,
         contract_coverage: 0.33,
         gap_kind: "peers-unavailable",
         first_seen_at: "2026-04-19T00:00:00Z",
@@ -464,7 +477,7 @@ fn upsert_new_row_inserts() {
     let rows = placement_gaps::list_gaps(&mut conn, "lamad", Default::default()).unwrap();
     assert_eq!(rows.len(), 1);
     assert_eq!(rows[0].gap_kind, "peers-unavailable");
-    assert_eq!(rows[0].achieved_household_count, 1);
+    assert_eq!(rows[0].achieved_steward_count, 1);
 }
 
 #[test]
@@ -477,8 +490,8 @@ fn upsert_existing_bumps_last_seen_keeps_first_seen() {
         content_id: "content-beta",
         shard_hash: "shard-h2",
         h_app_id: "lamad",
-        requested_household_count: 3,
-        achieved_household_count: 2,
+        requested_steward_count: 3,
+        achieved_steward_count: 2,
         contract_coverage: 0.66,
         gap_kind: "under-committed",
         first_seen_at: "2026-04-19T00:00:00Z",
@@ -489,7 +502,7 @@ fn upsert_existing_bumps_last_seen_keeps_first_seen() {
     let gap_v2 = NewPlacementGap {
         id: "gap-ignored", // existing row keeps its id
         last_seen_at: "2026-04-19T01:30:00Z",
-        achieved_household_count: 3, // healed one household
+        achieved_steward_count: 3, // healed one household
         contract_coverage: 1.0,
         ..gap_v1
     };
@@ -499,7 +512,7 @@ fn upsert_existing_bumps_last_seen_keeps_first_seen() {
     assert_eq!(rows.len(), 1);
     assert_eq!(rows[0].first_seen_at, "2026-04-19T00:00:00Z");
     assert_eq!(rows[0].last_seen_at,  "2026-04-19T01:30:00Z");
-    assert_eq!(rows[0].achieved_household_count, 3);
+    assert_eq!(rows[0].achieved_steward_count, 3);
 }
 
 #[test]
@@ -510,7 +523,7 @@ fn list_filters_by_kind() {
     for (id, kind) in [("a", "peers-unavailable"), ("b", "under-committed"), ("c", "peers-unavailable")] {
         placement_gaps::upsert_gap(&mut conn, &NewPlacementGap {
             id, content_id: id, shard_hash: id, h_app_id: "lamad",
-            requested_household_count: 3, achieved_household_count: 0, contract_coverage: 0.0,
+            requested_steward_count: 3, achieved_steward_count: 0, contract_coverage: 0.0,
             gap_kind: kind, first_seen_at: "2026-04-19T00:00:00Z", last_seen_at: "2026-04-19T00:00:00Z",
         }).unwrap();
     }
@@ -528,7 +541,7 @@ fn gc_stale_removes_old_rows() {
 
     let fresh = NewPlacementGap {
         id: "fresh", content_id: "a", shard_hash: "a", h_app_id: "lamad",
-        requested_household_count: 3, achieved_household_count: 0, contract_coverage: 0.0,
+        requested_steward_count: 3, achieved_steward_count: 0, contract_coverage: 0.0,
         gap_kind: "peers-unavailable",
         first_seen_at: "2026-04-19T00:00:00Z",
         last_seen_at:  "2026-04-19T00:00:00Z",
@@ -600,7 +613,7 @@ pub fn upsert_gap(
                 .filter(placement_gaps::gap_kind.eq(gap.gap_kind)),
         )
         .set((
-            placement_gaps::achieved_household_count.eq(gap.achieved_household_count),
+            placement_gaps::achieved_steward_count.eq(gap.achieved_steward_count),
             placement_gaps::contract_coverage.eq(gap.contract_coverage),
             placement_gaps::last_seen_at.eq(gap.last_seen_at),
         ))
@@ -1569,8 +1582,8 @@ pub struct PlacementGapView {
     pub id: String,
     pub content_id: String,
     pub shard_hash: String,
-    pub requested_household_count: i32,
-    pub achieved_household_count: i32,
+    pub requested_steward_count: i32,
+    pub achieved_steward_count: i32,
     pub contract_coverage: f32,
     pub gap_kind: String,
     pub first_seen_at: String,
@@ -1583,8 +1596,8 @@ impl From<PlacementGapRow> for PlacementGapView {
             id: r.id,
             content_id: r.content_id,
             shard_hash: r.shard_hash,
-            requested_household_count: r.requested_household_count,
-            achieved_household_count: r.achieved_household_count,
+            requested_steward_count: r.requested_steward_count,
+            achieved_steward_count: r.achieved_steward_count,
             contract_coverage: r.contract_coverage,
             gap_kind: r.gap_kind,
             first_seen_at: r.first_seen_at,
@@ -1608,21 +1621,30 @@ pub struct RegionalDistributionView {
 #[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
 pub struct ResilienceSnapshotView {
     pub content_id: String,
-    pub households_stewarding: i32,
-    pub commitment_backed_households: i32,
+    pub stewarding_collectives: i32,
+    pub commitment_backed_collectives: i32,
     pub diversity_score: f32,
     pub regional_distribution: RegionalDistributionView,
     pub placement_gaps: Vec<PlacementGapView>,
     pub protection_status: String,
-    pub households_reciprocated: Option<i32>,
+    pub reciprocating_collectives: Option<i32>,
     pub details: Option<ResilienceSnapshotDetailsView>,
 }
 
 #[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct StewardingCollectiveEntry {
+    pub id: String,
+    pub kind: String,
+    pub label: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
 pub struct ResilienceSnapshotDetailsView {
-    pub steward_households: Vec<String>,
+    pub stewarding_collectives: Vec<StewardingCollectiveEntry>,
     pub online_peer_count: i32,
     pub health_score: f32,
 }
@@ -1718,7 +1740,7 @@ async fn list_returns_rows_filterable_by_kind() {
     for (id, kind) in [("g1","peers-unavailable"),("g2","under-committed")] {
         elohim_storage::db::placement_gaps::upsert_gap(&mut conn, &NewPlacementGap {
             id, content_id: id, shard_hash: id, h_app_id: "lamad",
-            requested_household_count: 3, achieved_household_count: 1, contract_coverage: 0.5,
+            requested_steward_count: 3, achieved_steward_count: 1, contract_coverage: 0.5,
             gap_kind: kind, first_seen_at: "2026-04-19T00:00:00Z", last_seen_at: "2026-04-19T00:00:00Z",
         }).unwrap();
     }
@@ -1863,8 +1885,8 @@ fn snapshot_includes_placement_gaps_and_regional_distribution() {
         content_id: "content-via-shard-x",
         shard_hash: "shard-y",
         h_app_id: "lamad",
-        requested_household_count: 3,
-        achieved_household_count: 0,
+        requested_steward_count: 3,
+        achieved_steward_count: 0,
         contract_coverage: 0.0,
         gap_kind: "peers-unavailable",
         first_seen_at: "2026-04-19T00:00:00Z",
@@ -1878,8 +1900,8 @@ fn snapshot_includes_placement_gaps_and_regional_distribution() {
         None,
     ).unwrap();
 
-    assert_eq!(snapshot.households_stewarding, 2);
-    assert_eq!(snapshot.commitment_backed_households, 0); // no rea_commitments seeded
+    assert_eq!(snapshot.stewarding_collectives, 2);
+    assert_eq!(snapshot.commitment_backed_collectives, 0); // no rea_commitments seeded
     assert_eq!(snapshot.placement_gaps.len(), 1);
     assert_eq!(snapshot.placement_gaps[0].gap_kind, "peers-unavailable");
     assert_eq!(snapshot.regional_distribution.unknown, 2); // no region data seeded
@@ -1918,7 +1940,7 @@ pub fn snapshot(
     let mut conn = pool.get()
         .map_err(|e| crate::StorageError::Internal(e.to_string()))?;
 
-    // commitment_backed_households: distinct households with an active provide
+    // commitment_backed_collectives: distinct households with an active provide
     // commitment whose resource_classification matches this content's reach.
     // For Plan 1, derive reach from the content row (falls back to "commons").
     use crate::db::diesel_schema::contents;
@@ -1930,7 +1952,7 @@ pub fn snapshot(
         .unwrap_or_else(|_| "commons".into());
     let scope = format!("content:{}", content_reach);
 
-    let commitment_backed_households: i32 = {
+    let commitment_backed_collectives: i32 = {
         use crate::db::diesel_schema::humans;
         rea_commitments::table
             .inner_join(humans::table.on(
@@ -1946,18 +1968,18 @@ pub fn snapshot(
             .unwrap_or(0) as i32
     };
 
-    // diversity_score: min(households_stewarding, commitment_backed) / max(requested, 1)
+    // diversity_score: min(stewarding_collectives, commitment_backed) / max(requested, 1)
     // For Plan 1 the requested-count target is the manifest's parity+data count;
-    // use base.households_stewarding as achieved against the desired
-    // (RS default = 7). Where manifest is absent, fall back to households_stewarding itself.
+    // use base.stewarding_collectives as achieved against the desired
+    // (RS default = 7). Where manifest is absent, fall back to stewarding_collectives itself.
     let desired = 7; // RS 4+3 baseline; per-content override deferred to Plan 3
     let diversity_score: f32 = if desired == 0 { 0.0 } else {
-        (base.households_stewarding.min(commitment_backed_households.max(1)) as f32)
+        (base.stewarding_collectives.min(commitment_backed_collectives.max(1)) as f32)
             / (desired as f32)
     };
     let diversity_score = diversity_score.clamp(0.0, 1.0);
 
-    // regional_distribution: join steward households with collectives.region
+    // regional_distribution: join steward collectives with collectives.region
     // (region column shipped as operator-declared metadata; nullable).
     // Classification rule for Plan 1 (display-only):
     //   - if viewer_household_id has a region AND steward region matches: local
@@ -1966,7 +1988,7 @@ pub fn snapshot(
     //   - if steward has no region: unknown
     let regional_distribution = compute_regional_distribution(
         &mut conn, &ctx.h_app_id, content_id, viewer_household_id,
-    ).unwrap_or(RegionalDistributionView { local: 0, regional: 0, global: 0, unknown: base.households_stewarding });
+    ).unwrap_or(RegionalDistributionView { local: 0, regional: 0, global: 0, unknown: base.stewarding_collectives });
 
     // placement_gaps for this content.
     let gap_rows = placement_gaps::list_gaps(
@@ -1977,15 +1999,15 @@ pub fn snapshot(
 
     Ok(ResilienceSnapshotView {
         content_id: base.content_id.clone(),
-        households_stewarding: base.households_stewarding,
-        commitment_backed_households,
+        stewarding_collectives: base.stewarding_collectives,
+        commitment_backed_collectives,
         diversity_score,
         regional_distribution,
         placement_gaps: gaps,
         protection_status: base.protection_status.clone(),
-        households_reciprocated: Some(base.households_reciprocated),
+        reciprocating_collectives: Some(base.reciprocating_collectives),
         details: Some(ResilienceSnapshotDetailsView {
-            steward_households: base.details.as_ref().map(|d| d.steward_households.clone()).unwrap_or_default(),
+            stewarding_collectives: base.details.as_ref().map(|d| d.stewarding_collectives.iter().map(|c| StewardingCollectiveEntry { id: c.id.clone(), kind: c.kind.clone(), label: c.label.clone() }).collect()).unwrap_or_default(),
             online_peer_count: base.details.as_ref().map(|d| d.online_peer_count).unwrap_or(0),
             health_score: base.details.as_ref().map(|d| d.health_score).unwrap_or(0.0),
         }),
@@ -2279,8 +2301,8 @@ pub async fn distribute_shards(
                     content_id,
                     shard_hash: hash,
                     h_app_id,
-                    requested_household_count: requested,
-                    achieved_household_count: achieved,
+                    requested_steward_count: requested,
+                    achieved_steward_count: achieved,
                     contract_coverage: coverage,
                     gap_kind,
                     first_seen_at: &now,
@@ -2365,8 +2387,8 @@ describe('ResilienceService', () => {
   it('fetches snapshot for contentId', (done) => {
     const mock: ResilienceSnapshotView = {
       contentId: 'c1',
-      householdsStewarding: 3,
-      commitmentBackedHouseholds: 4,
+      stewardingCollectives: 3,
+      commitmentBackedCollectives: 4,
       diversityScore: 0.75,
       regionalDistribution: { local: 1, regional: 1, global: 1, unknown: 0 },
       placementGaps: [],
@@ -2456,8 +2478,8 @@ import { ResilienceSnapshotView } from '../../generated/resilience-snapshot-view
 
 const sampleProtected: ResilienceSnapshotView = {
   contentId: 'c1',
-  householdsStewarding: 4,
-  commitmentBackedHouseholds: 4,
+  stewardingCollectives: 4,
+  commitmentBackedCollectives: 4,
   diversityScore: 0.95,
   regionalDistribution: { local: 1, regional: 2, global: 1, unknown: 0 },
   placementGaps: [],
@@ -2466,7 +2488,7 @@ const sampleProtected: ResilienceSnapshotView = {
 
 const samplePartial: ResilienceSnapshotView = {
   ...sampleProtected,
-  householdsStewarding: 2,
+  stewardingCollectives: 2,
   diversityScore: 0.5,
   protectionStatus: 'partial',
 };
@@ -2492,7 +2514,7 @@ describe('ResilienceSnapshotComponent', () => {
     const icon = el.querySelector('[data-testid="resilience-icon"]');
     expect(icon?.classList.contains('status-protected')).toBe(true);
     const tooltip = el.querySelector('[data-testid="resilience-tooltip"]')?.textContent ?? '';
-    expect(tooltip).toContain('4 households');
+    expect(tooltip).toContain('4 collectives');
     expect(tooltip).toContain('protected');
   });
 
@@ -2509,7 +2531,7 @@ describe('ResilienceSnapshotComponent', () => {
       ...samplePartial,
       placementGaps: [{
         id: 'g1', contentId: 'c1', shardHash: 'h1',
-        requestedHouseholdCount: 3, achievedHouseholdCount: 1,
+        requestedStewardCount: 3, achievedStewardCount: 1,
         contractCoverage: 0.33, gapKind: 'peers-unavailable',
         firstSeenAt: '2026-04-19T00:00:00Z', lastSeenAt: '2026-04-19T00:00:00Z',
       }],
@@ -2521,19 +2543,24 @@ describe('ResilienceSnapshotComponent', () => {
     expect(gapCount?.textContent).toContain('1');
   });
 
-  it('full card lists steward households', () => {
-    const withHouseholds: ResilienceSnapshotView = {
+  it('full card lists steward collectives', () => {
+    const withCollectives: ResilienceSnapshotView = {
       ...sampleProtected,
       details: {
-        stewardHouseholds: ['home-alpha', 'home-beta', 'home-gamma', 'home-delta'],
+        stewardingCollectives: [
+          { id: 'home-alpha', kind: 'household', label: 'Alpha Household' },
+          { id: 'home-beta', kind: 'household', label: 'Beta Household' },
+          { id: 'home-gamma', kind: 'household', label: 'Gamma Household' },
+          { id: 'home-delta', kind: 'household', label: 'Delta Household' },
+        ],
         onlinePeerCount: 4,
         healthScore: 0.95,
       },
     };
-    component.snapshot = withHouseholds;
+    component.snapshot = withCollectives;
     component.density = 'full';
     fixture.detectChanges();
-    const rows = fixture.nativeElement.querySelectorAll('[data-testid^="resilience-household-"]');
+    const rows = fixture.nativeElement.querySelectorAll('[data-testid^="resilience-collective-"]');
     expect(rows.length).toBe(4);
   });
 });
@@ -2617,7 +2644,7 @@ Create `app/elohim-library/projects/elohim-service/src/components/resilience-sna
       ●
     </span>
     <span data-testid="resilience-tooltip" class="resilience-tooltip">
-      {{ snapshot.householdsStewarding }} households
+      {{ snapshot.stewardingCollectives }} households
       · {{ regionSummary || 'no region data' }}
       · {{ snapshot.protectionStatus }}
     </span>
@@ -2631,9 +2658,9 @@ Create `app/elohim-library/projects/elohim-service/src/components/resilience-sna
     </header>
     <dl>
       <dt>Households stewarding</dt>
-      <dd>{{ snapshot.householdsStewarding }}</dd>
+      <dd>{{ snapshot.stewardingCollectives }}</dd>
       <dt>Commitment-backed</dt>
-      <dd>{{ snapshot.commitmentBackedHouseholds }}</dd>
+      <dd>{{ snapshot.commitmentBackedCollectives }}</dd>
       <dt>Diversity score</dt>
       <dd>{{ snapshot.diversityScore | percent }}</dd>
       <dt>Geographic distribution</dt>
@@ -2652,18 +2679,19 @@ Create `app/elohim-library/projects/elohim-service/src/components/resilience-sna
     </header>
 
     <dl class="summary-grid">
-      <dt>Households stewarding</dt>  <dd>{{ snapshot.householdsStewarding }}</dd>
-      <dt>Commitment-backed</dt>      <dd>{{ snapshot.commitmentBackedHouseholds }}</dd>
+      <dt>Stewarding collectives</dt>  <dd>{{ snapshot.stewardingCollectives }}</dd>
+      <dt>Commitment-backed</dt>      <dd>{{ snapshot.commitmentBackedCollectives }}</dd>
       <dt>Diversity score</dt>        <dd>{{ snapshot.diversityScore | percent }}</dd>
       <dt>Geographic distribution</dt><dd>{{ regionSummary || 'no region data' }}</dd>
     </dl>
 
     <ng-container *ngIf="snapshot.details as details">
-      <h4>Steward households</h4>
-      <ul class="household-list">
-        <li *ngFor="let hh of details.stewardHouseholds"
-            [attr.data-testid]="'resilience-household-' + hh">
-          {{ hh }}
+      <h4>Steward collectives</h4>
+      <ul class="collective-list">
+        <li *ngFor="let c of details.stewardingCollectives"
+            [attr.data-testid]="'resilience-collective-' + c.id">
+          <span class="collective-label">{{ c.label || c.id }}</span>
+          <span class="collective-kind" *ngIf="c.kind">{{ c.kind }}</span>
         </li>
       </ul>
     </ng-container>
@@ -2673,7 +2701,7 @@ Create `app/elohim-library/projects/elohim-service/src/components/resilience-sna
       <ul class="gap-list">
         <li *ngFor="let gap of snapshot.placementGaps">
           <strong>{{ gap.gapKind }}</strong>
-          — {{ gap.achievedHouseholdCount }} of {{ gap.requestedHouseholdCount }} households
+          — {{ gap.achievedStewardCount }} of {{ gap.requestedStewardCount }} collectives
           ({{ gap.contractCoverage | percent }} contract coverage)
         </li>
       </ul>
@@ -2795,9 +2823,19 @@ Create `app/elohim-library/projects/elohim-service/src/components/resilience-sna
     color: var(--text-muted, #64748b);
   }
 
-  .household-list, .gap-list {
+  .collective-list, .gap-list {
     margin: 0 0 0.75rem;
     padding-left: 1rem;
+  }
+
+  .collective-list li {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.25rem;
+
+    .collective-label { font-weight: 500; }
+    .collective-kind { font-size: 0.85em; color: var(--text-muted, #64748b); }
   }
 }
 ```
@@ -3238,7 +3276,7 @@ Feature: Observable + contract-aware auto-distribute
   Scenario: Full placement across two households
     Given the cluster has peers in at least 2 distinct households each with an active "commons" provide commitment
     When I ingest a commons-reach content item "content-alpha"
-    Then within 30 seconds "/api/v1/resilience/content-alpha/household" reports "householdsStewarding" >= 2
+    Then within 30 seconds "/api/v1/resilience/content-alpha/household" reports "stewardingCollectives" >= 2
     And the response "placementGaps" is empty
     And "protectionStatus" is "protected" or "partial"
 
@@ -3406,9 +3444,9 @@ async fn distribute_lands_on_diverse_households() {
     // Wait for distribute_shards to complete.
     tokio::time::sleep(std::time::Duration::from_secs(5)).await;
 
-    // Read household count via the resilience snapshot endpoint.
+    // Read collective count via the resilience snapshot endpoint.
     let snap = storage_clients[0].get_resilience_snapshot(content_id).await.unwrap();
-    assert!(snap.households_stewarding >= 2);
+    assert!(snap.stewarding_collectives >= 2);
     assert!(snap.placement_gaps.is_empty() || snap.placement_gaps.iter().all(|g| g.gap_kind != "contracts-short"));
 }
 ```
@@ -3508,7 +3546,7 @@ Invoke `superpowers:finishing-a-development-branch` to pick the integration path
 | Contract-aware diverse-peer selector | 7 |
 | `distribute_shards` upgrade | 11 |
 | `/api/v1/placement-gaps` endpoint | 9 |
-| Resilience view enrichment (commitmentBackedHouseholds, diversityScore, placementGaps, regionalDistribution) | 8, 10 |
+| Resilience view enrichment (commitmentBackedCollectives, diversityScore, placementGaps, regionalDistribution) | 8, 10 |
 | `<elohim-resilience-snapshot>` component v1 | 12 |
 | Shefa Network Health enhancement | 13 |
 | Content-viewer resilience tooltip | 15 |

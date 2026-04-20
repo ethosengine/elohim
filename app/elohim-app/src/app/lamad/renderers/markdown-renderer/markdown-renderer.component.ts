@@ -29,8 +29,8 @@ import { EprResolverService, type StepRef } from '@app/elohim/services/epr-resol
 import { StorageClientService } from '@app/elohim/services/storage-client.service';
 import { parseEpr } from '@app/elohim/utils/epr-ref';
 
-import { ContentNode } from '../../models/content-node.model';
 import { isConceptNode } from '../../generated/content-node-types';
+import { ContentNode } from '../../models/content-node.model';
 import { PathContextService } from '../../services/path-context.service';
 import { PathService } from '../../services/path.service';
 

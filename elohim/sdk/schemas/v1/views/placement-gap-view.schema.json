@@ -1,0 +1,20 @@
+{
+  "$id": "placement-gap-view.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PlacementGapView",
+  "description": "Structured shefa signal: a content item's achieved placement falls short of its requested stewarding-collective diversity. The 'steward' can be any collective kind (household, church, patron-circle, DAO, …) — any group that can hold DHT-notarized REA commitments. Source of truth: computed projection from shard_locations + rea_commitments + humans → collectives. Operational Category C — no DHT entry.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "contentId", "shardHash", "requestedStewardCount", "achievedStewardCount", "contractCoverage", "gapKind", "firstSeenAt", "lastSeenAt"],
+  "properties": {
+    "id":                    { "type": "string", "description": "UUID of this gap record." },
+    "contentId":             { "type": "string" },
+    "shardHash":             { "type": "string" },
+    "requestedStewardCount": { "type": "integer", "minimum": 0, "description": "Target number of distinct stewarding collectives (any kind) the placement should reach." },
+    "achievedStewardCount":  { "type": "integer", "minimum": 0, "description": "Actual number of distinct stewarding collectives that accepted the shard." },
+    "contractCoverage":      { "type": "number",  "minimum": 0, "maximum": 1, "description": "Fraction of requested diversity backed by active REA commitments." },
+    "gapKind":               { "enum": ["under-committed", "contracts-short", "peers-unavailable"] },
+    "firstSeenAt":           { "type": "string", "format": "date-time" },
+    "lastSeenAt":            { "type": "string", "format": "date-time" }
+  }
+}

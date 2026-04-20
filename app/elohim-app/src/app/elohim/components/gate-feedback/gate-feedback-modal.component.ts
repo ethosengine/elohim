@@ -14,14 +14,15 @@ import {
 
 import { Observable } from 'rxjs';
 
-import { GateArtifactCardComponent } from '../gate-artifact-card/gate-artifact-card.component';
-import type { MutationContext, ReachTier } from '../../services/gate-interaction.service';
-import { StorageApiService } from '../../services/storage-api.service';
 import {
   DiagnosticCollectorService,
   type DiagnosticBundle,
 } from '../../services/diagnostic-collector.service';
 import { IssueReportService } from '../../services/issue-report.service';
+import { StorageApiService } from '../../services/storage-api.service';
+import { GateArtifactCardComponent } from '../gate-artifact-card/gate-artifact-card.component';
+
+import type { MutationContext, ReachTier } from '../../services/gate-interaction.service';
 
 export type FeedbackType = 'flag' | 'challenge' | 'feedback' | 'report';
 
@@ -160,7 +161,9 @@ export class GateFeedbackModalComponent {
   readonly artifactCard = viewChild.required(GateArtifactCardComponent);
 
   readonly title = computed(() => TITLE_MAP[this.feedbackType()] ?? 'Share Feedback');
-  readonly placeholder = computed(() => PLACEHOLDER_MAP[this.feedbackType()] ?? 'Share your thoughts...');
+  readonly placeholder = computed(
+    () => PLACEHOLDER_MAP[this.feedbackType()] ?? 'Share your thoughts...'
+  );
   readonly contextMetadata = computed(() => ({
     contentId: this.contentId(),
     category: this.feedbackType(),
@@ -169,7 +172,7 @@ export class GateFeedbackModalComponent {
   constructor() {
     effect(() => {
       if (this.feedbackType() === 'report') {
-        this.diagnosticCollector.collect().then((bundle) => {
+        this.diagnosticCollector.collect().then(bundle => {
           this.diagnosticBundle = bundle;
         });
       }

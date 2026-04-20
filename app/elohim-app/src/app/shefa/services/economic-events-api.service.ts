@@ -86,9 +86,7 @@ export class EconomicEventsApiService implements IEconomicEventFactory {
   }
 
   async createEconomicEvent(payload: CreateEconomicEventInput): Promise<EconomicEvent> {
-    return firstValueFrom(
-      this.http.post<EconomicEvent>('/api/v1/economic-events', payload)
-    );
+    return firstValueFrom(this.http.post<EconomicEvent>('/api/v1/economic-events', payload));
   }
 
   // ===========================================================================
