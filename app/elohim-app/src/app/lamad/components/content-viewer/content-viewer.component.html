@@ -61,17 +61,19 @@
             [title]="getReachTooltip()"
             (click)="setActiveTab('trust')"
             role="button"
-            [attr.aria-label]="'Reach: ' + (node.reach || 'commons') + '. Click to view trust details.'"
+            [attr.aria-label]="
+              'Reach: ' + (node.reach || 'commons') + '. Click to view trust details.'
+            "
             data-testid="viewer-reach-badge"
-          >{{ getReachIcon() }}</span>
-          <span
-            class="resilience-info"
-            [title]="getResilienceTooltip()"
-            (click)="setActiveTab('network')"
-            role="button"
-            aria-label="View resilience and stewardship details"
+          >
+            {{ getReachIcon() }}
+          </span>
+          <elohim-resilience-snapshot
+            *ngIf="resilienceSnapshot$ | async as snap"
+            [snapshot]="snap"
+            density="icon"
             data-testid="viewer-resilience-info"
-          >{{ getResilienceIcon() }}</span>
+          ></elohim-resilience-snapshot>
         </h1>
         <p class="content-description">{{ node.description }}</p>
 
@@ -96,7 +98,9 @@
             role="button"
             [attr.aria-label]="getFlagLabel(flag.type) + ': ' + flag.reason"
             data-testid="viewer-content-flag"
-          >{{ getFlagLabel(flag.type) }}</span>
+          >
+            {{ getFlagLabel(flag.type) }}
+          </span>
         </div>
 
         <!-- Content actions -->
@@ -296,11 +300,7 @@
           </div>
 
           <!-- Signal Summary -->
-          <div
-            class="signal-summary"
-            *ngIf="aggregatedSignals"
-            data-testid="viewer-signal-summary"
-          >
+          <div class="signal-summary" *ngIf="aggregatedSignals" data-testid="viewer-signal-summary">
             <ng-container *ngIf="aggregatedSignals.reactionCounts.total > 0; else emptySignals">
               <div class="signal-metric">
                 <span class="metric-label">Community Sentiment</span>
@@ -335,7 +335,9 @@
             </ng-container>
             <ng-template #emptySignals>
               <div class="signal-empty" data-testid="viewer-signal-empty">
-                <span class="metric-label">{{ aggregatedSignals.reactionCounts.total }} signals from 0 participants</span>
+                <span class="metric-label">
+                  {{ aggregatedSignals.reactionCounts.total }} signals from 0 participants
+                </span>
               </div>
             </ng-template>
           </div>
@@ -458,7 +460,9 @@
                 data-testid="trust-stewardship-card"
               >
                 <div class="steward-identity">
-                  <span class="steward-name">{{ alloc.steward?.displayName || alloc.stewardPresenceId }}</span>
+                  <span class="steward-name">
+                    {{ alloc.steward?.displayName || alloc.stewardPresenceId }}
+                  </span>
                   <span class="steward-role">{{ alloc.contributionType }}</span>
                 </div>
                 <div class="steward-metrics">
@@ -468,10 +472,12 @@
                       [style.width.%]="alloc.allocationRatio * 100"
                     ></div>
                   </div>
-                  <span class="allocation-pct">{{ (alloc.allocationRatio * 100) | number:'1.0-0' }}%</span>
+                  <span class="allocation-pct">
+                    {{ alloc.allocationRatio * 100 | number: '1.0-0' }}%
+                  </span>
                 </div>
                 <div class="steward-recognition" *ngIf="alloc.recognitionAccumulated > 0">
-                  {{ alloc.recognitionAccumulated | number:'1.1-1' }} recognition
+                  {{ alloc.recognitionAccumulated | number: '1.1-1' }} recognition
                 </div>
                 <div class="steward-dispute" *ngIf="alloc.governanceState === 'disputed'">
                   Disputed{{ alloc.disputeReason ? ': ' + alloc.disputeReason : '' }}
@@ -641,13 +647,16 @@
               class="health-badge"
               [ngClass]="resilience?.health?.status || 'unknown'"
               data-testid="viewer-health-badge"
-            >{{ (resilience?.health?.status || 'unknown') | titlecase }}</span>
+            >
+              {{ resilience?.health?.status || 'unknown' | titlecase }}
+            </span>
           </div>
 
           <div class="resilience-grid" *ngIf="resilience; else loadingResilience">
             <div class="resilience-metric">
               <span class="metric-label">Encoding</span>
-              <span class="metric-value">{{ resilience.encoding.strategy }}
+              <span class="metric-value">
+                {{ resilience.encoding.strategy }}
                 <span *ngIf="resilience.encoding.parityShards > 0">
                   (can lose {{ resilience.health.canSurviveFailures }} peers)
                 </span>
@@ -657,27 +666,36 @@
             <div class="resilience-metric">
               <span class="metric-label">Shards</span>
               <span class="metric-value">
-                {{ resilience.distribution.shardsWithLocations }}/{{ resilience.distribution.totalShards }} distributed
+                {{ resilience.distribution.shardsWithLocations }}/{{
+                  resilience.distribution.totalShards
+                }}
+                distributed
               </span>
             </div>
 
             <div class="resilience-metric">
               <span class="metric-label">Peers</span>
-              <span class="metric-value">{{ resilience.distribution.distinctPeers }} holding shards</span>
+              <span class="metric-value">
+                {{ resilience.distribution.distinctPeers }} holding shards
+              </span>
             </div>
 
             <div class="resilience-metric" *ngIf="resilience.stewardship.stewardCount > 0">
               <span class="metric-label">Stewards</span>
               <span class="metric-value">
                 <span *ngFor="let a of resilience.stewardship.allocations; let last = last">
-                  {{ a.stewardPresenceId }} ({{ (a.allocationRatio * 100) | number:'1.0-0' }}%){{ last ? '' : ' · ' }}
+                  {{ a.stewardPresenceId }} ({{ a.allocationRatio * 100 | number: '1.0-0' }}%){{
+                    last ? '' : ' · '
+                  }}
                 </span>
               </span>
             </div>
 
             <div class="resilience-metric" *ngIf="resilience.commitments.totalCommittedBytes > 0">
               <span class="metric-label">Storage Committed</span>
-              <span class="metric-value">{{ resilience.commitments.totalCommittedBytes / 1073741824 | number:'1.0-0' }}GB</span>
+              <span class="metric-value">
+                {{ resilience.commitments.totalCommittedBytes / 1073741824 | number: '1.0-0' }}GB
+              </span>
             </div>
           </div>
 
@@ -691,9 +709,16 @@
                 [ngClass]="{
                   'shard-data': shard.shardType === 'data',
                   'shard-parity': shard.shardType === 'parity',
-                  'shard-missing': shard.peerIds.length === 0
+                  'shard-missing': shard.peerIds.length === 0,
                 }"
-                [title]="'Shard ' + i + ' (' + shard.shardType + '): ' + (shard.peerIds.length > 0 ? shard.peerIds.length + ' peers' : 'no peers')"
+                [title]="
+                  'Shard ' +
+                  i +
+                  ' (' +
+                  shard.shardType +
+                  '): ' +
+                  (shard.peerIds.length > 0 ? shard.peerIds.length + ' peers' : 'no peers')
+                "
               >
                 {{ shard.peerIds.length > 0 ? shard.peerIds.length : '?' }}
               </div>
@@ -712,19 +737,24 @@
               {{ isVerifying ? 'Verifying...' : 'Verify Resilience' }}
             </button>
 
-            <div class="verification-result" *ngIf="verificationResult" data-testid="viewer-verification-result">
+            <div
+              class="verification-result"
+              *ngIf="verificationResult"
+              data-testid="viewer-verification-result"
+            >
               <div class="verify-status" [ngClass]="verificationResult.verified ? 'pass' : 'fail'">
                 {{ verificationResult.verified ? 'PASS' : 'FAIL' }}
               </div>
               <div class="verify-details">
-                <span>{{ verificationResult.shardsLocated }}/{{ verificationResult.shardsNeeded }} shards located</span>
+                <span>
+                  {{ verificationResult.shardsLocated }}/{{ verificationResult.shardsNeeded }}
+                  shards located
+                </span>
                 <span *ngIf="verificationResult.shardsMissing > 0">
                   ({{ verificationResult.shardsMissing }} missing)
                 </span>
                 <span>{{ verificationResult.reconstructionTimeMs }}ms</span>
-                <span *ngIf="verificationResult.error">
-                  Error: {{ verificationResult.error }}
-                </span>
+                <span *ngIf="verificationResult.error">Error: {{ verificationResult.error }}</span>
               </div>
             </div>
           </div>
