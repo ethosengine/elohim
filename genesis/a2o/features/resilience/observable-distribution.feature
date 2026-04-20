@@ -1,4 +1,4 @@
-@e2e @resilience @resilience-p1
+@e2e @resilience @resilience-p1 @local
 Feature: Observable + contract-aware auto-distribute
   As an operator running a household mesh
   I want ingested content to land on diverse households within contract bounds
