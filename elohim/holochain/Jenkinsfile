@@ -342,13 +342,20 @@ def computeP2PBootstrapNodes(Map currentHuman, List allHumans) {
 
 /**
  * Compute conductor WebSocket URLs for a doorway in a given environment.
+ *
+ * Headless services do not remap ports for pod-direct (-0.) DNS, so the URL
+ * must name the container port that's actually listening in the pod. Doorway
+ * derives the admin URL as app-port minus 1, so we emit the App WS port:
+ *
+ *   pattern=consolidated (elohim-node): conductor binds 0.0.0.0:4444/4445   → :4445
+ *   pattern=legacy (edgenode + socat):  socat bridges 0.0.0.0:8444/8445     → :8445
+ *                                        to conductor's 127.0.0.1:4444/4445
  */
 def computeConductorUrls(String targetEnv, List allHumans) {
     def envHumans = allHumans.findAll { it.env == targetEnv }
     return envHumans.collect { h ->
-        // App WS port is 4445 in consolidated-conductor mode (no socat bridge).
-        // Doorway derives the admin URL as app - 1 → 4444, matching the ConfigMap.
-        "ws://${h.resourcePrefix}-0.${h.resourcePrefix}-headless.elohim-${targetEnv}.svc.cluster.local:4445"
+        def appPort = (h.pattern == 'consolidated') ? 4445 : 8445
+        "ws://${h.resourcePrefix}-0.${h.resourcePrefix}-headless.elohim-${targetEnv}.svc.cluster.local:${appPort}"
     }.join(',')
 }
 
