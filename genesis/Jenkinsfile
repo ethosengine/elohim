@@ -925,7 +925,7 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
 
                                     E2E_DOORWAY_ALPHA="${doorwayHost}" \
                                     E2E_DOORWAY_STAGING="${doorwayHost}" \
-                                        npx cucumber-js --tags '@e2e and not @browser-only' \
+                                        npx cucumber-js --tags '@e2e and not @browser-only and not @local' \
                                         --format progress-bar \
                                         --format json:reports/cucumber-report.json \
                                         --format html:reports/cucumber-report.html
