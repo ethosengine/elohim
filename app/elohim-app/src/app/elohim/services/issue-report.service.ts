@@ -1,7 +1,9 @@
 import { Injectable, inject } from '@angular/core';
+
 import { Observable } from 'rxjs';
 
 import { StorageApiService } from './storage-api.service';
+
 import type { DiagnosticBundle } from './diagnostic-collector.service';
 import type { ContentWithTagsView, CreateContentInputView } from '@elohim/storage-client/generated';
 
@@ -59,19 +61,13 @@ export class IssueReportService {
     return this.storageApi.getContents({ contentType: 'issue-report' });
   }
 
-  updateResolution(
-    reportId: string,
-    status: ResolutionStatus,
-  ): Observable<ContentWithTagsView> {
+  updateResolution(reportId: string, status: ResolutionStatus): Observable<ContentWithTagsView> {
     return this.storageApi.updateContent(reportId, {
       metadata: { resolutionStatus: status },
     });
   }
 
-  promoteToWorkStory(
-    reportId: string,
-    projectId: string,
-  ): Observable<ContentWithTagsView> {
+  promoteToWorkStory(reportId: string, projectId: string): Observable<ContentWithTagsView> {
     return this.storageApi.updateContent(reportId, {
       metadata: {
         projectId,

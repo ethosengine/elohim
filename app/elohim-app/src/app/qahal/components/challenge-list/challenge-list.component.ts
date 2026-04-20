@@ -8,9 +8,9 @@
 import { Component, inject, signal, type OnInit } from '@angular/core';
 import { RouterLink } from '@angular/router';
 
-import type { ChallengeView } from '@elohim/storage-client/generated';
-
 import { GovernanceApiService } from '@app/elohim/services/governance-api.service';
+
+import type { ChallengeView } from '@elohim/storage-client/generated';
 
 @Component({
   selector: 'qahal-challenge-list',

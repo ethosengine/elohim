@@ -1,10 +1,12 @@
 import { Injectable, inject, signal, computed } from '@angular/core';
+
 import { Observable } from 'rxjs';
 
-import type { GateEvaluationView } from '@elohim/storage-client';
-
 import { extractGateFromResponse } from '../models/gated-response.model';
+
 import { GateService } from './gate.service';
+
+import type { GateEvaluationView } from '@elohim/storage-client';
 
 export type GateArtifactState =
   | 'draft'
@@ -65,7 +67,7 @@ export class GateInteractionService {
     text: string,
     mutationType: string,
     context: MutationContext,
-    apiCall: (text: string, context: MutationContext) => Observable<unknown>,
+    apiCall: (text: string, context: MutationContext) => Observable<unknown>
   ): void {
     if (this._state() === 'evaluating') return;
     this._draftText.set(text);
@@ -74,7 +76,7 @@ export class GateInteractionService {
     this._state.set('evaluating');
 
     apiCall(text, context).subscribe({
-      next: (response) => {
+      next: response => {
         const gate = extractGateFromResponse(response);
         if (gate) {
           this.handleGateEvaluation(gate);
@@ -82,7 +84,7 @@ export class GateInteractionService {
           this._state.set('posted');
         }
       },
-      error: (err) => {
+      error: err => {
         const gate = err?.error?.gate;
         if ((err?.status === 409 || err?.status === 403) && gate) {
           this.handleGateEvaluation(gate);
@@ -109,10 +111,10 @@ export class GateInteractionService {
 
     if (gate.settlementBoundary != null) {
       this._state.set('settled');
-    } else if (gate.pausePrompt != null) {
-      this._state.set('dialogue');
-    } else {
+    } else if (gate.pausePrompt == null) {
       this._state.set('affirm');
+    } else {
+      this._state.set('dialogue');
     }
   }
 

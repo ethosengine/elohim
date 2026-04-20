@@ -1,6 +1,8 @@
 import { HttpClient } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
+
 import { Observable } from 'rxjs';
+
 import { StorageClientService } from '@app/elohim/services/storage-client.service';
 
 export interface ResilienceView {
@@ -16,20 +18,20 @@ export interface ResilienceView {
     totalShards: number;
     shardsWithLocations: number;
     distinctPeers: number;
-    shards: Array<{
+    shards: {
       hash: string;
       shardType: string;
       peerIds: string[];
       status: string;
-    }>;
+    }[];
   };
   stewardship: {
     stewardCount: number;
-    allocations: Array<{
+    allocations: {
       stewardPresenceId: string;
       allocationRatio: number;
       contributionType: string;
-    }>;
+    }[];
   };
   commitments: {
     activePeers: number;
@@ -66,7 +68,7 @@ export class ResilienceService {
   getContentResilience(contentId: string): Observable<ResilienceView> {
     const baseUrl = this.storageClient.getStorageBaseUrl();
     return this.http.get<ResilienceView>(
-      `${baseUrl}/api/v1/resilience/${encodeURIComponent(contentId)}`,
+      `${baseUrl}/api/v1/resilience/${encodeURIComponent(contentId)}`
     );
   }
 
@@ -74,7 +76,7 @@ export class ResilienceService {
     const baseUrl = this.storageClient.getStorageBaseUrl();
     return this.http.post<VerificationResultView>(
       `${baseUrl}/api/v1/resilience/${encodeURIComponent(contentId)}/verify`,
-      {},
+      {}
     );
   }
 }

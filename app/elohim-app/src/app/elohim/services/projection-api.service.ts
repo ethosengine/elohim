@@ -548,8 +548,9 @@ export class ProjectionAPIService implements IStorageApi {
         difficulty: (d['difficulty'] ?? 'beginner') as string,
         estimatedDuration: d['estimatedDuration'] as string | undefined,
         thumbnailUrl: this.contentService.resolveBlobReference(
-          ((d['metadata'] as Record<string, unknown> | undefined)?.['thumbnailUrl'] as string | undefined)
-            ?? d['thumbnailUrl'] as string | null | undefined
+          ((d['metadata'] as Record<string, unknown> | undefined)?.['thumbnailUrl'] as
+            | string
+            | undefined) ?? (d['thumbnailUrl'] as string | null | undefined)
         ),
         thumbnailAlt: d['thumbnailAlt'] as string | undefined,
         version: (d['version'] ?? '1.0.0') as string,

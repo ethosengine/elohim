@@ -23,8 +23,8 @@ import type {
   PerseusItem,
   PerseusScoreResult,
 } from '../../content-io/plugins/sophia/sophia-moment.model';
-import type { MasteryLevel } from '../../models/content-mastery.model';
 import type { ConceptMetadata } from '../../generated/metadata-types';
+import type { MasteryLevel } from '../../models/content-mastery.model';
 
 // @coverage: 100.0% (2026-02-24)
 

@@ -30,9 +30,7 @@ import { RouterModule } from '@angular/router';
         <a routerLink="directory" class="nav-link directory-link" data-testid="directory-link">
           Community Directory
         </a>
-        <p>
-          Browse community members, households, and groups.
-        </p>
+        <p>Browse community members, households, and groups.</p>
       </div>
 
       <div class="features">

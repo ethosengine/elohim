@@ -65,7 +65,6 @@ import {
   BulkAllocationResult,
 } from '@app/lamad/models/stewardship-allocation.model';
 
-import { LoggerService } from './logger.service';
 import { environment } from '../../../environments/environment';
 import {
   type IStorageApi,
@@ -77,6 +76,8 @@ import {
   type CreateMasteryInput,
   type CreateEventInput,
 } from '../interfaces';
+
+import { LoggerService } from './logger.service';
 
 import type {
   RelationshipView,
@@ -936,21 +937,16 @@ export class StorageApiService implements IStorageApi, IStorageWriter {
    * Gated mutation — extracts gate evaluation from response envelope.
    */
   createComment(contentId: string, body: string): Observable<unknown> {
-    return this.http
-      .post<unknown>(`${this.baseUrl}/api/v1/comments`, { contentId, body })
-      .pipe(
-        timeout(this.defaultTimeoutMs),
-        tap(response => {
-          const gate = extractGateFromResponse(response);
-          if (gate) this.gateService.handleGateResponse(gate);
-        }),
-        map(
-          response =>
-            (response as { data: unknown }).data ?? response
-        ),
-        catchError(error => handleGateError(error, this.gateService)),
-        catchError(error => this.handleError('createComment', error))
-      );
+    return this.http.post<unknown>(`${this.baseUrl}/api/v1/comments`, { contentId, body }).pipe(
+      timeout(this.defaultTimeoutMs),
+      tap(response => {
+        const gate = extractGateFromResponse(response);
+        if (gate) this.gateService.handleGateResponse(gate);
+      }),
+      map(response => (response as { data: unknown }).data ?? response),
+      catchError(error => handleGateError(error, this.gateService)),
+      catchError(error => this.handleError('createComment', error))
+    );
   }
 
   /**
@@ -960,12 +956,10 @@ export class StorageApiService implements IStorageApi, IStorageWriter {
   getComments(contentId: string): Observable<unknown[]> {
     const params = new HttpParams().set('contentId', contentId);
 
-    return this.http
-      .get<unknown[]>(`${this.baseUrl}/api/v1/comments`, { params })
-      .pipe(
-        timeout(this.defaultTimeoutMs),
-        catchError(error => this.handleError('getComments', error))
-      );
+    return this.http.get<unknown[]>(`${this.baseUrl}/api/v1/comments`, { params }).pipe(
+      timeout(this.defaultTimeoutMs),
+      catchError(error => this.handleError('getComments', error))
+    );
   }
 
   // ==========================================================================

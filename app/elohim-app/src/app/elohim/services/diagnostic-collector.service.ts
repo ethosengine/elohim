@@ -1,6 +1,7 @@
+import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Router } from '@angular/router';
-import { HttpClient } from '@angular/common/http';
+
 import { firstValueFrom, timeout, catchError, of } from 'rxjs';
 
 import { LoggerService, type LogEntry } from './logger.service';
@@ -31,31 +32,22 @@ export class DiagnosticCollectorService {
 
   async collect(): Promise<DiagnosticBundle> {
     const allLogs = this.logger.getRecentLogs();
-    const logs = allLogs.filter(
-      (l) => l.level === 'warn' || l.level === 'error',
-    );
+    const logs = allLogs.filter(l => l.level === 'warn' || l.level === 'error');
 
     const correlationIds = [
-      ...new Set(
-        logs
-          .map((l) => l.correlationId)
-          .filter((id): id is string => id != null),
-      ),
+      ...new Set(logs.map(l => l.correlationId).filter((id): id is string => id != null)),
     ];
 
     const isTauri =
-      'window' in globalThis &&
-      '__TAURI__' in (globalThis as Record<string, unknown>);
+      'window' in globalThis && '__TAURI__' in (globalThis as Record<string, unknown>);
 
     let storageHealth: Record<string, unknown> | null = null;
     try {
       storageHealth = await firstValueFrom(
-        this.http
-          .get<Record<string, unknown>>('/health')
-          .pipe(
-            timeout(5000),
-            catchError(() => of(null)),
-          ),
+        this.http.get<Record<string, unknown>>('/health').pipe(
+          timeout(5000),
+          catchError(() => of(null))
+        )
       );
     } catch {
       storageHealth = null;

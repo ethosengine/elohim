@@ -2,6 +2,7 @@ import { CommonModule } from '@angular/common';
 import { Component, OnInit, inject, input, signal } from '@angular/core';
 
 import { GovernanceApiService } from '@app/elohim/services/governance-api.service';
+
 import type { SignalAggregateView } from '@elohim/storage-client/generated';
 
 /**
@@ -34,10 +35,7 @@ import type { SignalAggregateView } from '@elohim/storage-client/generated';
               <div class="value-row">
                 <span class="value-label">{{ entry.label }}</span>
                 <div class="value-bar-track">
-                  <div
-                    class="value-bar-fill"
-                    [style.width.%]="entry.percentage"
-                  ></div>
+                  <div class="value-bar-fill" [style.width.%]="entry.percentage"></div>
                 </div>
                 <span class="value-count">
                   {{ entry.count }} ({{ entry.percentage | number: '1.0-0' }}%)
@@ -152,10 +150,7 @@ export class FeedbackAggregateComponent implements OnInit {
   private readonly governanceApi = inject(GovernanceApiService);
 
   async ngOnInit(): Promise<void> {
-    const result = await this.governanceApi.getSignalAggregate(
-      this.entityType(),
-      this.entityId()
-    );
+    const result = await this.governanceApi.getSignalAggregate(this.entityType(), this.entityId());
     this.aggregate.set(result);
   }
 
@@ -173,7 +168,7 @@ export class FeedbackAggregateComponent implements OnInit {
 
   typeBreakdownText(): string {
     return this.typeBreakdown()
-      .map((e) => `${e.count} ${e.label}`)
+      .map(e => `${e.count} ${e.label}`)
       .join(' \u00b7 ');
   }
 

@@ -15,6 +15,7 @@
 import { InjectionToken, inject } from '@angular/core';
 
 import { FlowPlanningApiService } from '../services/flow-planning-api.service';
+
 import type {
   FlowPlan,
   FlowBudget,
@@ -175,8 +176,14 @@ export interface IFlowPlanning {
 
   buildFlowDashboard(stewardId: string): Promise<FlowPlanningDashboard>;
   analyzeFlowHealth(planId: string): Promise<FlowHealthAnalysis>;
-  generatePlanningInsights(stewardId: string, lookbackMonths?: number): Promise<FlowPlanningInsight[]>;
-  detectAnomalies(resourceId: string, sensitivity?: 'low' | 'medium' | 'high'): Promise<AnomalyDetection[]>;
+  generatePlanningInsights(
+    stewardId: string,
+    lookbackMonths?: number
+  ): Promise<FlowPlanningInsight[]>;
+  detectAnomalies(
+    resourceId: string,
+    sensitivity?: 'low' | 'medium' | 'high'
+  ): Promise<AnomalyDetection[]>;
 
   // -- Constitutional Compliance --
 

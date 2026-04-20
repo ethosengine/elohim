@@ -10,6 +10,7 @@
 import { Component, inject, input, OnInit, signal, computed } from '@angular/core';
 
 import { GovernanceApiService } from '@app/elohim/services/governance-api.service';
+
 import type {
   GovernanceDispositionView,
   UpdateDispositionInputView,
@@ -38,7 +39,8 @@ import type {
               data-testid="risk-tolerance-slider"
               [value]="editRiskTolerance()"
               [disabled]="!editing()"
-              (input)="onRiskToleranceChange($event)" />
+              (input)="onRiskToleranceChange($event)"
+            />
             <span class="range-label-right">Progressive</span>
           </div>
           <span class="range-value">{{ (editRiskTolerance() * 100).toFixed(0) }}%</span>
@@ -58,7 +60,8 @@ import type {
               data-testid="change-openness-slider"
               [value]="editChangeOpenness()"
               [disabled]="!editing()"
-              (input)="onChangeOpennessChange($event)" />
+              (input)="onChangeOpennessChange($event)"
+            />
             <span class="range-label-right">Embrace change</span>
           </div>
           <span class="range-value">{{ (editChangeOpenness() * 100).toFixed(0) }}%</span>
@@ -78,12 +81,11 @@ import type {
               data-testid="consensus-preference-slider"
               [value]="editConsensusPreference()"
               [disabled]="!editing()"
-              (input)="onConsensusPreferenceChange($event)" />
+              (input)="onConsensusPreferenceChange($event)"
+            />
             <span class="range-label-right">Consensus-seeking</span>
           </div>
-          <span class="range-value">
-            {{ (editConsensusPreference() * 100).toFixed(0) }}%
-          </span>
+          <span class="range-value">{{ (editConsensusPreference() * 100).toFixed(0) }}%</span>
         </div>
 
         <!-- Priority Values -->
@@ -100,9 +102,9 @@ import type {
 
         <!-- Stats -->
         <div class="stats">
-          {{ disposition()!.totalVotesCast }} votes cast
-          &middot; {{ disposition()!.totalChallengesFiled }} challenges filed
-          &middot; {{ disposition()!.totalSignalsRecorded }} signals recorded
+          {{ disposition()!.totalVotesCast }} votes cast &middot;
+          {{ disposition()!.totalChallengesFiled }} challenges filed &middot;
+          {{ disposition()!.totalSignalsRecorded }} signals recorded
         </div>
 
         <!-- Voting Pattern -->
@@ -119,14 +121,16 @@ import type {
             <button
               class="btn btn-secondary"
               data-testid="adjust-manually-btn"
-              (click)="startEditing()">
+              (click)="startEditing()"
+            >
               Adjust manually
             </button>
             <button
               class="btn btn-secondary"
               data-testid="recompute-btn"
               (click)="recompute()"
-              [disabled]="recomputing()">
+              [disabled]="recomputing()"
+            >
               {{ recomputing() ? 'Recomputing...' : 'Recompute from history' }}
             </button>
           } @else {
@@ -134,13 +138,15 @@ import type {
               class="btn btn-primary"
               data-testid="save-disposition-btn"
               (click)="save()"
-              [disabled]="saving()">
+              [disabled]="saving()"
+            >
               {{ saving() ? 'Saving...' : 'Save' }}
             </button>
             <button
               class="btn btn-secondary"
               data-testid="cancel-edit-btn"
-              (click)="cancelEditing()">
+              (click)="cancelEditing()"
+            >
               Cancel
             </button>
           }
@@ -460,11 +466,8 @@ function parsePriorityValues(values: JsonValue): string[] {
 function parseVotingPattern(summary: JsonValue): string {
   if (!summary || typeof summary !== 'object' || Array.isArray(summary)) return '';
   const entries = Object.entries(summary as Record<string, JsonValue>)
-    .filter(([, v]) => typeof v === 'number' && (v as number) > 0)
+    .filter(([, v]) => typeof v === 'number' && v > 0)
     .sort(([, a], [, b]) => (b as number) - (a as number));
   if (entries.length === 0) return '';
-  return (
-    'Mostly ' +
-    entries.map(([mechanism, pct]) => `${mechanism} (${pct}%)`).join(', ')
-  );
+  return 'Mostly ' + entries.map(([mechanism, pct]) => `${mechanism} (${pct}%)`).join(', ');
 }

@@ -9,6 +9,7 @@
  * Governance levels 3-7 route here via the gateway's renderTarget === 'psephos'.
  */
 
+import { DecimalPipe, TitleCasePipe } from '@angular/common';
 import {
   Component,
   CUSTOM_ELEMENTS_SCHEMA,
@@ -19,7 +20,8 @@ import {
   output,
   signal,
 } from '@angular/core';
-import { DecimalPipe, TitleCasePipe } from '@angular/common';
+
+import { GovernanceApiService } from '@app/elohim/services/governance-api.service';
 
 import type {
   ProposalView,
@@ -28,8 +30,6 @@ import type {
   TallyResult,
   BallotEntry,
 } from '@elohim/storage-client/generated';
-
-import { GovernanceApiService } from '@app/elohim/services/governance-api.service';
 
 /** Shape of the ballot object passed to PsephosBallotComponent. */
 interface PsephosBallot {
@@ -96,9 +96,7 @@ interface BallotRecognition {
       <div class="ballot-container">
         <h4>{{ proposal().title }}</h4>
         <p class="mechanism-badge">{{ mechanism() }}</p>
-        <app-psephos-ballot
-          [ballot]="ballot()"
-          (recognized)="onRecognized($any($event))" />
+        <app-psephos-ballot [ballot]="ballot()" (recognized)="onRecognized($any($event))" />
       </div>
     }
   `,
@@ -212,7 +210,7 @@ export class PsephosBallotWrapperComponent {
     const prop = this.proposal();
     return {
       mechanism: this.mechanism(),
-      options: opts.map((o) => ({
+      options: opts.map(o => ({
         id: o.id,
         label: o.label,
         description: o.description,

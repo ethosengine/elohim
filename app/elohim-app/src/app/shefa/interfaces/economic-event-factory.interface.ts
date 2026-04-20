@@ -26,8 +26,8 @@ import { InjectionToken, inject } from '@angular/core';
 
 import { EconomicEventsApiService } from '../services/economic-events-api.service';
 
-import type { StagedTransaction } from '@app/shefa/models/transaction-import.model';
 import type { EconomicEvent, REAAction, LamadEventType } from '@app/elohim/models';
+import type { StagedTransaction } from '@app/shefa/models/transaction-import.model';
 
 /**
  * AppreciationDisplay -- Flattened appreciation record for UI consumption.

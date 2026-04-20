@@ -13,19 +13,8 @@
 import { Component, computed, effect, inject, input, signal } from '@angular/core';
 import { Router } from '@angular/router';
 
-import type { ChallengeView, GovernanceStateView, ProposalView } from '@elohim/storage-client';
-
 import { GovernanceApiService } from '@app/elohim/services/governance-api.service';
 
-import {
-  ContextMenuOnlyComponent,
-  type ContextMenuAction,
-} from '../context-menu-only/context-menu-only.component';
-import { ReactionBarComponent } from '../reaction-bar/reaction-bar.component';
-import { GraduatedFeedbackComponent } from '../graduated-feedback/graduated-feedback.component';
-import { PsephosBallotWrapperComponent } from '../psephos-ballot-wrapper/psephos-ballot-wrapper.component';
-import { FileChallengeComponent } from '../file-challenge/file-challenge.component';
-import { FeedbackAggregateComponent } from '../feedback-aggregate/feedback-aggregate.component';
 import {
   MechanismSelectionService,
   type MechanismSelection,
@@ -34,6 +23,17 @@ import {
   SignalAccumulationService,
   type AccumulationStatus,
 } from '../../services/signal-accumulation.service';
+import {
+  ContextMenuOnlyComponent,
+  type ContextMenuAction,
+} from '../context-menu-only/context-menu-only.component';
+import { FeedbackAggregateComponent } from '../feedback-aggregate/feedback-aggregate.component';
+import { FileChallengeComponent } from '../file-challenge/file-challenge.component';
+import { GraduatedFeedbackComponent } from '../graduated-feedback/graduated-feedback.component';
+import { PsephosBallotWrapperComponent } from '../psephos-ballot-wrapper/psephos-ballot-wrapper.component';
+import { ReactionBarComponent } from '../reaction-bar/reaction-bar.component';
+
+import type { ChallengeView, GovernanceStateView, ProposalView } from '@elohim/storage-client';
 
 @Component({
   selector: 'qahal-feedback-mechanism-gateway',
@@ -55,13 +55,15 @@ import {
             type="button"
             aria-label="Close challenge form"
             data-testid="close-challenge-form"
-            (click)="closeChallengeForm()">
+            (click)="closeChallengeForm()"
+          >
             &times;
           </button>
           <qahal-file-challenge
             [entityType]="entityType()"
             [entityId]="entityId()"
-            (challengeFiled)="onChallengeFiled($event)" />
+            (challengeFiled)="onChallengeFiled($event)"
+          />
         </div>
       </div>
     }
@@ -74,20 +76,15 @@ import {
               [entityType]="entityType()"
               [entityId]="entityId()"
               (challenge)="onChallengeAction($event)"
-              (flag)="onFlagAction($event)" />
+              (flag)="onFlagAction($event)"
+            />
           }
           @case (1) {
-            <app-reaction-bar
-              [entityType]="entityType()"
-              [entityId]="entityId()" />
+            <app-reaction-bar [entityType]="entityType()" [entityId]="entityId()" />
           }
           @case (2) {
-            <app-graduated-feedback
-              [entityType]="entityType()"
-              [entityId]="entityId()" />
-            <app-reaction-bar
-              [entityType]="entityType()"
-              [entityId]="entityId()" />
+            <app-graduated-feedback [entityType]="entityType()" [entityId]="entityId()" />
+            <app-reaction-bar [entityType]="entityType()" [entityId]="entityId()" />
           }
         }
       }
@@ -96,13 +93,12 @@ import {
         <qahal-psephos-ballot-wrapper
           [proposal]="sel.activeProposal"
           [mechanism]="sel.mechanism"
-          (ballotSubmitted)="onBallotSubmitted($event)" />
+          (ballotSubmitted)="onBallotSubmitted($event)"
+        />
       }
 
       <!-- Signal aggregate - shows what others thought -->
-      <app-feedback-aggregate
-        [entityType]="entityType()"
-        [entityId]="entityId()" />
+      <app-feedback-aggregate [entityType]="entityType()" [entityId]="entityId()" />
 
       <!-- Accumulation status badges -->
       @if (accumulationStatus(); as status) {
@@ -111,7 +107,8 @@ import {
             type="button"
             class="accumulation-badge sensemaking sensemaking-link"
             data-testid="sensemaking-link"
-            (click)="navigateToSensemaking()">
+            (click)="navigateToSensemaking()"
+          >
             Diverse perspectives on this content — sensemaking available
           </button>
         }
@@ -285,7 +282,7 @@ export class FeedbackMechanismGatewayComponent {
     return this.mechanismSelection.selectMechanism(
       this.governanceState(),
       this.contentType(),
-      this.activeProposal(),
+      this.activeProposal()
     );
   });
 

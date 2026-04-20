@@ -18,9 +18,8 @@ import type {
   TrustCircleDepth,
   ResilienceConcern,
 } from './resilience-profile.model';
-
-import type { ReachLevel } from '@app/elohim/models/protocol-core.model';
 import type { AgentRef } from '@app/elohim/models/coordination-envelope.model';
+import type { ReachLevel } from '@app/elohim/models/protocol-core.model';
 
 // =============================================================================
 // 1. ProtectionStatus exhaustiveness
@@ -82,7 +81,7 @@ const _riskBucket: ContentRiskBucket = {
 const _riskBucketNoExemplar: ContentRiskBucket = {
   reach: 'commons' satisfies ReachLevel,
   contentCount: 200,
-  shardDistribution: 42.0,
+  shardDistribution: 42,
   adequacy: 0.99,
 };
 

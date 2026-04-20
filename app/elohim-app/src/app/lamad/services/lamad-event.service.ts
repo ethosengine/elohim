@@ -22,12 +22,12 @@ export class LamadEventService {
     contentId: string,
     quizId: string,
     correct: boolean,
-    score?: number,
+    score?: number
   ): Observable<EconomicEventView> {
     return this.eventService.recordContentInteraction(
       agentId,
       contentId,
-      'content-complete' as any, // TODO: once LamadDomainEventType is wired, use 'quiz-submit'
+      'content-complete' as any // TODO: once LamadDomainEventType is wired, use 'quiz-submit'
     );
   }
 
@@ -35,24 +35,24 @@ export class LamadEventService {
     agentId: string,
     contentId: string,
     assessmentId: string,
-    score?: number,
+    score?: number
   ): Observable<EconomicEventView> {
     return this.eventService.recordContentInteraction(
       agentId,
       contentId,
-      'content-complete' as any, // TODO: once LamadDomainEventType is wired, use 'assessment-complete'
+      'content-complete' as any // TODO: once LamadDomainEventType is wired, use 'assessment-complete'
     );
   }
 
   recordPathStepComplete(
     agentId: string,
     pathId: string,
-    stepId: string,
+    stepId: string
   ): Observable<EconomicEventView> {
     return this.eventService.recordContentInteraction(
       agentId,
       pathId,
-      'content-complete' as any, // TODO: use 'path-step-complete'
+      'content-complete' as any // TODO: use 'path-step-complete'
     );
   }
 }

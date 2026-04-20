@@ -14,6 +14,7 @@ import {
 import { SessionHumanService } from '@app/imagodei/services/session-human.service';
 
 import { ContentNode } from '../models/content-node.model';
+
 import type { AssessmentMetadata } from '../generated/metadata-types';
 
 /**

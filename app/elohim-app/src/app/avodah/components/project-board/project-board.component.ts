@@ -8,7 +8,11 @@ import {
   DEFAULT_BOARD_COLUMNS,
   parseWorkProjectMeta,
 } from '../../models/work-project.model';
-import { parseWorkStoryMeta, type WorkStoryMeta, type WorkStoryStatus } from '../../models/work-story.model';
+import {
+  parseWorkStoryMeta,
+  type WorkStoryMeta,
+  type WorkStoryStatus,
+} from '../../models/work-story.model';
 import { AvodahApiService } from '../../services/avodah-api.service';
 import { StoryCardComponent } from '../story-card/story-card.component';
 
@@ -68,7 +72,9 @@ import { StoryCardComponent } from '../story-card/story-card.component';
                   class="add-story"
                   data-testid="add-story-btn"
                   (click)="addingInColumn = col.id"
-                >+ Add story</div>
+                >
+                  + Add story
+                </div>
               }
             </div>
           }
@@ -273,7 +279,7 @@ export class ProjectBoardComponent implements OnInit {
     void this.api.updateStoryStatus(
       storyId,
       column.id as WorkStoryStatus,
-      column.isTerminal ?? false,
+      column.isTerminal ?? false
     );
   }
 

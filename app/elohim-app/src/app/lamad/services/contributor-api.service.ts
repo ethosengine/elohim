@@ -8,15 +8,15 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 
 import { catchError } from 'rxjs/operators';
+
 import { firstValueFrom, of } from 'rxjs';
 
+import type { IContributor } from '../interfaces/contributor.interface';
 import type {
   ContributorDashboardView,
   ContributorImpactView,
   ContributorRecognitionView,
 } from '@elohim/storage-client/generated';
-
-import type { IContributor } from '../interfaces/contributor.interface';
 
 @Injectable({ providedIn: 'root' })
 export class ContributorApiService implements IContributor {

@@ -18,11 +18,11 @@ import { Component, EventEmitter, Input, OnDestroy, OnInit, Output, inject } fro
 
 import { Subject, takeUntil } from 'rxjs';
 
+import { COMPUTE_DASHBOARD } from '../../interfaces';
 import {
   BidirectionalCustodianView,
   CustodianRelationship,
 } from '../../models/shefa-dashboard.model';
-import { COMPUTE_DASHBOARD } from '../../interfaces';
 
 @Component({
   selector: 'app-custodian-view',

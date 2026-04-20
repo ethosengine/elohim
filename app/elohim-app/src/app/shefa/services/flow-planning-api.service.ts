@@ -94,15 +94,11 @@ export class FlowPlanningApiService implements IFlowPlanning {
   }
 
   async archivePlan(planId: string, reason: string): Promise<FlowPlan> {
-    return firstValueFrom(
-      this.http.post<FlowPlan>(`${BASE}/plans/${planId}/archive`, { reason })
-    );
+    return firstValueFrom(this.http.post<FlowPlan>(`${BASE}/plans/${planId}/archive`, { reason }));
   }
 
   async reviewPlan(planId: string): Promise<PlanReviewResult> {
-    return firstValueFrom(
-      this.http.get<PlanReviewResult>(`${BASE}/plans/${planId}/review`)
-    );
+    return firstValueFrom(this.http.get<PlanReviewResult>(`${BASE}/plans/${planId}/review`));
   }
 
   // =========================================================================
@@ -161,9 +157,7 @@ export class FlowPlanningApiService implements IFlowPlanning {
   }
 
   async reconcileBudget(budgetId: string): Promise<FlowBudget> {
-    return firstValueFrom(
-      this.http.post<FlowBudget>(`${BASE}/budgets/${budgetId}/reconcile`, {})
-    );
+    return firstValueFrom(this.http.post<FlowBudget>(`${BASE}/budgets/${budgetId}/reconcile`, {}));
   }
 
   // =========================================================================
@@ -171,9 +165,7 @@ export class FlowPlanningApiService implements IFlowPlanning {
   // =========================================================================
 
   async createGoal(planId: string, goalDefinition: Partial<FlowGoal>): Promise<FlowGoal> {
-    return firstValueFrom(
-      this.http.post<FlowGoal>(`${BASE}/goals`, { planId, ...goalDefinition })
-    );
+    return firstValueFrom(this.http.post<FlowGoal>(`${BASE}/goals`, { planId, ...goalDefinition }));
   }
 
   async updateGoalProgress(goalId: string, currentValue: number): Promise<FlowGoal> {
@@ -183,9 +175,7 @@ export class FlowPlanningApiService implements IFlowPlanning {
   }
 
   async evaluateGoal(goalId: string): Promise<GoalEvaluationResult> {
-    return firstValueFrom(
-      this.http.get<GoalEvaluationResult>(`${BASE}/goals/${goalId}/evaluate`)
-    );
+    return firstValueFrom(this.http.get<GoalEvaluationResult>(`${BASE}/goals/${goalId}/evaluate`));
   }
 
   async getGoalsForPlan(planId: string, status?: GoalStatus): Promise<FlowGoal[]> {
@@ -216,10 +206,7 @@ export class FlowPlanningApiService implements IFlowPlanning {
     );
   }
 
-  async projectResourceUtilization(
-    resourceId: string,
-    months: number
-  ): Promise<FlowProjection> {
+  async projectResourceUtilization(resourceId: string, months: number): Promise<FlowProjection> {
     return firstValueFrom(
       this.http.get<FlowProjection>(`${BASE}/projections/resource-utilization`, {
         params: { resourceId, months: String(months) },
@@ -241,10 +228,9 @@ export class FlowPlanningApiService implements IFlowPlanning {
     threshold: number
   ): Promise<ProjectionBreakpoint[]> {
     return firstValueFrom(
-      this.http.get<ProjectionBreakpoint[]>(
-        `${BASE}/projections/${projectionId}/breakpoints`,
-        { params: { metric, threshold: String(threshold) } }
-      )
+      this.http.get<ProjectionBreakpoint[]>(`${BASE}/projections/${projectionId}/breakpoints`, {
+        params: { metric, threshold: String(threshold) },
+      })
     );
   }
 
@@ -286,10 +272,7 @@ export class FlowPlanningApiService implements IFlowPlanning {
 
   async runScenario(scenarioId: string): Promise<ScenarioSimulationResult> {
     return firstValueFrom(
-      this.http.post<ScenarioSimulationResult>(
-        `${BASE}/scenarios/${scenarioId}/run`,
-        {}
-      )
+      this.http.post<ScenarioSimulationResult>(`${BASE}/scenarios/${scenarioId}/run`, {})
     );
   }
 
@@ -345,9 +328,7 @@ export class FlowPlanningApiService implements IFlowPlanning {
   }
 
   async calculateNextDue(pattern: RecurringPattern): Promise<string> {
-    return firstValueFrom(
-      this.http.post<string>(`${BASE}/patterns/next-due`, pattern)
-    );
+    return firstValueFrom(this.http.post<string>(`${BASE}/patterns/next-due`, pattern));
   }
 
   async identifyPatternsFromHistory(
@@ -390,9 +371,7 @@ export class FlowPlanningApiService implements IFlowPlanning {
   }
 
   async analyzeFlowHealth(planId: string): Promise<FlowHealthAnalysis> {
-    return firstValueFrom(
-      this.http.get<FlowHealthAnalysis>(`${BASE}/plans/${planId}/health`)
-    );
+    return firstValueFrom(this.http.get<FlowHealthAnalysis>(`${BASE}/plans/${planId}/health`));
   }
 
   async generatePlanningInsights(
@@ -401,9 +380,7 @@ export class FlowPlanningApiService implements IFlowPlanning {
   ): Promise<FlowPlanningInsight[]> {
     const params: Record<string, string> = { stewardId };
     if (lookbackMonths != null) params['lookbackMonths'] = String(lookbackMonths);
-    return firstValueFrom(
-      this.http.get<FlowPlanningInsight[]>(`${BASE}/insights`, { params })
-    );
+    return firstValueFrom(this.http.get<FlowPlanningInsight[]>(`${BASE}/insights`, { params }));
   }
 
   async detectAnomalies(
@@ -412,9 +389,7 @@ export class FlowPlanningApiService implements IFlowPlanning {
   ): Promise<AnomalyDetection[]> {
     const params: Record<string, string> = { resourceId };
     if (sensitivity) params['sensitivity'] = sensitivity;
-    return firstValueFrom(
-      this.http.get<AnomalyDetection[]>(`${BASE}/anomalies`, { params })
-    );
+    return firstValueFrom(this.http.get<AnomalyDetection[]>(`${BASE}/anomalies`, { params }));
   }
 
   // =========================================================================
@@ -422,8 +397,6 @@ export class FlowPlanningApiService implements IFlowPlanning {
   // =========================================================================
 
   async checkPlanCompliance(planId: string): Promise<ComplianceCheck> {
-    return firstValueFrom(
-      this.http.get<ComplianceCheck>(`${BASE}/plans/${planId}/compliance`)
-    );
+    return firstValueFrom(this.http.get<ComplianceCheck>(`${BASE}/plans/${planId}/compliance`));
   }
 }

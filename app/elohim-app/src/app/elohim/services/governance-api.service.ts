@@ -187,9 +187,9 @@ export class GovernanceApiService implements IGovernance {
   async getProposalOptions(proposalId: string): Promise<ProposalOptionView[]> {
     return firstValueFrom(
       this.http
-        .get<ProposalOptionView[]>(
-          `/api/v1/governance/proposals/${encodeURIComponent(proposalId)}/options`
-        )
+        .get<
+          ProposalOptionView[]
+        >(`/api/v1/governance/proposals/${encodeURIComponent(proposalId)}/options`)
         .pipe(catchError(() => of([])))
     );
   }
@@ -223,9 +223,9 @@ export class GovernanceApiService implements IGovernance {
   async getRankedVotes(proposalId: string): Promise<RankedVoteView[]> {
     return firstValueFrom(
       this.http
-        .get<RankedVoteView[]>(
-          `/api/v1/governance/proposals/${encodeURIComponent(proposalId)}/ranked-votes`
-        )
+        .get<
+          RankedVoteView[]
+        >(`/api/v1/governance/proposals/${encodeURIComponent(proposalId)}/ranked-votes`)
         .pipe(catchError(() => of([])))
     );
   }
@@ -248,10 +248,7 @@ export class GovernanceApiService implements IGovernance {
     );
   }
 
-  async getSignalAggregate(
-    entityType: string,
-    entityId: string
-  ): Promise<SignalAggregateView> {
+  async getSignalAggregate(entityType: string, entityId: string): Promise<SignalAggregateView> {
     const emptyAggregate: SignalAggregateView = {
       entityType,
       entityId,
@@ -289,15 +286,10 @@ export class GovernanceApiService implements IGovernance {
   // --- Challenges & Appeals ---
 
   async fileChallenge(input: FileChallengeInputView): Promise<ChallengeView> {
-    return firstValueFrom(
-      this.http.post<ChallengeView>('/api/v1/governance/challenges', input)
-    );
+    return firstValueFrom(this.http.post<ChallengeView>('/api/v1/governance/challenges', input));
   }
 
-  async respondToChallenge(
-    id: string,
-    input: RespondToChallengeInputView
-  ): Promise<ChallengeView> {
+  async respondToChallenge(id: string, input: RespondToChallengeInputView): Promise<ChallengeView> {
     return firstValueFrom(
       this.http.post<ChallengeView>(
         `/api/v1/governance/challenges/${encodeURIComponent(id)}/respond`,
@@ -315,10 +307,7 @@ export class GovernanceApiService implements IGovernance {
     );
   }
 
-  async getChallengesForEntity(
-    entityType: string,
-    entityId: string
-  ): Promise<ChallengeView[]> {
+  async getChallengesForEntity(entityType: string, entityId: string): Promise<ChallengeView[]> {
     return firstValueFrom(
       this.http
         .get<ChallengeView[]>('/api/v1/governance/challenges', {
@@ -342,9 +331,9 @@ export class GovernanceApiService implements IGovernance {
   async getAppeals(challengeId: string): Promise<AppealView[]> {
     return firstValueFrom(
       this.http
-        .get<AppealView[]>(
-          `/api/v1/governance/challenges/${encodeURIComponent(challengeId)}/appeals`
-        )
+        .get<
+          AppealView[]
+        >(`/api/v1/governance/challenges/${encodeURIComponent(challengeId)}/appeals`)
         .pipe(catchError(() => of([])))
     );
   }
@@ -395,10 +384,7 @@ export class GovernanceApiService implements IGovernance {
     );
   }
 
-  async getClusters(
-    entityType: string,
-    entityId: string
-  ): Promise<SensemakingResultView> {
+  async getClusters(entityType: string, entityId: string): Promise<SensemakingResultView> {
     const emptyResult: SensemakingResultView = {
       entityType,
       entityId,
@@ -472,9 +458,9 @@ export class GovernanceApiService implements IGovernance {
   async getProxyVotes(proposalId: string): Promise<RankedVoteView[]> {
     return firstValueFrom(
       this.http
-        .get<RankedVoteView[]>(
-          `/api/v1/governance/proposals/${encodeURIComponent(proposalId)}/proxy-votes`
-        )
+        .get<
+          RankedVoteView[]
+        >(`/api/v1/governance/proposals/${encodeURIComponent(proposalId)}/proxy-votes`)
         .pipe(catchError(() => of([])))
     );
   }

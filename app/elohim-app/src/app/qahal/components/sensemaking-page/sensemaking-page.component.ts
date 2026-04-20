@@ -15,11 +15,12 @@ import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 
 import { GovernanceApiService } from '@app/elohim/services/governance-api.service';
-import type { SensemakingResultView, StatementView } from '@elohim/storage-client/generated';
 
+import { BracketSynthesisService } from '../../services/bracket-synthesis.service';
 import { ContributeStatementComponent } from '../contribute-statement/contribute-statement.component';
 import { OpinionClusterComponent } from '../opinion-cluster/opinion-cluster.component';
-import { BracketSynthesisService } from '../../services/bracket-synthesis.service';
+
+import type { SensemakingResultView, StatementView } from '@elohim/storage-client/generated';
 
 @Component({
   selector: 'qahal-sensemaking-page',
@@ -28,25 +29,19 @@ import { BracketSynthesisService } from '../../services/bracket-synthesis.servic
   template: `
     <div class="sensemaking-page">
       <h2>Community Sensemaking</h2>
-      <p class="subtitle">
-        Contribute your perspective and see where opinions cluster
-      </p>
+      <p class="subtitle">Contribute your perspective and see where opinions cluster</p>
 
       @if (entityType() && entityId()) {
         <!-- Polis-style statement voting -->
         <section class="contribute-section">
           <h3>Share & Vote</h3>
-          <app-contribute-statement
-            [entityType]="entityType()!"
-            [entityId]="entityId()!" />
+          <app-contribute-statement [entityType]="entityType()!" [entityId]="entityId()!" />
         </section>
 
         <!-- Opinion cluster visualization -->
         <section class="clusters-section">
           <h3>Opinion Landscape</h3>
-          <app-opinion-cluster
-            [entityType]="entityType()!"
-            [entityId]="entityId()!" />
+          <app-opinion-cluster [entityType]="entityType()!" [entityId]="entityId()!" />
         </section>
 
         <!-- Bridging statements + synthesis -->
@@ -63,7 +58,8 @@ import { BracketSynthesisService } from '../../services/bracket-synthesis.servic
               class="synthesize-btn"
               data-testid="synthesize-bracket"
               (click)="synthesizeBracket()"
-              [disabled]="synthesizing()">
+              [disabled]="synthesizing()"
+            >
               {{ synthesizing() ? 'Synthesizing...' : 'Synthesize Ranked-Choice Bracket' }}
             </button>
           }
@@ -246,12 +242,12 @@ export class SensemakingPageComponent implements OnInit {
 
   /** Bridging statements extracted from the sensemaking result. */
   readonly bridgingStatements = computed<StatementView[]>(
-    () => this.sensemakingResult()?.bridgingStatements ?? [],
+    () => this.sensemakingResult()?.bridgingStatements ?? []
   );
 
   /** Divisive statements that split clusters. */
   readonly divisiveStatements = computed<StatementView[]>(
-    () => this.sensemakingResult()?.divisiveStatements ?? [],
+    () => this.sensemakingResult()?.divisiveStatements ?? []
   );
 
   /** Whether bracket synthesis is in progress. */

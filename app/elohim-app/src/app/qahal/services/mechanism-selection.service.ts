@@ -47,12 +47,12 @@ const FEEDBACK_CONTENT_TYPES = new Set([
 
 /** Map from proposal voting mechanism to ladder level */
 const MECHANISM_LEVEL_MAP: Record<string, number> = {
-  'approval': 3,
+  approval: 3,
   'dot-vote': 3,
   'ranked-choice': 4,
   'score-vote': 5,
-  'conviction': 5,
-  'consent': 6,
+  conviction: 5,
+  consent: 6,
 };
 
 /** Governance states that lock content to level 0 (context menu only) */
@@ -71,13 +71,10 @@ export class MechanismSelectionService {
   selectMechanism(
     governanceState: GovernanceStateView | null,
     contentType: string,
-    activeProposal?: ProposalView,
+    activeProposal?: ProposalView
   ): MechanismSelection {
     // Rule 1: No governance state, or constitutional/settled content -> level 0
-    if (
-      !governanceState ||
-      SETTLED_STATES.has(governanceState.votingState)
-    ) {
+    if (!governanceState || SETTLED_STATES.has(governanceState.votingState)) {
       return {
         level: 0,
         mechanism: 'none',

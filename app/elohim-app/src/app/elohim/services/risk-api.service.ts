@@ -1,5 +1,6 @@
-import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
+import { Injectable, inject } from '@angular/core';
+
 import { Observable } from 'rxjs';
 
 import type {
@@ -15,7 +16,7 @@ export class RiskApiService {
 
   getVulnerability(placeId: string): Observable<VulnerabilityAssessmentView> {
     return this.http.get<VulnerabilityAssessmentView>(
-      `${this.baseUrl}/api/v1/risk/vulnerability/${placeId}`,
+      `${this.baseUrl}/api/v1/risk/vulnerability/${placeId}`
     );
   }
 

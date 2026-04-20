@@ -12,8 +12,9 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 
-import { firstValueFrom } from 'rxjs';
 import { catchError } from 'rxjs/operators';
+
+import { firstValueFrom } from 'rxjs';
 
 import type { IIdentityApi } from '../interfaces/identity.interface';
 import type {

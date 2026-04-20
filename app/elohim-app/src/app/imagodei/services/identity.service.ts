@@ -19,6 +19,7 @@ import { Injectable, inject, signal, computed, effect, untracked } from '@angula
 // @coverage: 59.4% (2026-02-24)
 
 import { HolochainClientService } from '../../elohim/services/holochain-client.service';
+import { IDENTITY_API } from '../interfaces/identity.interface';
 import { type PasswordCredentials, type AuthResult } from '../models/auth.model';
 import {
   type IdentityState,
@@ -37,7 +38,6 @@ import {
   getInitials,
   isNetworkMode,
 } from '../models/identity.model';
-import { IDENTITY_API } from '../interfaces/identity.interface';
 
 import { AgencyService } from './agency.service';
 import { AuthService } from './auth.service';
@@ -490,7 +490,10 @@ export class IdentityService {
   /**
    * Fetch identity via the identity API boundary.
    */
-  private async fetchHolochainIdentity(): Promise<{ success: boolean; data: HumanSessionResult | null }> {
+  private async fetchHolochainIdentity(): Promise<{
+    success: boolean;
+    data: HumanSessionResult | null;
+  }> {
     try {
       const data = await this.identityApi.getMyHuman();
       return { success: data !== null, data };

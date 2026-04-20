@@ -2,6 +2,6 @@
 // The actual types live at ../../node_modules/maplibre-gl/dist/maplibre-gl.d.ts
 declare module 'maplibre-gl' {
   export * from '../../node_modules/maplibre-gl/dist/maplibre-gl';
-  import maplibregl from '../../node_modules/maplibre-gl/dist/maplibre-gl';
-  export default maplibregl;
 }
+
+export { default } from '../../node_modules/maplibre-gl/dist/maplibre-gl';

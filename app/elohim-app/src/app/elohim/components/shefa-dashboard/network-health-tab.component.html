@@ -10,13 +10,14 @@
     <div class="unavailable-icon">📡</div>
     <p class="unavailable-message">Network posture unavailable (endpoint coming in F2)</p>
     <p class="unavailable-hint">
-      The <code>/api/v1/network/posture</code> endpoint will be live once the F2 sprint task ships.
+      The
+      <code>/api/v1/network/posture</code>
+      endpoint will be live once the F2 sprint task ships.
     </p>
   </div>
 
   <!-- Live posture data -->
   <div *ngIf="!loading() && posture() !== null" class="posture-grid">
-
     <!-- Peer counts card -->
     <div class="card posture-card">
       <h3 class="posture-card-title">Peer Activity</h3>
@@ -31,9 +32,9 @@
       <div class="metric-bar">
         <div
           class="metric-fill"
-          [style.width.%]="posture()!.totalPeers > 0
-            ? (posture()!.activePeers / posture()!.totalPeers) * 100
-            : 0"
+          [style.width.%]="
+            posture()!.totalPeers > 0 ? (posture()!.activePeers / posture()!.totalPeers) * 100 : 0
+          "
         ></div>
       </div>
 
@@ -99,9 +100,7 @@
 
     <!-- Snapshot timestamp -->
     <div class="posture-footer">
-      <span class="posture-timestamp">
-        Snapshot: {{ posture()!.computedAt | date: 'medium' }}
-      </span>
+      <span class="posture-timestamp">Snapshot: {{ posture()!.computedAt | date: 'medium' }}</span>
     </div>
   </div>
 
@@ -125,11 +124,17 @@
       class="groups-empty"
       data-testid="household-groups-empty"
     >
-      <p>No household groups found. Peers will appear here once nodes register their household binding.</p>
+      <p>
+        No household groups found. Peers will appear here once nodes register their household
+        binding.
+      </p>
     </div>
 
     <!-- Household rows -->
-    <ul class="households" *ngIf="!groupsLoading() && householdGroups() !== null && householdGroups()!.length > 0">
+    <ul
+      class="households"
+      *ngIf="!groupsLoading() && householdGroups() !== null && householdGroups()!.length > 0"
+    >
       <li
         *ngFor="let hh of householdGroups()"
         class="household-row"
@@ -149,7 +154,9 @@
             class="peer-row"
             [attr.data-testid]="'peer-row-' + peer.peerId"
           >
-            <span class="peer-id" title="{{ peer.peerId }}">{{ peer.peerId | slice:0:12 }}…</span>
+            <span class="peer-id" title="{{ peer.peerId }}">
+              {{ peer.peerId | slice: 0 : 12 }}…
+            </span>
             <span class="peer-archetype" *ngIf="peer.archetype">{{ peer.archetype }}</span>
             <span class="peer-lifecycle" [ngClass]="'lifecycle-' + peer.lifecycleState">
               {{ peer.lifecycleState }}

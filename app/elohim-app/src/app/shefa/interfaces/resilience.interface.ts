@@ -25,7 +25,7 @@
 
 import { InjectionToken, inject } from '@angular/core';
 
-import type { Observable } from 'rxjs';
+import { ResilienceApiService } from '../services/resilience-api.service';
 
 import type {
   ResilienceProfile,
@@ -34,7 +34,7 @@ import type {
   ContentRiskBucket,
   ElohimResilienceAssessment,
 } from '../models/resilience-profile.model';
-import { ResilienceApiService } from '../services/resilience-api.service';
+import type { Observable } from 'rxjs';
 
 // =============================================================================
 // INTERFACE

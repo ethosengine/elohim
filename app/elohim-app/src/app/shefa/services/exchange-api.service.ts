@@ -16,11 +16,7 @@ import { firstValueFrom, of } from 'rxjs';
 import type { IExchange } from '../interfaces/exchange.interface';
 import type { EconomicEvent } from '@app/elohim/models/economic-event.model';
 import type { Intent } from '@app/elohim/models/rea-bridge.model';
-import type {
-  ServiceMatch,
-  ServiceOffer,
-  ServiceRequest,
-} from '@app/shefa/models/exchange.model';
+import type { ServiceMatch, ServiceOffer, ServiceRequest } from '@app/shefa/models/exchange.model';
 
 const BASE = '/api/v1/exchange';
 

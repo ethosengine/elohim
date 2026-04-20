@@ -15,7 +15,7 @@ self.addEventListener('install', () => {
   self.skipWaiting();
 });
 
-self.addEventListener('activate', (event) => {
+self.addEventListener('activate', event => {
   // Claim all clients immediately so the SW controls the page on first visit
   event.waitUntil(self.clients.claim());
 });
@@ -88,7 +88,15 @@ function scorePeerForSw(peer: DeliveryPeerResponse, contentHash: string): Scored
   const ip = extractIpFromMultiaddrSw(peer.multiaddrs[0] || '');
   const baseUrl = ip ? `http://${ip}:${peer.httpPort}` : '';
 
-  return { peerId: peer.peerId, baseUrl, score, network: peer.network, servesExtracted, servesCompressed, warm };
+  return {
+    peerId: peer.peerId,
+    baseUrl,
+    score,
+    network: peer.network,
+    servesExtracted,
+    servesCompressed,
+    warm,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -145,8 +153,7 @@ async function probeCapability(slug: string): Promise<DeliveryInfo> {
       blobHash: resp.headers.get('X-Blob-Hash') || '',
       cacheTier: resp.headers.get('X-Cache-Tier') || 'unknown',
       ready:
-        resp.headers.get('X-Ready') === 'true' ||
-        resp.headers.get('X-Projection-Ready') === 'true',
+        resp.headers.get('X-Ready') === 'true' || resp.headers.get('X-Projection-Ready') === 'true',
     };
     deliveryCache.set(slug, info);
     return info;
@@ -179,14 +186,12 @@ async function handleAppFetch(request: Request): Promise<Response> {
   const blobHash = capability.blobHash;
 
   console.log(
-    `[apps-sw] capability: ${identifier} deliveryMode=${capability.deliveryMode} ready=${capability.ready} blobHash=${capability.blobHash.slice(0, 12)}...`,
+    `[apps-sw] capability: ${identifier} deliveryMode=${capability.deliveryMode} ready=${capability.ready} blobHash=${capability.blobHash.slice(0, 12)}...`
   );
 
   // 2. Try cache under CID key first (immutable content address)
   if (blobHash) {
-    const cidKey = new Request(
-      `${self.location.origin}/apps/${blobHash}/${filePath}`,
-    );
+    const cidKey = new Request(`${self.location.origin}/apps/${blobHash}/${filePath}`);
     const cached = await cache.match(cidKey);
     if (cached) {
       console.log(`[apps-sw] cache-hit: ${filePath} key=${blobHash || identifier}`);
@@ -207,12 +212,10 @@ async function handleAppFetch(request: Request): Promise<Response> {
     if (!peer.baseUrl) continue;
     try {
       console.log(
-        `[apps-sw] peer-try: ${peer.peerId.slice(0, 12)} network=${peer.network} score=${peer.score}`,
+        `[apps-sw] peer-try: ${peer.peerId.slice(0, 12)} network=${peer.network} score=${peer.score}`
       );
       if (peer.servesExtracted && peer.warm) {
-        const resp = await fetch(
-          `${peer.baseUrl}/apps/${identifier}/${filePath}`,
-        );
+        const resp = await fetch(`${peer.baseUrl}/apps/${identifier}/${filePath}`);
         if (resp.ok) {
           console.log(`[apps-sw] peer-hit: ${peer.peerId.slice(0, 12)} ${identifier}/${filePath}`);
           const cacheKey = buildCacheKey(blobHash, identifier, filePath);
@@ -227,7 +230,7 @@ async function handleAppFetch(request: Request): Promise<Response> {
 
   // 5. Fall back to default path (doorway — the safety net)
   console.log(
-    `[apps-sw] fallback: mode=${capability.deliveryMode} ready=${capability.ready} → ${capability.deliveryMode === 'extracted' || capability.ready ? 'fetch-individual' : 'fetch-zip'}`,
+    `[apps-sw] fallback: mode=${capability.deliveryMode} ready=${capability.ready} → ${capability.deliveryMode === 'extracted' || capability.ready ? 'fetch-individual' : 'fetch-zip'}`
   );
   if (capability.deliveryMode === 'extracted' || capability.ready) {
     // Doorway can serve individual files — fetch and cache under CID
@@ -239,11 +242,7 @@ async function handleAppFetch(request: Request): Promise<Response> {
 }
 
 /** Build a cache key Request — prefer CID (immutable) over slug */
-function buildCacheKey(
-  blobHash: string,
-  slug: string,
-  filePath: string,
-): Request {
+function buildCacheKey(blobHash: string, slug: string, filePath: string): Request {
   const prefix = blobHash || slug;
   return new Request(`${self.location.origin}/apps/${prefix}/${filePath}`);
 }
@@ -253,21 +252,18 @@ async function fetchAndCacheByCid(
   request: Request,
   blobHash: string,
   slug: string,
-  filePath: string,
+  filePath: string
 ): Promise<Response> {
   try {
     const response = await fetch(request);
     if (response.ok) {
       // Read content address from response header (doorway sets this)
-      const contentAddress =
-        response.headers.get('X-Content-Address') || blobHash;
+      const contentAddress = response.headers.get('X-Content-Address') || blobHash;
       const responseToCache = response.clone();
 
       // Cache under CID key (immutable) if we have a content address
       if (contentAddress) {
-        const cidKey = new Request(
-          `${self.location.origin}/apps/${contentAddress}/${filePath}`,
-        );
+        const cidKey = new Request(`${self.location.origin}/apps/${contentAddress}/${filePath}`);
         await cache.put(cidKey, responseToCache);
       } else {
         await cache.put(request, responseToCache);
@@ -292,16 +288,13 @@ async function fetchViaZip(
   cache: Cache,
   slug: string,
   blobHash: string,
-  filePath: string,
+  filePath: string
 ): Promise<Response> {
   const extractionKey = blobHash || slug;
 
   // Ensure ZIP is extracted (deduplicate concurrent extractions)
   if (!zipExtracting.has(extractionKey)) {
-    zipExtracting.set(
-      extractionKey,
-      extractZip(cache, slug, blobHash),
-    );
+    zipExtracting.set(extractionKey, extractZip(cache, slug, blobHash));
   }
   await zipExtracting.get(extractionKey);
   zipExtracting.delete(extractionKey);
@@ -309,7 +302,7 @@ async function fetchViaZip(
   // Now serve from cache — look under CID key first, then slug
   const cachePrefix = blobHash || slug;
   const cached = await cache.match(
-    new Request(`${self.location.origin}/apps/${cachePrefix}/${filePath}`),
+    new Request(`${self.location.origin}/apps/${cachePrefix}/${filePath}`)
   );
   if (cached) return cached;
 
@@ -317,11 +310,7 @@ async function fetchViaZip(
   return new Response('File not found in app bundle', { status: 404 });
 }
 
-async function extractZip(
-  cache: Cache,
-  slug: string,
-  blobHash: string,
-): Promise<void> {
+async function extractZip(cache: Cache, slug: string, blobHash: string): Promise<void> {
   // Fetch the raw ZIP blob
   const blobUrl = blobHash ? `/blob/${blobHash}` : `/apps/${slug}/`;
   const resp = await fetch(blobUrl);
@@ -341,10 +330,7 @@ async function extractZip(
     const response = new Response(content, {
       headers: { 'Content-Type': contentType },
     });
-    await cache.put(
-      new Request(`${self.location.origin}/apps/${cachePrefix}/${path}`),
-      response,
-    );
+    await cache.put(new Request(`${self.location.origin}/apps/${cachePrefix}/${path}`), response);
     console.log(`[apps-sw] cache-put: ${cachePrefix}/${path} type=${contentType}`);
   }
 }
@@ -394,16 +380,16 @@ channel.onmessage = async (event: MessageEvent) => {
     if (slug) prefixes.push(`/apps/${slug}/`);
     if (blobHash) prefixes.push(`/apps/${blobHash}/`);
 
-    const toDelete = keys.filter((req) => {
+    const toDelete = keys.filter(req => {
       const pathname = new URL(req.url).pathname;
-      return prefixes.some((prefix) => pathname.startsWith(prefix));
+      return prefixes.some(prefix => pathname.startsWith(prefix));
     });
-    await Promise.all(toDelete.map((key) => cache.delete(key)));
+    await Promise.all(toDelete.map(async key => cache.delete(key)));
 
     // Clear delivery probe cache for this slug
     if (slug) deliveryCache.delete(slug);
     console.log(
-      `[apps-sw] invalidated ${toDelete.length} files for ${[slug, blobHash].filter(Boolean).join(' / ')}`,
+      `[apps-sw] invalidated ${toDelete.length} files for ${[slug, blobHash].filter(Boolean).join(' / ')}`
     );
   }
 };

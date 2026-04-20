@@ -23,10 +23,7 @@ export interface AccumulationStatus {
 export class SignalAccumulationService {
   private readonly governanceApi = inject(GovernanceApiService);
 
-  async getAccumulationStatus(
-    entityType: string,
-    entityId: string
-  ): Promise<AccumulationStatus> {
+  async getAccumulationStatus(entityType: string, entityId: string): Promise<AccumulationStatus> {
     const aggregate = await this.governanceApi.getSignalAggregate(entityType, entityId);
     const totalSignals = Number(aggregate.totalSignals);
     const uniqueParticipants = Number(aggregate.uniqueParticipants);

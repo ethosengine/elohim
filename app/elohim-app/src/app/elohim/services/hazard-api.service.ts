@@ -1,5 +1,6 @@
-import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
+import { Injectable, inject } from '@angular/core';
+
 import { Observable } from 'rxjs';
 
 import type { HazardView, CreateHazardInputView } from '@elohim/storage-client';
@@ -33,7 +34,7 @@ export class HazardApiService {
 
   updateStatus(
     id: string,
-    patch: { status: string; severity?: string; actualOnset?: string; resolvedAt?: string },
+    patch: { status: string; severity?: string; actualOnset?: string; resolvedAt?: string }
   ): Observable<HazardView> {
     return this.http.patch<HazardView>(`${this.baseUrl}/api/v1/hazards/${id}`, patch);
   }

@@ -11,9 +11,10 @@ import { Component, inject, OnInit, signal } from '@angular/core';
 import { Router } from '@angular/router';
 
 import { GovernanceApiService } from '@app/elohim/services/governance-api.service';
-import type { RankedVoteView } from '@elohim/storage-client/generated';
 
 import { ProxyVoteNotificationComponent } from '../proxy-vote-notification/proxy-vote-notification.component';
+
+import type { RankedVoteView } from '@elohim/storage-client/generated';
 
 /** A proxy vote paired with its proposal title for display. */
 interface ProxyVoteEntry {
@@ -40,7 +41,8 @@ interface ProxyVoteEntry {
               [proxyVote]="entry.vote"
               [proposalTitle]="entry.proposalTitle"
               (confirmed)="dismiss(entry.vote.id)"
-              (overrideRequested)="navigateToProposal($event)" />
+              (overrideRequested)="navigateToProposal($event)"
+            />
           }
         </div>
       }

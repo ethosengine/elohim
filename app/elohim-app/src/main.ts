@@ -12,11 +12,7 @@ if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker
       .register('/apps-sw.js', { scope: '/apps/' })
-      .then((reg) =>
-        console.log('[apps-sw] registered, scope:', reg.scope)
-      )
-      .catch((err) =>
-        console.warn('[apps-sw] registration failed:', err)
-      );
+      .then(reg => console.log('[apps-sw] registered, scope:', reg.scope))
+      .catch(err => console.warn('[apps-sw] registration failed:', err));
   });
 }

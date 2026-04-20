@@ -1,6 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 
 import { GovernanceApiService } from '@app/elohim/services/governance-api.service';
+
 import type {
   SensemakingResultView,
   StatementView,
@@ -59,8 +60,8 @@ export class BracketSynthesisService {
 
     const proposal = await this.governanceApi.createProposal(proposalInput);
 
-    const options: CreateProposalOptionInputView[] =
-      sensemakingResult.bridgingStatements.map((s: StatementView, i: number) => ({
+    const options: CreateProposalOptionInputView[] = sensemakingResult.bridgingStatements.map(
+      (s: StatementView, i: number) => ({
         id: `synth-opt-${i}`,
         label: s.text.substring(0, 100),
         description: s.text,
@@ -69,7 +70,8 @@ export class BracketSynthesisService {
         sourceJustification: s.isBridging
           ? `Bridging statement (agree: ${s.agreeCount}, disagree: ${s.disagreeCount})`
           : null,
-      }));
+      })
+    );
 
     if (options.length > 0) {
       await this.governanceApi.createProposalOptions(proposal.id, options);

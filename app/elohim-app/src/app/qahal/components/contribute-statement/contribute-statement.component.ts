@@ -3,10 +3,8 @@ import { Component, OnInit, inject, input } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
 import { GovernanceApiService } from '@app/elohim/services/governance-api.service';
-import type {
-  StatementView,
-  CreateStatementInputView,
-} from '@elohim/storage-client/generated';
+
+import type { StatementView, CreateStatementInputView } from '@elohim/storage-client/generated';
 
 /**
  * ContributeStatementComponent - Polis-style One-at-a-Time Voting
@@ -44,14 +42,9 @@ import type {
       <!-- Polis-style one-at-a-time voting -->
       <div class="contribute-vote" data-testid="contribute-vote">
         <div class="progress-bar-container">
-          <div
-            class="progress-bar-fill"
-            [style.width.%]="progressPercent"
-          ></div>
+          <div class="progress-bar-fill" [style.width.%]="progressPercent"></div>
         </div>
-        <p class="progress-text">
-          Voted on {{ votedCount }} of {{ statements.length }} statements
-        </p>
+        <p class="progress-text">Voted on {{ votedCount }} of {{ statements.length }} statements</p>
 
         <div class="statement-card" [class.voting]="isVoting" data-testid="statement-card">
           <p class="statement-text">{{ currentStatement.text }}</p>
@@ -103,9 +96,7 @@ import type {
 
     <ng-template #contributeForm>
       <div class="contribute-form" data-testid="contribute-form">
-        <label class="contribute-label" for="new-statement">
-          Add your own perspective
-        </label>
+        <label class="contribute-label" for="new-statement">Add your own perspective</label>
         <textarea
           id="new-statement"
           [(ngModel)]="newStatementText"
@@ -305,7 +296,7 @@ export class ContributeStatementComponent implements OnInit {
 
   /** The next unvoted statement to show, or null if all voted. */
   get currentStatement(): StatementView | null {
-    return this.statements.find((s) => !this.votedIds.has(s.id)) ?? null;
+    return this.statements.find(s => !this.votedIds.has(s.id)) ?? null;
   }
 
   get votedCount(): number {
@@ -313,9 +304,7 @@ export class ContributeStatementComponent implements OnInit {
   }
 
   get progressPercent(): number {
-    return this.statements.length > 0
-      ? (this.votedCount / this.statements.length) * 100
-      : 0;
+    return this.statements.length > 0 ? (this.votedCount / this.statements.length) * 100 : 0;
   }
 
   ngOnInit(): void {
@@ -327,10 +316,7 @@ export class ContributeStatementComponent implements OnInit {
     this.error = '';
 
     try {
-      this.statements = await this.governanceApi.getStatements(
-        this.entityType(),
-        this.entityId()
-      );
+      this.statements = await this.governanceApi.getStatements(this.entityType(), this.entityId());
     } catch {
       this.error = 'Failed to load statements. Please try again.';
     } finally {

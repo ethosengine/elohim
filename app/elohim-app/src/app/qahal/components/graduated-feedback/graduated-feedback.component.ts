@@ -4,17 +4,15 @@ import { FormsModule } from '@angular/forms';
 
 import { Subject, takeUntil } from 'rxjs';
 
+import { GovernanceApiService } from '@app/elohim/services/governance-api.service';
 import {
   GovernanceSignalService,
   GraduatedFeedbackInput,
   FeedbackStats,
 } from '@app/elohim/services/governance-signal.service';
-import { GovernanceApiService } from '@app/elohim/services/governance-api.service';
 import { GovernanceRecognitionService } from '@app/qahal/services/governance-recognition.service';
-import type {
-  RecordSignalInputView,
-  GovernanceSignalView,
-} from '@elohim/storage-client/generated';
+
+import type { RecordSignalInputView, GovernanceSignalView } from '@elohim/storage-client/generated';
 
 /**
  * GraduatedFeedbackComponent - Context-Aware Scaled Responses
@@ -111,11 +109,7 @@ import type {
             {{ isSubmitting ? 'Submitting...' : hasSubmitted ? 'Update Feedback' : 'Submit' }}
           </button>
           @if (hasSubmitted) {
-            <button
-              class="reset-btn"
-              (click)="reset()"
-              data-testid="reset-feedback-btn"
-            >
+            <button class="reset-btn" (click)="reset()" data-testid="reset-feedback-btn">
               Reset
             </button>
           }
@@ -136,9 +130,7 @@ import type {
                   [style.width.%]="getDistributionWidth(position)"
                   [style.background-color]="position.color"
                   [title]="
-                    position.label +
-                    ': ' +
-                    formatPercentage(getDistributionWidth(position) / 100)
+                    position.label + ': ' + formatPercentage(getDistributionWidth(position) / 100)
                   "
                 ></div>
               }

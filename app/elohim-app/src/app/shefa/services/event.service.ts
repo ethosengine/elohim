@@ -88,7 +88,7 @@ export class EventService {
   recordContentInteraction(
     agentId: string,
     contentId: string,
-    interactionType: ProtocolEventType,
+    interactionType: ProtocolEventType
   ): Observable<EconomicEventView> {
     const mapping = PROTOCOL_EVENT_MAPPINGS[interactionType];
     return this.storageApi.createEconomicEvent({

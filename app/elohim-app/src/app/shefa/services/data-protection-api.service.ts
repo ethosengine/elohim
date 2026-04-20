@@ -30,17 +30,13 @@ import type {
 @Injectable({ providedIn: 'root' })
 export class DataProtectionApiService implements IDataProtection {
   private readonly http = inject(HttpClient);
-  private readonly status$ = new BehaviorSubject<FamilyCommunityProtectionStatus | null>(
-    null
-  );
+  private readonly status$ = new BehaviorSubject<FamilyCommunityProtectionStatus | null>(null);
   private pollingSubscription: Subscription | null = null;
 
   /**
    * Fetch protection status once from the API and cache it.
    */
-  async fetchProtectionStatus(
-    operatorId: string
-  ): Promise<FamilyCommunityProtectionStatus> {
+  async fetchProtectionStatus(operatorId: string): Promise<FamilyCommunityProtectionStatus> {
     const status = await firstValueFrom(
       this.http.get<FamilyCommunityProtectionStatus>(
         `/api/v1/custodians/protection/${operatorId}/summary`
@@ -62,7 +58,7 @@ export class DataProtectionApiService implements IDataProtection {
           `/api/v1/custodians/protection/${operatorId}/summary`
         )
       ),
-      tap((status) => this.status$.next(status))
+      tap(status => this.status$.next(status))
     );
 
     this.pollingSubscription = poll$.subscribe();
@@ -81,21 +77,21 @@ export class DataProtectionApiService implements IDataProtection {
   getCustodiansByType(type: CustodianType): CustodianNode[] {
     const status = this.status$.getValue();
     if (!status) return [];
-    return status.custodians.filter((c) => c.type === type);
+    return status.custodians.filter(c => c.type === type);
   }
 
   getHighRiskRegions(): RegionalPresence[] {
     const status = this.status$.getValue();
     if (!status) return [];
     return status.geographicDistribution.regions.filter(
-      (r) => r.riskFactors.length > 0 || r.custodianCount <= 1
+      r => r.riskFactors.length > 0 || r.custodianCount <= 1
     );
   }
 
   isCustodianHealthy(custodianId: string): boolean {
     const status = this.status$.getValue();
     if (!status) return false;
-    const custodian = status.custodians.find((c) => c.id === custodianId);
+    const custodian = status.custodians.find(c => c.id === custodianId);
     return custodian ? custodian.health.upPercent >= 95 : false;
   }
 
@@ -115,7 +111,7 @@ export class DataProtectionApiService implements IDataProtection {
       alerts.push('Protection level is vulnerable — add more custodians');
     }
 
-    const unhealthy = status.custodians.filter((c) => c.health.upPercent < 95);
+    const unhealthy = status.custodians.filter(c => c.health.upPercent < 95);
     for (const c of unhealthy) {
       alerts.push(`Custodian ${c.name} uptime is ${c.health.upPercent}%`);
     }

@@ -3,12 +3,11 @@ import { Component, OnDestroy, OnInit, inject, input } from '@angular/core';
 
 import { Subject, takeUntil } from 'rxjs';
 
+import { GovernanceApiService } from '@app/elohim/services/governance-api.service';
 import {
   GovernanceSignalService,
   ReactionCounts,
 } from '@app/elohim/services/governance-signal.service';
-import { GovernanceApiService } from '@app/elohim/services/governance-api.service';
-import { GovernanceRecognitionService } from '@app/qahal/services/governance-recognition.service';
 import {
   EmotionalReactionType,
   EmotionalReactionConstraints,
@@ -18,10 +17,9 @@ import {
   MediatedReaction,
   DEFAULT_REACTION_CONSTRAINTS,
 } from '@app/lamad/models/feedback-profile.model';
-import type {
-  RecordSignalInputView,
-  GovernanceSignalView,
-} from '@elohim/storage-client/generated';
+import { GovernanceRecognitionService } from '@app/qahal/services/governance-recognition.service';
+
+import type { RecordSignalInputView, GovernanceSignalView } from '@elohim/storage-client/generated';
 
 /**
  * ReactionBarComponent - Low-Friction Emotional Feedback
@@ -41,12 +39,7 @@ import type {
   standalone: true,
   imports: [CommonModule],
   template: `
-    <div
-      class="reaction-bar"
-      [class.compact]="compact()"
-      role="group"
-      aria-label="Reactions"
-    >
+    <div class="reaction-bar" [class.compact]="compact()" role="group" aria-label="Reactions">
       @for (reaction of availableReactions; track reaction.type) {
         <button
           class="reaction-btn"
@@ -94,10 +87,7 @@ import type {
           <div class="mediation-actions">
             @if (mediationContext.mediationConfig.suggestedAlternatives?.length) {
               <p>Consider expressing this differently:</p>
-              @for (
-                alt of mediationContext.mediationConfig.suggestedAlternatives;
-                track alt
-              ) {
+              @for (alt of mediationContext.mediationConfig.suggestedAlternatives; track alt) {
                 <button
                   class="mediation-alt-btn"
                   [attr.data-testid]="'mediation-alt-' + alt"
@@ -315,9 +305,7 @@ export class ReactionBarComponent implements OnInit, OnDestroy {
     if (this.userSubmittedReactions.has(reaction.type)) {
       this.userSubmittedReactions.delete(reaction.type);
       this.userReaction =
-        this.userSubmittedReactions.size > 0
-          ? [...this.userSubmittedReactions].pop()!
-          : null;
+        this.userSubmittedReactions.size > 0 ? [...this.userSubmittedReactions].pop()! : null;
       return;
     }
 
