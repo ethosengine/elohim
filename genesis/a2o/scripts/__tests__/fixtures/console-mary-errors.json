@@ -7,6 +7,9 @@
     }
   ],
   "pageErrors": [
-    { "message": "Uncaught (in promise) TypeError: Cannot read properties of null (reading 'token')", "url": "https://doorway-alpha.elohim.host/login" }
+    {
+      "message": "Uncaught (in promise) TypeError: Cannot read properties of null (reading 'token')",
+      "url": "https://doorway-alpha.elohim.host/login"
+    }
   ]
 }

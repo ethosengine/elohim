@@ -15,10 +15,7 @@ describe('normalizeMessage', () => {
 
   it('strips port numbers from URLs', () => {
     const m = 'fetch https://doorway-alpha.elohim.host:8443/foo failed';
-    assert.equal(
-      normalizeMessage(m),
-      'fetch https://doorway-alpha.elohim.host/foo failed'
-    );
+    assert.equal(normalizeMessage(m), 'fetch https://doorway-alpha.elohim.host/foo failed');
   });
 
   it('strips hex hashes (sha-256 style)', () => {
@@ -50,8 +47,12 @@ describe('fingerprint', () => {
   });
 
   it('ignores runtime noise so two realistic variants collide', () => {
-    const a = fingerprint('Failed to load 550e8400-e29b-41d4-a716-446655440000 at 2026-04-19T10:15:23.123Z');
-    const b = fingerprint('Failed to load 660e8400-e29b-41d4-a716-446655441111 at 2026-04-19T10:20:00.000Z');
+    const a = fingerprint(
+      'Failed to load 550e8400-e29b-41d4-a716-446655440000 at 2026-04-19T10:15:23.123Z'
+    );
+    const b = fingerprint(
+      'Failed to load 660e8400-e29b-41d4-a716-446655441111 at 2026-04-19T10:20:00.000Z'
+    );
     assert.equal(a, b);
   });
 

@@ -1,8 +1,15 @@
 import { readdirSync, readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 
-export interface ConsoleLogEntry { level: string; text: string; url: string }
-export interface PageErrorEntry   { message: string; url: string }
+export interface ConsoleLogEntry {
+  level: string;
+  text: string;
+  url: string;
+}
+export interface PageErrorEntry {
+  message: string;
+  url: string;
+}
 
 export interface ConsoleArtifact {
   scenario: string;
@@ -36,7 +43,7 @@ export function loadConsoleArtifacts(dir: string): ConsoleArtifact[] {
       scenario: parts.scenario,
       human: parts.human,
       consoleErrors: body.consoleErrors ?? [],
-      pageErrors:    body.pageErrors    ?? [],
+      pageErrors: body.pageErrors ?? [],
     });
   }
   return artifacts;

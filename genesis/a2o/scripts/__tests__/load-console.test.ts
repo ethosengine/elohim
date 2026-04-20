@@ -10,18 +10,24 @@ const fixturesDir = fileURLToPath(new URL('./fixtures/', import.meta.url));
 
 function makeReportsDir(): string {
   const tmp = mkdtempSync(join(tmpdir(), 'a2o-console-'));
-  cpSync(join(fixturesDir, 'console-timothy-errors.json'), join(tmp, 'learning-journey-timothy-errors.json'));
-  cpSync(join(fixturesDir, 'console-mary-errors.json'),    join(tmp, 'learning-journey-mary-errors.json'));
+  cpSync(
+    join(fixturesDir, 'console-timothy-errors.json'),
+    join(tmp, 'learning-journey-timothy-errors.json')
+  );
+  cpSync(
+    join(fixturesDir, 'console-mary-errors.json'),
+    join(tmp, 'learning-journey-mary-errors.json')
+  );
   writeFileSync(join(tmp, 'not-an-artifact.txt'), 'ignored');
   return tmp;
 }
 
 describe('parseScenarioHumanFromFilename', () => {
   it('splits scenario and human on last hyphen before "errors"', () => {
-    assert.deepEqual(
-      parseScenarioHumanFromFilename('learning-journey-timothy-errors.json'),
-      { scenario: 'learning-journey', human: 'timothy' }
-    );
+    assert.deepEqual(parseScenarioHumanFromFilename('learning-journey-timothy-errors.json'), {
+      scenario: 'learning-journey',
+      human: 'timothy',
+    });
   });
 
   it('returns null on unrecognized filename', () => {

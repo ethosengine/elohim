@@ -29,7 +29,7 @@ export function renderMarkdown(report: SprintReport): string {
     byPillar.set(f.pillar, arr);
   }
 
-  for (const [pillar, findings] of [...byPillar.entries()].sort()) {
+  for (const [pillar, findings] of [...byPillar.entries()].sort(([a], [b]) => a.localeCompare(b))) {
     lines.push(`## ${pillar}`);
     lines.push('');
     for (const f of findings) {

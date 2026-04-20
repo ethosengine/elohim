@@ -3,10 +3,7 @@ import { strict as assert } from 'node:assert';
 import { readFileSync } from 'node:fs';
 import { loadCucumber } from '../lib/load-cucumber.js';
 
-const fixture = readFileSync(
-  new URL('./fixtures/cucumber-mixed.json', import.meta.url),
-  'utf8'
-);
+const fixture = readFileSync(new URL('./fixtures/cucumber-mixed.json', import.meta.url), 'utf8');
 
 describe('loadCucumber', () => {
   it('parses all scenarios with feature URI', () => {

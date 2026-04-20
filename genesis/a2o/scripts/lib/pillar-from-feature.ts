@@ -1,7 +1,8 @@
 const AUTH_IS_IMAGODEI = new Map<string, string>([['auth', 'imagodei']]);
+const FEATURE_RE = /features\/([^/]+)\/[^/]+\.feature$/;
 
 export function pillarFromFeature(uri: string): string {
-  const match = uri.match(/features\/([^/]+)\/[^/]+\.feature$/);
+  const match = FEATURE_RE.exec(uri);
   if (!match) return 'unknown';
   const raw = match[1];
   return AUTH_IS_IMAGODEI.get(raw) ?? raw;

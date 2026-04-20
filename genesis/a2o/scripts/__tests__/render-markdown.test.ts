@@ -10,7 +10,11 @@ const report: SprintReport = {
   doorway: 'https://doorway-alpha.elohim.host',
   summary: {
     scenarios: { total: 3, passed: 1, failed: 1, skipped: 0, pending: 1 },
-    findings:  { total: 3, bySource: { 'console-error': 1, 'scenario-failure': 1, 'pending-step': 1 }, byPillar: { browser: 1, lamad: 1, imagodei: 1 } },
+    findings: {
+      total: 3,
+      bySource: { 'console-error': 1, 'scenario-failure': 1, 'pending-step': 1 },
+      byPillar: { browser: 1, lamad: 1, imagodei: 1 },
+    },
   },
   findings: [
     {

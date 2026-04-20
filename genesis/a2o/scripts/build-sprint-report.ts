@@ -8,7 +8,8 @@ import * as addFormatsNs from 'ajv-formats';
 // Unwrap both at runtime using namespace imports to avoid TypeScript's
 // "no construct signatures" error on default imports from CJS modules.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const AjvCtor: new (opts: { strict: boolean; allErrors: boolean }) => AjvNs.default = (AjvNs as any).default ?? AjvNs;
+const AjvCtor: new (opts: { strict: boolean; allErrors: boolean }) => AjvNs.default =
+  (AjvNs as any).default ?? AjvNs;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const addFormatsFn: (ajv: AjvNs.default) => void = (addFormatsNs as any).default ?? addFormatsNs;
 
@@ -37,14 +38,14 @@ function parseArgs(argv: string[]): Args {
   const reportsDir = opts.get('--reports-dir') ?? 'reports';
   return {
     reportsDir,
-    cucumberPath:    opts.get('--cucumber')      ?? join(reportsDir, 'cucumber-report.json'),
-    consoleDir:      opts.get('--console-dir')   ?? join(reportsDir, 'console'),
-    coverageGapPath: opts.get('--coverage-gap')  ?? join(reportsDir, 'coverage-gap.json'),
-    outJson:         opts.get('--out-json')      ?? join(reportsDir, 'sprint-report.json'),
-    outMd:           opts.get('--out-md')        ?? join(reportsDir, 'sprint-report.md'),
-    runId:           opts.get('--run-id')        ?? process.env.BUILD_TAG ?? new Date().toISOString(),
-    profile:         opts.get('--profile')       ?? process.env.CUCUMBER_PROFILE ?? 'unknown',
-    doorway:         opts.get('--doorway')       ?? process.env.E2E_DOORWAY_ALPHA,
+    cucumberPath: opts.get('--cucumber') ?? join(reportsDir, 'cucumber-report.json'),
+    consoleDir: opts.get('--console-dir') ?? join(reportsDir, 'console'),
+    coverageGapPath: opts.get('--coverage-gap') ?? join(reportsDir, 'coverage-gap.json'),
+    outJson: opts.get('--out-json') ?? join(reportsDir, 'sprint-report.json'),
+    outMd: opts.get('--out-md') ?? join(reportsDir, 'sprint-report.md'),
+    runId: opts.get('--run-id') ?? process.env.BUILD_TAG ?? new Date().toISOString(),
+    profile: opts.get('--profile') ?? process.env.CUCUMBER_PROFILE ?? 'unknown',
+    doorway: opts.get('--doorway') ?? process.env.E2E_DOORWAY_ALPHA,
   };
 }
 
@@ -64,8 +65,12 @@ function main() {
   const gaps = loadCoverageGap(args.coverageGapPath);
 
   const report = aggregate({
-    scenarios, consoleArtifacts, gaps,
-    runId: args.runId, profile: args.profile, doorway: args.doorway,
+    scenarios,
+    consoleArtifacts,
+    gaps,
+    runId: args.runId,
+    profile: args.profile,
+    doorway: args.doorway,
   });
 
   // Schema-validate before writing
@@ -90,7 +95,9 @@ function main() {
   console.log(`Sprint report written:`);
   console.log(`  ${args.outJson}`);
   console.log(`  ${args.outMd}`);
-  console.log(`Findings: ${report.summary.findings.total} (scenarios: ${report.summary.scenarios.total})`);
+  console.log(
+    `Findings: ${report.summary.findings.total} (scenarios: ${report.summary.scenarios.total})`
+  );
 }
 
 main();

@@ -12,7 +12,11 @@ export type FindingSource =
   | 'pending-step'
   | 'coverage-gap';
 
-export interface FindingScenario { name: string; feature: string; human?: string }
+export interface FindingScenario {
+  name: string;
+  feature: string;
+  human?: string;
+}
 
 export interface Finding {
   fingerprint: string;
@@ -33,7 +37,7 @@ export interface SprintReport {
   doorway?: string;
   summary: {
     scenarios: { total: number; passed: number; failed: number; skipped: number; pending: number };
-    findings:  { total: number; bySource: Record<string, number>; byPillar: Record<string, number> };
+    findings: { total: number; bySource: Record<string, number>; byPillar: Record<string, number> };
   };
   findings: Finding[];
 }
@@ -59,12 +63,18 @@ interface RawFinding {
 function suggestObjective(source: FindingSource, message: string): string {
   const head = message.slice(0, 120);
   switch (source) {
-    case 'console-error':     return `Fix browser console error: ${head}`;
-    case 'page-error':        return `Fix unhandled page exception: ${head}`;
-    case 'failed-request':    return `Fix failing network request: ${head}`;
-    case 'scenario-failure':  return `Fix scenario failure: ${head}`;
-    case 'pending-step':      return `Implement pending step definition: ${head}`;
-    case 'coverage-gap':      return `Author missing scenario: ${head}`;
+    case 'console-error':
+      return `Fix browser console error: ${head}`;
+    case 'page-error':
+      return `Fix unhandled page exception: ${head}`;
+    case 'failed-request':
+      return `Fix failing network request: ${head}`;
+    case 'scenario-failure':
+      return `Fix scenario failure: ${head}`;
+    case 'pending-step':
+      return `Implement pending step definition: ${head}`;
+    case 'coverage-gap':
+      return `Author missing scenario: ${head}`;
   }
 }
 

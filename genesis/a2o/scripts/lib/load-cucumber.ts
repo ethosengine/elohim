@@ -24,9 +24,7 @@ interface CucumberFeature {
   elements?: CucumberElement[];
 }
 
-const STATUS_PRIORITY: ScenarioStatus[] = [
-  'failed', 'undefined', 'pending', 'skipped', 'passed',
-];
+const STATUS_PRIORITY: ScenarioStatus[] = ['failed', 'undefined', 'pending', 'skipped', 'passed'];
 
 function aggregateStatus(steps: CucumberStep[]): ScenarioStatus {
   const seen = new Set(steps.map(s => (s.result?.status ?? 'undefined') as ScenarioStatus));
