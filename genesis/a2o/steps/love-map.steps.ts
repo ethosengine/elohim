@@ -101,9 +101,9 @@ Given(
     );
     assert.ok(adamToEve, 'No relationship found between Adam and Eve in humans.json');
     assert.strictEqual(
-      adamToEve.type,
+      adamToEve.relationshipType,
       relType,
-      `Expected "${relType}" relationship, found "${adamToEve.type}"`
+      `Expected "${relType}" relationship, found "${adamToEve.relationshipType}"`
     );
     this.contentIds.set('mutualAttestation', 'true');
   }

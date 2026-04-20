@@ -48,8 +48,8 @@ export interface HumansJsonHuman {
 export interface HumansJsonRelationship {
   source: string;
   target: string;
-  type: string;
-  intimacy: string;
+  relationshipType: string;
+  intimacyLevel: string;
   context?: string;
 }
 
