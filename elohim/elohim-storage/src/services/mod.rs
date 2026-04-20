@@ -20,6 +20,7 @@
 //! ```
 
 pub mod agreement_service;
+pub mod peer_selection;
 pub mod anomaly_detection;
 pub mod behavioral_trust;
 pub mod boot_registration;
