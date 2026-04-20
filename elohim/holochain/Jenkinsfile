@@ -346,7 +346,9 @@ def computeP2PBootstrapNodes(Map currentHuman, List allHumans) {
 def computeConductorUrls(String targetEnv, List allHumans) {
     def envHumans = allHumans.findAll { it.env == targetEnv }
     return envHumans.collect { h ->
-        "ws://${h.resourcePrefix}-0.${h.resourcePrefix}-headless.elohim-${targetEnv}.svc.cluster.local:8445"
+        // App WS port is 4445 in consolidated-conductor mode (no socat bridge).
+        // Doorway derives the admin URL as app - 1 → 4444, matching the ConfigMap.
+        "ws://${h.resourcePrefix}-0.${h.resourcePrefix}-headless.elohim-${targetEnv}.svc.cluster.local:4445"
     }.join(',')
 }
 
