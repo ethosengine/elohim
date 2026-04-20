@@ -22,7 +22,17 @@ COPY elohim/elohim-compute ./elohim/elohim-compute
 COPY elohim/elohim-cache-core ./elohim/elohim-cache-core
 COPY elohim/sdk/domains/imagodei/types ./elohim/sdk/domains/imagodei/types
 COPY elohim/sdk/domains/infrastructure/types ./elohim/sdk/domains/infrastructure/types
+# gate-client + its workspace root and transitive internal members
+COPY elohim/Cargo.toml ./elohim/Cargo.toml
+COPY elohim/constitution ./elohim/constitution
+COPY elohim/elohim-agent/elohim-agent-service ./elohim/elohim-agent/elohim-agent-service
 COPY elohim/elohim-agent/gate-client ./elohim/elohim-agent/gate-client
+COPY elohim/elohim-agent/gate-types ./elohim/elohim-agent/gate-types
+
+# Prune workspace members that aren't copied into the build context.
+# Keeps: constitution, elohim-agent-service, gate-client, gate-types (and elohim-compute via members list).
+# Removes: gate-client-zome, eae, elohim-token (not needed for doorway build).
+RUN sed -i '/"elohim-agent\/gate-client-zome"/d; /"eae"/d; /"elohim-token"/d' elohim/Cargo.toml
 
 # Create dummy src to build dependencies
 RUN mkdir -p src/bin && \
