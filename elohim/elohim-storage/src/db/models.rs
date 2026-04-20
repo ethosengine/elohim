@@ -1081,6 +1081,7 @@ pub struct Collective {
     pub created_at: String,
     pub updated_at: String,
     pub dissolved_at: Option<String>,
+    pub region: Option<String>,
 }
 
 /// New collective for INSERT

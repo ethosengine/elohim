@@ -38,6 +38,7 @@ diesel::table! {
         created_at -> Text,
         updated_at -> Text,
         dissolved_at -> Nullable<Text>,
+        region -> Nullable<Text>,
     }
 }
 

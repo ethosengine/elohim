@@ -10,9 +10,13 @@ use std::collections::HashSet;
 
 use diesel::prelude::*;
 
-use crate::db::{peer_statuses, AppContext, DbPool};
+use crate::db::{peer_statuses, placement_gaps, AppContext, DbPool};
 use crate::error::StorageError;
-use crate::views::{HouseholdResilienceDetails, HouseholdResilienceView};
+use crate::views::{
+    HouseholdResilienceDetails, HouseholdResilienceView, PlacementGapView,
+    RegionalDistributionView, ResilienceSnapshotDetailsView, ResilienceSnapshotView,
+    StewardingCollectiveEntry,
+};
 
 /// Compute per-content household resilience. The viewer's household id is
 /// optional — when present, `households_reciprocated` counts mutual
@@ -122,6 +126,193 @@ pub fn compute(
             health_score,
         },
     })
+}
+
+/// Enriched collective-general resilience snapshot. Builds on `compute()` and
+/// adds commitment-backed count, diversity score, regional distribution, and
+/// placement gaps. Handler for `/api/v1/resilience/{id}/household`.
+pub fn snapshot(
+    pool: &DbPool,
+    ctx: &AppContext,
+    content_id: &str,
+    viewer_household_id: Option<&str>,
+) -> Result<ResilienceSnapshotView, StorageError> {
+    let base = compute(pool, ctx, content_id, viewer_household_id)?;
+
+    let mut conn = pool
+        .get()
+        .map_err(|e| StorageError::Internal(e.to_string()))?;
+
+    // commitment_backed_collectives: distinct households with an active provide
+    // commitment whose resource_classified_as matches this content's reach.
+    use crate::db::diesel_schema::{content, humans, rea_commitments};
+    let content_reach: String = content::table
+        .filter(content::id.eq(content_id))
+        .filter(content::h_app_id.eq(&ctx.h_app_id))
+        .select(content::reach)
+        .first(&mut conn)
+        .unwrap_or_else(|_| "commons".to_string());
+    let scope = format!("content:{}", content_reach);
+
+    let commitment_backed_collectives: i32 = {
+        rea_commitments::table
+            .inner_join(
+                humans::table.on(
+                    humans::agent_pub_key
+                        .nullable()
+                        .eq(rea_commitments::provider.nullable()),
+                ),
+            )
+            .filter(rea_commitments::h_app_id.eq(&ctx.h_app_id))
+            .filter(rea_commitments::action.eq("provide"))
+            .filter(rea_commitments::state.eq("active"))
+            .filter(rea_commitments::resource_classified_as.nullable().eq(&scope))
+            .filter(humans::household_id.is_not_null())
+            .select(diesel::dsl::count_distinct(humans::household_id))
+            .first::<i64>(&mut conn)
+            .unwrap_or(0) as i32
+    };
+
+    // diversity_score: min(stewarding_collectives, max(commitment_backed,1)) / desired
+    // RS 4+3 baseline target = 7. Per-content override deferred to Plan 3.
+    let desired = 7_i32;
+    let diversity_score = if desired == 0 {
+        0.0_f32
+    } else {
+        (base
+            .households_stewarding
+            .min(commitment_backed_collectives.max(1)) as f32
+            / desired as f32)
+            .clamp(0.0, 1.0)
+    };
+
+    // regional_distribution: join steward collectives → collectives.region.
+    let regional_distribution = compute_regional_distribution(
+        &mut conn,
+        &ctx.h_app_id,
+        content_id,
+        viewer_household_id,
+    )
+    .unwrap_or(RegionalDistributionView {
+        local: 0,
+        regional: 0,
+        global: 0,
+        unknown: base.households_stewarding,
+    });
+
+    // placement_gaps for this content.
+    let gap_rows = placement_gaps::list_gaps(
+        &mut conn,
+        &ctx.h_app_id,
+        placement_gaps::GapQuery {
+            content_id: Some(content_id.to_string()),
+            ..Default::default()
+        },
+    )?;
+    let gaps: Vec<PlacementGapView> = gap_rows.into_iter().map(Into::into).collect();
+
+    // Map steward_households (Vec<String> of ids) → Vec<StewardingCollectiveEntry>
+    let steward_collective_entries: Vec<StewardingCollectiveEntry> = base
+        .details
+        .steward_households
+        .iter()
+        .map(|id| StewardingCollectiveEntry {
+            id: id.clone(),
+            kind: "household".to_string(),
+            label: None,
+        })
+        .collect();
+
+    Ok(ResilienceSnapshotView {
+        content_id: base.content_id.clone(),
+        stewarding_collectives: base.households_stewarding,
+        commitment_backed_collectives,
+        diversity_score,
+        regional_distribution,
+        placement_gaps: gaps,
+        protection_status: base.protection_status.clone(),
+        reciprocating_collectives: Some(base.households_reciprocated),
+        details: Some(ResilienceSnapshotDetailsView {
+            stewarding_collectives: steward_collective_entries,
+            online_peer_count: base.details.online_peer_count,
+            health_score: base.details.health_score,
+        }),
+    })
+}
+
+fn compute_regional_distribution(
+    conn: &mut diesel::SqliteConnection,
+    h_app_id: &str,
+    content_id: &str,
+    viewer_household_id: Option<&str>,
+) -> Result<RegionalDistributionView, StorageError> {
+    use crate::db::diesel_schema::{collectives, humans, shard_locations};
+
+    // Find the content's shard hashes via the manifest.
+    let manifest = crate::db::shard_manifests::get_manifest(conn, h_app_id, content_id)?;
+    let shard_hashes: Vec<String> = match &manifest {
+        Some(m) => serde_json::from_str(&m.shard_hashes_json).unwrap_or_default(),
+        None => {
+            return Ok(RegionalDistributionView {
+                local: 0,
+                regional: 0,
+                global: 0,
+                unknown: 0,
+            })
+        }
+    };
+
+    // Join shard_locations → humans → collectives to get each steward's region.
+    // humans.household_id → collectives.id (left join; stewards without a
+    // collective get NULL region → unknown bucket).
+    let rows: Vec<(String, Option<String>, Option<String>)> = shard_locations::table
+        .inner_join(
+            humans::table.on(humans::agent_pub_key.nullable().eq(shard_locations::peer_id.nullable())),
+        )
+        .left_join(
+            collectives::table.on(collectives::id.nullable().eq(humans::household_id)),
+        )
+        .filter(shard_locations::h_app_id.eq(h_app_id))
+        .filter(shard_locations::shard_hash.eq_any(&shard_hashes))
+        .select((
+            humans::id,
+            humans::household_id,
+            collectives::region.nullable(),
+        ))
+        .load(conn)
+        .unwrap_or_default();
+
+    let viewer_region: Option<String> = match viewer_household_id {
+        None => None,
+        Some(vh) => collectives::table
+            .filter(collectives::id.eq(vh))
+            .select(collectives::region)
+            .first::<Option<String>>(conn)
+            .unwrap_or(None),
+    };
+
+    // Dedupe by household so two peers in the same household count once.
+    let mut seen: HashSet<Option<String>> = Default::default();
+    let mut dist = RegionalDistributionView {
+        local: 0,
+        regional: 0,
+        global: 0,
+        unknown: 0,
+    };
+    for (_human_id, household_id, steward_region) in rows {
+        if !seen.insert(household_id.clone()) {
+            continue;
+        }
+        match (viewer_region.as_deref(), steward_region.as_deref()) {
+            (None, None) => dist.unknown += 1,
+            (None, Some(_)) => dist.global += 1,
+            (Some(_), None) => dist.unknown += 1,
+            (Some(vr), Some(sr)) if vr == sr => dist.local += 1,
+            (Some(_), Some(_)) => dist.regional += 1,
+        }
+    }
+
+    Ok(dist)
 }
 
 fn count_online_peers_in_households(

@@ -59,7 +59,7 @@ async fn handle_get_household_resilience(
             .map(|(_, v)| v.into_owned())
     });
 
-    match crate::services::household_resilience::compute(
+    match crate::services::household_resilience::snapshot(
         pool,
         ctx,
         content_id,

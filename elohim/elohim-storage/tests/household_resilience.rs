@@ -1,6 +1,7 @@
 use diesel::RunQueryDsl;
 use elohim_storage::db;
-use elohim_storage::db::models::{NewHuman, NewShardLocation, NewShardManifest};
+use elohim_storage::db::models::{NewHuman, NewPlacementGap, NewShardLocation, NewShardManifest};
+use elohim_storage::db::placement_gaps;
 use elohim_storage::services::household_resilience;
 use elohim_storage::test_util::test_pool;
 
@@ -75,4 +76,59 @@ fn distinct_households_counted_from_shard_locations() {
     ).unwrap();
 
     assert_eq!(view.households_stewarding, 2);
+}
+
+#[test]
+fn snapshot_includes_placement_gaps_and_regional_distribution() {
+    let pool = test_pool();
+    let mut conn = pool.get().unwrap();
+
+    seed_human(&mut conn, "agent-alpha-1", Some("home-alpha"));
+    seed_human(&mut conn, "agent-beta-1", Some("home-beta"));
+    seed_shard_location(&mut conn, "shard-x", "agent-alpha-1");
+    seed_shard_location(&mut conn, "shard-x", "agent-beta-1");
+
+    // Seed the manifest so snapshot() follows the two-step manifest path.
+    seed_shard_manifest(&mut conn, "content-via-shard-x", r#"["shard-x"]"#);
+
+    // Insert a known placement_gap row for this content.
+    placement_gaps::upsert_gap(
+        &mut conn,
+        &NewPlacementGap {
+            id: "g1",
+            content_id: "content-via-shard-x",
+            shard_hash: "shard-y",
+            h_app_id: "lamad",
+            requested_steward_count: 3,
+            achieved_steward_count: 0,
+            contract_coverage: 0.0,
+            gap_kind: "peers-unavailable",
+            first_seen_at: "2026-04-19T00:00:00Z",
+            last_seen_at: "2026-04-19T00:00:00Z",
+        },
+    )
+    .unwrap();
+
+    let snapshot = household_resilience::snapshot(
+        &pool,
+        &elohim_storage::db::AppContext {
+            h_app_id: "lamad".into(),
+        },
+        "content-via-shard-x",
+        None,
+    )
+    .unwrap();
+
+    assert_eq!(snapshot.stewarding_collectives, 2);
+    assert_eq!(snapshot.commitment_backed_collectives, 0); // no rea_commitments seeded
+    assert_eq!(snapshot.placement_gaps.len(), 1);
+    assert_eq!(snapshot.placement_gaps[0].gap_kind, "peers-unavailable");
+    // No region data seeded: both households bucketed as unknown
+    assert_eq!(snapshot.regional_distribution.unknown, 2);
+    assert_eq!(
+        snapshot.regional_distribution.local
+            + snapshot.regional_distribution.regional
+            + snapshot.regional_distribution.global,
+        0
+    );
 }
