@@ -73,6 +73,7 @@ pub struct HealthResponse {
 
 /// P2P network health from elohim-storage sidecar
 #[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct P2PHealth {
     /// Whether P2P networking is enabled
     pub enabled: bool,
