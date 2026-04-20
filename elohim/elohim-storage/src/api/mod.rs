@@ -31,6 +31,7 @@ pub mod identity;
 pub mod mastery;
 pub mod network_posture;
 pub mod node_shape;
+pub mod placement_gaps;
 pub mod peer_statuses;
 pub mod places;
 pub mod presence;
@@ -143,6 +144,9 @@ pub async fn handle_api_request(
     } else if sub_path.starts_with("hazards") {
         let resource_path = sub_path.strip_prefix("hazards").unwrap_or("");
         hazards::handle(req, method, resource_path, &pool, &app_ctx).await
+    } else if sub_path.starts_with("placement-gaps") {
+        let resource_path = sub_path.strip_prefix("placement-gaps").unwrap_or("");
+        placement_gaps::handle(req, method, resource_path, &pool, &app_ctx).await
     } else if sub_path.starts_with("dashboard") {
         let resource_path = sub_path.strip_prefix("dashboard").unwrap_or("");
         dashboard::handle(req, method, resource_path, &pool, &app_ctx).await
