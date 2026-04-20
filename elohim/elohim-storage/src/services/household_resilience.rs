@@ -154,6 +154,7 @@ pub fn snapshot(
         .unwrap_or_else(|_| "commons".to_string());
     let scope = format!("content:{}", content_reach);
 
+    #[allow(deprecated)]
     let commitment_backed_collectives: i32 = {
         rea_commitments::table
             .inner_join(
@@ -218,6 +219,8 @@ pub fn snapshot(
         .iter()
         .map(|id| StewardingCollectiveEntry {
             id: id.clone(),
+            // Legacy: all stewards are households today. Future collective-kinds will
+            // require a lookup into the collectives table to determine the actual kind.
             kind: "household".to_string(),
             label: None,
         })
