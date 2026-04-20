@@ -19,7 +19,10 @@ import { provideHttpClient } from '@angular/common/http';
 import { of } from 'rxjs';
 
 import { NetworkHealthTabComponent } from './network-health-tab.component';
-import { NetworkPostureService, type NetworkPostureView } from '../../services/network-posture.service';
+import {
+  NetworkPostureService,
+  type NetworkPostureView,
+} from '../../services/network-posture.service';
 import { HouseholdDevicesService } from '@app/shefa/services/household-devices.service';
 import { CollectiveService } from '@app/qahal/services/collective.service';
 import type { HouseholdDevicesView } from '@app/generated/household-devices-view';
@@ -264,7 +267,9 @@ describe('NetworkHealthTabComponent', () => {
       await buildFixture();
       fixture.detectChanges();
       // Flush active-commitments so the forkJoin + switchMap resolves
-      httpMock.expectOne((req) => req.url.includes('/api/v1/commitments')).flush({ items: [], total: 0 });
+      httpMock
+        .expectOne(req => req.url.includes('/api/v1/commitments'))
+        .flush({ items: [], total: 0 });
       fixture.detectChanges();
     });
 
@@ -275,16 +280,12 @@ describe('NetworkHealthTabComponent', () => {
 
     it('should render a household-row for household-matthew', () => {
       const el: HTMLElement = fixture.nativeElement;
-      expect(
-        el.querySelector('[data-testid="household-row-household-matthew"]')
-      ).toBeTruthy();
+      expect(el.querySelector('[data-testid="household-row-household-matthew"]')).toBeTruthy();
     });
 
     it('should render a peer-row for the peer in the household', () => {
       const el: HTMLElement = fixture.nativeElement;
-      expect(
-        el.querySelector('[data-testid="peer-row-uhCAkABC123"]')
-      ).toBeTruthy();
+      expect(el.querySelector('[data-testid="peer-row-uhCAkABC123"]')).toBeTruthy();
     });
 
     it('should report householdCount = 1', () => {
@@ -304,7 +305,9 @@ describe('NetworkHealthTabComponent', () => {
       await buildFixture();
       fixture.detectChanges();
       // combineLatest fires commitments even with empty collectives
-      httpMock.expectOne((req) => req.url.includes('/api/v1/commitments')).flush({ items: [], total: 0 });
+      httpMock
+        .expectOne(req => req.url.includes('/api/v1/commitments'))
+        .flush({ items: [], total: 0 });
       fixture.detectChanges();
     });
 

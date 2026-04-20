@@ -4,8 +4,10 @@ import { Component, OnInit, OnDestroy, inject, signal, computed } from '@angular
 // @coverage: 26.7% (2026-02-24)
 
 import { CUSTODIAN_METRICS, type CustodianMetrics } from '@app/shefa';
+import { SignalsCardComponent } from '@app/shefa/components/signals-card/signals-card.component';
 
 import { CustodianSelectionService } from '../../services/custodian-selection.service';
+
 import { NetworkHealthTabComponent } from './network-health-tab.component';
 
 /** Alert from the Shefa service */
@@ -40,7 +42,7 @@ interface ShefaRecommendation {
 @Component({
   selector: 'app-shefa-dashboard',
   standalone: true,
-  imports: [CommonModule, NetworkHealthTabComponent],
+  imports: [CommonModule, NetworkHealthTabComponent, SignalsCardComponent],
   templateUrl: './shefa-dashboard.component.html',
   styleUrl: './shefa-dashboard.component.css',
 })
