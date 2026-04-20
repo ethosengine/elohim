@@ -1,8 +1,8 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { ResilienceSnapshotView } from '../../projects/elohim-service/src/generated/resilience-snapshot-view';
-import { PlacementGapView } from '../../projects/elohim-service/src/generated/placement-gap-view';
+import { ResilienceSnapshotView } from '../generated/resilience-snapshot-view';
+import { PlacementGapView } from '../generated/placement-gap-view';
 
 @Injectable({ providedIn: 'root' })
 export class ResilienceService {

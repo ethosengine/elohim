@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, Input } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { ResilienceSnapshotView } from '../../../projects/elohim-service/src/generated/resilience-snapshot-view';
+import { ResilienceSnapshotView } from '../../generated/resilience-snapshot-view';
 import { ResilienceSnapshotDensity } from './resilience-snapshot.types';
 
 @Component({
