@@ -6534,3 +6534,108 @@ pub struct HouseholdResilienceDetails {
     pub online_peer_count: i32,
     pub health_score: f32,
 }
+
+// ============================================================================
+// Placement Gap + Resilience Snapshot Views
+// ============================================================================
+
+use crate::db::models::PlacementGapRow;
+
+/// Structured shefa signal: a content item's achieved placement falls short of
+/// its requested stewarding-collective diversity. Source of truth: computed
+/// projection from shard_locations + rea_commitments + humans → collectives.
+/// Operational Category C — no DHT entry.
+///
+/// Wire format: `elohim/sdk/schemas/v1/views/placement-gap-view.schema.json`
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct PlacementGapView {
+    pub id: String,
+    pub content_id: String,
+    pub shard_hash: String,
+    pub requested_steward_count: i32,
+    pub achieved_steward_count: i32,
+    pub contract_coverage: f32,
+    pub gap_kind: String,
+    pub first_seen_at: String,
+    pub last_seen_at: String,
+}
+
+impl From<PlacementGapRow> for PlacementGapView {
+    fn from(r: PlacementGapRow) -> Self {
+        Self {
+            id: r.id,
+            content_id: r.content_id,
+            shard_hash: r.shard_hash,
+            requested_steward_count: r.requested_steward_count,
+            achieved_steward_count: r.achieved_steward_count,
+            contract_coverage: r.contract_coverage,
+            gap_kind: r.gap_kind,
+            first_seen_at: r.first_seen_at,
+            last_seen_at: r.last_seen_at,
+        }
+    }
+}
+
+/// Regional distribution of steward peers across geographic tiers.
+///
+/// Wire format: embedded in `resilience-snapshot-view.schema.json`
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct RegionalDistributionView {
+    pub local: i32,
+    pub regional: i32,
+    pub global: i32,
+    pub unknown: i32,
+}
+
+/// Per-content collective-general resilience snapshot. Collective-general:
+/// stewards can be any collective kind (household, church, patron-circle,
+/// DAO, …) — any group that holds DHT-notarized REA commitments.
+/// Source of truth: computed projection. Operational Category C.
+///
+/// Wire format: `elohim/sdk/schemas/v1/views/resilience-snapshot-view.schema.json`
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct ResilienceSnapshotView {
+    pub content_id: String,
+    pub stewarding_collectives: i32,
+    pub commitment_backed_collectives: i32,
+    pub diversity_score: f32,
+    pub regional_distribution: RegionalDistributionView,
+    pub placement_gaps: Vec<PlacementGapView>,
+    pub protection_status: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reciprocating_collectives: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub details: Option<ResilienceSnapshotDetailsView>,
+}
+
+/// A collective (of any kind) currently stewarding a content item.
+///
+/// Wire format: embedded in `resilience-snapshot-view.schema.json` details
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct StewardingCollectiveEntry {
+    pub id: String,
+    pub kind: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
+}
+
+/// Optional detail layer for `ResilienceSnapshotView`. Source of truth:
+/// computed projection. Operational Category C.
+///
+/// Wire format: embedded in `resilience-snapshot-view.schema.json` details
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct ResilienceSnapshotDetailsView {
+    pub stewarding_collectives: Vec<StewardingCollectiveEntry>,
+    pub online_peer_count: i32,
+    pub health_score: f32,
+}

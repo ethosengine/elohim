@@ -165,3 +165,7 @@ pub use views::{
     ElohimCapabilityProfile, HouseholdDevicesView, HouseholdResilienceDetails,
     HouseholdResilienceView, NetworkPostureView, NodeShapeView, PeerStatusView,
 };
+pub use views::{
+    PlacementGapView, RegionalDistributionView, ResilienceSnapshotDetailsView,
+    ResilienceSnapshotView, StewardingCollectiveEntry,
+};
