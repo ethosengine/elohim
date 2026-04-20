@@ -22,6 +22,7 @@ COPY elohim/elohim-compute ./elohim/elohim-compute
 COPY elohim/elohim-cache-core ./elohim/elohim-cache-core
 COPY elohim/sdk/domains/imagodei/types ./elohim/sdk/domains/imagodei/types
 COPY elohim/sdk/domains/infrastructure/types ./elohim/sdk/domains/infrastructure/types
+COPY elohim/elohim-agent/gate-client ./elohim/elohim-agent/gate-client
 
 # Create dummy src to build dependencies
 RUN mkdir -p src/bin && \
@@ -34,7 +35,8 @@ RUN sed -i 's|path = "../../crates/doorway-client"|path = "crates/doorway-client
     sed -i 's|path = "../../elohim/elohim-compute"|path = "elohim/elohim-compute"|' Cargo.toml && \
     sed -i 's|path = "../../elohim/elohim-cache-core"|path = "elohim/elohim-cache-core"|' Cargo.toml && \
     sed -i 's|path = "../../elohim/sdk/domains/imagodei/types"|path = "elohim/sdk/domains/imagodei/types"|' Cargo.toml && \
-    sed -i 's|path = "../../elohim/sdk/domains/infrastructure/types"|path = "elohim/sdk/domains/infrastructure/types"|' Cargo.toml
+    sed -i 's|path = "../../elohim/sdk/domains/infrastructure/types"|path = "elohim/sdk/domains/infrastructure/types"|' Cargo.toml && \
+    sed -i 's|path = "../../elohim/elohim-agent/gate-client"|path = "elohim/elohim-agent/gate-client"|' Cargo.toml
 
 # Build dependencies (this layer gets cached)
 RUN cargo build --release
