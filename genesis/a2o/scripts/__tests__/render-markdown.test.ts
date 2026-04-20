@@ -1,6 +1,8 @@
-import { describe, it } from 'node:test';
 import { strict as assert } from 'node:assert';
+import { describe, it } from 'node:test';
+
 import { renderMarkdown } from '../lib/render-markdown.js';
+
 import type { SprintReport } from '../lib/aggregate.js';
 
 const report: SprintReport = {
@@ -34,33 +36,33 @@ const report: SprintReport = {
   ],
 };
 
-describe('renderMarkdown', () => {
-  it('includes the run id and profile in the header', () => {
+void describe('renderMarkdown', () => {
+  void it('includes the run id and profile in the header', () => {
     const md = renderMarkdown(report);
     assert.match(md, /A2O Sprint Report/);
     assert.match(md, /build-123/);
     assert.match(md, /alpha/);
   });
 
-  it('renders summary counts', () => {
+  void it('renders summary counts', () => {
     const md = renderMarkdown(report);
-    assert.match(md, /passed[^0-9]*1/i);
-    assert.match(md, /failed[^0-9]*1/i);
+    assert.match(md, /passed\D*1/i);
+    assert.match(md, /failed\D*1/i);
   });
 
-  it('groups findings by pillar header', () => {
+  void it('groups findings by pillar header', () => {
     const md = renderMarkdown(report);
     assert.match(md, /## .*browser/i);
   });
 
-  it('includes fingerprint, occurrences, and suggested objective', () => {
+  void it('includes fingerprint, occurrences, and suggested objective', () => {
     const md = renderMarkdown(report);
     assert.match(md, /abc123def456/);
     assert.match(md, /occurrences.*2/i);
     assert.match(md, /Fix browser console error/);
   });
 
-  it('lists each scenario that triggered the finding', () => {
+  void it('lists each scenario that triggered the finding', () => {
     const md = renderMarkdown(report);
     assert.match(md, /timothy/);
     assert.match(md, /mary/);

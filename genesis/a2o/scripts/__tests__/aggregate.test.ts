@@ -1,9 +1,11 @@
-import { describe, it } from 'node:test';
 import { strict as assert } from 'node:assert';
+import { describe, it } from 'node:test';
+
 import { aggregate } from '../lib/aggregate.js';
-import type { ScenarioResult } from '../lib/load-cucumber.js';
+
 import type { ConsoleArtifact } from '../lib/load-console.js';
 import type { GapFinding } from '../lib/load-coverage-gap.js';
+import type { ScenarioResult } from '../lib/load-cucumber.js';
 
 function input() {
   const scenarios: ScenarioResult[] = [
@@ -65,8 +67,8 @@ function input() {
   return { scenarios, console, gaps };
 }
 
-describe('aggregate', () => {
-  it('counts scenarios in summary', () => {
+void describe('aggregate', () => {
+  void it('counts scenarios in summary', () => {
     const { scenarios, console, gaps } = input();
     const r = aggregate({
       scenarios,
@@ -82,7 +84,7 @@ describe('aggregate', () => {
     assert.equal(r.summary.scenarios.pending, 1);
   });
 
-  it('dedupes identical console errors into one finding with occurrences=2', () => {
+  void it('dedupes identical console errors into one finding with occurrences=2', () => {
     const { scenarios, console, gaps } = input();
     const r = aggregate({
       scenarios,
@@ -98,7 +100,7 @@ describe('aggregate', () => {
     assert.equal(sophia.scenarios.length, 2);
   });
 
-  it('includes scenario-failure findings', () => {
+  void it('includes scenario-failure findings', () => {
     const { scenarios, console, gaps } = input();
     const r = aggregate({
       scenarios,
@@ -113,7 +115,7 @@ describe('aggregate', () => {
     assert.equal(failure.pillar, 'lamad');
   });
 
-  it('includes pending-step findings', () => {
+  void it('includes pending-step findings', () => {
     const { scenarios, console, gaps } = input();
     const r = aggregate({
       scenarios,
@@ -124,10 +126,10 @@ describe('aggregate', () => {
     });
     const pending = r.findings.find(f => f.source === 'pending-step');
     assert.ok(pending);
-    assert.equal(pending!.pillar, 'imagodei');
+    assert.equal(pending.pillar, 'imagodei');
   });
 
-  it('includes coverage-gap findings', () => {
+  void it('includes coverage-gap findings', () => {
     const { scenarios, console, gaps } = input();
     const r = aggregate({
       scenarios,
@@ -141,7 +143,7 @@ describe('aggregate', () => {
     assert.equal(gap.pillar, 'elohim');
   });
 
-  it('sorts findings by occurrences desc', () => {
+  void it('sorts findings by occurrences desc', () => {
     const { scenarios, console, gaps } = input();
     const r = aggregate({
       scenarios,
@@ -155,7 +157,7 @@ describe('aggregate', () => {
     }
   });
 
-  it('emits suggested objective headlines', () => {
+  void it('emits suggested objective headlines', () => {
     const { scenarios, console, gaps } = input();
     const r = aggregate({
       scenarios,

@@ -1,8 +1,9 @@
-import { describe, it } from 'node:test';
 import { strict as assert } from 'node:assert';
+import { describe, it } from 'node:test';
+
 import { pillarFromFeature } from '../lib/pillar-from-feature.js';
 
-describe('pillarFromFeature', () => {
+void describe('pillarFromFeature', () => {
   const cases: [string, string][] = [
     ['features/lamad/learning-journey.feature', 'lamad'],
     ['features/auth/fixture-humans.feature', 'imagodei'],
@@ -21,7 +22,7 @@ describe('pillarFromFeature', () => {
   ];
 
   for (const [uri, expected] of cases) {
-    it(`"${uri}" → ${expected}`, () => {
+    void it(`"${uri}" → ${expected}`, () => {
       assert.equal(pillarFromFeature(uri), expected);
     });
   }
