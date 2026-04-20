@@ -1,0 +1,43 @@
+[
+  {
+    "uri": "features/lamad/learning-journey.feature",
+    "name": "Learning Journey",
+    "elements": [
+      {
+        "name": "Timothy completes path",
+        "type": "scenario",
+        "steps": [
+          { "name": "doorway is reachable", "result": { "status": "passed", "duration": 100 } }
+        ]
+      },
+      {
+        "name": "Mary fails on assessment",
+        "type": "scenario",
+        "steps": [
+          { "name": "doorway is reachable", "result": { "status": "passed", "duration": 50 } },
+          {
+            "name": "answer is scored",
+            "result": {
+              "status": "failed",
+              "duration": 200,
+              "error_message": "AssertionError: expected 500 to be 200\n    at Object.<anonymous>"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "uri": "features/auth/fixture-humans.feature",
+    "name": "Fixture Humans",
+    "elements": [
+      {
+        "name": "Stub step not implemented",
+        "type": "scenario",
+        "steps": [
+          { "name": "a new human wanders in", "result": { "status": "pending", "duration": 0 } }
+        ]
+      }
+    ]
+  }
+]
