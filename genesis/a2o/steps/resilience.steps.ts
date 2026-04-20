@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/require-await -- Cucumber step handlers are async by convention; some sync assertions and @wip stubs don't await. */
+
 /**
  * Resilience step definitions — Plan 1 observable auto-distribute acceptance criteria.
  *
@@ -75,17 +77,11 @@ function loadResponse(world: E2EWorld): Record<string, unknown> {
  *
  * Example: And elohim-storage is reachable at "E2E_STORAGE_URL"
  */
-Given(
-  'elohim-storage is reachable at {string}',
-  async function (this: E2EWorld, urlOrEnv: string) {
-    const url = process.env[urlOrEnv] ?? urlOrEnv;
-    const { statusCode } = await request(`${url}/api/v1/health`);
-    assert.ok(
-      statusCode === 200,
-      `elohim-storage not reachable at ${url} (status ${statusCode})`
-    );
-  }
-);
+Given('elohim-storage is reachable at {string}', async function (this: E2EWorld, urlOrEnv: string) {
+  const url = process.env[urlOrEnv] ?? urlOrEnv;
+  const { statusCode } = await request(`${url}/api/v1/health`);
+  assert.ok(statusCode === 200, `elohim-storage not reachable at ${url} (status ${statusCode})`);
+});
 
 // ---------------------------------------------------------------------------
 // Given — cluster preconditions
@@ -105,9 +101,10 @@ Given(
 Given(
   'the cluster has peers in at least {int} distinct households each with an active {string} provide commitment',
   async function (this: E2EWorld, minCount: number, reach: string) {
-    const peers = (await storageGet('/api/v1/peers/delivery')) as unknown as Array<
-      Record<string, unknown>
-    >;
+    const peers = (await storageGet('/api/v1/peers/delivery')) as unknown as Record<
+      string,
+      unknown
+    >[];
 
     const committed = peers.filter(p => {
       const commitments = (p['commitments'] as string[] | undefined) ?? [];
@@ -134,9 +131,10 @@ Given(
 Given(
   'the cluster has peers in {int} households but only {int} has an active {string} provide commitment',
   async function (this: E2EWorld, _totalHouseholds: number, committedCount: number, reach: string) {
-    const peers = (await storageGet('/api/v1/peers/delivery')) as unknown as Array<
-      Record<string, unknown>
-    >;
+    const peers = (await storageGet('/api/v1/peers/delivery')) as unknown as Record<
+      string,
+      unknown
+    >[];
 
     const committed = peers.filter(p => {
       const commitments = (p['commitments'] as string[] | undefined) ?? [];
@@ -200,7 +198,11 @@ Given(
     const doorway = this.getDoorway(doorwayId);
     const { statusCode, body } = await request(`${doorway.url}/db/content/${contentId}`);
     const text = await body.text();
-    assert.equal(statusCode, 200, `Content "${contentId}" not found on doorway "${doorwayId}": ${text}`);
+    assert.equal(
+      statusCode,
+      200,
+      `Content "${contentId}" not found on doorway "${doorwayId}": ${text}`
+    );
   }
 );
 
@@ -237,12 +239,9 @@ When(
  * Example:
  *   When I open the content-viewer for "content-alpha"
  */
-When(
-  'I open the content-viewer for {string}',
-  async function (this: E2EWorld, _contentId: string) {
-    return 'pending';
-  }
-);
+When('I open the content-viewer for {string}', async function (this: E2EWorld, _contentId: string) {
+  return 'pending';
+});
 
 /**
  * Navigate to a given app route (@wip — requires Playwright).
@@ -300,17 +299,14 @@ Then(
  * Example:
  *   And the response field "placementGaps" is empty
  */
-Then(
-  'the response field {string} is empty',
-  async function (this: E2EWorld, fieldName: string) {
-    const data = loadResponse(this);
-    const value = data[fieldName];
-    assert.ok(
-      Array.isArray(value) && value.length === 0,
-      `Expected "${fieldName}" to be empty; got: ${JSON.stringify(value)}`
-    );
-  }
-);
+Then('the response field {string} is empty', async function (this: E2EWorld, fieldName: string) {
+  const data = loadResponse(this);
+  const value = data[fieldName];
+  assert.ok(
+    Array.isArray(value) && value.length === 0,
+    `Expected "${fieldName}" to be empty; got: ${JSON.stringify(value)}`
+  );
+});
 
 /**
  * Assert that a named string field in the last stored response matches one of the given values.
@@ -364,7 +360,7 @@ Then(
   'the row has {string} matching {string} or {string}',
   async function (this: E2EWorld, fieldName: string, valueA: string, valueB: string) {
     const data = loadResponse(this);
-    const items = (data['items'] as Array<Record<string, unknown>>) ?? [];
+    const items = (data['items'] as Record<string, unknown>[]) ?? [];
     assert.ok(items.length > 0, 'No rows in stored response');
     const firstRow = items[0];
     const actual = firstRow[fieldName] as string | undefined;
