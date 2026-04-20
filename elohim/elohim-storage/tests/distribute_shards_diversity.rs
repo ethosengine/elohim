@@ -40,7 +40,10 @@ async fn distribute_picks_diverse_households() {
         .distribute_shards("content-x", &blob, &pool, "lamad")
         .await
         .unwrap();
-    assert!(distributed > 0, "expected at least one shard distributed, got {distributed}");
+    assert!(
+        distributed > 0,
+        "expected at least one shard distributed, got {distributed}"
+    );
 
     // Verify shard_locations has ≥ 2 distinct households represented.
     let mut conn = pool.get().unwrap();
@@ -78,7 +81,7 @@ async fn distribute_records_gap_when_households_are_short() {
     let pool = test_pool();
     let harness = spawn_p2p_with_peers(
         pool.clone(),
-        &[("agent-alpha-1", "home-alpha", "leaving")],  // committed but not accepting
+        &[("agent-alpha-1", "home-alpha", "leaving")], // committed but not accepting
     )
     .await;
 

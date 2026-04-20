@@ -8,9 +8,15 @@ use elohim_storage::test_util::test_pool;
 fn seed_human(conn: &mut diesel::SqliteConnection, id: &str, household_id: Option<&str>) {
     diesel::insert_into(db::diesel_schema::humans::table)
         .values(&NewHuman {
-            id: id.into(), agent_pub_key: Some(id.into()), display_name: id.into(),
-            bio: None, affinities: "[]".into(), profile_reach: "commons".into(),
-            location: None, profile_photo_url: None, h_app_id: "lamad".into(),
+            id: id.into(),
+            agent_pub_key: Some(id.into()),
+            display_name: id.into(),
+            bio: None,
+            affinities: "[]".into(),
+            profile_reach: "commons".into(),
+            location: None,
+            profile_photo_url: None,
+            h_app_id: "lamad".into(),
             household_id: household_id.map(str::to_string),
         })
         .execute(conn)
@@ -19,12 +25,19 @@ fn seed_human(conn: &mut diesel::SqliteConnection, id: &str, household_id: Optio
 
 fn seed_shard_location(conn: &mut diesel::SqliteConnection, shard_hash: &str, peer_id: &str) {
     let loc = NewShardLocation {
-        shard_hash, peer_id, h_app_id: "lamad", status: "announced",
+        shard_hash,
+        peer_id,
+        h_app_id: "lamad",
+        status: "announced",
     };
     db::shard_locations::upsert_location(conn, &loc).unwrap();
 }
 
-fn seed_shard_manifest(conn: &mut diesel::SqliteConnection, content_id: &str, shard_hashes_json: &str) {
+fn seed_shard_manifest(
+    conn: &mut diesel::SqliteConnection,
+    content_id: &str,
+    shard_hashes_json: &str,
+) {
     let manifest = NewShardManifest {
         content_id,
         h_app_id: "lamad",
@@ -49,8 +62,8 @@ fn distinct_households_counted_from_shard_locations() {
 
     seed_human(&mut conn, "agent-alpha-1", Some("home-alpha"));
     seed_human(&mut conn, "agent-alpha-2", Some("home-alpha")); // same household
-    seed_human(&mut conn, "agent-beta-1",  Some("home-beta"));
-    seed_human(&mut conn, "agent-ghost",   None);
+    seed_human(&mut conn, "agent-beta-1", Some("home-beta"));
+    seed_human(&mut conn, "agent-ghost", None);
 
     seed_shard_location(&mut conn, "shard-x", "agent-alpha-1");
     seed_shard_location(&mut conn, "shard-x", "agent-alpha-2");
@@ -70,10 +83,13 @@ fn distinct_households_counted_from_shard_locations() {
     // the agent-ghost should not count.
     let view = household_resilience::compute(
         &pool,
-        &elohim_storage::db::AppContext { h_app_id: "lamad".into() },
+        &elohim_storage::db::AppContext {
+            h_app_id: "lamad".into(),
+        },
         "content-via-shard-x",
         None,
-    ).unwrap();
+    )
+    .unwrap();
 
     assert_eq!(view.households_stewarding, 2);
 }

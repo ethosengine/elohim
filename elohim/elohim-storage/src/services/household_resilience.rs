@@ -69,10 +69,7 @@ pub fn compute(
     let steward_households: HashSet<String> = {
         let raw_households: Vec<Option<String>> = shard_locations::table
             .inner_join(
-                humans::table.on(
-                    humans::agent_pub_key
-                        .eq(shard_locations::peer_id.nullable()),
-                ),
+                humans::table.on(humans::agent_pub_key.eq(shard_locations::peer_id.nullable())),
             )
             .filter(shard_locations::h_app_id.eq(&ctx.h_app_id))
             .filter(humans::household_id.is_not_null())
@@ -158,16 +155,18 @@ pub fn snapshot(
     let commitment_backed_collectives: i32 = {
         rea_commitments::table
             .inner_join(
-                humans::table.on(
-                    humans::agent_pub_key
-                        .nullable()
-                        .eq(rea_commitments::provider.nullable()),
-                ),
+                humans::table.on(humans::agent_pub_key
+                    .nullable()
+                    .eq(rea_commitments::provider.nullable())),
             )
             .filter(rea_commitments::h_app_id.eq(&ctx.h_app_id))
             .filter(rea_commitments::action.eq("provide"))
             .filter(rea_commitments::state.eq("active"))
-            .filter(rea_commitments::resource_classified_as.nullable().eq(&scope))
+            .filter(
+                rea_commitments::resource_classified_as
+                    .nullable()
+                    .eq(&scope),
+            )
             .filter(humans::household_id.is_not_null())
             .select(diesel::dsl::count_distinct(humans::household_id))
             .first::<i64>(&mut conn)
@@ -188,18 +187,14 @@ pub fn snapshot(
     };
 
     // regional_distribution: join steward collectives → collectives.region.
-    let regional_distribution = compute_regional_distribution(
-        &mut conn,
-        &ctx.h_app_id,
-        content_id,
-        viewer_household_id,
-    )
-    .unwrap_or(RegionalDistributionView {
-        local: 0,
-        regional: 0,
-        global: 0,
-        unknown: base.households_stewarding,
-    });
+    let regional_distribution =
+        compute_regional_distribution(&mut conn, &ctx.h_app_id, content_id, viewer_household_id)
+            .unwrap_or(RegionalDistributionView {
+                local: 0,
+                regional: 0,
+                global: 0,
+                unknown: base.households_stewarding,
+            });
 
     // placement_gaps for this content.
     let gap_rows = placement_gaps::list_gaps(
@@ -270,11 +265,11 @@ fn compute_regional_distribution(
     // collective get NULL region → unknown bucket).
     let rows: Vec<(String, Option<String>, Option<String>)> = shard_locations::table
         .inner_join(
-            humans::table.on(humans::agent_pub_key.nullable().eq(shard_locations::peer_id.nullable())),
+            humans::table.on(humans::agent_pub_key
+                .nullable()
+                .eq(shard_locations::peer_id.nullable())),
         )
-        .left_join(
-            collectives::table.on(collectives::id.nullable().eq(humans::household_id)),
-        )
+        .left_join(collectives::table.on(collectives::id.nullable().eq(humans::household_id)))
         .filter(shard_locations::h_app_id.eq(h_app_id))
         .filter(shard_locations::shard_hash.eq_any(&shard_hashes))
         .select((

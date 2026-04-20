@@ -961,7 +961,10 @@ fn resilience_snapshot_view_minimal_matches_schema() {
     let json = serde_json::to_value(&view).unwrap();
     // Optional fields must be absent when None (skip_serializing_if)
     assert!(
-        !json.as_object().unwrap().contains_key("reciprocatingCollectives"),
+        !json
+            .as_object()
+            .unwrap()
+            .contains_key("reciprocatingCollectives"),
         "reciprocatingCollectives must be absent when None"
     );
     assert!(

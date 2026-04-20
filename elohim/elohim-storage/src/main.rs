@@ -356,10 +356,8 @@ async fn async_main(
     if let Some(pool) = db_pool.as_ref() {
         let pool_clone = pool.clone();
         tokio::spawn(async move {
-            match elohim_storage::services::holochain_humans_replayer::snapshot_household_ids(
-                &(),
-            )
-            .await
+            match elohim_storage::services::holochain_humans_replayer::snapshot_household_ids(&())
+                .await
             {
                 Ok(mapping) => {
                     if let Err(e) =

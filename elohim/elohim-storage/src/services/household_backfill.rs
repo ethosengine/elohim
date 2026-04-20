@@ -16,16 +16,15 @@ use crate::StorageError;
 /// twice with the same mapping produces the same result.
 ///
 /// Returns the number of rows actually updated.
-pub fn run_once(
-    pool: &DbPool,
-    mapping: Vec<(String, String)>,
-) -> Result<usize, StorageError> {
+pub fn run_once(pool: &DbPool, mapping: Vec<(String, String)>) -> Result<usize, StorageError> {
     if mapping.is_empty() {
         tracing::debug!("household_backfill: empty mapping, nothing to do");
         return Ok(0);
     }
 
-    let mut conn = pool.get().map_err(|e| StorageError::Internal(e.to_string()))?;
+    let mut conn = pool
+        .get()
+        .map_err(|e| StorageError::Internal(e.to_string()))?;
     let mut filled = 0usize;
 
     for (human_id, household_id) in mapping {

@@ -9,9 +9,7 @@ use crate::StorageError;
 /// Placeholder implementation: returns an empty mapping until the DHT reader
 /// hook lands.  The backfill is idempotent and a zero-length mapping is a
 /// valid outcome — rows already populated remain correct.
-pub async fn snapshot_household_ids<C>(
-    _dht: &C,
-) -> Result<Vec<(String, String)>, StorageError> {
+pub async fn snapshot_household_ids<C>(_dht: &C) -> Result<Vec<(String, String)>, StorageError> {
     // Placeholder: returns empty until the DHT reader hook lands.
     // The backfill is idempotent and a zero-length mapping is a valid outcome.
     Ok(vec![])

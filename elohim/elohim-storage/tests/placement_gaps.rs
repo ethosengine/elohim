@@ -135,8 +135,10 @@ fn list_filters_by_kind() {
         .unwrap();
     }
 
-    let filter =
-        placement_gaps::GapQuery { kind: Some("peers-unavailable".into()), ..Default::default() };
+    let filter = placement_gaps::GapQuery {
+        kind: Some("peers-unavailable".into()),
+        ..Default::default()
+    };
     let rows = placement_gaps::list_gaps(&mut conn, "lamad", filter).unwrap();
     assert_eq!(rows.len(), 2);
     assert!(rows.iter().all(|r| r.gap_kind == "peers-unavailable"));

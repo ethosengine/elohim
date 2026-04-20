@@ -18,13 +18,12 @@ use super::diesel_schema::{
     contributor_presences, custodian_metrics, device_policies, discussions, economic_events,
     enum_registry, governance_dispositions, governance_signals, governance_states, hazards,
     human_relationships, humans, imagodei_observations, knowledge_maps, local_sessions,
-    node_stewardship, observation_entries, observation_sessions, placement_gaps, places, precedents,
-    premium_gates,
-    proposal_options, proposals, ranked_votes, rea_commitments, relationships,
-    responsibility_demand_configs, risk_alerts, schedules, shard_locations, shard_manifests,
-    spatial_contexts, statement_votes, statements, steward_credentials, stewarded_nodes,
-    stewardship_allocations, token_balances, token_decay_events, token_mint_events,
-    token_transfers, votes,
+    node_stewardship, observation_entries, observation_sessions, placement_gaps, places,
+    precedents, premium_gates, proposal_options, proposals, ranked_votes, rea_commitments,
+    relationships, responsibility_demand_configs, risk_alerts, schedules, shard_locations,
+    shard_manifests, spatial_contexts, statement_votes, statements, steward_credentials,
+    stewarded_nodes, stewardship_allocations, token_balances, token_decay_events,
+    token_mint_events, token_transfers, votes,
 };
 
 // ============================================================================

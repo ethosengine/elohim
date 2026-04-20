@@ -23,7 +23,9 @@
 use diesel::prelude::*;
 use std::collections::HashMap;
 
-use crate::db::diesel_schema::{humans, node_stewardship, peer_statuses, rea_commitments, stewarded_nodes};
+use crate::db::diesel_schema::{
+    humans, node_stewardship, peer_statuses, rea_commitments, stewarded_nodes,
+};
 use crate::db::DbPool;
 use crate::StorageError;
 
@@ -98,10 +100,7 @@ impl PeerSelection {
     ///   Pass 2 — fill from distinct archetypes
     ///   Pass 3 — fill from distinct nodes
     ///   Pass 4 — fill from anything remaining
-    pub fn select(
-        &self,
-        input: &SelectionInput,
-    ) -> Result<SelectionOutcome, StorageError> {
+    pub fn select(&self, input: &SelectionInput) -> Result<SelectionOutcome, StorageError> {
         let mut conn = self
             .pool
             .get()
@@ -225,8 +224,7 @@ impl PeerSelection {
 
         let node_rows: Vec<NodeRow> = node_stewardship::table
             .inner_join(
-                stewarded_nodes::table
-                    .on(stewarded_nodes::id.eq(node_stewardship::node_id)),
+                stewarded_nodes::table.on(stewarded_nodes::id.eq(node_stewardship::node_id)),
             )
             .filter(node_stewardship::human_id.eq_any(&human_ids))
             .select((

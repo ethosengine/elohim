@@ -20,12 +20,7 @@ use elohim_storage::test_util::test_pool;
 // ---------------------------------------------------------------------------
 
 /// Insert a Human row. `agent_key` is stored in agent_pub_key (the peer identity).
-fn seed_human(
-    conn: &mut diesel::SqliteConnection,
-    id: &str,
-    agent_key: &str,
-    hh: Option<&str>,
-) {
+fn seed_human(conn: &mut diesel::SqliteConnection, id: &str, agent_key: &str, hh: Option<&str>) {
     diesel::insert_into(db::diesel_schema::humans::table)
         .values(&NewHuman {
             id: id.into(),
@@ -73,11 +68,7 @@ fn seed_peer_status(conn: &mut diesel::SqliteConnection, peer_id: &str, lifecycl
 /// - `provider` (not provider_agent)
 /// - `resource_classified_as` (not resource_classification)
 /// - `state` (not status)
-fn seed_rea_commitment(
-    conn: &mut diesel::SqliteConnection,
-    provider: &str,
-    content_scope: &str,
-) {
+fn seed_rea_commitment(conn: &mut diesel::SqliteConnection, provider: &str, content_scope: &str) {
     diesel::insert_into(rea_commitments::table)
         .values((
             rea_commitments::id.eq(format!("cmt-{provider}-{content_scope}")),
@@ -85,8 +76,7 @@ fn seed_rea_commitment(
             rea_commitments::action.eq("provide"),
             rea_commitments::provider.eq(provider),
             rea_commitments::receiver.eq(""),
-            rea_commitments::resource_classified_as
-                .eq(Some(format!("content:{content_scope}"))),
+            rea_commitments::resource_classified_as.eq(Some(format!("content:{content_scope}"))),
             rea_commitments::state.eq("active"),
             rea_commitments::finished.eq(0),
             rea_commitments::created_at.eq("2026-04-19T00:00:00Z"),
@@ -132,7 +122,11 @@ fn selects_distinct_households_first() {
                 .iter()
                 .map(|p| p.household_id.as_deref().unwrap_or(""))
                 .collect();
-            assert_eq!(households.len(), 2, "expected distinct households in selection");
+            assert_eq!(
+                households.len(),
+                2,
+                "expected distinct households in selection"
+            );
         }
         other => panic!("expected Ok, got {other:?}"),
     }

@@ -20,7 +20,6 @@
 //! ```
 
 pub mod agreement_service;
-pub mod peer_selection;
 pub mod anomaly_detection;
 pub mod behavioral_trust;
 pub mod boot_registration;
@@ -40,6 +39,7 @@ pub mod inference_engine;
 pub mod inference_router;
 pub mod knowledge_service;
 pub mod mastery_depth;
+pub mod peer_selection;
 pub mod presence_service;
 pub mod provenance_service;
 pub mod rea_commitment_service;

@@ -62,14 +62,11 @@ pub struct P2PTestHarness {
 /// - `pool`: the seeded database
 /// - `p2p`:  a stub handle (see `P2PHandle::for_testing()`)
 #[cfg(feature = "p2p")]
-pub async fn spawn_p2p_with_peers(
-    pool: DbPool,
-    peers: &[(&str, &str, &str)],
-) -> P2PTestHarness {
-    use diesel::prelude::*;
-    use diesel::RunQueryDsl;
+pub async fn spawn_p2p_with_peers(pool: DbPool, peers: &[(&str, &str, &str)]) -> P2PTestHarness {
     use crate::db::diesel_schema::{peer_statuses, rea_commitments};
     use crate::db::models::NewHuman;
+    use diesel::prelude::*;
+    use diesel::RunQueryDsl;
 
     let mut conn = pool.get().expect("test pool connection");
 
@@ -95,8 +92,8 @@ pub async fn spawn_p2p_with_peers(
         // Insert peer status
         let (status, pool_member, reserves) = match *lifecycle {
             "accepting" => ("online", 1i32, 1i32),
-            "leaving"   => ("leaving", 0i32, 0i32),
-            other       => panic!("unexpected lifecycle in spawn_p2p_with_peers: {other}"),
+            "leaving" => ("leaving", 0i32, 0i32),
+            other => panic!("unexpected lifecycle in spawn_p2p_with_peers: {other}"),
         };
         diesel::insert_or_ignore_into(peer_statuses::table)
             .values((

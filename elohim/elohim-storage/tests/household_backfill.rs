@@ -49,10 +49,14 @@ fn backfill_fills_null_household_ids_from_dht_map() {
     let filled = household_backfill::run_once(&pool, mapping).unwrap();
     assert_eq!(filled, 1);
 
-    let adam = db::humans::get_human_by_id(&mut conn, "h-adam").unwrap().unwrap();
+    let adam = db::humans::get_human_by_id(&mut conn, "h-adam")
+        .unwrap()
+        .unwrap();
     assert_eq!(adam.household_id.as_deref(), Some("eden"));
 
-    let eve = db::humans::get_human_by_id(&mut conn, "h-eve").unwrap().unwrap();
+    let eve = db::humans::get_human_by_id(&mut conn, "h-eve")
+        .unwrap()
+        .unwrap();
     assert_eq!(eve.household_id.as_deref(), Some("eden")); // untouched
 }
 

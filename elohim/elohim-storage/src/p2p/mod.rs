@@ -673,7 +673,10 @@ impl P2PHandle {
             }
             let peer = &selected[i % selected.len()];
 
-            match self.push_shard(&peer.peer_id, hash, shard_data.clone()).await {
+            match self
+                .push_shard(&peer.peer_id, hash, shard_data.clone())
+                .await
+            {
                 Ok(()) => {
                     tracing::info!(
                         content_id,
@@ -734,7 +737,8 @@ impl P2PHandle {
         } else {
             // Full placement — clear any stale gaps for this content.
             if let Ok(mut conn) = pool.get() {
-                let _ = crate::db::placement_gaps::clear_for_content(&mut conn, h_app_id, content_id);
+                let _ =
+                    crate::db::placement_gaps::clear_for_content(&mut conn, h_app_id, content_id);
             }
         }
 

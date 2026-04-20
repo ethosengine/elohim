@@ -20,10 +20,7 @@ pub struct GapQuery {
 
 /// Insert a new gap row or bump `last_seen_at` + current-state fields on the
 /// matching `(content_id, shard_hash, h_app_id, gap_kind)` row.
-pub fn upsert_gap(
-    conn: &mut SqliteConnection,
-    gap: &NewPlacementGap,
-) -> Result<(), StorageError> {
+pub fn upsert_gap(conn: &mut SqliteConnection, gap: &NewPlacementGap) -> Result<(), StorageError> {
     // Try plain insert first; on unique-index conflict, update current-state.
     let inserted = diesel::insert_or_ignore_into(placement_gaps::table)
         .values(gap)
@@ -78,10 +75,9 @@ pub fn list_gaps(
 /// Remove rows whose `last_seen_at` is strictly less than the cutoff.
 /// Returns the number of rows deleted.
 pub fn gc_stale(conn: &mut SqliteConnection, cutoff_iso: &str) -> Result<usize, StorageError> {
-    let n = diesel::delete(
-        placement_gaps::table.filter(placement_gaps::last_seen_at.lt(cutoff_iso)),
-    )
-    .execute(conn)?;
+    let n =
+        diesel::delete(placement_gaps::table.filter(placement_gaps::last_seen_at.lt(cutoff_iso)))
+            .execute(conn)?;
     Ok(n)
 }
 
