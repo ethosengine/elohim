@@ -175,12 +175,19 @@ async fn get_epr(
 // ---------------------------------------------------------------------------
 
 async fn get_envelope(
-    _req: Request<Incoming>,
-    _cid: &str,
-    _pool: &DbPool,
+    req: Request<Incoming>,
+    cid: &str,
+    pool: &DbPool,
     _ctx: &AppContext,
 ) -> Result<Response<Full<Bytes>>, StorageError> {
-    Ok(response::not_found("not implemented — Task 13")) // Task 13
+    let mut conn = get_conn(pool)?;
+    let Some(fetched) = epr_service::fetch_by_cid(&mut conn, cid)? else {
+        return Ok(response::not_found(&format!("epr not found: {cid}")));
+    };
+    if !reach_visible_to(&fetched.atom.reach, &req) {
+        return Ok(response::not_found(&format!("epr not found: {cid}")));
+    }
+    Ok(response::ok(&to_envelope_view(&fetched)))
 }
 
 async fn get_payload(
