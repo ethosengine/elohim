@@ -1086,3 +1086,25 @@ If the admin-reachability feature fails, the forwarder is not spawning correctly
 **Placeholder scan:** No `TODO`, `TBD`, `implement later`, `fill in`, or `similar to Task N` placeholders remain. Every code block is concrete. The per-migration template is repeated by reference in Tasks 8-12 with `<human>` substitution rules spelled out explicitly.
 
 **Type consistency:** `NetworkConfig` field names (`conductor_admin_external_bind`, `conductor_admin_internal_port`) are used identically in config.rs (Task 1), evaluator.rs (Task 1), heartbeat.rs (Task 1), peer-policy.example.toml (Task 1), and main.rs (Task 2). The manifest ConfigMap key `peer-policy.toml` and its mount path `/etc/elohim/peer-policy.toml` plus the env var `ELOHIM_STORAGE_PEER_POLICY_PATH` (which already exists in `config.rs:99` and `main.rs:221` — verified during fact-gathering) all agree in Phase B Task 4. `spawn_forwarder(bind, upstream_port)` signature in main.rs Task 2 matches the existing `forwarder.rs:33` signature exactly.
+
+---
+
+## Clean rebuild execution (2026-04-21)
+
+After the Phase D incremental migrations surfaced two latent Jenkinsfile bugs (`eaddeff1` source-file picker, `c202d2b8` agent-side log read), the Adam-admin forwarder fix (`5f5fbb58`), jessica/frank migrations, and the batched pete+timothy+matthew migration, the cluster accumulated stale state from a sequence of partially-completed deploys: matthew's storage :8090 unreachable, timothy's chromebook-tier memory (1536Mi) OOMKilling under sync load, and a Jiva iSCSI write-loss (`pvc-7f1595cd`) during the node write-saturation incident that also disrupted the `ethosengine` build host.
+
+Rather than continue incrementally patching, we performed a full k8s-level reset of `elohim-alpha`:
+
+- **Deleted:** 6 per-human StatefulSets; 16 PVCs (12 current + 4 shared-edgenode orphans from the pre-per-human era); 2 ancient unlabeled PVCs on microk8s-hostpath (79-day orphans); 6 peer-policy ConfigMaps; MongoDB projection-cache PVC and scaled its Deployment to 0.
+- **Preserved:** `elohim-alpha` namespace; per-human Services (ClusterIP + headless); TLS secrets; `cross-namespace-p2p-networkpolicy`; doorway + elohim-site + nats deployments (doorway will reconnect to fresh MongoDB when the pipeline brings it back).
+- **Reclaimed:** ~185 GiB, most of it Jiva-backed (relieves iSCSI load on the host that was under writeback saturation).
+
+Final tweak before re-deploy: `45235287` bumps timothy's `edgenodeMemoryLimit` from 1536Mi → 3Gi (with request 512Mi → 1Gi) per observed 1.5GB RSS + 3 OOMKilled restarts in 19 minutes during sustained content-serving load. Chromebook floor (384Mi/768Mi + 150m/500m) preserved in `$chromebookFloor` as the eventual restoration target.
+
+Pipeline trigger comes via `[build:all]` on this commit. On recreation all 16 PVCs land on `openebs-hostpath` per the Jenkinsfile:460 sed rule (matthew's Jiva PVC `pvc-7f1595cd` stays deleted; jessica's other Jiva PVC likewise). Acceptance gate:
+
+- `75ca9eb6e5dc` Adam admin refused → 0 (third consecutive fresh-trigger confirmation — done-stable)
+- `conductor-admin-reachability.feature` (Task 15, `5f35a7a9`) passing
+- `aac96b4f6151` login 401 cascade — expected to collapse now that matthew's fresh pod serves :8090 cleanly and the seeder can route through him
+
+[build:all]
