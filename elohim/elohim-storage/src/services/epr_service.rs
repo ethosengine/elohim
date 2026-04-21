@@ -189,7 +189,7 @@ pub struct FetchedEpr {
     pub superseded_by: Option<String>,
 }
 
-/// Reconstruct an Epr from storage.
+/// Reconstruct an Epr from storage by joining all four EPR tables.
 /// Returns None if the cid is not in the store.
 pub fn fetch_by_cid(
     conn: &mut SqliteConnection,
