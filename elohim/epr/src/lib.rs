@@ -22,3 +22,4 @@ pub use kind::{CouplingLeg, EprKind};
 pub use proof::{sign, verify, AgentKeypair};
 pub use reach::Reach;
 pub use signature::Signature;
+pub use validation::validate_coupling;
