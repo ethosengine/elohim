@@ -403,13 +403,14 @@ def deployHumanManifest(Map humanConfig, String envFile, List allHumans) {
     def envConfig = getEnvConfig()[humanConfig.env]
     def p2pNodes = computeP2PBootstrapNodes(humanConfig, allHumans)
 
-    // Pick source manifest based on deployment pattern. `consolidated` humans
-    // have a hand-crafted manifest (Adam — the reference impl while
-    // elohim-node 0.0.0.0 binding is unverified). `legacy` humans share a
-    // template rendered with their per-human placeholders from deployments.json.
-    def sourceFile = humanConfig.pattern == 'consolidated' ?
-        humanConfig.manifest :
-        humanConfig.template
+    // Pick source manifest. Adam is the historical consolidated reference
+    // with a hand-crafted manifest (`manifest:` field, no placeholders since
+    // it's already fully rendered). All other humans — legacy pattern AND
+    // newly-migrated consolidated humans — use a shared template with
+    // per-human placeholders (`template:` field), rendered via the sed
+    // pipeline below. Prefer `manifest:` when present (Adam's path), fall
+    // back to `template:` for everyone else regardless of pattern.
+    def sourceFile = humanConfig.manifest ?: humanConfig.template
     if (!sourceFile) {
         error "Human ${humanConfig.name}: neither 'manifest' nor 'template' resolved (pattern=${humanConfig.pattern})"
     }
