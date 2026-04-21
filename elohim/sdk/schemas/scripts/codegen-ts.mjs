@@ -56,8 +56,7 @@ const INTERFACE_FILES = [
   { src: 'views/network-posture-view.ts', dest: 'network-posture-view.ts' },
   { src: 'views/placement-gap-view.ts', dest: 'placement-gap-view.ts' },
   { src: 'views/resilience-snapshot-view.ts', dest: 'resilience-snapshot-view.ts' },
-  { src: 'views/recovery-seed-commitment.ts', dest: 'recovery-seed-commitment.ts' },
-  { src: 'views/recovery-quorum-request.ts', dest: 'recovery-quorum-request.ts' },
+  { src: 'views/recovery-request.ts', dest: 'recovery-request.ts' },
   { src: 'views/key-rotation.ts', dest: 'key-rotation.ts' },
 ];
 

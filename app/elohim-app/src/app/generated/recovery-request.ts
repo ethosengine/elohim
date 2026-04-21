@@ -1,17 +1,21 @@
 /* eslint-disable @typescript-eslint/consistent-indexed-object-style */
-/* Generated from protocol schema: views/recovery-quorum-request.schema.json -- DO NOT EDIT */
+/* Generated from protocol schema: views/recovery-request.schema.json -- DO NOT EDIT */
 
 /**
- * Projection of imagodei RecoveryQuorumRequest DHT entry. Source of truth: DHT (Notarized, Category A).
+ * Projection of imagodei RecoveryRequest DHT entry (modernized). Source of truth: DHT.
  */
-export interface RecoveryQuorumRequestView {
+export interface RecoveryRequestView {
   dhtAnchorHash: string;
   humanAgentPubkey: string;
-  seedCommitmentHash: string;
   newAgentPubkey: string;
   hostingDoorwayPubkey: string;
-  recoveryMode: 'normal' | 'stewarded';
-  stewardedGrantHash?: string | null;
+  proposedAuthorityKind:
+    | 'intimateQuorum'
+    | 'communityConsensus'
+    | 'governanceAct'
+    | 'networkWitness'
+    | 'cryptographicQuorum';
+  proposedAuthorityJson: string;
   /**
    * @minItems 16
    * @maxItems 16

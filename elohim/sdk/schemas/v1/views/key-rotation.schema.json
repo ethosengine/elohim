@@ -1,8 +1,8 @@
 {
-  "$id": "epr:schema:view:key-rotation",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "epr:schema:view:key-rotation",
   "title": "KeyRotationView",
-  "description": "Projection of imagodei KeyRotation DHT entry. Source of truth: DHT (Notarized, Category A). The authoritative claim that a human's agent key has rotated.",
+  "description": "Projection of imagodei KeyRotation DHT entry with RecoveryAuthority enum. Source of truth: DHT. The authoritative claim that a human's agent key has rotated. Authority evidence carried as variant_kind + JSON-encoded variant fields.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -10,9 +10,9 @@
     "humanAgentPubkey",
     "newAgentPubkey",
     "supersededAgentPubkey",
-    "seedCommitmentHash",
     "recoveryRequestHash",
-    "quorumSignature",
+    "authorityKind",
+    "authorityJson",
     "rotatedAt"
   ],
   "properties": {
@@ -20,15 +20,12 @@
     "humanAgentPubkey": { "type": "string" },
     "newAgentPubkey": { "type": "string" },
     "supersededAgentPubkey": { "type": "string" },
-    "seedCommitmentHash": { "type": "string" },
     "recoveryRequestHash": { "type": "string" },
-    "quorumSignature": {
-      "type": "array",
-      "items": { "type": "integer", "minimum": 0, "maximum": 255 },
-      "minItems": 64,
-      "maxItems": 64,
-      "description": "Ed25519 signature under seed_public_half over (new_agent_pubkey || recovery_request_hash)"
+    "authorityKind": {
+      "type": "string",
+      "enum": ["intimateQuorum", "communityConsensus", "governanceAct", "networkWitness", "cryptographicQuorum"]
     },
+    "authorityJson": { "type": "string" },
     "rotatedAt": { "type": "string" }
   }
 }

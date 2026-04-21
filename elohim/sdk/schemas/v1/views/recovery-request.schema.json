@@ -1,28 +1,30 @@
 {
-  "$id": "epr:schema:view:recovery-quorum-request",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "RecoveryQuorumRequestView",
-  "description": "Projection of imagodei RecoveryQuorumRequest DHT entry. Source of truth: DHT (Notarized, Category A).",
+  "$id": "epr:schema:view:recovery-request",
+  "title": "RecoveryRequestView",
+  "description": "Projection of imagodei RecoveryRequest DHT entry (modernized). Source of truth: DHT.",
   "type": "object",
   "additionalProperties": false,
   "required": [
     "dhtAnchorHash",
     "humanAgentPubkey",
-    "seedCommitmentHash",
     "newAgentPubkey",
     "hostingDoorwayPubkey",
-    "recoveryMode",
+    "proposedAuthorityKind",
+    "proposedAuthorityJson",
     "requestNonce",
     "createdAt"
   ],
   "properties": {
     "dhtAnchorHash": { "type": "string" },
     "humanAgentPubkey": { "type": "string" },
-    "seedCommitmentHash": { "type": "string" },
     "newAgentPubkey": { "type": "string" },
     "hostingDoorwayPubkey": { "type": "string" },
-    "recoveryMode": { "type": "string", "enum": ["normal", "stewarded"] },
-    "stewardedGrantHash": { "type": ["string", "null"] },
+    "proposedAuthorityKind": {
+      "type": "string",
+      "enum": ["intimateQuorum", "communityConsensus", "governanceAct", "networkWitness", "cryptographicQuorum"]
+    },
+    "proposedAuthorityJson": { "type": "string" },
     "requestNonce": {
       "type": "array",
       "items": { "type": "integer", "minimum": 0, "maximum": 255 },

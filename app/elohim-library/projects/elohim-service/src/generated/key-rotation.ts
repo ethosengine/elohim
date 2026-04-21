@@ -2,86 +2,20 @@
 /* Generated from protocol schema: views/key-rotation.schema.json -- DO NOT EDIT */
 
 /**
- * Projection of imagodei KeyRotation DHT entry. Source of truth: DHT (Notarized, Category A). The authoritative claim that a human's agent key has rotated.
+ * Projection of imagodei KeyRotation DHT entry with RecoveryAuthority enum. Source of truth: DHT. The authoritative claim that a human's agent key has rotated. Authority evidence carried as variant_kind + JSON-encoded variant fields.
  */
 export interface KeyRotationView {
   dhtAnchorHash: string;
   humanAgentPubkey: string;
   newAgentPubkey: string;
   supersededAgentPubkey: string;
-  seedCommitmentHash: string;
   recoveryRequestHash: string;
-  /**
-   * Ed25519 signature under seed_public_half over (new_agent_pubkey || recovery_request_hash)
-   *
-   * @minItems 64
-   * @maxItems 64
-   */
-  quorumSignature: [
-    number,
-    number,
-    number,
-    number,
-    number,
-    number,
-    number,
-    number,
-    number,
-    number,
-    number,
-    number,
-    number,
-    number,
-    number,
-    number,
-    number,
-    number,
-    number,
-    number,
-    number,
-    number,
-    number,
-    number,
-    number,
-    number,
-    number,
-    number,
-    number,
-    number,
-    number,
-    number,
-    number,
-    number,
-    number,
-    number,
-    number,
-    number,
-    number,
-    number,
-    number,
-    number,
-    number,
-    number,
-    number,
-    number,
-    number,
-    number,
-    number,
-    number,
-    number,
-    number,
-    number,
-    number,
-    number,
-    number,
-    number,
-    number,
-    number,
-    number,
-    number,
-    number,
-    number,
-    number,
-  ];
+  authorityKind:
+    | 'intimateQuorum'
+    | 'communityConsensus'
+    | 'governanceAct'
+    | 'networkWitness'
+    | 'cryptographicQuorum';
+  authorityJson: string;
   rotatedAt: string;
 }
