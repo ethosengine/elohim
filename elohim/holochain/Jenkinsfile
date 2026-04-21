@@ -523,7 +523,16 @@ def deployHumanManifest(Map humanConfig, String envFile, List allHumans) {
     )
     sh "cat ${applyLog}"
     if (applyCode != 0) {
-        def applyOutput = readFile(applyLog)
+        // Read the log via `sh returnStdout` (agent side) rather than
+        // readFile (master side) — the log lives in /tmp on the agent and
+        // Jenkins master's readFile can't see it, which trips
+        // NoSuchFileException. This path is only exercised when kubectl
+        // apply fails (usually Forbidden-field drift on StatefulSet spec
+        // changes — the case we're trying to handle).
+        def applyOutput = sh(
+            script: "cat ${applyLog}",
+            returnStdout: true,
+        ).trim()
         if (applyOutput.contains('Forbidden: updates to statefulset spec')) {
             echo "Forbidden-field drift detected — orphan-deleting StatefulSet ${humanConfig.resourcePrefix} (pods + PVCs retained) and reapplying"
             sh "kubectl delete statefulset/${humanConfig.resourcePrefix} -n ${humanConfig.namespace} --cascade=orphan --ignore-not-found=true"
