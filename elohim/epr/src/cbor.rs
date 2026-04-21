@@ -22,7 +22,11 @@ pub fn decode_strict(bytes: &[u8]) -> Result<Ipld> {
     let decoded = decode(bytes)?;
     let re_encoded = encode(&decoded)?;
     if re_encoded != bytes {
-        return Err(EprError::Decode("input is not canonical dag-cbor".into()));
+        return Err(EprError::Decode(format!(
+            "input is not canonical dag-cbor (got {} bytes, re-encoded to {} bytes)",
+            bytes.len(),
+            re_encoded.len()
+        )));
     }
     Ok(decoded)
 }

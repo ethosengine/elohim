@@ -8,8 +8,8 @@ pub enum EprError {
     Encode(String),
     #[error("cbor decode error: {0}")]
     Decode(String),
-    #[error("invalid cid: {0}")]
-    InvalidCid(String),
+    #[error("invalid cid: expected {expected}, got {actual}")]
+    InvalidCid { expected: String, actual: String },
     #[error("signature error: {0}")]
     Signature(String),
     #[error("coupling requirement not met: {0}")]
