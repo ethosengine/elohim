@@ -75,3 +75,43 @@ five stages run in parallel; all must be green for the holochain pipeline to
 gate green. That wiring is deferred to the Wave 1 close-out with
 `feedback_shift_measure_jenkins.md` as the bar — tests must be green on
 Jenkins, not merely locally.
+
+## Che compile blocker (2026-04-21)
+
+The `holochain` crate's default features include `datachannel-vendored`,
+which pulls in `datachannel-sys` and builds libdatachannel from source via
+a `cmake` build script. Che's base image (`base-developer-image:ubi10-latest`)
+does not ship `cmake`. Without it, `cargo check -p elohim_sweettest` fails:
+
+```
+thread 'main' panicked at cmake-0.1.58/src/lib.rs:1132:5:
+failed to execute command: No such file or directory (os error 2)
+is `cmake` not installed?
+```
+
+Alternatives evaluated:
+
+- `backend-go-pion`: requires `go` compiler — not installed either.
+- `default-features = false` without any webrtc backend: compile fails
+  inside `tx5-connection-0.8.1/src/config.rs` because `BackendModule`'s
+  `Default` impl is feature-gated and collapses to `fn default() -> Self {}`
+  when no backend is selected.
+- Using the installed `/opt/holochain/bin/holochain` binary directly:
+  sweettest is in-process; it needs the holochain crate linked into the
+  test binary, not an external binary.
+
+Orchestration options (out of scope for this session):
+
+1. Add `cmake` + `make` to `Dockerfile` (one-line `dnf install -y cmake
+   make` add-on). This is the lightest path; only affects the image,
+   rebuilds on next workspace spin-up.
+2. Run sweettest exclusively in Jenkins (where cmake is presumably
+   available via the holochain build agent). Reverts to the "measures
+   live in Jenkins" default for this particular gate.
+3. Switch to `backend-go-pion` and add `go` to the image. Wider surface
+   area change.
+
+Until this is resolved, the sweettest tests stay `#[ignore]`'d and only
+compile in environments with cmake installed. The `manifest-hygiene/`
+sibling crate does not depend on holochain and runs fine locally in Che —
+husky pre-push uses that for the fast gate.

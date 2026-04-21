@@ -36,7 +36,13 @@ path = "src/tests/infrastructure.rs"
 [dependencies]
 # Holochain runtime — sweettest embeds a real conductor in-process.
 # Versions are pinned to match the DNAs (HDK 0.6.0 / HDI 0.7.0).
-holochain = { version = "=0.6.0", default-features = false, features = ["sweettest", "test_utils"] }
+#
+# `default-features = true` pulls in `datachannel-vendored` which provides a
+# webrtc backend (tx5-connection requires one; turning defaults off produces
+# a transitive compile error in tx5-connection's BackendModule::default).
+# The vendored libdatachannel build adds ~1-2 min to first compile; cached
+# thereafter.
+holochain = { version = "=0.6.0", features = ["sweettest", "test_utils"] }
 holochain_types = "=0.6.0"
 hdk = "=0.6.0"
 hdi = "=0.7.0"
