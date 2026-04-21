@@ -13,7 +13,7 @@
 
 use bytes::Bytes;
 use http_body_util::Full;
-use hyper::{body::Incoming, Method, Request, Response};
+use hyper::{body::Incoming, Method, Request, Response, StatusCode};
 
 use crate::db::{AppContext, DbPool};
 use crate::error::StorageError;
@@ -191,12 +191,27 @@ async fn get_envelope(
 }
 
 async fn get_payload(
-    _req: Request<Incoming>,
-    _cid: &str,
-    _pool: &DbPool,
+    req: Request<Incoming>,
+    cid: &str,
+    pool: &DbPool,
     _ctx: &AppContext,
 ) -> Result<Response<Full<Bytes>>, StorageError> {
-    Ok(response::not_found("not implemented — Task 14")) // Task 14
+    let mut conn = get_conn(pool)?;
+    let Some(fetched) = epr_service::fetch_by_cid(&mut conn, cid)? else {
+        return Ok(response::not_found(&format!("epr not found: {cid}")));
+    };
+    if !reach_visible_to(&fetched.atom.reach, &req) {
+        return Ok(response::not_found(&format!("epr not found: {cid}")));
+    }
+
+    // Raw bytes; Content-Type = application/octet-stream.
+    // Phase 3 will look up the real MIME via the manifest schema resolver.
+    Ok(Response::builder()
+        .status(StatusCode::OK)
+        .header(hyper::header::CONTENT_TYPE, "application/octet-stream")
+        .header("X-Epr-Cid", &fetched.atom.cid)
+        .body(Full::new(Bytes::from(fetched.atom.payload_bytes.clone())))
+        .unwrap())
 }
 
 async fn get_verify(
