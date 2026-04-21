@@ -223,7 +223,8 @@ pub fn fetch_by_cid(
 // ---------------------------------------------------------------------------
 
 /// Paged list of atoms, filtered by kind / reach / schemaRef / cursor.
-/// Returns (items, next_cursor) where next_cursor is None when exhausted.
+/// Returns (items, next_cursor) where next_cursor is None when the page is exhausted.
+/// Fetches limit+1 rows to detect the next page without a count query.
 pub fn list(
     conn: &mut SqliteConnection,
     q: &EprListQuery,
