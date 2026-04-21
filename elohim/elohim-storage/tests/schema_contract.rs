@@ -974,6 +974,39 @@ fn resilience_snapshot_view_minimal_matches_schema() {
     validate_against_schema("views/resilience-snapshot-view.schema.json", &json);
 }
 
+// ============================================================================
+// Phase 2a — EPR view schema parsing (Rust struct validation added in Task 11)
+// ============================================================================
+
+#[test]
+fn epr_view_schema_parses() {
+    let _ = load_schema("views/epr-view.schema.json");
+}
+
+#[test]
+fn epr_envelope_view_schema_parses() {
+    let _ = load_schema("views/epr-envelope-view.schema.json");
+}
+
+#[test]
+fn epr_verify_view_schema_parses() {
+    let _ = load_schema("views/epr-verify-view.schema.json");
+}
+
+#[test]
+fn epr_list_view_schema_parses() {
+    let _ = load_schema("views/epr-list-view.schema.json");
+}
+
+#[test]
+fn epr_publish_input_schema_parses() {
+    let path = schema_dir()
+        .join("inputs")
+        .join("epr-publish-input.schema.json");
+    let raw = std::fs::read_to_string(&path).unwrap();
+    let _: serde_json::Value = serde_json::from_str(&raw).unwrap();
+}
+
 // ── Convention enforcement ──────────────────────────────────────
 
 #[test]
@@ -990,6 +1023,10 @@ fn view_schemas_declare_source_of_truth() {
         "views/peer-status-view.schema.json",
         "views/elohim-capability-profile.schema.json",
         "views/elohim-reputation-profile-view.schema.json",
+        "views/epr-view.schema.json",
+        "views/epr-envelope-view.schema.json",
+        "views/epr-verify-view.schema.json",
+        "views/epr-list-view.schema.json",
     ];
 
     for schema_name in &view_schemas {
