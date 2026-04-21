@@ -15,11 +15,19 @@ max_storage_pct = 80
 # its safe localhost default. Doorway is the external auth boundary.
 expose_conductor_externally = false
 
+# External ports (8444/8445) differ from internal ports (4444/4445)
+# intentionally. The Holochain conductor binds 127.0.0.1:4444 and :4445
+# inside the pod's network namespace. A forwarder bind on 0.0.0.0:4444
+# would fail with EADDRINUSE because 0.0.0.0 overlaps with 127.0.0.1 on
+# the same netns. So the forwarder listens on 8444/8445 externally and
+# bridges to 4444/4445 on localhost — matching the socat convention
+# already used by legacy-pattern humans.
+
 # App WebSocket (zome calls). Corresponds to HOLOCHAIN_APP_URL in elohim-node.
-conductor_external_bind = "0.0.0.0:4445"
+conductor_external_bind = "0.0.0.0:8445"
 conductor_internal_port = 4445
 
 # Admin WebSocket (register agents, install hApps, list cells).
 # Corresponds to HOLOCHAIN_ADMIN_URL in elohim-node.
-conductor_admin_external_bind = "0.0.0.0:4444"
+conductor_admin_external_bind = "0.0.0.0:8444"
 conductor_admin_internal_port = 4444

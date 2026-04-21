@@ -32,10 +32,16 @@ data:
     # conductor exclusively through these forwarded ports; Holochain
     # itself stays on 127.0.0.1 (its safe default). elohim-storage is
     # the auth boundary for external traffic.
+    # External ports 8444/8445 differ from internal ports 4444/4445
+    # intentionally. The conductor binds 127.0.0.1:4444 and :4445 inside
+    # the pod netns; a forwarder bind on 0.0.0.0:4444 would hit EADDRINUSE
+    # because 0.0.0.0 overlaps with localhost. So the forwarder listens on
+    # 8444/8445 externally and bridges to 4444/4445 on localhost — matching
+    # the socat convention that legacy-pattern humans use.
     expose_conductor_externally = true
-    conductor_external_bind = "0.0.0.0:4445"
+    conductor_external_bind = "0.0.0.0:8445"
     conductor_internal_port = 4445
-    conductor_admin_external_bind = "0.0.0.0:4444"
+    conductor_admin_external_bind = "0.0.0.0:8444"
     conductor_admin_internal_port = 4444
 ---
 # ConfigMap for conductor configuration
@@ -125,7 +131,7 @@ spec:
         # mounted but no forwarder code to honor it. Bump this timestamp
         # to force another rollout whenever the running image lags the
         # latest dev-latest.
-        kubectl.kubernetes.io/restartedAt: "2026-04-21T05:15:00Z"
+        kubectl.kubernetes.io/restartedAt: "2026-04-21T07:30:00Z"
       labels:
         app: elohim-edgenode
         elohim-human: adam-firstman
@@ -246,13 +252,17 @@ spec:
             - name: REGION
               value: "us-central"
           ports:
-            # Conductor admin WebSocket (direct, no socat bridge)
-            - name: admin-ws
-              containerPort: 4444
+            # Conductor admin WebSocket — exposed via elohim-storage forwarder
+            # on 8444 (bridges to conductor's 127.0.0.1:4444). Port 4444 on
+            # the pod network is unreachable because 0.0.0.0:4444 would
+            # collide with the conductor's localhost bind in the same netns.
+            - name: admin-ws-fwd
+              containerPort: 8444
               protocol: TCP
-            # Conductor app WebSocket (direct)
-            - name: app-ws
-              containerPort: 4445
+            # Conductor app WebSocket — exposed via forwarder on 8445
+            # (bridges to conductor's 127.0.0.1:4445). Same rationale as admin.
+            - name: app-ws-fwd
+              containerPort: 8445
               protocol: TCP
             # elohim-storage HTTP API
             - name: storage-http
@@ -355,13 +365,15 @@ spec:
     elohim-human: adam-firstman
     environment: ENV_PLACEHOLDER
   ports:
+    # Conductor admin WebSocket (via forwarder bridge 8444→127.0.0.1:4444)
     - name: admin-ws
       port: 4444
-      targetPort: 4444
+      targetPort: 8444
       protocol: TCP
+    # Conductor app WebSocket (via forwarder bridge 8445→127.0.0.1:4445)
     - name: app-ws
       port: 4445
-      targetPort: 4445
+      targetPort: 8445
       protocol: TCP
     - name: p2p
       port: 9876
@@ -386,15 +398,17 @@ metadata:
 spec:
   type: ClusterIP
   ports:
-    # Conductor admin WebSocket (direct — no socat bridge in consolidated mode)
+    # Conductor admin WebSocket (via elohim-storage forwarder bridge
+    # 0.0.0.0:8444 → 127.0.0.1:4444 — same external port convention as
+    # legacy socat humans, so doorway can hit :4444 uniformly)
     - name: admin-ws
       port: 4444
-      targetPort: 4444
+      targetPort: 8444
       protocol: TCP
-    # Conductor app WebSocket (direct)
+    # Conductor app WebSocket (via forwarder bridge 8445 → 4445)
     - name: app-ws
       port: 4445
-      targetPort: 4445
+      targetPort: 8445
       protocol: TCP
     # elohim-storage HTTP API
     - name: storage-db

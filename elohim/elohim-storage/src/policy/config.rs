@@ -94,9 +94,9 @@ mod tests {
         assert!(cfg.pool.require_conductor_healthy);
         assert_eq!(cfg.stewardship.max_storage_pct, 80);
         assert!(!cfg.network.expose_conductor_externally);
-        assert_eq!(cfg.network.conductor_external_bind, "0.0.0.0:4445");
+        assert_eq!(cfg.network.conductor_external_bind, "0.0.0.0:8445");
         assert_eq!(cfg.network.conductor_internal_port, 4445);
-        assert_eq!(cfg.network.conductor_admin_external_bind, "0.0.0.0:4444");
+        assert_eq!(cfg.network.conductor_admin_external_bind, "0.0.0.0:8444");
         assert_eq!(cfg.network.conductor_admin_internal_port, 4444);
     }
 
@@ -114,16 +114,16 @@ max_storage_pct = 80
 
 [network]
 expose_conductor_externally = true
-conductor_external_bind = "0.0.0.0:4445"
+conductor_external_bind = "0.0.0.0:8445"
 conductor_internal_port = 4445
-conductor_admin_external_bind = "0.0.0.0:4444"
+conductor_admin_external_bind = "0.0.0.0:8444"
 conductor_admin_internal_port = 4444
 "#;
         let cfg: PolicyConfig = toml::from_str(toml_str).unwrap();
         assert!(cfg.network.expose_conductor_externally);
-        assert_eq!(cfg.network.conductor_external_bind, "0.0.0.0:4445");
+        assert_eq!(cfg.network.conductor_external_bind, "0.0.0.0:8445");
         assert_eq!(cfg.network.conductor_internal_port, 4445);
-        assert_eq!(cfg.network.conductor_admin_external_bind, "0.0.0.0:4444");
+        assert_eq!(cfg.network.conductor_admin_external_bind, "0.0.0.0:8444");
         assert_eq!(cfg.network.conductor_admin_internal_port, 4444);
     }
 
@@ -142,9 +142,9 @@ max_storage_pct = 80
 
 [network]
 expose_conductor_externally = false
-conductor_external_bind = "0.0.0.0:4445"
+conductor_external_bind = "0.0.0.0:8445"
 conductor_internal_port = 4445
-conductor_admin_external_bind = "0.0.0.0:4444"
+conductor_admin_external_bind = "0.0.0.0:8444"
 conductor_admin_internal_port = 4444
 "#,
         )

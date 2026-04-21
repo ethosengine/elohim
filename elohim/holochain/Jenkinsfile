@@ -343,19 +343,18 @@ def computeP2PBootstrapNodes(Map currentHuman, List allHumans) {
 /**
  * Compute conductor WebSocket URLs for a doorway in a given environment.
  *
- * Headless services do not remap ports for pod-direct (-0.) DNS, so the URL
- * must name the container port that's actually listening in the pod. Doorway
- * derives the admin URL as app-port minus 1, so we emit the App WS port:
- *
- *   pattern=consolidated (elohim-node): conductor binds 0.0.0.0:4444/4445   → :4445
- *   pattern=legacy (edgenode + socat):  socat bridges 0.0.0.0:8444/8445     → :8445
- *                                        to conductor's 127.0.0.1:4444/4445
+ * Both deployment patterns expose the conductor's app WS on containerPort
+ * 8445 (mapped from Holochain's 127.0.0.1:4445):
+ *   - legacy (edgenode + socat):      socat bridges 0.0.0.0:8445 → 127.0.0.1:4445
+ *   - consolidated (elohim-node):     Rust forwarder bridges 0.0.0.0:8445 → 127.0.0.1:4445
+ * Headless-service pod-direct DNS bypasses Service port mapping, so we must
+ * name the container port directly. Doorway derives the admin URL as
+ * app-port minus 1 → :8444, which both patterns also expose.
  */
 def computeConductorUrls(String targetEnv, List allHumans) {
     def envHumans = allHumans.findAll { it.env == targetEnv }
     return envHumans.collect { h ->
-        def appPort = (h.pattern == 'consolidated') ? 4445 : 8445
-        "ws://${h.resourcePrefix}-0.${h.resourcePrefix}-headless.elohim-${targetEnv}.svc.cluster.local:${appPort}"
+        "ws://${h.resourcePrefix}-0.${h.resourcePrefix}-headless.elohim-${targetEnv}.svc.cluster.local:8445"
     }.join(',')
 }
 
