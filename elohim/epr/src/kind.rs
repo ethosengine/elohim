@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, TS)]
-#[ts(export, export_to = "../sdk/epr-ts/src/generated/")]
+#[ts(export, export_to = "../../sdk/epr-ts/src/generated/")]
 pub enum EprKind {
     Content,
     Agent,
@@ -22,7 +22,7 @@ pub enum EprKind {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, TS)]
 #[serde(rename_all = "lowercase")]
-#[ts(export, export_to = "../sdk/epr-ts/src/generated/")]
+#[ts(export, export_to = "../../sdk/epr-ts/src/generated/")]
 pub enum CouplingLeg {
     Knowledge,
     Value,

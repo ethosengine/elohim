@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, TS)]
-#[ts(export, export_to = "../sdk/epr-ts/src/generated/")]
+#[ts(export, export_to = "../../sdk/epr-ts/src/generated/")]
 pub struct Coupling {
     #[serde(skip_serializing_if = "Option::is_none", default)]
     #[ts(type = "string | null", optional)]

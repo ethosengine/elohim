@@ -14,7 +14,7 @@ use ts_rs::TS;
 // first reversing the variant declaration order.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, TS)]
 #[serde(rename_all = "lowercase")]
-#[ts(export, export_to = "../sdk/epr-ts/src/generated/")]
+#[ts(export, export_to = "../../sdk/epr-ts/src/generated/")]
 pub enum Reach {
     /// Open to all — commons-level content.
     Commons,

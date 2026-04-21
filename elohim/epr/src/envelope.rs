@@ -12,7 +12,7 @@ use ts_rs::TS;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../sdk/epr-ts/src/generated/")]
+#[ts(export, export_to = "../../sdk/epr-ts/src/generated/")]
 pub struct Envelope {
     /// Self-derived content identifier. NOT included in canonical signing bytes.
     #[ts(type = "string")]

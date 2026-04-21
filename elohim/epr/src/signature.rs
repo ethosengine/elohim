@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
-#[ts(export, export_to = "../sdk/epr-ts/src/generated/")]
+#[ts(export, export_to = "../../sdk/epr-ts/src/generated/")]
 pub struct Signature {
     /// CID of the issuer's Agent EPR.
     #[ts(type = "string")]
