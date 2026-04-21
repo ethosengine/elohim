@@ -18,6 +18,7 @@
 #   schema-codegen           → verify codegen is fresh (schema changes)
 #   rakia-codegen            → verify rakia generated_types.rs is fresh (rakia schema or rakia-core changes)
 #   rakia-validate           → validate build-manifest.json files against rakia schema (any manifest or rakia schema change)
+#   manifest-hygiene         → DNA manifest hygiene schema contract (any dna.yaml / happ.yaml / manifest-hygiene test change)
 #   genesis/a2o/             → E2E lint + typecheck
 #   genesis/orchestrator/    → Jenkinsfile linting (any *Jenkinsfile* change)
 #
@@ -199,6 +200,9 @@ if [ "$USE_MANIFEST" = false ]; then
   if echo "$CHANGED" | grep -q "^elohim/holochain/\|^elohim/sdk/schemas/"; then
     PROJECTS="$PROJECTS schema-dna"
   fi
+  if echo "$CHANGED" | grep -qE "^elohim/holochain/dna/[^/]+/dna\.yaml|^elohim/holochain/dna/elohim/workdir/happ\.yaml|^elohim/holochain/tests/manifest-hygiene/"; then
+    PROJECTS="$PROJECTS manifest-hygiene"
+  fi
   if echo "$CHANGED" | grep -q "^genesis/data/\|^elohim/sdk/schemas/.*enum\|generated/schema-enums"; then
     PROJECTS="$PROJECTS constants-sync"
   fi
@@ -246,7 +250,7 @@ run_gate() {
   cd "$PROJECT_DIR" || return 1
 
   # Schema checks run pnpm scripts directly — no justfile needed
-  if [ "$PROJECT_NAME" = "schema-validate" ] || [ "$PROJECT_NAME" = "schema-dna" ] || [ "$PROJECT_NAME" = "schema-codegen" ] || [ "$PROJECT_NAME" = "constants-sync" ] || [ "$PROJECT_NAME" = "domain-types" ] || [ "$PROJECT_NAME" = "rakia-codegen" ] || [ "$PROJECT_NAME" = "rakia-validate" ]; then
+  if [ "$PROJECT_NAME" = "schema-validate" ] || [ "$PROJECT_NAME" = "schema-dna" ] || [ "$PROJECT_NAME" = "schema-codegen" ] || [ "$PROJECT_NAME" = "constants-sync" ] || [ "$PROJECT_NAME" = "domain-types" ] || [ "$PROJECT_NAME" = "rakia-codegen" ] || [ "$PROJECT_NAME" = "rakia-validate" ] || [ "$PROJECT_NAME" = "manifest-hygiene" ]; then
     case "$PROJECT_NAME" in
       schema-validate)
         echo "[$PROJECT_NAME] Validating seed data against protocol schemas..."
@@ -296,6 +300,11 @@ run_gate() {
             rc=1
           fi
         done
+        ;;
+      manifest-hygiene)
+        echo "[$PROJECT_NAME] Running DNA manifest hygiene schema contract tests..."
+        RUSTFLAGS="" cargo test --manifest-path elohim/holochain/tests/manifest-hygiene/Cargo.toml 2>&1
+        rc=$?
         ;;
     esac
   elif command -v just >/dev/null 2>&1 && [ -f justfile ]; then
@@ -415,6 +424,13 @@ run_gate() {
         pnpm run lint 2>&1 && pnpm run format:check 2>&1 && pnpm run typecheck 2>&1
         rc=$?
         ;;
+      manifest-hygiene)
+        # Fast schema contract test over the 5 DNA manifests + happ.yaml.
+        # Pure YAML parsing, no holochain dep, runs in milliseconds.
+        echo "[$PROJECT_NAME] Running DNA manifest hygiene schema contract tests..."
+        RUSTFLAGS="" cargo test --manifest-path elohim/holochain/tests/manifest-hygiene/Cargo.toml 2>&1
+        rc=$?
+        ;;
       *)
         echo "  Unknown project: $PROJECT_NAME"
         rc=1
@@ -505,6 +521,7 @@ for PROJECT in $PROJECTS; do
       domain-types)     PROJECT_DIR="." ;;
       rakia-codegen)    PROJECT_DIR="." ;;
       rakia-validate)   PROJECT_DIR="." ;;
+      manifest-hygiene) PROJECT_DIR="." ;;
       *)                PROJECT_DIR="$PROJECT" ;;
     esac
   fi

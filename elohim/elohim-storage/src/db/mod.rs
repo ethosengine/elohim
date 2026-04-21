@@ -101,6 +101,9 @@ pub mod placement_gaps;
 // EPR storage layer — Phase 2a (notarized atoms, coupling, claims, supersedence)
 pub mod epr_atoms;
 
+// Recovery Protocol Phase 2 — DHT projection CRUD (imagodei RecoveryRequest + KeyRotation)
+pub mod recovery_requests;
+
 use std::path::Path;
 use std::time::Duration;
 

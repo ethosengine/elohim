@@ -545,6 +545,16 @@ pub struct RecoveryRequest {
     pub proposed_authority: RecoveryAuthorityKind,
     /// Random 16-byte nonce disambiguating concurrent or retried attempts.
     pub request_nonce: Vec<u8>,
+    /// Coordinator-populated resolution of human_agent_pubkey to the legacy
+    /// String human_id used by HumanityWitness, HumanRelationship, IdentityFreeze.
+    /// Coordinator derives this via Agent entry lookup on holochain_agent_key
+    /// at request-commit time. Required for IntimateQuorum rotations and for
+    /// the freeze-floor check in validate_key_rotation.
+    pub human_id: Option<String>,
+    /// Threshold for the IntimateQuorum authority path. Coordinator computes
+    /// ceil(emergency_contact_count / 2) + 1 at request time, floored at 2.
+    /// Validator enforces: distinct-witness-author count ≥ this value.
+    pub required_witness_count: u32,
     pub created_at: Timestamp,
 }
 
@@ -857,6 +867,12 @@ pub struct IdentityFreeze {
     // === TIMESTAMPS ===
     pub frozen_at: String,
     pub expires_at: Option<String>,    // Auto-lift for low severity
+
+    /// Which RecoveryAuthority layer triggered this freeze. See
+    /// recovery_v2::RECOVERY_AUTHORITY_LAYERS. None on pre-M2 entries — the
+    /// freeze-floor check in validate_key_rotation treats None as "intimate"
+    /// (the most restrictive default).
+    pub frozen_at_layer: Option<String>,
 }
 
 // =============================================================================
@@ -1458,6 +1474,13 @@ fn validate_recovery_request(request: &RecoveryRequest) -> ExternResult<Validate
             "RecoveryRequest new_agent_pubkey must differ from human_agent_pubkey".to_string(),
         ));
     }
+    // M2: required_witness_count has an absolute floor of 2 (defense-in-depth).
+    // Per the spec §5.2, intimate quorum requires at least 2 distinct witnesses.
+    if request.required_witness_count < 2 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "RecoveryRequest required_witness_count must be >= 2".to_string(),
+        ));
+    }
     // Rule 3: if proposed_authority is a stubbed variant, that's still OK at request time —
     // the request is claimant's intent; the actual authorization may escalate. The validator
     // only rejects stubbed variants at KeyRotation time (Task 5).
@@ -1865,6 +1888,17 @@ fn validate_identity_freeze(freeze: &IdentityFreeze) -> ExternResult<ValidateCal
         return Ok(ValidateCallbackResult::Invalid(
             "IdentityFreeze must freeze at least one capability".to_string(),
         ));
+    }
+
+    // M2: validate frozen_at_layer if present
+    if let Some(layer) = &freeze.frozen_at_layer {
+        if !crate::recovery_v2::RECOVERY_AUTHORITY_LAYERS.contains(&layer.as_str()) {
+            return Ok(ValidateCallbackResult::Invalid(format!(
+                "IdentityFreeze frozen_at_layer '{}' must be one of {:?}",
+                layer,
+                crate::recovery_v2::RECOVERY_AUTHORITY_LAYERS
+            )));
+        }
     }
 
     // Validate all frozen capabilities

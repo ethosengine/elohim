@@ -1144,6 +1144,8 @@ diesel::table! {
         proposed_authority_kind -> Text,
         proposed_authority_json -> Text,
         request_nonce -> Binary,
+        human_id -> Nullable<Text>,
+        required_witness_count -> Integer,
         created_at -> Text,
     }
 }

@@ -116,6 +116,28 @@ fn recovery_request_view_matches_schema() {
         proposed_authority_kind: "intimateQuorum".to_string(),
         proposed_authority_json: "{}".to_string(),
         request_nonce: vec![0u8; 16],
+        human_id: Some("human-123".to_string()),
+        required_witness_count: 2,
+        created_at: "2026-04-22T00:00:00Z".to_string(),
+    };
+    let json = serde_json::to_value(&view).expect("serializes");
+    validate_against_schema("views/recovery-request.schema.json", &json);
+}
+
+#[test]
+fn recovery_request_view_matches_schema_null_human_id() {
+    // human_id is explicitly optional at request-commit time (back-compat).
+    // requiredWitnessCount is required in the schema (must be present even when human_id is None).
+    let view = RecoveryRequestView {
+        dht_anchor_hash: "req002".to_string(),
+        human_agent_pubkey: "uhCAk_human2".to_string(),
+        new_agent_pubkey: "uhCAk_new2".to_string(),
+        hosting_doorway_pubkey: "uhCAk_doorway2".to_string(),
+        proposed_authority_kind: "cryptographicQuorum".to_string(),
+        proposed_authority_json: "{\"stewardshipHash\":\"abc\"}".to_string(),
+        request_nonce: vec![0u8; 16],
+        human_id: None,
+        required_witness_count: 2,
         created_at: "2026-04-22T00:00:00Z".to_string(),
     };
     let json = serde_json::to_value(&view).expect("serializes");

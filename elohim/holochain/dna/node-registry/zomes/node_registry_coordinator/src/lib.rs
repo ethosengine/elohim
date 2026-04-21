@@ -12,6 +12,13 @@ pub use node_registry_integrity::{
 pub mod shape;
 pub use shape::{NodeShapeInput, register_node_shape};
 
+// Bootstrap-steward pattern (node-registry copy; reference lives in imagodei).
+pub mod bootstrap_steward;
+pub use bootstrap_steward::{
+    am_i_bootstrap_steward, bootstrap_steward, maybe_bootstrap_steward, BootstrapStewardError,
+    DnaProperties,
+};
+
 /// Retired: frontend should call `/api/v1/households/{id}/devices` via
 /// elohim-storage, which projects `NodeRegistration` DHT entries filtered by
 /// household. This stub returns an empty Vec so legacy callers (frontend

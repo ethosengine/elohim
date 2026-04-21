@@ -17,13 +17,13 @@ use super::diesel_schema::{
     comments, content, content_attestations, content_mastery, content_tags, contributor_dashboards,
     contributor_presences, custodian_metrics, device_policies, discussions, economic_events,
     enum_registry, governance_dispositions, governance_signals, governance_states, hazards,
-    human_relationships, humans, imagodei_observations, knowledge_maps, local_sessions,
-    node_stewardship, observation_entries, observation_sessions, placement_gaps, places,
-    precedents, premium_gates, proposal_options, proposals, ranked_votes, rea_commitments,
-    relationships, responsibility_demand_configs, risk_alerts, schedules, shard_locations,
-    shard_manifests, spatial_contexts, statement_votes, statements, steward_credentials,
-    stewarded_nodes, stewardship_allocations, token_balances, token_decay_events,
-    token_mint_events, token_transfers, votes,
+    human_relationships, humans, imagodei_observations, key_rotations, knowledge_maps,
+    local_sessions, node_stewardship, observation_entries, observation_sessions, placement_gaps,
+    places, precedents, premium_gates, proposal_options, proposals, ranked_votes, rea_commitments,
+    recovery_requests, relationships, responsibility_demand_configs, risk_alerts, schedules,
+    shard_locations, shard_manifests, spatial_contexts, statement_votes, statements,
+    steward_credentials, stewarded_nodes, stewardship_allocations, token_balances,
+    token_decay_events, token_mint_events, token_transfers, votes,
 };
 
 // ============================================================================
@@ -2858,4 +2858,75 @@ pub struct NewPlacementGap<'a> {
     pub gap_kind: &'a str,
     pub first_seen_at: &'a str,
     pub last_seen_at: &'a str,
+}
+
+// ============================================================================
+// Recovery Protocol Phase 2 Models (imagodei DNA projections)
+// Source of truth: DHT. These rows are populated from RecoveryV2Signal events.
+// ============================================================================
+
+/// Recovery request row from SELECT query.
+/// Source of truth: DHT (imagodei RecoveryRequest entry). This is a read-optimized projection.
+#[derive(Debug, Clone, Queryable, Selectable, Serialize, Deserialize)]
+#[diesel(table_name = recovery_requests)]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+pub struct RecoveryRequestRow {
+    pub dht_anchor_hash: String,
+    pub human_agent_pubkey: String,
+    pub new_agent_pubkey: String,
+    pub hosting_doorway_pubkey: String,
+    pub proposed_authority_kind: String,
+    pub proposed_authority_json: String,
+    pub request_nonce: Vec<u8>,
+    /// Coordinator-populated String human_id (M2). NULL for pre-M2 rows.
+    pub human_id: Option<String>,
+    /// IntimateQuorum witness threshold (M2). Default 2 for pre-M2 rows.
+    pub required_witness_count: i32,
+    pub created_at: String,
+}
+
+/// New recovery request for INSERT (upsert on dht_anchor_hash).
+#[derive(Debug, Clone, Insertable)]
+#[diesel(table_name = recovery_requests)]
+pub struct NewRecoveryRequestRow {
+    pub dht_anchor_hash: String,
+    pub human_agent_pubkey: String,
+    pub new_agent_pubkey: String,
+    pub hosting_doorway_pubkey: String,
+    pub proposed_authority_kind: String,
+    pub proposed_authority_json: String,
+    pub request_nonce: Vec<u8>,
+    pub human_id: Option<String>,
+    pub required_witness_count: i32,
+    pub created_at: String,
+}
+
+/// Key rotation row from SELECT query.
+/// Source of truth: DHT (imagodei KeyRotation entry). This is a read-optimized projection.
+#[derive(Debug, Clone, Queryable, Selectable, Serialize, Deserialize)]
+#[diesel(table_name = key_rotations)]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+pub struct KeyRotationRow {
+    pub dht_anchor_hash: String,
+    pub human_agent_pubkey: String,
+    pub new_agent_pubkey: String,
+    pub superseded_agent_pubkey: String,
+    pub recovery_request_hash: String,
+    pub authority_kind: String,
+    pub authority_json: String,
+    pub rotated_at: String,
+}
+
+/// New key rotation for INSERT (upsert on dht_anchor_hash).
+#[derive(Debug, Clone, Insertable)]
+#[diesel(table_name = key_rotations)]
+pub struct NewKeyRotationRow {
+    pub dht_anchor_hash: String,
+    pub human_agent_pubkey: String,
+    pub new_agent_pubkey: String,
+    pub superseded_agent_pubkey: String,
+    pub recovery_request_hash: String,
+    pub authority_kind: String,
+    pub authority_json: String,
+    pub rotated_at: String,
 }

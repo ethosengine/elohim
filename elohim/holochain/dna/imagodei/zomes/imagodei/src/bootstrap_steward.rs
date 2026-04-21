@@ -22,17 +22,22 @@
 //! let is_me = am_i_bootstrap_steward()?;
 //! ```
 //!
-//! # Graduated authority
+//! # Authority frame — persistent identity, graduated authority
 //!
-//! This module only *identifies* the bootstrap steward. It does not enforce
-//! exclusive authority. Per stewardship philosophy, authority flows from the
-//! bootstrap steward to later stewards via explicit grants (attestations,
-//! relationships) — not by keeping the bootstrap pubkey as the only admin.
+//! The bootstrap steward is the initial `constitutional`-tier steward at DNA
+//! install time. Authority is **not** exclusive to this pubkey at any point;
+//! this module exposes only **identity**. Authority checks MUST go through
+//! the stewardship-grant resolution layer (imagodei `StewardshipGrant`
+//! entries) — which trivially accepts the bootstrap steward at install time
+//! and accepts any later agent who holds a matching `StewardshipGrant`.
 //!
-//! Integrity zome validators may reject bootstrap-only actions taken by
-//! non-bootstrap-steward agents; coordinator functions use these helpers to
-//! short-circuit before requesting chain authorship. Either way, this is the
-//! identity anchor, not a capability gate.
+//! Callers seeking "is this agent allowed to X?" must not use
+//! `is_bootstrap_steward` as a capability gate. Gating on the bootstrap
+//! pubkey would calcify exclusive authority — the opposite of the graduated
+//! authority principle in `project_stewardship_philosophy.md`.
+//!
+//! Frame rationale:
+//! `genesis/docs/superpowers/specs/2026-04-21-bootstrap-steward-authority-frame-design.md`
 
 use hdk::prelude::*;
 

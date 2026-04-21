@@ -1,9 +1,24 @@
 # Infrastructure DNA - Doorway Federation & Network Operations
+#
+# Manifest hygiene (Wave 1 / §7):
+# - manifest_version "1": Holochain 0.6 schema.
+# - network_seed "elohim_infrastructure_alpha": stability contract. _alpha suffix
+#   means "we WILL reset this network on breaking changes; do not treat as production."
+# - lineage []: this hash is the genesis ancestor.
+# - clone_limit is per-role in happ.yaml (default-deny 0).
+#
+# Bootstrap-steward: NOT APPLICABLE.
+# This DNA is federation-native — doorways self-register via their own agent key
+# (validation rule: operator_agent must be the entry author). There is no central
+# admission authority, so no founding steward role. The pattern is
+# self-registration with peer-attested reputation (DoorwayTier computed from
+# uptime + attestations), not bootstrap-then-graduate authority. This answers
+# §1.2 Q2 in the Wave 1 execution plan.
 ---
-manifest_version: "0"
+manifest_version: "1"
 name: infrastructure
 integrity:
-  network_seed: ~
+  network_seed: "elohim_infrastructure_alpha"
   properties: ~
   zomes:
     - name: infrastructure_integrity
@@ -15,3 +30,5 @@ coordinator:
       path: "target/wasm32-unknown-unknown/release/infrastructure.wasm"
       dependencies:
         - name: infrastructure_integrity
+
+lineage: []

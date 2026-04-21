@@ -13,6 +13,7 @@
     "proposedAuthorityKind",
     "proposedAuthorityJson",
     "requestNonce",
+    "requiredWitnessCount",
     "createdAt"
   ],
   "properties": {
@@ -30,6 +31,15 @@
       "items": { "type": "integer", "minimum": 0, "maximum": 255 },
       "minItems": 16,
       "maxItems": 16
+    },
+    "humanId": {
+      "type": ["string", "null"],
+      "description": "Coordinator-populated resolution of humanAgentPubkey to the legacy String human_id used by HumanityWitness/HumanRelationship/IdentityFreeze. Null accepted at request commit; required by the time a KeyRotation is attempted for IntimateQuorum rotations or when a freeze may apply."
+    },
+    "requiredWitnessCount": {
+      "type": "integer",
+      "minimum": 2,
+      "description": "Coordinator-computed threshold for IntimateQuorum authority. Computed as ceil(emergency_contact_count / 2) + 1 at request time, floored at 2. Validator enforces distinct-witness-author count >= this value at KeyRotation commit."
     },
     "createdAt": { "type": "string" }
   }

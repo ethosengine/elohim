@@ -27,6 +27,7 @@ import type { CreateContentInput } from './generated/create-content-input.js';
 import type { ConceptMetadata, PathMetadata } from './generated/metadata-types.js';
 import type { Section, Item } from './generated/body-types.js';
 import { waitForDrain } from './wait-for-drain.js';
+import { applyPathThumbnail } from './path-thumbnail.js';
 
 // Directory setup
 const __filename = fileURLToPath(import.meta.url);
@@ -1054,14 +1055,11 @@ async function main() {
     console.log(`\nTransforming paths to content nodes...`);
     const pathContentInputs = paths.map(p => {
       const input = transformPathToContent(p);
-      // Update thumbnailUrl to blob reference if we uploaded one
-      if (p.thumbnailUrl && uploadedThumbnails.has(p.thumbnailUrl)) {
-        const blobHash = uploadedThumbnails.get(p.thumbnailUrl)!;
-        const meta = (typeof input.metadata === 'object' && input.metadata !== null ? input.metadata : {}) as Record<string, unknown>;
-        meta.thumbnailUrl = `/blob/${blobHash}`;
-        input.metadata = meta;
-      }
-      return input;
+      const thumbnailHash =
+        p.thumbnailUrl && uploadedThumbnails.has(p.thumbnailUrl)
+          ? uploadedThumbnails.get(p.thumbnailUrl)
+          : undefined;
+      return applyPathThumbnail(input, thumbnailHash);
     });
 
     // Count steps for logging

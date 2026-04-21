@@ -1,0 +1,64 @@
+[package]
+name = "elohim_sweettest"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Sweettest integration tests for all 5 Elohim DNAs."
+
+# Standalone workspace — NOT a member of any per-DNA workspace. This keeps
+# native-only deps (holochain, tokio) from leaking into WASM DNA builds.
+# Invoke with: `CARGO_TARGET_DIR=target/native-tests cargo test -p elohim_sweettest`
+[workspace]
+
+[lib]
+path = "src/lib.rs"
+
+[[test]]
+name = "imagodei"
+path = "src/tests/imagodei.rs"
+
+[[test]]
+name = "mishpat"
+path = "src/tests/mishpat.rs"
+
+[[test]]
+name = "lamad"
+path = "src/tests/lamad.rs"
+
+[[test]]
+name = "node_registry"
+path = "src/tests/node_registry.rs"
+
+[[test]]
+name = "infrastructure"
+path = "src/tests/infrastructure.rs"
+
+[dependencies]
+# Holochain runtime — sweettest embeds a real conductor in-process.
+# Versions are pinned to match the DNAs (HDK 0.6.0 / HDI 0.7.0).
+#
+# `default-features = true` pulls in `datachannel-vendored` which provides a
+# webrtc backend (tx5-connection requires one; turning defaults off produces
+# a transitive compile error in tx5-connection's BackendModule::default).
+# The vendored libdatachannel build adds ~1-2 min to first compile; cached
+# thereafter.
+holochain = { version = "=0.6.0", features = ["sweettest", "test_utils"] }
+holochain_types = "=0.6.0"
+hdk = "=0.6.0"
+hdi = "=0.7.0"
+holo_hash = "=0.6.0"
+holochain_serialized_bytes = "=0.0.56"
+
+# Async runtime
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "time"] }
+futures = "0.3"
+
+# Serde for test fixtures
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Test helpers
+anyhow = "1"
+
+[dev-dependencies]
+# Every integration test shares these — kept in dev-deps so `cargo check --tests` is lean.

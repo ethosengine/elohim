@@ -597,6 +597,145 @@ pub fn handle_mishpat_signal(
     }
 }
 
+// =============================================================================
+// RecoveryV2Signal — projection of imagodei DNA post-commit signals
+// =============================================================================
+//
+// Mirrors the DNA-side `RecoveryV2Signal` enum (imagodei coordinator zome).
+// Fields that are `AgentPubKey` or `ActionHash` on the DNA side serialize as
+// base64 `String`s over the wire. `Timestamp` serializes as microseconds i64.
+// `RecoveryAuthorityKind` serializes as a serde-internally-tagged enum with
+// PascalCase variant names (no rename_all on the DNA side).
+//
+// Serde tag must match the DNA side exactly: `tag = "type"` (internally tagged,
+// no `content` wrapper — the coordinator uses `#[serde(tag = "type")]`).
+
+/// Storage-side mirror of the RecoveryRequest fields as they arrive in the signal.
+/// `proposed_authority` is stored as two columns: `kind` (discriminator string)
+/// and `json` (variant-specific payload). This mirrors the view layer's
+/// `proposed_authority_kind` + `proposed_authority_json` split.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RecoveryRequestPayload {
+    pub human_agent_pubkey: String,
+    pub new_agent_pubkey: String,
+    pub hosting_doorway_pubkey: String,
+    pub proposed_authority: serde_json::Value,
+    pub request_nonce: Vec<u8>,
+    pub human_id: Option<String>,
+    pub required_witness_count: u32,
+    /// Holochain Timestamp — serializes as microseconds i64.
+    pub created_at: serde_json::Value,
+}
+
+/// Storage-side mirror of the KeyRotation fields as they arrive in the signal.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct KeyRotationPayload {
+    pub human_agent_pubkey: String,
+    pub new_agent_pubkey: String,
+    pub superseded_agent_pubkey: String,
+    pub recovery_request_hash: String,
+    pub authority: serde_json::Value,
+    /// Holochain Timestamp — serializes as microseconds i64.
+    pub rotated_at: serde_json::Value,
+}
+
+/// Storage-side mirror of the DNA `RecoveryV2Signal` enum.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub enum RecoveryV2Signal {
+    RecoveryRequestCreated {
+        action_hash: String,
+        request: RecoveryRequestPayload,
+    },
+    KeyRotationCommitted {
+        action_hash: String,
+        rotation: KeyRotationPayload,
+    },
+}
+
+/// Extract the authority kind discriminator from a `RecoveryAuthorityKind`
+/// or `RecoveryAuthority` serde_json::Value (internally-tagged or plain variant).
+fn extract_authority_kind(v: &serde_json::Value) -> String {
+    // Internally-tagged: {"type": "IntimateQuorum", ...} or just "IntimateQuorum"
+    if let Some(t) = v.get("type").and_then(|t| t.as_str()) {
+        return t.to_string();
+    }
+    // Plain string variant (unit variants serialize as string)
+    if let Some(s) = v.as_str() {
+        return s.to_string();
+    }
+    "unknown".to_string()
+}
+
+/// Convert a Holochain Timestamp serde_json::Value to an ISO 8601 string.
+/// HDK Timestamp serializes as microseconds i64 or as `{"secs": i64, "nanos": u32}`.
+fn timestamp_to_iso(v: &serde_json::Value) -> String {
+    if let Some(micros) = v.as_i64() {
+        let secs = micros / 1_000_000;
+        let dt = chrono::DateTime::from_timestamp(secs, 0).unwrap_or_default();
+        return dt.format("%Y-%m-%dT%H:%M:%SZ").to_string();
+    }
+    if let Some(secs) = v.get("secs").and_then(|s| s.as_i64()) {
+        let dt = chrono::DateTime::from_timestamp(secs, 0).unwrap_or_default();
+        return dt.format("%Y-%m-%dT%H:%M:%SZ").to_string();
+    }
+    chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string()
+}
+
+/// Dispatch a `RecoveryV2Signal` into the SQLite projection.
+///
+/// New variants add a match arm here. Keep this function thin — per-entity
+/// projection logic belongs in `db::recovery_requests`.
+pub fn handle_recovery_v2_signal(
+    conn: &mut diesel::sqlite::SqliteConnection,
+    signal: RecoveryV2Signal,
+) -> Result<(), StorageError> {
+    match signal {
+        RecoveryV2Signal::RecoveryRequestCreated {
+            action_hash,
+            request,
+        } => {
+            let authority_kind = extract_authority_kind(&request.proposed_authority);
+            let authority_json = request.proposed_authority.to_string();
+            let created_at = timestamp_to_iso(&request.created_at);
+
+            let row = crate::db::models::NewRecoveryRequestRow {
+                dht_anchor_hash: action_hash,
+                human_agent_pubkey: request.human_agent_pubkey,
+                new_agent_pubkey: request.new_agent_pubkey,
+                hosting_doorway_pubkey: request.hosting_doorway_pubkey,
+                proposed_authority_kind: authority_kind,
+                proposed_authority_json: authority_json,
+                request_nonce: request.request_nonce,
+                human_id: request.human_id,
+                required_witness_count: request.required_witness_count as i32,
+                created_at,
+            };
+            crate::db::recovery_requests::upsert_recovery_request(conn, row)
+        }
+        RecoveryV2Signal::KeyRotationCommitted {
+            action_hash,
+            rotation,
+        } => {
+            let authority_kind = extract_authority_kind(&rotation.authority);
+            let authority_json = rotation.authority.to_string();
+            let rotated_at = timestamp_to_iso(&rotation.rotated_at);
+
+            let row = crate::db::models::NewKeyRotationRow {
+                dht_anchor_hash: action_hash,
+                human_agent_pubkey: rotation.human_agent_pubkey,
+                new_agent_pubkey: rotation.new_agent_pubkey,
+                superseded_agent_pubkey: rotation.superseded_agent_pubkey,
+                recovery_request_hash: rotation.recovery_request_hash,
+                authority_kind,
+                authority_json,
+                rotated_at,
+            };
+            crate::db::recovery_requests::upsert_key_rotation(conn, row)
+        }
+    }
+}
+
 #[cfg(test)]
 mod mishpat_signal_tests {
     use super::*;

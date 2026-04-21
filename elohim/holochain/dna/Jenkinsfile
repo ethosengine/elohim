@@ -221,6 +221,40 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
             }
         }
 
+        stage('Manifest Hygiene') {
+            // Fast schema contract check — pure YAML parse, no conductor,
+            // no holochain dep. Runs BEFORE the 20-40 min DNA WASM build so
+            // manifest drift fails fast. Registered in
+            // elohim/holochain/dna/build-manifest.json as step `manifest-hygiene`.
+            when { allOf {
+                expression { env.PIPELINE_SKIPPED != 'true' }
+                expression { shouldRunStep('manifest-hygiene') }
+            }}
+            steps {
+                container('builder') {
+                    script {
+                        echo 'Running DNA manifest hygiene schema contract...'
+                        sh '''#!/usr/bin/env bash
+                            set -euo pipefail
+
+                            export HOME="${HOME:-/root}"
+                            mkdir -p "$HOME"
+                            echo "[safe]" > "$HOME/.gitconfig"
+                            echo "    directory = *" >> "$HOME/.gitconfig"
+                            export GIT_CONFIG_GLOBAL="$HOME/.gitconfig"
+
+                            # No holochain dep — plain cargo is enough. If the
+                            # builder image doesn't expose cargo on PATH, wrap
+                            # the invocation in `nix develop --command` using
+                            # the flake at elohim/holochain/dna/elohim.
+                            cd "$WORKSPACE/elohim/holochain/tests/manifest-hygiene"
+                            RUSTFLAGS="" cargo test
+                        '''
+                    }
+                }
+            }
+        }
+
         stage('Setup Nix Cache') {
             when { expression { env.PIPELINE_SKIPPED != 'true' } }
             steps {
