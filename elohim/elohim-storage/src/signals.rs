@@ -691,7 +691,10 @@ pub fn handle_recovery_v2_signal(
     signal: RecoveryV2Signal,
 ) -> Result<(), StorageError> {
     match signal {
-        RecoveryV2Signal::RecoveryRequestCreated { action_hash, request } => {
+        RecoveryV2Signal::RecoveryRequestCreated {
+            action_hash,
+            request,
+        } => {
             let authority_kind = extract_authority_kind(&request.proposed_authority);
             let authority_json = request.proposed_authority.to_string();
             let created_at = timestamp_to_iso(&request.created_at);
@@ -710,7 +713,10 @@ pub fn handle_recovery_v2_signal(
             };
             crate::db::recovery_requests::upsert_recovery_request(conn, row)
         }
-        RecoveryV2Signal::KeyRotationCommitted { action_hash, rotation } => {
+        RecoveryV2Signal::KeyRotationCommitted {
+            action_hash,
+            rotation,
+        } => {
             let authority_kind = extract_authority_kind(&rotation.authority);
             let authority_json = rotation.authority.to_string();
             let rotated_at = timestamp_to_iso(&rotation.rotated_at);

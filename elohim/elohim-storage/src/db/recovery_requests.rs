@@ -121,7 +121,5 @@ pub fn list_key_rotations_for_agent(
         .filter(key_rotations::human_agent_pubkey.eq(human_agent_pubkey))
         .order(key_rotations::rotated_at.desc())
         .load::<KeyRotationRow>(conn)
-        .map_err(|e| {
-            StorageError::Internal(format!("Failed to list key_rotations for agent: {e}"))
-        })
+        .map_err(|e| StorageError::Internal(format!("Failed to list key_rotations for agent: {e}")))
 }
