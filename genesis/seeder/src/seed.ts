@@ -41,6 +41,7 @@ import { validateBatch, logValidationErrors, isStrictValidation } from './valida
 import type { ContentFormat, ContentType, Reach } from './generated/schema-enums.js';
 import type { CreateContentInput } from './generated/create-content-input.js';
 import { SeedingVerification, type ExpectedCounts } from './verification.js';
+import { applyPathThumbnail } from './path-thumbnail.js';
 // ========================================
 // PERFORMANCE TIMING UTILITIES
 // ========================================
@@ -1638,7 +1639,7 @@ async function seedViaDoorway(): Promise<SeedResult> {
      * Paths become ContentNodes with contentType 'path' and contentFormat 'epr-composite'.
      * The contentBody holds a structured JSON layout of EPR references.
      */
-    function pathToContent(pathData: any, thumbnailHash: string | undefined): CreateContentInput {
+    function pathToContent(pathData: any): CreateContentInput {
       // Build epr-composite sections from chapters (or wrap flat steps in a default section)
       let sections: any[];
 
@@ -1783,7 +1784,7 @@ async function seedViaDoorway(): Promise<SeedResult> {
         console.log(`   📍 Path "${pathData.id}": No chapters or steps found (metadata-only path)`);
       }
 
-      const thumbnailUrl = thumbnailHash ? `/blob/${thumbnailHash}` : pathData.thumbnailUrl || undefined;
+      const thumbnailUrl = pathData.thumbnailUrl || undefined;
       const pathType = normalizePathType(pathData.pathType || pathData.metadata?.pathType);
 
       return {
@@ -1835,10 +1836,14 @@ async function seedViaDoorway(): Promise<SeedResult> {
       }));
     }
 
-    // Transform all paths into ContentNode inputs + step Relationships
+    // Transform all paths into ContentNode inputs + step Relationships.
+    // Thumbnail blob linkage is applied after transform so the path row gets
+    // both `blobHash` (storage-level linkage) and `metadata.thumbnailUrl`
+    // (UI-level rendering) pointing at the uploaded thumbnail.
     const pathContentItems = allPaths.map(({ pathData }) => {
+      const input = pathToContent(pathData);
       const thumbnailHash = pathThumbnailHashes.get(pathData.id);
-      return pathToContent(pathData, thumbnailHash);
+      return applyPathThumbnail(input, thumbnailHash);
     });
 
     const stepRelationships = allPaths.flatMap(({ pathData }) =>
