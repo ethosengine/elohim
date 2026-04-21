@@ -215,6 +215,63 @@ The Elohim make Holochain's weakness (coordination) into a strength that aligns 
 
 ---
 
+## Forward-Compat Policy (Wave 1 §7)
+
+Each DNA manifest declares `lineage: []` at top level. The current hash is the
+genesis ancestor. The policy below governs when you add to the lineage vs keep
+the same hash.
+
+### Additive changes — no hash bump, no lineage entry
+
+- New **optional** fields on entry structs, annotated with `#[serde(default)]`
+- New link types (additive only — never repurpose an existing one)
+- New coordinator functions
+- Changes inside coordinator-only logic
+- Extensions to `metadata_json` or similar free-form fields
+
+Rule: old and new agents must both be able to deserialize entries written by
+the other side. `#[serde(default)]` ensures forward-compat when a newer field
+is absent; skipping unknown fields (serde default) ensures backward-compat.
+
+### Breaking changes — bump DNA hash, add previous hash to `lineage`
+
+- Removed or renamed fields on entry structs
+- Changed validation (tighter OR looser — either way, the network's rules changed)
+- Repurposed link types (same tag, different semantics)
+- Changed entry-type enum variants
+- Any change to `integrity` zome constants used in validation
+
+When you make a breaking change:
+
+1. Capture the previous DNA hash (the one this replaces): `hc dna hash workdir/<name>.dna`
+2. Prepend it to the DNA's `lineage: []` list: `lineage: ["uhC0k<old-hash>"]`
+3. Document the migration path in NETWORK_UPGRADES.md (the bridge/seeder story)
+4. The stewarded migration flow (elohim nodes running both DNAs) applies
+
+### Why lineage matters (even though Holochain doesn't enforce it yet)
+
+`lineage` is honored by later tooling (`hc` CLI, Launcher, Moss group admin
+UIs) to show "this DNA supersedes X, Y, Z." It documents the ancestry even
+when users are only running the current version. Future DHT bridging tools
+will use it to route cross-version queries. Not setting it today means we
+cannot retroactively reconstruct the chain.
+
+### Network seed upgrade ladder
+
+Network seeds are stability contracts. The suffix declares intent:
+
+| Suffix | Meaning |
+|---|---|
+| `_alpha` | Will be reset on any breaking change. Not production. |
+| `_beta` | Breaking changes migrate; no silent resets. |
+| (none) | Production — breaking changes require governance + lineage + migration. |
+
+Transitions are one-way (alpha → beta → prod). A reset means bumping `_alpha`
+to `_alpha2` (or similar) with the old hash in `lineage` so the history
+remains discoverable.
+
+---
+
 ## Open Questions
 
 1. **Migration tooling** - What's the exact export/import pipeline?
