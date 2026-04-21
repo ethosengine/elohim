@@ -2240,6 +2240,244 @@ pub fn complete_recovery(request_id: String) -> ExternResult<RecoveryRequestOutp
 }
 
 // =============================================================================
+// Recovery Protocol Phase 2 — Signals (seed-quorum based)
+// =============================================================================
+
+/// Signals for Recovery Protocol Phase 2 (seed-quorum model).
+/// Emitted by coordinator functions for real-time projection into elohim-storage.
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(tag = "type")]
+pub enum RecoveryV2Signal {
+    SeedCommitmentCreated {
+        action_hash: ActionHash,
+        commitment: RecoverySeedCommitment,
+    },
+    SeedCommitmentSuperseded {
+        old_hash: ActionHash,
+        new_hash: ActionHash,
+    },
+    RecoveryQuorumRequestCreated {
+        action_hash: ActionHash,
+        request: RecoveryQuorumRequest,
+    },
+    KeyRotationCommitted {
+        action_hash: ActionHash,
+        rotation: KeyRotation,
+    },
+}
+
+// =============================================================================
+// Recovery Protocol Phase 2 — Input/Output Types
+// =============================================================================
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct CommitRecoverySeedInput {
+    pub seed_public_half: Vec<u8>, // 32 bytes Ed25519 public key
+    pub threshold_n: u8,
+    pub total_m: u8,
+    pub commitment_nonce: Vec<u8>, // 16 bytes, generated client-side
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct RecoverySeedCommitmentOutput {
+    pub action_hash: ActionHash,
+    pub entry_hash: EntryHash,
+    pub commitment: RecoverySeedCommitment,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct CreateRecoveryQuorumRequestInput {
+    pub human_agent_pubkey: AgentPubKey,
+    pub seed_commitment_hash: ActionHash,
+    pub new_agent_pubkey: AgentPubKey,
+    pub hosting_doorway_pubkey: AgentPubKey,
+    pub recovery_mode: RecoveryMode,
+    pub request_nonce: Vec<u8>, // 16 bytes random
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct RecoveryQuorumRequestOutput {
+    pub action_hash: ActionHash,
+    pub request: RecoveryQuorumRequest,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct CommitKeyRotationInput {
+    pub human_agent_pubkey: AgentPubKey,
+    pub new_agent_pubkey: AgentPubKey,
+    pub superseded_agent_pubkey: AgentPubKey,
+    pub seed_commitment_hash: ActionHash,
+    pub recovery_request_hash: ActionHash,
+    pub quorum_signature: Vec<u8>, // 64 bytes Ed25519 signature
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct KeyRotationOutput {
+    pub action_hash: ActionHash,
+    pub rotation: KeyRotation,
+}
+
+// =============================================================================
+// Recovery Protocol Phase 2 — Coordinator Functions
+// =============================================================================
+
+/// Commit a recovery seed commitment to the DHT.
+/// Only the calling agent can commit their own seed commitment (author == human_agent_pubkey).
+#[hdk_extern]
+pub fn commit_recovery_seed(
+    input: CommitRecoverySeedInput,
+) -> ExternResult<RecoverySeedCommitmentOutput> {
+    let agent_info = agent_info()?;
+    let now = sys_time()?;
+
+    let commitment = RecoverySeedCommitment {
+        human_agent_pubkey: agent_info.agent_initial_pubkey.clone(),
+        seed_public_half: input.seed_public_half,
+        threshold_n: input.threshold_n,
+        total_m: input.total_m,
+        commitment_nonce: input.commitment_nonce,
+        created_at: now,
+    };
+
+    let action_hash = create_entry(&EntryTypes::RecoverySeedCommitment(commitment.clone()))?;
+    let entry_hash = hash_entry(&commitment)?;
+
+    // Link Anchor(recovery_seed_commitment, human_pubkey) -> commitment for discovery
+    let anchor = StringAnchor::new(
+        "recovery_seed_commitment",
+        &agent_info.agent_initial_pubkey.to_string(),
+    );
+    let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor))?;
+    create_link(
+        anchor_hash,
+        action_hash.clone(),
+        LinkTypes::HumanToCurrentSeedCommitment,
+        (),
+    )?;
+
+    // Emit post-commit signal for storage projection
+    emit_signal(RecoveryV2Signal::SeedCommitmentCreated {
+        action_hash: action_hash.clone(),
+        commitment: commitment.clone(),
+    })?;
+
+    Ok(RecoverySeedCommitmentOutput {
+        action_hash,
+        entry_hash,
+        commitment,
+    })
+}
+
+/// Create a recovery quorum request, linking it to both the seed commitment and the human anchor.
+/// Authored by the hosting doorway on behalf of the claimant.
+#[hdk_extern]
+pub fn create_recovery_quorum_request(
+    input: CreateRecoveryQuorumRequestInput,
+) -> ExternResult<RecoveryQuorumRequestOutput> {
+    let now = sys_time()?;
+
+    let request = RecoveryQuorumRequest {
+        human_agent_pubkey: input.human_agent_pubkey.clone(),
+        seed_commitment_hash: input.seed_commitment_hash.clone(),
+        new_agent_pubkey: input.new_agent_pubkey,
+        hosting_doorway_pubkey: input.hosting_doorway_pubkey,
+        recovery_mode: input.recovery_mode,
+        request_nonce: input.request_nonce,
+        created_at: now,
+    };
+
+    let action_hash = create_entry(&EntryTypes::RecoveryQuorumRequest(request.clone()))?;
+
+    // Link seed commitment -> request (forward traversal)
+    create_link(
+        input.seed_commitment_hash.clone(),
+        action_hash.clone(),
+        LinkTypes::SeedCommitmentToRequest,
+        (),
+    )?;
+
+    // Link Anchor(recovery_quorum_request, human_pubkey) -> request (human-scoped discovery)
+    let anchor = StringAnchor::new(
+        "recovery_quorum_request",
+        &input.human_agent_pubkey.to_string(),
+    );
+    let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor))?;
+    create_link(
+        anchor_hash,
+        action_hash.clone(),
+        LinkTypes::HumanToRecoveryQuorumRequest,
+        (),
+    )?;
+
+    emit_signal(RecoveryV2Signal::RecoveryQuorumRequestCreated {
+        action_hash: action_hash.clone(),
+        request: request.clone(),
+    })?;
+
+    Ok(RecoveryQuorumRequestOutput {
+        action_hash,
+        request,
+    })
+}
+
+/// Commit a key rotation to the DHT.
+/// Integrity validation (Rule 6: Ed25519 signature verification) runs automatically
+/// as part of entry creation — the entry will not land if the quorum_signature is invalid.
+#[hdk_extern]
+pub fn commit_key_rotation(input: CommitKeyRotationInput) -> ExternResult<KeyRotationOutput> {
+    let now = sys_time()?;
+
+    let rotation = KeyRotation {
+        human_agent_pubkey: input.human_agent_pubkey.clone(),
+        new_agent_pubkey: input.new_agent_pubkey.clone(),
+        superseded_agent_pubkey: input.superseded_agent_pubkey,
+        seed_commitment_hash: input.seed_commitment_hash,
+        recovery_request_hash: input.recovery_request_hash,
+        quorum_signature: input.quorum_signature,
+        rotated_at: now,
+    };
+
+    // Integrity zome's validate_key_rotation runs before this entry lands on the DHT.
+    let action_hash = create_entry(&EntryTypes::KeyRotation(rotation.clone()))?;
+
+    // Link Anchor(current_agent, human_pubkey) -> rotation (latest = current agent)
+    let human_anchor = StringAnchor::new(
+        "current_agent",
+        &input.human_agent_pubkey.to_string(),
+    );
+    let human_anchor_hash = hash_entry(&EntryTypes::StringAnchor(human_anchor))?;
+    create_link(
+        human_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::HumanToCurrentAgent,
+        (),
+    )?;
+
+    // Link Anchor(agent_rotation, new_agent_pubkey) -> rotation (reverse lookup)
+    let new_agent_anchor = StringAnchor::new(
+        "agent_rotation",
+        &input.new_agent_pubkey.to_string(),
+    );
+    let new_agent_anchor_hash = hash_entry(&EntryTypes::StringAnchor(new_agent_anchor))?;
+    create_link(
+        new_agent_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::AgentToKeyRotation,
+        (),
+    )?;
+
+    emit_signal(RecoveryV2Signal::KeyRotationCommitted {
+        action_hash: action_hash.clone(),
+        rotation: rotation.clone(),
+    })?;
+
+    Ok(KeyRotationOutput {
+        action_hash,
+        rotation,
+    })
+}
+
+// =============================================================================
 // Renewal Protocol Types
 // =============================================================================
 
