@@ -1,15 +1,17 @@
 //! EPR REST controller — routes under /api/v1/epr.
 //!
-//! See Integrator Compatibility Contract §2.2.
-//! Controller → EprService → db::epr_atoms.
+//! Routes talk to an EprStore trait so P2P federation (Phase 2c) can be added
+//! without route changes. Phase 2a ships FederatedEprStore with the libp2p
+//! bridge stubbed — all calls fall through to LocalEprStore.
 //!
 //! Route table:
-//!   GET  /api/v1/epr/:cid              → get_epr
-//!   GET  /api/v1/epr/:cid/envelope     → get_envelope  (Task 13)
-//!   GET  /api/v1/epr/:cid/payload      → get_payload   (Task 14)
-//!   GET  /api/v1/epr/:cid/verify       → get_verify    (Task 15)
-//!   GET  /api/v1/epr                   → list_epr      (Task 16)
-//!   POST /api/v1/epr                   → post_epr      (Task 17)
+//!   GET  /api/v1/epr                        → list_epr
+//!   GET  /api/v1/epr/:cid                   → get_epr
+//!   GET  /api/v1/epr/:cid/envelope          → get_envelope
+//!   GET  /api/v1/epr/:cid/payload           → get_payload
+//!   GET  /api/v1/epr/:cid/verify            → get_verify
+//!   GET  /api/v1/epr/:cid/providers         → get_providers
+//!   PUT  /api/v1/epr/:cid                   → put_epr
 
 use bytes::Bytes;
 use http_body_util::Full;
@@ -17,7 +19,8 @@ use hyper::{body::Incoming, Method, Request, Response, StatusCode};
 
 use crate::db::{AppContext, DbPool};
 use crate::error::StorageError;
-use crate::services::epr_service::{self, FetchedEpr};
+use crate::services::epr_service::FetchedEpr;
+use crate::services::epr_store::{default_epr_store, EprStore};
 use crate::services::response;
 use crate::views::{EprCouplingView, EprEnvelopeView, EprSignatureView, EprView};
 
@@ -42,8 +45,10 @@ pub async fn handle(
         // GET /api/v1/epr
         (&Method::GET, "") => list_epr(req, pool, ctx).await,
 
-        // POST /api/v1/epr
-        (&Method::POST, "") => post_epr(req, pool, ctx).await,
+        // PUT /api/v1/epr/:cid  (content-addressed idempotent put)
+        (&Method::PUT, cid) if !cid.is_empty() && !cid.contains('/') => {
+            put_epr(req, cid, pool, ctx).await
+        }
 
         // GET /api/v1/epr/:cid/envelope
         (&Method::GET, p) if p.ends_with("/envelope") && p.split('/').count() == 2 => {
@@ -61,6 +66,12 @@ pub async fn handle(
         (&Method::GET, p) if p.ends_with("/verify") && p.split('/').count() == 2 => {
             let cid = p.trim_end_matches("/verify");
             get_verify(req, cid, pool, ctx).await
+        }
+
+        // GET /api/v1/epr/:cid/providers
+        (&Method::GET, p) if p.ends_with("/providers") && p.split('/').count() == 2 => {
+            let cid = p.trim_end_matches("/providers");
+            get_providers(req, cid, pool, ctx).await
         }
 
         // GET /api/v1/epr/:cid  (plain CID — must not contain '/')
@@ -157,21 +168,30 @@ async fn get_epr(
         .map(|q| q.contains("includeCanonical=true"))
         .unwrap_or(false);
 
+    let store = default_epr_store();
     let mut conn = get_conn(pool)?;
-    let Some(fetched) = epr_service::fetch_by_cid(&mut conn, cid)? else {
+
+    let Some(outcome) = store.fetch(&mut conn, cid)? else {
         return Ok(response::not_found(&format!("epr not found: {cid}")));
     };
-
-    if !reach_visible_to(&fetched.atom.reach, &req) {
+    if !reach_visible_to(&outcome.fetched.atom.reach, &req) {
         return Ok(response::not_found(&format!("epr not found: {cid}")));
     }
 
-    let view = to_epr_view(&fetched, include_canonical);
-    Ok(response::ok(&view))
+    let view = to_epr_view(&outcome.fetched, include_canonical);
+    let body = serde_json::to_vec(&view)
+        .map_err(|e| StorageError::Database(format!("serialize: {e}")))?;
+
+    Ok(Response::builder()
+        .status(StatusCode::OK)
+        .header(hyper::header::CONTENT_TYPE, "application/json")
+        .header("X-Epr-Source", outcome.source.header_value())
+        .body(Full::new(Bytes::from(body)))
+        .unwrap())
 }
 
 // ---------------------------------------------------------------------------
-// Stubs for Tasks 13–17 (replaced in subsequent commits)
+// GET /api/v1/epr/:cid/envelope
 // ---------------------------------------------------------------------------
 
 async fn get_envelope(
@@ -180,15 +200,30 @@ async fn get_envelope(
     pool: &DbPool,
     _ctx: &AppContext,
 ) -> Result<Response<Full<Bytes>>, StorageError> {
+    let store = default_epr_store();
     let mut conn = get_conn(pool)?;
-    let Some(fetched) = epr_service::fetch_by_cid(&mut conn, cid)? else {
+
+    let Some(outcome) = store.fetch(&mut conn, cid)? else {
         return Ok(response::not_found(&format!("epr not found: {cid}")));
     };
-    if !reach_visible_to(&fetched.atom.reach, &req) {
+    if !reach_visible_to(&outcome.fetched.atom.reach, &req) {
         return Ok(response::not_found(&format!("epr not found: {cid}")));
     }
-    Ok(response::ok(&to_envelope_view(&fetched)))
+
+    let body = serde_json::to_vec(&to_envelope_view(&outcome.fetched))
+        .map_err(|e| StorageError::Database(format!("serialize: {e}")))?;
+
+    Ok(Response::builder()
+        .status(StatusCode::OK)
+        .header(hyper::header::CONTENT_TYPE, "application/json")
+        .header("X-Epr-Source", outcome.source.header_value())
+        .body(Full::new(Bytes::from(body)))
+        .unwrap())
 }
+
+// ---------------------------------------------------------------------------
+// GET /api/v1/epr/:cid/payload
+// ---------------------------------------------------------------------------
 
 async fn get_payload(
     req: Request<Incoming>,
@@ -196,11 +231,13 @@ async fn get_payload(
     pool: &DbPool,
     _ctx: &AppContext,
 ) -> Result<Response<Full<Bytes>>, StorageError> {
+    let store = default_epr_store();
     let mut conn = get_conn(pool)?;
-    let Some(fetched) = epr_service::fetch_by_cid(&mut conn, cid)? else {
+
+    let Some(outcome) = store.fetch(&mut conn, cid)? else {
         return Ok(response::not_found(&format!("epr not found: {cid}")));
     };
-    if !reach_visible_to(&fetched.atom.reach, &req) {
+    if !reach_visible_to(&outcome.fetched.atom.reach, &req) {
         return Ok(response::not_found(&format!("epr not found: {cid}")));
     }
 
@@ -209,10 +246,17 @@ async fn get_payload(
     Ok(Response::builder()
         .status(StatusCode::OK)
         .header(hyper::header::CONTENT_TYPE, "application/octet-stream")
-        .header("X-Epr-Cid", &fetched.atom.cid)
-        .body(Full::new(Bytes::from(fetched.atom.payload_bytes.clone())))
+        .header("X-Epr-Cid", &outcome.fetched.atom.cid)
+        .header("X-Epr-Source", outcome.source.header_value())
+        .body(Full::new(Bytes::from(
+            outcome.fetched.atom.payload_bytes.clone(),
+        )))
         .unwrap())
 }
+
+// ---------------------------------------------------------------------------
+// GET /api/v1/epr/:cid/verify?publicKey=<hex>
+// ---------------------------------------------------------------------------
 
 async fn get_verify(
     req: Request<Incoming>,
@@ -239,17 +283,18 @@ async fn get_verify(
     let mut pk = [0u8; 32];
     pk.copy_from_slice(&pk_bytes);
 
+    let store = default_epr_store();
     let mut conn = get_conn(pool)?;
 
     // Reach check: if the EPR isn't visible to the caller, return 404.
-    let Some(fetched) = epr_service::fetch_by_cid(&mut conn, cid)? else {
+    let Some(outcome) = store.fetch(&mut conn, cid)? else {
         return Ok(response::not_found(&format!("epr not found: {cid}")));
     };
-    if !reach_visible_to(&fetched.atom.reach, &req) {
+    if !reach_visible_to(&outcome.fetched.atom.reach, &req) {
         return Ok(response::not_found(&format!("epr not found: {cid}")));
     }
 
-    let report = epr_service::verify(&mut conn, cid, &pk)?;
+    let report = store.verify(&mut conn, cid, &pk)?;
 
     let view = crate::views::EprVerifyView {
         cid: report.cid,
@@ -261,21 +306,273 @@ async fn get_verify(
             message: e.message,
         }),
     };
-    Ok(response::ok(&view))
+
+    let body = serde_json::to_vec(&view)
+        .map_err(|e| StorageError::Database(format!("serialize: {e}")))?;
+
+    Ok(Response::builder()
+        .status(StatusCode::OK)
+        .header(hyper::header::CONTENT_TYPE, "application/json")
+        .header("X-Epr-Source", outcome.source.header_value())
+        .body(Full::new(Bytes::from(body)))
+        .unwrap())
 }
+
+// ---------------------------------------------------------------------------
+// GET /api/v1/epr/:cid/providers
+// ---------------------------------------------------------------------------
+
+async fn get_providers(
+    req: Request<Incoming>,
+    cid: &str,
+    pool: &DbPool,
+    _ctx: &AppContext,
+) -> Result<Response<Full<Bytes>>, StorageError> {
+    let store = default_epr_store();
+    let mut conn = get_conn(pool)?;
+
+    // Reach check: we need to know the atom's reach to enforce, but if the
+    // atom isn't locally known and we can't reach peers yet (Phase 2c), we
+    // can't enforce reach before returning providers. For Phase 2a: if the
+    // atom isn't local, return [] (no-op disclosure).
+    if let Some(outcome) = store.fetch(&mut conn, cid)? {
+        if !reach_visible_to(&outcome.fetched.atom.reach, &req) {
+            return Ok(response::not_found(&format!("epr not found: {cid}")));
+        }
+    }
+
+    let providers = store.providers(&mut conn, cid)?;
+    let provider_strings: Vec<String> = providers.into_iter().map(|p| p.peer_id).collect();
+
+    let view = crate::views::EprProvidersView {
+        cid: cid.to_string(),
+        providers: provider_strings,
+    };
+    let body = serde_json::to_vec(&view)
+        .map_err(|e| StorageError::Database(format!("serialize: {e}")))?;
+
+    Ok(Response::builder()
+        .status(StatusCode::OK)
+        .header(hyper::header::CONTENT_TYPE, "application/json")
+        .body(Full::new(Bytes::from(body)))
+        .unwrap())
+}
+
+// ---------------------------------------------------------------------------
+// PUT /api/v1/epr/:cid  (idempotent content-addressed put)
+// ---------------------------------------------------------------------------
+
+async fn put_epr(
+    req: Request<Incoming>,
+    path_cid: &str,
+    pool: &DbPool,
+    _ctx: &AppContext,
+) -> Result<Response<Full<Bytes>>, StorageError> {
+    use elohim_epr::{Coupling, Envelope, Epr, EprKind, Reach, Signature};
+    use std::str::FromStr;
+
+    let input: crate::views::EprPublishInput = super::parse_body(req).await?;
+
+    // Path CID must match envelope CID — enforces the content-addressed contract
+    // at the route level.
+    if input.envelope.cid != path_cid {
+        return Ok(response::bad_request(&format!(
+            "path cid {} does not match envelope cid {}",
+            path_cid, input.envelope.cid
+        )));
+    }
+
+    // Rehydrate the Rust Epr from wire view.
+    let cid = cid::Cid::from_str(&input.envelope.cid)
+        .map_err(|e| StorageError::InvalidInput(format!("bad cid: {e}")))?;
+    let schema_ref = cid::Cid::from_str(&input.envelope.schema_ref)
+        .map_err(|e| StorageError::InvalidInput(format!("bad schemaRef: {e}")))?;
+    let signer = cid::Cid::from_str(&input.envelope.proof.signer)
+        .map_err(|e| StorageError::InvalidInput(format!("bad signer: {e}")))?;
+
+    let kind = match input.envelope.kind.as_str() {
+        "Content" => EprKind::Content,
+        "Agent" => EprKind::Agent,
+        "Manifest" => EprKind::Manifest,
+        "Claim" => EprKind::Claim,
+        "Observation" => EprKind::Observation,
+        "EconomicEvent" => EprKind::EconomicEvent,
+        "Commitment" => EprKind::Commitment,
+        "Attestation" => EprKind::Attestation,
+        "Delegation" => EprKind::Delegation,
+        other => return Ok(response::bad_request(&format!("unknown kind: {other}"))),
+    };
+
+    let reach = match input.envelope.reach.as_str() {
+        "private" => Reach::Private,
+        "self" => Reach::SelfScope,
+        "intimate" => Reach::Intimate,
+        "trusted" => Reach::Trusted,
+        "familiar" => Reach::Familiar,
+        "community" => Reach::Community,
+        "public" => Reach::Public,
+        "commons" => Reach::Commons,
+        other => return Ok(response::bad_request(&format!("unknown reach: {other}"))),
+    };
+
+    let coupling = Coupling {
+        knowledge: input
+            .envelope
+            .coupling
+            .knowledge
+            .as_deref()
+            .map(cid::Cid::from_str)
+            .transpose()
+            .map_err(|e| StorageError::InvalidInput(format!("bad knowledge cid: {e}")))?,
+        value: input
+            .envelope
+            .coupling
+            .value
+            .as_deref()
+            .map(cid::Cid::from_str)
+            .transpose()
+            .map_err(|e| StorageError::InvalidInput(format!("bad value cid: {e}")))?,
+        governance: input
+            .envelope
+            .coupling
+            .governance
+            .as_deref()
+            .map(cid::Cid::from_str)
+            .transpose()
+            .map_err(|e| StorageError::InvalidInput(format!("bad governance cid: {e}")))?,
+    };
+
+    let claims = input
+        .envelope
+        .claims
+        .iter()
+        .map(|s| cid::Cid::from_str(s))
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| StorageError::InvalidInput(format!("bad claims cid: {e}")))?;
+
+    let supersedes = input
+        .envelope
+        .supersedes
+        .as_deref()
+        .map(cid::Cid::from_str)
+        .transpose()
+        .map_err(|e| StorageError::InvalidInput(format!("bad supersedes cid: {e}")))?;
+
+    let sig_bytes = hex::decode(&input.envelope.proof.signature)
+        .map_err(|e| StorageError::InvalidInput(format!("bad signature hex: {e}")))?;
+    if sig_bytes.len() != 64 {
+        return Ok(response::bad_request("signature must decode to 64 bytes"));
+    }
+
+    // issued_at is an RFC3339 String in the wire view. Parse for the Envelope.
+    let issued_at = chrono::DateTime::parse_from_rfc3339(&input.envelope.issued_at)
+        .map_err(|e| StorageError::InvalidInput(format!("bad issuedAt: {e}")))?
+        .with_timezone(&chrono::Utc);
+
+    let envelope = Envelope {
+        cid,
+        kind,
+        schema_ref,
+        schema_key: input.envelope.schema_key,
+        reach,
+        coupling,
+        claims,
+        supersedes,
+        superseded_by: None, // server-derived
+        issued_at,
+        proof: Signature::ed25519(signer, sig_bytes),
+    };
+
+    let payload = hex::decode(&input.payload)
+        .map_err(|e| StorageError::InvalidInput(format!("bad payload hex: {e}")))?;
+
+    let epr = Epr { envelope, payload };
+
+    let store = default_epr_store();
+    let mut conn = get_conn(pool)?;
+    let result = store.put(&mut conn, epr)?;
+
+    // Idempotent: 200 on both new and exact-match re-put. Mismatched bytes under
+    // the same CID are rejected as InvalidInput by LocalEprStore::put.
+    let body = serde_json::to_vec(&result)
+        .map_err(|e| StorageError::Database(format!("serialize: {e}")))?;
+    Ok(Response::builder()
+        .status(StatusCode::OK)
+        .header(hyper::header::CONTENT_TYPE, "application/json")
+        .body(Full::new(Bytes::from(body)))
+        .unwrap())
+}
+
+// ---------------------------------------------------------------------------
+// GET /api/v1/epr  (list with filters + pagination)
+// ---------------------------------------------------------------------------
 
 async fn list_epr(
-    _req: Request<Incoming>,
-    _pool: &DbPool,
+    req: Request<Incoming>,
+    pool: &DbPool,
     _ctx: &AppContext,
 ) -> Result<Response<Full<Bytes>>, StorageError> {
-    Ok(response::not_found("not implemented — Task 16")) // Task 16
-}
+    use crate::db::epr_atoms::EprListQuery;
 
-async fn post_epr(
-    _req: Request<Incoming>,
-    _pool: &DbPool,
-    _ctx: &AppContext,
-) -> Result<Response<Full<Bytes>>, StorageError> {
-    Ok(response::not_found("not implemented — Task 17")) // Task 17
+    let query = req.uri().query().unwrap_or("");
+
+    let caller_authed = req
+        .headers()
+        .get(hyper::header::AUTHORIZATION)
+        .and_then(|h| h.to_str().ok())
+        .map(|s| !s.trim().is_empty())
+        .unwrap_or(false);
+
+    let mut list_query = EprListQuery {
+        limit: 50,
+        ..Default::default()
+    };
+
+    for kv in query.split('&') {
+        if let Some(v) = kv.strip_prefix("kind=") {
+            list_query.kind = Some(v.into());
+        } else if let Some(v) = kv.strip_prefix("reach=") {
+            list_query.reach = Some(v.into());
+        } else if let Some(v) = kv.strip_prefix("schemaRef=") {
+            list_query.schema_ref = Some(v.into());
+        } else if let Some(v) = kv.strip_prefix("after=") {
+            list_query.after_cid = Some(v.into());
+        } else if let Some(v) = kv.strip_prefix("limit=") {
+            if let Ok(n) = v.parse::<i64>() {
+                list_query.limit = n.clamp(1, 200);
+            }
+        }
+    }
+
+    // Unauthed callers: restrict to commons/public.
+    if !caller_authed {
+        if let Some(r) = &list_query.reach {
+            if !matches!(r.as_str(), "commons" | "public") {
+                // Caller asked for a restricted reach they cannot access — return empty.
+                return Ok(response::ok(&crate::views::EprListView {
+                    items: vec![],
+                    next_cursor: None,
+                }));
+            }
+        } else {
+            // No reach filter supplied — default to commons so unauthenticated callers
+            // only see public-domain EPRs. Authed callers see everything by default.
+            list_query.reach = Some("commons".into());
+        }
+    }
+
+    let store = default_epr_store();
+    let mut conn = get_conn(pool)?;
+    let (atoms, next_cursor) = store.list(&mut conn, &list_query)?;
+
+    // Rehydrate each atom to build EprEnvelopeView (N+1 is acceptable for Phase 2a;
+    // page size is clamped to 200, and a joined query can land in Phase 2b if needed).
+    let mut items: Vec<EprEnvelopeView> = Vec::with_capacity(atoms.len());
+    for atom in &atoms {
+        if let Some(outcome) = store.fetch(&mut conn, &atom.cid)? {
+            items.push(to_envelope_view(&outcome.fetched));
+        }
+    }
+
+    Ok(response::ok(&crate::views::EprListView { items, next_cursor }))
 }

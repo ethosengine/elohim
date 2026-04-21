@@ -6795,3 +6795,19 @@ pub struct EprPublishInput {
     /// Hex-encoded payload bytes.
     pub payload: String,
 }
+
+/// Wire view for the providers endpoint.
+///
+/// Source of truth: peer providers advertising that they hold the atom at the
+/// given cid. Phase 2a returns ["local"] when held locally, [] otherwise.
+/// Phase 2c extends with Kad DHT provider records.
+/// Category C — operational (DHT query, reconstructed per request).
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct EprProvidersView {
+    /// CIDv1 base32 of the queried atom.
+    pub cid: String,
+    /// Peer identifiers — "local" for this node, or libp2p PeerId for remote peers.
+    pub providers: Vec<String>,
+}
