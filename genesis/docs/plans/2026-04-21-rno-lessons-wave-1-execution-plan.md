@@ -214,6 +214,11 @@ Do not proceed to Wave 2 from this session. Orchestration holds the vision; this
 
 ## 4. Wave 1 outcome (filled in at close)
 
+> **Reshape update 2026-04-21 (later same day).** A second session ran an
+> expanded reshape pass. Original outcome is preserved below for traceability.
+> The reshape outcome (commits, brainstorm spec, schema test, sweettest spike
+> verdict, husky hook, Jenkins wiring) is appended at §4a.
+
 **Status:** Partially executed 2026-04-21 (single sprint session, uncommitted).
 
 ### Sprint 1.A outcome — DNA manifest hygiene
@@ -420,3 +425,205 @@ Wave 1.
   validation uses the steward yet. The orchestration session should decide
   whether content authorship really needs a founding-steward anchor, or
   whether lamad should drop to federation-native alongside infrastructure.
+
+---
+
+## 4a. Reshape outcome (2026-04-21, later same day)
+
+Expanded-scope reshape sprint. Goal: commit the work, run the deferred
+brainstorm, add the schema contract test, run a sweettest-in-Che spike,
+wire husky, push with husky engaged, update this plan. Result: everything
+except the sweettest green-in-Che milestone landed. Spike hit a real
+environment blocker that needs an orchestration call.
+
+### Branch and commits
+
+Feature branch `wave1-manifest-hygiene-and-sweettest` pushed to
+`origin/wave1-manifest-hygiene-and-sweettest`, 11 commits beyond `dev`:
+
+```
+367d1286 ci(holochain): add manifest-hygiene stage to DNA pipeline
+af410429 chore(orchestrator): register manifest-hygiene in DNA build-manifest
+cb128cde docs(holochain): README for manifest-hygiene crate
+06f704d8 chore(husky): run manifest-hygiene schema test on dna.yaml/happ.yaml changes
+265858ba test(holochain): sweettest compile — enable webrtc backend + document Che blocker
+948b02ad test(holochain): manifest-hygiene schema contract test
+d4aadee5 docs(holochain): bootstrap-steward authority frame spec + module docstring refresh
+f841773e test(holochain): sweettest workspace scaffolding for 5 DNAs
+c1a23bb2 docs(holochain): forward-compat policy for DNA lineage
+462609c8 feat(holochain): port bootstrap-steward pattern to mishpat/node-registry/lamad
+4a0a397a feat(holochain): DNA manifest hygiene — stable seeds, lineage, modifiers
+3ffb9ccb docs(plans): R&O-lessons wave plans and cross-wave guidance
+```
+
+Branch pushed twice with husky engaged (no `HUSKY=0`). Both pushes passed.
+The first push gate emitted `schema-dna` only (manifest-hygiene wasn't yet
+registered in `build-manifest.json`); the third push (after
+`cb128cde`) emitted both `schema-dna` and `manifest-hygiene`, and
+`manifest-hygiene` ran 10 tests in 0.00s inside a 7s total gate. The
+husky feedback loop is now real.
+
+### §1.2 Q1 brainstorm result
+
+Ran as a written design memo rather than live collaborative dialogue
+(orchestration session holds the vision but was not in the brainstorm
+seat). Memo at
+`genesis/docs/superpowers/specs/2026-04-21-bootstrap-steward-authority-frame-design.md`.
+
+Outcome: **validate option (b) — persistent identity, graduated authority.**
+
+Rationale: (a) dissolution-at-quorum requires a quorum mechanism that does
+not exist and should not be invented just for bootstrap management; (c)
+rotation collapses to (b) given Holochain's immutable `progenitor_pubkey`
+modifier; (b) composes cleanly with the existing
+`STEWARD_CAPABILITY_TIERS` graduated-capability framework — bootstrap
+steward is the **initial `constitutional`-tier steward at DNA install
+time**.
+
+Code change: doc-only. The four `bootstrap_steward.rs` module headers
+now explicitly state that the module exposes **identity only**; authority
+checks must flow through the stewardship-grant resolution layer, not
+through `is_bootstrap_steward`. No integrity-zome gates added (deliberately
+— adding them now would calcify exclusive authority, the opposite of
+graduated authority).
+
+Scaffolding gap openly documented in the memo: until
+`StewardshipGrant`-based validators are wired in the four bootstrap-
+steward DNAs, practical authority defaults to the bootstrap pubkey by
+lack-of-alternative. Wave 2+ must close this gap before any non-alpha
+network publishes.
+
+### Schema contract test location
+
+`elohim/holochain/tests/manifest-hygiene/` — standalone Cargo crate
+(not a member of the sweettest workspace; deliberately isolated from the
+holochain dep graph). Ten assertions over `dna.yaml` × 5 + `happ.yaml`:
+
+1. `manifest_version == "1"` on every `dna.yaml`
+2. `dna.yaml` `name` matches expected
+3. `network_seed == elohim_<dna>_alpha`
+4. Top-level `lineage:` present; entries look like DNA hashes
+5. `happ.yaml` version 1, all 5 roles declared
+6. Every role has `clone_limit: 0`
+7. happ role seeds match dna.yaml seeds (cross-file coherence)
+8. Bootstrap-steward DNAs declare `progenitor_pubkey` in modifiers
+9. Infrastructure does NOT declare `progenitor_pubkey`
+10. No bare `progenitor` vocabulary in dna.yaml (surface-language check)
+
+Empirical run time: 0.01s. All 10 green on first successful push.
+
+### Sweettest-in-Che spike outcome
+
+**Verdict: spike blocked by environment, not by design.**
+
+- Removed `default-features = false` from the `holochain` dep. Without
+  defaults, `tx5-connection-0.8.1` fails at compile with
+  `fn default() -> Self {}` for `BackendModule` — its `Default` impl is
+  feature-gated and collapses when no webrtc backend is enabled.
+- With defaults enabled, `datachannel-vendored` kicks in. It builds
+  libdatachannel from source via a `cmake` build script.
+- **Che's `base-developer-image:ubi10-latest` does not ship cmake.**
+  Compile fails at `cmake-0.1.58/src/lib.rs:1132:5`:
+  `failed to execute command: No such file or directory`.
+- Alternatives considered: `backend-go-pion` needs `go` (not installed);
+  user-level `sudo dnf install cmake` is sandbox-denied (infrastructure
+  modification outside repo scope); using `/opt/holochain/bin/holochain`
+  externally doesn't apply because sweettest is in-process.
+
+Sweettest test bodies were NOT unignored. The imagodei test body already
+describes the bootstrap-steward identity contract (get returns install-
+time pubkey; second agent is not the steward) — it just cannot
+compile-verify in Che without cmake.
+
+Documented in `elohim/holochain/tests/sweettest/README.md` under
+"Che compile blocker (2026-04-21)" with three orchestration options:
+
+1. Add `cmake` + `make` to `Dockerfile` (one-line dnf install add-on).
+   Cheapest path. Image rebuild on next workspace respin.
+2. Run sweettest exclusively in Jenkins where the build agent has cmake.
+3. Switch to `backend-go-pion` and add `go` to the image.
+
+The spike did not push a branch that works around the problem — per the
+reshape instruction ("we want real feedback, not a false green").
+
+### Husky hook changes
+
+- `.husky/pre-push`: new `manifest-hygiene` project in the grep-based
+  fallback detector + `manifest-hygiene` case in both gate-runner switches
+  (schema-style path at line 294 and full-project path at line 400).
+- `elohim/holochain/dna/build-manifest.json`: new `manifest-hygiene` step
+  + `gate.projects` entry so the graph walker (which takes precedence
+  over the grep fallback when a manifest matches) also emits it.
+- Invocation:
+  `RUSTFLAGS="" cargo test --manifest-path elohim/holochain/tests/manifest-hygiene/Cargo.toml`.
+- Verified: push of `cb128cde` triggered `manifest-hygiene: PASSED (6s)`
+  with all 10 assertions green.
+
+### Jenkins pipeline wiring
+
+- `elohim/holochain/dna/Jenkinsfile`: new `Manifest Hygiene` stage
+  between `Setup Version` and `Setup Nix Cache`. Runs the same
+  `cargo test` the husky hook runs, before the 20-40 min DNA WASM build
+  so manifest drift fails fast.
+- Gated by `shouldRunStep('manifest-hygiene')` so the existing
+  partial-rebuild logic honours it.
+- The sweettest Jenkins stage is **not wired here** — that's
+  out-of-scope (`/shift` territory) and depends on the cmake decision
+  above. The sweettest README captures the pending work.
+
+### `feedback_shift_measure_jenkins.md` — nuance suggested
+
+Current memory rule: "`/shift measures → Jenkins` — Che has no docker/
+k8s/holochain; shift Objective measures MUST use Jenkins MCP, not local
+shell."
+
+What the spike revealed: the rule is **specifically about shift
+Objective measures** (feature completion, pipeline green). **Dev-time
+verification that does not require a conductor** (pure YAML parsing,
+type checks, JSON schema validation, formatter/linter checks) is a
+legitimate Che local concern and can / should gate at husky.
+
+Proposed memory update (orchestration to decide):
+
+> Shift Objective measures live in Jenkins (local Che has no
+> docker/k8s/holochain). Dev-time pre-push gates that don't need those
+> runtimes (schema contracts, type checks, lint) can and should run
+> locally in Che via husky — these catch drift before Jenkins spins.
+> The split is about **what you're measuring**, not **where you run
+> tests**.
+
+### What's deferred to /shift
+
+- **Actually running the holochain pipeline on this branch.** Trigger
+  the elohim-holochain pipeline to verify: (a) the new Manifest Hygiene
+  Jenkins stage runs cleanly, (b) the bootstrap-steward ports compile
+  under Nix, (c) the full DNA WASM build + hApp pack still completes.
+- **Sweettest Jenkins integration.** Depends on cmake decision. Five
+  per-DNA stages in parallel per §2.1.2; all must gate green.
+- **Remaining DNA test bodies** for mishpat / lamad / node_registry /
+  infrastructure. The imagodei test body exists; the four others carry
+  minimal stubs plus TODOs. Normal sprint work — not a reshape concern.
+- **Scaffolding gap: `StewardshipGrant`-based validators** in the four
+  bootstrap-steward DNAs. Without this, "graduated authority" is only
+  half-implemented (see §4a brainstorm outcome). Belongs with each
+  DNA's feature sprints.
+- **Pre-existing `sovereignty`/`sovereign` vocabulary** in
+  `elohim/holochain/docs/*.md` — excluded from this reshape per the
+  instruction. Editorial sweep belongs in its own sprint.
+
+### Reshape verdict
+
+**Pass with reshape remainder.** The reshape hit its primary goal —
+dev-time feedback for manifest drift is now real and husky-gated in Che.
+The one explicit stretch goal (sweettest green-in-Che) is blocked by a
+concrete, documented environment gap (cmake) that orchestration can
+resolve in one of three well-scoped ways. Everything else — commits,
+brainstorm, schema test, husky wiring, Jenkins wiring — landed.
+
+Orchestration should:
+1. Decide the cmake question (image add / Jenkins-only / backend-go-pion).
+2. Trigger the elohim-holochain pipeline on
+   `wave1-manifest-hygiene-and-sweettest` to verify the Jenkins side.
+3. Resolve the nuance on `feedback_shift_measure_jenkins.md` (update
+   memory or reject the proposed wording).
+4. Only then consider Wave 2 spawn-readiness.
