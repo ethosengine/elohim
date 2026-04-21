@@ -1,9 +1,22 @@
 # Lamad DNA - Content & Learning
+#
+# Manifest hygiene (Wave 1 / §7):
+# - manifest_version "1": Holochain 0.6 schema.
+# - network_seed "elohim_lamad_alpha": stability contract. The _alpha suffix means
+#   "we WILL reset this network on breaking changes; do not treat as production."
+#   Upgrade to _beta or drop the suffix when we commit to persistence.
+# - lineage []: this DNA hash is the genesis ancestor. Add previous hashes here on
+#   breaking integrity changes per the forward-compat policy (elohim/holochain/README.md).
+# - clone_limit is declared per-role in happ.yaml, not here (default-deny 0).
+#
+# Lamad does not currently require a bootstrap-steward (content authorship is
+# author-scoped, not network-scoped). Revisit if content stewardship roles
+# require chain-of-trust from a founding steward.
 ---
-manifest_version: "0"
+manifest_version: "1"
 name: lamad
 integrity:
-  network_seed: ~
+  network_seed: "elohim_lamad_alpha"
   properties: ~
   zomes:
     - name: content_store_integrity
@@ -15,3 +28,5 @@ coordinator:
       path: "target/wasm32-unknown-unknown/release/content_store.wasm"
       dependencies:
         - name: content_store_integrity
+
+lineage: []

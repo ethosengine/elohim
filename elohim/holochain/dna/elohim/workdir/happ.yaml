@@ -1,8 +1,22 @@
 # Elohim hApp Manifest
+#
+# Manifest hygiene (Wave 1 / §7):
+# - manifest_version "1": Holochain 0.6 schema.
+# - Per-role `modifiers` block declares network_seed + properties (including
+#   bootstrap-steward pubkey where applicable, using Holochain's primitive field
+#   name `progenitor_pubkey`; our surface language is "bootstrap steward" —
+#   see project_no_sovereignty_stewardship_over_ownership.md).
+# - clone_limit: 0 is default-deny. Revisit when per-household infrastructure
+#   cells are designed.
+# - `progenitor_pubkey` below is a placeholder ("~"). Before publishing an
+#   alpha network, override via runtime modifiers or replace here with the
+#   founding steward's agent pubkey (uhCAk...).
+#
 # Rebuilt: 2025-12-14 - fixed getrandom wasm_js issue
 # Updated: 2025-12-25 - multi-DNA architecture (lamad, infrastructure, imagodei)
+# Updated: 2026-04-21 - Wave 1 §7 manifest hygiene (modifiers, bootstrap steward)
 ---
-manifest_version: "0"
+manifest_version: "1"
 name: elohim
 description: "Elohim Protocol hApp - Decentralized Learning & Identity"
 roles:
@@ -13,36 +27,63 @@ roles:
       deferred: false
     dna:
       path: "lamad.dna"
+      modifiers:
+        network_seed: "elohim_lamad_alpha"
+        properties: ~
+      installed_hash: ~
+      clone_limit: 0
 
-  # Infrastructure DNA - Doorway Federation & Network Ops
+  # Infrastructure DNA - Doorway Federation & Network Ops (federation-native, no bootstrap steward)
   - name: infrastructure
     provisioning:
       strategy: create
       deferred: false
     dna:
       path: "infrastructure.dna"
+      modifiers:
+        network_seed: "elohim_infrastructure_alpha"
+        properties: ~
+      installed_hash: ~
+      clone_limit: 0
 
-  # Imago Dei DNA - Identity & Relationships
+  # Imago Dei DNA - Identity & Relationships (bootstrap-steward reference impl)
   - name: imagodei
     provisioning:
       strategy: create
       deferred: false
     dna:
       path: "imagodei.dna"
+      modifiers:
+        network_seed: "elohim_imagodei_alpha"
+        properties:
+          progenitor_pubkey: ~  # bootstrap steward; override before alpha publish
+      installed_hash: ~
+      clone_limit: 0
 
-  # Mishpat DNA - Governance
+  # Mishpat DNA - Governance (bootstrap-steward)
   - name: mishpat
     provisioning:
       strategy: create
       deferred: false
     dna:
       path: "mishpat.dna"
+      modifiers:
+        network_seed: "elohim_mishpat_alpha"
+        properties:
+          progenitor_pubkey: ~  # bootstrap steward; override before alpha publish
+      installed_hash: ~
+      clone_limit: 0
 
-  # Node Registry DNA - Discovery & Health
+  # Node Registry DNA - Node Admission (bootstrap-steward)
   - name: node_registry
     provisioning:
       strategy: create
       deferred: false
     dna:
       path: "../../node-registry/node-registry.dna"
-
+      modifiers:
+        network_seed: "elohim_node_registry_alpha"
+        properties:
+          progenitor_pubkey: ~  # bootstrap steward; override before alpha publish
+      installed_hash: ~
+      clone_limit: 0

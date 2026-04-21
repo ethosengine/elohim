@@ -1,8 +1,19 @@
+# Node Registry DNA - Node Discovery & Admission
+#
+# Manifest hygiene (Wave 1 / §7):
+# - manifest_version "1": Holochain 0.6 schema.
+# - network_seed "elohim_node_registry_alpha": stability contract. _alpha suffix
+#   means "we WILL reset this network on breaking changes; do not treat as production."
+# - lineage []: this hash is the genesis ancestor.
+# - clone_limit is per-role in happ.yaml (default-deny 0).
+#
+# Bootstrap-steward: node-registry uses the bootstrap-steward pattern (node
+# admission needs a bootstrap authority). See happ.yaml modifiers.properties.
 ---
-manifest_version: "0"
+manifest_version: "1"
 name: node_registry
 integrity:
-  network_seed: ~
+  network_seed: "elohim_node_registry_alpha"
   properties: ~
   zomes:
     - name: node_registry_integrity
@@ -14,3 +25,5 @@ coordinator:
       path: target/wasm32-unknown-unknown/release/node_registry_coordinator.wasm
       dependencies:
         - name: node_registry_integrity
+
+lineage: []
