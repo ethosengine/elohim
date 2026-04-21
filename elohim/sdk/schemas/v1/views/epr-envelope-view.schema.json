@@ -1,0 +1,42 @@
+{
+  "$id": "epr:schema:view:epr-envelope",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "EprEnvelopeView",
+  "description": "Source of truth: EPR atom (self-notarized via content-address + Ed25519). Wire-string projection of Envelope for HTTP consumers. CIDs are CIDv1 base32 strings. Category A — notarized via content-derived CID + signer proof.",
+  "type": "object",
+  "required": ["cid", "kind", "schemaRef", "schemaKey", "reach", "coupling", "claims", "issuedAt", "proof"],
+  "additionalProperties": false,
+  "properties": {
+    "cid": { "type": "string", "description": "CIDv1 base32" },
+    "kind": { "$ref": "../enums/epr-kind.schema.json" },
+    "schemaRef": { "type": "string", "description": "CIDv1 base32 of the Manifest EPR" },
+    "schemaKey": { "type": "string", "description": "Content-type key within the referenced manifest" },
+    "reach": { "$ref": "../enums/reach.schema.json" },
+    "coupling": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "knowledge": { "type": ["string", "null"], "description": "CIDv1 base32 of Claim-EPR" },
+        "value": { "type": ["string", "null"], "description": "CIDv1 base32 of EconomicEvent-EPR" },
+        "governance": { "type": ["string", "null"], "description": "CIDv1 base32 of Governance-EPR" }
+      }
+    },
+    "claims": {
+      "type": "array",
+      "items": { "type": "string", "description": "CIDv1 base32" }
+    },
+    "supersedes": { "type": ["string", "null"], "description": "CIDv1 base32" },
+    "supersededBy": { "type": ["string", "null"], "description": "CIDv1 base32 (derived from index, not in canonical bytes)" },
+    "issuedAt": { "type": "string", "format": "date-time" },
+    "proof": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["signer", "algorithm", "signature"],
+      "properties": {
+        "signer": { "type": "string", "description": "CIDv1 base32 of Agent EPR" },
+        "algorithm": { "type": "string", "const": "ed25519" },
+        "signature": { "type": "string", "pattern": "^[0-9a-f]{128}$", "description": "Hex-encoded 64 bytes" }
+      }
+    }
+  }
+}

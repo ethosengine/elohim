@@ -1,0 +1,37 @@
+{
+  "$id": "epr:schema:view:epr-verify",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "EprVerifyView",
+  "description": "Source of truth: EPR atom verification result (derived on request). Category C — operational (reconstructed per request, not persisted).",
+  "type": "object",
+  "required": ["cid", "verified", "stagesRun"],
+  "additionalProperties": false,
+  "properties": {
+    "cid": { "type": "string", "description": "CIDv1 base32 of the EPR being verified" },
+    "verified": { "type": "boolean", "description": "true iff all run stages passed" },
+    "stagesRun": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["canonicalization", "signature", "coupling", "payloadSchema"]
+      }
+    },
+    "stagesSkipped": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["canonicalization", "signature", "coupling", "payloadSchema"]
+      },
+      "description": "Stages that were not run (e.g., payloadSchema deferred to Phase 3)"
+    },
+    "error": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["stage", "message"],
+      "properties": {
+        "stage": { "type": "string", "enum": ["canonicalization", "signature", "coupling", "payloadSchema"] },
+        "message": { "type": "string" }
+      }
+    }
+  }
+}

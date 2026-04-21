@@ -1,0 +1,13 @@
+{
+  "$id": "epr:schema:input:epr-publish",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "EprPublishInput",
+  "description": "Input body for POST /api/v1/epr. Accepts a fully-signed EPR from the caller; server validates signature + coupling before storing.",
+  "type": "object",
+  "required": ["envelope", "payload"],
+  "additionalProperties": false,
+  "properties": {
+    "envelope": { "$ref": "../views/epr-envelope-view.schema.json" },
+    "payload": { "type": "string", "description": "Hex-encoded payload bytes" }
+  }
+}
