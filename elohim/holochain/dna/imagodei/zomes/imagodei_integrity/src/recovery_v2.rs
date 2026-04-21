@@ -421,6 +421,381 @@ fn check_freeze_floor(
     Ok(None)
 }
 
+// =============================================================================
+// Unit Tests (pure-logic helpers; no HDI runtime required)
+// =============================================================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ed25519_dalek::{Signer, SigningKey};
+
+    // ---- Layer helpers ----
+
+    #[test]
+    fn test_authority_layer_name_variants() {
+        assert_eq!(authority_layer_name(&RecoveryAuthority::IntimateQuorum { witness_hashes: vec![] }), LAYER_INTIMATE);
+        assert_eq!(authority_layer_name(&RecoveryAuthority::CommunityConsensus { challenge_hash: fake_action_hash() }), LAYER_COMMUNITY);
+        assert_eq!(authority_layer_name(&RecoveryAuthority::GovernanceAct { grant_hash: fake_action_hash(), resolution_hash: fake_action_hash() }), LAYER_GOVERNANCE);
+        assert_eq!(authority_layer_name(&RecoveryAuthority::NetworkWitness { witness_entries: vec![], consensus_threshold_met_at: Timestamp::from_micros(0), purpose: NetworkWitnessPurpose::Rescue }), LAYER_NETWORK);
+        assert_eq!(authority_layer_name(&RecoveryAuthority::CryptographicQuorum { stewardship_hash: fake_action_hash(), quorum_signature: vec![] }), LAYER_CRYPTOGRAPHIC);
+    }
+
+    #[test]
+    fn test_authority_layer_rank_ordered() {
+        assert_eq!(authority_layer_rank("intimate"), Some(1));
+        assert_eq!(authority_layer_rank("community"), Some(2));
+        assert_eq!(authority_layer_rank("governance"), Some(3));
+        assert_eq!(authority_layer_rank("network"), Some(4));
+    }
+
+    #[test]
+    fn test_authority_layer_rank_cryptographic_is_none() {
+        assert_eq!(authority_layer_rank("cryptographic"), None);
+    }
+
+    #[test]
+    fn test_authority_layer_rank_unknown_is_none() {
+        assert_eq!(authority_layer_rank("bogus"), None);
+    }
+
+    // ---- IntimateQuorum ----
+
+    #[test]
+    fn test_intimate_happy_path() {
+        let req = mk_request(Some("human-abc"), 2);
+        let witnesses = vec![
+            mk_witness("human-abc", None, fake_agent_pubkey(1)),
+            mk_witness("human-abc", None, fake_agent_pubkey(2)),
+        ];
+        assert!(matches!(check_intimate_quorum_rules(&req, &witnesses), ValidateCallbackResult::Valid));
+    }
+
+    #[test]
+    fn test_intimate_below_absolute_floor() {
+        let req = mk_request(Some("human-abc"), 2);
+        let witnesses = vec![mk_witness("human-abc", None, fake_agent_pubkey(1))];
+        assert_rejects(check_intimate_quorum_rules(&req, &witnesses), "requires at least 2");
+    }
+
+    #[test]
+    fn test_intimate_below_required_witness_count() {
+        let req = mk_request(Some("human-abc"), 3);
+        let witnesses = vec![
+            mk_witness("human-abc", None, fake_agent_pubkey(1)),
+            mk_witness("human-abc", None, fake_agent_pubkey(2)),
+        ];
+        assert_rejects(check_intimate_quorum_rules(&req, &witnesses), "requires 3");
+    }
+
+    #[test]
+    fn test_intimate_duplicate_author() {
+        let req = mk_request(Some("human-abc"), 2);
+        let dup = fake_agent_pubkey(1);
+        let witnesses = vec![
+            mk_witness("human-abc", None, dup.clone()),
+            mk_witness("human-abc", None, dup),
+        ];
+        assert_rejects(check_intimate_quorum_rules(&req, &witnesses), "distinct authors");
+    }
+
+    #[test]
+    fn test_intimate_revoked_witness() {
+        let req = mk_request(Some("human-abc"), 2);
+        let witnesses = vec![
+            mk_witness("human-abc", None, fake_agent_pubkey(1)),
+            mk_witness("human-abc", Some("2026-01-01"), fake_agent_pubkey(2)),
+        ];
+        assert_rejects(check_intimate_quorum_rules(&req, &witnesses), "revoked");
+    }
+
+    #[test]
+    fn test_intimate_witnesses_disagree_on_human_id() {
+        let req = mk_request(Some("human-abc"), 2);
+        let witnesses = vec![
+            mk_witness("human-abc", None, fake_agent_pubkey(1)),
+            mk_witness("human-xyz", None, fake_agent_pubkey(2)),
+        ];
+        assert_rejects(check_intimate_quorum_rules(&req, &witnesses), "disagree on human_id");
+    }
+
+    #[test]
+    fn test_intimate_witness_id_mismatches_request() {
+        let req = mk_request(Some("human-abc"), 2);
+        let witnesses = vec![
+            mk_witness("human-xyz", None, fake_agent_pubkey(1)),
+            mk_witness("human-xyz", None, fake_agent_pubkey(2)),
+        ];
+        assert_rejects(check_intimate_quorum_rules(&req, &witnesses), "does not match RecoveryRequest.human_id");
+    }
+
+    #[test]
+    fn test_intimate_request_human_id_missing() {
+        let req = mk_request(None, 2);
+        let witnesses = vec![
+            mk_witness("human-abc", None, fake_agent_pubkey(1)),
+            mk_witness("human-abc", None, fake_agent_pubkey(2)),
+        ];
+        assert_rejects(check_intimate_quorum_rules(&req, &witnesses), "RecoveryRequest.human_id");
+    }
+
+    // ---- CryptographicQuorum ----
+
+    #[test]
+    fn test_cryptographic_happy_path() {
+        let (stewardship, signing_key) = mk_stewardship_with_signer();
+        let new_agent = [0x42u8; 39];
+        let req_hash = [0x55u8; 39];
+        let sig = sign_rotation(&signing_key, &new_agent, &req_hash);
+        assert!(matches!(
+            check_cryptographic_quorum_rules(&stewardship, &new_agent, &req_hash, &sig),
+            ValidateCallbackResult::Valid
+        ));
+    }
+
+    #[test]
+    fn test_cryptographic_sig_wrong_length() {
+        let (stewardship, _) = mk_stewardship_with_signer();
+        let bad_sig = vec![0u8; 63];
+        assert_rejects(
+            check_cryptographic_quorum_rules(&stewardship, &[0; 39], &[0; 39], &bad_sig),
+            "must be 64 bytes",
+        );
+    }
+
+    #[test]
+    fn test_cryptographic_bad_base64() {
+        let mut stewardship = mk_stewardship_with_signer().0;
+        stewardship.shard_commitment_hash = "!!!not-base64!!!".to_string();
+        let sig = vec![0u8; 64];
+        assert_rejects(
+            check_cryptographic_quorum_rules(&stewardship, &[0; 39], &[0; 39], &sig),
+            "base64",
+        );
+    }
+
+    #[test]
+    fn test_cryptographic_wrong_key_length() {
+        let mut stewardship = mk_stewardship_with_signer().0;
+        // 16 bytes, not 32
+        use base64::{engine::general_purpose::STANDARD, Engine as _};
+        stewardship.shard_commitment_hash = STANDARD.encode([0u8; 16]);
+        let sig = vec![0u8; 64];
+        assert_rejects(
+            check_cryptographic_quorum_rules(&stewardship, &[0; 39], &[0; 39], &sig),
+            "expected 32 bytes",
+        );
+    }
+
+    #[test]
+    fn test_cryptographic_sig_wrong_message() {
+        let (stewardship, signing_key) = mk_stewardship_with_signer();
+        let sig = sign_rotation(&signing_key, &[0xAA; 39], &[0xBB; 39]);
+        // Verify against different message.
+        assert_rejects(
+            check_cryptographic_quorum_rules(&stewardship, &[0xCC; 39], &[0xBB; 39], &sig),
+            "verification failed",
+        );
+    }
+
+    #[test]
+    fn test_cryptographic_sig_wrong_key() {
+        let (mut stewardship, signing_key) = mk_stewardship_with_signer();
+        let sig = sign_rotation(&signing_key, &[0xAA; 39], &[0xBB; 39]);
+        // Replace the commitment with a different valid key.
+        let other = SigningKey::from_bytes(&[7u8; 32]);
+        use base64::{engine::general_purpose::STANDARD, Engine as _};
+        stewardship.shard_commitment_hash = STANDARD.encode(other.verifying_key().to_bytes());
+        assert_rejects(
+            check_cryptographic_quorum_rules(&stewardship, &[0xAA; 39], &[0xBB; 39], &sig),
+            "verification failed",
+        );
+    }
+
+    #[test]
+    fn test_cryptographic_superseded_stewardship_rejects() {
+        let (mut stewardship, signing_key) = mk_stewardship_with_signer();
+        stewardship.rotated_at = Some("2026-01-01T00:00:00Z".to_string());
+        let sig = sign_rotation(&signing_key, &[0; 39], &[0; 39]);
+        assert_rejects(
+            check_cryptographic_quorum_rules(&stewardship, &[0; 39], &[0; 39], &sig),
+            "superseded",
+        );
+    }
+
+    // ---- Freeze-floor ----
+
+    #[test]
+    fn test_freeze_floor_no_freezes_passes() {
+        let authority = RecoveryAuthority::IntimateQuorum { witness_hashes: vec![] };
+        assert_eq!(check_freeze_floor_rules(&authority, "human-abc", &[]), None);
+    }
+
+    #[test]
+    fn test_freeze_floor_same_layer_rejects() {
+        let freeze = mk_freeze("human-abc", true, Some("intimate"));
+        let authority = RecoveryAuthority::IntimateQuorum { witness_hashes: vec![] };
+        assert!(check_freeze_floor_rules(&authority, "human-abc", &[&freeze]).is_some());
+    }
+
+    #[test]
+    fn test_freeze_floor_lower_layer_rejects() {
+        let freeze = mk_freeze("human-abc", true, Some("governance"));
+        let authority = RecoveryAuthority::IntimateQuorum { witness_hashes: vec![] };
+        assert!(check_freeze_floor_rules(&authority, "human-abc", &[&freeze]).is_some());
+    }
+
+    #[test]
+    fn test_freeze_floor_higher_layer_passes() {
+        let freeze = mk_freeze("human-abc", true, Some("intimate"));
+        let authority = RecoveryAuthority::NetworkWitness {
+            witness_entries: vec![],
+            consensus_threshold_met_at: Timestamp::from_micros(0),
+            purpose: NetworkWitnessPurpose::Rescue,
+        };
+        assert_eq!(check_freeze_floor_rules(&authority, "human-abc", &[&freeze]), None);
+    }
+
+    #[test]
+    fn test_freeze_floor_none_layer_treated_as_intimate() {
+        let freeze = mk_freeze("human-abc", true, None);
+        let intimate = RecoveryAuthority::IntimateQuorum { witness_hashes: vec![] };
+        assert!(check_freeze_floor_rules(&intimate, "human-abc", &[&freeze]).is_some());
+
+        let community = RecoveryAuthority::CommunityConsensus { challenge_hash: fake_action_hash() };
+        assert_eq!(check_freeze_floor_rules(&community, "human-abc", &[&freeze]), None);
+    }
+
+    #[test]
+    fn test_freeze_floor_lifted_freeze_passes() {
+        let freeze = mk_freeze("human-abc", false, Some("intimate"));
+        let authority = RecoveryAuthority::IntimateQuorum { witness_hashes: vec![] };
+        assert_eq!(check_freeze_floor_rules(&authority, "human-abc", &[&freeze]), None);
+    }
+
+    #[test]
+    fn test_freeze_floor_different_human_passes() {
+        let freeze = mk_freeze("human-other", true, Some("intimate"));
+        let authority = RecoveryAuthority::IntimateQuorum { witness_hashes: vec![] };
+        assert_eq!(check_freeze_floor_rules(&authority, "human-abc", &[&freeze]), None);
+    }
+
+    // ---- Test fixtures ----
+
+    fn assert_rejects(r: ValidateCallbackResult, expected_substring: &str) {
+        match r {
+            ValidateCallbackResult::Invalid(msg) => {
+                assert!(
+                    msg.contains(expected_substring),
+                    "expected Invalid containing '{expected_substring}', got '{msg}'"
+                );
+            }
+            other => panic!("expected Invalid, got {other:?}"),
+        }
+    }
+
+    fn fake_action_hash() -> ActionHash {
+        ActionHash::from_raw_36(vec![0u8; 36])
+    }
+
+    fn fake_agent_pubkey(seed: u8) -> AgentPubKey {
+        let raw = vec![seed; 36];
+        AgentPubKey::from_raw_36(raw)
+    }
+
+    fn mk_request(human_id: Option<&str>, required: u32) -> super::super::RecoveryRequest {
+        super::super::RecoveryRequest {
+            human_agent_pubkey: fake_agent_pubkey(0xAA),
+            new_agent_pubkey: fake_agent_pubkey(0xBB),
+            hosting_doorway_pubkey: fake_agent_pubkey(0xCC),
+            proposed_authority: super::super::RecoveryAuthorityKind::IntimateQuorum,
+            request_nonce: vec![0u8; 16],
+            human_id: human_id.map(|s| s.to_string()),
+            required_witness_count: required,
+            created_at: Timestamp::from_micros(0),
+        }
+    }
+
+    fn mk_witness(
+        human_id: &str,
+        revoked_at: Option<&str>,
+        _author: AgentPubKey,
+    ) -> (super::super::HumanityWitness, AgentPubKey) {
+        let w = super::super::HumanityWitness {
+            id: "w1".to_string(),
+            human_id: human_id.to_string(),
+            witness_agent_id: "agent-x".to_string(),
+            attestation_type: "continuous".to_string(),
+            confidence: 1.0,
+            behavioral_hash: None,
+            evidence_json: None,
+            verification_method: None,
+            created_at: "2026-04-21".to_string(),
+            expires_at: "2027-04-21".to_string(),
+            revoked_at: revoked_at.map(|s| s.to_string()),
+        };
+        (w, _author)
+    }
+
+    fn mk_freeze(
+        human_id: &str,
+        is_active: bool,
+        frozen_at_layer: Option<&str>,
+    ) -> super::super::IdentityFreeze {
+        super::super::IdentityFreeze {
+            id: "f1".to_string(),
+            human_id: human_id.to_string(),
+            freeze_type: "total".to_string(),
+            frozen_capabilities: vec!["post".to_string()],
+            severity: "high".to_string(),
+            triggered_by: "anomaly-1".to_string(),
+            trigger_type: "anomaly".to_string(),
+            requires_verification: "humanity_witness".to_string(),
+            verification_attempts: 0,
+            last_verification_at: None,
+            is_active,
+            lifted_at: None,
+            lifted_by: None,
+            lift_reason: None,
+            frozen_at: "2026-04-21".to_string(),
+            expires_at: None,
+            frozen_at_layer: frozen_at_layer.map(|s| s.to_string()),
+        }
+    }
+
+    fn mk_stewardship_with_signer() -> (super::super::KeyStewardship, SigningKey) {
+        use base64::{engine::general_purpose::STANDARD, Engine as _};
+        let signing_key = SigningKey::from_bytes(&[3u8; 32]);
+        let vk_b64 = STANDARD.encode(signing_key.verifying_key().to_bytes());
+        let s = super::super::KeyStewardship {
+            id: "s1".to_string(),
+            human_id: "human-abc".to_string(),
+            key_shard_holders: vec!["a".to_string(), "b".to_string()],
+            threshold_m: 2,
+            total_shards_n: 2,
+            signing_policy: "normal".to_string(),
+            elevated_threshold: None,
+            key_generation_id: "gen-1".to_string(),
+            shard_commitment_hash: vk_b64,
+            created_at: "2026-04-21".to_string(),
+            updated_at: "2026-04-21".to_string(),
+            rotated_at: None,
+        };
+        (s, signing_key)
+    }
+
+    fn sign_rotation(
+        signing_key: &SigningKey,
+        new_agent: &[u8],
+        recovery_request_hash: &[u8],
+    ) -> Vec<u8> {
+        let mut message = Vec::with_capacity(new_agent.len() + recovery_request_hash.len());
+        message.extend_from_slice(new_agent);
+        message.extend_from_slice(recovery_request_hash);
+        signing_key.sign(&message).to_bytes().to_vec()
+    }
+}
+
 pub fn validate_key_rotation(
     rotation: &KeyRotation,
 ) -> ExternResult<ValidateCallbackResult> {
