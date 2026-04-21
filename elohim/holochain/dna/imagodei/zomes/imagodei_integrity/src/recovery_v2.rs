@@ -101,3 +101,49 @@ pub fn validate_recovery_seed_commitment(
     // further cryptographic verification happens in coordinator flows.
     Ok(ValidateCallbackResult::Valid)
 }
+
+// =============================================================================
+// RecoveryQuorumRequest
+// =============================================================================
+
+/// A request to rotate an agent key via seed-quorum recovery.
+/// Authored by the hosting doorway (the recovering human has no working cell).
+/// No authority is implied by authorship; authority comes from KeyRotation's
+/// quorum_signature verifying under the commitment's seed_public_half.
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct RecoveryQuorumRequest {
+    pub human_agent_pubkey: AgentPubKey,
+    pub seed_commitment_hash: ActionHash,
+    pub new_agent_pubkey: AgentPubKey,
+    pub hosting_doorway_pubkey: AgentPubKey,
+    pub recovery_mode: RecoveryMode,
+    pub request_nonce: Vec<u8>,      // 16 bytes random
+    pub created_at: Timestamp,
+}
+
+pub fn validate_recovery_quorum_request(
+    request: &RecoveryQuorumRequest,
+) -> ExternResult<ValidateCallbackResult> {
+    // Rule 1: request_nonce must be 16 bytes
+    if request.request_nonce.len() != 16 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "RecoveryQuorumRequest request_nonce must be exactly 16 bytes".to_string(),
+        ));
+    }
+    // Rule 2: seed_commitment_hash must be non-empty
+    // Further validation (existence on DHT, non-superseded) happens in
+    // must_get_valid_record during KeyRotation validation — the request itself
+    // is just a claim of intent, cheap to commit.
+    // Rule 3: human_agent_pubkey must differ from new_agent_pubkey
+    if request.human_agent_pubkey == request.new_agent_pubkey {
+        return Ok(ValidateCallbackResult::Invalid(
+            "RecoveryQuorumRequest new_agent_pubkey must differ from human_agent_pubkey"
+                .to_string(),
+        ));
+    }
+    // Rule 4: Stewarded mode requires a grant_hash; validation of grant-ness
+    // is deferred to Phase 2b (stewarded-specific validation branches in KeyRotation).
+    // The enum variant carries the hash; no additional check here.
+    Ok(ValidateCallbackResult::Valid)
+}

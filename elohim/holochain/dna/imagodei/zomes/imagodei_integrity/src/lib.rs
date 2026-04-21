@@ -1014,6 +1014,7 @@ pub enum EntryTypes {
     RelationshipRenewal(RelationshipRenewal),
     // Recovery Protocol Phase 2 (seed-quorum based)
     RecoverySeedCommitment(RecoverySeedCommitment),
+    RecoveryQuorumRequest(RecoveryQuorumRequest),
 }
 
 // =============================================================================
@@ -1211,6 +1212,8 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 // Recovery Protocol Phase 2 validation
                 EntryTypes::RecoverySeedCommitment(commitment) =>
                     validate_recovery_seed_commitment(&commitment, &action),
+                EntryTypes::RecoveryQuorumRequest(request) =>
+                    validate_recovery_quorum_request(&request),
                 _ => Ok(ValidateCallbackResult::Valid),
             },
             OpEntry::UpdateEntry { app_entry, .. } => match app_entry {
@@ -1221,6 +1224,10 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                     Ok(ValidateCallbackResult::Invalid(
                         "RecoverySeedCommitment is immutable; use SeedCommitmentSupersededBy link to supersede"
                             .to_string(),
+                    )),
+                EntryTypes::RecoveryQuorumRequest(_) =>
+                    Ok(ValidateCallbackResult::Invalid(
+                        "RecoveryQuorumRequest is immutable".to_string(),
                     )),
                 _ => Ok(ValidateCallbackResult::Valid),
             },
