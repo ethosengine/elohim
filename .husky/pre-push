@@ -171,6 +171,13 @@ if [ "$USE_MANIFEST" = false ]; then
   if echo "$CHANGED" | grep -q "^elohim/elohim-storage/"; then
     PROJECTS="$PROJECTS elohim-storage"
   fi
+  # EPR-specific quality gate: runs when EPR implementation paths or schemas change.
+  # Also triggered for storage-client-ts EPR tests that elohim-storage gate doesn't cover.
+  # Runs: cargo build + schema_contract + schema_contract_diesel_epr + pnpm test.
+  if echo "$CHANGED" | grep -qE \
+    "^elohim/elohim-storage/src/api/epr|^elohim/elohim-storage/src/db/epr_atoms|^elohim/elohim-storage/src/services/epr_service|^elohim/elohim-storage/src/services/epr_store|^elohim/elohim-storage/migrations/.*add_epr_tables|^elohim/sdk/schemas/v1/views/epr-|^elohim/sdk/schemas/v1/inputs/epr-|^elohim/sdk/storage-client-ts/tests/epr|^elohim/sdk/storage-client-ts/src/generated/Epr"; then
+    PROJECTS="$PROJECTS epr-storage"
+  fi
   if echo "$CHANGED" | grep -qE "^elohim/epr/|^elohim/sdk/epr-ts/"; then
     PROJECTS="$PROJECTS elohim-epr"
   fi
@@ -332,6 +339,15 @@ run_gate() {
         RUSTFLAGS='--cfg getrandom_backend="custom"' cargo test 2>&1
         rc=$?
         ;;
+      epr-storage)
+        # EPR-specific quality gate: build + EPR schema contracts + TS client smoke tests.
+        # Runs in addition to the main elohim-storage gate when EPR implementation paths change.
+        RUSTFLAGS='--cfg getrandom_backend="custom"' cargo build 2>&1 && \
+        RUSTFLAGS='--cfg getrandom_backend="custom"' cargo test --test schema_contract 2>&1 && \
+        RUSTFLAGS='--cfg getrandom_backend="custom"' cargo test --test schema_contract_diesel_epr 2>&1 && \
+        (cd ../../sdk/storage-client-ts && pnpm test) 2>&1
+        rc=$?
+        ;;
       elohim-compute)
         cargo fmt --check 2>&1 && \
         cargo clippy -- -D warnings 2>&1 && \
@@ -475,6 +491,7 @@ for PROJECT in $PROJECTS; do
       doorway)          PROJECT_DIR="doorway/doorway-service" ;;
       doorway-app)      PROJECT_DIR="doorway/doorway-app" ;;
       elohim-storage)   PROJECT_DIR="elohim/elohim-storage" ;;
+      epr-storage)      PROJECT_DIR="elohim/elohim-storage" ;;
       elohim-compute)   PROJECT_DIR="elohim/elohim-compute" ;;
       elohim-epr)       PROJECT_DIR="elohim/epr" ;;
       steward-node)     PROJECT_DIR="steward/node" ;;
