@@ -6644,42 +6644,29 @@ pub struct ResilienceSnapshotDetailsView {
 // Recovery Protocol Phase 2 Views
 // =============================================================================
 
-/// RecoverySeedCommitmentView - projection of imagodei RecoverySeedCommitment DHT entry.
-/// Source of truth: DHT. This is a read-optimized projection.
+/// Source of truth: DHT (imagodei RecoveryRequest entry).
+/// RecoveryRequestView — projection of the modernized RecoveryRequest DHT entry.
+/// Replaces the M1 RecoveryQuorumRequestView. See recovery phase 2 revised spec §5.3.
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct RecoverySeedCommitmentView {
+pub struct RecoveryRequestView {
     pub dht_anchor_hash: String,
     pub human_agent_pubkey: String,
-    pub seed_public_half: Vec<u8>,
-    pub threshold_n: u32,
-    pub total_m: u32,
-    pub commitment_nonce: Vec<u8>,
-    pub superseded_by: Option<String>,
-    pub created_at: String,
-}
-
-/// RecoveryQuorumRequestView - projection of RecoveryQuorumRequest DHT entry.
-/// Source of truth: DHT. This is a read-optimized projection.
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
-pub struct RecoveryQuorumRequestView {
-    pub dht_anchor_hash: String,
-    pub human_agent_pubkey: String,
-    pub seed_commitment_hash: String,
     pub new_agent_pubkey: String,
     pub hosting_doorway_pubkey: String,
-    pub recovery_mode: String,
-    pub stewarded_grant_hash: Option<String>,
+    /// Discriminator for proposed_authority — "intimateQuorum" | "communityConsensus" | "governanceAct" | "networkWitness" | "cryptographicQuorum".
+    pub proposed_authority_kind: String,
+    /// JSON-encoded variant-specific fields (grant_hash, purpose, stewardship_hash, etc.).
+    /// Empty string `""` for variants with no extra fields.
+    pub proposed_authority_json: String,
     pub request_nonce: Vec<u8>,
     pub created_at: String,
 }
 
-/// KeyRotationView - projection of KeyRotation DHT entry.
-/// Source of truth: DHT. This is a read-optimized projection.
-/// The authoritative claim that a human's agent key has rotated.
+/// Source of truth: DHT (imagodei KeyRotation entry).
+/// KeyRotationView — projection of the modernized KeyRotation DHT entry with RecoveryAuthority enum.
+/// Replaces the M1 KeyRotationView (which had seed_commitment_hash + quorum_signature fields).
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
@@ -6688,8 +6675,10 @@ pub struct KeyRotationView {
     pub human_agent_pubkey: String,
     pub new_agent_pubkey: String,
     pub superseded_agent_pubkey: String,
-    pub seed_commitment_hash: String,
     pub recovery_request_hash: String,
-    pub quorum_signature: Vec<u8>,
+    /// Discriminator for authority — "intimateQuorum" | "communityConsensus" | "governanceAct" | "networkWitness" | "cryptographicQuorum".
+    pub authority_kind: String,
+    /// JSON-encoded variant-specific fields (witness_hashes, challenge_hash, etc.).
+    pub authority_json: String,
     pub rotated_at: String,
 }
