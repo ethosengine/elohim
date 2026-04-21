@@ -1,6 +1,9 @@
 # Recovery Protocol Phase 2 — Socially Derived Identity Recovery
 
-**Status:** Draft
+**Status:** SUPERSEDED (2026-04-22)
+**Superseded by:** `genesis/docs/superpowers/specs/2026-04-22-recovery-protocol-phase-2-revised-design.md`
+**Superseded because:** A retrospective after the M1 data-model work surfaced that this spec (a) reinvented existing protocol primitives (`RecoverySeedCommitment` duplicated `KeyStewardship`, etc.), (b) embedded a crypto-first framing incompatible with the Elohim Protocol's graduated-community-authority vision, and (c) lacked an explicit anti-lockout commitment. The revised spec is the current authority. This file is kept for historical reference and to show the journey — see §13 of the revised spec for the retrospective analysis.
+
 **Date:** 2026-04-21
 **Owner:** Matthew Dowell
 **Supersedes for Phase 2 scope:** `doorway/doorway-service/RECOVERY-PROTOCOL.md` (Jan 2026), `doorway/doorway-service/RECOVERY-SPRINT-PLAN.md` (Jan 2026)
