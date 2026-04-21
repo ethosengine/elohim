@@ -1,0 +1,8 @@
+{
+  "$id": "epr:schema:enum:coupling-leg",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CouplingLeg",
+  "description": "The three legs of the ThreeLegCoupling defined by the graph substrate spec §4.1. Source of truth: elohim-epr protocol constants. Category A — enumeration values are part of the DNA-notarized protocol vocabulary. knowledge = knowledge graph binding (Claim EPR CID); value = economic event binding (EconomicEvent EPR CID); governance = governance attestation binding (Governance EPR CID). Serialized lowercase by serde.",
+  "type": "string",
+  "enum": ["knowledge", "value", "governance"]
+}

@@ -1,0 +1,60 @@
+{
+  "$id": "epr:schema:objects:envelope",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Envelope",
+  "description": "EPR envelope — the protocol-owned header of an EPR atom (spec §4.1). Source of truth: EPR atom, self-notarized via content-address (CIDv1 dag-cbor sha256) + Ed25519 signature. Canonical CBOR bytes + detached signature is the authoritative form. Category A — notarized; notarization mechanism is content-derived CID + signer proof (not DHT). JSON wire format: all CID fields (cid, schemaRef, claims items, coupling legs, supersedes, supersededBy) serialize as integer arrays (byte representation of CIDv1 multihash binary form, via cid crate serde-codec feature). Optional fields supersedes and supersededBy are absent (not null) when not set.",
+  "type": "object",
+  "required": ["cid", "kind", "schemaRef", "schemaKey", "reach", "coupling", "claims", "issuedAt", "proof"],
+  "additionalProperties": false,
+  "properties": {
+    "cid": {
+      "type": "array",
+      "items": { "type": "integer", "minimum": 0, "maximum": 255 },
+      "description": "Self-derived CIDv1 content identifier of the canonical bytes. Serialized as a byte array. NOT included in canonical signing bytes."
+    },
+    "kind": {
+      "$ref": "../enums/epr-kind.schema.json"
+    },
+    "schemaRef": {
+      "type": "array",
+      "items": { "type": "integer", "minimum": 0, "maximum": 255 },
+      "description": "CIDv1 of the Manifest EPR that declares the payload schema, serialized as a byte array."
+    },
+    "schemaKey": {
+      "type": "string",
+      "description": "Content-type key within the referenced manifest."
+    },
+    "reach": {
+      "$ref": "../enums/epr-reach.schema.json"
+    },
+    "coupling": {
+      "$ref": "./coupling.schema.json"
+    },
+    "claims": {
+      "type": "array",
+      "items": {
+        "type": "array",
+        "items": { "type": "integer", "minimum": 0, "maximum": 255 }
+      },
+      "description": "Outcome claims this EPR asserts. Each element is a CIDv1 serialized as a byte array."
+    },
+    "supersedes": {
+      "type": "array",
+      "items": { "type": "integer", "minimum": 0, "maximum": 255 },
+      "description": "CIDv1 of the prior version if this is a revision, serialized as a byte array. Absent when not set (skip_serializing_if)."
+    },
+    "supersededBy": {
+      "type": "array",
+      "items": { "type": "integer", "minimum": 0, "maximum": 255 },
+      "description": "Forward pointer to the superseding EPR CID, derived from supersedence index. NOT in canonical bytes. Absent when not set (skip_serializing_if)."
+    },
+    "issuedAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "UTC timestamp, RFC3339 with seconds precision and Z suffix (e.g. '2026-04-21T12:00:00Z'). Included in canonical bytes."
+    },
+    "proof": {
+      "$ref": "./signature.schema.json"
+    }
+  }
+}

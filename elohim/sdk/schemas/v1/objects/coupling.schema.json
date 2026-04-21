@@ -1,0 +1,25 @@
+{
+  "$id": "epr:schema:objects:coupling",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Coupling",
+  "description": "ThreeLegCoupling attestation refs (spec §4.1). Source of truth: EPR atom, self-notarized via content-address (CIDv1 dag-cbor sha256) + Ed25519 signature. Canonical CBOR bytes + detached signature is the authoritative form. Category A — notarized; notarization mechanism is content-derived CID + signer proof (not DHT). JSON wire format: CID fields serialize as integer arrays when present; fields are absent (not null) when not set, because Rust uses skip_serializing_if on Option fields.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "knowledge": {
+      "type": "array",
+      "items": { "type": "integer", "minimum": 0, "maximum": 255 },
+      "description": "CIDv1 of Claim-EPR binding to knowledge graph, serialized as a byte array. Absent when not set."
+    },
+    "value": {
+      "type": "array",
+      "items": { "type": "integer", "minimum": 0, "maximum": 255 },
+      "description": "CIDv1 of EconomicEvent-EPR, serialized as a byte array. Absent when not set."
+    },
+    "governance": {
+      "type": "array",
+      "items": { "type": "integer", "minimum": 0, "maximum": 255 },
+      "description": "CIDv1 of Governance-EPR, serialized as a byte array. Absent when not set."
+    }
+  }
+}

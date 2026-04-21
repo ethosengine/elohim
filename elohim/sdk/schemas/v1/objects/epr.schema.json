@@ -1,0 +1,19 @@
+{
+  "$id": "epr:schema:objects:epr",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Epr",
+  "description": "Complete EPR atom: envelope header + raw payload bytes. Source of truth: EPR atom, self-notarized via content-address (CIDv1 dag-cbor sha256) + Ed25519 signature. Canonical CBOR bytes + detached signature is the authoritative form. Category A — notarized; notarization mechanism is content-derived CID + signer proof (not DHT). JSON wire format: payload serializes as an integer array (byte array produced by serde_bytes on Vec<u8>).",
+  "type": "object",
+  "required": ["envelope", "payload"],
+  "additionalProperties": false,
+  "properties": {
+    "envelope": {
+      "$ref": "./envelope.schema.json"
+    },
+    "payload": {
+      "type": "array",
+      "items": { "type": "integer", "minimum": 0, "maximum": 255 },
+      "description": "Raw payload bytes serialized as an integer array by serde_bytes. Interpretation is determined by the schemaRef + schemaKey in the envelope."
+    }
+  }
+}
