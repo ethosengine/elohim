@@ -1,5 +1,4 @@
 use elohim_epr::Reach;
-use serde_json;
 
 #[test]
 fn reach_serializes_lowercase() {

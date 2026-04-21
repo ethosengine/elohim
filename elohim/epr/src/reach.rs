@@ -6,6 +6,12 @@
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
+// Note: Ord/PartialOrd are intentionally NOT derived. The declaration order
+// (Commons first, Private last) is opposite to the semantic openness ranking
+// that `openness()` returns (Commons = most open = 5). A derived `Ord` would
+// make `Commons < Private`, which is the opposite of any operator's intuition.
+// Use `openness()` for comparisons; do not add `#[derive(Ord)]` here without
+// first reversing the variant declaration order.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, TS)]
 #[serde(rename_all = "lowercase")]
 #[ts(export, export_to = "../sdk/epr-ts/src/generated/")]
