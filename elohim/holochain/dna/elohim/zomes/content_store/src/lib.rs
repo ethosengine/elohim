@@ -11,6 +11,13 @@ use doorway_client::{CacheRule, CacheRuleBuilder, CacheSignal, CacheSignalType, 
 use hdk::prelude::*;
 use std::collections::HashMap;
 
+// Bootstrap-steward pattern (lamad copy; reference lives in imagodei).
+pub mod bootstrap_steward;
+pub use bootstrap_steward::{
+    am_i_bootstrap_steward, bootstrap_steward, maybe_bootstrap_steward, BootstrapStewardError,
+    DnaProperties as BootstrapStewardDnaProperties,
+};
+
 // Re-export lamad wire types from shared crate
 pub use lamad_types::{
     AddPathStepInput,

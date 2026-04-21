@@ -1,6 +1,13 @@
 use hdk::prelude::*;
 use mishpat_integrity::*;
 
+// Bootstrap-steward pattern (mishpat copy; reference lives in imagodei).
+pub mod bootstrap_steward;
+pub use bootstrap_steward::{
+    am_i_bootstrap_steward, bootstrap_steward, maybe_bootstrap_steward, BootstrapStewardError,
+    DnaProperties,
+};
+
 // Re-export all wire types from qahal-types crate.
 // Integrity entry types (Challenge, Proposal, etc.) stay in mishpat_integrity
 // and are converted to wire types at construction sites below.
