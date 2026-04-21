@@ -8,6 +8,18 @@ accept_new_reserves = "auto"
 max_storage_pct = 80
 
 [network]
+# Master switch. When true, elohim-storage spawns two TCP forwarders that
+# bridge pod-network ports to the embedded conductor's localhost ports.
+# Intended for k8s deployments where the embedded conductor must be reachable
+# to sibling pods (doorway) on the pod network, while keeping Holochain on
+# its safe localhost default. Doorway is the external auth boundary.
 expose_conductor_externally = false
+
+# App WebSocket (zome calls). Corresponds to HOLOCHAIN_APP_URL in elohim-node.
 conductor_external_bind = "0.0.0.0:4445"
 conductor_internal_port = 4445
+
+# Admin WebSocket (register agents, install hApps, list cells).
+# Corresponds to HOLOCHAIN_ADMIN_URL in elohim-node.
+conductor_admin_external_bind = "0.0.0.0:4444"
+conductor_admin_internal_port = 4444

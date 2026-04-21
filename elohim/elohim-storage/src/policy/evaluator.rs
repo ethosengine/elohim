@@ -64,6 +64,8 @@ mod tests {
                 expose_conductor_externally: false,
                 conductor_external_bind: "0.0.0.0:4445".into(),
                 conductor_internal_port: 4445,
+                conductor_admin_external_bind: "0.0.0.0:4444".into(),
+                conductor_admin_internal_port: 4444,
             },
         }
     }

@@ -47,9 +47,23 @@ pub struct StewardshipConfig {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NetworkConfig {
+    /// Master switch. When true, elohim-storage spawns TCP forwarders that
+    /// bridge pod-network ports to the embedded conductor's localhost ports.
+    /// The conductor itself stays on 127.0.0.1 (Holochain's safe default);
+    /// elohim-storage owns the pod-network exposure point and is the auth
+    /// boundary for external traffic.
     pub expose_conductor_externally: bool,
+
+    /// Bind address for the app-WS forwarder (zome calls).
     pub conductor_external_bind: String,
+    /// Upstream app-WS port on 127.0.0.1 that Holochain is listening on.
     pub conductor_internal_port: u16,
+
+    /// Bind address for the admin-WS forwarder (register, install hApp, etc).
+    /// On headless k8s services this port is what doorway pods actually reach.
+    pub conductor_admin_external_bind: String,
+    /// Upstream admin-WS port on 127.0.0.1 that Holochain is listening on.
+    pub conductor_admin_internal_port: u16,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -82,6 +96,35 @@ mod tests {
         assert!(!cfg.network.expose_conductor_externally);
         assert_eq!(cfg.network.conductor_external_bind, "0.0.0.0:4445");
         assert_eq!(cfg.network.conductor_internal_port, 4445);
+        assert_eq!(cfg.network.conductor_admin_external_bind, "0.0.0.0:4444");
+        assert_eq!(cfg.network.conductor_admin_internal_port, 4444);
+    }
+
+    #[test]
+    fn network_config_parses_admin_fields() {
+        let toml_str = r#"
+[pool]
+accept_general_traffic = "auto"
+min_free_storage_pct = 20
+require_conductor_healthy = true
+
+[stewardship]
+accept_new_reserves = "auto"
+max_storage_pct = 80
+
+[network]
+expose_conductor_externally = true
+conductor_external_bind = "0.0.0.0:4445"
+conductor_internal_port = 4445
+conductor_admin_external_bind = "0.0.0.0:4444"
+conductor_admin_internal_port = 4444
+"#;
+        let cfg: PolicyConfig = toml::from_str(toml_str).unwrap();
+        assert!(cfg.network.expose_conductor_externally);
+        assert_eq!(cfg.network.conductor_external_bind, "0.0.0.0:4445");
+        assert_eq!(cfg.network.conductor_internal_port, 4445);
+        assert_eq!(cfg.network.conductor_admin_external_bind, "0.0.0.0:4444");
+        assert_eq!(cfg.network.conductor_admin_internal_port, 4444);
     }
 
     #[test]
@@ -101,6 +144,8 @@ max_storage_pct = 80
 expose_conductor_externally = false
 conductor_external_bind = "0.0.0.0:4445"
 conductor_internal_port = 4445
+conductor_admin_external_bind = "0.0.0.0:4444"
+conductor_admin_internal_port = 4444
 "#,
         )
         .unwrap();
