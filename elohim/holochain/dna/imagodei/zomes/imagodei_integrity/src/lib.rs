@@ -16,6 +16,10 @@ use hdi::prelude::*;
 pub mod stewardship;
 pub use stewardship::*;
 
+// Recovery Protocol Phase 2 (social-derived + seed-quorum)
+pub mod recovery_v2;
+pub use recovery_v2::*;
+
 // =============================================================================
 // Identity Constants
 // =============================================================================
