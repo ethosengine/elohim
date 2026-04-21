@@ -1015,8 +1015,6 @@ pub enum EntryTypes {
     // Recovery Protocol Phase 2
     RecoveryQuorumRequest(RecoveryQuorumRequest),
     KeyRotation(KeyRotation),
-    HeldRecoveryShare(HeldRecoveryShare),
-    MyRecoveryAuthorization(MyRecoveryAuthorization),
 }
 
 // =============================================================================
@@ -1224,10 +1222,6 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 EntryTypes::RecoveryQuorumRequest(request) =>
                     validate_recovery_quorum_request(&request),
                 EntryTypes::KeyRotation(rotation) => validate_key_rotation(&rotation),
-                EntryTypes::HeldRecoveryShare(share) =>
-                    validate_held_recovery_share(&share, &action),
-                EntryTypes::MyRecoveryAuthorization(authz) =>
-                    validate_my_recovery_authorization(&authz),
                 _ => Ok(ValidateCallbackResult::Valid),
             },
             OpEntry::UpdateEntry { app_entry, .. } => match app_entry {
@@ -1240,12 +1234,6 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                     )),
                 EntryTypes::KeyRotation(_) => Ok(ValidateCallbackResult::Invalid(
                     "KeyRotation is immutable".to_string(),
-                )),
-                EntryTypes::HeldRecoveryShare(_) => Ok(ValidateCallbackResult::Invalid(
-                    "HeldRecoveryShare is immutable".to_string(),
-                )),
-                EntryTypes::MyRecoveryAuthorization(_) => Ok(ValidateCallbackResult::Invalid(
-                    "MyRecoveryAuthorization is immutable".to_string(),
                 )),
                 _ => Ok(ValidateCallbackResult::Valid),
             },
