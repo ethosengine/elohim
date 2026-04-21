@@ -1,0 +1,23 @@
+[package]
+name = "elohim-epr"
+version = "0.1.0"
+edition = "2021"
+description = "Elohim EPR codec: canonical CBOR + CIDv1 + Ed25519 for the graph substrate"
+license = "CAL-1.0"
+
+[dependencies]
+ipld-core = "0.4"
+serde_ipld_dagcbor = "0.6"
+cid = { version = "0.11", features = ["serde-codec"] }
+multihash-codetable = { version = "0.2", features = ["sha2"] }
+ed25519-dalek = { version = "2.1", features = ["rand_core", "serde"] }
+serde = { version = "1", features = ["derive"] }
+serde_bytes = "0.11"
+serde_json = "1"
+chrono = { version = "0.4", default-features = false, features = ["std", "serde"] }
+thiserror = "2"
+ts-rs = { version = "10", features = ["chrono-impl", "serde-compat"] }
+hex = "0.4"
+
+[dev-dependencies]
+rand = "0.8"
