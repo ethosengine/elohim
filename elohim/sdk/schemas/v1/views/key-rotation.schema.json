@@ -1,0 +1,34 @@
+{
+  "$id": "epr:schema:view:key-rotation",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "KeyRotationView",
+  "description": "Projection of imagodei KeyRotation DHT entry. Source of truth: DHT (Notarized, Category A). The authoritative claim that a human's agent key has rotated.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "dhtAnchorHash",
+    "humanAgentPubkey",
+    "newAgentPubkey",
+    "supersededAgentPubkey",
+    "seedCommitmentHash",
+    "recoveryRequestHash",
+    "quorumSignature",
+    "rotatedAt"
+  ],
+  "properties": {
+    "dhtAnchorHash": { "type": "string" },
+    "humanAgentPubkey": { "type": "string" },
+    "newAgentPubkey": { "type": "string" },
+    "supersededAgentPubkey": { "type": "string" },
+    "seedCommitmentHash": { "type": "string" },
+    "recoveryRequestHash": { "type": "string" },
+    "quorumSignature": {
+      "type": "array",
+      "items": { "type": "integer", "minimum": 0, "maximum": 255 },
+      "minItems": 64,
+      "maxItems": 64,
+      "description": "Ed25519 signature under seed_public_half over (new_agent_pubkey || recovery_request_hash)"
+    },
+    "rotatedAt": { "type": "string" }
+  }
+}
