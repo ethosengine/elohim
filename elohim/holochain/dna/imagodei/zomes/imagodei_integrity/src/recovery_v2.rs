@@ -454,13 +454,22 @@ pub fn validate_key_rotation(
         ));
     }
 
-    // Rule 3: Phase 2 stub-rejects all variant-specific validation.
-    // M2 milestone implements IntimateQuorum + CryptographicQuorum happy paths
-    // and wires the floor-check against active IdentityFreeze entries.
+    // Rule 3: Freeze-floor check (CryptographicQuorum is orthogonal; exempt).
+    if !matches!(rotation.authority, RecoveryAuthority::CryptographicQuorum { .. }) {
+        if let Some(reason) = check_freeze_floor(&rotation.authority, &request_entry.human_id)? {
+            return Ok(ValidateCallbackResult::Invalid(reason));
+        }
+    }
+
+    // Rule 4: Variant-specific validation.
     match &rotation.authority {
-        RecoveryAuthority::IntimateQuorum { .. } => Ok(ValidateCallbackResult::Invalid(
-            "KeyRotation::IntimateQuorum: variant validation pending in M2".to_string(),
-        )),
+        RecoveryAuthority::IntimateQuorum { witness_hashes } => {
+            validate_intimate_quorum(&request_entry, witness_hashes)
+        }
+        RecoveryAuthority::CryptographicQuorum {
+            stewardship_hash,
+            quorum_signature,
+        } => validate_cryptographic_quorum(rotation, stewardship_hash, quorum_signature),
         RecoveryAuthority::CommunityConsensus { .. } => Ok(ValidateCallbackResult::Invalid(
             "KeyRotation::CommunityConsensus: Phase 2b — IdentityChallenge resolution flow not yet implemented".to_string(),
         )),
@@ -469,9 +478,6 @@ pub fn validate_key_rotation(
         )),
         RecoveryAuthority::NetworkWitness { .. } => Ok(ValidateCallbackResult::Invalid(
             "KeyRotation::NetworkWitness: reserved for elohim constitutional-governance design".to_string(),
-        )),
-        RecoveryAuthority::CryptographicQuorum { .. } => Ok(ValidateCallbackResult::Invalid(
-            "KeyRotation::CryptographicQuorum: variant validation pending in M2".to_string(),
         )),
     }
 }
