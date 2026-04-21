@@ -7,7 +7,9 @@
 //! before compiling because the jsonschema crate does not resolve file-based
 //! references automatically.
 
-use elohim_storage::views::{KeyRotationView, RecoveryQuorumRequestView, RecoverySeedCommitmentView};
+use elohim_storage::views::{
+    KeyRotationView, RecoveryQuorumRequestView, RecoverySeedCommitmentView,
+};
 use serde_json::Value;
 use std::collections::HashMap;
 use std::fs;
