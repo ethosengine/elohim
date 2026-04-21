@@ -1,15 +1,12 @@
-//! Recovery Protocol Phase 2 — Socially Derived Identity Recovery
+//! Recovery Protocol Phase 2 — Graduated Authority Identity Recovery
 //!
-//! Entry types and validation for seed-quorum-based identity recovery.
-//! See: genesis/docs/superpowers/specs/2026-04-21-recovery-protocol-phase-2-design.md
+//! Entry types and validation for graduated-authority-based identity recovery.
+//! See: genesis/docs/superpowers/specs/2026-04-22-recovery-protocol-phase-2-revised-design.md
 //!
 //! New entry types (prefixed with the module to distinguish from legacy
 //! attestation-vote-based recovery in lib.rs):
-//! - RecoverySeedCommitment: on-DHT public half + thresholds, no holder list
 //! - RecoveryQuorumRequest: claimant's request, authored by hosting doorway
 //! - KeyRotation: authoritative claim "new agent X is Matthew now"
-//! - HeldRecoveryShare: private source-chain entry on holder devices
-//! - MyRecoveryAuthorization: optional private audit log on holder devices
 
 use hdi::prelude::*;
 
@@ -32,75 +29,6 @@ pub enum ConfidenceTier {
 }
 
 // Entry type structs and validation functions will be added in subsequent tasks.
-
-// =============================================================================
-// RecoverySeedCommitment
-// =============================================================================
-
-/// Public commitment to a recovery seed: seed's public half + threshold params.
-/// Share-holder identities are NOT stored here (privacy invariant).
-/// Author must be the human_agent_pubkey (only the human commits their own seed).
-#[hdk_entry_helper]
-#[derive(Clone, PartialEq)]
-pub struct RecoverySeedCommitment {
-    pub human_agent_pubkey: AgentPubKey,
-    pub seed_public_half: Vec<u8>,   // 32 bytes Ed25519 public key; Vec<u8> for serialize compat
-    pub threshold_n: u8,
-    pub total_m: u8,
-    pub commitment_nonce: Vec<u8>,   // 16 bytes random
-    pub created_at: Timestamp,
-}
-
-pub fn validate_recovery_seed_commitment(
-    commitment: &RecoverySeedCommitment,
-    action: &Create,
-) -> ExternResult<ValidateCallbackResult> {
-    // Rule 1: threshold range
-    if commitment.threshold_n < 2 {
-        return Ok(ValidateCallbackResult::Invalid(
-            "RecoverySeedCommitment threshold_n must be >= 2".to_string(),
-        ));
-    }
-    if commitment.threshold_n > commitment.total_m {
-        return Ok(ValidateCallbackResult::Invalid(
-            "RecoverySeedCommitment threshold_n must be <= total_m".to_string(),
-        ));
-    }
-    // Rule 2: total_m range
-    if commitment.total_m < 2 {
-        return Ok(ValidateCallbackResult::Invalid(
-            "RecoverySeedCommitment total_m must be >= 2".to_string(),
-        ));
-    }
-    if commitment.total_m > 16 {
-        return Ok(ValidateCallbackResult::Invalid(
-            "RecoverySeedCommitment total_m must be <= 16".to_string(),
-        ));
-    }
-    // Rule 3: seed_public_half must be 32 bytes
-    if commitment.seed_public_half.len() != 32 {
-        return Ok(ValidateCallbackResult::Invalid(
-            "RecoverySeedCommitment seed_public_half must be exactly 32 bytes".to_string(),
-        ));
-    }
-    // Rule 4: commitment_nonce must be 16 bytes
-    if commitment.commitment_nonce.len() != 16 {
-        return Ok(ValidateCallbackResult::Invalid(
-            "RecoverySeedCommitment commitment_nonce must be exactly 16 bytes".to_string(),
-        ));
-    }
-    // Rule 5: author must be the committing human
-    // action.author is the AgentPubKey of the source-chain author (Create action)
-    if action.author != commitment.human_agent_pubkey {
-        return Ok(ValidateCallbackResult::Invalid(
-            "RecoverySeedCommitment: author must equal human_agent_pubkey".to_string(),
-        ));
-    }
-    // Rule 6: seed_public_half must be valid Ed25519 public key bytes
-    // Note: byte-length check (Rule 3) is the validation floor here;
-    // further cryptographic verification happens in coordinator flows.
-    Ok(ValidateCallbackResult::Valid)
-}
 
 // =============================================================================
 // RecoveryQuorumRequest
@@ -208,47 +136,10 @@ pub fn validate_key_rotation(
             "KeyRotation human_agent_pubkey must match request".to_string(),
         ));
     }
-    if request_entry.seed_commitment_hash != rotation.seed_commitment_hash {
-        return Ok(ValidateCallbackResult::Invalid(
-            "KeyRotation seed_commitment_hash must match request".to_string(),
-        ));
-    }
+    // Note: seed_commitment_hash check removed — RecoverySeedCommitment deleted in M1-cleanup.
+    // KeyRotation validator will be fully replaced in Task 5 with RecoveryAuthority enum.
 
-    // Rule 5: Resolve RecoverySeedCommitment via must_get_valid_record
-    let commitment_record = must_get_valid_record(rotation.seed_commitment_hash.clone())?;
-    let commitment_entry: RecoverySeedCommitment = commitment_record
-        .entry()
-        .to_app_option()
-        .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!(
-            "KeyRotation references non-RecoverySeedCommitment: {e:?}"
-        ))))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "KeyRotation commitment_hash entry missing".to_string()
-        )))?;
-
-    if commitment_entry.human_agent_pubkey != rotation.human_agent_pubkey {
-        return Ok(ValidateCallbackResult::Invalid(
-            "KeyRotation human_agent_pubkey must match seed commitment".to_string(),
-        ));
-    }
-
-    // Rule 6: quorum_signature must verify under the commitment's seed_public_half
-    // for Normal mode. Stewarded mode deferred to Phase 2b (stub-reject here).
-    match &request_entry.recovery_mode {
-        RecoveryMode::Normal => {
-            return verify_quorum_signature(
-                &commitment_entry.seed_public_half,
-                &rotation.new_agent_pubkey,
-                &rotation.recovery_request_hash,
-                &rotation.quorum_signature,
-            );
-        }
-        RecoveryMode::Stewarded { .. } => {
-            return Ok(ValidateCallbackResult::Invalid(
-                "KeyRotation Stewarded mode not yet implemented (Phase 2b)".to_string(),
-            ));
-        }
-    }
+    Ok(ValidateCallbackResult::Valid)
 }
 
 /// Ed25519 signature verification for the quorum signature.

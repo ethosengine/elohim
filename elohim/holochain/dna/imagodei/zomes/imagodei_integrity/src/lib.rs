@@ -1012,8 +1012,7 @@ pub enum EntryTypes {
     RenewalAttestation(RenewalAttestation),
     AgentRetirement(AgentRetirement),
     RelationshipRenewal(RelationshipRenewal),
-    // Recovery Protocol Phase 2 (seed-quorum based)
-    RecoverySeedCommitment(RecoverySeedCommitment),
+    // Recovery Protocol Phase 2
     RecoveryQuorumRequest(RecoveryQuorumRequest),
     KeyRotation(KeyRotation),
     HeldRecoveryShare(HeldRecoveryShare),
@@ -1222,8 +1221,6 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 EntryTypes::AgentRetirement(retirement) => validate_agent_retirement(&retirement),
                 EntryTypes::RelationshipRenewal(renewal) => validate_relationship_renewal(&renewal),
                 // Recovery Protocol Phase 2 validation
-                EntryTypes::RecoverySeedCommitment(commitment) =>
-                    validate_recovery_seed_commitment(&commitment, &action),
                 EntryTypes::RecoveryQuorumRequest(request) =>
                     validate_recovery_quorum_request(&request),
                 EntryTypes::KeyRotation(rotation) => validate_key_rotation(&rotation),
@@ -1237,11 +1234,6 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 EntryTypes::Human(human) => validate_human(&human),
                 EntryTypes::Agent(agent) => validate_agent(&agent),
                 // Recovery Protocol Phase 2 — immutable entries
-                EntryTypes::RecoverySeedCommitment(_) =>
-                    Ok(ValidateCallbackResult::Invalid(
-                        "RecoverySeedCommitment is immutable; use SeedCommitmentSupersededBy link to supersede"
-                            .to_string(),
-                    )),
                 EntryTypes::RecoveryQuorumRequest(_) =>
                     Ok(ValidateCallbackResult::Invalid(
                         "RecoveryQuorumRequest is immutable".to_string(),
