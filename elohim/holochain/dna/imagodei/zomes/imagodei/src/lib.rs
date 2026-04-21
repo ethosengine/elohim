@@ -17,6 +17,14 @@ use std::time::Duration;
 pub mod stewardship;
 pub use stewardship::*;
 
+// Bootstrap-steward pattern — reference implementation for the protocol
+// (also ported to mishpat, node-registry, lamad). See bootstrap_steward.rs.
+pub mod bootstrap_steward;
+pub use bootstrap_steward::{
+    am_i_bootstrap_steward, bootstrap_steward, maybe_bootstrap_steward, BootstrapStewardError,
+    DnaProperties,
+};
+
 // =============================================================================
 // Input/Output Types
 // =============================================================================
@@ -1487,14 +1495,7 @@ pub fn get_presences_by_state(state: String) -> ExternResult<Vec<PresenceOutput>
 // Recovery Types
 // =============================================================================
 
-/// Output from recovery request operations
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RecoveryRequestOutput {
-    pub action_hash: ActionHash,
-    pub request: RecoveryRequest,
-}
-
-/// Output from recovery vote operations
+/// Output from recovery vote operations (RecoveryVote entry type still registered)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RecoveryVoteOutput {
     pub action_hash: ActionHash,
@@ -1508,24 +1509,6 @@ pub struct RecoveryHintOutput {
     pub hint: RecoveryHint,
 }
 
-/// Input for creating a recovery request
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CreateRecoveryRequestInput {
-    pub human_id: String,
-    pub doorway_id: String,
-    pub recovery_method: String,
-    pub expires_in_hours: Option<u32>,
-}
-
-/// Input for voting on a recovery request
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct VoteOnRecoveryInput {
-    pub request_id: String,
-    pub approved: bool,
-    pub attestation: String,
-    pub verification_method: String,
-}
-
 /// Input for creating/updating a recovery hint
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UpsertRecoveryHintInput {
@@ -1534,181 +1517,96 @@ pub struct UpsertRecoveryHintInput {
     pub encryption_nonce: String,
 }
 
-/// Input for Elohim verification score update
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct UpdateElohimScoreInput {
-    pub request_id: String,
-    pub questions_json: String,
-    pub score: f64,
-}
+// =============================================================================
+// Recovery Protocol Phase 2 — Signals
+// =============================================================================
 
-/// Recovery signals for real-time notification
-#[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(tag = "type", content = "payload")]
-pub enum RecoverySignal {
-    RecoveryRequested {
-        action_hash: ActionHash,
-        request: RecoveryRequest,
-        eligible_voters: Vec<String>,
-    },
-    RecoveryVoteCast {
-        action_hash: ActionHash,
-        vote: RecoveryVote,
-        request_id: String,
-        current_approvals: u32,
-        required_approvals: u32,
-    },
-    RecoveryApproved {
+/// Signals for Recovery Protocol Phase 2.
+/// Emitted by coordinator functions for real-time projection into elohim-storage.
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(tag = "type")]
+pub enum RecoveryV2Signal {
+    RecoveryRequestCreated {
         action_hash: ActionHash,
         request: RecoveryRequest,
     },
-    RecoveryRejected {
+    KeyRotationCommitted {
         action_hash: ActionHash,
-        request_id: String,
-        reason: String,
+        rotation: KeyRotation,
     },
 }
 
 // =============================================================================
-// Recovery Functions
+// Recovery Protocol Phase 2 — Input/Output Types
 // =============================================================================
 
-/// Helper to calculate confidence weight based on intimacy level
-fn get_intimacy_weight(intimacy_level: &str) -> f64 {
-    match intimacy_level {
-        "intimate" => 0.25, // Family counts 25% each
-        "trusted" => 0.20,  // Close friends 20%
-        "familiar" => 0.15, // Acquaintances 15%
-        "acquainted" => 0.10,
-        "public" => 0.05,
-        _ => 0.05,
-    }
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct CreateRecoveryRequestInput {
+    pub human_agent_pubkey: AgentPubKey,
+    pub new_agent_pubkey: AgentPubKey,
+    pub hosting_doorway_pubkey: AgentPubKey,
+    pub proposed_authority: RecoveryAuthorityKind,
+    pub request_nonce: Vec<u8>,
 }
 
-/// Helper to calculate required approvals based on relationships
-fn calculate_required_approvals(relationships: &[HumanRelationship]) -> u32 {
-    let weighted_count: f64 = relationships
-        .iter()
-        .filter(|r| r.emergency_access_enabled)
-        .map(|r| match r.intimacy_level.as_str() {
-            "intimate" => 2.0,
-            "trusted" => 1.5,
-            "familiar" => 1.0,
-            _ => 0.5,
-        })
-        .sum();
-
-    // M = ceil(weighted / 3), minimum 2
-    let m = (weighted_count / 3.0).ceil() as u32;
-    m.max(2)
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct RecoveryRequestOutput {
+    pub action_hash: ActionHash,
+    pub request: RecoveryRequest,
 }
 
-/// Create a recovery request
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct CommitKeyRotationInput {
+    pub human_agent_pubkey: AgentPubKey,
+    pub new_agent_pubkey: AgentPubKey,
+    pub superseded_agent_pubkey: AgentPubKey,
+    pub recovery_request_hash: ActionHash,
+    pub authority: RecoveryAuthority,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct KeyRotationOutput {
+    pub action_hash: ActionHash,
+    pub rotation: KeyRotation,
+}
+
+// =============================================================================
+// Recovery Protocol Phase 2 — Coordinator Functions
+// =============================================================================
+
+/// Create a recovery request.
+/// Authored by the hosting doorway on behalf of the claimant's new device.
 #[hdk_extern]
 pub fn create_recovery_request(
     input: CreateRecoveryRequestInput,
 ) -> ExternResult<RecoveryRequestOutput> {
     let now = sys_time()?;
-    let timestamp = format!("{:?}", now);
-
-    // Calculate expiry (default 48 hours)
-    let hours = input.expires_in_hours.unwrap_or(48);
-    let expiry_ms = hours as u64 * 60 * 60 * 1000 * 1000; // microseconds
-    let expires_at = format!(
-        "{:?}",
-        now.checked_add(&Duration::from_micros(expiry_ms))
-            .unwrap_or(now)
-    );
-
-    // Get relationships with emergency_access_enabled to determine M
-    let relationships = get_emergency_access_relationships(&input.human_id)?;
-    let required_approvals = calculate_required_approvals(&relationships);
-
-    let request_id = format!(
-        "recovery-{}-{}",
-        input.human_id,
-        timestamp.replace([':', ' ', '(', ')'], "-")
-    );
 
     let request = RecoveryRequest {
-        id: request_id.clone(),
-        human_id: input.human_id.clone(),
-        doorway_id: input.doorway_id,
-        recovery_method: input.recovery_method,
-        status: "pending".to_string(),
-        required_approvals,
-        current_approvals: 0,
-        confidence_score: 0.0,
-        elohim_questions_json: None,
-        elohim_score: None,
-        elohim_verified_at: None,
-        requested_at: timestamp.clone(),
-        expires_at,
-        approved_at: None,
-        completed_at: None,
+        human_agent_pubkey: input.human_agent_pubkey.clone(),
+        new_agent_pubkey: input.new_agent_pubkey,
+        hosting_doorway_pubkey: input.hosting_doorway_pubkey,
+        proposed_authority: input.proposed_authority,
+        request_nonce: input.request_nonce,
+        created_at: now,
     };
 
     let action_hash = create_entry(&EntryTypes::RecoveryRequest(request.clone()))?;
 
-    // Create ID lookup link
-    let id_anchor = StringAnchor::new("recovery_request_id", &request_id);
-    let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
+    // Link Anchor(human_pubkey) → request using HumanToRecoveryRequest link type.
+    let anchor = StringAnchor::new("recovery_request", &input.human_agent_pubkey.to_string());
+    let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor.clone()))?;
+    create_entry(&EntryTypes::StringAnchor(anchor))?;
     create_link(
-        id_anchor_hash,
-        action_hash.clone(),
-        LinkTypes::IdToRecoveryRequest,
-        (),
-    )?;
-
-    // Create human lookup link
-    let human_anchor = StringAnchor::new("human_recovery_requests", &input.human_id);
-    let human_anchor_hash = hash_entry(&EntryTypes::StringAnchor(human_anchor))?;
-    create_link(
-        human_anchor_hash,
+        anchor_hash,
         action_hash.clone(),
         LinkTypes::HumanToRecoveryRequest,
         (),
     )?;
 
-    // Create status link
-    let status_anchor = StringAnchor::new("recovery_status", "pending");
-    let status_anchor_hash = hash_entry(&EntryTypes::StringAnchor(status_anchor))?;
-    create_link(
-        status_anchor_hash,
-        action_hash.clone(),
-        LinkTypes::RecoveryRequestByStatus,
-        (),
-    )?;
-
-    // Create pending vote links for each eligible voter
-    let eligible_voters: Vec<String> = relationships
-        .iter()
-        .filter(|r| r.emergency_access_enabled)
-        .flat_map(|r| {
-            if r.party_a_id == input.human_id {
-                vec![r.party_b_id.clone()]
-            } else {
-                vec![r.party_a_id.clone()]
-            }
-        })
-        .collect();
-
-    for voter_id in &eligible_voters {
-        let voter_anchor = StringAnchor::new("pending_recovery_votes", voter_id);
-        let voter_anchor_hash = hash_entry(&EntryTypes::StringAnchor(voter_anchor))?;
-        create_link(
-            voter_anchor_hash,
-            action_hash.clone(),
-            LinkTypes::PendingRecoveryVote,
-            request_id.as_bytes().to_vec(),
-        )?;
-    }
-
-    // Emit signal for real-time notification
-    emit_signal(RecoverySignal::RecoveryRequested {
+    emit_signal(RecoveryV2Signal::RecoveryRequestCreated {
         action_hash: action_hash.clone(),
         request: request.clone(),
-        eligible_voters,
     })?;
 
     Ok(RecoveryRequestOutput {
@@ -1717,335 +1615,63 @@ pub fn create_recovery_request(
     })
 }
 
-/// Helper to get relationships with emergency_access_enabled for a human
-fn get_emergency_access_relationships(human_id: &str) -> ExternResult<Vec<HumanRelationship>> {
-    let anchor = StringAnchor::new("agent_relationships", human_id);
-    let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor))?;
-
-    let query = LinkQuery::try_new(anchor_hash, LinkTypes::AgentToRelationship)?;
-    let links = get_links(query, GetStrategy::default())?;
-
-    let mut results = Vec::new();
-    for link in links {
-        if let Some(action_hash) = link.target.clone().into_action_hash() {
-            if let Some(record) = get(action_hash, GetOptions::default())? {
-                if let Some(relationship) = record
-                    .entry()
-                    .to_app_option::<HumanRelationship>()
-                    .ok()
-                    .flatten()
-                {
-                    if relationship.emergency_access_enabled {
-                        results.push(relationship);
-                    }
-                }
-            }
-        }
-    }
-
-    Ok(results)
-}
-
-/// Vote on a recovery request
+/// Commit a key rotation to the DHT.
+/// NOTE: The integrity validator currently stub-rejects all RecoveryAuthority variants.
+/// M2 adds variant-specific validation. Until then this coordinator will return Err
+/// on any attempted rotation — intentional during M1-cleanup.
 #[hdk_extern]
-pub fn vote_on_recovery(input: VoteOnRecoveryInput) -> ExternResult<RecoveryVoteOutput> {
+pub fn commit_key_rotation(input: CommitKeyRotationInput) -> ExternResult<KeyRotationOutput> {
     let now = sys_time()?;
-    let timestamp = format!("{:?}", now);
 
-    // Get my human profile
-    let my_human = get_my_human(())?.ok_or_else(|| {
-        wasm_error!(WasmErrorInner::Guest(
-            "Must have Human profile to vote".to_string()
-        ))
-    })?;
-
-    // Get the recovery request
-    let request_output =
-        get_recovery_request_by_id(input.request_id.clone())?.ok_or_else(|| {
-            wasm_error!(WasmErrorInner::Guest(
-                "Recovery request not found".to_string()
-            ))
-        })?;
-
-    if request_output.request.status != "pending" {
-        return Err(wasm_error!(WasmErrorInner::Guest(
-            "Can only vote on pending recovery requests".to_string()
-        )));
-    }
-
-    // Verify voter has emergency_access_enabled relationship with requestor
-    let relationships = get_emergency_access_relationships(&request_output.request.human_id)?;
-    let voter_relationship = relationships
-        .iter()
-        .find(|r| r.party_a_id == my_human.human.id || r.party_b_id == my_human.human.id);
-
-    let relationship = voter_relationship.ok_or_else(|| {
-        wasm_error!(WasmErrorInner::Guest(
-            "You do not have emergency access enabled with this human".to_string()
-        ))
-    })?;
-
-    let confidence_weight = get_intimacy_weight(&relationship.intimacy_level);
-
-    let vote_id = format!("{}-{}", input.request_id, my_human.human.id);
-
-    let vote = RecoveryVote {
-        id: vote_id.clone(),
-        request_id: input.request_id.clone(),
-        voter_human_id: my_human.human.id.clone(),
-        approved: input.approved,
-        attestation: input.attestation,
-        intimacy_level: relationship.intimacy_level.clone(),
-        confidence_weight,
-        verification_method: input.verification_method,
-        voted_at: timestamp,
+    let rotation = KeyRotation {
+        human_agent_pubkey: input.human_agent_pubkey.clone(),
+        new_agent_pubkey: input.new_agent_pubkey.clone(),
+        superseded_agent_pubkey: input.superseded_agent_pubkey,
+        recovery_request_hash: input.recovery_request_hash,
+        authority: input.authority,
+        rotated_at: now,
     };
 
-    let action_hash = create_entry(&EntryTypes::RecoveryVote(vote.clone()))?;
+    let action_hash = create_entry(&EntryTypes::KeyRotation(rotation.clone()))?;
 
-    // Link vote to request
+    let current_agent_anchor =
+        StringAnchor::new("current_agent", &input.human_agent_pubkey.to_string());
+    let current_agent_anchor_hash =
+        hash_entry(&EntryTypes::StringAnchor(current_agent_anchor.clone()))?;
+    create_entry(&EntryTypes::StringAnchor(current_agent_anchor))?;
     create_link(
-        request_output.action_hash.clone(),
+        current_agent_anchor_hash,
         action_hash.clone(),
-        LinkTypes::RecoveryVoteToRequest,
-        my_human.human.id.as_bytes().to_vec(),
-    )?;
-
-    // Remove pending vote link for this voter
-    let voter_anchor = StringAnchor::new("pending_recovery_votes", &my_human.human.id);
-    let voter_anchor_hash = hash_entry(&EntryTypes::StringAnchor(voter_anchor))?;
-    let pending_links = get_links(
-        LinkQuery::try_new(voter_anchor_hash, LinkTypes::PendingRecoveryVote)?,
-        GetStrategy::default(),
-    )?;
-    for link in pending_links {
-        if link.target == request_output.action_hash.clone().into() {
-            delete_link(link.create_link_hash, GetOptions::default())?;
-        }
-    }
-
-    // Update request with new approval count and check threshold
-    let all_votes = get_recovery_votes(input.request_id.clone())?;
-    let current_approvals = all_votes.iter().filter(|v| v.vote.approved).count() as u32;
-    let total_confidence: f64 = all_votes
-        .iter()
-        .filter(|v| v.vote.approved)
-        .map(|v| v.vote.confidence_weight)
-        .sum();
-
-    // Emit vote signal
-    emit_signal(RecoverySignal::RecoveryVoteCast {
-        action_hash: action_hash.clone(),
-        vote: vote.clone(),
-        request_id: input.request_id.clone(),
-        current_approvals,
-        required_approvals: request_output.request.required_approvals,
-    })?;
-
-    // Check if threshold reached
-    if current_approvals >= request_output.request.required_approvals {
-        // Update request status to approved
-        let mut updated_request = request_output.request.clone();
-        updated_request.status = "approved".to_string();
-        updated_request.current_approvals = current_approvals;
-        updated_request.confidence_score = total_confidence.min(1.0);
-        updated_request.approved_at = Some(format!("{:?}", sys_time()?));
-
-        let new_request_hash = create_entry(&EntryTypes::RecoveryRequest(updated_request.clone()))?;
-
-        // Update status links
-        let old_status_anchor = StringAnchor::new("recovery_status", "pending");
-        let old_status_anchor_hash = hash_entry(&EntryTypes::StringAnchor(old_status_anchor))?;
-        let old_links = get_links(
-            LinkQuery::try_new(old_status_anchor_hash, LinkTypes::RecoveryRequestByStatus)?,
-            GetStrategy::default(),
-        )?;
-        for link in old_links {
-            if link.target == request_output.action_hash.clone().into() {
-                delete_link(link.create_link_hash, GetOptions::default())?;
-            }
-        }
-
-        let new_status_anchor = StringAnchor::new("recovery_status", "approved");
-        let new_status_anchor_hash = hash_entry(&EntryTypes::StringAnchor(new_status_anchor))?;
-        create_link(
-            new_status_anchor_hash,
-            new_request_hash.clone(),
-            LinkTypes::RecoveryRequestByStatus,
-            (),
-        )?;
-
-        // Emit approval signal
-        emit_signal(RecoverySignal::RecoveryApproved {
-            action_hash: new_request_hash,
-            request: updated_request,
-        })?;
-    }
-
-    Ok(RecoveryVoteOutput { action_hash, vote })
-}
-
-/// Get recovery request by ID
-#[hdk_extern]
-pub fn get_recovery_request_by_id(id: String) -> ExternResult<Option<RecoveryRequestOutput>> {
-    let id_anchor = StringAnchor::new("recovery_request_id", &id);
-    let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
-
-    let query = LinkQuery::try_new(id_anchor_hash, LinkTypes::IdToRecoveryRequest)?;
-    let links = get_links(query, GetStrategy::default())?;
-
-    if let Some(link) = links.first() {
-        if let Some(action_hash) = link.target.clone().into_action_hash() {
-            if let Some(record) = get(action_hash.clone(), GetOptions::default())? {
-                if let Some(request) = record
-                    .entry()
-                    .to_app_option::<RecoveryRequest>()
-                    .ok()
-                    .flatten()
-                {
-                    return Ok(Some(RecoveryRequestOutput {
-                        action_hash,
-                        request,
-                    }));
-                }
-            }
-        }
-    }
-
-    Ok(None)
-}
-
-/// Get votes for a recovery request
-#[hdk_extern]
-pub fn get_recovery_votes(request_id: String) -> ExternResult<Vec<RecoveryVoteOutput>> {
-    let request_output = get_recovery_request_by_id(request_id)?.ok_or_else(|| {
-        wasm_error!(WasmErrorInner::Guest(
-            "Recovery request not found".to_string()
-        ))
-    })?;
-
-    let query = LinkQuery::try_new(request_output.action_hash, LinkTypes::RecoveryVoteToRequest)?;
-    let links = get_links(query, GetStrategy::default())?;
-
-    let mut results = Vec::new();
-    for link in links {
-        if let Some(action_hash) = link.target.clone().into_action_hash() {
-            if let Some(record) = get(action_hash.clone(), GetOptions::default())? {
-                if let Some(vote) = record
-                    .entry()
-                    .to_app_option::<RecoveryVote>()
-                    .ok()
-                    .flatten()
-                {
-                    results.push(RecoveryVoteOutput { action_hash, vote });
-                }
-            }
-        }
-    }
-
-    Ok(results)
-}
-
-/// Get pending recovery votes for the calling agent
-#[hdk_extern]
-pub fn get_my_pending_recovery_votes(_: ()) -> ExternResult<Vec<RecoveryRequestOutput>> {
-    let my_human = get_my_human(())?
-        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Must have Human profile".to_string())))?;
-
-    let voter_anchor = StringAnchor::new("pending_recovery_votes", &my_human.human.id);
-    let voter_anchor_hash = hash_entry(&EntryTypes::StringAnchor(voter_anchor))?;
-
-    let query = LinkQuery::try_new(voter_anchor_hash, LinkTypes::PendingRecoveryVote)?;
-    let links = get_links(query, GetStrategy::default())?;
-
-    let mut results = Vec::new();
-    for link in links {
-        if let Some(action_hash) = link.target.clone().into_action_hash() {
-            if let Some(record) = get(action_hash.clone(), GetOptions::default())? {
-                if let Some(request) = record
-                    .entry()
-                    .to_app_option::<RecoveryRequest>()
-                    .ok()
-                    .flatten()
-                {
-                    results.push(RecoveryRequestOutput {
-                        action_hash,
-                        request,
-                    });
-                }
-            }
-        }
-    }
-
-    Ok(results)
-}
-
-/// Update recovery request with Elohim verification score
-#[hdk_extern]
-pub fn update_elohim_score(input: UpdateElohimScoreInput) -> ExternResult<RecoveryRequestOutput> {
-    let request_output =
-        get_recovery_request_by_id(input.request_id.clone())?.ok_or_else(|| {
-            wasm_error!(WasmErrorInner::Guest(
-                "Recovery request not found".to_string()
-            ))
-        })?;
-
-    if request_output.request.status != "pending" {
-        return Err(wasm_error!(WasmErrorInner::Guest(
-            "Can only update pending recovery requests".to_string()
-        )));
-    }
-
-    let now = sys_time()?;
-    let timestamp = format!("{:?}", now);
-
-    let mut updated_request = request_output.request.clone();
-    updated_request.elohim_questions_json = Some(input.questions_json);
-    updated_request.elohim_score = Some(input.score);
-    updated_request.elohim_verified_at = Some(timestamp);
-
-    // Add Elohim score to confidence (max 60% from Elohim)
-    let elohim_confidence = input.score * 0.6;
-    updated_request.confidence_score =
-        (updated_request.confidence_score + elohim_confidence).min(1.0);
-
-    // Check if confidence threshold reached (80%)
-    if updated_request.confidence_score >= 0.8 {
-        updated_request.status = "approved".to_string();
-        updated_request.approved_at = Some(format!("{:?}", sys_time()?));
-    }
-
-    let action_hash = create_entry(&EntryTypes::RecoveryRequest(updated_request.clone()))?;
-
-    // Update ID link
-    let id_anchor = StringAnchor::new("recovery_request_id", &input.request_id);
-    let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
-    let old_links = get_links(
-        LinkQuery::try_new(id_anchor_hash.clone(), LinkTypes::IdToRecoveryRequest)?,
-        GetStrategy::default(),
-    )?;
-    for link in old_links {
-        delete_link(link.create_link_hash, GetOptions::default())?;
-    }
-    create_link(
-        id_anchor_hash,
-        action_hash.clone(),
-        LinkTypes::IdToRecoveryRequest,
+        LinkTypes::HumanToCurrentAgent,
         (),
     )?;
 
-    if updated_request.status == "approved" {
-        emit_signal(RecoverySignal::RecoveryApproved {
-            action_hash: action_hash.clone(),
-            request: updated_request.clone(),
-        })?;
-    }
+    let agent_rotation_anchor =
+        StringAnchor::new("agent_rotation", &input.new_agent_pubkey.to_string());
+    let agent_rotation_anchor_hash =
+        hash_entry(&EntryTypes::StringAnchor(agent_rotation_anchor.clone()))?;
+    create_entry(&EntryTypes::StringAnchor(agent_rotation_anchor))?;
+    create_link(
+        agent_rotation_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::AgentToKeyRotation,
+        (),
+    )?;
 
-    Ok(RecoveryRequestOutput {
+    emit_signal(RecoveryV2Signal::KeyRotationCommitted {
+        action_hash: action_hash.clone(),
+        rotation: rotation.clone(),
+    })?;
+
+    Ok(KeyRotationOutput {
         action_hash,
-        request: updated_request,
+        rotation,
     })
 }
+
+// =============================================================================
+// Recovery Hint Functions
+// =============================================================================
 
 /// Create or update a recovery hint for the calling agent
 #[hdk_extern]
@@ -2170,312 +1796,6 @@ pub fn get_my_recovery_hints(_: ()) -> ExternResult<Vec<RecoveryHintOutput>> {
     Ok(results)
 }
 
-/// Mark recovery as completed (called by doorway after successful re-custody)
-#[hdk_extern]
-pub fn complete_recovery(request_id: String) -> ExternResult<RecoveryRequestOutput> {
-    let request_output = get_recovery_request_by_id(request_id.clone())?.ok_or_else(|| {
-        wasm_error!(WasmErrorInner::Guest(
-            "Recovery request not found".to_string()
-        ))
-    })?;
-
-    if request_output.request.status != "approved" {
-        return Err(wasm_error!(WasmErrorInner::Guest(
-            "Can only complete approved recovery requests".to_string()
-        )));
-    }
-
-    let now = sys_time()?;
-    let timestamp = format!("{:?}", now);
-
-    let mut updated_request = request_output.request.clone();
-    updated_request.status = "completed".to_string();
-    updated_request.completed_at = Some(timestamp);
-
-    let action_hash = create_entry(&EntryTypes::RecoveryRequest(updated_request.clone()))?;
-
-    // Update links
-    let id_anchor = StringAnchor::new("recovery_request_id", &request_id);
-    let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
-    let old_links = get_links(
-        LinkQuery::try_new(id_anchor_hash.clone(), LinkTypes::IdToRecoveryRequest)?,
-        GetStrategy::default(),
-    )?;
-    for link in old_links {
-        delete_link(link.create_link_hash, GetOptions::default())?;
-    }
-    create_link(
-        id_anchor_hash,
-        action_hash.clone(),
-        LinkTypes::IdToRecoveryRequest,
-        (),
-    )?;
-
-    // Update status link
-    let old_status_anchor = StringAnchor::new("recovery_status", "approved");
-    let old_status_anchor_hash = hash_entry(&EntryTypes::StringAnchor(old_status_anchor))?;
-    let old_status_links = get_links(
-        LinkQuery::try_new(old_status_anchor_hash, LinkTypes::RecoveryRequestByStatus)?,
-        GetStrategy::default(),
-    )?;
-    for link in old_status_links {
-        if link.target == request_output.action_hash.clone().into() {
-            delete_link(link.create_link_hash, GetOptions::default())?;
-        }
-    }
-
-    let new_status_anchor = StringAnchor::new("recovery_status", "completed");
-    let new_status_anchor_hash = hash_entry(&EntryTypes::StringAnchor(new_status_anchor))?;
-    create_link(
-        new_status_anchor_hash,
-        action_hash.clone(),
-        LinkTypes::RecoveryRequestByStatus,
-        (),
-    )?;
-
-    Ok(RecoveryRequestOutput {
-        action_hash,
-        request: updated_request,
-    })
-}
-
-// =============================================================================
-// Recovery Protocol Phase 2 — Signals (seed-quorum based)
-// =============================================================================
-
-/// Signals for Recovery Protocol Phase 2 (seed-quorum model).
-/// Emitted by coordinator functions for real-time projection into elohim-storage.
-#[derive(Serialize, Deserialize, Clone, Debug)]
-#[serde(tag = "type")]
-pub enum RecoveryV2Signal {
-    SeedCommitmentCreated {
-        action_hash: ActionHash,
-        commitment: RecoverySeedCommitment,
-    },
-    SeedCommitmentSuperseded {
-        old_hash: ActionHash,
-        new_hash: ActionHash,
-    },
-    RecoveryQuorumRequestCreated {
-        action_hash: ActionHash,
-        request: RecoveryQuorumRequest,
-    },
-    KeyRotationCommitted {
-        action_hash: ActionHash,
-        rotation: KeyRotation,
-    },
-}
-
-// =============================================================================
-// Recovery Protocol Phase 2 — Input/Output Types
-// =============================================================================
-
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct CommitRecoverySeedInput {
-    pub seed_public_half: Vec<u8>, // 32 bytes Ed25519 public key
-    pub threshold_n: u8,
-    pub total_m: u8,
-    pub commitment_nonce: Vec<u8>, // 16 bytes, generated client-side
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct RecoverySeedCommitmentOutput {
-    pub action_hash: ActionHash,
-    pub entry_hash: EntryHash,
-    pub commitment: RecoverySeedCommitment,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct CreateRecoveryQuorumRequestInput {
-    pub human_agent_pubkey: AgentPubKey,
-    pub seed_commitment_hash: ActionHash,
-    pub new_agent_pubkey: AgentPubKey,
-    pub hosting_doorway_pubkey: AgentPubKey,
-    pub recovery_mode: RecoveryMode,
-    pub request_nonce: Vec<u8>, // 16 bytes random
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct RecoveryQuorumRequestOutput {
-    pub action_hash: ActionHash,
-    pub request: RecoveryQuorumRequest,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct CommitKeyRotationInput {
-    pub human_agent_pubkey: AgentPubKey,
-    pub new_agent_pubkey: AgentPubKey,
-    pub superseded_agent_pubkey: AgentPubKey,
-    pub seed_commitment_hash: ActionHash,
-    pub recovery_request_hash: ActionHash,
-    pub quorum_signature: Vec<u8>, // 64 bytes Ed25519 signature
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct KeyRotationOutput {
-    pub action_hash: ActionHash,
-    pub rotation: KeyRotation,
-}
-
-// =============================================================================
-// Recovery Protocol Phase 2 — Coordinator Functions
-// =============================================================================
-
-/// Commit a recovery seed commitment to the DHT.
-/// Only the calling agent can commit their own seed commitment (author == human_agent_pubkey).
-#[hdk_extern]
-pub fn commit_recovery_seed(
-    input: CommitRecoverySeedInput,
-) -> ExternResult<RecoverySeedCommitmentOutput> {
-    let agent_info = agent_info()?;
-    let now = sys_time()?;
-
-    let commitment = RecoverySeedCommitment {
-        human_agent_pubkey: agent_info.agent_initial_pubkey.clone(),
-        seed_public_half: input.seed_public_half,
-        threshold_n: input.threshold_n,
-        total_m: input.total_m,
-        commitment_nonce: input.commitment_nonce,
-        created_at: now,
-    };
-
-    let action_hash = create_entry(&EntryTypes::RecoverySeedCommitment(commitment.clone()))?;
-    let entry_hash = hash_entry(&commitment)?;
-
-    // Link Anchor(recovery_seed_commitment, human_pubkey) -> commitment for discovery
-    let anchor = StringAnchor::new(
-        "recovery_seed_commitment",
-        &agent_info.agent_initial_pubkey.to_string(),
-    );
-    let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor))?;
-    create_link(
-        anchor_hash,
-        action_hash.clone(),
-        LinkTypes::HumanToCurrentSeedCommitment,
-        (),
-    )?;
-
-    // Emit post-commit signal for storage projection
-    emit_signal(RecoveryV2Signal::SeedCommitmentCreated {
-        action_hash: action_hash.clone(),
-        commitment: commitment.clone(),
-    })?;
-
-    Ok(RecoverySeedCommitmentOutput {
-        action_hash,
-        entry_hash,
-        commitment,
-    })
-}
-
-/// Create a recovery quorum request, linking it to both the seed commitment and the human anchor.
-/// Authored by the hosting doorway on behalf of the claimant.
-#[hdk_extern]
-pub fn create_recovery_quorum_request(
-    input: CreateRecoveryQuorumRequestInput,
-) -> ExternResult<RecoveryQuorumRequestOutput> {
-    let now = sys_time()?;
-
-    let request = RecoveryQuorumRequest {
-        human_agent_pubkey: input.human_agent_pubkey.clone(),
-        seed_commitment_hash: input.seed_commitment_hash.clone(),
-        new_agent_pubkey: input.new_agent_pubkey,
-        hosting_doorway_pubkey: input.hosting_doorway_pubkey,
-        recovery_mode: input.recovery_mode,
-        request_nonce: input.request_nonce,
-        created_at: now,
-    };
-
-    let action_hash = create_entry(&EntryTypes::RecoveryQuorumRequest(request.clone()))?;
-
-    // Link seed commitment -> request (forward traversal)
-    create_link(
-        input.seed_commitment_hash.clone(),
-        action_hash.clone(),
-        LinkTypes::SeedCommitmentToRequest,
-        (),
-    )?;
-
-    // Link Anchor(recovery_quorum_request, human_pubkey) -> request (human-scoped discovery)
-    let anchor = StringAnchor::new(
-        "recovery_quorum_request",
-        &input.human_agent_pubkey.to_string(),
-    );
-    let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor))?;
-    create_link(
-        anchor_hash,
-        action_hash.clone(),
-        LinkTypes::HumanToRecoveryQuorumRequest,
-        (),
-    )?;
-
-    emit_signal(RecoveryV2Signal::RecoveryQuorumRequestCreated {
-        action_hash: action_hash.clone(),
-        request: request.clone(),
-    })?;
-
-    Ok(RecoveryQuorumRequestOutput {
-        action_hash,
-        request,
-    })
-}
-
-/// Commit a key rotation to the DHT.
-/// Integrity validation (Rule 6: Ed25519 signature verification) runs automatically
-/// as part of entry creation — the entry will not land if the quorum_signature is invalid.
-#[hdk_extern]
-pub fn commit_key_rotation(input: CommitKeyRotationInput) -> ExternResult<KeyRotationOutput> {
-    let now = sys_time()?;
-
-    let rotation = KeyRotation {
-        human_agent_pubkey: input.human_agent_pubkey.clone(),
-        new_agent_pubkey: input.new_agent_pubkey.clone(),
-        superseded_agent_pubkey: input.superseded_agent_pubkey,
-        seed_commitment_hash: input.seed_commitment_hash,
-        recovery_request_hash: input.recovery_request_hash,
-        quorum_signature: input.quorum_signature,
-        rotated_at: now,
-    };
-
-    // Integrity zome's validate_key_rotation runs before this entry lands on the DHT.
-    let action_hash = create_entry(&EntryTypes::KeyRotation(rotation.clone()))?;
-
-    // Link Anchor(current_agent, human_pubkey) -> rotation (latest = current agent)
-    let human_anchor = StringAnchor::new(
-        "current_agent",
-        &input.human_agent_pubkey.to_string(),
-    );
-    let human_anchor_hash = hash_entry(&EntryTypes::StringAnchor(human_anchor))?;
-    create_link(
-        human_anchor_hash,
-        action_hash.clone(),
-        LinkTypes::HumanToCurrentAgent,
-        (),
-    )?;
-
-    // Link Anchor(agent_rotation, new_agent_pubkey) -> rotation (reverse lookup)
-    let new_agent_anchor = StringAnchor::new(
-        "agent_rotation",
-        &input.new_agent_pubkey.to_string(),
-    );
-    let new_agent_anchor_hash = hash_entry(&EntryTypes::StringAnchor(new_agent_anchor))?;
-    create_link(
-        new_agent_anchor_hash,
-        action_hash.clone(),
-        LinkTypes::AgentToKeyRotation,
-        (),
-    )?;
-
-    emit_signal(RecoveryV2Signal::KeyRotationCommitted {
-        action_hash: action_hash.clone(),
-        rotation: rotation.clone(),
-    })?;
-
-    Ok(KeyRotationOutput {
-        action_hash,
-        rotation,
-    })
-}
 
 // =============================================================================
 // Renewal Protocol Types
