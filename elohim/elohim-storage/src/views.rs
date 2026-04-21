@@ -6639,3 +6639,57 @@ pub struct ResilienceSnapshotDetailsView {
     pub online_peer_count: i32,
     pub health_score: f32,
 }
+
+// =============================================================================
+// Recovery Protocol Phase 2 Views
+// =============================================================================
+
+/// RecoverySeedCommitmentView - projection of imagodei RecoverySeedCommitment DHT entry.
+/// Source of truth: DHT. This is a read-optimized projection.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct RecoverySeedCommitmentView {
+    pub dht_anchor_hash: String,
+    pub human_agent_pubkey: String,
+    pub seed_public_half: Vec<u8>,
+    pub threshold_n: u32,
+    pub total_m: u32,
+    pub commitment_nonce: Vec<u8>,
+    pub superseded_by: Option<String>,
+    pub created_at: String,
+}
+
+/// RecoveryQuorumRequestView - projection of RecoveryQuorumRequest DHT entry.
+/// Source of truth: DHT. This is a read-optimized projection.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct RecoveryQuorumRequestView {
+    pub dht_anchor_hash: String,
+    pub human_agent_pubkey: String,
+    pub seed_commitment_hash: String,
+    pub new_agent_pubkey: String,
+    pub hosting_doorway_pubkey: String,
+    pub recovery_mode: String,
+    pub stewarded_grant_hash: Option<String>,
+    pub request_nonce: Vec<u8>,
+    pub created_at: String,
+}
+
+/// KeyRotationView - projection of KeyRotation DHT entry.
+/// Source of truth: DHT. This is a read-optimized projection.
+/// The authoritative claim that a human's agent key has rotated.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct KeyRotationView {
+    pub dht_anchor_hash: String,
+    pub human_agent_pubkey: String,
+    pub new_agent_pubkey: String,
+    pub superseded_agent_pubkey: String,
+    pub seed_commitment_hash: String,
+    pub recovery_request_hash: String,
+    pub quorum_signature: Vec<u8>,
+    pub rotated_at: String,
+}
