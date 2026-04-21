@@ -16,7 +16,7 @@ pub mod validation;
 
 pub use coupling::Coupling;
 pub use envelope::Envelope;
-pub use epr::Epr;
+pub use epr::{Epr, EprBuilder};
 pub use error::{EprError, Result};
 pub use kind::{CouplingLeg, EprKind};
 pub use proof::{sign, verify, AgentKeypair};
