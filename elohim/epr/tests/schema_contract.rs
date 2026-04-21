@@ -147,7 +147,7 @@ fn assert_source_of_truth_declared(schema_path: &str) {
 #[test]
 fn epr_schemas_declare_source_of_truth() {
     let schemas = [
-        "enums/epr-reach.schema.json",
+        "enums/reach.schema.json",
         "enums/epr-kind.schema.json",
         "enums/coupling-leg.schema.json",
         "objects/signature.schema.json",
@@ -165,14 +165,17 @@ fn epr_schemas_declare_source_of_truth() {
 #[test]
 fn reach_values_conform() {
     for r in [
-        Reach::Commons,
-        Reach::Community,
-        Reach::Collective,
-        Reach::Steward,
         Reach::Private,
+        Reach::SelfScope,
+        Reach::Intimate,
+        Reach::Trusted,
+        Reach::Familiar,
+        Reach::Community,
+        Reach::Public,
+        Reach::Commons,
     ] {
         validate(
-            "enums/epr-reach.schema.json",
+            "enums/reach.schema.json",
             &serde_json::to_value(r).unwrap(),
         );
     }
@@ -294,7 +297,7 @@ fn envelope_with_supersedes_conforms() {
         .kind(EprKind::Content)
         .schema_ref(compute_cid(&[1u8]))
         .schema_key("concept")
-        .reach(Reach::Collective)
+        .reach(Reach::Trusted)
         .coupling(Coupling {
             knowledge: Some(compute_cid(&[2u8])),
             value: Some(compute_cid(&[3u8])),

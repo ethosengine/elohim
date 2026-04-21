@@ -7,36 +7,47 @@ use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
 // Note: Ord/PartialOrd are intentionally NOT derived. The declaration order
-// (Commons first, Private last) is opposite to the semantic openness ranking
-// that `openness()` returns (Commons = most open = 5). A derived `Ord` would
-// make `Commons < Private`, which is the opposite of any operator's intuition.
-// Use `openness()` for comparisons; do not add `#[derive(Ord)]` here without
-// first reversing the variant declaration order.
+// (Private first, Commons last) is from most restrictive to most open per the
+// DNA-notarized CORE_REACH_LEVELS vocabulary. A derived `Ord` would make
+// `Private < Commons`, which is the opposite of the semantic openness ranking
+// that `openness()` exposes (Commons = most open = 8). Use `openness()` for
+// comparisons; do not add `#[derive(Ord)]` here without re-reviewing semantics.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, TS)]
 #[serde(rename_all = "lowercase")]
 #[ts(export, export_to = "../../sdk/epr-ts/src/generated/")]
 pub enum Reach {
-    /// Open to all — commons-level content.
-    Commons,
-    /// Open within the broader community / network.
-    Community,
-    /// Scoped to a specific collective / affinity group.
-    Collective,
-    /// Visible only to explicit stewards.
-    Steward,
     /// Fully private; outside the substrate's public surface.
     Private,
+    /// Scope of the authoring self / owner only.
+    #[serde(rename = "self")]
+    SelfScope,
+    /// Intimate circle — closest relationships.
+    Intimate,
+    /// Trusted relationships — beyond intimate.
+    Trusted,
+    /// Familiar contacts — known, not close.
+    Familiar,
+    /// Open within the broader community / network.
+    Community,
+    /// Public — openly visible on the substrate.
+    Public,
+    /// Commons-level — maximally open, cooperatively held.
+    Commons,
 }
 
 impl Reach {
-    /// Monotonically decreasing openness score (5 = most open, 1 = most closed).
+    /// Monotonically increasing openness score (1 = most restrictive, 8 = most open).
+    /// Matches the CORE_REACH_LEVELS declaration order (private → commons).
     pub const fn openness(self) -> u8 {
         match self {
-            Reach::Commons => 5,
-            Reach::Community => 4,
-            Reach::Collective => 3,
-            Reach::Steward => 2,
             Reach::Private => 1,
+            Reach::SelfScope => 2,
+            Reach::Intimate => 3,
+            Reach::Trusted => 4,
+            Reach::Familiar => 5,
+            Reach::Community => 6,
+            Reach::Public => 7,
+            Reach::Commons => 8,
         }
     }
 }

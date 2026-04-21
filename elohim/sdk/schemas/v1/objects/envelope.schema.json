@@ -25,7 +25,7 @@
       "description": "Content-type key within the referenced manifest."
     },
     "reach": {
-      "$ref": "../enums/epr-reach.schema.json"
+      "$ref": "../enums/reach.schema.json"
     },
     "coupling": {
       "$ref": "./coupling.schema.json"

@@ -119,11 +119,14 @@ fn kind_canonical(k: EprKind) -> String {
 
 fn reach_canonical(r: Reach) -> String {
     match r {
-        Reach::Commons => "commons",
-        Reach::Community => "community",
-        Reach::Collective => "collective",
-        Reach::Steward => "steward",
         Reach::Private => "private",
+        Reach::SelfScope => "self",
+        Reach::Intimate => "intimate",
+        Reach::Trusted => "trusted",
+        Reach::Familiar => "familiar",
+        Reach::Community => "community",
+        Reach::Public => "public",
+        Reach::Commons => "commons",
     }
     .into()
 }

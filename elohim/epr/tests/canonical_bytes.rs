@@ -155,20 +155,18 @@ fn kind_canonical_strings_for_all_variants() {
 fn reach_canonical_strings_for_all_variants() {
     let mut e = env();
     for (reach, expected_substring) in [
-        (Reach::Commons, "\"reach\":\"commons\""),
-        (Reach::Community, "\"reach\":\"community\""),
-        (Reach::Collective, "\"reach\":\"collective\""),
-        (Reach::Steward, "\"reach\":\"steward\""),
         (Reach::Private, "\"reach\":\"private\""),
+        (Reach::SelfScope, "\"reach\":\"self\""),
+        (Reach::Intimate, "\"reach\":\"intimate\""),
+        (Reach::Trusted, "\"reach\":\"trusted\""),
+        (Reach::Familiar, "\"reach\":\"familiar\""),
+        (Reach::Community, "\"reach\":\"community\""),
+        (Reach::Public, "\"reach\":\"public\""),
+        (Reach::Commons, "\"reach\":\"commons\""),
     ] {
         e.reach = reach;
         let json = serde_json::to_string(&e).unwrap();
-        assert!(
-            json.contains(expected_substring),
-            "reach {:?} did not produce expected substring {}: got {}",
-            reach,
-            expected_substring,
-            json
-        );
+        assert!(json.contains(expected_substring),
+            "reach {:?} did not produce expected substring {}: got {}", reach, expected_substring, json);
     }
 }

@@ -1,8 +1,0 @@
-{
-  "$id": "epr:schema:enum:epr-reach",
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "EprReach",
-  "description": "EPR envelope-level reach scoping primitive. Source of truth: elohim-epr protocol constants. Category A — enumeration values are part of the DNA-notarized protocol vocabulary. Openness ordering: commons (most open, 5) > community (4) > collective (3) > steward (2) > private (most closed, 1). Gateways enforce reach rules without parsing payload.",
-  "type": "string",
-  "enum": ["commons", "community", "collective", "steward", "private"]
-}

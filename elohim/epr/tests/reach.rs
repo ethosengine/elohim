@@ -3,11 +3,14 @@ use elohim_epr::Reach;
 #[test]
 fn reach_serializes_lowercase() {
     for (variant, expected) in [
-        (Reach::Commons, "\"commons\""),
-        (Reach::Community, "\"community\""),
-        (Reach::Collective, "\"collective\""),
-        (Reach::Steward, "\"steward\""),
         (Reach::Private, "\"private\""),
+        (Reach::SelfScope, "\"self\""),
+        (Reach::Intimate, "\"intimate\""),
+        (Reach::Trusted, "\"trusted\""),
+        (Reach::Familiar, "\"familiar\""),
+        (Reach::Community, "\"community\""),
+        (Reach::Public, "\"public\""),
+        (Reach::Commons, "\"commons\""),
     ] {
         let s = serde_json::to_string(&variant).unwrap();
         assert_eq!(s, expected);
@@ -18,9 +21,12 @@ fn reach_serializes_lowercase() {
 
 #[test]
 fn reach_ordering() {
-    // Design intent: commons is most-open, private is most-closed.
-    assert!(Reach::Commons.openness() > Reach::Community.openness());
-    assert!(Reach::Community.openness() > Reach::Collective.openness());
-    assert!(Reach::Collective.openness() > Reach::Steward.openness());
-    assert!(Reach::Steward.openness() > Reach::Private.openness());
+    // openness() returns monotonically increasing values: private=1, commons=8
+    assert!(Reach::Commons.openness() > Reach::Public.openness());
+    assert!(Reach::Public.openness() > Reach::Community.openness());
+    assert!(Reach::Community.openness() > Reach::Familiar.openness());
+    assert!(Reach::Familiar.openness() > Reach::Trusted.openness());
+    assert!(Reach::Trusted.openness() > Reach::Intimate.openness());
+    assert!(Reach::Intimate.openness() > Reach::SelfScope.openness());
+    assert!(Reach::SelfScope.openness() > Reach::Private.openness());
 }
