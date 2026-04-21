@@ -545,6 +545,16 @@ pub struct RecoveryRequest {
     pub proposed_authority: RecoveryAuthorityKind,
     /// Random 16-byte nonce disambiguating concurrent or retried attempts.
     pub request_nonce: Vec<u8>,
+    /// Coordinator-populated resolution of human_agent_pubkey to the legacy
+    /// String human_id used by HumanityWitness, HumanRelationship, IdentityFreeze.
+    /// Coordinator derives this via Agent entry lookup on holochain_agent_key
+    /// at request-commit time. Required for IntimateQuorum rotations and for
+    /// the freeze-floor check in validate_key_rotation.
+    pub human_id: Option<String>,
+    /// Threshold for the IntimateQuorum authority path. Coordinator computes
+    /// ceil(emergency_contact_count / 2) + 1 at request time, floored at 2.
+    /// Validator enforces: distinct-witness-author count ≥ this value.
+    pub required_witness_count: u32,
     pub created_at: Timestamp,
 }
 
@@ -1462,6 +1472,13 @@ fn validate_recovery_request(request: &RecoveryRequest) -> ExternResult<Validate
     if request.human_agent_pubkey == request.new_agent_pubkey {
         return Ok(ValidateCallbackResult::Invalid(
             "RecoveryRequest new_agent_pubkey must differ from human_agent_pubkey".to_string(),
+        ));
+    }
+    // M2: required_witness_count has an absolute floor of 2 (defense-in-depth).
+    // Per the spec §5.2, intimate quorum requires at least 2 distinct witnesses.
+    if request.required_witness_count < 2 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "RecoveryRequest required_witness_count must be >= 2".to_string(),
         ));
     }
     // Rule 3: if proposed_authority is a stubbed variant, that's still OK at request time —

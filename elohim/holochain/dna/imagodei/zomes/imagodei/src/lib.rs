@@ -1588,6 +1588,8 @@ pub fn create_recovery_request(
         hosting_doorway_pubkey: input.hosting_doorway_pubkey,
         proposed_authority: input.proposed_authority,
         request_nonce: input.request_nonce,
+        human_id: None,          // M3 coordinator flow will populate via Agent entry lookup
+        required_witness_count: 2, // M3 coordinator flow will compute ceil(M/2)+1; floor=2
         created_at: now,
     };
 
