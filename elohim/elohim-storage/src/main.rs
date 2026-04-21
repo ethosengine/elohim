@@ -432,13 +432,26 @@ async fn async_main(
                 // consistent with the heartbeat startup pattern above: we
                 // continue serving HTTP even if peer-status is unavailable.
                 if policy_cfg.network.expose_conductor_externally {
+                    // App WS forwarder — zome calls from peers (and doorway's
+                    // TypedAppClient / conductor-normalizer path).
                     if let Err(e) = elohim_storage::forwarder::spawn_forwarder(
                         &policy_cfg.network.conductor_external_bind,
                         policy_cfg.network.conductor_internal_port,
                     )
                     .await
                     {
-                        warn!("conductor forwarder failed to start: {e}");
+                        warn!("conductor app forwarder failed to start: {e}");
+                    }
+
+                    // Admin WS forwarder — register agents, install hApps,
+                    // list cells. Doorway calls this on /auth/register.
+                    if let Err(e) = elohim_storage::forwarder::spawn_forwarder(
+                        &policy_cfg.network.conductor_admin_external_bind,
+                        policy_cfg.network.conductor_admin_internal_port,
+                    )
+                    .await
+                    {
+                        warn!("conductor admin forwarder failed to start: {e}");
                     }
                 }
 
