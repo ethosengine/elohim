@@ -1,8 +1,21 @@
 //! Error types for the elohim-epr crate.
-//! Implementation: Task 2+.
 
-/// Placeholder — will be replaced with the real EprError enum.
-pub struct EprError;
+use thiserror::Error;
 
-/// Convenience alias.
+#[derive(Debug, Error)]
+pub enum EprError {
+    #[error("cbor encode error: {0}")]
+    Encode(String),
+    #[error("cbor decode error: {0}")]
+    Decode(String),
+    #[error("invalid cid: {0}")]
+    InvalidCid(String),
+    #[error("signature error: {0}")]
+    Signature(String),
+    #[error("coupling requirement not met: {0}")]
+    Coupling(String),
+    #[error("invalid envelope: {0}")]
+    InvalidEnvelope(String),
+}
+
 pub type Result<T> = std::result::Result<T, EprError>;
