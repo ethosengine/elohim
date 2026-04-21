@@ -419,6 +419,25 @@ def deployHumanManifest(Map humanConfig, String envFile, List allHumans) {
     // Produces: ["performance"] or ["operations", "edge"].
     def nodeTypeValues = '[' + (humanConfig.nodeTypes ?: []).collect { "\"${it}\"" }.join(', ') + ']'
 
+    // Strip the `device-` prefix from the deployments.json archetype to match the
+    // DEVICE_ARCHETYPE env-var form Adam's hand-rendered manifest uses
+    // (e.g. `device-family-node-base` → `family-node-base`).
+    def deviceArchetype = (humanConfig.deviceArchetype ?: '').replaceFirst(/^device-/, '')
+
+    // Household identifier — one per human by convention (`household-<name>`).
+    // Matches Adam's hand-rendered value (`household-adam`).
+    def householdId = "household-${humanConfig.name}"
+
+    // Node role: Adam is the genesis peer / archival anchor; everyone else
+    // runs as `edge`. Kept explicit-by-name because the topology is small and
+    // the mapping is load-bearing (P2P bootstrap vs. leaf). Revisit when a
+    // second archival peer joins.
+    def nodeRole = humanConfig.name == 'adam' ? 'archival' : 'edge'
+
+    // Region is uniform across the cluster today. Hardcoded until a human
+    // deploys outside us-central — at that point, move to deployments.json.
+    def region = 'us-central'
+
     def sedArgs = [
         // Image tag placeholders
         "s|EDGENODE_TAG_PLACEHOLDER|${versions.EDGENODE_TAG}|g",
@@ -449,6 +468,13 @@ def deployHumanManifest(Map humanConfig, String envFile, List allHumans) {
         "s|EDGENODE_MEMORY_LIMIT_PLACEHOLDER|${humanConfig.edgenodeMemoryLimit ?: ''}|g",
         "s|EDGENODE_CPU_REQUEST_PLACEHOLDER|${humanConfig.edgenodeCpuRequest ?: ''}|g",
         "s|EDGENODE_CPU_LIMIT_PLACEHOLDER|${humanConfig.edgenodeCpuLimit ?: ''}|g",
+        // Consolidated-template env-var placeholders (no-ops on the legacy
+        // template and on Adam's hand-rendered manifest, which either omit
+        // these tokens entirely or pre-bake their values).
+        "s|DEVICE_ARCHETYPE_PLACEHOLDER|${deviceArchetype}|g",
+        "s|HOUSEHOLD_ID_PLACEHOLDER|${householdId}|g",
+        "s|NODE_ROLE_PLACEHOLDER|${nodeRole}|g",
+        "s|REGION_PLACEHOLDER|${region}|g",
     ].collect {
         // Each sed expression is wrapped in single quotes for the shell, so any
         // apostrophe inside the expression (e.g. "Matthew's role" in an affinity
