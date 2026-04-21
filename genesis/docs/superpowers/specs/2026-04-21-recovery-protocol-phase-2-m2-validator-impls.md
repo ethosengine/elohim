@@ -368,6 +368,18 @@ If the `base64` crate is not already a dependency of the integrity zome, add it.
 
 ### 5.4 `check_freeze_floor`
 
+**HDI architectural constraint (surfaced during M2 implementation):** the integrity-zome validation callback context does NOT expose `get_links` or `GetLinksInputBuilder`. Those are HDK-only (coordinator zome). Validators have access to deterministic primitives only: `must_get_valid_record`, `must_get_entry`, `must_get_action`, `must_get_agent_activity`, and `hash_entry`. Link state is non-deterministic; a validator that depended on link state could validate differently on different peers.
+
+**Consequence:** the freeze-floor check cannot traverse the `ActiveFreezes` anchor inside `validate_key_rotation`. The enforcement model shifts:
+
+1. **Pure-logic helper (`check_freeze_floor_rules`)** — fully implemented in M2, unit-tested, owns the freeze/rotation layer-comparison rules. Shared between validator and coordinator. Takes pre-resolved freezes as input.
+2. **HDI wrapper (`check_freeze_floor`)** — present as a dispatch hook in `validate_key_rotation` for future tightening, but returns `Ok(None)` in Phase 2 because it has no way to enumerate freezes deterministically. A `must_get_agent_activity` lookup could surface freezes authored by a specific elohim, but the elohim-of-human binding is itself an open spec question (§8.2) deferred to later work.
+3. **Coordinator pre-commit gate (M5)** — the real enforcement point. Before calling `create_entry(KeyRotation)`, the coordinator queries `get_links` on the `ActiveFreezes` anchor, feeds the results to `check_freeze_floor_rules`, and bails if a blocker exists. This matches the Stage-1 social-bootstrap model (spec §3.2) — coordinator owns correctness; validator enforces what is cheaply verifiable; elohim defender escalation (M5+) is the compensating control for adversarial coordinators.
+
+The dispatch wiring stays in `validate_key_rotation` so M5 can replace the stub body without touching the dispatch or the test surface. Pure-logic rules are the portable piece.
+
+**Legacy design (superseded by the above, kept for traceability):**
+
 ```rust
 /// Returns Ok(None) if no blocking freeze exists, Ok(Some(reason)) if one does.
 /// Caller is responsible for skipping this helper for CryptographicQuorum —
