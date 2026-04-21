@@ -1,0 +1,418 @@
+# Consolidated single-container pattern — shared by all consolidated humans.
+#
+# Per-human values are injected by deployHumanManifest in
+# elohim/holochain/Jenkinsfile, driven by
+# genesis/orchestrator/data/deployments.json. This template is NOT applied
+# directly; it's rendered through sed into a per-human manifest before
+# kubectl apply.
+#
+# Architecture:
+#   Doorway Deployment → ClusterIP service → forwarder (0.0.0.0:4444/4445)
+#                       → conductor localhost:4444/4445
+#   P2P: elohim-node peers discover each other via headless service DNS.
+#   Storage, conductor, happ installer are one container; cgroup-shared
+#   memory pool; no socat sidecar.
+#
+# Ports:
+#   - 4444: Conductor Admin WebSocket (exposed via forwarder)
+#   - 4445: Conductor App WebSocket (exposed via forwarder)
+#   - 8090: elohim-storage HTTP API
+#   - 9876: P2P libp2p transport (cross-namespace via NetworkPolicy)
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: RESOURCE_PREFIX_PLACEHOLDER-peer-policy
+  namespace: NAMESPACE_PLACEHOLDER
+  labels:
+    app: elohim-edgenode
+    elohim-human: HUMAN_LABEL_PLACEHOLDER
+    environment: ENV_PLACEHOLDER
+    app.kubernetes.io/component: policy
+    app.kubernetes.io/part-of: elohim
+    app.kubernetes.io/managed-by: jenkins
+data:
+  peer-policy.toml: |
+    [pool]
+    accept_general_traffic = "auto"
+    min_free_storage_pct = 20
+    require_conductor_healthy = true
+
+    [stewardship]
+    accept_new_reserves = "auto"
+    max_storage_pct = 80
+
+    [network]
+    # Spawns the two localhost→pod-network forwarders for conductor
+    # admin (4444) and app (4445) WebSocket ports. Doorway reaches the
+    # conductor exclusively through these forwarded ports; Holochain
+    # itself stays on 127.0.0.1 (its safe default). elohim-storage is
+    # the auth boundary for external traffic.
+    expose_conductor_externally = true
+    conductor_external_bind = "0.0.0.0:4445"
+    conductor_internal_port = 4445
+    conductor_admin_external_bind = "0.0.0.0:4444"
+    conductor_admin_internal_port = 4444
+---
+# ConfigMap for conductor configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: RESOURCE_PREFIX_PLACEHOLDER-config
+  namespace: NAMESPACE_PLACEHOLDER
+  labels:
+    app: elohim-edgenode
+    elohim-human: HUMAN_LABEL_PLACEHOLDER
+    environment: ENV_PLACEHOLDER
+    app.kubernetes.io/name: edgenode
+    app.kubernetes.io/instance: INSTANCE_PLACEHOLDER
+    app.kubernetes.io/version: "DEPLOY_VERSION_PLACEHOLDER"
+    app.kubernetes.io/component: data
+    app.kubernetes.io/part-of: elohim
+    app.kubernetes.io/managed-by: jenkins
+data:
+  # hApp version to fetch from Harbor (dev-latest for dev environments, explicit version for prod)
+  happ-version: "HAPP_TAG_PLACEHOLDER"
+  conductor-config.yaml: |
+    # Holochain Conductor Configuration for Elohim Protocol
+    # Conductor binds to 127.0.0.1:4444/4445 (Holochain's safe default).
+    # elohim-storage's forwarder bridges pod-network:4444/4445 → 127.0.0.1,
+    # so doorway reaches admin via the pod-IP without Holochain itself
+    # exposing externally. See peer-policy ConfigMap in this manifest.
+    admin_interfaces:
+      - driver:
+          type: websocket
+          port: 4444
+          allowed_origins: "*"
+    network:
+      # Bootstrap served by Doorway gateway
+      bootstrap_url: "BOOTSTRAP_URL_PLACEHOLDER"
+      # Signal served on dedicated subdomain (tx5/SBD protocol requires path = pubkey)
+      signal_url: "SIGNAL_URL_PLACEHOLDER"
+      enable_mdns: false
+      enable_relaying: true
+      webrtc_config:
+        ice_servers:
+          - urls: ["stun:stun.cloudflare.com:3478"]
+          - urls: ["stun:stun.l.google.com:19302"]
+    data_root_path: "/var/local/lib/holochain"
+    keystore:
+      type: lair_server_in_proc
+      lair_root: "/var/local/lib/holochain/ks"
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: RESOURCE_PREFIX_PLACEHOLDER
+  namespace: NAMESPACE_PLACEHOLDER
+  labels:
+    app: elohim-edgenode
+    elohim-human: HUMAN_LABEL_PLACEHOLDER
+    environment: ENV_PLACEHOLDER
+    app.kubernetes.io/name: edgenode
+    app.kubernetes.io/instance: INSTANCE_PLACEHOLDER
+    app.kubernetes.io/version: "DEPLOY_VERSION_PLACEHOLDER"
+    app.kubernetes.io/component: data
+    app.kubernetes.io/part-of: elohim
+    app.kubernetes.io/managed-by: jenkins
+spec:
+  serviceName: RESOURCE_PREFIX_PLACEHOLDER-headless
+  replicas: 1
+  # Retain PVCs across StatefulSet delete/recreate — needed when a forbidden-field
+  # change (e.g. volumeClaimTemplates, selector) forces orphan-delete + reapply.
+  persistentVolumeClaimRetentionPolicy:
+    whenDeleted: Retain
+    whenScaled: Retain
+  podManagementPolicy: Parallel
+  updateStrategy:
+    type: RollingUpdate
+  selector:
+    matchLabels:
+      app: elohim-edgenode
+      elohim-human: HUMAN_LABEL_PLACEHOLDER
+      environment: ENV_PLACEHOLDER
+  template:
+    metadata:
+      labels:
+        app: elohim-edgenode
+        elohim-human: HUMAN_LABEL_PLACEHOLDER
+        environment: ENV_PLACEHOLDER
+        app.kubernetes.io/name: edgenode
+        app.kubernetes.io/instance: INSTANCE_PLACEHOLDER
+        app.kubernetes.io/version: "DEPLOY_VERSION_PLACEHOLDER"
+        app.kubernetes.io/component: data
+        app.kubernetes.io/part-of: elohim
+        app.kubernetes.io/managed-by: jenkins
+    spec:
+      securityContext:
+        fsGroup: 1000
+      # AFFINITY_COMMENT_PLACEHOLDER
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: node-type
+                    operator: In
+                    values: NODE_TYPE_VALUES_PLACEHOLDER
+      # Init container fetches hApp from Harbor registry using oras
+      initContainers:
+        - name: happ-fetcher
+          image: ghcr.io/oras-project/oras:v1.1.0
+          command: ['sh', '-c']
+          args:
+            - |
+              set -e
+              echo "Fetching hApp from Harbor registry..."
+              echo "Version: ${HAPP_VERSION}"
+
+              # Login to Harbor and pull artifact
+              oras pull harbor.ethosengine.com/ethosengine/elohim-happ:${HAPP_VERSION} -o /happ
+
+              if [ -f /happ/elohim.happ ]; then
+                echo "hApp downloaded successfully from Harbor"
+                ls -lh /happ/elohim.happ
+              else
+                echo "Failed to download hApp from Harbor"
+                exit 1
+              fi
+          env:
+            - name: HAPP_VERSION
+              valueFrom:
+                configMapKeyRef:
+                  name: RESOURCE_PREFIX_PLACEHOLDER-config
+                  key: happ-version
+          volumeMounts:
+            - name: happ-volume
+              mountPath: /happ
+          resources:
+            requests:
+              memory: "32Mi"
+              cpu: "10m"
+            limits:
+              memory: "64Mi"
+              cpu: "100m"
+      containers:
+        # elohim-node: unified conductor + storage + P2P
+        # Manages holochain conductor as embedded child process.
+        # Replaces: edgenode + ws-proxy + elohim-storage + happ-installer
+        - name: elohim-node
+          image: harbor.ethosengine.com/ethosengine/elohim-storage:STORAGE_TAG_PLACEHOLDER
+          imagePullPolicy: Always
+          env:
+            - name: HUMAN_ID
+              value: "HUMAN_ID_PLACEHOLDER"
+            - name: RUST_LOG
+              value: "info,elohim_storage=debug"
+            # --- Embedded conductor mode ---
+            - name: EMBEDDED_CONDUCTOR
+              value: "true"
+            - name: CONDUCTOR_CONFIG_PATH
+              value: "/etc/holochain/conductor-config.yaml"
+            - name: CONDUCTOR_DATA_DIR
+              value: "/var/local/lib/holochain"
+            - name: HAPP_PATH
+              value: "/opt/holochain/elohim.happ"
+            # Path to the peer-policy mount — enables conductor forwarders.
+            - name: ELOHIM_STORAGE_PEER_POLICY_PATH
+              value: "/etc/elohim/peer-policy.toml"
+            # --- Storage config (unchanged) ---
+            - name: HOLOCHAIN_ADMIN_URL
+              value: "ws://localhost:4444"
+            - name: HOLOCHAIN_APP_URL
+              value: "ws://localhost:4445"
+            - name: HOLOCHAIN_APP_ID
+              value: "elohim"
+            - name: ENABLE_IMPORT_API
+              value: "true"
+            - name: ENABLE_CONTENT_DB
+              value: "true"
+            - name: IMPORT_CHUNK_SIZE
+              value: "50"
+            - name: IMPORT_CHUNK_DELAY_MS
+              value: "300"
+            - name: ENABLE_P2P
+              value: "true"
+            - name: P2P_PORT
+              value: "9876"
+            - name: DISABLE_MDNS
+              value: "true"
+            # Peer mesh — computed by deployHumanManifest from topology
+            - name: P2P_BOOTSTRAP_NODES
+              value: "P2P_BOOTSTRAP_NODES_PLACEHOLDER"
+            - name: RELAY_MODE
+              value: "server"
+            # Node-shape self-registration at boot (Task C7)
+            - name: DEVICE_ARCHETYPE
+              value: "DEVICE_ARCHETYPE_PLACEHOLDER"
+            - name: HOUSEHOLD_ID
+              value: "HOUSEHOLD_ID_PLACEHOLDER"
+            - name: NODE_ROLE
+              value: "NODE_ROLE_PLACEHOLDER"
+            - name: REGION
+              value: "REGION_PLACEHOLDER"
+          ports:
+            # Conductor admin WebSocket (direct, no socat bridge)
+            - name: admin-ws
+              containerPort: 4444
+              protocol: TCP
+            # Conductor app WebSocket (direct)
+            - name: app-ws
+              containerPort: 4445
+              protocol: TCP
+            # elohim-storage HTTP API
+            - name: storage-http
+              containerPort: 8090
+              protocol: TCP
+            # P2P libp2p transport
+            - name: p2p
+              containerPort: 9876
+              protocol: TCP
+          # Cooperative memory pool — conductor + storage share one cgroup
+          resources:
+            requests:
+              memory: "EDGENODE_MEMORY_REQUEST_PLACEHOLDER"
+              cpu: "EDGENODE_CPU_REQUEST_PLACEHOLDER"
+            limits:
+              memory: "EDGENODE_MEMORY_LIMIT_PLACEHOLDER"
+              cpu: "EDGENODE_CPU_LIMIT_PLACEHOLDER"
+          volumeMounts:
+            - name: holochain-data
+              mountPath: /var/local/lib/holochain
+            - name: storage-data
+              mountPath: /data
+            - name: conductor-config
+              mountPath: /etc/holochain/conductor-config.yaml
+              subPath: conductor-config.yaml
+            - name: happ-volume
+              mountPath: /opt/holochain
+            - name: peer-policy
+              mountPath: /etc/elohim/peer-policy.toml
+              subPath: peer-policy.toml
+              readOnly: true
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8090
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8090
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            failureThreshold: 5
+      volumes:
+        # Shared volume for hApp (fetched by init container)
+        - name: happ-volume
+          emptyDir: {}
+        # Conductor config from ConfigMap
+        - name: conductor-config
+          configMap:
+            name: RESOURCE_PREFIX_PLACEHOLDER-config
+        - name: peer-policy
+          configMap:
+            name: RESOURCE_PREFIX_PLACEHOLDER-peer-policy
+  # Per-pod persistent volumes — each StatefulSet replica gets its own PVCs
+  # Named volumes are referenced in volumeMounts above
+  volumeClaimTemplates:
+    - metadata:
+        name: holochain-data
+      spec:
+        accessModes: [ReadWriteOnce]
+        # Node-local storage — P2P dataplane is the replication layer, not k8s
+        storageClassName: "STORAGE_CLASS_PLACEHOLDER"
+        resources:
+          requests:
+            storage: 20Gi
+    - metadata:
+        name: storage-data
+      spec:
+        accessModes: [ReadWriteOnce]
+        # Node-local storage — P2P dataplane is the replication layer, not k8s
+        storageClassName: "STORAGE_CLASS_PLACEHOLDER"
+        resources:
+          requests:
+            storage: 20Gi
+---
+# Headless service for StatefulSet DNS-based peer discovery
+# Pod gets stable DNS name: RESOURCE_PREFIX_PLACEHOLDER-0.RESOURCE_PREFIX_PLACEHOLDER-headless.NAMESPACE_PLACEHOLDER.svc.cluster.local
+# Doorway uses these DNS names in CONDUCTOR_URLS for per-conductor routing
+apiVersion: v1
+kind: Service
+metadata:
+  name: RESOURCE_PREFIX_PLACEHOLDER-headless
+  namespace: NAMESPACE_PLACEHOLDER
+  labels:
+    app: elohim-edgenode
+    elohim-human: HUMAN_LABEL_PLACEHOLDER
+    environment: ENV_PLACEHOLDER
+    app.kubernetes.io/name: edgenode
+    app.kubernetes.io/instance: INSTANCE_PLACEHOLDER
+    app.kubernetes.io/version: "DEPLOY_VERSION_PLACEHOLDER"
+    app.kubernetes.io/component: data
+    app.kubernetes.io/part-of: elohim
+    app.kubernetes.io/managed-by: jenkins
+spec:
+  clusterIP: None
+  selector:
+    app: elohim-edgenode
+    elohim-human: HUMAN_LABEL_PLACEHOLDER
+    environment: ENV_PLACEHOLDER
+  ports:
+    - name: admin-ws
+      port: 4444
+      targetPort: 4444
+      protocol: TCP
+    - name: app-ws
+      port: 4445
+      targetPort: 4445
+      protocol: TCP
+    - name: p2p
+      port: 9876
+      targetPort: 9876
+      protocol: TCP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: RESOURCE_PREFIX_PLACEHOLDER
+  namespace: NAMESPACE_PLACEHOLDER
+  labels:
+    app: elohim-edgenode
+    elohim-human: HUMAN_LABEL_PLACEHOLDER
+    environment: ENV_PLACEHOLDER
+    app.kubernetes.io/name: edgenode
+    app.kubernetes.io/instance: INSTANCE_PLACEHOLDER
+    app.kubernetes.io/version: "DEPLOY_VERSION_PLACEHOLDER"
+    app.kubernetes.io/component: data
+    app.kubernetes.io/part-of: elohim
+    app.kubernetes.io/managed-by: jenkins
+spec:
+  type: ClusterIP
+  ports:
+    # Conductor admin WebSocket (direct — no socat bridge in consolidated mode)
+    - name: admin-ws
+      port: 4444
+      targetPort: 4444
+      protocol: TCP
+    # Conductor app WebSocket (direct)
+    - name: app-ws
+      port: 4445
+      targetPort: 4445
+      protocol: TCP
+    # elohim-storage HTTP API
+    - name: storage-db
+      port: 8090
+      targetPort: 8090
+      protocol: TCP
+    # P2P libp2p transport
+    - name: p2p
+      port: 9876
+      targetPort: 9876
+      protocol: TCP
+  selector:
+    app: elohim-edgenode
+    elohim-human: HUMAN_LABEL_PLACEHOLDER
+    environment: ENV_PLACEHOLDER
