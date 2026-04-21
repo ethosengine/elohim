@@ -18,7 +18,7 @@ pub use coupling::Coupling;
 pub use envelope::Envelope;
 pub use epr::Epr;
 pub use error::{EprError, Result};
-pub use kind::EprKind;
+pub use kind::{CouplingLeg, EprKind};
 pub use proof::{sign, verify, AgentKeypair};
 pub use reach::Reach;
 pub use signature::Signature;
