@@ -14,4 +14,15 @@ proposedAuthorityKind: string,
  * JSON-encoded variant-specific fields (grant_hash, purpose, stewardship_hash, etc.).
  * Empty string `""` for variants with no extra fields.
  */
-proposedAuthorityJson: string, requestNonce: Array<number>, createdAt: string, };
+proposedAuthorityJson: string, requestNonce: Array<number>, 
+/**
+ * Coordinator-populated resolution of human_agent_pubkey to legacy String human_id.
+ * None at request-commit time is accepted (back-compat); required for IntimateQuorum
+ * KeyRotation and freeze-floor checks per M2 validator semantics.
+ */
+humanId: string | null, 
+/**
+ * Threshold for IntimateQuorum — distinct witness-author count must be >= this value.
+ * Coordinator computes ceil(emergency_contact_count / 2) + 1, floored at 2.
+ */
+requiredWitnessCount: number, createdAt: string, };
