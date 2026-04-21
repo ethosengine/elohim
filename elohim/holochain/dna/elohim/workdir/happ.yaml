@@ -20,7 +20,7 @@ manifest_version: "1"
 name: elohim
 description: "Elohim Protocol hApp - Decentralized Learning & Identity"
 roles:
-  # Lamad DNA - Content & Learning
+  # Lamad DNA - Content & Learning (bootstrap-steward DNA — see wave-1 §1.1.5)
   - name: lamad
     provisioning:
       strategy: create
@@ -29,7 +29,8 @@ roles:
       path: "lamad.dna"
       modifiers:
         network_seed: "elohim_lamad_alpha"
-        properties: ~
+        properties:
+          progenitor_pubkey: ~  # bootstrap steward; override before alpha publish
       installed_hash: ~
       clone_limit: 0
 

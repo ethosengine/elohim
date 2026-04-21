@@ -1,0 +1,16 @@
+[package]
+name = "elohim_manifest_hygiene"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Fast schema contract test for elohim DNA manifests (wave-1 §7)."
+
+# Standalone workspace — deliberately NOT part of sweettest's workspace so
+# that running this test never requires compiling the full holochain +
+# tokio stack. Used by husky pre-push.
+[workspace]
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_yaml = "0.9"
+anyhow = "1"
