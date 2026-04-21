@@ -1168,6 +1168,15 @@ pub enum LinkTypes {
     IdToRelationshipRenewal,         // Anchor(rel_renewal_id) -> RelationshipRenewal
     OriginalRelToRenewal,            // Anchor(original_relationship_id) -> RelationshipRenewal
     RenewalAttestationByStatus,      // Anchor(renewal_status) -> RenewalAttestation
+
+    // Recovery Protocol Phase 2 (seed-quorum)
+    HumanToCurrentSeedCommitment,   // Anchor(human_pubkey) -> RecoverySeedCommitment
+    SeedCommitmentSupersededBy,     // old RecoverySeedCommitment -> new RecoverySeedCommitment
+    SeedCommitmentToRequest,        // RecoverySeedCommitment -> RecoveryQuorumRequest
+    HumanToRecoveryQuorumRequest,   // Anchor(human_pubkey) -> RecoveryQuorumRequest
+    HumanToCurrentAgent,            // Anchor(human_pubkey) -> KeyRotation (latest = current)
+    KeyRotationSupersededBy,        // old KeyRotation -> new KeyRotation (audit chain)
+    AgentToKeyRotation,             // Anchor(new_agent_pubkey) -> KeyRotation (reverse lookup)
 }
 
 // =============================================================================
