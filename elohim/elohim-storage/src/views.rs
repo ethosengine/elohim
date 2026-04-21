@@ -6661,6 +6661,13 @@ pub struct RecoveryRequestView {
     /// Empty string `""` for variants with no extra fields.
     pub proposed_authority_json: String,
     pub request_nonce: Vec<u8>,
+    /// Coordinator-populated resolution of human_agent_pubkey to legacy String human_id.
+    /// None at request-commit time is accepted (back-compat); required for IntimateQuorum
+    /// KeyRotation and freeze-floor checks per M2 validator semantics.
+    pub human_id: Option<String>,
+    /// Threshold for IntimateQuorum — distinct witness-author count must be >= this value.
+    /// Coordinator computes ceil(emergency_contact_count / 2) + 1, floored at 2.
+    pub required_witness_count: u32,
     pub created_at: String,
 }
 
