@@ -65,9 +65,14 @@ describe('StorageClientService', () => {
       expect(service.getBlobUrl('')).toBe('');
     });
 
-    it('should construct doorway blob URL', () => {
+    it('should construct doorway blob URL at /blob/{hash}', () => {
+      // Doorway serves blobs via the storage-manifest-registered /blob/{hash}
+      // route through the RouteRegistry. The legacy /api/blob/{hash} alias at
+      // http.rs is not reachable on deployed doorway (returns 404), so using
+      // it breaks thumbnail rendering. Both doorway and direct modes now use
+      // /blob/{hash}.
       const url = service.getBlobUrl('sha256-abc123');
-      expect(url).toBe('http://localhost:8888/api/blob/sha256-abc123');
+      expect(url).toBe('http://localhost:8888/blob/sha256-abc123');
     });
 
     it('should construct direct blob URL when strategy is direct', () => {
@@ -91,7 +96,7 @@ describe('StorageClientService', () => {
         result = buffer;
       });
 
-      const req = httpMock.expectOne('http://localhost:8888/api/blob/sha256-test');
+      const req = httpMock.expectOne('http://localhost:8888/blob/sha256-test');
       expect(req.request.method).toBe('GET');
       expect(req.request.responseType).toBe('arraybuffer');
       req.flush(mockBuffer);
@@ -112,7 +117,7 @@ describe('StorageClientService', () => {
         },
       });
 
-      const req = httpMock.expectOne('http://localhost:8888/api/blob/sha256-missing');
+      const req = httpMock.expectOne('http://localhost:8888/blob/sha256-missing');
       req.error(new ProgressEvent('error'), { status: 404 });
 
       tick();
@@ -128,7 +133,7 @@ describe('StorageClientService', () => {
         },
       });
 
-      const req = httpMock.expectOne('http://localhost:8888/api/blob/sha256-slow');
+      const req = httpMock.expectOne('http://localhost:8888/blob/sha256-slow');
       tick(31000); // > 30s default timeout
       expect(timedOut).toBe(true);
 
@@ -147,7 +152,7 @@ describe('StorageClientService', () => {
         exists = result;
       });
 
-      const req = httpMock.expectOne('http://localhost:8888/api/blob/sha256-exists');
+      const req = httpMock.expectOne('http://localhost:8888/blob/sha256-exists');
       expect(req.request.method).toBe('HEAD');
       req.flush(null, { status: 200, statusText: 'OK' });
 
@@ -162,7 +167,7 @@ describe('StorageClientService', () => {
         exists = result;
       });
 
-      const req = httpMock.expectOne('http://localhost:8888/api/blob/sha256-missing');
+      const req = httpMock.expectOne('http://localhost:8888/blob/sha256-missing');
       req.error(new ProgressEvent('error'), { status: 404 });
 
       tick();
@@ -176,7 +181,7 @@ describe('StorageClientService', () => {
         exists = result;
       });
 
-      const req = httpMock.expectOne('http://localhost:8888/api/blob/sha256-error');
+      const req = httpMock.expectOne('http://localhost:8888/blob/sha256-error');
       req.error(new ProgressEvent('error'));
 
       tick();

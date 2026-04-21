@@ -6,8 +6,13 @@
  * - SQL metadata: Content nodes, relationships, projections
  *
  * Routes requests based on connection strategy:
- * - Doorway mode (browser): Blobs via /api/blob/{hash}, DB via /db/{table}
+ * - Doorway mode (browser): Blobs via /blob/{hash}, DB via /db/{table}
  * - Direct mode (Tauri): http://localhost:8090/blob/{hash}, /db/{table}
+ *
+ * Both modes use /blob/{hash} — doorway exposes this route via the storage
+ * manifest registration in its RouteRegistry, which proxies to storage's
+ * /blob/{hash}. The legacy /api/blob/{hash} alias in doorway's http.rs is
+ * not reachable on deployed doorway (rewrites to a 404 /store/{hash} path).
  *
  * In Eclipse Che, doorway is accessed via the hc-dev endpoint URL.
  */
@@ -89,17 +94,12 @@ export class StorageClientService {
   getBlobUrl(blobHash: string): string {
     if (!blobHash) return '';
 
-    // Use strategy to determine blob URL
-    // The strategy knows the appropriate base URL for current mode
-    const baseUrl = this.getStorageBaseUrl();
-
-    // Route based on connection mode:
-    // - Direct mode: /blob/{hash} (directly to elohim-storage)
-    // - Doorway mode: /api/blob/{hash} (doorway proxies to storage's /blob/{hash})
-    if (this.strategy.mode === 'direct') {
-      return `${baseUrl}/blob/${blobHash}`;
-    }
-    return `${baseUrl}/api/blob/${blobHash}`;
+    // Both doorway and direct modes serve blobs at /blob/{hash}. Doorway's
+    // RouteRegistry exposes this from storage's manifest; direct mode hits
+    // elohim-storage directly. The /api/blob/{hash} alias at doorway's
+    // http.rs rewrites to /store/{hash} which isn't a reachable route on
+    // deployed doorway — using it 404s.
+    return `${this.getStorageBaseUrl()}/blob/${blobHash}`;
   }
 
   /**
