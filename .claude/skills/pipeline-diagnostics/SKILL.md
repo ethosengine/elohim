@@ -120,6 +120,29 @@ Pick based on what you're waiting for:
 - **Orchestrator can supersede a prior in-flight build.** If you push twice quickly, the first orchestrator run is marked "Not built / Superseded" and its downstream triggers can be cancelled. The second run analyzes the cumulative diff since the last green — so downstreams still fire correctly, but any in-flight edge/holochain from the first run may abort mid-way.
 - **Edge and holochain run in parallel, not serial.** Holochain may finish (SUCCESS) before edge publishes new images, meaning the deploy ran against the OLD storage image tag (`dev-latest` points at last green). Watch for this: holochain green + edge not-yet-green = Adam is running old code. You need either a fresh holochain trigger after edge, or a rollout restart to pick up the new image tag.
 - **`dev-latest` tag race.** StatefulSet pods only re-pull images on pod restart. With `imagePullPolicy: Always` + `dev-latest`, k8s WILL pull the new image, but ONLY when the pod restarts. A StatefulSet rolling restart happens on spec change (env var, mount, resource bump) — NOT on image tag content change. Deploys that rely on `dev-latest` moving must also change something in the pod spec, or include an explicit `kubectl rollout restart statefulset/...` call.
+- **Pipeline names vs file paths are not 1:1.** Despite the name, the Jenkins job `elohim-edge` uses `elohim/holochain/Jenkinsfile` (not the DNA-only Jenkinsfile). The DNA-only job is `elohim-holochain`, which uses `elohim/holochain/dna/Jenkinsfile`. `elohim-edge` is what actually builds Rust images *and* deploys humans. Check `genesis/orchestrator/Jenkinsfile` `PIPELINES` map for the authoritative name→jenkinsPath→changePatterns mapping.
+- **Orchestrator skips pipelines it thinks are up-to-date.** Even when a file path matches a pipeline's `changePatterns`, the orchestrator uses per-pipeline baselines: if the pipeline was built at a commit that already contained the file in its current state, it skips re-triggering. This bit during a manifest-only restart-annotation push — the annotation was "new" but edge's baseline already included the surrounding manifest, so edge didn't retrigger despite the path match. Escape hatch below.
+
+### Forcing a pipeline with `[build:*]` commit tags
+
+The orchestrator's webhook-trigger branch parses the commit message for `[build:<pipeline>]` tags and adds matching pipelines to `FORCE_BUILD_PIPELINES` regardless of changeset analysis. Supported tags:
+
+| Tag | Pipeline |
+|-----|----------|
+| `[build:edge]` | elohim-edge (Rust doorway + storage + deploy) |
+| `[build:dna]` | elohim-holochain (DNA/hApp only) |
+| `[build:app]` | elohim (Angular) |
+| `[build:genesis]` | elohim-genesis (a2o + seed) |
+| `[build:sophia]` | elohim-sophia |
+| `[build:steward]` | elohim-steward |
+| `[build:all]` | every non-manualOnly pipeline |
+
+Comma-separated forms work: `[build:edge,genesis]`. The tag must appear in the commit message of the HEAD commit at push time (webhook triggers only). Use this when:
+- The orchestrator's changeset analysis is wrong and you've verified path matching should have triggered
+- You need a rolling restart that the normal deploy wouldn't cause (pod spec unchanged, but you know the image tag moved)
+- You're testing CI changes without meaningful source changes
+
+Don't abuse `[build:all]` — each pipeline costs minutes. Prefer the narrowest tag that'll do the job.
 
 ## Red flags — anti-patterns observed when agents DON'T use this skill
 
