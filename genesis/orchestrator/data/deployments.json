@@ -60,7 +60,7 @@
       "edgenodeCpuLimit": "1000m"
     },
     {
-      "$comment": "TEMPORARY BUMP (2026-04-17) to unblock seeding — Chromebook floor was 384Mi/768Mi + 150m/500m, OOMing under initial seed burst. Bumped to the Jessica/Frank/Pete 'typical steward' tier so we can (a) complete seeding, (b) validate the consolidated-pod strategy under real load, then (c) tune back down to the Chromebook floor and prove the device-chromebook-edu archetype story in genesis/plans/2026-04-13-device-archetypes-design.md. The floor values are preserved below as the restoration target.",
+      "$comment": "SECOND TEMPORARY BUMP (2026-04-21). History: Chromebook floor 384Mi/768Mi + 150m/500m → bumped 2026-04-17 to Jessica/Frank/Pete 'typical steward' tier (512Mi/1536Mi + 250m/1000m) to survive seed burst. That held for seeding but the 1536Mi limit OOMed during sustained content-serving: pod observed at ~1.5GB RSS while serving 3498-item inventory to 5 peers + handling Holochain app-WS authentication backlog (3 OOMKilled restarts within 19min, container-level exit 137). Bumped again to 1Gi/3Gi + 250m/1000m — doubles the limit, gives ~2× headroom over observed RSS. Restoration chain: to prove the device-chromebook-edu archetype we eventually tune all the way back to the floor below. Full design in genesis/plans/2026-04-13-device-archetypes-design.md.",
       "$chromebookFloor": {
         "edgenodeMemoryRequest": "384Mi",
         "edgenodeMemoryLimit": "768Mi",
@@ -74,10 +74,10 @@
       "pattern": "consolidated",
       "template": "genesis/orchestrator/manifests/humans/_edgenode-consolidated.template.yaml",
       "deviceArchetype": "device-chromebook-edu",
-      "affinityComment": "Timothy: Chromebook-class stewarded child — edge only, bumped for seeding (see $comment)",
+      "affinityComment": "Timothy: Chromebook-class stewarded child — edge only, bumped twice for seeding + sync-load (see $comment)",
       "nodeTypes": ["edge"],
-      "edgenodeMemoryRequest": "512Mi",
-      "edgenodeMemoryLimit": "1536Mi",
+      "edgenodeMemoryRequest": "1Gi",
+      "edgenodeMemoryLimit": "3Gi",
       "edgenodeCpuRequest": "250m",
       "edgenodeCpuLimit": "1000m"
     },
