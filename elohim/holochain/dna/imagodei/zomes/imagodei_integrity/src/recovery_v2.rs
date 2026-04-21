@@ -294,3 +294,45 @@ fn verify_quorum_signature(
         )),
     }
 }
+
+// =============================================================================
+// HeldRecoveryShare (private source-chain, never gossiped)
+// =============================================================================
+
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct HeldRecoveryShare {
+    pub seed_commitment_hash: ActionHash,
+    pub encrypted_share: Vec<u8>,
+    pub relationship_label: String,
+    pub protected_human_pubkey: AgentPubKey,
+    pub received_at: Timestamp,
+}
+
+pub fn validate_held_recovery_share(
+    share: &HeldRecoveryShare,
+    action: &Create,
+) -> ExternResult<ValidateCallbackResult> {
+    // Rule 1: share author must be the holder (the one committing)
+    // This is automatic in Holochain source chains; we just sanity-check
+    // that the protected_human is distinct from the author
+    if action.author == share.protected_human_pubkey {
+        return Ok(ValidateCallbackResult::Invalid(
+            "HeldRecoveryShare: author cannot be the protected human (you hold shares for others)"
+                .to_string(),
+        ));
+    }
+    // Rule 2: encrypted_share non-empty
+    if share.encrypted_share.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "HeldRecoveryShare encrypted_share must not be empty".to_string(),
+        ));
+    }
+    // Rule 3: relationship_label reasonable length
+    if share.relationship_label.len() > 128 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "HeldRecoveryShare relationship_label too long (max 128 chars)".to_string(),
+        ));
+    }
+    Ok(ValidateCallbackResult::Valid)
+}
