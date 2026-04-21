@@ -98,6 +98,9 @@ pub mod elohim_reputation;
 // Placement gap CRUD — shefa signal surface (self-healing Plan 1 Task 4)
 pub mod placement_gaps;
 
+// Recovery Protocol Phase 2 — DHT projection CRUD (imagodei RecoveryRequest + KeyRotation)
+pub mod recovery_requests;
+
 use std::path::Path;
 use std::time::Duration;
 
