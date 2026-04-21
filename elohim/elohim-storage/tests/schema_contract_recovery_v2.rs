@@ -7,9 +7,7 @@
 //! before compiling because the jsonschema crate does not resolve file-based
 //! references automatically.
 
-use elohim_storage::views::{
-    KeyRotationView, RecoveryQuorumRequestView, RecoverySeedCommitmentView,
-};
+use elohim_storage::views::{KeyRotationView, RecoveryRequestView};
 use serde_json::Value;
 use std::collections::HashMap;
 use std::fs;
@@ -109,50 +107,33 @@ fn validate_against_schema(schema_path_str: &str, instance: &Value) {
 // ── Recovery Phase 2 Contract Tests ─────────────────────────────────────────
 
 #[test]
-fn recovery_seed_commitment_view_matches_schema() {
-    let view = RecoverySeedCommitmentView {
-        dht_anchor_hash: "abcd1234".to_string(),
-        human_agent_pubkey: "uhCAk...".to_string(),
-        seed_public_half: vec![0u8; 32],
-        threshold_n: 3,
-        total_m: 5,
-        commitment_nonce: vec![0u8; 16],
-        superseded_by: None,
-        created_at: "2026-04-21T00:00:00Z".to_string(),
-    };
-    let json = serde_json::to_value(&view).expect("RecoverySeedCommitmentView serializes");
-    validate_against_schema("views/recovery-seed-commitment.schema.json", &json);
-}
-
-#[test]
-fn recovery_quorum_request_view_matches_schema() {
-    let view = RecoveryQuorumRequestView {
-        dht_anchor_hash: "req0001".to_string(),
-        human_agent_pubkey: "uhCAk...".to_string(),
-        seed_commitment_hash: "commit001".to_string(),
+fn recovery_request_view_matches_schema() {
+    let view = RecoveryRequestView {
+        dht_anchor_hash: "req001".to_string(),
+        human_agent_pubkey: "uhCAk_human".to_string(),
         new_agent_pubkey: "uhCAk_new".to_string(),
-        hosting_doorway_pubkey: "uhCAk_door".to_string(),
-        recovery_mode: "normal".to_string(),
-        stewarded_grant_hash: None,
+        hosting_doorway_pubkey: "uhCAk_doorway".to_string(),
+        proposed_authority_kind: "intimateQuorum".to_string(),
+        proposed_authority_json: "{}".to_string(),
         request_nonce: vec![0u8; 16],
-        created_at: "2026-04-21T00:00:00Z".to_string(),
+        created_at: "2026-04-22T00:00:00Z".to_string(),
     };
-    let json = serde_json::to_value(&view).expect("RecoveryQuorumRequestView serializes");
-    validate_against_schema("views/recovery-quorum-request.schema.json", &json);
+    let json = serde_json::to_value(&view).expect("serializes");
+    validate_against_schema("views/recovery-request.schema.json", &json);
 }
 
 #[test]
 fn key_rotation_view_matches_schema() {
     let view = KeyRotationView {
-        dht_anchor_hash: "rot0001".to_string(),
-        human_agent_pubkey: "uhCAk...".to_string(),
+        dht_anchor_hash: "rot001".to_string(),
+        human_agent_pubkey: "uhCAk_human".to_string(),
         new_agent_pubkey: "uhCAk_new".to_string(),
         superseded_agent_pubkey: "uhCAk_old".to_string(),
-        seed_commitment_hash: "commit001".to_string(),
-        recovery_request_hash: "req0001".to_string(),
-        quorum_signature: vec![0u8; 64],
-        rotated_at: "2026-04-21T00:00:00Z".to_string(),
+        recovery_request_hash: "req001".to_string(),
+        authority_kind: "intimateQuorum".to_string(),
+        authority_json: "{\"witnessHashes\":[]}".to_string(),
+        rotated_at: "2026-04-22T00:00:00Z".to_string(),
     };
-    let json = serde_json::to_value(&view).expect("KeyRotationView serializes");
+    let json = serde_json::to_value(&view).expect("serializes");
     validate_against_schema("views/key-rotation.schema.json", &json);
 }
