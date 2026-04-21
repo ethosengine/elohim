@@ -11,3 +11,9 @@ name = "imagodei_integrity"
 hdi.workspace = true
 holochain_serialized_bytes.workspace = true
 serde.workspace = true
+
+# Recovery Protocol Phase 2 — verifiable Shamir secret sharing + Ed25519 signature verification
+# vsss-rs is optional: kept out of the WASM integrity zome if it fails to compile for wasm32.
+# ed25519-dalek is required here for quorum_signature verification in KeyRotation validation.
+vsss-rs = { version = "5.1", default-features = false, features = ["std", "curve25519"], optional = true }
+ed25519-dalek = { version = "2", default-features = false, features = ["zeroize"] }

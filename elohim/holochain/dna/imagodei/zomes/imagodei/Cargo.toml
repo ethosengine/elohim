@@ -14,3 +14,7 @@ serde.workspace = true
 serde_json.workspace = true
 imagodei_integrity = { path = "../imagodei_integrity" }
 imagodei-types = { path = "../../../../../sdk/domains/imagodei/types" }
+
+# Recovery Protocol Phase 2 — Shamir secret sharing + Ed25519 (coordinator zome uses vsss-rs)
+vsss-rs = { version = "5.1", default-features = false, features = ["std", "curve25519"], optional = true }
+ed25519-dalek = { version = "2", default-features = false, features = ["zeroize"] }
