@@ -171,6 +171,9 @@ if [ "$USE_MANIFEST" = false ]; then
   if echo "$CHANGED" | grep -q "^elohim/elohim-storage/"; then
     PROJECTS="$PROJECTS elohim-storage"
   fi
+  if echo "$CHANGED" | grep -qE "^elohim/epr/|^elohim/sdk/epr-ts/"; then
+    PROJECTS="$PROJECTS elohim-epr"
+  fi
   if echo "$CHANGED" | grep -q "^elohim/elohim-compute/"; then
     PROJECTS="$PROJECTS elohim-compute"
   fi
@@ -335,6 +338,14 @@ run_gate() {
         cargo test 2>&1
         rc=$?
         ;;
+      elohim-epr)
+        cargo fmt --check 2>&1 && \
+        cargo clippy -p elohim-epr -- -D warnings 2>&1 && \
+        cargo test -p elohim-epr --all-targets 2>&1
+        TS_RC=$?
+        (cd ../../sdk/epr-ts && pnpm test) 2>&1
+        rc=$((TS_RC | $?))
+        ;;
       elohim-library)
         pnpm exec eslint projects/elohim-service/src projects/lamad-ui/src projects/html5-app-plugin/src 2>&1 && \
         (cd projects/elohim-service && pnpm exec tsc --noEmit) 2>&1 && \
@@ -465,6 +476,7 @@ for PROJECT in $PROJECTS; do
       doorway-app)      PROJECT_DIR="doorway/doorway-app" ;;
       elohim-storage)   PROJECT_DIR="elohim/elohim-storage" ;;
       elohim-compute)   PROJECT_DIR="elohim/elohim-compute" ;;
+      elohim-epr)       PROJECT_DIR="elohim/epr" ;;
       steward-node)     PROJECT_DIR="steward/node" ;;
       genesis)          PROJECT_DIR="genesis/seeder" ;;
       schema-validate)  PROJECT_DIR="." ;;
