@@ -17,3 +17,5 @@ serde.workspace = true
 # ed25519-dalek is required here for quorum_signature verification in KeyRotation validation.
 vsss-rs = { version = "5.1", default-features = false, features = ["std", "curve25519"], optional = true }
 ed25519-dalek = { version = "2", default-features = false, features = ["zeroize"] }
+# base64 decoding for KeyStewardship.shard_commitment_hash (interpreted as base64-encoded Ed25519 verifying key per spec §3.1)
+base64 = { version = "0.22", default-features = false, features = ["alloc"] }
