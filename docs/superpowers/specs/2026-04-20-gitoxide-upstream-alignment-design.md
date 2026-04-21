@@ -1,31 +1,35 @@
 # Gitoxide Upstream Alignment — Design
 
 **Date:** 2026-04-20
-**Status:** Approved (brainstorming complete, ready for implementation plan)
+**Status:** Approved, amended same-day with `gix-brit` playground reframe
 **Author:** Matthew Dowell + Claude Opus 4.7
 **Predecessor sprints:**
 - `docs/superpowers/sprint-results/2026-04-19-brit-cli-test-page.md` — built our Linux-only test infrastructure
 - `docs/superpowers/specs/2026-04-19-brit-cli-test-page-design.md` — designed that infrastructure
 
+**Amendment note (2026-04-20, second brainstorm):** The original spec had a Phase 3 deliverable of a "first-PR candidate shortlist" — a speculative, pre-selected menu of candidates to bring to Sebastian. In a follow-up brainstorm the same day we concluded this framing was timid and passive. The shortlist was deleted. Replaced with `gix-brit`: a dedicated gitoxide-contribution playground branch where we hack on gitoxide with upstream discipline, and first-PR candidates emerge naturally from real work rather than being speculatively chosen.
+
 ## TL;DR
 
-Establish the operational foundation for contributing to upstream gitoxide (`GitoxideLabs/gitoxide`) with maintainer respect, before any upstream PR ships. Master the territory first — their practices, their CI, their objectives, their taste — so when we do approach Sebastian Thiel with a PR, it serves his roadmap and costs him minimal review time.
+Establish the operational foundation for contributing to upstream gitoxide (`GitoxideLabs/gitoxide`) with maintainer respect. Do it by BUILDING, not studying: set up a dedicated contribution-playground branch (`gix-brit`) where we work on gitoxide in upstream shape for our own needs. First upstream PRs emerge as natural byproducts of that work — commits we made for ourselves that turn out to be valuable enough to cherry-pick upstream.
 
-Two structural changes, four reference artifacts, one self-imposed readiness gate.
+Three structural changes, three reference artifacts, one self-imposed readiness gate.
 
 **Structural:**
 1. A `gix-main` branch on our fork that is an auto-synced mirror of `upstream/main`. Never carries brit commits.
-2. An explicit **upstream-PR workflow** where every PR to gitoxide branches off `gix-main`, never `main`.
+2. A `gix-brit` branch, off `gix-main`, as our active **contribution playground**. Pure gitoxide tree. We hack on gix freely, but commit-at-commit we hold ourselves to upstream conventions (conventional commits, AI trailer, thiserror, no unwrap, tests-first). Diverges from `gix-main` as we work; rebased periodically for freshness.
+3. An explicit **upstream-PR workflow** where every PR to `GitoxideLabs/gitoxide` is a `feat/*-upstream` branch off fresh `gix-main`, cherry-picked from `gix-brit` when a commit or chain proves upstream-worthy.
 
 **Artifacts (deliverables of this spec's implementation):**
 1. `gitoxide-house-style.md` — distilled pre-PR checklist from CONTRIBUTING/DEVELOPMENT/COLLABORATING/STABILITY
 2. `gitoxide-local-ci.md` — reproducible setup for running `just ci-test` across all 4 feature matrices locally
-3. `gitoxide-objectives.md` — cross-referenced map of `tasks.md` + `SHORTCOMINGS.md` + `crate-status.md` + recent merge/reject PR patterns → where Sebastian actually wants help
-4. `gitoxide-first-pr-candidates.md` — 3-5 ranked potential first contributions, each justified against (3)
+3. `gitoxide-objectives.md` — cross-referenced map of `tasks.md` + `SHORTCOMINGS.md` + `crate-status.md` + recent merge/reject PR patterns → shapes our SENSE of what's valuable but does NOT pre-pick candidates
 
-**Gate:** A self-imposed readiness checklist. No upstream PR ships until every item is green.
+**Gate:** A self-imposed readiness checklist. No upstream PR ships until every item is green. Applies at the **feat/*-upstream cherry-pick moment**, not to raw gix-brit commits.
 
 **Non-goal for this spec:** the actual first PR, the multi-platform testing strategy, any rewrite of our existing `cli-journey`/`cli-test-page`/`baseline.md` work. Those are downstream decisions, informed by this foundation.
+
+**Explicitly dissolved:** The speculative "first-PR candidate shortlist" deliverable. We don't need to guess what Sebastian wants — we build what WE need in upstream shape, and the upstream-valuable subset surfaces itself.
 
 ## Problem
 
@@ -48,8 +52,9 @@ To prevent scope creep:
 - **Not** shipping a first PR. The spec produces the conditions for a first PR; the first PR itself is a later decision.
 - **Not** designing the multi-platform test strategy. That's a downstream concern once we see how gitoxide's own testing handles Windows/macOS.
 - **Not** archiving or rewriting our existing brit test infrastructure. `main` carries what it carries; `gix-main` is a separate pristine workspace. Cleanup of `main` is a future decision.
-- **Not** implementing `push` / `commit` / any feature work in gitoxide. Those become candidates in `gitoxide-first-pr-candidates.md`; selection happens after this spec.
-- **Not** choosing which PR to ship first. The shortlist is ranked but unselected. Selection requires follow-up discussion with Sebastian (via issue or discussion, per COLLABORATING.md).
+- **Not** implementing `push` / `commit` / any feature work in gitoxide as this spec's scope. Those become natural gix-brit work items when we decide to hack on them.
+- **Not** choosing which PR to ship first. First PR emerges from real gix-brit work — not pre-selected from a speculative shortlist.
+- **Not** porting brit's existing main-branch work (brit-cli, cli-journey, cli-test-page, baseline.md, sibling-path deps to rakia) into gix-brit. gix-brit starts from pristine gix-main and stays pristine-gitoxide-shape.
 
 ## Architecture
 
@@ -57,26 +62,66 @@ To prevent scope creep:
 
 ```
 origin (our fork: ethosengine/brit)
-├── main             ← brit dev branch (79 commits ahead of upstream/main)
-│                       carries the brit binary, brit-verify, brit-build-ref,
-│                       cli-journey, cli-test-page, baseline.md — our work
+├── main             ← brit-the-product (unchanged, 79 commits ahead of upstream/main)
+│                       carries brit binary, brit-verify, brit-build-ref,
+│                       cli-journey, cli-test-page, baseline.md, rakia sibling deps
+│                       - dev continues here for brit product features
+│                       - periodically merges from gix-main to pull upstream fixes
+│                       - ci.yml fails here due to sibling-path deps — acceptable
+│                         known issue, deferred to Phase 2 Local-CI-Runbook
 │
 ├── gix-main         ← pristine mirror of upstream/main
 │                       auto-synced via .github/workflows/sync-upstream.yml
 │                       NEVER carries brit commits
-│                       starting point for all upstream PRs
+│                       starting point for gix-brit AND for all upstream PRs
 │
-├── feat/*-brit      ← feature branches for brit-only work (off main)
-└── feat/*-upstream  ← feature branches for upstream PRs (off gix-main)
+├── gix-brit         ← gitoxide contribution playground, off gix-main
+│                       - pure gitoxide tree, no brit customizations
+│                       - we hack freely (YOLO on problems we want to solve)
+│                       - but each commit holds to upstream conventions:
+│                         conventional commits, AI trailer, thiserror, no unwrap,
+│                         tests accompany code, etc.
+│                       - diverges from gix-main as we work
+│                       - **rebased** on gix-main periodically for freshness
+│                         (force-push to origin/gix-brit is OK — solo branch)
+│                       - commits are NOT automatically upstreamed
+│
+├── feat/*-brit      ← feature branches for brit product work (off main)
+└── feat/*-upstream  ← feature branches for upstream PRs
+                        branched off fresh gix-main, NOT off gix-brit
+                        individual commits cherry-picked from gix-brit
+                        polished, readiness-gated, then PR'd upstream
 ```
 
-Every upstream PR starts from `gix-main`. Diff to `upstream/main` is pristine — no brit commits leak in. When the PR is ready, push the branch to `origin`, then open the PR at `GitoxideLabs/gitoxide` (head = `ethosengine:feat/xxx-upstream`, base = `main`).
+### Two concerns, cleanly separated
 
-When upstream merges it, we either:
-- Wait for the auto-sync to pull it into our `gix-main`, then merge `gix-main → main` to get the change into brit
-- Or merge `upstream/main → main` directly
+| Concern | Home branch | Character of work |
+|---|---|---|
+| Brit-the-product development | `main` | Build brit binary, verify, build-ref, use gix as library, dogfood |
+| Gitoxide improvement work | `gix-brit` | Hack on gitoxide; YOLO + discipline; no PR pressure |
+| Actual upstream PR submission | `feat/*-upstream` | Cherry-picked from gix-brit, polished, PR'd |
 
-`main` continues to carry brit-specific work. The two streams of work are cleanly separated.
+### How first PRs emerge naturally
+
+1. We work on `gix-brit` — on whatever gix problem we want to solve, in upstream shape
+2. Each commit has conventional message, AI trailer, tests, no unwrap, thiserror errors
+3. Over time, gix-brit accumulates improvements
+4. **When a commit or chain proves valuable upstream** (we hit it multiple times, or we know other gitoxide users would want it), we:
+   - Branch `feat/<topic>-upstream` off current `gix-main` (pristine)
+   - `git cherry-pick <commit(s)>` from `gix-brit`
+   - Polish: address any conflicts from gix-main freshness, fill gaps
+   - Apply the readiness gate to the final set
+   - Push to our fork, open PR at `GitoxideLabs/gitoxide`
+5. When upstream merges, the change lands in `upstream/main` → `gix-main` auto-syncs → we rebase `gix-brit` on gix-main → our commit now exists "above" upstream's version (usually becomes a no-op and drops during rebase)
+
+### Why not port main's work into gix-brit?
+
+- **main's brit-cli has sibling-path deps** to `../rakia/rakia-brit` and `../rakia/rakia-core` that break in any tree that doesn't have rakia as a sibling. gix-brit needs to stay self-contained.
+- **main's cli-journey and cli-test-page** are tech debt (reinventing trycmd+insta poorly). We don't want to carry that into our contribution surface.
+- **main's baseline.md** is a brit-product artifact, not upstream-shape.
+- **main as the brit product is FINE.** It ships what it ships. Leaving it alone is the right move.
+
+Eventually, when we want brit features to benefit from our gix-brit improvements, they flow naturally: gix-brit commits → upstream PRs → upstream/main → gix-main → `main` via periodic merge. The round-trip is slow but clean.
 
 ### Sync workflow
 
@@ -237,61 +282,81 @@ Produces a **ranked understanding of where help would actually help**. Not a can
 
 Implementation: read the upstream docs; scan recent PRs via `gh api`; write synthesis.
 
-### 6. First-PR candidate shortlist — `docs/gitoxide-first-pr-candidates.md` (in brit repo, on `main`)
+### 6. `gix-brit` branch — ALREADY SHIPPED ✓
 
-3-5 ranked candidates for our first upstream PR, each with:
-- **What**: crisp scope (what we'd change)
-- **Why it serves the maintainer**: which objective(s) from the objectives map this maps to
-- **Estimated scope**: LOC, crates touched, stability tier
-- **Risks**: what could go wrong, what reviewer pushback might look like
-- **Prereq engagement**: should we open an issue/discussion first? (Almost always yes for anything non-trivial.)
-- **Our skill fit**: do we actually have the domain to execute this cleanly, or would we be overreaching?
+Created from `gix-main`, pushed to `origin/gix-brit` as part of this spec's amendment. Our contribution playground. Discipline rules:
 
-Ranked by (maintainer value × our fitness × reversibility / total effort).
-
-The output is NOT a selection. It's a menu informed by (5) and constrained by our honest self-assessment.
+- **Commits on gix-brit are NOT auto-PR'd upstream** — they're ours to use, keep, discard, rewrite
+- **Each commit holds to upstream conventions** regardless: conventional commits (for user-visible), AI trailer on AI-assisted work, thiserror errors, no unwrap, tests-first where practical
+- **We stay pristine-gitoxide-shape** — no brit customizations, no sibling-path-deps, no brit-specific renames
+- **Rebase, don't merge, when pulling from gix-main** — keeps cherry-picks for feat/*-upstream branches clean and linear
+- **Force-push to origin/gix-brit is OK** — solo branch, no collaborators to break
 
 ## Sequencing
 
 This spec is implemented in three phases. Each produces concrete artifacts.
 
-### Phase 1 — Infrastructure (this spec session, already partial)
+### Phase 1 — Infrastructure (complete)
 - [x] Create `gix-main` branch, push to origin
 - [x] Install `just` locally
-- [ ] Add `.github/workflows/sync-upstream.yml`, commit to `main`
-- [ ] Verify `just check` runs (at minimum)
-- [ ] Commit this spec to `docs/superpowers/specs/`
+- [x] Add `.github/workflows/sync-upstream.yml`, commit to `main`
+- [x] Verify `just check` runs (at minimum)
+- [x] Commit this spec to `docs/superpowers/specs/`
+- [x] Enable GitHub Actions on fork
+- [x] Verify `sync-gix-main` workflow runs successfully
+- [x] Create `gix-brit` branch, push to origin (spec amendment work)
 
 ### Phase 2 — Study (next work session, roughly 2 days)
 - [ ] Write `docs/gitoxide-house-style.md`
 - [ ] Write `docs/gitoxide-local-ci.md` (after actually running `just ci-test` ourselves)
 - [ ] Write `docs/gitoxide-objectives.md`
 
-### Phase 3 — Candidate selection readiness (after Phase 2, roughly 1 day)
-- [ ] Write `docs/gitoxide-first-pr-candidates.md`
-- [ ] Review the candidate list against the readiness gate
-- [ ] Decide: do we engage Sebastian via issue/discussion on a candidate, or do we hold and keep studying?
+### Phase 3 — First gix-brit work session (after Phase 2, open-ended)
 
-## Open questions — to resolve after Phase 2
+No pre-selected candidate. We open gix-brit, decide what problem we want to solve today, and we start solving it. The discipline is at the commit level, not the candidate-selection level.
 
-These don't block Phase 1 but need answers before Phase 3 candidate selection:
+- [ ] First working session on gix-brit — any gix problem we find interesting
+- [ ] Set up a lightweight tracking habit: as we hit things worth noting (shortcomings we'd like to address, infra gaps, Windows issues, etc.), we add them to a simple `gix-brit-notes.md` scratch doc — not a prioritized candidate list, just a reminder of threads we'd want to pick up
+- [ ] When a gix-brit commit or chain proves upstream-worthy (by our own judgment, informed by the objectives map), cherry-pick to `feat/<topic>-upstream` off gix-main, polish, apply readiness gate, open PR
 
-1. **Do we engage Sebastian via issue or discussion first?** COLLABORATING.md suggests yes for non-trivial work. The shortlist doc should state our plan per-candidate.
-2. **What's the right cadence for `main ← upstream/main` merges?** Do we merge continuously, or only when an upstream change affects brit's correctness? (Affects how fresh our main stays with upstream fixes.)
-3. **Do we adopt their `tests/snapshots/` layout for OUR future tests?** Or keep our `baseline.md` single-file approach on `main`? (Decided: keep `baseline.md` on `main`; any test we'd upstream gets reshaped to `tests/snapshots/` on a feat/*-upstream branch.)
-4. **Does Sebastian accept GitHub Actions sync workflows in forks?** (Our workflow is in OUR fork, not upstream — so this is a non-issue for upstream, just a note to ourselves.)
+## Readiness-gate application timing
+
+The ten-item readiness gate applies **at the feat/*-upstream cherry-pick moment**, not to gix-brit commits themselves. Specifically:
+
+- gix-brit commits aim to be upstream-shape but aren't required to pass the full gate
+- When we branch `feat/<topic>-upstream` off gix-main and cherry-pick, THAT's when the full gate runs
+- Typical flow at cherry-pick time:
+  1. `git checkout gix-main && git pull`
+  2. `git checkout -b feat/<topic>-upstream`
+  3. `git cherry-pick <commits from gix-brit>`
+  4. Resolve any freshness conflicts; tidy the chain
+  5. Run the full gate locally (`just ci-test`, clippy all matrices, doc, check-mode)
+  6. Push; open PR
+
+The gate is protection for Sebastian at the interface, not bureaucracy on our internal work.
+
+## Open questions — to resolve during/after Phase 2
+
+These don't block current work but need answers eventually:
+
+1. **What's the rebase cadence for gix-brit on gix-main?** Once a week? Whenever conflict emerges? Probably "whenever we remember and it's convenient" — solo branch, low stakes.
+2. **How do we handle the ci.yml-red-on-main issue?** (Sibling-path deps to rakia.) Options: remove brit-cli from workspace in CI, git-submodule rakia into brit, relocate rakia-brit/rakia-core into brit. Phase 2 Local-CI-Runbook is where this gets decided and potentially fixed.
+3. **Do we adopt trycmd+insta for future testing work on main?** (Recognized tech debt in cli-journey/cli-test-page.) Not blocking; probably answered when we next touch that code.
+4. **Do we maintain a gix-brit-notes.md scratch doc?** My lean: yes, lightweight. Just a bullet list of "things we noticed on gix-brit that might be worth upstreaming someday." Not a prioritized shortlist.
 
 ## Risks
 
 - **Auto-sync failure goes unnoticed** — if the sync workflow breaks (credential expiry, upstream force-pushes, etc.), `gix-main` silently drifts. Mitigation: the workflow should email/notify us on failure. Low priority until we actually depend on freshness.
-- **We never make it past Phase 2** — study phases can become perpetual. Mitigation: Phase 3 has a hard time budget; after it expires, we either ship a PR or explicitly decide to keep studying with a new budget.
-- **Overfit to gitoxide's current state** — Sebastian's priorities change. Our objectives map is a snapshot. Mitigation: date-stamp all the reference docs; re-read `tasks.md` before selecting any candidate.
-- **The gate becomes bureaucracy** — if every PR requires ticking 15 boxes, we'll avoid shipping. Mitigation: the gate is specifically for the FIRST upstream PR. Subsequent PRs can skip gate items we've already proven we reliably do (e.g., after 3 PRs we don't need to re-prove we can run `just ci-test`).
+- **We never make it past Phase 2** — study phases can become perpetual. Mitigation: Phase 2 deliverables are explicit; after they're done, gix-brit work begins whether or not the study feels "complete".
+- **gix-brit drifts so far from gix-main that cherry-picks become painful** — Mitigation: rebase gix-brit on gix-main at least weekly during active work; if a specific commit won't rebase cleanly, that's a signal to either upstream it sooner or accept it as gix-brit-only.
+- **We build upstream-valuable work on gix-brit but never actually submit it** — the "emerges naturally" model could produce stagnation. Mitigation: periodic (monthly?) review of gix-brit commits, ask "has any chain here become upstream-worthy?" and cherry-pick the yes-answers.
+- **Overfit to gitoxide's current state** — Sebastian's priorities change. Our objectives map is a snapshot. Mitigation: date-stamp the reference docs; re-read `tasks.md` before cherry-picking any candidate to a feat/*-upstream branch.
+- **The gate becomes bureaucracy** — if every PR requires ticking 15 boxes, we'll avoid shipping. Mitigation: the gate is explicitly for upstream submission, not for gix-brit work. First PR's gate is strict; subsequent PRs can skip gate items we've proven reliably (after 3 PRs we don't re-prove we can run `just ci-test`).
 
 ## What this spec does NOT decide
 
-- Which PR we ship first (Phase 3 candidate selection does)
+- Which PR we ship first — emerges from gix-brit work, not pre-selected
 - Whether to rewrite `cli-journey` / `cli-test-page` / `baseline.md` (deferred — they're on `main`, out of the upstream-PR workstream)
-- Multi-platform testing strategy (deferred — informed by what we see in gitoxide's own CI)
-- How we handle `push` / `commit` feature gaps upstream (candidate in Phase 3, execution in a later spec)
-- Our position on SHA-256 / reftables / partial clones (candidate in Phase 3)
+- Multi-platform testing strategy (deferred — informed by what we see in gitoxide's own CI and what we build in gix-brit)
+- How we handle `push` / `commit` feature gaps upstream — these become natural gix-brit candidates if we need them for brit product, or just stay upstream-backlog items if we don't
+- Our position on SHA-256 / reftables / partial clones (these may become gix-brit topics if we choose)
