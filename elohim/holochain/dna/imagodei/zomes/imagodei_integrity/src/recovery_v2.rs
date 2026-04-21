@@ -5,7 +5,6 @@
 //!
 //! New entry types (prefixed with the module to distinguish from legacy
 //! attestation-vote-based recovery in lib.rs):
-//! - RecoveryQuorumRequest: claimant's request, authored by hosting doorway (M1-cleanup: merging into RecoveryRequest)
 //! - KeyRotation: authoritative claim "new agent X is Matthew now"
 
 use hdi::prelude::*;
@@ -81,54 +80,6 @@ pub enum ConfidenceTier {
     Constitutional,
 }
 
-// Entry type structs and validation functions will be added in subsequent tasks.
-
-// =============================================================================
-// RecoveryQuorumRequest
-// =============================================================================
-
-/// A request to rotate an agent key via seed-quorum recovery.
-/// Authored by the hosting doorway (the recovering human has no working cell).
-/// No authority is implied by authorship; authority comes from KeyRotation's
-/// quorum_signature verifying under the commitment's seed_public_half.
-#[hdk_entry_helper]
-#[derive(Clone, PartialEq)]
-pub struct RecoveryQuorumRequest {
-    pub human_agent_pubkey: AgentPubKey,
-    pub seed_commitment_hash: ActionHash,
-    pub new_agent_pubkey: AgentPubKey,
-    pub hosting_doorway_pubkey: AgentPubKey,
-    // recovery_mode removed — RecoveryMode deleted in M1-cleanup (superseded by RecoveryAuthority)
-    pub request_nonce: Vec<u8>,      // 16 bytes random
-    pub created_at: Timestamp,
-}
-
-pub fn validate_recovery_quorum_request(
-    request: &RecoveryQuorumRequest,
-) -> ExternResult<ValidateCallbackResult> {
-    // Rule 1: request_nonce must be 16 bytes
-    if request.request_nonce.len() != 16 {
-        return Ok(ValidateCallbackResult::Invalid(
-            "RecoveryQuorumRequest request_nonce must be exactly 16 bytes".to_string(),
-        ));
-    }
-    // Rule 2: seed_commitment_hash must be non-empty
-    // Further validation (existence on DHT, non-superseded) happens in
-    // must_get_valid_record during KeyRotation validation — the request itself
-    // is just a claim of intent, cheap to commit.
-    // Rule 3: human_agent_pubkey must differ from new_agent_pubkey
-    if request.human_agent_pubkey == request.new_agent_pubkey {
-        return Ok(ValidateCallbackResult::Invalid(
-            "RecoveryQuorumRequest new_agent_pubkey must differ from human_agent_pubkey"
-                .to_string(),
-        ));
-    }
-    // Rule 4: Stewarded mode requires a grant_hash; validation of grant-ness
-    // is deferred to Phase 2b (stewarded-specific validation branches in KeyRotation).
-    // The enum variant carries the hash; no additional check here.
-    Ok(ValidateCallbackResult::Valid)
-}
-
 // =============================================================================
 // KeyRotation
 // =============================================================================
@@ -159,15 +110,12 @@ pub fn validate_key_rotation(
     }
 
     // Rule 2: Resolve the referenced RecoveryRequest and verify matching fields.
-    // NOTE: Task 6 replaces the legacy RecoveryRequest (string-ID struct) with the modernized
-    // AgentPubKey-based struct. Until then, we resolve against RecoveryQuorumRequest which
-    // has the same AgentPubKey fields. Task 6 will update this to RecoveryRequest.
     let request_record = must_get_valid_record(rotation.recovery_request_hash.clone())?;
-    let request_entry: RecoveryQuorumRequest = request_record
+    let request_entry: super::RecoveryRequest = request_record
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!(
-            "KeyRotation references non-RecoveryQuorumRequest entry: {e:?}"
+            "KeyRotation references non-RecoveryRequest entry: {e:?}"
         ))))?
         .ok_or(wasm_error!(WasmErrorInner::Guest(
             "KeyRotation recovery_request_hash entry missing".to_string()
