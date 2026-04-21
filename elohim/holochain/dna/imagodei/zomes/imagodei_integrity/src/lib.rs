@@ -857,6 +857,12 @@ pub struct IdentityFreeze {
     // === TIMESTAMPS ===
     pub frozen_at: String,
     pub expires_at: Option<String>,    // Auto-lift for low severity
+
+    /// Which RecoveryAuthority layer triggered this freeze. See
+    /// recovery_v2::RECOVERY_AUTHORITY_LAYERS. None on pre-M2 entries — the
+    /// freeze-floor check in validate_key_rotation treats None as "intimate"
+    /// (the most restrictive default).
+    pub frozen_at_layer: Option<String>,
 }
 
 // =============================================================================
@@ -1865,6 +1871,17 @@ fn validate_identity_freeze(freeze: &IdentityFreeze) -> ExternResult<ValidateCal
         return Ok(ValidateCallbackResult::Invalid(
             "IdentityFreeze must freeze at least one capability".to_string(),
         ));
+    }
+
+    // M2: validate frozen_at_layer if present
+    if let Some(layer) = &freeze.frozen_at_layer {
+        if !crate::recovery_v2::RECOVERY_AUTHORITY_LAYERS.contains(&layer.as_str()) {
+            return Ok(ValidateCallbackResult::Invalid(format!(
+                "IdentityFreeze frozen_at_layer '{}' must be one of {:?}",
+                layer,
+                crate::recovery_v2::RECOVERY_AUTHORITY_LAYERS
+            )));
+        }
     }
 
     // Validate all frozen capabilities
