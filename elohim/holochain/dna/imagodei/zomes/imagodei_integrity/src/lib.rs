@@ -1015,6 +1015,7 @@ pub enum EntryTypes {
     // Recovery Protocol Phase 2 (seed-quorum based)
     RecoverySeedCommitment(RecoverySeedCommitment),
     RecoveryQuorumRequest(RecoveryQuorumRequest),
+    KeyRotation(KeyRotation),
 }
 
 // =============================================================================
@@ -1214,6 +1215,7 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                     validate_recovery_seed_commitment(&commitment, &action),
                 EntryTypes::RecoveryQuorumRequest(request) =>
                     validate_recovery_quorum_request(&request),
+                EntryTypes::KeyRotation(rotation) => validate_key_rotation(&rotation),
                 _ => Ok(ValidateCallbackResult::Valid),
             },
             OpEntry::UpdateEntry { app_entry, .. } => match app_entry {
@@ -1229,6 +1231,9 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                     Ok(ValidateCallbackResult::Invalid(
                         "RecoveryQuorumRequest is immutable".to_string(),
                     )),
+                EntryTypes::KeyRotation(_) => Ok(ValidateCallbackResult::Invalid(
+                    "KeyRotation is immutable".to_string(),
+                )),
                 _ => Ok(ValidateCallbackResult::Valid),
             },
             _ => Ok(ValidateCallbackResult::Valid),

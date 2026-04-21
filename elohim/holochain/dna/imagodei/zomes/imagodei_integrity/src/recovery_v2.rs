@@ -147,3 +147,150 @@ pub fn validate_recovery_quorum_request(
     // The enum variant carries the hash; no additional check here.
     Ok(ValidateCallbackResult::Valid)
 }
+
+// =============================================================================
+// KeyRotation
+// =============================================================================
+
+/// The authoritative claim that a human's agent key has rotated.
+/// Validated by verifying quorum_signature under the referenced commitment's
+/// seed_public_half (Normal mode), or under the referenced StewardshipGrant's
+/// authority set (Stewarded mode, deferred to Phase 2b).
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct KeyRotation {
+    pub human_agent_pubkey: AgentPubKey,
+    pub new_agent_pubkey: AgentPubKey,
+    pub superseded_agent_pubkey: AgentPubKey,
+    pub seed_commitment_hash: ActionHash,
+    pub recovery_request_hash: ActionHash,
+    pub quorum_signature: Vec<u8>,   // 64 bytes Ed25519 signature
+    pub rotated_at: Timestamp,
+}
+
+pub fn validate_key_rotation(
+    rotation: &KeyRotation,
+) -> ExternResult<ValidateCallbackResult> {
+    // Rule 1: quorum_signature must be exactly 64 bytes
+    if rotation.quorum_signature.len() != 64 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "KeyRotation quorum_signature must be exactly 64 bytes".to_string(),
+        ));
+    }
+
+    // Rule 2: new_agent_pubkey must differ from superseded_agent_pubkey
+    if rotation.new_agent_pubkey == rotation.superseded_agent_pubkey {
+        return Ok(ValidateCallbackResult::Invalid(
+            "KeyRotation new_agent_pubkey must differ from superseded_agent_pubkey".to_string(),
+        ));
+    }
+
+    // Rule 3: Resolve RecoveryQuorumRequest via must_get_valid_record
+    let request_record = must_get_valid_record(rotation.recovery_request_hash.clone())?;
+    let request_entry: RecoveryQuorumRequest = request_record
+        .entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!(
+            "KeyRotation references non-RecoveryQuorumRequest: {e:?}"
+        ))))?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "KeyRotation request_hash entry missing".to_string()
+        )))?;
+
+    // Rule 4: Request fields must match rotation fields
+    if request_entry.new_agent_pubkey != rotation.new_agent_pubkey {
+        return Ok(ValidateCallbackResult::Invalid(
+            "KeyRotation new_agent_pubkey must match request".to_string(),
+        ));
+    }
+    if request_entry.human_agent_pubkey != rotation.human_agent_pubkey {
+        return Ok(ValidateCallbackResult::Invalid(
+            "KeyRotation human_agent_pubkey must match request".to_string(),
+        ));
+    }
+    if request_entry.seed_commitment_hash != rotation.seed_commitment_hash {
+        return Ok(ValidateCallbackResult::Invalid(
+            "KeyRotation seed_commitment_hash must match request".to_string(),
+        ));
+    }
+
+    // Rule 5: Resolve RecoverySeedCommitment via must_get_valid_record
+    let commitment_record = must_get_valid_record(rotation.seed_commitment_hash.clone())?;
+    let commitment_entry: RecoverySeedCommitment = commitment_record
+        .entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!(
+            "KeyRotation references non-RecoverySeedCommitment: {e:?}"
+        ))))?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "KeyRotation commitment_hash entry missing".to_string()
+        )))?;
+
+    if commitment_entry.human_agent_pubkey != rotation.human_agent_pubkey {
+        return Ok(ValidateCallbackResult::Invalid(
+            "KeyRotation human_agent_pubkey must match seed commitment".to_string(),
+        ));
+    }
+
+    // Rule 6: quorum_signature must verify under the commitment's seed_public_half
+    // for Normal mode. Stewarded mode deferred to Phase 2b (stub-reject here).
+    match &request_entry.recovery_mode {
+        RecoveryMode::Normal => {
+            return verify_quorum_signature(
+                &commitment_entry.seed_public_half,
+                &rotation.new_agent_pubkey,
+                &rotation.recovery_request_hash,
+                &rotation.quorum_signature,
+            );
+        }
+        RecoveryMode::Stewarded { .. } => {
+            return Ok(ValidateCallbackResult::Invalid(
+                "KeyRotation Stewarded mode not yet implemented (Phase 2b)".to_string(),
+            ));
+        }
+    }
+}
+
+/// Ed25519 signature verification for the quorum signature.
+/// Pure verification — no state, deterministic, WASM-safe.
+fn verify_quorum_signature(
+    seed_public_half: &[u8],
+    new_agent_pubkey: &AgentPubKey,
+    recovery_request_hash: &ActionHash,
+    signature_bytes: &[u8],
+) -> ExternResult<ValidateCallbackResult> {
+    use ed25519_dalek::{Signature, Verifier, VerifyingKey};
+
+    // Parse verifying key
+    let vk_bytes: [u8; 32] = seed_public_half.try_into().map_err(|_| {
+        wasm_error!(WasmErrorInner::Guest(
+            "seed_public_half not 32 bytes in verify_quorum_signature".to_string()
+        ))
+    })?;
+    let vk = VerifyingKey::from_bytes(&vk_bytes).map_err(|e| {
+        wasm_error!(WasmErrorInner::Guest(format!(
+            "seed_public_half not a valid Ed25519 verifying key: {e}"
+        )))
+    })?;
+
+    // Parse signature
+    let sig_bytes: [u8; 64] = signature_bytes.try_into().map_err(|_| {
+        wasm_error!(WasmErrorInner::Guest(
+            "quorum_signature not 64 bytes".to_string()
+        ))
+    })?;
+    let sig = Signature::from_bytes(&sig_bytes);
+
+    // Construct message: new_agent_pubkey.get_raw_39() || recovery_request_hash.get_raw_39()
+    // We use raw bytes for deterministic serialization in the signed payload.
+    let mut message: Vec<u8> = Vec::with_capacity(39 + 39);
+    message.extend_from_slice(new_agent_pubkey.get_raw_39());
+    message.extend_from_slice(recovery_request_hash.get_raw_39());
+
+    match vk.verify(&message, &sig) {
+        Ok(()) => Ok(ValidateCallbackResult::Valid),
+        Err(_) => Ok(ValidateCallbackResult::Invalid(
+            "KeyRotation quorum_signature verification failed".to_string(),
+        )),
+    }
+}
