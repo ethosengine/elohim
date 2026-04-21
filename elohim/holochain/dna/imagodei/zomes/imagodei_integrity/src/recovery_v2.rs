@@ -134,107 +134,74 @@ pub fn validate_recovery_quorum_request(
 // =============================================================================
 
 /// The authoritative claim that a human's agent key has rotated.
-/// Validated by verifying quorum_signature under the referenced commitment's
-/// seed_public_half (Normal mode), or under the referenced StewardshipGrant's
-/// authority set (Stewarded mode, deferred to Phase 2b).
+/// Evidence is carried in the `authority` field as one of five graduated variants.
+/// Phase 2 validator accepts the structural shape; variant-specific validation
+/// (Ed25519 sig verification, HumanityWitness quorum counting) lands in M2.
 #[hdk_entry_helper]
 #[derive(Clone, PartialEq)]
 pub struct KeyRotation {
     pub human_agent_pubkey: AgentPubKey,
     pub new_agent_pubkey: AgentPubKey,
     pub superseded_agent_pubkey: AgentPubKey,
-    pub seed_commitment_hash: ActionHash,
     pub recovery_request_hash: ActionHash,
-    pub quorum_signature: Vec<u8>,   // 64 bytes Ed25519 signature
+    pub authority: RecoveryAuthority,
     pub rotated_at: Timestamp,
 }
 
 pub fn validate_key_rotation(
     rotation: &KeyRotation,
 ) -> ExternResult<ValidateCallbackResult> {
-    // Rule 1: quorum_signature must be exactly 64 bytes
-    if rotation.quorum_signature.len() != 64 {
-        return Ok(ValidateCallbackResult::Invalid(
-            "KeyRotation quorum_signature must be exactly 64 bytes".to_string(),
-        ));
-    }
-
-    // Rule 2: new_agent_pubkey must differ from superseded_agent_pubkey
+    // Rule 1: new_agent_pubkey must differ from superseded_agent_pubkey
     if rotation.new_agent_pubkey == rotation.superseded_agent_pubkey {
         return Ok(ValidateCallbackResult::Invalid(
             "KeyRotation new_agent_pubkey must differ from superseded_agent_pubkey".to_string(),
         ));
     }
 
-    // Rule 3: Resolve RecoveryQuorumRequest via must_get_valid_record
+    // Rule 2: Resolve the referenced RecoveryRequest and verify matching fields.
+    // NOTE: Task 6 replaces the legacy RecoveryRequest (string-ID struct) with the modernized
+    // AgentPubKey-based struct. Until then, we resolve against RecoveryQuorumRequest which
+    // has the same AgentPubKey fields. Task 6 will update this to RecoveryRequest.
     let request_record = must_get_valid_record(rotation.recovery_request_hash.clone())?;
     let request_entry: RecoveryQuorumRequest = request_record
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!(
-            "KeyRotation references non-RecoveryQuorumRequest: {e:?}"
+            "KeyRotation references non-RecoveryQuorumRequest entry: {e:?}"
         ))))?
         .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "KeyRotation request_hash entry missing".to_string()
+            "KeyRotation recovery_request_hash entry missing".to_string()
         )))?;
 
-    // Rule 4: Request fields must match rotation fields
-    if request_entry.new_agent_pubkey != rotation.new_agent_pubkey {
-        return Ok(ValidateCallbackResult::Invalid(
-            "KeyRotation new_agent_pubkey must match request".to_string(),
-        ));
-    }
     if request_entry.human_agent_pubkey != rotation.human_agent_pubkey {
         return Ok(ValidateCallbackResult::Invalid(
-            "KeyRotation human_agent_pubkey must match request".to_string(),
+            "KeyRotation human_agent_pubkey must match RecoveryRequest".to_string(),
         ));
     }
-    // Note: seed_commitment_hash check removed — RecoverySeedCommitment deleted in M1-cleanup.
-    // KeyRotation validator will be fully replaced in Task 5 with RecoveryAuthority enum.
+    if request_entry.new_agent_pubkey != rotation.new_agent_pubkey {
+        return Ok(ValidateCallbackResult::Invalid(
+            "KeyRotation new_agent_pubkey must match RecoveryRequest".to_string(),
+        ));
+    }
 
-    Ok(ValidateCallbackResult::Valid)
-}
-
-/// Ed25519 signature verification for the quorum signature.
-/// Pure verification — no state, deterministic, WASM-safe.
-fn verify_quorum_signature(
-    seed_public_half: &[u8],
-    new_agent_pubkey: &AgentPubKey,
-    recovery_request_hash: &ActionHash,
-    signature_bytes: &[u8],
-) -> ExternResult<ValidateCallbackResult> {
-    use ed25519_dalek::{Signature, Verifier, VerifyingKey};
-
-    // Parse verifying key
-    let vk_bytes: [u8; 32] = seed_public_half.try_into().map_err(|_| {
-        wasm_error!(WasmErrorInner::Guest(
-            "seed_public_half not 32 bytes in verify_quorum_signature".to_string()
-        ))
-    })?;
-    let vk = VerifyingKey::from_bytes(&vk_bytes).map_err(|e| {
-        wasm_error!(WasmErrorInner::Guest(format!(
-            "seed_public_half not a valid Ed25519 verifying key: {e}"
-        )))
-    })?;
-
-    // Parse signature
-    let sig_bytes: [u8; 64] = signature_bytes.try_into().map_err(|_| {
-        wasm_error!(WasmErrorInner::Guest(
-            "quorum_signature not 64 bytes".to_string()
-        ))
-    })?;
-    let sig = Signature::from_bytes(&sig_bytes);
-
-    // Construct message: new_agent_pubkey.get_raw_39() || recovery_request_hash.get_raw_39()
-    // We use raw bytes for deterministic serialization in the signed payload.
-    let mut message: Vec<u8> = Vec::with_capacity(39 + 39);
-    message.extend_from_slice(new_agent_pubkey.get_raw_39());
-    message.extend_from_slice(recovery_request_hash.get_raw_39());
-
-    match vk.verify(&message, &sig) {
-        Ok(()) => Ok(ValidateCallbackResult::Valid),
-        Err(_) => Ok(ValidateCallbackResult::Invalid(
-            "KeyRotation quorum_signature verification failed".to_string(),
+    // Rule 3: Phase 2 stub-rejects all variant-specific validation.
+    // M2 milestone implements IntimateQuorum + CryptographicQuorum happy paths
+    // and wires the floor-check against active IdentityFreeze entries.
+    match &rotation.authority {
+        RecoveryAuthority::IntimateQuorum { .. } => Ok(ValidateCallbackResult::Invalid(
+            "KeyRotation::IntimateQuorum: variant validation pending in M2".to_string(),
+        )),
+        RecoveryAuthority::CommunityConsensus { .. } => Ok(ValidateCallbackResult::Invalid(
+            "KeyRotation::CommunityConsensus: Phase 2b — IdentityChallenge resolution flow not yet implemented".to_string(),
+        )),
+        RecoveryAuthority::GovernanceAct { .. } => Ok(ValidateCallbackResult::Invalid(
+            "KeyRotation::GovernanceAct: Phase 2b — cross-DNA qahal/mishpat resolution not yet implemented".to_string(),
+        )),
+        RecoveryAuthority::NetworkWitness { .. } => Ok(ValidateCallbackResult::Invalid(
+            "KeyRotation::NetworkWitness: reserved for elohim constitutional-governance design".to_string(),
+        )),
+        RecoveryAuthority::CryptographicQuorum { .. } => Ok(ValidateCallbackResult::Invalid(
+            "KeyRotation::CryptographicQuorum: variant validation pending in M2".to_string(),
         )),
     }
 }
