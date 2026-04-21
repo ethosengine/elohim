@@ -10,6 +10,49 @@
 use hdi::prelude::*;
 
 // =============================================================================
+// Layer Constants & Helpers (Graduated Authority Ordering)
+// =============================================================================
+
+/// Layer name constants for RecoveryAuthority variants.
+pub const LAYER_INTIMATE: &str = "intimate";
+pub const LAYER_COMMUNITY: &str = "community";
+pub const LAYER_GOVERNANCE: &str = "governance";
+pub const LAYER_NETWORK: &str = "network";
+pub const LAYER_CRYPTOGRAPHIC: &str = "cryptographic";
+
+/// All valid layer names, ordered by ascending authority for the ordered layers.
+/// `cryptographic` is orthogonal — it bypasses the freeze-floor ordering.
+pub const RECOVERY_AUTHORITY_LAYERS: &[&str] = &[
+    LAYER_INTIMATE,
+    LAYER_COMMUNITY,
+    LAYER_GOVERNANCE,
+    LAYER_NETWORK,
+    LAYER_CRYPTOGRAPHIC,
+];
+
+/// Map a RecoveryAuthority variant to its layer name.
+pub fn authority_layer_name(authority: &RecoveryAuthority) -> &'static str {
+    match authority {
+        RecoveryAuthority::IntimateQuorum { .. } => LAYER_INTIMATE,
+        RecoveryAuthority::CommunityConsensus { .. } => LAYER_COMMUNITY,
+        RecoveryAuthority::GovernanceAct { .. } => LAYER_GOVERNANCE,
+        RecoveryAuthority::NetworkWitness { .. } => LAYER_NETWORK,
+        RecoveryAuthority::CryptographicQuorum { .. } => LAYER_CRYPTOGRAPHIC,
+    }
+}
+
+/// Ordered layer rank for comparison. Returns None for `cryptographic` (orthogonal).
+pub fn authority_layer_rank(layer: &str) -> Option<u8> {
+    match layer {
+        LAYER_INTIMATE => Some(1),
+        LAYER_COMMUNITY => Some(2),
+        LAYER_GOVERNANCE => Some(3),
+        LAYER_NETWORK => Some(4),
+        _ => None,
+    }
+}
+
+// =============================================================================
 // Public Enums
 // =============================================================================
 
