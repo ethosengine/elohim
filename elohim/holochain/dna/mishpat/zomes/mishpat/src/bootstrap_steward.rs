@@ -6,10 +6,12 @@
 //! and `DnaProperties` must be a concrete type in each integrity+coordinator
 //! pair.
 //!
-//! In mishpat, the bootstrap steward is the accountable founding steward for
-//! governance: the pubkey that may seed the initial governance substrate
-//! (first proposal formats, initial councils). Authority graduates to
-//! later-joining stewards per `project_stewardship_philosophy.md`.
+//! In mishpat, the bootstrap steward is the initial `constitutional`-tier
+//! steward at DNA install time. Authority is **not** exclusive to this
+//! pubkey at any point; this module exposes only **identity**. Authority
+//! checks must flow through the stewardship-grant resolution layer, not
+//! through `is_bootstrap_steward`. Frame rationale:
+//! `genesis/docs/superpowers/specs/2026-04-21-bootstrap-steward-authority-frame-design.md`
 
 use hdk::prelude::*;
 

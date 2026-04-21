@@ -3,10 +3,12 @@
 //! See `elohim/holochain/dna/imagodei/zomes/imagodei/src/bootstrap_steward.rs`
 //! for the full pattern documentation.
 //!
-//! In node-registry, the bootstrap steward is the pubkey authorized to admit
-//! the first nodes into the network. Once the initial node set is established,
-//! admission authority graduates to peer-attested trust per
-//! `project_stewardship_philosophy.md`.
+//! In node-registry, the bootstrap steward is the initial `constitutional`-
+//! tier steward at DNA install time. Authority is **not** exclusive to this
+//! pubkey at any point; this module exposes only **identity**. Admission
+//! policy flows through stewardship grants (once wired) plus peer-attested
+//! trust, not through `is_bootstrap_steward`. Frame rationale:
+//! `genesis/docs/superpowers/specs/2026-04-21-bootstrap-steward-authority-frame-design.md`
 
 use hdk::prelude::*;
 

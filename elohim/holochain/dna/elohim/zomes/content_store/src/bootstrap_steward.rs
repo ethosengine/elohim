@@ -3,10 +3,13 @@
 //! See `elohim/holochain/dna/imagodei/zomes/imagodei/src/bootstrap_steward.rs`
 //! for the full pattern documentation.
 //!
-//! In lamad, the bootstrap steward is the pubkey that may seed initial content
-//! authority (foundational content collections, canonical path catalogs).
-//! Content authorship beyond that seed is agent-scoped per stewardship
-//! philosophy — no steward owns content, they steward it.
+//! In lamad, the bootstrap steward is the initial `constitutional`-tier
+//! steward at DNA install time. Authority is **not** exclusive to this
+//! pubkey at any point; this module exposes only **identity**. Content
+//! authorship is agent-scoped; curation-level authority flows through
+//! stewardship grants once wired, not through `is_bootstrap_steward`.
+//! Frame rationale:
+//! `genesis/docs/superpowers/specs/2026-04-21-bootstrap-steward-authority-frame-design.md`
 
 use hdk::prelude::*;
 
