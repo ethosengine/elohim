@@ -336,3 +336,28 @@ pub fn validate_held_recovery_share(
     }
     Ok(ValidateCallbackResult::Valid)
 }
+
+// =============================================================================
+// MyRecoveryAuthorization (private audit, optional)
+// =============================================================================
+
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct MyRecoveryAuthorization {
+    pub recovery_request_hash: ActionHash,
+    pub protected_human_pubkey: AgentPubKey,
+    pub authorized_at: Timestamp,
+    pub elohim_confidence_tier: ConfidenceTier,
+    pub reasoning_summary: String,
+}
+
+pub fn validate_my_recovery_authorization(
+    authz: &MyRecoveryAuthorization,
+) -> ExternResult<ValidateCallbackResult> {
+    if authz.reasoning_summary.len() > 2048 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "MyRecoveryAuthorization reasoning_summary too long (max 2048 chars)".to_string(),
+        ));
+    }
+    Ok(ValidateCallbackResult::Valid)
+}

@@ -1017,6 +1017,7 @@ pub enum EntryTypes {
     RecoveryQuorumRequest(RecoveryQuorumRequest),
     KeyRotation(KeyRotation),
     HeldRecoveryShare(HeldRecoveryShare),
+    MyRecoveryAuthorization(MyRecoveryAuthorization),
 }
 
 // =============================================================================
@@ -1219,6 +1220,8 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 EntryTypes::KeyRotation(rotation) => validate_key_rotation(&rotation),
                 EntryTypes::HeldRecoveryShare(share) =>
                     validate_held_recovery_share(&share, &action),
+                EntryTypes::MyRecoveryAuthorization(authz) =>
+                    validate_my_recovery_authorization(&authz),
                 _ => Ok(ValidateCallbackResult::Valid),
             },
             OpEntry::UpdateEntry { app_entry, .. } => match app_entry {
@@ -1239,6 +1242,9 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 )),
                 EntryTypes::HeldRecoveryShare(_) => Ok(ValidateCallbackResult::Invalid(
                     "HeldRecoveryShare is immutable".to_string(),
+                )),
+                EntryTypes::MyRecoveryAuthorization(_) => Ok(ValidateCallbackResult::Invalid(
+                    "MyRecoveryAuthorization is immutable".to_string(),
                 )),
                 _ => Ok(ValidateCallbackResult::Valid),
             },
