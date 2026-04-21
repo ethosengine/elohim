@@ -3,6 +3,41 @@
 # Trust topology: bootstraps to all five other conductors
 # Resource profile: ELEVATED — handles initial content seed write before P2P replication kicks in
 ---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: elohim-adam-alpha-peer-policy
+  namespace: elohim-alpha
+  labels:
+    app: elohim-edgenode
+    elohim-human: adam-firstman
+    environment: alpha
+    app.kubernetes.io/component: policy
+    app.kubernetes.io/part-of: elohim
+    app.kubernetes.io/managed-by: jenkins
+data:
+  peer-policy.toml: |
+    [pool]
+    accept_general_traffic = "auto"
+    min_free_storage_pct = 20
+    require_conductor_healthy = true
+
+    [stewardship]
+    accept_new_reserves = "auto"
+    max_storage_pct = 80
+
+    [network]
+    # Spawns the two localhost→pod-network forwarders for conductor
+    # admin (4444) and app (4445) WebSocket ports. Doorway reaches the
+    # conductor exclusively through these forwarded ports; Holochain
+    # itself stays on 127.0.0.1 (its safe default). elohim-storage is
+    # the auth boundary for external traffic.
+    expose_conductor_externally = true
+    conductor_external_bind = "0.0.0.0:4445"
+    conductor_internal_port = 4445
+    conductor_admin_external_bind = "0.0.0.0:4444"
+    conductor_admin_internal_port = 4444
+---
 # ConfigMap for conductor configuration
 apiVersion: v1
 kind: ConfigMap
@@ -24,13 +59,14 @@ data:
   happ-version: "HAPP_TAG_PLACEHOLDER"
   conductor-config.yaml: |
     # Holochain Conductor Configuration for Elohim Protocol
+    # Conductor binds to 127.0.0.1:4444/4445 (Holochain's safe default).
+    # elohim-storage's forwarder bridges pod-network:4444/4445 → 127.0.0.1,
+    # so doorway reaches admin via the pod-IP without Holochain itself
+    # exposing externally. See peer-policy ConfigMap in this manifest.
     admin_interfaces:
       - driver:
           type: websocket
           port: 4444
-          host: "0.0.0.0"
-          # Consolidated mode: conductor binds to pod network so doorway
-          # can reach it directly (no socat bridge). Doorway handles auth.
           allowed_origins: "*"
     network:
       # Bootstrap served by Doorway gateway
@@ -162,6 +198,9 @@ spec:
               value: "/var/local/lib/holochain"
             - name: HAPP_PATH
               value: "/opt/holochain/elohim.happ"
+            # Path to the peer-policy mount — enables conductor forwarders.
+            - name: ELOHIM_STORAGE_PEER_POLICY_PATH
+              value: "/etc/elohim/peer-policy.toml"
             # --- Storage config (unchanged) ---
             - name: HOLOCHAIN_ADMIN_URL
               value: "ws://localhost:4444"
@@ -232,6 +271,10 @@ spec:
               subPath: conductor-config.yaml
             - name: happ-volume
               mountPath: /opt/holochain
+            - name: peer-policy
+              mountPath: /etc/elohim/peer-policy.toml
+              subPath: peer-policy.toml
+              readOnly: true
           readinessProbe:
             httpGet:
               path: /health
@@ -253,6 +296,9 @@ spec:
         - name: conductor-config
           configMap:
             name: RESOURCE_PREFIX_PLACEHOLDER-config
+        - name: peer-policy
+          configMap:
+            name: elohim-adam-alpha-peer-policy
   # Per-pod persistent volumes — each StatefulSet replica gets its own PVCs
   # Named volumes are referenced in volumeMounts above
   volumeClaimTemplates:
