@@ -1,0 +1,28 @@
+{
+  "$id": "epr:schema:objects:signature",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Signature",
+  "description": "Detached Ed25519 proof over EPR canonical bytes. Source of truth: EPR atom, self-notarized via content-address (CIDv1 dag-cbor sha256) + Ed25519 signature. Canonical CBOR bytes + detached signature is the authoritative form. Category A — notarized; notarization mechanism is content-derived CID + signer proof (not DHT). JSON wire format: CIDs serialize as integer arrays (byte representation of the CIDv1 multihash binary form, via the cid crate serde-codec feature); signature bytes serialize as integer arrays (64 bytes for Ed25519), produced by serde_bytes.",
+  "type": "object",
+  "required": ["signer", "algorithm", "signature"],
+  "additionalProperties": false,
+  "properties": {
+    "signer": {
+      "type": "array",
+      "items": { "type": "integer", "minimum": 0, "maximum": 255 },
+      "description": "CIDv1 of the issuer's Agent EPR, serialized as a byte array (serde-codec feature of the cid crate)."
+    },
+    "algorithm": {
+      "type": "string",
+      "const": "ed25519",
+      "description": "Signing algorithm identifier. Only ed25519 is accepted."
+    },
+    "signature": {
+      "type": "array",
+      "items": { "type": "integer", "minimum": 0, "maximum": 255 },
+      "minItems": 64,
+      "maxItems": 64,
+      "description": "Raw Ed25519 signature bytes (exactly 64 bytes), serialized as an integer array by serde_bytes."
+    }
+  }
+}

@@ -1,0 +1,41 @@
+pipeline {
+  agent { label 'rust-node' }
+
+  options {
+    overrideIndexTriggers(false)
+    buildDiscarder(logRotator(numToKeepStr: '30'))
+    timeout(time: 20, unit: 'MINUTES')
+  }
+
+  stages {
+    stage('Rust — fmt + clippy') {
+      steps {
+        dir('elohim') {
+          sh 'cargo fmt --check'
+          sh 'cargo clippy -p elohim-epr -- -D warnings'
+        }
+      }
+    }
+    stage('Rust — tests') {
+      steps {
+        dir('elohim') {
+          sh 'cargo test -p elohim-epr --all-targets'
+        }
+      }
+    }
+    stage('TS — tests') {
+      steps {
+        dir('elohim/sdk/epr-ts') {
+          sh 'pnpm install --frozen-lockfile'
+          sh 'pnpm test'
+        }
+      }
+    }
+  }
+
+  post {
+    always {
+      cleanWs()
+    }
+  }
+}

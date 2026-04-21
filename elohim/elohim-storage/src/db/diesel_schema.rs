@@ -1161,6 +1161,54 @@ diesel::table! {
     }
 }
 
+// EPR storage layer — Phase 2a
+// Source of truth: EPR atoms (self-notarized via content-derived CID + Ed25519).
+// Timestamps stored as TEXT (ISO-8601). Binary blobs stored as Binary/BLOB.
+
+diesel::table! {
+    epr_atoms (cid) {
+        cid -> Text,
+        kind -> Text,
+        schema_ref -> Text,
+        schema_key -> Text,
+        reach -> Text,
+        issued_at -> Text,
+        signer_cid -> Text,
+        supersedes -> Nullable<Text>,
+        canonical_bytes -> Binary,
+        payload_bytes -> Binary,
+        proof_bytes -> Binary,
+        proof_algorithm -> Text,
+    }
+}
+
+diesel::table! {
+    epr_coupling (epr_cid, leg) {
+        epr_cid -> Text,
+        leg -> Text,
+        target_cid -> Text,
+    }
+}
+
+diesel::table! {
+    epr_claims (epr_cid, claim_cid) {
+        epr_cid -> Text,
+        claim_cid -> Text,
+    }
+}
+
+diesel::table! {
+    epr_supersedence (predecessor, successor) {
+        predecessor -> Text,
+        successor -> Text,
+        attested_by -> Text,
+        attested_at -> Text,
+    }
+}
+
+diesel::joinable!(epr_coupling -> epr_atoms (epr_cid));
+diesel::joinable!(epr_claims -> epr_atoms (epr_cid));
+
 diesel::joinable!(statement_votes -> statements (statement_id));
 diesel::joinable!(collective_participations -> collectives (collective_id));
 diesel::joinable!(content_tags -> content (content_id));
@@ -1188,6 +1236,10 @@ diesel::allow_tables_to_appear_in_same_query!(
     discussions,
     economic_events,
     enum_registry,
+    epr_atoms,
+    epr_claims,
+    epr_coupling,
+    epr_supersedence,
     gate_decision_attestations,
     gate_decision_challenges,
     governance_dispositions,

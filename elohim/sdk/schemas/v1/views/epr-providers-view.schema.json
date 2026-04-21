@@ -1,0 +1,22 @@
+{
+  "$id": "epr:schema:view:epr-providers",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "EprProvidersView",
+  "description": "Source of truth: peer providers advertising that they hold the atom at the given cid. Phase 2a returns ['local'] when held locally, [] otherwise. Phase 2c extends with Kad DHT provider records. Category C — operational (DHT query, reconstructed per request).",
+  "type": "object",
+  "required": ["cid", "providers"],
+  "additionalProperties": false,
+  "properties": {
+    "cid": {
+      "type": "string",
+      "description": "CIDv1 base32 of the queried atom"
+    },
+    "providers": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "description": "Peer identifier — 'local' for this node, or libp2p PeerId for remote peers"
+      }
+    }
+  }
+}

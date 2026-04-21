@@ -29,7 +29,9 @@
     "build": "tsc",
     "clean": "rm -rf dist",
     "prepublishOnly": "pnpm run clean && pnpm run build",
-    "generate:transformers": "tsx scripts/generate-transformers.ts"
+    "generate:transformers": "tsx scripts/generate-transformers.ts",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "keywords": [
     "elohim",
@@ -50,7 +52,8 @@
     "@types/node": "^20.0.0",
     "ts-morph": "^21.0.0",
     "@typescript-eslint/parser": "^8.50.1",
-    "tsx": "^4.7.0"
+    "tsx": "^4.7.0",
+    "vitest": "^3.0.0"
   },
   "engines": {
     "node": ">=18.0.0"

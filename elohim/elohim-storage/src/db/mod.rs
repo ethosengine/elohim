@@ -98,6 +98,9 @@ pub mod elohim_reputation;
 // Placement gap CRUD — shefa signal surface (self-healing Plan 1 Task 4)
 pub mod placement_gaps;
 
+// EPR storage layer — Phase 2a (notarized atoms, coupling, claims, supersedence)
+pub mod epr_atoms;
+
 use std::path::Path;
 use std::time::Duration;
 

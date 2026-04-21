@@ -1,0 +1,14 @@
+{
+  "$id": "epr:schema:view:epr",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "EprView",
+  "description": "Source of truth: EPR atom (self-notarized via content-address + Ed25519). Full HTTP view for GET /api/v1/epr/:cid. Payload is hex-encoded. Category A — notarized via content-derived CID + signer proof.",
+  "type": "object",
+  "required": ["envelope", "payload"],
+  "additionalProperties": false,
+  "properties": {
+    "envelope": { "$ref": "./epr-envelope-view.schema.json" },
+    "payload": { "type": "string", "description": "Hex-encoded payload bytes" },
+    "canonicalBytes": { "type": "string", "description": "Optional hex-encoded canonical bytes (included when client sets ?includeCanonical=true)" }
+  }
+}

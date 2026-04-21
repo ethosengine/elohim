@@ -38,6 +38,8 @@ fn load_ref_map() -> HashMap<String, Value> {
                             let filename = path.file_name().unwrap().to_str().unwrap().to_string();
                             // Same-dir ref: "drain-status-view.schema.json"
                             refs.insert(filename.clone(), schema.clone());
+                            // Same-dir ref with leading ./: "./drain-status-view.schema.json"
+                            refs.insert(format!("./{}", filename), schema.clone());
                             // Cross-dir ref: "../enums/nat-status.schema.json"
                             refs.insert(format!("../{}/{}", subdir, filename), schema.clone());
                             // From views/ to views/: "replication-status-view.schema.json"
@@ -974,6 +976,116 @@ fn resilience_snapshot_view_minimal_matches_schema() {
     validate_against_schema("views/resilience-snapshot-view.schema.json", &json);
 }
 
+// ============================================================================
+// Phase 2a — EPR view schema conformance (Task 11)
+// ============================================================================
+
+fn sample_envelope_view() -> elohim_storage::EprEnvelopeView {
+    use elohim_storage::{EprCouplingView, EprEnvelopeView, EprSignatureView};
+    EprEnvelopeView {
+        cid: "bafyreib2vq7fztfnmgzrmo7q5jnfkdvxkfxpvsjmesxrqjzqxkzqzqzqa".into(),
+        kind: "Manifest".into(),
+        schema_ref: "bafyreib2vq7schemaref01234567890123456789012345678901234567890".into(),
+        schema_key: "concept".into(),
+        reach: "commons".into(),
+        coupling: EprCouplingView {
+            knowledge: None,
+            value: None,
+            governance: Some(
+                "bafyreib2vq7governance01234567890123456789012345678901234567890".into(),
+            ),
+        },
+        claims: vec![],
+        supersedes: None,
+        superseded_by: None,
+        issued_at: "2026-04-22T00:00:00Z".into(),
+        proof: EprSignatureView {
+            signer: "bafyreib2vq7agentcid01234567890123456789012345678901234567890".into(),
+            algorithm: "ed25519".into(),
+            // 128 lowercase hex chars = 64 bytes
+            signature: "a".repeat(128),
+        },
+    }
+}
+
+#[test]
+fn epr_envelope_view_conforms() {
+    let v = sample_envelope_view();
+    let json = serde_json::to_value(&v).unwrap();
+    validate_against_schema("views/epr-envelope-view.schema.json", &json);
+}
+
+#[test]
+fn epr_view_conforms() {
+    use elohim_storage::EprView;
+    let v = EprView {
+        envelope: sample_envelope_view(),
+        payload: "deadbeef".into(),
+        canonical_bytes: None,
+    };
+    let json = serde_json::to_value(&v).unwrap();
+    validate_against_schema("views/epr-view.schema.json", &json);
+}
+
+#[test]
+fn epr_verify_view_conforms() {
+    use elohim_storage::EprVerifyView;
+    let v = EprVerifyView {
+        cid: "bafyreib2vq7fztfnmgzrmo7q5jnfkdvxkfxpvsjmesxrqjzqxkzqzqzqa".into(),
+        verified: true,
+        stages_run: vec![
+            "canonicalization".into(),
+            "signature".into(),
+            "coupling".into(),
+        ],
+        stages_skipped: vec!["payloadSchema".into()],
+        error: None,
+    };
+    let json = serde_json::to_value(&v).unwrap();
+    validate_against_schema("views/epr-verify-view.schema.json", &json);
+}
+
+#[test]
+fn epr_list_view_conforms() {
+    use elohim_storage::EprListView;
+    let v = EprListView {
+        items: vec![sample_envelope_view()],
+        next_cursor: Some(
+            "bafyreib2vq7fztfnmgzrmo7q5jnfkdvxkfxpvsjmesxrqjzqxkzqzqzqa".into(),
+        ),
+    };
+    let json = serde_json::to_value(&v).unwrap();
+    validate_against_schema("views/epr-list-view.schema.json", &json);
+}
+
+#[test]
+fn epr_publish_input_conforms() {
+    use elohim_storage::EprPublishInput;
+    let v = EprPublishInput {
+        envelope: sample_envelope_view(),
+        payload: "cafebabe".into(),
+    };
+    let json = serde_json::to_value(&v).unwrap();
+    validate_against_schema("inputs/epr-publish-input.schema.json", &json);
+}
+
+#[test]
+fn epr_providers_view_conforms() {
+    use elohim_storage::EprProvidersView;
+    let v = EprProvidersView {
+        cid: "bafyreib2vq7fztfnmgzrmo7q5jnfkdvxkfxpvsjmesxrqjzqxkzqzqzqa".into(),
+        providers: vec!["local".into()],
+    };
+    let json = serde_json::to_value(&v).unwrap();
+    validate_against_schema("views/epr-providers-view.schema.json", &json);
+}
+
+#[test]
+fn epr_providers_view_schema_parses() {
+    // Ensures the schema file is present and valid JSON Schema — will panic if not.
+    let _ = load_schema("views/epr-providers-view.schema.json");
+}
+
 // ── Convention enforcement ──────────────────────────────────────
 
 #[test]
@@ -990,6 +1102,11 @@ fn view_schemas_declare_source_of_truth() {
         "views/peer-status-view.schema.json",
         "views/elohim-capability-profile.schema.json",
         "views/elohim-reputation-profile-view.schema.json",
+        "views/epr-view.schema.json",
+        "views/epr-envelope-view.schema.json",
+        "views/epr-verify-view.schema.json",
+        "views/epr-list-view.schema.json",
+        "views/epr-providers-view.schema.json",
     ];
 
     for schema_name in &view_schemas {

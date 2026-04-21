@@ -1,0 +1,19 @@
+{
+  "$id": "epr:schema:view:epr-list",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "EprListView",
+  "description": "Source of truth: EPR atoms (self-notarized). Paged list response for GET /api/v1/epr?... Items are envelope-only (no payload). Category A — atoms are notarized; the list projection is a query-time operation.",
+  "type": "object",
+  "required": ["items", "nextCursor"],
+  "additionalProperties": false,
+  "properties": {
+    "items": {
+      "type": "array",
+      "items": { "$ref": "./epr-envelope-view.schema.json" }
+    },
+    "nextCursor": {
+      "type": ["string", "null"],
+      "description": "Opaque cursor for next page; null when exhausted"
+    }
+  }
+}

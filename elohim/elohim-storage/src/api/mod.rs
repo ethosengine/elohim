@@ -22,6 +22,7 @@ pub mod contributors;
 pub mod custodians;
 pub mod dashboard;
 pub mod economic_events;
+pub mod epr;
 pub mod exchange;
 pub mod flow_planning;
 pub mod gate;
@@ -87,6 +88,9 @@ pub async fn handle_api_request(
     } else if sub_path.starts_with("economic-events") {
         let resource_path = sub_path.strip_prefix("economic-events").unwrap_or("");
         economic_events::handle(req, method, resource_path, &pool, &app_ctx).await
+    } else if sub_path.starts_with("epr") {
+        let resource_path = sub_path.strip_prefix("epr").unwrap_or("");
+        epr::handle(req, method, resource_path, &pool, &app_ctx).await
     } else if sub_path.starts_with("resources") {
         let resource_path = sub_path.strip_prefix("resources").unwrap_or("");
         resources::handle(req, method, resource_path, &pool, &app_ctx, services).await

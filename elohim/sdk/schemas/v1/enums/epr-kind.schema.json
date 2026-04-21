@@ -1,0 +1,8 @@
+{
+  "$id": "epr:schema:enum:epr-kind",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "EprKind",
+  "description": "The nine EPR atom kinds defined by the graph substrate spec §4.2. Source of truth: elohim-epr protocol constants. Category A — enumeration values are part of the DNA-notarized protocol vocabulary. Each kind declares required coupling legs: Content requires all three (knowledge + value + governance); Agent/Manifest/Attestation/Delegation require governance; Claim/Observation require knowledge; EconomicEvent requires value; Commitment requires value + governance.",
+  "type": "string",
+  "enum": ["Content", "Agent", "Manifest", "Claim", "Observation", "EconomicEvent", "Commitment", "Attestation", "Delegation"]
+}
