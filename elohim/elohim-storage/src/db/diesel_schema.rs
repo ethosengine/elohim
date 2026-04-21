@@ -1132,6 +1132,47 @@ diesel::table! {
     }
 }
 
+// Recovery Protocol Phase 2 — DHT projection tables (imagodei DNA)
+diesel::table! {
+    recovery_seed_commitments (dht_anchor_hash) {
+        dht_anchor_hash -> Text,
+        human_agent_pubkey -> Text,
+        seed_public_half -> Binary,
+        threshold_n -> Integer,
+        total_m -> Integer,
+        commitment_nonce -> Binary,
+        superseded_by -> Nullable<Text>,
+        created_at -> Text,
+    }
+}
+
+diesel::table! {
+    recovery_quorum_requests (dht_anchor_hash) {
+        dht_anchor_hash -> Text,
+        human_agent_pubkey -> Text,
+        seed_commitment_hash -> Text,
+        new_agent_pubkey -> Text,
+        hosting_doorway_pubkey -> Text,
+        recovery_mode -> Text,
+        stewarded_grant_hash -> Nullable<Text>,
+        request_nonce -> Binary,
+        created_at -> Text,
+    }
+}
+
+diesel::table! {
+    key_rotations (dht_anchor_hash) {
+        dht_anchor_hash -> Text,
+        human_agent_pubkey -> Text,
+        new_agent_pubkey -> Text,
+        superseded_agent_pubkey -> Text,
+        seed_commitment_hash -> Text,
+        recovery_request_hash -> Text,
+        quorum_signature -> Binary,
+        rotated_at -> Text,
+    }
+}
+
 diesel::joinable!(statement_votes -> statements (statement_id));
 diesel::joinable!(collective_participations -> collectives (collective_id));
 diesel::joinable!(content_tags -> content (content_id));
@@ -1180,7 +1221,10 @@ diesel::allow_tables_to_appear_in_same_query!(
     proposal_options,
     proposals,
     ranked_votes,
+    key_rotations,
     rea_commitments,
+    recovery_quorum_requests,
+    recovery_seed_commitments,
     relationships,
     responsibility_demand_configs,
     risk_alerts,
