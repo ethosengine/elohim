@@ -1012,6 +1012,8 @@ pub enum EntryTypes {
     RenewalAttestation(RenewalAttestation),
     AgentRetirement(AgentRetirement),
     RelationshipRenewal(RelationshipRenewal),
+    // Recovery Protocol Phase 2 (seed-quorum based)
+    RecoverySeedCommitment(RecoverySeedCommitment),
 }
 
 // =============================================================================
@@ -1206,11 +1208,20 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 EntryTypes::RenewalAttestation(attestation) => validate_renewal_attestation(&attestation),
                 EntryTypes::AgentRetirement(retirement) => validate_agent_retirement(&retirement),
                 EntryTypes::RelationshipRenewal(renewal) => validate_relationship_renewal(&renewal),
+                // Recovery Protocol Phase 2 validation
+                EntryTypes::RecoverySeedCommitment(commitment) =>
+                    validate_recovery_seed_commitment(&commitment, &action),
                 _ => Ok(ValidateCallbackResult::Valid),
             },
             OpEntry::UpdateEntry { app_entry, .. } => match app_entry {
                 EntryTypes::Human(human) => validate_human(&human),
                 EntryTypes::Agent(agent) => validate_agent(&agent),
+                // Recovery Protocol Phase 2 — immutable entries
+                EntryTypes::RecoverySeedCommitment(_) =>
+                    Ok(ValidateCallbackResult::Invalid(
+                        "RecoverySeedCommitment is immutable; use SeedCommitmentSupersededBy link to supersede"
+                            .to_string(),
+                    )),
                 _ => Ok(ValidateCallbackResult::Valid),
             },
             _ => Ok(ValidateCallbackResult::Valid),

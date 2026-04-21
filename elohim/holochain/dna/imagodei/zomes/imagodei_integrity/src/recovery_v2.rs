@@ -32,3 +32,72 @@ pub enum ConfidenceTier {
 }
 
 // Entry type structs and validation functions will be added in subsequent tasks.
+
+// =============================================================================
+// RecoverySeedCommitment
+// =============================================================================
+
+/// Public commitment to a recovery seed: seed's public half + threshold params.
+/// Share-holder identities are NOT stored here (privacy invariant).
+/// Author must be the human_agent_pubkey (only the human commits their own seed).
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct RecoverySeedCommitment {
+    pub human_agent_pubkey: AgentPubKey,
+    pub seed_public_half: Vec<u8>,   // 32 bytes Ed25519 public key; Vec<u8> for serialize compat
+    pub threshold_n: u8,
+    pub total_m: u8,
+    pub commitment_nonce: Vec<u8>,   // 16 bytes random
+    pub created_at: Timestamp,
+}
+
+pub fn validate_recovery_seed_commitment(
+    commitment: &RecoverySeedCommitment,
+    action: &Create,
+) -> ExternResult<ValidateCallbackResult> {
+    // Rule 1: threshold range
+    if commitment.threshold_n < 2 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "RecoverySeedCommitment threshold_n must be >= 2".to_string(),
+        ));
+    }
+    if commitment.threshold_n > commitment.total_m {
+        return Ok(ValidateCallbackResult::Invalid(
+            "RecoverySeedCommitment threshold_n must be <= total_m".to_string(),
+        ));
+    }
+    // Rule 2: total_m range
+    if commitment.total_m < 2 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "RecoverySeedCommitment total_m must be >= 2".to_string(),
+        ));
+    }
+    if commitment.total_m > 16 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "RecoverySeedCommitment total_m must be <= 16".to_string(),
+        ));
+    }
+    // Rule 3: seed_public_half must be 32 bytes
+    if commitment.seed_public_half.len() != 32 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "RecoverySeedCommitment seed_public_half must be exactly 32 bytes".to_string(),
+        ));
+    }
+    // Rule 4: commitment_nonce must be 16 bytes
+    if commitment.commitment_nonce.len() != 16 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "RecoverySeedCommitment commitment_nonce must be exactly 16 bytes".to_string(),
+        ));
+    }
+    // Rule 5: author must be the committing human
+    // action.author is the AgentPubKey of the source-chain author (Create action)
+    if action.author != commitment.human_agent_pubkey {
+        return Ok(ValidateCallbackResult::Invalid(
+            "RecoverySeedCommitment: author must equal human_agent_pubkey".to_string(),
+        ));
+    }
+    // Rule 6: seed_public_half must be valid Ed25519 public key bytes
+    // Note: byte-length check (Rule 3) is the validation floor here;
+    // further cryptographic verification happens in coordinator flows.
+    Ok(ValidateCallbackResult::Valid)
+}
