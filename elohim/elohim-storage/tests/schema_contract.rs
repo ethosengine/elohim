@@ -1050,9 +1050,7 @@ fn epr_list_view_conforms() {
     use elohim_storage::EprListView;
     let v = EprListView {
         items: vec![sample_envelope_view()],
-        next_cursor: Some(
-            "bafyreib2vq7fztfnmgzrmo7q5jnfkdvxkfxpvsjmesxrqjzqxkzqzqzqa".into(),
-        ),
+        next_cursor: Some("bafyreib2vq7fztfnmgzrmo7q5jnfkdvxkfxpvsjmesxrqjzqxkzqzqzqa".into()),
     };
     let json = serde_json::to_value(&v).unwrap();
     validate_against_schema("views/epr-list-view.schema.json", &json);

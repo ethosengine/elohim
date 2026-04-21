@@ -166,10 +166,10 @@ pub use views::{
     HouseholdResilienceView, NetworkPostureView, NodeShapeView, PeerStatusView,
 };
 pub use views::{
-    PlacementGapView, RegionalDistributionView, ResilienceSnapshotDetailsView,
-    ResilienceSnapshotView, StewardingCollectiveEntry,
-};
-pub use views::{
     EprCouplingView, EprEnvelopeView, EprListView, EprProvidersView, EprPublishInput,
     EprSignatureView, EprVerifyErrorView, EprVerifyView, EprView,
+};
+pub use views::{
+    PlacementGapView, RegionalDistributionView, ResilienceSnapshotDetailsView,
+    ResilienceSnapshotView, StewardingCollectiveEntry,
 };

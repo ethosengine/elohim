@@ -9,8 +9,8 @@
 
 use diesel::SqliteConnection;
 
-use crate::db::epr_atoms::EprListQuery;
 use crate::db::epr_atoms::EprAtom;
+use crate::db::epr_atoms::EprListQuery;
 use crate::error::StorageError;
 use crate::services::epr_service::{self, EprIngestResult, EprVerifyReport, FetchedEpr};
 use elohim_epr::Epr;
@@ -69,11 +69,7 @@ pub trait EprStore: Send + Sync {
 
     /// Idempotent put. If the CID already exists locally, validates inbound
     /// matches stored and returns the existing result (200, not 409).
-    fn put(
-        &self,
-        conn: &mut SqliteConnection,
-        epr: Epr,
-    ) -> Result<EprIngestResult, StorageError>;
+    fn put(&self, conn: &mut SqliteConnection, epr: Epr) -> Result<EprIngestResult, StorageError>;
 
     /// List atoms held locally by this store. Federation across peers is a
     /// separate concern — see `list_federated` in Phase 2c.
@@ -127,17 +123,15 @@ impl EprStore for LocalEprStore {
         conn: &mut SqliteConnection,
         cid: &str,
     ) -> Result<Option<FetchOutcome>, StorageError> {
-        Ok(epr_service::fetch_by_cid(conn, cid)?.map(|fetched| FetchOutcome {
-            fetched,
-            source: EprSource::Local,
-        }))
+        Ok(
+            epr_service::fetch_by_cid(conn, cid)?.map(|fetched| FetchOutcome {
+                fetched,
+                source: EprSource::Local,
+            }),
+        )
     }
 
-    fn put(
-        &self,
-        conn: &mut SqliteConnection,
-        epr: Epr,
-    ) -> Result<EprIngestResult, StorageError> {
+    fn put(&self, conn: &mut SqliteConnection, epr: Epr) -> Result<EprIngestResult, StorageError> {
         let cid = epr.envelope.cid.to_string();
         // Idempotent semantics: if the CID already exists, validate inbound
         // matches stored and return the existing result (catches collision attempts
@@ -231,11 +225,7 @@ impl EprStore for FederatedEprStore {
         Ok(None)
     }
 
-    fn put(
-        &self,
-        conn: &mut SqliteConnection,
-        epr: Epr,
-    ) -> Result<EprIngestResult, StorageError> {
+    fn put(&self, conn: &mut SqliteConnection, epr: Epr) -> Result<EprIngestResult, StorageError> {
         let result = self.local.put(conn, epr)?;
         // TODO(phase-2c): self.swarm_handle.kad_start_providing(result.cid.parse()?).await?;
         // This announces to the DHT that this node holds the atom, so future

@@ -5,15 +5,11 @@
 
 use diesel::prelude::*;
 use elohim_epr::{
-    cid::compute_cid,
-    proof::verify as verify_ed25519,
-    validate_coupling, Epr, EprError,
+    cid::compute_cid, proof::verify as verify_ed25519, validate_coupling, Epr, EprError,
 };
 use serde::{Deserialize, Serialize};
 
-use crate::db::epr_atoms::{
-    self, EprAtom, EprClaimRow, EprCouplingRow, EprListQuery,
-};
+use crate::db::epr_atoms::{self, EprAtom, EprClaimRow, EprCouplingRow, EprListQuery};
 use crate::error::StorageError;
 
 // ---------------------------------------------------------------------------
@@ -239,8 +235,8 @@ pub fn list(
         after_cid: q.after_cid.clone(),
     };
 
-    let mut rows = epr_atoms::list_atoms(conn, &query)
-        .map_err(|e| StorageError::Database(e.to_string()))?;
+    let mut rows =
+        epr_atoms::list_atoms(conn, &query).map_err(|e| StorageError::Database(e.to_string()))?;
 
     let next_cursor = if rows.len() as i64 > q.limit {
         rows.pop(); // discard the sentinel row

@@ -20,8 +20,6 @@
 //! ```
 
 pub mod agreement_service;
-pub mod epr_service;
-pub mod epr_store;
 pub mod anomaly_detection;
 pub mod behavioral_trust;
 pub mod boot_registration;
@@ -30,6 +28,8 @@ pub mod disposition_service;
 pub mod distribution;
 pub mod economic_event_service;
 pub mod elohim_gate;
+pub mod epr_service;
+pub mod epr_store;
 pub mod events;
 pub mod exchange_service;
 pub mod governance_health;

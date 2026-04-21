@@ -90,23 +90,14 @@ pub fn insert_coupling_rows(
         .execute(conn)
 }
 
-pub fn insert_claim_rows(
-    conn: &mut SqliteConnection,
-    rows: &[EprClaimRow],
-) -> QueryResult<usize> {
+pub fn insert_claim_rows(conn: &mut SqliteConnection, rows: &[EprClaimRow]) -> QueryResult<usize> {
     diesel::insert_into(epr_claims::table)
         .values(rows)
         .execute(conn)
 }
 
-pub fn fetch_atom_by_cid(
-    conn: &mut SqliteConnection,
-    cid: &str,
-) -> QueryResult<Option<EprAtom>> {
-    epr_atoms::table
-        .find(cid)
-        .first::<EprAtom>(conn)
-        .optional()
+pub fn fetch_atom_by_cid(conn: &mut SqliteConnection, cid: &str) -> QueryResult<Option<EprAtom>> {
+    epr_atoms::table.find(cid).first::<EprAtom>(conn).optional()
 }
 
 pub fn fetch_coupling_for_atom(
@@ -147,10 +138,7 @@ pub struct EprListQuery {
     pub limit: i64,
 }
 
-pub fn list_atoms(
-    conn: &mut SqliteConnection,
-    q: &EprListQuery,
-) -> QueryResult<Vec<EprAtom>> {
+pub fn list_atoms(conn: &mut SqliteConnection, q: &EprListQuery) -> QueryResult<Vec<EprAtom>> {
     let mut query = epr_atoms::table.into_boxed();
     if let Some(k) = &q.kind {
         query = query.filter(epr_atoms::kind.eq(k));

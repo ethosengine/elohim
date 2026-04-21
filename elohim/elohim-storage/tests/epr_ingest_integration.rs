@@ -89,7 +89,10 @@ fn ingest_fetch_verify_roundtrip() {
         .verify(&mut conn, &declared_cid, &pub_key)
         .expect("verify should succeed");
 
-    assert!(report.verified, "signature must verify under the signing key");
+    assert!(
+        report.verified,
+        "signature must verify under the signing key"
+    );
     assert!(
         report.stages_run.contains(&"canonicalization".to_string()),
         "stages_run must include canonicalization"
@@ -134,7 +137,9 @@ fn verify_with_wrong_key_is_rejected() {
         !report.verified,
         "verification must fail under the wrong key"
     );
-    let error = report.error.expect("error detail must be present on failure");
+    let error = report
+        .error
+        .expect("error detail must be present on failure");
     assert_eq!(
         error.stage, "signature",
         "failure must be attributed to the signature stage"
@@ -161,15 +166,14 @@ fn put_same_canonical_bytes_is_idempotent() {
         "deterministic builder must produce the same CID for the same inputs"
     );
 
-    let first = store.put(&mut conn, epr_a).expect("first put should succeed");
+    let first = store
+        .put(&mut conn, epr_a)
+        .expect("first put should succeed");
     let second = store
         .put(&mut conn, epr_b)
         .expect("second put (same canonical bytes) should be idempotent — not an error");
 
-    assert_eq!(
-        first.cid, second.cid,
-        "both puts must return the same CID"
-    );
+    assert_eq!(first.cid, second.cid, "both puts must return the same CID");
 }
 
 // ---------------------------------------------------------------------------
@@ -197,7 +201,9 @@ fn put_different_bytes_same_cid_is_rejected() {
     // Ingest the legitimate EPR
     let (epr_a, _kp) = build_content_epr(b"original payload collision test");
     let stored_cid = epr_a.envelope.cid.to_string();
-    store.put(&mut conn, epr_a).expect("original put should succeed");
+    store
+        .put(&mut conn, epr_a)
+        .expect("original put should succeed");
 
     // Build a *different* EPR with different payload — it will have a different CID
     let (mut epr_b, _kp2) = build_content_epr(b"different payload collision test");

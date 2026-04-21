@@ -179,8 +179,8 @@ async fn get_epr(
     }
 
     let view = to_epr_view(&outcome.fetched, include_canonical);
-    let body = serde_json::to_vec(&view)
-        .map_err(|e| StorageError::Database(format!("serialize: {e}")))?;
+    let body =
+        serde_json::to_vec(&view).map_err(|e| StorageError::Database(format!("serialize: {e}")))?;
 
     Ok(Response::builder()
         .status(StatusCode::OK)
@@ -267,10 +267,7 @@ async fn get_verify(
     // Caller provides publicKey as hex in query string:
     //   GET /api/v1/epr/:cid/verify?publicKey=<64-hex>
     let query = req.uri().query().unwrap_or("");
-    let Some(pk_hex) = query
-        .split('&')
-        .find_map(|p| p.strip_prefix("publicKey="))
-    else {
+    let Some(pk_hex) = query.split('&').find_map(|p| p.strip_prefix("publicKey=")) else {
         return Ok(response::bad_request("publicKey query parameter required"));
     };
 
@@ -307,8 +304,8 @@ async fn get_verify(
         }),
     };
 
-    let body = serde_json::to_vec(&view)
-        .map_err(|e| StorageError::Database(format!("serialize: {e}")))?;
+    let body =
+        serde_json::to_vec(&view).map_err(|e| StorageError::Database(format!("serialize: {e}")))?;
 
     Ok(Response::builder()
         .status(StatusCode::OK)
@@ -348,8 +345,8 @@ async fn get_providers(
         cid: cid.to_string(),
         providers: provider_strings,
     };
-    let body = serde_json::to_vec(&view)
-        .map_err(|e| StorageError::Database(format!("serialize: {e}")))?;
+    let body =
+        serde_json::to_vec(&view).map_err(|e| StorageError::Database(format!("serialize: {e}")))?;
 
     Ok(Response::builder()
         .status(StatusCode::OK)
@@ -574,5 +571,8 @@ async fn list_epr(
         }
     }
 
-    Ok(response::ok(&crate::views::EprListView { items, next_cursor }))
+    Ok(response::ok(&crate::views::EprListView {
+        items,
+        next_cursor,
+    }))
 }
