@@ -37,10 +37,6 @@
 // (must be declared before any modules that use randomness)
 mod getrandom_custom;
 
-// Phase 2a smoke: confirm elohim-epr builds under custom RUSTFLAGS.
-#[doc(hidden)]
-pub use elohim_epr::{Epr, Envelope, EprKind};
-
 // Protocol enum constants — AUTO-GENERATED from JSON schemas
 pub mod generated_enums;
 
