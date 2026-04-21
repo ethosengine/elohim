@@ -215,12 +215,53 @@ async fn get_payload(
 }
 
 async fn get_verify(
-    _req: Request<Incoming>,
-    _cid: &str,
-    _pool: &DbPool,
+    req: Request<Incoming>,
+    cid: &str,
+    pool: &DbPool,
     _ctx: &AppContext,
 ) -> Result<Response<Full<Bytes>>, StorageError> {
-    Ok(response::not_found("not implemented — Task 15")) // Task 15
+    // Caller provides publicKey as hex in query string:
+    //   GET /api/v1/epr/:cid/verify?publicKey=<64-hex>
+    let query = req.uri().query().unwrap_or("");
+    let Some(pk_hex) = query
+        .split('&')
+        .find_map(|p| p.strip_prefix("publicKey="))
+    else {
+        return Ok(response::bad_request("publicKey query parameter required"));
+    };
+
+    let Ok(pk_bytes) = hex::decode(pk_hex) else {
+        return Ok(response::bad_request("publicKey must be valid hex"));
+    };
+    if pk_bytes.len() != 32 {
+        return Ok(response::bad_request("publicKey must decode to 32 bytes"));
+    }
+    let mut pk = [0u8; 32];
+    pk.copy_from_slice(&pk_bytes);
+
+    let mut conn = get_conn(pool)?;
+
+    // Reach check: if the EPR isn't visible to the caller, return 404.
+    let Some(fetched) = epr_service::fetch_by_cid(&mut conn, cid)? else {
+        return Ok(response::not_found(&format!("epr not found: {cid}")));
+    };
+    if !reach_visible_to(&fetched.atom.reach, &req) {
+        return Ok(response::not_found(&format!("epr not found: {cid}")));
+    }
+
+    let report = epr_service::verify(&mut conn, cid, &pk)?;
+
+    let view = crate::views::EprVerifyView {
+        cid: report.cid,
+        verified: report.verified,
+        stages_run: report.stages_run,
+        stages_skipped: report.stages_skipped,
+        error: report.error.map(|e| crate::views::EprVerifyErrorView {
+            stage: e.stage,
+            message: e.message,
+        }),
+    };
+    Ok(response::ok(&view))
 }
 
 async fn list_epr(
