@@ -1069,6 +1069,23 @@ fn epr_publish_input_conforms() {
     validate_against_schema("inputs/epr-publish-input.schema.json", &json);
 }
 
+#[test]
+fn epr_providers_view_conforms() {
+    use elohim_storage::EprProvidersView;
+    let v = EprProvidersView {
+        cid: "bafyreib2vq7fztfnmgzrmo7q5jnfkdvxkfxpvsjmesxrqjzqxkzqzqzqa".into(),
+        providers: vec!["local".into()],
+    };
+    let json = serde_json::to_value(&v).unwrap();
+    validate_against_schema("views/epr-providers-view.schema.json", &json);
+}
+
+#[test]
+fn epr_providers_view_schema_parses() {
+    // Ensures the schema file is present and valid JSON Schema — will panic if not.
+    let _ = load_schema("views/epr-providers-view.schema.json");
+}
+
 // ── Convention enforcement ──────────────────────────────────────
 
 #[test]
@@ -1089,6 +1106,7 @@ fn view_schemas_declare_source_of_truth() {
         "views/epr-envelope-view.schema.json",
         "views/epr-verify-view.schema.json",
         "views/epr-list-view.schema.json",
+        "views/epr-providers-view.schema.json",
     ];
 
     for schema_name in &view_schemas {

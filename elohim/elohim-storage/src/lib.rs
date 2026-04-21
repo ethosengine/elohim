@@ -170,6 +170,6 @@ pub use views::{
     ResilienceSnapshotView, StewardingCollectiveEntry,
 };
 pub use views::{
-    EprCouplingView, EprEnvelopeView, EprListView, EprPublishInput, EprSignatureView,
-    EprVerifyErrorView, EprVerifyView, EprView,
+    EprCouplingView, EprEnvelopeView, EprListView, EprProvidersView, EprPublishInput,
+    EprSignatureView, EprVerifyErrorView, EprVerifyView, EprView,
 };
