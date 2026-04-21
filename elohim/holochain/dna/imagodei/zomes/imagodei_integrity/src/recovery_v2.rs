@@ -14,10 +14,63 @@ use hdi::prelude::*;
 // Public Enums
 // =============================================================================
 
+/// Purpose of a NetworkWitness authority — either restore access or retire the account.
+/// Dissolution variant is reserved for cradle-to-grave care (deferred to constitutional-governance design).
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
-pub enum RecoveryMode {
-    Normal,
-    Stewarded { grant_hash: ActionHash },
+pub enum NetworkWitnessPurpose {
+    /// Rescue: restore access to the human's active identity.
+    Rescue,
+    /// Dissolution: retire the account (deceased, irrecoverable).
+    /// new_agent_pubkey is a memorial-marker null agent.
+    /// Phase 2: stub-rejected in validator; shape reserved for constitutional-governance design.
+    Dissolution,
+}
+
+/// Evidence supporting a KeyRotation. Five variants; any one sufficient for authorization.
+/// Phase 2 implements IntimateQuorum + CryptographicQuorum; other variants stub-reject.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub enum RecoveryAuthority {
+    /// Layer 1: Intimate-circle quorum via HumanityWitness entries from emergency contacts.
+    /// Phase 2: IMPLEMENTED (structural shape; variant-specific validation lands in M2).
+    IntimateQuorum {
+        witness_hashes: Vec<ActionHash>,
+    },
+    /// Layer 2: Extended community via IdentityChallenge resolution.
+    /// Phase 2: STUB-REJECTED (Phase 2b).
+    CommunityConsensus {
+        challenge_hash: ActionHash,
+    },
+    /// Layer 3: Governance act via qahal/stewardship resolution.
+    /// Phase 2: STUB-REJECTED (cross-DNA qahal/mishpat work pending).
+    GovernanceAct {
+        grant_hash: ActionHash,
+        resolution_hash: ActionHash,
+    },
+    /// Layer 4: Global elohim witness — prevents absolute lockout.
+    /// Phase 2: STUB-REJECTED (pending elohim constitutional-governance design).
+    NetworkWitness {
+        witness_entries: Vec<ActionHash>,
+        consensus_threshold_met_at: Timestamp,
+        purpose: NetworkWitnessPurpose,
+    },
+    /// Layer 5 (orthogonal): Cryptographic M-of-N threshold via KeyStewardship.
+    /// Provisioned only when elohim judges the human vulnerable enough.
+    /// Phase 2: IMPLEMENTED (structural shape; variant-specific validation lands in M2).
+    CryptographicQuorum {
+        stewardship_hash: ActionHash,
+        quorum_signature: Vec<u8>,
+    },
+}
+
+/// Claimant's declared intent for which authority path a RecoveryRequest will pursue.
+/// The actual KeyRotation authority can differ (escalation is allowed).
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub enum RecoveryAuthorityKind {
+    IntimateQuorum,
+    CommunityConsensus,
+    GovernanceAct { grant_hash: ActionHash },
+    NetworkWitness { purpose: NetworkWitnessPurpose },
+    CryptographicQuorum { stewardship_hash: ActionHash },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
@@ -45,7 +98,7 @@ pub struct RecoveryQuorumRequest {
     pub seed_commitment_hash: ActionHash,
     pub new_agent_pubkey: AgentPubKey,
     pub hosting_doorway_pubkey: AgentPubKey,
-    pub recovery_mode: RecoveryMode,
+    // recovery_mode removed — RecoveryMode deleted in M1-cleanup (superseded by RecoveryAuthority)
     pub request_nonce: Vec<u8>,      // 16 bytes random
     pub created_at: Timestamp,
 }
