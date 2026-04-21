@@ -93,6 +93,34 @@ mcp__jenkins__triggerBuild jobFullName="elohim-genesis/dev"
 
 Detection: check your tool list for `mcp__jenkins__*`. If absent, **do not** waste a turn asking an agent to try MCP — it'll fail the same way. Go straight to WebFetch.
 
+## Pipeline timing reference
+
+Observed durations for the `elohim-*` pipelines on `dev`. Use these to set `ScheduleWakeup.delaySeconds` — not for polling inside a turn.
+
+| Pipeline | Typical duration | Notes |
+|----------|-----------------|-------|
+| `elohim-orchestrator` | **3-5 min** | Changeset analysis + downstream trigger. Fast because it's mostly pattern-matching file paths. Will supersede an in-flight build if a new push lands before it completes. |
+| `elohim-edge` | **25-35 min** | Doorway + elohim-storage Docker image builds. Heavy Rust compilation (cargo build --release) and image publish. The long pole — start here when estimating end-to-end time. |
+| `elohim-holochain` | **15-25 min** | hApp packaging + k8s deploy (StatefulSet rollout). Fast build, slower deploy phase (pod restarts + readiness probes). |
+| `elohim-genesis` | **10-15 min** | A2O cucumber run + sprint-report generation. Duration is dominated by the E2E scenario timeouts; a broken alpha inflates this. |
+| **Full cascade** (push → sprint-report) | **~45-60 min** | Serial-ish: orchestrator blocks trigger, edge runs parallel with holochain, genesis waits for deploy. Budget a full hour from `git push` to when you should read a fresh sprint-report. |
+
+### Wakeup-delay guidance
+
+Pick based on what you're waiting for:
+
+- **Just pushed, waiting for orchestrator to finish analysis:** 300s (5 min) — then you know which downstream pipelines fired.
+- **Waiting for edge to finish compiling:** 1200-1800s (20-30 min) — don't poll inside the compile window, you're not going to learn anything new.
+- **Waiting for the whole cascade after a push that touches Rust + manifests:** 2400-3000s (40-50 min) — come back after genesis has had a chance to run; if you wake up too early, re-sleep with a shorter delay.
+- **Waiting for a cascade where edge is already green and only genesis needs to run:** 900s (15 min).
+- **Build is running but stuck/queued:** don't wake up sooner than the p95 duration; you'll just re-sleep.
+
+### Coordination gotchas
+
+- **Orchestrator can supersede a prior in-flight build.** If you push twice quickly, the first orchestrator run is marked "Not built / Superseded" and its downstream triggers can be cancelled. The second run analyzes the cumulative diff since the last green — so downstreams still fire correctly, but any in-flight edge/holochain from the first run may abort mid-way.
+- **Edge and holochain run in parallel, not serial.** Holochain may finish (SUCCESS) before edge publishes new images, meaning the deploy ran against the OLD storage image tag (`dev-latest` points at last green). Watch for this: holochain green + edge not-yet-green = Adam is running old code. You need either a fresh holochain trigger after edge, or a rollout restart to pick up the new image tag.
+- **`dev-latest` tag race.** StatefulSet pods only re-pull images on pod restart. With `imagePullPolicy: Always` + `dev-latest`, k8s WILL pull the new image, but ONLY when the pod restarts. A StatefulSet rolling restart happens on spec change (env var, mount, resource bump) — NOT on image tag content change. Deploys that rely on `dev-latest` moving must also change something in the pod spec, or include an explicit `kubectl rollout restart statefulset/...` call.
+
 ## Red flags — anti-patterns observed when agents DON'T use this skill
 
 | Thought | Reality |
