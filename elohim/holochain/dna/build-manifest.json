@@ -66,11 +66,32 @@
         "stage": "Schema DNA Check",
         "function": null
       }
+    },
+    "manifest-hygiene": {
+      "description": "DNA manifest hygiene schema contract (wave-1 §7) — pure YAML parse, no conductor",
+      "inputs": {
+        "sources": [
+          "elohim/holochain/dna/*/dna.yaml",
+          "elohim/holochain/dna/elohim/workdir/happ.yaml",
+          "elohim/holochain/tests/manifest-hygiene/**"
+        ],
+        "buildProcess": []
+      },
+      "outputs": {
+        "artifacts": [],
+        "verify": null
+      },
+      "depends": [],
+      "executor": {
+        "stage": "Manifest Hygiene",
+        "function": null
+      }
     }
   },
   "gate": {
     "projects": {
-      "schema-dna": { "dir": ".", "steps": ["schema-dna"] }
+      "schema-dna": { "dir": ".", "steps": ["schema-dna"] },
+      "manifest-hygiene": { "dir": ".", "steps": ["manifest-hygiene"] }
     }
   },
   "deployment": {}
