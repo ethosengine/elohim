@@ -76,42 +76,64 @@ gate green. That wiring is deferred to the Wave 1 close-out with
 `feedback_shift_measure_jenkins.md` as the bar — tests must be green on
 Jenkins, not merely locally.
 
-## Che compile blocker (2026-04-21)
+## Build environment
 
-The `holochain` crate's default features include `datachannel-vendored`,
-which pulls in `datachannel-sys` and builds libdatachannel from source via
-a `cmake` build script. Che's base image (`base-developer-image:ubi10-latest`)
-does not ship `cmake`. Without it, `cargo check -p elohim_sweettest` fails:
+Sweettest pulls in `holochain` (native) and builds `libdatachannel` from
+source via `datachannel-sys`. That build chain needs `cmake`, `clang-libs`,
+`zlib-devel`, and a one-line patch to libdatachannel's CMakeLists injecting
+`find_package(ZLIB REQUIRED)` before `find_package(OpenSSL)`. Three surfaces
+to be aware of:
 
+### Eclipse Che (recommended for contributors)
+
+The `ethosengine/che-devworkspaces` image is preconfigured. See
+https://github.com/ethosengine/che-devworkspaces/blob/main/containers/rust-dev/claude.md
+for the container spec. Includes the libdatachannel CMakeLists patch and
+sets `BINDGEN_EXTRA_CLANG_ARGS` so bindgen finds its clang resource dir
+without a `clang` driver binary installed.
+
+### Jenkins Nix build
+
+The `holochain/dna/*.nix` dev shell provides `cmake`, `clang` (full driver),
+`libsodium`, `openssl`, and the holochain toolchain. No workarounds needed —
+`nix develop --command cargo test ...` just works. See the Jenkins stage
+`DNA Integration (bootstrap-steward)` in `elohim/holochain/dna/Jenkinsfile`.
+
+### Bare laptop (not recommended; contributors should use Che)
+
+If you must build outside Che and outside Nix:
+
+```bash
+# RHEL/Fedora
+sudo dnf install -y cmake clang-libs zlib-devel
+
+# Debian/Ubuntu
+sudo apt-get install -y cmake libclang-dev zlib1g-dev
+
+# Apply the libdatachannel CMakeLists patch in the cargo registry:
+CML=$(find ~/.cargo/registry/src -path '*datachannel-sys-0.23.0+0.23.2/libdatachannel/CMakeLists.txt' -print -quit)
+grep -q 'find_package(ZLIB REQUIRED)' "$CML" || \
+  sed -i 's|^\tfind_package(OpenSSL REQUIRED)$|\tfind_package(ZLIB REQUIRED)\n\tfind_package(OpenSSL REQUIRED)|' "$CML"
+
+# Set bindgen's clang resource path (Linux location may vary):
+export BINDGEN_EXTRA_CLANG_ARGS="-I/usr/lib/clang/20/include"
 ```
-thread 'main' panicked at cmake-0.1.58/src/lib.rs:1132:5:
-failed to execute command: No such file or directory (os error 2)
-is `cmake` not installed?
-```
 
-Alternatives evaluated:
+The devcontainer applies the patch and env var automatically. Contributors
+on bare systems maintain the patch themselves.
 
-- `backend-go-pion`: requires `go` compiler — not installed either.
-- `default-features = false` without any webrtc backend: compile fails
-  inside `tx5-connection-0.8.1/src/config.rs` because `BackendModule`'s
-  `Default` impl is feature-gated and collapses to `fn default() -> Self {}`
-  when no backend is selected.
-- Using the installed `/opt/holochain/bin/holochain` binary directly:
-  sweettest is in-process; it needs the holochain crate linked into the
-  test binary, not an external binary.
+## Husky compile-check gate
 
-Orchestration options (out of scope for this session):
+Any push that touches `elohim/holochain/dna/*/zomes/**/*.rs` or
+`elohim/holochain/tests/sweettest/**` triggers a push-time
+`cargo check -p elohim_sweettest`. This catches extern-signature drift
+before Jenkins runs. See `.husky/pre-push` and
+`elohim/holochain/dna/build-manifest.json` for the wiring.
 
-1. Add `cmake` + `make` to `Dockerfile` (one-line `dnf install -y cmake
-   make` add-on). This is the lightest path; only affects the image,
-   rebuilds on next workspace spin-up.
-2. Run sweettest exclusively in Jenkins (where cmake is presumably
-   available via the holochain build agent). Reverts to the "measures
-   live in Jenkins" default for this particular gate.
-3. Switch to `backend-go-pion` and add `go` to the image. Wider surface
-   area change.
+## Jenkins stage
 
-Until this is resolved, the sweettest tests stay `#[ignore]`'d and only
-compile in environments with cmake installed. The `manifest-hygiene/`
-sibling crate does not depend on holochain and runs fine locally in Che —
-husky pre-push uses that for the fast gate.
+The Jenkins stage `DNA Integration (bootstrap-steward)` runs
+`cargo test --release -- --test-threads=1 --include-ignored` after the
+`Build DNA` stage (packed `.dna` artifacts are a prerequisite). Output
+is filtered to summary-on-pass, full panic context on fail. See
+`elohim/holochain/dna/Jenkinsfile`.
