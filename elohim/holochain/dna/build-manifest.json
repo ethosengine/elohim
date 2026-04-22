@@ -86,12 +86,34 @@
         "stage": "Manifest Hygiene",
         "function": null
       }
+    },
+    "sweettest-check": {
+      "description": "Sweettest compile-check — catches extern-signature drift before Jenkins-time integration run. See spec §3 (noisy-husky Gate 2).",
+      "inputs": {
+        "sources": [
+          "elohim/holochain/dna/*/zomes/**/src/*.rs",
+          "elohim/holochain/dna/*/zomes/**/Cargo.toml",
+          "elohim/holochain/tests/sweettest/src/**",
+          "elohim/holochain/tests/sweettest/Cargo.toml"
+        ],
+        "buildProcess": []
+      },
+      "outputs": {
+        "artifacts": [],
+        "verify": null
+      },
+      "depends": [],
+      "executor": {
+        "stage": "Sweettest Compile Check",
+        "function": null
+      }
     }
   },
   "gate": {
     "projects": {
       "schema-dna": { "dir": ".", "steps": ["schema-dna"] },
-      "manifest-hygiene": { "dir": ".", "steps": ["manifest-hygiene"] }
+      "manifest-hygiene": { "dir": ".", "steps": ["manifest-hygiene"] },
+      "sweettest-check": { "dir": ".", "steps": ["sweettest-check"] }
     }
   },
   "deployment": {}
