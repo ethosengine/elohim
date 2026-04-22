@@ -96,7 +96,7 @@ pub fn compute_disposition(
     }
     // Sort by frequency descending, take top 5
     let mut grounds_vec: Vec<(String, i64)> = grounds_counts.into_iter().collect();
-    grounds_vec.sort_by(|a, b| b.1.cmp(&a.1));
+    grounds_vec.sort_by_key(|x| std::cmp::Reverse(x.1));
     let priority_values: Vec<String> = grounds_vec
         .into_iter()
         .take(5)

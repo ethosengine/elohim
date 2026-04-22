@@ -296,13 +296,11 @@ pub async fn handle_debug_websocket(
             msg = ws_read.next() => {
                 match msg {
                     Some(Ok(Message::Close(_))) | None => break,
-                    Some(Ok(Message::Text(text))) => {
+                    Some(Ok(Message::Text(text))) if text.contains("ping") => {
                         // Handle ping command
-                        if text.contains("ping") {
-                            let pong = DebugEvent::debug("pong", "pong");
-                            if let Ok(json) = serde_json::to_string(&pong) {
-                                let _ = ws_write.send(Message::Text(json)).await;
-                            }
+                        let pong = DebugEvent::debug("pong", "pong");
+                        if let Ok(json) = serde_json::to_string(&pong) {
+                            let _ = ws_write.send(Message::Text(json)).await;
                         }
                     }
                     _ => {}
