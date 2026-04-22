@@ -24,7 +24,8 @@ pub async fn load_dna(
     bootstrap_steward: Option<AgentPubKey>,
 ) -> Result<DnaFile> {
     let path: PathBuf = dna_path(dna_name)?;
-    let bundle = DnaBundle::read_from_file(&path).await?;
+    let bytes = std::fs::read(&path)?;
+    let bundle = DnaBundle::unpack(bytes.as_slice())?;
 
     let mut properties: Option<SerializedBytes> = None;
     if let Some(pubkey) = bootstrap_steward {
