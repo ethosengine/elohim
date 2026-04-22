@@ -19,6 +19,7 @@
 #   rakia-codegen            → verify rakia generated_types.rs is fresh (rakia schema or rakia-core changes)
 #   rakia-validate           → validate build-manifest.json files against rakia schema (any manifest or rakia schema change)
 #   manifest-hygiene         → DNA manifest hygiene schema contract (any dna.yaml / happ.yaml / manifest-hygiene test change)
+#   sweettest-check          → Sweettest compile-check (any zome source or sweettest source change)
 #   genesis/a2o/             → E2E lint + typecheck
 #   genesis/orchestrator/    → Jenkinsfile linting (any *Jenkinsfile* change)
 #
@@ -203,6 +204,9 @@ if [ "$USE_MANIFEST" = false ]; then
   if echo "$CHANGED" | grep -qE "^elohim/holochain/dna/[^/]+/dna\.yaml|^elohim/holochain/dna/elohim/workdir/happ\.yaml|^elohim/holochain/tests/manifest-hygiene/"; then
     PROJECTS="$PROJECTS manifest-hygiene"
   fi
+  if echo "$CHANGED" | grep -qE "^elohim/holochain/dna/[^/]+/zomes/.*\.rs$|^elohim/holochain/tests/sweettest/"; then
+    PROJECTS="$PROJECTS sweettest-check"
+  fi
   if echo "$CHANGED" | grep -q "^genesis/data/\|^elohim/sdk/schemas/.*enum\|generated/schema-enums"; then
     PROJECTS="$PROJECTS constants-sync"
   fi
@@ -250,7 +254,7 @@ run_gate() {
   cd "$PROJECT_DIR" || return 1
 
   # Schema checks run pnpm scripts directly — no justfile needed
-  if [ "$PROJECT_NAME" = "schema-validate" ] || [ "$PROJECT_NAME" = "schema-dna" ] || [ "$PROJECT_NAME" = "schema-codegen" ] || [ "$PROJECT_NAME" = "constants-sync" ] || [ "$PROJECT_NAME" = "domain-types" ] || [ "$PROJECT_NAME" = "rakia-codegen" ] || [ "$PROJECT_NAME" = "rakia-validate" ] || [ "$PROJECT_NAME" = "manifest-hygiene" ]; then
+  if [ "$PROJECT_NAME" = "schema-validate" ] || [ "$PROJECT_NAME" = "schema-dna" ] || [ "$PROJECT_NAME" = "schema-codegen" ] || [ "$PROJECT_NAME" = "constants-sync" ] || [ "$PROJECT_NAME" = "domain-types" ] || [ "$PROJECT_NAME" = "rakia-codegen" ] || [ "$PROJECT_NAME" = "rakia-validate" ] || [ "$PROJECT_NAME" = "manifest-hygiene" ] || [ "$PROJECT_NAME" = "sweettest-check" ]; then
     case "$PROJECT_NAME" in
       schema-validate)
         echo "[$PROJECT_NAME] Validating seed data against protocol schemas..."
@@ -304,6 +308,15 @@ run_gate() {
       manifest-hygiene)
         echo "[$PROJECT_NAME] Running DNA manifest hygiene schema contract tests..."
         RUSTFLAGS="" cargo test --manifest-path elohim/holochain/tests/manifest-hygiene/Cargo.toml 2>&1
+        rc=$?
+        ;;
+      sweettest-check)
+        echo "[$PROJECT_NAME] Running sweettest compile check..."
+        # Che devcontainer needs BINDGEN_EXTRA_CLANG_ARGS to point at clang resource dir;
+        # Nix/Jenkins provide it automatically. Setting it unconditionally is harmless.
+        BINDGEN_EXTRA_CLANG_ARGS="${BINDGEN_EXTRA_CLANG_ARGS:--I/usr/lib/clang/20/include}" \
+        RUSTFLAGS="" \
+          cargo check --manifest-path elohim/holochain/tests/sweettest/Cargo.toml --tests 2>&1
         rc=$?
         ;;
     esac
@@ -431,6 +444,13 @@ run_gate() {
         RUSTFLAGS="" cargo test --manifest-path elohim/holochain/tests/manifest-hygiene/Cargo.toml 2>&1
         rc=$?
         ;;
+      sweettest-check)
+        echo "[$PROJECT_NAME] Running sweettest compile check..."
+        BINDGEN_EXTRA_CLANG_ARGS="${BINDGEN_EXTRA_CLANG_ARGS:--I/usr/lib/clang/20/include}" \
+        RUSTFLAGS="" \
+          cargo check --manifest-path elohim/holochain/tests/sweettest/Cargo.toml --tests 2>&1
+        rc=$?
+        ;;
       *)
         echo "  Unknown project: $PROJECT_NAME"
         rc=1
@@ -522,6 +542,7 @@ for PROJECT in $PROJECTS; do
       rakia-codegen)    PROJECT_DIR="." ;;
       rakia-validate)   PROJECT_DIR="." ;;
       manifest-hygiene) PROJECT_DIR="." ;;
+      sweettest-check) PROJECT_DIR="." ;;
       *)                PROJECT_DIR="$PROJECT" ;;
     esac
   fi
