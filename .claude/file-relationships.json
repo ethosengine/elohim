@@ -160,6 +160,36 @@
         }
       ]
     },
+    "zome-sweettest-sync": {
+      "description": "Zome source changes should have matching sweettest updates — see genesis/docs/superpowers/specs/2026-04-22-sweettest-integration-layer-design.md",
+      "sync_rules": [
+        {
+          "trigger_pattern": "elohim/holochain/dna/imagodei/zomes/**/*.rs",
+          "notify": [],
+          "message": "imagodei zome changed. Update tests/sweettest/src/tests/imagodei.rs — per-extern happy-path test, per-must_* rejection test. See R&O parity bar in the design spec."
+        },
+        {
+          "trigger_pattern": "elohim/holochain/dna/mishpat/zomes/**/*.rs",
+          "notify": [],
+          "message": "mishpat zome changed. Update tests/sweettest/src/tests/mishpat.rs — per-extern happy-path test, per-must_* rejection test."
+        },
+        {
+          "trigger_pattern": "elohim/holochain/dna/lamad/zomes/**/*.rs",
+          "notify": [],
+          "message": "lamad zome changed. Update tests/sweettest/src/tests/lamad.rs — per-extern happy-path test, per-must_* rejection test."
+        },
+        {
+          "trigger_pattern": "elohim/holochain/dna/node-registry/zomes/**/*.rs",
+          "notify": [],
+          "message": "node-registry zome changed. Update tests/sweettest/src/tests/node_registry.rs — per-extern happy-path test, per-must_* rejection test."
+        },
+        {
+          "trigger_pattern": "elohim/holochain/dna/infrastructure/zomes/**/*.rs",
+          "notify": [],
+          "message": "infrastructure zome changed. Update tests/sweettest/src/tests/infrastructure.rs — infrastructure is federation-native (no bootstrap steward), exercise doorway self-registration flow."
+        }
+      ]
+    },
     "model-sync": {
       "description": "ContentNode models must stay in sync between service and app",
       "pairs": [
