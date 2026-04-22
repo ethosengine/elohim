@@ -436,6 +436,85 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
             }
         }
 
+        stage('DNA Integration (bootstrap-steward)') {
+            when { allOf {
+                expression { env.PIPELINE_SKIPPED != 'true' }
+                expression { shouldRunStep('build-dna-wasm') }
+            } }
+            options {
+                // Kill stage if hung — a stuck conductor should not burn the agent.
+                timeout(time: 30, unit: 'MINUTES')
+            }
+            steps {
+                container('builder') {
+                    dir('elohim/holochain/tests/sweettest') {
+                        script {
+                            sh '''#!/usr/bin/env bash
+                                set -uo pipefail
+
+                                export HOME="${HOME:-/root}"
+                                mkdir -p "$HOME"
+                                [ -f "$HOME/.gitconfig" ] || printf "[safe]\\n    directory = *\\n" > "$HOME/.gitconfig"
+                                export GIT_CONFIG_GLOBAL="$HOME/.gitconfig"
+
+                                LOG="$(pwd)/dna-integration.log"
+                                : > "$LOG"
+
+                                # Resource guards:
+                                #   CARGO_BUILD_JOBS=2  — caps compile parallelism; prevents the
+                                #                         ~6-8 GB RAM spike when linking holochain.
+                                #   --test-threads=1    — one conductor at a time (~1 GB runtime peak).
+                                #   --release           — slower compile, ~30% less runtime RAM.
+                                # Sweettest is IN-PROCESS: each test spins up a full kitsune2 p2p
+                                # stack + SQLite + keystore. Serializing keeps peak flat. See
+                                # stage comment in tests/sweettest/README.md for the trade-off.
+                                nix develop --accept-flake-config --command bash -c "
+                                    set -uo pipefail
+                                    export CARGO_BUILD_JOBS=2
+
+                                    cargo test --release --no-fail-fast -- \\
+                                        --include-ignored \\
+                                        --test-threads=1 \\
+                                        2>&1 | tee \\"$LOG\\"
+                                "
+                                RC=${PIPESTATUS[0]}
+
+                                # Happy path — surface only the per-binary summary lines.
+                                if [ "$RC" -eq 0 ]; then
+                                    echo "--- DNA Integration: PASSED ---"
+                                    grep -E "^test result: ok" "$LOG" || true
+                                    exit 0
+                                fi
+
+                                # Failure — extract panic + failure context, silence the rest.
+                                echo "--- DNA Integration: FAILED ---"
+                                echo ""
+                                echo "Summary:"
+                                grep -E "^test result:" "$LOG" || true
+                                echo ""
+                                echo "Failures:"
+                                awk "/^---- .* stdout ----\\$/,/^\\$/" "$LOG"
+                                awk "/^failures:\\$/,0" "$LOG" | head -50
+                                echo ""
+                                echo "(full log archived as dna-integration.log)"
+                                exit $RC
+                            '''
+                        }
+                    }
+                }
+            }
+            post {
+                always {
+                    archiveArtifacts(
+                        artifacts: 'elohim/holochain/tests/sweettest/dna-integration.log',
+                        allowEmptyArchive: true
+                    )
+                    // Clean leaked temp conductor dirs (panicked tests can skip Drop).
+                    sh 'find /tmp -maxdepth 2 -name "sweet_conductor_*" -mtime +0 -exec rm -rf {} + 2>/dev/null || true'
+                }
+            }
+        }
+
         stage('Push to Harbor') {
             when { expression { env.PIPELINE_SKIPPED != 'true' } }
             steps {
