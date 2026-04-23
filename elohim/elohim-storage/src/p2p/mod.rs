@@ -29,6 +29,7 @@
 //! ```
 
 pub mod behaviour;
+pub mod epr_atom_protocol;
 pub mod epr_protocol;
 pub mod kad_store;
 pub mod replication;
@@ -132,6 +133,11 @@ use crate::sync::{DocStore, StreamTracker, SyncManager};
 use elohim_cache_core::extraction::ExtractionCache;
 
 pub use behaviour::{ElohimStorageBehaviour, RelayMode};
+pub use epr_atom_protocol::{
+    EprAtomCodec, EprAtomProtocol, EprAtomRequest, EprAtomResponse, EPR_ATOM_PROTOCOL_ID,
+    MAX_BATCH_CIDS, MAX_REQUEST_SIZE as EPR_ATOM_MAX_REQUEST_SIZE,
+    MAX_RESPONSE_SIZE as EPR_ATOM_MAX_RESPONSE_SIZE,
+};
 pub use epr_protocol::{EprCodec, EprProtocol, EprRequest, EprResponse};
 pub use shard_protocol::{ShardCodec, ShardProtocol, ShardRequest, ShardResponse};
 pub use sync_protocol::{DocumentInfo, SyncCodec, SyncProtocol, SyncRequest, SyncResponse};

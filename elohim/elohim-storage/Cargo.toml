@@ -78,6 +78,8 @@ ipld-core = { version = "0.4.1", features = ["serde"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 serde_urlencoded = "0.7"
+serde_bytes = "0.11"
+ciborium = "0.2"
 
 # TypeScript generation from Rust types
 ts-rs = { version = "10.1", features = ["serde-compat"] }
