@@ -141,6 +141,82 @@ fn batch_size_constant_matches_spec() {
     assert_eq!(MAX_BATCH_CIDS, 128);
 }
 
+/// Golden vector stability — if these change, the protocol version must bump.
+/// The fixture describes the transient wire format only; no persistent source
+/// of truth is involved.
+#[test]
+fn golden_vectors_stable() {
+    let fixture_str = std::fs::read_to_string("tests/vectors/epr_atom_messages.json")
+        .expect("fixture missing");
+    let fixture: serde_json::Value = serde_json::from_str(&fixture_str).expect("fixture parse");
+    let v = &fixture["vectors"];
+
+    // Pairs of (Rust value, fixture key)
+    let pairs: Vec<(Vec<u8>, &str)> = vec![
+        (
+            encode(&EprAtomRequest::Fetch { cid: "bafkreiabc".into() }),
+            "request_fetch",
+        ),
+        (
+            encode(&EprAtomRequest::Announce {
+                envelope_bytes: vec![0x01, 0x02, 0x03],
+            }),
+            "request_announce",
+        ),
+        (
+            encode(&EprAtomRequest::FetchBatch {
+                cids: vec!["a".into(), "b".into()],
+            }),
+            "request_fetch_batch",
+        ),
+        (
+            encode(&EprAtomResponse::Atom {
+                envelope_bytes: vec![0x01, 0x02, 0x03],
+            }),
+            "response_atom",
+        ),
+        (
+            encode(&EprAtomResponse::AtomBatch {
+                atoms: vec![Some(vec![0x01]), None, Some(vec![0x03])],
+            }),
+            "response_atom_batch",
+        ),
+        (
+            encode(&EprAtomResponse::Announced {
+                accepted: true,
+                reason: None,
+            }),
+            "response_announced_true",
+        ),
+        (
+            encode(&EprAtomResponse::Announced {
+                accepted: false,
+                reason: Some("bad sig".into()),
+            }),
+            "response_announced_false",
+        ),
+        (encode(&EprAtomResponse::NotFound), "response_not_found"),
+        (
+            encode(&EprAtomResponse::Error {
+                message: "batch too large".into(),
+            }),
+            "response_error",
+        ),
+    ];
+
+    for (bytes, key) in pairs {
+        let actual = hex::encode(&bytes);
+        let expected = v[key]["cbor_hex"].as_str().unwrap_or_else(|| {
+            panic!("fixture missing cbor_hex for {}", key)
+        });
+        assert_eq!(
+            actual, expected,
+            "{}: golden vector drift — if the protocol truly changed, bump the version in the fixture",
+            key
+        );
+    }
+}
+
 /// Existing variants should be decodable after new ones are added.
 /// Uses tag-based discrimination, so variant order in source doesn't matter.
 #[test]

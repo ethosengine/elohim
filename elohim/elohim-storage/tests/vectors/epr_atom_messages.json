@@ -1,0 +1,52 @@
+{
+  "description": "Golden CBOR-hex vectors for /elohim/epr-atom/1.0.0. Regenerate only if protocol version bumps. Source of truth remains the ed25519-signed Envelope; these vectors validate transient wire stability only.",
+  "version": "1.0.0",
+  "framing": "No length prefix — these are raw CBOR bodies. The on-wire framing adds a 4-byte BE length prefix.",
+  "vectors": {
+    "request_fetch": {
+      "description": "Fetch by CID",
+      "input": { "tag": "fetch", "cid": "bafkreiabc" },
+      "cbor_hex": "a263746167656665746368636369646a6261666b726569616263"
+    },
+    "request_announce": {
+      "description": "Announce atom (envelope_bytes = [0x01, 0x02, 0x03])",
+      "input": { "tag": "announce", "envelope_bytes_hex": "010203" },
+      "cbor_hex": "a26374616768616e6e6f756e63656e656e76656c6f70655f627974657343010203"
+    },
+    "request_fetch_batch": {
+      "description": "Fetch batch with 2 CIDs",
+      "input": { "tag": "fetch_batch", "cids": ["a", "b"] },
+      "cbor_hex": "a2637461676b66657463685f626174636864636964738261616162"
+    },
+    "response_atom": {
+      "description": "Single atom (envelope_bytes = [0x01, 0x02, 0x03])",
+      "input": { "tag": "atom", "envelope_bytes_hex": "010203" },
+      "cbor_hex": "a2637461676461746f6d6e656e76656c6f70655f627974657343010203"
+    },
+    "response_atom_batch": {
+      "description": "Batch response with Some/None/Some slot pattern",
+      "input": { "tag": "atom_batch", "atoms_hex": ["01", null, "03"] },
+      "cbor_hex": "a2637461676a61746f6d5f62617463686561746f6d73834101f64103"
+    },
+    "response_announced_true": {
+      "description": "Accepted announcement, no reason",
+      "input": { "tag": "announced", "accepted": true, "reason": null },
+      "cbor_hex": "a36374616769616e6e6f756e636564686163636570746564f566726561736f6ef6"
+    },
+    "response_announced_false": {
+      "description": "Rejected announcement with reason",
+      "input": { "tag": "announced", "accepted": false, "reason": "bad sig" },
+      "cbor_hex": "a36374616769616e6e6f756e636564686163636570746564f466726561736f6e6762616420736967"
+    },
+    "response_not_found": {
+      "description": "Leak-free: atom missing OR reach gate failed",
+      "input": { "tag": "not_found" },
+      "cbor_hex": "a163746167696e6f745f666f756e64"
+    },
+    "response_error": {
+      "description": "Protocol error (e.g., batch exceeds MAX_BATCH_CIDS)",
+      "input": { "tag": "error", "message": "batch too large" },
+      "cbor_hex": "a263746167656572726f72676d6573736167656f626174636820746f6f206c61726765"
+    }
+  }
+}
