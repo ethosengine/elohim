@@ -27,12 +27,14 @@ COPY crates ./crates
 COPY elohim/constitution ./constitution
 COPY elohim/elohim-cache-core ./elohim-cache-core
 COPY elohim/elohim-compute ./elohim-compute
+COPY elohim/epr ./epr
 
 # Fix the paths to local crates (now relative to /app)
 RUN sed -i 's|path = "../../crates/doorway-client"|path = "crates/doorway-client"|' Cargo.toml && \
     sed -i 's|path = "../constitution"|path = "constitution"|' Cargo.toml && \
     sed -i 's|path = "../elohim-cache-core"|path = "elohim-cache-core"|' Cargo.toml && \
-    sed -i 's|path = "../elohim-compute"|path = "elohim-compute"|' Cargo.toml
+    sed -i 's|path = "../elohim-compute"|path = "elohim-compute"|' Cargo.toml && \
+    sed -i 's|path = "../epr"|path = "epr"|' Cargo.toml
 
 # Constitution crate uses workspace inheritance — inline the values since
 # the workspace root (elohim/Cargo.toml) isn't copied into the build context
@@ -53,6 +55,19 @@ RUN sed -i \
     -e 's|chrono.workspace = true|chrono = { version = "0.4", features = ["serde"] }|' \
     -e 's|uuid.workspace = true|uuid = { version = "1.16", features = ["v4", "serde"] }|' \
     constitution/Cargo.toml
+
+# elohim-epr crate uses workspace inheritance too — inline the values.
+# Unlike constitution, epr uses inline-feature forms for serde and ts-rs.
+RUN sed -i \
+    -e 's|version.workspace = true|version = "0.1.0"|' \
+    -e 's|edition.workspace = true|edition = "2021"|' \
+    -e 's|serde = { workspace = true, features = \["derive"\] }|serde = { version = "1.0", features = ["derive"] }|' \
+    -e 's|serde_json.workspace = true|serde_json = "1.0"|' \
+    -e 's|chrono.workspace = true|chrono = { version = "0.4", features = ["serde"] }|' \
+    -e 's|thiserror.workspace = true|thiserror = "2.0"|' \
+    -e 's|ts-rs = { workspace = true, features = \["chrono-impl", "serde-compat"\] }|ts-rs = { version = "10.0", features = ["chrono-impl", "serde-compat"] }|' \
+    -e 's|hex.workspace = true|hex = "0.4"|' \
+    epr/Cargo.toml
 
 # Create dummy src to build dependencies
 RUN mkdir -p src && \
