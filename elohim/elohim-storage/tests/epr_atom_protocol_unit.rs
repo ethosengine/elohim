@@ -146,15 +146,17 @@ fn batch_size_constant_matches_spec() {
 /// of truth is involved.
 #[test]
 fn golden_vectors_stable() {
-    let fixture_str = std::fs::read_to_string("tests/vectors/epr_atom_messages.json")
-        .expect("fixture missing");
+    let fixture_str =
+        std::fs::read_to_string("tests/vectors/epr_atom_messages.json").expect("fixture missing");
     let fixture: serde_json::Value = serde_json::from_str(&fixture_str).expect("fixture parse");
     let v = &fixture["vectors"];
 
     // Pairs of (Rust value, fixture key)
     let pairs: Vec<(Vec<u8>, &str)> = vec![
         (
-            encode(&EprAtomRequest::Fetch { cid: "bafkreiabc".into() }),
+            encode(&EprAtomRequest::Fetch {
+                cid: "bafkreiabc".into(),
+            }),
             "request_fetch",
         ),
         (
@@ -206,9 +208,9 @@ fn golden_vectors_stable() {
 
     for (bytes, key) in pairs {
         let actual = hex::encode(&bytes);
-        let expected = v[key]["cbor_hex"].as_str().unwrap_or_else(|| {
-            panic!("fixture missing cbor_hex for {}", key)
-        });
+        let expected = v[key]["cbor_hex"]
+            .as_str()
+            .unwrap_or_else(|| panic!("fixture missing cbor_hex for {}", key));
         assert_eq!(
             actual, expected,
             "{}: golden vector drift — if the protocol truly changed, bump the version in the fixture",
@@ -222,7 +224,9 @@ fn golden_vectors_stable() {
 #[test]
 fn all_variants_roundtrip_byte_identical() {
     let requests: Vec<EprAtomRequest> = vec![
-        EprAtomRequest::Fetch { cid: "bafkrei_a".into() },
+        EprAtomRequest::Fetch {
+            cid: "bafkrei_a".into(),
+        },
         EprAtomRequest::Announce {
             envelope_bytes: vec![0x01, 0x02],
         },

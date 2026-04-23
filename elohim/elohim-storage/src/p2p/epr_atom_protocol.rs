@@ -105,7 +105,10 @@ mod serde_bytes_vec {
         D: Deserializer<'de>,
     {
         let mapped: Vec<Option<ByteBuf>> = Vec::deserialize(d)?;
-        Ok(mapped.into_iter().map(|o| o.map(|b| b.into_vec())).collect())
+        Ok(mapped
+            .into_iter()
+            .map(|o| o.map(|b| b.into_vec()))
+            .collect())
     }
 }
 

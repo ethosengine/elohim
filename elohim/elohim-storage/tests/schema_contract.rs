@@ -1134,8 +1134,8 @@ fn view_schemas_declare_source_of_truth() {
 #[test]
 fn epr_atom_wire_contract_validates_request_shapes() {
     let schema = load_schema("p2p/epr-atom-message.schema.json");
-    let validator = jsonschema::validator_for(&schema)
-        .expect("epr-atom wire contract should compile");
+    let validator =
+        jsonschema::validator_for(&schema).expect("epr-atom wire contract should compile");
 
     let examples = [
         serde_json::json!({ "tag": "fetch", "cid": "bafkreiabc" }),
@@ -1163,8 +1163,8 @@ fn epr_atom_wire_contract_validates_request_shapes() {
 #[test]
 fn epr_atom_wire_contract_validates_response_shapes() {
     let schema = load_schema("p2p/epr-atom-message.schema.json");
-    let validator = jsonschema::validator_for(&schema)
-        .expect("epr-atom wire contract should compile");
+    let validator =
+        jsonschema::validator_for(&schema).expect("epr-atom wire contract should compile");
 
     let examples = [
         serde_json::json!({ "tag": "atom", "envelope_bytes": "AQID" }),
@@ -1199,8 +1199,8 @@ fn epr_atom_wire_contract_validates_response_shapes() {
 #[test]
 fn epr_atom_wire_contract_rejects_oversized_batch() {
     let schema = load_schema("p2p/epr-atom-message.schema.json");
-    let validator = jsonschema::validator_for(&schema)
-        .expect("epr-atom wire contract should compile");
+    let validator =
+        jsonschema::validator_for(&schema).expect("epr-atom wire contract should compile");
 
     // 129 cids — schema cap is 128
     let cids: Vec<String> = (0..129).map(|i| format!("bafkrei_{}", i)).collect();
@@ -1216,8 +1216,8 @@ fn epr_atom_wire_contract_rejects_oversized_batch() {
 #[test]
 fn epr_atom_wire_contract_rejects_missing_tag() {
     let schema = load_schema("p2p/epr-atom-message.schema.json");
-    let validator = jsonschema::validator_for(&schema)
-        .expect("epr-atom wire contract should compile");
+    let validator =
+        jsonschema::validator_for(&schema).expect("epr-atom wire contract should compile");
 
     let missing_tag = serde_json::json!({ "cid": "bafkreiabc" });
 

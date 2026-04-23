@@ -102,9 +102,7 @@ pub enum ElohimStorageBehaviourEvent {
     /// EPR protocol event (legacy /elohim/epr/1.0.0)
     EprProtocol(request_response::Event<super::EprRequest, super::EprResponse>),
     /// EPR atom federation event (/elohim/epr-atom/1.0.0)
-    EprAtomProtocol(
-        request_response::Event<super::EprAtomRequest, super::EprAtomResponse>,
-    ),
+    EprAtomProtocol(request_response::Event<super::EprAtomRequest, super::EprAtomResponse>),
     /// Trust protocol event
     TrustProtocol(
         request_response::Event<
@@ -167,9 +165,7 @@ impl From<request_response::Event<super::EprRequest, super::EprResponse>>
 impl From<request_response::Event<super::EprAtomRequest, super::EprAtomResponse>>
     for ElohimStorageBehaviourEvent
 {
-    fn from(
-        event: request_response::Event<super::EprAtomRequest, super::EprAtomResponse>,
-    ) -> Self {
+    fn from(event: request_response::Event<super::EprAtomRequest, super::EprAtomResponse>) -> Self {
         Self::EprAtomProtocol(event)
     }
 }
