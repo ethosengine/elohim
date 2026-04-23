@@ -31,6 +31,7 @@
 pub mod behaviour;
 pub mod epr_atom_protocol;
 pub mod epr_protocol;
+pub mod identity_map;
 pub mod kad_store;
 pub mod replication;
 pub mod shard_protocol;
@@ -139,6 +140,7 @@ pub use epr_atom_protocol::{
     MAX_RESPONSE_SIZE as EPR_ATOM_MAX_RESPONSE_SIZE,
 };
 pub use epr_protocol::{EprCodec, EprProtocol, EprRequest, EprResponse};
+pub use identity_map::{CallerIdentity, PeerIdentityMap, StubIdentityMap};
 pub use shard_protocol::{ShardCodec, ShardProtocol, ShardRequest, ShardResponse};
 pub use sync_protocol::{DocumentInfo, SyncCodec, SyncProtocol, SyncRequest, SyncResponse};
 
