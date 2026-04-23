@@ -264,3 +264,15 @@ fn all_variants_roundtrip_byte_identical() {
         assert_eq!(bytes, re_encoded, "roundtrip drifted: {:?}", r);
     }
 }
+
+#[test]
+fn verify_rejects_malformed_cbor() {
+    use elohim_storage::p2p::{verify_incoming_epr, VerifyError};
+
+    let bad_bytes = vec![0xFF, 0xFE, 0xFD];
+    let err = verify_incoming_epr(&bad_bytes).unwrap_err();
+    assert!(
+        matches!(err, VerifyError::CborDecode(_)),
+        "expected CborDecode variant, got {err:?}"
+    );
+}

@@ -135,9 +135,9 @@ use elohim_cache_core::extraction::ExtractionCache;
 
 pub use behaviour::{ElohimStorageBehaviour, RelayMode};
 pub use epr_atom_protocol::{
-    EprAtomCodec, EprAtomProtocol, EprAtomRequest, EprAtomResponse, EPR_ATOM_PROTOCOL_ID,
-    MAX_BATCH_CIDS, MAX_REQUEST_SIZE as EPR_ATOM_MAX_REQUEST_SIZE,
-    MAX_RESPONSE_SIZE as EPR_ATOM_MAX_RESPONSE_SIZE,
+    verify_incoming_epr, EprAtomCodec, EprAtomProtocol, EprAtomRequest, EprAtomResponse,
+    VerifyError, EPR_ATOM_PROTOCOL_ID, MAX_BATCH_CIDS,
+    MAX_REQUEST_SIZE as EPR_ATOM_MAX_REQUEST_SIZE, MAX_RESPONSE_SIZE as EPR_ATOM_MAX_RESPONSE_SIZE,
 };
 pub use epr_protocol::{EprCodec, EprProtocol, EprRequest, EprResponse};
 pub use identity_map::{CallerIdentity, PeerIdentityMap, StubIdentityMap};
