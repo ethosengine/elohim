@@ -1116,3 +1116,111 @@ fn view_schemas_declare_source_of_truth() {
         assert_source_of_truth_declared(&schema_value, schema_name);
     }
 }
+
+// -----------------------------------------------------------------------
+// /elohim/epr-atom/1.0.0 wire contract validation (Phase 2c)
+//
+// Validates the transient wire contract — no projection, no persistent
+// source of truth. The notarized source of truth is the ed25519-signed
+// CBOR Envelope (content-addressed by CID); this test only verifies the
+// logical request/response shapes described in the wire contract.
+//
+// Note: CBOR encodes `envelope_bytes` as a native byte string. For this
+// JSON-Schema validation we use base64-encoded strings, which is the
+// shape a non-CBOR peer would produce. On-wire CBOR encoding is
+// separately exercised by tests in `tests/epr_atom_protocol_unit.rs`.
+// -----------------------------------------------------------------------
+
+#[test]
+fn epr_atom_wire_contract_validates_request_shapes() {
+    let schema = load_schema("p2p/epr-atom-message.schema.json");
+    let validator = jsonschema::validator_for(&schema)
+        .expect("epr-atom wire contract should compile");
+
+    let examples = [
+        serde_json::json!({ "tag": "fetch", "cid": "bafkreiabc" }),
+        serde_json::json!({ "tag": "announce", "envelope_bytes": "AQID" }),
+        serde_json::json!({
+            "tag": "fetch_batch",
+            "cids": ["bafkreiabc", "bafkreidef"],
+        }),
+    ];
+
+    for instance in &examples {
+        let errors: Vec<String> = validator
+            .iter_errors(instance)
+            .map(|e| format!("  - {} (at {})", e, e.instance_path))
+            .collect();
+        assert!(
+            errors.is_empty(),
+            "request shape failed wire contract:\n{}\n\ninstance:\n{}",
+            errors.join("\n"),
+            serde_json::to_string_pretty(instance).unwrap()
+        );
+    }
+}
+
+#[test]
+fn epr_atom_wire_contract_validates_response_shapes() {
+    let schema = load_schema("p2p/epr-atom-message.schema.json");
+    let validator = jsonschema::validator_for(&schema)
+        .expect("epr-atom wire contract should compile");
+
+    let examples = [
+        serde_json::json!({ "tag": "atom", "envelope_bytes": "AQID" }),
+        serde_json::json!({
+            "tag": "atom_batch",
+            "atoms": ["AQ==", null, "AwQ="],
+        }),
+        serde_json::json!({ "tag": "announced", "accepted": true, "reason": null }),
+        serde_json::json!({
+            "tag": "announced",
+            "accepted": false,
+            "reason": "signature verification failed",
+        }),
+        serde_json::json!({ "tag": "not_found" }),
+        serde_json::json!({ "tag": "error", "message": "batch too large" }),
+    ];
+
+    for instance in &examples {
+        let errors: Vec<String> = validator
+            .iter_errors(instance)
+            .map(|e| format!("  - {} (at {})", e, e.instance_path))
+            .collect();
+        assert!(
+            errors.is_empty(),
+            "response shape failed wire contract:\n{}\n\ninstance:\n{}",
+            errors.join("\n"),
+            serde_json::to_string_pretty(instance).unwrap()
+        );
+    }
+}
+
+#[test]
+fn epr_atom_wire_contract_rejects_oversized_batch() {
+    let schema = load_schema("p2p/epr-atom-message.schema.json");
+    let validator = jsonschema::validator_for(&schema)
+        .expect("epr-atom wire contract should compile");
+
+    // 129 cids — schema cap is 128
+    let cids: Vec<String> = (0..129).map(|i| format!("bafkrei_{}", i)).collect();
+    let oversize = serde_json::json!({ "tag": "fetch_batch", "cids": cids });
+
+    let has_errors = validator.iter_errors(&oversize).next().is_some();
+    assert!(
+        has_errors,
+        "wire contract should reject batch > MAX_BATCH_CIDS"
+    );
+}
+
+#[test]
+fn epr_atom_wire_contract_rejects_missing_tag() {
+    let schema = load_schema("p2p/epr-atom-message.schema.json");
+    let validator = jsonschema::validator_for(&schema)
+        .expect("epr-atom wire contract should compile");
+
+    let missing_tag = serde_json::json!({ "cid": "bafkreiabc" });
+
+    let has_errors = validator.iter_errors(&missing_tag).next().is_some();
+    assert!(has_errors, "wire contract should require tag discriminator");
+}
