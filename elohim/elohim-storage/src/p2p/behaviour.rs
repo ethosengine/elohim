@@ -14,6 +14,7 @@ use super::kad_store::SledRecordStore;
 
 use std::time::Duration;
 
+use super::epr_atom_protocol::{EprAtomCodec, EprAtomProtocol};
 use super::epr_protocol::{EprCodec, EprProtocol};
 use super::shard_protocol::{ShardCodec, ShardProtocol};
 use super::sync_protocol::{SyncCodec, SyncProtocol};
@@ -67,8 +68,10 @@ pub struct ElohimStorageBehaviour {
     pub shard_protocol: RequestResponse<ShardCodec>,
     /// Request-response for CRDT sync
     pub sync_protocol: RequestResponse<SyncCodec>,
-    /// Request-response for EPR Head resolution
+    /// Request-response for EPR Head resolution (legacy /elohim/epr/1.0.0)
     pub epr_protocol: RequestResponse<EprCodec>,
+    /// Request-response for signed EPR atom federation (/elohim/epr-atom/1.0.0)
+    pub epr_atom_protocol: RequestResponse<EprAtomCodec>,
     /// Request-response for trust negotiation
     pub trust_protocol: RequestResponse<TrustCodec>,
     /// Local network discovery (mDNS)
@@ -96,8 +99,12 @@ pub enum ElohimStorageBehaviourEvent {
     ShardProtocol(request_response::Event<super::ShardRequest, super::ShardResponse>),
     /// Sync protocol event
     SyncProtocol(request_response::Event<super::SyncRequest, super::SyncResponse>),
-    /// EPR protocol event
+    /// EPR protocol event (legacy /elohim/epr/1.0.0)
     EprProtocol(request_response::Event<super::EprRequest, super::EprResponse>),
+    /// EPR atom federation event (/elohim/epr-atom/1.0.0)
+    EprAtomProtocol(
+        request_response::Event<super::EprAtomRequest, super::EprAtomResponse>,
+    ),
     /// Trust protocol event
     TrustProtocol(
         request_response::Event<
@@ -154,6 +161,16 @@ impl From<request_response::Event<super::EprRequest, super::EprResponse>>
 {
     fn from(event: request_response::Event<super::EprRequest, super::EprResponse>) -> Self {
         Self::EprProtocol(event)
+    }
+}
+
+impl From<request_response::Event<super::EprAtomRequest, super::EprAtomResponse>>
+    for ElohimStorageBehaviourEvent
+{
+    fn from(
+        event: request_response::Event<super::EprAtomRequest, super::EprAtomResponse>,
+    ) -> Self {
+        Self::EprAtomProtocol(event)
     }
 }
 
@@ -240,9 +257,15 @@ impl ElohimStorageBehaviour {
             request_response::Config::default().with_request_timeout(config.request_timeout),
         );
 
-        // EPR request-response protocol for cross-peer content resolution
+        // EPR request-response protocol for cross-peer content resolution (legacy)
         let epr_protocol = RequestResponse::new(
             [(EprProtocol, ProtocolSupport::Full)],
+            request_response::Config::default().with_request_timeout(config.request_timeout),
+        );
+
+        // EPR atom federation protocol (/elohim/epr-atom/1.0.0) — signed atoms
+        let epr_atom_protocol = RequestResponse::new(
+            [(EprAtomProtocol, ProtocolSupport::Full)],
             request_response::Config::default().with_request_timeout(config.request_timeout),
         );
 
@@ -290,6 +313,7 @@ impl ElohimStorageBehaviour {
             shard_protocol,
             sync_protocol,
             epr_protocol,
+            epr_atom_protocol,
             trust_protocol,
             mdns,
             relay_client,

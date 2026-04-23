@@ -2062,6 +2062,56 @@ impl P2PNode {
                 debug!(peer = %peer, request_id = ?request_id, "EPR response sent");
             }
 
+            // === EPR atom federation events (/elohim/epr-atom/1.0.0) ===
+            behaviour::ElohimStorageBehaviourEvent::EprAtomProtocol(
+                request_response::Event::Message { peer, message },
+            ) => match message {
+                request_response::Message::Request {
+                    request, channel, ..
+                } => {
+                    debug!(peer = %peer, request = ?request, "Received EPR atom request");
+                    let response = self.handle_epr_atom_request(peer, request).await;
+                    let mut swarm = self.swarm.write().await;
+                    if let Err(e) = swarm
+                        .behaviour_mut()
+                        .epr_atom_protocol
+                        .send_response(channel, response)
+                    {
+                        warn!(peer = %peer, error = ?e, "Failed to send EPR atom response");
+                    }
+                }
+                request_response::Message::Response {
+                    request_id,
+                    response,
+                } => {
+                    self.handle_epr_atom_response(peer, request_id, response)
+                        .await;
+                }
+            },
+            behaviour::ElohimStorageBehaviourEvent::EprAtomProtocol(
+                request_response::Event::OutboundFailure {
+                    peer,
+                    request_id,
+                    error,
+                },
+            ) => {
+                warn!(peer = %peer, request_id = ?request_id, error = ?error, "Outbound EPR atom request failed");
+            }
+            behaviour::ElohimStorageBehaviourEvent::EprAtomProtocol(
+                request_response::Event::InboundFailure {
+                    peer,
+                    request_id,
+                    error,
+                },
+            ) => {
+                warn!(peer = %peer, request_id = ?request_id, error = ?error, "Inbound EPR atom request failed");
+            }
+            behaviour::ElohimStorageBehaviourEvent::EprAtomProtocol(
+                request_response::Event::ResponseSent { peer, request_id },
+            ) => {
+                debug!(peer = %peer, request_id = ?request_id, "EPR atom response sent");
+            }
+
             // === Trust protocol events ===
             behaviour::ElohimStorageBehaviourEvent::TrustProtocol(
                 request_response::Event::Message { peer, message },
@@ -3102,6 +3152,56 @@ impl P2PNode {
 
             _ => Err(format!("Unknown reach level: {}", reach)),
         }
+    }
+
+    /// Handle an incoming EPR atom federation request from a peer.
+    ///
+    /// Batch C (Tasks 11–14) replaces these stubs with real fetch/announce
+    /// logic that reads/writes the `epr_atoms` projection and enforces the
+    /// reach gate. During Batch B, the protocol is wired end-to-end but
+    /// returns shape-correct placeholders.
+    async fn handle_epr_atom_request(
+        &self,
+        _peer: libp2p::PeerId,
+        request: EprAtomRequest,
+    ) -> EprAtomResponse {
+        match request {
+            EprAtomRequest::Fetch { cid } => {
+                debug!(cid = %cid, "EPR atom fetch (Batch B stub)");
+                EprAtomResponse::NotFound
+            }
+            EprAtomRequest::Announce { envelope_bytes } => {
+                debug!(
+                    bytes = envelope_bytes.len(),
+                    "EPR atom announce (Batch B stub)"
+                );
+                EprAtomResponse::Announced {
+                    accepted: false,
+                    reason: Some("handler not yet implemented (Batch C)".to_string()),
+                }
+            }
+            EprAtomRequest::FetchBatch { cids } => {
+                debug!(count = cids.len(), "EPR atom fetch batch (Batch B stub)");
+                EprAtomResponse::AtomBatch {
+                    atoms: vec![None; cids.len()],
+                }
+            }
+        }
+    }
+
+    /// Handle an incoming EPR atom response to one of our outbound requests.
+    async fn handle_epr_atom_response(
+        &self,
+        peer: libp2p::PeerId,
+        request_id: request_response::OutboundRequestId,
+        response: EprAtomResponse,
+    ) {
+        debug!(
+            peer = %peer,
+            request_id = ?request_id,
+            response = ?response,
+            "EPR atom response (Batch B stub — no pending-request tracker yet)"
+        );
     }
 
     /// Handle an incoming EPR request from a peer
