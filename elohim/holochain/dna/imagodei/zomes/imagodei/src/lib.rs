@@ -1530,6 +1530,12 @@ pub enum RecoveryV2Signal {
         action_hash: ActionHash,
         request: RecoveryRequest,
     },
+    IntimateWitnessSubmitted {
+        action_hash: ActionHash,
+        request_hash: ActionHash,
+        witness: HumanityWitness,
+        witness_agent_id: AgentPubKey,
+    },
     KeyRotationCommitted {
         action_hash: ActionHash,
         rotation: KeyRotation,
