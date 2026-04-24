@@ -59,6 +59,8 @@ const INTERFACE_FILES = [
   { src: 'views/recovery-request.ts', dest: 'recovery-request.ts' },
   { src: 'views/key-rotation.ts', dest: 'key-rotation.ts' },
   { src: 'views/recovery-witness.ts', dest: 'recovery-witness.ts' },
+  { src: 'views/key-revocation.ts', dest: 'key-revocation.ts' },
+  { src: 'views/revocation-vote.ts', dest: 'revocation-vote.ts' },
 ];
 
 /**
