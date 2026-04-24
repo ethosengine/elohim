@@ -1540,6 +1540,38 @@ pub enum RecoveryV2Signal {
         action_hash: ActionHash,
         rotation: KeyRotation,
     },
+    // M4: fast-path revocation signals.
+    KeyRevocationRequested {
+        id: String,
+        human_id: String,
+        revoked_key: String,
+        reason: String,
+        trigger_type: String,
+        initiated_by: String,
+        required_votes: u32,
+        current_votes: u32,
+        threshold_reached: bool,
+        effective_at: Option<String>,
+        created_at: String,
+    },
+    RevocationVoteSubmitted {
+        id: String,
+        revocation_id: String,
+        steward_id: String,
+        approved: bool,
+        attestation: String,
+        voted_at: String,
+        current_votes: u32,
+        required_votes: u32,
+        threshold_now_reached: bool,
+    },
+    KeyRevocationEffective {
+        revocation_id: String,
+        revoked_key: String,
+        human_id: String,
+        effective_at: String,
+        triggering_vote_id: Option<String>,
+    },
 }
 
 // =============================================================================
