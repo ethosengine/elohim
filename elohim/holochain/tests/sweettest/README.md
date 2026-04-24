@@ -54,9 +54,11 @@ so `cargo test` runs them in parallel.
    CARGO_TARGET_DIR=target/native-tests cargo test -p elohim_sweettest --release
    ```
 
-3. **Unignore tests:** the baseline tests carry `#[ignore]` until the Jenkins
-   pipeline wires pack-then-test. Run with `--ignored` to exercise them
-   locally once DNAs are packed.
+3. **Unignore tests:** baseline tests carry `#[ignore = "requires packed DNA
+   artifact"]` until each DNA's Jenkins run proves green with
+   `--include-ignored`. Flips are staged (one commit per DNA, behind its own
+   Jenkins-green proof). Run `cargo test -- --include-ignored` locally to
+   exercise them once DNAs are packed.
 
 ## Adding a new test
 
@@ -68,13 +70,28 @@ so `cargo test` runs them in parallel.
 4. For a brand-new DNA, add a new `src/tests/<dna>.rs` and a matching
    `[[test]]` entry in `Cargo.toml`.
 
-## Pipeline integration (pending — Sprint 1.B Jenkins follow-up)
+## Pipeline integration — baseline coverage
 
-Each DNA gets its own Jenkins stage so failures are attributed crisply. All
-five stages run in parallel; all must be green for the holochain pipeline to
-gate green. That wiring is deferred to the Wave 1 close-out with
-`feedback_shift_measure_jenkins.md` as the bar — tests must be green on
-Jenkins, not merely locally.
+Sprint 1.B scaffolded the workspace; the Wave 1 bodies sprint (2026-04-24)
+filled the per-DNA baselines. Each file at `src/tests/<dna>.rs` covers:
+
+| DNA | Scenarios |
+|---|---|
+| `imagodei` | `bootstrap_steward_is_identifiable`, `second_agent_is_not_bootstrap_steward`. Scenario 3 (validator rejection of bootstrap-only actions from non-stewards) is deliberately absent — see the test file's header comment; the bootstrap-steward pattern is identity, not a capability gate. |
+| `mishpat` | `bootstrap_steward_is_configured`, `proposal_round_trips_across_agents` (two-agent create/read via `create_proposal` + `get_proposal_by_id`). |
+| `lamad` | `content_store_is_reachable`, `content_publishes_and_retrieves_by_id` (single agent create + read by id + read by action hash), `content_visible_across_agents` (two-agent create + cross-agent read). |
+| `node_registry` | `node_registry_has_bootstrap_steward`, `register_node_round_trips` (single agent), `admission_visible_across_agents` (two-agent `register_node` + cross-agent `get_nodes_by_region`). |
+| `infrastructure` | `infrastructure_installs_without_bootstrap_steward`, `doorway_self_registers`, `doorway_visible_across_agents_and_operator_only_can_update` (self-registration succeeds, cross-agent read after settle, second-agent `update_doorway` rejected by coordinator). |
+
+Each DNA has at least one cross-agent scenario that waits on
+`common::mirrors::settle_dht` to verify DHT propagation. Fixture factories
+(`common::fixtures::node_registration`) keep the 26-field `NodeRegistration`
+construction out of the test body.
+
+The Jenkins stage `DNA Integration (bootstrap-steward)` runs all five DNAs
+with `--include-ignored` until the staged unignore flips complete (one
+commit per DNA, each behind its own Jenkins-green proof). Measures live in
+Jenkins, not locally — `feedback_shift_measure_jenkins.md`.
 
 ## Build environment
 
