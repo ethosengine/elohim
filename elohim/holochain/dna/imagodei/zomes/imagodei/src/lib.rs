@@ -2360,6 +2360,51 @@ pub fn commit_key_rotation(input: CommitKeyRotationInput) -> ExternResult<KeyRot
         }
     }
 
+    // M4: revocation-floor gate.
+    // If a pending or effective KeyRevocation exists for the human_agent_pubkey
+    // (the key being rotated from), block the rotation. No authority-layer exemption
+    // — revocation is structural (a revoked key must not produce valid rotations under
+    // any claimed authority), intentionally asymmetric with the freeze-floor gate
+    // which exempts CryptographicQuorum.
+    {
+        let rotating_from_str = input.human_agent_pubkey.to_string();
+
+        let pending_anchor = StringAnchor::new("pending_revocations", "global");
+        let pending_anchor_hash = hash_entry(&EntryTypes::StringAnchor(pending_anchor))?;
+        let pending_links = get_links(
+            LinkQuery::try_new(pending_anchor_hash, LinkTypes::PendingRevocations)?,
+            GetStrategy::default(),
+        )?;
+
+        let effective_anchor = StringAnchor::new("effective_revocations", "global");
+        let effective_anchor_hash = hash_entry(&EntryTypes::StringAnchor(effective_anchor))?;
+        let effective_links = get_links(
+            LinkQuery::try_new(effective_anchor_hash, LinkTypes::EffectiveRevocations)?,
+            GetStrategy::default(),
+        )?;
+
+        for (link, status) in pending_links
+            .iter()
+            .map(|l| (l, "pending"))
+            .chain(effective_links.iter().map(|l| (l, "effective")))
+        {
+            let Some(rev_hash) = link.target.clone().into_action_hash() else { continue };
+            let Some(rec) = get(rev_hash, GetOptions::default())? else { continue };
+            let Some(rev): Option<KeyRevocation> = rec
+                .entry()
+                .to_app_option()
+                .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+            else { continue };
+            if rev.revoked_key == rotating_from_str {
+                return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                    "commit_key_rotation blocked: key {} has a {} revocation ({}). \
+                     Resolve or await the revocation before rotating.",
+                    rotating_from_str, status, rev.id
+                ))));
+            }
+        }
+    }
+
     let rotation = KeyRotation {
         human_agent_pubkey: input.human_agent_pubkey.clone(),
         new_agent_pubkey: input.new_agent_pubkey.clone(),
