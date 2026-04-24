@@ -1178,6 +1178,10 @@ pub enum LinkTypes {
     HumanToCurrentAgent,            // Anchor(human_pubkey) -> KeyRotation (latest = current)
     KeyRotationSupersededBy,        // old KeyRotation -> new KeyRotation (audit chain)
     AgentToKeyRotation,             // Anchor(new_agent_pubkey) -> KeyRotation (reverse lookup)
+
+    // Recovery Protocol Phase 2 — M3
+    RecoveryRequestToHumanityWitness, // RecoveryRequest -> HumanityWitness (IntimateQuorum link)
+    RecoveryRequestToKeyStewardship,  // RecoveryRequest -> KeyStewardship (CryptographicQuorum link; M3 registers type, no coordinator creates yet)
 }
 
 // =============================================================================
