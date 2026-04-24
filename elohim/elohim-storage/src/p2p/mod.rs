@@ -241,6 +241,10 @@ pub struct P2PNode {
     /// Set by bulk write operations (account import, content bulk) to prevent
     /// P2P sync from competing for memory during heavy writes.
     sync_paused: Arc<AtomicBool>,
+    /// PeerId → agent pubkey mapping for reach enforcement (Phase 2c stub).
+    /// Concrete `StubIdentityMap` lets tests call `register(peer, pubkey)`.
+    /// Phase 2b replaces this with a real libp2p-identity-backed map.
+    identity_map: Arc<identity_map::StubIdentityMap>,
 }
 
 /// Cached identify protocol info for a connected peer.
@@ -898,6 +902,8 @@ impl P2PNode {
         };
         let (status_tx, _) = tokio::sync::watch::channel(initial_status);
 
+        let identity_map = Arc::new(identity_map::StubIdentityMap::new());
+
         info!(peer_id = %peer_id, relay_mode = %config.relay_mode, "Created P2P node with NAT traversal");
 
         Ok(Self {
@@ -938,6 +944,7 @@ impl P2PNode {
             identify_cache: Arc::new(DashMap::new()),
             peer_metrics: Arc::new(DashMap::new()),
             sync_paused: Arc::new(AtomicBool::new(false)),
+            identity_map,
         })
     }
 
@@ -965,6 +972,13 @@ impl P2PNode {
     /// Get the local PeerId
     pub fn peer_id(&self) -> &PeerId {
         self.identity.peer_id()
+    }
+
+    /// Test-only: access the identity map so harnesses can register
+    /// `PeerId → agent pubkey` mappings before exercising the reach gate.
+    #[doc(hidden)]
+    pub fn identity_map(&self) -> &Arc<identity_map::StubIdentityMap> {
+        &self.identity_map
     }
 
     /// Start listening and event loop
@@ -3164,9 +3178,12 @@ impl P2PNode {
     /// returns shape-correct placeholders.
     async fn handle_epr_atom_request(
         &self,
-        _peer: libp2p::PeerId,
+        peer: libp2p::PeerId,
         request: EprAtomRequest,
     ) -> EprAtomResponse {
+        use crate::p2p::PeerIdentityMap;
+        let caller = self.identity_map.lookup(&peer);
+
         match request {
             EprAtomRequest::Fetch { cid } => {
                 let Some(pool) = self.db_pool.as_ref() else {
@@ -3187,9 +3204,9 @@ impl P2PNode {
 
                 match crate::services::epr_service::fetch_wire_bytes_by_cid(&mut conn, &cid) {
                     Ok(Some(fetched)) => {
-                        // Reach gate: Phase 2c serves Commons/Public to any peer.
-                        // Task 14 replaces this with an identity-aware gate.
-                        if is_publicly_servable(&fetched.reach) {
+                        // Reach gate: Phase 2c — public atoms served to all; authors
+                        // may fetch their own private atoms.
+                        if reach_gate_allows(&fetched.reach, &caller, Some(&fetched.signer_cid)) {
                             debug!(
                                 cid = %cid,
                                 reach = %fetched.reach,
@@ -3809,10 +3826,74 @@ impl P2PNode {
     }
 }
 
-/// Reach gate for Phase 2c: only Commons/Public atoms are served cross-peer.
-/// Private/Collective/Steward atoms are denied as NotFound (leak-free).
-/// Task 14 extends this with `CallerIdentity` to allow authors to fetch their
-/// own private atoms.
-fn is_publicly_servable(reach: &str) -> bool {
-    matches!(reach, "commons" | "public")
+/// Phase 2c reach gate: allow Commons/Public to any caller; allow the author
+/// to fetch their own Private/Community/Familiar/Trusted/Intimate/Self atoms.
+/// Unknown reach values deny by default.
+///
+/// Phase 2b will extend this with relationship + stewardship lookup so that
+/// non-author callers with a qualifying relationship can receive the atom.
+fn reach_gate_allows(
+    atom_reach: &str,
+    caller: &crate::p2p::CallerIdentity,
+    atom_author: Option<&str>,
+) -> bool {
+    match atom_reach {
+        "commons" | "public" => true,
+        "community" | "familiar" | "trusted" | "intimate" | "self" | "private" => {
+            match (caller, atom_author) {
+                (crate::p2p::CallerIdentity::Agent(c), Some(a)) => c == a,
+                _ => false,
+            }
+        }
+        _ => false,
+    }
+}
+
+#[cfg(test)]
+mod reach_gate_tests {
+    use super::reach_gate_allows;
+    use crate::p2p::CallerIdentity;
+
+    #[test]
+    fn commons_served_to_anonymous() {
+        assert!(reach_gate_allows(
+            "commons",
+            &CallerIdentity::Anonymous,
+            None
+        ));
+        assert!(reach_gate_allows(
+            "public",
+            &CallerIdentity::Anonymous,
+            Some("anyone")
+        ));
+    }
+
+    #[test]
+    fn private_served_only_to_author() {
+        let author = "bafyAUTHOR";
+        assert!(reach_gate_allows(
+            "private",
+            &CallerIdentity::Agent(author.to_string()),
+            Some(author),
+        ));
+        assert!(!reach_gate_allows(
+            "private",
+            &CallerIdentity::Agent("bafyOTHER".to_string()),
+            Some(author),
+        ));
+        assert!(!reach_gate_allows(
+            "private",
+            &CallerIdentity::Anonymous,
+            Some(author),
+        ));
+    }
+
+    #[test]
+    fn unknown_reach_denies() {
+        assert!(!reach_gate_allows(
+            "mystery",
+            &CallerIdentity::Anonymous,
+            None
+        ));
+    }
 }
