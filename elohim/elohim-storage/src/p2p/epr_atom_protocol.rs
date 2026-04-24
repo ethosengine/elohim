@@ -216,3 +216,70 @@ where
     io.flush().await?;
     Ok(())
 }
+
+// ---------------------------------------------------------------------------
+// Inbound envelope verification
+// ---------------------------------------------------------------------------
+
+/// Decode wire bytes as `elohim_epr::Epr`, recompute CID from canonical bytes,
+/// verify the CID matches, run structural signature checks (algorithm + length),
+/// and run the coupling validator. Returns the verified `Epr` and its `Cid`,
+/// or a `VerifyError` describing which stage failed.
+///
+/// This helper does NOT verify the ed25519 signature under a public key —
+/// that requires a resolver we don't have at this layer. `EprService::ingest`
+/// will re-run the same structural pass before persistence; this helper lets
+/// handlers reject obviously-malformed bytes early without touching the DB.
+pub fn verify_incoming_epr(wire_bytes: &[u8]) -> Result<(elohim_epr::Epr, cid::Cid), VerifyError> {
+    // Stage 1: CBOR decode to Epr (envelope + payload together).
+    let epr: elohim_epr::Epr = ciborium::de::from_reader(wire_bytes)
+        .map_err(|e| VerifyError::CborDecode(e.to_string()))?;
+
+    // Stage 2: canonicalize + CID recompute.
+    let canonical = epr
+        .envelope
+        .canonical_bytes(&epr.payload)
+        .map_err(|e| VerifyError::Canonicalize(e.to_string()))?;
+    let computed_cid = elohim_epr::cid::compute_cid(&canonical);
+    if computed_cid != epr.envelope.cid {
+        return Err(VerifyError::CidMismatch {
+            claimed: epr.envelope.cid.to_string(),
+            computed: computed_cid.to_string(),
+        });
+    }
+
+    // Stage 3: structural signature check (algorithm + length only).
+    if epr.envelope.proof.algorithm != "ed25519" {
+        return Err(VerifyError::Signature(format!(
+            "unsupported algorithm: {}",
+            epr.envelope.proof.algorithm
+        )));
+    }
+    if epr.envelope.proof.signature.len() != 64 {
+        return Err(VerifyError::Signature(
+            "ed25519 signature must be 64 bytes".to_string(),
+        ));
+    }
+
+    // Stage 4: coupling validator chain.
+    elohim_epr::validate_coupling(&epr.envelope)
+        .map_err(|e| VerifyError::Validation(e.to_string()))?;
+
+    let cid = epr.envelope.cid;
+    Ok((epr, cid))
+}
+
+/// Error returned by `verify_incoming_epr`, tagged by the stage that failed.
+#[derive(Debug, thiserror::Error)]
+pub enum VerifyError {
+    #[error("cbor decode: {0}")]
+    CborDecode(String),
+    #[error("canonicalize: {0}")]
+    Canonicalize(String),
+    #[error("cid mismatch: claimed={claimed} computed={computed}")]
+    CidMismatch { claimed: String, computed: String },
+    #[error("signature: {0}")]
+    Signature(String),
+    #[error("validation: {0}")]
+    Validation(String),
+}

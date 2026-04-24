@@ -362,3 +362,214 @@ fn kind_from_str(s: &str) -> Result<elohim_epr::EprKind, StorageError> {
         ))),
     }
 }
+
+fn reach_from_str(s: &str) -> Result<elohim_epr::Reach, StorageError> {
+    use elohim_epr::Reach::*;
+    match s {
+        "private" => Ok(Private),
+        "self" => Ok(SelfScope),
+        "intimate" => Ok(Intimate),
+        "trusted" => Ok(Trusted),
+        "familiar" => Ok(Familiar),
+        "community" => Ok(Community),
+        "public" => Ok(Public),
+        "commons" => Ok(Commons),
+        other => Err(StorageError::InvalidInput(format!(
+            "unknown reach: {other}"
+        ))),
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Wire-bytes helpers (Phase 2c — libp2p federation)
+// ---------------------------------------------------------------------------
+
+/// Ciborium-serialized Epr bytes + the metadata a libp2p handler needs to apply
+/// the reach gate. Wire format is `ciborium::ser::into_writer(&elohim_epr::Epr, &mut buf)`.
+#[derive(Debug, Clone)]
+pub struct FetchedWireBytes {
+    pub wire_bytes: Vec<u8>,
+    pub reach: String,
+    pub signer_cid: String,
+}
+
+/// Decode ciborium-encoded `Epr` wire bytes and persist via the existing
+/// `ingest()` validator chain. Idempotent on CID (Phase 2a INSERT OR IGNORE).
+pub fn ingest_from_wire_bytes(
+    conn: &mut SqliteConnection,
+    bytes: &[u8],
+) -> Result<EprIngestResult, StorageError> {
+    let epr: elohim_epr::Epr = ciborium::de::from_reader(bytes)
+        .map_err(|e| StorageError::InvalidInput(format!("cbor decode: {e}")))?;
+    ingest(conn, epr)
+}
+
+/// Reconstruct an `elohim_epr::Epr` from stored rows, serialize to ciborium
+/// CBOR, and return together with reach + signer info.
+pub fn fetch_wire_bytes_by_cid(
+    conn: &mut SqliteConnection,
+    cid: &str,
+) -> Result<Option<FetchedWireBytes>, StorageError> {
+    let Some(fetched) = fetch_by_cid(conn, cid)? else {
+        return Ok(None);
+    };
+
+    let epr = reconstruct_epr(&fetched)?;
+    let mut wire_bytes = Vec::new();
+    ciborium::ser::into_writer(&epr, &mut wire_bytes)
+        .map_err(|e| StorageError::Database(format!("cbor encode: {e}")))?;
+
+    let reach = fetched.atom.reach.clone();
+    let signer_cid = fetched.atom.signer_cid.clone();
+
+    Ok(Some(FetchedWireBytes {
+        wire_bytes,
+        reach,
+        signer_cid,
+    }))
+}
+
+fn reconstruct_epr(fetched: &FetchedEpr) -> Result<elohim_epr::Epr, StorageError> {
+    use cid::Cid;
+    use elohim_epr::{Coupling, Envelope, Epr, Signature};
+    use std::str::FromStr;
+
+    let parse_cid = |s: &str| -> Result<Cid, StorageError> {
+        Cid::from_str(s).map_err(|e| StorageError::InvalidInput(format!("bad cid {s}: {e}")))
+    };
+
+    let cid = parse_cid(&fetched.atom.cid)?;
+    let kind = kind_from_str(&fetched.atom.kind)?;
+    let schema_ref = parse_cid(&fetched.atom.schema_ref)?;
+    let reach = reach_from_str(&fetched.atom.reach)?;
+    let signer = parse_cid(&fetched.atom.signer_cid)?;
+
+    let issued_at = chrono::DateTime::parse_from_rfc3339(&fetched.atom.issued_at)
+        .map_err(|e| StorageError::InvalidInput(format!("bad issued_at: {e}")))?
+        .with_timezone(&chrono::Utc);
+
+    let supersedes = fetched
+        .atom
+        .supersedes
+        .as_deref()
+        .map(parse_cid)
+        .transpose()?;
+
+    let claims: Result<Vec<Cid>, StorageError> = fetched
+        .claims
+        .iter()
+        .map(|c| parse_cid(&c.claim_cid))
+        .collect();
+    let claims = claims?;
+
+    let mut coupling = Coupling {
+        knowledge: None,
+        value: None,
+        governance: None,
+    };
+    for row in &fetched.coupling {
+        let target = parse_cid(&row.target_cid)?;
+        match row.leg.as_str() {
+            "knowledge" => coupling.knowledge = Some(target),
+            "value" => coupling.value = Some(target),
+            "governance" => coupling.governance = Some(target),
+            other => {
+                return Err(StorageError::Database(format!(
+                    "unknown coupling leg in row: {other}"
+                )))
+            }
+        }
+    }
+
+    let envelope = Envelope {
+        cid,
+        kind,
+        schema_ref,
+        schema_key: fetched.atom.schema_key.clone(),
+        reach,
+        coupling,
+        claims,
+        supersedes,
+        superseded_by: None,
+        issued_at,
+        proof: Signature {
+            signer,
+            algorithm: fetched.atom.proof_algorithm.clone(),
+            signature: fetched.atom.proof_bytes.clone(),
+        },
+    };
+
+    Ok(Epr {
+        envelope,
+        payload: fetched.atom.payload_bytes.clone(),
+    })
+}
+
+#[cfg(test)]
+mod wire_bytes_tests {
+    use super::*;
+    use diesel::connection::SimpleConnection;
+    use elohim_epr::{cid::compute_cid, proof::AgentKeypair, Coupling, Epr, EprKind, Reach};
+
+    fn setup_conn() -> SqliteConnection {
+        let mut conn = SqliteConnection::establish(":memory:").expect("open memory db");
+        let migrations_sql =
+            std::fs::read_to_string("migrations/2026-04-22-000000_add_epr_tables/up.sql")
+                .expect("load epr up.sql");
+        conn.batch_execute(&migrations_sql)
+            .expect("apply epr migrations");
+        conn
+    }
+
+    fn sample_epr() -> Epr {
+        let kp = AgentKeypair::from_secret(&[77u8; 32]).unwrap();
+        let signer_cid = compute_cid(b"signer-agent-placeholder");
+        let schema_ref = compute_cid(b"schema-ref-placeholder");
+        let gov = compute_cid(b"governance-target");
+        let coupling = Coupling {
+            knowledge: None,
+            value: None,
+            governance: Some(gov),
+        };
+        Epr::builder()
+            .kind(EprKind::Manifest)
+            .schema_ref(schema_ref)
+            .schema_key("test/schema")
+            .reach(Reach::Commons)
+            .coupling(coupling)
+            .issued_at(chrono::Utc::now())
+            .payload(b"payload".to_vec())
+            .sign(&kp, signer_cid)
+            .expect("sign")
+    }
+
+    #[test]
+    fn ingest_and_fetch_wire_bytes_round_trip() {
+        let mut conn = setup_conn();
+        let epr = sample_epr();
+
+        let mut wire = Vec::new();
+        ciborium::ser::into_writer(&epr, &mut wire).expect("encode");
+
+        let ingested = ingest_from_wire_bytes(&mut conn, &wire).expect("ingest");
+        assert_eq!(ingested.cid, epr.envelope.cid.to_string());
+
+        let fetched = fetch_wire_bytes_by_cid(&mut conn, &ingested.cid)
+            .expect("fetch")
+            .expect("row present");
+        assert_eq!(fetched.reach, "commons");
+        assert_eq!(fetched.signer_cid, epr.envelope.proof.signer.to_string());
+
+        // Decode the round-tripped wire bytes back into an Epr and confirm CID + payload match.
+        let decoded: Epr = ciborium::de::from_reader(&fetched.wire_bytes[..]).expect("decode");
+        assert_eq!(decoded.envelope.cid, epr.envelope.cid);
+        assert_eq!(decoded.payload, epr.payload);
+    }
+
+    #[test]
+    fn ingest_from_wire_bytes_rejects_malformed() {
+        let mut conn = setup_conn();
+        let err = ingest_from_wire_bytes(&mut conn, &[0xFF, 0xFE]).unwrap_err();
+        assert!(matches!(err, StorageError::InvalidInput(_)));
+    }
+}

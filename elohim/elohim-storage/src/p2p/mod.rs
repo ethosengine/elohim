@@ -31,6 +31,7 @@
 pub mod behaviour;
 pub mod epr_atom_protocol;
 pub mod epr_protocol;
+pub mod identity_map;
 pub mod kad_store;
 pub mod replication;
 pub mod shard_protocol;
@@ -134,11 +135,12 @@ use elohim_cache_core::extraction::ExtractionCache;
 
 pub use behaviour::{ElohimStorageBehaviour, RelayMode};
 pub use epr_atom_protocol::{
-    EprAtomCodec, EprAtomProtocol, EprAtomRequest, EprAtomResponse, EPR_ATOM_PROTOCOL_ID,
-    MAX_BATCH_CIDS, MAX_REQUEST_SIZE as EPR_ATOM_MAX_REQUEST_SIZE,
-    MAX_RESPONSE_SIZE as EPR_ATOM_MAX_RESPONSE_SIZE,
+    verify_incoming_epr, EprAtomCodec, EprAtomProtocol, EprAtomRequest, EprAtomResponse,
+    VerifyError, EPR_ATOM_PROTOCOL_ID, MAX_BATCH_CIDS,
+    MAX_REQUEST_SIZE as EPR_ATOM_MAX_REQUEST_SIZE, MAX_RESPONSE_SIZE as EPR_ATOM_MAX_RESPONSE_SIZE,
 };
 pub use epr_protocol::{EprCodec, EprProtocol, EprRequest, EprResponse};
+pub use identity_map::{CallerIdentity, PeerIdentityMap, StubIdentityMap};
 pub use shard_protocol::{ShardCodec, ShardProtocol, ShardRequest, ShardResponse};
 pub use sync_protocol::{DocumentInfo, SyncCodec, SyncProtocol, SyncRequest, SyncResponse};
 
@@ -239,6 +241,10 @@ pub struct P2PNode {
     /// Set by bulk write operations (account import, content bulk) to prevent
     /// P2P sync from competing for memory during heavy writes.
     sync_paused: Arc<AtomicBool>,
+    /// PeerId → agent pubkey mapping for reach enforcement (Phase 2c stub).
+    /// Concrete `StubIdentityMap` lets tests call `register(peer, pubkey)`.
+    /// Phase 2b replaces this with a real libp2p-identity-backed map.
+    identity_map: Arc<identity_map::StubIdentityMap>,
 }
 
 /// Cached identify protocol info for a connected peer.
@@ -896,6 +902,8 @@ impl P2PNode {
         };
         let (status_tx, _) = tokio::sync::watch::channel(initial_status);
 
+        let identity_map = Arc::new(identity_map::StubIdentityMap::new());
+
         info!(peer_id = %peer_id, relay_mode = %config.relay_mode, "Created P2P node with NAT traversal");
 
         Ok(Self {
@@ -936,6 +944,7 @@ impl P2PNode {
             identify_cache: Arc::new(DashMap::new()),
             peer_metrics: Arc::new(DashMap::new()),
             sync_paused: Arc::new(AtomicBool::new(false)),
+            identity_map,
         })
     }
 
@@ -963,6 +972,13 @@ impl P2PNode {
     /// Get the local PeerId
     pub fn peer_id(&self) -> &PeerId {
         self.identity.peer_id()
+    }
+
+    /// Test-only: access the identity map so harnesses can register
+    /// `PeerId → agent pubkey` mappings before exercising the reach gate.
+    #[doc(hidden)]
+    pub fn identity_map(&self) -> &Arc<identity_map::StubIdentityMap> {
+        &self.identity_map
     }
 
     /// Start listening and event loop
@@ -3162,29 +3178,182 @@ impl P2PNode {
     /// returns shape-correct placeholders.
     async fn handle_epr_atom_request(
         &self,
-        _peer: libp2p::PeerId,
+        peer: libp2p::PeerId,
         request: EprAtomRequest,
     ) -> EprAtomResponse {
+        use crate::p2p::PeerIdentityMap;
+        let caller = self.identity_map.lookup(&peer);
+
         match request {
             EprAtomRequest::Fetch { cid } => {
-                debug!(cid = %cid, "EPR atom fetch (Batch B stub)");
-                EprAtomResponse::NotFound
+                let Some(pool) = self.db_pool.as_ref() else {
+                    warn!(cid = %cid, "EPR atom fetch: db pool unavailable");
+                    return EprAtomResponse::Error {
+                        message: "storage unavailable".to_string(),
+                    };
+                };
+                let mut conn = match pool.get() {
+                    Ok(c) => c,
+                    Err(e) => {
+                        warn!(cid = %cid, error = %e, "EPR atom fetch: db pool exhausted");
+                        return EprAtomResponse::Error {
+                            message: "storage busy".to_string(),
+                        };
+                    }
+                };
+
+                match crate::services::epr_service::fetch_wire_bytes_by_cid(&mut conn, &cid) {
+                    Ok(Some(fetched)) => {
+                        // Reach gate: Phase 2c — public atoms served to all; authors
+                        // may fetch their own private atoms.
+                        if reach_gate_allows(&fetched.reach, &caller, Some(&fetched.signer_cid)) {
+                            debug!(
+                                cid = %cid,
+                                reach = %fetched.reach,
+                                bytes = fetched.wire_bytes.len(),
+                                "EPR atom fetch served"
+                            );
+                            EprAtomResponse::Atom {
+                                envelope_bytes: fetched.wire_bytes,
+                            }
+                        } else {
+                            // Leak-free: caller cannot distinguish missing from unauthorized.
+                            debug!(
+                                cid = %cid,
+                                reach = %fetched.reach,
+                                "EPR atom fetch denied by reach gate"
+                            );
+                            EprAtomResponse::NotFound
+                        }
+                    }
+                    Ok(None) => EprAtomResponse::NotFound,
+                    Err(e) => {
+                        warn!(cid = %cid, error = ?e, "EPR atom fetch error");
+                        EprAtomResponse::Error {
+                            message: "internal error".to_string(),
+                        }
+                    }
+                }
             }
             EprAtomRequest::Announce { envelope_bytes } => {
-                debug!(
-                    bytes = envelope_bytes.len(),
-                    "EPR atom announce (Batch B stub)"
-                );
-                EprAtomResponse::Announced {
-                    accepted: false,
-                    reason: Some("handler not yet implemented (Batch C)".to_string()),
+                let Some(pool) = self.db_pool.as_ref() else {
+                    warn!(
+                        bytes = envelope_bytes.len(),
+                        "EPR atom announce: db pool unavailable"
+                    );
+                    return EprAtomResponse::Announced {
+                        accepted: false,
+                        reason: Some("storage unavailable".to_string()),
+                    };
+                };
+                let mut conn = match pool.get() {
+                    Ok(c) => c,
+                    Err(e) => {
+                        warn!(error = %e, "EPR atom announce: db pool exhausted");
+                        return EprAtomResponse::Announced {
+                            accepted: false,
+                            reason: Some("storage busy".to_string()),
+                        };
+                    }
+                };
+
+                match crate::services::epr_service::ingest_from_wire_bytes(
+                    &mut conn,
+                    &envelope_bytes,
+                ) {
+                    Ok(ingested) => {
+                        debug!(
+                            cid = %ingested.cid,
+                            bytes = envelope_bytes.len(),
+                            "EPR atom announce accepted"
+                        );
+                        EprAtomResponse::Announced {
+                            accepted: true,
+                            reason: None,
+                        }
+                    }
+                    Err(crate::error::StorageError::InvalidInput(msg)) => {
+                        debug!(bytes = envelope_bytes.len(), reason = %msg, "EPR atom announce rejected (invalid)");
+                        EprAtomResponse::Announced {
+                            accepted: false,
+                            reason: Some(format!("verification failed: {msg}")),
+                        }
+                    }
+                    Err(e) => {
+                        warn!(bytes = envelope_bytes.len(), error = ?e, "EPR atom announce: persistence error");
+                        EprAtomResponse::Announced {
+                            accepted: false,
+                            reason: Some("persistence error".to_string()),
+                        }
+                    }
                 }
             }
             EprAtomRequest::FetchBatch { cids } => {
-                debug!(count = cids.len(), "EPR atom fetch batch (Batch B stub)");
-                EprAtomResponse::AtomBatch {
-                    atoms: vec![None; cids.len()],
+                use crate::p2p::MAX_BATCH_CIDS;
+                if cids.len() > MAX_BATCH_CIDS {
+                    debug!(
+                        count = cids.len(),
+                        max = MAX_BATCH_CIDS,
+                        "EPR atom fetch batch rejected — oversized"
+                    );
+                    return EprAtomResponse::Error {
+                        message: format!(
+                            "batch too large: {} cids (max {})",
+                            cids.len(),
+                            MAX_BATCH_CIDS
+                        ),
+                    };
                 }
+
+                let Some(pool) = self.db_pool.as_ref() else {
+                    warn!(
+                        count = cids.len(),
+                        "EPR atom fetch batch: db pool unavailable"
+                    );
+                    return EprAtomResponse::Error {
+                        message: "storage unavailable".to_string(),
+                    };
+                };
+                let mut conn = match pool.get() {
+                    Ok(c) => c,
+                    Err(e) => {
+                        warn!(count = cids.len(), error = %e, "EPR atom fetch batch: db pool exhausted");
+                        return EprAtomResponse::Error {
+                            message: "storage busy".to_string(),
+                        };
+                    }
+                };
+
+                let mut atoms: Vec<Option<Vec<u8>>> = Vec::with_capacity(cids.len());
+                let mut served = 0usize;
+                for cid in &cids {
+                    let slot =
+                        match crate::services::epr_service::fetch_wire_bytes_by_cid(&mut conn, cid)
+                        {
+                            Ok(Some(fetched))
+                                if reach_gate_allows(
+                                    &fetched.reach,
+                                    &caller,
+                                    Some(&fetched.signer_cid),
+                                ) =>
+                            {
+                                served += 1;
+                                Some(fetched.wire_bytes)
+                            }
+                            Ok(_) => None,
+                            Err(e) => {
+                                warn!(cid = %cid, error = ?e, "EPR atom fetch batch: row error");
+                                None
+                            }
+                        };
+                    atoms.push(slot);
+                }
+                debug!(
+                    total = cids.len(),
+                    served = served,
+                    "EPR atom fetch batch completed"
+                );
+                EprAtomResponse::AtomBatch { atoms }
             }
         }
     }
@@ -3715,5 +3884,77 @@ impl P2PNode {
             sync_paused: self.sync_paused.load(Ordering::Acquire),
         };
         let _ = self.status_tx.send(status);
+    }
+}
+
+/// Phase 2c reach gate: allow Commons/Public to any caller; allow the author
+/// to fetch their own Private/Community/Familiar/Trusted/Intimate/Self atoms.
+/// Unknown reach values deny by default.
+///
+/// Phase 2b will extend this with relationship + stewardship lookup so that
+/// non-author callers with a qualifying relationship can receive the atom.
+pub fn reach_gate_allows(
+    atom_reach: &str,
+    caller: &crate::p2p::CallerIdentity,
+    atom_author: Option<&str>,
+) -> bool {
+    match atom_reach {
+        "commons" | "public" => true,
+        "community" | "familiar" | "trusted" | "intimate" | "self" | "private" => {
+            match (caller, atom_author) {
+                (crate::p2p::CallerIdentity::Agent(c), Some(a)) => c == a,
+                _ => false,
+            }
+        }
+        _ => false,
+    }
+}
+
+#[cfg(test)]
+mod reach_gate_tests {
+    use super::reach_gate_allows;
+    use crate::p2p::CallerIdentity;
+
+    #[test]
+    fn commons_served_to_anonymous() {
+        assert!(reach_gate_allows(
+            "commons",
+            &CallerIdentity::Anonymous,
+            None
+        ));
+        assert!(reach_gate_allows(
+            "public",
+            &CallerIdentity::Anonymous,
+            Some("anyone")
+        ));
+    }
+
+    #[test]
+    fn private_served_only_to_author() {
+        let author = "bafyAUTHOR";
+        assert!(reach_gate_allows(
+            "private",
+            &CallerIdentity::Agent(author.to_string()),
+            Some(author),
+        ));
+        assert!(!reach_gate_allows(
+            "private",
+            &CallerIdentity::Agent("bafyOTHER".to_string()),
+            Some(author),
+        ));
+        assert!(!reach_gate_allows(
+            "private",
+            &CallerIdentity::Anonymous,
+            Some(author),
+        ));
+    }
+
+    #[test]
+    fn unknown_reach_denies() {
+        assert!(!reach_gate_allows(
+            "mystery",
+            &CallerIdentity::Anonymous,
+            None
+        ));
     }
 }
