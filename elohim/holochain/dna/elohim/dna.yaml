@@ -1,7 +1,7 @@
 # Lamad DNA - Content & Learning
 #
 # Manifest hygiene (Wave 1 / §7):
-# - manifest_version "1": Holochain 0.6 schema.
+# - manifest_version "0": Holochain 0.6 schema.
 # - network_seed "elohim_lamad_alpha": stability contract. The _alpha suffix means
 #   "we WILL reset this network on breaking changes; do not treat as production."
 #   Upgrade to _beta or drop the suffix when we commit to persistence.
@@ -13,7 +13,7 @@
 # author-scoped, not network-scoped). Revisit if content stewardship roles
 # require chain-of-trust from a founding steward.
 ---
-manifest_version: "1"
+manifest_version: "0"
 name: lamad
 integrity:
   network_seed: "elohim_lamad_alpha"

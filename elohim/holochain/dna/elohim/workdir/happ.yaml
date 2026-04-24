@@ -1,7 +1,7 @@
 # Elohim hApp Manifest
 #
 # Manifest hygiene (Wave 1 / §7):
-# - manifest_version "1": Holochain 0.6 schema.
+# - manifest_version "0": Holochain 0.6 schema.
 # - Per-role `modifiers` block declares network_seed + properties (including
 #   bootstrap-steward pubkey where applicable, using Holochain's primitive field
 #   name `progenitor_pubkey`; our surface language is "bootstrap steward" —
@@ -16,7 +16,7 @@
 # Updated: 2025-12-25 - multi-DNA architecture (lamad, infrastructure, imagodei)
 # Updated: 2026-04-21 - Wave 1 §7 manifest hygiene (modifiers, bootstrap steward)
 ---
-manifest_version: "1"
+manifest_version: "0"
 name: elohim
 description: "Elohim Protocol hApp - Decentralized Learning & Identity"
 roles:

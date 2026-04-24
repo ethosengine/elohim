@@ -331,7 +331,7 @@ During migration, bundle both DNA versions:
 
 ```yaml
 # happ.yaml
-manifest_version: "1"
+manifest_version: "0"
 name: my-app
 roles:
   - name: my-dna              # Current version (v2)

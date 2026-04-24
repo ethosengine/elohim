@@ -117,12 +117,12 @@ fn expected_network_seed(dna_name: &str) -> String {
 // -----------------------------------------------------------------------------
 
 #[test]
-fn every_dna_manifest_is_version_1() -> Result<()> {
+fn every_dna_manifest_is_version_0() -> Result<()> {
     for (dir, name) in DNAS {
         let m = load_dna_manifest(dir)?;
-        if m.manifest_version != "1" {
+        if m.manifest_version != "0" {
             bail!(
-                "dna/{dir}/dna.yaml manifest_version must be \"1\" (Holochain 0.6 schema), got {:?}",
+                "dna/{dir}/dna.yaml manifest_version must be \"0\" (Holochain 0.6 DnaManifest tag), got {:?}",
                 m.manifest_version
             );
         }
@@ -182,11 +182,11 @@ fn every_dna_declares_lineage_field() -> Result<()> {
 }
 
 #[test]
-fn happ_is_version_1_and_has_all_five_roles() -> Result<()> {
+fn happ_is_version_0_and_has_all_five_roles() -> Result<()> {
     let h = load_happ_manifest()?;
-    if h.manifest_version != "1" {
+    if h.manifest_version != "0" {
         bail!(
-            "elohim/workdir/happ.yaml manifest_version must be \"1\" (HC 0.6), got {:?}",
+            "elohim/workdir/happ.yaml manifest_version must be \"0\" (HC 0.6 AppManifest tag), got {:?}",
             h.manifest_version
         );
     }

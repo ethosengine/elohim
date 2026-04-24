@@ -1,7 +1,7 @@
 # Imago Dei DNA - Identity, Relationships & Attestations
 #
 # Manifest hygiene (Wave 1 / §7):
-# - manifest_version "1": Holochain 0.6 schema.
+# - manifest_version "0": Holochain 0.6 schema.
 # - network_seed "elohim_imagodei_alpha": stability contract. _alpha suffix means
 #   "we WILL reset this network on breaking changes; do not treat as production."
 # - lineage []: this hash is the genesis ancestor. Add previous hashes here on
@@ -14,7 +14,7 @@
 # name — in our surface we call this "bootstrap steward"). Authority is
 # graduated to later-joining stewards per project_stewardship_philosophy.md.
 ---
-manifest_version: "1"
+manifest_version: "0"
 name: imagodei
 integrity:
   network_seed: "elohim_imagodei_alpha"

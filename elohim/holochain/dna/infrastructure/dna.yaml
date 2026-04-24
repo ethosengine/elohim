@@ -1,7 +1,7 @@
 # Infrastructure DNA - Doorway Federation & Network Operations
 #
 # Manifest hygiene (Wave 1 / §7):
-# - manifest_version "1": Holochain 0.6 schema.
+# - manifest_version "0": Holochain 0.6 schema.
 # - network_seed "elohim_infrastructure_alpha": stability contract. _alpha suffix
 #   means "we WILL reset this network on breaking changes; do not treat as production."
 # - lineage []: this hash is the genesis ancestor.
@@ -15,7 +15,7 @@
 # uptime + attestations), not bootstrap-then-graduate authority. This answers
 # §1.2 Q2 in the Wave 1 execution plan.
 ---
-manifest_version: "1"
+manifest_version: "0"
 name: infrastructure
 integrity:
   network_seed: "elohim_infrastructure_alpha"

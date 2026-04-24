@@ -1,7 +1,7 @@
 # Mishpat DNA - Formal Governance & Justice
 #
 # Manifest hygiene (Wave 1 / §7):
-# - manifest_version "1": Holochain 0.6 schema.
+# - manifest_version "0": Holochain 0.6 schema.
 # - network_seed "elohim_mishpat_alpha": stability contract. _alpha suffix means
 #   "we WILL reset this network on breaking changes; do not treat as production."
 # - lineage []: this hash is the genesis ancestor.
@@ -10,7 +10,7 @@
 # Bootstrap-steward: mishpat uses the bootstrap-steward pattern (governance
 # needs an accountable founding steward). See happ.yaml modifiers.properties.
 ---
-manifest_version: "1"
+manifest_version: "0"
 name: mishpat
 integrity:
   network_seed: "elohim_mishpat_alpha"

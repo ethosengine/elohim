@@ -15,12 +15,12 @@ plan §7.
 ## What it checks
 
 ```
-1.  Every dna.yaml is manifest_version "1" (Holochain 0.6 schema).
+1.  Every dna.yaml is manifest_version "0" (Holochain 0.6 DnaManifest tag).
 2.  dna.yaml `name` field matches the expected DNA name.
 3.  integrity.network_seed follows elohim_<dna>_alpha stability contract.
 4.  Top-level `lineage:` field is present (even if empty); non-empty
     entries look like DNA hashes (uhC0k… prefix).
-5.  happ.yaml is manifest_version "1" and declares all 5 expected roles.
+5.  happ.yaml is manifest_version "0" and declares all 5 expected roles.
 6.  Every happ role has `clone_limit: 0` (default-deny).
 7.  happ role network_seeds match their dna.yaml counterparts (no drift).
 8.  Bootstrap-steward DNAs (lamad, imagodei, mishpat, node_registry)
