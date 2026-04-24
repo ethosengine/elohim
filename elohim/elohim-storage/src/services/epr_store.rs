@@ -4,7 +4,7 @@
 //! FederatedEprStore wraps LocalEprStore + a libp2p swarm handle and, on local
 //! miss, issues EprRequest::Resolve via /elohim/epr/1.0.0 to discover peers
 //! that hold the atom. Phase 2a ships FederatedEprStore with the libp2p bridge
-//! stubbed as TODO(phase-2c); Phase 2c wires the swarm handle and flips the
+//! stubbed as TODO(phase-2b); Phase 2c wires the swarm handle and flips the
 //! construction site from LocalEprStore → FederatedEprStore.
 
 use diesel::SqliteConnection;
@@ -189,7 +189,7 @@ impl EprStore for LocalEprStore {
 /// to LocalEprStore with explicit TODO markers for each federation seam.
 pub struct FederatedEprStore {
     local: LocalEprStore,
-    // TODO(phase-2c): swarm_handle: SwarmHandle — channel into the running
+    // TODO(phase-2b): swarm_handle: SwarmHandle — channel into the running
     // elohim-storage swarm so fetch/put can issue EprRequest::Resolve and
     // Kad start_providing. Requires resolving EprHead↔Envelope format
     // compatibility (see Phase 2c pivot doc).
@@ -218,7 +218,7 @@ impl EprStore for FederatedEprStore {
         if let Some(outcome) = self.local.fetch(conn, cid)? {
             return Ok(Some(outcome));
         }
-        // TODO(phase-2c): on local miss, issue swarm_handle.resolve_epr(cid).
+        // TODO(phase-2b): on local miss, issue swarm_handle.resolve_epr(cid).
         // For each returned peer, send EprRequest::Resolve { id: cid }; if
         // EprResponse::Head arrives, decode + validate + LocalEprStore::put + return
         // FetchOutcome::Peer(peer_id). Give up after N peers or T timeout.
@@ -227,7 +227,7 @@ impl EprStore for FederatedEprStore {
 
     fn put(&self, conn: &mut SqliteConnection, epr: Epr) -> Result<EprIngestResult, StorageError> {
         let result = self.local.put(conn, epr)?;
-        // TODO(phase-2c): self.swarm_handle.kad_start_providing(result.cid.parse()?).await?;
+        // TODO(phase-2b): self.swarm_handle.kad_start_providing(result.cid.parse()?).await?;
         // This announces to the DHT that this node holds the atom, so future
         // fetch requests from other peers can find us via EprRequest::Resolve.
         Ok(result)
@@ -258,7 +258,7 @@ impl EprStore for FederatedEprStore {
         cid: &str,
     ) -> Result<Vec<ProviderRef>, StorageError> {
         let providers = self.local.providers(conn, cid)?;
-        // TODO(phase-2c): extend providers with DHT provider records:
+        // TODO(phase-2b): extend providers with DHT provider records:
         //   let dht_providers = self.swarm_handle.kad_get_providers(cid).await?;
         //   providers.extend(dht_providers.into_iter().map(ProviderRef::from));
         Ok(providers)
