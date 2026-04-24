@@ -64,6 +64,43 @@ async fn second_agent_is_not_bootstrap_steward() -> Result<()> {
     Ok(())
 }
 
-// TODO (Wave 1 Sprint 1.A follow-up):
-// - Exercise integrity validation that rejects bootstrap-only actions from
-//   non-steward agents, once the validation rules for such actions exist.
+// --- Scenario 3: intentionally absent ---
+//
+// The plan (wave1-sweettest-bodies §2.1) predicted: "there is no integrity
+// validator in imagodei that rejects an action *because* the author is not the
+// bootstrap steward." This prediction has been verified by reading all three
+// source files in `imagodei_integrity/src/`:
+//
+//   - lib.rs          — dispatches to per-entry validate_* functions; zero
+//                       references to `bootstrap_steward`, `progenitor`, or
+//                       `is_bootstrap`.
+//   - stewardship.rs  — `validate_stewardship_grant` gates on structural
+//                       validity (empty IDs, enum membership, delegation depth)
+//                       only; no author-identity check.
+//   - recovery_v2.rs  — no bootstrap-steward references.
+//
+// The absence is deliberate, not a gap. The authority frame is documented in:
+//   genesis/docs/superpowers/specs/2026-04-21-bootstrap-steward-authority-frame-design.md
+//
+// Recommendation (b) from that spec was adopted: the bootstrap steward is the
+// initial `constitutional`-tier steward at DNA install time, but authority is
+// NOT exclusive to that pubkey. Gating integrity validators on the bootstrap
+// pubkey would calcify exclusive authority — the opposite of the graduated-
+// authority principle in `project_stewardship_philosophy.md`.
+//
+// The relevant design constraints from bootstrap_steward.rs (lines 28-37):
+//
+//   > Authority is **not** exclusive to this pubkey at any point; this module
+//   > exposes only **identity**. Authority checks MUST go through the
+//   > stewardship-grant resolution layer … Callers seeking "is this agent
+//   > allowed to X?" must not use `is_bootstrap_steward` as a capability gate.
+//
+// When `StewardshipGrant`-based validators are added to the four ported DNAs
+// (mishpat, node-registry, lamad, and imagodei itself) in a future wave, the
+// gating condition will be "holds a StewardshipGrant at tier X with matching
+// scope" — a check the bootstrap steward passes trivially at install time and
+// that later-attested stewards also pass. At that point a cross-agent rejection
+// test should be added here exercising the tier-based gate, not the bootstrap
+// pubkey directly.
+//
+// See also: §7 (deferred work) of the authority frame design doc.
