@@ -1817,6 +1817,132 @@ pub fn create_recovery_request(
     })
 }
 
+// =============================================================================
+// Recovery Protocol Phase 2 — M4: Fast-Path Key Revocation
+// =============================================================================
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct CreateSelfRevocationInput {
+    pub revoked_key: AgentPubKey,
+    pub reason: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct KeyRevocationOutput {
+    pub revocation_id: String,
+    pub action_hash: ActionHash,
+}
+
+/// M4: Self-revocation. A human with a valid agent key voluntarily revokes
+/// a different (compromised) key they control. Single-cell authority, no
+/// quorum, no witnesses.
+#[hdk_extern]
+pub fn create_self_revocation(
+    input: CreateSelfRevocationInput,
+) -> ExternResult<KeyRevocationOutput> {
+    let caller_pubkey = agent_info()?.agent_initial_pubkey;
+    let human_id = resolve_human_id_for_agent(&caller_pubkey)?;
+
+    // Gate: revoked_key must belong to the same human.
+    let owner_human_id = resolve_human_id_for_agent(&input.revoked_key)?;
+    if owner_human_id != human_id {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "create_self_revocation: caller does not control revoked_key (different human_id)".into()
+        )));
+    }
+
+    if !REVOCATION_REASONS.contains(&input.reason.as_str()) {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "create_self_revocation: invalid reason '{}'. Must be one of {:?}",
+            input.reason, REVOCATION_REASONS
+        ))));
+    }
+
+    let now = sys_time()?;
+    let timestamp = format!("{:?}", now);
+    let revocation_id = format!("rev-{}-{}", human_id, timestamp);
+    let revoked_key_str = input.revoked_key.to_string();
+
+    let revocation = KeyRevocation {
+        id: revocation_id.clone(),
+        human_id: human_id.clone(),
+        revoked_key: revoked_key_str.clone(),
+        reason: input.reason.clone(),
+        initiated_by: human_id.clone(),
+        trigger_type: "voluntary".to_string(),
+        required_votes: 1,
+        current_votes: 1,
+        votes_json: String::new(), // legacy field, unused by M4
+        threshold_reached: true,
+        effective_at: Some(timestamp.clone()),
+        created_at: timestamp.clone(),
+        updated_at: timestamp.clone(),
+    };
+
+    let action_hash = create_entry(&EntryTypes::KeyRevocation(revocation.clone()))?;
+
+    // IdToKeyRevocation anchor
+    let id_anchor = StringAnchor::new("revocation_id", &revocation_id);
+    let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor.clone()))?;
+    create_entry(&EntryTypes::StringAnchor(id_anchor))?;
+    create_link(id_anchor_hash, action_hash.clone(), LinkTypes::IdToKeyRevocation, ())?;
+
+    // HumanToKeyRevocation anchor (dual-anchor primacy: human listing)
+    let human_anchor = StringAnchor::new("human_revocations", &human_id);
+    let human_anchor_hash = hash_entry(&EntryTypes::StringAnchor(human_anchor.clone()))?;
+    create_entry(&EntryTypes::StringAnchor(human_anchor))?;
+    create_link(human_anchor_hash, action_hash.clone(), LinkTypes::HumanToKeyRevocation, ())?;
+
+    // RevokedKeyToRevocation anchor (dual-anchor primacy: hot gate query)
+    let revoked_key_anchor = StringAnchor::new("revoked_key", &revoked_key_str);
+    let revoked_key_anchor_hash =
+        hash_entry(&EntryTypes::StringAnchor(revoked_key_anchor.clone()))?;
+    create_entry(&EntryTypes::StringAnchor(revoked_key_anchor))?;
+    create_link(
+        revoked_key_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::RevokedKeyToRevocation,
+        (),
+    )?;
+
+    // EffectiveRevocations anchor — voluntary is effective on creation.
+    let effective_anchor = StringAnchor::new("effective_revocations", "global");
+    let effective_anchor_hash =
+        hash_entry(&EntryTypes::StringAnchor(effective_anchor.clone()))?;
+    create_entry(&EntryTypes::StringAnchor(effective_anchor))?;
+    create_link(
+        effective_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::EffectiveRevocations,
+        (),
+    )?;
+
+    // Emit both signals atomically: Requested + Effective.
+    emit_signal(RecoveryV2Signal::KeyRevocationRequested {
+        id: revocation.id.clone(),
+        human_id: revocation.human_id.clone(),
+        revoked_key: revocation.revoked_key.clone(),
+        reason: revocation.reason.clone(),
+        trigger_type: revocation.trigger_type.clone(),
+        initiated_by: revocation.initiated_by.clone(),
+        required_votes: revocation.required_votes,
+        current_votes: revocation.current_votes,
+        threshold_reached: revocation.threshold_reached,
+        effective_at: revocation.effective_at.clone(),
+        created_at: revocation.created_at.clone(),
+    })?;
+
+    emit_signal(RecoveryV2Signal::KeyRevocationEffective {
+        revocation_id: revocation.id.clone(),
+        revoked_key: revocation.revoked_key.clone(),
+        human_id: revocation.human_id.clone(),
+        effective_at: timestamp,
+        triggering_vote_id: None,
+    })?;
+
+    Ok(KeyRevocationOutput { revocation_id, action_hash })
+}
+
 /// Traverse `HumanToFreeze` links for the given `human_id` and return all
 /// `IdentityFreeze` entries with `is_active = true`. Used by the M3 freeze-
 /// floor gate on `commit_key_rotation`.
