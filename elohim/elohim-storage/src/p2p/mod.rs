@@ -3893,7 +3893,7 @@ impl P2PNode {
 ///
 /// Phase 2b will extend this with relationship + stewardship lookup so that
 /// non-author callers with a qualifying relationship can receive the atom.
-fn reach_gate_allows(
+pub fn reach_gate_allows(
     atom_reach: &str,
     caller: &crate::p2p::CallerIdentity,
     atom_author: Option<&str>,
