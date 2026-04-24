@@ -627,6 +627,19 @@ pub struct RecoveryRequestPayload {
     pub created_at: serde_json::Value,
 }
 
+/// Storage-side mirror of the HumanityWitness fields as they arrive in the
+/// IntimateWitnessSubmitted signal.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HumanityWitnessPayload {
+    pub human_id: String,
+    pub witness_agent_id: String,
+    pub attestation_type: String,
+    pub note: Option<String>,
+    /// Holochain Timestamp — serializes as microseconds i64.
+    pub issued_at: serde_json::Value,
+    pub revoked_at: Option<serde_json::Value>,
+}
+
 /// Storage-side mirror of the KeyRotation fields as they arrive in the signal.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct KeyRotationPayload {
@@ -646,6 +659,12 @@ pub enum RecoveryV2Signal {
     RecoveryRequestCreated {
         action_hash: String,
         request: RecoveryRequestPayload,
+    },
+    IntimateWitnessSubmitted {
+        action_hash: String,
+        request_hash: String,
+        witness: HumanityWitnessPayload,
+        witness_agent_id: String,
     },
     KeyRotationCommitted {
         action_hash: String,
@@ -712,6 +731,23 @@ pub fn handle_recovery_v2_signal(
                 created_at,
             };
             crate::db::recovery_requests::upsert_recovery_request(conn, row)
+        }
+        RecoveryV2Signal::IntimateWitnessSubmitted {
+            action_hash,
+            request_hash,
+            witness,
+            witness_agent_id,
+        } => {
+            let submitted_at = timestamp_to_iso(&witness.issued_at);
+            let row = crate::db::models::NewRecoveryWitnessRow {
+                dht_anchor_hash: action_hash,
+                recovery_request_hash: request_hash,
+                witness_agent_id,
+                human_id: witness.human_id,
+                note: witness.note,
+                submitted_at,
+            };
+            crate::db::recovery_witnesses::upsert_recovery_witness(conn, row)
         }
         RecoveryV2Signal::KeyRotationCommitted {
             action_hash,
@@ -1215,6 +1251,104 @@ mod peer_status_tests {
                 assert_eq!(peer_id, "uhCAkABC");
                 assert_eq!(status, "online");
             }
+        }
+    }
+}
+
+#[cfg(test)]
+mod recovery_v2_signal_tests {
+    use super::*;
+    use diesel::connection::SimpleConnection;
+    use diesel::prelude::*;
+    use diesel::sqlite::SqliteConnection;
+
+    /// Create an in-memory connection with only the tables needed for these tests.
+    fn setup_test_conn() -> SqliteConnection {
+        let mut conn =
+            SqliteConnection::establish(":memory:").expect("in-memory SQLite");
+        conn.batch_execute(include_str!(
+            "../migrations/2026-04-24-000000_recovery_witnesses/up.sql"
+        ))
+        .expect("create recovery_witnesses table");
+        conn
+    }
+
+    #[test]
+    fn dispatches_intimate_witness_submitted() {
+        let mut conn = setup_test_conn();
+        let signal = RecoveryV2Signal::IntimateWitnessSubmitted {
+            action_hash: "W1".into(),
+            request_hash: "R1".into(),
+            witness: HumanityWitnessPayload {
+                human_id: "H1".into(),
+                witness_agent_id: "A1".into(),
+                attestation_type: "intimate_recovery".into(),
+                note: Some("recognized".into()),
+                issued_at: serde_json::json!(1_700_000_000_000_000_i64),
+                revoked_at: None,
+            },
+            witness_agent_id: "A1".into(),
+        };
+        handle_recovery_v2_signal(&mut conn, signal).expect("dispatch ok");
+        let count =
+            crate::db::recovery_witnesses::count_witnesses_for_request(&mut conn, "R1").unwrap();
+        assert_eq!(count, 1);
+    }
+
+    #[test]
+    fn intimate_witness_submitted_is_idempotent() {
+        let mut conn = setup_test_conn();
+        let signal = RecoveryV2Signal::IntimateWitnessSubmitted {
+            action_hash: "W2".into(),
+            request_hash: "R2".into(),
+            witness: HumanityWitnessPayload {
+                human_id: "H2".into(),
+                witness_agent_id: "A2".into(),
+                attestation_type: "intimate_recovery".into(),
+                note: None,
+                issued_at: serde_json::json!(1_700_000_000_000_000_i64),
+                revoked_at: None,
+            },
+            witness_agent_id: "A2".into(),
+        };
+        handle_recovery_v2_signal(&mut conn, signal.clone()).expect("first dispatch");
+        handle_recovery_v2_signal(&mut conn, signal).expect("second dispatch (idempotent)");
+        let count =
+            crate::db::recovery_witnesses::count_witnesses_for_request(&mut conn, "R2").unwrap();
+        assert_eq!(count, 1, "Replayed signal must not duplicate the row");
+    }
+
+    #[test]
+    fn intimate_witness_submitted_serde_tag_matches_dna() {
+        // Verify the internally-tagged enum shape matches the DNA-side RecoveryV2Signal.
+        let wire = serde_json::json!({
+            "type": "IntimateWitnessSubmitted",
+            "action_hash": "uhCkkW1",
+            "request_hash": "uhCkkR1",
+            "witness": {
+                "human_id": "human-123",
+                "witness_agent_id": "uhCAkWIT",
+                "attestation_type": "intimate_recovery",
+                "note": null,
+                "issued_at": 1_700_000_000_000_000_i64,
+                "revoked_at": null,
+            },
+            "witness_agent_id": "uhCAkWIT",
+        });
+        let signal: RecoveryV2Signal = serde_json::from_value(wire).unwrap();
+        match signal {
+            RecoveryV2Signal::IntimateWitnessSubmitted {
+                action_hash,
+                request_hash,
+                witness,
+                witness_agent_id,
+            } => {
+                assert_eq!(action_hash, "uhCkkW1");
+                assert_eq!(request_hash, "uhCkkR1");
+                assert_eq!(witness.human_id, "human-123");
+                assert_eq!(witness_agent_id, "uhCAkWIT");
+            }
+            _ => panic!("Expected IntimateWitnessSubmitted variant"),
         }
     }
 }
