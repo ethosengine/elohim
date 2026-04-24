@@ -1963,7 +1963,7 @@ pub fn submit_intimate_witness(
         attestation_type: "intimate_recovery".into(),
         confidence: 1.0,
         behavioral_hash: None,
-        evidence_json: input.note.map(|n| format!("{{\"note\":{:?}}}", n)),
+        evidence_json: input.note.map(|n| serde_json::json!({ "note": n }).to_string()),
         verification_method: Some("intimate_recovery_ceremony".into()),
         created_at: timestamp,
         expires_at,
