@@ -476,6 +476,12 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                 nix develop --accept-flake-config "$WORKSPACE/elohim/holochain/dna/elohim" --command bash -c "
                                     set -uo pipefail
                                     export CARGO_BUILD_JOBS=2
+                                    # The flake exports RUSTFLAGS='--cfg getrandom_backend=\"custom\"'
+                                    # for WASM zome builds (Holochain provides the host RNG fn).
+                                    # Sweettest is a NATIVE build — that flag makes the linker
+                                    # search for __getrandom_v03_custom which doesn't exist off-WASM.
+                                    # See CLAUDE.md §RUSTFLAGS Override Required.
+                                    export RUSTFLAGS=\"\"
 
                                     cargo test --release --no-fail-fast -- \\
                                         --include-ignored \\

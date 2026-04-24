@@ -1530,6 +1530,12 @@ pub enum RecoveryV2Signal {
         action_hash: ActionHash,
         request: RecoveryRequest,
     },
+    IntimateWitnessSubmitted {
+        action_hash: ActionHash,
+        request_hash: ActionHash,
+        witness: HumanityWitness,
+        witness_agent_id: AgentPubKey,
+    },
     KeyRotationCommitted {
         action_hash: ActionHash,
         rotation: KeyRotation,
@@ -1570,17 +1576,149 @@ pub struct KeyRotationOutput {
     pub rotation: KeyRotation,
 }
 
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct SubmitIntimateWitnessInput {
+    pub recovery_request_hash: ActionHash,
+    pub note: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct SubmitIntimateWitnessOutput {
+    pub action_hash: ActionHash,
+    pub witness: HumanityWitness,
+}
+
+// =============================================================================
+// Recovery Protocol Phase 2 — M3 Helpers
+// =============================================================================
+
+/// Resolve an `AgentPubKey` to the `human_id` String by traversing
+/// `AgentKeyToHuman` link → Human entry → human.id. Returns a coordinator
+/// error if no Human is bound to the given pubkey.
+fn resolve_human_id_for_agent(agent_pubkey: &AgentPubKey) -> ExternResult<String> {
+    let links = get_links(
+        LinkQuery::try_new(agent_pubkey.clone(), LinkTypes::AgentKeyToHuman)?,
+        GetStrategy::default(),
+    )?;
+    let first = links.first().ok_or(wasm_error!(WasmErrorInner::Guest(format!(
+        "No Human bound to agent pubkey {}",
+        agent_pubkey
+    ))))?;
+    let action_hash = first
+        .target
+        .clone()
+        .into_action_hash()
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "AgentKeyToHuman target is not an action hash".into()
+        )))?;
+    let record = get(action_hash, GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Human entry missing".into())))?;
+    let human: Human = record
+        .entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Human entry deserialize failed".into())))?;
+    Ok(human.id)
+}
+
+/// Count the human's active `HumanRelationship` entries where
+/// `emergency_access_enabled = true`. Active means no revocation path applied;
+/// the simple rule for M3 is "entry still exists and flag is true."
+fn count_active_emergency_contacts(human_id: &str) -> ExternResult<u32> {
+    let anchor = StringAnchor::new("agent_relationships", human_id);
+    let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor))?;
+    let links = get_links(
+        LinkQuery::try_new(anchor_hash, LinkTypes::AgentToRelationship)?,
+        GetStrategy::default(),
+    )?;
+    let mut count: u32 = 0;
+    for link in links {
+        let rel_hash = match link.target.clone().into_action_hash() {
+            Some(h) => h,
+            None => continue,
+        };
+        let Some(record) = get(rel_hash, GetOptions::default())? else { continue };
+        let Some(rel): Option<HumanRelationship> = record
+            .entry()
+            .to_app_option()
+            .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        else { continue };
+        if rel.emergency_access_enabled {
+            count += 1;
+        }
+    }
+    Ok(count)
+}
+
+/// Threshold formula per revised spec §5 / M3 design §4.2: `max(2, ceil(M/2) + 1)`.
+fn compute_required_witness_count(active_emergency_contacts: u32) -> u32 {
+    let m = active_emergency_contacts;
+    let ceil_half_plus_one = (m + 1) / 2 + 1; // ceil(m/2) + 1 for u32
+    std::cmp::max(2, ceil_half_plus_one)
+}
+
+/// Intimate-recovery witness validity horizon. Matches protocol spec §5.
+const WITNESS_EXPIRY_DAYS: u64 = 90;
+const MICROS_PER_DAY: u64 = 24 * 60 * 60 * 1_000_000;
+
+#[cfg(test)]
+mod m3_witness_threshold_tests {
+    use super::compute_required_witness_count;
+
+    #[test]
+    fn floor_at_two_when_no_contacts() {
+        assert_eq!(compute_required_witness_count(0), 2);
+    }
+
+    #[test]
+    fn floor_at_two_when_one_contact() {
+        assert_eq!(compute_required_witness_count(1), 2);
+    }
+
+    #[test]
+    fn two_contacts_yields_two() {
+        // ceil(2/2) + 1 = 1 + 1 = 2; floor is 2; max(2, 2) = 2.
+        // Boundary: the point where the floor stops dominating.
+        assert_eq!(compute_required_witness_count(2), 2);
+    }
+
+    #[test]
+    fn three_contacts_yields_three() {
+        // ceil(3/2) + 1 = 2 + 1 = 3
+        assert_eq!(compute_required_witness_count(3), 3);
+    }
+
+    #[test]
+    fn four_contacts_yields_three() {
+        // ceil(4/2) + 1 = 2 + 1 = 3
+        assert_eq!(compute_required_witness_count(4), 3);
+    }
+
+    #[test]
+    fn five_contacts_yields_four() {
+        // ceil(5/2) + 1 = 3 + 1 = 4
+        assert_eq!(compute_required_witness_count(5), 4);
+    }
+}
+
 // =============================================================================
 // Recovery Protocol Phase 2 — Coordinator Functions
 // =============================================================================
 
 /// Create a recovery request.
 /// Authored by the hosting doorway on behalf of the claimant's new device.
+/// M3: resolves human_id from agent pubkey and computes required_witness_count.
+/// Anchors on human_id (was: pubkey string). See design §12.
 #[hdk_extern]
 pub fn create_recovery_request(
     input: CreateRecoveryRequestInput,
 ) -> ExternResult<RecoveryRequestOutput> {
     let now = sys_time()?;
+
+    // M3: resolve human_id + compute required_witness_count
+    let human_id = resolve_human_id_for_agent(&input.human_agent_pubkey)?;
+    let contact_count = count_active_emergency_contacts(&human_id)?;
+    let required_witness_count = compute_required_witness_count(contact_count);
 
     let request = RecoveryRequest {
         human_agent_pubkey: input.human_agent_pubkey.clone(),
@@ -1588,15 +1726,15 @@ pub fn create_recovery_request(
         hosting_doorway_pubkey: input.hosting_doorway_pubkey,
         proposed_authority: input.proposed_authority,
         request_nonce: input.request_nonce,
-        human_id: None,          // M3 coordinator flow will populate via Agent entry lookup
-        required_witness_count: 2, // M3 coordinator flow will compute ceil(M/2)+1; floor=2
+        human_id: Some(human_id.clone()),
+        required_witness_count,
         created_at: now,
     };
 
     let action_hash = create_entry(&EntryTypes::RecoveryRequest(request.clone()))?;
 
-    // Link Anchor(human_pubkey) → request using HumanToRecoveryRequest link type.
-    let anchor = StringAnchor::new("recovery_request", &input.human_agent_pubkey.to_string());
+    // M3 decision log #2: anchor on human_id (was: pubkey). See design §12.
+    let anchor = StringAnchor::new("recovery_request", &human_id);
     let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor.clone()))?;
     create_entry(&EntryTypes::StringAnchor(anchor))?;
     create_link(
@@ -1617,13 +1755,56 @@ pub fn create_recovery_request(
     })
 }
 
+/// Traverse `HumanToFreeze` links for the given `human_id` and return all
+/// `IdentityFreeze` entries with `is_active = true`. Used by the M3 freeze-
+/// floor gate on `commit_key_rotation`.
+fn collect_active_freezes_for_human(human_id: &str) -> ExternResult<Vec<IdentityFreeze>> {
+    let anchor = StringAnchor::new("identity_freeze_by_human", human_id);
+    let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor))?;
+    let links = get_links(
+        LinkQuery::try_new(anchor_hash, LinkTypes::HumanToFreeze)?,
+        GetStrategy::default(),
+    )?;
+    let mut freezes = Vec::new();
+    for link in links {
+        let Some(hash) = link.target.clone().into_action_hash() else { continue };
+        let Some(record) = get(hash, GetOptions::default())? else { continue };
+        let Some(freeze): Option<IdentityFreeze> = record
+            .entry()
+            .to_app_option()
+            .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        else { continue };
+        if freeze.is_active {
+            freezes.push(freeze);
+        }
+    }
+    Ok(freezes)
+}
+
 /// Commit a key rotation to the DHT.
-/// NOTE: The integrity validator currently stub-rejects all RecoveryAuthority variants.
-/// M2 adds variant-specific validation. Until then this coordinator will return Err
-/// on any attempted rotation — intentional during M1-cleanup.
+/// M3: runs freeze-floor pre-commit gate (CryptographicQuorum exempt) before
+/// creating the entry.
 #[hdk_extern]
 pub fn commit_key_rotation(input: CommitKeyRotationInput) -> ExternResult<KeyRotationOutput> {
     let now = sys_time()?;
+
+    // M3: freeze-floor gate (skips for CryptographicQuorum per design §4.3).
+    let is_cryptographic = matches!(
+        &input.authority,
+        RecoveryAuthority::CryptographicQuorum { .. }
+    );
+    if !is_cryptographic {
+        // Resolve human_id from the rotating pubkey (same path as create_recovery_request).
+        let human_id = resolve_human_id_for_agent(&input.human_agent_pubkey)?;
+        let active_freezes = collect_active_freezes_for_human(&human_id)?;
+        let freeze_refs: Vec<&IdentityFreeze> = active_freezes.iter().collect();
+
+        if let Some(reason) = check_freeze_floor_rules(&input.authority, &human_id, &freeze_refs) {
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "freeze-floor gate rejected rotation: {reason}"
+            ))));
+        }
+    }
 
     let rotation = KeyRotation {
         human_agent_pubkey: input.human_agent_pubkey.clone(),
@@ -1668,6 +1849,163 @@ pub fn commit_key_rotation(input: CommitKeyRotationInput) -> ExternResult<KeyRot
     Ok(KeyRotationOutput {
         action_hash,
         rotation,
+    })
+}
+
+// =============================================================================
+// Recovery Protocol Phase 2 — M3: submit_intimate_witness
+// =============================================================================
+
+/// Returns true if `authorizer_human_id` holds an active `HumanRelationship`
+/// with `emergency_access_enabled = true` targeting `target_human_id`.
+/// Both `party_a_id` and `party_b_id` are human ID strings.
+fn is_active_emergency_contact(
+    target_human_id: &str,
+    authorizer_human_id: &str,
+) -> ExternResult<bool> {
+    // Traverse AgentToRelationship links anchored on the target human's id.
+    let anchor = StringAnchor::new("agent_relationships", target_human_id);
+    let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor))?;
+    let links = get_links(
+        LinkQuery::try_new(anchor_hash, LinkTypes::AgentToRelationship)?,
+        GetStrategy::default(),
+    )?;
+    for link in links {
+        let Some(rel_hash) = link.target.clone().into_action_hash() else { continue };
+        let Some(record) = get(rel_hash, GetOptions::default())? else { continue };
+        let Some(rel): Option<HumanRelationship> = record
+            .entry()
+            .to_app_option()
+            .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        else { continue };
+        if !rel.emergency_access_enabled { continue; }
+        // party_a_id and party_b_id are human ID strings.
+        if rel.party_a_id == authorizer_human_id || rel.party_b_id == authorizer_human_id {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
+/// Returns true if `authorizer_human_id` already has a `HumanityWitness` linked
+/// from the given request (via `RecoveryRequestToHumanityWitness`).
+fn has_existing_witness_for_request(
+    request_hash: &ActionHash,
+    authorizer_human_id: &str,
+) -> ExternResult<bool> {
+    let links = get_links(
+        LinkQuery::try_new(request_hash.clone(), LinkTypes::RecoveryRequestToHumanityWitness)?,
+        GetStrategy::default(),
+    )?;
+    for link in links {
+        let Some(w_hash) = link.target.clone().into_action_hash() else { continue };
+        let Some(record) = get(w_hash, GetOptions::default())? else { continue };
+        let Some(w): Option<HumanityWitness> = record
+            .entry()
+            .to_app_option()
+            .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        else { continue };
+        if w.witness_agent_id == authorizer_human_id {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
+/// Submit an intimate witness attestation for a recovery request.
+///
+/// Gates:
+/// 1. RecoveryRequest must exist and have a populated human_id.
+/// 2. Authorizer must be an active emergency contact of the target human
+///    (has a HumanRelationship with emergency_access_enabled = true).
+/// 3. Dedupe: authorizer cannot witness the same request twice.
+#[hdk_extern]
+pub fn submit_intimate_witness(
+    input: SubmitIntimateWitnessInput,
+) -> ExternResult<SubmitIntimateWitnessOutput> {
+    // Gate 1: fetch the RecoveryRequest; must exist.
+    let request_record = get(input.recovery_request_hash.clone(), GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "RecoveryRequest not found at given hash".into()
+        )))?;
+    let request: RecoveryRequest = request_record
+        .entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "RecoveryRequest record has no entry".into()
+        )))?;
+    let human_id = request.human_id.clone().ok_or(wasm_error!(WasmErrorInner::Guest(
+        "RecoveryRequest has no human_id (pre-M3 entry?)".into()
+    )))?;
+
+    // Gate 2: authorizer must be on an active emergency-enabled HumanRelationship.
+    let authorizer_pubkey = agent_info()?.agent_initial_pubkey;
+    let authorizer_human_id = resolve_human_id_for_agent(&authorizer_pubkey)?;
+    if !is_active_emergency_contact(&human_id, &authorizer_human_id)? {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "authorizing agent is not an active emergency contact of this human".into()
+        )));
+    }
+
+    // Gate 3: dedupe — the authorizer cannot witness the same request twice.
+    if has_existing_witness_for_request(&input.recovery_request_hash, &authorizer_human_id)? {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "this agent has already submitted a witness for this request".into()
+        )));
+    }
+
+    // Commit the HumanityWitness. HumanityWitness has no `note` field;
+    // the optional note is stored in evidence_json.
+    let now = sys_time()?;
+    let timestamp = format!("{:?}", now);
+    let expiry_micros = WITNESS_EXPIRY_DAYS * MICROS_PER_DAY;
+    let expires_at = format!(
+        "{:?}",
+        now.checked_add(&Duration::from_micros(expiry_micros))
+            .unwrap_or(now)
+    );
+    // Sanitize characters that appear in Timestamp Debug output; match the
+    // convention used by other id generators in this zome (e.g., renewals).
+    let witness_id_ts = timestamp.replace([':', ' ', '(', ')'], "-");
+    let witness_id = format!("intimate-witness-{}-{}", human_id, witness_id_ts);
+    let witness = HumanityWitness {
+        id: witness_id,
+        human_id: human_id.clone(),
+        // NOTE: M3 stores authorizer's human_id here, not agent pubkey.
+        // The field's name is a pre-M3 misnomer the protocol accepts.
+        // Dedupe gate `has_existing_witness_for_request` depends on this convention.
+        witness_agent_id: authorizer_human_id.clone(),
+        attestation_type: "intimate_recovery".into(),
+        confidence: 1.0,
+        behavioral_hash: None,
+        evidence_json: input.note.map(|n| serde_json::json!({ "note": n }).to_string()),
+        verification_method: Some("intimate_recovery_ceremony".into()),
+        created_at: timestamp,
+        expires_at,
+        revoked_at: None,
+    };
+    let action_hash = create_entry(&EntryTypes::HumanityWitness(witness.clone()))?;
+
+    // Create the M3 link from the request to the witness.
+    create_link(
+        input.recovery_request_hash.clone(),
+        action_hash.clone(),
+        LinkTypes::RecoveryRequestToHumanityWitness,
+        (),
+    )?;
+
+    // Emit rich signal.
+    emit_signal(RecoveryV2Signal::IntimateWitnessSubmitted {
+        action_hash: action_hash.clone(),
+        request_hash: input.recovery_request_hash,
+        witness: witness.clone(),
+        witness_agent_id: authorizer_pubkey,
+    })?;
+
+    Ok(SubmitIntimateWitnessOutput {
+        action_hash,
+        witness,
     })
 }
 
