@@ -892,6 +892,7 @@ dependencies = [
 name = "imagodei_integrity"
 version = "0.1.0"
 dependencies = [
+ "base64",
  "ed25519-dalek",
  "hdi",
  "holochain_serialized_bytes",
