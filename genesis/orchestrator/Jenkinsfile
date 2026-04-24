@@ -53,7 +53,12 @@ import groovy.transform.Field
         jenkinsPath: 'Jenkinsfile',
         changePatterns: ['app/elohim-app/', 'app/elohim-library/', 'elohim/sdk/', 'VERSION'],
         artifacts: ['elohim-app'],
-        dependsOn: ['elohim-sophia'],  // rebuild app when sophia UMD bundle changes
+        // elohim-sophia: rebuild app when sophia UMD bundle changes.
+        // elohim-holochain: app pulls elohim-cache-core WASM image from Harbor
+        // by SHA tag (`1.0.0-dev-<sha>`), which is produced by the DNA pipeline.
+        // Without this dep the two race and app fails with a Harbor "not found"
+        // on every first build after a DNA-affecting commit.
+        dependsOn: ['elohim-sophia', 'elohim-holochain'],
         triggersGenesis: true,
         deploymentCheck: [
             dev: 'https://alpha.elohim.host',
