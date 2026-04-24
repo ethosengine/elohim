@@ -3169,8 +3169,54 @@ impl P2PNode {
     ) -> EprAtomResponse {
         match request {
             EprAtomRequest::Fetch { cid } => {
-                debug!(cid = %cid, "EPR atom fetch (Batch B stub)");
-                EprAtomResponse::NotFound
+                let Some(pool) = self.db_pool.as_ref() else {
+                    warn!(cid = %cid, "EPR atom fetch: db pool unavailable");
+                    return EprAtomResponse::Error {
+                        message: "storage unavailable".to_string(),
+                    };
+                };
+                let mut conn = match pool.get() {
+                    Ok(c) => c,
+                    Err(e) => {
+                        warn!(cid = %cid, error = %e, "EPR atom fetch: db pool exhausted");
+                        return EprAtomResponse::Error {
+                            message: "storage busy".to_string(),
+                        };
+                    }
+                };
+
+                match crate::services::epr_service::fetch_wire_bytes_by_cid(&mut conn, &cid) {
+                    Ok(Some(fetched)) => {
+                        // Reach gate: Phase 2c serves Commons/Public to any peer.
+                        // Task 14 replaces this with an identity-aware gate.
+                        if is_publicly_servable(&fetched.reach) {
+                            debug!(
+                                cid = %cid,
+                                reach = %fetched.reach,
+                                bytes = fetched.wire_bytes.len(),
+                                "EPR atom fetch served"
+                            );
+                            EprAtomResponse::Atom {
+                                envelope_bytes: fetched.wire_bytes,
+                            }
+                        } else {
+                            // Leak-free: caller cannot distinguish missing from unauthorized.
+                            debug!(
+                                cid = %cid,
+                                reach = %fetched.reach,
+                                "EPR atom fetch denied by reach gate"
+                            );
+                            EprAtomResponse::NotFound
+                        }
+                    }
+                    Ok(None) => EprAtomResponse::NotFound,
+                    Err(e) => {
+                        warn!(cid = %cid, error = ?e, "EPR atom fetch error");
+                        EprAtomResponse::Error {
+                            message: "internal error".to_string(),
+                        }
+                    }
+                }
             }
             EprAtomRequest::Announce { envelope_bytes } => {
                 debug!(
@@ -3718,4 +3764,12 @@ impl P2PNode {
         };
         let _ = self.status_tx.send(status);
     }
+}
+
+/// Reach gate for Phase 2c: only Commons/Public atoms are served cross-peer.
+/// Private/Collective/Steward atoms are denied as NotFound (leak-free).
+/// Task 14 extends this with `CallerIdentity` to allow authors to fetch their
+/// own private atoms.
+fn is_publicly_servable(reach: &str) -> bool {
+    matches!(reach, "commons" | "public")
 }
