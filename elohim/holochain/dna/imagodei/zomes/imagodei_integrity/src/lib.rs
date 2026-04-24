@@ -20,6 +20,10 @@ pub use stewardship::*;
 pub mod recovery_v2;
 pub use recovery_v2::*;
 
+// EPR Phase 2B — AgentPeerBinding (libp2p ↔ Holochain agent identity binding)
+pub mod agent_peer_binding;
+pub use agent_peer_binding::*;
+
 // =============================================================================
 // Identity Constants
 // =============================================================================
@@ -54,18 +58,18 @@ pub const INTIMACY_LEVELS: [&str; 5] = [
 
 /// Human relationship types (social bonds between agents)
 pub const HUMAN_RELATIONSHIP_TYPES: [&str; 12] = [
-    "spouse",          // Married/life partner (intimate)
-    "parent",          // Parent-child (intimate)
-    "child",           // Parent-child (intimate)
-    "sibling",         // Brother/sister (intimate or trusted)
-    "grandparent",     // Grandparent-grandchild (trusted)
-    "grandchild",      // Grandparent-grandchild (trusted)
-    "extended-family", // Aunt, uncle, cousin (trusted or familiar)
-    "trusted-friend",  // Close friend (trusted)
-    "colleague",       // Work colleague (familiar)
-    "neighbor",        // Geographic proximity (familiar)
+    "spouse",           // Married/life partner (intimate)
+    "parent",           // Parent-child (intimate)
+    "child",            // Parent-child (intimate)
+    "sibling",          // Brother/sister (intimate or trusted)
+    "grandparent",      // Grandparent-grandchild (trusted)
+    "grandchild",       // Grandparent-grandchild (trusted)
+    "extended-family",  // Aunt, uncle, cousin (trusted or familiar)
+    "trusted-friend",   // Close friend (trusted)
+    "colleague",        // Work colleague (familiar)
+    "neighbor",         // Geographic proximity (familiar)
     "community-member", // Same community/church/organization (familiar)
-    "acquaintance",    // Known but not close (acquainted)
+    "acquaintance",     // Known but not close (acquainted)
 ];
 
 // =============================================================================
@@ -127,10 +131,10 @@ pub const RECOVERY_METHODS: [&str; 3] = [
 
 /// Recovery hint types
 pub const RECOVERY_HINT_TYPES: [&str; 4] = [
-    "password_hint",     // Encrypted password reminder
-    "security_qa",       // Security questions/answers
-    "trusted_doorways",  // Pre-registered doorway list
-    "trusted_contacts",  // Emergency contact list
+    "password_hint",    // Encrypted password reminder
+    "security_qa",      // Security questions/answers
+    "trusted_doorways", // Pre-registered doorway list
+    "trusted_contacts", // Emergency contact list
 ];
 
 // =============================================================================
@@ -148,12 +152,12 @@ pub const ATTESTATION_TYPES: [&str; 5] = [
 
 /// Anomaly types detected by behavioral monitoring
 pub const ANOMALY_TYPES: [&str; 6] = [
-    "posting_pattern",    // Sudden change in posting frequency/style
-    "content_style",      // AI-detected writing style deviation
+    "posting_pattern",     // Sudden change in posting frequency/style
+    "content_style",       // AI-detected writing style deviation
     "relationship_change", // Rapid/mass relationship modifications
-    "geo_shift",          // Geographic location anomaly
-    "session_anomaly",    // Unusual login patterns
-    "capability_abuse",   // Excessive use of privileged operations
+    "geo_shift",           // Geographic location anomaly
+    "session_anomaly",     // Unusual login patterns
+    "capability_abuse",    // Excessive use of privileged operations
 ];
 
 /// Anomaly severity levels
@@ -182,26 +186,26 @@ pub const CHALLENGE_STATUSES: [&str; 4] = [
 
 /// Key revocation reasons
 pub const REVOCATION_REASONS: [&str; 4] = [
-    "compromised",       // Key known to be compromised
-    "stolen",            // Device/key stolen
-    "challenge_upheld",  // Community challenge succeeded
-    "voluntary",         // User-initiated revocation
+    "compromised",      // Key known to be compromised
+    "stolen",           // Device/key stolen
+    "challenge_upheld", // Community challenge succeeded
+    "voluntary",        // User-initiated revocation
 ];
 
 /// Identity freeze types
 pub const FREEZE_TYPES: [&str; 3] = [
-    "auto_anomaly",       // Triggered by anomaly detection
+    "auto_anomaly",        // Triggered by anomaly detection
     "community_challenge", // Triggered by community reports
-    "steward_emergency",  // Triggered by M-of-N steward consensus
+    "steward_emergency",   // Triggered by M-of-N steward consensus
 ];
 
 /// Capabilities that can be frozen
 pub const FREEZABLE_CAPABILITIES: [&str; 5] = [
-    "post",               // Create new content
-    "transfer",           // Transfer assets/points
+    "post",                 // Create new content
+    "transfer",             // Transfer assets/points
     "modify_relationships", // Change relationship graph
-    "vote",               // Participate in governance votes
-    "attest",             // Issue attestations to others
+    "vote",                 // Participate in governance votes
+    "attest",               // Issue attestations to others
 ];
 
 /// Verification requirements to unfreeze
@@ -214,8 +218,8 @@ pub const UNFREEZE_REQUIREMENTS: [&str; 4] = [
 
 /// Signing policy levels for distributed key custody
 pub const SIGNING_POLICIES: [&str; 3] = [
-    "normal",   // Standard M-of-N threshold
-    "elevated", // Higher threshold for sensitive ops
+    "normal",    // Standard M-of-N threshold
+    "elevated",  // Higher threshold for sensitive ops
     "emergency", // Recovery mode (relaxed threshold)
 ];
 
@@ -335,8 +339,8 @@ pub struct AgentProgress {
     pub current_step_index: u32,
     pub completed_step_indices: Vec<u32>,
     pub completed_content_ids: Vec<String>,
-    pub step_affinity_json: String,        // Record<number, number> as JSON
-    pub step_notes_json: String,           // Record<number, string> as JSON
+    pub step_affinity_json: String, // Record<number, number> as JSON
+    pub step_notes_json: String,    // Record<number, string> as JSON
     pub reflection_responses_json: String, // Record<number, string[]> as JSON
     pub attestations_earned: Vec<String>,
     pub started_at: String,
@@ -365,19 +369,19 @@ pub struct HumanRelationship {
     pub is_bidirectional: bool,    // Both parties acknowledge (true) or one-sided (false)
 
     // === CONSENT & PERMISSIONS ===
-    pub consent_given_by_a: bool,  // Party A agrees to relationship
-    pub consent_given_by_b: bool,  // Party B agrees to relationship
+    pub consent_given_by_a: bool,   // Party A agrees to relationship
+    pub consent_given_by_b: bool,   // Party B agrees to relationship
     pub custody_enabled_by_a: bool, // Party A allows B to custody their data
     pub custody_enabled_by_b: bool, // Party B allows A to custody their data
 
     // === CUSTODY & BACKUP ===
-    pub auto_custody_enabled: bool,              // Should intimate/private content auto-replicate?
+    pub auto_custody_enabled: bool, // Should intimate/private content auto-replicate?
     pub shared_encryption_key_id: Option<String>, // For family-shared content
-    pub emergency_access_enabled: bool,          // Can this relationship trigger emergency recovery?
+    pub emergency_access_enabled: bool, // Can this relationship trigger emergency recovery?
 
     // === METADATA ===
-    pub initiated_by: String,         // Which party initiated (party_a_id or party_b_id)
-    pub verified_at: Option<String>,  // When both parties confirmed
+    pub initiated_by: String, // Which party initiated (party_a_id or party_b_id)
+    pub verified_at: Option<String>, // When both parties confirmed
     pub created_at: String,
     pub updated_at: String,
     pub expires_at: Option<String>, // Optional expiration (e.g., temporary trust)
@@ -405,10 +409,10 @@ pub struct Attestation {
     pub display_name: String,
     pub description: String,
     pub icon_url: Option<String>,
-    pub tier: Option<String>,     // bronze, silver, gold, platinum
-    pub earned_via_json: String,  // EarnedVia details as JSON
+    pub tier: Option<String>,    // bronze, silver, gold, platinum
+    pub earned_via_json: String, // EarnedVia details as JSON
     pub issued_at: String,
-    pub issued_by: String,        // System, steward, governance, or peer
+    pub issued_by: String, // System, steward, governance, or peer
     pub expires_at: Option<String>,
     pub proof: Option<String>, // Cryptographic signature
 }
@@ -433,9 +437,9 @@ pub struct ContentMastery {
     pub id: String,
     pub human_id: String,
     pub content_id: String,
-    pub mastery_level: String,      // MasteryLevel: not_started → create
-    pub mastery_level_index: u32,   // 0-7 for comparison
-    pub freshness_score: f64,       // 0.0-1.0, decays over time
+    pub mastery_level: String,    // MasteryLevel: not_started → create
+    pub mastery_level_index: u32, // 0-7 for comparison
+    pub freshness_score: f64,     // 0.0-1.0, decays over time
     pub needs_refresh: bool,
     pub engagement_count: u32,
     pub last_engagement_type: String, // EngagementType
@@ -477,16 +481,16 @@ pub struct ContributorPresence {
     pub presence_state: String, // unclaimed, stewarded, claimed
 
     // === EXTERNAL IDENTITY ===
-    pub external_identifiers_json: String,    // ExternalIdentifier[] as JSON
+    pub external_identifiers_json: String, // ExternalIdentifier[] as JSON
     pub establishing_content_ids_json: String, // Content IDs that cite this contributor
     pub established_at: String,
 
     // === RECOGNITION ACCUMULATION ===
-    pub affinity_total: i64,         // Total affinity points accumulated
-    pub unique_engagers: u32,        // Count of unique agents who engaged
-    pub citation_count: u32,         // How many times cited in content
-    pub endorsements_json: String,   // Endorsement[] as JSON
-    pub recognition_score: f64,      // Computed recognition score
+    pub affinity_total: i64,       // Total affinity points accumulated
+    pub unique_engagers: u32,      // Count of unique agents who engaged
+    pub citation_count: u32,       // How many times cited in content
+    pub endorsements_json: String, // Endorsement[] as JSON
+    pub recognition_score: f64,    // Computed recognition score
     pub recognition_by_content_json: String, // Record<contentId, score> as JSON
     pub accumulating_since: String,
     pub last_recognition_at: String,
@@ -566,12 +570,12 @@ pub struct RecoveryRequest {
 #[derive(Clone, PartialEq)]
 pub struct RecoveryVote {
     pub id: String,
-    pub request_id: String,        // ID of RecoveryRequest being voted on
-    pub voter_human_id: String,    // Human ID of voter
-    pub approved: bool,            // Approve or reject
-    pub attestation: String,       // Verification note: "Verified via video call"
-    pub intimacy_level: String,    // Voter's intimacy level with requestor
-    pub confidence_weight: f64,    // Weight contribution (based on intimacy)
+    pub request_id: String,          // ID of RecoveryRequest being voted on
+    pub voter_human_id: String,      // Human ID of voter
+    pub approved: bool,              // Approve or reject
+    pub attestation: String,         // Verification note: "Verified via video call"
+    pub intimacy_level: String,      // Voter's intimacy level with requestor
+    pub confidence_weight: f64,      // Weight contribution (based on intimacy)
     pub verification_method: String, // How voter verified: video_call, phone, in_person
     pub voted_at: String,
 }
@@ -590,10 +594,10 @@ pub struct RecoveryVote {
 pub struct RecoveryHint {
     pub id: String,
     pub human_id: String,
-    pub hint_type: String,       // See RECOVERY_HINT_TYPES
-    pub encrypted_data: String,  // AES-GCM encrypted hint data
+    pub hint_type: String,        // See RECOVERY_HINT_TYPES
+    pub encrypted_data: String,   // AES-GCM encrypted hint data
     pub encryption_nonce: String, // Nonce used for encryption
-    pub version: u32,            // For updating hints
+    pub version: u32,             // For updating hints
     pub created_at: String,
     pub updated_at: String,
 }
@@ -618,22 +622,22 @@ pub struct RecoveryHint {
 #[derive(Clone, PartialEq)]
 pub struct HumanityWitness {
     pub id: String,
-    pub human_id: String,        // Human being attested
+    pub human_id: String,         // Human being attested
     pub witness_agent_id: String, // Agent providing attestation
 
     // === ATTESTATION DETAILS ===
-    pub attestation_type: String,       // See ATTESTATION_TYPES
-    pub confidence: f64,                // 0.0 - 1.0 confidence in identity
+    pub attestation_type: String,        // See ATTESTATION_TYPES
+    pub confidence: f64,                 // 0.0 - 1.0 confidence in identity
     pub behavioral_hash: Option<String>, // Hash of behavioral baseline for comparison
 
     // === EVIDENCE ===
-    pub evidence_json: Option<String>,  // Supporting evidence (e.g., video call timestamp)
+    pub evidence_json: Option<String>, // Supporting evidence (e.g., video call timestamp)
     pub verification_method: Option<String>, // How identity was verified
 
     // === LIFECYCLE ===
     pub created_at: String,
-    pub expires_at: String,             // Attestations decay - must be renewed
-    pub revoked_at: Option<String>,     // Explicitly revoked if witness changes mind
+    pub expires_at: String,         // Attestations decay - must be renewed
+    pub revoked_at: Option<String>, // Explicitly revoked if witness changes mind
 }
 
 /// KeyStewardship - Distributed key custody via Shamir Secret Sharing.
@@ -655,22 +659,22 @@ pub struct KeyStewardship {
     pub human_id: String,
 
     // === SHARD HOLDERS ===
-    pub key_shard_holders: Vec<String>,  // Agent IDs holding key shards
-    pub threshold_m: u32,                // M required to sign
-    pub total_shards_n: u32,             // Total shards distributed
+    pub key_shard_holders: Vec<String>, // Agent IDs holding key shards
+    pub threshold_m: u32,               // M required to sign
+    pub total_shards_n: u32,            // Total shards distributed
 
     // === POLICY ===
     pub signing_policy: String,          // See SIGNING_POLICIES
     pub elevated_threshold: Option<u32>, // Higher M for sensitive ops
 
     // === KEY METADATA ===
-    pub key_generation_id: String,       // Which key generation this stewardship covers
-    pub shard_commitment_hash: String,   // Commitment to verify shards
+    pub key_generation_id: String, // Which key generation this stewardship covers
+    pub shard_commitment_hash: String, // Commitment to verify shards
 
     // === LIFECYCLE ===
     pub created_at: String,
     pub updated_at: String,
-    pub rotated_at: Option<String>,      // Last key rotation
+    pub rotated_at: Option<String>, // Last key rotation
 }
 
 /// IdentityAnomaly - Detected behavioral deviation.
@@ -690,26 +694,26 @@ pub struct IdentityAnomaly {
     pub human_id: String,
 
     // === ANOMALY DETAILS ===
-    pub anomaly_type: String,       // See ANOMALY_TYPES
-    pub severity: String,           // See ANOMALY_SEVERITIES
-    pub deviation_score: f64,       // 0.0 - 1.0 (1.0 = extreme deviation)
+    pub anomaly_type: String, // See ANOMALY_TYPES
+    pub severity: String,     // See ANOMALY_SEVERITIES
+    pub deviation_score: f64, // 0.0 - 1.0 (1.0 = extreme deviation)
 
     // === EVIDENCE ===
-    pub evidence_json: String,      // JSON blob: { baseline: {...}, current: {...}, diff: {...} }
-    pub detection_method: String,   // AI model, rule-based, etc.
+    pub evidence_json: String, // JSON blob: { baseline: {...}, current: {...}, diff: {...} }
+    pub detection_method: String, // AI model, rule-based, etc.
 
     // === ACTIONS ===
     pub auto_freeze_triggered: bool, // Did this anomaly trigger a freeze?
     pub freeze_id: Option<String>,   // Link to IdentityFreeze if triggered
 
     // === RESOLUTION ===
-    pub acknowledged_at: Option<String>,  // User acknowledged anomaly
+    pub acknowledged_at: Option<String>, // User acknowledged anomaly
     pub resolved_at: Option<String>,
-    pub resolution_json: Option<String>,  // How it was resolved
+    pub resolution_json: Option<String>, // How it was resolved
 
     // === TIMESTAMPS ===
     pub detected_at: String,
-    pub expires_at: Option<String>,       // Anomalies may expire if not concerning
+    pub expires_at: Option<String>, // Anomalies may expire if not concerning
 }
 
 /// IdentityChallenge - Community override mechanism.
@@ -727,34 +731,34 @@ pub struct IdentityAnomaly {
 #[derive(Clone, PartialEq)]
 pub struct IdentityChallenge {
     pub id: String,
-    pub human_id: String,           // Human being challenged
+    pub human_id: String, // Human being challenged
 
     // === CHALLENGE DETAILS ===
-    pub challenge_type: String,     // See CHALLENGE_TYPES
-    pub initiator_id: String,       // Who started the challenge
-    pub initiator_weight: f64,      // Weight of initial challenger
+    pub challenge_type: String, // See CHALLENGE_TYPES
+    pub initiator_id: String,   // Who started the challenge
+    pub initiator_weight: f64,  // Weight of initial challenger
 
     // === EVIDENCE ===
-    pub evidence_json: String,      // JSON: { description: "", screenshots: [], etc. }
+    pub evidence_json: String, // JSON: { description: "", screenshots: [], etc. }
     pub supporting_anomaly_id: Option<String>, // Link to IdentityAnomaly if related
 
     // === SUPPORT ACCUMULATION ===
-    pub weighted_support: f64,      // Sum of all supporter weights
-    pub supporter_count: u32,       // Number of unique supporters
-    pub supporters_json: String,    // JSON array of { agent_id, weight, voted_at }
+    pub weighted_support: f64,   // Sum of all supporter weights
+    pub supporter_count: u32,    // Number of unique supporters
+    pub supporters_json: String, // JSON array of { agent_id, weight, voted_at }
 
     // === THRESHOLDS ===
-    pub freeze_threshold: f64,      // Weight needed to trigger freeze (default 10.0)
-    pub revoke_threshold: f64,      // Weight needed to trigger revocation (default 25.0)
+    pub freeze_threshold: f64, // Weight needed to trigger freeze (default 10.0)
+    pub revoke_threshold: f64, // Weight needed to trigger revocation (default 25.0)
 
     // === STATUS ===
-    pub status: String,             // See CHALLENGE_STATUSES
+    pub status: String, // See CHALLENGE_STATUSES
     pub status_changed_at: Option<String>,
     pub resolution_json: Option<String>, // How challenge was resolved
 
     // === TIMESTAMPS ===
     pub created_at: String,
-    pub expires_at: String,         // Challenges expire after timeout (default 7 days)
+    pub expires_at: String, // Challenges expire after timeout (default 7 days)
 }
 
 /// ChallengeSupport - Support for an IdentityChallenge.
@@ -765,10 +769,10 @@ pub struct IdentityChallenge {
 #[derive(Clone, PartialEq)]
 pub struct ChallengeSupport {
     pub id: String,
-    pub challenge_id: String,       // Challenge being supported
-    pub supporter_id: String,       // Human supporting the challenge
-    pub weight: f64,                // Trust weight of supporter
-    pub intimacy_level: String,     // Relationship intimacy level
+    pub challenge_id: String,          // Challenge being supported
+    pub supporter_id: String,          // Human supporting the challenge
+    pub weight: f64,                   // Trust weight of supporter
+    pub intimacy_level: String,        // Relationship intimacy level
     pub evidence_json: Option<String>, // Optional additional evidence
     pub created_at: String,
 }
@@ -791,17 +795,17 @@ pub struct KeyRevocation {
     pub human_id: String,
 
     // === REVOKED KEY ===
-    pub revoked_key: String,        // The agent_pub_key being revoked
-    pub reason: String,             // See REVOCATION_REASONS
+    pub revoked_key: String, // The agent_pub_key being revoked
+    pub reason: String,      // See REVOCATION_REASONS
 
     // === TRIGGER ===
-    pub initiated_by: String,       // challenge_id, steward consensus, or voluntary
-    pub trigger_type: String,       // challenge, steward_vote, voluntary
+    pub initiated_by: String, // challenge_id, steward consensus, or voluntary
+    pub trigger_type: String, // challenge, steward_vote, voluntary
 
     // === STEWARD VOTES ===
-    pub required_votes: u32,        // M required for revocation
+    pub required_votes: u32, // M required for revocation
     pub current_votes: u32,
-    pub votes_json: String,         // JSON array of RevocationVote
+    pub votes_json: String, // JSON array of RevocationVote
 
     // === STATUS ===
     pub threshold_reached: bool,
@@ -817,10 +821,10 @@ pub struct KeyRevocation {
 #[derive(Clone, PartialEq)]
 pub struct RevocationVote {
     pub id: String,
-    pub revocation_id: String,      // KeyRevocation being voted on
-    pub steward_id: String,         // Steward voting
-    pub approved: bool,             // Approve or reject revocation
-    pub attestation: String,        // Why they're voting this way
+    pub revocation_id: String, // KeyRevocation being voted on
+    pub steward_id: String,    // Steward voting
+    pub approved: bool,        // Approve or reject revocation
+    pub attestation: String,   // Why they're voting this way
     pub voted_at: String,
 }
 
@@ -845,13 +849,13 @@ pub struct IdentityFreeze {
     pub human_id: String,
 
     // === FREEZE DETAILS ===
-    pub freeze_type: String,           // See FREEZE_TYPES
+    pub freeze_type: String,              // See FREEZE_TYPES
     pub frozen_capabilities: Vec<String>, // See FREEZABLE_CAPABILITIES
-    pub severity: String,              // Anomaly severity that triggered
+    pub severity: String,                 // Anomaly severity that triggered
 
     // === TRIGGER ===
-    pub triggered_by: String,          // ID of anomaly/challenge/steward action
-    pub trigger_type: String,          // anomaly, challenge, steward
+    pub triggered_by: String, // ID of anomaly/challenge/steward action
+    pub trigger_type: String, // anomaly, challenge, steward
 
     // === VERIFICATION REQUIRED ===
     pub requires_verification: String, // See UNFREEZE_REQUIREMENTS
@@ -861,12 +865,12 @@ pub struct IdentityFreeze {
     // === STATUS ===
     pub is_active: bool,
     pub lifted_at: Option<String>,
-    pub lifted_by: Option<String>,     // Who lifted the freeze
+    pub lifted_by: Option<String>, // Who lifted the freeze
     pub lift_reason: Option<String>,
 
     // === TIMESTAMPS ===
     pub frozen_at: String,
-    pub expires_at: Option<String>,    // Auto-lift for low severity
+    pub expires_at: Option<String>, // Auto-lift for low severity
 
     /// Which RecoveryAuthority layer triggered this freeze. See
     /// recovery_v2::RECOVERY_AUTHORITY_LAYERS. None on pre-M2 entries — the
@@ -904,12 +908,12 @@ pub struct RenewalAttestation {
     pub renewal_reason: String,              // See RENEWAL_REASONS
     pub doorway_id: Option<String>,          // Doorway facilitating the renewal
     pub recovery_request_id: Option<String>, // Link to RecoveryRequest if applicable
-    pub votes_json: String,                  // Serialized Vec<RenewalVote> — voter_id, approved, weight, intimacy, voted_at
-    pub required_approvals: u32,             // M threshold
-    pub current_approvals: u32,              // How many approved so far
-    pub confidence_score: f64,               // 0.0-1.0 weighted confidence
-    pub status: String,                      // See RENEWAL_STATUSES
-    pub witnessed_at: Option<String>,        // When threshold was reached
+    pub votes_json: String, // Serialized Vec<RenewalVote> — voter_id, approved, weight, intimacy, voted_at
+    pub required_approvals: u32, // M threshold
+    pub current_approvals: u32, // How many approved so far
+    pub confidence_score: f64, // 0.0-1.0 weighted confidence
+    pub status: String,     // See RENEWAL_STATUSES
+    pub witnessed_at: Option<String>, // When threshold was reached
     pub created_at: String,
     pub expires_at: String,
 }
@@ -927,10 +931,10 @@ pub struct RenewalAttestation {
 pub struct AgentRetirement {
     pub id: String,
     pub human_id: String,
-    pub retired_agent_key: String,           // The dead key
-    pub renewed_into_agent_key: String,      // The new key
-    pub renewal_attestation_id: String,      // Proof of social witness
-    pub retirement_reason: String,           // See RENEWAL_REASONS
+    pub retired_agent_key: String,      // The dead key
+    pub renewed_into_agent_key: String, // The new key
+    pub renewal_attestation_id: String, // Proof of social witness
+    pub retirement_reason: String,      // See RENEWAL_REASONS
     pub retired_at: String,
     pub created_at: String,
 }
@@ -947,17 +951,17 @@ pub struct AgentRetirement {
 #[derive(Clone, PartialEq)]
 pub struct RelationshipRenewal {
     pub id: String,
-    pub original_relationship_id: String,    // The HumanRelationship being renewed
-    pub renewal_attestation_id: String,      // Proof of social witness
-    pub human_id: String,                    // The human whose key changed
-    pub new_agent_key: String,               // Their new key
-    pub counterparty_id: String,             // The other party's human_id
-    pub counterparty_agent_key: String,      // The other party's current key
-    pub relationship_type: String,           // Carried forward from original
-    pub intimacy_level: String,              // Carried forward or renegotiated
-    pub emergency_access_enabled: bool,      // Reaffirmed
-    pub reaffirmed_by_counterparty: bool,    // True when other party co-signs
-    pub reaffirmed_at: Option<String>,       // When counterparty confirmed
+    pub original_relationship_id: String, // The HumanRelationship being renewed
+    pub renewal_attestation_id: String,   // Proof of social witness
+    pub human_id: String,                 // The human whose key changed
+    pub new_agent_key: String,            // Their new key
+    pub counterparty_id: String,          // The other party's human_id
+    pub counterparty_agent_key: String,   // The other party's current key
+    pub relationship_type: String,        // Carried forward from original
+    pub intimacy_level: String,           // Carried forward or renegotiated
+    pub emergency_access_enabled: bool,   // Reaffirmed
+    pub reaffirmed_by_counterparty: bool, // True when other party co-signs
+    pub reaffirmed_at: Option<String>,    // When counterparty confirmed
     pub created_at: String,
 }
 
@@ -1023,6 +1027,8 @@ pub enum EntryTypes {
     RelationshipRenewal(RelationshipRenewal),
     // Recovery Protocol Phase 2
     KeyRotation(KeyRotation),
+    // EPR Phase 2B — peer identity binding (libp2p PeerId ↔ Holochain AgentCid)
+    AgentPeerBinding(AgentPeerBinding),
 }
 
 // =============================================================================
@@ -1032,18 +1038,18 @@ pub enum EntryTypes {
 #[hdk_link_types]
 pub enum LinkTypes {
     // Human/Agent identity links
-    IdToHuman,              // Anchor(human_id) -> Human
-    IdToAgent,              // Anchor(agent_id) -> Agent
-    AgentKeyToHuman,        // AgentPubKey -> Human (one-to-one binding for auth)
-    AgentKeyToAgent,        // AgentPubKey -> Agent
-    HumanByAffinity,        // Anchor(affinity) -> Human
-    AgentByAffinity,        // Anchor(affinity) -> Agent
-    HumanByExternalId,      // Anchor(provider:credential_hash) -> Human
+    IdToHuman,         // Anchor(human_id) -> Human
+    IdToAgent,         // Anchor(agent_id) -> Agent
+    AgentKeyToHuman,   // AgentPubKey -> Human (one-to-one binding for auth)
+    AgentKeyToAgent,   // AgentPubKey -> Agent
+    HumanByAffinity,   // Anchor(affinity) -> Human
+    AgentByAffinity,   // Anchor(affinity) -> Agent
+    HumanByExternalId, // Anchor(provider:credential_hash) -> Human
 
     // Progress links
-    HumanToProgress,        // Human -> HumanProgress
-    AgentToProgress,        // Agent -> AgentProgress
-    ProgressToPath,         // Progress -> LearningPath (cross-DNA reference)
+    HumanToProgress, // Human -> HumanProgress
+    AgentToProgress, // Agent -> AgentProgress
+    ProgressToPath,  // Progress -> LearningPath (cross-DNA reference)
 
     // Human Relationship links (Social Graph)
     IdToHumanRelationship,       // Anchor(relationship_id) -> HumanRelationship
@@ -1054,134 +1060,138 @@ pub enum LinkTypes {
     RelationshipWithCustody,     // Anchor(custody_enabled) -> HumanRelationship
 
     // Attestation links
-    AgentToAttestation,      // Anchor(agent_id) -> Attestation
-    AttestationByCategory,   // Anchor(category) -> Attestation
-    AttestationByType,       // Anchor(attestation_type) -> Attestation
+    AgentToAttestation,    // Anchor(agent_id) -> Attestation
+    AttestationByCategory, // Anchor(category) -> Attestation
+    AttestationByType,     // Anchor(attestation_type) -> Attestation
 
     // Content Mastery links
-    HumanToMastery,          // Anchor(human_id) -> ContentMastery
-    ContentToMastery,        // Anchor(content_id) -> ContentMastery
-    MasteryByLevel,          // Anchor(level) -> ContentMastery
+    HumanToMastery,   // Anchor(human_id) -> ContentMastery
+    ContentToMastery, // Anchor(content_id) -> ContentMastery
+    MasteryByLevel,   // Anchor(level) -> ContentMastery
 
     // ContributorPresence links
-    IdToPresence,            // Anchor(presence_id) -> ContributorPresence
-    PresenceByState,         // Anchor(state) -> ContributorPresence
-    StewardToPresence,       // Anchor(steward_id) -> ContributorPresence
-    ClaimedAgentToPresence,  // Anchor(claimed_agent_id) -> ContributorPresence
+    IdToPresence,           // Anchor(presence_id) -> ContributorPresence
+    PresenceByState,        // Anchor(state) -> ContributorPresence
+    StewardToPresence,      // Anchor(steward_id) -> ContributorPresence
+    ClaimedAgentToPresence, // Anchor(claimed_agent_id) -> ContributorPresence
 
     // Recovery links
-    IdToRecoveryRequest,         // Anchor(request_id) -> RecoveryRequest
-    HumanToRecoveryRequest,      // Anchor(human_id) -> RecoveryRequest (user's requests)
-    RecoveryRequestByStatus,     // Anchor(status) -> RecoveryRequest
-    PendingRecoveryVote,         // Anchor(voter_human_id) -> RecoveryRequest (requests voter can act on)
-    RecoveryVoteToRequest,       // RecoveryVote -> RecoveryRequest
-    HumanToRecoveryHint,         // Anchor(human_id) -> RecoveryHint
-    RecoveryHintByType,          // Anchor(hint_type) -> RecoveryHint
+    IdToRecoveryRequest,     // Anchor(request_id) -> RecoveryRequest
+    HumanToRecoveryRequest,  // Anchor(human_id) -> RecoveryRequest (user's requests)
+    RecoveryRequestByStatus, // Anchor(status) -> RecoveryRequest
+    PendingRecoveryVote, // Anchor(voter_human_id) -> RecoveryRequest (requests voter can act on)
+    RecoveryVoteToRequest, // RecoveryVote -> RecoveryRequest
+    HumanToRecoveryHint, // Anchor(human_id) -> RecoveryHint
+    RecoveryHintByType,  // Anchor(hint_type) -> RecoveryHint
 
     // Network-Attested Identity links (Phase 2)
     // HumanityWitness links
-    IdToHumanityWitness,         // Anchor(witness_id) -> HumanityWitness
-    HumanToWitness,              // Anchor(human_id) -> HumanityWitness (witnesses FOR this human)
-    WitnessAgentToWitness,       // Anchor(witness_agent_id) -> HumanityWitness (witnesses BY this agent)
-    WitnessByType,               // Anchor(attestation_type) -> HumanityWitness
-    ActiveWitnesses,             // Anchor(active) -> HumanityWitness (non-expired, non-revoked)
+    IdToHumanityWitness,   // Anchor(witness_id) -> HumanityWitness
+    HumanToWitness,        // Anchor(human_id) -> HumanityWitness (witnesses FOR this human)
+    WitnessAgentToWitness, // Anchor(witness_agent_id) -> HumanityWitness (witnesses BY this agent)
+    WitnessByType,         // Anchor(attestation_type) -> HumanityWitness
+    ActiveWitnesses,       // Anchor(active) -> HumanityWitness (non-expired, non-revoked)
 
     // KeyStewardship links
-    IdToKeyStewardship,          // Anchor(stewardship_id) -> KeyStewardship
-    HumanToKeyStewardship,       // Anchor(human_id) -> KeyStewardship
-    ShardHolderToStewardship,    // Anchor(shard_holder_id) -> KeyStewardship (stewardships this agent participates in)
+    IdToKeyStewardship,       // Anchor(stewardship_id) -> KeyStewardship
+    HumanToKeyStewardship,    // Anchor(human_id) -> KeyStewardship
+    ShardHolderToStewardship, // Anchor(shard_holder_id) -> KeyStewardship (stewardships this agent participates in)
 
     // IdentityAnomaly links
-    IdToIdentityAnomaly,         // Anchor(anomaly_id) -> IdentityAnomaly
-    HumanToAnomaly,              // Anchor(human_id) -> IdentityAnomaly
-    AnomalyByType,               // Anchor(anomaly_type) -> IdentityAnomaly
-    AnomalyBySeverity,           // Anchor(severity) -> IdentityAnomaly
-    UnresolvedAnomalies,         // Anchor(unresolved) -> IdentityAnomaly
+    IdToIdentityAnomaly, // Anchor(anomaly_id) -> IdentityAnomaly
+    HumanToAnomaly,      // Anchor(human_id) -> IdentityAnomaly
+    AnomalyByType,       // Anchor(anomaly_type) -> IdentityAnomaly
+    AnomalyBySeverity,   // Anchor(severity) -> IdentityAnomaly
+    UnresolvedAnomalies, // Anchor(unresolved) -> IdentityAnomaly
 
     // IdentityChallenge links
-    IdToIdentityChallenge,       // Anchor(challenge_id) -> IdentityChallenge
-    HumanToChallenge,            // Anchor(human_id) -> IdentityChallenge (challenges against this human)
-    InitiatorToChallenge,        // Anchor(initiator_id) -> IdentityChallenge
-    ChallengeByType,             // Anchor(challenge_type) -> IdentityChallenge
-    ChallengeByStatus,           // Anchor(status) -> IdentityChallenge
-    ActiveChallenges,            // Anchor(active) -> IdentityChallenge (pending, not expired)
+    IdToIdentityChallenge, // Anchor(challenge_id) -> IdentityChallenge
+    HumanToChallenge,      // Anchor(human_id) -> IdentityChallenge (challenges against this human)
+    InitiatorToChallenge,  // Anchor(initiator_id) -> IdentityChallenge
+    ChallengeByType,       // Anchor(challenge_type) -> IdentityChallenge
+    ChallengeByStatus,     // Anchor(status) -> IdentityChallenge
+    ActiveChallenges,      // Anchor(active) -> IdentityChallenge (pending, not expired)
 
     // ChallengeSupport links
-    IdToChallengeSupport,        // Anchor(support_id) -> ChallengeSupport
-    ChallengeToSupport,          // Anchor(challenge_id) -> ChallengeSupport
-    SupporterToSupport,          // Anchor(supporter_id) -> ChallengeSupport
+    IdToChallengeSupport, // Anchor(support_id) -> ChallengeSupport
+    ChallengeToSupport,   // Anchor(challenge_id) -> ChallengeSupport
+    SupporterToSupport,   // Anchor(supporter_id) -> ChallengeSupport
 
     // KeyRevocation links
-    IdToKeyRevocation,           // Anchor(revocation_id) -> KeyRevocation
-    HumanToKeyRevocation,        // Anchor(human_id) -> KeyRevocation
-    RevokedKeyToRevocation,      // Anchor(revoked_key) -> KeyRevocation (lookup by key)
-    PendingRevocations,          // Anchor(pending) -> KeyRevocation
-    EffectiveRevocations,        // Anchor(effective) -> KeyRevocation (threshold reached)
+    IdToKeyRevocation,      // Anchor(revocation_id) -> KeyRevocation
+    HumanToKeyRevocation,   // Anchor(human_id) -> KeyRevocation
+    RevokedKeyToRevocation, // Anchor(revoked_key) -> KeyRevocation (lookup by key)
+    PendingRevocations,     // Anchor(pending) -> KeyRevocation
+    EffectiveRevocations,   // Anchor(effective) -> KeyRevocation (threshold reached)
 
     // RevocationVote links
-    IdToRevocationVote,          // Anchor(vote_id) -> RevocationVote
-    RevocationToVote,            // Anchor(revocation_id) -> RevocationVote
-    StewardToRevocationVote,     // Anchor(steward_id) -> RevocationVote
+    IdToRevocationVote,      // Anchor(vote_id) -> RevocationVote
+    RevocationToVote,        // Anchor(revocation_id) -> RevocationVote
+    StewardToRevocationVote, // Anchor(steward_id) -> RevocationVote
 
     // IdentityFreeze links
-    IdToIdentityFreeze,          // Anchor(freeze_id) -> IdentityFreeze
-    HumanToFreeze,               // Anchor(human_id) -> IdentityFreeze
-    ActiveFreezes,               // Anchor(active) -> IdentityFreeze (currently frozen)
-    FreezeByType,                // Anchor(freeze_type) -> IdentityFreeze
+    IdToIdentityFreeze, // Anchor(freeze_id) -> IdentityFreeze
+    HumanToFreeze,      // Anchor(human_id) -> IdentityFreeze
+    ActiveFreezes,      // Anchor(active) -> IdentityFreeze (currently frozen)
+    FreezeByType,       // Anchor(freeze_type) -> IdentityFreeze
 
     // Stewardship links (Graduated Capabilities)
     // StewardshipGrant links
-    IdToStewardshipGrant,        // Anchor(grant_id) -> StewardshipGrant
-    StewardToGrant,              // Anchor(steward_id) -> StewardshipGrant (grants where I am steward)
-    SubjectToGrant,              // Anchor(subject_id) -> StewardshipGrant (grants affecting me)
-    GrantByStatus,               // Anchor(status) -> StewardshipGrant
-    GrantByAuthorityBasis,       // Anchor(authority_basis) -> StewardshipGrant
-    ActiveGrants,                // Anchor(active) -> StewardshipGrant (currently active)
-    DelegatedFromGrant,          // Anchor(parent_grant_id) -> StewardshipGrant (delegated children)
+    IdToStewardshipGrant,  // Anchor(grant_id) -> StewardshipGrant
+    StewardToGrant,        // Anchor(steward_id) -> StewardshipGrant (grants where I am steward)
+    SubjectToGrant,        // Anchor(subject_id) -> StewardshipGrant (grants affecting me)
+    GrantByStatus,         // Anchor(status) -> StewardshipGrant
+    GrantByAuthorityBasis, // Anchor(authority_basis) -> StewardshipGrant
+    ActiveGrants,          // Anchor(active) -> StewardshipGrant (currently active)
+    DelegatedFromGrant,    // Anchor(parent_grant_id) -> StewardshipGrant (delegated children)
 
     // DevicePolicy links
-    IdToDevicePolicy,            // Anchor(policy_id) -> DevicePolicy
-    SubjectToPolicy,             // Anchor(subject_id) -> DevicePolicy
-    AuthorToPolicy,              // Anchor(author_id) -> DevicePolicy
-    PolicyByTier,                // Anchor(author_tier) -> DevicePolicy
-    InheritedFromPolicy,         // Anchor(parent_policy_id) -> DevicePolicy (children)
-    EffectivePolicies,           // Anchor(effective) -> DevicePolicy (currently in effect)
+    IdToDevicePolicy,    // Anchor(policy_id) -> DevicePolicy
+    SubjectToPolicy,     // Anchor(subject_id) -> DevicePolicy
+    AuthorToPolicy,      // Anchor(author_id) -> DevicePolicy
+    PolicyByTier,        // Anchor(author_tier) -> DevicePolicy
+    InheritedFromPolicy, // Anchor(parent_policy_id) -> DevicePolicy (children)
+    EffectivePolicies,   // Anchor(effective) -> DevicePolicy (currently in effect)
 
     // PolicyInheritance links
-    IdToPolicyInheritance,       // Anchor(inheritance_id) -> PolicyInheritance
-    SubjectToInheritance,        // Anchor(subject_id) -> PolicyInheritance
+    IdToPolicyInheritance, // Anchor(inheritance_id) -> PolicyInheritance
+    SubjectToInheritance,  // Anchor(subject_id) -> PolicyInheritance
 
     // StewardshipAppeal links
-    IdToStewardshipAppeal,       // Anchor(appeal_id) -> StewardshipAppeal
-    AppellantToAppeal,           // Anchor(appellant_id) -> StewardshipAppeal
-    GrantToAppeal,               // Anchor(grant_id) -> StewardshipAppeal (appeals against grant)
-    AppealByStatus,              // Anchor(status) -> StewardshipAppeal
-    AppealByType,                // Anchor(appeal_type) -> StewardshipAppeal
-    ActiveAppeals,               // Anchor(pending) -> StewardshipAppeal
+    IdToStewardshipAppeal, // Anchor(appeal_id) -> StewardshipAppeal
+    AppellantToAppeal,     // Anchor(appellant_id) -> StewardshipAppeal
+    GrantToAppeal,         // Anchor(grant_id) -> StewardshipAppeal (appeals against grant)
+    AppealByStatus,        // Anchor(status) -> StewardshipAppeal
+    AppealByType,          // Anchor(appeal_type) -> StewardshipAppeal
+    ActiveAppeals,         // Anchor(pending) -> StewardshipAppeal
 
     // ActivityLog links
-    IdToActivityLog,             // Anchor(log_id) -> ActivityLog
-    SubjectToActivityLog,        // Anchor(subject_id) -> ActivityLog
-    SessionToActivityLog,        // Anchor(session_id) -> ActivityLog
+    IdToActivityLog,      // Anchor(log_id) -> ActivityLog
+    SubjectToActivityLog, // Anchor(subject_id) -> ActivityLog
+    SessionToActivityLog, // Anchor(session_id) -> ActivityLog
 
     // Renewal protocol links
-    IdToRenewalAttestation,          // Anchor(renewal_id) -> RenewalAttestation
-    HumanToRenewalAttestation,       // Anchor(human_id) -> RenewalAttestation
-    OldAgentToRetirement,            // Anchor(retired_agent_key) -> AgentRetirement
-    NewAgentFromRetirement,          // Anchor(renewed_into_key) -> AgentRetirement
-    IdToAgentRetirement,             // Anchor(retirement_id) -> AgentRetirement
-    IdToRelationshipRenewal,         // Anchor(rel_renewal_id) -> RelationshipRenewal
-    OriginalRelToRenewal,            // Anchor(original_relationship_id) -> RelationshipRenewal
-    RenewalAttestationByStatus,      // Anchor(renewal_status) -> RenewalAttestation
+    IdToRenewalAttestation,     // Anchor(renewal_id) -> RenewalAttestation
+    HumanToRenewalAttestation,  // Anchor(human_id) -> RenewalAttestation
+    OldAgentToRetirement,       // Anchor(retired_agent_key) -> AgentRetirement
+    NewAgentFromRetirement,     // Anchor(renewed_into_key) -> AgentRetirement
+    IdToAgentRetirement,        // Anchor(retirement_id) -> AgentRetirement
+    IdToRelationshipRenewal,    // Anchor(rel_renewal_id) -> RelationshipRenewal
+    OriginalRelToRenewal,       // Anchor(original_relationship_id) -> RelationshipRenewal
+    RenewalAttestationByStatus, // Anchor(renewal_status) -> RenewalAttestation
 
     // Recovery Protocol Phase 2
-    HumanToCurrentAgent,            // Anchor(human_pubkey) -> KeyRotation (latest = current)
-    KeyRotationSupersededBy,        // old KeyRotation -> new KeyRotation (audit chain)
-    AgentToKeyRotation,             // Anchor(new_agent_pubkey) -> KeyRotation (reverse lookup)
+    HumanToCurrentAgent, // Anchor(human_pubkey) -> KeyRotation (latest = current)
+    KeyRotationSupersededBy, // old KeyRotation -> new KeyRotation (audit chain)
+    AgentToKeyRotation,  // Anchor(new_agent_pubkey) -> KeyRotation (reverse lookup)
 
     // Recovery Protocol Phase 2 — M3
     RecoveryRequestToHumanityWitness, // RecoveryRequest -> HumanityWitness (IntimateQuorum link)
-    RecoveryRequestToKeyStewardship,  // RecoveryRequest -> KeyStewardship (CryptographicQuorum link; M3 registers type, no coordinator creates yet)
+    RecoveryRequestToKeyStewardship, // RecoveryRequest -> KeyStewardship (CryptographicQuorum link; M3 registers type, no coordinator creates yet)
+
+    // EPR Phase 2B — AgentPeerBinding links
+    AgentToPeerBinding, // AgentPubKey -> AgentPeerBinding (current bindings for this agent)
+    PeerToBinding, // StringAnchor(peer_id) -> AgentPeerBinding (reverse lookup: peer_id -> binding)
 }
 
 // =============================================================================
@@ -1203,7 +1213,9 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 EntryTypes::HumanRelationship(rel) => validate_human_relationship(&rel, &action),
                 EntryTypes::Attestation(attestation) => validate_attestation(&attestation),
                 EntryTypes::ContentMastery(mastery) => validate_content_mastery(&mastery),
-                EntryTypes::ContributorPresence(presence) => validate_contributor_presence(&presence),
+                EntryTypes::ContributorPresence(presence) => {
+                    validate_contributor_presence(&presence)
+                }
                 EntryTypes::RecoveryRequest(request) => validate_recovery_request(&request),
                 EntryTypes::RecoveryVote(vote) => validate_recovery_vote(&vote),
                 EntryTypes::RecoveryHint(hint) => validate_recovery_hint(&hint),
@@ -1219,15 +1231,23 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 // Stewardship entry validation
                 EntryTypes::StewardshipGrant(grant) => validate_stewardship_grant(&grant),
                 EntryTypes::DevicePolicy(policy) => validate_device_policy(&policy),
-                EntryTypes::PolicyInheritance(inheritance) => validate_policy_inheritance(&inheritance),
+                EntryTypes::PolicyInheritance(inheritance) => {
+                    validate_policy_inheritance(&inheritance)
+                }
                 EntryTypes::StewardshipAppeal(appeal) => validate_stewardship_appeal(&appeal),
                 EntryTypes::ActivityLog(log) => validate_activity_log(&log),
                 // Renewal protocol validation
-                EntryTypes::RenewalAttestation(attestation) => validate_renewal_attestation(&attestation),
+                EntryTypes::RenewalAttestation(attestation) => {
+                    validate_renewal_attestation(&attestation)
+                }
                 EntryTypes::AgentRetirement(retirement) => validate_agent_retirement(&retirement),
                 EntryTypes::RelationshipRenewal(renewal) => validate_relationship_renewal(&renewal),
                 // Recovery Protocol Phase 2 validation
                 EntryTypes::KeyRotation(rotation) => validate_key_rotation(&rotation),
+                // EPR Phase 2B validation
+                EntryTypes::AgentPeerBinding(binding) => {
+                    validate_create_agent_peer_binding(&binding)
+                }
                 _ => Ok(ValidateCallbackResult::Valid),
             },
             OpEntry::UpdateEntry { app_entry, .. } => match app_entry {
@@ -1236,6 +1256,12 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 // Recovery Protocol Phase 2 — immutable entries
                 EntryTypes::KeyRotation(_) => Ok(ValidateCallbackResult::Invalid(
                     "KeyRotation is immutable".to_string(),
+                )),
+                // EPR Phase 2B — AgentPeerBinding is immutable; supersededBy is set via
+                // reconciliation controller, not via HDK update. A new binding must be
+                // created; the old one is linked via SupersededBy at the coordinator level.
+                EntryTypes::AgentPeerBinding(_) => Ok(ValidateCallbackResult::Invalid(
+                    "AgentPeerBinding is immutable; create a new binding instead".to_string(),
                 )),
                 _ => Ok(ValidateCallbackResult::Valid),
             },
@@ -1413,7 +1439,9 @@ fn validate_content_mastery(mastery: &ContentMastery) -> ExternResult<ValidateCa
 }
 
 /// Validate ContributorPresence entry
-fn validate_contributor_presence(presence: &ContributorPresence) -> ExternResult<ValidateCallbackResult> {
+fn validate_contributor_presence(
+    presence: &ContributorPresence,
+) -> ExternResult<ValidateCallbackResult> {
     if presence.id.is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "ContributorPresence ID cannot be empty".to_string(),
@@ -1710,7 +1738,9 @@ fn validate_identity_anomaly(anomaly: &IdentityAnomaly) -> ExternResult<Validate
 }
 
 /// Validate IdentityChallenge entry
-fn validate_identity_challenge(challenge: &IdentityChallenge) -> ExternResult<ValidateCallbackResult> {
+fn validate_identity_challenge(
+    challenge: &IdentityChallenge,
+) -> ExternResult<ValidateCallbackResult> {
     if challenge.id.is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "IdentityChallenge ID cannot be empty".to_string(),
@@ -1937,7 +1967,9 @@ fn validate_identity_freeze(freeze: &IdentityFreeze) -> ExternResult<ValidateCal
 // =============================================================================
 
 /// Validate RenewalAttestation entry
-fn validate_renewal_attestation(attestation: &RenewalAttestation) -> ExternResult<ValidateCallbackResult> {
+fn validate_renewal_attestation(
+    attestation: &RenewalAttestation,
+) -> ExternResult<ValidateCallbackResult> {
     if attestation.id.is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "RenewalAttestation ID cannot be empty".to_string(),
@@ -2046,7 +2078,9 @@ fn validate_agent_retirement(retirement: &AgentRetirement) -> ExternResult<Valid
 }
 
 /// Validate RelationshipRenewal entry
-fn validate_relationship_renewal(renewal: &RelationshipRenewal) -> ExternResult<ValidateCallbackResult> {
+fn validate_relationship_renewal(
+    renewal: &RelationshipRenewal,
+) -> ExternResult<ValidateCallbackResult> {
     if renewal.id.is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "RelationshipRenewal ID cannot be empty".to_string(),
