@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "epr:schema:objects:agent-peer-binding",
+  "title": "AgentPeerBinding",
+  "description": "Declares that a libp2p peer identity (PeerId) is operated by a specific Holochain agent (AgentCid). Source of truth: DHT (Notarized, Category A — imagodei integrity zome). The ActionHash of the DHT entry is the canonical identifier; the SQLite projection in peer_identity_bindings carries dht_anchor_hash to link back. The 'signature' field is the agent's Ed25519 signature over the canonical binding body — all fields except 'signature' and 'supersededBy', deterministically serialized — so that libp2p peers can verify bindings received via handshake or gossip without fetching the DHT entry. 'supersededBy' is absent at creation and set only when this binding is superseded.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["peerId", "agentCid", "validFrom", "deviceArchetype", "signature"],
+  "properties": {
+    "peerId": {
+      "type": "string",
+      "description": "libp2p PeerId, multibase-encoded (base58btc multihash of the peer's public key). Stable identity of the network-layer peer."
+    },
+    "agentCid": {
+      "type": "string",
+      "description": "CIDv1 (dag-cbor sha256) of the Agent EPR in imagodei — the content-addressed identifier of the Holochain agent that operates this peer. Binds the network identity to the protocol identity."
+    },
+    "validFrom": {
+      "type": "string",
+      "format": "date-time",
+      "description": "UTC timestamp (RFC3339, Z suffix) from which this binding is valid. Included in canonical signing bytes."
+    },
+    "validUntil": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "description": "UTC timestamp (RFC3339, Z suffix) at which this binding expires, or null if the binding has no declared expiry. Included in canonical signing bytes when present."
+    },
+    "deviceArchetype": {
+      "$ref": "../enums/device-archetype.schema.json",
+      "description": "Hardware/deployment archetype of this peer. Affects replication weight, availability expectations, and collective resource allocation."
+    },
+    "signature": {
+      "type": "string",
+      "description": "Base64-encoded Ed25519 signature over the canonical binding body. Canonical body is the deterministic serialization of all fields except 'signature' and 'supersededBy' (supersededBy is set post-creation when superseded; it must not be included so signatures remain stable across the binding's lifetime). Enables libp2p peers to verify bindings received via handshake or gossip (elohim/identity/binding topic) without a DHT round-trip."
+    },
+    "supersededBy": {
+      "type": ["string", "null"],
+      "description": "ActionHash (base64url-encoded Holochain ActionHash) of the AgentPeerBinding DHT entry that replaces this one, or null if this binding is current. NOT included in canonical signing bytes — it is set externally when a superseding binding is notarized, so its absence at creation is required for signature stability. Propagated by the reconciliation controller (Principle P1) when a newer binding is observed."
+    }
+  }
+}
