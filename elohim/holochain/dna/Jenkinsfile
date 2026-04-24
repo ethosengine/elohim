@@ -471,7 +471,9 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                 # Sweettest is IN-PROCESS: each test spins up a full kitsune2 p2p
                                 # stack + SQLite + keystore. Serializing keeps peak flat. See
                                 # stage comment in tests/sweettest/README.md for the trade-off.
-                                nix develop --accept-flake-config --command bash -c "
+                                # Flake-ref is explicit — tests/sweettest/ has no flake.nix
+                                # so nix would otherwise search parents and bail.
+                                nix develop --accept-flake-config "$WORKSPACE/elohim/holochain/dna/elohim" --command bash -c "
                                     set -uo pipefail
                                     export CARGO_BUILD_JOBS=2
 
