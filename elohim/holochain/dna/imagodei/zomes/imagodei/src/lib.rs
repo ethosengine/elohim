@@ -1577,16 +1577,125 @@ pub struct KeyRotationOutput {
 }
 
 // =============================================================================
+// Recovery Protocol Phase 2 — M3 Helpers
+// =============================================================================
+
+/// Resolve an `AgentPubKey` to the `human_id` String by traversing
+/// `AgentKeyToHuman` link → Human entry → human.id. Returns a coordinator
+/// error if no Human is bound to the given pubkey.
+fn resolve_human_id_for_agent(agent_pubkey: &AgentPubKey) -> ExternResult<String> {
+    let links = get_links(
+        LinkQuery::try_new(agent_pubkey.clone(), LinkTypes::AgentKeyToHuman)?,
+        GetStrategy::default(),
+    )?;
+    let first = links.first().ok_or(wasm_error!(WasmErrorInner::Guest(format!(
+        "No Human bound to agent pubkey {:?}",
+        agent_pubkey
+    ))))?;
+    let action_hash = first
+        .target
+        .clone()
+        .into_action_hash()
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "AgentKeyToHuman target is not an action hash".into()
+        )))?;
+    let record = get(action_hash, GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Human entry missing".into())))?;
+    let human: Human = record
+        .entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Human entry deserialize failed".into())))?;
+    Ok(human.id)
+}
+
+/// Count the human's active `HumanRelationship` entries where
+/// `emergency_access_enabled = true`. Active means no revocation path applied;
+/// the simple rule for M3 is "entry still exists and flag is true."
+fn count_active_emergency_contacts(human_id: &str) -> ExternResult<u32> {
+    let anchor = StringAnchor::new("agent_relationships", human_id);
+    let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor))?;
+    let links = get_links(
+        LinkQuery::try_new(anchor_hash, LinkTypes::AgentToRelationship)?,
+        GetStrategy::default(),
+    )?;
+    let mut count: u32 = 0;
+    for link in links {
+        let rel_hash = match link.target.clone().into_action_hash() {
+            Some(h) => h,
+            None => continue,
+        };
+        let Some(record) = get(rel_hash, GetOptions::default())? else { continue };
+        let Some(rel): Option<HumanRelationship> = record
+            .entry()
+            .to_app_option()
+            .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        else { continue };
+        if rel.emergency_access_enabled {
+            count += 1;
+        }
+    }
+    Ok(count)
+}
+
+/// Threshold formula per revised spec §5 / M3 design §4.2: `max(2, ceil(M/2) + 1)`.
+fn compute_required_witness_count(active_emergency_contacts: u32) -> u32 {
+    let m = active_emergency_contacts;
+    let ceil_half_plus_one = (m + 1) / 2 + 1; // ceil(m/2) + 1 for u32
+    std::cmp::max(2, ceil_half_plus_one)
+}
+
+#[cfg(test)]
+mod m3_witness_threshold_tests {
+    use super::compute_required_witness_count;
+
+    #[test]
+    fn floor_at_two_when_no_contacts() {
+        assert_eq!(compute_required_witness_count(0), 2);
+    }
+
+    #[test]
+    fn floor_at_two_when_one_contact() {
+        assert_eq!(compute_required_witness_count(1), 2);
+    }
+
+    #[test]
+    fn three_contacts_yields_three() {
+        // ceil(3/2) + 1 = 2 + 1 = 3
+        assert_eq!(compute_required_witness_count(3), 3);
+    }
+
+    #[test]
+    fn four_contacts_yields_three() {
+        // ceil(4/2) + 1 = 2 + 1 = 3
+        assert_eq!(compute_required_witness_count(4), 3);
+    }
+
+    #[test]
+    fn five_contacts_yields_four() {
+        // ceil(5/2) + 1 = 3 + 1 = 4
+        assert_eq!(compute_required_witness_count(5), 4);
+    }
+}
+
+// =============================================================================
 // Recovery Protocol Phase 2 — Coordinator Functions
 // =============================================================================
 
 /// Create a recovery request.
 /// Authored by the hosting doorway on behalf of the claimant's new device.
+/// M3: resolves human_id from agent pubkey and computes required_witness_count.
+/// Anchors on human_id (was: pubkey string). See design §12.
 #[hdk_extern]
 pub fn create_recovery_request(
     input: CreateRecoveryRequestInput,
 ) -> ExternResult<RecoveryRequestOutput> {
     let now = sys_time()?;
+
+    // M3: resolve human_id + compute required_witness_count
+    let human_id = resolve_human_id_for_agent(&input.human_agent_pubkey)?;
+    let contact_count = count_active_emergency_contacts(&human_id)?;
+    let required_witness_count = compute_required_witness_count(contact_count);
 
     let request = RecoveryRequest {
         human_agent_pubkey: input.human_agent_pubkey.clone(),
@@ -1594,15 +1703,15 @@ pub fn create_recovery_request(
         hosting_doorway_pubkey: input.hosting_doorway_pubkey,
         proposed_authority: input.proposed_authority,
         request_nonce: input.request_nonce,
-        human_id: None,          // M3 coordinator flow will populate via Agent entry lookup
-        required_witness_count: 2, // M3 coordinator flow will compute ceil(M/2)+1; floor=2
+        human_id: Some(human_id.clone()),
+        required_witness_count,
         created_at: now,
     };
 
     let action_hash = create_entry(&EntryTypes::RecoveryRequest(request.clone()))?;
 
-    // Link Anchor(human_pubkey) → request using HumanToRecoveryRequest link type.
-    let anchor = StringAnchor::new("recovery_request", &input.human_agent_pubkey.to_string());
+    // M3 decision log #2: anchor on human_id (was: pubkey). See design §12.
+    let anchor = StringAnchor::new("recovery_request", &human_id);
     let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor.clone()))?;
     create_entry(&EntryTypes::StringAnchor(anchor))?;
     create_link(
