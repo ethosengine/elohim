@@ -36,11 +36,24 @@ pub fn dna_path(dna_name: &str) -> Result<PathBuf> {
         return Ok(in_happ);
     }
 
+    // Standalone DNAs that pack with hyphenated names alongside their crate
+    // (e.g., node-registry → dna/node-registry/node-registry.dna). Normalize
+    // the underscore name to its hyphenated dir/file form.
+    let hyphen_name = dna_name.replace('_', "-");
+    let standalone_flat = holochain_dir
+        .join("dna")
+        .join(&hyphen_name)
+        .join(format!("{hyphen_name}.dna"));
+    if standalone_flat.exists() {
+        return Ok(standalone_flat);
+    }
+
     Err(anyhow!(
         "DNA artifact not found for '{dna_name}'. Run `hc dna pack` (or the \
-         holochain build) before invoking sweettest. Searched: {:?}, {:?}",
+         holochain build) before invoking sweettest. Searched: {:?}, {:?}, {:?}",
         per_dna,
-        in_happ
+        in_happ,
+        standalone_flat
     ))
 }
 
