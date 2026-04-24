@@ -58,6 +58,7 @@ const INTERFACE_FILES = [
   { src: 'views/resilience-snapshot-view.ts', dest: 'resilience-snapshot-view.ts' },
   { src: 'views/recovery-request.ts', dest: 'recovery-request.ts' },
   { src: 'views/key-rotation.ts', dest: 'key-rotation.ts' },
+  { src: 'views/recovery-witness.ts', dest: 'recovery-witness.ts' },
 ];
 
 /**

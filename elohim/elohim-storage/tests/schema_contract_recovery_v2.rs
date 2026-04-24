@@ -7,7 +7,7 @@
 //! before compiling because the jsonschema crate does not resolve file-based
 //! references automatically.
 
-use elohim_storage::views::{KeyRotationView, RecoveryRequestView};
+use elohim_storage::views::{KeyRotationView, RecoveryRequestView, RecoveryWitnessView};
 use serde_json::Value;
 use std::collections::HashMap;
 use std::fs;
@@ -158,4 +158,33 @@ fn key_rotation_view_matches_schema() {
     };
     let json = serde_json::to_value(&view).expect("serializes");
     validate_against_schema("views/key-rotation.schema.json", &json);
+}
+
+#[test]
+fn recovery_witness_view_matches_schema() {
+    let view = RecoveryWitnessView {
+        dht_anchor_hash: "wit001".to_string(),
+        recovery_request_hash: "req001".to_string(),
+        witness_agent_id: "uhCAk_witness".to_string(),
+        human_id: "human-123".to_string(),
+        note: Some("recognized the voice".to_string()),
+        submitted_at: "2026-04-24T00:00:00Z".to_string(),
+    };
+    let json = serde_json::to_value(&view).expect("serializes");
+    validate_against_schema("views/recovery-witness.schema.json", &json);
+}
+
+#[test]
+fn recovery_witness_view_matches_schema_null_note() {
+    // note is optional — verify null variant validates.
+    let view = RecoveryWitnessView {
+        dht_anchor_hash: "wit002".to_string(),
+        recovery_request_hash: "req002".to_string(),
+        witness_agent_id: "uhCAk_witness2".to_string(),
+        human_id: "human-456".to_string(),
+        note: None,
+        submitted_at: "2026-04-24T12:00:00Z".to_string(),
+    };
+    let json = serde_json::to_value(&view).expect("serializes");
+    validate_against_schema("views/recovery-witness.schema.json", &json);
 }

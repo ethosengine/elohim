@@ -6690,6 +6690,34 @@ pub struct KeyRotationView {
     pub rotated_at: String,
 }
 
+/// Source of truth: DHT (imagodei HumanityWitness entry linked via
+/// RecoveryRequestToHumanityWitness from a RecoveryRequest). Projection
+/// populated from `RecoveryV2Signal::IntimateWitnessSubmitted`.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct RecoveryWitnessView {
+    pub dht_anchor_hash: String,
+    pub recovery_request_hash: String,
+    pub witness_agent_id: String,
+    pub human_id: String,
+    pub note: Option<String>,
+    pub submitted_at: String,
+}
+
+impl From<crate::db::models::RecoveryWitnessRow> for RecoveryWitnessView {
+    fn from(r: crate::db::models::RecoveryWitnessRow) -> Self {
+        Self {
+            dht_anchor_hash: r.dht_anchor_hash,
+            recovery_request_hash: r.recovery_request_hash,
+            witness_agent_id: r.witness_agent_id,
+            human_id: r.human_id,
+            note: r.note,
+            submitted_at: r.submitted_at,
+        }
+    }
+}
+
 // ============================================================================
 // EPR views (Phase 2a)
 // Source of truth: EPR atom (self-notarized via content-address + Ed25519).
