@@ -48,7 +48,7 @@ M4 is the "kill a compromised key quickly" milestone. Deliverables:
 
 4. **Rotation-vs-revocation interaction** — if `PendingRevocations` or `EffectiveRevocations` anchor points to a revocation for the rotating agent's current key, `commit_key_rotation` blocks with a descriptive error. Mirror the M3 freeze-floor gate pattern (pre-commit, in the coordinator, using must_get_entry — never `get_links` in a validator).
 
-5. **Storage projection** — `key_revocations` table (and `revocation_votes` if the three-paths design splits them). Schema-first: JSON schema → hand-written Rust view → schema-contract test → ts-rs codegen → distribution to all three generated-ts locations.
+5. **Storage projection** — `key_revocations` table (and optionally `revocation_votes` if the three-paths design splits them). **Source of truth: DHT** (imagodei `KeyRevocation` + `RevocationVote` entries). The table is a read-optimized projection rebuildable via signal replay, not a canonical record. Schema-first: JSON schema → hand-written Rust view → schema-contract test → ts-rs codegen → distribution to all three generated-ts locations.
 
 6. **Signal variants** — extend `RecoveryV2Signal` with `KeyRevocationRequested`, `RevocationVoteSubmitted`, `KeyRevocationEffective` (or similar — brainstorm names). Rich payloads. serde tag stays `"type"` across DNA and storage mirror.
 
