@@ -2059,6 +2059,256 @@ pub fn create_revocation_request(
     Ok(KeyRevocationOutput { revocation_id, action_hash })
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct SubmitRevocationVoteInput {
+    pub revocation_id: String,
+    pub approved: bool,
+    pub attestation: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct RevocationVoteOutput {
+    pub vote_id: String,
+    pub current_votes: u32,
+    pub required_votes: u32,
+    pub threshold_now_reached: bool,
+}
+
+/// M4: Submit an emergency-contact vote on a pending KeyRevocation.
+/// On the threshold-meeting vote, the coordinator updates the KeyRevocation
+/// entry (flips threshold_reached, sets effective_at), moves it from
+/// PendingRevocations to EffectiveRevocations, and emits both
+/// RevocationVoteSubmitted and KeyRevocationEffective signals.
+#[hdk_extern]
+pub fn submit_revocation_vote(
+    input: SubmitRevocationVoteInput,
+) -> ExternResult<RevocationVoteOutput> {
+    let caller_pubkey = agent_info()?.agent_initial_pubkey;
+    let caller_human_id = resolve_human_id_for_agent(&caller_pubkey)?;
+
+    if input.attestation.trim().is_empty() {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "submit_revocation_vote: attestation cannot be empty".into()
+        )));
+    }
+
+    // Load the KeyRevocation via IdToKeyRevocation anchor.
+    let revocation_id_anchor = StringAnchor::new("revocation_id", &input.revocation_id);
+    let revocation_anchor_hash =
+        hash_entry(&EntryTypes::StringAnchor(revocation_id_anchor))?;
+    let revocation_links = get_links(
+        LinkQuery::try_new(revocation_anchor_hash, LinkTypes::IdToKeyRevocation)?,
+        GetStrategy::default(),
+    )?;
+    let revocation_link = revocation_links.first().ok_or_else(|| {
+        wasm_error!(WasmErrorInner::Guest(format!(
+            "submit_revocation_vote: no KeyRevocation with id {}",
+            input.revocation_id
+        )))
+    })?;
+    let revocation_action_hash = revocation_link
+        .target
+        .clone()
+        .into_action_hash()
+        .ok_or_else(|| {
+            wasm_error!(WasmErrorInner::Guest(
+                "IdToKeyRevocation target was not an ActionHash".into()
+            ))
+        })?;
+    let revocation_record =
+        get(revocation_action_hash.clone(), GetOptions::default())?.ok_or_else(|| {
+            wasm_error!(WasmErrorInner::Guest("KeyRevocation record not found".into()))
+        })?;
+    let revocation: KeyRevocation = revocation_record
+        .entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        .ok_or_else(|| {
+            wasm_error!(WasmErrorInner::Guest("KeyRevocation record missing entry".into()))
+        })?;
+
+    // Gate: votes only apply to the steward_vote path.
+    if revocation.trigger_type != "steward_vote" {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "submit_revocation_vote: revocation {} has trigger_type={}, votes not accepted",
+            input.revocation_id, revocation.trigger_type
+        ))));
+    }
+
+    if revocation.threshold_reached {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "submit_revocation_vote: revocation {} already effective",
+            input.revocation_id
+        ))));
+    }
+
+    // Gate: caller must be an active emergency contact.
+    if !is_active_emergency_contact(&revocation.human_id, &caller_human_id)? {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "submit_revocation_vote: caller is not an active emergency contact for {}",
+            revocation.human_id
+        ))));
+    }
+
+    // Gate: no existing vote from this steward on this revocation.
+    let steward_anchor = StringAnchor::new("steward_revocation_votes", &caller_human_id);
+    let steward_anchor_hash = hash_entry(&EntryTypes::StringAnchor(steward_anchor.clone()))?;
+    let steward_vote_links = get_links(
+        LinkQuery::try_new(steward_anchor_hash.clone(), LinkTypes::StewardToRevocationVote)?,
+        GetStrategy::default(),
+    )?;
+    for link in &steward_vote_links {
+        let Some(vote_hash) = link.target.clone().into_action_hash() else { continue };
+        let Some(rec) = get(vote_hash, GetOptions::default())? else { continue };
+        let Some(prior_vote): Option<RevocationVote> = rec
+            .entry()
+            .to_app_option()
+            .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        else { continue };
+        if prior_vote.revocation_id == input.revocation_id {
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "submit_revocation_vote: steward {} has already voted on revocation {}",
+                caller_human_id, input.revocation_id
+            ))));
+        }
+    }
+
+    let now = sys_time()?;
+    let timestamp = format!("{:?}", now);
+    let vote_id = format!("vote-{}-{}", caller_human_id, timestamp);
+
+    let vote = RevocationVote {
+        id: vote_id.clone(),
+        revocation_id: input.revocation_id.clone(),
+        steward_id: caller_human_id.clone(),
+        approved: input.approved,
+        attestation: input.attestation.clone(),
+        voted_at: timestamp.clone(),
+    };
+
+    let vote_action_hash = create_entry(&EntryTypes::RevocationVote(vote.clone()))?;
+
+    // IdToRevocationVote anchor
+    let vote_id_anchor = StringAnchor::new("revocation_vote_id", &vote_id);
+    let vote_id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(vote_id_anchor.clone()))?;
+    create_entry(&EntryTypes::StringAnchor(vote_id_anchor))?;
+    create_link(
+        vote_id_anchor_hash,
+        vote_action_hash.clone(),
+        LinkTypes::IdToRevocationVote,
+        (),
+    )?;
+
+    // RevocationToVote anchor (per-revocation vote list)
+    let revocation_votes_anchor =
+        StringAnchor::new("revocation_votes", &input.revocation_id);
+    let revocation_votes_anchor_hash =
+        hash_entry(&EntryTypes::StringAnchor(revocation_votes_anchor.clone()))?;
+    create_entry(&EntryTypes::StringAnchor(revocation_votes_anchor))?;
+    create_link(
+        revocation_votes_anchor_hash,
+        vote_action_hash.clone(),
+        LinkTypes::RevocationToVote,
+        (),
+    )?;
+
+    // StewardToRevocationVote anchor
+    create_entry(&EntryTypes::StringAnchor(steward_anchor))?;
+    create_link(
+        steward_anchor_hash,
+        vote_action_hash.clone(),
+        LinkTypes::StewardToRevocationVote,
+        (),
+    )?;
+
+    // Recompute threshold (count approved votes from link traversal).
+    let approved_count = count_approved_revocation_votes(&input.revocation_id)?;
+    let threshold_now_reached = approved_count >= revocation.required_votes;
+
+    if threshold_now_reached {
+        // Update the KeyRevocation entry: flip threshold_reached, set effective_at.
+        let mut updated = revocation.clone();
+        updated.current_votes = approved_count;
+        updated.threshold_reached = true;
+        updated.effective_at = Some(timestamp.clone());
+        updated.updated_at = timestamp.clone();
+        update_entry(revocation_action_hash, &EntryTypes::KeyRevocation(updated.clone()))?;
+
+        // Move from PendingRevocations to EffectiveRevocations.
+        let pending_global_anchor = StringAnchor::new("pending_revocations", "global");
+        let pending_global_anchor_hash =
+            hash_entry(&EntryTypes::StringAnchor(pending_global_anchor))?;
+        let pending_links = get_links(
+            LinkQuery::try_new(pending_global_anchor_hash, LinkTypes::PendingRevocations)?,
+            GetStrategy::default(),
+        )?;
+        for link in pending_links {
+            // Each pending link points to a specific revocation's action_hash.
+            // We identify by fetching the entry and matching the id.
+            let Some(link_target_hash) = link.target.clone().into_action_hash() else { continue };
+            let Some(rec) = get(link_target_hash, GetOptions::default())? else { continue };
+            let Some(rev): Option<KeyRevocation> = rec
+                .entry()
+                .to_app_option()
+                .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+            else { continue };
+            if rev.id == input.revocation_id {
+                delete_link(link.create_link_hash, GetOptions::default())?;
+            }
+        }
+
+        let effective_anchor = StringAnchor::new("effective_revocations", "global");
+        let effective_anchor_hash =
+            hash_entry(&EntryTypes::StringAnchor(effective_anchor.clone()))?;
+        create_entry(&EntryTypes::StringAnchor(effective_anchor))?;
+        create_link(
+            effective_anchor_hash,
+            revocation_link.target.clone(), // points to the revocation entry
+            LinkTypes::EffectiveRevocations,
+            (),
+        )?;
+
+        emit_signal(RecoveryV2Signal::RevocationVoteSubmitted {
+            id: vote_id.clone(),
+            revocation_id: input.revocation_id.clone(),
+            steward_id: caller_human_id.clone(),
+            approved: input.approved,
+            attestation: input.attestation.clone(),
+            voted_at: timestamp.clone(),
+            current_votes: approved_count,
+            required_votes: revocation.required_votes,
+            threshold_now_reached: true,
+        })?;
+
+        emit_signal(RecoveryV2Signal::KeyRevocationEffective {
+            revocation_id: input.revocation_id.clone(),
+            revoked_key: revocation.revoked_key.clone(),
+            human_id: revocation.human_id.clone(),
+            effective_at: timestamp,
+            triggering_vote_id: Some(vote_id.clone()),
+        })?;
+    } else {
+        emit_signal(RecoveryV2Signal::RevocationVoteSubmitted {
+            id: vote_id.clone(),
+            revocation_id: input.revocation_id.clone(),
+            steward_id: caller_human_id.clone(),
+            approved: input.approved,
+            attestation: input.attestation.clone(),
+            voted_at: timestamp,
+            current_votes: approved_count,
+            required_votes: revocation.required_votes,
+            threshold_now_reached: false,
+        })?;
+    }
+
+    Ok(RevocationVoteOutput {
+        vote_id,
+        current_votes: approved_count,
+        required_votes: revocation.required_votes,
+        threshold_now_reached,
+    })
+}
+
 /// Traverse `HumanToFreeze` links for the given `human_id` and return all
 /// `IdentityFreeze` entries with `is_active = true`. Used by the M3 freeze-
 /// floor gate on `commit_key_rotation`.
