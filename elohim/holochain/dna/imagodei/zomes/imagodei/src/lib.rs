@@ -1943,6 +1943,122 @@ pub fn create_self_revocation(
     Ok(KeyRevocationOutput { revocation_id, action_hash })
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct CreateRevocationRequestInput {
+    pub target_human_id: String,
+    pub revoked_key: AgentPubKey,
+    pub reason: String,
+}
+
+/// M4: Emergency-contact revocation request. The caller must be an active
+/// emergency contact of `target_human_id`. Creates a pending KeyRevocation
+/// with quorum threshold = compute_required_witness_count(active_emergency_contact_count).
+#[hdk_extern]
+pub fn create_revocation_request(
+    input: CreateRevocationRequestInput,
+) -> ExternResult<KeyRevocationOutput> {
+    let caller_pubkey = agent_info()?.agent_initial_pubkey;
+    let caller_human_id = resolve_human_id_for_agent(&caller_pubkey)?;
+
+    // Gate: caller must be an active emergency contact for target_human_id.
+    if !is_active_emergency_contact(&input.target_human_id, &caller_human_id)? {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "create_revocation_request: caller is not an active emergency contact for {}",
+            input.target_human_id
+        ))));
+    }
+
+    // Gate: revoked_key must belong to target_human_id.
+    let owner_human_id = resolve_human_id_for_agent(&input.revoked_key)?;
+    if owner_human_id != input.target_human_id {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "create_revocation_request: revoked_key does not belong to target_human_id".into()
+        )));
+    }
+
+    if !REVOCATION_REASONS.contains(&input.reason.as_str()) {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "create_revocation_request: invalid reason '{}'. Must be one of {:?}",
+            input.reason, REVOCATION_REASONS
+        ))));
+    }
+
+    // TODO(M4-post): revisit whether revocation quorum should diverge from
+    // recovery quorum. For now, parity with M3 keeps the two paths coherent.
+    let contact_count = count_active_emergency_contacts(&input.target_human_id)?;
+    let required = compute_required_witness_count(contact_count);
+
+    let now = sys_time()?;
+    let timestamp = format!("{:?}", now);
+    let revocation_id =
+        format!("rev-{}-{}", input.target_human_id, timestamp);
+    let revoked_key_str = input.revoked_key.to_string();
+
+    let revocation = KeyRevocation {
+        id: revocation_id.clone(),
+        human_id: input.target_human_id.clone(),
+        revoked_key: revoked_key_str.clone(),
+        reason: input.reason.clone(),
+        initiated_by: caller_human_id.clone(),
+        trigger_type: "steward_vote".to_string(),
+        required_votes: required,
+        current_votes: 0,
+        votes_json: String::new(),
+        threshold_reached: false,
+        effective_at: None,
+        created_at: timestamp.clone(),
+        updated_at: timestamp.clone(),
+    };
+
+    let action_hash = create_entry(&EntryTypes::KeyRevocation(revocation.clone()))?;
+
+    // IdToKeyRevocation anchor
+    let id_anchor = StringAnchor::new("revocation_id", &revocation_id);
+    let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor.clone()))?;
+    create_entry(&EntryTypes::StringAnchor(id_anchor))?;
+    create_link(id_anchor_hash, action_hash.clone(), LinkTypes::IdToKeyRevocation, ())?;
+
+    // HumanToKeyRevocation anchor
+    let human_anchor = StringAnchor::new("human_revocations", &input.target_human_id);
+    let human_anchor_hash = hash_entry(&EntryTypes::StringAnchor(human_anchor.clone()))?;
+    create_entry(&EntryTypes::StringAnchor(human_anchor))?;
+    create_link(human_anchor_hash, action_hash.clone(), LinkTypes::HumanToKeyRevocation, ())?;
+
+    // RevokedKeyToRevocation anchor
+    let revoked_key_anchor = StringAnchor::new("revoked_key", &revoked_key_str);
+    let revoked_key_anchor_hash =
+        hash_entry(&EntryTypes::StringAnchor(revoked_key_anchor.clone()))?;
+    create_entry(&EntryTypes::StringAnchor(revoked_key_anchor))?;
+    create_link(
+        revoked_key_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::RevokedKeyToRevocation,
+        (),
+    )?;
+
+    // PendingRevocations anchor — quorum is not yet met.
+    let pending_anchor = StringAnchor::new("pending_revocations", "global");
+    let pending_anchor_hash = hash_entry(&EntryTypes::StringAnchor(pending_anchor.clone()))?;
+    create_entry(&EntryTypes::StringAnchor(pending_anchor))?;
+    create_link(pending_anchor_hash, action_hash.clone(), LinkTypes::PendingRevocations, ())?;
+
+    emit_signal(RecoveryV2Signal::KeyRevocationRequested {
+        id: revocation.id.clone(),
+        human_id: revocation.human_id.clone(),
+        revoked_key: revocation.revoked_key.clone(),
+        reason: revocation.reason.clone(),
+        trigger_type: revocation.trigger_type.clone(),
+        initiated_by: revocation.initiated_by.clone(),
+        required_votes: revocation.required_votes,
+        current_votes: revocation.current_votes,
+        threshold_reached: revocation.threshold_reached,
+        effective_at: revocation.effective_at.clone(),
+        created_at: revocation.created_at.clone(),
+    })?;
+
+    Ok(KeyRevocationOutput { revocation_id, action_hash })
+}
+
 /// Traverse `HumanToFreeze` links for the given `human_id` and return all
 /// `IdentityFreeze` entries with `is_active = true`. Used by the M3 freeze-
 /// floor gate on `commit_key_rotation`.
