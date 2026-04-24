@@ -123,7 +123,10 @@ spec:
     }
 
     options {
-        timeout(time: 60, unit: 'MINUTES')
+        // Cold sweettest compile (no cargo cache hit) takes ~30min on its own;
+        // WASM stages + DNA pack + tests together push past the old 60min ceiling.
+        // Once the cargo PVC is warm, total wall time drops back under an hour.
+        timeout(time: 150, unit: 'MINUTES')
         disableConcurrentBuilds()
         preserveStashes(buildCount: 5)
         overrideIndexTriggers(false)  // Only orchestrator or manual triggers - no webhook/branch indexing
@@ -445,8 +448,12 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                 expression { shouldRunStep('build-dna-wasm') }
             } }
             options {
-                // Kill stage if hung — a stuck conductor should not burn the agent.
-                timeout(time: 30, unit: 'MINUTES')
+                // Cold sweettest compile is ~30min by itself before any test runs.
+                // Each test spins up a real conductor + kitsune2 stack and is run
+                // serialized (--test-threads=1), so the full suite can take 30+ min
+                // on top. Stage timeout sized for cold-cache worst case; warm runs
+                // will finish in ~10–15min.
+                timeout(time: 90, unit: 'MINUTES')
             }
             steps {
                 container('builder') {
