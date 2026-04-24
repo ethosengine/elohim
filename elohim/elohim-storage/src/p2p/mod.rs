@@ -33,6 +33,7 @@ pub mod epr_atom_protocol;
 pub mod epr_protocol;
 pub mod identity_map;
 pub mod kad_store;
+pub mod recovery_invitation;
 pub mod replication;
 pub mod shard_protocol;
 pub mod sync_protocol;
