@@ -1732,13 +1732,56 @@ pub fn create_recovery_request(
     })
 }
 
+/// Traverse `HumanToFreeze` links for the given `human_id` and return all
+/// `IdentityFreeze` entries with `is_active = true`. Used by the M3 freeze-
+/// floor gate on `commit_key_rotation`.
+fn collect_active_freezes_for_human(human_id: &str) -> ExternResult<Vec<IdentityFreeze>> {
+    let anchor = StringAnchor::new("identity_freeze_by_human", human_id);
+    let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor))?;
+    let links = get_links(
+        LinkQuery::try_new(anchor_hash, LinkTypes::HumanToFreeze)?,
+        GetStrategy::default(),
+    )?;
+    let mut freezes = Vec::new();
+    for link in links {
+        let Some(hash) = link.target.clone().into_action_hash() else { continue };
+        let Some(record) = get(hash, GetOptions::default())? else { continue };
+        let Some(freeze): Option<IdentityFreeze> = record
+            .entry()
+            .to_app_option()
+            .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        else { continue };
+        if freeze.is_active {
+            freezes.push(freeze);
+        }
+    }
+    Ok(freezes)
+}
+
 /// Commit a key rotation to the DHT.
-/// NOTE: The integrity validator currently stub-rejects all RecoveryAuthority variants.
-/// M2 adds variant-specific validation. Until then this coordinator will return Err
-/// on any attempted rotation — intentional during M1-cleanup.
+/// M3: runs freeze-floor pre-commit gate (CryptographicQuorum exempt) before
+/// creating the entry.
 #[hdk_extern]
 pub fn commit_key_rotation(input: CommitKeyRotationInput) -> ExternResult<KeyRotationOutput> {
     let now = sys_time()?;
+
+    // M3: freeze-floor gate (skips for CryptographicQuorum per design §4.3).
+    let is_cryptographic = matches!(
+        &input.authority,
+        RecoveryAuthority::CryptographicQuorum { .. }
+    );
+    if !is_cryptographic {
+        // Resolve human_id from the rotating pubkey (same path as create_recovery_request).
+        let human_id = resolve_human_id_for_agent(&input.human_agent_pubkey)?;
+        let active_freezes = collect_active_freezes_for_human(&human_id)?;
+        let freeze_refs: Vec<&IdentityFreeze> = active_freezes.iter().collect();
+
+        if let Some(reason) = check_freeze_floor_rules(&input.authority, &human_id, &freeze_refs) {
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "freeze-floor gate rejected rotation: {reason}"
+            ))));
+        }
+    }
 
     let rotation = KeyRotation {
         human_agent_pubkey: input.human_agent_pubkey.clone(),
