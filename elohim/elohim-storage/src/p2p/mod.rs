@@ -408,6 +408,12 @@ pub enum P2PCommand {
     ListPeers {
         reply: oneshot::Sender<Vec<PeerInfoView>>,
     },
+    /// Publish a RecoveryInvitation to the `recovery.invitation` gossipsub topic.
+    /// Sent by the projection layer after a successful `RecoveryRequestCreated`
+    /// upsert. The swarm event loop calls `gossipsub.publish(topic, bytes)`.
+    /// Best-effort — publish failure does NOT revert the DB projection; the DHT
+    /// remains the source of truth and subscribers can rediscover via signal replay.
+    PublishRecoveryInvitation(crate::p2p::recovery_invitation::RecoveryInvitation),
 }
 
 /// RAII guard that resumes P2P sync when dropped.
@@ -489,6 +495,7 @@ impl P2PHandle {
                         let _ = reply.send(vec![]);
                     }
                     P2PCommand::PublishEprHead { .. } => {} // fire-and-forget
+                    P2PCommand::PublishRecoveryInvitation(_) => {} // fire-and-forget
                 }
             }
         });
@@ -1340,6 +1347,32 @@ impl P2PNode {
                     })
                     .collect();
                 let _ = reply.send(peers);
+            }
+            P2PCommand::PublishRecoveryInvitation(inv) => {
+                let topic = libp2p::gossipsub::IdentTopic::new("recovery.invitation");
+                match inv.to_bytes() {
+                    Ok(bytes) => match swarm.behaviour_mut().gossipsub.publish(topic, bytes) {
+                        Ok(msg_id) => info!(
+                            target: "elohim_storage::recovery",
+                            request_hash = %inv.request_hash,
+                            human_id = %inv.human_id,
+                            message_id = ?msg_id,
+                            "Published RecoveryInvitation to recovery.invitation"
+                        ),
+                        Err(e) => warn!(
+                            target: "elohim_storage::recovery",
+                            request_hash = %inv.request_hash,
+                            error = ?e,
+                            "gossipsub publish failed (often: no peers subscribed yet)"
+                        ),
+                    },
+                    Err(e) => warn!(
+                        target: "elohim_storage::recovery",
+                        request_hash = %inv.request_hash,
+                        error = ?e,
+                        "Failed to encode RecoveryInvitation"
+                    ),
+                }
             }
         }
     }
@@ -2328,7 +2361,38 @@ impl P2PNode {
             },
 
             behaviour::ElohimStorageBehaviourEvent::Gossipsub(event) => {
-                debug!(event = ?event, "Gossipsub event");
+                use libp2p::gossipsub::Event as GossipsubEvent;
+                match event {
+                    GossipsubEvent::Message {
+                        propagation_source,
+                        message_id,
+                        message,
+                    } => {
+                        if message.topic.as_str() == "recovery.invitation" {
+                            match crate::p2p::recovery_invitation::RecoveryInvitation::from_bytes(
+                                &message.data,
+                            ) {
+                                Ok(inv) => info!(
+                                    target: "elohim_storage::recovery",
+                                    from = %propagation_source,
+                                    message_id = ?message_id,
+                                    request_hash = %inv.request_hash,
+                                    human_id = %inv.human_id,
+                                    "Received recovery invitation"
+                                ),
+                                Err(e) => warn!(
+                                    target: "elohim_storage::recovery",
+                                    from = %propagation_source,
+                                    error = ?e,
+                                    "Failed to decode RecoveryInvitation"
+                                ),
+                            }
+                        } else {
+                            debug!(topic = %message.topic, "Gossipsub message on untracked topic");
+                        }
+                    }
+                    other => debug!(event = ?other, "Gossipsub event"),
+                }
             }
         }
     }

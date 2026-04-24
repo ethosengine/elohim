@@ -701,10 +701,49 @@ fn timestamp_to_iso(v: &serde_json::Value) -> String {
     chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string()
 }
 
+/// Extract a `RecoveryInvitation` publish intent from a `RecoveryV2Signal`.
+///
+/// Returns `Some(RecoveryInvitation)` only for `RecoveryRequestCreated` signals
+/// where the coordinator populated `human_id` (post-M3 requests). The production
+/// signal subscriber SHOULD send this (if present) via its `P2PCommand` channel
+/// alongside calling `handle_recovery_v2_signal` for the SQLite projection:
+///
+/// ```ignore
+/// if let Some(inv) = recovery_invitation_from_signal(&sig) {
+///     let _ = p2p_tx.try_send(P2PCommand::PublishRecoveryInvitation(inv));
+/// }
+/// handle_recovery_v2_signal(&mut conn, sig)?;
+/// ```
+///
+/// Best-effort: dropping the publish intent does not affect projection correctness.
+/// The DHT remains the source of truth and peers can rediscover via signal replay.
+pub fn recovery_invitation_from_signal(
+    signal: &RecoveryV2Signal,
+) -> Option<crate::p2p::recovery_invitation::RecoveryInvitation> {
+    match signal {
+        RecoveryV2Signal::RecoveryRequestCreated {
+            action_hash,
+            request,
+        } => request
+            .human_id
+            .as_ref()
+            .map(|hid| crate::p2p::recovery_invitation::RecoveryInvitation {
+                request_hash: action_hash.clone(),
+                human_id: hid.clone(),
+                created_at: timestamp_to_iso(&request.created_at),
+            }),
+        _ => None,
+    }
+}
+
 /// Dispatch a `RecoveryV2Signal` into the SQLite projection.
 ///
 /// New variants add a match arm here. Keep this function thin — per-entity
 /// projection logic belongs in `db::recovery_requests`.
+///
+/// The gossipsub publish bridge is intentionally separate — use
+/// `recovery_invitation_from_signal` to extract a publish intent and forward it
+/// via `P2PCommand::PublishRecoveryInvitation` in the production signal loop.
 pub fn handle_recovery_v2_signal(
     conn: &mut diesel::sqlite::SqliteConnection,
     signal: RecoveryV2Signal,
@@ -1350,5 +1389,62 @@ mod recovery_v2_signal_tests {
             }
             _ => panic!("Expected IntimateWitnessSubmitted variant"),
         }
+    }
+
+    #[test]
+    fn publish_intent_from_request_created_has_fields() {
+        let signal = RecoveryV2Signal::RecoveryRequestCreated {
+            action_hash: "uhCkkR1".into(),
+            request: RecoveryRequestPayload {
+                human_agent_pubkey: "uhCAkHAP".into(),
+                new_agent_pubkey: "uhCAkNAP".into(),
+                hosting_doorway_pubkey: "uhCAkHDP".into(),
+                proposed_authority: serde_json::json!({"type": "IntimateQuorum"}),
+                request_nonce: vec![0u8; 16],
+                human_id: Some("human-abc".into()),
+                required_witness_count: 3,
+                created_at: serde_json::json!(1_700_000_000_000_000_i64),
+            },
+        };
+        let inv = recovery_invitation_from_signal(&signal).expect("some");
+        assert_eq!(inv.request_hash, "uhCkkR1");
+        assert_eq!(inv.human_id, "human-abc");
+        assert!(!inv.created_at.is_empty());
+    }
+
+    #[test]
+    fn publish_intent_is_none_without_human_id() {
+        let signal = RecoveryV2Signal::RecoveryRequestCreated {
+            action_hash: "uhCkkR2".into(),
+            request: RecoveryRequestPayload {
+                human_agent_pubkey: "x".into(),
+                new_agent_pubkey: "y".into(),
+                hosting_doorway_pubkey: "z".into(),
+                proposed_authority: serde_json::json!({}),
+                request_nonce: vec![],
+                human_id: None,
+                required_witness_count: 2,
+                created_at: serde_json::json!(0_i64),
+            },
+        };
+        assert!(recovery_invitation_from_signal(&signal).is_none());
+    }
+
+    #[test]
+    fn publish_intent_is_none_for_other_variants() {
+        let signal = RecoveryV2Signal::IntimateWitnessSubmitted {
+            action_hash: "W".into(),
+            request_hash: "R".into(),
+            witness: HumanityWitnessPayload {
+                human_id: "H".into(),
+                witness_agent_id: "A".into(),
+                attestation_type: "intimate_recovery".into(),
+                note: None,
+                issued_at: serde_json::json!(0_i64),
+                revoked_at: None,
+            },
+            witness_agent_id: "A".into(),
+        };
+        assert!(recovery_invitation_from_signal(&signal).is_none());
     }
 }
