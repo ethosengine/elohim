@@ -17,7 +17,19 @@
             wasm-pack
             # liblzma (required by wasm-pack)
             xz
+            # Native build chain for sweettest (datachannel-sys → libdatachannel
+            # built from source). Required by the DNA Integration stage; holonix
+            # default devShell does not include these.
+            cmake
+            pkg-config
+            clang
+            libclang.lib
+            openssl
+            zlib
+            libsodium
           ];
+          # bindgen needs to find the clang resource directory for stdbool.h etc.
+          LIBCLANG_PATH = "${pkgs.libclang.lib}/lib";
           # Required for getrandom 0.3.x on wasm32-unknown-unknown
           # Holochain provides a custom random implementation via host functions
           RUSTFLAGS = "--cfg getrandom_backend=\"custom\"";
