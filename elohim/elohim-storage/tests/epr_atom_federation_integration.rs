@@ -4,8 +4,8 @@
 //! commit 88cc4fdf.
 
 mod harness;
-use elohim_storage::p2p::verify_incoming_epr;
-use harness::spawn_test_node;
+use elohim_storage::p2p::{verify_incoming_epr, MAX_BATCH_CIDS};
+use harness::{spawn_test_node, BatchOutcome};
 use std::time::Duration;
 use tokio::time::timeout;
 
@@ -157,4 +157,108 @@ async fn private_atom_not_cross_peer_servable_phase_2c() {
         response.is_none(),
         "Phase 2c gate should deny private atom even to identity-mapped non-author peer",
     );
+}
+
+// ---------------------------------------------------------------------------
+// Task 17 — Batch semantics (P1)
+//
+// FetchBatch must preserve slot order and must apply the same leak-free
+// reach gate per-slot as the single Fetch path. A batch of
+// [public, private_not_author, unknown] must return [Some, None, None].
+//
+// MAX_BATCH_CIDS enforces back-pressure: oversize requests are rejected as
+// a protocol Error, not an AtomBatch of Nones.
+// ---------------------------------------------------------------------------
+
+#[tokio::test]
+async fn fetch_batch_preserves_slot_order_with_leak_free_denial() {
+    let node_a = spawn_test_node("a").await;
+    let node_b = spawn_test_node("b").await;
+
+    node_a.dial(node_b.addr()).await.expect("dial");
+    tokio::time::sleep(DIAL_SETTLE).await;
+    node_a
+        .wait_for_connection(&node_b.peer_id(), CONNECT_WAIT)
+        .await;
+
+    // Slot 0: a Commons atom on A — should be served.
+    let public_epr = node_a.author_test_atom("commons", b"public slot").await;
+    let public_cid = public_epr.envelope.cid.to_string();
+    node_a.ingest_local(public_epr).await;
+
+    // Slot 1: a Private atom on A, caller (B) is not author — should gate to None.
+    let private_epr = node_a
+        .author_test_atom("private", b"private slot")
+        .await;
+    let private_cid = private_epr.envelope.cid.to_string();
+    node_a.ingest_local(private_epr).await;
+
+    // Slot 2: a syntactically valid CID that was never ingested.
+    let unknown_cid = elohim_epr::cid::compute_cid(b"never-ingested").to_string();
+
+    let outcome = timeout(
+        FETCH_TIMEOUT,
+        node_b.fetch_batch_from(
+            &node_a.peer_id(),
+            vec![public_cid, private_cid, unknown_cid],
+        ),
+    )
+    .await
+    .expect("fetch_batch timed out")
+    .unwrap_or_else(|e| panic!("fetch_batch error: {e}"));
+
+    let atoms = match outcome {
+        BatchOutcome::AtomBatch(atoms) => atoms,
+        BatchOutcome::ProtocolError(msg) => {
+            panic!("expected AtomBatch, got ProtocolError: {msg}")
+        }
+    };
+
+    assert_eq!(atoms.len(), 3, "slot count must match request");
+    assert!(atoms[0].is_some(), "slot 0 (public) must be served");
+    assert!(
+        atoms[1].is_none(),
+        "slot 1 (private, non-author) must be None — leak-free denial",
+    );
+    assert!(
+        atoms[2].is_none(),
+        "slot 2 (unknown CID) must be None",
+    );
+}
+
+#[tokio::test]
+async fn fetch_batch_rejects_oversized_request() {
+    let node_a = spawn_test_node("a").await;
+    let node_b = spawn_test_node("b").await;
+
+    node_a.dial(node_b.addr()).await.expect("dial");
+    tokio::time::sleep(DIAL_SETTLE).await;
+    node_a
+        .wait_for_connection(&node_b.peer_id(), CONNECT_WAIT)
+        .await;
+
+    // Construct MAX_BATCH_CIDS+1 CIDs. The length check runs before any parse,
+    // so syntactically-valid stand-ins are sufficient.
+    let stub_cid = elohim_epr::cid::compute_cid(b"oversize-stub").to_string();
+    let cids: Vec<String> = (0..=MAX_BATCH_CIDS).map(|_| stub_cid.clone()).collect();
+
+    let outcome = timeout(
+        FETCH_TIMEOUT,
+        node_b.fetch_batch_from(&node_a.peer_id(), cids),
+    )
+    .await
+    .expect("fetch_batch timed out")
+    .unwrap_or_else(|e| panic!("fetch_batch error: {e}"));
+
+    match outcome {
+        BatchOutcome::ProtocolError(msg) => {
+            assert!(
+                msg.contains("batch too large"),
+                "error should describe oversize, got: {msg}",
+            );
+        }
+        BatchOutcome::AtomBatch(_) => {
+            panic!("oversize batch must be rejected as ProtocolError, not AtomBatch")
+        }
+    }
 }
