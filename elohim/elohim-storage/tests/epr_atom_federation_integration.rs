@@ -262,3 +262,166 @@ async fn fetch_batch_rejects_oversized_request() {
         }
     }
 }
+
+// ---------------------------------------------------------------------------
+// Task 18 — Validation rejection (P1)
+//
+// Phase 2c's `verify_incoming_epr` is explicitly structural-only — its
+// docstring calls out that full Ed25519 verification against a public key is
+// deferred to a later layer (no signer-CID resolver at this point). The
+// protection surface at Phase 2c is therefore:
+//
+//   1. CID recompute — detects tampering of any field in the canonical bytes
+//      (payload and all envelope fields, including the signature).
+//   2. Structural signature check — algorithm must be "ed25519", signature
+//      must be 64 bytes.
+//   3. Coupling validator.
+//
+// Three tests: payload tamper (CID mismatch path), bad signature length
+// (structural path), and a byte-flipped 64-byte signature to pin the
+// "signature is in canonical bytes" invariant. If that invariant ever
+// changes (detached-signature refactor), Phase 2b's resolver-backed
+// Ed25519 verify must land first or the third test must flip.
+// ---------------------------------------------------------------------------
+
+#[tokio::test]
+async fn announce_with_tampered_payload_is_rejected() {
+    let node_a = spawn_test_node("a").await;
+    let node_b = spawn_test_node("b").await;
+
+    node_a.dial(node_b.addr()).await.expect("dial");
+    tokio::time::sleep(DIAL_SETTLE).await;
+    node_a
+        .wait_for_connection(&node_b.peer_id(), CONNECT_WAIT)
+        .await;
+
+    let mut epr = node_a.author_test_atom("commons", b"payload v1").await;
+    let cid = epr.envelope.cid.to_string();
+
+    assert!(!epr.payload.is_empty(), "test needs a non-empty payload");
+    epr.payload[0] ^= 0x01;
+
+    let wire = node_a.encode_envelope(&epr).await;
+
+    let ack = timeout(
+        FETCH_TIMEOUT,
+        node_a.announce_to(&node_b.peer_id(), wire),
+    )
+    .await
+    .expect("announce timed out")
+    .unwrap_or_else(|e| panic!("announce channel error: {e}"));
+
+    assert!(
+        !ack.accepted,
+        "tampered payload must be rejected — CID recompute mismatch",
+    );
+    assert!(
+        ack.reason.is_some(),
+        "rejection must carry a reason for operator visibility",
+    );
+
+    let post_fetch = timeout(
+        FETCH_TIMEOUT,
+        node_a.fetch_atom_from(&node_b.peer_id(), &cid),
+    )
+    .await
+    .expect("fetch timed out")
+    .unwrap_or_else(|e| panic!("fetch error: {e}"));
+    assert!(
+        post_fetch.is_none(),
+        "tampered atom must not be persisted in B's pool",
+    );
+}
+
+#[tokio::test]
+async fn announce_with_wrong_signature_length_is_rejected() {
+    let node_a = spawn_test_node("a").await;
+    let node_b = spawn_test_node("b").await;
+
+    node_a.dial(node_b.addr()).await.expect("dial");
+    tokio::time::sleep(DIAL_SETTLE).await;
+    node_a
+        .wait_for_connection(&node_b.peer_id(), CONNECT_WAIT)
+        .await;
+
+    let mut epr = node_a.author_test_atom("commons", b"payload v1").await;
+    let cid = epr.envelope.cid.to_string();
+
+    epr.envelope.proof.signature.pop();
+    assert_eq!(epr.envelope.proof.signature.len(), 63);
+
+    let wire = node_a.encode_envelope(&epr).await;
+
+    let ack = timeout(
+        FETCH_TIMEOUT,
+        node_a.announce_to(&node_b.peer_id(), wire),
+    )
+    .await
+    .expect("announce timed out")
+    .unwrap_or_else(|e| panic!("announce channel error: {e}"));
+
+    assert!(
+        !ack.accepted,
+        "63-byte signature must be rejected at verify_incoming_epr",
+    );
+
+    let post_fetch = timeout(
+        FETCH_TIMEOUT,
+        node_a.fetch_atom_from(&node_b.peer_id(), &cid),
+    )
+    .await
+    .expect("fetch timed out")
+    .unwrap_or_else(|e| panic!("fetch error: {e}"));
+    assert!(
+        post_fetch.is_none(),
+        "structurally invalid atom must not be persisted",
+    );
+}
+
+#[tokio::test]
+async fn announce_with_tampered_signature_bytes_accepted_phase_2c_limitation() {
+    // Documents Phase 2c's deliberate scoping. `verify_incoming_epr` is
+    // structural-only AND the EPR canonicalisation is detached-signature —
+    // the signature is not included in the canonical bytes the CID hashes
+    // over. The result: byte flips inside a 64-byte ed25519 signature
+    // (length preserved, algorithm preserved) pass every current check.
+    //
+    // The intent of Phase 2c is to ship federation with an honest scope —
+    // structural integrity + coupling + reach gate — and land full
+    // resolver-backed Ed25519 verification in Phase 2b+ where the
+    // signer-CID resolver is available.
+    //
+    // When Phase 2b's resolver-backed verify lands, flip the final
+    // assertion to `!ack.accepted` and rename this test to drop the
+    // `_phase_2c_limitation` suffix.
+    let node_a = spawn_test_node("a").await;
+    let node_b = spawn_test_node("b").await;
+
+    node_a.dial(node_b.addr()).await.expect("dial");
+    tokio::time::sleep(DIAL_SETTLE).await;
+    node_a
+        .wait_for_connection(&node_b.peer_id(), CONNECT_WAIT)
+        .await;
+
+    let mut epr = node_a.author_test_atom("commons", b"payload v1").await;
+    epr.envelope.proof.signature[0] ^= 0x01;
+    assert_eq!(epr.envelope.proof.signature.len(), 64);
+    assert_eq!(epr.envelope.proof.algorithm, "ed25519");
+
+    let wire = node_a.encode_envelope(&epr).await;
+
+    let ack = timeout(
+        FETCH_TIMEOUT,
+        node_a.announce_to(&node_b.peer_id(), wire),
+    )
+    .await
+    .expect("announce timed out")
+    .unwrap_or_else(|e| panic!("announce channel error: {e}"));
+
+    assert!(
+        ack.accepted,
+        "Phase 2c detached-signature + structural-only verify accepts \
+         byte-flipped sigs; flip to !accepted when Phase 2b Ed25519 verify \
+         lands (see test docstring).",
+    );
+}
