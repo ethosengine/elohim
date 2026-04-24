@@ -2326,6 +2326,10 @@ impl P2PNode {
                 Ok(_) => info!(peer = %remote_peer_id, "DCUtR: direct connection upgraded"),
                 Err(ref e) => debug!(peer = %remote_peer_id, error = %e, "DCUtR: upgrade failed"),
             },
+
+            behaviour::ElohimStorageBehaviourEvent::Gossipsub(event) => {
+                debug!(event = ?event, "Gossipsub event");
+            }
         }
     }
 
