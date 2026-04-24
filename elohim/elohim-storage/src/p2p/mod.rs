@@ -3219,13 +3219,56 @@ impl P2PNode {
                 }
             }
             EprAtomRequest::Announce { envelope_bytes } => {
-                debug!(
-                    bytes = envelope_bytes.len(),
-                    "EPR atom announce (Batch B stub)"
-                );
-                EprAtomResponse::Announced {
-                    accepted: false,
-                    reason: Some("handler not yet implemented (Batch C)".to_string()),
+                let Some(pool) = self.db_pool.as_ref() else {
+                    warn!(
+                        bytes = envelope_bytes.len(),
+                        "EPR atom announce: db pool unavailable"
+                    );
+                    return EprAtomResponse::Announced {
+                        accepted: false,
+                        reason: Some("storage unavailable".to_string()),
+                    };
+                };
+                let mut conn = match pool.get() {
+                    Ok(c) => c,
+                    Err(e) => {
+                        warn!(error = %e, "EPR atom announce: db pool exhausted");
+                        return EprAtomResponse::Announced {
+                            accepted: false,
+                            reason: Some("storage busy".to_string()),
+                        };
+                    }
+                };
+
+                match crate::services::epr_service::ingest_from_wire_bytes(
+                    &mut conn,
+                    &envelope_bytes,
+                ) {
+                    Ok(ingested) => {
+                        debug!(
+                            cid = %ingested.cid,
+                            bytes = envelope_bytes.len(),
+                            "EPR atom announce accepted"
+                        );
+                        EprAtomResponse::Announced {
+                            accepted: true,
+                            reason: None,
+                        }
+                    }
+                    Err(crate::error::StorageError::InvalidInput(msg)) => {
+                        debug!(bytes = envelope_bytes.len(), reason = %msg, "EPR atom announce rejected (invalid)");
+                        EprAtomResponse::Announced {
+                            accepted: false,
+                            reason: Some(format!("verification failed: {msg}")),
+                        }
+                    }
+                    Err(e) => {
+                        warn!(bytes = envelope_bytes.len(), error = ?e, "EPR atom announce: persistence error");
+                        EprAtomResponse::Announced {
+                            accepted: false,
+                            reason: Some("persistence error".to_string()),
+                        }
+                    }
                 }
             }
             EprAtomRequest::FetchBatch { cids } => {
