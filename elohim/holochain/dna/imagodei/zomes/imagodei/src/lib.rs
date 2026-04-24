@@ -1657,6 +1657,36 @@ fn compute_required_witness_count(active_emergency_contacts: u32) -> u32 {
     std::cmp::max(2, ceil_half_plus_one)
 }
 
+/// Count approved votes on a KeyRevocation by traversing RevocationToVote links.
+///
+/// Only votes with `approved == true` count toward the quorum threshold.
+/// Rejections are preserved in the DHT for audit but never advance the
+/// pending -> effective transition.
+fn count_approved_revocation_votes(revocation_id: &str) -> ExternResult<u32> {
+    let anchor = StringAnchor::new("revocation_votes", revocation_id);
+    let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor))?;
+    let links = get_links(
+        LinkQuery::try_new(anchor_hash, LinkTypes::RevocationToVote)?,
+        GetStrategy::default(),
+    )?;
+
+    let mut approved_count: u32 = 0;
+    for link in links {
+        let Some(vote_hash) = link.target.clone().into_action_hash() else { continue };
+        let Some(record) = get(vote_hash, GetOptions::default())? else { continue };
+        let Some(vote): Option<RevocationVote> = record
+            .entry()
+            .to_app_option()
+            .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        else { continue };
+        if vote.approved {
+            approved_count += 1;
+        }
+    }
+
+    Ok(approved_count)
+}
+
 /// Intimate-recovery witness validity horizon. Matches protocol spec §5.
 const WITNESS_EXPIRY_DAYS: u64 = 90;
 const MICROS_PER_DAY: u64 = 24 * 60 * 60 * 1_000_000;
