@@ -35,8 +35,6 @@ struct DnaManifest {
     name: String,
     integrity: IntegritySection,
     #[serde(default)]
-    lineage: Option<Vec<String>>,
-    #[serde(default)]
     #[allow(dead_code)]
     coordinator: Option<serde_yaml::Value>,
 }
@@ -156,30 +154,12 @@ fn every_dna_has_stable_alpha_network_seed() -> Result<()> {
     Ok(())
 }
 
-#[test]
-fn every_dna_declares_lineage_field() -> Result<()> {
-    for (dir, _name) in DNAS {
-        let m = load_dna_manifest(dir)?;
-        match m.lineage {
-            None => bail!(
-                "dna/{dir}/dna.yaml must declare top-level `lineage:` (empty list for genesis DNAs). \
-                 Not declaring lineage means breaking-change chains cannot be reconstructed later."
-            ),
-            Some(entries) => {
-                for e in &entries {
-                    if !e.starts_with("uhC0k") {
-                        bail!(
-                            "dna/{dir}/dna.yaml lineage entry {:?} does not look like a DNA hash \
-                             (expected uhC0k… prefix)",
-                            e
-                        );
-                    }
-                }
-            }
-        }
-    }
-    Ok(())
-}
+// Note: a `every_dna_declares_lineage_field` test existed here and asserted
+// `lineage: []` on every DNA manifest. Holochain 0.6 gates the `lineage` field
+// behind the `unstable-migration` cargo feature; the stable `hc dna pack`
+// rejects the field as unknown. The test (and the field) were removed pending
+// upstream stabilization. Design intent — recoverable DNA upgrade chains —
+// is tracked separately (rna module, NETWORK_UPGRADES.md, future brainstorm).
 
 #[test]
 fn happ_is_version_0_and_has_all_five_roles() -> Result<()> {

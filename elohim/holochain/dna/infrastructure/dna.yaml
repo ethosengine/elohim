@@ -4,7 +4,7 @@
 # - manifest_version "0": Holochain 0.6 schema.
 # - network_seed "elohim_infrastructure_alpha": stability contract. _alpha suffix
 #   means "we WILL reset this network on breaking changes; do not treat as production."
-# - lineage []: this hash is the genesis ancestor.
+# - lineage: omitted pending HC 0.6 unstable-migration stabilization.
 # - clone_limit is per-role in happ.yaml (default-deny 0).
 #
 # Bootstrap-steward: NOT APPLICABLE.
@@ -30,5 +30,3 @@ coordinator:
       path: "target/wasm32-unknown-unknown/release/infrastructure.wasm"
       dependencies:
         - name: infrastructure_integrity
-
-lineage: []

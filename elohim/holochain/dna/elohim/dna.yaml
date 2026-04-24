@@ -5,8 +5,11 @@
 # - network_seed "elohim_lamad_alpha": stability contract. The _alpha suffix means
 #   "we WILL reset this network on breaking changes; do not treat as production."
 #   Upgrade to _beta or drop the suffix when we commit to persistence.
-# - lineage []: this DNA hash is the genesis ancestor. Add previous hashes here on
-#   breaking integrity changes per the forward-compat policy (elohim/holochain/README.md).
+# - lineage: currently omitted. Holochain 0.6 gates the `lineage` field behind
+#   the `unstable-migration` feature; the stable hc CLI rejects it. Until the
+#   feature stabilizes (or we adopt a hc build that enables it), upgrade paths
+#   must be reconstructed from git history + network_seed rollover. See the
+#   rna module (elohim/holochain/rna/) and NETWORK_UPGRADES.md.
 # - clone_limit is declared per-role in happ.yaml, not here (default-deny 0).
 #
 # Lamad does not currently require a bootstrap-steward (content authorship is
@@ -28,5 +31,3 @@ coordinator:
       path: "target/wasm32-unknown-unknown/release/content_store.wasm"
       dependencies:
         - name: content_store_integrity
-
-lineage: []

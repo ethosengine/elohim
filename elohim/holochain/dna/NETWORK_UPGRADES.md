@@ -1,5 +1,18 @@
 # Holochain Network Upgrades: The Elohim Coordination Model
 
+> **STATUS (2026-04-24)**: The `lineage` field recommended throughout this
+> doc is currently **omitted from every dna.yaml**. Holochain 0.6 gates the
+> field behind the `unstable-migration` cargo feature; the stable `hc dna
+> pack` rejects it as an unknown field. All alpha-network manifests now
+> declare only `name`, `integrity`, `coordinator`. Upgrade history is
+> reconstructed from git + network_seed rollover until the feature
+> stabilizes upstream (or we adopt a holonix flavor that enables it).
+>
+> This is a real regression — see the `rna/` module (currently on the
+> backburner) and a scheduled brainstorming session on first-class upgrade
+> paths. The policy below describes the intended end-state; today's
+> mechanics are git-history + `_alpha` → `_alpha2` seed rollover.
+
 ## The Problem
 
 In Holochain, the DNA hash IS the network identity. Any change to:

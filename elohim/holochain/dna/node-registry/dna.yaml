@@ -4,7 +4,7 @@
 # - manifest_version "0": Holochain 0.6 schema.
 # - network_seed "elohim_node_registry_alpha": stability contract. _alpha suffix
 #   means "we WILL reset this network on breaking changes; do not treat as production."
-# - lineage []: this hash is the genesis ancestor.
+# - lineage: omitted pending HC 0.6 unstable-migration stabilization.
 # - clone_limit is per-role in happ.yaml (default-deny 0).
 #
 # Bootstrap-steward: node-registry uses the bootstrap-steward pattern (node
@@ -25,5 +25,3 @@ coordinator:
       path: target/wasm32-unknown-unknown/release/node_registry_coordinator.wasm
       dependencies:
         - name: node_registry_integrity
-
-lineage: []

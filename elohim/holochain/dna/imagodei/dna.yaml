@@ -4,8 +4,8 @@
 # - manifest_version "0": Holochain 0.6 schema.
 # - network_seed "elohim_imagodei_alpha": stability contract. _alpha suffix means
 #   "we WILL reset this network on breaking changes; do not treat as production."
-# - lineage []: this hash is the genesis ancestor. Add previous hashes here on
-#   breaking integrity changes per forward-compat policy.
+# - lineage: currently omitted (HC 0.6 gates the field behind unstable-migration;
+#   hc CLI rejects it). Upgrade paths are git-tracked until the feature stabilizes.
 # - clone_limit is per-role in happ.yaml (default-deny 0).
 #
 # Bootstrap-steward: imagodei IS the reference implementation for the
@@ -29,5 +29,3 @@ coordinator:
       path: "target/wasm32-unknown-unknown/release/imagodei.wasm"
       dependencies:
         - name: imagodei_integrity
-
-lineage: []
