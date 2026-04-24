@@ -1601,7 +1601,7 @@ fn resolve_human_id_for_agent(agent_pubkey: &AgentPubKey) -> ExternResult<String
         GetStrategy::default(),
     )?;
     let first = links.first().ok_or(wasm_error!(WasmErrorInner::Guest(format!(
-        "No Human bound to agent pubkey {:?}",
+        "No Human bound to agent pubkey {}",
         agent_pubkey
     ))))?;
     let action_hash = first
@@ -1657,6 +1657,10 @@ fn compute_required_witness_count(active_emergency_contacts: u32) -> u32 {
     std::cmp::max(2, ceil_half_plus_one)
 }
 
+/// Intimate-recovery witness validity horizon. Matches protocol spec §5.
+const WITNESS_EXPIRY_DAYS: u64 = 90;
+const MICROS_PER_DAY: u64 = 24 * 60 * 60 * 1_000_000;
+
 #[cfg(test)]
 mod m3_witness_threshold_tests {
     use super::compute_required_witness_count;
@@ -1669,6 +1673,13 @@ mod m3_witness_threshold_tests {
     #[test]
     fn floor_at_two_when_one_contact() {
         assert_eq!(compute_required_witness_count(1), 2);
+    }
+
+    #[test]
+    fn two_contacts_yields_two() {
+        // ceil(2/2) + 1 = 1 + 1 = 2; floor is 2; max(2, 2) = 2.
+        // Boundary: the point where the floor stops dominating.
+        assert_eq!(compute_required_witness_count(2), 2);
     }
 
     #[test]
@@ -1948,17 +1959,22 @@ pub fn submit_intimate_witness(
     // the optional note is stored in evidence_json.
     let now = sys_time()?;
     let timestamp = format!("{:?}", now);
-    // Witnesses decay after 90 days per protocol spec.
-    let expiry_micros = 90u64 * 24 * 60 * 60 * 1_000_000;
+    let expiry_micros = WITNESS_EXPIRY_DAYS * MICROS_PER_DAY;
     let expires_at = format!(
         "{:?}",
         now.checked_add(&Duration::from_micros(expiry_micros))
             .unwrap_or(now)
     );
-    let witness_id = format!("intimate-witness-{}-{}", human_id, timestamp);
+    // Sanitize characters that appear in Timestamp Debug output; match the
+    // convention used by other id generators in this zome (e.g., renewals).
+    let witness_id_ts = timestamp.replace([':', ' ', '(', ')'], "-");
+    let witness_id = format!("intimate-witness-{}-{}", human_id, witness_id_ts);
     let witness = HumanityWitness {
         id: witness_id,
         human_id: human_id.clone(),
+        // NOTE: M3 stores authorizer's human_id here, not agent pubkey.
+        // The field's name is a pre-M3 misnomer the protocol accepts.
+        // Dedupe gate `has_existing_witness_for_request` depends on this convention.
         witness_agent_id: authorizer_human_id.clone(),
         attestation_type: "intimate_recovery".into(),
         confidence: 1.0,
