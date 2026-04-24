@@ -20,7 +20,7 @@ use super::diesel_schema::{
     human_relationships, humans, imagodei_observations, key_rotations, knowledge_maps,
     local_sessions, node_stewardship, observation_entries, observation_sessions, placement_gaps,
     places, precedents, premium_gates, proposal_options, proposals, ranked_votes, rea_commitments,
-    recovery_requests, relationships, responsibility_demand_configs, risk_alerts, schedules,
+    recovery_requests, recovery_witnesses, relationships, responsibility_demand_configs, risk_alerts, schedules,
     shard_locations, shard_manifests, spatial_contexts, statement_votes, statements,
     steward_credentials, stewarded_nodes, stewardship_allocations, token_balances,
     token_decay_events, token_mint_events, token_transfers, votes,
@@ -2929,4 +2929,34 @@ pub struct NewKeyRotationRow {
     pub authority_kind: String,
     pub authority_json: String,
     pub rotated_at: String,
+}
+
+// Recovery Protocol Phase 2 — M3 Witness Projection
+// Source of truth: DHT (imagodei HumanityWitness entry, linked via
+// RecoveryRequestToHumanityWitness from its RecoveryRequest).
+// This table is a read-optimized projection rebuildable from signal replay.
+
+/// Query model for reading recovery witnesses (SELECT).
+#[derive(Debug, Clone, Queryable, Selectable)]
+#[diesel(table_name = recovery_witnesses)]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+pub struct RecoveryWitnessRow {
+    pub dht_anchor_hash: String,
+    pub recovery_request_hash: String,
+    pub witness_agent_id: String,
+    pub human_id: String,
+    pub note: Option<String>,
+    pub submitted_at: String,
+}
+
+/// Insert model for recovery witnesses (INSERT on dht_anchor_hash).
+#[derive(Debug, Clone, Insertable)]
+#[diesel(table_name = recovery_witnesses)]
+pub struct NewRecoveryWitnessRow {
+    pub dht_anchor_hash: String,
+    pub recovery_request_hash: String,
+    pub witness_agent_id: String,
+    pub human_id: String,
+    pub note: Option<String>,
+    pub submitted_at: String,
 }

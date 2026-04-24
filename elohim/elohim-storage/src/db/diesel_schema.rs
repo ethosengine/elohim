@@ -1163,6 +1163,21 @@ diesel::table! {
     }
 }
 
+// Recovery Protocol Phase 2 — M3 witness projection.
+// Source of truth: DHT. HumanityWitness entries (linked via
+// RecoveryRequestToHumanityWitness) are the notary. This table is a
+// read-optimized projection rebuildable from signal replay.
+diesel::table! {
+    recovery_witnesses (dht_anchor_hash) {
+        dht_anchor_hash -> Text,
+        recovery_request_hash -> Text,
+        witness_agent_id -> Text,
+        human_id -> Text,
+        note -> Nullable<Text>,
+        submitted_at -> Text,
+    }
+}
+
 // EPR storage layer — Phase 2a
 // Source of truth: EPR atoms (self-notarized via content-derived CID + Ed25519).
 // Timestamps stored as TEXT (ISO-8601). Binary blobs stored as Binary/BLOB.
@@ -1266,6 +1281,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     key_rotations,
     rea_commitments,
     recovery_requests,
+    recovery_witnesses,
     relationships,
     responsibility_demand_configs,
     risk_alerts,

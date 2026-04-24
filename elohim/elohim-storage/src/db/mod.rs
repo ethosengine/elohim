@@ -104,6 +104,9 @@ pub mod epr_atoms;
 // Recovery Protocol Phase 2 — DHT projection CRUD (imagodei RecoveryRequest + KeyRotation)
 pub mod recovery_requests;
 
+// Recovery Protocol Phase 2 — M3 witness projection (IntimateWitnessSubmitted signal)
+pub mod recovery_witnesses;
+
 use std::path::Path;
 use std::time::Duration;
 
