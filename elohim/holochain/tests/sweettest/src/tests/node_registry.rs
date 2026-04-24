@@ -19,7 +19,6 @@ use holo_hash::ActionHash;
 const DNA: &str = "node_registry";
 
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "requires packed DNA artifact"]
 async fn node_registry_has_bootstrap_steward() -> Result<()> {
     let (mut conductor, agent) = single_agent_conductor().await?;
     let dna = load_dna(DNA, &network_seed(DNA), Some(agent.clone())).await?;
@@ -40,7 +39,6 @@ async fn node_registry_has_bootstrap_steward() -> Result<()> {
 /// links created by `register_node` (region anchor → NodeRegistration) are
 /// traversable in the same conductor.
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "requires packed DNA artifact"]
 async fn register_node_round_trips() -> Result<()> {
     let (mut conductor, agent) = single_agent_conductor().await?;
     let dna = load_dna(DNA, &network_seed(DNA), Some(agent.clone())).await?;
@@ -86,7 +84,6 @@ async fn register_node_round_trips() -> Result<()> {
 /// After `settle_dht` the second conductor should be able to traverse them via
 /// `get_nodes_by_region`.
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "requires packed DNA artifact"]
 async fn admission_visible_across_agents() -> Result<()> {
     let [(mut c1, a1), (mut c2, a2)] = two_agent_conductors().await?;
 

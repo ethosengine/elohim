@@ -5,9 +5,8 @@
 //! 2. Second agent joins and can see the identity via coordinator `get`.
 //! 3. Validation rejects bootstrap-only actions from non-steward agents.
 //!
-//! These stubs compile against the sweettest harness but skip (`ignore`) when
-//! the DNA artifact isn't built. Remove the `#[ignore]` once the holochain
-//! pipeline packs the DNA before invoking the tests.
+//! Run via the Jenkins DNA Integration (bootstrap-steward) stage; the packed
+//! DNA artifact is produced by the preceding Build DNA stage.
 
 use anyhow::Result;
 use elohim_sweettest::common::{
@@ -18,7 +17,6 @@ use elohim_sweettest::common::{
 const DNA: &str = "imagodei";
 
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "requires packed DNA artifact — wire into Jenkins pack-then-test stage"]
 async fn bootstrap_steward_is_identifiable() -> Result<()> {
     let (mut conductor, agent) = single_agent_conductor().await?;
     let dna = load_dna(DNA, &network_seed(DNA), Some(agent.clone())).await?;
@@ -40,7 +38,6 @@ async fn bootstrap_steward_is_identifiable() -> Result<()> {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "requires packed DNA artifact"]
 async fn second_agent_is_not_bootstrap_steward() -> Result<()> {
     let [(mut c1, a1), (mut c2, a2)] = two_agent_conductors().await?;
     let dna_file = load_dna(DNA, &network_seed(DNA), Some(a1.clone())).await?;

@@ -7,8 +7,6 @@
 //!
 //! The coordinator zome is `content_store` (per dna/elohim/dna.yaml).
 //! DNA artifact: `dna/elohim/workdir/lamad.dna`.
-//! All tests carry `#[ignore = "requires packed DNA artifact"]` — remove per
-//! DNA after Jenkins-green proof (Wave 1 ignore-flip stage).
 
 use anyhow::Result;
 use holo_hash::ActionHash;
@@ -105,7 +103,6 @@ fn test_content(id: &str) -> CreateContentInput {
 // ---------------------------------------------------------------------------
 
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "requires packed DNA artifact"]
 async fn content_store_is_reachable() -> Result<()> {
     let (mut conductor, agent) = single_agent_conductor().await?;
     let dna = load_dna(DNA, &network_seed(DNA), Some(agent.clone())).await?;
@@ -121,7 +118,6 @@ async fn content_store_is_reachable() -> Result<()> {
 /// → get_content path through content_store is wired end-to-end without
 /// needing a second conductor or DHT gossip.
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "requires packed DNA artifact"]
 async fn content_publishes_and_retrieves_by_id() -> Result<()> {
     let (mut conductor, agent) = single_agent_conductor().await?;
     let dna = load_dna(DNA, &network_seed(DNA), Some(agent.clone())).await?;
@@ -174,7 +170,6 @@ async fn content_publishes_and_retrieves_by_id() -> Result<()> {
 /// Validates that the IdToContent link gossips correctly to a second
 /// conductor sharing the same network seed.
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "requires packed DNA artifact"]
 async fn content_visible_across_agents() -> Result<()> {
     let [(mut c1, a1), (mut c2, a2)] = two_agent_conductors().await?;
     let seed = network_seed(DNA);

@@ -14,7 +14,6 @@ use qahal_types::{CreateProposalInput, ProposalOutput};
 const DNA: &str = "mishpat";
 
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "requires packed DNA artifact"]
 async fn bootstrap_steward_is_configured() -> Result<()> {
     let (mut conductor, agent) = single_agent_conductor().await?;
     let dna = load_dna(DNA, &network_seed(DNA), Some(agent.clone())).await?;
@@ -42,7 +41,6 @@ async fn bootstrap_steward_is_configured() -> Result<()> {
 ///   and `status` — empty-array / empty-object strings are sufficient.
 /// - No referential IDs (no `precedent_id`, no `challenge_id`) are required.
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "requires packed DNA artifact"]
 async fn proposal_round_trips_across_agents() -> Result<()> {
     let [(mut c1, a1), (mut c2, a2)] = two_agent_conductors().await?;
 

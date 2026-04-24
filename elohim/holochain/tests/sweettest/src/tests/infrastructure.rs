@@ -91,7 +91,6 @@ fn alpha_doorway_input() -> RegisterDoorwayInput {
 // ---------------------------------------------------------------------------
 
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "requires packed DNA artifact"]
 async fn infrastructure_installs_without_bootstrap_steward() -> Result<()> {
     let (mut conductor, agent) = single_agent_conductor().await?;
     // Infrastructure takes no bootstrap-steward modifier.
@@ -106,7 +105,6 @@ async fn infrastructure_installs_without_bootstrap_steward() -> Result<()> {
 /// A doorway operator self-registers: the coordinator binds operator_agent to
 /// the calling agent's key, so no caller can impersonate another.
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "requires packed DNA artifact"]
 async fn doorway_self_registers() -> Result<()> {
     let (mut conductor, agent) = single_agent_conductor().await?;
     let dna = load_dna(DNA, &network_seed(DNA), None).await?;
@@ -146,7 +144,6 @@ async fn doorway_self_registers() -> Result<()> {
 /// This exercises the self-registration enforcement rule: the coordinator
 /// checks `operator_agent == caller` before allowing any mutation.
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "requires packed DNA artifact"]
 async fn doorway_visible_across_agents_and_operator_only_can_update() -> Result<()> {
     let [(mut c1, a1), (mut c2, a2)] = two_agent_conductors().await?;
     let dna = load_dna(DNA, &network_seed(DNA), None).await?;
