@@ -670,6 +670,38 @@ pub enum RecoveryV2Signal {
         action_hash: String,
         rotation: KeyRotationPayload,
     },
+    // M4: fast-path revocation signals. Field order and names match DNA side exactly.
+    KeyRevocationRequested {
+        id: String,
+        human_id: String,
+        revoked_key: String,
+        reason: String,
+        trigger_type: String,
+        initiated_by: String,
+        required_votes: u32,
+        current_votes: u32,
+        threshold_reached: bool,
+        effective_at: Option<String>,
+        created_at: String,
+    },
+    RevocationVoteSubmitted {
+        id: String,
+        revocation_id: String,
+        steward_id: String,
+        approved: bool,
+        attestation: String,
+        voted_at: String,
+        current_votes: u32,
+        required_votes: u32,
+        threshold_now_reached: bool,
+    },
+    KeyRevocationEffective {
+        revocation_id: String,
+        revoked_key: String,
+        human_id: String,
+        effective_at: String,
+        triggering_vote_id: Option<String>,
+    },
 }
 
 /// Extract the authority kind discriminator from a `RecoveryAuthorityKind`
@@ -806,6 +838,16 @@ pub fn handle_recovery_v2_signal(
                 rotated_at,
             };
             crate::db::recovery_requests::upsert_key_rotation(conn, row)
+        }
+        // M4 revocation projection stubs — replaced in Phase D.
+        RecoveryV2Signal::KeyRevocationRequested { .. } => {
+            unimplemented!("Task D.3: handle KeyRevocationRequested projection")
+        }
+        RecoveryV2Signal::RevocationVoteSubmitted { .. } => {
+            unimplemented!("Task D.3: handle RevocationVoteSubmitted projection")
+        }
+        RecoveryV2Signal::KeyRevocationEffective { .. } => {
+            unimplemented!("Task D.3: handle KeyRevocationEffective projection + eager sweep")
         }
     }
 }
