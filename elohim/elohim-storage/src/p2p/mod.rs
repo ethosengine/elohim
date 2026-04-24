@@ -3289,10 +3289,71 @@ impl P2PNode {
                 }
             }
             EprAtomRequest::FetchBatch { cids } => {
-                debug!(count = cids.len(), "EPR atom fetch batch (Batch B stub)");
-                EprAtomResponse::AtomBatch {
-                    atoms: vec![None; cids.len()],
+                use crate::p2p::MAX_BATCH_CIDS;
+                if cids.len() > MAX_BATCH_CIDS {
+                    debug!(
+                        count = cids.len(),
+                        max = MAX_BATCH_CIDS,
+                        "EPR atom fetch batch rejected — oversized"
+                    );
+                    return EprAtomResponse::Error {
+                        message: format!(
+                            "batch too large: {} cids (max {})",
+                            cids.len(),
+                            MAX_BATCH_CIDS
+                        ),
+                    };
                 }
+
+                let Some(pool) = self.db_pool.as_ref() else {
+                    warn!(
+                        count = cids.len(),
+                        "EPR atom fetch batch: db pool unavailable"
+                    );
+                    return EprAtomResponse::Error {
+                        message: "storage unavailable".to_string(),
+                    };
+                };
+                let mut conn = match pool.get() {
+                    Ok(c) => c,
+                    Err(e) => {
+                        warn!(count = cids.len(), error = %e, "EPR atom fetch batch: db pool exhausted");
+                        return EprAtomResponse::Error {
+                            message: "storage busy".to_string(),
+                        };
+                    }
+                };
+
+                let mut atoms: Vec<Option<Vec<u8>>> = Vec::with_capacity(cids.len());
+                let mut served = 0usize;
+                for cid in &cids {
+                    let slot =
+                        match crate::services::epr_service::fetch_wire_bytes_by_cid(&mut conn, cid)
+                        {
+                            Ok(Some(fetched))
+                                if reach_gate_allows(
+                                    &fetched.reach,
+                                    &caller,
+                                    Some(&fetched.signer_cid),
+                                ) =>
+                            {
+                                served += 1;
+                                Some(fetched.wire_bytes)
+                            }
+                            Ok(_) => None,
+                            Err(e) => {
+                                warn!(cid = %cid, error = ?e, "EPR atom fetch batch: row error");
+                                None
+                            }
+                        };
+                    atoms.push(slot);
+                }
+                debug!(
+                    total = cids.len(),
+                    served = served,
+                    "EPR atom fetch batch completed"
+                );
+                EprAtomResponse::AtomBatch { atoms }
             }
         }
     }
