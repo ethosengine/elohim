@@ -60,5 +60,8 @@ serde_json = "1"
 # Test helpers
 anyhow = "1"
 
+# Shared wire types for coordinator I/O — same holo_hash pin (=0.6.0) as the DNA workspace.
+qahal-types = { path = "../../../sdk/domains/qahal/types" }
+
 [dev-dependencies]
 # Every integration test shares these — kept in dev-deps so `cargo check --tests` is lean.

@@ -1449,6 +1449,7 @@ dependencies = [
  "holochain",
  "holochain_serialized_bytes",
  "holochain_types",
+ "qahal-types",
  "serde",
  "serde_json",
  "tokio",
@@ -4627,6 +4628,14 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.117",
+]
+
+[[package]]
+name = "qahal-types"
+version = "0.1.0"
+dependencies = [
+ "holo_hash",
+ "serde",
 ]
 
 [[package]]
