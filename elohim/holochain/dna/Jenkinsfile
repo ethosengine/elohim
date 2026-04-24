@@ -243,12 +243,15 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                             echo "    directory = *" >> "$HOME/.gitconfig"
                             export GIT_CONFIG_GLOBAL="$HOME/.gitconfig"
 
-                            # No holochain dep — plain cargo is enough. If the
-                            # builder image doesn't expose cargo on PATH, wrap
-                            # the invocation in `nix develop --command` using
-                            # the flake at elohim/holochain/dna/elohim.
+                            # No holochain dep, but the builder container
+                            # doesn't expose cargo on PATH — use `nix develop`
+                            # against the flake at elohim/holochain/dna/elohim
+                            # to pick up the toolchain. RUSTFLAGS="" overrides
+                            # the flake's wasm32 setting for this native test.
                             cd "$WORKSPACE/elohim/holochain/tests/manifest-hygiene"
-                            RUSTFLAGS="" cargo test
+                            nix develop --accept-flake-config \
+                                "$WORKSPACE/elohim/holochain/dna/elohim" \
+                                --command bash -c 'RUSTFLAGS="" cargo test'
                         '''
                     }
                 }
