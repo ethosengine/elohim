@@ -1,7 +1,7 @@
 //! ElohimStorageBehaviour - Combined network behaviour for P2P shard and sync transfer
 
 use libp2p::{
-    autonat, dcutr, identify,
+    autonat, dcutr, gossipsub, identify,
     identity::Keypair,
     kad::{self, Behaviour as Kademlia},
     mdns, ping, relay,
@@ -88,6 +88,8 @@ pub struct ElohimStorageBehaviour {
     pub autonat: autonat::Behaviour,
     /// Ping protocol for RTT measurement
     pub ping: ping::Behaviour,
+    /// Gossipsub for pub/sub messaging (M3: recovery invitation broadcast)
+    pub gossipsub: gossipsub::Behaviour,
 }
 
 /// Events emitted by ElohimStorageBehaviour
@@ -124,6 +126,8 @@ pub enum ElohimStorageBehaviourEvent {
     AutoNat(autonat::Event),
     /// Ping event (RTT measurement)
     Ping(ping::Event),
+    /// Gossipsub event (pub/sub messages)
+    Gossipsub(gossipsub::Event),
 }
 
 impl From<kad::Event> for ElohimStorageBehaviourEvent {
@@ -224,6 +228,12 @@ impl From<ping::Event> for ElohimStorageBehaviourEvent {
     }
 }
 
+impl From<gossipsub::Event> for ElohimStorageBehaviourEvent {
+    fn from(event: gossipsub::Event) -> Self {
+        Self::Gossipsub(event)
+    }
+}
+
 impl ElohimStorageBehaviour {
     /// Create a new behaviour with NAT traversal support.
     ///
@@ -304,6 +314,23 @@ impl ElohimStorageBehaviour {
 
         let ping = ping::Behaviour::new(ping::Config::new());
 
+        // Gossipsub — pub/sub for recovery invitation broadcast (M3).
+        // Uses the node's signing keypair for message authentication.
+        let gossipsub_config = gossipsub::ConfigBuilder::default()
+            .heartbeat_interval(std::time::Duration::from_secs(10))
+            .validation_mode(gossipsub::ValidationMode::Strict)
+            .build()
+            .expect("valid gossipsub config");
+        let mut gossipsub = gossipsub::Behaviour::new(
+            gossipsub::MessageAuthenticity::Signed(keypair.clone()),
+            gossipsub_config,
+        )
+        .expect("gossipsub behaviour init");
+        let recovery_topic = gossipsub::IdentTopic::new("recovery.invitation");
+        gossipsub
+            .subscribe(&recovery_topic)
+            .expect("subscribe to recovery.invitation");
+
         Self {
             kademlia,
             shard_protocol,
@@ -318,6 +345,7 @@ impl ElohimStorageBehaviour {
             identify,
             autonat,
             ping,
+            gossipsub,
         }
     }
 }

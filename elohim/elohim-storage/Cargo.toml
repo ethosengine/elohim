@@ -139,6 +139,7 @@ libp2p = { version = "0.54", features = [
     "noise",            # Noise protocol encryption
     "yamux",            # Stream multiplexing
     "kad",              # Kademlia DHT
+    "gossipsub",        # Pub/sub for recovery invitation broadcast
     "request-response", # Shard transfer protocol
     "mdns",             # Local network discovery
     "relay",            # NAT traversal relay

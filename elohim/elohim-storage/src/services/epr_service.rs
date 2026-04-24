@@ -514,7 +514,7 @@ mod wire_bytes_tests {
     fn setup_conn() -> SqliteConnection {
         let mut conn = SqliteConnection::establish(":memory:").expect("open memory db");
         let migrations_sql =
-            std::fs::read_to_string("migrations/2026-04-22-000000_add_epr_tables/up.sql")
+            std::fs::read_to_string("migrations/2026-04-22-050000_add_epr_tables/up.sql")
                 .expect("load epr up.sql");
         conn.batch_execute(&migrations_sql)
             .expect("apply epr migrations");

@@ -90,7 +90,10 @@ mod tests {
     #[test]
     fn lists_in_submitted_order() {
         let mut conn = test_conn();
-        for (w, t) in [("W1", "2026-04-24T00:00:02Z"), ("W2", "2026-04-24T00:00:01Z")] {
+        for (w, t) in [
+            ("W1", "2026-04-24T00:00:02Z"),
+            ("W2", "2026-04-24T00:00:01Z"),
+        ] {
             upsert_recovery_witness(
                 &mut conn,
                 NewRecoveryWitnessRow {

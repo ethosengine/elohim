@@ -59,11 +59,7 @@ async fn signed_atom_round_trips_and_verifies() {
     let (verified_epr, verified_cid) =
         verify_incoming_epr(&wire).expect("B should reverify the envelope");
 
-    assert_eq!(
-        verified_cid.to_string(),
-        cid,
-        "CID drifted across the wire",
-    );
+    assert_eq!(verified_cid.to_string(), cid, "CID drifted across the wire",);
     assert_eq!(
         verified_epr.payload, epr.payload,
         "payload changed on the wire",
@@ -113,10 +109,7 @@ async fn private_atom_not_served_to_anonymous_peer() {
 
     // Leak-free invariant: the response MUST be NotFound, not AccessDenied.
     // The harness maps NotFound to Ok(None).
-    assert!(
-        response.is_none(),
-        "private atom leaked to anonymous peer",
-    );
+    assert!(response.is_none(), "private atom leaked to anonymous peer",);
 }
 
 #[tokio::test]
@@ -187,9 +180,7 @@ async fn fetch_batch_preserves_slot_order_with_leak_free_denial() {
     node_a.ingest_local(public_epr).await;
 
     // Slot 1: a Private atom on A, caller (B) is not author — should gate to None.
-    let private_epr = node_a
-        .author_test_atom("private", b"private slot")
-        .await;
+    let private_epr = node_a.author_test_atom("private", b"private slot").await;
     let private_cid = private_epr.envelope.cid.to_string();
     node_a.ingest_local(private_epr).await;
 
@@ -220,10 +211,7 @@ async fn fetch_batch_preserves_slot_order_with_leak_free_denial() {
         atoms[1].is_none(),
         "slot 1 (private, non-author) must be None — leak-free denial",
     );
-    assert!(
-        atoms[2].is_none(),
-        "slot 2 (unknown CID) must be None",
-    );
+    assert!(atoms[2].is_none(), "slot 2 (unknown CID) must be None",);
 }
 
 #[tokio::test]
@@ -303,13 +291,10 @@ async fn announce_with_tampered_payload_is_rejected() {
 
     let wire = node_a.encode_envelope(&epr).await;
 
-    let ack = timeout(
-        FETCH_TIMEOUT,
-        node_a.announce_to(&node_b.peer_id(), wire),
-    )
-    .await
-    .expect("announce timed out")
-    .unwrap_or_else(|e| panic!("announce channel error: {e}"));
+    let ack = timeout(FETCH_TIMEOUT, node_a.announce_to(&node_b.peer_id(), wire))
+        .await
+        .expect("announce timed out")
+        .unwrap_or_else(|e| panic!("announce channel error: {e}"));
 
     assert!(
         !ack.accepted,
@@ -352,13 +337,10 @@ async fn announce_with_wrong_signature_length_is_rejected() {
 
     let wire = node_a.encode_envelope(&epr).await;
 
-    let ack = timeout(
-        FETCH_TIMEOUT,
-        node_a.announce_to(&node_b.peer_id(), wire),
-    )
-    .await
-    .expect("announce timed out")
-    .unwrap_or_else(|e| panic!("announce channel error: {e}"));
+    let ack = timeout(FETCH_TIMEOUT, node_a.announce_to(&node_b.peer_id(), wire))
+        .await
+        .expect("announce timed out")
+        .unwrap_or_else(|e| panic!("announce channel error: {e}"));
 
     assert!(
         !ack.accepted,
@@ -410,13 +392,10 @@ async fn announce_with_tampered_signature_bytes_accepted_phase_2c_limitation() {
 
     let wire = node_a.encode_envelope(&epr).await;
 
-    let ack = timeout(
-        FETCH_TIMEOUT,
-        node_a.announce_to(&node_b.peer_id(), wire),
-    )
-    .await
-    .expect("announce timed out")
-    .unwrap_or_else(|e| panic!("announce channel error: {e}"));
+    let ack = timeout(FETCH_TIMEOUT, node_a.announce_to(&node_b.peer_id(), wire))
+        .await
+        .expect("announce timed out")
+        .unwrap_or_else(|e| panic!("announce channel error: {e}"));
 
     assert!(
         ack.accepted,

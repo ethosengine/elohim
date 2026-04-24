@@ -724,14 +724,13 @@ pub fn recovery_invitation_from_signal(
         RecoveryV2Signal::RecoveryRequestCreated {
             action_hash,
             request,
-        } => request
-            .human_id
-            .as_ref()
-            .map(|hid| crate::p2p::recovery_invitation::RecoveryInvitation {
+        } => request.human_id.as_ref().map(|hid| {
+            crate::p2p::recovery_invitation::RecoveryInvitation {
                 request_hash: action_hash.clone(),
                 human_id: hid.clone(),
                 created_at: timestamp_to_iso(&request.created_at),
-            }),
+            }
+        }),
         _ => None,
     }
 }
@@ -1303,8 +1302,7 @@ mod recovery_v2_signal_tests {
 
     /// Create an in-memory connection with only the tables needed for these tests.
     fn setup_test_conn() -> SqliteConnection {
-        let mut conn =
-            SqliteConnection::establish(":memory:").expect("in-memory SQLite");
+        let mut conn = SqliteConnection::establish(":memory:").expect("in-memory SQLite");
         conn.batch_execute(include_str!(
             "../migrations/2026-04-24-000000_recovery_witnesses/up.sql"
         ))
