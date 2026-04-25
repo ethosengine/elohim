@@ -1213,6 +1213,12 @@ diesel::table! {
         payload_bytes -> Binary,
         proof_bytes -> Binary,
         proof_algorithm -> Text,
+        /// UTC ISO-8601 timestamp at which resolver-backed Ed25519 verify succeeded.
+        /// NULL for atoms ingested before A.7 or whose signer has no timeline entry.
+        verified_at -> Nullable<Text>,
+        /// blake3-128-prefix of the 32-byte ed25519 pubkey that signed this atom
+        /// (first 16 bytes = 32 hex chars). NULL when verified_at is NULL.
+        verified_signer_fingerprint -> Nullable<Text>,
     }
 }
 

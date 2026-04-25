@@ -62,6 +62,10 @@ reqwest = { version = "0.12", default-features = false, features = ["json", "rus
 sha2 = "0.10"
 hex = "0.4"
 base64 = "0.22"
+# Fast hash for pubkey fingerprints (verified_signer_fingerprint — Task A.7)
+blake3 = "1"
+# Ed25519 verify_strict for resolver-backed EPR signature check (Task A.7)
+ed25519-dalek = { version = "2.1", features = ["digest"] }
 hostname = "0.4"  # gethostname() for node-shape self-registration at boot
 url = "2"  # Query string parsing for HTTP sync API
 

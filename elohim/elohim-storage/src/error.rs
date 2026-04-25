@@ -101,4 +101,12 @@ pub enum StorageError {
 
     #[error("Codec error: {0}")]
     Codec(String),
+
+    /// Resolver-backed Ed25519 signature verification failed (Task A.7).
+    ///
+    /// Returned by `EprService::ingest_with_cache` when the signer's pubkey
+    /// timeline cannot supply a key for `issued_at`, or when the signature
+    /// does not verify under that key. The EPR is rejected and NOT persisted.
+    #[error("EPR signature verification failed: {reason}")]
+    VerifyFailed { reason: String },
 }
