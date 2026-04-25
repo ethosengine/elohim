@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/consistent-indexed-object-style */
 /* Generated from protocol schema: inputs/wisdom-invocation-input.schema.json -- DO NOT EDIT */
 
 /**

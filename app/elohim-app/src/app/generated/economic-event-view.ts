@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/consistent-indexed-object-style */
 /* Generated from protocol schema: views/economic-event-view.schema.json -- DO NOT EDIT */
 
 /**

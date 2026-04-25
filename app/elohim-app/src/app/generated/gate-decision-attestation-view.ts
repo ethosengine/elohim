@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/consistent-indexed-object-style */
 /* Generated from protocol schema: views/gate-decision-attestation-view.schema.json -- DO NOT EDIT */
 
 /**

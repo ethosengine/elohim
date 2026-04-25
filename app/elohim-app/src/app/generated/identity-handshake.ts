@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/consistent-indexed-object-style */
 /* Generated from protocol schema: p2p/identity-handshake.schema.json -- DO NOT EDIT */
 
 /**
