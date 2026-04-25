@@ -71,6 +71,7 @@ use crate::projector::mapping::{ManifestRegistry, RegisteredProjection};
 use crate::services::epr_service::{ingest, EprIngestResult};
 use crate::services::response;
 use crate::signing::{ConductorSigningClient, SigningError};
+use crate::write_through::{EffectiveWriteThrough, WriteThroughState};
 
 use super::get_conn;
 
@@ -162,6 +163,16 @@ pub enum SignalEmitError {
 
     #[error("signature length must be 64 bytes; got {0}")]
     BadSignatureLength(usize),
+
+    #[error(
+        "write-through is OFF for pillar='{pillar}' kind='{kind}' (layer={layer}); \
+         enable via env/admin override (Task C.6) or set the manifest default"
+    )]
+    WriteThroughOff {
+        pillar: String,
+        kind: String,
+        layer: String,
+    },
 }
 
 impl SignalEmitError {
@@ -177,6 +188,10 @@ impl SignalEmitError {
             Self::NoProjection { .. } => StatusCode::NOT_FOUND,
             Self::Canonicalize(_) | Self::Ingest(_) => StatusCode::INTERNAL_SERVER_ERROR,
             Self::Sign(_) => StatusCode::BAD_GATEWAY,
+            // Write-through OFF is a deliberate operator decision — return 503
+            // so clients (Angular harness, hosted-doorway proxies) can fall back
+            // to the legacy non-EPR path while ramps are in progress.
+            Self::WriteThroughOff { .. } => StatusCode::SERVICE_UNAVAILABLE,
         }
     }
 }
@@ -318,6 +333,34 @@ pub fn assemble_signed_epr(
 }
 
 // ---------------------------------------------------------------------------
+// Pure builder — phase 0: write-through gate (Task C.5)
+// ---------------------------------------------------------------------------
+
+/// Check the composed write-through state for an intent's (pillar, kind).
+///
+/// Pure: takes the parsed intent + state, returns `Ok(())` when the path is
+/// allowed (write-through ON or integrity exception) or
+/// `Err(WriteThroughOff{...})` when the operator has not enabled this pair.
+///
+/// Called BEFORE conductor signing in `handle` so a cold pillar fails fast
+/// without burning a round-trip to the conductor. Integrity-bearing kinds
+/// always pass (per memory pin `project_epr2b_recovery_m4_convergence`).
+pub fn check_write_through(
+    pillar: &str,
+    kind: &str,
+    state: &WriteThroughState,
+) -> Result<(), SignalEmitError> {
+    match state.effective_for(pillar, kind) {
+        EffectiveWriteThrough::On { .. } | EffectiveWriteThrough::OnIntegrityException => Ok(()),
+        EffectiveWriteThrough::Off { source } => Err(SignalEmitError::WriteThroughOff {
+            pillar: pillar.to_string(),
+            kind: kind.to_string(),
+            layer: format!("{source:?}"),
+        }),
+    }
+}
+
+// ---------------------------------------------------------------------------
 // HTTP dispatcher
 // ---------------------------------------------------------------------------
 
@@ -326,12 +369,17 @@ pub fn assemble_signed_epr(
 /// `signing_client` is `Option` so storage instances without a conductor
 /// connection (test fixtures, dev environments) gracefully return 503 rather
 /// than panicking. In production all instances should have it wired at startup.
+///
+/// `write_through_state` defaults to `WriteThroughState::empty()` when None;
+/// in that case all non-integrity kinds resolve to OFF (implicit default) and
+/// the endpoint returns 503. Operators wire real state at startup.
 pub async fn handle(
     req: Request<Incoming>,
     method: Method,
     pool: &DbPool,
     registry: &ManifestRegistry,
     signing_client: Option<&Arc<ConductorSigningClient>>,
+    write_through_state: Option<&Arc<WriteThroughState>>,
 ) -> Result<Response<Full<Bytes>>, StorageError> {
     if method != Method::POST {
         return Ok(response::method_not_allowed());
@@ -367,6 +415,23 @@ pub async fn handle(
         Ok(p) => p,
         Err(e) => return Ok(error_response(e)),
     };
+
+    // Write-through gate (Task C.5). Failed before conductor round-trip so the
+    // operator's intent (pillar OFF) costs no signing work. Integrity kinds
+    // bypass via `WriteThroughState::effective_for`.
+    let kind_str = kind_canonical(prepared.kind);
+    let fallback_state = Arc::new(WriteThroughState::empty());
+    let state_ref: &WriteThroughState = write_through_state
+        .map(|arc| arc.as_ref())
+        .unwrap_or_else(|| fallback_state.as_ref());
+    if let Err(e) = check_write_through(&intent.pillar, kind_str, state_ref) {
+        warn!(
+            pillar = %intent.pillar,
+            kind = %kind_str,
+            "signal_emit: write-through OFF — refusing to sign + ingest"
+        );
+        return Ok(error_response(e));
+    }
 
     debug!(
         pillar = %intent.pillar,
@@ -640,5 +705,96 @@ mod tests {
             SignalEmitError::Ingest("x".into()).http_status(),
             StatusCode::INTERNAL_SERVER_ERROR
         );
+        assert_eq!(
+            SignalEmitError::WriteThroughOff {
+                pillar: "shefa".into(),
+                kind: "EconomicEvent".into(),
+                layer: "ManifestDefault".into(),
+            }
+            .http_status(),
+            StatusCode::SERVICE_UNAVAILABLE
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // C.5 — write-through gate
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn check_write_through_passes_when_state_is_on() {
+        use crate::write_through::{WriteThroughConfig, WriteThroughState};
+        use std::collections::HashMap;
+
+        let mut manifest = HashMap::new();
+        manifest.insert(
+            "shefa".to_string(),
+            WriteThroughConfig {
+                enabled: true,
+                kinds: None,
+            },
+        );
+        let state = WriteThroughState::from_manifest(manifest);
+        assert!(check_write_through("shefa", "EconomicEvent", &state).is_ok());
+    }
+
+    #[test]
+    fn check_write_through_fails_when_state_is_implicit_off() {
+        use crate::write_through::WriteThroughState;
+        let state = WriteThroughState::empty();
+        let err = check_write_through("shefa", "EconomicEvent", &state).unwrap_err();
+        match err {
+            SignalEmitError::WriteThroughOff {
+                pillar,
+                kind,
+                layer,
+            } => {
+                assert_eq!(pillar, "shefa");
+                assert_eq!(kind, "EconomicEvent");
+                assert!(layer.contains("ImplicitDefault"));
+            }
+            other => panic!("expected WriteThroughOff, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn check_write_through_fails_when_kind_out_of_scope() {
+        use crate::write_through::{WriteThroughConfig, WriteThroughState};
+        use std::collections::HashMap;
+
+        let mut manifest = HashMap::new();
+        manifest.insert(
+            "shefa".to_string(),
+            WriteThroughConfig {
+                enabled: true,
+                kinds: Some(vec!["EconomicEvent".to_string()]),
+            },
+        );
+        let state = WriteThroughState::from_manifest(manifest);
+        // EconomicEvent in-scope: passes.
+        assert!(check_write_through("shefa", "EconomicEvent", &state).is_ok());
+        // Observation out-of-scope: fails with WriteThroughOff.
+        let err = check_write_through("shefa", "Observation", &state).unwrap_err();
+        assert!(matches!(err, SignalEmitError::WriteThroughOff { .. }));
+    }
+
+    #[test]
+    fn check_write_through_passes_for_integrity_kind_even_when_off() {
+        use crate::write_through::{WriteThroughConfig, WriteThroughState};
+        use std::collections::HashMap;
+
+        // Pillar explicitly OFF, but integrity kind bypasses.
+        let mut manifest = HashMap::new();
+        manifest.insert(
+            "imagodei".to_string(),
+            WriteThroughConfig {
+                enabled: false,
+                kinds: None,
+            },
+        );
+        let state = WriteThroughState::from_manifest(manifest);
+        assert!(check_write_through("imagodei", "KeyRotation", &state).is_ok());
+        assert!(check_write_through("imagodei", "KeyRevocation", &state).is_ok());
+        assert!(check_write_through("imagodei", "AgentPeerBinding", &state).is_ok());
+        assert!(check_write_through("imagodei", "RevocationAttestation", &state).is_ok());
     }
 }

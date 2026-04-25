@@ -714,6 +714,7 @@ impl HttpServer {
                             pool,
                             registry,
                             self.signing_client.as_ref(),
+                            self.write_through_state.as_ref(),
                         )
                         .await
                     } else {
