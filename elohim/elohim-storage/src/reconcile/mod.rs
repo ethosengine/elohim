@@ -29,6 +29,7 @@
 
 pub mod controller;
 pub mod holochain_app_signal;
+pub mod portal_host_handlers;
 pub mod pubkey_timeline;
 pub mod signal_stream;
 pub mod sweep;

@@ -20,6 +20,8 @@
 //! | `KeyRevocationRequested`         | `DnaSignal::RevocationAttestation` (kind = request) |
 //! | `RevocationVoteSubmitted`        | `DnaSignal::RevocationAttestation` (kind = vote)    |
 //! | *(future create_agent_peer_binding)* | `DnaSignal::AgentPeerBinding` |
+//! | `PortalHostCreated`              | `DnaSignal::PortalHostCreated`   |
+//! | `PortalHostRemoved`              | `DnaSignal::PortalHostRemoved`   |
 //!
 //! The storage-internal shape is deliberately decoupled from the DNA-side enum
 //! to keep the controller's interface stable across DNA evolution.
@@ -157,6 +159,57 @@ pub struct AgentPeerBindingSignal {
     pub emitted_at: DateTime<Utc>,
 }
 
+/// Payload for `DnaSignal::PortalHostCreated`.
+///
+/// Projection of the imagodei `PortalHost` DHT entry being created.
+/// Source of truth: DHT (Category A notarized entry referenced by `action_hash`).
+/// Emitted by the imagodei coordinator `register_portal_host` (M5).
+///
+/// `action_hash` is the Create ActionHash — this becomes the projection's
+/// `dht_anchor_hash`. `human_action_hash` is the ActionHash of the Human DHT
+/// entry; it maps to `portal_hosts.human_id`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PortalHostCreatedSignal {
+    /// Holochain ActionHash (base64) of the `PortalHost` DHT entry.
+    /// Stored as `dht_anchor_hash` in the projection.
+    pub action_hash: String,
+    /// Holochain ActionHash (base64) of the Human DHT entry for the owner.
+    /// Stored as `human_id` in the projection (foreign key into humans table).
+    pub human_action_hash: String,
+    /// The registered doorway URL.
+    pub host_url: String,
+    /// Optional human-readable label for this doorway registration.
+    pub label: Option<String>,
+    /// ISO 8601 timestamp at which the DHT entry records the registration.
+    pub added_at: String,
+    /// Debug-formatted reach enum tag (e.g. `"Trusted"`, `"Public"`).
+    pub reach: String,
+}
+
+/// Payload for `DnaSignal::PortalHostRemoved`.
+///
+/// Projection of a `PortalHost` DHT entry being soft-deleted (Delete action).
+/// Source of truth: DHT (Category A notarized Delete action referenced by
+/// `action_hash`; the original Create is referenced by `original_action_hash`).
+///
+/// `original_action_hash` is the dht_anchor_hash that identifies the projection
+/// row to remove — it was the `action_hash` from the preceding `PortalHostCreated`
+/// signal.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PortalHostRemovedSignal {
+    /// Holochain ActionHash (base64) of the Delete action itself.
+    pub action_hash: String,
+    /// Holochain ActionHash (base64) of the original Create action.
+    /// This is the `dht_anchor_hash` stored in the projection row to delete.
+    pub original_action_hash: String,
+    /// Holochain ActionHash (base64) of the Human DHT entry for the owner.
+    pub human_action_hash: String,
+    /// The doorway URL that was removed.
+    pub host_url: String,
+}
+
 /// Discriminates the two kinds of revocation attestation.
 ///
 /// Used by `RevocationAttestationSignal::attestation_kind` to distinguish the
@@ -239,6 +292,10 @@ pub enum DnaSignal {
     AgentPeerBinding(AgentPeerBindingSignal),
     /// A steward has submitted a revocation request or cast a vote.
     RevocationAttestation(RevocationAttestationSignal),
+    /// A portal host (doorway registration) has been created on the DHT.
+    PortalHostCreated(PortalHostCreatedSignal),
+    /// A portal host (doorway registration) has been removed from the DHT.
+    PortalHostRemoved(PortalHostRemovedSignal),
 }
 
 // ---------------------------------------------------------------------------
