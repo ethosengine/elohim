@@ -330,6 +330,10 @@ impl ElohimStorageBehaviour {
         gossipsub
             .subscribe(&recovery_topic)
             .expect("subscribe to recovery.invitation");
+        let revocation_topic = gossipsub::IdentTopic::new("recovery.revocation");
+        gossipsub
+            .subscribe(&revocation_topic)
+            .expect("subscribe to recovery.revocation");
 
         Self {
             kademlia,

@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "epr:schema:view:key-revocation",
+  "title": "KeyRevocationView",
+  "description": "Read-optimized projection of an imagodei KeyRevocation DHT entry. Source of truth: DHT. Rebuildable via signal replay on RecoveryV2Signal::KeyRevocationRequested/Effective.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "dhtAnchorHash",
+    "id",
+    "humanId",
+    "revokedKey",
+    "reason",
+    "triggerType",
+    "initiatedBy",
+    "requiredVotes",
+    "currentVotes",
+    "thresholdReached",
+    "createdAt",
+    "updatedAt"
+  ],
+  "properties": {
+    "dhtAnchorHash": {
+      "type": "string",
+      "description": "Holochain ActionHash of the KeyRevocation entry (base64)."
+    },
+    "id": {
+      "type": "string",
+      "description": "Coordinator-generated ID."
+    },
+    "humanId": {
+      "type": "string",
+      "description": "String id of the human whose key is being revoked."
+    },
+    "revokedKey": {
+      "type": "string",
+      "description": "The AgentPubKey being revoked (stringified)."
+    },
+    "reason": {
+      "type": "string",
+      "description": "One of REVOCATION_REASONS: compromised, stolen, challenge_upheld, voluntary."
+    },
+    "triggerType": {
+      "type": "string",
+      "enum": ["voluntary", "steward_vote", "challenge"],
+      "description": "How the revocation was initiated."
+    },
+    "initiatedBy": {
+      "type": "string",
+      "description": "human_id of the initiating agent."
+    },
+    "requiredVotes": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Votes required to reach threshold. 1 for voluntary; >=2 for steward_vote/challenge."
+    },
+    "currentVotes": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Approved votes counted so far."
+    },
+    "thresholdReached": {
+      "type": "boolean",
+      "description": "True when currentVotes >= requiredVotes and the revocation is effective."
+    },
+    "effectiveAt": {
+      "type": ["string", "null"],
+      "description": "ISO-8601 timestamp when revocation became effective. Null while pending."
+    },
+    "createdAt": {
+      "type": "string",
+      "description": "ISO-8601 timestamp of initial commit."
+    },
+    "updatedAt": {
+      "type": "string",
+      "description": "ISO-8601 timestamp of last update (e.g., when threshold was reached)."
+    }
+  }
+}

@@ -6718,6 +6718,86 @@ impl From<crate::db::models::RecoveryWitnessRow> for RecoveryWitnessView {
     }
 }
 
+// =============================================================================
+// Recovery Protocol Phase 2 — M4 Views
+// Source of truth: DHT (imagodei KeyRevocation / RevocationVote entries).
+// These tables are read-optimized projections rebuildable via signal replay.
+// =============================================================================
+
+/// Projection of an imagodei KeyRevocation DHT entry.
+/// Source of truth: DHT. Rebuildable via signal replay on
+/// RecoveryV2Signal::KeyRevocationRequested / KeyRevocationEffective.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct KeyRevocationView {
+    pub dht_anchor_hash: String,
+    pub id: String,
+    pub human_id: String,
+    pub revoked_key: String,
+    pub reason: String,
+    pub trigger_type: String,
+    pub initiated_by: String,
+    pub required_votes: u32,
+    pub current_votes: u32,
+    pub threshold_reached: bool,
+    pub effective_at: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+impl From<crate::db::models::KeyRevocationRow> for KeyRevocationView {
+    fn from(r: crate::db::models::KeyRevocationRow) -> Self {
+        Self {
+            dht_anchor_hash: r.dht_anchor_hash,
+            id: r.id,
+            human_id: r.human_id,
+            revoked_key: r.revoked_key,
+            reason: r.reason,
+            trigger_type: r.trigger_type,
+            initiated_by: r.initiated_by,
+            required_votes: r.required_votes as u32,
+            current_votes: r.current_votes as u32,
+            threshold_reached: r.threshold_reached == 1,
+            effective_at: r.effective_at,
+            created_at: r.created_at,
+            updated_at: r.updated_at,
+        }
+    }
+}
+
+/// Projection of an imagodei RevocationVote DHT entry.
+/// Source of truth: DHT. Rebuildable via signal replay on
+/// RecoveryV2Signal::RevocationVoteSubmitted.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct RevocationVoteView {
+    pub dht_anchor_hash: String,
+    pub id: String,
+    pub revocation_dht_anchor_hash: String,
+    pub revocation_id: String,
+    pub steward_id: String,
+    pub approved: bool,
+    pub attestation: String,
+    pub voted_at: String,
+}
+
+impl From<crate::db::models::RevocationVoteRow> for RevocationVoteView {
+    fn from(r: crate::db::models::RevocationVoteRow) -> Self {
+        Self {
+            dht_anchor_hash: r.dht_anchor_hash,
+            id: r.id,
+            revocation_dht_anchor_hash: r.revocation_dht_anchor_hash,
+            revocation_id: r.revocation_id,
+            steward_id: r.steward_id,
+            approved: r.approved == 1,
+            attestation: r.attestation,
+            voted_at: r.voted_at,
+        }
+    }
+}
+
 // ============================================================================
 // EPR views (Phase 2a)
 // Source of truth: EPR atom (self-notarized via content-address + Ed25519).
