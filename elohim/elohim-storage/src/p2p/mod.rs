@@ -31,6 +31,7 @@
 pub mod behaviour;
 pub mod epr_atom_protocol;
 pub mod epr_protocol;
+pub mod identity_binding_gossip;
 pub mod identity_handshake;
 pub mod identity_map;
 pub mod kad_store;
@@ -418,6 +419,17 @@ pub enum P2PCommand {
     /// Best-effort — publish failure does NOT revert the DB projection; the DHT
     /// remains the source of truth and subscribers can rediscover via signal replay.
     PublishRecoveryInvitation(crate::p2p::recovery_invitation::RecoveryInvitation),
+    /// Publish an IdentityBindingGossip to the `elohim/identity/binding` gossipsub topic.
+    ///
+    /// Sent by `ReconcileController::on_agent_peer_binding` (Task A.10) when a local
+    /// `AgentPeerBinding` DHT signal is received. Propagates the binding to all
+    /// subscribed peers so they can update their `peer_identity_bindings` projection
+    /// without waiting for a connection-time handshake.
+    ///
+    /// Best-effort — publish failure does NOT block the controller; the DHT entry
+    /// remains the source of truth and peers can reconstruct via signal replay or
+    /// the next connection-time handshake (A.9).
+    PublishIdentityBinding(crate::p2p::identity_binding_gossip::IdentityBindingGossip),
 }
 
 /// RAII guard that resumes P2P sync when dropped.
@@ -451,6 +463,16 @@ impl P2PHandle {
     /// Get the latest P2P status snapshot
     pub fn status(&self) -> P2PStatusInfo {
         self.status_rx.borrow().clone()
+    }
+
+    /// Return a clone of the P2P command sender.
+    ///
+    /// Used by `ReconcileController::with_swarm_tx` (Task A.10) to wire the
+    /// controller's gossip-publish path. The controller holds the `Sender`
+    /// and calls `send(P2PCommand::PublishIdentityBinding(...))` when an
+    /// `AgentPeerBinding` DHT signal arrives.
+    pub fn command_sender(&self) -> mpsc::Sender<P2PCommand> {
+        self.command_tx.clone()
     }
 
     /// Pause sync/replication cycles for backpressure during bulk writes.
@@ -500,6 +522,7 @@ impl P2PHandle {
                     }
                     P2PCommand::PublishEprHead { .. } => {} // fire-and-forget
                     P2PCommand::PublishRecoveryInvitation(_) => {} // fire-and-forget
+                    P2PCommand::PublishIdentityBinding(_) => {} // fire-and-forget
                 }
             }
         });
@@ -1378,6 +1401,37 @@ impl P2PNode {
                         request_hash = %inv.request_hash,
                         error = ?e,
                         "Failed to encode RecoveryInvitation"
+                    ),
+                }
+            }
+            // A.10: publish identity binding to elohim/identity/binding topic.
+            // Triggered by ReconcileController::on_agent_peer_binding when a local
+            // AgentPeerBinding DHT signal arrives. Best-effort: publish failure is
+            // logged but does not block the controller loop.
+            P2PCommand::PublishIdentityBinding(payload) => {
+                let topic = libp2p::gossipsub::IdentTopic::new("elohim/identity/binding");
+                match payload.to_bytes() {
+                    Ok(bytes) => match swarm.behaviour_mut().gossipsub.publish(topic, bytes) {
+                        Ok(msg_id) => info!(
+                            target: "elohim_storage::identity",
+                            peer_id = %payload.peer_id,
+                            agent_cid = %payload.agent_cid,
+                            message_id = ?msg_id,
+                            "Published IdentityBindingGossip to elohim/identity/binding"
+                        ),
+                        Err(e) => warn!(
+                            target: "elohim_storage::identity",
+                            peer_id = %payload.peer_id,
+                            agent_cid = %payload.agent_cid,
+                            error = ?e,
+                            "gossipsub publish failed for identity binding (often: no peers subscribed yet)"
+                        ),
+                    },
+                    Err(e) => warn!(
+                        target: "elohim_storage::identity",
+                        peer_id = %payload.peer_id,
+                        error = ?e,
+                        "Failed to encode IdentityBindingGossip"
                     ),
                 }
             }
@@ -2571,6 +2625,80 @@ impl P2PNode {
                                     from = %propagation_source,
                                     error = ?e,
                                     "Failed to decode RecoveryInvitation"
+                                ),
+                            }
+                        } else if message.topic.as_str() == "elohim/identity/binding" {
+                            // A.10: receive an identity binding from a peer and upsert
+                            // into peer_identity_bindings with source='gossip'.
+                            // Stage 1: structural verification only (non-empty fields).
+                            // Stage 2: add Ed25519 verify against resolved pubkey.
+                            match crate::p2p::identity_binding_gossip::IdentityBindingGossip::from_bytes(
+                                &message.data,
+                            ) {
+                                Ok(payload) => {
+                                    match payload.verify_structural() {
+                                        Err(reason) => warn!(
+                                            target: "elohim_storage::identity",
+                                            from = %propagation_source,
+                                            reason = %reason,
+                                            "IdentityBindingGossip failed structural verify — dropped"
+                                        ),
+                                        Ok(()) => {
+                                            let now_iso = chrono::Utc::now()
+                                                .format("%Y-%m-%dT%H:%M:%SZ")
+                                                .to_string();
+                                            let row = crate::db::models::NewPeerIdentityBindingRow {
+                                                peer_id: payload.peer_id.clone(),
+                                                agent_cid: payload.agent_cid.clone(),
+                                                dht_anchor_hash: payload.binding_action_hash.clone(),
+                                                valid_from: payload.valid_from.clone(),
+                                                valid_until: payload.valid_until.clone(),
+                                                observed_at: now_iso,
+                                                source: "gossip".to_string(),
+                                            };
+                                            match self.db_pool.as_ref() {
+                                                Some(pool) => {
+                                                    match pool.get() {
+                                                        Ok(mut conn) => {
+                                                            match crate::db::peer_identity_bindings::upsert(&mut conn, &row) {
+                                                                Ok(()) => info!(
+                                                                    target: "elohim_storage::identity",
+                                                                    from = %propagation_source,
+                                                                    peer_id = %payload.peer_id,
+                                                                    agent_cid = %payload.agent_cid,
+                                                                    "IdentityBindingGossip upserted with source='gossip'"
+                                                                ),
+                                                                Err(e) => warn!(
+                                                                    target: "elohim_storage::identity",
+                                                                    from = %propagation_source,
+                                                                    peer_id = %payload.peer_id,
+                                                                    error = %e,
+                                                                    "IdentityBindingGossip db upsert failed"
+                                                                ),
+                                                            }
+                                                        }
+                                                        Err(e) => warn!(
+                                                            target: "elohim_storage::identity",
+                                                            peer_id = %payload.peer_id,
+                                                            error = %e,
+                                                            "IdentityBindingGossip: db pool exhausted"
+                                                        ),
+                                                    }
+                                                }
+                                                None => debug!(
+                                                    target: "elohim_storage::identity",
+                                                    peer_id = %payload.peer_id,
+                                                    "IdentityBindingGossip: no db_pool configured, skipping persistence"
+                                                ),
+                                            }
+                                        }
+                                    }
+                                }
+                                Err(e) => warn!(
+                                    target: "elohim_storage::identity",
+                                    from = %propagation_source,
+                                    error = ?e,
+                                    "Failed to decode IdentityBindingGossip"
                                 ),
                             }
                         } else {

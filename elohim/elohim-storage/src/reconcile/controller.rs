@@ -28,10 +28,11 @@
 use std::sync::Arc;
 
 use thiserror::Error;
-use tokio::sync::Mutex;
+use tokio::sync::{mpsc, Mutex};
 use tracing::{debug, info, warn};
 
 use crate::db::DbPool;
+use crate::p2p::P2PCommand;
 use crate::reconcile::pubkey_timeline::PubkeyTimelineCache;
 use crate::reconcile::signal_stream::{
     AgentPeerBindingSignal, DnaSignal, DnaSignalStream, KeyRevocationSignal, KeyRotationSignal,
@@ -104,6 +105,18 @@ pub struct ReconcileController<S: DnaSignalStream> {
     /// controller task and the verify path (Task A.7). The `Mutex` is Tokio's
     /// async variant; cache ops are short so there is no contention concern.
     pubkey_cache: Option<Arc<Mutex<PubkeyTimelineCache>>>,
+
+    /// A.10: optional P2P command sender for gossipsub publish.
+    ///
+    /// When `Some(tx)`, `on_agent_peer_binding` sends a
+    /// `P2PCommand::PublishIdentityBinding` to propagate the new binding to
+    /// subscribed peers. `None` in test stubs that don't need live P2P
+    /// (e.g. the A.4 suite constructed via `new()` / `new_with_storage()`).
+    ///
+    /// Set via `with_swarm_tx(tx)`. In production the sender is extracted from
+    /// the `P2PHandle` (Task A.11 wiring). The channel is unbounded to avoid
+    /// blocking the controller loop — the P2P event loop drains it promptly.
+    swarm_tx: Option<mpsc::Sender<P2PCommand>>,
 }
 
 impl<S: DnaSignalStream> ReconcileController<S> {
@@ -117,6 +130,7 @@ impl<S: DnaSignalStream> ReconcileController<S> {
             observed_kinds: Vec::new(),
             db_pool: None,
             pubkey_cache: None,
+            swarm_tx: None,
         }
     }
 
@@ -134,7 +148,20 @@ impl<S: DnaSignalStream> ReconcileController<S> {
             observed_kinds: Vec::new(),
             db_pool: Some(db_pool),
             pubkey_cache: Some(pubkey_cache),
+            swarm_tx: None,
         }
+    }
+
+    /// Wire a P2P command sender so the controller can publish gossip messages
+    /// when DHT signals arrive (Task A.10).
+    ///
+    /// The sender is cloned from the `P2PHandle`'s command channel. Using
+    /// `Option` preserves backward compatibility — the A.4 unit-test suite
+    /// constructs controllers without a live swarm. When `None`, gossip publish
+    /// is silently skipped (logged at debug level).
+    pub fn with_swarm_tx(mut self, tx: mpsc::Sender<P2PCommand>) -> Self {
+        self.swarm_tx = Some(tx);
+        self
     }
 
     // -----------------------------------------------------------------------
@@ -294,15 +321,72 @@ impl<S: DnaSignalStream> ReconcileController<S> {
         Ok(())
     }
 
-    /// STUB — Task A.5: insert/update peer_identity_bindings row.
+    /// Task A.10: publish AgentPeerBinding to the `elohim/identity/binding` gossipsub topic.
     ///
-    /// Will upsert the libp2p PeerId → agent CID mapping into the
-    /// `peer_identity_bindings` SQLite projection table.
+    /// When a local agent creates a new `AgentPeerBinding` DHT entry, the DNA
+    /// emits an `AgentPeerBinding` signal. The controller propagates this to all
+    /// subscribed peers by sending `P2PCommand::PublishIdentityBinding` to the
+    /// P2P event loop.
+    ///
+    /// ## Stage 1 signature
+    ///
+    /// Per `project_bootstrap_to_elohim_security_gradient`, the signature field
+    /// in the gossip payload is a non-empty sentinel for Stage 1. Stage 2 (A.13
+    /// or later) replaces this with a real Ed25519 signature.
+    ///
+    /// ## No-swarm path
+    ///
+    /// If the controller was constructed without `with_swarm_tx(tx)`, the
+    /// method logs at debug level and returns `Ok(())` — preserving backward
+    /// compatibility with the A.4 test suite that doesn't wire a live swarm.
     async fn on_agent_peer_binding(
         &mut self,
-        _signal: AgentPeerBindingSignal,
+        signal: AgentPeerBindingSignal,
     ) -> Result<(), ReconcileError> {
-        // Task A.5 replaces this stub.
+        // Build the gossip payload from the DHT signal fields.
+        let payload = crate::p2p::identity_binding_gossip::IdentityBindingGossip {
+            action_hash: signal.action_hash.clone(),
+            peer_id: signal.peer_id.clone(),
+            agent_cid: signal.agent_cid.clone(),
+            valid_from: signal.valid_from.format("%Y-%m-%dT%H:%M:%SZ").to_string(),
+            valid_until: signal
+                .valid_until
+                .map(|dt| dt.format("%Y-%m-%dT%H:%M:%SZ").to_string()),
+            device_archetype: format!("{:?}", signal.device_archetype).to_lowercase(),
+            binding_action_hash: signal.binding_action_hash.clone(),
+            emitted_at: signal.emitted_at.format("%Y-%m-%dT%H:%M:%SZ").to_string(),
+            // Stage 1: structural-only sentinel. Stage 2 replaces with real Ed25519
+            // signature over canonical payload bytes (see identity_binding_gossip.rs).
+            signature: crate::p2p::identity_binding_gossip::STAGE1_SIGNATURE_SENTINEL.to_string(),
+        };
+
+        match &self.swarm_tx {
+            Some(tx) => {
+                if let Err(e) = tx.send(P2PCommand::PublishIdentityBinding(payload)).await {
+                    warn!(
+                        peer_id = %signal.peer_id,
+                        agent_cid = %signal.agent_cid,
+                        error = %e,
+                        "Failed to send PublishIdentityBinding command — swarm channel closed?"
+                    );
+                } else {
+                    debug!(
+                        peer_id = %signal.peer_id,
+                        agent_cid = %signal.agent_cid,
+                        "Sent PublishIdentityBinding command to P2P event loop"
+                    );
+                }
+            }
+            None => {
+                debug!(
+                    peer_id = %signal.peer_id,
+                    agent_cid = %signal.agent_cid,
+                    "on_agent_peer_binding: no swarm_tx wired — gossip publish skipped \
+                     (use with_swarm_tx for production or gossip integration tests)"
+                );
+            }
+        }
+
         Ok(())
     }
 
@@ -593,5 +677,97 @@ mod tests {
         );
 
         assert_eq!(controller.observed_kinds(), &["keyRevocation"]);
+    }
+
+    // -----------------------------------------------------------------------
+    // A.10: on_agent_peer_binding → PublishIdentityBinding
+    // -----------------------------------------------------------------------
+
+    /// `on_agent_peer_binding` without `with_swarm_tx` returns Ok and records
+    /// the kind — preserving backward compatibility with the A.4 test suite.
+    #[tokio::test]
+    async fn controller_on_agent_peer_binding_no_swarm_tx_is_ok() {
+        let signals = vec![DnaSignal::AgentPeerBinding(sample_binding_signal())];
+        let stream = InMemoryDnaSignalStream::with_signals(signals);
+        let mut controller = ReconcileController::new(stream);
+
+        controller.run_one_pass().await.unwrap();
+
+        assert_eq!(controller.observed_kinds(), &["agentPeerBinding"]);
+    }
+
+    /// `on_agent_peer_binding` WITH `with_swarm_tx` sends a
+    /// `P2PCommand::PublishIdentityBinding` containing the correct fields.
+    #[tokio::test]
+    async fn controller_on_agent_peer_binding_sends_publish_identity_binding() {
+        use crate::p2p::identity_binding_gossip::STAGE1_SIGNATURE_SENTINEL;
+        use crate::p2p::P2PCommand;
+
+        let signal = sample_binding_signal();
+        let stream = InMemoryDnaSignalStream::with_signals(vec![DnaSignal::AgentPeerBinding(
+            signal.clone(),
+        )]);
+
+        let (tx, mut rx) = mpsc::channel::<P2PCommand>(8);
+        let mut controller = ReconcileController::new(stream).with_swarm_tx(tx);
+        controller.run_one_pass().await.unwrap();
+
+        // Must have recorded the kind.
+        assert_eq!(controller.observed_kinds(), &["agentPeerBinding"]);
+
+        // Must have sent a PublishIdentityBinding command.
+        let cmd = rx.try_recv().expect("expected command on swarm channel");
+        match cmd {
+            P2PCommand::PublishIdentityBinding(payload) => {
+                assert_eq!(payload.peer_id, signal.peer_id);
+                assert_eq!(payload.agent_cid, signal.agent_cid);
+                assert_eq!(payload.binding_action_hash, signal.binding_action_hash);
+                assert_eq!(payload.signature, STAGE1_SIGNATURE_SENTINEL);
+                assert!(
+                    !payload.valid_from.is_empty(),
+                    "valid_from must be non-empty"
+                );
+            }
+            _other => panic!("expected PublishIdentityBinding, got unexpected command variant"),
+        }
+    }
+
+    /// Multiple AgentPeerBinding signals in sequence each produce a command.
+    #[tokio::test]
+    async fn controller_on_agent_peer_binding_multiple_signals_produce_commands() {
+        use crate::p2p::P2PCommand;
+
+        let signals = vec![
+            DnaSignal::AgentPeerBinding(sample_binding_signal()),
+            DnaSignal::AgentPeerBinding(AgentPeerBindingSignal {
+                peer_id: "12D3KooWSecondPeer".into(),
+                agent_cid: "bafybeicid-second".into(),
+                ..sample_binding_signal()
+            }),
+        ];
+        let stream = InMemoryDnaSignalStream::with_signals(signals);
+
+        let (tx, mut rx) = mpsc::channel::<P2PCommand>(8);
+        let mut controller = ReconcileController::new(stream).with_swarm_tx(tx);
+        controller.run_one_pass().await.unwrap();
+
+        assert_eq!(
+            controller.observed_kinds(),
+            &["agentPeerBinding", "agentPeerBinding"]
+        );
+
+        let cmd1 = rx.try_recv().expect("first command");
+        let cmd2 = rx.try_recv().expect("second command");
+
+        assert!(
+            matches!(cmd1, P2PCommand::PublishIdentityBinding(_)),
+            "first command must be PublishIdentityBinding"
+        );
+        assert!(
+            matches!(cmd2, P2PCommand::PublishIdentityBinding(_)),
+            "second command must be PublishIdentityBinding"
+        );
+
+        assert!(rx.try_recv().is_err(), "no more commands after two signals");
     }
 }

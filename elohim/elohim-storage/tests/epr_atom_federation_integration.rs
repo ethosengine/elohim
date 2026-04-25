@@ -6,6 +6,10 @@
 //! Phase 2B Task A.9: identity handshake test extends the harness with the
 //! handshake protocol and asserts that after connect, peer B resolves peer A's
 //! identity from its `peer_identity_bindings` table.
+//! Phase 2B Task A.10: gossipsub `elohim/identity/binding` propagation test —
+//! peer A receives an AgentPeerBinding DHT signal, publishes to the topic via
+//! the controller's swarm_tx, peer B receives via gossip and upserts into
+//! `peer_identity_bindings` with source='gossip'.
 
 mod harness;
 use elohim_storage::p2p::{verify_incoming_epr, CallerIdentity, MAX_BATCH_CIDS};
@@ -461,5 +465,323 @@ async fn identity_handshake_populates_peer_identity_map_on_connect() {
             CallerIdentity::Agent(cid) if cid == &node_b.agent_cid()
         ),
         "peer A should resolve peer B's identity as Agent after handshake, got: {identity_b_from_a:?}",
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Task A.10 — Gossipsub `elohim/identity/binding` propagation (P0)
+//
+// When a local agent's `AgentPeerBinding` DHT signal arrives, the
+// ReconcileController sends `P2PCommand::PublishIdentityBinding` to the
+// swarm. The swarm publishes on `elohim/identity/binding`. Subscribed peers
+// receive the gossip, apply structural verification, and upsert into
+// `peer_identity_bindings` with source='gossip'.
+//
+// This test verifies two things:
+//
+// 1. Controller wiring: `ReconcileController::on_agent_peer_binding` sends the
+//    correct `P2PCommand::PublishIdentityBinding` payload to the swarm channel.
+//
+// 2. Gossip propagation: two minimal gossipsub-capable swarms exchange a
+//    binding; the receiving side upserts into its DB with source='gossip', and
+//    the row is queryable via `peer_identity_bindings::lookup_active`.
+// ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// A.10.1 — Controller sends PublishIdentityBinding when swarm_tx is wired
+// ---------------------------------------------------------------------------
+
+#[tokio::test]
+async fn controller_on_agent_peer_binding_sends_publish_command() {
+    use chrono::Utc;
+    use elohim_storage::p2p::{identity_binding_gossip::STAGE1_SIGNATURE_SENTINEL, P2PCommand};
+    use elohim_storage::reconcile::controller::ReconcileController;
+    use elohim_storage::reconcile::signal_stream::{
+        AgentPeerBindingSignal, DeviceArchetype, DnaSignal, InMemoryDnaSignalStream,
+    };
+    use tokio::sync::mpsc;
+
+    let binding_signal = AgentPeerBindingSignal {
+        action_hash: "uhCkk-ctrl-binding-hash".into(),
+        peer_id: "12D3KooWGossipTestPeer".into(),
+        agent_cid: "bafybeicid-gossip-agent".into(),
+        valid_from: Utc::now(),
+        valid_until: None,
+        device_archetype: DeviceArchetype::Node,
+        binding_action_hash: "uhCkk-ctrl-binding-hash".into(),
+        emitted_at: Utc::now(),
+    };
+
+    let stream = InMemoryDnaSignalStream::with_signals(vec![DnaSignal::AgentPeerBinding(
+        binding_signal.clone(),
+    )]);
+
+    // Channel the controller will send commands to.
+    let (tx, mut rx) = mpsc::channel::<P2PCommand>(8);
+
+    let mut controller = ReconcileController::new(stream).with_swarm_tx(tx);
+    controller.run_one_pass().await.expect("run_one_pass");
+
+    // The controller must have sent exactly one PublishIdentityBinding command.
+    let cmd = rx
+        .recv()
+        .await
+        .expect("expected a command on the swarm channel");
+
+    match cmd {
+        P2PCommand::PublishIdentityBinding(payload) => {
+            assert_eq!(
+                payload.peer_id, binding_signal.peer_id,
+                "peer_id mismatch in gossip payload"
+            );
+            assert_eq!(
+                payload.agent_cid, binding_signal.agent_cid,
+                "agent_cid mismatch in gossip payload"
+            );
+            assert_eq!(
+                payload.binding_action_hash, binding_signal.binding_action_hash,
+                "binding_action_hash mismatch in gossip payload"
+            );
+            assert_eq!(
+                payload.signature, STAGE1_SIGNATURE_SENTINEL,
+                "Stage 1 sentinel signature must be used"
+            );
+            assert!(
+                !payload.valid_from.is_empty(),
+                "valid_from must be non-empty"
+            );
+        }
+        other => panic!(
+            "expected P2PCommand::PublishIdentityBinding, got: {:?}",
+            std::mem::discriminant(&other)
+        ),
+    }
+
+    // No more commands on the channel.
+    assert!(
+        rx.try_recv().is_err(),
+        "only one PublishIdentityBinding command expected"
+    );
+
+    assert_eq!(
+        controller.observed_kinds(),
+        &["agentPeerBinding"],
+        "controller must record the agentPeerBinding kind"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// A.10.2 — Gossip propagation: peer A publishes → peer B upserts with source='gossip'
+// ---------------------------------------------------------------------------
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn gossipsub_identity_binding_propagates_to_peer_db() {
+    use elohim_storage::db::models::NewPeerIdentityBindingRow;
+    use elohim_storage::p2p::identity_binding_gossip::{
+        IdentityBindingGossip, STAGE1_SIGNATURE_SENTINEL,
+    };
+    use elohim_storage::test_util::test_pool;
+    use futures::StreamExt;
+    use libp2p::{
+        gossipsub, identity, noise, swarm::SwarmEvent, tcp, yamux, Multiaddr, SwarmBuilder,
+    };
+
+    // Peer B's pool is used for the gossip upsert assertion.
+    let pool_b = test_pool();
+
+    // Build a gossipsub-only swarm bound to a deterministic identity.
+    fn build_gossip_swarm() -> libp2p::Swarm<gossipsub::Behaviour> {
+        let local_key = identity::Keypair::generate_ed25519();
+        let gossipsub_config = gossipsub::ConfigBuilder::default()
+            // Short heartbeat so subscription info propagates quickly in tests.
+            .heartbeat_interval(std::time::Duration::from_millis(100))
+            .validation_mode(gossipsub::ValidationMode::Strict)
+            .build()
+            .expect("valid gossipsub config");
+        let behaviour = gossipsub::Behaviour::new(
+            gossipsub::MessageAuthenticity::Signed(local_key.clone()),
+            gossipsub_config,
+        )
+        .expect("gossipsub behaviour");
+        SwarmBuilder::with_existing_identity(local_key)
+            .with_tokio()
+            .with_tcp(
+                tcp::Config::default(),
+                noise::Config::new,
+                yamux::Config::default,
+            )
+            .expect("tcp")
+            .with_behaviour(|_| behaviour)
+            .expect("behaviour")
+            .with_swarm_config(|c| c.with_idle_connection_timeout(Duration::from_secs(30)))
+            .build()
+    }
+
+    let topic = gossipsub::IdentTopic::new("elohim/identity/binding");
+
+    // --- Peer B setup ---
+    let mut swarm_b = build_gossip_swarm();
+    swarm_b
+        .behaviour_mut()
+        .subscribe(&topic)
+        .expect("subscribe b");
+    swarm_b
+        .listen_on("/ip4/127.0.0.1/tcp/0".parse::<Multiaddr>().unwrap())
+        .expect("listen b");
+    // Pump swarm_b until we learn its listen address.
+    let addr_b: Multiaddr = loop {
+        match swarm_b.next().await.expect("event") {
+            SwarmEvent::NewListenAddr { address, .. } => break address,
+            _ => continue,
+        }
+    };
+
+    // Build the gossip payload peer A will publish.
+    let payload = IdentityBindingGossip {
+        action_hash: "uhCkk-gossip-test-binding".into(),
+        peer_id: "12D3KooWGossipTestPeerA".into(),
+        agent_cid: "bafybeicid-gossip-propagation-agent".into(),
+        valid_from: "2026-04-25T00:00:00Z".into(),
+        valid_until: None,
+        device_archetype: "node".into(),
+        binding_action_hash: "uhCkk-gossip-test-binding".into(),
+        emitted_at: "2026-04-25T00:00:01Z".into(),
+        signature: STAGE1_SIGNATURE_SENTINEL.into(),
+    };
+    let payload_bytes = payload.to_bytes().expect("encode");
+
+    // Channel: B notifies test when it has upserted.
+    let (done_tx, done_rx) = tokio::sync::oneshot::channel::<()>();
+    let pool_b_task = pool_b.clone();
+
+    // --- Peer B driver (background task) ---
+    // Receives gossip messages, verifies structurally, and upserts into DB.
+    let topic_b = topic.clone();
+    tokio::spawn(async move {
+        let mut done_tx_opt = Some(done_tx);
+        loop {
+            match swarm_b.next().await {
+                Some(SwarmEvent::Behaviour(gossipsub::Event::Message { message, .. })) => {
+                    if message.topic != topic_b.hash() {
+                        continue;
+                    }
+                    let Ok(received) = IdentityBindingGossip::from_bytes(&message.data) else {
+                        continue;
+                    };
+                    if received.verify_structural().is_err() {
+                        continue;
+                    }
+                    let now_iso = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
+                    let row = NewPeerIdentityBindingRow {
+                        peer_id: received.peer_id.clone(),
+                        agent_cid: received.agent_cid.clone(),
+                        dht_anchor_hash: received.binding_action_hash.clone(),
+                        valid_from: received.valid_from.clone(),
+                        valid_until: received.valid_until.clone(),
+                        observed_at: now_iso,
+                        source: "gossip".to_string(),
+                    };
+                    let mut conn = pool_b_task.get().expect("conn");
+                    elohim_storage::db::peer_identity_bindings::upsert(&mut conn, &row)
+                        .expect("upsert");
+                    if let Some(tx) = done_tx_opt.take() {
+                        let _ = tx.send(());
+                    }
+                }
+                None => break,
+                _ => {}
+            }
+        }
+    });
+
+    // --- Peer A setup ---
+    let mut swarm_a = build_gossip_swarm();
+    swarm_a
+        .behaviour_mut()
+        .subscribe(&topic)
+        .expect("subscribe a");
+    swarm_a
+        .listen_on("/ip4/127.0.0.1/tcp/0".parse::<Multiaddr>().unwrap())
+        .expect("listen a");
+    loop {
+        match swarm_a.next().await.expect("event") {
+            SwarmEvent::NewListenAddr { .. } => break,
+            _ => continue,
+        }
+    }
+
+    // Dial B from A.
+    swarm_a.dial(addr_b.clone()).expect("dial");
+
+    // Pump A until connection is established.
+    loop {
+        match swarm_a.next().await.expect("swarm a event") {
+            SwarmEvent::ConnectionEstablished { .. } => break,
+            _ => continue,
+        }
+    }
+
+    // Pump A briefly to allow gossipsub subscription exchange to complete.
+    // Retry publish until it succeeds (returns Err(InsufficientPeers) when
+    // B hasn't yet propagated its subscription to A's gossipsub view).
+    let publish_deadline = tokio::time::Instant::now() + Duration::from_secs(5);
+    loop {
+        match swarm_a
+            .behaviour_mut()
+            .publish(topic.clone(), payload_bytes.clone())
+        {
+            Ok(_) => break,
+            Err(gossipsub::PublishError::InsufficientPeers) => {
+                // Subscription exchange not complete yet — pump and retry.
+                if tokio::time::Instant::now() >= publish_deadline {
+                    panic!("timed out waiting for B's subscription to propagate to A");
+                }
+                // Drive A's event loop once to process gossipsub control messages.
+                tokio::select! {
+                    Some(_) = swarm_a.next() => {}
+                    _ = tokio::time::sleep(Duration::from_millis(50)) => {}
+                }
+            }
+            Err(e) => panic!("publish error: {e:?}"),
+        }
+    }
+
+    // Continue driving A's event loop briefly so the message is fully sent.
+    let drive_deadline = tokio::time::Instant::now() + Duration::from_millis(500);
+    loop {
+        tokio::select! {
+            _ = tokio::time::sleep_until(drive_deadline) => break,
+            Some(_) = swarm_a.next() => {}
+        }
+    }
+
+    // Wait for peer B to receive and upsert, with a reasonable timeout.
+    tokio::time::timeout(Duration::from_secs(15), done_rx)
+        .await
+        .expect("timeout waiting for gossip delivery")
+        .expect("done channel dropped");
+
+    // Assert: peer B's DB has the binding with source='gossip'.
+    let now_iso = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
+    let mut conn_b = pool_b.get().expect("conn_b");
+    let row = elohim_storage::db::peer_identity_bindings::lookup_active(
+        &mut conn_b,
+        &payload.peer_id,
+        &now_iso,
+    )
+    .expect("lookup_active")
+    .expect("expected active binding for gossip-propagated peer");
+
+    assert_eq!(
+        row.agent_cid, payload.agent_cid,
+        "agent_cid must match the gossip payload"
+    );
+    assert_eq!(
+        row.source, "gossip",
+        "source must be 'gossip' for gossipsub-received binding"
+    );
+    assert_eq!(
+        row.dht_anchor_hash, payload.binding_action_hash,
+        "dht_anchor_hash must match binding_action_hash from gossip payload"
     );
 }

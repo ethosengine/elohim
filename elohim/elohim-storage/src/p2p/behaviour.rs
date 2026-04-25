@@ -353,7 +353,8 @@ impl ElohimStorageBehaviour {
 
         let ping = ping::Behaviour::new(ping::Config::new());
 
-        // Gossipsub — pub/sub for recovery invitation broadcast (M3).
+        // Gossipsub — pub/sub for recovery invitation broadcast (M3) and
+        // identity binding propagation (A.10: mid-session rotation).
         // Uses the node's signing keypair for message authentication.
         let gossipsub_config = gossipsub::ConfigBuilder::default()
             .heartbeat_interval(std::time::Duration::from_secs(10))
@@ -369,6 +370,12 @@ impl ElohimStorageBehaviour {
         gossipsub
             .subscribe(&recovery_topic)
             .expect("subscribe to recovery.invitation");
+        // A.10: subscribe to identity binding topic — propagates AgentPeerBinding
+        // DHT entries to peers as an operational projection (Category C).
+        let identity_binding_topic = gossipsub::IdentTopic::new("elohim/identity/binding");
+        gossipsub
+            .subscribe(&identity_binding_topic)
+            .expect("subscribe to elohim/identity/binding");
 
         Self {
             kademlia,
