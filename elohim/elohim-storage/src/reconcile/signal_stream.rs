@@ -267,6 +267,15 @@ pub enum SignalStreamError {
     CursorOutOfRange(SignalCursor),
     #[error("stream is closed")]
     Closed,
+    /// Operation is not yet implemented.
+    ///
+    /// Used by `resume_from` on streams that do not (yet) support cursor-based
+    /// replay. Both `HolochainAppSignalStream` and `ChannelSignalStream` return
+    /// this at Stage 1. Task A.12 will upgrade `HolochainAppSignalStream` to
+    /// return a real replay result; `ChannelSignalStream` will retain this error
+    /// permanently (channel history is not replayable by design).
+    #[error("not implemented: {0}")]
+    NotImplemented(String),
     #[error("stream error: {0}")]
     Other(String),
 }
@@ -417,9 +426,11 @@ impl DnaSignalStream for ChannelSignalStream {
     async fn resume_from(&mut self, cursor: SignalCursor) -> Result<(), SignalStreamError> {
         // Channel streams cannot replay missed signals; the conductor is the
         // source of truth and replaying requires a real implementation.
-        Err(SignalStreamError::Other(format!(
+        // This permanently returns NotImplemented — channel history is not
+        // replayable by design.
+        Err(SignalStreamError::NotImplemented(format!(
             "ChannelSignalStream does not support resume_from (cursor = {cursor:?}); \
-             use HolochainAppSignalStream (Task A.11) for cursor-based resumption"
+             use HolochainAppSignalStream (Task A.12) for cursor-based resumption"
         )))
     }
 }
@@ -599,8 +610,8 @@ mod tests {
 
         let result = stream.resume_from(SignalCursor::new("0")).await;
         assert!(
-            result.is_err(),
-            "ChannelSignalStream.resume_from should always error"
+            matches!(result, Err(SignalStreamError::NotImplemented(_))),
+            "ChannelSignalStream.resume_from should return NotImplemented (channel history is not replayable)"
         );
     }
 

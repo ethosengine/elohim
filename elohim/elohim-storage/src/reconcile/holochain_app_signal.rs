@@ -84,11 +84,10 @@ use tracing::{debug, info, warn};
 
 use holochain_client::{
     AdminWebsocket, AllowedOrigins, AppWebsocket, AuthorizeSigningCredentialsPayload,
-    ClientAgentSigner, ZomeCallTarget,
+    ClientAgentSigner,
 };
 use holochain_types::signal::Signal;
 
-use crate::db::key_revocations::get_key_revocation_by_id;
 use crate::db::DbPool;
 use crate::reconcile::signal_stream::{
     AgentPeerBindingSignal, AttestationKind, DeviceArchetype, DnaSignal, DnaSignalStream,
@@ -159,7 +158,7 @@ fn translate_recovery_v2(
             action_hash,
             rotation,
         } => {
-            let rotated_at = crate::signals::timestamp_to_iso_for_translator(&rotation.rotated_at);
+            let rotated_at = crate::signals::timestamp_to_iso(&rotation.rotated_at);
             let rotated_at_dt = parse_iso(&rotated_at);
             // agent_cid: use `human_agent_pubkey` (the agent's current key identifier).
             // See module docstring for the Stage 1 agent_cid derivation rationale.
@@ -272,67 +271,29 @@ fn translate_recovery_v2(
 
 /// Derive `compromise_at` for `KeyRevocationEffective`.
 ///
-/// Looks up the `key_revocations` projection row for `revocation_id` and uses
-/// its `created_at` field. Falls back to `effective_at` if the row doesn't exist
-/// (out-of-order delivery, fresh boot).
+/// Stage 1: always returns `effective_at` as a conservative `compromise_at`.
 ///
-/// Design: projection lookup is preferred over a DHT zome-call round-trip.
-/// The projection `created_at` equals the `KeyRevocationRequested` signal's
-/// `created_at`, which is when the community first declared the key compromised.
+/// This over-estimates the tainted window — it marks `[effective_at, ∞)` as
+/// tainted rather than the wider (and more accurate) `[created_at, ∞)` where
+/// `created_at` is when the community first declared the key compromised. The
+/// over-estimation is safe: no legitimate session is falsely accepted; some
+/// sessions that were legitimate may be held for re-verification.
+///
+/// TODO(A.12): When replay-on-reconnect lands and the controller's
+/// `on_revocation_attestation` handler upserts `key_revocations.created_at`,
+/// this function should query that projection to use the community's first
+/// declared compromise time rather than the protocol's effective time. The
+/// dead-on-arrival projection lookup that was here at A.11 has been removed
+/// because `signals.rs::handle_recovery_v2_signal` is no longer called on the
+/// live path — the controller path is the only signal consumer.
 fn derive_compromise_at(
-    db_pool: Option<&Arc<DbPool>>,
-    revocation_id: &str,
+    _db_pool: Option<&Arc<DbPool>>,
+    _revocation_id: &str,
     effective_at_fallback: DateTime<Utc>,
 ) -> DateTime<Utc> {
-    let Some(pool) = db_pool else {
-        debug!(
-            revocation_id,
-            "No db_pool wired — using effective_at as compromise_at fallback"
-        );
-        return effective_at_fallback;
-    };
-
-    match pool.get() {
-        Ok(mut conn) => {
-            match get_key_revocation_by_id(&mut conn, revocation_id) {
-                Ok(Some(row)) => {
-                    let dt = parse_iso(&row.created_at);
-                    debug!(
-                        revocation_id,
-                        compromise_at = %dt,
-                        "Derived compromise_at from key_revocations projection"
-                    );
-                    dt
-                }
-                Ok(None) => {
-                    // TODO(A.12): replay missed KeyRevocationRequested signals on reconnect
-                    // so that the projection row exists before KeyRevocationEffective arrives.
-                    warn!(
-                        revocation_id,
-                        "key_revocations projection row not found; using effective_at as \
-                         compromise_at (out-of-order delivery? consider A.12 replay)"
-                    );
-                    effective_at_fallback
-                }
-                Err(e) => {
-                    warn!(
-                        revocation_id,
-                        error = %e,
-                        "Failed to query key_revocations for compromise_at; using effective_at"
-                    );
-                    effective_at_fallback
-                }
-            }
-        }
-        Err(e) => {
-            warn!(
-                revocation_id,
-                error = %e,
-                "DB pool checkout failed for compromise_at derivation; using effective_at"
-            );
-            effective_at_fallback
-        }
-    }
+    // Stage 1: always use effective_at as conservative compromise_at.
+    // See TODO(A.12) above for the upgrade path.
+    effective_at_fallback
 }
 
 /// Translate an `ImagodeiSignal` into a `DnaSignal`, if the variant is
@@ -466,9 +427,39 @@ pub struct HolochainAppSignalStream {
     rx: mpsc::Receiver<DnaSignal>,
     /// Count of delivered signals (for cursor tracking).
     delivered: u64,
+    /// Live AppWebsocket connection — MUST NOT drop.
+    ///
+    /// The `on_signal` callback is registered inside the `AppWebsocket` struct.
+    /// Dropping `app_ws` closes the WebSocket and fires the callback's Drop,
+    /// which closes `tx`. `rx.recv()` then immediately returns `None` and the
+    /// controller loop exits. This field keeps `app_ws` alive for the full
+    /// lifetime of the stream.
+    ///
+    /// Unit tests that construct `HolochainAppSignalStream` directly (without
+    /// going through `connect`) use `for_testing(rx)` which sets this to `None`.
+    /// The live path always sets it to `Some(app_ws)`.
+    _app_ws: Option<AppWebsocket>,
 }
 
 impl HolochainAppSignalStream {
+    /// Construct a stream for unit tests, bypassing `connect`.
+    ///
+    /// Tests that exercise the signal-delivery logic directly inject a channel
+    /// receiver here without needing a real conductor. The `_app_ws` field is
+    /// `None` because there is no live WebSocket — the test drives the channel
+    /// directly via the paired sender.
+    ///
+    /// **Never use this in production code.** Use `connect()` instead, which
+    /// stores the live `AppWebsocket` in `_app_ws` to prevent premature drop.
+    #[cfg(test)]
+    pub fn for_testing(rx: mpsc::Receiver<DnaSignal>) -> Self {
+        Self {
+            rx,
+            delivered: 0,
+            _app_ws: None,
+        }
+    }
+
     /// Connect to the imagodei app interface and subscribe to signals.
     ///
     /// `admin_url` — Holochain admin WebSocket URL (e.g. `ws://localhost:4444`).
@@ -605,23 +596,20 @@ impl HolochainAppSignalStream {
             })
             .await;
 
-        // Issue a no-op zome call to validate the connection is live and the
-        // cell is responsive. Errors here are non-fatal — the subscription is
-        // still registered; a warm-up failure just means the cell took longer
-        // to start. We log and continue.
-        let _ = app_ws
-            .call_zome(
-                ZomeCallTarget::CellId(cell_id),
-                "imagodei".into(),
-                "get_my_mastery".into(),
-                holochain_client::ExternIO::from(rmp_serde::to_vec(&()).unwrap_or_default()),
-            )
-            .await
-            .map_err(|e| {
-                debug!(error = %e, "warm-up zome call failed (non-fatal)");
-            });
+        // No warm-up zome call — successful on_signal registration is sufficient.
+        // Reading from imagodei without a Human profile would error and add no value.
+        // get_my_mastery takes a String (content_id) and requires a Human profile;
+        // passing () would always fail. The on_signal registration above is the
+        // validation that the connection is live.
 
-        Ok(Self { rx, delivered: 0 })
+        Ok(Self {
+            rx,
+            delivered: 0,
+            // CRITICAL: keep app_ws alive — the on_signal callback lives inside
+            // AppWebsocket. Dropping app_ws here would close the WS and make tx
+            // unreachable, causing next_signal() to return None immediately.
+            _app_ws: Some(app_ws),
+        })
     }
 }
 
@@ -650,7 +638,7 @@ impl DnaSignalStream for HolochainAppSignalStream {
         // signals since the given action_hash cursor. The current implementation
         // reconnects from scratch (no replay) — missed signals are recoverable
         // from a full DHT rescan on reconnect.
-        Err(SignalStreamError::Other(format!(
+        Err(SignalStreamError::NotImplemented(format!(
             "HolochainAppSignalStream does not yet support resume_from (cursor = {cursor:?}); \
              Task A.12 will add replay-from-cursor semantics. \
              Call connect() to start a fresh subscription from the current head."
@@ -917,7 +905,7 @@ mod tests {
     #[tokio::test]
     async fn next_signal_returns_none_after_close() {
         let (tx, rx) = mpsc::channel::<DnaSignal>(8);
-        let mut stream = HolochainAppSignalStream { rx, delivered: 0 };
+        let mut stream = HolochainAppSignalStream::for_testing(rx);
 
         // Push one signal then drop the sender.
         let rotation = DnaSignal::KeyRotation(KeyRotationSignal {
@@ -945,7 +933,7 @@ mod tests {
     #[tokio::test]
     async fn cursor_increments_on_delivery() {
         let (tx, rx) = mpsc::channel::<DnaSignal>(8);
-        let mut stream = HolochainAppSignalStream { rx, delivered: 0 };
+        let mut stream = HolochainAppSignalStream::for_testing(rx);
 
         assert_eq!(stream.cursor().await, None);
 
@@ -965,17 +953,20 @@ mod tests {
     }
 
     // -----------------------------------------------------------------------
-    // resume_from always errors (Stage 1)
+    // resume_from always errors (Stage 1) — returns NotImplemented variant
+    //
+    // NOTE: This test constructs via for_testing() to avoid needing a real
+    // conductor. The live connect() path is validated by sweettest in Task A.12.
     // -----------------------------------------------------------------------
 
     #[tokio::test]
     async fn resume_from_returns_error() {
         let (_tx, rx) = mpsc::channel::<DnaSignal>(1);
-        let mut stream = HolochainAppSignalStream { rx, delivered: 0 };
+        let mut stream = HolochainAppSignalStream::for_testing(rx);
         let result = stream.resume_from(SignalCursor::new("0")).await;
         assert!(
-            result.is_err(),
-            "HolochainAppSignalStream.resume_from must error in Stage 1"
+            matches!(result, Err(SignalStreamError::NotImplemented(_))),
+            "HolochainAppSignalStream.resume_from must return NotImplemented at Stage 1"
         );
     }
 

@@ -837,7 +837,11 @@ fn extract_authority_kind(v: &serde_json::Value) -> String {
 
 /// Convert a Holochain Timestamp serde_json::Value to an ISO 8601 string.
 /// HDK Timestamp serializes as microseconds i64 or as `{"secs": i64, "nanos": u32}`.
-fn timestamp_to_iso(v: &serde_json::Value) -> String {
+///
+/// Exposed as `pub(crate)` so the reconcile translator (`holochain_app_signal`)
+/// can call it directly without duplicating the conversion logic or encoding
+/// caller identity in the function name.
+pub(crate) fn timestamp_to_iso(v: &serde_json::Value) -> String {
     if let Some(micros) = v.as_i64() {
         let secs = micros / 1_000_000;
         let dt = chrono::DateTime::from_timestamp(secs, 0).unwrap_or_default();
@@ -848,15 +852,6 @@ fn timestamp_to_iso(v: &serde_json::Value) -> String {
         return dt.format("%Y-%m-%dT%H:%M:%SZ").to_string();
     }
     chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string()
-}
-
-/// Public re-export of `timestamp_to_iso` for use by the reconcile translator.
-///
-/// `holochain_app_signal` needs to convert `KeyRotationPayload.rotated_at`
-/// (a Holochain Timestamp encoded as `serde_json::Value`) to an ISO string
-/// without duplicating the conversion logic.
-pub fn timestamp_to_iso_for_translator(v: &serde_json::Value) -> String {
-    timestamp_to_iso(v)
 }
 
 /// Extract a `RecoveryInvitation` publish intent from a `RecoveryV2Signal`.

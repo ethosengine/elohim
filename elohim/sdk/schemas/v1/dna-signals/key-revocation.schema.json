@@ -26,7 +26,7 @@
     },
     "agentCid": {
       "type": "string",
-      "description": "CID of the agent whose key was revoked."
+      "description": "Agent identifier string. Stage 1: populated with human_id (the stable human identifier) from the KeyRevocationEffective signal. Stage 2: will be a content CID derived from the imagodei Human entry."
     },
     "revokedPubkey": {
       "type": "string",
