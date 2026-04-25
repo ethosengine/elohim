@@ -163,6 +163,29 @@ pub fn post_commit(committed_actions: Vec<SignedActionHashed>) -> ExternResult<(
         let action = signed_action.hashed.content.clone();
         let action_hash = signed_action.hashed.hash.clone();
 
+        // Handle Delete actions for PortalHost removal signal.
+        // `deletes_address` is the ActionHash of the original Create action.
+        if let Action::Delete(ref delete) = action {
+            let original_action_hash = delete.deletes_address.clone();
+            if let Some(original_record) =
+                get(original_action_hash.clone(), GetOptions::default())?
+            {
+                if let Ok(Some(ph)) =
+                    original_record.entry().to_app_option::<PortalHost>()
+                {
+                    let reach = format!("{:?}", ph.reach);
+                    let _ = emit_signal(RecoveryV2Signal::PortalHostRemoved {
+                        action_hash,
+                        original_action_hash,
+                        human_action_hash: ph.human_action_hash,
+                        host_url: ph.host_url,
+                    });
+                    let _ = reach; // suppress unused warning
+                }
+            }
+            continue;
+        }
+
         let entry_hash = match &action {
             Action::Create(create) => create.entry_hash.clone(),
             Action::Update(update) => update.entry_hash.clone(),
@@ -175,6 +198,20 @@ pub fn post_commit(committed_actions: Vec<SignedActionHashed>) -> ExternResult<(
         };
 
         let author = action.author().clone();
+
+        // PortalHost Create — emit before the generic ImagodeiSignal arms.
+        if let Ok(Some(ph)) = record.entry().to_app_option::<PortalHost>() {
+            let reach = format!("{:?}", ph.reach);
+            emit_signal(RecoveryV2Signal::PortalHostCreated {
+                action_hash,
+                human_action_hash: ph.human_action_hash,
+                host_url: ph.host_url,
+                label: ph.label,
+                added_at: ph.added_at,
+                reach,
+            })?;
+            continue;
+        }
 
         if let Some(human) = record.entry().to_app_option::<Human>().ok().flatten() {
             emit_signal(ImagodeiSignal::HumanCommitted {
@@ -1596,6 +1633,23 @@ pub enum RecoveryV2Signal {
         human_id: String,
         effective_at: String,
         triggering_vote_id: Option<String>,
+    },
+    // M5: portal-host signals — consumed by elohim-storage ReconcileController.
+    PortalHostCreated {
+        action_hash: ActionHash,
+        human_action_hash: ActionHash,
+        host_url: String,
+        label: Option<String>,
+        added_at: Timestamp,
+        reach: String,
+    },
+    PortalHostRemoved {
+        /// ActionHash of the Delete action itself.
+        action_hash: ActionHash,
+        /// ActionHash of the original PortalHost Create action (= the row id in storage).
+        original_action_hash: ActionHash,
+        human_action_hash: ActionHash,
+        host_url: String,
     },
 }
 
