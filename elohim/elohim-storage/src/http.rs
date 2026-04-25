@@ -5574,40 +5574,13 @@ impl HttpServer {
         // Look up EPR Head from content DB by ID
         if let Ok(mut conn) = self.get_conn() {
             let app_ctx = db::AppContext::default_lamad();
-            // External HTTP handler for GET /epr-head/{id} — gate on provenance
-            // so we never surface a row that has neither been notarized on
-            // Holochain nor published to libp2p Kad.
-            let content_opt =
-                db::content_diesel::get_content_with_tags(&mut conn, &app_ctx, id, true)?;
+            // External HTTP handler — gate on provenance so we never surface a
+            // row that has neither been notarized on Holochain nor published to
+            // libp2p Kad.  No pillar enrichment: shefa/qahal remain at their
+            // empty defaults for the public metadata surface.
+            let head_opt = crate::epr_head::derive_epr_head(&mut conn, &app_ctx, id, true, false)?;
 
-            if let Some(content_with_tags) = content_opt {
-                let content = &content_with_tags.content;
-                // Build an EprHead from the content record
-                let head = crate::epr_codec::EprHead {
-                    version: 1,
-                    id: content.id.clone(),
-                    content: content.blob_cid.clone().unwrap_or_default(),
-                    lamad: crate::epr_codec::EprLamadContext {
-                        title: content.title.clone(),
-                        content_type: content.content_type.clone(),
-                        description: content.description.clone(),
-                        content_format: Some(content.content_format.clone()),
-                        tags: content_with_tags.tags.clone(),
-                    },
-                    shefa: crate::epr_codec::EprShefaContext {
-                        stewards: vec![],
-                        allocations: vec![],
-                    },
-                    qahal: crate::epr_codec::EprQahalContext {
-                        reach: Some(content.reach.clone()),
-                        layer: None,
-                        attestation_requirements: vec![],
-                    },
-                    relationships: vec![],
-                    author: content.created_by.clone(),
-                    updated: Some(content.updated_at.clone()),
-                };
-
+            if let Some(head) = head_opt {
                 // Check Accept header for content negotiation
                 let wants_cbor = req
                     .headers()

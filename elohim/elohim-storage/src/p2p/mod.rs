@@ -3347,83 +3347,17 @@ impl P2PNode {
         let pool = self.db_pool.as_ref()?;
         let mut conn = pool.get().ok()?;
         let app_ctx = crate::db::AppContext::default_lamad();
-        // Internal P2P-side EPR head resolution; provenance gate off so the
-        // drain loop (which also rides this path) can project pre-publish rows.
-        match crate::db::content_diesel::get_content_with_tags(&mut conn, &app_ctx, id, false) {
-            Ok(Some(content_with_tags)) => {
-                let content = &content_with_tags.content;
-                let head = crate::epr_codec::EprHead {
-                    version: 1,
-                    id: content.id.clone(),
-                    content: content.blob_cid.clone().unwrap_or_default(),
-                    lamad: crate::epr_codec::EprLamadContext {
-                        title: content.title.clone(),
-                        content_type: content.content_type.clone(),
-                        description: content.description.clone(),
-                        content_format: Some(content.content_format.clone()),
-                        tags: content_with_tags.tags.clone(),
-                    },
-                    shefa: {
-                        match crate::db::stewardship_allocations::get_allocations_for_content(
-                            &mut conn,
-                            &app_ctx,
-                            &content.id,
-                        ) {
-                            Ok(allocations) if !allocations.is_empty() => {
-                                crate::epr_codec::EprShefaContext {
-                                    stewards: allocations
-                                        .iter()
-                                        .map(|a| a.steward_presence_id.clone())
-                                        .collect(),
-                                    allocations: allocations
-                                        .iter()
-                                        .map(|a| a.allocation_ratio as f64)
-                                        .collect(),
-                                }
-                            }
-                            _ => crate::epr_codec::EprShefaContext {
-                                stewards: vec![],
-                                allocations: vec![],
-                            },
-                        }
-                    },
-                    qahal: {
-                        let mut attestation_requirements = Vec::new();
-                        if let Ok(atts) =
-                            crate::db::content_attestations::query_attestations_for_content(
-                                &mut conn,
-                                &content.id,
-                            )
-                        {
-                            for att in &atts {
-                                if att.is_revoked == 0 {
-                                    let req = if let Some(ref evidence) = att.evidence {
-                                        format!("{}:{}", att.attestation_type, evidence)
-                                    } else {
-                                        att.attestation_type.clone()
-                                    };
-                                    attestation_requirements.push(req);
-                                }
-                            }
-                        }
-                        crate::epr_codec::EprQahalContext {
-                            reach: Some(content.reach.clone()),
-                            layer: None,
-                            attestation_requirements,
-                        }
-                    },
-                    relationships: vec![],
-                    author: content.created_by.clone(),
-                    updated: Some(content.updated_at.clone()),
-                };
-                match rmp_serde::to_vec(&head) {
-                    Ok(bytes) => Some(bytes),
-                    Err(e) => {
-                        warn!(id = %id, error = %e, "Failed to encode EPR Head");
-                        None
-                    }
+        // Internal P2P-side resolution; provenance gate off so the drain loop
+        // (which also rides this path) can project pre-publish rows.  Pillar
+        // enrichment ON: peers receive full stewardship + attestation context.
+        match crate::epr_head::derive_epr_head(&mut conn, &app_ctx, id, false, true) {
+            Ok(Some(head)) => match rmp_serde::to_vec(&head) {
+                Ok(bytes) => Some(bytes),
+                Err(e) => {
+                    warn!(id = %id, error = %e, "Failed to encode EPR Head");
+                    None
                 }
-            }
+            },
             Ok(None) => {
                 debug!(id = %id, "Content not found for EPR resolve");
                 None
