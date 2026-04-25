@@ -1,6 +1,8 @@
 export { BasePage } from './base.page.js';
 export { ThresholdLoginPage } from './threshold-login.page.js';
 export { AppShellPage } from './app-shell.page.js';
+export { AccountShellPage, ACCOUNT_SHELL } from './account/account-shell.page.js';
+export { SecuritySigninPane } from './account/security-signin-pane.page.js';
 export { DoorwayLandingPage } from './doorway-landing.page.js';
 export { DoorwayToolbarPage } from './doorway-toolbar.page.js';
 export { DoorwayDashboardPage } from './doorway-dashboard.page.js';
