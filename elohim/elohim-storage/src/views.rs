@@ -6746,6 +6746,26 @@ pub struct KeyRevocationView {
     pub updated_at: String,
 }
 
+impl From<crate::db::models::KeyRevocationRow> for KeyRevocationView {
+    fn from(r: crate::db::models::KeyRevocationRow) -> Self {
+        Self {
+            dht_anchor_hash: r.dht_anchor_hash,
+            id: r.id,
+            human_id: r.human_id,
+            revoked_key: r.revoked_key,
+            reason: r.reason,
+            trigger_type: r.trigger_type,
+            initiated_by: r.initiated_by,
+            required_votes: r.required_votes as u32,
+            current_votes: r.current_votes as u32,
+            threshold_reached: r.threshold_reached == 1,
+            effective_at: r.effective_at,
+            created_at: r.created_at,
+            updated_at: r.updated_at,
+        }
+    }
+}
+
 /// Projection of an imagodei RevocationVote DHT entry.
 /// Source of truth: DHT. Rebuildable via signal replay on
 /// RecoveryV2Signal::RevocationVoteSubmitted.
@@ -6761,6 +6781,21 @@ pub struct RevocationVoteView {
     pub approved: bool,
     pub attestation: String,
     pub voted_at: String,
+}
+
+impl From<crate::db::models::RevocationVoteRow> for RevocationVoteView {
+    fn from(r: crate::db::models::RevocationVoteRow) -> Self {
+        Self {
+            dht_anchor_hash: r.dht_anchor_hash,
+            id: r.id,
+            revocation_dht_anchor_hash: r.revocation_dht_anchor_hash,
+            revocation_id: r.revocation_id,
+            steward_id: r.steward_id,
+            approved: r.approved == 1,
+            attestation: r.attestation,
+            voted_at: r.voted_at,
+        }
+    }
 }
 
 // ============================================================================

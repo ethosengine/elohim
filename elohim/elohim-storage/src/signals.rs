@@ -1006,7 +1006,7 @@ pub fn handle_recovery_v2_signal(
             approved,
             attestation,
             voted_at,
-            current_votes,
+            current_votes: _,
             required_votes: _,
             threshold_now_reached: _,
         } => {
@@ -1064,12 +1064,14 @@ pub fn handle_recovery_v2_signal(
             sweep_dependent_caches_on_revocation(conn, &revoked_key)?;
 
             // P1: Outbound reconciliation signal — imagodei.revocation_observed.
+            // observed_at is the storage wallclock (when the controller reconciled),
+            // not the DNA's effective_at (when the threshold flipped on-DHT).
             emit_reconciled_signal(ImagodeiReconciledEvent::RevocationObserved {
                 revocation_id,
                 revoked_key,
                 human_id,
                 status: "effective".into(),
-                observed_at: effective_at,
+                observed_at: now,
             });
             Ok(())
         }
@@ -1079,9 +1081,15 @@ pub fn handle_recovery_v2_signal(
 /// Sweep dependent cached state tied to a revoked key. Eager, bounded,
 /// indexed (not a table scan).
 ///
-/// M4: stub — no dependent cache tables exist yet at M4 scope.
-/// Phase 2B extension point: add `UPDATE epr_atoms SET verified_at = NULL
-///   WHERE signer_cid = ?revoked_key` when the epr_atoms table carries signer_cid.
+/// M4: intentional no-op — no dependent cache tables exist yet at M4 scope
+/// (`peer_identity_bindings` is M5; `epr_atoms.signer_cid` is Phase 2B).
+/// Phase F sweettests assert P1 reconciliation via the
+/// `imagodei.revocation_observed` reconciled-event emission and via direct
+/// `key_revocations` row state (`threshold_reached`, `effective_at`), NOT
+/// via this sweep call.
+/// Phase 2B extension point: `UPDATE epr_atoms SET verified_at = NULL
+///   WHERE signer_cid = ?revoked_key`.
+/// M5 extension point: `DELETE FROM peer_identity_bindings WHERE pubkey = ?revoked_key`.
 fn sweep_dependent_caches_on_revocation(
     _conn: &mut diesel::sqlite::SqliteConnection,
     revoked_key: &str,

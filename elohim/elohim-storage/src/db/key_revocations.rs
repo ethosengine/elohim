@@ -59,7 +59,7 @@ pub fn set_key_revocation_effective(
     new_effective_at: &str,
     new_updated_at: &str,
 ) -> Result<(), StorageError> {
-    diesel::update(
+    let rows = diesel::update(
         key_revocations::table
             .filter(key_revocations::dht_anchor_hash.eq(target_dht_anchor_hash)),
     )
@@ -69,10 +69,21 @@ pub fn set_key_revocation_effective(
         key_revocations::updated_at.eq(new_updated_at.to_string()),
     ))
     .execute(conn)
-    .map(|_| ())
     .map_err(|e| {
         StorageError::Internal(format!("Failed to set key_revocation effective: {e}"))
-    })
+    })?;
+
+    if rows == 0 {
+        // Effective gossip arrived before we had projected the Requested signal
+        // (DHT partition recovery, fresh boot, replay-out-of-order). M5 elohim-defender
+        // gates need to know about this peer's revocation; surface the gap loudly.
+        tracing::warn!(
+            target: "imagodei.revocation_observed",
+            dht_anchor_hash = %target_dht_anchor_hash,
+            "set_key_revocation_effective: no projection row exists; revocation may be invisible to local gates until requested signal replays"
+        );
+    }
+    Ok(())
 }
 
 /// Update the denormalized current_votes count on a key_revocation row.
