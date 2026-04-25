@@ -647,6 +647,7 @@ dependencies = [
  "bytes",
  "chrono",
  "constitution",
+ "elohim-agent-defender-specialist",
  "futures",
  "llama-cpp-2",
  "pin-project-lite",

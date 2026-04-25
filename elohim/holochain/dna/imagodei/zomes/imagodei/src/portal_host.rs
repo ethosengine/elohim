@@ -53,18 +53,16 @@ fn get_my_human_record() -> ExternResult<(ActionHash, Human)> {
         ))
     })?;
 
-    let action_hash = first
-        .target
-        .clone()
-        .into_action_hash()
-        .ok_or_else(|| {
-            wasm_error!(WasmErrorInner::Guest(
-                "AgentKeyToHuman target is not an action hash".to_string()
-            ))
-        })?;
+    let action_hash = first.target.clone().into_action_hash().ok_or_else(|| {
+        wasm_error!(WasmErrorInner::Guest(
+            "AgentKeyToHuman target is not an action hash".to_string()
+        ))
+    })?;
 
     let record = get(action_hash.clone(), GetOptions::default())?.ok_or_else(|| {
-        wasm_error!(WasmErrorInner::Guest("Human entry missing from DHT".to_string()))
+        wasm_error!(WasmErrorInner::Guest(
+            "Human entry missing from DHT".to_string()
+        ))
     })?;
 
     // Authorship gate: the Human entry must have been authored by the calling agent.
