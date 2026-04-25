@@ -171,6 +171,10 @@ pub struct HttpServer {
     /// Conductor signing client for /api/v1/signal/emit (EPR Phase 2B Task C.2).
     /// Wired at startup via `with_signing_client`. None = endpoint returns 503.
     signing_client: Option<Arc<crate::signing::ConductorSigningClient>>,
+    /// Composed write-through state (EPR Phase 2B Task C.4).
+    /// Wired at startup via `with_write_through_state`. When absent, every
+    /// non-integrity (pillar, kind) resolves to OFF (implicit default).
+    write_through_state: Option<Arc<crate::write_through::WriteThroughState>>,
 }
 
 /// Extract X-Schema-Version header from request and validate it.
@@ -228,6 +232,7 @@ impl HttpServer {
             elohim_capability: None,
             manifest_registry: None,
             signing_client: None,
+            write_through_state: None,
         }
     }
 
@@ -270,6 +275,23 @@ impl HttpServer {
         client: Arc<crate::signing::ConductorSigningClient>,
     ) -> Self {
         self.signing_client = Some(client);
+        self
+    }
+
+    /// Set the composed write-through state (EPR Phase 2B Task C.4).
+    ///
+    /// When set, `GET /api/v1/status/write-through` reports the effective
+    /// per-(pillar, kind) flag composed across all 4 override layers, and
+    /// (Task C.5) the signal-emit endpoint consults it to decide whether to
+    /// project. When absent, the status endpoint reports an empty
+    /// `effective[]` array (registry-derived rows are still included if a
+    /// manifest registry is wired) and the implicit default OFF applies for
+    /// all non-integrity kinds.
+    pub fn with_write_through_state(
+        mut self,
+        state: Arc<crate::write_through::WriteThroughState>,
+    ) -> Self {
+        self.write_through_state = Some(state);
         self
     }
 
@@ -631,6 +653,29 @@ impl HttpServer {
                         "Database pool not configured — projector status unavailable",
                     ))
                 }
+            }
+
+            // Write-through status — effective per-(pillar, kind) flag composed
+            // across all 4 override layers. Matched before the /api/v1/
+            // catch-all so the registry + state are injected from HttpServer
+            // directly. EPR Phase 2B Task C.4.
+            (Method::GET, "/api/v1/status/write-through") => {
+                let registry = self
+                    .manifest_registry
+                    .clone()
+                    .unwrap_or_else(|| Arc::new(crate::projector::ManifestRegistry::empty()));
+                let state = self
+                    .write_through_state
+                    .clone()
+                    .unwrap_or_else(|| Arc::new(crate::write_through::WriteThroughState::empty()));
+                crate::api::write_through_status::handle(
+                    req,
+                    Method::GET,
+                    "",
+                    &state,
+                    registry.as_ref(),
+                )
+                .await
             }
 
             // SSE event stream — must be matched before the /api/v1/ catch-all
@@ -7244,6 +7289,15 @@ pub fn build_manifest() -> doorway_client::DoorwayRoutes {
             Route::post("/api/v1/signal/emit")
                 .handler("signal_emit")
                 .auth_required()
+                .build(),
+        )
+        // =====================================================================
+        // /api/v1/status — Operator status views (write-through, projector)
+        // =====================================================================
+        .route(
+            Route::get("/api/v1/status/write-through")
+                .handler("write_through_status")
+                .cache_ttl(5)
                 .build(),
         )
         // =====================================================================

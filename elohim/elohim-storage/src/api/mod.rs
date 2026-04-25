@@ -52,6 +52,7 @@ pub mod steward_affinity;
 pub mod stewardship;
 pub mod token;
 pub mod weather;
+pub mod write_through_status;
 
 use bytes::Bytes;
 use http_body_util::Full;
