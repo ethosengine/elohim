@@ -21,6 +21,10 @@ pub use stewardship::*;
 pub mod agent_peer_binding;
 pub use agent_peer_binding::*;
 
+// PortalHost coordinator functions (Recovery Phase 2 M5)
+pub mod portal_host;
+pub use portal_host::*;
+
 // Bootstrap-steward pattern — reference implementation for the protocol
 // (also ported to mishpat, node-registry, lamad). See bootstrap_steward.rs.
 pub mod bootstrap_steward;
