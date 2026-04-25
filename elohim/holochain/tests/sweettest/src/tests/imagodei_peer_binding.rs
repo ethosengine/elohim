@@ -193,7 +193,6 @@ async fn binding_creates_and_is_readable() -> Result<()> {
 ///
 /// Expected: the `conductor.call` returns an error (WasmError::Guest).
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "requires packed DNA artifact — wire into Jenkins pack-then-test stage"]
 async fn binding_rejects_wrong_signer() -> Result<()> {
     let [(mut c1, a1), (mut c2, a2)] = two_agent_conductors().await?;
 
