@@ -1,0 +1,17 @@
+.card {
+  padding: 1rem;
+  border: 1px solid var(--color-border, #e0e0e0);
+  border-radius: 6px;
+  margin-bottom: 1.25rem;
+}
+
+h1 {
+  margin-bottom: 1.25rem;
+}
+
+h2 {
+  margin-top: 0;
+  margin-bottom: 0.75rem;
+  font-size: 1rem;
+  font-weight: 600;
+}

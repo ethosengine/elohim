@@ -1,0 +1,20 @@
+@let acct = account.account();
+@if (acct?.activeKeyRotation; as active) {
+  <div class="key-row" data-testid="active-key">
+    <strong>Active</strong>
+    &middot; {{ active.newAgentPubkey | slice: 0 : 16 }}&hellip;
+    <span class="muted">since {{ active.rotatedAt | date: 'mediumDate' }}</span>
+  </div>
+}
+@for (rev of acct?.recentRevocations ?? []; track rev.dhtAnchorHash) {
+  <div class="key-row revoked" [attr.data-testid]="'revoked-' + rev.dhtAnchorHash">
+    <strong>Revoked</strong>
+    &middot; {{ rev.revokedKey | slice: 0 : 16 }}&hellip;
+    <span class="muted">
+      {{ rev.triggerType }} &middot; {{ rev.createdAt | date: 'mediumDate' }}
+    </span>
+  </div>
+}
+@if (!acct?.activeKeyRotation && (acct?.recentRevocations?.length ?? 0) === 0) {
+  <p class="muted" data-testid="key-list-empty">No key history available yet.</p>
+}

@@ -1,0 +1,13 @@
+@let acct = account.account();
+@if (acct) {
+  @if (acct.activeKeyRotation) {
+    <p>You can revoke your current key (above) or initiate recovery if you cannot sign in.</p>
+  } @else {
+    <p>You do not have an active key. Use the recovery flow.</p>
+  }
+  <button type="button" data-testid="lost-key-recovery" (click)="goRecovery()">
+    Start recovery
+  </button>
+} @else {
+  <p class="muted">Loading account&hellip;</p>
+}

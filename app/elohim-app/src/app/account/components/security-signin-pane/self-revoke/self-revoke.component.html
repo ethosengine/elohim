@@ -1,0 +1,32 @@
+@let active = account.account()?.activeKeyRotation;
+@if (active) {
+  <p>You are about to revoke the key currently in use. This is irreversible.</p>
+  @if (!confirming()) {
+    <button type="button" data-testid="self-revoke-start" (click)="confirming.set(true)">
+      Revoke this key
+    </button>
+  } @else {
+    <p>
+      <strong>Are you sure?</strong>
+      Your peers will be notified to stop trusting this key.
+    </p>
+    <button
+      type="button"
+      data-testid="self-revoke-confirm"
+      (click)="confirm()"
+      [disabled]="working()"
+    >
+      Yes, revoke
+    </button>
+    <button type="button" data-testid="self-revoke-cancel" (click)="confirming.set(false)">
+      Cancel
+    </button>
+  }
+  @if (errorMsg()) {
+    <div class="error-msg" data-testid="self-revoke-error" role="alert">
+      {{ errorMsg() }}
+    </div>
+  }
+} @else {
+  <p class="muted">No active key to revoke.</p>
+}
