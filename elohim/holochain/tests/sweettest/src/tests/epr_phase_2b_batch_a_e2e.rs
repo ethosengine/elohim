@@ -521,6 +521,11 @@ async fn wire_shape_contract_revoked_stale_sentinel() -> Result<()> {
 
     // Verify the epr_atoms wire shape for the test fixture.
     // An EPR atom at t1 signed by K1, verified with K1's fingerprint.
+    // (vec![0; N] used because the json! macro does not accept Rust array-repeat
+    // syntax `[0u8; N]` inside its braces.)
+    let canonical_zeros: Vec<u8> = vec![0; 4];
+    let payload_zeros: Vec<u8> = vec![0; 4];
+    let proof_zeros: Vec<u8> = vec![0; 64];
     let epr_atom_fixture = serde_json::json!({
         "cid": "bafy-epr-phase-2b-a12-test-atom",
         "kind": "agent-epr",
@@ -530,9 +535,9 @@ async fn wire_shape_contract_revoked_stale_sentinel() -> Result<()> {
         "issued_at": "2026-04-25T01:00:00Z",  // t1: after K1 was compromised at t0
         "signer_cid": AGENT_A_CID,
         "supersedes": null,
-        "canonical_bytes": [0u8; 4],
-        "payload_bytes": [0u8; 4],
-        "proof_bytes": [0u8; 64],
+        "canonical_bytes": canonical_zeros,
+        "payload_bytes": payload_zeros,
+        "proof_bytes": proof_zeros,
         "proof_algorithm": "ed25519",
         "verified_at": "2026-04-25T01:00:01Z",  // verified just after signing
         "verified_signer_fingerprint": "abcdef0123456789abcdef0123456789"  // 32 hex chars (real)
@@ -761,13 +766,11 @@ async fn epr_2b_batch_a_full_loop() -> Result<()> {
         "recovery_request_hash": "uhCkk-epr2b-a12-recovery-request-hash",
         "authority": { "type": "SelfSovereign" }
     });
-    let _rotation_result: Result<serde_json::Value, _> = conductor_call_fallible(
-        &mut c1,
-        &cell1.zome("imagodei"),
-        "commit_key_rotation",
-        rotation_input,
-    )
-    .await;
+    let _rotation_result: holochain::conductor::api::error::ConductorApiResult<
+        serde_json::Value,
+    > = c1
+        .call_fallible(&cell1.zome("imagodei"), "commit_key_rotation", rotation_input)
+        .await;
     // NOTE: rotation may fail if recovery_request_hash doesn't exist in DHT —
     // the coordinator gate checks for a valid recovery request. This is expected
     // in the test scaffold; the assertion is on signal delivery, not rotation success.
@@ -779,13 +782,11 @@ async fn epr_2b_batch_a_full_loop() -> Result<()> {
         "revoked_key": PUBKEY_K1, // K1 = the test-constant compromised key
         "reason": "compromised: used after compromise point t0"
     });
-    let _revocation_result: Result<serde_json::Value, _> = conductor_call_fallible(
-        &mut c1,
-        &cell1.zome("imagodei"),
-        "create_self_revocation",
-        revocation_input,
-    )
-    .await;
+    let _revocation_result: holochain::conductor::api::error::ConductorApiResult<
+        serde_json::Value,
+    > = c1
+        .call_fallible(&cell1.zome("imagodei"), "create_self_revocation", revocation_input)
+        .await;
 
     // -----------------------------------------------------------------------
     // Step 7: Allow signal propagation and run the controller.
@@ -809,45 +810,3 @@ async fn epr_2b_batch_a_full_loop() -> Result<()> {
 // Helper: fallible conductor call (returns Result instead of panicking)
 // ---------------------------------------------------------------------------
 
-/// Wraps `SweetConductor::call` to return a `Result` for negative-path tests
-/// and test steps where the zome call may legitimately fail (e.g. coordinator
-/// gate rejections in negative-path scenarios).
-///
-/// `SweetConductor::call` panics on error; this captures the panic as an `Err`
-/// so callers can ignore coordinator rejections and still exercise signal delivery.
-///
-/// Pattern sourced from `imagodei_peer_binding.rs::conductor_call_fallible`.
-async fn conductor_call_fallible<I, O>(
-    conductor: &mut holochain::sweettest::SweetConductor,
-    zome: &holochain::sweettest::SweetZome,
-    fn_name: &str,
-    input: I,
-) -> Result<O, anyhow::Error>
-where
-    I: serde::Serialize + std::fmt::Debug,
-    O: serde::de::DeserializeOwned + std::fmt::Debug,
-{
-    use holochain::conductor::api::AppResponse;
-    use holochain_types::prelude::ExternIO;
-
-    let payload = ExternIO::encode(input)?;
-    let response = conductor
-        .raw_handle()
-        .call_zome(holochain_types::prelude::ZomeCall {
-            cell_id: zome.cell_id().clone(),
-            zome_name: zome.name().clone(),
-            fn_name: fn_name.into(),
-            cap_secret: None,
-            provenance: zome.cell_id().agent_pubkey().clone(),
-            payload,
-        })
-        .await??;
-
-    match response {
-        AppResponse::ZomeCalled(result) => {
-            let output: O = result.decode()?;
-            Ok(output)
-        }
-        other => Err(anyhow::anyhow!("unexpected AppResponse: {other:?}")),
-    }
-}

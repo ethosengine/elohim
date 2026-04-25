@@ -31,7 +31,6 @@ use anyhow::Result;
 use elohim_sweettest::common::{
     conductors::{load_dna, single_agent_conductor, two_agent_conductors, SweetAgents},
     fixtures::network_seed,
-    mirrors::{settle_dht, wait_for},
 };
 use holochain::sweettest::{await_consistency, SweetConductor};
 use holochain_serialized_bytes::prelude::*;
@@ -269,13 +268,9 @@ async fn binding_rejects_wrong_signer() -> Result<()> {
 
     // Agent B calls `create_agent_peer_binding` — coordinator must reject it
     // because B's pubkey does not match A1's registered holochain_agent_key.
-    let result: Result<CreateAgentPeerBindingOutput, _> = conductor_call_fallible(
-        &mut c2,
-        &cell2.zome("imagodei"),
-        "create_agent_peer_binding",
-        input,
-    )
-    .await;
+    let result: holochain::conductor::api::error::ConductorApiResult<CreateAgentPeerBindingOutput> =
+        c2.call_fallible(&cell2.zome("imagodei"), "create_agent_peer_binding", input)
+            .await;
 
     assert!(
         result.is_err(),
@@ -293,49 +288,6 @@ async fn binding_rejects_wrong_signer() -> Result<()> {
     assert!(by_a1.is_empty(), "no bindings must exist for agent A1");
 
     let _ = (a2, cell2); // keep imports used
-    let _ = settle_dht; // keep import used
-    let _ = wait_for; // keep import used
     Ok(())
 }
 
-// ---------------------------------------------------------------------------
-// Helper: fallible conductor call (returns Result instead of panicking)
-// ---------------------------------------------------------------------------
-
-/// Wraps `SweetConductor::call` to return a `Result` for negative-path tests.
-/// SweetConductor::call panics on error; this captures the panic as an Err.
-async fn conductor_call_fallible<I, O>(
-    conductor: &mut holochain::sweettest::SweetConductor,
-    zome: &holochain::sweettest::SweetZome,
-    fn_name: &str,
-    input: I,
-) -> Result<O, anyhow::Error>
-where
-    I: serde::Serialize + std::fmt::Debug,
-    O: serde::de::DeserializeOwned + std::fmt::Debug,
-{
-    // Use the raw call interface which returns a Result.
-    use holochain::conductor::api::AppResponse;
-    use holochain_types::prelude::ExternIO;
-
-    let payload = ExternIO::encode(input)?;
-    let response = conductor
-        .raw_handle()
-        .call_zome(holochain_types::prelude::ZomeCall {
-            cell_id: zome.cell_id().clone(),
-            zome_name: zome.name().clone(),
-            fn_name: fn_name.into(),
-            cap_secret: None,
-            provenance: zome.cell_id().agent_pubkey().clone(),
-            payload,
-        })
-        .await??;
-
-    match response {
-        AppResponse::ZomeCalled(result) => {
-            let output: O = result.decode()?;
-            Ok(output)
-        }
-        other => Err(anyhow::anyhow!("unexpected AppResponse: {other:?}")),
-    }
-}

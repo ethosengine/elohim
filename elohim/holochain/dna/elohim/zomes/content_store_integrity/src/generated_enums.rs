@@ -107,6 +107,12 @@ pub const ALL_CONTENT_TYPES: &[&str] = &[
     "escalation-target-spec",
 ];
 
+/// Core devicearchetype — DNA-notarized device archetypes for AgentPeerBinding entries in imagodei integrity zome (Task A.2). 'node' = dedicated elohim-node instances (household blades, server processes). 'desktop' = Tauri-wrapped desktop clients. 'mobile' = mobile devices. 'steward' = collective infrastructure steward processes. All four values are required at genesis; no extensible tier defined.
+pub const CORE_DEVICE_ARCHETYPES: &[&str] = &["node", "desktop", "mobile", "steward"];
+
+/// All devicearchetype — includes storage-only and extensible.
+pub const ALL_DEVICE_ARCHETYPES: &[&str] = &["node", "desktop", "mobile", "steward"];
+
 /// Core elohimskill — Gate-shaped skills with active registered gate interfaces: content-safety-gate, discernment-gate-v1-mechanical, reach-gate-v1. These 8 skills are wired to protocol gate invocation paths. Phase 4 Section 6.3 gate primitives. DNA-notarized for dispatch validation.
 pub const CORE_ELOHIM_SKILLS: &[&str] = &[
     "content-safety-review",
