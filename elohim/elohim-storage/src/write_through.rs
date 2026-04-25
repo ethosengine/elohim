@@ -86,6 +86,68 @@ impl WriteThroughOverride {
     pub fn for_pillar(&self, pillar: &str) -> Option<&WriteThroughConfig> {
         self.pillars.get(pillar)
     }
+
+    /// Returns true iff this override has at least one pillar entry. Used by
+    /// loaders to skip wrapping an empty override in `Some` (which would
+    /// shadow lower layers without contributing any opinion).
+    pub fn is_empty(&self) -> bool {
+        self.pillars.is_empty()
+    }
+
+    /// Build an override from the env vars matching `ELOHIM_WRITE_THROUGH_<PILLAR>`
+    /// (Task C.6 layer 3).
+    ///
+    /// Each var's value is parsed:
+    /// - `"on"` / `"true"` / `"1"` → enabled = true
+    /// - `"off"` / `"false"` / `"0"` → enabled = false
+    /// - anything else → ignored with a warning (silent ramps are dangerous)
+    ///
+    /// Pillar names are derived by stripping the prefix and lowercasing
+    /// (`ELOHIM_WRITE_THROUGH_SHEFA` → `"shefa"`). The kind-restriction list
+    /// is not exposed via env — keep env vars simple; use policy.toml or
+    /// the admin override for kind-level granularity.
+    ///
+    /// Reads from the live process environment via `std::env::vars`.
+    pub fn from_env() -> Self {
+        Self::from_env_iter(std::env::vars())
+    }
+
+    /// Inner helper for `from_env` that takes an iterator of env vars so tests
+    /// can inject their own without touching the real process environment.
+    pub fn from_env_iter<I>(iter: I) -> Self
+    where
+        I: IntoIterator<Item = (String, String)>,
+    {
+        const PREFIX: &str = "ELOHIM_WRITE_THROUGH_";
+        let mut pillars = HashMap::new();
+        for (key, value) in iter {
+            let Some(rest) = key.strip_prefix(PREFIX) else {
+                continue;
+            };
+            let pillar = rest.to_lowercase();
+            let enabled = match value.to_ascii_lowercase().as_str() {
+                "on" | "true" | "1" => Some(true),
+                "off" | "false" | "0" => Some(false),
+                _ => None,
+            };
+            let Some(enabled) = enabled else {
+                tracing::warn!(
+                    env_var = %key,
+                    raw = %value,
+                    "ELOHIM_WRITE_THROUGH_* env var has invalid value (expected on/off/true/false/1/0); ignoring"
+                );
+                continue;
+            };
+            pillars.insert(
+                pillar,
+                WriteThroughConfig {
+                    enabled,
+                    kinds: None,
+                },
+            );
+        }
+        Self { pillars }
+    }
 }
 
 /// The layer that produced an effective decision. Reported by the
@@ -529,6 +591,50 @@ mod tests {
         let eff = state.effective_for("shefa", "Observation");
         assert!(!eff.is_on());
         assert_eq!(eff.source(), WriteThroughSource::ManifestDefault);
+    }
+
+    // -----------------------------------------------------------------------
+    // C.6 — env override loader
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn from_env_iter_parses_on_off_variants() {
+        let env = vec![
+            ("ELOHIM_WRITE_THROUGH_SHEFA".to_string(), "on".to_string()),
+            ("ELOHIM_WRITE_THROUGH_LAMAD".to_string(), "off".to_string()),
+            ("ELOHIM_WRITE_THROUGH_QAHAL".to_string(), "TRUE".to_string()),
+            ("ELOHIM_WRITE_THROUGH_MISHPAT".to_string(), "0".to_string()),
+            ("UNRELATED_VAR".to_string(), "noise".to_string()),
+        ];
+        let ov = WriteThroughOverride::from_env_iter(env);
+        assert!(ov.for_pillar("shefa").unwrap().enabled);
+        assert!(!ov.for_pillar("lamad").unwrap().enabled);
+        assert!(ov.for_pillar("qahal").unwrap().enabled);
+        assert!(!ov.for_pillar("mishpat").unwrap().enabled);
+        assert!(ov.for_pillar("unrelated_var").is_none());
+        // No kind restriction from env.
+        assert!(ov.for_pillar("shefa").unwrap().kinds.is_none());
+    }
+
+    #[test]
+    fn from_env_iter_ignores_invalid_values() {
+        let env = vec![
+            (
+                "ELOHIM_WRITE_THROUGH_SHEFA".to_string(),
+                "maybe".to_string(),
+            ),
+            ("ELOHIM_WRITE_THROUGH_LAMAD".to_string(), "on".to_string()),
+        ];
+        let ov = WriteThroughOverride::from_env_iter(env);
+        assert!(ov.for_pillar("shefa").is_none(), "invalid value ignored");
+        assert!(ov.for_pillar("lamad").unwrap().enabled);
+    }
+
+    #[test]
+    fn from_env_iter_returns_empty_when_no_relevant_vars() {
+        let env: Vec<(String, String)> = vec![("HOME".to_string(), "/root".to_string())];
+        let ov = WriteThroughOverride::from_env_iter(env);
+        assert!(ov.is_empty());
     }
 
     #[test]

@@ -736,9 +736,52 @@ async fn async_main(
         info!("No elohim capability profile — node operates as storage/relay only (set ELOHIM_CAPABILITY_CONFIG_FILE to enable)");
     }
 
+    // EPR Phase 2B Task C.6 — compose the 4-layer write-through state.
+    //
+    // Layer 1 (manifest defaults) — TODO: Phase 4 manifest registry will load
+    // pillar manifests from disk and pass them in. For now we start with an
+    // empty manifest layer; layers 2-4 cover real configuration intent.
+    //
+    // Layer 2 (policy.toml) — read from PolicyConfig::write_through if present.
+    //
+    // Layer 3 (env vars) — `ELOHIM_WRITE_THROUGH_<PILLAR>=on|off|true|false|1|0`.
+    //
+    // Layer 4 (admin override) — mutated live via `POST /admin/write-through`.
+    let write_through_state = {
+        let manifest_layer = std::collections::HashMap::new();
+        let mut state =
+            elohim_storage::write_through::WriteThroughState::from_manifest(manifest_layer);
+        // Layer 2 — policy.toml. Try to load; failures are warned, not fatal.
+        if let Ok(policy_cfg) = elohim_storage::policy::PolicyConfig::load(&config.peer_policy_path)
+        {
+            if let Some(policy_override) =
+                elohim_storage::policy::write_through_override_from_policy(
+                    &policy_cfg.write_through,
+                )
+            {
+                info!(
+                    pillars = policy_override.pillars.len(),
+                    "write-through layer 2 (policy.toml) applied"
+                );
+                state = state.with_policy_override(policy_override);
+            }
+        }
+        // Layer 3 — env vars.
+        let env_override = elohim_storage::write_through::WriteThroughOverride::from_env();
+        if !env_override.is_empty() {
+            info!(
+                pillars = env_override.pillars.len(),
+                "write-through layer 3 (env) applied"
+            );
+            state = state.with_env_override(env_override);
+        }
+        Arc::new(state)
+    };
+
     let mut http_server = HttpServer::new(blob_store.clone(), http_addr)
         .with_progress_hub(Arc::clone(&progress_hub))
-        .with_elohim_capability(elohim_capability);
+        .with_elohim_capability(elohim_capability)
+        .with_write_through_state(write_through_state.clone());
 
     if args.embedded_conductor {
         http_server = http_server.with_embedded_conductor();

@@ -67,6 +67,7 @@ mod tests {
                 conductor_admin_external_bind: "0.0.0.0:8444".into(),
                 conductor_admin_internal_port: 4444,
             },
+            write_through: std::collections::HashMap::new(),
         }
     }
 

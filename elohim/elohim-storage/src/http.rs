@@ -902,6 +902,16 @@ impl HttpServer {
                 self.handle_extraction_cache_evict(slug).await
             }
 
+            // Admin: replace the layer-4 write-through override.
+            // EPR Phase 2B Task C.6 layer 4 (live admin trigger).
+            (method, "/admin/write-through") => {
+                let state = self
+                    .write_through_state
+                    .clone()
+                    .unwrap_or_else(|| Arc::new(crate::write_through::WriteThroughState::empty()));
+                crate::api::write_through_admin::handle(req, method, &state).await
+            }
+
             // Not found
             _ => Ok(Response::builder()
                 .status(StatusCode::NOT_FOUND)
