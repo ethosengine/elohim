@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://schemas.elohim.protocol/v1/agent/anomaly-attestation.json",
+  "$id": "epr:schema:agent:anomaly-attestation",
   "title": "AnomalyAttestation",
   "type": "object",
   "additionalProperties": false,

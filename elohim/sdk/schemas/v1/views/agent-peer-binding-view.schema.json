@@ -1,7 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://schemas.elohim.protocol/v1/views/agent-peer-binding-view.json",
+  "$id": "epr:schema:view:agent-peer-binding-view",
   "title": "AgentPeerBindingView",
+  "description": "Source of truth: DHT (Notarized, Category A). AgentPeerBinding from EPR 2B Batch A binds a peer's libp2p PeerId to its agent CID with signed validity window.",
   "type": "object",
   "additionalProperties": false,
   "required": ["agentCid", "peerId", "validFrom", "signature", "dhtAnchorHash"],

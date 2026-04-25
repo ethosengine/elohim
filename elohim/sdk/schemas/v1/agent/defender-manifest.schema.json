@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://schemas.elohim.protocol/v1/agent/defender-manifest.json",
+  "$id": "epr:schema:agent:defender-manifest",
   "title": "DefenderManifest",
   "type": "object",
   "additionalProperties": false,

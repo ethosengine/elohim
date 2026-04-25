@@ -1,7 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://schemas.elohim.protocol/v1/views/portal-host-view.json",
+  "$id": "epr:schema:view:portal-host-view",
   "title": "PortalHostView",
+  "description": "Source of truth: DHT (Notarized, Category A). PortalHost declares URLs authorized to render this human's auth portal. Anchored on the Human entry's ActionHash so portal hosts survive KeyRotation. M5 ships only reach=trusted.",
   "type": "object",
   "additionalProperties": false,
   "required": ["humanId", "hostUrl", "addedAt", "reach", "dhtAnchorHash"],
@@ -11,7 +12,7 @@
     "label":            { "type": ["string", "null"], "maxLength": 256 },
     "addedAt":          { "type": "string", "format": "date-time" },
     "lastReachableAt":  { "type": ["string", "null"], "format": "date-time", "description": "Operational enrichment from libp2p; not part of notarized entry" },
-    "reach":            { "type": "string", "enum": ["trusted", "intimate", "public"], "description": "M5 ships only 'trusted'" },
+    "reach":            { "$ref": "../enums/reach.schema.json", "description": "M5 ships only 'trusted'" },
     "dhtAnchorHash":    { "type": "string", "description": "ActionHash (base64url) of the PortalHost entry; canonical PK" }
   }
 }

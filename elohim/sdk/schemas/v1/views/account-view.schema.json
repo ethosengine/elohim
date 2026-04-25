@@ -1,17 +1,18 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://schemas.elohim.protocol/v1/views/account-view.json",
+  "$id": "epr:schema:view:account-view",
   "title": "AccountView",
+  "description": "Source of truth: aggregate (DHT-derived projections). Composes Human + KeyRotation + KeyRevocation + RecoveryRequest + HumanRelationship + PortalHost views into one snapshot for the account-management surface.",
   "type": "object",
   "additionalProperties": false,
   "required": ["human", "isSteward", "hasLocalConductor", "portalHosts", "emergencyContacts", "recentRevocations", "pendingRecoveryRequests"],
   "properties": {
-    "human":                   { "$ref": "https://schemas.elohim.protocol/v1/views/human-view.json" },
-    "activeKeyRotation":       { "anyOf": [{ "$ref": "https://schemas.elohim.protocol/v1/views/key-rotation-view.json" }, { "type": "null" }] },
-    "recentRevocations":       { "type": "array", "items": { "$ref": "https://schemas.elohim.protocol/v1/views/key-revocation-view.json" } },
-    "pendingRecoveryRequests": { "type": "array", "items": { "$ref": "https://schemas.elohim.protocol/v1/views/recovery-request-view.json" } },
-    "emergencyContacts":       { "type": "array", "items": { "$ref": "https://schemas.elohim.protocol/v1/views/human-relationship-view.json" } },
-    "portalHosts":             { "type": "array", "items": { "$ref": "https://schemas.elohim.protocol/v1/views/portal-host-view.json" } },
+    "human":                   { "$ref": "epr:schema:view:human" },
+    "activeKeyRotation":       { "anyOf": [{ "$ref": "epr:schema:view:key-rotation" }, { "type": "null" }] },
+    "recentRevocations":       { "type": "array", "items": { "$ref": "epr:schema:view:key-revocation" } },
+    "pendingRecoveryRequests": { "type": "array", "items": { "$ref": "epr:schema:view:recovery-request" } },
+    "emergencyContacts":       { "type": "array", "items": { "$ref": "epr:schema:view:human-relationship" } },
+    "portalHosts":             { "type": "array", "items": { "$ref": "epr:schema:view:portal-host-view" } },
     "isSteward":               { "type": "boolean", "description": "Derived from peer_identity_bindings projection" },
     "hasLocalConductor":       { "type": "boolean", "description": "Derived" }
   }

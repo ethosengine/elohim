@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://schemas.elohim.protocol/v1/zome-inputs/add-portal-host.json",
+  "$id": "epr:schema:input:add-portal-host",
   "title": "AddPortalHostInput",
   "type": "object",
   "additionalProperties": false,
@@ -8,6 +8,6 @@
   "properties": {
     "hostUrl": { "type": "string", "format": "uri", "maxLength": 2048 },
     "label":   { "type": ["string", "null"], "maxLength": 256 },
-    "reach":   { "type": "string", "enum": ["trusted", "intimate", "public"], "default": "trusted", "description": "M5 only accepts 'trusted'" }
+    "reach":   { "$ref": "../enums/reach.schema.json", "default": "trusted", "description": "M5 only accepts 'trusted'" }
   }
 }
