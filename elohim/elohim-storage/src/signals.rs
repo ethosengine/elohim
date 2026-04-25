@@ -704,6 +704,60 @@ pub enum RecoveryV2Signal {
     },
 }
 
+// =============================================================================
+// M4 outbound reconciliation signal (P1 — imagodei.revocation_observed)
+// =============================================================================
+
+/// Outbound event emitted by the storage reconciliation controller after each
+/// revocation projection write. Downstream consumers (M5 elohim defender,
+/// Phase 4 GraphQL subscriptions) subscribe to `imagodei.revocation_observed`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub enum ImagodeiReconciledEvent {
+    RevocationObserved {
+        revocation_id: String,
+        revoked_key: String,
+        human_id: String,
+        /// "pending" | "effective-on-create" | "effective"
+        status: String,
+        observed_at: String,
+    },
+}
+
+/// Emit a reconciled event to the `imagodei.revocation_observed` log target.
+///
+/// M4 implementation: best-effort log line. M5 wires this to a broadcast channel
+/// for elohim-defender subscribers. The log target is the seam future consumers
+/// will hook into.
+fn emit_reconciled_signal(event: ImagodeiReconciledEvent) {
+    tracing::info!(target: "imagodei.revocation_observed", ?event, "reconciled event");
+}
+
+// =============================================================================
+// M4 mesh wire struct (RecoveryRevocationMessage)
+// =============================================================================
+
+/// MessagePack wire payload for the `recovery.revocation` gossipsub topic.
+/// Subscribers filter on `revocation_id` for events relevant to their humans.
+/// Active consumer logic lands in M5 (elohim defender + UI); M4 only
+/// subscribe/logs inbound messages.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RecoveryRevocationMessage {
+    pub revocation_id: String,
+    pub human_id: String,
+    pub revoked_key: String,
+    /// "voluntary" | "steward_vote" | "challenge"
+    pub trigger_type: String,
+    pub reason: String,
+    /// "pending" | "effective"
+    pub status: String,
+    /// Local peer id of the publishing node (base58 PeerId string).
+    pub sender_peer_id: String,
+    /// ISO-8601 timestamp when this message was assembled for publishing.
+    pub sent_at: String,
+}
+
 /// Extract the authority kind discriminator from a `RecoveryAuthorityKind`
 /// or `RecoveryAuthority` serde_json::Value (internally-tagged or plain variant).
 fn extract_authority_kind(v: &serde_json::Value) -> String {
@@ -839,17 +893,155 @@ pub fn handle_recovery_v2_signal(
             };
             crate::db::recovery_requests::upsert_key_rotation(conn, row)
         }
-        // M4 revocation projection stubs — replaced in Phase D.
-        RecoveryV2Signal::KeyRevocationRequested { .. } => {
-            unimplemented!("Task D.3: handle KeyRevocationRequested projection")
+        // M4 revocation projection handlers (Phase D.3).
+        //
+        // Design note: the M4 DNA signals do not include an ActionHash field
+        // (unlike RecoveryRequestCreated which carries `action_hash`). The `id`
+        // field is the coordinator-assigned revocation UUID. We use `id` as the
+        // `dht_anchor_hash` storage key for deduplication; it is stable and unique.
+        // A future enrichment pass can backfill the real ActionHash if needed.
+        RecoveryV2Signal::KeyRevocationRequested {
+            id,
+            human_id,
+            revoked_key,
+            reason,
+            trigger_type,
+            initiated_by,
+            required_votes,
+            current_votes,
+            threshold_reached,
+            effective_at,
+            created_at,
+        } => {
+            // Use id as dht_anchor_hash (see design note above).
+            let dht_anchor_hash = id.clone();
+            let now = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
+            let row = crate::db::models::UpsertKeyRevocationRow {
+                dht_anchor_hash: dht_anchor_hash.clone(),
+                id: id.clone(),
+                human_id: human_id.clone(),
+                revoked_key: revoked_key.clone(),
+                reason: reason.clone(),
+                trigger_type: trigger_type.clone(),
+                initiated_by,
+                required_votes: required_votes as i32,
+                current_votes: current_votes as i32,
+                threshold_reached: if threshold_reached { 1 } else { 0 },
+                effective_at: effective_at.clone(),
+                created_at: created_at.clone(),
+                updated_at: created_at.clone(),
+            };
+            crate::db::key_revocations::upsert_key_revocation(conn, row)?;
+
+            // P1: Outbound reconciliation signal — imagodei.revocation_observed.
+            emit_reconciled_signal(ImagodeiReconciledEvent::RevocationObserved {
+                revocation_id: id,
+                revoked_key,
+                human_id,
+                status: if threshold_reached {
+                    "effective-on-create".into()
+                } else {
+                    "pending".into()
+                },
+                observed_at: now,
+            });
+            Ok(())
         }
-        RecoveryV2Signal::RevocationVoteSubmitted { .. } => {
-            unimplemented!("Task D.3: handle RevocationVoteSubmitted projection")
+        RecoveryV2Signal::RevocationVoteSubmitted {
+            id,
+            revocation_id,
+            steward_id,
+            approved,
+            attestation,
+            voted_at,
+            current_votes,
+            required_votes: _,
+            threshold_now_reached: _,
+        } => {
+            // Resolve the parent key_revocation's dht_anchor_hash via revocation_id.
+            // In M4, dht_anchor_hash == revocation_id (see design note on KeyRevocationRequested).
+            let revocation_dht_anchor_hash = revocation_id.clone();
+            let vote_dht_anchor_hash = id.clone();
+            let row = crate::db::models::InsertRevocationVoteRow {
+                dht_anchor_hash: vote_dht_anchor_hash,
+                id,
+                revocation_dht_anchor_hash: revocation_dht_anchor_hash.clone(),
+                revocation_id: revocation_id.clone(),
+                steward_id,
+                approved: if approved { 1 } else { 0 },
+                attestation,
+                voted_at: voted_at.clone(),
+            };
+            crate::db::revocation_votes::insert_revocation_vote(conn, row)?;
+
+            // Recompute current_votes from authoritative count in projection.
+            let approved_count = crate::db::revocation_votes::count_approved_votes_for_revocation(
+                conn,
+                &revocation_dht_anchor_hash,
+            )?;
+            let now = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
+            crate::db::key_revocations::update_current_votes(
+                conn,
+                &revocation_dht_anchor_hash,
+                approved_count as i32,
+                &now,
+            )?;
+            Ok(())
         }
-        RecoveryV2Signal::KeyRevocationEffective { .. } => {
-            unimplemented!("Task D.3: handle KeyRevocationEffective projection + eager sweep")
+        RecoveryV2Signal::KeyRevocationEffective {
+            revocation_id,
+            revoked_key,
+            human_id,
+            effective_at,
+            triggering_vote_id: _,
+        } => {
+            // In M4, dht_anchor_hash == revocation_id (see design note on KeyRevocationRequested).
+            let target_dht_anchor_hash = revocation_id.clone();
+            let now = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
+            crate::db::key_revocations::set_key_revocation_effective(
+                conn,
+                &target_dht_anchor_hash,
+                &effective_at,
+                &now,
+            )?;
+
+            // P1 — Eager cache-invalidation sweep (bounded, indexed by revoked_key).
+            // Today: best-effort stub. Future Phase 2B seam:
+            //   UPDATE epr_atoms SET verified_at = NULL WHERE signer_cid = ?revoked_key;
+            // EAGER-SWEEP HOOK (P1): extend here when epr_atoms / peer_identity_bindings land.
+            sweep_dependent_caches_on_revocation(conn, &revoked_key)?;
+
+            // P1: Outbound reconciliation signal — imagodei.revocation_observed.
+            emit_reconciled_signal(ImagodeiReconciledEvent::RevocationObserved {
+                revocation_id,
+                revoked_key,
+                human_id,
+                status: "effective".into(),
+                observed_at: effective_at,
+            });
+            Ok(())
         }
     }
+}
+
+/// Sweep dependent cached state tied to a revoked key. Eager, bounded,
+/// indexed (not a table scan).
+///
+/// M4: stub — no dependent cache tables exist yet at M4 scope.
+/// Phase 2B extension point: add `UPDATE epr_atoms SET verified_at = NULL
+///   WHERE signer_cid = ?revoked_key` when the epr_atoms table carries signer_cid.
+fn sweep_dependent_caches_on_revocation(
+    _conn: &mut diesel::sqlite::SqliteConnection,
+    revoked_key: &str,
+) -> Result<(), crate::error::StorageError> {
+    // EAGER-SWEEP HOOK (P1): Phase 2B adds epr_atoms sweep here.
+    // M5 adds peer_identity_bindings sweep here.
+    tracing::debug!(
+        target: "imagodei.revocation_sweep",
+        revoked_key = %revoked_key,
+        "eager sweep triggered; no dependent cache tables in M4 scope"
+    );
+    Ok(())
 }
 
 #[cfg(test)]
