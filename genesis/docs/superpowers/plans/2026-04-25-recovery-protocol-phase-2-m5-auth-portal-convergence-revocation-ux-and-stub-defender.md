@@ -1139,9 +1139,11 @@ git commit -m "tests(sweettest): M5 portal-host CRUD + specialist-revocation gat
 **Files:**
 - Modify: `elohim/elohim-storage/src/views.rs`
 
-- [ ] **Step 1: Add 7 output view structs**
+> **Plan amendment (Task 1 corrected schemas):** `KeyRotationView`, `KeyRevocationView`, `RevocationVoteView`, `RecoveryRequestView`, `HumanView`, `HumanRelationshipView`, `RecoveryWitnessView` **already exist** in `views.rs` and have matching schemas at `elohim/sdk/schemas/v1/views/key-rotation.schema.json` etc. Task 1 deleted the duplicate `*-view.schema.json` files it had created. M5 only adds the **3 truly new view types**: `PortalHostView`, `AgentPeerBindingView`, `AccountView`. Plus 2 input views: `AddPortalHostInputView`, `SubmitSpecialistRevocationInputView`. Skip the old types in step 1 below — they're already in the file.
 
-Append to `views.rs` (preserve existing types untouched):
+- [ ] **Step 1: Add 3 NEW output view structs**
+
+Append to `views.rs` (preserve existing types — including the existing KeyRotationView/KeyRevocationView/RevocationVoteView/RecoveryRequestView — untouched):
 
 ```rust
 #[derive(Debug, Clone, Serialize, TS)]
@@ -1764,6 +1766,11 @@ git commit -m "storage(http): /api/v1/account/* routes — M5"
 **Files:**
 - Modify: `elohim/elohim-storage/tests/schema_contract.rs`
 - Modify: `elohim/sdk/schemas/scripts/codegen-ts.mjs` (add new view interfaces to `INTERFACE_FILES`)
+
+> **Plan amendment (Task 1 corrected schemas):**
+> - `KeyRotationView`, `KeyRevocationView`, `RevocationVoteView`, `RecoveryRequestView` already have schemas (`key-rotation.schema.json` etc., NO `-view` suffix). Their schema-contract tests likely already exist in `tests/schema_contract.rs` — verify and skip.
+> - **Forward-reference resolution:** `account-view.schema.json` `$ref`s `epr:schema:view:human` and `epr:schema:view:human-relationship` — neither `human.schema.json` nor `human-relationship.schema.json` exists yet. Their corresponding Rust `HumanView` and `HumanRelationshipView` already exist in `views.rs` (lines 328 and 2288). Task 11 must create these two view schemas (not -view suffixed, per existing convention) so the AccountView contract test resolves cleanly.
+> - New schema-contract tests needed: `verify_portal_host_view`, `verify_agent_peer_binding_view`, `verify_account_view`, `verify_add_portal_host_input`, `verify_submit_specialist_revocation_input`, `verify_human_view`, `verify_human_relationship_view`.
 
 - [ ] **Step 1: Add schema contract tests**
 
