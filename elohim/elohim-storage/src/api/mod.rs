@@ -45,6 +45,7 @@ pub mod resources;
 pub mod risk;
 pub mod routing;
 pub mod schedules;
+pub mod signal_emit;
 pub mod spatial;
 pub mod steward;
 pub mod steward_affinity;

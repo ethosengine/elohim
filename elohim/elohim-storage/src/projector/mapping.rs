@@ -119,6 +119,19 @@ impl ManifestRegistry {
             .iter()
             .any(|p| p.kind == kind && p.schema_key == schema_key)
     }
+
+    /// Look up a projection by `(pillar, kind)` for signal-emit composition.
+    ///
+    /// Returns the first projection matching both fields. Used by
+    /// `/api/v1/signal/emit` (EPR Phase 2B Task C.2) to resolve an inbound
+    /// `SignalIntent { pillar, signalType }` into the `(schema_key, target_table)`
+    /// pair the composed `Envelope` needs. Today shefa is the only pillar
+    /// declaring a projection; future pillars register more.
+    pub fn find_projection(&self, pillar: &str, kind: &str) -> Option<&RegisteredProjection> {
+        self.projections
+            .iter()
+            .find(|p| p.pillar == pillar && p.kind == kind)
+    }
 }
 
 // ---------------------------------------------------------------------------
