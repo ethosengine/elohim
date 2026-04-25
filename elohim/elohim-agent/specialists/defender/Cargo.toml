@@ -1,0 +1,15 @@
+[package]
+name = "elohim-agent-defender-specialist"
+description = "Defender specialist for elohim-agent — detects key rotation anomalies and portal host integrity"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+chrono = { workspace = true }
