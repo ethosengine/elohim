@@ -24,11 +24,7 @@ export interface ContentTypeCoupling {
 export const SHEFA_COUPLING_MAP: Record<string, ContentTypeCoupling> = {
   'stewardship-context': {
     value: {
-      onContribute: {
-        action: 'produce',
-        resourceConformsTo: 'stewardship-standing',
-        recognition: 'stewardship-standing',
-      },
+      onContribute: { action: 'produce', resourceConformsTo: 'stewardship-standing', recognition: 'stewardship-standing' },
     },
     governance: {
       defaultReach: 'community',
