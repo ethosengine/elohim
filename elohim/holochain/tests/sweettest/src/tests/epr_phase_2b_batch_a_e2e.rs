@@ -1,8 +1,58 @@
-//! Sweettest — EPR Phase 2B Batch A: End-to-End Integration (Task A.12).
+//! Sweettest — EPR Phase 2B Batch A: Wire-Shape Contracts + Conductor-Bound Loop (Task A.12).
 //!
-//! Batch A done-bar: prove the full reconciliation pipeline works end-to-end.
+//! ## What this file proves and does NOT prove
 //!
-//! ## Three-layer truth model
+//! This file contains THREE tests, two of which are wire-shape contract
+//! documentation tests and one of which is a conductor-bound end-to-end loop
+//! (deferred to Stage 2).
+//!
+//! ### Wire-shape contract tests (NOT #[ignore]'d)
+//!
+//! These tests assert constants and serde round-trips. They do NOT exercise
+//! the `ReconcileController` against a real DB or real conductor. Their
+//! purpose is to pin the DNA-wire field names and sentinel values so that
+//! field-name drift in `holochain_app_signal.rs` surfaces immediately as
+//! serde assertion failures, not silent test breaks.
+//!
+//! - `wire_shape_contract_keyRotation_keyRevocation` — pins the
+//!   `KeyRotationCommitted` and `KeyRevocationEffective` DNA-wire shapes.
+//!   Validates: discriminator strings, field names, dispatch ordering contract,
+//!   Stage 1 compromise_at = effective_at fallback, revocation ID format.
+//!
+//! - `wire_shape_contract_revoked_stale_sentinel` — pins the
+//!   `REVOKED_STALE_FINGERPRINT` sentinel value ("revoked_stale") and the
+//!   epr_atoms wire shape used in the sweep fixture.
+//!
+//! ### Conductor-bound full loop (DEFERRED — #[ignore]'d)
+//!
+//! - `epr_2b_batch_a_full_loop` — two-conductor sweettest with real
+//!   `imagodei` DNA, real DHT signals, `HolochainAppSignalStream`, and real
+//!   SQLite projection. Deferred pending Stage 2 `derive_compromise_at`
+//!   upgrade + DNA artifact pack in Jenkins.
+//!
+//! ## Authoritative storage-layer tests (done-bar for Batch A)
+//!
+//! The actual DB sweep + cache invalidation + full controller loop are
+//! proven in elohim-storage (no conductor/nix required):
+//!
+//!   `elohim-storage/tests/epr_atom_federation_integration.rs` →
+//!     `epr_2b_batch_a_full_loop_rotation_then_revocation_clears_verified_at`
+//!     (controller loop: rotation → revocation → sweep end-to-end)
+//!
+//!   `elohim-storage/src/reconcile/controller.rs` →
+//!     `tests::controller_on_revocation_invalidates_cache_and_runs_sweep`
+//!     (revocation-only controller path; cache invalidate + sweep)
+//!
+//!   `elohim-storage/src/reconcile/sweep.rs` →
+//!     `tests::sweep_clears_verified_within_compromise_window`
+//!     (sweep predicate and fingerprint sentinel)
+//!
+//! The signal translation layer is covered by:
+//!   `elohim-storage/src/reconcile/holochain_app_signal.rs` →
+//!     `tests::translates_key_rotation_committed`
+//!     `tests::translates_key_revocation_effective_with_compromise_at_fallback`
+//!
+//! ## Three-layer truth model (for orientation)
 //!
 //! ```text
 //! imagodei DNA (post-commit signals)     — DHT = notary
@@ -18,54 +68,6 @@
 //! epr_atoms projection table             — local queryable truth
 //!     verified_at cleared for atoms signed after compromise_at
 //! ```
-//!
-//! ## Test inventory
-//!
-//! ### NOT #[ignore]'d
-//!
-//! - `epr_2b_batch_a_controller_loop_signal_dispatch` — exercises the full
-//!   K1→K2 rotation then K1 revocation signal sequence through the controller's
-//!   dispatch logic. Uses synthetic `serde_json` shapes matching the exact DNA
-//!   wire format defined in `holochain_app_signal.rs`. Validates:
-//!   * Signal kind sequencing (rotation recorded before revocation).
-//!   * Correct dispatch order in the controller's `observed_kinds` accumulator.
-//!   * That `KeyRevocationEffective` carries `compromise_at` derived from
-//!     `effective_at` (Stage 1 fallback, per `holochain_app_signal.rs`).
-//!   * That `sweep_on_revocation` semantics are exercised (pre-compromise atom
-//!     untouched; post-compromise atom cleared).
-//!   Authoritative DB assertion: see `elohim-storage` →
-//!   `reconcile::controller::tests::controller_on_revocation_invalidates_cache_and_runs_sweep`.
-//!
-//! - `epr_2b_batch_a_revocation_sweep_signal_contract` — validates the
-//!   `KeyRevocationEffective` wire shape (serde round-trip) and the sentinel
-//!   fingerprint value used in the projection. No conductor required.
-//!
-//! ### #[ignore]'d (requires packed DNA artifact)
-//!
-//! - `epr_2b_batch_a_full_loop` — two-conductor sweettest with real
-//!   `imagodei` DNA, real DHT signals, `HolochainAppSignalStream`, and real
-//!   SQLite projection. Exercises the full A-to-Z loop with live conductors.
-//!   Remove `#[ignore]` once the pipeline's pack-then-test stage is wired.
-//!
-//! ## Authoriative cross-references
-//!
-//! The storage-layer done-bar (DB sweep + cache invalidation) is covered by:
-//!   `elohim-storage/src/reconcile/controller.rs` →
-//!     `tests::controller_on_revocation_invalidates_cache_and_runs_sweep`
-//!   `elohim-storage/src/reconcile/sweep.rs` →
-//!     `tests::sweep_clears_verified_within_compromise_window`
-//!
-//! The signal translation layer is covered by:
-//!   `elohim-storage/src/reconcile/holochain_app_signal.rs` →
-//!     `tests::translates_key_rotation_committed`
-//!     `tests::translates_key_revocation_effective_with_compromise_at_fallback`
-//!
-//! ## Why the non-ignored tests live here (not in elohim-storage)
-//!
-//! Task A.12 is the convergence proof for Batch A: it documents the complete
-//! signal pipeline in one place. The sweettest suite *owns* cross-layer
-//! integration assertions; elohim-storage owns per-layer unit/integration tests.
-//! These tests are the boundary markers that connect both layers.
 
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
@@ -153,57 +155,40 @@ struct WireKeyRevocationEffective {
 }
 
 // ---------------------------------------------------------------------------
-// Scenario A.12 Non-ignored: signal dispatch sequence
+// Wire-shape contract test 1: KeyRotation + KeyRevocation DNA-wire field names
 // ---------------------------------------------------------------------------
 
-/// Batch A done-bar: controller dispatch ordering for the K1→K2 rotation then
-/// K1 revocation with compromise_at=t0 (before the EPR was signed at t1).
+/// Wire-shape contract for `KeyRotationCommitted` and `KeyRevocationEffective`.
 ///
-/// ## What this test proves
+/// ## What this test IS
 ///
-/// The test exercises the three-layer pipeline:
+/// A discriminator-string and sentinel-string contract test. It constructs
+/// synthetic JSON fixtures matching the exact DNA-wire format and asserts that
+/// field names, type discriminators, and derived values round-trip correctly
+/// through serde. No controller, no DB, no conductor.
 ///
-/// 1. **Signal shape contract** (DHT → signal stream boundary): The
-///    `KeyRotationCommitted` and `KeyRevocationEffective` wire shapes match
-///    exactly what the DNA-side coordinator emits and what
-///    `HolochainAppSignalStream::try_decode_and_translate` expects.
-///    Field name drift surfaces immediately as serde failures.
+/// Its value is documentation and early-warning: any field-name drift in
+/// `holochain_app_signal.rs` will surface here as a serde assertion failure
+/// rather than a silent test break.
 ///
-/// 2. **Controller dispatch sequence** (signal stream → controller boundary):
-///    The controller processes rotation before revocation; both signal kinds are
-///    recorded in `observed_kinds` in the correct order. This proves the
-///    dispatch table routes correctly for both variants.
+/// ## What this test does NOT prove
 ///
-/// 3. **Semantic correctness of the revocation signal** (controller → projection
-///    boundary): The `KeyRevocationEffective` payload carries `compromise_at`
-///    that is <= the EPR's `signed_at=t1` (the post-compromise atom), so the
-///    sweep would correctly clear `verified_at` for that atom.
+/// - It does NOT feed signals to a `ReconcileController` instance.
+/// - It does NOT touch a real or in-memory `epr_atoms` table.
+/// - It does NOT prove that `sweep_on_revocation` clears `verified_at`.
 ///
-/// ## Authoritative DB assertion (cross-reference)
+/// ## Authoritative counterpart
 ///
-/// The actual SQL sweep that clears `epr_atoms.verified_at` is tested in:
-///   `elohim-storage/src/reconcile/controller.rs` →
-///     `tests::controller_on_revocation_invalidates_cache_and_runs_sweep`
+/// The full controller loop (rotation → revocation → sweep against a real DB)
+/// is proven in:
+///   `elohim-storage/tests/epr_atom_federation_integration.rs` →
+///     `epr_2b_batch_a_full_loop_rotation_then_revocation_clears_verified_at`
 ///
-/// That test: seeds pre-compromise (t50) + post-compromise (t90) atoms,
-/// fires `KeyRevocationSignal` with `compromise_at=t75`, and asserts:
-/// - pre-compromise atom: `verified_at` stays populated
-/// - post-compromise atom: `verified_at` cleared, `verified_signer_fingerprint="revoked_stale"`
-///
-/// The non-ignored part of A.12 (this test) proves the signal pipeline that
-/// leads to that sweep handler; the elohim-storage test proves the sweep itself.
-///
-/// ## Simplifications documented
-///
-/// - No live conductor or DHT — signals injected as synthetic JSON.
-/// - No libp2p swarm — no EPR atom exchange over the wire.
-/// - The EPR atom is described in the test assertions (not inserted into a DB)
-///   because `elohim-storage` is not a dependency of the sweettest crate.
-///   The DB assertion is fully covered by the cross-referenced storage test.
-/// - `create_self_revocation` (single-vote path, threshold=1) is used —
-///   the simplest path to an effective revocation (no multi-witness quorum).
+/// The conductor-bound version of this loop is:
+///   `epr_2b_batch_a_full_loop` (below) — `#[ignore]`'d pending Stage 2
+///   `derive_compromise_at` upgrade + DNA artifact pack in Jenkins.
 #[tokio::test(flavor = "multi_thread")]
-async fn epr_2b_batch_a_controller_loop_signal_dispatch() -> Result<()> {
+async fn wire_shape_contract_keyRotation_keyRevocation() -> Result<()> {
     // -------------------------------------------------------------------------
     // Fixture: establish the time axis
     //
@@ -478,25 +463,40 @@ async fn epr_2b_batch_a_controller_loop_signal_dispatch() -> Result<()> {
 }
 
 // ---------------------------------------------------------------------------
-// Scenario A.12 Non-ignored: revocation sweep signal contract
+// Wire-shape contract test 2: REVOKED_STALE_FINGERPRINT sentinel + epr_atoms shape
 // ---------------------------------------------------------------------------
 
-/// Verifies the `REVOKED_STALE_FINGERPRINT` sentinel value and sweep semantics
-/// contract between the controller and the epr_atoms projection.
+/// Wire-shape contract for the `REVOKED_STALE_FINGERPRINT` sentinel and the
+/// `epr_atoms` projection wire shape used by the sweep fixture.
 ///
-/// This is a compile-time shape test — no conductor, no DB. It validates that:
-/// 1. The sentinel fingerprint value ("revoked_stale") is the non-hex,
-///    non-empty string that distinguishes tainted rows from real fingerprints.
-/// 2. The `epr_atoms` wire shape that the storage test uses matches the A.12
-///    test fixture expectations.
+/// ## What this test IS
 ///
-/// Authoritative sweep test: `elohim-storage::reconcile::sweep::tests::
-///   sweep_clears_verified_within_compromise_window`
+/// A sentinel-string contract test. No conductor, no DB, no controller. It
+/// validates that the string constant "revoked_stale" is:
+/// - 13 characters (not 32 hex chars, which would be a real fingerprint)
+/// - Not a valid hex fingerprint
+/// - Stable at exactly "revoked_stale"
 ///
-/// Authoritative fingerprint constant: `elohim-storage::reconcile::sweep::
-///   REVOKED_STALE_FINGERPRINT`
+/// It also documents the `epr_atoms` JSON shape for the sweep fixture,
+/// confirming pre-sweep vs post-sweep fields.
+///
+/// ## What this test does NOT prove
+///
+/// - It does NOT call `sweep_on_revocation` against a real DB.
+/// - It does NOT verify the sentinel is written to any actual table row.
+///
+/// ## Authoritative counterpart
+///
+/// The sweep that writes `REVOKED_STALE_FINGERPRINT` to a real DB row is
+/// proven in:
+///   `elohim-storage/src/reconcile/sweep.rs` →
+///     `tests::sweep_clears_verified_within_compromise_window`
+///
+/// The full rotation → revocation → sweep controller loop is proven in:
+///   `elohim-storage/tests/epr_atom_federation_integration.rs` →
+///     `epr_2b_batch_a_full_loop_rotation_then_revocation_clears_verified_at`
 #[tokio::test(flavor = "multi_thread")]
-async fn epr_2b_batch_a_revocation_sweep_signal_contract() -> Result<()> {
+async fn wire_shape_contract_revoked_stale_sentinel() -> Result<()> {
     // The sentinel value written to verified_signer_fingerprint for tainted rows.
     // Must match REVOKED_STALE_FINGERPRINT in elohim-storage/src/reconcile/sweep.rs.
     let revoked_stale_fingerprint = "revoked_stale";
@@ -580,8 +580,14 @@ async fn epr_2b_batch_a_revocation_sweep_signal_contract() -> Result<()> {
 // Scenario A.12 #[ignore]'d: Full two-conductor loop with real DNA signals
 // ---------------------------------------------------------------------------
 
-/// Full end-to-end integration test: two conductors, real imagodei DNA, real
-/// `HolochainAppSignalStream`, and real SQLite projection.
+/// Conductor-bound counterpart of
+/// `epr_2b_batch_a_full_loop_rotation_then_revocation_clears_verified_at`
+/// in `elohim-storage/tests/epr_atom_federation_integration.rs`.
+///
+/// That storage-layer test (no conductor required) is the Batch A done-bar:
+/// it proves the full controller loop (rotation → revocation → sweep) against
+/// a real `DbPool` + `epr_atoms` table. This test is its conductor-bound
+/// sibling, deferred to Stage 2.
 ///
 /// ## What this test proves (when un-ignored)
 ///
@@ -603,12 +609,21 @@ async fn epr_2b_batch_a_revocation_sweep_signal_contract() -> Result<()> {
 ///
 /// ## Why it is #[ignore]'d
 ///
-/// This test requires a packed `imagodei.dna` artifact. The local build
-/// environment cannot build `datachannel-sys` / OpenSSL (env constraint).
-/// Jenkins has the full toolchain and will run this test after
-/// `hc dna pack workdir/` is wired into the pack-then-test stage.
+/// Two dependencies:
 ///
-/// Remove `#[ignore]` once the pipeline's pack-then-test stage is wired.
+/// 1. Requires a packed `imagodei.dna` artifact. The local build environment
+///    cannot build `datachannel-sys` / OpenSSL (env constraint). Jenkins has
+///    the full toolchain and will run this test after `hc dna pack workdir/`
+///    is wired into the pack-then-test stage.
+///
+/// 2. Requires Stage 2 `derive_compromise_at` upgrade in
+///    `holochain_app_signal.rs`. Until that upgrade lands, `compromise_at`
+///    equals `effective_at` (Stage 1 fallback), which places the sweep window
+///    AFTER `signed_at=t1` — so `verified_at` is NOT cleared by Stage 1.
+///    The storage-layer test uses `compromise_at < signed_at` directly,
+///    bypassing this Stage 1 limitation.
+///
+/// Remove `#[ignore]` once BOTH conditions are met.
 ///
 /// ## Setup shortcuts (documented)
 ///
@@ -621,15 +636,6 @@ async fn epr_2b_batch_a_revocation_sweep_signal_contract() -> Result<()> {
 ///   `admin_port()` and `app_port()` from the `SweetConductor` API.
 /// - The controller is driven by `run_one_pass()` inside a `tokio::time::timeout`
 ///   rather than `run_loop()` to avoid hanging on missing signals.
-///
-/// ## TODO(A.12) upgrade path
-///
-/// When `derive_compromise_at` in `holochain_app_signal.rs` is upgraded (Stage 2)
-/// to look up `key_revocations.created_at` from the projection, the sweep
-/// window widens from [effective_at, ∞) to [created_at, ∞). The test fixture
-/// places `signed_at=t1` between `created_at=t0` and `effective_at=t3`, so the
-/// Stage 2 upgrade is what enables the `verified_at` clearing assertion in step 7.
-/// Add the `assert!(row.verified_at.is_none())` check after that upgrade lands.
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "requires packed imagodei DNA artifact — wire into Jenkins pack-then-test stage; \
             also requires Stage 2 derive_compromise_at upgrade for verified_at sweep assertion \
@@ -770,7 +776,7 @@ async fn epr_2b_batch_a_full_loop() -> Result<()> {
     // Step 6: Peer A calls create_self_revocation on K1.
     // -----------------------------------------------------------------------
     let revocation_input = serde_json::json!({
-        "revoked_key": a1.to_string(), // K1 = the agent's current key
+        "revoked_key": PUBKEY_K1, // K1 = the test-constant compromised key
         "reason": "compromised: used after compromise point t0"
     });
     let _revocation_result: Result<serde_json::Value, _> = conductor_call_fallible(

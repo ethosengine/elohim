@@ -13,6 +13,250 @@
 
 mod harness;
 use elohim_storage::p2p::{verify_incoming_epr, CallerIdentity, MAX_BATCH_CIDS};
+
+// ---------------------------------------------------------------------------
+// A.12 — Full controller loop integration (rotation → revocation → sweep)
+//
+// This is the storage-layer done-bar for Batch A. It proves the complete
+// reconciliation pipeline works end-to-end against a real DbPool and the
+// real `epr_atoms` table — no conductor required.
+//
+// Design note: the `on_key_rotation` handler is still a stub (Task A.6 fills
+// it in), so the pubkey timeline cache is pre-warmed in setup to simulate the
+// state that a working rotation handler would produce. The rotation signal is
+// still fed to the controller so `observed_kinds` reflects the real dispatch
+// order. Cache invalidation and DB sweep are both driven by the live revocation
+// handler (Task A.8 — fully implemented).
+// ---------------------------------------------------------------------------
+
+/// Full controller loop: KeyRotation then KeyRevocation feeds the controller
+/// running against a real DbPool + epr_atoms table.
+///
+/// ## Scenario
+///
+/// ```text
+/// t_start = 0      — K1 validity starts (pre-warm cache with this window)
+/// t_signed = 100   — EPR atom signed with K1 (post-compromise: compromise < signed)
+/// t_rotate = 150   — rotation effective (K1 → K2)
+/// t_compromise = 75 — the key was actually compromised here (before t_signed)
+/// t_effective = 160 — revocation effective (quorum reached)
+/// ```
+///
+/// Because `t_compromise (75) < t_signed (100)`, the sweep must clear the atom
+/// at t_signed. The pre-compromise atom (t_pre = 50) must be untouched.
+///
+/// ## Invariants asserted
+///
+/// - `observed_kinds == ["keyRotation", "keyRevocation"]`
+/// - pubkey timeline cache entry for `loop-agent-a` is absent after revocation
+/// - `epr_atoms` post-compromise row (`issued_at=t_signed`): `verified_at = NULL`,
+///   `verified_signer_fingerprint = REVOKED_STALE_FINGERPRINT`
+/// - `epr_atoms` pre-compromise row (`issued_at=t_pre`): untouched
+///
+/// Conductor-bound counterpart: `epr_2b_batch_a_full_loop` in
+/// `elohim/holochain/tests/sweettest/src/tests/epr_phase_2b_batch_a_e2e.rs`.
+/// That test is `#[ignore]`'d pending Stage 2 `derive_compromise_at` + DNA pack.
+#[tokio::test(flavor = "multi_thread")]
+async fn epr_2b_batch_a_full_loop_rotation_then_revocation_clears_verified_at() {
+    use chrono::{TimeZone, Utc};
+    use diesel::prelude::*;
+    use elohim_storage::db::diesel_schema::epr_atoms::dsl as a_dsl;
+    use elohim_storage::db::epr_atoms::EprAtom;
+    use elohim_storage::reconcile::controller::ReconcileController;
+    use elohim_storage::reconcile::pubkey_timeline::{PubkeyTimeline, PubkeyTimelineCache};
+    use elohim_storage::reconcile::signal_stream::{
+        DnaSignal, InMemoryDnaSignalStream, KeyRevocationSignal, KeyRotationSignal,
+    };
+    use elohim_storage::reconcile::sweep::REVOKED_STALE_FINGERPRINT;
+    use elohim_storage::test_util::test_pool;
+    use std::sync::Arc;
+    use tokio::sync::Mutex;
+
+    // -----------------------------------------------------------------------
+    // Step 1: Build a real DbPool and run migrations.
+    // -----------------------------------------------------------------------
+    let pool = Arc::new(test_pool());
+    let mut conn = pool.get().expect("connection");
+
+    // Time helpers — the scenario time axis:
+    //   t_pre       = 50   (pre-compromise atom — must NOT be swept)
+    //   t_compromise = 75  (key was compromised here)
+    //   t_signed    = 100  (EPR atom signed with K1, after compromise — MUST be swept)
+    //   t_rotate    = 150  (K1 → K2 rotation effective)
+    //   t_effective = 160  (revocation quorum reached)
+    let t = |secs: i64| Utc.timestamp_opt(secs, 0).single().unwrap();
+    let ts = |dt: chrono::DateTime<Utc>| dt.format("%Y-%m-%dT%H:%M:%SZ").to_string();
+
+    let agent_cid = "loop-agent-a";
+    let t_pre = t(50);
+    let t_compromise = t(75);
+    let t_signed = t(100);
+    let t_rotate = t(150);
+    let t_effective = t(160);
+
+    // Fingerprints for freshly-verified atoms.
+    let real_fingerprint = "abcdef0123456789abcdef0123456789";
+
+    // -----------------------------------------------------------------------
+    // Step 2: Pre-warm the PubkeyTimelineCache with agent A's K1 entry.
+    //
+    // K1 is valid from t=0 (open-ended at construction time). The controller's
+    // on_key_rotation stub doesn't update the cache yet (Task A.6), so we
+    // simulate what A.6 will produce by pre-inserting the timeline. This
+    // represents the state the cache is in when the rotation signal arrives.
+    // -----------------------------------------------------------------------
+    let k1_bytes: [u8; 32] = [0x01; 32];
+
+    let cache = Arc::new(Mutex::new(PubkeyTimelineCache::with_capacity(16)));
+    {
+        let mut c = cache.lock().await;
+        let mut tl = PubkeyTimeline::new();
+        // K1 valid from epoch 0, open-ended (will be closed by rotation/revocation).
+        tl.insert(k1_bytes, t(0), None, "uhCkk-loop-a12-k1-warmup".to_string());
+        c.insert(agent_cid.to_string(), tl);
+    }
+    assert!(
+        cache.lock().await.get(&agent_cid.to_string()).is_some(),
+        "cache must be warm before the signal sequence"
+    );
+
+    // -----------------------------------------------------------------------
+    // Step 3: Insert epr_atoms rows.
+    //
+    // Row A (pre-compromise, t_pre=50): verified with K1 before compromise point.
+    //   → Must NOT be swept (issued_at < compromise_at).
+    //
+    // Row B (post-compromise, t_signed=100): verified with K1 after compromise.
+    //   → MUST be swept (issued_at >= compromise_at).
+    // -----------------------------------------------------------------------
+    let insert_atom = |conn: &mut diesel::SqliteConnection, issued: chrono::DateTime<Utc>| {
+        let atom = EprAtom {
+            cid: format!("bafy-loop-a12-{}", issued.timestamp()),
+            kind: "agent-epr".into(),
+            schema_ref: "epr/agent/v1".into(),
+            schema_key: agent_cid.to_string(),
+            reach: "commons".into(),
+            issued_at: issued.format("%Y-%m-%dT%H:%M:%SZ").to_string(),
+            signer_cid: agent_cid.to_string(),
+            supersedes: None,
+            canonical_bytes: vec![0u8; 4],
+            payload_bytes: vec![0u8; 4],
+            proof_bytes: vec![0u8; 64],
+            proof_algorithm: "ed25519".into(),
+            verified_at: Some(issued.format("%Y-%m-%dT%H:%M:%SZ").to_string()),
+            verified_signer_fingerprint: Some(real_fingerprint.to_string()),
+        };
+        diesel::insert_into(a_dsl::epr_atoms)
+            .values(&atom)
+            .execute(conn)
+            .expect("insert epr_atom");
+    };
+
+    insert_atom(&mut conn, t_pre);
+    insert_atom(&mut conn, t_signed);
+    drop(conn); // release connection back to pool before block_in_place
+
+    // -----------------------------------------------------------------------
+    // Step 4: Build an InMemoryDnaSignalStream with TWO signals in order:
+    //   a. KeyRotation  — K1 → K2 at t_rotate
+    //   b. KeyRevocation — K1 revoked with compromise_at=t_compromise (< t_signed)
+    // -----------------------------------------------------------------------
+
+    // K2 base64 (32 bytes of 0x02).
+    use base64::{engine::general_purpose, Engine};
+    let k2_b64 = general_purpose::STANDARD.encode([0x02u8; 32]);
+    let k1_b64 = general_purpose::STANDARD.encode(k1_bytes);
+
+    let rotation_signal = KeyRotationSignal {
+        action_hash: "uhCkk-loop-a12-rotation-action-hash".to_string(),
+        agent_cid: agent_cid.to_string(),
+        new_pubkey: k2_b64,
+        old_pubkey: k1_b64,
+        rotated_at: t_rotate,
+        emitted_at: t_rotate,
+    };
+
+    let revocation_signal = KeyRevocationSignal {
+        action_hash: "rev-loop-agent-a-2026-04-25".to_string(),
+        agent_cid: agent_cid.to_string(),
+        revoked_pubkey: general_purpose::STANDARD.encode(k1_bytes),
+        compromise_at: t_compromise, // t(75) — BEFORE t_signed(100) → sweep fires
+        effective_at: t_effective,
+        triggering_revocation_id: Some("rev-loop-a12-1".to_string()),
+        emitted_at: t_effective,
+    };
+
+    let signals = vec![
+        DnaSignal::KeyRotation(rotation_signal),
+        DnaSignal::KeyRevocation(revocation_signal),
+    ];
+    let stream = InMemoryDnaSignalStream::with_signals(signals);
+
+    // -----------------------------------------------------------------------
+    // Step 5: Build ReconcileController with storage wired and run the loop.
+    //
+    // InMemoryDnaSignalStream closes after the two signals, so run_loop()
+    // exits cleanly after processing both.
+    // -----------------------------------------------------------------------
+    let mut controller =
+        ReconcileController::new_with_storage(stream, Arc::clone(&pool), Arc::clone(&cache));
+
+    controller.run_loop().await.expect("controller run_loop");
+
+    // -----------------------------------------------------------------------
+    // Step 6: Assertions
+    // -----------------------------------------------------------------------
+
+    // 6a. observed_kinds records rotation before revocation.
+    assert_eq!(
+        controller.observed_kinds(),
+        &["keyRotation", "keyRevocation"],
+        "controller must dispatch rotation then revocation in order"
+    );
+
+    // 6b. Pubkey timeline cache entry for agent A is absent (revocation invalidated it).
+    assert!(
+        cache.lock().await.get(&agent_cid.to_string()).is_none(),
+        "pubkey timeline cache must be invalidated for agent A after revocation"
+    );
+
+    // 6c. DB assertions: fetch both atoms.
+    let mut conn2 = pool.get().expect("connection2");
+
+    let pre_atom: EprAtom = a_dsl::epr_atoms
+        .filter(a_dsl::signer_cid.eq(agent_cid))
+        .filter(a_dsl::issued_at.eq(ts(t_pre)))
+        .first(&mut conn2)
+        .expect("pre-compromise atom must exist");
+
+    let post_atom: EprAtom = a_dsl::epr_atoms
+        .filter(a_dsl::signer_cid.eq(agent_cid))
+        .filter(a_dsl::issued_at.eq(ts(t_signed)))
+        .first(&mut conn2)
+        .expect("post-compromise atom must exist");
+
+    // Pre-compromise atom (t_pre=50 < t_compromise=75): UNTOUCHED.
+    assert!(
+        pre_atom.verified_at.is_some(),
+        "pre-compromise atom (issued_at=t50) must remain verified after sweep"
+    );
+    assert_eq!(
+        pre_atom.verified_signer_fingerprint,
+        Some(real_fingerprint.to_string()),
+        "pre-compromise atom fingerprint must not be overwritten to revoked_stale"
+    );
+
+    // Post-compromise atom (t_signed=100 >= t_compromise=75): SWEPT.
+    assert!(
+        post_atom.verified_at.is_none(),
+        "post-compromise atom (issued_at=t100) must have verified_at cleared to NULL after sweep"
+    );
+    assert_eq!(
+        post_atom.verified_signer_fingerprint,
+        Some(REVOKED_STALE_FINGERPRINT.to_string()),
+        "post-compromise atom fingerprint must be REVOKED_STALE_FINGERPRINT after sweep"
+    );
+}
 use harness::{spawn_test_node, BatchOutcome};
 use std::time::Duration;
 use tokio::time::timeout;
