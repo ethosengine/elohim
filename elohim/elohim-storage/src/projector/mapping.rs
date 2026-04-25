@@ -132,26 +132,83 @@ struct ManifestProjectionEntry {
 // Test helper
 // ---------------------------------------------------------------------------
 
-/// Build a [`ManifestRegistry`] for tests without any file I/O.
+/// Build the canonical shefa `EconomicEvent → economic_events` column mapping.
 ///
-/// Registers the `shefa / EconomicEvent / economic-event → economic_events`
-/// projection, which matches the shefa manifest's `projections[]` declaration.
+/// This is the authoritative in-process representation of the shefa manifest's
+/// `projections[0].columnMapping`. Both the unit-test mock helper and the
+/// integration test use this to construct a [`ManifestRegistry`] without file I/O.
+///
+/// Column mapping covers all NOT NULL columns of `economic_events`:
+/// - `id`, `dht_anchor_hash` ← `$cid` (content address = idempotent PK + provenance)
+/// - `h_app_id` ← `$signer`
+/// - `created_at` ← `$issuedAt`
+/// - `state` ← `$state:recorded` (constant default)
+/// - `action`, `provider`, `receiver`, `has_point_in_time` ← dotted payload paths
+/// - optional quantity/resource columns ← dotted payload paths (nullable; ok if absent)
+fn shefa_economic_event_column_mapping() -> BTreeMap<String, String> {
+    let mut m = BTreeMap::new();
+    // Projector-derived NOT NULL columns.
+    m.insert("id".to_string(), "$cid".to_string());
+    m.insert("h_app_id".to_string(), "$signer".to_string());
+    m.insert("created_at".to_string(), "$issuedAt".to_string());
+    m.insert("state".to_string(), "$state:recorded".to_string());
+    m.insert("dht_anchor_hash".to_string(), "$cid".to_string());
+    // Payload-sourced columns.
+    m.insert("action".to_string(), "payload.action".to_string());
+    m.insert("provider".to_string(), "payload.provider".to_string());
+    m.insert("receiver".to_string(), "payload.receiver".to_string());
+    m.insert(
+        "has_point_in_time".to_string(),
+        "payload.hasPointInTime".to_string(),
+    );
+    m.insert(
+        "resource_conforms_to".to_string(),
+        "payload.resourceConformsTo".to_string(),
+    );
+    m.insert(
+        "resource_quantity_value".to_string(),
+        "payload.resourceQuantity.numericValue".to_string(),
+    );
+    m.insert(
+        "resource_quantity_unit".to_string(),
+        "payload.resourceQuantity.hasUnit".to_string(),
+    );
+    m.insert(
+        "effort_quantity_value".to_string(),
+        "payload.effortQuantity.numericValue".to_string(),
+    );
+    m.insert(
+        "effort_quantity_unit".to_string(),
+        "payload.effortQuantity.hasUnit".to_string(),
+    );
+    m
+}
+
+impl ManifestRegistry {
+    /// Construct a registry pre-loaded with the shefa `EconomicEvent → economic_events`
+    /// projection. Available in all build profiles so integration tests can use it
+    /// without a feature flag.
+    pub fn with_shefa_economic_event() -> Self {
+        Self {
+            projections: vec![RegisteredProjection {
+                pillar: "shefa".to_string(),
+                kind: "EconomicEvent".to_string(),
+                schema_key: "economic-event".to_string(),
+                target_table: "economic_events".to_string(),
+                column_mapping: shefa_economic_event_column_mapping(),
+            }],
+        }
+    }
+}
+
+/// Build a [`ManifestRegistry`] for unit tests without any file I/O.
+///
+/// Alias for [`ManifestRegistry::with_shefa_economic_event`], kept as a
+/// `#[cfg(test)]` free function for backwards compat with unit tests that
+/// import `mock_manifest_registry` directly.
 #[cfg(test)]
 pub fn mock_manifest_registry() -> ManifestRegistry {
-    let mut column_mapping = BTreeMap::new();
-    column_mapping.insert("provider".to_string(), "payload.provider".to_string());
-    column_mapping.insert("receiver".to_string(), "payload.receiver".to_string());
-    column_mapping.insert("action".to_string(), "payload.action".to_string());
-
-    ManifestRegistry {
-        projections: vec![RegisteredProjection {
-            pillar: "shefa".to_string(),
-            kind: "EconomicEvent".to_string(),
-            schema_key: "economic-event".to_string(),
-            target_table: "economic_events".to_string(),
-            column_mapping,
-        }],
-    }
+    ManifestRegistry::with_shefa_economic_event()
 }
 
 // ---------------------------------------------------------------------------

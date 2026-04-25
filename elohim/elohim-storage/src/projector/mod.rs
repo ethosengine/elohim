@@ -19,14 +19,45 @@
 //!     │  fetch_epr_atoms_since
 //!     ▼
 //! pillar read-model tables (economic_events, ...)
-//!     (populated by Task B.4 — UPSERT stub for B.3)
 //! ```
 //!
-//! ## Current state (B.3 skeleton)
+//! ## Column mapping source paths (Task B.4)
 //!
-//! `run_one_pass` walks each registered projection, fetches new atoms since the
-//! cursor, calls the stub `project()` method (returns `Ok(())`), and advances
-//! the cursor. Task B.4 fills in the actual UPSERT logic.
+//! Each entry in a manifest's `columnMapping` maps a snake_case DB column name
+//! to a **source path**, which is one of:
+//!
+//! - `payload.<dotted.path>` — JSON path into the atom's `payload_bytes`
+//!   (deserialized as a JSON object). Dots separate object keys. Only string
+//!   and number leaf values are projected; objects/arrays are silently skipped.
+//!
+//! - `$cid` — the atom's `cid` field (content address). Idempotent UPSERT key.
+//!
+//! - `$signer` — the atom's `signer_cid` field (economic agent identity).
+//!
+//! - `$issuedAt` — the atom's `issued_at` field (ISO-8601 TEXT).
+//!
+//! - `$state:<default>` — a literal constant value (e.g. `$state:recorded`
+//!   maps to the string `"recorded"`).
+//!
+//! All other `$`-prefixed paths that don't match the above are treated as
+//! unknown and silently skipped (column left out of the INSERT).
+//!
+//! ## UPSERT semantics
+//!
+//! The projector issues `INSERT OR REPLACE INTO {target_table}` (SQLite alias
+//! for `INSERT OR REPLACE`, equivalent to `INSERT ... ON CONFLICT DO REPLACE`).
+//! The `id` column — sourced from `$cid` — makes every UPSERT idempotent: if
+//! the projector re-processes an atom that was already projected (e.g. after a
+//! crash-restart replay), the row is replaced in place rather than duplicated.
+//!
+//! ## NOT NULL columns not covered by the manifest
+//!
+//! The manifest only maps columns it knows about. NOT NULL columns that the
+//! manifest does not map (`has_point_in_time` being the sentinel) must be
+//! covered by `$`-prefixed rules or default values. If a required column is
+//! absent from the built column set AND has no fallback, the INSERT will fail
+//! with a Diesel `NotNullViolation`. The canonical resolution is to add the
+//! mapping to the manifest (see shefa `manifest.json`'s `projections[0]`).
 
 pub mod cursor;
 pub mod mapping;
@@ -34,11 +65,12 @@ pub mod mapping;
 pub use cursor::{advance_cursor, load_cursor, CursorError, ProjectorCursorRow};
 pub use mapping::{ManifestRegistry, RegisteredProjection, RegistryError};
 
+use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use diesel::prelude::*;
 use thiserror::Error;
-use tracing::{debug, trace};
+use tracing::{debug, trace, warn};
 
 use crate::db::diesel_schema::epr_atoms;
 use crate::db::epr_atoms::EprAtom;
@@ -55,6 +87,9 @@ pub enum ProjectorError {
 
     #[error("cursor error: {0}")]
     Cursor(#[from] CursorError),
+
+    #[error("projection error for table {table}: {cause}")]
+    Projection { table: String, cause: String },
 }
 
 // ---------------------------------------------------------------------------
@@ -154,28 +189,207 @@ impl Projector {
     }
 
     // -----------------------------------------------------------------------
-    // Stub handler — Task B.4 replaces this with UPSERT logic
+    // Column mapping evaluator (Task B.4)
     // -----------------------------------------------------------------------
 
     /// Project a single EPR atom into the target pillar table.
     ///
-    /// **B.3 stub**: logs the projection intent and returns `Ok(())`.
-    /// Task B.4 fills in the actual UPSERT into `projection.target_table`
-    /// using the `column_mapping` JSONPath expressions over `atom.payload_bytes`.
+    /// Evaluates each `(column, source_path)` entry in the manifest's
+    /// `column_mapping`, resolves a scalar string value for each, and issues
+    /// an `INSERT OR REPLACE INTO {target_table}` via `diesel::sql_query`.
+    ///
+    /// ## Source path resolution
+    ///
+    /// - `payload.<dotted.path>` → walk the atom's JSON payload. Only string
+    ///   and number leaves are emitted; objects/arrays are skipped.
+    /// - `$cid` → `atom.cid`
+    /// - `$signer` → `atom.signer_cid`
+    /// - `$issuedAt` → `atom.issued_at`
+    /// - `$state:<literal>` → the literal string after the colon (e.g. `"recorded"`)
+    /// - Any other `$`-prefixed path → warn + skip (column omitted from INSERT)
+    ///
+    /// Columns with no resolvable value are silently omitted from the INSERT.
+    /// If a NOT NULL column is omitted, Diesel will return a constraint error.
     fn project(
         &self,
-        _conn: &mut SqliteConnection,
+        conn: &mut SqliteConnection,
         projection: &RegisteredProjection,
         atom: &EprAtom,
     ) -> Result<(), ProjectorError> {
-        // B.3 stub — intentional no-op. Cursor advances; no table writes yet.
-        // Task B.4 replaces this with a generic JSONPath → UPSERT implementation.
         trace!(
             target_table = %projection.target_table,
             atom_cid = %atom.cid,
-            "project stub: would upsert atom into target table (B.4)"
+            "projecting atom into target table"
         );
+
+        // Deserialize payload — payload_bytes is JSON-encoded in the EPR atom.
+        let payload: serde_json::Value = if atom.payload_bytes.is_empty() {
+            serde_json::Value::Null
+        } else {
+            serde_json::from_slice(&atom.payload_bytes).unwrap_or(serde_json::Value::Null)
+        };
+
+        // Resolve each column → scalar string value.
+        let resolved = evaluate_column_mapping(&projection.column_mapping, atom, &payload);
+
+        if resolved.is_empty() {
+            warn!(
+                target_table = %projection.target_table,
+                atom_cid = %atom.cid,
+                "column mapping produced no columns — skipping UPSERT"
+            );
+            return Ok(());
+        }
+
+        // Build a dynamic INSERT OR REPLACE via SimpleConnection::batch_execute.
+        //
+        // Diesel's typed query builder cannot handle dynamic column sets, and
+        // diesel::sql_query::bind() returns a new owned type each call, making
+        // loop-based accumulation impossible. Instead we embed the values inline
+        // in the SQL string, escaped for SQLite's TEXT literal syntax.
+        //
+        // Safety: all values come from controlled sources — EPR CID strings
+        // (base58 content addresses), ISO-8601 timestamps, and JSON string/number
+        // scalars extracted by the evaluator. None are user-supplied HTML. We
+        // escape each value by replacing single-quotes with '' (SQLite convention).
+        let columns: Vec<&str> = resolved.keys().map(String::as_str).collect();
+        let values_sql: Vec<String> = columns
+            .iter()
+            .map(|col| {
+                let val = resolved.get(*col).expect("key from own map");
+                format!("'{}'", val.replace('\'', "''"))
+            })
+            .collect();
+
+        let sql = format!(
+            "INSERT OR REPLACE INTO {} ({}) VALUES ({})",
+            projection.target_table,
+            columns.join(", "),
+            values_sql.join(", ")
+        );
+
+        use diesel::connection::SimpleConnection;
+        conn.batch_execute(&sql)
+            .map_err(|e| ProjectorError::Projection {
+                table: projection.target_table.clone(),
+                cause: format!("SQL={sql} error={e}"),
+            })?;
+
+        debug!(
+            target_table = %projection.target_table,
+            atom_cid = %atom.cid,
+            columns = columns.len(),
+            "atom projected successfully"
+        );
+
         Ok(())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Column mapping evaluator
+// ---------------------------------------------------------------------------
+
+/// Evaluate a manifest `column_mapping` against an EPR atom and its decoded
+/// payload, returning a map of `column_name → resolved_string_value`.
+///
+/// Columns that cannot be resolved (unknown `$`-prefix, missing payload path,
+/// non-scalar payload value) are silently omitted. The caller decides whether
+/// to treat an empty result as an error.
+///
+/// This function is `pub(crate)` so the integration test can call it directly.
+pub(crate) fn evaluate_column_mapping(
+    column_mapping: &BTreeMap<String, String>,
+    atom: &EprAtom,
+    payload: &serde_json::Value,
+) -> BTreeMap<String, String> {
+    let mut resolved: BTreeMap<String, String> = BTreeMap::new();
+
+    for (column, source_path) in column_mapping {
+        // Skip comment entries (manifest allows a "_comment" key for documentation).
+        if column.starts_with('_') {
+            continue;
+        }
+
+        let value_opt = if source_path.starts_with('$') {
+            resolve_projector_source(source_path, atom)
+        } else if let Some(dotted) = source_path.strip_prefix("payload.") {
+            resolve_payload_path(dotted, payload)
+        } else {
+            // Unrecognised source prefix — log and skip.
+            warn!(
+                column = %column,
+                source = %source_path,
+                "unknown source path prefix in column mapping — skipping"
+            );
+            None
+        };
+
+        if let Some(value) = value_opt {
+            resolved.insert(column.clone(), value);
+        } else {
+            trace!(
+                column = %column,
+                source = %source_path,
+                "column mapping produced no value — column omitted from INSERT"
+            );
+        }
+    }
+
+    resolved
+}
+
+/// Resolve a `$`-prefixed projector-derived source path against the atom.
+///
+/// Supported rules:
+/// - `$cid` → atom CID string
+/// - `$signer` → atom signer CID string
+/// - `$issuedAt` → atom issued_at ISO-8601 string
+/// - `$state:<literal>` → the literal string after the colon
+///
+/// Returns `None` for unknown `$`-prefixed paths.
+fn resolve_projector_source(source_path: &str, atom: &EprAtom) -> Option<String> {
+    match source_path {
+        "$cid" => Some(atom.cid.clone()),
+        "$signer" => Some(atom.signer_cid.clone()),
+        "$issuedAt" => Some(atom.issued_at.clone()),
+        other if other.starts_with("$state:") => {
+            let literal = other.trim_start_matches("$state:");
+            Some(literal.to_string())
+        }
+        unknown => {
+            warn!(
+                source = %unknown,
+                "unknown $-prefixed projector source — column will be omitted"
+            );
+            None
+        }
+    }
+}
+
+/// Walk a dotted payload path (e.g. `"resourceQuantity.numericValue"`) through
+/// a JSON value and return the leaf as a string.
+///
+/// Only string and number leaves are returned. Objects, arrays, booleans, and
+/// null produce `None` (the column is omitted from the INSERT).
+fn resolve_payload_path(dotted_path: &str, payload: &serde_json::Value) -> Option<String> {
+    let mut current = payload;
+    for key in dotted_path.split('.') {
+        match current.get(key) {
+            Some(next) => current = next,
+            None => return None,
+        }
+    }
+    scalar_to_string(current)
+}
+
+/// Convert a JSON scalar (string or number) to a `String`. Returns `None` for
+/// objects, arrays, booleans, and null.
+fn scalar_to_string(value: &serde_json::Value) -> Option<String> {
+    match value {
+        serde_json::Value::String(s) => Some(s.clone()),
+        serde_json::Value::Number(n) => Some(n.to_string()),
+        _ => None,
     }
 }
 
@@ -215,6 +429,11 @@ mod tests {
     use diesel::prelude::*;
 
     /// Insert a minimal EprAtom with the given CID, kind, and issued_at into the test DB.
+    ///
+    /// `payload_bytes` carries a minimal JSON payload that satisfies the NOT NULL
+    /// columns of `economic_events` (`action`, `provider`, `receiver`,
+    /// `hasPointInTime`) so the real column mapping evaluator can UPSERT
+    /// successfully in the projector_advances_cursor tests.
     fn insert_epr_atom(
         conn: &mut SqliteConnection,
         cid: &str,
@@ -222,6 +441,14 @@ mod tests {
         schema_key: &str,
         issued_at: &str,
     ) {
+        let payload = serde_json::json!({
+            "action": "use",
+            "provider": "agent:provider-skeleton",
+            "receiver": "agent:receiver-skeleton",
+            "hasPointInTime": issued_at
+        });
+        let payload_bytes = serde_json::to_vec(&payload).expect("serialize skeleton payload");
+
         let atom = EprAtom {
             cid: cid.to_string(),
             kind: kind.to_string(),
@@ -232,7 +459,7 @@ mod tests {
             signer_cid: "test-signer".to_string(),
             supersedes: None,
             canonical_bytes: vec![0u8; 4],
-            payload_bytes: vec![0u8; 4],
+            payload_bytes,
             proof_bytes: vec![0u8; 64],
             proof_algorithm: "ed25519".to_string(),
             verified_at: None,
