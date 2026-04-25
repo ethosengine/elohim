@@ -1502,6 +1502,7 @@ dependencies = [
  "futures",
  "gate-types",
  "http",
+ "reqwest",
  "serde",
  "serde_json",
  "serde_yaml",
