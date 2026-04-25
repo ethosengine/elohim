@@ -25,5 +25,9 @@
 //!
 //! - [`signal_stream`] — `DnaSignal` enum + payload structs, `DnaSignalStream`
 //!   trait, and stub implementations for testing.
+//! - [`controller`] — `ReconcileController` k8s-style loop (Task A.4).
 
+pub mod controller;
 pub mod signal_stream;
+
+pub use controller::{ReconcileController, ReconcileError};
