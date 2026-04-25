@@ -25,29 +25,37 @@
 //! the signal kind in `observed_kinds` for test introspection and return `Ok(())`.
 //! Handler implementations are filled in by Tasks A.5, A.6, A.8, and A.10.
 
-use thiserror::Error;
-use tracing::{debug, warn};
+use std::sync::Arc;
 
+use thiserror::Error;
+use tokio::sync::Mutex;
+use tracing::{debug, info, warn};
+
+use crate::db::DbPool;
+use crate::reconcile::pubkey_timeline::PubkeyTimelineCache;
 use crate::reconcile::signal_stream::{
     AgentPeerBindingSignal, DnaSignal, DnaSignalStream, KeyRevocationSignal, KeyRotationSignal,
     RevocationAttestationSignal,
 };
+use crate::reconcile::sweep::sweep_on_revocation;
 
 // ---------------------------------------------------------------------------
 // Error type
 // ---------------------------------------------------------------------------
 
 /// Errors that can occur in the reconcile controller loop.
-///
-/// Currently only wraps stream-level errors. Later tasks will add
-/// handler-specific error variants (e.g. `DbWrite`, `CacheInsert`).
 #[derive(Debug, Error)]
 pub enum ReconcileError {
     #[error("signal stream error: {0}")]
     Stream(String),
-    // Future variants added by A.5 / A.6 / A.8 / A.10:
-    //   DbWrite(#[from] diesel::result::Error),
-    //   CacheInsert(String),
+
+    /// A.8: revocation sweep DB write failed.
+    #[error("revocation sweep failed: {0}")]
+    Sweep(String),
+
+    /// A.8: r2d2 pool checkout failed.
+    #[error("db pool error: {0}")]
+    Pool(String),
 }
 
 // ---------------------------------------------------------------------------
@@ -65,16 +73,13 @@ pub enum ReconcileError {
 ///
 /// ## State evolution
 ///
-/// The only state carried today is `observed_kinds` — a test-introspection
-/// accumulator. Later tasks will add real per-handler state:
-///
 /// | Task | State added |
 /// |------|-------------|
 /// | A.5  | `binding_cache: Arc<RwLock<PeerBindingCache>>` |
 /// | A.6  | `pubkey_cache: PubkeyTimelineCache` |
-/// | A.8  | Uses `db_pool` for sweep queries |
+/// | A.8  | `db_pool` + `pubkey_cache` (sweep + cache invalidate) — THIS TASK |
 /// | A.10 | Uses `db_pool` for revocation_votes projection |
-/// | A.11 | `db_pool: Arc<Pool<ConnectionManager<SqliteConnection>>>` |
+/// | A.11 | `db_pool` wired from `HttpServer` / `Services` startup |
 pub struct ReconcileController<S: DnaSignalStream> {
     stream: S,
 
@@ -86,16 +91,49 @@ pub struct ReconcileController<S: DnaSignalStream> {
     /// Expected to evolve: as Tasks A.5/A.6/A.8/A.10 add real handler state,
     /// this field may be moved to a `#[cfg(test)]`-only extension or removed.
     observed_kinds: Vec<String>,
+
+    /// A.8: optional r2d2 pool for DB sweep operations.
+    ///
+    /// `None` in test stubs that don't need persistence (the no-storage
+    /// `new()` constructor). `Some(...)` when wired via `new_with_storage`.
+    db_pool: Option<Arc<DbPool>>,
+
+    /// A.8: optional pubkey timeline cache for per-agent invalidation.
+    ///
+    /// Wrapped in `Arc<Mutex<...>>` so the cache can be shared between the
+    /// controller task and the verify path (Task A.7). The `Mutex` is Tokio's
+    /// async variant; cache ops are short so there is no contention concern.
+    pubkey_cache: Option<Arc<Mutex<PubkeyTimelineCache>>>,
 }
 
 impl<S: DnaSignalStream> ReconcileController<S> {
-    /// Construct a controller subscribing to `stream`.
+    /// Construct a controller subscribing to `stream`, without DB or cache.
     ///
-    /// No caches or DB pools are accepted yet — those are added by later tasks.
+    /// Suitable for stub-only test controllers that don't need persistence.
+    /// The A.4 test suite uses this constructor; it remains unchanged.
     pub fn new(stream: S) -> Self {
         Self {
             stream,
             observed_kinds: Vec::new(),
+            db_pool: None,
+            pubkey_cache: None,
+        }
+    }
+
+    /// Construct a controller with DB pool and pubkey cache wired in (A.8).
+    ///
+    /// Use this constructor in production (Task A.11 startup) and in tests
+    /// that exercise the full sweep + cache-invalidate path.
+    pub fn new_with_storage(
+        stream: S,
+        db_pool: Arc<DbPool>,
+        pubkey_cache: Arc<Mutex<PubkeyTimelineCache>>,
+    ) -> Self {
+        Self {
+            stream,
+            observed_kinds: Vec::new(),
+            db_pool: Some(db_pool),
+            pubkey_cache: Some(pubkey_cache),
         }
     }
 
@@ -189,20 +227,70 @@ impl<S: DnaSignalStream> ReconcileController<S> {
         Ok(())
     }
 
-    /// STUB — Task A.8: invalidate pubkey cache + sweep epr_atoms.
+    /// Task A.8: invalidate pubkey cache + sweep epr_atoms.
     ///
-    /// Will mark any EPR atom signed by `revoked_pubkey` after `compromise_at`
-    /// as tainted and trigger re-verification or invalidation.
+    /// ## Steps
+    ///
+    /// 1. Invalidate the per-agent pubkey timeline cache entry so the next
+    ///    EPR verify reloads fresh key history from the DB (preventing stale
+    ///    cache from approving tainted envelopes after revocation).
+    ///
+    /// 2. Run `sweep_on_revocation` against `epr_atoms`: clear `verified_at`
+    ///    and set `verified_signer_fingerprint = "revoked_stale"` for any atom
+    ///    whose `signer_cid` matches the revoked agent AND whose `issued_at >=
+    ///    compromise_at`. Pre-compromise atoms are untouched.
+    ///
+    /// Steps 1 and 2 are intentionally ordered: invalidate cache before sweep
+    /// so any concurrent verify request that races with the sweep sees a cache
+    /// miss and must re-check the DB rather than returning a stale hit.
+    ///
+    /// ## No-storage path
+    ///
+    /// If the controller was constructed with `new()` (no pool/cache), the
+    /// method logs a warning and returns `Ok(())` — preserving backward
+    /// compatibility with the A.4 test suite that doesn't wire storage.
     async fn on_key_revocation(
         &mut self,
         signal: KeyRevocationSignal,
     ) -> Result<(), ReconcileError> {
-        // Task A.8 replaces this stub.
-        warn!(
-            revoked_pubkey = %signal.revoked_pubkey,
-            compromise_at = %signal.compromise_at,
-            "KeyRevocation received — sweep not yet implemented (Task A.8)"
-        );
+        // Step 1: invalidate the pubkey timeline cache for the revoked agent.
+        // Do this BEFORE the sweep so racing verify calls see a cache miss.
+        if let Some(cache) = &self.pubkey_cache {
+            cache.lock().await.invalidate(&signal.agent_cid);
+            debug!(agent_cid = %signal.agent_cid, "pubkey timeline cache invalidated on revocation");
+        }
+
+        // Step 2: sweep epr_atoms if a DB pool is available.
+        if let Some(pool) = &self.db_pool {
+            let pool = Arc::clone(pool);
+            let signal_clone = signal.clone();
+
+            // The r2d2 pool is sync. We use block_in_place to avoid blocking
+            // the Tokio runtime's async thread while holding the connection.
+            let report = tokio::task::block_in_place(move || {
+                let mut conn = pool
+                    .get()
+                    .map_err(|e| ReconcileError::Pool(e.to_string()))?;
+                sweep_on_revocation(&mut conn, &signal_clone)
+                    .map_err(|e| ReconcileError::Sweep(e.to_string()))
+            })?;
+
+            info!(
+                agent_cid = %report.agent_cid,
+                affected_rows = report.affected_rows,
+                compromise_at = %report.compromise_at,
+                swept_at = %report.at,
+                "revocation sweep complete"
+            );
+        } else {
+            warn!(
+                agent_cid = %signal.agent_cid,
+                revoked_pubkey = %signal.revoked_pubkey,
+                compromise_at = %signal.compromise_at,
+                "KeyRevocation received but no db_pool wired — sweep skipped (use new_with_storage)"
+            );
+        }
+
         Ok(())
     }
 
@@ -390,5 +478,120 @@ mod tests {
         controller.run_one_pass().await.unwrap();
 
         assert!(controller.observed_kinds().is_empty());
+    }
+
+    // -----------------------------------------------------------------------
+    // A.8: controller + sweep + cache integration
+    // -----------------------------------------------------------------------
+
+    /// End-to-end: a KeyRevocation signal through new_with_storage causes
+    /// cache invalidation AND DB sweep in the correct order.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn controller_on_revocation_invalidates_cache_and_runs_sweep() {
+        use crate::db::diesel_schema::epr_atoms::dsl as a_dsl;
+        use crate::db::epr_atoms::EprAtom;
+        use crate::reconcile::pubkey_timeline::{PubkeyTimeline, PubkeyTimelineCache};
+        use crate::test_util::test_pool;
+        use chrono::{TimeZone, Utc};
+        use diesel::prelude::*;
+        use std::sync::Arc;
+        use tokio::sync::Mutex;
+
+        let pool = Arc::new(test_pool());
+        let mut conn = pool.get().expect("connection");
+
+        let t = |secs: i64| Utc.timestamp_opt(secs, 0).single().unwrap();
+        let ts = |dt: chrono::DateTime<Utc>| dt.format("%Y-%m-%dT%H:%M:%SZ").to_string();
+
+        // Insert two atoms for the agent: pre-compromise (t50) and post (t90).
+        for (issued, verified) in [(t(50), t(51)), (t(90), t(91))] {
+            let atom = EprAtom {
+                cid: format!("bafy-ctrl-{}", issued.timestamp()),
+                kind: "test-kind".into(),
+                schema_ref: "test-schema".into(),
+                schema_key: "test-key".into(),
+                reach: "commons".into(),
+                issued_at: ts(issued),
+                signer_cid: "ctrl-agent".into(),
+                supersedes: None,
+                canonical_bytes: vec![0u8; 4],
+                payload_bytes: vec![0u8; 4],
+                proof_bytes: vec![0u8; 64],
+                proof_algorithm: "ed25519".into(),
+                verified_at: Some(ts(verified)),
+                verified_signer_fingerprint: Some("abcdef0123456789abcdef0123456789".into()),
+            };
+            diesel::insert_into(a_dsl::epr_atoms)
+                .values(&atom)
+                .execute(&mut conn)
+                .expect("insert atom");
+        }
+
+        // Pre-warm the pubkey cache for the agent.
+        let cache = Arc::new(Mutex::new(PubkeyTimelineCache::with_capacity(16)));
+        {
+            let mut c = cache.lock().await;
+            let mut tl = PubkeyTimeline::new();
+            tl.insert([0x01; 32], t(0), None, "ah-warmup".into());
+            c.insert("ctrl-agent".into(), tl);
+        }
+        assert!(
+            cache.lock().await.get(&"ctrl-agent".to_string()).is_some(),
+            "cache should be warm before signal"
+        );
+
+        drop(conn); // release connection back to pool before block_in_place
+
+        // Build controller with storage wired.
+        let signal = KeyRevocationSignal {
+            action_hash: "uhCkk-ctrl-rev-hash".into(),
+            agent_cid: "ctrl-agent".into(),
+            revoked_pubkey: "cmV2b2tlZGtleWJhc2U2NAAAAAAAAAAAAAAAAAAAAAA".into(),
+            compromise_at: t(75),
+            effective_at: t(76),
+            triggering_revocation_id: Some("rev-ctrl-1".into()),
+            emitted_at: Utc::now(),
+        };
+
+        let stream = InMemoryDnaSignalStream::with_signals(vec![DnaSignal::KeyRevocation(signal)]);
+        let mut controller =
+            ReconcileController::new_with_storage(stream, Arc::clone(&pool), Arc::clone(&cache));
+
+        controller.run_one_pass().await.expect("run_one_pass");
+
+        // Cache must be invalidated.
+        assert!(
+            cache.lock().await.get(&"ctrl-agent".to_string()).is_none(),
+            "cache entry must be removed after revocation"
+        );
+
+        // DB: pre-compromise atom (t50) stays verified.
+        let mut conn2 = pool.get().expect("connection2");
+        let pre: EprAtom = a_dsl::epr_atoms
+            .filter(a_dsl::signer_cid.eq("ctrl-agent"))
+            .filter(a_dsl::issued_at.eq(ts(t(50))))
+            .first(&mut conn2)
+            .expect("pre-compromise atom");
+        assert!(
+            pre.verified_at.is_some(),
+            "pre-compromise atom must remain verified"
+        );
+
+        // DB: post-compromise atom (t90) is cleared.
+        let post: EprAtom = a_dsl::epr_atoms
+            .filter(a_dsl::signer_cid.eq("ctrl-agent"))
+            .filter(a_dsl::issued_at.eq(ts(t(90))))
+            .first(&mut conn2)
+            .expect("post-compromise atom");
+        assert!(
+            post.verified_at.is_none(),
+            "post-compromise atom must have verified_at cleared"
+        );
+        assert_eq!(
+            post.verified_signer_fingerprint,
+            Some(crate::reconcile::sweep::REVOKED_STALE_FINGERPRINT.to_string())
+        );
+
+        assert_eq!(controller.observed_kinds(), &["keyRevocation"]);
     }
 }

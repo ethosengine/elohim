@@ -30,6 +30,8 @@
 pub mod controller;
 pub mod pubkey_timeline;
 pub mod signal_stream;
+pub mod sweep;
 
 pub use controller::{ReconcileController, ReconcileError};
 pub use pubkey_timeline::{PubkeyTimeline, PubkeyTimelineCache, PubkeyValidity};
+pub use sweep::{sweep_on_revocation, SweepReport, REVOKED_STALE_FINGERPRINT};
