@@ -344,15 +344,16 @@ impl<S: DnaSignalStream> ReconcileController<S> {
         signal: AgentPeerBindingSignal,
     ) -> Result<(), ReconcileError> {
         // Build the gossip payload from the DHT signal fields.
+        // Note: action_hash is intentionally excluded from the gossip wire payload —
+        // binding_action_hash is the canonical DHT provenance field for P2P gossip.
         let payload = crate::p2p::identity_binding_gossip::IdentityBindingGossip {
-            action_hash: signal.action_hash.clone(),
             peer_id: signal.peer_id.clone(),
             agent_cid: signal.agent_cid.clone(),
             valid_from: signal.valid_from.format("%Y-%m-%dT%H:%M:%SZ").to_string(),
             valid_until: signal
                 .valid_until
                 .map(|dt| dt.format("%Y-%m-%dT%H:%M:%SZ").to_string()),
-            device_archetype: format!("{:?}", signal.device_archetype).to_lowercase(),
+            device_archetype: signal.device_archetype.as_str().to_string(),
             binding_action_hash: signal.binding_action_hash.clone(),
             emitted_at: signal.emitted_at.format("%Y-%m-%dT%H:%M:%SZ").to_string(),
             // Stage 1: structural-only sentinel. Stage 2 replaces with real Ed25519

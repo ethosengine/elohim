@@ -55,6 +55,24 @@ pub enum DeviceArchetype {
     Steward,
 }
 
+impl DeviceArchetype {
+    /// Return the stable canonical wire string for this archetype.
+    ///
+    /// These strings are intentionally lowercase and match the `serde(rename_all
+    /// = "camelCase")` output for single-word variants. Using this method (rather
+    /// than `format!("{:?}", ...)`) ensures that variant renames do not silently
+    /// change the gossip wire format. Add a new arm here whenever a variant is
+    /// added to the enum.
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            DeviceArchetype::Node => "node",
+            DeviceArchetype::Desktop => "desktop",
+            DeviceArchetype::Mobile => "mobile",
+            DeviceArchetype::Steward => "steward",
+        }
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Per-variant payload structs
 // ---------------------------------------------------------------------------
@@ -584,6 +602,19 @@ mod tests {
             result.is_err(),
             "ChannelSignalStream.resume_from should always error"
         );
+    }
+
+    /// Verify every `DeviceArchetype` variant maps to its stable canonical string.
+    ///
+    /// This test exists to make variant renames a compile error rather than a
+    /// silent wire-format break. If a new variant is added without updating
+    /// `as_str`, this test will remind the author to add the matching arm.
+    #[test]
+    fn device_archetype_as_str_is_stable() {
+        assert_eq!(DeviceArchetype::Node.as_str(), "node");
+        assert_eq!(DeviceArchetype::Desktop.as_str(), "desktop");
+        assert_eq!(DeviceArchetype::Mobile.as_str(), "mobile");
+        assert_eq!(DeviceArchetype::Steward.as_str(), "steward");
     }
 
     #[test]

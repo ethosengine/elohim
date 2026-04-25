@@ -35,16 +35,17 @@ use serde::{Deserialize, Serialize};
 
 /// Wire payload for the `elohim/identity/binding` gossipsub topic.
 ///
-/// Carries the same fields as `AgentPeerBindingSignal` from
-/// `reconcile::signal_stream`, plus a `signature` field for future
+/// Carries the key fields from `AgentPeerBindingSignal` (see
+/// `reconcile::signal_stream`), plus a `signature` field for future
 /// Ed25519 verification (Stage 2 / 3). For Stage 1 the signature is a
 /// non-empty sentinel value.
+///
+/// Note: the `action_hash` field present in `AgentPeerBindingSignal` is NOT
+/// included here. `binding_action_hash` is the canonical DHT provenance field
+/// for the gossip wire; the "uniform stream deserialization" justification only
+/// applies to the conductor-side signal stream, not to P2P gossip payloads.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct IdentityBindingGossip {
-    /// Holochain ActionHash (base64) of the `AgentPeerBinding` DHT entry.
-    /// Semantic alias for `binding_action_hash`; present for uniform stream
-    /// deserialization. Used as the `dht_anchor_hash` in the DB row.
-    pub action_hash: String,
     /// multibase-encoded libp2p PeerId of the bound peer.
     pub peer_id: String,
     /// CID of the agent to which this peer is bound. Must be non-empty.
@@ -57,9 +58,8 @@ pub struct IdentityBindingGossip {
     pub valid_until: Option<String>,
     /// Hardware/deployment archetype string (e.g. "node", "desktop", "mobile").
     pub device_archetype: String,
-    /// Semantic alias for `action_hash` — the DHT ActionHash specifically for
-    /// the `AgentPeerBinding` entry. Consumers tracking binding provenance
-    /// should prefer this field.
+    /// Holochain ActionHash (base64) of the `AgentPeerBinding` DHT entry.
+    /// Used as the `dht_anchor_hash` in the DB row.
     pub binding_action_hash: String,
     /// ISO-8601 timestamp at which the signal was emitted from the conductor.
     pub emitted_at: String,
@@ -114,6 +114,14 @@ impl IdentityBindingGossip {
     }
 }
 
+/// Gossipsub topic name for identity binding propagation.
+///
+/// Published by `ReconcileController::on_agent_peer_binding` when a local
+/// `AgentPeerBinding` DHT signal arrives. Subscribed in `behaviour.rs`.
+/// Use this constant at all publish/subscribe/receive call sites to prevent
+/// compile-time typo drift.
+pub const IDENTITY_BINDING_TOPIC: &str = "elohim/identity/binding";
+
 /// Sentinel signature value used by Stage 1 gossip publish.
 ///
 /// base64("stage-1-signature") — non-empty, passes structural check,
@@ -126,7 +134,6 @@ mod tests {
 
     fn sample() -> IdentityBindingGossip {
         IdentityBindingGossip {
-            action_hash: "uhCkk-binding-action-hash".into(),
             peer_id: "12D3KooWExamplePeerId".into(),
             agent_cid: "bafybeicid-agent-gossip-test".into(),
             valid_from: "2026-04-25T00:00:00Z".into(),

@@ -8,6 +8,13 @@
 
 use serde::{Deserialize, Serialize};
 
+/// Gossipsub topic name for recovery invitation propagation.
+///
+/// Published when a `RecoveryRequest` is committed to the DHT. Subscribed in
+/// `behaviour.rs`. Use this constant at all publish/subscribe/receive call
+/// sites to prevent compile-time typo drift.
+pub const RECOVERY_INVITATION_TOPIC: &str = "recovery.invitation";
+
 /// Broadcast announcement that a recovery request has been committed.
 /// Subscribers filter (M5) for invitations relevant to humans their
 /// elohim represents.

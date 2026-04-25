@@ -638,7 +638,6 @@ async fn gossipsub_identity_binding_propagates_to_peer_db() {
 
     // Build the gossip payload peer A will publish.
     let payload = IdentityBindingGossip {
-        action_hash: "uhCkk-gossip-test-binding".into(),
         peer_id: "12D3KooWGossipTestPeerA".into(),
         agent_cid: "bafybeicid-gossip-propagation-agent".into(),
         valid_from: "2026-04-25T00:00:00Z".into(),

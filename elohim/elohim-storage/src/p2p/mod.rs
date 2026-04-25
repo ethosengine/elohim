@@ -1379,7 +1379,9 @@ impl P2PNode {
                 let _ = reply.send(peers);
             }
             P2PCommand::PublishRecoveryInvitation(inv) => {
-                let topic = libp2p::gossipsub::IdentTopic::new("recovery.invitation");
+                let topic = libp2p::gossipsub::IdentTopic::new(
+                    crate::p2p::recovery_invitation::RECOVERY_INVITATION_TOPIC,
+                );
                 match inv.to_bytes() {
                     Ok(bytes) => match swarm.behaviour_mut().gossipsub.publish(topic, bytes) {
                         Ok(msg_id) => info!(
@@ -1409,7 +1411,9 @@ impl P2PNode {
             // AgentPeerBinding DHT signal arrives. Best-effort: publish failure is
             // logged but does not block the controller loop.
             P2PCommand::PublishIdentityBinding(payload) => {
-                let topic = libp2p::gossipsub::IdentTopic::new("elohim/identity/binding");
+                let topic = libp2p::gossipsub::IdentTopic::new(
+                    crate::p2p::identity_binding_gossip::IDENTITY_BINDING_TOPIC,
+                );
                 match payload.to_bytes() {
                     Ok(bytes) => match swarm.behaviour_mut().gossipsub.publish(topic, bytes) {
                         Ok(msg_id) => info!(
@@ -2608,7 +2612,9 @@ impl P2PNode {
                         message_id,
                         message,
                     } => {
-                        if message.topic.as_str() == "recovery.invitation" {
+                        if message.topic.as_str()
+                            == crate::p2p::recovery_invitation::RECOVERY_INVITATION_TOPIC
+                        {
                             match crate::p2p::recovery_invitation::RecoveryInvitation::from_bytes(
                                 &message.data,
                             ) {
@@ -2627,7 +2633,9 @@ impl P2PNode {
                                     "Failed to decode RecoveryInvitation"
                                 ),
                             }
-                        } else if message.topic.as_str() == "elohim/identity/binding" {
+                        } else if message.topic.as_str()
+                            == crate::p2p::identity_binding_gossip::IDENTITY_BINDING_TOPIC
+                        {
                             // A.10: receive an identity binding from a peer and upsert
                             // into peer_identity_bindings with source='gossip'.
                             // Stage 1: structural verification only (non-empty fields).
@@ -2691,6 +2699,18 @@ impl P2PNode {
                                                     "IdentityBindingGossip: no db_pool configured, skipping persistence"
                                                 ),
                                             }
+                                            // device_archetype is carried in the wire payload (Category C) but not
+                                            // persisted in peer_identity_bindings yet — column addition deferred to a
+                                            // later batch. Available for inspection via gossip but not for SQL filtering.
+
+                                            // NOTE: reconcile signal emission deferred — the controller processes only
+                                            // DNA signals in Stage 1. A P2P-received binding reaching the reconcile layer
+                                            // (for cache invalidation, etc.) is an A.12 concern.
+
+                                            // TODO(A.12): invalidate the remote agent's pubkey_timeline cache entry here.
+                                            // The !Send cache lives in the controller; the receive arm cannot reach it
+                                            // without restructuring. Deferred to the full controller signal-flow landing
+                                            // in A.12.
                                         }
                                     }
                                 }

@@ -16,7 +16,9 @@ use std::time::Duration;
 
 use super::epr_atom_protocol::{EprAtomCodec, EprAtomProtocol};
 use super::epr_protocol::{EprCodec, EprProtocol};
+use super::identity_binding_gossip::IDENTITY_BINDING_TOPIC;
 use super::identity_handshake::{IdentityHandshakeCodec, IdentityHandshakeProtocol};
+use super::recovery_invitation::RECOVERY_INVITATION_TOPIC;
 use super::shard_protocol::{ShardCodec, ShardProtocol};
 use super::sync_protocol::{SyncCodec, SyncProtocol};
 use super::trust_protocol::{TrustCodec, TrustProtocol};
@@ -366,13 +368,13 @@ impl ElohimStorageBehaviour {
             gossipsub_config,
         )
         .expect("gossipsub behaviour init");
-        let recovery_topic = gossipsub::IdentTopic::new("recovery.invitation");
+        let recovery_topic = gossipsub::IdentTopic::new(RECOVERY_INVITATION_TOPIC);
         gossipsub
             .subscribe(&recovery_topic)
             .expect("subscribe to recovery.invitation");
         // A.10: subscribe to identity binding topic — propagates AgentPeerBinding
         // DHT entries to peers as an operational projection (Category C).
-        let identity_binding_topic = gossipsub::IdentTopic::new("elohim/identity/binding");
+        let identity_binding_topic = gossipsub::IdentTopic::new(IDENTITY_BINDING_TOPIC);
         gossipsub
             .subscribe(&identity_binding_topic)
             .expect("subscribe to elohim/identity/binding");
