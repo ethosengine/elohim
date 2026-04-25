@@ -8747,6 +8747,63 @@ pub fn build_manifest() -> doorway_client::DoorwayRoutes {
                 .auth_required()
                 .build(),
         )
+        // =====================================================================
+        // /api/v1/account — M5 Auth Portal Convergence (Recovery Phase 2)
+        // =====================================================================
+        .route(
+            Route::get("/api/v1/account")
+                .handler("get_account")
+                .auth_required()
+                .build(),
+        )
+        .route(
+            Route::get("/api/v1/account/keys")
+                .handler("get_account_keys")
+                .auth_required()
+                .build(),
+        )
+        .route(
+            Route::get("/api/v1/account/revocations")
+                .handler("get_account_revocations")
+                .auth_required()
+                .build(),
+        )
+        .route(
+            Route::post("/api/v1/account/self-revocation")
+                .handler("post_self_revocation")
+                .auth_required()
+                .build(),
+        )
+        .route(
+            Route::get("/api/v1/account/pending-recovery")
+                .handler("get_pending_recovery")
+                .auth_required()
+                .build(),
+        )
+        .route(
+            Route::post("/api/v1/account/recovery/{id}/vote")
+                .handler("post_recovery_vote")
+                .auth_required()
+                .build(),
+        )
+        .route(
+            Route::get("/api/v1/account/portal-hosts")
+                .handler("get_portal_hosts")
+                .auth_required()
+                .build(),
+        )
+        .route(
+            Route::post("/api/v1/account/portal-hosts")
+                .handler("post_portal_host")
+                .auth_required()
+                .build(),
+        )
+        .route(
+            Route::delete("/api/v1/account/portal-hosts/{url_b64}")
+                .handler("delete_portal_host")
+                .auth_required()
+                .build(),
+        )
         // Blob proxy: doorway caches blobs from /blob/{hash}
         .with_blobs_at("/blob")
         .build()
