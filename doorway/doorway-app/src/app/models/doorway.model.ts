@@ -472,6 +472,15 @@ export interface CapabilitiesResponse {
 export type AgencyStep = 'hosted' | 'key_export' | 'install_app' | 'steward';
 
 /**
+ * Portal host response from GET /auth/portal-host
+ */
+export interface PortalHostResponse {
+  reachable: boolean;
+  hostUrl?: string;
+  allHosts: string[];
+}
+
+/**
  * Account response from GET /auth/account
  */
 export interface AccountResponse {

@@ -13,6 +13,7 @@ import { DoorwayAdminService } from '../../services/doorway-admin.service';
 import {
   AccountResponse,
   AgencyStep,
+  PortalHostResponse,
   quotaGaugeColor,
   formatBytes,
 } from '../../models/doorway.model';
@@ -224,6 +225,17 @@ const AGENCY_STEPS: PipelineStep[] = [
           </section>
         }
 
+        <!-- Manage from your steward -->
+        @if (portalHostUrl(); as hostUrl) {
+          <section class="card portal-host">
+            <h2>Manage from your steward</h2>
+            <p>Your account is also reachable from your peer-native client.</p>
+            <button class="btn-primary" (click)="openSteward()" data-testid="portal-host-redirect">
+              Manage from your steward →
+            </button>
+          </section>
+        }
+
         <!-- Profile link -->
         <div class="profile-link-section">
           <a href="/identity/profile" class="profile-link">View full profile in Elohim App</a>
@@ -252,8 +264,12 @@ export class DoorwayAccountComponent implements OnInit {
   readonly queriesColor = computed(() => quotaGaugeColor(this.queriesPercent()));
   readonly bandwidthColor = computed(() => quotaGaugeColor(this.bandwidthPercent()));
 
+  private readonly portalHostSignal = signal<PortalHostResponse | null>(null);
+  readonly portalHostUrl = computed(() => this.portalHostSignal()?.hostUrl ?? null);
+
   ngOnInit(): void {
     this.loadAccount();
+    this.loadPortalHost();
   }
 
   async loadAccount(): Promise<void> {
@@ -272,6 +288,22 @@ export class DoorwayAccountComponent implements OnInit {
     } finally {
       this.loading.set(false);
     }
+  }
+
+  async loadPortalHost(): Promise<void> {
+    try {
+      const resp = await this.adminService.getPortalHostUrl();
+      this.portalHostSignal.set(resp);
+    } catch {
+      this.portalHostSignal.set(null);
+    }
+  }
+
+  async openSteward(): Promise<void> {
+    const url = this.portalHostUrl();
+    if (!url) return;
+    const { sessionToken } = await this.adminService.mintSessionToken();
+    window.location.href = `${url}?session_token=${encodeURIComponent(sessionToken)}`;
   }
 
   isStepCompleted(step: AgencyStep): boolean {
