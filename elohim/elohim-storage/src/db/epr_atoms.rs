@@ -32,6 +32,12 @@ pub struct EprAtom {
     pub payload_bytes: Vec<u8>,
     pub proof_bytes: Vec<u8>,
     pub proof_algorithm: String,
+    /// UTC ISO-8601 timestamp at which resolver-backed Ed25519 verify succeeded.
+    /// `None` for atoms ingested before A.7 or whose signer has no timeline entry.
+    pub verified_at: Option<String>,
+    /// blake3-128-prefix of the 32-byte ed25519 pubkey that signed this atom
+    /// (first 16 bytes of the hash = 32 hex chars). `None` when `verified_at` is `None`.
+    pub verified_signer_fingerprint: Option<String>,
 }
 
 // ---------------------------------------------------------------------------

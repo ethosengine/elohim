@@ -1178,6 +1178,23 @@ diesel::table! {
     }
 }
 
+// EPR Phase 2B — peer_identity_bindings
+// Source of truth: Holochain DHT (imagodei AgentPeerBinding entry — Task A.2).
+// This table is a Category C operational projection rebuildable from signal replay.
+// Timestamps stored as TEXT (ISO-8601) per elohim-storage conventions.
+
+diesel::table! {
+    peer_identity_bindings (peer_id, dht_anchor_hash) {
+        peer_id         -> Text,
+        agent_cid       -> Text,
+        dht_anchor_hash -> Text,
+        valid_from      -> Text,
+        valid_until     -> Nullable<Text>,
+        observed_at     -> Text,
+        source          -> Text,
+    }
+}
+
 // Recovery Protocol Phase 2 — M4 revocation projection tables.
 // Source of truth: DHT (imagodei KeyRevocation + RevocationVote entries).
 // These tables are read-optimized projections rebuildable via signal replay.
@@ -1231,6 +1248,12 @@ diesel::table! {
         payload_bytes -> Binary,
         proof_bytes -> Binary,
         proof_algorithm -> Text,
+        /// UTC ISO-8601 timestamp at which resolver-backed Ed25519 verify succeeded.
+        /// NULL for atoms ingested before A.7 or whose signer has no timeline entry.
+        verified_at -> Nullable<Text>,
+        /// blake3-128-prefix of the 32-byte ed25519 pubkey that signed this atom
+        /// (first 16 bytes = 32 hex chars). NULL when verified_at is NULL.
+        verified_signer_fingerprint -> Nullable<Text>,
     }
 }
 
@@ -1306,6 +1329,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     node_stewardship,
     observation_entries,
     observation_sessions,
+    peer_identity_bindings,
     peer_statuses,
     placement_gaps,
     precedents,

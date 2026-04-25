@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "epr:schema:dna-signal:key-rotation",
+  "title": "KeyRotationSignal",
+  "description": "Category C — operational projection of the imagodei KeyRotation DHT entry. Source-of-truth for this signal is the DHT-notarized KeyRotation entry referenced by actionHash (imagodei DNA, recovery_v2 integrity zome). The stream message is reconstructable by querying the DNA; it is never persisted as-is. Emitted when commit_key_rotation succeeds and post-commit fires RecoveryV2Signal::KeyRotationCommitted. Translated by HolochainAppSignalStream (Task A.11) into this canonical storage-internal shape.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "signalType",
+    "actionHash",
+    "agentCid",
+    "newPubkey",
+    "oldPubkey",
+    "rotatedAt",
+    "emittedAt"
+  ],
+  "properties": {
+    "signalType": {
+      "type": "string",
+      "const": "keyRotation"
+    },
+    "actionHash": {
+      "type": "string",
+      "description": "Holochain ActionHash (base64) of the KeyRotation DHT entry that originated this signal. Use to verify provenance against the DHT."
+    },
+    "agentCid": {
+      "type": "string",
+      "description": "Agent identifier string. Stage 1: populated with human_agent_pubkey (the agent's current ed25519 pubkey, base64) from the KeyRotationCommitted signal. Stage 2: will be a content CID derived from the imagodei Human entry."
+    },
+    "newPubkey": {
+      "type": "string",
+      "description": "The incoming ed25519 pubkey (base64, 32 bytes) that replaces the old key."
+    },
+    "oldPubkey": {
+      "type": "string",
+      "description": "The rotated-out ed25519 pubkey (base64, 32 bytes). After rotation, content signed by this key must be re-verified against the key rotation chain."
+    },
+    "rotatedAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "UTC timestamp at which the DHT entry records the rotation as having occurred. Derived from the KeyRotation entry's rotated_at Holochain Timestamp field."
+    },
+    "emittedAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "UTC timestamp at which the signal was emitted from the conductor post-commit hook."
+    }
+  }
+}

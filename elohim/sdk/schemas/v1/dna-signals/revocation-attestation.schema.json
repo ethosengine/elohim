@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "epr:schema:dna-signal:revocation-attestation",
+  "title": "RevocationAttestationSignal",
+  "description": "Category C — operational projection of revocation vote-collection state from the imagodei DNA. Source-of-truth is the DHT-notarized KeyRevocation and RevocationVote entries referenced by actionHash and revocationId. Stream message is reconstructable from the DNA. Unifies two Recovery M4 signals: RecoveryV2Signal::KeyRevocationRequested (attestationKind = 'request') and RecoveryV2Signal::RevocationVoteSubmitted (attestationKind = 'vote'). The controller (Task A.4) uses this to maintain the in-progress revocation vote state in the key_revocations projection table.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "signalType",
+    "actionHash",
+    "revocationId",
+    "stewardId",
+    "approved",
+    "attestationKind",
+    "currentVotes",
+    "requiredVotes",
+    "thresholdReached",
+    "attestedAt",
+    "emittedAt"
+  ],
+  "properties": {
+    "signalType": {
+      "type": "string",
+      "const": "revocationAttestation"
+    },
+    "actionHash": {
+      "type": "string",
+      "description": "Holochain ActionHash (base64) of the DHT entry that originated this signal. For 'request' kind: the KeyRevocation entry action hash. For 'vote' kind: the RevocationVote entry action hash."
+    },
+    "revocationId": {
+      "type": "string",
+      "description": "Stable identifier linking this attestation to the overall KeyRevocation request. Corresponds to Recovery M4 KeyRevocationRequested.id / RevocationVoteSubmitted.revocation_id."
+    },
+    "stewardId": {
+      "type": "string",
+      "description": "Agent CID or pubkey of the steward submitting the attestation. For 'request' kind: the initiating steward (initiated_by from M4). For 'vote' kind: the voting steward (steward_id from M4)."
+    },
+    "approved": {
+      "type": "boolean",
+      "description": "Whether this attestation approves the revocation. For 'request' kind this is always true (the request itself is an affirmative act). For 'vote' kind this reflects the steward's vote direction."
+    },
+    "attestationKind": {
+      "type": "string",
+      "enum": ["request", "vote"],
+      "description": "'request' = initial revocation trigger (maps from M4 KeyRevocationRequested); 'vote' = subsequent steward vote (maps from M4 RevocationVoteSubmitted). The controller can use this to distinguish the initiating event from follow-on votes."
+    },
+    "currentVotes": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Current count of affirmative votes at the time this attestation was recorded."
+    },
+    "requiredVotes": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Vote threshold required for the revocation to become effective."
+    },
+    "thresholdReached": {
+      "type": "boolean",
+      "description": "Whether the vote threshold has been reached as of this attestation. When true, a KeyRevocationSignal should follow shortly after the conductor processes the threshold transition."
+    },
+    "attestedAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "UTC timestamp at which the attestation was recorded in the DNA. For 'request' kind: created_at from M4 KeyRevocationRequested. For 'vote' kind: voted_at from M4 RevocationVoteSubmitted."
+    },
+    "emittedAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "UTC timestamp at which the signal was emitted from the conductor post-commit hook."
+    }
+  }
+}

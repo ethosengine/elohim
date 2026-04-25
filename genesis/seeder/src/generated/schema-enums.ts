@@ -108,6 +108,11 @@ export const ALL_CONTENT_TYPES = [
 export const CONTENT_TYPES = ALL_CONTENT_TYPES;
 export type ContentType = (typeof ALL_CONTENT_TYPES)[number];
 
+export const CORE_DEVICE_ARCHETYPES = ['node', 'desktop', 'mobile', 'steward'] as const;
+export const ALL_DEVICE_ARCHETYPES = ['node', 'desktop', 'mobile', 'steward'] as const;
+export const DEVICE_ARCHETYPES = ALL_DEVICE_ARCHETYPES;
+export type DeviceArchetype = (typeof ALL_DEVICE_ARCHETYPES)[number];
+
 export const CORE_ELOHIM_SKILLS = [
   'content-safety-review',
   'discernment-evaluation',

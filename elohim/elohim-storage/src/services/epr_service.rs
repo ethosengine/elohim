@@ -3,7 +3,9 @@
 //! See Integrator Compatibility Contract §2.2 for REST surface; this
 //! service is the model/controller layer's business logic.
 
+use chrono::Utc;
 use diesel::prelude::*;
+use ed25519_dalek::{Signature as EdSig, VerifyingKey};
 use elohim_epr::{
     cid::compute_cid, proof::verify as verify_ed25519, validate_coupling, Epr, EprError,
 };
@@ -11,6 +13,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::db::epr_atoms::{self, EprAtom, EprClaimRow, EprCouplingRow, EprListQuery};
 use crate::error::StorageError;
+use crate::reconcile::pubkey_timeline::PubkeyTimelineCache;
 
 // ---------------------------------------------------------------------------
 // Public result shapes
@@ -42,6 +45,10 @@ pub struct EprVerifyError {
 
 /// Validate an Epr (stages 1–3) and persist to storage.
 /// Stage 4 (payload schema validation) is deferred to Phase 3.
+///
+/// This variant performs structural-only signature verification (algorithm +
+/// length check). For resolver-backed Ed25519 verify that stamps `verified_at`
+/// and `verified_signer_fingerprint`, use [`ingest_with_cache`] instead.
 pub fn ingest(conn: &mut SqliteConnection, epr: Epr) -> Result<EprIngestResult, StorageError> {
     // Stage 1: canonicalization — recompute canonical bytes and confirm CID matches
     let canonical = epr
@@ -77,8 +84,8 @@ pub fn ingest(conn: &mut SqliteConnection, epr: Epr) -> Result<EprIngestResult, 
 
     // Stage 4: payload schema — DEFERRED to Phase 3 (needs manifest resolver)
 
-    // Persist
-    let atom = to_atom(&epr, &canonical);
+    // Persist — no resolver-backed verify, so stamp fields are None
+    let atom = to_atom(&epr, &canonical, None, None);
     let coupling = coupling_rows(&epr);
     let claims = claim_rows(&epr);
 
@@ -99,7 +106,141 @@ pub fn ingest(conn: &mut SqliteConnection, epr: Epr) -> Result<EprIngestResult, 
     })
 }
 
-fn to_atom(epr: &Epr, canonical: &[u8]) -> EprAtom {
+/// Validate an Epr with **resolver-backed Ed25519 verification** and persist.
+///
+/// Extends the structural stages of [`ingest`] with a timeline-based pubkey
+/// lookup (Task A.7 — Decision #2):
+///
+/// 1. Structural decode + CID + algorithm + length (same as `ingest`)
+/// 2. Look up the signer's pubkey in `pubkey_cache` at `envelope.issued_at`
+/// 3. Verify the Ed25519 signature against that pubkey with `verify_strict`
+/// 4. On success: stamp `verified_at = Utc::now()` and
+///    `verified_signer_fingerprint = blake3-128-prefix(pubkey)` before persistence
+/// 5. On failure: return [`StorageError::VerifyFailed`] — the atom is NOT persisted
+///
+/// ## Cache miss behaviour
+///
+/// If `pubkey_cache` has no entry for `envelope.proof.signer`, the EPR is
+/// rejected with `StorageError::VerifyFailed`. Callers responsible for cache
+/// warm-up (the reconcile controller) must pre-populate entries before routing
+/// EPRs through this path.
+///
+/// ## Fingerprint format
+///
+/// `verified_signer_fingerprint` = first 16 bytes of `blake3::hash(pubkey_bytes)`
+/// expressed as 32 lowercase hex characters. This 128-bit prefix is cheap to
+/// index and sufficient for A.8's sweep targeting.
+pub fn ingest_with_cache(
+    conn: &mut SqliteConnection,
+    pubkey_cache: &mut PubkeyTimelineCache,
+    epr: Epr,
+) -> Result<EprIngestResult, StorageError> {
+    // Stage 1: canonicalization
+    let canonical = epr
+        .envelope
+        .canonical_bytes(&epr.payload)
+        .map_err(|e| StorageError::InvalidInput(format!("canonicalization: {e}")))?;
+    let derived_cid = compute_cid(&canonical);
+    if derived_cid.to_string() != epr.envelope.cid.to_string() {
+        return Err(StorageError::InvalidInput(format!(
+            "cid mismatch: derived {} vs declared {}",
+            derived_cid, epr.envelope.cid
+        )));
+    }
+
+    // Stage 2: structural check (algorithm + length)
+    if epr.envelope.proof.algorithm != "ed25519" {
+        return Err(StorageError::InvalidInput(format!(
+            "unsupported proof algorithm: {}",
+            epr.envelope.proof.algorithm
+        )));
+    }
+    if epr.envelope.proof.signature.len() != 64 {
+        return Err(StorageError::InvalidInput(
+            "ed25519 signature must be 64 bytes".into(),
+        ));
+    }
+
+    // Stage 3: coupling
+    validate_coupling(&epr.envelope)
+        .map_err(|e: EprError| StorageError::InvalidInput(format!("coupling: {e}")))?;
+
+    // Stage 2B (A.7): resolver-backed Ed25519 verify
+    let signer_cid_str = epr.envelope.proof.signer.to_string();
+    let issued_at = epr.envelope.issued_at;
+
+    let validity = pubkey_cache
+        .get(&signer_cid_str)
+        .and_then(|tl| tl.pubkey_at(issued_at))
+        .ok_or_else(|| StorageError::VerifyFailed {
+            reason: format!(
+                "no pubkey valid at {} for signer {}",
+                issued_at.to_rfc3339(),
+                signer_cid_str
+            ),
+        })?;
+
+    let pubkey_bytes = validity.pubkey;
+
+    // Verify using ed25519-dalek verify_strict (rejects weak-form signatures)
+    let verifying_key =
+        VerifyingKey::from_bytes(&pubkey_bytes).map_err(|e| StorageError::VerifyFailed {
+            reason: format!("invalid pubkey bytes for signer {signer_cid_str}: {e}"),
+        })?;
+    let sig = EdSig::from_slice(&epr.envelope.proof.signature).map_err(|e| {
+        StorageError::VerifyFailed {
+            reason: format!("invalid signature encoding: {e}"),
+        }
+    })?;
+    verifying_key
+        .verify_strict(&canonical, &sig)
+        .map_err(|_| StorageError::VerifyFailed {
+            reason: format!(
+                "Ed25519 signature mismatch for signer {} at {}",
+                signer_cid_str,
+                issued_at.to_rfc3339()
+            ),
+        })?;
+
+    // Compute blake3-128-prefix fingerprint (first 16 bytes = 32 hex chars)
+    let hash = blake3::hash(&pubkey_bytes);
+    let fingerprint: String = hash.as_bytes()[..16]
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect();
+
+    let verified_at_str = Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
+
+    // Stage 4: payload schema — DEFERRED to Phase 3 (needs manifest resolver)
+
+    // Persist with verify stamp
+    let atom = to_atom(&epr, &canonical, Some(verified_at_str), Some(fingerprint));
+    let coupling = coupling_rows(&epr);
+    let claims = claim_rows(&epr);
+
+    conn.transaction::<_, diesel::result::Error, _>(|txn| {
+        epr_atoms::insert_atom(txn, &atom)?;
+        if !coupling.is_empty() {
+            epr_atoms::insert_coupling_rows(txn, &coupling)?;
+        }
+        if !claims.is_empty() {
+            epr_atoms::insert_claim_rows(txn, &claims)?;
+        }
+        Ok(())
+    })
+    .map_err(|e| StorageError::Database(e.to_string()))?;
+
+    Ok(EprIngestResult {
+        cid: epr.envelope.cid.to_string(),
+    })
+}
+
+fn to_atom(
+    epr: &Epr,
+    canonical: &[u8],
+    verified_at: Option<String>,
+    verified_signer_fingerprint: Option<String>,
+) -> EprAtom {
     EprAtom {
         cid: epr.envelope.cid.to_string(),
         kind: format!("{:?}", epr.envelope.kind),
@@ -116,6 +257,8 @@ fn to_atom(epr: &Epr, canonical: &[u8]) -> EprAtom {
         payload_bytes: epr.payload.clone(),
         proof_bytes: epr.envelope.proof.signature.clone(),
         proof_algorithm: epr.envelope.proof.algorithm.clone(),
+        verified_at,
+        verified_signer_fingerprint,
     }
 }
 
@@ -518,6 +661,12 @@ mod wire_bytes_tests {
                 .expect("load epr up.sql");
         conn.batch_execute(&migrations_sql)
             .expect("apply epr migrations");
+        // A.7 migration: verified_at + verified_signer_fingerprint columns
+        let a7_sql =
+            std::fs::read_to_string("migrations/2026-04-25-000000_verified_at_on_epr_atoms/up.sql")
+                .expect("load a7 verified_at migration");
+        conn.batch_execute(&a7_sql)
+            .expect("apply a7 verified_at migration");
         conn
     }
 
@@ -571,5 +720,258 @@ mod wire_bytes_tests {
         let mut conn = setup_conn();
         let err = ingest_from_wire_bytes(&mut conn, &[0xFF, 0xFE]).unwrap_err();
         assert!(matches!(err, StorageError::InvalidInput(_)));
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Task A.7 — ingest_with_cache tests
+// ---------------------------------------------------------------------------
+
+#[cfg(test)]
+mod ingest_with_cache_tests {
+    use super::*;
+    use chrono::{TimeZone, Utc};
+    use diesel::connection::SimpleConnection;
+    use elohim_epr::{cid::compute_cid, proof::AgentKeypair, Coupling, Epr, EprKind, Reach};
+
+    use crate::reconcile::pubkey_timeline::{PubkeyTimeline, PubkeyTimelineCache};
+
+    // -----------------------------------------------------------------------
+    // Helpers
+    // -----------------------------------------------------------------------
+
+    fn t(secs: i64) -> chrono::DateTime<Utc> {
+        Utc.timestamp_opt(secs, 0)
+            .single()
+            .expect("test timestamp must be valid")
+    }
+
+    fn setup_conn() -> SqliteConnection {
+        let mut conn = SqliteConnection::establish(":memory:").expect("open memory db");
+        let sql = std::fs::read_to_string("migrations/2026-04-22-050000_add_epr_tables/up.sql")
+            .expect("load epr tables sql");
+        conn.batch_execute(&sql)
+            .expect("apply epr tables migration");
+        let a7_sql =
+            std::fs::read_to_string("migrations/2026-04-25-000000_verified_at_on_epr_atoms/up.sql")
+                .expect("load a7 verified_at migration");
+        conn.batch_execute(&a7_sql)
+            .expect("apply a7 verified_at migration");
+        conn
+    }
+
+    /// Build a signed EPR using the given keypair and signer CID, with the
+    /// given issued_at timestamp.
+    fn signed_epr(
+        kp: &AgentKeypair,
+        signer_cid: cid::Cid,
+        issued_at: chrono::DateTime<Utc>,
+    ) -> Epr {
+        let schema_ref = compute_cid(b"test-schema-ref");
+        let gov = compute_cid(b"test-governance-target");
+        let coupling = Coupling {
+            knowledge: None,
+            value: None,
+            governance: Some(gov),
+        };
+        Epr::builder()
+            .kind(EprKind::Manifest)
+            .schema_ref(schema_ref)
+            .schema_key("test/schema")
+            .reach(Reach::Commons)
+            .coupling(coupling)
+            .issued_at(issued_at)
+            .payload(b"test-payload".to_vec())
+            .sign(kp, signer_cid)
+            .expect("sign epr")
+    }
+
+    // -----------------------------------------------------------------------
+    // Tests
+    // -----------------------------------------------------------------------
+
+    /// When the signer's pubkey is in the cache and covers `issued_at`, the
+    /// EPR is persisted and `verified_at` + `verified_signer_fingerprint` are stamped.
+    #[test]
+    fn ingest_stamps_verified_at_when_signature_verifies() {
+        let mut conn = setup_conn();
+
+        let kp = AgentKeypair::from_secret(&[0xAA; 32]).unwrap();
+        let pubkey = kp.public_key_bytes();
+        let issued_at = t(1_000_000);
+
+        // Pre-compute the signer CID (content-addressed from pubkey)
+        let signer_cid = compute_cid(&pubkey);
+
+        // Pre-populate the pubkey cache with a validity window covering issued_at
+        let mut cache = PubkeyTimelineCache::with_capacity(8);
+        let mut tl = PubkeyTimeline::new();
+        tl.insert(pubkey, t(0), None, "ah-test-rotation".into());
+        cache.insert(signer_cid.to_string(), tl);
+
+        let epr = signed_epr(&kp, signer_cid, issued_at);
+        let cid_str = epr.envelope.cid.to_string();
+
+        let result = ingest_with_cache(&mut conn, &mut cache, epr)
+            .expect("ingest_with_cache must succeed when signature verifies");
+        assert_eq!(result.cid, cid_str);
+
+        // Fetch the stored atom and confirm stamps are present
+        let atom = epr_atoms::fetch_atom_by_cid(&mut conn, &cid_str)
+            .expect("db query ok")
+            .expect("atom must exist after successful ingest");
+
+        assert!(
+            atom.verified_at.is_some(),
+            "verified_at must be stamped on success"
+        );
+        assert!(
+            atom.verified_signer_fingerprint.is_some(),
+            "verified_signer_fingerprint must be stamped on success"
+        );
+
+        // Fingerprint must be 32 hex chars (16 bytes / 128 bits)
+        let fp = atom.verified_signer_fingerprint.unwrap();
+        assert_eq!(fp.len(), 32, "fingerprint must be 32 hex chars");
+        assert!(
+            fp.chars().all(|c| c.is_ascii_hexdigit()),
+            "fingerprint must be lowercase hex"
+        );
+    }
+
+    /// When the signature uses a different key than what the cache holds, the
+    /// EPR is rejected and NOT persisted.
+    #[test]
+    fn ingest_rejects_when_signature_does_not_verify() {
+        let mut conn = setup_conn();
+
+        // Sign with key K
+        let signing_kp = AgentKeypair::from_secret(&[0xBB; 32]).unwrap();
+        // Cache holds key K' (different key) for the agent
+        let wrong_kp = AgentKeypair::from_secret(&[0xCC; 32]).unwrap();
+        let wrong_pubkey = wrong_kp.public_key_bytes();
+        let issued_at = t(2_000_000);
+
+        let signer_cid = compute_cid(&signing_kp.public_key_bytes());
+
+        // Cache has the wrong pubkey for this signer
+        let mut cache = PubkeyTimelineCache::with_capacity(8);
+        let mut tl = PubkeyTimeline::new();
+        tl.insert(wrong_pubkey, t(0), None, "ah-wrong-key".into());
+        cache.insert(signer_cid.to_string(), tl);
+
+        let epr = signed_epr(&signing_kp, signer_cid, issued_at);
+        let cid_str = epr.envelope.cid.to_string();
+
+        let err = ingest_with_cache(&mut conn, &mut cache, epr)
+            .expect_err("must reject when signature does not verify");
+        assert!(
+            matches!(err, StorageError::VerifyFailed { .. }),
+            "expected VerifyFailed, got: {err:?}"
+        );
+
+        // Atom must NOT have been persisted
+        let stored = epr_atoms::fetch_atom_by_cid(&mut conn, &cid_str).expect("db query ok");
+        assert!(
+            stored.is_none(),
+            "atom must not be persisted when signature fails"
+        );
+    }
+
+    /// When the cache has no entry for the signer at all, the EPR is rejected.
+    #[test]
+    fn ingest_rejects_when_signer_not_in_timeline() {
+        let mut conn = setup_conn();
+
+        let kp = AgentKeypair::from_secret(&[0xDD; 32]).unwrap();
+        let issued_at = t(3_000_000);
+        let signer_cid = compute_cid(&kp.public_key_bytes());
+
+        // Empty cache — no entry for this signer
+        let mut cache = PubkeyTimelineCache::with_capacity(8);
+
+        let epr = signed_epr(&kp, signer_cid, issued_at);
+        let cid_str = epr.envelope.cid.to_string();
+
+        let err = ingest_with_cache(&mut conn, &mut cache, epr)
+            .expect_err("must reject when signer has no timeline entry");
+        assert!(
+            matches!(err, StorageError::VerifyFailed { .. }),
+            "expected VerifyFailed, got: {err:?}"
+        );
+
+        let stored = epr_atoms::fetch_atom_by_cid(&mut conn, &cid_str).expect("db query ok");
+        assert!(
+            stored.is_none(),
+            "atom must not be persisted when signer not in cache"
+        );
+    }
+
+    /// When `issued_at` falls outside the validity window, the EPR is rejected.
+    #[test]
+    fn ingest_rejects_when_issued_at_before_key_validity() {
+        let mut conn = setup_conn();
+
+        let kp = AgentKeypair::from_secret(&[0xEE; 32]).unwrap();
+        let pubkey = kp.public_key_bytes();
+        // Key is only valid from t(500_000) onward; EPR was issued at t(100)
+        let issued_at = t(100);
+        let signer_cid = compute_cid(&pubkey);
+
+        let mut cache = PubkeyTimelineCache::with_capacity(8);
+        let mut tl = PubkeyTimeline::new();
+        tl.insert(pubkey, t(500_000), None, "ah-future-key".into());
+        cache.insert(signer_cid.to_string(), tl);
+
+        let epr = signed_epr(&kp, signer_cid, issued_at);
+        let cid_str = epr.envelope.cid.to_string();
+
+        let err = ingest_with_cache(&mut conn, &mut cache, epr)
+            .expect_err("must reject when issued_at is before key validity window");
+        assert!(
+            matches!(err, StorageError::VerifyFailed { .. }),
+            "expected VerifyFailed, got: {err:?}"
+        );
+
+        let stored = epr_atoms::fetch_atom_by_cid(&mut conn, &cid_str).expect("db query ok");
+        assert!(stored.is_none(), "atom must not be persisted");
+    }
+
+    /// Verify that the fingerprint is the blake3-128-prefix (first 16 bytes) of
+    /// the pubkey that was in the cache at `issued_at`.
+    #[test]
+    fn fingerprint_matches_blake3_prefix_of_signing_pubkey() {
+        let mut conn = setup_conn();
+
+        let kp = AgentKeypair::from_secret(&[0x42; 32]).unwrap();
+        let pubkey = kp.public_key_bytes();
+        let issued_at = t(4_000_000);
+        let signer_cid = compute_cid(&pubkey);
+
+        let mut cache = PubkeyTimelineCache::with_capacity(8);
+        let mut tl = PubkeyTimeline::new();
+        tl.insert(pubkey, t(0), None, "ah-fp-test".into());
+        cache.insert(signer_cid.to_string(), tl);
+
+        let epr = signed_epr(&kp, signer_cid, issued_at);
+        let cid_str = epr.envelope.cid.to_string();
+        ingest_with_cache(&mut conn, &mut cache, epr).expect("ingest ok");
+
+        let atom = epr_atoms::fetch_atom_by_cid(&mut conn, &cid_str)
+            .expect("db ok")
+            .expect("atom present");
+        let stored_fp = atom.verified_signer_fingerprint.unwrap();
+
+        // Compute expected fingerprint independently
+        let hash = blake3::hash(&pubkey);
+        let expected_fp: String = hash.as_bytes()[..16]
+            .iter()
+            .map(|b| format!("{b:02x}"))
+            .collect();
+
+        assert_eq!(
+            stored_fp, expected_fp,
+            "stored fingerprint must equal blake3-128-prefix of signing pubkey"
+        );
     }
 }

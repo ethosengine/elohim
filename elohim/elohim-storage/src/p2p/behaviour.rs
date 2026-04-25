@@ -16,6 +16,9 @@ use std::time::Duration;
 
 use super::epr_atom_protocol::{EprAtomCodec, EprAtomProtocol};
 use super::epr_protocol::{EprCodec, EprProtocol};
+use super::identity_binding_gossip::IDENTITY_BINDING_TOPIC;
+use super::identity_handshake::{IdentityHandshakeCodec, IdentityHandshakeProtocol};
+use super::recovery_invitation::RECOVERY_INVITATION_TOPIC;
 use super::shard_protocol::{ShardCodec, ShardProtocol};
 use super::sync_protocol::{SyncCodec, SyncProtocol};
 use super::trust_protocol::{TrustCodec, TrustProtocol};
@@ -74,6 +77,12 @@ pub struct ElohimStorageBehaviour {
     pub epr_atom_protocol: RequestResponse<EprAtomCodec>,
     /// Request-response for trust negotiation
     pub trust_protocol: RequestResponse<TrustCodec>,
+    /// Request-response for identity handshake (/elohim/identity/handshake/1.0.0)
+    ///
+    /// Category C — session-local projection of the AgentPeerBinding DHT entry.
+    /// Fires on ConnectionEstablished; receiver verifies and writes into
+    /// `peer_identity_bindings` with source='handshake'.
+    pub identity_handshake: RequestResponse<IdentityHandshakeCodec>,
     /// Local network discovery (mDNS)
     pub mdns: mdns::tokio::Behaviour,
     /// Relay client for NAT traversal (connect through relay servers)
@@ -110,6 +119,13 @@ pub enum ElohimStorageBehaviourEvent {
         request_response::Event<
             super::trust_protocol::TrustHandshake,
             super::trust_protocol::TrustResponse,
+        >,
+    ),
+    /// Identity handshake event (/elohim/identity/handshake/1.0.0)
+    IdentityHandshake(
+        request_response::Event<
+            super::identity_handshake::IdentityHandshakeRequest,
+            super::identity_handshake::IdentityHandshakeResponse,
         >,
     ),
     /// mDNS event
@@ -189,6 +205,24 @@ impl
         >,
     ) -> Self {
         Self::TrustProtocol(event)
+    }
+}
+
+impl
+    From<
+        request_response::Event<
+            super::identity_handshake::IdentityHandshakeRequest,
+            super::identity_handshake::IdentityHandshakeResponse,
+        >,
+    > for ElohimStorageBehaviourEvent
+{
+    fn from(
+        event: request_response::Event<
+            super::identity_handshake::IdentityHandshakeRequest,
+            super::identity_handshake::IdentityHandshakeResponse,
+        >,
+    ) -> Self {
+        Self::IdentityHandshake(event)
     }
 }
 
@@ -281,6 +315,13 @@ impl ElohimStorageBehaviour {
             request_response::Config::default().with_request_timeout(config.request_timeout),
         );
 
+        // Identity handshake protocol — Category C session-local projection of
+        // AgentPeerBinding DHT entries. Fires on ConnectionEstablished.
+        let identity_handshake = RequestResponse::new(
+            [(IdentityHandshakeProtocol, ProtocolSupport::Full)],
+            request_response::Config::default().with_request_timeout(config.request_timeout),
+        );
+
         // mDNS for local discovery
         let mdns = mdns::tokio::Behaviour::new(mdns::Config::default(), peer_id)
             .expect("mDNS behaviour should be created");
@@ -314,7 +355,8 @@ impl ElohimStorageBehaviour {
 
         let ping = ping::Behaviour::new(ping::Config::new());
 
-        // Gossipsub — pub/sub for recovery invitation broadcast (M3).
+        // Gossipsub — pub/sub for recovery invitation broadcast (M3) and
+        // identity binding propagation (A.10: mid-session rotation).
         // Uses the node's signing keypair for message authentication.
         let gossipsub_config = gossipsub::ConfigBuilder::default()
             .heartbeat_interval(std::time::Duration::from_secs(10))
@@ -326,11 +368,19 @@ impl ElohimStorageBehaviour {
             gossipsub_config,
         )
         .expect("gossipsub behaviour init");
-        let recovery_topic = gossipsub::IdentTopic::new("recovery.invitation");
+        let recovery_topic = gossipsub::IdentTopic::new(RECOVERY_INVITATION_TOPIC);
         gossipsub
             .subscribe(&recovery_topic)
             .expect("subscribe to recovery.invitation");
-        let revocation_topic = gossipsub::IdentTopic::new("recovery.revocation");
+        // A.10: subscribe to identity binding topic — propagates AgentPeerBinding
+        // DHT entries to peers as an operational projection (Category C).
+        let identity_binding_topic = gossipsub::IdentTopic::new(IDENTITY_BINDING_TOPIC);
+        gossipsub
+            .subscribe(&identity_binding_topic)
+            .expect("subscribe to elohim/identity/binding");
+        // M4: subscribe to key revocation fan-out topic.
+        // Subscriber set: emergency contacts, specialist-elohim watchers, security dashboards.
+        let revocation_topic = gossipsub::IdentTopic::new(super::RECOVERY_REVOCATION_TOPIC);
         gossipsub
             .subscribe(&revocation_topic)
             .expect("subscribe to recovery.revocation");
@@ -342,6 +392,7 @@ impl ElohimStorageBehaviour {
             epr_protocol,
             epr_atom_protocol,
             trust_protocol,
+            identity_handshake,
             mdns,
             relay_client,
             relay_server,

@@ -17,6 +17,10 @@ use std::time::Duration;
 pub mod stewardship;
 pub use stewardship::*;
 
+// AgentPeerBinding coordinator functions (EPR Phase 2B, Task A.13)
+pub mod agent_peer_binding;
+pub use agent_peer_binding::*;
+
 // Bootstrap-steward pattern — reference implementation for the protocol
 // (also ported to mishpat, node-registry, lamad). See bootstrap_steward.rs.
 pub mod bootstrap_steward;
@@ -125,6 +129,19 @@ pub enum ImagodeiSignal {
         entry_hash: EntryHash,
         attestation: Attestation,
         author: AgentPubKey,
+    },
+    /// Emitted by `create_agent_peer_binding` (Task A.13).
+    /// Consumed by elohim-storage `HolochainAppSignalStream` (Task A.11)
+    /// to project into the `peer_identity_bindings` SQLite table.
+    ///
+    /// NOTE: This variant intentionally omits `entry_hash` and `author` that
+    /// other variants carry. The `action_hash` alone is sufficient — storage
+    /// projects by calling `get(action_hash)` to fetch the full entry. Adding
+    /// `entry_hash`/`author` here would duplicate data already in the action
+    /// record and diverge from the minimal-signal pattern used in Task A.11.
+    AgentPeerBindingCreated {
+        action_hash: ActionHash,
+        binding: AgentPeerBinding,
     },
 }
 

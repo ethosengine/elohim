@@ -1309,6 +1309,7 @@ dependencies = [
  "rand_core 0.6.4",
  "serde",
  "sha2 0.10.9",
+ "signature",
  "subtle",
  "zeroize",
 ]
@@ -1370,6 +1371,7 @@ dependencies = [
  "async-trait",
  "automerge",
  "base64",
+ "blake3",
  "bytes",
  "chrono",
  "ciborium",
@@ -1381,6 +1383,7 @@ dependencies = [
  "diesel_migrations",
  "dirs",
  "doorway-client",
+ "ed25519-dalek",
  "elohim-cache-core",
  "elohim-compute",
  "elohim-epr",
@@ -1400,6 +1403,7 @@ dependencies = [
  "ipld-core",
  "jsonschema",
  "libp2p",
+ "lru 0.12.5",
  "lz4_flex",
  "multihash-codetable 0.1.4",
  "reed-solomon-erasure",
@@ -5669,6 +5673,7 @@ version = "2.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "77549399552de45a898a580c1b41d445bf730df867cc44e6c0233bbc4b8329de"
 dependencies = [
+ "digest 0.10.7",
  "rand_core 0.6.4",
 ]
 

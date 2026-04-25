@@ -73,6 +73,9 @@ pub mod sse;
 // Cache stream for projection warm-up (SSE)
 pub mod cache_stream;
 
+// Reconcile controller — Principle P1 (DHT as manifest, eager projection)
+pub mod reconcile;
+
 // Tally strategies for multi-mechanism voting
 pub mod tally;
 

@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "epr:schema:dna-signal-stream",
+  "title": "DnaSignalStream",
+  "description": "Operational projection (Category C) of DHT-notarized identity events for elohim-storage's reconcile controller. Each message is reconstructable from the imagodei DNA at any time; stream itself is not persisted. Source-of-truth for each variant is the DHT entry referenced by actionHash.",
+  "oneOf": [
+    { "$ref": "dna-signals/key-rotation.schema.json" },
+    { "$ref": "dna-signals/key-revocation.schema.json" },
+    { "$ref": "dna-signals/agent-peer-binding.schema.json" },
+    { "$ref": "dna-signals/revocation-attestation.schema.json" }
+  ]
+}

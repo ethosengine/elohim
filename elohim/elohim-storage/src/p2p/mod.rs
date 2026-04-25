@@ -31,6 +31,8 @@
 pub mod behaviour;
 pub mod epr_atom_protocol;
 pub mod epr_protocol;
+pub mod identity_binding_gossip;
+pub mod identity_handshake;
 pub mod identity_map;
 pub mod kad_store;
 pub mod recovery_invitation;
@@ -156,7 +158,9 @@ pub use epr_atom_protocol::{
     MAX_REQUEST_SIZE as EPR_ATOM_MAX_REQUEST_SIZE, MAX_RESPONSE_SIZE as EPR_ATOM_MAX_RESPONSE_SIZE,
 };
 pub use epr_protocol::{EprCodec, EprProtocol, EprRequest, EprResponse};
-pub use identity_map::{CallerIdentity, PeerIdentityMap, StubIdentityMap};
+pub use identity_map::{
+    CallerIdentity, HolochainBackedPeerIdentityMap, PeerIdentityMap, StubIdentityMap,
+};
 pub use shard_protocol::{ShardCodec, ShardProtocol, ShardRequest, ShardResponse};
 pub use sync_protocol::{DocumentInfo, SyncCodec, SyncProtocol, SyncRequest, SyncResponse};
 
@@ -257,10 +261,11 @@ pub struct P2PNode {
     /// Set by bulk write operations (account import, content bulk) to prevent
     /// P2P sync from competing for memory during heavy writes.
     sync_paused: Arc<AtomicBool>,
-    /// PeerId → agent pubkey mapping for reach enforcement (Phase 2c stub).
-    /// Concrete `StubIdentityMap` lets tests call `register(peer, pubkey)`.
-    /// Phase 2b replaces this with a real libp2p-identity-backed map.
-    identity_map: Arc<identity_map::StubIdentityMap>,
+    /// PeerId → agent CID mapping for reach enforcement.
+    /// Backed by `HolochainBackedPeerIdentityMap` once a db_pool is attached
+    /// (via `with_db_pool`). Falls back to `StubIdentityMap` (always-Anonymous)
+    /// when no pool is present (e.g. unit tests without a DB).
+    identity_map: Arc<dyn identity_map::PeerIdentityMap>,
 }
 
 /// Cached identify protocol info for a connected peer.
@@ -429,6 +434,17 @@ pub enum P2PCommand {
     /// Best-effort — publish failure does NOT revert the DB projection; the DHT
     /// remains the source of truth and subscribers can rediscover via signal replay.
     PublishRecoveryInvitation(crate::p2p::recovery_invitation::RecoveryInvitation),
+    /// Publish an IdentityBindingGossip to the `elohim/identity/binding` gossipsub topic.
+    ///
+    /// Sent by `ReconcileController::on_agent_peer_binding` (Task A.10) when a local
+    /// `AgentPeerBinding` DHT signal is received. Propagates the binding to all
+    /// subscribed peers so they can update their `peer_identity_bindings` projection
+    /// without waiting for a connection-time handshake.
+    ///
+    /// Best-effort — publish failure does NOT block the controller; the DHT entry
+    /// remains the source of truth and peers can reconstruct via signal replay or
+    /// the next connection-time handshake (A.9).
+    PublishIdentityBinding(crate::p2p::identity_binding_gossip::IdentityBindingGossip),
     /// Publish a RecoveryRevocationMessage to the `recovery.revocation` gossipsub topic.
     /// Sent by the projection layer after `KeyRevocationRequested` or
     /// `KeyRevocationEffective` signals. Best-effort — subscriber discovery is
@@ -467,6 +483,16 @@ impl P2PHandle {
     /// Get the latest P2P status snapshot
     pub fn status(&self) -> P2PStatusInfo {
         self.status_rx.borrow().clone()
+    }
+
+    /// Return a clone of the P2P command sender.
+    ///
+    /// Used by `ReconcileController::with_swarm_tx` (Task A.10) to wire the
+    /// controller's gossip-publish path. The controller holds the `Sender`
+    /// and calls `send(P2PCommand::PublishIdentityBinding(...))` when an
+    /// `AgentPeerBinding` DHT signal arrives.
+    pub fn command_sender(&self) -> mpsc::Sender<P2PCommand> {
+        self.command_tx.clone()
     }
 
     /// Pause sync/replication cycles for backpressure during bulk writes.
@@ -516,6 +542,7 @@ impl P2PHandle {
                     }
                     P2PCommand::PublishEprHead { .. } => {} // fire-and-forget
                     P2PCommand::PublishRecoveryInvitation(_) => {} // fire-and-forget
+                    P2PCommand::PublishIdentityBinding(_) => {} // fire-and-forget
                     P2PCommand::PublishRecoveryRevocation(_) => {} // fire-and-forget
                 }
             }
@@ -961,7 +988,10 @@ impl P2PNode {
         };
         let (status_tx, _) = tokio::sync::watch::channel(initial_status);
 
-        let identity_map = Arc::new(identity_map::StubIdentityMap::new());
+        // Default to always-Anonymous until a pool is attached via with_db_pool().
+        // with_db_pool() replaces this with HolochainBackedPeerIdentityMap.
+        let identity_map: Arc<dyn identity_map::PeerIdentityMap> =
+            Arc::new(identity_map::StubIdentityMap::new());
 
         info!(peer_id = %peer_id, relay_mode = %config.relay_mode, "Created P2P node with NAT traversal");
 
@@ -1007,8 +1037,15 @@ impl P2PNode {
         })
     }
 
-    /// Set the database pool for EPR Head construction
+    /// Set the database pool for EPR Head construction and peer identity lookup.
+    ///
+    /// Also replaces the default stub identity map with a
+    /// `HolochainBackedPeerIdentityMap` backed by the provided pool, enabling
+    /// real PeerId → agent CID resolution from the `peer_identity_bindings` table.
     pub fn with_db_pool(mut self, pool: DbPool) -> Self {
+        self.identity_map = Arc::new(identity_map::HolochainBackedPeerIdentityMap::new(
+            pool.clone(),
+        ));
         self.db_pool = Some(pool);
         self
     }
@@ -1031,13 +1068,6 @@ impl P2PNode {
     /// Get the local PeerId
     pub fn peer_id(&self) -> &PeerId {
         self.identity.peer_id()
-    }
-
-    /// Test-only: access the identity map so harnesses can register
-    /// `PeerId → agent pubkey` mappings before exercising the reach gate.
-    #[doc(hidden)]
-    pub fn identity_map(&self) -> &Arc<identity_map::StubIdentityMap> {
-        &self.identity_map
     }
 
     /// Start listening and event loop
@@ -1425,6 +1455,39 @@ impl P2PNode {
                     ),
                 }
             }
+            // A.10: publish identity binding to elohim/identity/binding topic.
+            // Triggered by ReconcileController::on_agent_peer_binding when a local
+            // AgentPeerBinding DHT signal arrives. Best-effort: publish failure is
+            // logged but does not block the controller loop.
+            P2PCommand::PublishIdentityBinding(payload) => {
+                let topic = libp2p::gossipsub::IdentTopic::new(
+                    crate::p2p::identity_binding_gossip::IDENTITY_BINDING_TOPIC,
+                );
+                match payload.to_bytes() {
+                    Ok(bytes) => match swarm.behaviour_mut().gossipsub.publish(topic, bytes) {
+                        Ok(msg_id) => info!(
+                            target: "elohim_storage::identity",
+                            peer_id = %payload.peer_id,
+                            agent_cid = %payload.agent_cid,
+                            message_id = ?msg_id,
+                            "Published IdentityBindingGossip to elohim/identity/binding"
+                        ),
+                        Err(e) => warn!(
+                            target: "elohim_storage::identity",
+                            peer_id = %payload.peer_id,
+                            agent_cid = %payload.agent_cid,
+                            error = ?e,
+                            "gossipsub publish failed for identity binding (often: no peers subscribed yet)"
+                        ),
+                    },
+                    Err(e) => warn!(
+                        target: "elohim_storage::identity",
+                        peer_id = %payload.peer_id,
+                        error = ?e,
+                        "Failed to encode IdentityBindingGossip"
+                    ),
+                }
+            }
             P2PCommand::PublishRecoveryRevocation(msg) => {
                 let topic = libp2p::gossipsub::IdentTopic::new(RECOVERY_REVOCATION_TOPIC);
                 match msg.to_bytes() {
@@ -1732,6 +1795,43 @@ impl P2PNode {
                         .behaviour_mut()
                         .trust_protocol
                         .send_request(&peer_id, handshake);
+
+                    // Trigger identity handshake (/elohim/identity/handshake/1.0.0)
+                    // Category C — session-local projection of AgentPeerBinding DHT state.
+                    // The receiver verifies structural integrity + validity window, then
+                    // inserts into peer_identity_bindings with source='handshake'.
+                    debug!(peer = %peer_id, "Sending identity handshake");
+                    let now_iso = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
+                    let nonce = {
+                        let n = uuid::Uuid::new_v4();
+                        base64::Engine::encode(
+                            &base64::engine::general_purpose::STANDARD,
+                            n.as_bytes(),
+                        )
+                    };
+                    let identity_request = identity_handshake::IdentityHandshakeRequest {
+                        binding: identity_handshake::HandshakeBindingPayload {
+                            peer_id: self.identity.peer_id().to_base58(),
+                            agent_cid: self.identity.agent_pubkey().to_string(),
+                            // TODO(A.11): replace with AgentPeerBinding.valid_from from DHT signal
+                            // stream when real binding source is wired.
+                            valid_from: now_iso.clone(),
+                            valid_until: None,
+                            device_archetype: "node".to_string(),
+                            // Stage 1: structural non-empty sentinel; full Ed25519 sign is Stage 3.
+                            signature: base64::Engine::encode(
+                                &base64::engine::general_purpose::STANDARD,
+                                self.identity.peer_id().to_base58().as_bytes(),
+                            ),
+                            dht_anchor_hash: None,
+                        },
+                        timestamp: now_iso,
+                        nonce,
+                    };
+                    swarm
+                        .behaviour_mut()
+                        .identity_handshake
+                        .send_request(&peer_id, identity_request);
                 }
                 self.refresh_status().await;
             }
@@ -2317,6 +2417,148 @@ impl P2PNode {
                 debug!(peer = %peer, "Trust response sent");
             }
 
+            // === Identity handshake events (/elohim/identity/handshake/1.0.0) ===
+            behaviour::ElohimStorageBehaviourEvent::IdentityHandshake(
+                request_response::Event::Message { peer, message },
+            ) => match message {
+                request_response::Message::Request {
+                    request, channel, ..
+                } => {
+                    debug!(
+                        peer = %peer,
+                        agent_cid = %request.binding.agent_cid,
+                        "Received identity handshake"
+                    );
+                    let now_iso = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
+                    let peer_id_str = peer.to_base58();
+                    let response = match identity_handshake::verify_handshake_request(
+                        &request,
+                        &peer_id_str,
+                        &now_iso,
+                    ) {
+                        identity_handshake::VerifyOutcome::Invalid(reason) => {
+                            info!(
+                                peer = %peer,
+                                reason = %reason,
+                                "Identity handshake rejected"
+                            );
+                            identity_handshake::IdentityHandshakeResponse::Rejected { reason }
+                        }
+                        identity_handshake::VerifyOutcome::Valid => {
+                            // Insert into peer_identity_bindings with source='handshake'.
+                            let b = &request.binding;
+                            let dht_anchor_hash = b.dht_anchor_hash.clone().unwrap_or_else(|| {
+                                identity_handshake::synthesise_dht_anchor_hash(
+                                    &b.peer_id,
+                                    &b.agent_cid,
+                                )
+                            });
+                            let row = crate::db::models::NewPeerIdentityBindingRow {
+                                peer_id: peer_id_str.clone(),
+                                agent_cid: b.agent_cid.clone(),
+                                dht_anchor_hash,
+                                valid_from: b.valid_from.clone(),
+                                valid_until: b.valid_until.clone(),
+                                observed_at: now_iso,
+                                source: "handshake".to_string(),
+                            };
+                            match self.db_pool.as_ref() {
+                                Some(pool) => match pool.get() {
+                                    Ok(mut conn) => {
+                                        match crate::db::peer_identity_bindings::upsert(
+                                            &mut conn, &row,
+                                        ) {
+                                            Ok(()) => {
+                                                debug!(
+                                                    peer = %peer,
+                                                    agent_cid = %b.agent_cid,
+                                                    "Identity handshake: binding recorded"
+                                                );
+                                                identity_handshake::IdentityHandshakeResponse::Accepted
+                                            }
+                                            Err(e) => {
+                                                warn!(
+                                                    peer = %peer,
+                                                    error = %e,
+                                                    "Identity handshake: db upsert failed"
+                                                );
+                                                identity_handshake::IdentityHandshakeResponse::Error(
+                                                    format!("db error: {e}"),
+                                                )
+                                            }
+                                        }
+                                    }
+                                    Err(e) => {
+                                        warn!(
+                                            peer = %peer,
+                                            error = %e,
+                                            "Identity handshake: pool exhausted"
+                                        );
+                                        identity_handshake::IdentityHandshakeResponse::Error(
+                                            "pool exhausted".to_string(),
+                                        )
+                                    }
+                                },
+                                None => {
+                                    // No pool configured — accept but do not persist.
+                                    debug!(
+                                        peer = %peer,
+                                        "Identity handshake: no db_pool configured, skipping persistence"
+                                    );
+                                    identity_handshake::IdentityHandshakeResponse::Accepted
+                                }
+                            }
+                        }
+                    };
+                    let mut swarm = self.swarm.write().await;
+                    if let Err(e) = swarm
+                        .behaviour_mut()
+                        .identity_handshake
+                        .send_response(channel, response)
+                    {
+                        warn!(peer = %peer, error = ?e, "Failed to send identity handshake response");
+                    }
+                }
+                request_response::Message::Response { response, .. } => match response {
+                    identity_handshake::IdentityHandshakeResponse::Accepted => {
+                        debug!(peer = %peer, "Identity handshake accepted by remote");
+                    }
+                    identity_handshake::IdentityHandshakeResponse::Rejected { reason } => {
+                        info!(
+                            peer = %peer,
+                            reason = %reason,
+                            "Remote rejected our identity handshake"
+                        );
+                    }
+                    identity_handshake::IdentityHandshakeResponse::Error(msg) => {
+                        warn!(peer = %peer, error = %msg, "Remote error on identity handshake");
+                    }
+                },
+            },
+            behaviour::ElohimStorageBehaviourEvent::IdentityHandshake(
+                request_response::Event::OutboundFailure { peer, error, .. },
+            ) => {
+                debug!(
+                    peer = %peer,
+                    error = ?error,
+                    "Identity handshake outbound failure"
+                );
+            }
+            behaviour::ElohimStorageBehaviourEvent::IdentityHandshake(
+                request_response::Event::InboundFailure { peer, error, .. },
+            ) => {
+                debug!(
+                    peer = %peer,
+                    error = ?error,
+                    "Identity handshake inbound failure"
+                );
+            }
+            behaviour::ElohimStorageBehaviourEvent::IdentityHandshake(
+                request_response::Event::ResponseSent { peer, .. },
+            ) => {
+                debug!(peer = %peer, "Identity handshake response sent");
+            }
+
             // === NAT traversal events ===
             behaviour::ElohimStorageBehaviourEvent::Identify(identify::Event::Received {
                 peer_id,
@@ -2463,6 +2705,94 @@ impl P2PNode {
                                     from = %propagation_source,
                                     error = ?e,
                                     "Failed to decode RecoveryInvitation"
+                                ),
+                            }
+                        } else if message.topic.as_str()
+                            == crate::p2p::identity_binding_gossip::IDENTITY_BINDING_TOPIC
+                        {
+                            // A.10: receive an identity binding from a peer and upsert
+                            // into peer_identity_bindings with source='gossip'.
+                            // Stage 1: structural verification only (non-empty fields).
+                            // Stage 2: add Ed25519 verify against resolved pubkey.
+                            match crate::p2p::identity_binding_gossip::IdentityBindingGossip::from_bytes(
+                                &message.data,
+                            ) {
+                                Ok(payload) => {
+                                    match payload.verify_structural() {
+                                        Err(reason) => warn!(
+                                            target: "elohim_storage::identity",
+                                            from = %propagation_source,
+                                            reason = %reason,
+                                            "IdentityBindingGossip failed structural verify — dropped"
+                                        ),
+                                        Ok(()) => {
+                                            let now_iso = chrono::Utc::now()
+                                                .format("%Y-%m-%dT%H:%M:%SZ")
+                                                .to_string();
+                                            let row = crate::db::models::NewPeerIdentityBindingRow {
+                                                peer_id: payload.peer_id.clone(),
+                                                agent_cid: payload.agent_cid.clone(),
+                                                dht_anchor_hash: payload.binding_action_hash.clone(),
+                                                valid_from: payload.valid_from.clone(),
+                                                valid_until: payload.valid_until.clone(),
+                                                observed_at: now_iso,
+                                                source: "gossip".to_string(),
+                                            };
+                                            match self.db_pool.as_ref() {
+                                                Some(pool) => {
+                                                    match pool.get() {
+                                                        Ok(mut conn) => {
+                                                            match crate::db::peer_identity_bindings::upsert(&mut conn, &row) {
+                                                                Ok(()) => info!(
+                                                                    target: "elohim_storage::identity",
+                                                                    from = %propagation_source,
+                                                                    peer_id = %payload.peer_id,
+                                                                    agent_cid = %payload.agent_cid,
+                                                                    "IdentityBindingGossip upserted with source='gossip'"
+                                                                ),
+                                                                Err(e) => warn!(
+                                                                    target: "elohim_storage::identity",
+                                                                    from = %propagation_source,
+                                                                    peer_id = %payload.peer_id,
+                                                                    error = %e,
+                                                                    "IdentityBindingGossip db upsert failed"
+                                                                ),
+                                                            }
+                                                        }
+                                                        Err(e) => warn!(
+                                                            target: "elohim_storage::identity",
+                                                            peer_id = %payload.peer_id,
+                                                            error = %e,
+                                                            "IdentityBindingGossip: db pool exhausted"
+                                                        ),
+                                                    }
+                                                }
+                                                None => debug!(
+                                                    target: "elohim_storage::identity",
+                                                    peer_id = %payload.peer_id,
+                                                    "IdentityBindingGossip: no db_pool configured, skipping persistence"
+                                                ),
+                                            }
+                                            // device_archetype is carried in the wire payload (Category C) but not
+                                            // persisted in peer_identity_bindings yet — column addition deferred to a
+                                            // later batch. Available for inspection via gossip but not for SQL filtering.
+
+                                            // NOTE: reconcile signal emission deferred — the controller processes only
+                                            // DNA signals in Stage 1. A P2P-received binding reaching the reconcile layer
+                                            // (for cache invalidation, etc.) is an A.12 concern.
+
+                                            // TODO(A.12): invalidate the remote agent's pubkey_timeline cache entry here.
+                                            // The !Send cache lives in the controller; the receive arm cannot reach it
+                                            // without restructuring. Deferred to the full controller signal-flow landing
+                                            // in A.12.
+                                        }
+                                    }
+                                }
+                                Err(e) => warn!(
+                                    target: "elohim_storage::identity",
+                                    from = %propagation_source,
+                                    error = ?e,
+                                    "Failed to decode IdentityBindingGossip"
                                 ),
                             }
                         } else if message.topic.as_str() == RECOVERY_REVOCATION_TOPIC {
@@ -3350,7 +3680,6 @@ impl P2PNode {
         peer: libp2p::PeerId,
         request: EprAtomRequest,
     ) -> EprAtomResponse {
-        use crate::p2p::PeerIdentityMap;
         let caller = self.identity_map.lookup(&peer);
 
         match request {

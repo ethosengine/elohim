@@ -38,8 +38,16 @@ name = "recovery_m3"
 path = "src/tests/recovery_m3.rs"
 
 [[test]]
+name = "imagodei_peer_binding"
+path = "src/tests/imagodei_peer_binding.rs"
+
+[[test]]
 name = "recovery_m4"
 path = "src/tests/recovery_m4.rs"
+
+[[test]]
+name = "epr_phase_2b_batch_a_e2e"
+path = "src/tests/epr_phase_2b_batch_a_e2e.rs"
 
 [dependencies]
 # Holochain runtime — sweettest embeds a real conductor in-process.
