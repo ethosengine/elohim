@@ -10,9 +10,16 @@
 //! peer A receives an AgentPeerBinding DHT signal, publishes to the topic via
 //! the controller's swarm_tx, peer B receives via gossip and upserts into
 //! `peer_identity_bindings` with source='gossip'.
+//! Phase 2B Task A.12: full reconcile loop integration —
+//! rotation+revocation→sweep→verified_at clearing, with control case.
 
 mod harness;
 use elohim_storage::p2p::{verify_incoming_epr, CallerIdentity, MAX_BATCH_CIDS};
+
+/// Format a UTC datetime as an ISO-8601 string matching the EPR wire format.
+fn ts(dt: chrono::DateTime<chrono::Utc>) -> String {
+    dt.format("%Y-%m-%dT%H:%M:%SZ").to_string()
+}
 
 // ---------------------------------------------------------------------------
 // A.12 — Full controller loop integration (rotation → revocation → sweep)
@@ -85,7 +92,6 @@ async fn epr_2b_batch_a_full_loop_rotation_then_revocation_clears_verified_at() 
     //   t_rotate    = 150  (K1 → K2 rotation effective)
     //   t_effective = 160  (revocation quorum reached)
     let t = |secs: i64| Utc.timestamp_opt(secs, 0).single().unwrap();
-    let ts = |dt: chrono::DateTime<Utc>| dt.format("%Y-%m-%dT%H:%M:%SZ").to_string();
 
     let agent_cid = "loop-agent-a";
     let t_pre = t(50);
@@ -136,14 +142,14 @@ async fn epr_2b_batch_a_full_loop_rotation_then_revocation_clears_verified_at() 
             schema_ref: "epr/agent/v1".into(),
             schema_key: agent_cid.to_string(),
             reach: "commons".into(),
-            issued_at: issued.format("%Y-%m-%dT%H:%M:%SZ").to_string(),
+            issued_at: ts(issued),
             signer_cid: agent_cid.to_string(),
             supersedes: None,
             canonical_bytes: vec![0u8; 4],
             payload_bytes: vec![0u8; 4],
             proof_bytes: vec![0u8; 64],
             proof_algorithm: "ed25519".into(),
-            verified_at: Some(issued.format("%Y-%m-%dT%H:%M:%SZ").to_string()),
+            verified_at: Some(ts(issued)),
             verified_signer_fingerprint: Some(real_fingerprint.to_string()),
         };
         diesel::insert_into(a_dsl::epr_atoms)
@@ -257,6 +263,7 @@ async fn epr_2b_batch_a_full_loop_rotation_then_revocation_clears_verified_at() 
         "post-compromise atom fingerprint must be REVOKED_STALE_FINGERPRINT after sweep"
     );
 }
+
 use harness::{spawn_test_node, BatchOutcome};
 use std::time::Duration;
 use tokio::time::timeout;

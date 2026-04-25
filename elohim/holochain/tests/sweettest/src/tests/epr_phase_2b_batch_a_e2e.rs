@@ -188,7 +188,7 @@ struct WireKeyRevocationEffective {
 ///   `epr_2b_batch_a_full_loop` (below) — `#[ignore]`'d pending Stage 2
 ///   `derive_compromise_at` upgrade + DNA artifact pack in Jenkins.
 #[tokio::test(flavor = "multi_thread")]
-async fn wire_shape_contract_keyRotation_keyRevocation() -> Result<()> {
+async fn wire_shape_contract_key_rotation_key_revocation() -> Result<()> {
     // -------------------------------------------------------------------------
     // Fixture: establish the time axis
     //
