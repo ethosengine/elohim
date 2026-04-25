@@ -51,6 +51,8 @@ pub const IDENTITY_HANDSHAKE_PROTOCOL_ID: &str = "/elohim/identity/handshake/1.0
 const MAX_REQUEST_SIZE: usize = 4 * 1024;
 /// Maximum size for a handshake response (small tag + optional reason string).
 const MAX_RESPONSE_SIZE: usize = 1024;
+/// Anti-replay window: reject handshake timestamps more than ±5 minutes from now.
+const ANTI_REPLAY_WINDOW_SECS: i64 = 300; // ±5 minutes
 
 // =============================================================================
 // Protocol marker
@@ -282,7 +284,7 @@ pub fn verify_handshake_request(
     // prevention a chrono parse is used when the check matters, but at Stage 1
     // we accept any timestamp whose prefix falls within plausible bounds.
     // A full chrono parse keeps the check honest.
-    let ts_ok = parse_iso_and_check_window(&request.timestamp, now_iso, 300);
+    let ts_ok = parse_iso_and_check_window(&request.timestamp, now_iso, ANTI_REPLAY_WINDOW_SECS);
     if !ts_ok {
         return VerifyOutcome::Invalid(format!(
             "handshake timestamp '{}' is outside the ±5-minute replay window (now='{}')",
@@ -296,17 +298,31 @@ pub fn verify_handshake_request(
 /// Returns `true` if `timestamp` is within `window_secs` of `now_iso`.
 ///
 /// Both strings are expected to be RFC3339 / ISO-8601 with Z suffix.
-/// Falls back to `true` (permissive) if either string fails to parse, so that
-/// misconfigured system clocks do not hard-lock identity establishment.
+///
+/// Parse failure handling is intentionally asymmetric:
+/// - If `now_iso` fails to parse (local clock misconfiguration), we pass
+///   permissively — a broken local clock should not hard-lock identity establishment.
+/// - If `timestamp` (the REMOTE peer's field) fails to parse, we reject — a peer
+///   that sends garbage in the timestamp field bypasses the anti-replay check
+///   otherwise, which is a security concern.
 fn parse_iso_and_check_window(timestamp: &str, now_iso: &str, window_secs: i64) -> bool {
     use chrono::{DateTime, Utc};
     let ts = match timestamp.parse::<DateTime<Utc>>() {
         Ok(t) => t,
-        Err(_) => return true, // permissive fallback — malformed clock should not hard-lock
+        Err(_) => return false, // reject — malformed remote timestamp, not a local clock issue
     };
     let now = match now_iso.parse::<DateTime<Utc>>() {
         Ok(t) => t,
-        Err(_) => return true,
+        Err(_) => {
+            // Local clock misconfiguration — log and pass permissively.
+            // Do not hard-lock identity establishment due to a local config issue.
+            tracing::warn!(
+                timestamp = %timestamp,
+                now_iso = %now_iso,
+                "local clock produced an unparseable ISO timestamp; skipping replay window check"
+            );
+            return true;
+        }
     };
     let delta = (ts - now).num_seconds().abs();
     delta <= window_secs
@@ -494,6 +510,23 @@ mod tests {
         req.timestamp = "2026-04-25T11:58:00Z".to_string();
         let result = verify_handshake_request(&req, "12D3KooWPeer1", "2026-04-25T12:00:00Z");
         assert_eq!(result, VerifyOutcome::Valid);
+    }
+
+    #[test]
+    fn verify_rejects_malformed_timestamp() {
+        // A peer that sends a garbage timestamp must be rejected, not passed.
+        // If we were permissive here, a remote peer could bypass the anti-replay
+        // window by sending any non-RFC3339 string.
+        let mut req = sample_request("12D3KooWPeer1", "bafyreiabc");
+        req.timestamp = "not-a-date".to_string();
+        let result = verify_handshake_request(&req, "12D3KooWPeer1", "2026-04-25T12:00:00Z");
+        match result {
+            VerifyOutcome::Invalid(msg) => assert!(
+                msg.contains("replay window"),
+                "expected replay window rejection for malformed timestamp, got: {msg}"
+            ),
+            VerifyOutcome::Valid => panic!("should have rejected malformed remote timestamp"),
+        }
     }
 
     #[test]

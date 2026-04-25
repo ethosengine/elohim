@@ -357,7 +357,9 @@ fn handle_event(
                 binding: HandshakeBindingPayload {
                     peer_id: local_peer_id.to_base58(),
                     agent_cid: local_agent_cid.to_string(),
-                    valid_from: "2026-01-01T00:00:00Z".to_string(),
+                    // TODO(A.11): replace with AgentPeerBinding.valid_from from DHT signal
+                    // stream when real binding source is wired.
+                    valid_from: now_iso.clone(),
                     valid_until: None,
                     device_archetype: "node".to_string(),
                     // Use a non-empty sentinel signature for Stage 1 structural check.

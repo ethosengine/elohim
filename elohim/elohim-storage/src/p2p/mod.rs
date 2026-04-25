@@ -1679,7 +1679,9 @@ impl P2PNode {
                         binding: identity_handshake::HandshakeBindingPayload {
                             peer_id: self.identity.peer_id().to_base58(),
                             agent_cid: self.identity.agent_pubkey().to_string(),
-                            valid_from: "2026-01-01T00:00:00Z".to_string(),
+                            // TODO(A.11): replace with AgentPeerBinding.valid_from from DHT signal
+                            // stream when real binding source is wired.
+                            valid_from: now_iso.clone(),
                             valid_until: None,
                             device_archetype: "node".to_string(),
                             // Stage 1: structural non-empty sentinel; full Ed25519 sign is Stage 3.
