@@ -165,6 +165,9 @@ pub struct HttpServer {
     /// Operator-configured elohim capability profile (Category C — operational, not DHT-derived).
     /// Loaded once at startup from ELOHIM_CAPABILITY_CONFIG_FILE. None for storage/relay-only nodes.
     elohim_capability: Option<crate::views::ElohimCapabilityProfile>,
+    /// Manifest registry for projector status endpoint.
+    /// Wired at startup via `with_manifest_registry`. None = endpoint returns empty cursors.
+    manifest_registry: Option<Arc<crate::projector::ManifestRegistry>>,
 }
 
 /// Extract X-Schema-Version header from request and validate it.
@@ -220,6 +223,7 @@ impl HttpServer {
             request_semaphore: Arc::new(Semaphore::new(MAX_CONCURRENT_REQUESTS)),
             embedded_conductor: false,
             elohim_capability: None,
+            manifest_registry: None,
         }
     }
 
@@ -232,6 +236,19 @@ impl HttpServer {
         capability: Option<crate::views::ElohimCapabilityProfile>,
     ) -> Self {
         self.elohim_capability = capability;
+        self
+    }
+
+    /// Set the manifest registry for the projector status endpoint.
+    ///
+    /// When set, `GET /api/v1/status/projector` returns live cursor + lag data
+    /// computed from the registry's registered projections. When absent, the
+    /// endpoint returns an empty `{ cursors: [], lag: [] }` response.
+    pub fn with_manifest_registry(
+        mut self,
+        registry: Arc<crate::projector::ManifestRegistry>,
+    ) -> Self {
+        self.manifest_registry = Some(registry);
         self
     }
 
@@ -553,6 +570,45 @@ impl HttpServer {
                             r#"{"error": "Sync API not enabled"}"#,
                         )))
                         .unwrap())
+                }
+            }
+
+            // Projector status — cursor + reconciliation-lag per (pillar, kind).
+            // Matched before /api/v1/ catch-all so the registry can be injected
+            // directly from HttpServer state rather than through handle_api_request.
+            (Method::GET, "/api/v1/status/projector") => {
+                if let Some(ref pool) = self.db_pool {
+                    if let Some(ref registry) = self.manifest_registry {
+                        let app_ctx = crate::db::AppContext {
+                            h_app_id: "elohim".to_string(),
+                        };
+                        crate::api::projector_status::handle(
+                            req,
+                            Method::GET,
+                            "",
+                            pool,
+                            &app_ctx,
+                            registry,
+                        )
+                        .await
+                    } else {
+                        // No registry wired — return empty status (not an error).
+                        let empty = crate::projector::ProjectorStatusView {
+                            cursors: vec![],
+                            lag: vec![],
+                        };
+                        Ok(Response::builder()
+                            .status(StatusCode::OK)
+                            .header(header::CONTENT_TYPE, "application/json")
+                            .body(Full::new(Bytes::from(
+                                serde_json::to_string(&empty).unwrap_or_default(),
+                            )))
+                            .unwrap())
+                    }
+                } else {
+                    Ok(response::service_unavailable(
+                        "Database pool not configured — projector status unavailable",
+                    ))
                 }
             }
 

@@ -36,6 +36,7 @@ pub mod peer_statuses;
 pub mod placement_gaps;
 pub mod places;
 pub mod presence;
+pub mod projector_status;
 pub mod rea_commitments;
 pub mod recognition;
 pub mod registry;

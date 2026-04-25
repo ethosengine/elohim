@@ -61,17 +61,25 @@
 
 pub mod cursor;
 pub mod mapping;
+pub mod signals;
+pub mod status;
 pub mod sweep;
 
 pub use cursor::{advance_cursor, load_cursor, CursorError, ProjectorCursorRow};
 pub use mapping::{ManifestRegistry, RegisteredProjection, RegistryError};
+pub use signals::ProjectorSignal;
+pub use status::{
+    compute_projector_status, ProjectorCursorView, ProjectorLagView, ProjectorStatusView,
+};
 pub use sweep::{sweep_projections_on_revocation, ProjectionSweepError, ProjectionSweepReport};
 
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
+use chrono::Utc;
 use diesel::prelude::*;
 use thiserror::Error;
+use tokio::sync::mpsc;
 use tracing::{debug, trace, warn};
 
 use crate::db::diesel_schema::epr_atoms;
@@ -115,6 +123,13 @@ pub struct PassReport {
 /// into pillar read-model tables per manifest-declared mappings.
 pub struct Projector {
     manifest_registry: Arc<ManifestRegistry>,
+    /// Optional channel sink for [`ProjectorSignal`] emission.
+    ///
+    /// When `Some`, a signal is sent after every successful UPSERT via
+    /// `try_send` (non-blocking). Callers that need to observe projection events
+    /// — dashboards, elohim-agent defenders, Phase 4 GraphQL subscriptions —
+    /// attach a receiver to this channel.
+    signal_sink: Option<mpsc::Sender<ProjectorSignal>>,
 }
 
 impl Projector {
@@ -122,12 +137,25 @@ impl Projector {
     pub fn new(manifest_registry: ManifestRegistry) -> Self {
         Self {
             manifest_registry: Arc::new(manifest_registry),
+            signal_sink: None,
         }
     }
 
     /// Construct a projector with a shared registry reference.
     pub fn with_registry(manifest_registry: Arc<ManifestRegistry>) -> Self {
-        Self { manifest_registry }
+        Self {
+            manifest_registry,
+            signal_sink: None,
+        }
+    }
+
+    /// Attach a signal sink channel. After each successful UPSERT the projector
+    /// sends a [`ProjectorSignal`] on this channel via `try_send`. If the
+    /// channel is full the signal is dropped and a warning is logged — the
+    /// projector loop is never blocked.
+    pub fn with_signal_sink(mut self, tx: mpsc::Sender<ProjectorSignal>) -> Self {
+        self.signal_sink = Some(tx);
+        self
     }
 
     /// Run one projection pass across all registered projections.
@@ -176,6 +204,26 @@ impl Projector {
                     &atom.issued_at,
                 )?;
                 report.atoms_processed += 1;
+
+                // Emit signal to any attached sink. Non-blocking: a full
+                // channel drops the signal rather than stalling the loop.
+                if let Some(ref tx) = self.signal_sink {
+                    let signal = ProjectorSignal {
+                        pillar: projection.pillar.clone(),
+                        kind: projection.kind.clone(),
+                        epr_cid: atom.cid.clone(),
+                        target_table: projection.target_table.clone(),
+                        row_key: atom.cid.clone(),
+                        timestamp: Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string(),
+                    };
+                    if let Err(e) = tx.try_send(signal) {
+                        warn!(
+                            atom_cid = %atom.cid,
+                            error = %e,
+                            "projector signal channel full — signal dropped"
+                        );
+                    }
+                }
             }
 
             report.projections_advanced += 1;
