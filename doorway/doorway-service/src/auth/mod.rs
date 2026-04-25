@@ -10,6 +10,7 @@ pub mod api_key;
 pub mod jwt;
 pub mod password;
 pub mod permissions;
+pub mod portal_host;
 
 pub use api_key::ApiKeyValidator;
 pub use jwt::{extract_token_from_header, Claims, JwtValidator, TokenInput, TokenValidationResult};
