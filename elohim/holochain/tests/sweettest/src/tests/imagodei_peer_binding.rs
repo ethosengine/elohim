@@ -69,7 +69,6 @@ struct CreateAgentPeerBindingOutput {
 ///   - `get_agent_peer_bindings(agent_pubkey)` → `Vec<AgentPeerBindingView>`
 ///   - `get_bindings_for_peer(peer_id)` → `Vec<AgentPeerBindingView>`
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "requires packed DNA artifact + coordinator A.3 — wire into Jenkins pack-then-test stage"]
 async fn binding_creates_and_is_readable() -> Result<()> {
     let (mut conductor, agent) = single_agent_conductor().await?;
     let dna = load_dna(DNA, &network_seed(DNA), Some(agent.clone())).await?;
@@ -157,7 +156,6 @@ async fn binding_creates_and_is_readable() -> Result<()> {
 ///
 /// Expected: the `conductor.call` returns an error (zome call rejected).
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "requires packed DNA artifact + coordinator A.3 — wire into Jenkins pack-then-test stage"]
 async fn binding_rejects_wrong_signer() -> Result<()> {
     let [(mut c1, a1), (mut c2, a2)] = two_agent_conductors().await?;
     let dna_file = load_dna(DNA, &network_seed(DNA), Some(a1.clone())).await?;
