@@ -821,6 +821,75 @@ pub fn recovery_invitation_from_signal(
     }
 }
 
+/// Extract a `RecoveryRevocationMessage` publish intent from a `RecoveryV2Signal`.
+///
+/// Returns `Some(msg)` for `KeyRevocationRequested` and `KeyRevocationEffective`
+/// (so other peers can re-ingest revocation state). Returns `None` for
+/// `RevocationVoteSubmitted` (votes are DHT-authoritative; they are not gossiped
+/// separately per spec §7.1 decision log entry #6) and all other variants.
+///
+/// The caller SHOULD forward the message via `P2PCommand::PublishRecoveryRevocation`
+/// alongside calling `handle_recovery_v2_signal`:
+///
+/// ```ignore
+/// if let Some(msg) = recovery_revocation_from_signal(&sig, &local_peer_id_str) {
+///     let _ = p2p_tx.try_send(P2PCommand::PublishRecoveryRevocation(msg));
+/// }
+/// handle_recovery_v2_signal(&mut conn, sig)?;
+/// ```
+///
+/// `sender_peer_id` is the local node's PeerId as a base58 string.
+pub fn recovery_revocation_from_signal(
+    signal: &RecoveryV2Signal,
+    sender_peer_id: &str,
+) -> Option<RecoveryRevocationMessage> {
+    let now = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
+    match signal {
+        RecoveryV2Signal::KeyRevocationRequested {
+            id,
+            human_id,
+            revoked_key,
+            trigger_type,
+            reason,
+            threshold_reached,
+            ..
+        } => Some(RecoveryRevocationMessage {
+            revocation_id: id.clone(),
+            human_id: human_id.clone(),
+            revoked_key: revoked_key.clone(),
+            trigger_type: trigger_type.clone(),
+            reason: reason.clone(),
+            status: if *threshold_reached {
+                "effective".into()
+            } else {
+                "pending".into()
+            },
+            sender_peer_id: sender_peer_id.to_string(),
+            sent_at: now,
+        }),
+        RecoveryV2Signal::KeyRevocationEffective {
+            revocation_id,
+            revoked_key,
+            human_id,
+            ..
+        } => Some(RecoveryRevocationMessage {
+            revocation_id: revocation_id.clone(),
+            human_id: human_id.clone(),
+            revoked_key: revoked_key.clone(),
+            // trigger_type and reason are not carried on the Effective signal;
+            // mesh subscribers key by revocation_id which is stable.
+            trigger_type: String::new(),
+            reason: String::new(),
+            status: "effective".into(),
+            sender_peer_id: sender_peer_id.to_string(),
+            sent_at: now,
+        }),
+        // RevocationVoteSubmitted: votes stay DHT-side; not gossiped separately.
+        // All other variants: not relevant to recovery.revocation topic.
+        _ => None,
+    }
+}
+
 /// Dispatch a `RecoveryV2Signal` into the SQLite projection.
 ///
 /// New variants add a match arm here. Keep this function thin — per-entity
