@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.elohim.protocol/v1/zome-inputs/submit-specialist-revocation.json",
+  "title": "SubmitSpecialistRevocationInput",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["humanActionHash", "revokedPubKey", "anomalyAttestation"],
+  "properties": {
+    "humanActionHash":    { "type": "string", "description": "ActionHash (base64url) of the target Human" },
+    "revokedPubKey":      { "type": "string" },
+    "anomalyAttestation": { "$ref": "https://schemas.elohim.protocol/v1/agent/anomaly-attestation.json" }
+  }
+}

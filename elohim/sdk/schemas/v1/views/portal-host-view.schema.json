@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.elohim.protocol/v1/views/portal-host-view.json",
+  "title": "PortalHostView",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["humanId", "hostUrl", "addedAt", "reach", "dhtAnchorHash"],
+  "properties": {
+    "humanId":          { "type": "string", "description": "ActionHash (base64url) of the Human entry this PortalHost anchors on" },
+    "hostUrl":          { "type": "string", "format": "uri", "maxLength": 2048 },
+    "label":            { "type": ["string", "null"], "maxLength": 256 },
+    "addedAt":          { "type": "string", "format": "date-time" },
+    "lastReachableAt":  { "type": ["string", "null"], "format": "date-time", "description": "Operational enrichment from libp2p; not part of notarized entry" },
+    "reach":            { "type": "string", "enum": ["trusted", "intimate", "public"], "description": "M5 ships only 'trusted'" },
+    "dhtAnchorHash":    { "type": "string", "description": "ActionHash (base64url) of the PortalHost entry; canonical PK" }
+  }
+}

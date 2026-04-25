@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.elohim.protocol/v1/views/agent-peer-binding-view.json",
+  "title": "AgentPeerBindingView",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["agentCid", "peerId", "validFrom", "signature", "dhtAnchorHash"],
+  "properties": {
+    "agentCid":      { "type": "string" },
+    "peerId":        { "type": "string", "description": "libp2p PeerId" },
+    "validFrom":     { "type": "string", "format": "date-time" },
+    "validUntil":    { "type": ["string", "null"], "format": "date-time" },
+    "signature":     { "type": "string", "description": "Ed25519 signature over canonical bytes" },
+    "dhtAnchorHash": { "type": "string" }
+  }
+}

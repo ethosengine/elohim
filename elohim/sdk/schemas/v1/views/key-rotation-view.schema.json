@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.elohim.protocol/v1/views/key-rotation-view.json",
+  "title": "KeyRotationView",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["humanId", "newPubKey", "authority", "rotatedAt", "dhtAnchorHash"],
+  "properties": {
+    "humanId":       { "type": "string" },
+    "oldPubKey":     { "type": ["string", "null"] },
+    "newPubKey":     { "type": "string" },
+    "authority":     { "type": "string", "enum": ["IntimateQuorum", "CryptographicQuorum", "CommunityConsensus", "GovernanceAct", "NetworkWitness"] },
+    "rotatedAt":     { "type": "string", "format": "date-time" },
+    "dhtAnchorHash": { "type": "string" }
+  }
+}

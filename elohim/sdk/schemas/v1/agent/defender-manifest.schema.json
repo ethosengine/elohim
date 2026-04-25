@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.elohim.protocol/v1/agent/defender-manifest.json",
+  "title": "DefenderManifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["specialistKind", "forHumans", "disclosureTier", "outputs", "systemPromptTemplate"],
+  "properties": {
+    "specialistKind":       { "type": "string", "const": "defender" },
+    "forHumans":            { "type": "array", "items": { "type": "string", "description": "Human ActionHash (base64url)" }, "minItems": 1 },
+    "disclosureTier":       { "type": "string", "enum": ["intimate", "trusted", "public"] },
+    "outputs":              { "type": "array", "items": { "type": "string" }, "description": "DHT entry types this specialist may author (e.g., 'KeyRevocation::specialist_attestation')" },
+    "systemPromptTemplate": { "type": "string" }
+  }
+}

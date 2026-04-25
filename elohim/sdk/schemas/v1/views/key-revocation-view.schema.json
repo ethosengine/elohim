@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.elohim.protocol/v1/views/key-revocation-view.json",
+  "title": "KeyRevocationView",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["humanId", "revokedPubKey", "triggerType", "revokedAt", "dhtAnchorHash"],
+  "properties": {
+    "humanId":       { "type": "string" },
+    "revokedPubKey": { "type": "string" },
+    "triggerType":   { "type": "string", "enum": ["self", "emergency_contact_quorum", "specialist_attestation"] },
+    "attestation":   { "type": ["object", "null"], "description": "anomaly_attestation payload when triggerType is specialist_attestation" },
+    "revokedAt":     { "type": "string", "format": "date-time" },
+    "dhtAnchorHash": { "type": "string" }
+  }
+}
