@@ -104,6 +104,21 @@ impl ManifestRegistry {
     pub fn all_projections(&self) -> &[RegisteredProjection] {
         &self.projections
     }
+
+    /// Return true if there is a registered projection for the given (kind, schema_key) pair.
+    ///
+    /// Used to document Invariant I2 (manifest-authority): the projector only fetches
+    /// atoms whose (kind, schema_key) match a declared projection. Undeclared atoms are
+    /// never fetched, so this guard is structural — the projector loop iterates
+    /// `all_projections()` and queries `epr_atoms` filtered by `(kind, schema_key)`,
+    /// which means atoms whose kind/schema_key have no declared projection are simply
+    /// never returned by `fetch_epr_atoms_since`. This method exists for clarity and
+    /// test-assertion purposes only.
+    pub fn has_projection(&self, kind: &str, schema_key: &str) -> bool {
+        self.projections
+            .iter()
+            .any(|p| p.kind == kind && p.schema_key == schema_key)
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -181,6 +196,11 @@ fn shefa_economic_event_column_mapping() -> BTreeMap<String, String> {
         "effort_quantity_unit".to_string(),
         "payload.effortQuantity.hasUnit".to_string(),
     );
+    // Mirror the source EPR atom's verified_at into the projection row (I4/I5).
+    // When the source atom is unverified, this resolves to None and the column
+    // is omitted from the INSERT, defaulting to NULL. On revocation sweep,
+    // the projection row's verified_at is cleared atomically.
+    m.insert("verified_at".to_string(), "$verifiedAt".to_string());
     m
 }
 

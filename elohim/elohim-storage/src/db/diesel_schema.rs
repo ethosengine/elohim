@@ -188,6 +188,7 @@ diesel::table! {
         dht_anchor_hash -> Nullable<Text>,
         created_at -> Text,
         at_location -> Nullable<Text>,
+        verified_at -> Nullable<Text>,
     }
 }
 

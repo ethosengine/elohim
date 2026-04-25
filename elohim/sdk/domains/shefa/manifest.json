@@ -268,7 +268,8 @@
         "h_app_id": "$signer",
         "state": "$state:recorded",
         "created_at": "$issuedAt",
-        "dht_anchor_hash": "$cid"
+        "dht_anchor_hash": "$cid",
+        "verified_at": "$verifiedAt"
       }
     }
   ]
