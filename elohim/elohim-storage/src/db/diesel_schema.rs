@@ -1281,6 +1281,17 @@ diesel::table! {
     }
 }
 
+// EPR Phase 2B — B.3: projector cursor (Category C operational)
+diesel::table! {
+    projector_cursor (pillar, kind) {
+        pillar -> Text,
+        kind -> Text,
+        last_epr_cid -> Nullable<Text>,
+        last_issued_at -> Nullable<Text>,
+        updated_at -> Text,
+    }
+}
+
 diesel::joinable!(epr_coupling -> epr_atoms (epr_cid));
 diesel::joinable!(epr_claims -> epr_atoms (epr_cid));
 
@@ -1335,6 +1346,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     precedents,
     premium_gates,
     proposal_options,
+    projector_cursor,
     proposals,
     ranked_votes,
     key_revocations,

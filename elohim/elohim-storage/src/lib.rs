@@ -76,6 +76,9 @@ pub mod cache_stream;
 // Reconcile controller — Principle P1 (DHT as manifest, eager projection)
 pub mod reconcile;
 
+// EPR projector — consumes epr_atoms, projects into pillar read-models (EPR 2B Decision #3)
+pub mod projector;
+
 // Tally strategies for multi-mechanism voting
 pub mod tally;
 
