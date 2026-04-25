@@ -107,6 +107,10 @@ pub mod recovery_requests;
 // Recovery Protocol Phase 2 — M3 witness projection (IntimateWitnessSubmitted signal)
 pub mod recovery_witnesses;
 
+// Recovery Protocol Phase 2 — M4 revocation projection (KeyRevocation + RevocationVote)
+pub mod key_revocations;
+pub mod revocation_votes;
+
 use std::path::Path;
 use std::time::Duration;
 
