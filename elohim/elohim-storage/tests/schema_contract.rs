@@ -1224,3 +1224,105 @@ fn epr_atom_wire_contract_rejects_missing_tag() {
     let has_errors = validator.iter_errors(&missing_tag).next().is_some();
     assert!(has_errors, "wire contract should require tag discriminator");
 }
+
+// =============================================================================
+// Recovery Protocol Phase 2 — M4 View Schema Contract Tests
+//
+// Source of truth: DHT (imagodei KeyRevocation + RevocationVote entries).
+// These tests verify that the Rust projection view structs match their
+// JSON Schema contracts in elohim/sdk/schemas/v1/views/.
+// =============================================================================
+
+#[test]
+fn key_revocation_view_matches_schema() {
+    use elohim_storage::views::KeyRevocationView;
+
+    let sample = KeyRevocationView {
+        dht_anchor_hash: "hCAkTESTHASH123".into(),
+        id: "rev-human-matthew-2026-04-24T00:00:00Z".into(),
+        human_id: "human-matthew".into(),
+        revoked_key: "uhCAkABCD1234567890".into(),
+        reason: "compromised".into(),
+        trigger_type: "voluntary".into(),
+        initiated_by: "human-matthew".into(),
+        required_votes: 1,
+        current_votes: 1,
+        threshold_reached: true,
+        effective_at: Some("2026-04-24T00:00:00Z".into()),
+        created_at: "2026-04-24T00:00:00Z".into(),
+        updated_at: "2026-04-24T00:00:00Z".into(),
+    };
+
+    validate_against_schema(
+        "views/key-revocation.schema.json",
+        &serde_json::to_value(&sample).unwrap(),
+    );
+}
+
+#[test]
+fn key_revocation_view_null_effective_at_matches_schema() {
+    use elohim_storage::views::KeyRevocationView;
+
+    let sample = KeyRevocationView {
+        dht_anchor_hash: "hCAkTESTHASH456".into(),
+        id: "rev-human-jessica-2026-04-24T00:01:00Z".into(),
+        human_id: "human-jessica".into(),
+        revoked_key: "uhCAkXYZ987654321".into(),
+        reason: "stolen".into(),
+        trigger_type: "steward_vote".into(),
+        initiated_by: "human-timothy".into(),
+        required_votes: 3,
+        current_votes: 0,
+        threshold_reached: false,
+        effective_at: None,
+        created_at: "2026-04-24T00:01:00Z".into(),
+        updated_at: "2026-04-24T00:01:00Z".into(),
+    };
+
+    validate_against_schema(
+        "views/key-revocation.schema.json",
+        &serde_json::to_value(&sample).unwrap(),
+    );
+}
+
+#[test]
+fn revocation_vote_view_matches_schema() {
+    use elohim_storage::views::RevocationVoteView;
+
+    let sample = RevocationVoteView {
+        dht_anchor_hash: "hCAkVOTEHASH789".into(),
+        id: "vote-human-jessica-2026-04-24T00:02:00Z".into(),
+        revocation_dht_anchor_hash: "hCAkREVHASH123".into(),
+        revocation_id: "rev-human-jessica-2026-04-24T00:01:00Z".into(),
+        steward_id: "human-timothy".into(),
+        approved: true,
+        attestation: "Key was captured by attacker; I verified identity via video call.".into(),
+        voted_at: "2026-04-24T00:02:00Z".into(),
+    };
+
+    validate_against_schema(
+        "views/revocation-vote.schema.json",
+        &serde_json::to_value(&sample).unwrap(),
+    );
+}
+
+#[test]
+fn revocation_vote_view_rejected_matches_schema() {
+    use elohim_storage::views::RevocationVoteView;
+
+    let sample = RevocationVoteView {
+        dht_anchor_hash: "hCAkVOTEHASHabc".into(),
+        id: "vote-human-sarah-2026-04-24T00:03:00Z".into(),
+        revocation_dht_anchor_hash: "hCAkREVHASH123".into(),
+        revocation_id: "rev-human-jessica-2026-04-24T00:01:00Z".into(),
+        steward_id: "human-sarah".into(),
+        approved: false,
+        attestation: "I spoke to Jessica directly; she still has her phone.".into(),
+        voted_at: "2026-04-24T00:03:00Z".into(),
+    };
+
+    validate_against_schema(
+        "views/revocation-vote.schema.json",
+        &serde_json::to_value(&sample).unwrap(),
+    );
+}
