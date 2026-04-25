@@ -61,9 +61,11 @@
 
 pub mod cursor;
 pub mod mapping;
+pub mod sweep;
 
 pub use cursor::{advance_cursor, load_cursor, CursorError, ProjectorCursorRow};
 pub use mapping::{ManifestRegistry, RegisteredProjection, RegistryError};
+pub use sweep::{sweep_projections_on_revocation, ProjectionSweepError, ProjectionSweepReport};
 
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -345,14 +347,18 @@ pub(crate) fn evaluate_column_mapping(
 /// - `$cid` → atom CID string
 /// - `$signer` → atom signer CID string
 /// - `$issuedAt` → atom issued_at ISO-8601 string
+/// - `$verifiedAt` → atom verified_at ISO-8601 string, or `None` when not yet verified
 /// - `$state:<literal>` → the literal string after the colon
 ///
-/// Returns `None` for unknown `$`-prefixed paths.
+/// Returns `None` for unknown `$`-prefixed paths. For `$verifiedAt`, `None` is
+/// returned when the source atom's `verified_at` is `None` (i.e. unverified),
+/// causing the column to be omitted from the INSERT so it defaults to NULL.
 fn resolve_projector_source(source_path: &str, atom: &EprAtom) -> Option<String> {
     match source_path {
         "$cid" => Some(atom.cid.clone()),
         "$signer" => Some(atom.signer_cid.clone()),
         "$issuedAt" => Some(atom.issued_at.clone()),
+        "$verifiedAt" => atom.verified_at.clone(),
         other if other.starts_with("$state:") => {
             let literal = other.trim_start_matches("$state:");
             Some(literal.to_string())
@@ -398,7 +404,14 @@ fn scalar_to_string(value: &serde_json::Value) -> Option<String> {
 // ---------------------------------------------------------------------------
 
 /// Fetch all EPR atoms for a given (kind, schema_key) pair whose `issued_at`
-/// is strictly after `since_issued_at`, ordered by `issued_at` ascending.
+/// is strictly after `since_issued_at`, ordered by `(signer_cid, issued_at)` ascending.
+///
+/// The composite order satisfies Invariant I3: within each signer, atoms arrive
+/// in chronological order so a later atom from the same signer always overwrites
+/// the projection row produced by an earlier one (UPSERT on CID ensures idempotency
+/// across signers). The `(signer_cid, issued_at)` compound index added by the
+/// 2026-04-25-000000_verified_at_on_epr_atoms migration is used automatically
+/// by SQLite's query planner.
 ///
 /// Used by [`Projector::run_one_pass`] to page forward from the last cursor.
 pub fn fetch_epr_atoms_since(
@@ -411,7 +424,7 @@ pub fn fetch_epr_atoms_since(
         .filter(epr_atoms::kind.eq(kind))
         .filter(epr_atoms::schema_key.eq(schema_key))
         .filter(epr_atoms::issued_at.gt(since_issued_at))
-        .order(epr_atoms::issued_at.asc())
+        .order((epr_atoms::signer_cid.asc(), epr_atoms::issued_at.asc()))
         .load::<EprAtom>(conn)
 }
 
@@ -426,7 +439,6 @@ mod tests {
     use crate::projector::cursor::load_cursor;
     use crate::projector::mapping::mock_manifest_registry;
     use crate::test_util::test_pool;
-    use diesel::prelude::*;
 
     /// Insert a minimal EprAtom with the given CID, kind, and issued_at into the test DB.
     ///
