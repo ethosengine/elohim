@@ -247,5 +247,22 @@
         "archetype": "outcome-divergence"
       }
     }
-  }
+  },
+  "projections": [
+    {
+      "kind": "EconomicEvent",
+      "schemaKey": "economic-event",
+      "targetTable": "economic_events",
+      "columnMapping": {
+        "provider": "payload.provider",
+        "receiver": "payload.receiver",
+        "action": "payload.action",
+        "resourceConformsTo": "payload.resourceConformsTo",
+        "quantity": "payload.quantity.numericValue",
+        "unit": "payload.quantity.hasUnit",
+        "hasPointInTime": "payload.hasPointInTime",
+        "effortQuantity": "payload.effortQuantity"
+      }
+    }
+  ]
 }
