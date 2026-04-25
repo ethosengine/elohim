@@ -60,8 +60,7 @@ pub fn set_key_revocation_effective(
     new_updated_at: &str,
 ) -> Result<(), StorageError> {
     let rows = diesel::update(
-        key_revocations::table
-            .filter(key_revocations::dht_anchor_hash.eq(target_dht_anchor_hash)),
+        key_revocations::table.filter(key_revocations::dht_anchor_hash.eq(target_dht_anchor_hash)),
     )
     .set((
         key_revocations::threshold_reached.eq(1),
@@ -69,9 +68,7 @@ pub fn set_key_revocation_effective(
         key_revocations::updated_at.eq(new_updated_at.to_string()),
     ))
     .execute(conn)
-    .map_err(|e| {
-        StorageError::Internal(format!("Failed to set key_revocation effective: {e}"))
-    })?;
+    .map_err(|e| StorageError::Internal(format!("Failed to set key_revocation effective: {e}")))?;
 
     if rows == 0 {
         // Effective gossip arrived before we had projected the Requested signal
@@ -96,8 +93,7 @@ pub fn update_current_votes(
     new_updated_at: &str,
 ) -> Result<(), StorageError> {
     diesel::update(
-        key_revocations::table
-            .filter(key_revocations::dht_anchor_hash.eq(target_dht_anchor_hash)),
+        key_revocations::table.filter(key_revocations::dht_anchor_hash.eq(target_dht_anchor_hash)),
     )
     .set((
         key_revocations::current_votes.eq(new_current_votes),
@@ -106,7 +102,9 @@ pub fn update_current_votes(
     .execute(conn)
     .map(|_| ())
     .map_err(|e| {
-        StorageError::Internal(format!("Failed to update current_votes on key_revocation: {e}"))
+        StorageError::Internal(format!(
+            "Failed to update current_votes on key_revocation: {e}"
+        ))
     })
 }
 
@@ -158,9 +156,7 @@ pub fn list_pending_revocations(
         .order(key_revocations::created_at.desc())
         .select(KeyRevocationRow::as_select())
         .load(conn)
-        .map_err(|e| {
-            StorageError::Internal(format!("Failed to list pending key_revocations: {e}"))
-        })
+        .map_err(|e| StorageError::Internal(format!("Failed to list pending key_revocations: {e}")))
 }
 
 #[cfg(test)]
@@ -213,9 +209,16 @@ mod tests {
     fn set_effective_marks_threshold_reached() {
         let mut conn = test_conn();
         upsert_key_revocation(&mut conn, sample_row("R2", 0)).unwrap();
-        set_key_revocation_effective(&mut conn, "R2", "2026-04-24T01:00:00Z", "2026-04-24T01:00:00Z")
+        set_key_revocation_effective(
+            &mut conn,
+            "R2",
+            "2026-04-24T01:00:00Z",
+            "2026-04-24T01:00:00Z",
+        )
+        .unwrap();
+        let row = get_key_revocation_by_anchor(&mut conn, "R2")
+            .unwrap()
             .unwrap();
-        let row = get_key_revocation_by_anchor(&mut conn, "R2").unwrap().unwrap();
         assert_eq!(row.threshold_reached, 1);
         assert_eq!(row.effective_at.as_deref(), Some("2026-04-24T01:00:00Z"));
     }
@@ -225,7 +228,9 @@ mod tests {
         let mut conn = test_conn();
         upsert_key_revocation(&mut conn, sample_row("R3", 0)).unwrap();
         update_current_votes(&mut conn, "R3", 2, "2026-04-24T01:00:00Z").unwrap();
-        let row = get_key_revocation_by_anchor(&mut conn, "R3").unwrap().unwrap();
+        let row = get_key_revocation_by_anchor(&mut conn, "R3")
+            .unwrap()
+            .unwrap();
         assert_eq!(row.current_votes, 2);
     }
 

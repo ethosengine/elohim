@@ -23,8 +23,8 @@ use super::diesel_schema::{
     rea_commitments, recovery_requests, recovery_witnesses, relationships,
     responsibility_demand_configs, revocation_votes, risk_alerts, schedules, shard_locations,
     shard_manifests, spatial_contexts, statement_votes, statements, steward_credentials,
-    stewarded_nodes, stewardship_allocations, token_balances, token_decay_events, token_mint_events,
-    token_transfers, votes,
+    stewarded_nodes, stewardship_allocations, token_balances, token_decay_events,
+    token_mint_events, token_transfers, votes,
 };
 
 // ============================================================================

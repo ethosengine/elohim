@@ -28,7 +28,10 @@ pub fn insert_revocation_vote(
 ) -> Result<(), StorageError> {
     diesel::insert_into(revocation_votes::table)
         .values(&row)
-        .on_conflict((revocation_votes::revocation_id, revocation_votes::steward_id))
+        .on_conflict((
+            revocation_votes::revocation_id,
+            revocation_votes::steward_id,
+        ))
         .do_nothing()
         .execute(conn)
         .map(|_| ())
@@ -66,7 +69,9 @@ pub fn list_votes_for_revocation(
         .select(RevocationVoteRow::as_select())
         .load(conn)
         .map_err(|e| {
-            StorageError::Internal(format!("Failed to list revocation_votes for revocation: {e}"))
+            StorageError::Internal(format!(
+                "Failed to list revocation_votes for revocation: {e}"
+            ))
         })
 }
 
