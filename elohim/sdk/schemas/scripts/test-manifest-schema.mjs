@@ -167,6 +167,16 @@ async function main() {
   );
   ajv.addSchema(observationPolaritySchema, 'epr:enums/observation-polarity.schema.json');
 
+  const eprKindSchema = await loadJson(
+    resolve(__dirname, '../v1/enums/epr-kind.schema.json'),
+  );
+  ajv.addSchema(eprKindSchema, 'epr:enums/epr-kind.schema.json');
+
+  const pillarProjectionSchema = await loadJson(
+    resolve(__dirname, '../v1/manifest/pillar-projection.schema.json'),
+  );
+  ajv.addSchema(pillarProjectionSchema, 'epr:pillar-projection.schema.json');
+
   const schema = await loadJson(
     resolve(__dirname, '../v1/manifest/app-manifest.schema.json'),
   );
@@ -286,6 +296,58 @@ async function main() {
     };
     const valid = validate(validClaims);
     assert(valid, `Should accept content type with valid claims + observations: ${JSON.stringify(validate.errors)}`);
+  }
+
+  // 12. Accepts manifest with valid projections array (Batch B — projector mapping)
+  {
+    const m = minimalManifest();
+    m.projections = [
+      {
+        kind: 'EconomicEvent',
+        schemaKey: 'economic-event',
+        targetTable: 'economic_events',
+        columnMapping: {
+          provider: 'payload.provider',
+          quantity: 'payload.quantity.numericValue',
+        },
+      },
+    ];
+    assert(validate(m), `accepts manifest with valid projections: ${JSON.stringify(validate.errors)}`);
+  }
+
+  // 13. Rejects projection with kind not in EprKind enum
+  {
+    const m = minimalManifest();
+    m.projections = [
+      {
+        kind: 'Squirrel',
+        schemaKey: 'economic-event',
+        targetTable: 'economic_events',
+        columnMapping: { provider: 'payload.provider' },
+      },
+    ];
+    assert(!validate(m), 'rejects projection with kind not in EprKind enum');
+  }
+
+  // 14. Rejects projection missing required fields
+  {
+    const m = minimalManifest();
+    m.projections = [{ kind: 'EconomicEvent', schemaKey: 'economic-event' }];
+    assert(!validate(m), 'rejects projection missing targetTable + columnMapping');
+  }
+
+  // 15. Rejects projection with empty columnMapping
+  {
+    const m = minimalManifest();
+    m.projections = [
+      {
+        kind: 'EconomicEvent',
+        schemaKey: 'economic-event',
+        targetTable: 'economic_events',
+        columnMapping: {},
+      },
+    ];
+    assert(!validate(m), 'rejects projection with empty columnMapping');
   }
 
   // 11. Should reject manifest without observations

@@ -33,6 +33,13 @@
       "additionalProperties": {
         "$ref": "#/$defs/RendererRegistration"
       }
+    },
+    "projections": {
+      "type": "array",
+      "description": "Declarations of how this app's EPR atoms project into pillar SQL read-models. Each entry binds an EPR (kind, schemaKey) to a target table and column mapping, consumed by the projector controller in elohim-storage. Optional — apps that have no read-model projections (or whose projections are derived elsewhere) omit this field.",
+      "items": {
+        "$ref": "./pillar-projection.schema.json"
+      }
     }
   },
   "additionalProperties": false,
