@@ -1,17 +1,15 @@
-/**
- * Account Shell — placeholder stub.
- * Full implementation in Task 18.
- */
+import { Component, inject } from '@angular/core';
+import { RouterOutlet, RouterLink, RouterLinkActive } from '@angular/router';
 
-import { Component } from '@angular/core';
-import { RouterOutlet } from '@angular/router';
+import { AccountService } from '../../services/account.service';
 
 @Component({
   selector: 'app-account-shell',
   standalone: true,
-  imports: [RouterOutlet],
-  template: `
-    <router-outlet />
-  `,
+  imports: [RouterOutlet, RouterLink, RouterLinkActive],
+  templateUrl: './account-shell.component.html',
+  styleUrl: './account-shell.component.css',
 })
-export class AccountShellComponent {}
+export class AccountShellComponent {
+  readonly account = inject(AccountService);
+}

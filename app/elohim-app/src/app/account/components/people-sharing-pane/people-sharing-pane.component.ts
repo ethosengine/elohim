@@ -1,16 +1,11 @@
-/**
- * People & Sharing Pane — placeholder stub.
- * Full implementation in Task 19.
- */
-
 import { Component } from '@angular/core';
 
 @Component({
   selector: 'app-people-sharing-pane',
   standalone: true,
-  imports: [],
   template: `
-    <p>People &amp; sharing — coming in Task 19.</p>
+    <h1 data-testid="pane-title-people-sharing">People &amp; sharing</h1>
+    <p>[M5 scaffold — content lands in a follow-on sprint]</p>
   `,
 })
 export class PeopleSharingPaneComponent {}

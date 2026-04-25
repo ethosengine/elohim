@@ -1,0 +1,5 @@
+.account-shell { display: flex; gap: 1rem; }
+.pane-nav { display: flex; flex-direction: column; min-width: 220px; padding: 1rem; }
+.pane-nav a { padding: 0.5rem; color: inherit; text-decoration: none; border-left: 3px solid transparent; }
+.pane-nav a.active { border-left-color: currentColor; font-weight: 600; }
+.pane-content { flex: 1; padding: 1rem; }
