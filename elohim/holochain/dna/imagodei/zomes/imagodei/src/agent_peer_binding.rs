@@ -124,9 +124,12 @@ pub fn create_agent_peer_binding(
     // Resolve agent_cid (the Agent EPR's id field) to its Agent entry.
     let maybe_agent = get_agent_by_id_internal(&input.agent_cid)?;
 
-    // If the Agent EPR is not found we still proceed — the binding might be
-    // self-sovereign without an Agent EPR in this DNA (e.g. elohim-node peers).
-    // However, if the EPR IS found, the caller must match.
+    // THREAT MODEL NOTE (Stage 1, see project_bootstrap_to_elohim_security_gradient):
+    // This carve-out means any caller may bind an arbitrary agent_cid that does
+    // not correspond to a registered Agent EPR. Stage 1 acceptable; Stage 2 should
+    // require the EPR to exist and reject otherwise. The structural validator and
+    // signature check (when wired in Stage 2) provide additional defense-in-depth.
+    // If the Agent EPR IS found, the caller must match — the gate fires correctly.
     if let Some(agent) = maybe_agent {
         let registered_key_str = agent.holochain_agent_key.ok_or_else(|| {
             wasm_error!(WasmErrorInner::Guest(format!(
@@ -153,6 +156,8 @@ pub fn create_agent_peer_binding(
     // -------------------------------------------------------------------------
     // Construct and commit the entry
     // -------------------------------------------------------------------------
+    // Timestamp::from_micros accepts any i64; out-of-range values would be caught by
+    // integrity validator's valid_from < valid_until check.
     let binding = AgentPeerBinding {
         peer_id: input.peer_id.clone(),
         agent_cid: input.agent_cid.clone(),
@@ -179,6 +184,8 @@ pub fn create_agent_peer_binding(
     // Reverse link: StringAnchor(peer_id) -> AgentPeerBinding
     // -------------------------------------------------------------------------
     let peer_anchor = StringAnchor::new("peer_binding", &input.peer_id);
+    // Commit the anchor entry so peers can fetch it directly via get(anchor_hash) — matches M4 recovery pattern (lib.rs:1811).
+    create_entry(&EntryTypes::StringAnchor(peer_anchor.clone()))?;
     let peer_anchor_hash = hash_entry(&EntryTypes::StringAnchor(peer_anchor))?;
     create_link(
         peer_anchor_hash,
@@ -206,6 +213,9 @@ pub fn create_agent_peer_binding(
 ///
 /// Traverses the forward link `AgentToPeerBinding` from the given
 /// `AgentPubKey`. Returns a `Vec<AgentPeerBindingView>` in camelCase.
+///
+/// Returns only currently-valid bindings (superseded entries are filtered out).
+/// Callers needing historical bindings should query the entry directly.
 #[hdk_extern]
 pub fn get_agent_peer_bindings(agent_pubkey: AgentPubKey) -> ExternResult<Vec<AgentPeerBindingView>> {
     let query = LinkQuery::try_new(agent_pubkey, LinkTypes::AgentToPeerBinding)?;
@@ -227,6 +237,7 @@ pub fn get_agent_peer_bindings(agent_pubkey: AgentPubKey) -> ExternResult<Vec<Ag
         }
     }
 
+    results.retain(|v| v.superseded_by.is_none());
     Ok(results)
 }
 
@@ -239,6 +250,9 @@ pub fn get_agent_peer_bindings(agent_pubkey: AgentPubKey) -> ExternResult<Vec<Ag
 /// Traverses the reverse link `PeerToBinding` from
 /// `StringAnchor("peer_binding", peer_id)`. Returns a `Vec<AgentPeerBindingView>`
 /// in camelCase.
+///
+/// Returns only currently-valid bindings (superseded entries are filtered out).
+/// Callers needing historical bindings should query the entry directly.
 #[hdk_extern]
 pub fn get_bindings_for_peer(peer_id: String) -> ExternResult<Vec<AgentPeerBindingView>> {
     let peer_anchor = StringAnchor::new("peer_binding", &peer_id);
@@ -263,6 +277,7 @@ pub fn get_bindings_for_peer(peer_id: String) -> ExternResult<Vec<AgentPeerBindi
         }
     }
 
+    results.retain(|v| v.superseded_by.is_none());
     Ok(results)
 }
 

@@ -133,6 +133,12 @@ pub enum ImagodeiSignal {
     /// Emitted by `create_agent_peer_binding` (Task A.13).
     /// Consumed by elohim-storage `HolochainAppSignalStream` (Task A.11)
     /// to project into the `peer_identity_bindings` SQLite table.
+    ///
+    /// NOTE: This variant intentionally omits `entry_hash` and `author` that
+    /// other variants carry. The `action_hash` alone is sufficient — storage
+    /// projects by calling `get(action_hash)` to fetch the full entry. Adding
+    /// `entry_hash`/`author` here would duplicate data already in the action
+    /// record and diverge from the minimal-signal pattern used in Task A.11.
     AgentPeerBindingCreated {
         action_hash: ActionHash,
         binding: AgentPeerBinding,
