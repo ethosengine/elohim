@@ -18,12 +18,13 @@ use super::diesel_schema::{
     contributor_presences, custodian_metrics, device_policies, discussions, economic_events,
     enum_registry, governance_dispositions, governance_signals, governance_states, hazards,
     human_relationships, humans, imagodei_observations, key_rotations, knowledge_maps,
-    local_sessions, node_stewardship, observation_entries, observation_sessions, placement_gaps,
-    places, precedents, premium_gates, proposal_options, proposals, ranked_votes, rea_commitments,
-    recovery_requests, recovery_witnesses, relationships, responsibility_demand_configs,
-    risk_alerts, schedules, shard_locations, shard_manifests, spatial_contexts, statement_votes,
-    statements, steward_credentials, stewarded_nodes, stewardship_allocations, token_balances,
-    token_decay_events, token_mint_events, token_transfers, votes,
+    local_sessions, node_stewardship, observation_entries, observation_sessions,
+    peer_identity_bindings, placement_gaps, places, precedents, premium_gates, proposal_options,
+    proposals, ranked_votes, rea_commitments, recovery_requests, recovery_witnesses, relationships,
+    responsibility_demand_configs, risk_alerts, schedules, shard_locations, shard_manifests,
+    spatial_contexts, statement_votes, statements, steward_credentials, stewarded_nodes,
+    stewardship_allocations, token_balances, token_decay_events, token_mint_events,
+    token_transfers, votes,
 };
 
 // ============================================================================
@@ -2959,4 +2960,46 @@ pub struct NewRecoveryWitnessRow {
     pub human_id: String,
     pub note: Option<String>,
     pub submitted_at: String,
+}
+
+// ============================================================================
+// EPR Phase 2B — peer_identity_bindings (Category C — operational projection)
+// ============================================================================
+//
+// Source of truth: Holochain DHT (imagodei DNA AgentPeerBinding entry — Task A.2).
+// This table is rebuildable from DHT signals + gossip replay (Principle P1).
+// dht_anchor_hash links each row back to the canonical notarized DHT entry.
+
+/// Query model for reading peer identity bindings (SELECT).
+#[derive(Debug, Clone, Queryable, Selectable)]
+#[diesel(table_name = peer_identity_bindings)]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+pub struct PeerIdentityBindingRow {
+    /// libp2p PeerId encoded as a multibase string (base58btc by default).
+    pub peer_id: String,
+    /// Stable agent CID — the content-addressed identity reference.
+    pub agent_cid: String,
+    /// Action hash of the AgentPeerBinding DHT entry — provenance anchor.
+    pub dht_anchor_hash: String,
+    /// ISO-8601 timestamp: when this binding became valid per the DHT entry.
+    pub valid_from: String,
+    /// ISO-8601 timestamp: when this binding expires. NULL = no expiry.
+    pub valid_until: Option<String>,
+    /// ISO-8601 timestamp: when this node observed/projected the binding.
+    pub observed_at: String,
+    /// Provenance: 'dht' | 'gossip' | 'handshake'
+    pub source: String,
+}
+
+/// Insert model for peer identity bindings (INSERT/REPLACE on primary key).
+#[derive(Debug, Clone, Insertable)]
+#[diesel(table_name = peer_identity_bindings)]
+pub struct NewPeerIdentityBindingRow {
+    pub peer_id: String,
+    pub agent_cid: String,
+    pub dht_anchor_hash: String,
+    pub valid_from: String,
+    pub valid_until: Option<String>,
+    pub observed_at: String,
+    pub source: String,
 }

@@ -1178,6 +1178,23 @@ diesel::table! {
     }
 }
 
+// EPR Phase 2B — peer_identity_bindings
+// Source of truth: Holochain DHT (imagodei AgentPeerBinding entry — Task A.2).
+// This table is a Category C operational projection rebuildable from signal replay.
+// Timestamps stored as TEXT (ISO-8601) per elohim-storage conventions.
+
+diesel::table! {
+    peer_identity_bindings (peer_id, dht_anchor_hash) {
+        peer_id         -> Text,
+        agent_cid       -> Text,
+        dht_anchor_hash -> Text,
+        valid_from      -> Text,
+        valid_until     -> Nullable<Text>,
+        observed_at     -> Text,
+        source          -> Text,
+    }
+}
+
 // EPR storage layer — Phase 2a
 // Source of truth: EPR atoms (self-notarized via content-derived CID + Ed25519).
 // Timestamps stored as TEXT (ISO-8601). Binary blobs stored as Binary/BLOB.
@@ -1271,6 +1288,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     node_stewardship,
     observation_entries,
     observation_sessions,
+    peer_identity_bindings,
     peer_statuses,
     placement_gaps,
     precedents,

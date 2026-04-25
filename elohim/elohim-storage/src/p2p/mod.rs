@@ -141,7 +141,9 @@ pub use epr_atom_protocol::{
     MAX_REQUEST_SIZE as EPR_ATOM_MAX_REQUEST_SIZE, MAX_RESPONSE_SIZE as EPR_ATOM_MAX_RESPONSE_SIZE,
 };
 pub use epr_protocol::{EprCodec, EprProtocol, EprRequest, EprResponse};
-pub use identity_map::{CallerIdentity, PeerIdentityMap, StubIdentityMap};
+pub use identity_map::{
+    CallerIdentity, HolochainBackedPeerIdentityMap, PeerIdentityMap, StubIdentityMap,
+};
 pub use shard_protocol::{ShardCodec, ShardProtocol, ShardRequest, ShardResponse};
 pub use sync_protocol::{DocumentInfo, SyncCodec, SyncProtocol, SyncRequest, SyncResponse};
 
@@ -242,10 +244,11 @@ pub struct P2PNode {
     /// Set by bulk write operations (account import, content bulk) to prevent
     /// P2P sync from competing for memory during heavy writes.
     sync_paused: Arc<AtomicBool>,
-    /// PeerId → agent pubkey mapping for reach enforcement (Phase 2c stub).
-    /// Concrete `StubIdentityMap` lets tests call `register(peer, pubkey)`.
-    /// Phase 2b replaces this with a real libp2p-identity-backed map.
-    identity_map: Arc<identity_map::StubIdentityMap>,
+    /// PeerId → agent CID mapping for reach enforcement.
+    /// Backed by `HolochainBackedPeerIdentityMap` once a db_pool is attached
+    /// (via `with_db_pool`). Falls back to `StubIdentityMap` (always-Anonymous)
+    /// when no pool is present (e.g. unit tests without a DB).
+    identity_map: Arc<dyn identity_map::PeerIdentityMap>,
 }
 
 /// Cached identify protocol info for a connected peer.
@@ -910,7 +913,10 @@ impl P2PNode {
         };
         let (status_tx, _) = tokio::sync::watch::channel(initial_status);
 
-        let identity_map = Arc::new(identity_map::StubIdentityMap::new());
+        // Default to always-Anonymous until a pool is attached via with_db_pool().
+        // with_db_pool() replaces this with HolochainBackedPeerIdentityMap.
+        let identity_map: Arc<dyn identity_map::PeerIdentityMap> =
+            Arc::new(identity_map::StubIdentityMap::new());
 
         info!(peer_id = %peer_id, relay_mode = %config.relay_mode, "Created P2P node with NAT traversal");
 
@@ -956,8 +962,15 @@ impl P2PNode {
         })
     }
 
-    /// Set the database pool for EPR Head construction
+    /// Set the database pool for EPR Head construction and peer identity lookup.
+    ///
+    /// Also replaces the default stub identity map with a
+    /// `HolochainBackedPeerIdentityMap` backed by the provided pool, enabling
+    /// real PeerId → agent CID resolution from the `peer_identity_bindings` table.
     pub fn with_db_pool(mut self, pool: DbPool) -> Self {
+        self.identity_map = Arc::new(identity_map::HolochainBackedPeerIdentityMap::new(
+            pool.clone(),
+        ));
         self.db_pool = Some(pool);
         self
     }
@@ -980,13 +993,6 @@ impl P2PNode {
     /// Get the local PeerId
     pub fn peer_id(&self) -> &PeerId {
         self.identity.peer_id()
-    }
-
-    /// Test-only: access the identity map so harnesses can register
-    /// `PeerId → agent pubkey` mappings before exercising the reach gate.
-    #[doc(hidden)]
-    pub fn identity_map(&self) -> &Arc<identity_map::StubIdentityMap> {
-        &self.identity_map
     }
 
     /// Start listening and event loop
@@ -3250,7 +3256,6 @@ impl P2PNode {
         peer: libp2p::PeerId,
         request: EprAtomRequest,
     ) -> EprAtomResponse {
-        use crate::p2p::PeerIdentityMap;
         let caller = self.identity_map.lookup(&peer);
 
         match request {

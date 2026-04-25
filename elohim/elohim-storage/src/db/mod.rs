@@ -107,6 +107,9 @@ pub mod recovery_requests;
 // Recovery Protocol Phase 2 — M3 witness projection (IntimateWitnessSubmitted signal)
 pub mod recovery_witnesses;
 
+// EPR Phase 2B — peer identity bindings projection (AgentPeerBinding DHT signal)
+pub mod peer_identity_bindings;
+
 use std::path::Path;
 use std::time::Duration;
 
