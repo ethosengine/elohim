@@ -102,6 +102,9 @@ automerge = "0.5"
 # Concurrent hash map for policy hot cache
 dashmap = "5"
 
+# LRU cache for per-agent pubkey timeline hot path (Task A.6)
+lru = "0.12"
+
 # Error handling
 thiserror = "1"
 anyhow = "1"

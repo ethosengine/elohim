@@ -1400,6 +1400,7 @@ dependencies = [
  "ipld-core",
  "jsonschema",
  "libp2p",
+ "lru 0.12.5",
  "lz4_flex",
  "multihash-codetable 0.1.4",
  "reed-solomon-erasure",

@@ -28,6 +28,8 @@
 //! - [`controller`] — `ReconcileController` k8s-style loop (Task A.4).
 
 pub mod controller;
+pub mod pubkey_timeline;
 pub mod signal_stream;
 
 pub use controller::{ReconcileController, ReconcileError};
+pub use pubkey_timeline::{PubkeyTimeline, PubkeyTimelineCache, PubkeyValidity};
