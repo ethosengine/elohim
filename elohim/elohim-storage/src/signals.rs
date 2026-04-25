@@ -737,26 +737,9 @@ fn emit_reconciled_signal(event: ImagodeiReconciledEvent) {
 // M4 mesh wire struct (RecoveryRevocationMessage)
 // =============================================================================
 
-/// MessagePack wire payload for the `recovery.revocation` gossipsub topic.
-/// Subscribers filter on `revocation_id` for events relevant to their humans.
-/// Active consumer logic lands in M5 (elohim defender + UI); M4 only
-/// subscribe/logs inbound messages.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct RecoveryRevocationMessage {
-    pub revocation_id: String,
-    pub human_id: String,
-    pub revoked_key: String,
-    /// "voluntary" | "steward_vote" | "challenge"
-    pub trigger_type: String,
-    pub reason: String,
-    /// "pending" | "effective"
-    pub status: String,
-    /// Local peer id of the publishing node (base58 PeerId string).
-    pub sender_peer_id: String,
-    /// ISO-8601 timestamp when this message was assembled for publishing.
-    pub sent_at: String,
-}
+// The canonical type is defined in p2p::recovery_revocation; re-export here so
+// callers of signals.rs don't need to know the p2p module path.
+pub use crate::p2p::recovery_revocation::RecoveryRevocationMessage;
 
 /// Extract the authority kind discriminator from a `RecoveryAuthorityKind`
 /// or `RecoveryAuthority` serde_json::Value (internally-tagged or plain variant).
