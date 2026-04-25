@@ -587,6 +587,36 @@ impl P2PHandle {
         }
     }
 
+    /// Publish a RecoveryRevocationMessage to the `recovery.revocation` gossipsub topic.
+    ///
+    /// Called by the production signal subscriber after `handle_recovery_v2_signal`
+    /// dispatches a `KeyRevocationRequested` or `KeyRevocationEffective` signal:
+    ///
+    /// ```ignore
+    /// if let Some(msg) = recovery_revocation_from_signal(&sig, &local_peer_id_str) {
+    ///     p2p_handle.publish_recovery_revocation(msg).await;
+    /// }
+    /// handle_recovery_v2_signal(&mut conn, sig)?;
+    /// ```
+    ///
+    /// Best-effort: failure does not affect projection correctness (DHT is truth).
+    /// Errors are logged and dropped.
+    pub async fn publish_recovery_revocation(
+        &self,
+        msg: crate::p2p::recovery_revocation::RecoveryRevocationMessage,
+    ) {
+        if let Err(e) = self
+            .command_tx
+            .send(P2PCommand::PublishRecoveryRevocation(msg))
+            .await
+        {
+            warn!(
+                error = %e,
+                "Failed to send PublishRecoveryRevocation command to P2P loop"
+            );
+        }
+    }
+
     /// Resolve an EPR Head from the DHT. Returns None on timeout or not found.
     pub async fn resolve_epr(&self, id: &str) -> Option<Vec<u8>> {
         let (reply_tx, reply_rx) = oneshot::channel();
