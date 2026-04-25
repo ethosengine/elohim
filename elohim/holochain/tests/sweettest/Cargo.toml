@@ -49,6 +49,10 @@ path = "src/tests/recovery_m4.rs"
 name = "epr_phase_2b_batch_a_e2e"
 path = "src/tests/epr_phase_2b_batch_a_e2e.rs"
 
+[[test]]
+name = "imagodei_sign_for_agent"
+path = "src/tests/imagodei_sign_for_agent.rs"
+
 [dependencies]
 # Holochain runtime — sweettest embeds a real conductor in-process.
 # Versions are pinned to match the DNAs (HDK 0.6.0 / HDI 0.7.0).
@@ -75,6 +79,12 @@ serde_json = "1"
 
 # Test helpers
 anyhow = "1"
+
+# Ed25519 verification — used by imagodei_sign_for_agent to verify signatures
+# the conductor returns. Already in the dep tree transitively via holochain;
+# pinned here so it's an explicit test dependency. Default features include
+# the `std` feature needed for `Verifier::verify`.
+ed25519-dalek = "2"
 
 # Shared wire types for coordinator I/O — same holo_hash pin (=0.6.0) as the DNA workspace.
 qahal-types = { path = "../../../sdk/domains/qahal/types" }

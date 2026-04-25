@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "epr:schema:conductor-signing",
+  "title": "ConductorSigning",
+  "description": "Operational RPC contract (Category C) for elohim-storage to request the conductor to sign canonical bytes under a specific agent's key. The conductor holds the agent's lair-managed private key; storage holds neither key material nor signing authority. Used to compose EPR Envelopes from /api/v1/signal/emit (EPR Phase 2B Batch C) when the caller cannot sign in-browser. The signed bytes returned become part of an Envelope (Category A) after EprService::ingest. The signer-match gate in the imagodei coordinator function rejects calls where the caller's agent pubkey does not match the Agent EPR identified by agentCid.",
+  "type": "object",
+  "$defs": {
+    "request": {
+      "title": "ConductorSigningRequest",
+      "type": "object",
+      "required": ["agentCid", "canonicalBytes"],
+      "additionalProperties": false,
+      "properties": {
+        "agentCid": {
+          "type": "string",
+          "description": "CIDv1 of the Agent EPR whose key should sign. Caller's agent pubkey must match this EPR's holochain_agent_key (signer-match gate)."
+        },
+        "canonicalBytes": {
+          "type": "string",
+          "contentEncoding": "base64",
+          "description": "Base64-encoded canonical bytes to sign. For EPR composition this is the Envelope's canonical CBOR serialization (envelope-ex-proof + payload)."
+        }
+      }
+    },
+    "response": {
+      "title": "ConductorSigningResponse",
+      "type": "object",
+      "required": ["signature", "signerPubkey"],
+      "additionalProperties": false,
+      "properties": {
+        "signature": {
+          "type": "string",
+          "contentEncoding": "base64",
+          "description": "Base64-encoded raw Ed25519 signature (64 bytes) over canonicalBytes."
+        },
+        "signerPubkey": {
+          "type": "string",
+          "contentEncoding": "base64",
+          "description": "Base64-encoded raw Ed25519 public key (32 bytes) of the signing agent. Returned for defense-in-depth: callers can verify the signature against this pubkey before ingesting the resulting EPR."
+        }
+      }
+    }
+  }
+}
