@@ -1858,11 +1858,31 @@ fn validate_key_revocation(revocation: &KeyRevocation) -> ExternResult<ValidateC
         )));
     }
 
-    // Minimum required votes is 2
-    if revocation.required_votes < 2 {
-        return Ok(ValidateCallbackResult::Invalid(
-            "required_votes must be at least 2 for security".to_string(),
-        ));
+    // M4: trigger-type-aware required_votes.
+    // Voluntary (self-revocation) has no quorum — required_votes must be exactly 1.
+    // Steward-vote (emergency-contact quorum) and challenge (M5 specialist stub)
+    // require at least 2 votes for security.
+    match revocation.trigger_type.as_str() {
+        "voluntary" => {
+            if revocation.required_votes != 1 {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "voluntary revocation must have required_votes == 1".to_string(),
+                ));
+            }
+        }
+        "steward_vote" | "challenge" => {
+            if revocation.required_votes < 2 {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "quorum revocation must have required_votes >= 2".to_string(),
+                ));
+            }
+        }
+        other => {
+            return Ok(ValidateCallbackResult::Invalid(format!(
+                "Invalid trigger_type '{}'. Must be one of: voluntary, steward_vote, challenge",
+                other
+            )));
+        }
     }
 
     Ok(ValidateCallbackResult::Valid)

@@ -61,6 +61,8 @@ const INTERFACE_FILES = [
   { src: 'views/recovery-witness.ts', dest: 'recovery-witness.ts' },
   // P2P protocol wire contracts (Category C operational — internal to libp2p protocols)
   { src: 'p2p/identity-handshake.ts', dest: 'identity-handshake.ts' },
+  { src: 'views/key-revocation.ts', dest: 'key-revocation.ts' },
+  { src: 'views/revocation-vote.ts', dest: 'revocation-vote.ts' },
 ];
 
 /**

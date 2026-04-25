@@ -1,5 +1,4 @@
 use hdk::prelude::*;
-use holochain_serialized_bytes::{SerializedBytes, SerializedBytesError};
 use node_registry_integrity::*;
 
 // Re-export integrity types for convenience
@@ -1031,84 +1030,48 @@ pub enum Signal {
 // HELPER FUNCTIONS
 // ============================================================================
 
+// HDK 0.6 entry deserialization: `record.entry().to_app_option::<T>()` unwraps
+// the `Entry::App(AppEntryBytes)` variant and msgpack-decodes the inner bytes
+// as `T`. The previous `entry.try_into() -> SerializedBytes -> T` round-trip
+// serialized the whole `Entry` enum (including the `App(...)` variant tag),
+// producing bytes that deserialized as a tuple/enum, not as `T` — which
+// surfaced as `missing field `node_id`` once node_registry sweettests began
+// exercising `get_nodes_by_region`. Other DNAs (mishpat, imagodei) already
+// use this pattern.
+
 /// Deserialize a NodeRegistration from a Record
 fn deserialize_node_registration(record: &Record) -> ExternResult<Option<NodeRegistration>> {
-    match record.entry().as_option() {
-        Some(entry) => {
-            let sb: SerializedBytes = entry.clone().try_into().map_err(|e: SerializedBytesError| {
-                wasm_error!(WasmErrorInner::Guest(format!("Serialize error: {:?}", e)))
-            })?;
-            let registration: NodeRegistration = sb.try_into().map_err(|e: SerializedBytesError| {
-                wasm_error!(WasmErrorInner::Guest(format!("Deserialize error: {:?}", e)))
-            })?;
-            Ok(Some(registration))
-        }
-        None => Ok(None),
-    }
+    record.entry().to_app_option::<NodeRegistration>().map_err(|e| {
+        wasm_error!(WasmErrorInner::Guest(format!("Deserialize error: {:?}", e)))
+    })
 }
 
 /// Deserialize a NodeHeartbeat from a Record
 fn deserialize_node_heartbeat(record: &Record) -> ExternResult<Option<NodeHeartbeat>> {
-    match record.entry().as_option() {
-        Some(entry) => {
-            let sb: SerializedBytes = entry.clone().try_into().map_err(|e: SerializedBytesError| {
-                wasm_error!(WasmErrorInner::Guest(format!("Serialize error: {:?}", e)))
-            })?;
-            let heartbeat: NodeHeartbeat = sb.try_into().map_err(|e: SerializedBytesError| {
-                wasm_error!(WasmErrorInner::Guest(format!("Deserialize error: {:?}", e)))
-            })?;
-            Ok(Some(heartbeat))
-        }
-        None => Ok(None),
-    }
+    record.entry().to_app_option::<NodeHeartbeat>().map_err(|e| {
+        wasm_error!(WasmErrorInner::Guest(format!("Deserialize error: {:?}", e)))
+    })
 }
 
 /// Deserialize a HealthAttestation from a Record
 fn deserialize_health_attestation(record: &Record) -> ExternResult<Option<HealthAttestation>> {
-    match record.entry().as_option() {
-        Some(entry) => {
-            let sb: SerializedBytes = entry.clone().try_into().map_err(|e: SerializedBytesError| {
-                wasm_error!(WasmErrorInner::Guest(format!("Serialize error: {:?}", e)))
-            })?;
-            let attestation: HealthAttestation = sb.try_into().map_err(|e: SerializedBytesError| {
-                wasm_error!(WasmErrorInner::Guest(format!("Deserialize error: {:?}", e)))
-            })?;
-            Ok(Some(attestation))
-        }
-        None => Ok(None),
-    }
+    record.entry().to_app_option::<HealthAttestation>().map_err(|e| {
+        wasm_error!(WasmErrorInner::Guest(format!("Deserialize error: {:?}", e)))
+    })
 }
 
 /// Deserialize a CustodianAssignment from a Record
 fn deserialize_custodian_assignment(record: &Record) -> ExternResult<Option<CustodianAssignment>> {
-    match record.entry().as_option() {
-        Some(entry) => {
-            let sb: SerializedBytes = entry.clone().try_into().map_err(|e: SerializedBytesError| {
-                wasm_error!(WasmErrorInner::Guest(format!("Serialize error: {:?}", e)))
-            })?;
-            let assignment: CustodianAssignment = sb.try_into().map_err(|e: SerializedBytesError| {
-                wasm_error!(WasmErrorInner::Guest(format!("Deserialize error: {:?}", e)))
-            })?;
-            Ok(Some(assignment))
-        }
-        None => Ok(None),
-    }
+    record.entry().to_app_option::<CustodianAssignment>().map_err(|e| {
+        wasm_error!(WasmErrorInner::Guest(format!("Deserialize error: {:?}", e)))
+    })
 }
 
 /// Deserialize a ShardAssignment from a Record
 fn deserialize_shard_assignment(record: &Record) -> ExternResult<Option<ShardAssignment>> {
-    match record.entry().as_option() {
-        Some(entry) => {
-            let sb: SerializedBytes = entry.clone().try_into().map_err(|e: SerializedBytesError| {
-                wasm_error!(WasmErrorInner::Guest(format!("Serialize error: {:?}", e)))
-            })?;
-            let assignment: ShardAssignment = sb.try_into().map_err(|e: SerializedBytesError| {
-                wasm_error!(WasmErrorInner::Guest(format!("Deserialize error: {:?}", e)))
-            })?;
-            Ok(Some(assignment))
-        }
-        None => Ok(None),
-    }
+    record.entry().to_app_option::<ShardAssignment>().map_err(|e| {
+        wasm_error!(WasmErrorInner::Guest(format!("Deserialize error: {:?}", e)))
+    })
 }
 
 fn get_node_registration_by_id(node_id: String) -> ExternResult<NodeRegistration> {

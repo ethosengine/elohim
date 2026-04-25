@@ -110,6 +110,10 @@ pub mod recovery_witnesses;
 // EPR Phase 2B — peer identity bindings projection (AgentPeerBinding DHT signal)
 pub mod peer_identity_bindings;
 
+// Recovery Protocol Phase 2 — M4 revocation projection (KeyRevocation + RevocationVote)
+pub mod key_revocations;
+pub mod revocation_votes;
+
 use std::path::Path;
 use std::time::Duration;
 

@@ -1195,6 +1195,41 @@ diesel::table! {
     }
 }
 
+// Recovery Protocol Phase 2 — M4 revocation projection tables.
+// Source of truth: DHT (imagodei KeyRevocation + RevocationVote entries).
+// These tables are read-optimized projections rebuildable via signal replay.
+
+diesel::table! {
+    key_revocations (dht_anchor_hash) {
+        dht_anchor_hash   -> Text,
+        id                -> Text,
+        human_id          -> Text,
+        revoked_key       -> Text,
+        reason            -> Text,
+        trigger_type      -> Text,
+        initiated_by      -> Text,
+        required_votes    -> Integer,
+        current_votes     -> Integer,
+        threshold_reached -> Integer,
+        effective_at      -> Nullable<Text>,
+        created_at        -> Text,
+        updated_at        -> Text,
+    }
+}
+
+diesel::table! {
+    revocation_votes (dht_anchor_hash) {
+        dht_anchor_hash            -> Text,
+        id                         -> Text,
+        revocation_dht_anchor_hash -> Text,
+        revocation_id              -> Text,
+        steward_id                 -> Text,
+        approved                   -> Integer,
+        attestation                -> Text,
+        voted_at                   -> Text,
+    }
+}
+
 // EPR storage layer — Phase 2a
 // Source of truth: EPR atoms (self-notarized via content-derived CID + Ed25519).
 // Timestamps stored as TEXT (ISO-8601). Binary blobs stored as Binary/BLOB.
@@ -1302,11 +1337,13 @@ diesel::allow_tables_to_appear_in_same_query!(
     proposal_options,
     proposals,
     ranked_votes,
+    key_revocations,
     key_rotations,
     rea_commitments,
     recovery_requests,
     recovery_witnesses,
     relationships,
+    revocation_votes,
     responsibility_demand_configs,
     risk_alerts,
     schema_version,

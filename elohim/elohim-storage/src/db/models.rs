@@ -17,14 +17,14 @@ use super::diesel_schema::{
     comments, content, content_attestations, content_mastery, content_tags, contributor_dashboards,
     contributor_presences, custodian_metrics, device_policies, discussions, economic_events,
     enum_registry, governance_dispositions, governance_signals, governance_states, hazards,
-    human_relationships, humans, imagodei_observations, key_rotations, knowledge_maps,
-    local_sessions, node_stewardship, observation_entries, observation_sessions,
+    human_relationships, humans, imagodei_observations, key_revocations, key_rotations,
+    knowledge_maps, local_sessions, node_stewardship, observation_entries, observation_sessions,
     peer_identity_bindings, placement_gaps, places, precedents, premium_gates, proposal_options,
     proposals, ranked_votes, rea_commitments, recovery_requests, recovery_witnesses, relationships,
-    responsibility_demand_configs, risk_alerts, schedules, shard_locations, shard_manifests,
-    spatial_contexts, statement_votes, statements, steward_credentials, stewarded_nodes,
-    stewardship_allocations, token_balances, token_decay_events, token_mint_events,
-    token_transfers, votes,
+    responsibility_demand_configs, revocation_votes, risk_alerts, schedules, shard_locations,
+    shard_manifests, spatial_contexts, statement_votes, statements, steward_credentials,
+    stewarded_nodes, stewardship_allocations, token_balances, token_decay_events,
+    token_mint_events, token_transfers, votes,
 };
 
 // ============================================================================
@@ -3002,4 +3002,78 @@ pub struct NewPeerIdentityBindingRow {
     pub valid_until: Option<String>,
     pub observed_at: String,
     pub source: String,
+}
+
+// Recovery Protocol Phase 2 — M4 Revocation Projection
+// Source of truth: DHT (imagodei KeyRevocation / RevocationVote entries).
+// These rows are read-optimized projections rebuildable from signal replay.
+
+/// Queryable model for key_revocations rows (SELECT).
+/// Source of truth: DHT (imagodei KeyRevocation entry). Read-optimized projection.
+#[derive(Debug, Clone, Queryable, Selectable, Serialize, Deserialize)]
+#[diesel(table_name = key_revocations)]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+pub struct KeyRevocationRow {
+    pub dht_anchor_hash: String,
+    pub id: String,
+    pub human_id: String,
+    pub revoked_key: String,
+    pub reason: String,
+    pub trigger_type: String,
+    pub initiated_by: String,
+    pub required_votes: i32,
+    pub current_votes: i32,
+    pub threshold_reached: i32, // 0/1 (SQLite boolean)
+    pub effective_at: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+/// Insertable / upsertable model for key_revocations rows (INSERT / UPDATE).
+#[derive(Debug, Clone, Insertable, AsChangeset)]
+#[diesel(table_name = key_revocations)]
+pub struct UpsertKeyRevocationRow {
+    pub dht_anchor_hash: String,
+    pub id: String,
+    pub human_id: String,
+    pub revoked_key: String,
+    pub reason: String,
+    pub trigger_type: String,
+    pub initiated_by: String,
+    pub required_votes: i32,
+    pub current_votes: i32,
+    pub threshold_reached: i32,
+    pub effective_at: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+/// Queryable model for revocation_votes rows (SELECT).
+/// Source of truth: DHT (imagodei RevocationVote entry). Read-optimized projection.
+#[derive(Debug, Clone, Queryable, Selectable, Serialize, Deserialize)]
+#[diesel(table_name = revocation_votes)]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+pub struct RevocationVoteRow {
+    pub dht_anchor_hash: String,
+    pub id: String,
+    pub revocation_dht_anchor_hash: String,
+    pub revocation_id: String,
+    pub steward_id: String,
+    pub approved: i32, // 0/1 (SQLite boolean)
+    pub attestation: String,
+    pub voted_at: String,
+}
+
+/// Insertable model for revocation_votes rows (INSERT).
+#[derive(Debug, Clone, Insertable)]
+#[diesel(table_name = revocation_votes)]
+pub struct InsertRevocationVoteRow {
+    pub dht_anchor_hash: String,
+    pub id: String,
+    pub revocation_dht_anchor_hash: String,
+    pub revocation_id: String,
+    pub steward_id: String,
+    pub approved: i32,
+    pub attestation: String,
+    pub voted_at: String,
 }

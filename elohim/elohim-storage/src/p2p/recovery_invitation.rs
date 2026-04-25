@@ -31,7 +31,9 @@ pub struct RecoveryInvitation {
 impl RecoveryInvitation {
     /// Encode to MessagePack bytes for gossipsub publish.
     pub fn to_bytes(&self) -> Result<Vec<u8>, rmp_serde::encode::Error> {
-        rmp_serde::to_vec(self)
+        // Named-field MessagePack (struct-as-map) so adding/reordering fields
+        // doesn't silently break across rolling upgrades.
+        rmp_serde::to_vec_named(self)
     }
 
     /// Decode from gossipsub-received bytes.

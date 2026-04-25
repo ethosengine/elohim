@@ -378,6 +378,12 @@ impl ElohimStorageBehaviour {
         gossipsub
             .subscribe(&identity_binding_topic)
             .expect("subscribe to elohim/identity/binding");
+        // M4: subscribe to key revocation fan-out topic.
+        // Subscriber set: emergency contacts, specialist-elohim watchers, security dashboards.
+        let revocation_topic = gossipsub::IdentTopic::new(super::RECOVERY_REVOCATION_TOPIC);
+        gossipsub
+            .subscribe(&revocation_topic)
+            .expect("subscribe to recovery.revocation");
 
         Self {
             kademlia,

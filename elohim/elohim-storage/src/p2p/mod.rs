@@ -36,6 +36,7 @@ pub mod identity_handshake;
 pub mod identity_map;
 pub mod kad_store;
 pub mod recovery_invitation;
+pub mod recovery_revocation;
 pub mod replication;
 pub mod shard_protocol;
 pub mod sync_protocol;
@@ -114,6 +115,20 @@ use dashmap::DashMap;
 use crate::blob_store::BlobStore;
 use crate::error::StorageError;
 use crate::identity::NodeIdentity;
+
+// =============================================================================
+// Gossipsub topic constants (centralised here to prevent drift)
+// =============================================================================
+
+/// Gossipsub topic for recovery invitation fan-out (M3).
+/// Subscriber set: the human's intimate recovery circle.
+pub const RECOVERY_INVITATION_TOPIC: &str = "recovery.invitation";
+
+/// Gossipsub topic for key revocation fan-out (M4).
+/// Subscriber set: emergency contacts, specialist-elohim watchers, security dashboards.
+/// Distinct from RECOVERY_INVITATION_TOPIC — subscriber sets differ and
+/// revocation semantics differ from invitation (see spec §7.1 decision #6).
+pub const RECOVERY_REVOCATION_TOPIC: &str = "recovery.revocation";
 
 /// A peer discovered on the network with its delivery capabilities.
 /// Populated from mDNS discovery + identify protocol info.
@@ -430,6 +445,11 @@ pub enum P2PCommand {
     /// remains the source of truth and peers can reconstruct via signal replay or
     /// the next connection-time handshake (A.9).
     PublishIdentityBinding(crate::p2p::identity_binding_gossip::IdentityBindingGossip),
+    /// Publish a RecoveryRevocationMessage to the `recovery.revocation` gossipsub topic.
+    /// Sent by the projection layer after `KeyRevocationRequested` or
+    /// `KeyRevocationEffective` signals. Best-effort — subscriber discovery is
+    /// eventual; publish failure does not affect projection correctness.
+    PublishRecoveryRevocation(crate::p2p::recovery_revocation::RecoveryRevocationMessage),
 }
 
 /// RAII guard that resumes P2P sync when dropped.
@@ -523,6 +543,7 @@ impl P2PHandle {
                     P2PCommand::PublishEprHead { .. } => {} // fire-and-forget
                     P2PCommand::PublishRecoveryInvitation(_) => {} // fire-and-forget
                     P2PCommand::PublishIdentityBinding(_) => {} // fire-and-forget
+                    P2PCommand::PublishRecoveryRevocation(_) => {} // fire-and-forget
                 }
             }
         });
@@ -590,6 +611,36 @@ impl P2PHandle {
             .await
         {
             warn!(error = %e, "Failed to send PublishEprHead command to P2P loop");
+        }
+    }
+
+    /// Publish a RecoveryRevocationMessage to the `recovery.revocation` gossipsub topic.
+    ///
+    /// Called by the production signal subscriber after `handle_recovery_v2_signal`
+    /// dispatches a `KeyRevocationRequested` or `KeyRevocationEffective` signal:
+    ///
+    /// ```ignore
+    /// if let Some(msg) = recovery_revocation_from_signal(&sig, &local_peer_id_str) {
+    ///     p2p_handle.publish_recovery_revocation(msg).await;
+    /// }
+    /// handle_recovery_v2_signal(&mut conn, sig)?;
+    /// ```
+    ///
+    /// Best-effort: failure does not affect projection correctness (DHT is truth).
+    /// Errors are logged and dropped.
+    pub async fn publish_recovery_revocation(
+        &self,
+        msg: crate::p2p::recovery_revocation::RecoveryRevocationMessage,
+    ) {
+        if let Err(e) = self
+            .command_tx
+            .send(P2PCommand::PublishRecoveryRevocation(msg))
+            .await
+        {
+            warn!(
+                error = %e,
+                "Failed to send PublishRecoveryRevocation command to P2P loop"
+            );
         }
     }
 
@@ -1379,9 +1430,7 @@ impl P2PNode {
                 let _ = reply.send(peers);
             }
             P2PCommand::PublishRecoveryInvitation(inv) => {
-                let topic = libp2p::gossipsub::IdentTopic::new(
-                    crate::p2p::recovery_invitation::RECOVERY_INVITATION_TOPIC,
-                );
+                let topic = libp2p::gossipsub::IdentTopic::new(RECOVERY_INVITATION_TOPIC);
                 match inv.to_bytes() {
                     Ok(bytes) => match swarm.behaviour_mut().gossipsub.publish(topic, bytes) {
                         Ok(msg_id) => info!(
@@ -1436,6 +1485,33 @@ impl P2PNode {
                         peer_id = %payload.peer_id,
                         error = ?e,
                         "Failed to encode IdentityBindingGossip"
+                    ),
+                }
+            }
+            P2PCommand::PublishRecoveryRevocation(msg) => {
+                let topic = libp2p::gossipsub::IdentTopic::new(RECOVERY_REVOCATION_TOPIC);
+                match msg.to_bytes() {
+                    Ok(bytes) => match swarm.behaviour_mut().gossipsub.publish(topic, bytes) {
+                        Ok(msg_id) => info!(
+                            target: "elohim_storage::recovery",
+                            revocation_id = %msg.revocation_id,
+                            human_id = %msg.human_id,
+                            status = %msg.status,
+                            message_id = ?msg_id,
+                            "Published RecoveryRevocationMessage to recovery.revocation"
+                        ),
+                        Err(e) => warn!(
+                            target: "elohim_storage::recovery",
+                            revocation_id = %msg.revocation_id,
+                            error = ?e,
+                            "gossipsub publish failed (often: no peers subscribed yet)"
+                        ),
+                    },
+                    Err(e) => warn!(
+                        target: "elohim_storage::recovery",
+                        revocation_id = %msg.revocation_id,
+                        error = ?e,
+                        "Failed to encode RecoveryRevocationMessage"
                     ),
                 }
             }
@@ -2612,9 +2688,7 @@ impl P2PNode {
                         message_id,
                         message,
                     } => {
-                        if message.topic.as_str()
-                            == crate::p2p::recovery_invitation::RECOVERY_INVITATION_TOPIC
-                        {
+                        if message.topic.as_str() == RECOVERY_INVITATION_TOPIC {
                             match crate::p2p::recovery_invitation::RecoveryInvitation::from_bytes(
                                 &message.data,
                             ) {
@@ -2719,6 +2793,28 @@ impl P2PNode {
                                     from = %propagation_source,
                                     error = ?e,
                                     "Failed to decode IdentityBindingGossip"
+                                ),
+                            }
+                        } else if message.topic.as_str() == RECOVERY_REVOCATION_TOPIC {
+                            // M4: subscribe/log stub. Active consumer logic lands in M5
+                            // (elohim defender + UI). Log is the seam M5 hooks into.
+                            match crate::p2p::recovery_revocation::RecoveryRevocationMessage::from_bytes(
+                                &message.data,
+                            ) {
+                                Ok(msg) => info!(
+                                    target: "recovery.revocation.inbound",
+                                    from = %propagation_source,
+                                    message_id = ?message_id,
+                                    revocation_id = %msg.revocation_id,
+                                    human_id = %msg.human_id,
+                                    status = %msg.status,
+                                    "Received recovery revocation"
+                                ),
+                                Err(e) => warn!(
+                                    target: "recovery.revocation.inbound",
+                                    from = %propagation_source,
+                                    error = ?e,
+                                    "Failed to decode RecoveryRevocationMessage"
                                 ),
                             }
                         } else {
