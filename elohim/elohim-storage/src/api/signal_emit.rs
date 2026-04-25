@@ -40,7 +40,8 @@
 //! ## What is NOT done in C.2
 //!
 //! - **Schema validation of `payload`** — Phase 3 (manifest-graph resolver).
-//!   Today the payload is encoded as canonical CBOR without per-pillar schema
+//!   Today the payload is encoded as JSON (matching the projector's read
+//!   contract) without per-pillar schema
 //!   checks; the manifest registry only knows column projections.
 //! - **Resolver-backed `verified_at` stamping** — uses [`ingest`] (structural
 //!   verify only), not `ingest_with_cache`. The reconcile controller's sweep
@@ -94,7 +95,8 @@ pub struct SignalIntent {
     pub signal_type: String,
     /// CIDv1 of the Agent EPR who authored this signal.
     pub agent_cid: String,
-    /// Pillar-specific payload (encoded as canonical CBOR for the Envelope).
+    /// Pillar-specific payload (encoded as JSON in the Envelope's payload
+    /// bytes; the projector reads it via `serde_json::from_slice`).
     pub payload: serde_json::Value,
     /// Three-leg coupling refs (knowledge / value / governance).
     pub coupling_refs: CouplingRefsInput,
@@ -231,7 +233,7 @@ pub struct PreparedSigningRequest {
 ///    resolution lands.
 /// 5. Resolve `reach` (intent override or default `community`).
 /// 6. Resolve coupling refs.
-/// 7. Encode `payload` as canonical CBOR via `serde_cbor` deterministic mode.
+/// 7. Encode `payload` as JSON (matches the projector's read contract).
 /// 8. Build a provisional `Envelope` (placeholder cid + zero-byte signature)
 ///    and compute its canonical bytes.
 pub fn prepare_signing_request(
@@ -555,10 +557,13 @@ fn parse_coupling(refs: &CouplingRefsInput) -> Result<Coupling, SignalEmitError>
 }
 
 fn encode_payload(value: &serde_json::Value) -> Result<Vec<u8>, SignalEmitError> {
-    // serde_ipld_dagcbor produces deterministic CBOR (RFC 8949 Core Deterministic
-    // Encoding) — the same encoding used by elohim-epr for envelope canonicalization.
-    // Same input → same bytes, so the resulting Envelope CID is reproducible.
-    serde_ipld_dagcbor::to_vec(value).map_err(|e| SignalEmitError::PayloadEncode(e.to_string()))
+    // Payload bytes are JSON-encoded to match the projector's contract
+    // (`projector::mod` line ~275: `serde_json::from_slice(&atom.payload_bytes)`).
+    // Envelope canonicalization for signing is handled separately by
+    // `EprBuilder::canonical_bytes` over the entire envelope — payload encoding
+    // doesn't need to match the canonical CBOR encoding because the canonical
+    // bytes treat the payload as opaque content-addressable bytes.
+    serde_json::to_vec(value).map_err(|e| SignalEmitError::PayloadEncode(e.to_string()))
 }
 
 /// Derive a deterministic placeholder schema_ref CID for a given (pillar,
