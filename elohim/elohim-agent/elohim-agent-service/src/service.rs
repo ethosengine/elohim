@@ -19,6 +19,7 @@ use crate::response::ResponseStatus;
 use crate::stream::TokenStream;
 use crate::types::ComputationCost;
 use constitution::{ConstitutionalStack, PromptAssembler, StackContext};
+use elohim_agent_defender_specialist::{DefenderManifest, DefenderRoleMarker};
 
 /// Error types for the service.
 #[derive(Debug, thiserror::Error)]
@@ -46,6 +47,14 @@ pub enum ServiceError {
     /// Request validation error
     #[error("Invalid request: {0}")]
     InvalidRequest(String),
+
+    /// Bad gate request (missing or malformed payload field)
+    #[error("Bad gate request: {0}")]
+    BadRequest(String),
+
+    /// Unknown gate kind
+    #[error("Unknown gate kind: {0}")]
+    UnknownGateKind(String),
 }
 
 /// Configuration for the ElohimAgentService.
@@ -88,11 +97,24 @@ pub struct ElohimAgentService {
     audit: Arc<AuditLog>,
     /// Whether service is initialized
     initialized: Arc<RwLock<bool>>,
+    /// Defender role marker — hydrated from ELOHIM_DEFENDER_MANIFEST at startup.
+    /// None = not configured as a defender (Stage 1 default-deny).
+    defender_role_marker: Option<DefenderRoleMarker>,
 }
 
 impl ElohimAgentService {
     /// Create a new service with the given backends.
+    ///
+    /// Hydrates the defender role marker from the `ELOHIM_DEFENDER_MANIFEST`
+    /// environment variable if present. If absent or the manifest fails to parse,
+    /// `defender_role_marker` is `None` and `is_defender_for` gates return `false`
+    /// (Stage 1 default-deny).
     pub fn new(backends: Vec<Arc<dyn LlmBackend>>) -> Self {
+        let defender_role_marker = std::env::var("ELOHIM_DEFENDER_MANIFEST")
+            .ok()
+            .and_then(|p| DefenderManifest::from_path(&p).ok())
+            .map(DefenderRoleMarker::new);
+
         Self {
             config: ServiceConfig::default(),
             backends,
@@ -100,6 +122,7 @@ impl ElohimAgentService {
             capabilities: Arc::new(CapabilityRegistry::new()),
             audit: Arc::new(AuditLog::new()),
             initialized: Arc::new(RwLock::new(false)),
+            defender_role_marker,
         }
     }
 
@@ -378,6 +401,40 @@ impl ElohimAgentService {
         prompt
     }
 
+    /// Dispatch a gate-check request by kind.
+    ///
+    /// Called by imagodei coordinator (via gate-client) to answer boolean gate
+    /// queries without going through the full LLM invocation path. The result
+    /// is a JSON object whose shape depends on `kind`.
+    ///
+    /// Currently supported kinds:
+    /// - `"is_defender_for"` — consults the local `DefenderRoleMarker`.
+    ///   Payload must contain `"humanActionHash": "<b64url>"`.
+    ///   Returns `{ "isDefender": bool }`.
+    pub async fn handle_gate_request(
+        &self,
+        kind: &str,
+        payload: &serde_json::Value,
+    ) -> Result<serde_json::Value, ServiceError> {
+        match kind {
+            "is_defender_for" => {
+                let human_hash = payload
+                    .get("humanActionHash")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| {
+                        ServiceError::BadRequest("missing humanActionHash".into())
+                    })?;
+                let is_defender = self
+                    .defender_role_marker
+                    .as_ref()
+                    .map(|m| m.is_defender_for(human_hash))
+                    .unwrap_or(false);
+                Ok(serde_json::json!({ "isDefender": is_defender }))
+            }
+            other => Err(ServiceError::UnknownGateKind(other.into())),
+        }
+    }
+
     /// Parse capability-specific response.
     fn parse_capability_response(
         &self,
@@ -488,5 +545,55 @@ mod tests {
         let response = service.invoke(request).await.unwrap();
 
         assert_eq!(response.status, ResponseStatus::Declined);
+    }
+
+    #[tokio::test]
+    async fn test_gate_is_defender_for_no_manifest_returns_false() {
+        // No ELOHIM_DEFENDER_MANIFEST env var set → defender_role_marker is None
+        // → is_defender_for always returns false (Stage 1 default-deny).
+        let backend = Arc::new(MockBackend::default());
+        let service = ElohimAgentService::new(vec![backend]);
+
+        let payload = serde_json::json!({ "humanActionHash": "uhCkk_some_hash" });
+        let result = service
+            .handle_gate_request("is_defender_for", &payload)
+            .await
+            .unwrap();
+
+        assert_eq!(result["isDefender"], false);
+    }
+
+    #[tokio::test]
+    async fn test_gate_is_defender_for_missing_hash_returns_bad_request() {
+        let backend = Arc::new(MockBackend::default());
+        let service = ElohimAgentService::new(vec![backend]);
+
+        let payload = serde_json::json!({});
+        let err = service
+            .handle_gate_request("is_defender_for", &payload)
+            .await
+            .unwrap_err();
+
+        assert!(
+            matches!(err, ServiceError::BadRequest(_)),
+            "expected BadRequest, got: {err:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_gate_unknown_kind_returns_error() {
+        let backend = Arc::new(MockBackend::default());
+        let service = ElohimAgentService::new(vec![backend]);
+
+        let payload = serde_json::json!({});
+        let err = service
+            .handle_gate_request("discernment_v99", &payload)
+            .await
+            .unwrap_err();
+
+        assert!(
+            matches!(err, ServiceError::UnknownGateKind(_)),
+            "expected UnknownGateKind, got: {err:?}"
+        );
     }
 }
