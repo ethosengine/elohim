@@ -1,0 +1,33 @@
+{
+  "$id": "epr:schema:manifest:pillar-projection",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PillarProjection",
+  "description": "Declares how an EPR atom of a given kind is projected into a pillar's read-model SQL table. The projector controller (alongside ReconcileController) iterates registered projections, evaluates each entry's columnMapping over an atom's payload, and UPSERTs the result into targetTable. Source-of-truth for the row remains the signed Envelope in epr_atoms (Category A); the projection is operational state (Category C) — fully rebuildable from the cursor. Manifest-authority guard: only EPR atoms whose (kind, schemaKey) match a declared projection are projected — unmapped kinds remain in epr_atoms but produce no pillar row (Invariant I6).",
+  "type": "object",
+  "required": ["kind", "schemaKey", "targetTable", "columnMapping"],
+  "properties": {
+    "kind": {
+      "$ref": "../enums/epr-kind.schema.json",
+      "description": "EPR atom kind this projection consumes. Must be one of the nine notarized EprKind values."
+    },
+    "schemaKey": {
+      "type": "string",
+      "description": "Application-level schema discriminator within the kind (e.g. 'economic-event' for shefa's EconomicEvent atoms). Combined with kind, forms the manifest-authority guard for projection (Invariant I2).",
+      "minLength": 1
+    },
+    "targetTable": {
+      "type": "string",
+      "description": "Name of the SQLite table to UPSERT projected rows into. Table must exist in elohim-storage with a primary key on the source EPR's content-address (cid) — that's the dht_anchor for the A-class source and ensures idempotent replay (Invariant I1).",
+      "minLength": 1
+    },
+    "columnMapping": {
+      "type": "object",
+      "description": "Map of target column name -> dotted source path within the EPR payload. Path is evaluated against the decoded payload (canonical_bytes). Special source paths (e.g. '$verifiedAt') resolve to projector-derived values rather than payload fields.",
+      "additionalProperties": {
+        "type": "string"
+      },
+      "minProperties": 1
+    }
+  },
+  "additionalProperties": false
+}

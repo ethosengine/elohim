@@ -33,6 +33,8 @@ use tracing::{debug, info, warn};
 
 use crate::db::DbPool;
 use crate::p2p::P2PCommand;
+use crate::projector::sweep::sweep_projections_on_revocation;
+use crate::projector::ManifestRegistry;
 use crate::reconcile::pubkey_timeline::PubkeyTimelineCache;
 use crate::reconcile::signal_stream::{
     AgentPeerBindingSignal, DnaSignal, DnaSignalStream, KeyRevocationSignal, KeyRotationSignal,
@@ -117,6 +119,18 @@ pub struct ReconcileController<S: DnaSignalStream> {
     /// the `P2PHandle` (Task A.11 wiring). The channel is unbounded to avoid
     /// blocking the controller loop — the P2P event loop drains it promptly.
     swarm_tx: Option<mpsc::Sender<P2PCommand>>,
+
+    /// B.6: optional manifest registry for projection revocation sweep.
+    ///
+    /// When `Some(registry)`, `on_key_revocation` also calls
+    /// `sweep_projections_on_revocation` after the `epr_atoms` sweep, clearing
+    /// `verified_at` on any projection rows whose source EPR atoms were tainted
+    /// by the revocation (Invariant I4).
+    ///
+    /// `None` in controllers constructed without a registry. In that case the
+    /// projection sweep is silently skipped (logged at debug level). Set via
+    /// `with_manifest_registry(registry)`. Existing constructors are unchanged.
+    manifest_registry: Option<Arc<ManifestRegistry>>,
 }
 
 impl<S: DnaSignalStream> ReconcileController<S> {
@@ -131,6 +145,7 @@ impl<S: DnaSignalStream> ReconcileController<S> {
             db_pool: None,
             pubkey_cache: None,
             swarm_tx: None,
+            manifest_registry: None,
         }
     }
 
@@ -149,6 +164,7 @@ impl<S: DnaSignalStream> ReconcileController<S> {
             db_pool: Some(db_pool),
             pubkey_cache: Some(pubkey_cache),
             swarm_tx: None,
+            manifest_registry: None,
         }
     }
 
@@ -161,6 +177,21 @@ impl<S: DnaSignalStream> ReconcileController<S> {
     /// is silently skipped (logged at debug level).
     pub fn with_swarm_tx(mut self, tx: mpsc::Sender<P2PCommand>) -> Self {
         self.swarm_tx = Some(tx);
+        self
+    }
+
+    /// Wire a manifest registry so the controller clears projection rows on
+    /// key revocation (Task B.6 / Invariant I4).
+    ///
+    /// When set, `on_key_revocation` calls `sweep_projections_on_revocation`
+    /// after the `epr_atoms` sweep, atomically clearing `verified_at` on any
+    /// projection rows whose source EPR atoms were tainted by the revocation.
+    ///
+    /// Preserves backward compatibility: without this call the projection sweep
+    /// is silently skipped (logged at debug level). Existing constructors and
+    /// test suites do not need modification.
+    pub fn with_manifest_registry(mut self, registry: Arc<ManifestRegistry>) -> Self {
+        self.manifest_registry = Some(registry);
         self
     }
 
@@ -291,22 +322,52 @@ impl<S: DnaSignalStream> ReconcileController<S> {
         if let Some(pool) = &self.db_pool {
             let pool = Arc::clone(pool);
             let signal_clone = signal.clone();
+            let registry_clone = self.manifest_registry.clone();
 
             // The r2d2 pool is sync. We use block_in_place to avoid blocking
             // the Tokio runtime's async thread while holding the connection.
-            let report = tokio::task::block_in_place(move || {
+            let (atom_report, projection_report) = tokio::task::block_in_place(move || {
                 let mut conn = pool
                     .get()
                     .map_err(|e| ReconcileError::Pool(e.to_string()))?;
-                sweep_on_revocation(&mut conn, &signal_clone)
-                    .map_err(|e| ReconcileError::Sweep(e.to_string()))
+
+                // Step 2a: sweep epr_atoms.
+                let atom_report = sweep_on_revocation(&mut conn, &signal_clone)
+                    .map_err(|e| ReconcileError::Sweep(e.to_string()))?;
+
+                // Step 2b: sweep projection rows if a registry is wired (B.6/I4).
+                let effective_at_str = signal_clone
+                    .effective_at
+                    .format("%Y-%m-%dT%H:%M:%SZ")
+                    .to_string();
+
+                let proj_report = if let Some(registry) = registry_clone {
+                    sweep_projections_on_revocation(
+                        &mut conn,
+                        &registry,
+                        &signal_clone.agent_cid,
+                        &effective_at_str,
+                    )
+                    .map_err(|e| ReconcileError::Sweep(format!("projection sweep: {e}")))?
+                } else {
+                    debug!(
+                        agent_cid = %signal_clone.agent_cid,
+                        "KeyRevocation: no manifest_registry wired — projection sweep skipped \
+                         (use with_manifest_registry for full I4 compliance)"
+                    );
+                    crate::projector::ProjectionSweepReport::default()
+                };
+
+                Ok::<_, ReconcileError>((atom_report, proj_report))
             })?;
 
             info!(
-                agent_cid = %report.agent_cid,
-                affected_rows = report.affected_rows,
-                compromise_at = %report.compromise_at,
-                swept_at = %report.at,
+                agent_cid = %atom_report.agent_cid,
+                affected_rows = atom_report.affected_rows,
+                compromise_at = %atom_report.compromise_at,
+                swept_at = %atom_report.at,
+                projection_tables_updated = projection_report.tables_updated,
+                projection_rows_cleared = projection_report.rows_cleared,
                 "revocation sweep complete"
             );
         } else {

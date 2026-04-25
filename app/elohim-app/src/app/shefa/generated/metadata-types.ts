@@ -29,12 +29,7 @@ export interface ExchangeMetadata {
   /** Whether reciprocal action is expected. False for gifts, true for trades. */
   reciprocityExpected?: boolean;
   /** REA resource nature dimensions for the exchanged resource */
-  resourceNature?: {
-    rivalry?: string;
-    excludability?: string;
-    depletability?: string;
-    fungibility?: string;
-  };
+  resourceNature?: { rivalry?: string; excludability?: string; depletability?: string; fungibility?: string };
   [key: string]: unknown;
 }
 
@@ -42,13 +37,7 @@ export interface AgreementMetadata {
   /** Agent IDs of agreement parties */
   parties?: string[];
   /** Individual obligations within the agreement */
-  obligations?: {
-    obligor?: string;
-    action?: string;
-    resourceConformsTo?: string;
-    dueDate?: string;
-    fulfilled?: boolean;
-  }[];
+  obligations?: { obligor?: string; action?: string; resourceConformsTo?: string; dueDate?: string; fulfilled?: boolean }[];
   /** Human-readable description of what constitutes fulfillment */
   fulfillmentCriteria?: string;
   /** Current agreement lifecycle state */

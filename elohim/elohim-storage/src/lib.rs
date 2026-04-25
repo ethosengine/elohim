@@ -51,6 +51,7 @@ pub mod config;
 pub mod dag_store;
 pub mod db; // SQLite content storage
 pub mod epr_codec;
+pub mod epr_head;
 pub mod error;
 pub mod happ_manager;
 pub mod hc_client;
@@ -75,6 +76,9 @@ pub mod cache_stream;
 
 // Reconcile controller — Principle P1 (DHT as manifest, eager projection)
 pub mod reconcile;
+
+// EPR projector — consumes epr_atoms, projects into pillar read-models (EPR 2B Decision #3)
+pub mod projector;
 
 // Tally strategies for multi-mechanism voting
 pub mod tally;

@@ -357,6 +357,13 @@ pub struct EconomicEvent {
     pub created_at: String,
     /// Place ID where this event occurred (spatial grounding for carrying capacity)
     pub at_location: Option<String>,
+    /// Mirror of the source EPR atom's `verified_at` timestamp.
+    ///
+    /// Set by the projector when it writes this row; sourced from `$verifiedAt` in
+    /// the column mapping. Cleared (set to NULL) by `sweep_projections_on_revocation`
+    /// atomically with the corresponding `epr_atoms.verified_at` clear. Satisfies
+    /// invariants I4 (revocation propagation) and I5 (verified-state consistency).
+    pub verified_at: Option<String>,
 }
 
 /// New economic event for INSERT
@@ -389,6 +396,7 @@ pub struct NewEconomicEvent<'a> {
     pub metadata_json: Option<&'a str>,
     pub dht_anchor_hash: Option<&'a str>,
     pub at_location: Option<&'a str>,
+    pub verified_at: Option<&'a str>,
 }
 
 // ============================================================================

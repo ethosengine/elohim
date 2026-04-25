@@ -247,5 +247,30 @@
         "archetype": "outcome-divergence"
       }
     }
-  }
+  },
+  "projections": [
+    {
+      "kind": "EconomicEvent",
+      "schemaKey": "economic-event",
+      "targetTable": "economic_events",
+      "columnMapping": {
+        "_comment": "Keys are snake_case DB column names. Values are dotted payload paths or $-prefixed projector-derived sources.",
+        "provider": "payload.provider",
+        "receiver": "payload.receiver",
+        "action": "payload.action",
+        "resource_conforms_to": "payload.resourceConformsTo",
+        "resource_quantity_value": "payload.resourceQuantity.numericValue",
+        "resource_quantity_unit": "payload.resourceQuantity.hasUnit",
+        "effort_quantity_value": "payload.effortQuantity.numericValue",
+        "effort_quantity_unit": "payload.effortQuantity.hasUnit",
+        "has_point_in_time": "payload.hasPointInTime",
+        "id": "$cid",
+        "h_app_id": "$signer",
+        "state": "$state:recorded",
+        "created_at": "$issuedAt",
+        "dht_anchor_hash": "$cid",
+        "verified_at": "$verifiedAt"
+      }
+    }
+  ]
 }

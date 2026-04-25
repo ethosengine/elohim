@@ -144,7 +144,6 @@ mod tests {
     use crate::reconcile::signal_stream::KeyRevocationSignal;
     use crate::test_util::test_pool;
     use chrono::{TimeZone, Utc};
-    use diesel::prelude::*;
 
     // -----------------------------------------------------------------------
     // Helpers
@@ -182,7 +181,7 @@ mod tests {
             payload_bytes: vec![0u8; 4],
             proof_bytes: vec![0u8; 64],
             proof_algorithm: "ed25519".into(),
-            verified_at: verified_dt.map(|d| ts(d)),
+            verified_at: verified_dt.map(ts),
             verified_signer_fingerprint: verified_dt
                 .map(|_| "abcdef0123456789abcdef0123456789".to_string()),
         };

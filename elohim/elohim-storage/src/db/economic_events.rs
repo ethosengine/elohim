@@ -330,6 +330,7 @@ pub fn record_event(
         metadata_json: input.metadata_json.as_deref(),
         dht_anchor_hash: None,
         at_location: input.at_location.as_deref(),
+        verified_at: None,
     };
 
     diesel::insert_into(economic_events::table)
@@ -654,6 +655,7 @@ pub fn upsert_with_anchor(
             metadata_json: input.metadata_json.as_deref(),
             dht_anchor_hash,
             at_location: input.at_location.as_deref(),
+            verified_at: None,
         };
 
         diesel::insert_into(economic_events::table)

@@ -3,6 +3,7 @@
 .claude/hooks/.p2p-audit-cooldown.json
 .mcp.json
 .worktrees/
+.claude/worktrees/
 
 # Agentic developer shift artifacts (local only)
 .claude/shifts/*
