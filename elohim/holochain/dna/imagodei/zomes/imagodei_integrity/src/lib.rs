@@ -24,6 +24,10 @@ pub use recovery_v2::*;
 pub mod agent_peer_binding;
 pub use agent_peer_binding::*;
 
+// Recovery Protocol Phase 2 M5 — PortalHost (auth portal URL registry)
+pub mod portal_host;
+pub use portal_host::*;
+
 // =============================================================================
 // Identity Constants
 // =============================================================================
@@ -1029,6 +1033,8 @@ pub enum EntryTypes {
     KeyRotation(KeyRotation),
     // EPR Phase 2B — peer identity binding (libp2p PeerId ↔ Holochain AgentCid)
     AgentPeerBinding(AgentPeerBinding),
+    // Recovery Protocol Phase 2 M5 — auth portal URL registry (Human → PortalHost)
+    PortalHost(PortalHost),
 }
 
 // =============================================================================
@@ -1192,6 +1198,9 @@ pub enum LinkTypes {
     // EPR Phase 2B — AgentPeerBinding links
     AgentToPeerBinding, // AgentPubKey -> AgentPeerBinding (current bindings for this agent)
     PeerToBinding, // StringAnchor(peer_id) -> AgentPeerBinding (reverse lookup: peer_id -> binding)
+
+    // Recovery Protocol Phase 2 M5 — PortalHost links
+    PortalHosts, // Human ActionHash -> PortalHost (all portal hosts for this human)
 }
 
 // =============================================================================
@@ -1248,6 +1257,10 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 EntryTypes::AgentPeerBinding(binding) => {
                     validate_create_agent_peer_binding(&binding)
                 }
+                // Recovery Protocol Phase 2 M5 validation
+                EntryTypes::PortalHost(portal_host) => {
+                    validate_create_portal_host(&action, &portal_host)
+                }
                 _ => Ok(ValidateCallbackResult::Valid),
             },
             OpEntry::UpdateEntry { app_entry, .. } => match app_entry {
@@ -1262,6 +1275,10 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 // created; the old one is linked via SupersededBy at the coordinator level.
                 EntryTypes::AgentPeerBinding(_) => Ok(ValidateCallbackResult::Invalid(
                     "AgentPeerBinding is immutable; create a new binding instead".to_string(),
+                )),
+                // Recovery Protocol Phase 2 M5 — PortalHost is immutable; delete + re-create.
+                EntryTypes::PortalHost(_) => Ok(ValidateCallbackResult::Invalid(
+                    "PortalHost is immutable; delete + re-create instead".to_string(),
                 )),
                 _ => Ok(ValidateCallbackResult::Valid),
             },
