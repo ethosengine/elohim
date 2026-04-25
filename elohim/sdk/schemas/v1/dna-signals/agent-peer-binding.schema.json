@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "epr:schema:dna-signal:agent-peer-binding",
+  "title": "AgentPeerBindingSignal",
+  "description": "Category C — operational projection of the imagodei AgentPeerBinding DHT entry (Task A.1/A.2). Source-of-truth is the DHT-notarized AgentPeerBinding entry referenced by actionHash and by bindingActionHash (same value, named explicitly for semantic clarity). The stream message is reconstructable from the DNA. Emitted by the imagodei coordinator's create_agent_peer_binding function (Task A.9 — out of scope for A.3). The reconcile controller (Task A.4) uses this signal to update the local peer-binding projection table.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "signalType",
+    "actionHash",
+    "peerId",
+    "agentCid",
+    "validFrom",
+    "deviceArchetype",
+    "bindingActionHash",
+    "emittedAt"
+  ],
+  "properties": {
+    "signalType": {
+      "type": "string",
+      "const": "agentPeerBinding"
+    },
+    "actionHash": {
+      "type": "string",
+      "description": "Holochain ActionHash (base64) of the AgentPeerBinding DHT entry. Same value as bindingActionHash; present for uniform stream deserialization."
+    },
+    "peerId": {
+      "type": "string",
+      "description": "multibase-encoded libp2p PeerId of the bound peer. Stable network identity used by the libp2p swarm. Format: base58btc-encoded multihash (e.g. '12D3KooW...')."
+    },
+    "agentCid": {
+      "type": "string",
+      "description": "CID of the agent (human or elohim) to which this peer is bound. Links the libp2p identity to the DHT identity."
+    },
+    "validFrom": {
+      "type": "string",
+      "format": "date-time",
+      "description": "UTC timestamp from which this binding is valid. Bindings issued before a key rotation are not automatically invalidated; the controller must check key rotation events to determine effective validity."
+    },
+    "validUntil": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "description": "UTC timestamp at which this binding expires. Null means the binding has no declared expiry (valid indefinitely until superseded or revoked)."
+    },
+    "deviceArchetype": {
+      "$ref": "../enums/device-archetype.schema.json",
+      "description": "Hardware/deployment archetype of the bound device. DNA-notarized as part of the AgentPeerBinding entry (imagodei integrity zome)."
+    },
+    "bindingActionHash": {
+      "type": "string",
+      "description": "The DHT ActionHash of the AgentPeerBinding entry — explicit semantic alias for actionHash. Consumers that specifically track binding provenance should use this field name."
+    },
+    "emittedAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "UTC timestamp at which the signal was emitted from the conductor post-commit hook."
+    }
+  }
+}

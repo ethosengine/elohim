@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "epr:schema:dna-signal:key-revocation",
+  "title": "KeyRevocationSignal",
+  "description": "Category C — operational projection of the imagodei KeyRevocation DHT entry becoming effective. Source-of-truth is the DHT-notarized KeyRevocation entry referenced by actionHash (imagodei DNA). The stream message is reconstructable from the DNA. Emitted when a revocation reaches quorum and transitions to effective state (Recovery M4 RecoveryV2Signal::KeyRevocationEffective). The controller sweep in Task A.8 uses compromiseAt to retroactively invalidate EPR attestations signed between compromiseAt and effectiveAt.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "signalType",
+    "actionHash",
+    "agentCid",
+    "revokedPubkey",
+    "compromiseAt",
+    "effectiveAt",
+    "triggeringRevocationId",
+    "emittedAt"
+  ],
+  "properties": {
+    "signalType": {
+      "type": "string",
+      "const": "keyRevocation"
+    },
+    "actionHash": {
+      "type": "string",
+      "description": "Holochain ActionHash (base64) of the KeyRevocation DHT entry that became effective. Use to verify provenance against the DHT."
+    },
+    "agentCid": {
+      "type": "string",
+      "description": "CID of the agent whose key was revoked."
+    },
+    "revokedPubkey": {
+      "type": "string",
+      "description": "The revoked ed25519 pubkey (base64, 32 bytes). Any EPR attestations bearing this pubkey that were issued after compromiseAt must be considered invalid."
+    },
+    "compromiseAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Point in time the key is declared to have first been compromised. The controller sweep (Task A.8) uses this as the retroactive invalidation boundary: EPR verifications referencing this key issued AFTER this timestamp are tainted."
+    },
+    "effectiveAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Point at which the revocation became effective in the DHT (when vote quorum was reached). Corresponds to KeyRevocationEffective.effective_at from Recovery M4."
+    },
+    "triggeringRevocationId": {
+      "type": ["string", "null"],
+      "description": "ID linking back to the KeyRevocation request that drove this effective event. Null if the revocation was administrative (no vote chain). Corresponds to M4 KeyRevocationEffective.triggering_vote_id."
+    },
+    "emittedAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "UTC timestamp at which the signal was emitted from the conductor post-commit hook."
+    }
+  }
+}
