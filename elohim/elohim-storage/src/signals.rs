@@ -705,6 +705,86 @@ pub enum RecoveryV2Signal {
 }
 
 // =============================================================================
+// ImagodeiSignal — mirror of the DNA-side enum (A.11 signal stream)
+// =============================================================================
+//
+// Wire format: the imagodei coordinator emits via `emit_signal(ImagodeiSignal::...)`
+// which serializes with `#[serde(tag = "type", content = "payload")]`.
+//
+// The `AgentPeerBindingCreated` variant is the one consumed by
+// `HolochainAppSignalStream` (Task A.11) to drive `DnaSignal::AgentPeerBinding`.
+// Other variants (HumanCommitted, etc.) are decoded but not yet consumed by the
+// reconcile controller; they are silently skipped after decode.
+//
+// Holochain Timestamp fields (valid_from, valid_until) serialize as microseconds
+// i64 from the DNA side. We store them as `i64` and convert to DateTime<Utc> in
+// the translator.
+
+/// Storage-side mirror of the `AgentPeerBinding` entry as it arrives in the
+/// `AgentPeerBindingCreated` signal payload.
+///
+/// Mirrors `imagodei_integrity::AgentPeerBinding`. `valid_from` / `valid_until`
+/// are Holochain Timestamps (microseconds i64). `device_archetype` is a
+/// snake_case string (`node`, `desktop`, `mobile`, `steward`).
+/// `signature` and `superseded_by` are present on the wire but not needed by
+/// the translator.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AgentPeerBindingPayload {
+    pub peer_id: String,
+    pub agent_cid: String,
+    /// Holochain Timestamp (microseconds i64).
+    pub valid_from: i64,
+    /// Holochain Timestamp (microseconds i64). `None` = no declared expiry.
+    pub valid_until: Option<i64>,
+    /// snake_case device archetype string.
+    pub device_archetype: String,
+    // signature / superseded_by are present on the wire but unused by the translator.
+    #[serde(default)]
+    pub signature: Vec<u8>,
+    #[serde(default)]
+    pub superseded_by: Option<serde_json::Value>,
+}
+
+/// Storage-side mirror of the imagodei DNA `ImagodeiSignal` enum.
+///
+/// The DNA side uses `#[serde(tag = "type", content = "payload")]`. This mirror
+/// uses the same structure. Only `AgentPeerBindingCreated` is consumed by
+/// `HolochainAppSignalStream`; other variants are decoded and silently skipped.
+///
+/// `action_hash` in each variant is an `ActionHash` on the DNA side, which
+/// serializes as a base64 `String` over the app-signal wire.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type", content = "payload")]
+pub enum ImagodeiSignal {
+    HumanCommitted {
+        action_hash: String,
+        // remaining fields unused — not decoded
+        #[serde(flatten)]
+        _rest: serde_json::Value,
+    },
+    AgentCommitted {
+        action_hash: String,
+        #[serde(flatten)]
+        _rest: serde_json::Value,
+    },
+    RelationshipCommitted {
+        action_hash: String,
+        #[serde(flatten)]
+        _rest: serde_json::Value,
+    },
+    AttestationCommitted {
+        action_hash: String,
+        #[serde(flatten)]
+        _rest: serde_json::Value,
+    },
+    /// Consumed by `HolochainAppSignalStream` → `DnaSignal::AgentPeerBinding`.
+    AgentPeerBindingCreated {
+        action_hash: String,
+        binding: AgentPeerBindingPayload,
+    },
+}
+
+// =============================================================================
 // M4 outbound reconciliation signal (P1 — imagodei.revocation_observed)
 // =============================================================================
 
@@ -768,6 +848,15 @@ fn timestamp_to_iso(v: &serde_json::Value) -> String {
         return dt.format("%Y-%m-%dT%H:%M:%SZ").to_string();
     }
     chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string()
+}
+
+/// Public re-export of `timestamp_to_iso` for use by the reconcile translator.
+///
+/// `holochain_app_signal` needs to convert `KeyRotationPayload.rotated_at`
+/// (a Holochain Timestamp encoded as `serde_json::Value`) to an ISO string
+/// without duplicating the conversion logic.
+pub fn timestamp_to_iso_for_translator(v: &serde_json::Value) -> String {
+    timestamp_to_iso(v)
 }
 
 /// Extract a `RecoveryInvitation` publish intent from a `RecoveryV2Signal`.

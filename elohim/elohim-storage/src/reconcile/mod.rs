@@ -28,10 +28,12 @@
 //! - [`controller`] — `ReconcileController` k8s-style loop (Task A.4).
 
 pub mod controller;
+pub mod holochain_app_signal;
 pub mod pubkey_timeline;
 pub mod signal_stream;
 pub mod sweep;
 
 pub use controller::{ReconcileController, ReconcileError};
+pub use holochain_app_signal::{AppSignalStreamError, HolochainAppSignalStream};
 pub use pubkey_timeline::{PubkeyTimeline, PubkeyTimelineCache, PubkeyValidity};
 pub use sweep::{sweep_on_revocation, SweepReport, REVOKED_STALE_FINGERPRINT};

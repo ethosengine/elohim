@@ -51,11 +51,13 @@ use elohim_storage::{ProgressHub, ProgressHubConfig, Services};
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
-use tokio::sync::{broadcast, RwLock};
+use tokio::sync::{broadcast, Mutex as TokioMutex, RwLock};
 use tracing::{error, info, warn};
 use tracing_subscriber::EnvFilter;
 
 use elohim_storage::db::init_pool_from_dir;
+use elohim_storage::reconcile::pubkey_timeline::PubkeyTimelineCache;
+use elohim_storage::reconcile::{HolochainAppSignalStream, ReconcileController};
 
 #[cfg(feature = "p2p")]
 use elohim_storage::db::local_sessions;
@@ -136,6 +138,14 @@ struct Args {
     /// Only used when --embedded-conductor is set.
     #[arg(long, env = "CONDUCTOR_MAX_RETRIES", default_value_t = 60)]
     conductor_max_retries: u32,
+
+    /// Installed app ID for the imagodei DNA (reconcile controller signal subscription).
+    /// Defaults to "imagodei". The controller subscribes to this app's signals to
+    /// project key-rotation, revocation, and agent-peer-binding events into SQLite.
+    /// Set to empty string to disable reconcile controller startup even if --app-url
+    /// is configured.
+    #[arg(long, env = "IMAGODEI_APP_ID", default_value = "imagodei")]
+    imagodei_app_id: String,
 
     /// Disable import handler (HTTP only mode)
     #[arg(long)]
@@ -894,6 +904,11 @@ async fn async_main(
 
     let http_server = Arc::new(http_server);
 
+    // Save admin_url before the import handler moves it out of args.
+    // The reconcile controller startup (below) needs this value after args.admin_url
+    // is potentially moved into the import config.
+    let saved_admin_url: Option<String> = args.admin_url.clone();
+
     // Start import handler if enabled
     let import_handle = if !args.no_import {
         if let Some(admin_url) = args.admin_url {
@@ -931,6 +946,115 @@ async fn async_main(
         info!("Import handler disabled via --no-import");
         None
     };
+
+    // ---------------------------------------------------------------------------
+    // Reconcile controller startup (Task A.11)
+    //
+    // Connects to the imagodei conductor app interface and subscribes to signals.
+    // The controller is spawned as a background tokio task. Non-fatal: if the
+    // imagodei conductor is not yet reachable, we log a warning and continue
+    // serving HTTP + blob storage without reconciliation.
+    //
+    // The controller requires:
+    //   1. --app-url / HOLOCHAIN_APP_URL (already used for ImportApi)
+    //   2. --admin-url / HOLOCHAIN_ADMIN_URL (for signing credentials)
+    //   3. --imagodei-app-id / IMAGODEI_APP_ID (default "imagodei")
+    //   4. --enable-content-db (for db_pool and compromise_at derivation; optional)
+    //
+    // In production all four are set via the elohim-node Helm chart / systemd unit.
+    // In dev / blob-only mode any of 1-3 may be absent; the no-op path is correct.
+    // ---------------------------------------------------------------------------
+    if !args.imagodei_app_id.is_empty() {
+        if let Some(admin_url) = saved_admin_url {
+            let app_url_clone = args.app_url.clone();
+            let admin_url_clone = admin_url;
+            let imagodei_app_id_clone = args.imagodei_app_id.clone();
+            let reconcile_pool = db_pool.clone().map(Arc::new);
+
+            // Pubkey cache is shared between the controller and the EPR verify
+            // path (Task A.7). Created here with a generous capacity so the
+            // controller and concurrent verifications never contend on a small LRU.
+            let pubkey_cache = Arc::new(TokioMutex::new(PubkeyTimelineCache::with_capacity(512)));
+
+            // Capture a P2P command sender if the p2p feature is enabled and the
+            // node is running. The controller uses this to gossip new AgentPeerBinding
+            // entries to subscribed peers (Task A.10).
+            //
+            // When p2p feature is disabled, the controller runs without a swarm_tx
+            // and gossip publish is silently skipped (logged at debug level per the
+            // no-swarm-path in on_agent_peer_binding).
+            #[cfg(feature = "p2p")]
+            let swarm_tx_opt = p2p_node.as_ref().map(|n| n.handle().command_sender());
+
+            tokio::spawn(async move {
+                match HolochainAppSignalStream::connect(
+                    &admin_url_clone,
+                    &app_url_clone,
+                    &imagodei_app_id_clone,
+                    &imagodei_app_id_clone, // role = app_id by convention for single-DNA apps
+                    reconcile_pool.clone(),
+                )
+                .await
+                {
+                    Ok(stream) => {
+                        info!(
+                            app_id = %imagodei_app_id_clone,
+                            "Reconcile controller connected to imagodei conductor — starting loop"
+                        );
+
+                        // Build controller. new_with_storage when db_pool available
+                        // (enables sweep + compromise_at derivation); new() otherwise.
+                        let mut controller = match reconcile_pool {
+                            Some(pool) => {
+                                let c = ReconcileController::new_with_storage(
+                                    stream,
+                                    pool,
+                                    Arc::clone(&pubkey_cache),
+                                );
+                                #[cfg(feature = "p2p")]
+                                let c = match swarm_tx_opt {
+                                    Some(tx) => c.with_swarm_tx(tx),
+                                    None => c,
+                                };
+                                c
+                            }
+                            None => {
+                                // No db_pool — sweep ops will be no-ops (logged by controller).
+                                let c = ReconcileController::new(stream);
+                                #[cfg(feature = "p2p")]
+                                let c = match swarm_tx_opt {
+                                    Some(tx) => c.with_swarm_tx(tx),
+                                    None => c,
+                                };
+                                c
+                            }
+                        };
+
+                        if let Err(e) = controller.run_loop().await {
+                            warn!(error = %e, "Reconcile controller run_loop exited with error");
+                        } else {
+                            info!("Reconcile controller run_loop exited cleanly (conductor disconnected)");
+                        }
+                    }
+                    Err(e) => {
+                        warn!(
+                            error = %e,
+                            app_id = %imagodei_app_id_clone,
+                            "Reconcile controller disabled: imagodei conductor connection failed \
+                             (storage still serves blobs/HTTP without reconciliation)"
+                        );
+                    }
+                }
+            });
+        } else {
+            info!(
+                "Reconcile controller disabled: no --admin-url / HOLOCHAIN_ADMIN_URL set \
+                 (set it to enable imagodei signal subscription)"
+            );
+        }
+    } else {
+        info!("Reconcile controller disabled: --imagodei-app-id is empty");
+    }
 
     info!("Press Ctrl+C to stop.");
 
