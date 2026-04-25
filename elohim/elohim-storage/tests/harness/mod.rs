@@ -1,7 +1,9 @@
-//! In-process two-peer swarm harness for /elohim/epr-atom/1.0.0.
+//! In-process two-peer swarm harness for /elohim/epr-atom/1.0.0 and
+//! /elohim/identity/handshake/1.0.0.
 //!
 //! Each `TestNode` owns:
-//!   - a libp2p Swarm with a minimal NetworkBehaviour (request-response + identify)
+//!   - a libp2p Swarm with a minimal NetworkBehaviour (request-response + identify
+//!     + identity-handshake)
 //!   - its own in-memory DbPool with migrations applied
 //!   - a StubIdentityMap so tests can register peer→pubkey mappings
 //!   - an AgentKeypair + signer_cid for authoring signed atoms
@@ -9,13 +11,22 @@
 //!
 //! Incoming requests are handled in-harness (the full P2PNode is NOT used)
 //! but apply the real production `reach_gate_allows` + `epr_service` functions.
+//! Handshake handling applies the real production `verify_handshake_request`
+//! function and writes into the real `peer_identity_bindings` projection table.
 
 #![allow(dead_code)]
 
+use elohim_storage::db::models::NewPeerIdentityBindingRow;
 use elohim_storage::db::DbPool;
+use elohim_storage::p2p::identity_handshake::{
+    synthesise_dht_anchor_hash, verify_handshake_request, HandshakeBindingPayload,
+    IdentityHandshakeCodec, IdentityHandshakeProtocol, IdentityHandshakeRequest,
+    IdentityHandshakeResponse, VerifyOutcome,
+};
 use elohim_storage::p2p::{
     reach_gate_allows, CallerIdentity, EprAtomCodec, EprAtomProtocol, EprAtomRequest,
-    EprAtomResponse, PeerIdentityMap, StubIdentityMap, MAX_BATCH_CIDS,
+    EprAtomResponse, HolochainBackedPeerIdentityMap, PeerIdentityMap, StubIdentityMap,
+    MAX_BATCH_CIDS,
 };
 use elohim_storage::services::epr_service::{
     fetch_wire_bytes_by_cid, ingest, ingest_from_wire_bytes,
@@ -34,12 +45,13 @@ use std::time::Duration;
 use tokio::sync::{mpsc, oneshot};
 
 // ---------------------------------------------------------------------------
-// Harness behaviour — only what we need: request-response + identify.
+// Harness behaviour — request-response (EPR atom + identity handshake) + identify.
 // ---------------------------------------------------------------------------
 
 #[derive(NetworkBehaviour)]
 pub struct HarnessBehaviour {
     pub epr_atom: request_response::Behaviour<EprAtomCodec>,
+    pub identity_handshake: request_response::Behaviour<IdentityHandshakeCodec>,
     pub identify: identify::Behaviour,
 }
 
@@ -104,6 +116,8 @@ pub struct TestNode {
     peer_id: PeerId,
     addr: Multiaddr,
     agent_pubkey: String,
+    /// Stable agent CID string used in identity bindings (derived from agent_pubkey).
+    agent_cid: String,
     keypair: elohim_epr::proof::AgentKeypair,
     signer_cid: cid::Cid,
     db_pool: DbPool,
@@ -137,9 +151,14 @@ pub async fn spawn_test_node(name: &str) -> TestNode {
                 [(EprAtomProtocol, ProtocolSupport::Full)],
                 request_response::Config::default().with_request_timeout(Duration::from_secs(5)),
             );
+            let identity_handshake = request_response::Behaviour::<IdentityHandshakeCodec>::new(
+                [(IdentityHandshakeProtocol, ProtocolSupport::Full)],
+                request_response::Config::default().with_request_timeout(Duration::from_secs(5)),
+            );
             let identify_cfg = identify::Config::new("/elohim/test/1.0.0".into(), key.public());
             HarnessBehaviour {
                 epr_atom,
+                identity_handshake,
                 identify: identify::Behaviour::new(identify_cfg),
             }
         })
@@ -173,18 +192,31 @@ pub async fn spawn_test_node(name: &str) -> TestNode {
         elohim_epr::proof::AgentKeypair::from_secret(&seed).expect("agent keypair from seed");
     let agent_pubkey = format!("agent-{name}");
     let signer_cid = elohim_epr::cid::compute_cid(agent_pubkey.as_bytes());
+    // Stable agent CID string for use in handshake bindings.
+    let agent_cid = signer_cid.to_string();
 
     let (cmd_tx, cmd_rx) = mpsc::channel::<Command>(32);
 
     // Spawn the async driver task.
+    // The driver holds the local peer_id and agent_cid so it can send handshake requests.
     let driver_pool = db_pool.clone();
     let driver_identity = Arc::clone(&identity_map);
-    tokio::spawn(run_driver(swarm, cmd_rx, driver_pool, driver_identity));
+    let driver_peer_id = local_peer_id;
+    let driver_agent_cid = agent_cid.clone();
+    tokio::spawn(run_driver(
+        swarm,
+        cmd_rx,
+        driver_pool,
+        driver_identity,
+        driver_peer_id,
+        driver_agent_cid,
+    ));
 
     TestNode {
         peer_id: local_peer_id,
         addr: listen_addr,
         agent_pubkey,
+        agent_cid,
         keypair,
         signer_cid,
         db_pool,
@@ -202,6 +234,8 @@ async fn run_driver(
     mut cmd_rx: mpsc::Receiver<Command>,
     pool: DbPool,
     identity: Arc<StubIdentityMap>,
+    local_peer_id: PeerId,
+    local_agent_cid: String,
 ) {
     let mut pending_fetches: FetchMap = HashMap::new();
     let mut pending_batches: BatchMap = HashMap::new();
@@ -233,6 +267,8 @@ async fn run_driver(
                     &mut swarm,
                     &pool,
                     &identity,
+                    &local_peer_id,
+                    &local_agent_cid,
                     &mut pending_fetches,
                     &mut pending_batches,
                     &mut pending_announces,
@@ -299,6 +335,8 @@ fn handle_event(
     swarm: &mut libp2p::Swarm<HarnessBehaviour>,
     pool: &DbPool,
     identity: &Arc<StubIdentityMap>,
+    local_peer_id: &PeerId,
+    local_agent_cid: &str,
     pending_fetches: &mut FetchMap,
     pending_batches: &mut BatchMap,
     pending_announces: &mut AnnounceMap,
@@ -307,11 +345,37 @@ fn handle_event(
     match event {
         SwarmEvent::ConnectionEstablished { peer_id, .. } => {
             connected.insert(peer_id);
+            // Send the identity handshake request to the newly connected peer.
+            // The binding uses this node's own peer_id (base58) and agent_cid.
+            let now_iso = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
+            // Use uuid v4 bytes as a nonce (uuid::Uuid::new_v4 is available as a dependency).
+            let nonce = {
+                let bytes = *uuid::Uuid::new_v4().as_bytes();
+                base64::Engine::encode(&base64::engine::general_purpose::STANDARD, bytes)
+            };
+            let request = IdentityHandshakeRequest {
+                binding: HandshakeBindingPayload {
+                    peer_id: local_peer_id.to_base58(),
+                    agent_cid: local_agent_cid.to_string(),
+                    valid_from: "2026-01-01T00:00:00Z".to_string(),
+                    valid_until: None,
+                    device_archetype: "node".to_string(),
+                    // Use a non-empty sentinel signature for Stage 1 structural check.
+                    signature: "aGFybmVzcy10ZXN0LXNpZ25hdHVyZQ==".to_string(),
+                    dht_anchor_hash: None,
+                },
+                timestamp: now_iso,
+                nonce,
+            };
+            swarm
+                .behaviour_mut()
+                .identity_handshake
+                .send_request(&peer_id, request);
         }
         SwarmEvent::ConnectionClosed { peer_id, .. } => {
             connected.remove(&peer_id);
         }
-        // Incoming request — handle with production reach gate + epr_service.
+        // Incoming EPR atom request — handle with production reach gate + epr_service.
         SwarmEvent::Behaviour(HarnessBehaviourEvent::EprAtom(
             request_response::Event::Message {
                 peer,
@@ -321,13 +385,13 @@ fn handle_event(
                     },
             },
         )) => {
-            let response = handle_incoming_request(pool, identity, peer, request);
+            let response = handle_incoming_epr_request(pool, identity, peer, request);
             let _ = swarm
                 .behaviour_mut()
                 .epr_atom
                 .send_response(channel, response);
         }
-        // Outbound response — resolve pending oneshot.
+        // Outbound EPR atom response — resolve pending oneshot.
         SwarmEvent::Behaviour(HarnessBehaviourEvent::EprAtom(
             request_response::Event::Message {
                 message:
@@ -346,7 +410,7 @@ fn handle_event(
                 pending_announces,
             );
         }
-        // Outbound failure — fail pending oneshot.
+        // Outbound EPR atom failure — fail pending oneshot.
         SwarmEvent::Behaviour(HarnessBehaviourEvent::EprAtom(
             request_response::Event::OutboundFailure {
                 request_id, error, ..
@@ -360,15 +424,106 @@ fn handle_event(
                 pending_announces,
             );
         }
+        // Incoming identity handshake request — verify and insert into DB.
+        SwarmEvent::Behaviour(HarnessBehaviourEvent::IdentityHandshake(
+            request_response::Event::Message {
+                peer,
+                message:
+                    request_response::Message::Request {
+                        request, channel, ..
+                    },
+            },
+        )) => {
+            let response = handle_incoming_handshake(pool, peer, request);
+            let _ = swarm
+                .behaviour_mut()
+                .identity_handshake
+                .send_response(channel, response);
+        }
+        // Outbound handshake response — no pending oneshot needed (fire-and-forget).
+        SwarmEvent::Behaviour(HarnessBehaviourEvent::IdentityHandshake(
+            request_response::Event::Message {
+                message: request_response::Message::Response { .. },
+                ..
+            },
+        )) => {
+            // Handshake response acknowledged; no action needed in the harness.
+        }
         _ => {}
     }
 }
 
 // ---------------------------------------------------------------------------
-// Incoming request handler — mirrors production P2PNode logic.
+// Identity handshake handler — mirrors production logic from mod.rs.
 // ---------------------------------------------------------------------------
 
-fn handle_incoming_request(
+fn handle_incoming_handshake(
+    pool: &DbPool,
+    peer: PeerId,
+    request: IdentityHandshakeRequest,
+) -> IdentityHandshakeResponse {
+    let now_iso = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
+    let peer_id_str = peer.to_base58();
+
+    // Verify structural integrity + validity window.
+    match verify_handshake_request(&request, &peer_id_str, &now_iso) {
+        VerifyOutcome::Invalid(reason) => {
+            tracing::warn!(
+                peer = %peer_id_str,
+                reason = %reason,
+                "identity handshake rejected"
+            );
+            return IdentityHandshakeResponse::Rejected { reason };
+        }
+        VerifyOutcome::Valid => {}
+    }
+
+    // Insert into peer_identity_bindings.
+    let b = &request.binding;
+    let dht_anchor_hash = b
+        .dht_anchor_hash
+        .clone()
+        .unwrap_or_else(|| synthesise_dht_anchor_hash(&b.peer_id, &b.agent_cid));
+
+    let row = NewPeerIdentityBindingRow {
+        peer_id: peer_id_str.clone(),
+        agent_cid: b.agent_cid.clone(),
+        dht_anchor_hash,
+        valid_from: b.valid_from.clone(),
+        valid_until: b.valid_until.clone(),
+        observed_at: now_iso,
+        source: "handshake".to_string(),
+    };
+
+    match pool.get() {
+        Ok(mut conn) => {
+            if let Err(e) = elohim_storage::db::peer_identity_bindings::upsert(&mut conn, &row) {
+                tracing::warn!(
+                    peer = %peer_id_str,
+                    error = %e,
+                    "identity handshake: db upsert failed"
+                );
+                return IdentityHandshakeResponse::Error(format!("db error: {e}"));
+            }
+        }
+        Err(e) => {
+            tracing::warn!(
+                peer = %peer_id_str,
+                error = %e,
+                "identity handshake: pool exhausted"
+            );
+            return IdentityHandshakeResponse::Error("pool exhausted".to_string());
+        }
+    }
+
+    IdentityHandshakeResponse::Accepted
+}
+
+// ---------------------------------------------------------------------------
+// Incoming EPR atom request handler — mirrors production P2PNode logic.
+// ---------------------------------------------------------------------------
+
+fn handle_incoming_epr_request(
     pool: &DbPool,
     identity: &Arc<StubIdentityMap>,
     peer: PeerId,
@@ -503,6 +658,11 @@ impl TestNode {
         self.agent_pubkey.clone()
     }
 
+    /// Stable agent CID string used in identity handshake bindings.
+    pub fn agent_cid(&self) -> String {
+        self.agent_cid.clone()
+    }
+
     pub async fn dial(&self, addr: Multiaddr) -> Result<(), String> {
         let (tx, rx) = oneshot::channel();
         self.cmd_tx
@@ -529,6 +689,16 @@ impl TestNode {
             }
             tokio::time::sleep(Duration::from_millis(50)).await;
         }
+    }
+
+    /// Look up a peer's identity in this node's `peer_identity_bindings` table.
+    ///
+    /// Uses `HolochainBackedPeerIdentityMap` backed by this node's real DB pool.
+    /// Returns `CallerIdentity::Agent(cid)` if the handshake inserted a row, or
+    /// `CallerIdentity::Anonymous` if no active binding exists.
+    pub async fn lookup_peer_identity(&self, peer: &PeerId) -> CallerIdentity {
+        let map = HolochainBackedPeerIdentityMap::new(self.db_pool.clone());
+        map.lookup(peer)
     }
 
     /// Author a freshly signed atom owned by this node.

@@ -59,6 +59,8 @@ const INTERFACE_FILES = [
   { src: 'views/recovery-request.ts', dest: 'recovery-request.ts' },
   { src: 'views/key-rotation.ts', dest: 'key-rotation.ts' },
   { src: 'views/recovery-witness.ts', dest: 'recovery-witness.ts' },
+  // P2P protocol wire contracts (Category C operational — internal to libp2p protocols)
+  { src: 'p2p/identity-handshake.ts', dest: 'identity-handshake.ts' },
 ];
 
 /**
@@ -240,7 +242,7 @@ async function main() {
     const refMap = await loadRefMap(SCHEMA_DIR);
 
     const allGenerated = [];
-    for (const subdir of ['enums', 'inputs', 'views']) {
+    for (const subdir of ['enums', 'inputs', 'views', 'p2p']) {
       const results = await generateFromDir(subdir, refMap);
       allGenerated.push(...results);
     }

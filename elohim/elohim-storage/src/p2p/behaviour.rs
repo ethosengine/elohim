@@ -16,6 +16,7 @@ use std::time::Duration;
 
 use super::epr_atom_protocol::{EprAtomCodec, EprAtomProtocol};
 use super::epr_protocol::{EprCodec, EprProtocol};
+use super::identity_handshake::{IdentityHandshakeCodec, IdentityHandshakeProtocol};
 use super::shard_protocol::{ShardCodec, ShardProtocol};
 use super::sync_protocol::{SyncCodec, SyncProtocol};
 use super::trust_protocol::{TrustCodec, TrustProtocol};
@@ -74,6 +75,12 @@ pub struct ElohimStorageBehaviour {
     pub epr_atom_protocol: RequestResponse<EprAtomCodec>,
     /// Request-response for trust negotiation
     pub trust_protocol: RequestResponse<TrustCodec>,
+    /// Request-response for identity handshake (/elohim/identity/handshake/1.0.0)
+    ///
+    /// Category C — session-local projection of the AgentPeerBinding DHT entry.
+    /// Fires on ConnectionEstablished; receiver verifies and writes into
+    /// `peer_identity_bindings` with source='handshake'.
+    pub identity_handshake: RequestResponse<IdentityHandshakeCodec>,
     /// Local network discovery (mDNS)
     pub mdns: mdns::tokio::Behaviour,
     /// Relay client for NAT traversal (connect through relay servers)
@@ -110,6 +117,13 @@ pub enum ElohimStorageBehaviourEvent {
         request_response::Event<
             super::trust_protocol::TrustHandshake,
             super::trust_protocol::TrustResponse,
+        >,
+    ),
+    /// Identity handshake event (/elohim/identity/handshake/1.0.0)
+    IdentityHandshake(
+        request_response::Event<
+            super::identity_handshake::IdentityHandshakeRequest,
+            super::identity_handshake::IdentityHandshakeResponse,
         >,
     ),
     /// mDNS event
@@ -189,6 +203,24 @@ impl
         >,
     ) -> Self {
         Self::TrustProtocol(event)
+    }
+}
+
+impl
+    From<
+        request_response::Event<
+            super::identity_handshake::IdentityHandshakeRequest,
+            super::identity_handshake::IdentityHandshakeResponse,
+        >,
+    > for ElohimStorageBehaviourEvent
+{
+    fn from(
+        event: request_response::Event<
+            super::identity_handshake::IdentityHandshakeRequest,
+            super::identity_handshake::IdentityHandshakeResponse,
+        >,
+    ) -> Self {
+        Self::IdentityHandshake(event)
     }
 }
 
@@ -281,6 +313,13 @@ impl ElohimStorageBehaviour {
             request_response::Config::default().with_request_timeout(config.request_timeout),
         );
 
+        // Identity handshake protocol — Category C session-local projection of
+        // AgentPeerBinding DHT entries. Fires on ConnectionEstablished.
+        let identity_handshake = RequestResponse::new(
+            [(IdentityHandshakeProtocol, ProtocolSupport::Full)],
+            request_response::Config::default().with_request_timeout(config.request_timeout),
+        );
+
         // mDNS for local discovery
         let mdns = mdns::tokio::Behaviour::new(mdns::Config::default(), peer_id)
             .expect("mDNS behaviour should be created");
@@ -338,6 +377,7 @@ impl ElohimStorageBehaviour {
             epr_protocol,
             epr_atom_protocol,
             trust_protocol,
+            identity_handshake,
             mdns,
             relay_client,
             relay_server,

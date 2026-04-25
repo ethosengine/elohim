@@ -1,10 +1,14 @@
-//! Cross-peer integration tests for /elohim/epr-atom/1.0.0.
+//! Cross-peer integration tests for /elohim/epr-atom/1.0.0 and
+//! /elohim/identity/handshake/1.0.0.
 //!
 //! Phase 2C Batch D: cross-peer behavioural proofs over the harness from
 //! commit 88cc4fdf.
+//! Phase 2B Task A.9: identity handshake test extends the harness with the
+//! handshake protocol and asserts that after connect, peer B resolves peer A's
+//! identity from its `peer_identity_bindings` table.
 
 mod harness;
-use elohim_storage::p2p::{verify_incoming_epr, MAX_BATCH_CIDS};
+use elohim_storage::p2p::{verify_incoming_epr, CallerIdentity, MAX_BATCH_CIDS};
 use harness::{spawn_test_node, BatchOutcome};
 use std::time::Duration;
 use tokio::time::timeout;
@@ -402,5 +406,60 @@ async fn announce_with_tampered_signature_bytes_accepted_phase_2c_limitation() {
         "Phase 2c detached-signature + structural-only verify accepts \
          byte-flipped sigs; flip to !accepted when Phase 2b Ed25519 verify \
          lands (see test docstring).",
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Task A.9 — Identity handshake (P0)
+//
+// After two peers connect, the /elohim/identity/handshake/1.0.0 protocol
+// fires automatically on ConnectionEstablished. Each peer sends the other
+// its signed AgentPeerBinding. The receiver verifies structural integrity
+// and validity window, then inserts into `peer_identity_bindings` with
+// source='handshake'.
+//
+// This test asserts: after node_a dials node_b and they both complete the
+// handshake, peer B's HolochainBackedPeerIdentityMap resolves peer A's
+// PeerId to CallerIdentity::Agent(peer_a_agent_cid).
+// ---------------------------------------------------------------------------
+
+/// `HANDSHAKE_SETTLE` gives both peers time to exchange the handshake and
+/// write the DB row before the assertion.
+const HANDSHAKE_SETTLE: Duration = Duration::from_millis(500);
+
+#[tokio::test]
+async fn identity_handshake_populates_peer_identity_map_on_connect() {
+    let node_a = spawn_test_node("a").await;
+    let node_b = spawn_test_node("b").await;
+
+    node_a.dial(node_b.addr()).await.expect("dial");
+    tokio::time::sleep(DIAL_SETTLE).await;
+    node_a
+        .wait_for_connection(&node_b.peer_id(), CONNECT_WAIT)
+        .await;
+
+    // Wait for the handshake to complete and the DB rows to be written.
+    tokio::time::sleep(HANDSHAKE_SETTLE).await;
+
+    // Verify: node_b's identity map resolves node_a's PeerId → Agent(agent_cid_a).
+    // `node_b.lookup_peer_identity(&node_a.peer_id())` reads from node_b's
+    // peer_identity_bindings table via HolochainBackedPeerIdentityMap.
+    let identity_a_from_b = node_b.lookup_peer_identity(&node_a.peer_id()).await;
+    assert!(
+        matches!(
+            &identity_a_from_b,
+            CallerIdentity::Agent(cid) if cid == &node_a.agent_cid()
+        ),
+        "peer B should resolve peer A's identity as Agent after handshake, got: {identity_a_from_b:?}",
+    );
+
+    // Symmetry: node_a's identity map resolves node_b's PeerId → Agent(agent_cid_b).
+    let identity_b_from_a = node_a.lookup_peer_identity(&node_b.peer_id()).await;
+    assert!(
+        matches!(
+            &identity_b_from_a,
+            CallerIdentity::Agent(cid) if cid == &node_b.agent_cid()
+        ),
+        "peer A should resolve peer B's identity as Agent after handshake, got: {identity_b_from_a:?}",
     );
 }

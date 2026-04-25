@@ -31,6 +31,7 @@
 pub mod behaviour;
 pub mod epr_atom_protocol;
 pub mod epr_protocol;
+pub mod identity_handshake;
 pub mod identity_map;
 pub mod kad_store;
 pub mod recovery_invitation;
@@ -1660,6 +1661,41 @@ impl P2PNode {
                         .behaviour_mut()
                         .trust_protocol
                         .send_request(&peer_id, handshake);
+
+                    // Trigger identity handshake (/elohim/identity/handshake/1.0.0)
+                    // Category C — session-local projection of AgentPeerBinding DHT state.
+                    // The receiver verifies structural integrity + validity window, then
+                    // inserts into peer_identity_bindings with source='handshake'.
+                    debug!(peer = %peer_id, "Sending identity handshake");
+                    let now_iso = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
+                    let nonce = {
+                        let n = uuid::Uuid::new_v4();
+                        base64::Engine::encode(
+                            &base64::engine::general_purpose::STANDARD,
+                            n.as_bytes(),
+                        )
+                    };
+                    let identity_request = identity_handshake::IdentityHandshakeRequest {
+                        binding: identity_handshake::HandshakeBindingPayload {
+                            peer_id: self.identity.peer_id().to_base58(),
+                            agent_cid: self.identity.agent_pubkey().to_string(),
+                            valid_from: "2026-01-01T00:00:00Z".to_string(),
+                            valid_until: None,
+                            device_archetype: "node".to_string(),
+                            // Stage 1: structural non-empty sentinel; full Ed25519 sign is Stage 3.
+                            signature: base64::Engine::encode(
+                                &base64::engine::general_purpose::STANDARD,
+                                self.identity.peer_id().to_base58().as_bytes(),
+                            ),
+                            dht_anchor_hash: None,
+                        },
+                        timestamp: now_iso,
+                        nonce,
+                    };
+                    swarm
+                        .behaviour_mut()
+                        .identity_handshake
+                        .send_request(&peer_id, identity_request);
                 }
                 self.refresh_status().await;
             }
@@ -2243,6 +2279,148 @@ impl P2PNode {
                 request_response::Event::ResponseSent { peer, .. },
             ) => {
                 debug!(peer = %peer, "Trust response sent");
+            }
+
+            // === Identity handshake events (/elohim/identity/handshake/1.0.0) ===
+            behaviour::ElohimStorageBehaviourEvent::IdentityHandshake(
+                request_response::Event::Message { peer, message },
+            ) => match message {
+                request_response::Message::Request {
+                    request, channel, ..
+                } => {
+                    debug!(
+                        peer = %peer,
+                        agent_cid = %request.binding.agent_cid,
+                        "Received identity handshake"
+                    );
+                    let now_iso = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
+                    let peer_id_str = peer.to_base58();
+                    let response = match identity_handshake::verify_handshake_request(
+                        &request,
+                        &peer_id_str,
+                        &now_iso,
+                    ) {
+                        identity_handshake::VerifyOutcome::Invalid(reason) => {
+                            info!(
+                                peer = %peer,
+                                reason = %reason,
+                                "Identity handshake rejected"
+                            );
+                            identity_handshake::IdentityHandshakeResponse::Rejected { reason }
+                        }
+                        identity_handshake::VerifyOutcome::Valid => {
+                            // Insert into peer_identity_bindings with source='handshake'.
+                            let b = &request.binding;
+                            let dht_anchor_hash = b.dht_anchor_hash.clone().unwrap_or_else(|| {
+                                identity_handshake::synthesise_dht_anchor_hash(
+                                    &b.peer_id,
+                                    &b.agent_cid,
+                                )
+                            });
+                            let row = crate::db::models::NewPeerIdentityBindingRow {
+                                peer_id: peer_id_str.clone(),
+                                agent_cid: b.agent_cid.clone(),
+                                dht_anchor_hash,
+                                valid_from: b.valid_from.clone(),
+                                valid_until: b.valid_until.clone(),
+                                observed_at: now_iso,
+                                source: "handshake".to_string(),
+                            };
+                            match self.db_pool.as_ref() {
+                                Some(pool) => match pool.get() {
+                                    Ok(mut conn) => {
+                                        match crate::db::peer_identity_bindings::upsert(
+                                            &mut conn, &row,
+                                        ) {
+                                            Ok(()) => {
+                                                debug!(
+                                                    peer = %peer,
+                                                    agent_cid = %b.agent_cid,
+                                                    "Identity handshake: binding recorded"
+                                                );
+                                                identity_handshake::IdentityHandshakeResponse::Accepted
+                                            }
+                                            Err(e) => {
+                                                warn!(
+                                                    peer = %peer,
+                                                    error = %e,
+                                                    "Identity handshake: db upsert failed"
+                                                );
+                                                identity_handshake::IdentityHandshakeResponse::Error(
+                                                    format!("db error: {e}"),
+                                                )
+                                            }
+                                        }
+                                    }
+                                    Err(e) => {
+                                        warn!(
+                                            peer = %peer,
+                                            error = %e,
+                                            "Identity handshake: pool exhausted"
+                                        );
+                                        identity_handshake::IdentityHandshakeResponse::Error(
+                                            "pool exhausted".to_string(),
+                                        )
+                                    }
+                                },
+                                None => {
+                                    // No pool configured — accept but do not persist.
+                                    debug!(
+                                        peer = %peer,
+                                        "Identity handshake: no db_pool configured, skipping persistence"
+                                    );
+                                    identity_handshake::IdentityHandshakeResponse::Accepted
+                                }
+                            }
+                        }
+                    };
+                    let mut swarm = self.swarm.write().await;
+                    if let Err(e) = swarm
+                        .behaviour_mut()
+                        .identity_handshake
+                        .send_response(channel, response)
+                    {
+                        warn!(peer = %peer, error = ?e, "Failed to send identity handshake response");
+                    }
+                }
+                request_response::Message::Response { response, .. } => match response {
+                    identity_handshake::IdentityHandshakeResponse::Accepted => {
+                        debug!(peer = %peer, "Identity handshake accepted by remote");
+                    }
+                    identity_handshake::IdentityHandshakeResponse::Rejected { reason } => {
+                        info!(
+                            peer = %peer,
+                            reason = %reason,
+                            "Remote rejected our identity handshake"
+                        );
+                    }
+                    identity_handshake::IdentityHandshakeResponse::Error(msg) => {
+                        warn!(peer = %peer, error = %msg, "Remote error on identity handshake");
+                    }
+                },
+            },
+            behaviour::ElohimStorageBehaviourEvent::IdentityHandshake(
+                request_response::Event::OutboundFailure { peer, error, .. },
+            ) => {
+                debug!(
+                    peer = %peer,
+                    error = ?error,
+                    "Identity handshake outbound failure"
+                );
+            }
+            behaviour::ElohimStorageBehaviourEvent::IdentityHandshake(
+                request_response::Event::InboundFailure { peer, error, .. },
+            ) => {
+                debug!(
+                    peer = %peer,
+                    error = ?error,
+                    "Identity handshake inbound failure"
+                );
+            }
+            behaviour::ElohimStorageBehaviourEvent::IdentityHandshake(
+                request_response::Event::ResponseSent { peer, .. },
+            ) => {
+                debug!(peer = %peer, "Identity handshake response sent");
             }
 
             // === NAT traversal events ===
