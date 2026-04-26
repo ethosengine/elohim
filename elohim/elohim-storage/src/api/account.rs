@@ -494,6 +494,80 @@ async fn get_portal_hosts(
 }
 
 // ---------------------------------------------------------------------------
+// Phase 11: mode gate + 503 contracts
+// ---------------------------------------------------------------------------
+
+/// Asserts the caller's resolved agent key matches the connected cell's
+/// owner. The Tauri-direct invariant — when matched, the imagodei zome
+/// will see the human as caller (cell owner == caller per the provenance
+/// note in this module's doc).
+///
+/// `Err(Response<...>)` is returned with `503 BROWSER_WRITE_PATH_PENDING`
+/// when the keys do not match — the browser-via-doorway path that lands
+/// in M6 once the hosting trust model is settled.
+///
+/// The `Response<Full<Bytes>>` in the `Err` variant is intentionally large —
+/// it is the early-exit response that route handlers return directly to the
+/// caller, avoiding an unwrap chain. Boxing would break the uniform response
+/// pattern used by every handler in this module.
+#[allow(dead_code, clippy::result_large_err)]
+fn verify_caller_owns_cell(
+    owner: &dyn crate::hc_client::CellOwner,
+    agent_key: &str,
+) -> Result<(), Response<Full<Bytes>>> {
+    if owner.agent_key_hex() != agent_key {
+        return Err(response_503_browser_write_path_pending());
+    }
+    Ok(())
+}
+
+/// Pure body builder for the BROWSER_WRITE_PATH_PENDING 503 contract.
+/// Extracted so unit tests can assert against the JSON Value directly
+/// without setting up async machinery to read a hyper Body.
+#[allow(dead_code)]
+fn browser_write_path_pending_body() -> serde_json::Value {
+    serde_json::json!({
+        "error": "browser write path not yet implemented",
+        "code": "BROWSER_WRITE_PATH_PENDING",
+        "message": "Self-sovereign writes require a peer the human controls. \
+                    The browser-via-doorway write path is deferred to M6 where \
+                    the hosting trust model is settled."
+    })
+}
+
+/// 503 response for the browser-via-doorway write path (M6+).
+#[allow(dead_code)]
+fn response_503_browser_write_path_pending() -> Response<Full<Bytes>> {
+    response::json_response(
+        hyper::StatusCode::SERVICE_UNAVAILABLE,
+        &browser_write_path_pending_body(),
+    )
+}
+
+/// Pure body builder for the IMAGODEI_BRIDGE_OFFLINE 503 contract.
+#[allow(dead_code)]
+fn imagodei_bridge_offline_body() -> serde_json::Value {
+    serde_json::json!({
+        "error": "imagodei bridge offline",
+        "code": "IMAGODEI_BRIDGE_OFFLINE",
+        "message": "The storage process did not connect to the imagodei \
+                    coordinator zome at startup. Account write routes are \
+                    unavailable until storage restarts with the imagodei DNA \
+                    installed."
+    })
+}
+
+/// 503 response when the imagodei HcClient failed to connect at startup.
+/// Recovery: restart storage with the imagodei DNA installed.
+#[allow(dead_code)]
+fn response_503_imagodei_bridge_offline() -> Response<Full<Bytes>> {
+    response::json_response(
+        hyper::StatusCode::SERVICE_UNAVAILABLE,
+        &imagodei_bridge_offline_body(),
+    )
+}
+
+// ---------------------------------------------------------------------------
 // Phase 11 stub: zome bridge not yet wired
 // ---------------------------------------------------------------------------
 
@@ -556,6 +630,48 @@ fn extract_agent_key(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    use crate::hc_client::CellOwner;
+
+    struct StubOwner(&'static str);
+    impl CellOwner for StubOwner {
+        fn agent_key_hex(&self) -> String {
+            self.0.to_string()
+        }
+    }
+
+    /// When the caller's resolved agent key matches the connected cell's
+    /// owner (Tauri-direct invariant), the gate returns Ok.
+    #[test]
+    fn verify_caller_owns_cell_passes_when_keys_match() {
+        let owner = StubOwner("uhCAkMATCH");
+        let result = verify_caller_owns_cell(&owner, "uhCAkMATCH");
+        assert!(result.is_ok(), "expected Ok when keys match");
+    }
+
+    /// On mismatch, the gate returns Err. Verify by inspecting the body
+    /// helper directly (avoids async test machinery for body extraction).
+    #[test]
+    fn verify_caller_owns_cell_returns_browser_pending_on_mismatch() {
+        let owner = StubOwner("uhCAkOWNER");
+        let result = verify_caller_owns_cell(&owner, "uhCAkCALLER");
+        let resp = result.expect_err("expected Err with 503 response");
+        assert_eq!(resp.status(), hyper::StatusCode::SERVICE_UNAVAILABLE);
+
+        // Body contents are asserted via the body-builder pure function.
+        let body = browser_write_path_pending_body();
+        assert_eq!(body["code"], "BROWSER_WRITE_PATH_PENDING");
+    }
+
+    /// IMAGODEI_BRIDGE_OFFLINE response has the correct status and code.
+    #[test]
+    fn imagodei_bridge_offline_response_has_correct_code() {
+        let resp = response_503_imagodei_bridge_offline();
+        assert_eq!(resp.status(), hyper::StatusCode::SERVICE_UNAVAILABLE);
+
+        let body = imagodei_bridge_offline_body();
+        assert_eq!(body["code"], "IMAGODEI_BRIDGE_OFFLINE");
+    }
 
     /// The zome bridge stub must return 503 with a machine-readable error body
     /// so Angular can surface "conductor bridge not available" instead of an
