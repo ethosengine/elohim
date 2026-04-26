@@ -29,12 +29,13 @@
 import { strict as assert } from 'node:assert';
 
 import { Given, When, Then } from '@cucumber/cucumber';
+
 import { request } from 'undici';
 
 import { PlaywrightDevice } from '../../src/framework/devices/playwright-device.js';
-import { E2EWorld } from '../../src/framework/world.js';
 import { AccountShellPage } from '../../src/framework/pages/account/account-shell.page.js';
 import { SecuritySigninPane } from '../../src/framework/pages/account/security-signin-pane.page.js';
+import { E2EWorld } from '../../src/framework/world.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -114,11 +115,14 @@ async function rawPost(
  * a specific fixture human, because the M5 feature files describe the role,
  * not the person.
  */
-Given('I am authenticated as a hosted human with a graduated steward presence', function (this: E2EWorld) {
-  // Precondition acknowledgement — auth state established by fixture-humans steps
-  // or by the browser session already being authenticated.
-  // No additional setup needed at this level.
-});
+Given(
+  'I am authenticated as a hosted human with a graduated steward presence',
+  function (this: E2EWorld) {
+    // Precondition acknowledgement — auth state established by fixture-humans steps
+    // or by the browser session already being authenticated.
+    // No additional setup needed at this level.
+  }
+);
 
 Given(
   'my AccountView includes one active KeyRotation and zero recent KeyRevocations',
@@ -188,13 +192,10 @@ Given(
   }
 );
 
-Given(
-  'the portal host responds to /healthz with 200',
-  function (this: E2EWorld) {
-    // Precondition: test environment has a reachable portal host stub.
-    // This is verified by the redirect scenario assertion.
-  }
-);
+Given('the portal host responds to /healthz with 200', function (this: E2EWorld) {
+  // Precondition: test environment has a reachable portal host stub.
+  // This is verified by the redirect scenario assertion.
+});
 
 Given('my portal host does not respond to /healthz', function (this: E2EWorld) {
   // Precondition: portal host is unreachable — doorway falls through to hosted view.
@@ -205,14 +206,11 @@ Given('I am authenticated as a steward', function (this: E2EWorld) {
   // Portal-host-discovery feature — steward auth precondition.
 });
 
-Given(
-  'the calling elohim-agent has no DefenderManifest configured',
-  function (this: E2EWorld) {
-    // Defender-role-gate: API-only scenario.
-    // No DefenderManifest means the coordinator should reject the call.
-    this.contentIds.set('defenderManifest', 'none');
-  }
-);
+Given('the calling elohim-agent has no DefenderManifest configured', function (this: E2EWorld) {
+  // Defender-role-gate: API-only scenario.
+  // No DefenderManifest means the coordinator should reject the call.
+  this.contentIds.set('defenderManifest', 'none');
+});
 
 Given(
   'the calling elohim-agent has a DefenderManifest listing the target human',
@@ -253,14 +251,17 @@ Then('I see the {string} pane title', async function (this: E2EWorld, paneTitleT
   await title.waitFor({ state: 'visible', timeout: 10_000 });
 });
 
-Then('I see my active key listed under {string}', async function (this: E2EWorld, _sectionTitle: string) {
-  const device = requirePlaywright(this);
-  if (!device) return 'pending';
+Then(
+  'I see my active key listed under {string}',
+  async function (this: E2EWorld, _sectionTitle: string) {
+    const device = requirePlaywright(this);
+    if (!device) return 'pending';
 
-  const shell = new AccountShellPage(device.page);
-  const visible = await shell.isActiveKeyVisible();
-  assert.ok(visible, 'Expected the active key card to be visible under "My keys"');
-});
+    const shell = new AccountShellPage(device.page);
+    const visible = await shell.isActiveKeyVisible();
+    assert.ok(visible, 'Expected the active key card to be visible under "My keys"');
+  }
+);
 
 Then('the active key shows its rotation date', async function (this: E2EWorld) {
   const device = requirePlaywright(this);
@@ -274,21 +275,24 @@ Then('the active key shows its rotation date', async function (this: E2EWorld) {
   // A more specific assertion requires knowing the fixture's rotatedAt value.
 });
 
-Then('I see the revoked key under {string}', async function (this: E2EWorld, _sectionTitle: string) {
-  const device = requirePlaywright(this);
-  if (!device) return 'pending';
+Then(
+  'I see the revoked key under {string}',
+  async function (this: E2EWorld, _sectionTitle: string) {
+    const device = requirePlaywright(this);
+    if (!device) return 'pending';
 
-  // The revoked key card uses data-testid="revoked-{dhtAnchorHash}".
-  // In absence of a known hash from a fixture, we verify at least one
-  // element with the "revoked-" prefix exists in the key list section.
-  const pane = new SecuritySigninPane(device.page);
-  const keysVisible = await pane.isMyKeysSectionVisible();
-  assert.ok(keysVisible, 'Expected "My keys" section to be visible');
+    // The revoked key card uses data-testid="revoked-{dhtAnchorHash}".
+    // In absence of a known hash from a fixture, we verify at least one
+    // element with the "revoked-" prefix exists in the key list section.
+    const pane = new SecuritySigninPane(device.page);
+    const keysVisible = await pane.isMyKeysSectionVisible();
+    assert.ok(keysVisible, 'Expected "My keys" section to be visible');
 
-  // Verify at least one revoked key card is present
-  const revokedCards = await device.page.locator('[data-testid^="revoked-"]').count();
-  assert.ok(revokedCards > 0, 'Expected at least one revoked key card to be visible');
-});
+    // Verify at least one revoked key card is present
+    const revokedCards = await device.page.locator('[data-testid^="revoked-"]').count();
+    assert.ok(revokedCards > 0, 'Expected at least one revoked key card to be visible');
+  }
+);
 
 Then(
   'the revoked key is labelled with triggerType {string}',
@@ -318,7 +322,10 @@ Then(
     // The card must render some content — it derives from KeyRotation.newAgentPubkey.
     // We can't assert the exact pubkey value without the fixture data, but we verify
     // the card is populated (non-empty, non-placeholder).
-    assert.ok(text && text.trim().length > 0, 'Active key card is empty — newAgentPubkey not rendered');
+    assert.ok(
+      text && text.trim().length > 0,
+      'Active key card is empty — newAgentPubkey not rendered'
+    );
   }
 );
 
@@ -383,36 +390,35 @@ When(
   }
 );
 
-Then(
-  'the POST to /api/v1/account/self-revocation returns 503',
-  async function (this: E2EWorld) {
-    // This step verifies the M5 reality: the endpoint returns 503 PHASE_11_PENDING.
-    // The browser step (clicking "Revoke this key" + "Yes, revoke") already triggered
-    // the request. We validate the UI received and displayed the error (see next step).
-    // For the HTTP mode variant, we issue the raw call and check the status directly.
-    if (this.deviceMode !== 'playwright') {
-      const doorwayUrl = requireDoorwayUrl(this);
-      const token = getFirstAuthToken(this);
-      const result = await rawPost(doorwayUrl, '/api/v1/account/self-revocation', {}, token);
-      this.contentIds.set('lastStatusCode', String(result.statusCode));
-      this.contentIds.set('lastResponseBody', result.body);
-      assert.strictEqual(
-        result.statusCode,
-        503,
-        `Expected 503 but got ${result.statusCode}: ${result.body}`
-      );
-    } else {
-      // In Playwright mode, the button click already triggered the POST.
-      // Store the expected code for the error message assertion.
-      this.contentIds.set('lastStatusCode', '503');
-    }
+Then('the POST to /api/v1/account/self-revocation returns 503', async function (this: E2EWorld) {
+  // This step verifies the M5 reality: the endpoint returns 503 PHASE_11_PENDING.
+  // The browser step (clicking "Revoke this key" + "Yes, revoke") already triggered
+  // the request. We validate the UI received and displayed the error (see next step).
+  // For the HTTP mode variant, we issue the raw call and check the status directly.
+  if (this.deviceMode === 'playwright') {
+    // In Playwright mode, the button click already triggered the POST.
+    // Store the expected code for the error message assertion.
+    this.contentIds.set('lastStatusCode', '503');
+  } else {
+    const doorwayUrl = requireDoorwayUrl(this);
+    const token = getFirstAuthToken(this);
+    const result = await rawPost(doorwayUrl, '/api/v1/account/self-revocation', {}, token);
+    this.contentIds.set('lastStatusCode', String(result.statusCode));
+    this.contentIds.set('lastResponseBody', result.body);
+    assert.strictEqual(
+      result.statusCode,
+      503,
+      `Expected 503 but got ${result.statusCode}: ${result.body}`
+    );
   }
-);
+});
 
 Then(
   'the POST to /api/v1/account/recovery/{string}/vote returns 503',
   async function (this: E2EWorld, _pathParam: string) {
-    if (this.deviceMode !== 'playwright') {
+    if (this.deviceMode === 'playwright') {
+      this.contentIds.set('lastStatusCode', '503');
+    } else {
       const doorwayUrl = requireDoorwayUrl(this);
       const token = getFirstAuthToken(this);
       // Use a wildcard-style path — actual hash not known at step time
@@ -429,8 +435,6 @@ Then(
         503,
         `Expected 503 but got ${result.statusCode}: ${result.body}`
       );
-    } else {
-      this.contentIds.set('lastStatusCode', '503');
     }
   }
 );
@@ -491,7 +495,7 @@ Then(
   }
 );
 
-Then('the KeyRevocation entry contains a revokedKey field', async function (this: E2EWorld) {
+Then('the KeyRevocation entry contains a revokedKey field', function (this: E2EWorld) {
   // Phase-11-pending — verifies DTO field name contract once the bridge is wired.
   // The UI renders the revokedKey value in the revoked key card.
   const device = requirePlaywright(this);
@@ -499,7 +503,7 @@ Then('the KeyRevocation entry contains a revokedKey field', async function (this
   // Verified transitively by the key card having content (non-empty revoked key display)
 });
 
-Then('the KeyRevocation entry contains a createdAt field', async function (this: E2EWorld) {
+Then('the KeyRevocation entry contains a createdAt field', function (this: E2EWorld) {
   // Phase-11-pending — verifies the createdAt timestamp is surfaced in the UI.
   const device = requirePlaywright(this);
   if (!device) return 'pending';
@@ -538,7 +542,10 @@ Then('no KeyRevocation entry is committed', async function (this: E2EWorld) {
   // Allow a moment for any pending network request to resolve, then verify no error
   await device.page.waitForTimeout(2000);
   const errorVisible = await shell.isSelfRevokeErrorVisible();
-  assert.ok(!errorVisible, 'Revocation error appeared after clicking Cancel — cancel did not abort');
+  assert.ok(
+    !errorVisible,
+    'Revocation error appeared after clicking Cancel — cancel did not abort'
+  );
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -627,10 +634,9 @@ Then('I am redirected to /identity/recover', async function (this: E2EWorld) {
   const device = requirePlaywright(this);
   if (!device) return 'pending';
 
-  await device.page.waitForURL(
-    (url: URL) => url.pathname.includes('/identity/recover'),
-    { timeout: 15_000 }
-  );
+  await device.page.waitForURL((url: URL) => url.pathname.includes('/identity/recover'), {
+    timeout: 15_000,
+  });
   const currentUrl = device.page.url();
   assert.ok(
     currentUrl.includes('/identity/recover'),
@@ -642,27 +648,24 @@ Then('I am redirected to /identity/recover', async function (this: E2EWorld) {
 // doorway-handoff-to-steward — portal host redirect
 // ─────────────────────────────────────────────────────────────────────────────
 
-Then(
-  'I see a {string} button',
-  async function (this: E2EWorld, buttonLabel: string) {
-    const device = requirePlaywright(this);
-    if (!device) return 'pending';
+Then('I see a {string} button', async function (this: E2EWorld, buttonLabel: string) {
+  const device = requirePlaywright(this);
+  if (!device) return 'pending';
 
-    // Map known button labels to testid selectors
-    const labelToTestId: Record<string, string> = {
-      'Manage from your steward →': 'portal-host-redirect',
-    };
+  // Map known button labels to testid selectors
+  const labelToTestId: Record<string, string> = {
+    'Manage from your steward →': 'portal-host-redirect',
+  };
 
-    const testId = labelToTestId[buttonLabel];
-    if (testId) {
-      const btn = device.page.locator(`[data-testid="${testId}"]`);
-      await btn.waitFor({ state: 'visible', timeout: 10_000 });
-    } else {
-      const btn = device.page.getByRole('button', { name: buttonLabel, exact: false }).first();
-      await btn.waitFor({ state: 'visible', timeout: 10_000 });
-    }
+  const testId = labelToTestId[buttonLabel];
+  if (testId) {
+    const btn = device.page.locator(`[data-testid="${testId}"]`);
+    await btn.waitFor({ state: 'visible', timeout: 10_000 });
+  } else {
+    const btn = device.page.getByRole('button', { name: buttonLabel, exact: false }).first();
+    await btn.waitFor({ state: 'visible', timeout: 10_000 });
   }
-);
+});
 
 // Note: 'I click "Manage from your steward →"' is handled by the generic
 // "I click {string}" step defined earlier in this file.
@@ -675,8 +678,7 @@ Then(
 
     const portalHostUrl = this.contentIds.get('portalHostUrl') ?? '';
     await device.page.waitForURL(
-      (url: URL) =>
-        url.href.startsWith(portalHostUrl) && url.searchParams.has('session_token'),
+      (url: URL) => url.href.startsWith(portalHostUrl) && url.searchParams.has('session_token'),
       { timeout: 15_000 }
     );
     const currentUrl = device.page.url();
@@ -688,16 +690,13 @@ Then(
   }
 );
 
-Then(
-  "elohim-app's account-guard consumes the session_token",
-  async function (this: E2EWorld) {
-    const device = requirePlaywright(this);
-    if (!device) return 'pending';
-    // The account-guard exchanges the session_token automatically on load.
-    // Verified transitively by landing on /account/security authenticated (next step).
-    await device.page.waitForLoadState('networkidle');
-  }
-);
+Then("elohim-app's account-guard consumes the session_token", async function (this: E2EWorld) {
+  const device = requirePlaywright(this);
+  if (!device) return 'pending';
+  // The account-guard exchanges the session_token automatically on load.
+  // Verified transitively by landing on /account/security authenticated (next step).
+  await device.page.waitForLoadState('networkidle');
+});
 
 Then(
   'I land on /account/security authenticated as the same identity',
@@ -705,10 +704,9 @@ Then(
     const device = requirePlaywright(this);
     if (!device) return 'pending';
 
-    await device.page.waitForURL(
-      (url: URL) => url.pathname.includes('/account/security'),
-      { timeout: 15_000 }
-    );
+    await device.page.waitForURL((url: URL) => url.pathname.includes('/account/security'), {
+      timeout: 15_000,
+    });
     const currentUrl = device.page.url();
     assert.ok(
       currentUrl.includes('/account/security'),
@@ -721,35 +719,36 @@ Then(
   }
 );
 
-Then(
-  'I do NOT see the {string} button',
-  async function (this: E2EWorld, buttonLabel: string) {
-    const device = requirePlaywright(this);
-    if (!device) return 'pending';
+Then('I do NOT see the {string} button', async function (this: E2EWorld, buttonLabel: string) {
+  const device = requirePlaywright(this);
+  if (!device) return 'pending';
 
-    const labelToTestId: Record<string, string> = {
-      'Manage from your steward →': 'portal-host-redirect',
-    };
+  const labelToTestId: Record<string, string> = {
+    'Manage from your steward →': 'portal-host-redirect',
+  };
 
-    const testId = labelToTestId[buttonLabel];
-    await device.page.waitForLoadState('networkidle');
+  const testId = labelToTestId[buttonLabel];
+  await device.page.waitForLoadState('networkidle');
 
-    if (testId) {
-      const count = await device.page.locator(`[data-testid="${testId}"]`).count();
-      assert.strictEqual(
-        count,
-        0,
-        `Expected "${buttonLabel}" button to be absent but it was visible`
-      );
-    } else {
-      const btn = device.page.getByRole('button', { name: buttonLabel, exact: false });
-      const count = await btn.count();
-      assert.strictEqual(count, 0, `Expected "${buttonLabel}" button to be absent but it was visible`);
-    }
+  if (testId) {
+    const count = await device.page.locator(`[data-testid="${testId}"]`).count();
+    assert.strictEqual(
+      count,
+      0,
+      `Expected "${buttonLabel}" button to be absent but it was visible`
+    );
+  } else {
+    const btn = device.page.getByRole('button', { name: buttonLabel, exact: false });
+    const count = await btn.count();
+    assert.strictEqual(
+      count,
+      0,
+      `Expected "${buttonLabel}" button to be absent but it was visible`
+    );
   }
-);
+});
 
-Then('I see the existing hosted account view', async function (this: E2EWorld) {
+Then('I see the existing hosted account view', function (this: E2EWorld) {
   const device = requirePlaywright(this);
   if (!device) return 'pending';
 
@@ -796,39 +795,36 @@ Then('the response is 200 with the new PortalHostView', function (this: E2EWorld
   assert.ok(view['addedAt'], 'PortalHostView missing addedAt field');
 });
 
-Then(
-  '/api/v1/account/portal-hosts returns the host in the list',
-  async function (this: E2EWorld) {
-    const doorwayUrl = requireDoorwayUrl(this);
-    const token = getFirstAuthToken(this);
-    const headers: Record<string, string> = {};
-    if (token) headers['authorization'] = `Bearer ${token}`;
+Then('/api/v1/account/portal-hosts returns the host in the list', async function (this: E2EWorld) {
+  const doorwayUrl = requireDoorwayUrl(this);
+  const token = getFirstAuthToken(this);
+  const headers: Record<string, string> = {};
+  if (token) headers['authorization'] = `Bearer ${token}`;
 
-    const { statusCode, body } = await request(
-      `${doorwayUrl}/api/v1/account/portal-hosts`,
-      { method: 'GET', headers }
-    );
-    const text = await body.text();
-    assert.strictEqual(statusCode, 200, `GET portal-hosts returned ${statusCode}: ${text}`);
+  const { statusCode, body } = await request(`${doorwayUrl}/api/v1/account/portal-hosts`, {
+    method: 'GET',
+    headers,
+  });
+  const text = await body.text();
+  assert.strictEqual(statusCode, 200, `GET portal-hosts returned ${statusCode}: ${text}`);
 
-    const list = JSON.parse(text) as unknown[];
-    assert.ok(Array.isArray(list) && list.length > 0, 'Expected at least one portal host in the list');
-  }
-);
+  const list = JSON.parse(text) as unknown[];
+  assert.ok(
+    Array.isArray(list) && list.length > 0,
+    'Expected at least one portal host in the list'
+  );
+});
 
-Then(
-  'the response is 400 with an error mentioning https',
-  function (this: E2EWorld) {
-    const code = this.contentIds.get('lastStatusCode');
-    assert.strictEqual(code, '400', `Expected 400 but got ${code ?? '(none)'}`);
+Then('the response is 400 with an error mentioning https', function (this: E2EWorld) {
+  const code = this.contentIds.get('lastStatusCode');
+  assert.strictEqual(code, '400', `Expected 400 but got ${code ?? '(none)'}`);
 
-    const body = this.contentIds.get('lastResponseBody') ?? '';
-    assert.ok(
-      body.toLowerCase().includes('https'),
-      `Expected error body to mention https, got: ${body}`
-    );
-  }
-);
+  const body = this.contentIds.get('lastResponseBody') ?? '';
+  assert.ok(
+    body.toLowerCase().includes('https'),
+    `Expected error body to mention https, got: ${body}`
+  );
+});
 
 // ─────────────────────────────────────────────────────────────────────────────
 // defender-role-gate — API-only, no browser required

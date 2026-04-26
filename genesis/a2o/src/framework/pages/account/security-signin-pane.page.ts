@@ -11,6 +11,7 @@
  */
 
 import { BasePage } from '../base.page.js';
+
 import { ACCOUNT_SHELL } from './account-shell.page.js';
 
 export class SecuritySigninPane extends BasePage {
@@ -81,7 +82,10 @@ export class SecuritySigninPane extends BasePage {
   /**
    * Check whether the revoked key card mentions the given triggerType label.
    */
-  async revokedKeyMentionsTriggerType(dhtAnchorHash: string, triggerType: string): Promise<boolean> {
+  async revokedKeyMentionsTriggerType(
+    dhtAnchorHash: string,
+    triggerType: string
+  ): Promise<boolean> {
     const text = await this.revokedKeyText(dhtAnchorHash);
     return text?.includes(triggerType) ?? false;
   }
