@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/consistent-indexed-object-style */
 /* Generated from protocol schema: views/key-revocation.schema.json -- DO NOT EDIT */
 
 /**

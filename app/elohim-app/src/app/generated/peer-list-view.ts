@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/consistent-indexed-object-style */
 /* Generated from protocol schema: views/peer-list-view.schema.json -- DO NOT EDIT */
 
 /**
