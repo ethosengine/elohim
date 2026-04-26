@@ -45,12 +45,15 @@ pub mod resources;
 pub mod risk;
 pub mod routing;
 pub mod schedules;
+pub mod signal_emit;
 pub mod spatial;
 pub mod steward;
 pub mod steward_affinity;
 pub mod stewardship;
 pub mod token;
 pub mod weather;
+pub mod write_through_admin;
+pub mod write_through_status;
 
 use bytes::Bytes;
 use http_body_util::Full;

@@ -21,6 +21,10 @@ pub use stewardship::*;
 pub mod agent_peer_binding;
 pub use agent_peer_binding::*;
 
+// sign_for_agent coordinator function (EPR Phase 2B, Task C.1)
+pub mod sign_for_agent;
+pub use sign_for_agent::*;
+
 // Bootstrap-steward pattern — reference implementation for the protocol
 // (also ported to mishpat, node-registry, lamad). See bootstrap_steward.rs.
 pub mod bootstrap_steward;

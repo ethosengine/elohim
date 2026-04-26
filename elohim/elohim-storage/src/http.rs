@@ -168,6 +168,13 @@ pub struct HttpServer {
     /// Manifest registry for projector status endpoint.
     /// Wired at startup via `with_manifest_registry`. None = endpoint returns empty cursors.
     manifest_registry: Option<Arc<crate::projector::ManifestRegistry>>,
+    /// Conductor signing client for /api/v1/signal/emit (EPR Phase 2B Task C.2).
+    /// Wired at startup via `with_signing_client`. None = endpoint returns 503.
+    signing_client: Option<Arc<crate::signing::ConductorSigningClient>>,
+    /// Composed write-through state (EPR Phase 2B Task C.4).
+    /// Wired at startup via `with_write_through_state`. When absent, every
+    /// non-integrity (pillar, kind) resolves to OFF (implicit default).
+    write_through_state: Option<Arc<crate::write_through::WriteThroughState>>,
 }
 
 /// Extract X-Schema-Version header from request and validate it.
@@ -224,6 +231,8 @@ impl HttpServer {
             embedded_conductor: false,
             elohim_capability: None,
             manifest_registry: None,
+            signing_client: None,
+            write_through_state: None,
         }
     }
 
@@ -249,6 +258,40 @@ impl HttpServer {
         registry: Arc<crate::projector::ManifestRegistry>,
     ) -> Self {
         self.manifest_registry = Some(registry);
+        self
+    }
+
+    /// Set the conductor signing client for `/api/v1/signal/emit`.
+    ///
+    /// When set, signal-intent payloads are composed into EPR Envelopes,
+    /// signed via the imagodei `sign_for_agent` zome, and ingested. When
+    /// absent, the endpoint returns 503 — storage instances without a
+    /// conductor connection (test fixtures, dev environments) gracefully
+    /// degrade rather than panicking.
+    ///
+    /// EPR Phase 2B Task C.2.
+    pub fn with_signing_client(
+        mut self,
+        client: Arc<crate::signing::ConductorSigningClient>,
+    ) -> Self {
+        self.signing_client = Some(client);
+        self
+    }
+
+    /// Set the composed write-through state (EPR Phase 2B Task C.4).
+    ///
+    /// When set, `GET /api/v1/status/write-through` reports the effective
+    /// per-(pillar, kind) flag composed across all 4 override layers, and
+    /// (Task C.5) the signal-emit endpoint consults it to decide whether to
+    /// project. When absent, the status endpoint reports an empty
+    /// `effective[]` array (registry-derived rows are still included if a
+    /// manifest registry is wired) and the implicit default OFF applies for
+    /// all non-integrity kinds.
+    pub fn with_write_through_state(
+        mut self,
+        state: Arc<crate::write_through::WriteThroughState>,
+    ) -> Self {
+        self.write_through_state = Some(state);
         self
     }
 
@@ -612,6 +655,29 @@ impl HttpServer {
                 }
             }
 
+            // Write-through status — effective per-(pillar, kind) flag composed
+            // across all 4 override layers. Matched before the /api/v1/
+            // catch-all so the registry + state are injected from HttpServer
+            // directly. EPR Phase 2B Task C.4.
+            (Method::GET, "/api/v1/status/write-through") => {
+                let registry = self
+                    .manifest_registry
+                    .clone()
+                    .unwrap_or_else(|| Arc::new(crate::projector::ManifestRegistry::empty()));
+                let state = self
+                    .write_through_state
+                    .clone()
+                    .unwrap_or_else(|| Arc::new(crate::write_through::WriteThroughState::empty()));
+                crate::api::write_through_status::handle(
+                    req,
+                    Method::GET,
+                    "",
+                    &state,
+                    registry.as_ref(),
+                )
+                .await
+            }
+
             // SSE event stream — must be matched before the /api/v1/ catch-all
             (Method::GET, "/api/v1/events") => {
                 if let Some(ref services) = self.services {
@@ -632,6 +698,34 @@ impl HttpServer {
                     return Ok(response.map(Either::Right));
                 } else {
                     Ok(response::service_unavailable("Database not available"))
+                }
+            }
+
+            // Signal-emit endpoint — composes EPR Envelope, signs via conductor,
+            // ingests. Matched before the /api/v1/ catch-all so the manifest
+            // registry + signing client are injected directly from HttpServer
+            // state. EPR Phase 2B Task C.2.
+            (method, "/api/v1/signal/emit") => {
+                if let Some(ref pool) = self.db_pool {
+                    if let Some(ref registry) = self.manifest_registry {
+                        crate::api::signal_emit::handle(
+                            req,
+                            method,
+                            pool,
+                            registry,
+                            self.signing_client.as_ref(),
+                            self.write_through_state.as_ref(),
+                        )
+                        .await
+                    } else {
+                        Ok(response::service_unavailable(
+                            "ManifestRegistry not configured — /api/v1/signal/emit unavailable",
+                        ))
+                    }
+                } else {
+                    Ok(response::service_unavailable(
+                        "Database pool not configured — /api/v1/signal/emit unavailable",
+                    ))
                 }
             }
 
@@ -806,6 +900,16 @@ impl HttpServer {
                     .strip_prefix("/admin/extraction-cache/evict/")
                     .unwrap_or("");
                 self.handle_extraction_cache_evict(slug).await
+            }
+
+            // Admin: replace the layer-4 write-through override.
+            // EPR Phase 2B Task C.6 layer 4 (live admin trigger).
+            (method, "/admin/write-through") => {
+                let state = self
+                    .write_through_state
+                    .clone()
+                    .unwrap_or_else(|| Arc::new(crate::write_through::WriteThroughState::empty()));
+                crate::api::write_through_admin::handle(req, method, &state).await
             }
 
             // Not found
@@ -7189,6 +7293,24 @@ fn correlate_issues(entries: &[crate::db::models::ObservationEntry]) -> Vec<Obse
 /// intentionally omitted — doorway handles them independently or not at all.
 pub fn build_manifest() -> doorway_client::DoorwayRoutes {
     DoorwayRoutesBuilder::new()
+        // =====================================================================
+        // /api/v1/signal — EPR signal emission (browser → conductor → ingest)
+        // =====================================================================
+        .route(
+            Route::post("/api/v1/signal/emit")
+                .handler("signal_emit")
+                .auth_required()
+                .build(),
+        )
+        // =====================================================================
+        // /api/v1/status — Operator status views (write-through, projector)
+        // =====================================================================
+        .route(
+            Route::get("/api/v1/status/write-through")
+                .handler("write_through_status")
+                .cache_ttl(5)
+                .build(),
+        )
         // =====================================================================
         // /api/v1/mastery — Content mastery lifecycle
         // =====================================================================

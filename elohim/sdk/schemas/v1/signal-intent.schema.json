@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "epr:schema:signal-intent",
+  "title": "SignalIntent",
+  "description": "Operational RPC request payload (Category C) for POST /api/v1/signal/emit (EPR Phase 2B Batch C). Browsers cannot sign EPRs in-process — agent keys live in the conductor's lair, not in the browser. The signal harness emits a SignalIntent describing what the renderer observed; elohim-storage looks up the pillar manifest, composes an EPR Envelope, requests a signature via the imagodei sign_for_agent zome (see conductor-signing.schema.json), and ingests the resulting Envelope through EprService::ingest_with_cache. The transient HTTP payload is Category C; the resulting persisted Envelope is Category A. Per memory pin project_epr_substrate_vs_vf_graphql, this contract is graph-substrate-primitive and must NOT couple to VF-GraphQL semantics — pillar-specific vocabularies are app-layer (Phase 4).",
+  "type": "object",
+  "required": ["pillar", "signalType", "agentCid", "payload", "couplingRefs"],
+  "additionalProperties": false,
+  "properties": {
+    "pillar": {
+      "type": "string",
+      "enum": ["lamad", "shefa", "imagodei", "mishpat", "qahal"],
+      "description": "Pillar that authored this signal. Drives manifest lookup for kind + schema_key + projection mapping."
+    },
+    "signalType": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Pillar-defined signal name (e.g., 'rendererCompletion', 'attestationIssued'). Maps to an EPR kind via the pillar's manifest."
+    },
+    "agentCid": {
+      "type": "string",
+      "minLength": 1,
+      "description": "CIDv1 of the Agent EPR who authored this signal. Storage requests a signature under this agent's key (signer-match gate enforces caller == agent_cid; see conductor-signing.schema.json)."
+    },
+    "payload": {
+      "type": "object",
+      "description": "Pillar-specific signal payload. The pillar's manifest declares the schema this payload conforms to; storage encodes it as canonical CBOR for the EPR Envelope's payload bytes. Schema validation lives at the manifest layer (Phase 3 — manifest-graph resolver), not here."
+    },
+    "couplingRefs": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Three-leg coupling references (knowledge / value / governance), per the substrate axiom. Each leg is the CID of another EPR that establishes the leg, or null if the pillar's manifest does not require that leg for this signal kind. Coupling-requirement enforcement is per-kind in the integrity validator.",
+      "properties": {
+        "knowledge": {
+          "type": ["string", "null"],
+          "description": "CID of the Claim/Concept EPR establishing the knowledge dimension."
+        },
+        "value": {
+          "type": ["string", "null"],
+          "description": "CID of the EconomicEvent/Commitment EPR establishing the value dimension."
+        },
+        "governance": {
+          "type": ["string", "null"],
+          "description": "CID of the Governance/Attestation EPR establishing the reach + authority dimension."
+        }
+      }
+    },
+    "reach": {
+      "type": "string",
+      "enum": ["private", "selfScope", "intimate", "trusted", "familiar", "community", "public", "commons"],
+      "description": "Optional reach hint for the composed Envelope. Defaults to the pillar manifest's signalType-specific default when absent. Per memory pin project_three_layer_truth_model, reach is envelope-level — not derived from doorway-projected state."
+    }
+  },
+  "$comment": "Response shape lives at SignalEmitResponse (see signal_emit.rs). Returns { eventCid, eprCid } where eprCid is the persisted Envelope CID and eventCid is the application-layer event id (typically equal to eprCid for now; reserved for future cases where multiple EPRs are emitted from one intent)."
+}

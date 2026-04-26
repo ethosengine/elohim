@@ -40,6 +40,9 @@
       "items": {
         "$ref": "./pillar-projection.schema.json"
       }
+    },
+    "writeThrough": {
+      "$ref": "#/$defs/WriteThrough"
     }
   },
   "additionalProperties": false,
@@ -393,6 +396,28 @@
         }
       },
       "additionalProperties": false
+    },
+    "WriteThrough": {
+      "title": "WriteThrough",
+      "description": "Per-pillar write-through flag declaration (EPR Phase 2B Batch C). When `enabled` is true, signals from this pillar that pass through `/api/v1/signal/emit` are composed into EPR Envelopes, signed, and ingested via EprService. When false (default when absent), signal-emit returns 503 for non-integrity kinds. The 4-layer override stack (manifest -> policy.toml -> env -> admin override) lets operators ramp pillars on/off without redeploys; this manifest field is layer 1 (the pillar's declared default). Integrity kinds (KeyRotation, KeyRevocation, RevocationAttestation, AgentPeerBinding) bypass the flag entirely — they are always written through, hardcoded in storage. Per memory pin project_cadence_archetype_tunable_with_dev_overrides for the 4-layer pattern; per memory pin project_elohim_active_observed_not_flagged the effective-state view reports observed activity, not just configured intent.",
+      "type": "object",
+      "required": ["enabled"],
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Whether this pillar's signals are written through to EPR storage by default. Initial recommendation: false. Operators ramp on per pillar via env/CLI/admin override (layers 2-4)."
+        },
+        "kinds": {
+          "type": "array",
+          "description": "Optional list of EPR kinds (e.g. 'EconomicEvent', 'Observation') restricting write-through to a subset. When absent or empty, applies to all kinds the pillar emits. Integrity kinds always bypass and ignore this list.",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        }
+      }
     }
   }
 }

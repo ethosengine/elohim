@@ -66,11 +66,38 @@ pub struct NetworkConfig {
     pub conductor_admin_internal_port: u16,
 }
 
+/// Per-pillar write-through override entry as it appears in policy.toml.
+///
+/// Mirrors the manifest `WriteThrough` shape (EPR Phase 2B Task C.4) but
+/// keyed under `[write_through.<pillar>]`. The `kinds` list is optional —
+/// when absent the override applies to every kind the pillar emits.
+///
+/// Example:
+/// ```toml
+/// [write_through.shefa]
+/// enabled = true
+/// kinds = ["EconomicEvent"]
+///
+/// [write_through.lamad]
+/// enabled = false
+/// ```
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct WriteThroughEntry {
+    pub enabled: bool,
+    #[serde(default)]
+    pub kinds: Option<Vec<String>>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PolicyConfig {
     pub pool: PoolConfig,
     pub stewardship: StewardshipConfig,
     pub network: NetworkConfig,
+    /// Layer-2 (policy.toml) write-through overrides keyed by pillar name.
+    /// Optional — operators that don't care about ramping leave the section
+    /// out entirely; layers 1/3/4 still apply. EPR Phase 2B Task C.6.
+    #[serde(default)]
+    pub write_through: std::collections::HashMap<String, WriteThroughEntry>,
 }
 
 impl PolicyConfig {
@@ -125,6 +152,69 @@ conductor_admin_internal_port = 4444
         assert_eq!(cfg.network.conductor_internal_port, 4445);
         assert_eq!(cfg.network.conductor_admin_external_bind, "0.0.0.0:8444");
         assert_eq!(cfg.network.conductor_admin_internal_port, 4444);
+    }
+
+    #[test]
+    fn write_through_section_parses_pillar_overrides() {
+        // EPR Phase 2B Task C.6 — policy.toml layer-2 wiring.
+        let toml_str = r#"
+[pool]
+accept_general_traffic = "auto"
+min_free_storage_pct = 20
+require_conductor_healthy = true
+
+[stewardship]
+accept_new_reserves = "auto"
+max_storage_pct = 80
+
+[network]
+expose_conductor_externally = false
+conductor_external_bind = "0.0.0.0:8445"
+conductor_internal_port = 4445
+conductor_admin_external_bind = "0.0.0.0:8444"
+conductor_admin_internal_port = 4444
+
+[write_through.shefa]
+enabled = true
+kinds = ["EconomicEvent"]
+
+[write_through.lamad]
+enabled = false
+"#;
+        let cfg: PolicyConfig = toml::from_str(toml_str).unwrap();
+        assert!(cfg.write_through.contains_key("shefa"));
+        assert!(cfg.write_through.contains_key("lamad"));
+        assert!(cfg.write_through["shefa"].enabled);
+        assert_eq!(
+            cfg.write_through["shefa"].kinds.as_deref(),
+            Some(&["EconomicEvent".to_string()][..])
+        );
+        assert!(!cfg.write_through["lamad"].enabled);
+        assert!(cfg.write_through["lamad"].kinds.is_none());
+    }
+
+    #[test]
+    fn write_through_section_is_optional() {
+        // Operators that don't care about layer 2 leave the section out.
+        let toml_str = r#"
+[pool]
+accept_general_traffic = "auto"
+min_free_storage_pct = 20
+require_conductor_healthy = true
+
+[stewardship]
+accept_new_reserves = "auto"
+max_storage_pct = 80
+
+[network]
+expose_conductor_externally = false
+conductor_external_bind = "0.0.0.0:8445"
+conductor_internal_port = 4445
+conductor_admin_external_bind = "0.0.0.0:8444"
+conductor_admin_internal_port = 4444
+"#;
+        let cfg: PolicyConfig = toml::from_str(toml_str).unwrap();
+        assert!(cfg.write_through.is_empty());
     }
 
     #[test]

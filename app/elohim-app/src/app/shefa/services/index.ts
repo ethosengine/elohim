@@ -65,3 +65,11 @@ export { ExchangeApiService } from './exchange-api.service';
 // Steward affinity API (thin HTTP client for affinity queries + curation events)
 export { StewardAffinityApiService } from './steward-affinity-api.service';
 export type { AffinityQuery } from './steward-affinity-api.service';
+
+// EPR signal-emit (write-through path; EPR Phase 2B Task C.3)
+export { SignalEmitService } from './signal-emit.service';
+export type {
+  SignalIntent,
+  SignalEmitSuccessResponse,
+  SignalEmitResult,
+} from './signal-emit.service';

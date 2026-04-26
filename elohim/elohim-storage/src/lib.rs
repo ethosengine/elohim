@@ -61,6 +61,8 @@ pub mod metadata;
 pub mod rea_projection; // REA projection signal handler (DHT → SQLite sync)
 pub mod sharding;
 pub mod signals; // Official holochain_client wrapper with signing support
+pub mod signing; // ConductorSigningClient — EPR Phase 2B Task C.1 (imagodei sign_for_agent wrapper)
+pub mod write_through; // Write-through flag state — EPR Phase 2B Task C.4 (4-layer override stack)
 pub use hc_client::{ConductorHealth, HcClient, HcClientConfig, NetworkHealth, StorageHealth};
 pub mod cell_discovery;
 pub mod debug_stream;

@@ -3,6 +3,10 @@
   "name": "shefa",
   "version": "1.0.0",
   "description": "Economy domain — value accounting, stewardship, resource flows, and economic coupling. Shefa primarily wraps protocol REA primitives (EconomicEvent, Agreement, Commitment) with economic semantics rather than declaring many new content types.",
+  "writeThrough": {
+    "enabled": false,
+    "kinds": ["EconomicEvent"]
+  },
   "vocabulary": {
     "contentTypes": {
       "stewardship-context": {
