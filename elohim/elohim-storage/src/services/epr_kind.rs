@@ -30,6 +30,18 @@ pub(crate) fn kind_canonical_str(k: EprKind) -> &'static str {
     }
 }
 
+/// Provisional pillar lookup for an EPR kind.
+///
+/// FIXME(phase-3): replace with a `ManifestRegistry` lookup once Phase 3's
+/// Manifest-EPR resolver exists. Until then, return the kind name lowercased
+/// — sufficient for D.8's integration tests because subscribers match on the
+/// same provisional name. **Subscribers written against this naming MUST be
+/// updated when Phase 3 lands.** Find this function by grepping for
+/// `pillar_for_kind_provisional` or `FIXME(phase-3)`.
+pub(crate) fn pillar_for_kind_provisional(kind: EprKind) -> String {
+    kind_canonical_str(kind).to_lowercase()
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------

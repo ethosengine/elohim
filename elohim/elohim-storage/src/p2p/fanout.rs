@@ -70,6 +70,9 @@ pub enum FanoutChannel {
 /// | Public              | Gossip + Kad                     |
 /// | Commons             | Kad + Gossip (Kad primary)       |
 pub fn channels_for_reach(reach: Reach, kind: &str) -> Vec<FanoutChannel> {
+    // TODO(D.5): integration test in epr_store.rs covering an integrity-kind put
+    // with Reach::Private — currently covered only via the unit test of this
+    // function (D.1) plus the cross-channel integration test in D.5.
     if is_integrity_kind(kind) {
         // §3.7 integrity exception: always all three channels so that
         // key-state changes reach every peer immediately.

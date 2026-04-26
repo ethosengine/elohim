@@ -184,7 +184,7 @@ impl EprStore for LocalEprStore {
 // FederatedEprStore — Phase 2b wires libp2p Kad provider advertisement
 // ---------------------------------------------------------------------------
 
-use super::epr_kind::kind_canonical_str;
+use super::epr_kind::{kind_canonical_str, pillar_for_kind_provisional};
 
 /// Federated store that bridges to the elohim-storage libp2p swarm for Kad
 /// provider advertisement (Phase 2b D.2). In Phase 2a the swarm_tx was
@@ -239,7 +239,7 @@ impl EprStore for FederatedEprStore {
     fn put(&self, conn: &mut SqliteConnection, epr: Epr) -> Result<EprIngestResult, StorageError> {
         // Snapshot reach + kind before consuming epr in local.put.
         let reach = epr.envelope.reach;
-        let kind = epr.envelope.kind;
+        let epr_kind = epr.envelope.kind;
 
         let result = self.local.put(conn, epr)?;
 
@@ -247,7 +247,7 @@ impl EprStore for FederatedEprStore {
         // a Kad or KadLight channel. Best-effort — send failure is logged and
         // dropped; the local put already succeeded and remains authoritative.
         use crate::p2p::fanout::{channels_for_reach, FanoutChannel};
-        let kind_str = kind_canonical_str(kind);
+        let kind_str = kind_canonical_str(epr_kind);
         let channels = channels_for_reach(reach, kind_str);
         let needs_kad = channels
             .iter()
@@ -268,6 +268,48 @@ impl EprStore for FederatedEprStore {
                         tracing::error!(
                             cid = %result.cid,
                             "kad_start_providing: swarm command channel closed — Kad advertisement permanently lost"
+                        );
+                    }
+                }
+            }
+        }
+
+        // D.3: publish EPR atom announce to the reach-scoped gossipsub topic when
+        // the fanout policy includes a Gossip channel. Best-effort — send failure
+        // is logged and dropped; the local put already succeeded.
+        let needs_gossip = channels.iter().any(|c| matches!(c, FanoutChannel::Gossip));
+        if needs_gossip {
+            if let Some(tx) = &self.swarm_tx {
+                let pillar = pillar_for_kind_provisional(epr_kind);
+                let topic = crate::p2p::topics::topic_for(&pillar, reach, None);
+                match build_announce_payload(&result.cid) {
+                    Ok(payload) => {
+                        match tx.try_send(crate::p2p::P2PCommand::PublishEprAnnounce {
+                            topic: topic.clone(),
+                            payload,
+                        }) {
+                            Ok(()) => {}
+                            Err(tokio::sync::mpsc::error::TrySendError::Full(_)) => {
+                                tracing::warn!(
+                                    cid = %result.cid,
+                                    topic = %topic,
+                                    "publish_announce: channel full — skipping (best-effort)"
+                                );
+                            }
+                            Err(tokio::sync::mpsc::error::TrySendError::Closed(_)) => {
+                                tracing::error!(
+                                    cid = %result.cid,
+                                    topic = %topic,
+                                    "publish_announce: swarm command channel closed"
+                                );
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        tracing::warn!(
+                            cid = %result.cid,
+                            error = %e,
+                            "publish_announce: payload encoding failed — skipping"
                         );
                     }
                 }
@@ -307,6 +349,20 @@ impl EprStore for FederatedEprStore {
         //   providers.extend(dht_providers.into_iter().map(ProviderRef::from));
         Ok(providers)
     }
+}
+
+// ---------------------------------------------------------------------------
+// Private helpers
+// ---------------------------------------------------------------------------
+
+/// Encode an EPR CID as a MessagePack announce payload.
+///
+/// The payload is intentionally minimal: just the CID string. Receivers can
+/// fetch the full atom via the EPR atom protocol if they want the payload.
+/// This keeps gossip bandwidth low for high-reach tiers.
+fn build_announce_payload(cid: &str) -> Result<Vec<u8>, crate::error::StorageError> {
+    rmp_serde::to_vec(&cid.to_string())
+        .map_err(|e| crate::error::StorageError::Internal(format!("encode announce: {e}")))
 }
 
 // ---------------------------------------------------------------------------
@@ -381,6 +437,24 @@ mod tests {
     // D.2 tests
     // -----------------------------------------------------------------------
 
+    /// Drain all commands from the channel into a Vec for inspection.
+    fn drain_commands(
+        rx: &mut mpsc::Receiver<crate::p2p::P2PCommand>,
+    ) -> Vec<crate::p2p::P2PCommand> {
+        let mut cmds = Vec::new();
+        loop {
+            match rx.try_recv() {
+                Ok(cmd) => cmds.push(cmd),
+                Err(_) => break,
+            }
+        }
+        cmds
+    }
+
+    // -----------------------------------------------------------------------
+    // D.2 tests — Kad advertisement
+    // -----------------------------------------------------------------------
+
     #[tokio::test]
     async fn put_with_commons_reach_sends_kad_start_providing() {
         let (tx, mut rx) = mpsc::channel::<crate::p2p::P2PCommand>(8);
@@ -393,19 +467,18 @@ mod tests {
         let result = store.put(&mut conn, epr).expect("put must succeed");
         assert_eq!(result.cid, expected_cid);
 
-        // The Commons fanout policy includes Kad, so KadStartProviding must be sent.
-        match rx.try_recv() {
-            Ok(crate::p2p::P2PCommand::KadStartProviding { cid }) => {
-                assert_eq!(
-                    cid, expected_cid,
-                    "KadStartProviding CID must match put result CID"
-                );
+        // D.2+D.3: Commons fanout = [Kad, Gossip] → two commands.
+        // Drain all commands and assert KadStartProviding is present.
+        let cmds = drain_commands(&mut rx);
+        let kad_cmd = cmds
+            .iter()
+            .find(|c| matches!(c, crate::p2p::P2PCommand::KadStartProviding { .. }));
+        match kad_cmd {
+            Some(crate::p2p::P2PCommand::KadStartProviding { cid }) => {
+                assert_eq!(cid, &expected_cid, "KadStartProviding CID must match");
             }
-            Ok(_) => panic!("expected KadStartProviding but received a different P2PCommand"),
-            Err(e) => panic!("expected KadStartProviding but channel was empty/closed: {e}"),
+            _ => panic!("KadStartProviding not found in {} commands", cmds.len()),
         }
-        // No second command.
-        assert!(rx.try_recv().is_err(), "only one command expected");
     }
 
     #[tokio::test]
@@ -418,16 +491,17 @@ mod tests {
         let result = store.put(&mut conn, epr).expect("put must succeed");
         assert!(!result.cid.is_empty());
 
-        // Private reach → DirectOnly fanout; no Kad command.
+        // Private reach → DirectOnly fanout; no commands at all.
+        let cmds = drain_commands(&mut rx);
         assert!(
-            rx.try_recv().is_err(),
-            "Private reach must NOT send KadStartProviding"
+            cmds.is_empty(),
+            "Private reach must NOT send any P2P commands"
         );
     }
 
     #[tokio::test]
     async fn put_with_public_reach_sends_kad_start_providing() {
-        // Public reach → [Gossip, Kad] fanout; Kad command must be sent.
+        // Public reach → [Gossip, Kad] fanout; KadStartProviding must be sent.
         let (tx, mut rx) = mpsc::channel::<crate::p2p::P2PCommand>(8);
         let store = FederatedEprStore::new().with_swarm_tx(tx);
         let mut conn = setup_conn();
@@ -438,25 +512,23 @@ mod tests {
         let result = store.put(&mut conn, epr).expect("put must succeed");
         assert_eq!(result.cid, expected_cid);
 
-        // The Public fanout policy includes Kad, so KadStartProviding must be sent.
-        match rx.try_recv() {
-            Ok(crate::p2p::P2PCommand::KadStartProviding { cid }) => {
-                assert_eq!(
-                    cid, expected_cid,
-                    "KadStartProviding CID must match put result CID"
-                );
+        // D.2+D.3: Public fanout = [Gossip, Kad] → two commands.
+        let cmds = drain_commands(&mut rx);
+        let kad_cmd = cmds
+            .iter()
+            .find(|c| matches!(c, crate::p2p::P2PCommand::KadStartProviding { .. }));
+        match kad_cmd {
+            Some(crate::p2p::P2PCommand::KadStartProviding { cid }) => {
+                assert_eq!(cid, &expected_cid, "KadStartProviding CID must match");
             }
-            Ok(_) => panic!("expected KadStartProviding but received a different P2PCommand"),
-            Err(e) => panic!("expected KadStartProviding but channel was empty/closed: {e}"),
+            _ => panic!("KadStartProviding not found in {} commands", cmds.len()),
         }
-        // No second command.
-        assert!(rx.try_recv().is_err(), "only one command expected");
     }
 
     #[tokio::test]
     async fn put_without_swarm_tx_is_ok() {
         // FederatedEprStore::new() has no swarm_tx — should not panic even for
-        // Commons reach (which would need Kad if a swarm were present).
+        // Commons reach (which would need Kad + Gossip if a swarm were present).
         let store = FederatedEprStore::new();
         let mut conn = setup_conn();
 
@@ -465,5 +537,122 @@ mod tests {
             .put(&mut conn, epr)
             .expect("put must succeed without swarm_tx");
         assert!(!result.cid.is_empty());
+    }
+
+    // -----------------------------------------------------------------------
+    // D.3 tests — gossip announce publish
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn put_with_familiar_reach_sends_publish_announce() {
+        // Familiar → [Gossip] only — no Kad, but a PublishEprAnnounce must be sent.
+        let (tx, mut rx) = mpsc::channel::<crate::p2p::P2PCommand>(8);
+        let store = FederatedEprStore::new().with_swarm_tx(tx);
+        let mut conn = setup_conn();
+
+        // Use EprKind::Manifest → kind_str = "manifest" → pillar placeholder = "manifest"
+        let epr = sample_epr_with_reach(Reach::Familiar);
+        let expected_cid = epr.envelope.cid.to_string();
+
+        let result = store.put(&mut conn, epr).expect("put must succeed");
+        assert_eq!(result.cid, expected_cid);
+
+        let cmds = drain_commands(&mut rx);
+
+        // No KadStartProviding for Familiar reach.
+        assert!(
+            !cmds
+                .iter()
+                .any(|c| matches!(c, crate::p2p::P2PCommand::KadStartProviding { .. })),
+            "Familiar reach must NOT send KadStartProviding"
+        );
+
+        // Exactly one PublishEprAnnounce.
+        let announce_cmd = cmds
+            .iter()
+            .find(|c| matches!(c, crate::p2p::P2PCommand::PublishEprAnnounce { .. }));
+        match announce_cmd {
+            Some(crate::p2p::P2PCommand::PublishEprAnnounce { topic, payload }) => {
+                // sample_epr_with_reach uses EprKind::Manifest → pillar = "manifest",
+                // reach = Familiar → exact topic = "elohim/manifest/familiar".
+                assert_eq!(
+                    topic, "elohim/manifest/familiar",
+                    "topic must be exact: elohim/manifest/familiar, got: {topic}"
+                );
+
+                // Payload must decode back to the CID.
+                let decoded_cid: String =
+                    rmp_serde::from_slice(payload).expect("payload must be valid msgpack string");
+                assert_eq!(
+                    decoded_cid, expected_cid,
+                    "payload CID must match put result CID"
+                );
+            }
+            _ => panic!("PublishEprAnnounce not found in {} commands", cmds.len()),
+        }
+    }
+
+    #[tokio::test]
+    async fn put_with_commons_reach_sends_both_kad_and_announce() {
+        // Commons → [Kad, Gossip]; both KadStartProviding AND PublishEprAnnounce must be sent.
+        let (tx, mut rx) = mpsc::channel::<crate::p2p::P2PCommand>(8);
+        let store = FederatedEprStore::new().with_swarm_tx(tx);
+        let mut conn = setup_conn();
+
+        let epr = sample_epr_with_reach(Reach::Commons);
+        let expected_cid = epr.envelope.cid.to_string();
+
+        let result = store.put(&mut conn, epr).expect("put must succeed");
+        assert_eq!(result.cid, expected_cid);
+
+        let cmds = drain_commands(&mut rx);
+
+        // KadStartProviding must be present.
+        let has_kad = cmds
+            .iter()
+            .any(|c| matches!(c, crate::p2p::P2PCommand::KadStartProviding { cid } if cid == &expected_cid));
+        assert!(has_kad, "Commons reach must send KadStartProviding");
+
+        // PublishEprAnnounce must be present.
+        let announce_cmd = cmds
+            .iter()
+            .find(|c| matches!(c, crate::p2p::P2PCommand::PublishEprAnnounce { .. }));
+        match announce_cmd {
+            Some(crate::p2p::P2PCommand::PublishEprAnnounce { topic, payload }) => {
+                assert!(
+                    topic.ends_with("/commons"),
+                    "topic must end with /commons, got: {topic}"
+                );
+                let decoded_cid: String =
+                    rmp_serde::from_slice(payload).expect("payload must be valid msgpack string");
+                assert_eq!(decoded_cid, expected_cid, "payload CID must match");
+            }
+            _ => panic!("PublishEprAnnounce not found in {} commands", cmds.len()),
+        }
+
+        // Exactly two commands: one Kad, one Gossip.
+        assert_eq!(
+            cmds.len(),
+            2,
+            "Commons reach must send exactly two commands"
+        );
+    }
+
+    #[tokio::test]
+    async fn put_with_private_reach_sends_neither_kad_nor_announce() {
+        // Private → [DirectOnly]; no P2P commands at all.
+        let (tx, mut rx) = mpsc::channel::<crate::p2p::P2PCommand>(8);
+        let store = FederatedEprStore::new().with_swarm_tx(tx);
+        let mut conn = setup_conn();
+
+        let epr = sample_epr_with_reach(Reach::Private);
+        let result = store.put(&mut conn, epr).expect("put must succeed");
+        assert!(!result.cid.is_empty());
+
+        let cmds = drain_commands(&mut rx);
+        assert!(
+            cmds.is_empty(),
+            "Private reach must send neither Kad nor announce commands"
+        );
     }
 }

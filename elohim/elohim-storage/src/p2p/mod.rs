@@ -41,8 +41,12 @@ pub mod recovery_revocation;
 pub mod replication;
 pub mod shard_protocol;
 pub mod sync_protocol;
+pub mod topics;
 pub mod trust_cache;
 pub mod trust_protocol;
+
+// D.3: re-export topic helpers so callers have a single import surface.
+pub use topics::{topic_for, TOPIC_IDENTITY_BINDING, TOPIC_INTEGRITY_REVOCATION};
 
 use futures::StreamExt;
 use libp2p::kad::{store::RecordStore, Record, RecordKey};
@@ -461,6 +465,16 @@ pub enum P2PCommand {
     /// Key prefix `epr-atom:{cid}` — distinct from `epr:{id}` used for EPR Head
     /// put_record to clearly demarcate the atom federation track.
     KadStartProviding { cid: String },
+    /// Publish an EPR atom announce to a gossipsub topic. Triggered by
+    /// `FederatedEprStore::put` when the fanout policy includes a Gossip channel.
+    ///
+    /// `topic` is the fully-qualified gossipsub topic name built by
+    /// `p2p::topics::topic_for`. `payload` is a MessagePack-encoded CID string
+    /// (announce-only; receivers fetch the full atom via the EPR atom protocol
+    /// if they want the payload).
+    ///
+    /// Best-effort: failure is logged but does NOT block the local put.
+    PublishEprAnnounce { topic: String, payload: Vec<u8> },
 }
 
 /// RAII guard that resumes P2P sync when dropped.
@@ -556,6 +570,7 @@ impl P2PHandle {
                     P2PCommand::PublishIdentityBinding(_) => {} // fire-and-forget
                     P2PCommand::PublishRecoveryRevocation(_) => {} // fire-and-forget
                     P2PCommand::KadStartProviding { .. } => {} // fire-and-forget
+                    P2PCommand::PublishEprAnnounce { .. } => {} // fire-and-forget
                 }
             }
         });
@@ -1542,6 +1557,27 @@ impl P2PNode {
                         cid = %cid,
                         error = ?e,
                         "kad_start_providing: DHT start_providing failed"
+                    ),
+                }
+            }
+            // D.3: publish EPR atom announce to a reach-scoped gossipsub topic.
+            // topic built by p2p::topics::topic_for; payload is msgpack-encoded CID.
+            // Best-effort — publish failure (e.g. no peers subscribed) is logged and
+            // does not affect the local put or Kad advertisement.
+            P2PCommand::PublishEprAnnounce { topic, payload } => {
+                let gsub_topic = libp2p::gossipsub::IdentTopic::new(&topic);
+                match swarm.behaviour_mut().gossipsub.publish(gsub_topic, payload) {
+                    Ok(msg_id) => info!(
+                        target: "elohim_storage::epr",
+                        topic = %topic,
+                        message_id = ?msg_id,
+                        "publish_epr_announce: published atom announce to gossipsub"
+                    ),
+                    Err(e) => warn!(
+                        target: "elohim_storage::epr",
+                        topic = %topic,
+                        error = ?e,
+                        "publish_epr_announce: gossipsub publish failed (often: no peers subscribed yet)"
                     ),
                 }
             }

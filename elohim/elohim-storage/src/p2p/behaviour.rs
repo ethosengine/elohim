@@ -381,9 +381,25 @@ impl ElohimStorageBehaviour {
         // M4: subscribe to key revocation fan-out topic.
         // Subscriber set: emergency contacts, specialist-elohim watchers, security dashboards.
         let revocation_topic = gossipsub::IdentTopic::new(super::RECOVERY_REVOCATION_TOPIC);
+        // TODO(M3/M4-migration): remove this legacy subscription once all
+        // recovery.revocation publishers (M3/M4) migrate to TOPIC_INTEGRITY_REVOCATION
+        // (= "elohim/integrity/revocation"). Tracked by Recovery epic M4. Until then,
+        // storage subscribes to BOTH names so it never misses a revocation regardless
+        // of which name the publisher uses.
         gossipsub
             .subscribe(&revocation_topic)
             .expect("subscribe to recovery.revocation");
+        // D.3: subscribe to the new canonical integrity-revocation topic.
+        // Dual-subscription during transition: M3/M4 publishers still use
+        // "recovery.revocation" (above); new D.5+ publishers use the canonical
+        // "elohim/integrity/revocation" name. Both are subscribed so this node
+        // receives revocations from both old and new publishers until M3/M4 is
+        // updated to use the canonical name exclusively.
+        let integrity_revocation_topic =
+            gossipsub::IdentTopic::new(super::TOPIC_INTEGRITY_REVOCATION);
+        gossipsub
+            .subscribe(&integrity_revocation_topic)
+            .expect("subscribe to elohim/integrity/revocation");
 
         Self {
             kademlia,
