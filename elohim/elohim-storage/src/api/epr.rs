@@ -173,7 +173,7 @@ async fn get_epr(
         .map(|q| q.contains("includeCanonical=true"))
         .unwrap_or(false);
 
-    let store = default_epr_store(None);
+    let store = default_epr_store(None, None, None);
     let mut conn = get_conn(pool)?;
 
     let Some(outcome) = store.fetch(&mut conn, cid)? else {
@@ -205,7 +205,7 @@ async fn get_envelope(
     pool: &DbPool,
     _ctx: &AppContext,
 ) -> Result<Response<Full<Bytes>>, StorageError> {
-    let store = default_epr_store(None);
+    let store = default_epr_store(None, None, None);
     let mut conn = get_conn(pool)?;
 
     let Some(outcome) = store.fetch(&mut conn, cid)? else {
@@ -236,7 +236,7 @@ async fn get_payload(
     pool: &DbPool,
     _ctx: &AppContext,
 ) -> Result<Response<Full<Bytes>>, StorageError> {
-    let store = default_epr_store(None);
+    let store = default_epr_store(None, None, None);
     let mut conn = get_conn(pool)?;
 
     let Some(outcome) = store.fetch(&mut conn, cid)? else {
@@ -285,7 +285,7 @@ async fn get_verify(
     let mut pk = [0u8; 32];
     pk.copy_from_slice(&pk_bytes);
 
-    let store = default_epr_store(None);
+    let store = default_epr_store(None, None, None);
     let mut conn = get_conn(pool)?;
 
     // Reach check: if the EPR isn't visible to the caller, return 404.
@@ -330,7 +330,7 @@ async fn get_providers(
     pool: &DbPool,
     _ctx: &AppContext,
 ) -> Result<Response<Full<Bytes>>, StorageError> {
-    let store = default_epr_store(None);
+    let store = default_epr_store(None, None, None);
     let mut conn = get_conn(pool)?;
 
     // Reach check: we need to know the atom's reach to enforce, but if the
@@ -491,7 +491,9 @@ async fn put_epr(
 
     let epr = Epr { envelope, payload };
 
-    let store = default_epr_store(swarm_tx);
+    // D.4: pass pool so FederatedEprStore can resolve signer_is_known_agent.
+    // local_agent_cid is None until the conductor signing client is wired (see TODO).
+    let store = default_epr_store(swarm_tx, Some(pool.clone()), None);
     let mut conn = get_conn(pool)?;
     let result = store.put(&mut conn, epr)?;
 
@@ -564,7 +566,7 @@ async fn list_epr(
         }
     }
 
-    let store = default_epr_store(None);
+    let store = default_epr_store(None, None, None);
     let mut conn = get_conn(pool)?;
     let (atoms, next_cursor) = store.list(&mut conn, &list_query)?;
 

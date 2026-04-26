@@ -58,7 +58,7 @@ fn build_content_epr(payload: &[u8]) -> (Epr, AgentKeypair) {
 fn ingest_fetch_verify_roundtrip() {
     let pool = test_pool();
     let mut conn = pool.get().expect("pool connection");
-    let store = default_epr_store();
+    let store = default_epr_store(None, None, None);
 
     // --- Ingest ---
     let (epr, kp) = build_content_epr(b"roundtrip payload");
@@ -121,7 +121,7 @@ fn ingest_fetch_verify_roundtrip() {
 fn verify_with_wrong_key_is_rejected() {
     let pool = test_pool();
     let mut conn = pool.get().expect("pool connection");
-    let store = default_epr_store();
+    let store = default_epr_store(None, None, None);
 
     let (epr, _correct_kp) = build_content_epr(b"wrong key payload");
     let cid = epr.envelope.cid.to_string();
@@ -155,7 +155,7 @@ fn verify_with_wrong_key_is_rejected() {
 fn put_same_canonical_bytes_is_idempotent() {
     let pool = test_pool();
     let mut conn = pool.get().expect("pool connection");
-    let store = default_epr_store();
+    let store = default_epr_store(None, None, None);
 
     let (epr_a, _kp) = build_content_epr(b"idempotent payload");
     // Build a second EPR from the same deterministic seed — must produce identical bytes
@@ -196,7 +196,7 @@ fn put_different_bytes_same_cid_is_rejected() {
 
     let pool = test_pool();
     let mut conn = pool.get().expect("pool connection");
-    let store = default_epr_store();
+    let store = default_epr_store(None, None, None);
 
     // Ingest the legitimate EPR
     let (epr_a, _kp) = build_content_epr(b"original payload collision test");

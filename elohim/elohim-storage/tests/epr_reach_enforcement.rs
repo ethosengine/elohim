@@ -68,7 +68,7 @@ fn build_epr_with_reach(reach: Reach, payload: &[u8]) -> Epr {
 fn reach_commons_is_persisted_verbatim() {
     let pool = test_pool();
     let mut conn = pool.get().expect("pool connection");
-    let store = default_epr_store();
+    let store = default_epr_store(None, None, None);
 
     let epr = build_epr_with_reach(Reach::Commons, b"commons reach payload");
     let cid = epr.envelope.cid.to_string();
@@ -86,7 +86,7 @@ fn reach_commons_is_persisted_verbatim() {
 fn reach_public_is_persisted_verbatim() {
     let pool = test_pool();
     let mut conn = pool.get().expect("pool connection");
-    let store = default_epr_store();
+    let store = default_epr_store(None, None, None);
 
     let epr = build_epr_with_reach(Reach::Public, b"public reach payload");
     let cid = epr.envelope.cid.to_string();
@@ -104,7 +104,7 @@ fn reach_public_is_persisted_verbatim() {
 fn reach_community_is_persisted_verbatim() {
     let pool = test_pool();
     let mut conn = pool.get().expect("pool connection");
-    let store = default_epr_store();
+    let store = default_epr_store(None, None, None);
 
     let epr = build_epr_with_reach(Reach::Community, b"community reach payload");
     let cid = epr.envelope.cid.to_string();
@@ -122,7 +122,7 @@ fn reach_community_is_persisted_verbatim() {
 fn reach_private_is_persisted_verbatim() {
     let pool = test_pool();
     let mut conn = pool.get().expect("pool connection");
-    let store = default_epr_store();
+    let store = default_epr_store(None, None, None);
 
     let epr = build_epr_with_reach(Reach::Private, b"private reach payload");
     let cid = epr.envelope.cid.to_string();
@@ -140,7 +140,7 @@ fn reach_private_is_persisted_verbatim() {
 fn reach_trusted_is_persisted_verbatim() {
     let pool = test_pool();
     let mut conn = pool.get().expect("pool connection");
-    let store = default_epr_store();
+    let store = default_epr_store(None, None, None);
 
     let epr = build_epr_with_reach(Reach::Trusted, b"trusted reach payload");
     let cid = epr.envelope.cid.to_string();
@@ -158,7 +158,7 @@ fn reach_trusted_is_persisted_verbatim() {
 fn reach_familiar_is_persisted_verbatim() {
     let pool = test_pool();
     let mut conn = pool.get().expect("pool connection");
-    let store = default_epr_store();
+    let store = default_epr_store(None, None, None);
 
     let epr = build_epr_with_reach(Reach::Familiar, b"familiar reach payload");
     let cid = epr.envelope.cid.to_string();
@@ -176,7 +176,7 @@ fn reach_familiar_is_persisted_verbatim() {
 fn reach_intimate_is_persisted_verbatim() {
     let pool = test_pool();
     let mut conn = pool.get().expect("pool connection");
-    let store = default_epr_store();
+    let store = default_epr_store(None, None, None);
 
     let epr = build_epr_with_reach(Reach::Intimate, b"intimate reach payload");
     let cid = epr.envelope.cid.to_string();
@@ -194,7 +194,7 @@ fn reach_intimate_is_persisted_verbatim() {
 fn reach_self_scope_is_persisted_verbatim() {
     let pool = test_pool();
     let mut conn = pool.get().expect("pool connection");
-    let store = default_epr_store();
+    let store = default_epr_store(None, None, None);
 
     let epr = build_epr_with_reach(Reach::SelfScope, b"self-scope reach payload");
     let cid = epr.envelope.cid.to_string();

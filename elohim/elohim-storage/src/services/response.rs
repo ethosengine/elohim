@@ -123,6 +123,8 @@ pub fn error_response(error: StorageError) -> Response<Full<Bytes>> {
         ),
         StorageError::InvalidInput(msg) => (StatusCode::BAD_REQUEST, msg.clone()),
         StorageError::Forbidden(msg) => (StatusCode::FORBIDDEN, msg.clone()),
+        // D.4: author-side reach earning refused → 403 Forbidden (author lacks earned reach).
+        StorageError::Unauthorized(msg) => (StatusCode::FORBIDDEN, msg.clone()),
         StorageError::Auth(msg) => (StatusCode::UNAUTHORIZED, msg.clone()),
         StorageError::Parse(msg) => (StatusCode::BAD_REQUEST, format!("Parse error: {}", msg)),
         StorageError::Json(e) => (StatusCode::BAD_REQUEST, format!("JSON error: {}", e)),

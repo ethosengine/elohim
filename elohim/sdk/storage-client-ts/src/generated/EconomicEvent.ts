@@ -7,4 +7,13 @@ export type EconomicEvent = { id: string, h_app_id: string, action: string, prov
 /**
  * Place ID where this event occurred (spatial grounding for carrying capacity)
  */
-at_location: string | null, };
+at_location: string | null, 
+/**
+ * Mirror of the source EPR atom's `verified_at` timestamp.
+ *
+ * Set by the projector when it writes this row; sourced from `$verifiedAt` in
+ * the column mapping. Cleared (set to NULL) by `sweep_projections_on_revocation`
+ * atomically with the corresponding `epr_atoms.verified_at` clear. Satisfies
+ * invariants I4 (revocation propagation) and I5 (verified-state consistency).
+ */
+verified_at: string | null, };

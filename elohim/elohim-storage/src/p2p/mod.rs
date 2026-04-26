@@ -36,6 +36,7 @@ pub mod identity_binding_gossip;
 pub mod identity_handshake;
 pub mod identity_map;
 pub mod kad_store;
+pub mod reach_authorization;
 pub mod recovery_invitation;
 pub mod recovery_revocation;
 pub mod replication;
@@ -47,6 +48,15 @@ pub mod trust_protocol;
 
 // D.3: re-export topic helpers so callers have a single import surface.
 pub use topics::{topic_for, TOPIC_IDENTITY_BINDING, TOPIC_INTEGRITY_REVOCATION};
+// D.4: re-export reach authorization types for callers (author-side earning +
+// receiver-side pre-authorization). The DB-backed resolver functions
+// (signer_is_known_agent, node_has_embodied_responsibility) are intentionally
+// NOT re-exported — they are internal to FederatedEprStore::put and the
+// Phase 3+ subscription wiring respectively.
+pub use reach_authorization::{
+    classify_pre_authorization, classify_reach_authorization, PreAuthorizationDecision,
+    ReachAuthDecision,
+};
 
 use futures::StreamExt;
 use libp2p::kad::{store::RecordStore, Record, RecordKey};

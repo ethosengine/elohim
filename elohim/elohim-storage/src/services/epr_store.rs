@@ -6,6 +6,17 @@
 //! that hold the atom. Phase 2a ships FederatedEprStore with the libp2p bridge
 //! stubbed as TODO(phase-2b); Phase 2b wires the swarm handle and flips the
 //! construction site from LocalEprStore → FederatedEprStore.
+//!
+//! ## D.4: Receiver-side pre-authorization (seam placeholder)
+//!
+//! `crate::p2p::reach_authorization::classify_pre_authorization` is the pure
+//! policy function that decides whether this node has standing in a given
+//! gossipsub topic scope. It will be called when storage decides which topics
+//! to subscribe to and which collectives to act as Kad provider for. That
+//! wiring is downstream of D.4 (Phase 3+ work) — D.4 ships the policy module
+//! and tests so Stage 2/3 graph walks (qahal household memberships, imagodei
+//! relationship attestations) land at a clear seam without rewriting call
+//! sites. NO subscription logic is added here in D.4.
 
 use diesel::SqliteConnection;
 
@@ -196,6 +207,18 @@ pub struct FederatedEprStore {
     /// When None (default, or in test contexts without a swarm), Kad
     /// advertisement is silently skipped.
     swarm_tx: Option<tokio::sync::mpsc::Sender<crate::p2p::P2PCommand>>,
+    /// D.4: DB pool for Stage 1 reach earning resolution via
+    /// `peer_identity_bindings`. When None (no pool configured, or in
+    /// test/in-memory contexts), the signer_is_known check fails-open at
+    /// Stage 1 — same as a pool-get error.
+    db_pool: Option<crate::db::DbPool>,
+    /// D.4: CID of the local conductor agent. When the signer CID matches
+    /// this, the signer is trivially known (they are this node's own user).
+    /// Set via `with_local_agent_cid`. When None, only the
+    /// `peer_identity_bindings` lookup path is used.
+    ///
+    /// TODO(D.4): wire local_agent_cid from conductor signing client when available.
+    local_agent_cid: Option<String>,
 }
 
 impl FederatedEprStore {
@@ -203,6 +226,8 @@ impl FederatedEprStore {
         FederatedEprStore {
             local: LocalEprStore::new(),
             swarm_tx: None,
+            db_pool: None,
+            local_agent_cid: None,
         }
     }
 
@@ -210,6 +235,22 @@ impl FederatedEprStore {
     /// when the EPR's fanout policy includes a Kad or KadLight channel.
     pub fn with_swarm_tx(mut self, tx: tokio::sync::mpsc::Sender<crate::p2p::P2PCommand>) -> Self {
         self.swarm_tx = Some(tx);
+        self
+    }
+
+    /// D.4: Wire the DB pool so `put` can resolve `signer_is_known_agent`
+    /// via `peer_identity_bindings`. Without this the resolver fails-open
+    /// (Stage 1 policy: allow during projection-rebuild windows).
+    pub fn with_db_pool(mut self, pool: crate::db::DbPool) -> Self {
+        self.db_pool = Some(pool);
+        self
+    }
+
+    /// D.4: Set the local conductor agent CID so that an EPR signed by
+    /// this node's own user is recognized as a known agent without a DB
+    /// lookup.
+    pub fn with_local_agent_cid(mut self, cid: String) -> Self {
+        self.local_agent_cid = Some(cid);
         self
     }
 }
@@ -237,8 +278,36 @@ impl EprStore for FederatedEprStore {
     }
 
     fn put(&self, conn: &mut SqliteConnection, epr: Epr) -> Result<EprIngestResult, StorageError> {
-        // Snapshot reach + kind before consuming epr in local.put.
+        // D.4 Stage 1: author-side reach earning. Refuse the put if the signer
+        // has not earned the declared reach. Receive side does NOT filter —
+        // see memory `project_reach_earned_at_authoring` (the email-collapse
+        // anti-pattern). This gate runs BEFORE any local persistence or
+        // network publication (Kad/gossip) so that unauthorized EPRs never
+        // enter the network.
         let reach = epr.envelope.reach;
+        let signer_cid = epr.envelope.proof.signer.to_string();
+        let signer_known = match self.db_pool.as_ref() {
+            Some(pool) => crate::p2p::reach_authorization::signer_is_known_agent(
+                pool,
+                self.local_agent_cid.as_deref(),
+                &signer_cid,
+            ),
+            None => true, // No pool = test/in-memory; fail-open at Stage 1
+        };
+        match crate::p2p::reach_authorization::classify_reach_authorization(
+            reach,
+            &signer_cid,
+            signer_known,
+        ) {
+            crate::p2p::reach_authorization::ReachAuthDecision::Authorized => {}
+            crate::p2p::reach_authorization::ReachAuthDecision::Refused { reason } => {
+                return Err(crate::error::StorageError::Unauthorized(format!(
+                    "reach authorization refused: {reason}"
+                )));
+            }
+        }
+
+        // Snapshot kind before consuming epr in local.put.
         let epr_kind = epr.envelope.kind;
 
         let result = self.local.put(conn, epr)?;
@@ -369,16 +438,29 @@ fn build_announce_payload(cid: &str) -> Result<Vec<u8>, crate::error::StorageErr
 // Factory function — used by route handlers (avoids AppContext field cascade)
 // ---------------------------------------------------------------------------
 
-/// Construct the Phase 2b default store. Routes call this; the optional
-/// `swarm_tx` wires Kad provider advertisement when the P2P swarm is running.
+/// Construct the Phase 2b default store.
+///
+/// Routes call this; the optional `swarm_tx` wires Kad provider advertisement
+/// when the P2P swarm is running. `pool` wires the Stage 1 reach-earning
+/// resolver (D.4); when `None` the resolver fails-open. `local_agent_cid`
+/// identifies the local conductor agent so self-signed EPRs are recognized
+/// as known-agent without a DB lookup (D.4).
 pub fn default_epr_store(
     swarm_tx: Option<tokio::sync::mpsc::Sender<crate::p2p::P2PCommand>>,
+    pool: Option<crate::db::DbPool>,
+    local_agent_cid: Option<String>,
 ) -> impl EprStore {
-    let store = FederatedEprStore::new();
-    match swarm_tx {
-        Some(tx) => store.with_swarm_tx(tx),
-        None => store,
+    let mut store = FederatedEprStore::new();
+    if let Some(tx) = swarm_tx {
+        store = store.with_swarm_tx(tx);
     }
+    if let Some(p) = pool {
+        store = store.with_db_pool(p);
+    }
+    if let Some(cid) = local_agent_cid {
+        store = store.with_local_agent_cid(cid);
+    }
+    store
 }
 
 // ---------------------------------------------------------------------------
@@ -653,6 +735,187 @@ mod tests {
         assert!(
             cmds.is_empty(),
             "Private reach must send neither Kad nor announce commands"
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // D.4 tests — Stage 1 author-side reach earning
+    // -----------------------------------------------------------------------
+
+    /// Build a test DB pool using in-memory SQLite with EPR migrations applied.
+    fn setup_pool() -> crate::db::DbPool {
+        use crate::db::{init_pool, run_migrations};
+        let url = format!(
+            "file:epr_store_d4_{}?mode=memory&cache=shared",
+            uuid::Uuid::new_v4().as_simple()
+        );
+        let pool = init_pool(&url).expect("test pool init");
+        run_migrations(&pool).expect("test migrations");
+        pool
+    }
+
+    /// Insert a `peer_identity_bindings` row mapping `agent_cid` to a
+    /// placeholder `peer_id` so the Stage 1 resolver recognises the signer.
+    fn insert_binding(pool: &crate::db::DbPool, agent_cid: &str) {
+        use crate::db::diesel_schema::peer_identity_bindings::dsl as p;
+        use diesel::prelude::*;
+        let mut conn = pool.get().expect("pool conn");
+        diesel::insert_or_ignore_into(p::peer_identity_bindings)
+            .values((
+                p::peer_id.eq(format!("peer-for-{agent_cid}")),
+                p::agent_cid.eq(agent_cid),
+                p::dht_anchor_hash.eq("anchor-test"),
+                p::valid_from.eq("2026-01-01T00:00:00Z"),
+                p::valid_until.eq::<Option<String>>(None),
+                p::observed_at.eq("2026-04-25T00:00:00Z"),
+                p::source.eq("handshake"),
+            ))
+            .execute(&mut conn)
+            .expect("insert binding");
+    }
+
+    /// Build an EPR whose `signer` CID is deterministic from `signer_seed`.
+    fn sample_epr_with_signer_seed(reach: Reach, signer_seed: u8) -> (Epr, String) {
+        use elohim_epr::cid::compute_cid;
+        use elohim_epr::proof::AgentKeypair;
+        use elohim_epr::Coupling;
+
+        let kp = AgentKeypair::from_secret(&[signer_seed; 32]).unwrap();
+        let signer_cid = compute_cid(&[signer_seed]);
+        let schema_ref = compute_cid(b"test-schema-ref");
+        let gov = compute_cid(b"test-governance");
+        let coupling = Coupling {
+            knowledge: None,
+            value: None,
+            governance: Some(gov),
+        };
+        let signer_cid_str = signer_cid.to_string();
+        let epr = Epr::builder()
+            .kind(elohim_epr::EprKind::Manifest)
+            .schema_ref(schema_ref)
+            .schema_key("test/schema")
+            .reach(reach)
+            .coupling(coupling)
+            .issued_at(chrono::Utc::now())
+            .payload(format!("payload-for-signer-{signer_seed}").into_bytes())
+            .sign(&kp, signer_cid)
+            .expect("sign test EPR");
+        (epr, signer_cid_str)
+    }
+
+    /// D.4 test 1: Familiar reach + unknown signer (no binding, no local_agent_cid)
+    /// → Err(StorageError::Unauthorized) AND no swarm command sent.
+    #[tokio::test]
+    async fn put_refuses_familiar_reach_for_unknown_signer() {
+        let pool = setup_pool();
+        let (tx, mut rx) = mpsc::channel::<crate::p2p::P2PCommand>(8);
+        let store = FederatedEprStore::new()
+            .with_db_pool(pool)
+            .with_swarm_tx(tx);
+
+        let (epr, _signer) = sample_epr_with_signer_seed(Reach::Familiar, 42);
+        let mut conn = setup_conn();
+
+        let err = store.put(&mut conn, epr).expect_err("should be refused");
+        assert!(
+            matches!(err, crate::error::StorageError::Unauthorized(_)),
+            "expected Unauthorized, got: {err:?}"
+        );
+
+        // No swarm command must have been sent.
+        let cmds = drain_commands(&mut rx);
+        assert!(
+            cmds.is_empty(),
+            "No P2P command must be sent when reach authorization is refused; {} command(s) received",
+            cmds.len()
+        );
+    }
+
+    /// D.4 test 2: Familiar reach + known signer (peer_identity_bindings row)
+    /// → Ok + announce sent.
+    #[tokio::test]
+    async fn put_authorizes_familiar_reach_for_known_signer() {
+        let pool = setup_pool();
+        let (epr, signer_cid) = sample_epr_with_signer_seed(Reach::Familiar, 43);
+
+        // Pre-insert the binding so the signer is "known".
+        insert_binding(&pool, &signer_cid);
+
+        let (tx, mut rx) = mpsc::channel::<crate::p2p::P2PCommand>(8);
+        let store = FederatedEprStore::new()
+            .with_db_pool(pool)
+            .with_swarm_tx(tx);
+
+        let mut conn = setup_conn();
+        let result = store.put(&mut conn, epr).expect("should succeed");
+        assert!(!result.cid.is_empty());
+
+        // Familiar reach → [Gossip] fanout → PublishEprAnnounce must be sent.
+        let cmds = drain_commands(&mut rx);
+        let has_announce = cmds
+            .iter()
+            .any(|c| matches!(c, crate::p2p::P2PCommand::PublishEprAnnounce { .. }));
+        assert!(
+            has_announce,
+            "Expected PublishEprAnnounce for known signer at Familiar reach"
+        );
+    }
+
+    /// D.4 test 3: Commons reach + unknown signer (no pool, no binding)
+    /// → Ok (open reach, no known-agent requirement).
+    #[tokio::test]
+    async fn put_authorizes_commons_reach_for_unknown_signer() {
+        // No pool needed — Commons is open broadcast; anyone can author.
+        let pool = setup_pool();
+        let (epr, _signer) = sample_epr_with_signer_seed(Reach::Commons, 44);
+
+        let (tx, mut rx) = mpsc::channel::<crate::p2p::P2PCommand>(8);
+        let store = FederatedEprStore::new()
+            .with_db_pool(pool)
+            .with_swarm_tx(tx);
+
+        let mut conn = setup_conn();
+        let result = store
+            .put(&mut conn, epr)
+            .expect("Commons reach must succeed for anyone");
+        assert!(!result.cid.is_empty());
+
+        // Commons fanout = [Kad, Gossip].
+        let cmds = drain_commands(&mut rx);
+        assert!(
+            !cmds.is_empty(),
+            "Commons reach must send P2P commands (Kad + Gossip)"
+        );
+    }
+
+    /// D.4 test 4: Familiar reach + local_agent_cid matches signer (no DB row)
+    /// → Ok (self-authored EPR recognized without DB lookup).
+    #[tokio::test]
+    async fn put_authorizes_familiar_reach_for_local_agent() {
+        let pool = setup_pool();
+        let (epr, signer_cid) = sample_epr_with_signer_seed(Reach::Familiar, 45);
+
+        // No binding row — but signer IS the local agent.
+        let (tx, mut rx) = mpsc::channel::<crate::p2p::P2PCommand>(8);
+        let store = FederatedEprStore::new()
+            .with_db_pool(pool)
+            .with_local_agent_cid(signer_cid.clone())
+            .with_swarm_tx(tx);
+
+        let mut conn = setup_conn();
+        let result = store
+            .put(&mut conn, epr)
+            .expect("local agent must be authorized for Familiar reach");
+        assert!(!result.cid.is_empty());
+
+        // Announce should be sent (Familiar → Gossip).
+        let cmds = drain_commands(&mut rx);
+        let has_announce = cmds
+            .iter()
+            .any(|c| matches!(c, crate::p2p::P2PCommand::PublishEprAnnounce { .. }));
+        assert!(
+            has_announce,
+            "Expected PublishEprAnnounce for local agent at Familiar reach"
         );
     }
 }
