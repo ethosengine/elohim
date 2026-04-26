@@ -85,7 +85,7 @@ pub async fn handle(
 
         // ── Portal hosts ──────────────────────────────────────────────────
         (Method::GET, "/portal-hosts") => get_portal_hosts(req, pool).await,
-        (Method::POST, "/portal-hosts") => Ok(zome_bridge_not_yet_wired("portal-hosts")),
+        (Method::POST, "/portal-hosts") => handle_add_portal_host(req, hc_registry, pool).await,
         (Method::DELETE, p) if p.starts_with("/portal-hosts/") => {
             Ok(zome_bridge_not_yet_wired("portal-hosts/:url_b64"))
         }
@@ -675,6 +675,15 @@ struct SubmitRevocationVoteZomeOutput {
     threshold_now_reached: bool,
 }
 
+#[derive(serde::Serialize)]
+struct AddPortalHostZomeInput {
+    host_url: String,
+    label: Option<String>,
+    /// One of "Public", "Trusted", "Private" — the zome enum's serde
+    /// representation. Defaults to "Trusted" when None at the InputView.
+    reach: Option<String>,
+}
+
 // ---------------------------------------------------------------------------
 // Phase 11: request body reader
 // ---------------------------------------------------------------------------
@@ -815,6 +824,65 @@ async fn handle_revocation_vote(
                 threshold_now_reached: out.threshold_now_reached,
             };
             Ok(response::ok(&view))
+        }
+        Err(e) => Ok(map_zome_err_to_http(&e)),
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Phase 11: handle_add_portal_host
+// ---------------------------------------------------------------------------
+
+async fn handle_add_portal_host(
+    req: Request<Incoming>,
+    hc_registry: Option<&std::sync::Arc<crate::hc_client_registry::HcClientRegistry>>,
+    pool: &DbPool,
+) -> Result<Response<Full<Bytes>>, StorageError> {
+    let mut conn = get_conn(pool)?;
+    let agent_key = match extract_agent_key(&req, &mut conn)? {
+        Some(k) => k,
+        None => {
+            return Ok(response::bad_request(
+                "missing X-Agent-Id and no active session",
+            ));
+        }
+    };
+
+    let registry = match hc_registry {
+        Some(r) => r,
+        None => return Ok(response_503_imagodei_bridge_offline()),
+    };
+    let hc = match registry.imagodei.as_ref() {
+        Some(h) => h,
+        None => return Ok(response_503_imagodei_bridge_offline()),
+    };
+
+    if let Err(resp) = verify_caller_owns_cell(hc.as_ref(), &agent_key) {
+        return Ok(resp);
+    }
+
+    let body_bytes = read_request_body(req).await?;
+    let input_view: crate::views::AddPortalHostInputView = serde_json::from_slice(&body_bytes)
+        .map_err(|e| StorageError::InvalidInput(format!("invalid request body: {e}")))?;
+
+    let zome_input = AddPortalHostZomeInput {
+        host_url: input_view.host_url,
+        label: input_view.label,
+        reach: input_view.reach,
+    };
+
+    match forward_to_imagodei::<_, holochain_types::prelude::ActionHash>(
+        hc,
+        "add_portal_host",
+        &zome_input,
+    )
+    .await
+    {
+        Ok(action_hash) => {
+            let view = crate::views::AddPortalHostOutputView {
+                action_hash: action_hash.to_string(),
+            };
+            Ok(response::created(&view))
         }
         Err(e) => Ok(map_zome_err_to_http(&e)),
     }
