@@ -567,6 +567,47 @@ fn response_503_imagodei_bridge_offline() -> Response<Full<Bytes>> {
     )
 }
 
+/// Maps a `StorageError` from a zome call to an HTTP response.
+///
+/// PHASE-11-DEBT: this string-matches well-known zome error prefixes.
+/// Brittle by design — matches what `imagodei` returns today. Typed
+/// errors over the conductor wire are an M6+ refactor.
+#[allow(dead_code)]
+fn map_zome_err_to_http(err: &StorageError) -> Response<Full<Bytes>> {
+    let msg = err.to_string();
+
+    // 403 — gate rejections (defender, EC, ownership)
+    if msg.contains("not a configured defender")
+        || msg.contains("not an active emergency contact")
+        || msg.contains("does not control")
+        || msg.contains("does not belong to")
+    {
+        let body = serde_json::json!({
+            "error": "forbidden",
+            "code": "ZOME_GATE_REJECTED",
+            "message": msg,
+        });
+        return response::json_response(hyper::StatusCode::FORBIDDEN, &body);
+    }
+
+    // 400 — input validation
+    if msg.contains("invalid reason")
+        || msg.contains("already effective")
+        || msg.contains("votes not accepted")
+        || msg.contains("attestation cannot be empty")
+        || msg.contains("no KeyRevocation with id")
+    {
+        return response::bad_request(&msg);
+    }
+
+    // 503 — conductor connectivity
+    if matches!(err, StorageError::Connection(_)) {
+        return response::service_unavailable(&msg);
+    }
+
+    response::internal_error(&msg)
+}
+
 // ---------------------------------------------------------------------------
 // Phase 11 stub: zome bridge not yet wired
 // ---------------------------------------------------------------------------
@@ -753,5 +794,64 @@ mod tests {
                 "route {r} should return 503"
             );
         }
+    }
+
+    use crate::error::StorageError;
+
+    /// Gate-rejection messages from the imagodei coordinator map to 403.
+    #[test]
+    fn map_zome_err_to_http_403_for_gate_rejection() {
+        let cases = [
+            "Conductor(\"create_self_revocation: caller does not control revoked_key (different human_id)\")",
+            "Conductor(\"submit_revocation_vote: caller is not an active emergency contact for human-x\")",
+            "Conductor(\"submit_specialist_revocation: caller is not a configured defender for this human\")",
+            "Conductor(\"submit_specialist_revocation: revoked_pub_key does not belong to target human\")",
+        ];
+        for msg in cases {
+            let err = StorageError::Conductor(msg.to_string());
+            let resp = map_zome_err_to_http(&err);
+            assert_eq!(
+                resp.status(),
+                hyper::StatusCode::FORBIDDEN,
+                "expected 403 for {msg}"
+            );
+        }
+    }
+
+    /// Input-validation failures map to 400.
+    #[test]
+    fn map_zome_err_to_http_400_for_invalid_input() {
+        let cases = [
+            "Conductor(\"create_self_revocation: invalid reason 'bogus'\")",
+            "Conductor(\"submit_revocation_vote: revocation rev-x already effective\")",
+            "Conductor(\"submit_revocation_vote: revocation rev-x has trigger_type=voluntary, votes not accepted\")",
+            "Conductor(\"submit_revocation_vote: attestation cannot be empty\")",
+            "Conductor(\"submit_revocation_vote: no KeyRevocation with id rev-missing\")",
+        ];
+        for msg in cases {
+            let err = StorageError::Conductor(msg.to_string());
+            let resp = map_zome_err_to_http(&err);
+            assert_eq!(
+                resp.status(),
+                hyper::StatusCode::BAD_REQUEST,
+                "expected 400 for {msg}"
+            );
+        }
+    }
+
+    /// Connectivity failures map to 503.
+    #[test]
+    fn map_zome_err_to_http_503_for_connection_error() {
+        let err = StorageError::Connection("Admin connect failed: refused".to_string());
+        let resp = map_zome_err_to_http(&err);
+        assert_eq!(resp.status(), hyper::StatusCode::SERVICE_UNAVAILABLE);
+    }
+
+    /// Anything else falls through to 500.
+    #[test]
+    fn map_zome_err_to_http_500_for_unknown() {
+        let err = StorageError::Conductor("Zome call failed: unexpected internal error".to_string());
+        let resp = map_zome_err_to_http(&err);
+        assert_eq!(resp.status(), hyper::StatusCode::INTERNAL_SERVER_ERROR);
     }
 }
