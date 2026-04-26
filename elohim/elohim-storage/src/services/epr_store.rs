@@ -219,6 +219,16 @@ pub struct FederatedEprStore {
     ///
     /// TODO(D.4): wire local_agent_cid from conductor signing client when available.
     local_agent_cid: Option<String>,
+    /// D.7 dedup fix: the local node's libp2p PeerId as a string.
+    ///
+    /// Kademlia's `get_providers` may return the local node's own PeerId when
+    /// this node is a provider. Without this field we cannot recognise it as
+    /// `"local"` (since `peer.to_string()` yields `"12D3KooW..."`, never `"local"`),
+    /// which would produce duplicate entries — one `"local"` and one raw PeerId.
+    ///
+    /// Set via `with_local_libp2p_peer_id`. When `None`, self-advertisement
+    /// dedup is skipped (safe: produces a harmless duplicate in that edge-case).
+    local_libp2p_peer_id: Option<String>,
 }
 
 impl FederatedEprStore {
@@ -228,6 +238,7 @@ impl FederatedEprStore {
             swarm_tx: None,
             db_pool: None,
             local_agent_cid: None,
+            local_libp2p_peer_id: None,
         }
     }
 
@@ -251,6 +262,15 @@ impl FederatedEprStore {
     /// lookup.
     pub fn with_local_agent_cid(mut self, cid: String) -> Self {
         self.local_agent_cid = Some(cid);
+        self
+    }
+
+    /// D.7 dedup fix: Set the local node's libp2p PeerId string so that
+    /// `providers()` can recognise and skip self-advertisement from Kademlia
+    /// results.  Call this at construction time from wherever the swarm's
+    /// PeerId is available (e.g. `P2PNode::peer_id().to_string()`).
+    pub fn with_local_libp2p_peer_id(mut self, peer_id: String) -> Self {
+        self.local_libp2p_peer_id = Some(peer_id);
         self
     }
 }
@@ -447,7 +467,7 @@ impl EprStore for FederatedEprStore {
                             let result = tokio::task::block_in_place(|| {
                                 handle.block_on(async {
                                     tokio::time::timeout(
-                                        std::time::Duration::from_secs(5),
+                                        crate::p2p::KAD_GET_PROVIDERS_TIMEOUT,
                                         reply_rx,
                                     )
                                     .await
@@ -455,12 +475,20 @@ impl EprStore for FederatedEprStore {
                             });
                             match result {
                                 Ok(Ok(peer_ids)) => {
-                                    let local_peer_id = "local";
                                     for peer_id in peer_ids {
                                         let peer_str = peer_id.to_string();
-                                        // Skip self-advertisement: if Kad returns the local
-                                        // peer it is already included as ProviderRef::local().
-                                        if peer_str != local_peer_id
+                                        // Skip self-advertisement: Kad may return the local
+                                        // node's own PeerId; it is already present as
+                                        // ProviderRef::local() (peer_id == "local").
+                                        // Compare against the stored libp2p PeerId string,
+                                        // NOT the literal "local" — peer.to_string() yields
+                                        // "12D3KooW...", never "local".
+                                        let is_self = self
+                                            .local_libp2p_peer_id
+                                            .as_deref()
+                                            .map(|id| id == peer_str)
+                                            .unwrap_or(false);
+                                        if !is_self
                                             && !providers.iter().any(|p| p.peer_id == peer_str)
                                         {
                                             providers.push(ProviderRef {
@@ -517,11 +545,15 @@ fn build_announce_payload(cid: &str) -> Result<Vec<u8>, crate::error::StorageErr
 /// when the P2P swarm is running. `pool` wires the Stage 1 reach-earning
 /// resolver (D.4); when `None` the resolver fails-open. `local_agent_cid`
 /// identifies the local conductor agent so self-signed EPRs are recognized
-/// as known-agent without a DB lookup (D.4).
+/// as known-agent without a DB lookup (D.4). `local_libp2p_peer_id` enables
+/// correct self-advertisement dedup in `providers()` (D.7 fix): pass
+/// `Some(node.peer_id().to_string())` where available; `None` is safe (dedup
+/// is skipped, producing a harmless duplicate in that edge-case).
 pub fn default_epr_store(
     swarm_tx: Option<tokio::sync::mpsc::Sender<crate::p2p::P2PCommand>>,
     pool: Option<crate::db::DbPool>,
     local_agent_cid: Option<String>,
+    local_libp2p_peer_id: Option<String>,
 ) -> impl EprStore {
     let mut store = FederatedEprStore::new();
     if let Some(tx) = swarm_tx {
@@ -532,6 +564,9 @@ pub fn default_epr_store(
     }
     if let Some(cid) = local_agent_cid {
         store = store.with_local_agent_cid(cid);
+    }
+    if let Some(pid) = local_libp2p_peer_id {
+        store = store.with_local_libp2p_peer_id(pid);
     }
     store
 }
@@ -1059,6 +1094,63 @@ mod tests {
             "should get only local provider on channel close"
         );
         assert_eq!(providers[0].peer_id, "local");
+    }
+
+    /// D.7 test 4: self-advertisement dedup — when the swarm returns the
+    /// local node's own libp2p PeerId, providers() must NOT produce a duplicate
+    /// entry.  The local ProviderRef ("local") is already present; the Kad
+    /// result for the same node must be suppressed.
+    ///
+    /// Regression guard for the broken `peer_str != "local"` guard: a real
+    /// PeerId string is never equal to the literal "local", so the old code
+    /// would push a second entry.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn providers_dedups_self_when_kad_returns_local_peer_id() {
+        // Generate a deterministic libp2p keypair so the PeerId is known.
+        let local_kp = libp2p::identity::Keypair::generate_ed25519();
+        let local_peer_id = local_kp.public().to_peer_id();
+        let local_peer_id_str = local_peer_id.to_string();
+
+        let (tx, mut rx) = mpsc::channel::<crate::p2p::P2PCommand>(8);
+        let store = FederatedEprStore::new()
+            .with_swarm_tx(tx)
+            .with_local_libp2p_peer_id(local_peer_id_str.clone());
+        let mut conn = setup_conn();
+
+        // Put an atom so the local store has a provider entry ("local").
+        let epr = sample_epr_with_reach(Reach::Commons);
+        let result = store.put(&mut conn, epr).expect("put must succeed");
+        // Drain the put's Kad+Gossip commands so the channel is clear.
+        let _ = drain_commands(&mut rx);
+
+        // Fake responder: returns the local node's own PeerId — this is the
+        // case Kademlia produces when the node is itself a provider.
+        let local_peer_id_clone = local_peer_id;
+        tokio::spawn(async move {
+            while let Some(cmd) = rx.recv().await {
+                if let crate::p2p::P2PCommand::KadGetProviders { reply, .. } = cmd {
+                    // Return the local node as if Kad found it.
+                    let _ = reply.send(vec![local_peer_id_clone]);
+                    break;
+                }
+            }
+        });
+
+        let providers = store
+            .providers(&mut conn, &result.cid)
+            .expect("providers must not error");
+
+        assert_eq!(
+            providers.len(),
+            1,
+            "expected exactly 1 provider (local), got {}: {:?}",
+            providers.len(),
+            providers.iter().map(|p| &p.peer_id).collect::<Vec<_>>()
+        );
+        assert_eq!(
+            providers[0].peer_id, "local",
+            "the single provider must be 'local', not the raw PeerId"
+        );
     }
 
     /// D.4 test 4: Familiar reach + local_agent_cid matches signer (no DB row)

@@ -81,6 +81,28 @@ use ts_rs::TS;
 
 use crate::db::DbPool;
 
+// ---------------------------------------------------------------------------
+// EPR atom Kademlia constants
+// ---------------------------------------------------------------------------
+
+/// Kademlia key prefix for EPR atom provider records.
+///
+/// MUST stay consistent across `KadStartProviding` (D.4) and `KadGetProviders`
+/// (D.7). Both arms format the key as `"{EPR_ATOM_KAD_KEY_PREFIX}:{cid}"`.
+/// A single constant prevents silent key-space divergence from a typo.
+pub(crate) const EPR_ATOM_KAD_KEY_PREFIX: &str = "epr-atom";
+
+/// Timeout for Kademlia `get_providers` queries before falling back to
+/// local-only results.  epr_store.rs imports this constant so the value is
+/// expressed once and can be tuned from a single location.
+pub(crate) const KAD_GET_PROVIDERS_TIMEOUT: Duration = Duration::from_secs(5);
+
+/// Format a Kademlia key for an EPR atom CID.
+#[inline]
+pub(crate) fn kad_key_for_atom(cid: &str) -> String {
+    format!("{EPR_ATOM_KAD_KEY_PREFIX}:{cid}")
+}
+
 /// Map of pending EPR resolve requests: request ID → (requested content ID, reply sender)
 type PendingEprMap = Arc<
     tokio::sync::Mutex<
@@ -1619,9 +1641,9 @@ impl P2PNode {
                 }
             }
             // D.2: announce atom provider record to Kademlia DHT.
-            // Key prefix `epr-atom:{cid}` — distinct from `epr:{id}` (EPR Head put_record).
+            // Key: EPR_ATOM_KAD_KEY_PREFIX + ":" + cid — distinct from `epr:{id}` (EPR Head put_record).
             P2PCommand::KadStartProviding { cid } => {
-                let key = RecordKey::new(&format!("epr-atom:{cid}"));
+                let key = RecordKey::new(&kad_key_for_atom(&cid));
                 match swarm.behaviour_mut().kademlia.start_providing(key) {
                     Ok(_) => info!(
                         target: "elohim_storage::epr",
@@ -1636,11 +1658,11 @@ impl P2PNode {
                     ),
                 }
             }
-            // D.7: query Kademlia DHT for providers of `epr-atom:{cid}`.
+            // D.7: query Kademlia DHT for providers of the EPR atom CID.
             // Issues `get_providers` and registers the query in `pending_kad_get_providers`
             // so that `OutboundQueryProgressed { GetProviders }` events can resolve it.
             P2PCommand::KadGetProviders { cid, reply } => {
-                let key = RecordKey::new(&format!("epr-atom:{cid}"));
+                let key = RecordKey::new(&kad_key_for_atom(&cid));
                 let query_id = swarm.behaviour_mut().kademlia.get_providers(key);
                 debug!(
                     target: "elohim_storage::epr",
