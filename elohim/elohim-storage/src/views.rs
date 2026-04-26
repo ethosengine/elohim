@@ -7014,3 +7014,75 @@ pub struct SubmitSpecialistRevocationInputView {
     /// by the imagodei coordinator zome before committing to DHT.
     pub anomaly_attestation: JsonVal,
 }
+
+/// Input for self-revocation (M4 fast-path: a human voluntarily revokes
+/// one of their own keys).
+#[derive(Debug, Clone, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct CreateSelfRevocationInputView {
+    /// Base64-encoded AgentPubKey (e.g. "uhCAk...") of the key being revoked.
+    /// Must belong to the same human as the caller.
+    pub revoked_key: String,
+    /// Reason — one of REVOCATION_REASONS recognised by the imagodei zome.
+    pub reason: String,
+}
+
+/// Output of `create_self_revocation` — projected from the zome's
+/// `KeyRevocationOutput` for HTTP camelCase responses.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct CreateSelfRevocationOutputView {
+    pub revocation_id: String,
+    /// Base64-encoded ActionHash of the committed KeyRevocation entry.
+    pub action_hash: String,
+}
+
+/// Input for an emergency-contact vote on a pending KeyRevocation.
+/// The `revocation_id` arrives via the URL path `/recovery/:id/vote`,
+/// so the body holds only the steward's vote payload.
+#[derive(Debug, Clone, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct SubmitRevocationVoteInputView {
+    /// `true` to approve the revocation, `false` to reject. The M4 zome
+    /// only counts approvals towards the threshold; rejections are recorded
+    /// for transparency.
+    pub approved: bool,
+    /// Free-text steward attestation — must be non-empty.
+    pub attestation: String,
+}
+
+/// Output of `submit_revocation_vote` — projected from the zome's
+/// `RevocationVoteOutput` for HTTP camelCase responses.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct SubmitRevocationVoteOutputView {
+    pub vote_id: String,
+    pub current_votes: u32,
+    pub required_votes: u32,
+    pub threshold_now_reached: bool,
+}
+
+/// Output of `add_portal_host` — projected from the zome's `ActionHash`
+/// return for a uniform HTTP shape.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct AddPortalHostOutputView {
+    /// Base64-encoded ActionHash of the committed PortalHost entry.
+    pub action_hash: String,
+}
+
+/// Output of `remove_portal_host`. Empty body on success — included for
+/// uniform contract shape (clients may still expect a JSON body).
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct RemovePortalHostOutputView {
+    /// Always `true` — the zome returns `()` on success; clients can use
+    /// this as a presence check.
+    pub deleted: bool,
+}
