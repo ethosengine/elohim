@@ -31,6 +31,7 @@
 pub mod behaviour;
 pub mod epr_atom_protocol;
 pub mod epr_protocol;
+pub mod fanout;
 pub mod identity_binding_gossip;
 pub mod identity_handshake;
 pub mod identity_map;
@@ -158,6 +159,7 @@ pub use epr_atom_protocol::{
     MAX_REQUEST_SIZE as EPR_ATOM_MAX_REQUEST_SIZE, MAX_RESPONSE_SIZE as EPR_ATOM_MAX_RESPONSE_SIZE,
 };
 pub use epr_protocol::{EprCodec, EprProtocol, EprRequest, EprResponse};
+pub use fanout::{channels_for_reach, FanoutChannel};
 pub use identity_map::{
     CallerIdentity, HolochainBackedPeerIdentityMap, PeerIdentityMap, StubIdentityMap,
 };
