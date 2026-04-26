@@ -14,6 +14,15 @@
 //! CRUD) require the conductor bridge, which is deferred to Phase 11 (threaded HcClient).
 //! Until then those routes return 503 with a machine-readable `notImplemented` code so the
 //! Angular layer can surface a graceful message instead of an unhandled error.
+//!
+//! ## Provenance assumption (Phase 11)
+//! `HcClient::call_zome` signs the call with admin-issued credentials, but
+//! the conductor presents the call to the zome as the cell's owner agent.
+//! Empirically verified by the heartbeat path: `record_peer_status` reads
+//! `agent_info()?.agent_initial_pubkey` and the resulting peer statuses are
+//! correctly attributed to peers (not to storage's signer). The mode gate
+//! `verify_caller_owns_cell` exploits this: if the connected cell's owner
+//! matches the resolved human key, the zome will see the human as caller.
 
 use bytes::Bytes;
 use http_body_util::Full;
