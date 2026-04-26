@@ -435,7 +435,7 @@ async fn async_main(
     let peer_policy_path = config.peer_policy_path.clone();
     // Populated inside the Ok(policy_cfg) arm below; read by HTTP layer in Task 5.
     // Underscore-prefixed until Task 5 threads it into the HTTP handler state.
-    let mut _hc_registry_for_http: Option<
+    let mut hc_registry_for_http: Option<
         std::sync::Arc<elohim_storage::hc_client_registry::HcClientRegistry>,
     > = None;
     if let Some(admin_url) = &args.admin_url {
@@ -561,8 +561,7 @@ async fn async_main(
                 }
 
                 // Stash the registry in shared state for HTTP handlers.
-                // Read by HTTP layer in Task 5; underscore-prefixed until then.
-                _hc_registry_for_http = Some(registry);
+                hc_registry_for_http = Some(registry);
             }
             Err(e) => {
                 warn!(
@@ -946,6 +945,11 @@ async fn async_main(
         http_server = http_server.with_sync_manager(node.sync_manager().clone());
         http_server = http_server.with_p2p_handle(node.handle());
         info!("P2P node wired to HTTP server — Sync API and /p2p/status active");
+    }
+
+    // Wire HcClientRegistry into HTTP server for zome forwarding (Phase 11 Task 5).
+    if let Some(registry) = hc_registry_for_http.as_ref() {
+        http_server = http_server.with_hc_registry(registry.clone());
     }
 
     // Load slug index for HTML5 app caching

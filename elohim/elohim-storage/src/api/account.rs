@@ -24,6 +24,8 @@
 //! `verify_caller_owns_cell` exploits this: if the connected cell's owner
 //! matches the resolved human key, the zome will see the human as caller.
 
+use std::sync::Arc;
+
 use bytes::Bytes;
 use http_body_util::Full;
 use hyper::{body::Incoming, Method, Request, Response};
@@ -50,6 +52,7 @@ pub async fn handle(
     method: Method,
     resource_path: &str,
     pool: &DbPool,
+    _hc_registry: Option<&Arc<crate::hc_client_registry::HcClientRegistry>>,
 ) -> Result<Response<Full<Bytes>>, StorageError> {
     match (method, resource_path) {
         // ── Aggregate ──────────────────────────────────────────────────────

@@ -175,6 +175,9 @@ pub struct HttpServer {
     /// Wired at startup via `with_write_through_state`. When absent, every
     /// non-integrity (pillar, kind) resolves to OFF (implicit default).
     write_through_state: Option<Arc<crate::write_through::WriteThroughState>>,
+    /// Registry of per-cell HcClient instances for zome forwarding (Phase 11).
+    /// Wired at startup via `with_hc_registry`. None = conductor bridge unavailable.
+    hc_registry: Option<Arc<crate::hc_client_registry::HcClientRegistry>>,
 }
 
 /// Extract X-Schema-Version header from request and validate it.
@@ -233,6 +236,7 @@ impl HttpServer {
             manifest_registry: None,
             signing_client: None,
             write_through_state: None,
+            hc_registry: None,
         }
     }
 
@@ -292,6 +296,15 @@ impl HttpServer {
         state: Arc<crate::write_through::WriteThroughState>,
     ) -> Self {
         self.write_through_state = Some(state);
+        self
+    }
+
+    /// Wire the HcClientRegistry for per-cell zome forwarding (Phase 11).
+    pub fn with_hc_registry(
+        mut self,
+        registry: std::sync::Arc<crate::hc_client_registry::HcClientRegistry>,
+    ) -> Self {
+        self.hc_registry = Some(registry);
         self
     }
 
@@ -749,6 +762,7 @@ impl HttpServer {
                         &path,
                         pool.clone(),
                         self.services.clone(),
+                        self.hc_registry.clone(),
                     )
                     .await
                 } else {
