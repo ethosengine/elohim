@@ -489,9 +489,8 @@ async fn async_main(
                         blob_store.clone(),
                         hc.clone(),
                     );
-                    let mut heartbeat = elohim_storage::heartbeat::HeartbeatTask::new(
-                        policy_cfg, publisher, probe,
-                    );
+                    let mut heartbeat =
+                        elohim_storage::heartbeat::HeartbeatTask::new(policy_cfg, publisher, probe);
                     // Task C8: pipe DEVICE_ARCHETYPE through to PeerStatus
                     // so consumers (/shefa/devices, /shefa/dashboard) can
                     // correlate peer vitals with hardware archetype.

@@ -65,18 +65,14 @@ pub async fn handle(
         (Method::GET, "/revocations") => get_account_revocations(req, pool).await,
 
         // ── Self-revocation (zome write — Phase 11 bridge) ────────────────
-        (Method::POST, "/self-revocation") => {
-            handle_self_revocation(req, hc_registry, pool).await
-        }
+        (Method::POST, "/self-revocation") => handle_self_revocation(req, hc_registry, pool).await,
 
         // ── Pending recovery requests (where I am EC) ─────────────────────
         (Method::GET, "/pending-recovery") => get_pending_recovery(req, pool).await,
 
         // ── Recovery vote (zome write — Phase 11 bridge) ──────────────────
         (Method::POST, p) if p.starts_with("/recovery/") && p.ends_with("/vote") => {
-            let revocation_id = p
-                .trim_start_matches("/recovery/")
-                .trim_end_matches("/vote");
+            let revocation_id = p.trim_start_matches("/recovery/").trim_end_matches("/vote");
             if revocation_id.is_empty() {
                 return Ok(response::bad_request("missing revocation id in URL path"));
             }
@@ -634,13 +630,11 @@ where
     I: serde::Serialize,
     O: serde::de::DeserializeOwned,
 {
-    let payload = rmp_serde::to_vec_named(input).map_err(|e| {
-        StorageError::Conductor(format!("encode {fn_name} input: {e}"))
-    })?;
+    let payload = rmp_serde::to_vec_named(input)
+        .map_err(|e| StorageError::Conductor(format!("encode {fn_name} input: {e}")))?;
     let bytes = hc.call_zome("imagodei", fn_name, payload).await?;
-    let output: O = rmp_serde::from_slice(&bytes).map_err(|e| {
-        StorageError::Conductor(format!("decode {fn_name} output: {e}"))
-    })?;
+    let output: O = rmp_serde::from_slice(&bytes)
+        .map_err(|e| StorageError::Conductor(format!("decode {fn_name} output: {e}")))?;
     Ok(output)
 }
 
@@ -698,9 +692,10 @@ struct AddPortalHostZomeInput {
 async fn read_request_body(req: Request<Incoming>) -> Result<Bytes, StorageError> {
     use http_body_util::BodyExt;
     let body = req.into_body();
-    let collected = body.collect().await.map_err(|e| {
-        StorageError::InvalidInput(format!("read request body: {e}"))
-    })?;
+    let collected = body
+        .collect()
+        .await
+        .map_err(|e| StorageError::InvalidInput(format!("read request body: {e}")))?;
     Ok(collected.to_bytes())
 }
 
@@ -741,10 +736,9 @@ async fn handle_self_revocation(
         serde_json::from_slice(&body_bytes)
             .map_err(|e| StorageError::InvalidInput(format!("invalid request body: {e}")))?;
 
-    let revoked_key = holochain_types::prelude::AgentPubKey::try_from(
-        input_view.revoked_key.as_str(),
-    )
-    .map_err(|e| StorageError::InvalidInput(format!("invalid revokedKey: {e}")))?;
+    let revoked_key =
+        holochain_types::prelude::AgentPubKey::try_from(input_view.revoked_key.as_str())
+            .map_err(|e| StorageError::InvalidInput(format!("invalid revokedKey: {e}")))?;
 
     let zome_input = CreateSelfRevocationZomeInput {
         revoked_key,
@@ -1133,7 +1127,8 @@ mod tests {
     /// Anything else falls through to 500.
     #[test]
     fn map_zome_err_to_http_500_for_unknown() {
-        let err = StorageError::Conductor("Zome call failed: unexpected internal error".to_string());
+        let err =
+            StorageError::Conductor("Zome call failed: unexpected internal error".to_string());
         let resp = map_zome_err_to_http(&err);
         assert_eq!(resp.status(), hyper::StatusCode::INTERNAL_SERVER_ERROR);
     }
