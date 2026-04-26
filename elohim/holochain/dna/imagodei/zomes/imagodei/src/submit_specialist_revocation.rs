@@ -42,12 +42,16 @@ use crate::{resolve_human_id_for_agent, RecoveryV2Signal, REVOCATION_REASONS};
 
 /// Input for `submit_specialist_revocation`.
 ///
-/// `anomaly_attestation` carries the structured attestation body from the
-/// elohim defender specialist.  Its shape is governed by
-/// `elohim/sdk/schemas/v1/agent/anomaly-attestation.schema.json`.  It is stored
-/// verbatim (serialised to a JSON string) in `KeyRevocation.votes_json` so that
-/// the elohim-storage projection can surface it to elohim-app without a lossy
-/// string truncation.
+/// `anomaly_attestation_json` carries the structured attestation body from the
+/// elohim defender specialist as a pre-serialised JSON string.  The structured
+/// shape is governed by `elohim/sdk/schemas/v1/agent/anomaly-attestation.schema.json`.
+/// It is stored verbatim in `KeyRevocation.votes_json` so the elohim-storage
+/// projection can surface it to elohim-app without lossy string truncation.
+///
+/// Caller (storage HTTP layer at Phase 11) is responsible for `JSON.stringify`
+/// before invoking this zome function. The WASM zome boundary uses
+/// `holochain_serialized_bytes` (MessagePack), which does not round-trip
+/// `serde_json::Value` cleanly — hence the pre-serialised string.
 #[derive(Serialize, Deserialize, SerializedBytes, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct SubmitSpecialistRevocationInput {
@@ -57,9 +61,9 @@ pub struct SubmitSpecialistRevocationInput {
     pub revoked_pub_key: AgentPubKey,
     /// Free-text reason — must be one of `REVOCATION_REASONS`.
     pub reason: String,
-    /// Structured anomaly attestation from the defender specialist.
-    /// Shape: `anomaly-attestation.schema.json`.
-    pub anomaly_attestation: serde_json::Value,
+    /// Pre-serialised JSON string of the anomaly attestation
+    /// (matches `anomaly-attestation.schema.json`).
+    pub anomaly_attestation_json: String,
 }
 
 // =============================================================================
@@ -167,12 +171,8 @@ pub fn submit_specialist_revocation(
         )));
     }
 
-    // --- Serialise anomaly_attestation into votes_json ---
-    let attestation_json = serde_json::to_string(&input.anomaly_attestation).map_err(|e| {
-        wasm_error!(WasmErrorInner::Guest(format!(
-            "submit_specialist_revocation: anomaly_attestation serialisation failed: {e}"
-        )))
-    })?;
+    // anomaly_attestation_json arrives pre-serialised — store it verbatim.
+    let attestation_json = input.anomaly_attestation_json.clone();
 
     let now = sys_time()?;
     let timestamp = format!("{:?}", now);

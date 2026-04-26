@@ -78,14 +78,17 @@ struct CreateHumanInput {
 ///   - `human_action_hash`   → "humanActionHash"
 ///   - `revoked_pub_key`     → "revokedPubKey"
 ///   - `reason`              → "reason"
-///   - `anomaly_attestation` → "anomalyAttestation"
+///   - `anomaly_attestation_json` → "anomalyAttestationJson"
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 struct SubmitSpecialistRevocationInput {
     human_action_hash: ActionHash,
     revoked_pub_key: AgentPubKey,
     reason: String,
-    anomaly_attestation: serde_json::Value,
+    /// Pre-serialised JSON string (matches `anomaly-attestation.schema.json`).
+    /// MessagePack does not round-trip `serde_json::Value` cleanly across the
+    /// WASM boundary, so the caller pre-stringifies.
+    anomaly_attestation_json: String,
 }
 
 // ============================================================================
@@ -176,7 +179,8 @@ async fn submit_specialist_revocation_rejects_without_role_marker() -> Result<()
         human_action_hash: target_human_hash,
         revoked_pub_key: agent.clone(),
         reason: "key_compromise".to_string(),
-        anomaly_attestation: minimal_anomaly_attestation("human-target-m5", &agent.to_string()),
+        anomaly_attestation_json: minimal_anomaly_attestation("human-target-m5", &agent.to_string())
+            .to_string(),
     };
 
     // Expect rejection — the Stage 1 gate stub unconditionally returns false.
@@ -273,7 +277,8 @@ async fn specialist_revocation_wire_shape_guard() -> Result<()> {
         human_action_hash: dummy_action_hash.clone(),
         revoked_pub_key: dummy_agent.clone(),
         reason: "key_compromise".to_string(),
-        anomaly_attestation: minimal_anomaly_attestation("human-wire-guard", "dummy-key"),
+        anomaly_attestation_json: minimal_anomaly_attestation("human-wire-guard", "dummy-key")
+            .to_string(),
     };
 
     let json = serde_json::to_value(&input)?;
@@ -289,12 +294,15 @@ async fn specialist_revocation_wire_shape_guard() -> Result<()> {
     );
     assert_eq!(json["reason"].as_str().unwrap_or(""), "key_compromise");
     assert!(
-        json.get("anomalyAttestation").is_some(),
-        "expected 'anomalyAttestation' field"
+        json.get("anomalyAttestationJson").is_some(),
+        "expected 'anomalyAttestationJson' field"
     );
 
-    // Verify anomaly_attestation shape.
-    let attestation = &json["anomalyAttestation"];
+    // The wire field is a JSON string; parse it to inspect the structured payload.
+    let attestation_str = json["anomalyAttestationJson"]
+        .as_str()
+        .expect("anomalyAttestationJson must be a string");
+    let attestation: serde_json::Value = serde_json::from_str(attestation_str)?;
     assert_eq!(
         attestation["anomalyType"].as_str().unwrap_or(""),
         "key_compromise"
