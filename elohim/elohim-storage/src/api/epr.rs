@@ -76,7 +76,7 @@ pub async fn handle(
         // GET /api/v1/epr/:cid/providers
         (&Method::GET, p) if p.ends_with("/providers") && p.split('/').count() == 2 => {
             let cid = p.trim_end_matches("/providers");
-            get_providers(req, cid, pool, ctx).await
+            get_providers(req, cid, pool, ctx, swarm_tx).await
         }
 
         // GET /api/v1/epr/:cid  (plain CID — must not contain '/')
@@ -329,8 +329,9 @@ async fn get_providers(
     cid: &str,
     pool: &DbPool,
     _ctx: &AppContext,
+    swarm_tx: Option<tokio::sync::mpsc::Sender<crate::p2p::P2PCommand>>,
 ) -> Result<Response<Full<Bytes>>, StorageError> {
-    let store = default_epr_store(None, None, None);
+    let store = default_epr_store(swarm_tx, Some(pool.clone()), None);
     let mut conn = get_conn(pool)?;
 
     // Reach check: we need to know the atom's reach to enforce, but if the

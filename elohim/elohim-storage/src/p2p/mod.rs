@@ -111,6 +111,16 @@ type PendingShardPushMap = Arc<
     >,
 >;
 
+/// D.7: Map of pending Kademlia `get_providers` queries.
+/// QueryId → (accumulated PeerIds, reply sender).
+/// Populated when `KadGetProviders` command is processed; resolved (and removed)
+/// when the query reaches `step.last == true` via `OutboundQueryProgressed`.
+type PendingKadGetProvidersMap = Arc<
+    tokio::sync::Mutex<
+        std::collections::HashMap<kad::QueryId, (Vec<PeerId>, oneshot::Sender<Vec<PeerId>>)>,
+    >,
+>;
+
 /// Map of pending shard verification requests: outbound request ID → (shard_hash, peer_id)
 type PendingVerificationMap = Arc<
     tokio::sync::Mutex<
@@ -290,6 +300,10 @@ pub struct P2PNode {
     /// In-memory only — restart clears the cache (acceptable; DB writes are
     /// idempotent, so duplicate processing on restart is a non-issue).
     dedup: Arc<dedup::DedupLru>,
+    /// D.7: pending Kademlia `get_providers` queries.
+    /// Populated by `handle_command(KadGetProviders)`, resolved when
+    /// `OutboundQueryProgressed { result: QueryResult::GetProviders(..), step.last }` fires.
+    pending_kad_get_providers: PendingKadGetProvidersMap,
 }
 
 /// Cached identify protocol info for a connected peer.
@@ -483,6 +497,15 @@ pub enum P2PCommand {
     /// Key prefix `epr-atom:{cid}` — distinct from `epr:{id}` used for EPR Head
     /// put_record to clearly demarcate the atom federation track.
     KadStartProviding { cid: String },
+    /// D.7: query Kademlia DHT for peers providing the given CID.
+    ///
+    /// The reply channel receives the accumulated list of PeerIds once the query
+    /// reaches `step.last == true` (or empty Vec on timeout / no providers).
+    /// Key `epr-atom:{cid}` — matches the key used by D.2's `KadStartProviding`.
+    KadGetProviders {
+        cid: String,
+        reply: oneshot::Sender<Vec<PeerId>>,
+    },
     /// Publish an EPR atom announce to a gossipsub topic. Triggered by
     /// `FederatedEprStore::put` when the fanout policy includes a Gossip channel.
     ///
@@ -603,6 +626,10 @@ impl P2PHandle {
                     P2PCommand::KadStartProviding { .. } => {} // fire-and-forget
                     P2PCommand::PublishEprAnnounce { .. } => {} // fire-and-forget
                     P2PCommand::DirectNotifyIntegrity { .. } => {} // fire-and-forget (D.5 best-effort)
+                    P2PCommand::KadGetProviders { reply, .. } => {
+                        // D.7 stub: no swarm in test, always return empty.
+                        let _ = reply.send(vec![]);
+                    }
                 }
             }
         });
@@ -1094,6 +1121,9 @@ impl P2PNode {
             sync_paused: Arc::new(AtomicBool::new(false)),
             identity_map,
             dedup: Arc::new(dedup::DedupLru::new()),
+            pending_kad_get_providers: Arc::new(tokio::sync::Mutex::new(
+                std::collections::HashMap::new(),
+            )),
         })
     }
 
@@ -1605,6 +1635,23 @@ impl P2PNode {
                         "kad_start_providing: DHT start_providing failed"
                     ),
                 }
+            }
+            // D.7: query Kademlia DHT for providers of `epr-atom:{cid}`.
+            // Issues `get_providers` and registers the query in `pending_kad_get_providers`
+            // so that `OutboundQueryProgressed { GetProviders }` events can resolve it.
+            P2PCommand::KadGetProviders { cid, reply } => {
+                let key = RecordKey::new(&format!("epr-atom:{cid}"));
+                let query_id = swarm.behaviour_mut().kademlia.get_providers(key);
+                debug!(
+                    target: "elohim_storage::epr",
+                    cid = %cid,
+                    query_id = ?query_id,
+                    "kad_get_providers: issued DHT provider query"
+                );
+                self.pending_kad_get_providers
+                    .lock()
+                    .await
+                    .insert(query_id, (Vec::new(), reply));
             }
             // D.3: publish EPR atom announce to a reach-scoped gossipsub topic.
             // topic built by p2p::topics::topic_for; payload is msgpack-encoded CID.
@@ -2280,6 +2327,80 @@ impl P2PNode {
             }) => {
                 if is_new_peer {
                     debug!(peer = %peer, "New peer added to Kademlia routing table");
+                }
+            }
+            // D.7: handle progressive GetProviders results.
+            // `FoundProviders` may arrive multiple times for a single query (kad emits
+            // one event per batch of discovered providers). Accumulate into
+            // `pending_kad_get_providers` until `step.last` fires, then deliver.
+            behaviour::ElohimStorageBehaviourEvent::Kademlia(
+                kad::Event::OutboundQueryProgressed {
+                    id,
+                    result:
+                        kad::QueryResult::GetProviders(Ok(kad::GetProvidersOk::FoundProviders {
+                            providers,
+                            ..
+                        })),
+                    step,
+                    ..
+                },
+            ) => {
+                let mut pending = self.pending_kad_get_providers.lock().await;
+                if let Some((acc, _)) = pending.get_mut(&id) {
+                    acc.extend(providers);
+                }
+                if step.last {
+                    if let Some((acc, tx)) = pending.remove(&id) {
+                        debug!(
+                            target: "elohim_storage::epr",
+                            query_id = ?id,
+                            provider_count = acc.len(),
+                            "kad_get_providers: query finished with providers (step.last)"
+                        );
+                        let _ = tx.send(acc);
+                    }
+                }
+            }
+            behaviour::ElohimStorageBehaviourEvent::Kademlia(
+                kad::Event::OutboundQueryProgressed {
+                    id,
+                    result:
+                        kad::QueryResult::GetProviders(Ok(
+                            kad::GetProvidersOk::FinishedWithNoAdditionalRecord { .. },
+                        )),
+                    step,
+                    ..
+                },
+            ) => {
+                if step.last {
+                    let mut pending = self.pending_kad_get_providers.lock().await;
+                    if let Some((acc, tx)) = pending.remove(&id) {
+                        debug!(
+                            target: "elohim_storage::epr",
+                            query_id = ?id,
+                            provider_count = acc.len(),
+                            "kad_get_providers: query finished (no additional records, step.last)"
+                        );
+                        let _ = tx.send(acc);
+                    }
+                }
+            }
+            behaviour::ElohimStorageBehaviourEvent::Kademlia(
+                kad::Event::OutboundQueryProgressed {
+                    id,
+                    result: kad::QueryResult::GetProviders(Err(e)),
+                    ..
+                },
+            ) => {
+                let mut pending = self.pending_kad_get_providers.lock().await;
+                if let Some((_, tx)) = pending.remove(&id) {
+                    warn!(
+                        target: "elohim_storage::epr",
+                        query_id = ?id,
+                        error = ?e,
+                        "kad_get_providers: query failed — returning empty provider list"
+                    );
+                    let _ = tx.send(Vec::new());
                 }
             }
             behaviour::ElohimStorageBehaviourEvent::Kademlia(event) => {

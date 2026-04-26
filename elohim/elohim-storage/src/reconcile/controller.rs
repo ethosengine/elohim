@@ -421,13 +421,15 @@ impl<S: DnaSignalStream> ReconcileController<S> {
                     // trigger_type and reason are not carried on KeyRevocationSignal;
                     // empty strings are valid per the wire contract (spec §7.2).
                     let msg = crate::p2p::recovery_revocation::RecoveryRevocationMessage {
-                        revocation_id: format!("rev-{}-{}", revoked_agent_cid, compromise_at_str),
+                        revocation_id: signal.triggering_revocation_id.clone().unwrap_or_else(
+                            || format!("rev-{}-{}", revoked_agent_cid, compromise_at_str),
+                        ),
                         human_id: revoked_agent_cid.clone(),
                         revoked_key: revoked_pubkey,
                         trigger_type: String::new(),
                         reason: String::new(),
                         status: "effective".to_string(),
-                        sender_peer_id: String::new(), // populated by P2PNode when sending
+                        sender_peer_id: String::new(), // Stage 1: empty; receiver identifies sender via transport PeerId (logged at inbound handler)
                         sent_at: now_iso,
                     };
                     match msg.to_bytes() {

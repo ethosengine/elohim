@@ -412,10 +412,83 @@ impl EprStore for FederatedEprStore {
         conn: &mut SqliteConnection,
         cid: &str,
     ) -> Result<Vec<ProviderRef>, StorageError> {
-        let providers = self.local.providers(conn, cid)?;
-        // TODO(phase-2b): extend providers with DHT provider records:
-        //   let dht_providers = self.swarm_handle.kad_get_providers(cid).await?;
-        //   providers.extend(dht_providers.into_iter().map(ProviderRef::from));
+        let mut providers = self.local.providers(conn, cid)?;
+
+        // D.7: extend with DHT providers from Kademlia `get_providers`.
+        // Guard: skip if no swarm channel or no tokio runtime (e.g. sync unit tests).
+        if let Some(tx) = &self.swarm_tx {
+            match tokio::runtime::Handle::try_current() {
+                Err(_) => {
+                    tracing::debug!(
+                        cid = %cid,
+                        "providers: no tokio runtime — skipping Kad query"
+                    );
+                }
+                Ok(handle) => {
+                    let (reply_tx, reply_rx) =
+                        tokio::sync::oneshot::channel::<Vec<libp2p::PeerId>>();
+                    let cmd = crate::p2p::P2PCommand::KadGetProviders {
+                        cid: cid.to_string(),
+                        reply: reply_tx,
+                    };
+                    match tx.try_send(cmd) {
+                        Err(e) => {
+                            tracing::warn!(
+                                cid = %cid,
+                                error = ?e,
+                                "providers: KadGetProviders command send failed"
+                            );
+                        }
+                        Ok(()) => {
+                            // Block the current thread safely: `block_in_place` moves other
+                            // tokio tasks off this thread, then `block_on` drives the timeout
+                            // future to completion. This avoids "cannot start a runtime from
+                            // within a runtime" panics when called from an async HTTP handler.
+                            let result = tokio::task::block_in_place(|| {
+                                handle.block_on(async {
+                                    tokio::time::timeout(
+                                        std::time::Duration::from_secs(5),
+                                        reply_rx,
+                                    )
+                                    .await
+                                })
+                            });
+                            match result {
+                                Ok(Ok(peer_ids)) => {
+                                    let local_peer_id = "local";
+                                    for peer_id in peer_ids {
+                                        let peer_str = peer_id.to_string();
+                                        // Skip self-advertisement: if Kad returns the local
+                                        // peer it is already included as ProviderRef::local().
+                                        if peer_str != local_peer_id
+                                            && !providers.iter().any(|p| p.peer_id == peer_str)
+                                        {
+                                            providers.push(ProviderRef {
+                                                peer_id: peer_str,
+                                                advertised_at: None,
+                                            });
+                                        }
+                                    }
+                                }
+                                Ok(Err(_channel_closed)) => {
+                                    tracing::debug!(
+                                        cid = %cid,
+                                        "providers: Kad reply channel closed before result"
+                                    );
+                                }
+                                Err(_timeout) => {
+                                    tracing::debug!(
+                                        cid = %cid,
+                                        "providers: Kad get_providers timed out after 5s"
+                                    );
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         Ok(providers)
     }
 }
@@ -886,6 +959,106 @@ mod tests {
             !cmds.is_empty(),
             "Commons reach must send P2P commands (Kad + Gossip)"
         );
+    }
+
+    // -----------------------------------------------------------------------
+    // D.7 tests — providers() returns local + DHT providers
+    // -----------------------------------------------------------------------
+
+    /// D.7 test 1: store without swarm_tx — providers() returns the single
+    /// local entry for a known CID, no panic.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn providers_local_only_when_no_swarm_tx() {
+        let store = FederatedEprStore::new(); // no swarm_tx
+        let mut conn = setup_conn();
+
+        // Put an atom so it has a local provider.
+        let epr = sample_epr_with_reach(Reach::Commons);
+        let result = store.put(&mut conn, epr).expect("put must succeed");
+
+        let providers = store
+            .providers(&mut conn, &result.cid)
+            .expect("providers must not error");
+        assert_eq!(
+            providers.len(),
+            1,
+            "local-only store must return exactly one provider"
+        );
+        assert_eq!(providers[0].peer_id, "local");
+    }
+
+    /// D.7 test 2: store with swarm_tx where the receiver replies with a known
+    /// PeerId — providers() returns both local AND that PeerId.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn providers_includes_kad_results_when_swarm_provides() {
+        let (tx, mut rx) = mpsc::channel::<crate::p2p::P2PCommand>(8);
+        let store = FederatedEprStore::new().with_swarm_tx(tx);
+        let mut conn = setup_conn();
+
+        // Put a local atom.
+        let epr = sample_epr_with_reach(Reach::Commons);
+        let result = store.put(&mut conn, epr).expect("put must succeed");
+        // Drain the put's Kad+Gossip commands.
+        let _ = drain_commands(&mut rx);
+
+        // Spawn a task that services the KadGetProviders command and replies with a peer ID.
+        let fake_peer_str = "12D3KooWGfzSBGbqkBdgPRMjVU6VvBnEKYqF3ZnHBmfpFyG1sD7T";
+        let fake_peer: libp2p::PeerId = fake_peer_str.parse().expect("valid PeerId for test");
+        tokio::spawn(async move {
+            while let Some(cmd) = rx.recv().await {
+                if let crate::p2p::P2PCommand::KadGetProviders { reply, .. } = cmd {
+                    let _ = reply.send(vec![fake_peer]);
+                    break;
+                }
+            }
+        });
+
+        let providers = store
+            .providers(&mut conn, &result.cid)
+            .expect("providers must not error");
+
+        assert_eq!(
+            providers.len(),
+            2,
+            "expected local + 1 DHT provider, got: {:?}",
+            providers.iter().map(|p| &p.peer_id).collect::<Vec<_>>()
+        );
+        assert!(
+            providers.iter().any(|p| p.peer_id == "local"),
+            "local must be present"
+        );
+        assert!(
+            providers.iter().any(|p| p.peer_id == fake_peer_str),
+            "DHT peer must be present"
+        );
+    }
+
+    /// D.7 test 3: store with swarm_tx but the receiver is dropped (simulating
+    /// a timeout / channel close) — providers() returns just the local entry
+    /// without panicking.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn providers_handles_kad_timeout_gracefully() {
+        let (tx, rx) = mpsc::channel::<crate::p2p::P2PCommand>(8);
+        let store = FederatedEprStore::new().with_swarm_tx(tx);
+        let mut conn = setup_conn();
+
+        // Put a local atom.
+        let epr = sample_epr_with_reach(Reach::Commons);
+        let result = store.put(&mut conn, epr).expect("put must succeed");
+
+        // Drop the receiver immediately to simulate timeout (channel closed).
+        drop(rx);
+
+        // providers() must not panic, must return just the local entry.
+        let providers = store
+            .providers(&mut conn, &result.cid)
+            .expect("providers must not error even when swarm is gone");
+        assert_eq!(
+            providers.len(),
+            1,
+            "should get only local provider on channel close"
+        );
+        assert_eq!(providers[0].peer_id, "local");
     }
 
     /// D.4 test 4: Familiar reach + local_agent_cid matches signer (no DB row)

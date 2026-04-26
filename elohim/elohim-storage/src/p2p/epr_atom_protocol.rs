@@ -44,7 +44,9 @@ impl AsRef<str> for EprAtomProtocol {
 /// Request variants — transient wire types (no persistent source of truth).
 /// `tag` is the CBOR discriminator; shape matches the wire contract in
 /// `elohim/sdk/schemas/v1/p2p/epr-atom-message.schema.json`.
-// TODO(D.5): update epr-atom-message.schema.json with integrity_notify variant
+// TODO(Z.1 / D.5 schema-first): update elohim/sdk/schemas/v1/p2p/epr-atom-message.schema.json
+// with integrity_notify request variant + integrity_ack response variant.
+// Tracked by Phase 2B Batch D Z.1 (TODO sweep).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "tag", rename_all = "snake_case")]
 pub enum EprAtomRequest {
