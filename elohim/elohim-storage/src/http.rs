@@ -743,12 +743,21 @@ impl HttpServer {
             // Enriched API: Business logic endpoints
             (method, p) if p.starts_with("/api/v1/") => {
                 if let Some(ref pool) = self.db_pool {
+                    // D.2: thread swarm_tx into handle_api_request so epr::handle
+                    // can issue KadStartProviding on successful puts.
+                    #[cfg(feature = "p2p")]
+                    let swarm_tx = self.p2p_handle.as_ref().map(|h| h.command_sender());
+                    #[cfg(not(feature = "p2p"))]
+                    let swarm_tx: Option<
+                        tokio::sync::mpsc::Sender<crate::p2p::P2PCommand>,
+                    > = None;
                     crate::api::handle_api_request(
                         req,
                         method,
                         &path,
                         pool.clone(),
                         self.services.clone(),
+                        swarm_tx,
                     )
                     .await
                 } else {

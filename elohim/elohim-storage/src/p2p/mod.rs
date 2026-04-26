@@ -452,6 +452,15 @@ pub enum P2PCommand {
     /// `KeyRevocationEffective` signals. Best-effort — subscriber discovery is
     /// eventual; publish failure does not affect projection correctness.
     PublishRecoveryRevocation(crate::p2p::recovery_revocation::RecoveryRevocationMessage),
+    /// Advertise that this node holds the EPR atom with the given CID by issuing
+    /// `kademlia.start_providing(...)`. Triggered by `FederatedEprStore::put`
+    /// when the fanout policy includes a Kad/KadLight channel for the EPR's reach.
+    /// Best-effort: failure to send (channel closed) or to start providing (DHT
+    /// rejection) is logged but does not affect the local put.
+    ///
+    /// Key prefix `epr-atom:{cid}` — distinct from `epr:{id}` used for EPR Head
+    /// put_record to clearly demarcate the atom federation track.
+    KadStartProviding { cid: String },
 }
 
 /// RAII guard that resumes P2P sync when dropped.
@@ -546,6 +555,7 @@ impl P2PHandle {
                     P2PCommand::PublishRecoveryInvitation(_) => {} // fire-and-forget
                     P2PCommand::PublishIdentityBinding(_) => {} // fire-and-forget
                     P2PCommand::PublishRecoveryRevocation(_) => {} // fire-and-forget
+                    P2PCommand::KadStartProviding { .. } => {} // fire-and-forget
                 }
             }
         });
@@ -1514,6 +1524,24 @@ impl P2PNode {
                         revocation_id = %msg.revocation_id,
                         error = ?e,
                         "Failed to encode RecoveryRevocationMessage"
+                    ),
+                }
+            }
+            // D.2: announce atom provider record to Kademlia DHT.
+            // Key prefix `epr-atom:{cid}` — distinct from `epr:{id}` (EPR Head put_record).
+            P2PCommand::KadStartProviding { cid } => {
+                let key = RecordKey::new(&format!("epr-atom:{cid}"));
+                match swarm.behaviour_mut().kademlia.start_providing(key) {
+                    Ok(_) => info!(
+                        target: "elohim_storage::epr",
+                        cid = %cid,
+                        "kad_start_providing: advertised atom CID to DHT"
+                    ),
+                    Err(e) => warn!(
+                        target: "elohim_storage::epr",
+                        cid = %cid,
+                        error = ?e,
+                        "kad_start_providing: DHT start_providing failed"
                     ),
                 }
             }

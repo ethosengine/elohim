@@ -4,7 +4,7 @@
 //! FederatedEprStore wraps LocalEprStore + a libp2p swarm handle and, on local
 //! miss, issues EprRequest::Resolve via /elohim/epr/1.0.0 to discover peers
 //! that hold the atom. Phase 2a ships FederatedEprStore with the libp2p bridge
-//! stubbed as TODO(phase-2b); Phase 2c wires the swarm handle and flips the
+//! stubbed as TODO(phase-2b); Phase 2b wires the swarm handle and flips the
 //! construction site from LocalEprStore → FederatedEprStore.
 
 use diesel::SqliteConnection;
@@ -181,25 +181,36 @@ impl EprStore for LocalEprStore {
 }
 
 // ---------------------------------------------------------------------------
-// FederatedEprStore — Phase 2a stub; Phase 2c wires libp2p bridge
+// FederatedEprStore — Phase 2b wires libp2p Kad provider advertisement
 // ---------------------------------------------------------------------------
 
-/// Federated store that, in Phase 2c, will bridge to the existing
-/// /elohim/epr/1.0.0 libp2p protocol and Kad DHT. In Phase 2a it falls through
-/// to LocalEprStore with explicit TODO markers for each federation seam.
+use super::epr_kind::kind_canonical_str;
+
+/// Federated store that bridges to the elohim-storage libp2p swarm for Kad
+/// provider advertisement (Phase 2b D.2). In Phase 2a the swarm_tx was
+/// stubbed; Phase 2b wires it via `with_swarm_tx`.
 pub struct FederatedEprStore {
     local: LocalEprStore,
-    // TODO(phase-2b): swarm_handle: SwarmHandle — channel into the running
-    // elohim-storage swarm so fetch/put can issue EprRequest::Resolve and
-    // Kad start_providing. Requires resolving EprHead↔Envelope format
-    // compatibility (see Phase 2c pivot doc).
+    /// Optional sender for the P2P command channel. When Some, successful
+    /// puts that match a Kad-tier fanout policy issue `KadStartProviding`.
+    /// When None (default, or in test contexts without a swarm), Kad
+    /// advertisement is silently skipped.
+    swarm_tx: Option<tokio::sync::mpsc::Sender<crate::p2p::P2PCommand>>,
 }
 
 impl FederatedEprStore {
     pub fn new() -> Self {
         FederatedEprStore {
             local: LocalEprStore::new(),
+            swarm_tx: None,
         }
+    }
+
+    /// Wire the P2P command channel so `put` can issue `KadStartProviding`
+    /// when the EPR's fanout policy includes a Kad or KadLight channel.
+    pub fn with_swarm_tx(mut self, tx: tokio::sync::mpsc::Sender<crate::p2p::P2PCommand>) -> Self {
+        self.swarm_tx = Some(tx);
+        self
     }
 }
 
@@ -226,10 +237,43 @@ impl EprStore for FederatedEprStore {
     }
 
     fn put(&self, conn: &mut SqliteConnection, epr: Epr) -> Result<EprIngestResult, StorageError> {
+        // Snapshot reach + kind before consuming epr in local.put.
+        let reach = epr.envelope.reach;
+        let kind = epr.envelope.kind;
+
         let result = self.local.put(conn, epr)?;
-        // TODO(phase-2b): self.swarm_handle.kad_start_providing(result.cid.parse()?).await?;
-        // This announces to the DHT that this node holds the atom, so future
-        // fetch requests from other peers can find us via EprRequest::Resolve.
+
+        // D.2: advertise atom to Kademlia DHT when the fanout policy includes
+        // a Kad or KadLight channel. Best-effort — send failure is logged and
+        // dropped; the local put already succeeded and remains authoritative.
+        use crate::p2p::fanout::{channels_for_reach, FanoutChannel};
+        let kind_str = kind_canonical_str(kind);
+        let channels = channels_for_reach(reach, kind_str);
+        let needs_kad = channels
+            .iter()
+            .any(|c| matches!(c, FanoutChannel::Kad | FanoutChannel::KadLight));
+        if needs_kad {
+            if let Some(tx) = &self.swarm_tx {
+                match tx.try_send(crate::p2p::P2PCommand::KadStartProviding {
+                    cid: result.cid.clone(),
+                }) {
+                    Ok(()) => {}
+                    Err(tokio::sync::mpsc::error::TrySendError::Full(_)) => {
+                        tracing::warn!(
+                            cid = %result.cid,
+                            "kad_start_providing: channel full — skipping (best-effort)"
+                        );
+                    }
+                    Err(tokio::sync::mpsc::error::TrySendError::Closed(_)) => {
+                        tracing::error!(
+                            cid = %result.cid,
+                            "kad_start_providing: swarm command channel closed — Kad advertisement permanently lost"
+                        );
+                    }
+                }
+            }
+        }
+
         Ok(result)
     }
 
@@ -269,8 +313,157 @@ impl EprStore for FederatedEprStore {
 // Factory function — used by route handlers (avoids AppContext field cascade)
 // ---------------------------------------------------------------------------
 
-/// Construct the Phase 2a default store. Routes call this; Phase 2c flips the
-/// return type from LocalEprStore to a fully-wired FederatedEprStore in one place.
-pub fn default_epr_store() -> impl EprStore {
-    FederatedEprStore::default()
+/// Construct the Phase 2b default store. Routes call this; the optional
+/// `swarm_tx` wires Kad provider advertisement when the P2P swarm is running.
+pub fn default_epr_store(
+    swarm_tx: Option<tokio::sync::mpsc::Sender<crate::p2p::P2PCommand>>,
+) -> impl EprStore {
+    let store = FederatedEprStore::new();
+    match swarm_tx {
+        Some(tx) => store.with_swarm_tx(tx),
+        None => store,
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use diesel::connection::SimpleConnection;
+    use elohim_epr::{cid::compute_cid, proof::AgentKeypair, Coupling, Epr, EprKind, Reach};
+    use tokio::sync::mpsc;
+
+    // -----------------------------------------------------------------------
+    // Helpers
+    // -----------------------------------------------------------------------
+
+    fn setup_conn() -> diesel::SqliteConnection {
+        use diesel::Connection;
+        let mut conn =
+            diesel::SqliteConnection::establish(":memory:").expect("open in-memory SQLite");
+        let sql = std::fs::read_to_string("migrations/2026-04-22-050000_add_epr_tables/up.sql")
+            .expect("load epr tables migration");
+        conn.batch_execute(&sql)
+            .expect("apply epr tables migration");
+        let a7_sql =
+            std::fs::read_to_string("migrations/2026-04-25-000000_verified_at_on_epr_atoms/up.sql")
+                .expect("load a7 verified_at migration");
+        conn.batch_execute(&a7_sql).expect("apply a7 migration");
+        conn
+    }
+
+    fn sample_epr_with_reach(reach: Reach) -> Epr {
+        let kp = AgentKeypair::from_secret(&[99u8; 32]).unwrap();
+        let signer_cid = compute_cid(b"test-signer");
+        let schema_ref = compute_cid(b"test-schema-ref");
+        let gov = compute_cid(b"test-governance");
+        let coupling = Coupling {
+            knowledge: None,
+            value: None,
+            governance: Some(gov),
+        };
+        Epr::builder()
+            .kind(EprKind::Manifest)
+            .schema_ref(schema_ref)
+            .schema_key("test/schema")
+            .reach(reach)
+            .coupling(coupling)
+            .issued_at(chrono::Utc::now())
+            .payload(b"test-payload".to_vec())
+            .sign(&kp, signer_cid)
+            .expect("sign test EPR")
+    }
+
+    // -----------------------------------------------------------------------
+    // D.2 tests
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn put_with_commons_reach_sends_kad_start_providing() {
+        let (tx, mut rx) = mpsc::channel::<crate::p2p::P2PCommand>(8);
+        let store = FederatedEprStore::new().with_swarm_tx(tx);
+        let mut conn = setup_conn();
+
+        let epr = sample_epr_with_reach(Reach::Commons);
+        let expected_cid = epr.envelope.cid.to_string();
+
+        let result = store.put(&mut conn, epr).expect("put must succeed");
+        assert_eq!(result.cid, expected_cid);
+
+        // The Commons fanout policy includes Kad, so KadStartProviding must be sent.
+        match rx.try_recv() {
+            Ok(crate::p2p::P2PCommand::KadStartProviding { cid }) => {
+                assert_eq!(
+                    cid, expected_cid,
+                    "KadStartProviding CID must match put result CID"
+                );
+            }
+            Ok(_) => panic!("expected KadStartProviding but received a different P2PCommand"),
+            Err(e) => panic!("expected KadStartProviding but channel was empty/closed: {e}"),
+        }
+        // No second command.
+        assert!(rx.try_recv().is_err(), "only one command expected");
+    }
+
+    #[tokio::test]
+    async fn put_with_private_reach_does_not_send_kad() {
+        let (tx, mut rx) = mpsc::channel::<crate::p2p::P2PCommand>(8);
+        let store = FederatedEprStore::new().with_swarm_tx(tx);
+        let mut conn = setup_conn();
+
+        let epr = sample_epr_with_reach(Reach::Private);
+        let result = store.put(&mut conn, epr).expect("put must succeed");
+        assert!(!result.cid.is_empty());
+
+        // Private reach → DirectOnly fanout; no Kad command.
+        assert!(
+            rx.try_recv().is_err(),
+            "Private reach must NOT send KadStartProviding"
+        );
+    }
+
+    #[tokio::test]
+    async fn put_with_public_reach_sends_kad_start_providing() {
+        // Public reach → [Gossip, Kad] fanout; Kad command must be sent.
+        let (tx, mut rx) = mpsc::channel::<crate::p2p::P2PCommand>(8);
+        let store = FederatedEprStore::new().with_swarm_tx(tx);
+        let mut conn = setup_conn();
+
+        let epr = sample_epr_with_reach(Reach::Public);
+        let expected_cid = epr.envelope.cid.to_string();
+
+        let result = store.put(&mut conn, epr).expect("put must succeed");
+        assert_eq!(result.cid, expected_cid);
+
+        // The Public fanout policy includes Kad, so KadStartProviding must be sent.
+        match rx.try_recv() {
+            Ok(crate::p2p::P2PCommand::KadStartProviding { cid }) => {
+                assert_eq!(
+                    cid, expected_cid,
+                    "KadStartProviding CID must match put result CID"
+                );
+            }
+            Ok(_) => panic!("expected KadStartProviding but received a different P2PCommand"),
+            Err(e) => panic!("expected KadStartProviding but channel was empty/closed: {e}"),
+        }
+        // No second command.
+        assert!(rx.try_recv().is_err(), "only one command expected");
+    }
+
+    #[tokio::test]
+    async fn put_without_swarm_tx_is_ok() {
+        // FederatedEprStore::new() has no swarm_tx — should not panic even for
+        // Commons reach (which would need Kad if a swarm were present).
+        let store = FederatedEprStore::new();
+        let mut conn = setup_conn();
+
+        let epr = sample_epr_with_reach(Reach::Commons);
+        let result = store
+            .put(&mut conn, epr)
+            .expect("put must succeed without swarm_tx");
+        assert!(!result.cid.is_empty());
+    }
 }
