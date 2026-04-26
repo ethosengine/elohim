@@ -31,6 +31,7 @@ import {
   GraduationCompletedResponse,
   // Account models
   AccountResponse,
+  PortalHostResponse,
   // Capabilities
   CapabilitiesResponse,
   // Route registry
@@ -405,6 +406,27 @@ export class DoorwayAdminService {
     return this.http.post<void>(`${this.baseUrl}/auth/logout`, {}).pipe(
       timeout(this.timeout),
       catchError(this.handleError<void>('logout', undefined))
+    );
+  }
+
+  /**
+   * Get the peer-native portal host for the current user, if reachable.
+   * Used to surface the "Manage from your steward" redirect.
+   */
+  async getPortalHostUrl(): Promise<PortalHostResponse> {
+    return firstValueFrom(
+      this.http.get<PortalHostResponse>(`${this.baseUrl}/auth/portal-host`)
+    );
+  }
+
+  /**
+   * Mint a short-lived session token for cross-origin portal redirect.
+   */
+  async mintSessionToken(): Promise<{ sessionToken: string; expiresAt: number }> {
+    return firstValueFrom(
+      this.http.get<{ sessionToken: string; expiresAt: number }>(
+        `${this.baseUrl}/auth/session-token`
+      )
     );
   }
 

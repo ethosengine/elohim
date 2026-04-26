@@ -6915,3 +6915,102 @@ pub struct EprProvidersView {
     /// Peer identifiers — "local" for this node, or libp2p PeerId for remote peers.
     pub providers: Vec<String>,
 }
+
+// =============================================================================
+// Recovery Protocol Phase 2 — M5 Views
+// Auth Portal Convergence + Revocation UX + Stub Defender
+// =============================================================================
+
+/// Projection of an imagodei PortalHost DHT entry.
+/// Source of truth: DHT (imagodei PortalHost entry).
+/// This table is a read-optimized projection rebuildable via signal replay.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct PortalHostView {
+    pub human_id: String,
+    pub host_url: String,
+    pub label: Option<String>,
+    pub added_at: String,
+    /// Last time this host was successfully reached.
+    /// Operational enrichment — NOT stored in the notarized DHT entry.
+    /// Populated by the elohim-storage reconciliation controller from
+    /// periodic health probes; may be None if never probed or unreachable.
+    pub last_reachable_at: Option<String>,
+    pub reach: String,
+    pub dht_anchor_hash: String,
+}
+
+/// Projection of an EPR 2B AgentPeerBinding DHT entry.
+/// Source of truth: DHT (imagodei AgentPeerBinding entry).
+/// Links an agent CID to a libp2p PeerId with an Ed25519 signature proof.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct AgentPeerBindingView {
+    /// CIDv1 base32 of the agent's EPR atom.
+    pub agent_cid: String,
+    /// libp2p PeerId of the bound peer (base58btc multihash).
+    pub peer_id: String,
+    /// RFC3339 date-time when the binding becomes valid.
+    pub valid_from: String,
+    /// RFC3339 date-time when the binding expires; None for non-expiring bindings.
+    pub valid_until: Option<String>,
+    /// Hex-encoded Ed25519 signature over canonical binding bytes.
+    pub signature: String,
+    pub dht_anchor_hash: String,
+}
+
+/// Aggregate view for the authenticated account portal.
+/// Composes identity, recovery state, and hosting configuration into a single
+/// response so the Angular account pillar can render the full account surface
+/// without multiple sequential calls.
+///
+/// Source of truth: composite — individual sub-views each carry their own
+/// `dhtAnchorHash` for provenance. See sub-view docs for per-entity truth layer.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct AccountView {
+    pub human: HumanView,
+    pub active_key_rotation: Option<KeyRotationView>,
+    pub recent_revocations: Vec<KeyRevocationView>,
+    pub pending_recovery_requests: Vec<RecoveryRequestView>,
+    pub emergency_contacts: Vec<HumanRelationshipView>,
+    pub portal_hosts: Vec<PortalHostView>,
+    /// True when this account holds a stewardship allocation on the local conductor.
+    pub is_steward: bool,
+    /// True when elohim-storage is connected to a local Holochain conductor
+    /// (as opposed to operating through a hosted doorway-only path).
+    pub has_local_conductor: bool,
+}
+
+/// Input for registering a new portal host URL for the authenticated human.
+/// reach defaults to "trusted" when omitted.
+#[derive(Debug, Clone, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct AddPortalHostInputView {
+    pub host_url: String,
+    pub label: Option<String>,
+    /// Reach classification — "public" | "trusted" | "private".
+    /// Defaults to "trusted" when omitted.
+    pub reach: Option<String>,
+}
+
+/// Input for an elohim defender submitting a specialist revocation.
+/// Used when the defender detects anomalous behaviour and escalates a
+/// revocation without waiting for a community quorum vote.
+#[derive(Debug, Clone, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct SubmitSpecialistRevocationInputView {
+    /// ActionHash (base64) of the human's source-chain entry being acted upon.
+    pub human_action_hash: String,
+    /// The agent pubkey being revoked (base64 or hex — must match DHT record).
+    pub revoked_pub_key: String,
+    /// Structured anomaly attestation produced by the elohim defender.
+    /// Schema is defined by the specialist revocation protocol; validated
+    /// by the imagodei coordinator zome before committing to DHT.
+    pub anomaly_attestation: JsonVal,
+}

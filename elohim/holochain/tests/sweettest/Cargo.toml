@@ -53,6 +53,14 @@ path = "src/tests/epr_phase_2b_batch_a_e2e.rs"
 name = "imagodei_sign_for_agent"
 path = "src/tests/imagodei_sign_for_agent.rs"
 
+[[test]]
+name = "portal_host_crud"
+path = "src/tests/portal_host_crud.rs"
+
+[[test]]
+name = "submit_specialist_revocation"
+path = "src/tests/submit_specialist_revocation.rs"
+
 [dependencies]
 # Holochain runtime — sweettest embeds a real conductor in-process.
 # Versions are pinned to match the DNAs (HDK 0.6.0 / HDI 0.7.0).

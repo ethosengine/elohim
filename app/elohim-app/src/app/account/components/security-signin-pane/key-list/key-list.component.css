@@ -1,0 +1,14 @@
+.key-row {
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--color-border, #e0e0e0);
+}
+
+.key-row.revoked {
+  opacity: 0.6;
+}
+
+.muted {
+  color: var(--color-text-muted, #666);
+  font-size: 0.875rem;
+  margin-left: 0.5rem;
+}

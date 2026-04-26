@@ -6,6 +6,7 @@ members = [
     "elohim-agent/gate-client",
     "elohim-agent/gate-types",
     "elohim-agent/gate-client-zome",
+    "elohim-agent/specialists/defender",
     "eae",
     "elohim-compute",
     "elohim-token",

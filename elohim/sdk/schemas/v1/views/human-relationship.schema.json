@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "epr:schema:view:human-relationship",
+  "title": "HumanRelationshipView",
+  "description": "Source of truth: DHT (Notarized, Category A). Projection of the imagodei HumanRelationship DHT entry. Rebuildable via signal replay on RelationshipCreated signals. dhtAnchorHash is null for pre-coherence rows.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id", "hAppId", "partyAId", "partyBId", "relationshipType",
+    "intimacyLevel", "isBidirectional", "consentGivenByA", "consentGivenByB",
+    "custodyEnabledByA", "custodyEnabledByB", "autoCustodyEnabled",
+    "emergencyAccessEnabled", "initiatedBy", "reach", "createdAt", "updatedAt"
+  ],
+  "properties": {
+    "id":                     { "type": "string", "description": "Coordinator-generated stable relationship identifier" },
+    "hAppId":                 { "type": "string", "description": "Holochain hApp instance identifier" },
+    "partyAId":               { "type": "string", "description": "human_id of party A (initiating side)" },
+    "partyBId":               { "type": "string", "description": "human_id of party B" },
+    "relationshipType":       { "type": "string", "description": "One of the RelationshipType enum values (e.g. family, friendship, stewardship)" },
+    "intimacyLevel":          { "$ref": "../enums/reach.schema.json", "description": "Reach level corresponding to intimacy (private → commons)" },
+    "isBidirectional":        { "type": "boolean" },
+    "consentGivenByA":        { "type": "boolean" },
+    "consentGivenByB":        { "type": "boolean" },
+    "custodyEnabledByA":      { "type": "boolean" },
+    "custodyEnabledByB":      { "type": "boolean" },
+    "autoCustodyEnabled":     { "type": "boolean" },
+    "emergencyAccessEnabled": { "type": "boolean" },
+    "initiatedBy":            { "type": "string", "description": "human_id of the relationship initiator" },
+    "verifiedAt":             { "type": ["string", "null"], "format": "date-time" },
+    "governanceLayer":        { "type": ["string", "null"], "description": "Governance scope label (e.g. household, qahal). None = no governance layer applied." },
+    "reach":                  { "$ref": "../enums/reach.schema.json" },
+    "context":                { "description": "Parsed context object (was context_json in storage). Schema is relationship-type-specific.", "oneOf": [{ "type": "object" }, { "type": "null" }] },
+    "createdAt":              { "type": "string", "format": "date-time" },
+    "updatedAt":              { "type": "string", "format": "date-time" },
+    "expiresAt":              { "type": ["string", "null"], "format": "date-time" },
+    "dhtAnchorHash":          { "type": ["string", "null"], "description": "ActionHash (base64url) of the HumanRelationship entry in imagodei DNA. None for pre-coherence rows." }
+  }
+}

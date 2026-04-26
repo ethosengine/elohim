@@ -1,0 +1,21 @@
+<div class="account-shell">
+  <nav class="pane-nav" data-testid="account-pane-nav">
+    <a routerLink="security" routerLinkActive="active" data-testid="nav-security">
+      Security &amp; sign-in
+    </a>
+    <a routerLink="personal-info" routerLinkActive="active" data-testid="nav-personal-info">
+      Personal info
+    </a>
+    <a routerLink="data-privacy" routerLinkActive="active" data-testid="nav-data-privacy">
+      Data &amp; privacy
+    </a>
+    <a routerLink="people-sharing" routerLinkActive="active" data-testid="nav-people-sharing">
+      People &amp; sharing
+    </a>
+    <a routerLink="third-party-apps" routerLinkActive="active" data-testid="nav-third-party-apps">
+      Third-party apps
+    </a>
+  </nav>
+  <main class="pane-content"><router-outlet /></main>
+</div>
+<!-- [M5 scaffold — Playwright sprint will polish layout, a11y, responsive] -->

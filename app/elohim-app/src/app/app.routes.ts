@@ -25,6 +25,10 @@ export const routes: Routes = [
     loadChildren: async () => import('./imagodei/imagodei.routes').then(m => m.IMAGODEI_ROUTES),
   },
   {
+    path: 'account',
+    loadChildren: async () => import('./account/account.routes').then(m => m.ACCOUNT_ROUTES),
+  },
+  {
     path: 'doorway',
     loadChildren: async () => import('./doorway/doorway.routes').then(m => m.DOORWAY_ROUTES),
   },

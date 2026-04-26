@@ -9,6 +9,7 @@ const prettierPlugin = require("eslint-plugin-prettier");
 const prettierConfig = require("eslint-config-prettier");
 const sonarjs = require("eslint-plugin-sonarjs");
 const unicorn = require("eslint-plugin-unicorn").default;
+const boundaries = require("eslint-plugin-boundaries");
 
 module.exports = tseslint.config(
   {
@@ -275,5 +276,68 @@ module.exports = tseslint.config(
       // Prettier for HTML templates (disabled in CI)
       "prettier/prettier": [process.env.CI === "true" ? "off" : "error"]
     }
+  },
+  // ============================================================
+  // PILLAR BOUNDARY RULES
+  // Enforces the architectural import boundaries between domain pillars.
+  //
+  // Rules:
+  //   elohim   → only @elohim/*, @app/generated, @app/testing (no sibling pillars)
+  //   imagodei → elohim + above
+  //   account  → imagodei + elohim + above  (account pillar: Task 17, not yet created)
+  //   lamad    → elohim + above  (NOT imagodei, account, shefa, qahal)
+  //   shefa    → elohim + above  (NOT imagodei, account, lamad, qahal)
+  //   qahal    → elohim + above  (NOT imagodei, account, lamad, shefa)
+  //
+  // NOTE: 174 pre-existing violations exist across the codebase. This rule is set
+  //       to "warn" to make the violations visible without blocking CI.
+  //       Target: migrate to "error" once the backlog is cleared.
+  //       Audit script: scripts/audit-pillar-imports.mjs
+  //       Tracking: see violation list in commit message for task 16 of M5 plan.
+  // ============================================================
+  {
+    files: ["src/app/**/*.ts"],
+    plugins: {
+      "boundaries": boundaries,
+    },
+    settings: {
+      // Each element type matches ALL files recursively within a pillar directory.
+      // eslint-import-resolver-typescript (already configured) resolves @app/* aliases
+      // to absolute paths; the plugin then matches the resolved path against these patterns.
+      "boundaries/elements": [
+        { type: "elohim",   pattern: "src/app/elohim/**/*" },
+        { type: "imagodei", pattern: "src/app/imagodei/**/*" },
+        { type: "account",  pattern: "src/app/account/**/*" },
+        { type: "lamad",    pattern: "src/app/lamad/**/*" },
+        { type: "shefa",    pattern: "src/app/shefa/**/*" },
+        { type: "qahal",    pattern: "src/app/qahal/**/*" },
+      ],
+    },
+    rules: {
+      // boundaries/element-types is deprecated in v6 in favour of boundaries/dependencies.
+      // Using boundaries/dependencies (v6 name) with object-based selectors.
+      // Rule set to "warn" — 174 pre-existing violations exist (see audit-pillar-imports.mjs).
+      // Target: flip to "error" once the violation backlog in M5 tracking is cleared.
+      "boundaries/dependencies": ["warn", {
+        // default: deny all cross-pillar imports unless a rule below explicitly allows it
+        default: "disallow",
+        rules: [
+          // Every pillar may always import from itself (intra-pillar imports are fine)
+          {
+            from: { type: ["elohim", "imagodei", "account", "lamad", "shefa", "qahal"] },
+            allow: { to: { type: "{{from.type}}" } },
+          },
+          // imagodei: may import elohim
+          { from: { type: "imagodei" }, allow: { to: { type: "elohim" } } },
+          // account: may import imagodei + elohim
+          { from: { type: "account" },  allow: { to: { type: ["imagodei", "elohim"] } } },
+          // lamad, shefa, qahal: may import elohim only (NOT each other, NOT imagodei, NOT account)
+          { from: { type: "lamad" },    allow: { to: { type: "elohim" } } },
+          { from: { type: "shefa" },    allow: { to: { type: "elohim" } } },
+          { from: { type: "qahal" },    allow: { to: { type: "elohim" } } },
+          // elohim: no sibling pillars (covered by self-allow above + default disallow)
+        ],
+      }],
+    },
   }
 );

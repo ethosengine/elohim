@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "epr:schema:view:human",
+  "title": "HumanView",
+  "description": "Source of truth: DHT (Notarized, Category A). Projection of the imagodei Human DHT entry. Rebuildable via signal replay on HumanCreated/HumanUpdated signals. dhtAnchorHash is null for pre-coherence rows (seeded before DHT was live).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "displayName", "affinities", "profileReach", "hAppId", "createdAt", "updatedAt"],
+  "properties": {
+    "id":               { "type": "string", "description": "Stable human identifier (UUID or agent-derived)" },
+    "agentPubKey":      { "type": ["string", "null"], "description": "Holochain AgentPubKey (base64url). None before coherence or for custodial-only rows." },
+    "displayName":      { "type": "string", "minLength": 1, "maxLength": 256 },
+    "bio":              { "type": ["string", "null"], "maxLength": 4096 },
+    "affinities":       { "type": "array", "items": { "type": "string" }, "description": "Tag-style affinity labels (parsed from JSON text in DB)" },
+    "profileReach":     { "$ref": "../enums/reach.schema.json", "description": "Visibility of this human's profile" },
+    "location":         { "type": ["string", "null"], "maxLength": 512 },
+    "profilePhotoUrl":  { "type": ["string", "null"], "maxLength": 2048 },
+    "hAppId":           { "type": "string", "description": "Holochain hApp instance identifier" },
+    "createdAt":        { "type": "string", "format": "date-time" },
+    "updatedAt":        { "type": "string", "format": "date-time" },
+    "dhtAnchorHash":    { "type": ["string", "null"], "description": "ActionHash (base64url) of the Human entry in imagodei DNA. None for pre-coherence rows." }
+  }
+}

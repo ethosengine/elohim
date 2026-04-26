@@ -1,0 +1,21 @@
+.card {
+  padding: 0.75rem;
+  border: 1px solid var(--color-border, #e0e0e0);
+  border-radius: 4px;
+  margin-bottom: 0.75rem;
+}
+
+.muted {
+  color: var(--color-text-muted, #666);
+  font-size: 0.875rem;
+}
+
+.error-msg {
+  margin-top: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  background: var(--color-error-bg, #fff0f0);
+  border: 1px solid var(--color-error-border, #f5c2c2);
+  border-radius: 4px;
+  color: var(--color-error-text, #c00);
+  font-size: 0.875rem;
+}

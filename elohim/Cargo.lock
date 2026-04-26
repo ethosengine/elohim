@@ -647,6 +647,7 @@ dependencies = [
  "bytes",
  "chrono",
  "constitution",
+ "elohim-agent-defender-specialist",
  "futures",
  "llama-cpp-2",
  "pin-project-lite",
@@ -661,6 +662,18 @@ dependencies = [
  "ts-rs",
  "uuid",
  "wiremock",
+]
+
+[[package]]
+name = "elohim-agent-defender-specialist"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.17",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]

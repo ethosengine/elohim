@@ -25,6 +25,14 @@ pub use agent_peer_binding::*;
 pub mod sign_for_agent;
 pub use sign_for_agent::*;
 
+// PortalHost coordinator functions (Recovery Phase 2 M5)
+pub mod portal_host;
+pub use portal_host::*;
+
+// submit_specialist_revocation — defender producer (Recovery Phase 2 M5, Task 4)
+pub mod submit_specialist_revocation;
+pub use submit_specialist_revocation::*;
+
 // Bootstrap-steward pattern — reference implementation for the protocol
 // (also ported to mishpat, node-registry, lamad). See bootstrap_steward.rs.
 pub mod bootstrap_steward;
@@ -159,6 +167,29 @@ pub fn post_commit(committed_actions: Vec<SignedActionHashed>) -> ExternResult<(
         let action = signed_action.hashed.content.clone();
         let action_hash = signed_action.hashed.hash.clone();
 
+        // Handle Delete actions for PortalHost removal signal.
+        // `deletes_address` is the ActionHash of the original Create action.
+        if let Action::Delete(ref delete) = action {
+            let original_action_hash = delete.deletes_address.clone();
+            if let Some(original_record) =
+                get(original_action_hash.clone(), GetOptions::default())?
+            {
+                if let Ok(Some(ph)) =
+                    original_record.entry().to_app_option::<PortalHost>()
+                {
+                    let reach = format!("{:?}", ph.reach);
+                    let _ = emit_signal(RecoveryV2Signal::PortalHostRemoved {
+                        action_hash,
+                        original_action_hash,
+                        human_action_hash: ph.human_action_hash,
+                        host_url: ph.host_url,
+                    });
+                    let _ = reach; // suppress unused warning
+                }
+            }
+            continue;
+        }
+
         let entry_hash = match &action {
             Action::Create(create) => create.entry_hash.clone(),
             Action::Update(update) => update.entry_hash.clone(),
@@ -171,6 +202,20 @@ pub fn post_commit(committed_actions: Vec<SignedActionHashed>) -> ExternResult<(
         };
 
         let author = action.author().clone();
+
+        // PortalHost Create — emit before the generic ImagodeiSignal arms.
+        if let Ok(Some(ph)) = record.entry().to_app_option::<PortalHost>() {
+            let reach = format!("{:?}", ph.reach);
+            emit_signal(RecoveryV2Signal::PortalHostCreated {
+                action_hash,
+                human_action_hash: ph.human_action_hash,
+                host_url: ph.host_url,
+                label: ph.label,
+                added_at: ph.added_at,
+                reach,
+            })?;
+            continue;
+        }
 
         if let Some(human) = record.entry().to_app_option::<Human>().ok().flatten() {
             emit_signal(ImagodeiSignal::HumanCommitted {
@@ -1593,6 +1638,23 @@ pub enum RecoveryV2Signal {
         effective_at: String,
         triggering_vote_id: Option<String>,
     },
+    // M5: portal-host signals — consumed by elohim-storage ReconcileController.
+    PortalHostCreated {
+        action_hash: ActionHash,
+        human_action_hash: ActionHash,
+        host_url: String,
+        label: Option<String>,
+        added_at: Timestamp,
+        reach: String,
+    },
+    PortalHostRemoved {
+        /// ActionHash of the Delete action itself.
+        action_hash: ActionHash,
+        /// ActionHash of the original PortalHost Create action (= the row id in storage).
+        original_action_hash: ActionHash,
+        human_action_hash: ActionHash,
+        host_url: String,
+    },
 }
 
 // =============================================================================
@@ -1653,24 +1715,30 @@ fn resolve_human_id_for_agent(agent_pubkey: &AgentPubKey) -> ExternResult<String
         LinkQuery::try_new(agent_pubkey.clone(), LinkTypes::AgentKeyToHuman)?,
         GetStrategy::default(),
     )?;
-    let first = links.first().ok_or(wasm_error!(WasmErrorInner::Guest(format!(
-        "No Human bound to agent pubkey {}",
-        agent_pubkey
-    ))))?;
-    let action_hash = first
-        .target
-        .clone()
-        .into_action_hash()
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "AgentKeyToHuman target is not an action hash".into()
-        )))?;
-    let record = get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Human entry missing".into())))?;
+    let first = links
+        .first()
+        .ok_or(wasm_error!(WasmErrorInner::Guest(format!(
+            "No Human bound to agent pubkey {}",
+            agent_pubkey
+        ))))?;
+    let action_hash =
+        first
+            .target
+            .clone()
+            .into_action_hash()
+            .ok_or(wasm_error!(WasmErrorInner::Guest(
+                "AgentKeyToHuman target is not an action hash".into()
+            )))?;
+    let record = get(action_hash, GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Human entry missing".into())
+    ))?;
     let human: Human = record
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Human entry deserialize failed".into())))?;
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Human entry deserialize failed".into()
+        )))?;
     Ok(human.id)
 }
 
@@ -1690,12 +1758,16 @@ fn count_active_emergency_contacts(human_id: &str) -> ExternResult<u32> {
             Some(h) => h,
             None => continue,
         };
-        let Some(record) = get(rel_hash, GetOptions::default())? else { continue };
+        let Some(record) = get(rel_hash, GetOptions::default())? else {
+            continue;
+        };
         let Some(rel): Option<HumanRelationship> = record
             .entry()
             .to_app_option()
             .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        else { continue };
+        else {
+            continue;
+        };
         if rel.emergency_access_enabled {
             count += 1;
         }
@@ -1725,13 +1797,19 @@ fn count_approved_revocation_votes(revocation_id: &str) -> ExternResult<u32> {
 
     let mut approved_count: u32 = 0;
     for link in links {
-        let Some(vote_hash) = link.target.clone().into_action_hash() else { continue };
-        let Some(record) = get(vote_hash, GetOptions::default())? else { continue };
+        let Some(vote_hash) = link.target.clone().into_action_hash() else {
+            continue;
+        };
+        let Some(record) = get(vote_hash, GetOptions::default())? else {
+            continue;
+        };
         let Some(vote): Option<RevocationVote> = record
             .entry()
             .to_app_option()
             .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        else { continue };
+        else {
+            continue;
+        };
         if vote.approved {
             approved_count += 1;
         }
@@ -1868,7 +1946,8 @@ pub fn create_self_revocation(
     let owner_human_id = resolve_human_id_for_agent(&input.revoked_key)?;
     if owner_human_id != human_id {
         return Err(wasm_error!(WasmErrorInner::Guest(
-            "create_self_revocation: caller does not control revoked_key (different human_id)".into()
+            "create_self_revocation: caller does not control revoked_key (different human_id)"
+                .into()
         )));
     }
 
@@ -1906,13 +1985,23 @@ pub fn create_self_revocation(
     let id_anchor = StringAnchor::new("revocation_id", &revocation_id);
     let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor.clone()))?;
     create_entry(&EntryTypes::StringAnchor(id_anchor))?;
-    create_link(id_anchor_hash, action_hash.clone(), LinkTypes::IdToKeyRevocation, ())?;
+    create_link(
+        id_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::IdToKeyRevocation,
+        (),
+    )?;
 
     // HumanToKeyRevocation anchor (dual-anchor primacy: human listing)
     let human_anchor = StringAnchor::new("human_revocations", &human_id);
     let human_anchor_hash = hash_entry(&EntryTypes::StringAnchor(human_anchor.clone()))?;
     create_entry(&EntryTypes::StringAnchor(human_anchor))?;
-    create_link(human_anchor_hash, action_hash.clone(), LinkTypes::HumanToKeyRevocation, ())?;
+    create_link(
+        human_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::HumanToKeyRevocation,
+        (),
+    )?;
 
     // RevokedKeyToRevocation anchor (dual-anchor primacy: hot gate query)
     let revoked_key_anchor = StringAnchor::new("revoked_key", &revoked_key_str);
@@ -1928,8 +2017,7 @@ pub fn create_self_revocation(
 
     // EffectiveRevocations anchor — voluntary is effective on creation.
     let effective_anchor = StringAnchor::new("effective_revocations", "global");
-    let effective_anchor_hash =
-        hash_entry(&EntryTypes::StringAnchor(effective_anchor.clone()))?;
+    let effective_anchor_hash = hash_entry(&EntryTypes::StringAnchor(effective_anchor.clone()))?;
     create_entry(&EntryTypes::StringAnchor(effective_anchor))?;
     create_link(
         effective_anchor_hash,
@@ -1961,7 +2049,10 @@ pub fn create_self_revocation(
         triggering_vote_id: None,
     })?;
 
-    Ok(KeyRevocationOutput { revocation_id, action_hash })
+    Ok(KeyRevocationOutput {
+        revocation_id,
+        action_hash,
+    })
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -2011,8 +2102,7 @@ pub fn create_revocation_request(
 
     let now = sys_time()?;
     let timestamp = format!("{:?}", now);
-    let revocation_id =
-        format!("rev-{}-{}", input.target_human_id, timestamp);
+    let revocation_id = format!("rev-{}-{}", input.target_human_id, timestamp);
     let revoked_key_str = input.revoked_key.to_string();
 
     let revocation = KeyRevocation {
@@ -2037,13 +2127,23 @@ pub fn create_revocation_request(
     let id_anchor = StringAnchor::new("revocation_id", &revocation_id);
     let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor.clone()))?;
     create_entry(&EntryTypes::StringAnchor(id_anchor))?;
-    create_link(id_anchor_hash, action_hash.clone(), LinkTypes::IdToKeyRevocation, ())?;
+    create_link(
+        id_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::IdToKeyRevocation,
+        (),
+    )?;
 
     // HumanToKeyRevocation anchor
     let human_anchor = StringAnchor::new("human_revocations", &input.target_human_id);
     let human_anchor_hash = hash_entry(&EntryTypes::StringAnchor(human_anchor.clone()))?;
     create_entry(&EntryTypes::StringAnchor(human_anchor))?;
-    create_link(human_anchor_hash, action_hash.clone(), LinkTypes::HumanToKeyRevocation, ())?;
+    create_link(
+        human_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::HumanToKeyRevocation,
+        (),
+    )?;
 
     // RevokedKeyToRevocation anchor
     let revoked_key_anchor = StringAnchor::new("revoked_key", &revoked_key_str);
@@ -2061,7 +2161,12 @@ pub fn create_revocation_request(
     let pending_anchor = StringAnchor::new("pending_revocations", "global");
     let pending_anchor_hash = hash_entry(&EntryTypes::StringAnchor(pending_anchor.clone()))?;
     create_entry(&EntryTypes::StringAnchor(pending_anchor))?;
-    create_link(pending_anchor_hash, action_hash.clone(), LinkTypes::PendingRevocations, ())?;
+    create_link(
+        pending_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::PendingRevocations,
+        (),
+    )?;
 
     emit_signal(RecoveryV2Signal::KeyRevocationRequested {
         id: revocation.id.clone(),
@@ -2077,7 +2182,10 @@ pub fn create_revocation_request(
         created_at: revocation.created_at.clone(),
     })?;
 
-    Ok(KeyRevocationOutput { revocation_id, action_hash })
+    Ok(KeyRevocationOutput {
+        revocation_id,
+        action_hash,
+    })
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -2115,8 +2223,7 @@ pub fn submit_revocation_vote(
 
     // Load the KeyRevocation via IdToKeyRevocation anchor.
     let revocation_id_anchor = StringAnchor::new("revocation_id", &input.revocation_id);
-    let revocation_anchor_hash =
-        hash_entry(&EntryTypes::StringAnchor(revocation_id_anchor))?;
+    let revocation_anchor_hash = hash_entry(&EntryTypes::StringAnchor(revocation_id_anchor))?;
     let revocation_links = get_links(
         LinkQuery::try_new(revocation_anchor_hash, LinkTypes::IdToKeyRevocation)?,
         GetStrategy::default(),
@@ -2136,16 +2243,20 @@ pub fn submit_revocation_vote(
                 "IdToKeyRevocation target was not an ActionHash".into()
             ))
         })?;
-    let revocation_record =
-        get(revocation_action_hash.clone(), GetOptions::default())?.ok_or_else(|| {
-            wasm_error!(WasmErrorInner::Guest("KeyRevocation record not found".into()))
+    let revocation_record = get(revocation_action_hash.clone(), GetOptions::default())?
+        .ok_or_else(|| {
+            wasm_error!(WasmErrorInner::Guest(
+                "KeyRevocation record not found".into()
+            ))
         })?;
     let revocation: KeyRevocation = revocation_record
         .entry()
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
         .ok_or_else(|| {
-            wasm_error!(WasmErrorInner::Guest("KeyRevocation record missing entry".into()))
+            wasm_error!(WasmErrorInner::Guest(
+                "KeyRevocation record missing entry".into()
+            ))
         })?;
 
     // Gate: votes only apply to the steward_vote path.
@@ -2175,17 +2286,26 @@ pub fn submit_revocation_vote(
     let steward_anchor = StringAnchor::new("steward_revocation_votes", &caller_human_id);
     let steward_anchor_hash = hash_entry(&EntryTypes::StringAnchor(steward_anchor.clone()))?;
     let steward_vote_links = get_links(
-        LinkQuery::try_new(steward_anchor_hash.clone(), LinkTypes::StewardToRevocationVote)?,
+        LinkQuery::try_new(
+            steward_anchor_hash.clone(),
+            LinkTypes::StewardToRevocationVote,
+        )?,
         GetStrategy::default(),
     )?;
     for link in &steward_vote_links {
-        let Some(vote_hash) = link.target.clone().into_action_hash() else { continue };
-        let Some(rec) = get(vote_hash, GetOptions::default())? else { continue };
+        let Some(vote_hash) = link.target.clone().into_action_hash() else {
+            continue;
+        };
+        let Some(rec) = get(vote_hash, GetOptions::default())? else {
+            continue;
+        };
         let Some(prior_vote): Option<RevocationVote> = rec
             .entry()
             .to_app_option()
             .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        else { continue };
+        else {
+            continue;
+        };
         if prior_vote.revocation_id == input.revocation_id {
             return Err(wasm_error!(WasmErrorInner::Guest(format!(
                 "submit_revocation_vote: steward {} has already voted on revocation {}",
@@ -2221,8 +2341,7 @@ pub fn submit_revocation_vote(
     )?;
 
     // RevocationToVote anchor (per-revocation vote list)
-    let revocation_votes_anchor =
-        StringAnchor::new("revocation_votes", &input.revocation_id);
+    let revocation_votes_anchor = StringAnchor::new("revocation_votes", &input.revocation_id);
     let revocation_votes_anchor_hash =
         hash_entry(&EntryTypes::StringAnchor(revocation_votes_anchor.clone()))?;
     create_entry(&EntryTypes::StringAnchor(revocation_votes_anchor))?;
@@ -2253,7 +2372,10 @@ pub fn submit_revocation_vote(
         updated.threshold_reached = true;
         updated.effective_at = Some(timestamp.clone());
         updated.updated_at = timestamp.clone();
-        update_entry(revocation_action_hash, &EntryTypes::KeyRevocation(updated.clone()))?;
+        update_entry(
+            revocation_action_hash,
+            &EntryTypes::KeyRevocation(updated.clone()),
+        )?;
 
         // Move from PendingRevocations to EffectiveRevocations.
         let pending_global_anchor = StringAnchor::new("pending_revocations", "global");
@@ -2266,13 +2388,19 @@ pub fn submit_revocation_vote(
         for link in pending_links {
             // Each pending link points to a specific revocation's action_hash.
             // We identify by fetching the entry and matching the id.
-            let Some(link_target_hash) = link.target.clone().into_action_hash() else { continue };
-            let Some(rec) = get(link_target_hash, GetOptions::default())? else { continue };
+            let Some(link_target_hash) = link.target.clone().into_action_hash() else {
+                continue;
+            };
+            let Some(rec) = get(link_target_hash, GetOptions::default())? else {
+                continue;
+            };
             let Some(rev): Option<KeyRevocation> = rec
                 .entry()
                 .to_app_option()
                 .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-            else { continue };
+            else {
+                continue;
+            };
             if rev.id == input.revocation_id {
                 delete_link(link.create_link_hash, GetOptions::default())?;
             }
@@ -2342,13 +2470,19 @@ fn collect_active_freezes_for_human(human_id: &str) -> ExternResult<Vec<Identity
     )?;
     let mut freezes = Vec::new();
     for link in links {
-        let Some(hash) = link.target.clone().into_action_hash() else { continue };
-        let Some(record) = get(hash, GetOptions::default())? else { continue };
+        let Some(hash) = link.target.clone().into_action_hash() else {
+            continue;
+        };
+        let Some(record) = get(hash, GetOptions::default())? else {
+            continue;
+        };
         let Some(freeze): Option<IdentityFreeze> = record
             .entry()
             .to_app_option()
             .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        else { continue };
+        else {
+            continue;
+        };
         if freeze.is_active {
             freezes.push(freeze);
         }
@@ -2409,13 +2543,19 @@ pub fn commit_key_rotation(input: CommitKeyRotationInput) -> ExternResult<KeyRot
             .map(|l| (l, "pending"))
             .chain(effective_links.iter().map(|l| (l, "effective")))
         {
-            let Some(rev_hash) = link.target.clone().into_action_hash() else { continue };
-            let Some(rec) = get(rev_hash, GetOptions::default())? else { continue };
+            let Some(rev_hash) = link.target.clone().into_action_hash() else {
+                continue;
+            };
+            let Some(rec) = get(rev_hash, GetOptions::default())? else {
+                continue;
+            };
             let Some(rev): Option<KeyRevocation> = rec
                 .entry()
                 .to_app_option()
                 .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-            else { continue };
+            else {
+                continue;
+            };
             if rev.revoked_key == rotating_from_str {
                 return Err(wasm_error!(WasmErrorInner::Guest(format!(
                     "commit_key_rotation blocked: key {} has a {} revocation ({}). \
@@ -2491,14 +2631,22 @@ fn is_active_emergency_contact(
         GetStrategy::default(),
     )?;
     for link in links {
-        let Some(rel_hash) = link.target.clone().into_action_hash() else { continue };
-        let Some(record) = get(rel_hash, GetOptions::default())? else { continue };
+        let Some(rel_hash) = link.target.clone().into_action_hash() else {
+            continue;
+        };
+        let Some(record) = get(rel_hash, GetOptions::default())? else {
+            continue;
+        };
         let Some(rel): Option<HumanRelationship> = record
             .entry()
             .to_app_option()
             .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        else { continue };
-        if !rel.emergency_access_enabled { continue; }
+        else {
+            continue;
+        };
+        if !rel.emergency_access_enabled {
+            continue;
+        }
         // party_a_id and party_b_id are human ID strings.
         if rel.party_a_id == authorizer_human_id || rel.party_b_id == authorizer_human_id {
             return Ok(true);
@@ -2514,17 +2662,26 @@ fn has_existing_witness_for_request(
     authorizer_human_id: &str,
 ) -> ExternResult<bool> {
     let links = get_links(
-        LinkQuery::try_new(request_hash.clone(), LinkTypes::RecoveryRequestToHumanityWitness)?,
+        LinkQuery::try_new(
+            request_hash.clone(),
+            LinkTypes::RecoveryRequestToHumanityWitness,
+        )?,
         GetStrategy::default(),
     )?;
     for link in links {
-        let Some(w_hash) = link.target.clone().into_action_hash() else { continue };
-        let Some(record) = get(w_hash, GetOptions::default())? else { continue };
+        let Some(w_hash) = link.target.clone().into_action_hash() else {
+            continue;
+        };
+        let Some(record) = get(w_hash, GetOptions::default())? else {
+            continue;
+        };
         let Some(w): Option<HumanityWitness> = record
             .entry()
             .to_app_option()
             .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        else { continue };
+        else {
+            continue;
+        };
         if w.witness_agent_id == authorizer_human_id {
             return Ok(true);
         }
@@ -2544,10 +2701,10 @@ pub fn submit_intimate_witness(
     input: SubmitIntimateWitnessInput,
 ) -> ExternResult<SubmitIntimateWitnessOutput> {
     // Gate 1: fetch the RecoveryRequest; must exist.
-    let request_record = get(input.recovery_request_hash.clone(), GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "RecoveryRequest not found at given hash".into()
-        )))?;
+    let request_record =
+        get(input.recovery_request_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
+            WasmErrorInner::Guest("RecoveryRequest not found at given hash".into())
+        ))?;
     let request: RecoveryRequest = request_record
         .entry()
         .to_app_option()
@@ -2555,9 +2712,12 @@ pub fn submit_intimate_witness(
         .ok_or(wasm_error!(WasmErrorInner::Guest(
             "RecoveryRequest record has no entry".into()
         )))?;
-    let human_id = request.human_id.clone().ok_or(wasm_error!(WasmErrorInner::Guest(
-        "RecoveryRequest has no human_id (pre-M3 entry?)".into()
-    )))?;
+    let human_id = request
+        .human_id
+        .clone()
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "RecoveryRequest has no human_id (pre-M3 entry?)".into()
+        )))?;
 
     // Gate 2: authorizer must be on an active emergency-enabled HumanRelationship.
     let authorizer_pubkey = agent_info()?.agent_initial_pubkey;
@@ -2599,7 +2759,9 @@ pub fn submit_intimate_witness(
         attestation_type: "intimate_recovery".into(),
         confidence: 1.0,
         behavioral_hash: None,
-        evidence_json: input.note.map(|n| serde_json::json!({ "note": n }).to_string()),
+        evidence_json: input
+            .note
+            .map(|n| serde_json::json!({ "note": n }).to_string()),
         verification_method: Some("intimate_recovery_ceremony".into()),
         created_at: timestamp,
         expires_at,
@@ -2755,7 +2917,6 @@ pub fn get_my_recovery_hints(_: ()) -> ExternResult<Vec<RecoveryHintOutput>> {
 
     Ok(results)
 }
-
 
 // =============================================================================
 // Renewal Protocol Types

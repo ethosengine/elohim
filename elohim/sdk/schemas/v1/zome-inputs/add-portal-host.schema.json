@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "epr:schema:input:add-portal-host",
+  "title": "AddPortalHostInput",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["hostUrl"],
+  "properties": {
+    "hostUrl": { "type": "string", "format": "uri", "maxLength": 2048 },
+    "label":   { "type": ["string", "null"], "maxLength": 256 },
+    "reach":   { "$ref": "../enums/reach.schema.json", "default": "trusted", "description": "M5 only accepts 'trusted'" }
+  }
+}

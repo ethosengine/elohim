@@ -63,6 +63,12 @@ const INTERFACE_FILES = [
   { src: 'p2p/identity-handshake.ts', dest: 'identity-handshake.ts' },
   { src: 'views/key-revocation.ts', dest: 'key-revocation.ts' },
   { src: 'views/revocation-vote.ts', dest: 'revocation-vote.ts' },
+  // M5: Auth Portal Convergence + Revocation UX + Stub Defender
+  { src: 'views/human.ts', dest: 'human.ts' },
+  { src: 'views/human-relationship.ts', dest: 'human-relationship.ts' },
+  { src: 'views/portal-host-view.ts', dest: 'portal-host-view.ts' },
+  { src: 'views/agent-peer-binding-view.ts', dest: 'agent-peer-binding-view.ts' },
+  { src: 'views/account-view.ts', dest: 'account-view.ts' },
 ];
 
 /**
@@ -100,6 +106,11 @@ async function loadRefMap(baseDir) {
     refMap.set(file, schema);
     // Cross-dir ref from other directories
     refMap.set(`../views/${file}`, schema);
+    // URI-style $id ref (e.g. "epr:schema:view:human") — resolves $ref in
+    // account-view.schema.json and similar schemas that use canonical $id refs.
+    if (schema.$id) {
+      refMap.set(schema.$id, schema);
+    }
   }
 
   return refMap;

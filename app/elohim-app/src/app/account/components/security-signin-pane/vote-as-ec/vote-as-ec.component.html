@@ -1,0 +1,35 @@
+@let pending = account.account()?.pendingRecoveryRequests ?? [];
+@if (pending.length === 0) {
+  <p data-testid="vote-empty">No pending recovery requests where you are an emergency contact.</p>
+} @else {
+  @for (req of pending; track req.dhtAnchorHash) {
+    <div class="card" [attr.data-testid]="'pending-' + req.dhtAnchorHash">
+      <p>
+        Recovery for human
+        <code>{{ req.humanId ?? 'unknown' | slice: 0 : 16 }}&hellip;</code>
+      </p>
+      <p class="muted">
+        Authority: {{ req.proposedAuthorityKind }} &middot; {{ req.createdAt | date: 'medium' }}
+      </p>
+      <button
+        type="button"
+        [attr.data-testid]="'approve-' + req.dhtAnchorHash"
+        (click)="vote(req.dhtAnchorHash, 'approve')"
+      >
+        Approve
+      </button>
+      <button
+        type="button"
+        [attr.data-testid]="'reject-' + req.dhtAnchorHash"
+        (click)="vote(req.dhtAnchorHash, 'reject')"
+      >
+        Reject
+      </button>
+    </div>
+  }
+}
+@if (errorMsg()) {
+  <div class="error-msg" data-testid="vote-error" role="alert">
+    {{ errorMsg() }}
+  </div>
+}

@@ -95,6 +95,11 @@ pub struct ExchangeSessionResponse {
     pub doorway_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub doorway_url: Option<String>,
+    /// First reachable portal host URL for this human, when `is_steward` is
+    /// true and at least one registered host responds to a health probe.
+    /// Omitted when not a steward or when no host is reachable.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub portal_host_url: Option<String>,
 }
 
 // =============================================================================
@@ -3478,6 +3483,169 @@ fn generate_oauth_token_response(
 }
 
 // =============================================================================
+// Portal-Host Handler
+// =============================================================================
+
+/// Minimal projection of a storage PortalHostView — only the fields we need
+/// for the probe loop.
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct StoragePortalHostRow {
+    host_url: String,
+}
+
+/// GET /auth/portal-host
+///
+/// Returns the first reachable portal host registered for the authenticated
+/// human.
+///
+/// Flow:
+/// 1. Validate Bearer JWT
+/// 2. GET {storage_url}/api/v1/account/portal-hosts with X-Agent-Id header
+/// 3. HEAD-probe each host's /healthz with a 1 s timeout
+/// 4. Return PortalHostResponse (200 even when nothing is reachable)
+async fn handle_portal_host(
+    req: Request<hyper::body::Incoming>,
+    state: Arc<AppState>,
+) -> Response<BoxBody> {
+    let auth_header = get_auth_header(&req);
+    let token = match extract_token_from_header(auth_header) {
+        Some(t) => t,
+        None => {
+            return json_response(
+                StatusCode::UNAUTHORIZED,
+                &ErrorResponse {
+                    error: "No token provided".into(),
+                    code: Some("NO_TOKEN".into()),
+                },
+            )
+        }
+    };
+
+    let jwt = match get_jwt_validator(&state) {
+        Ok(j) => j,
+        Err(resp) => return resp,
+    };
+
+    let result = jwt.verify_token(token);
+    if !result.valid {
+        return json_response(
+            StatusCode::UNAUTHORIZED,
+            &ErrorResponse {
+                error: result
+                    .error
+                    .unwrap_or_else(|| "Invalid or expired token".into()),
+                code: Some("INVALID_TOKEN".into()),
+            },
+        );
+    }
+
+    let claims = result.claims.unwrap();
+
+    // Build storage URL for this human's portal hosts.
+    let storage_base = state
+        .args
+        .storage_url
+        .as_deref()
+        .unwrap_or("http://127.0.0.1:8090");
+    let storage_url = format!(
+        "{}/api/v1/account/portal-hosts",
+        storage_base.trim_end_matches('/')
+    );
+
+    let client = reqwest::Client::new();
+
+    // Fetch hosts from storage; on any failure return { reachable: false }.
+    let hosts: Vec<StoragePortalHostRow> = match client
+        .get(&storage_url)
+        .header("X-Agent-Id", &claims.agent_pub_key)
+        .send()
+        .await
+        .and_then(|r| r.error_for_status())
+    {
+        Ok(resp) => resp.json().await.unwrap_or_default(),
+        Err(e) => {
+            warn!(error = %e, "Failed to fetch portal hosts from storage");
+            return json_response(
+                StatusCode::OK,
+                &crate::auth::portal_host::PortalHostResponse {
+                    reachable: false,
+                    host_url: None,
+                    all_hosts: vec![],
+                },
+            );
+        }
+    };
+
+    // Probe each host; pick the first one that replies with 2xx.
+    let mut all_urls: Vec<String> = Vec::with_capacity(hosts.len());
+    let mut chosen: Option<String> = None;
+
+    for h in &hosts {
+        all_urls.push(h.host_url.clone());
+        if chosen.is_none() {
+            let probe_url = format!("{}/healthz", h.host_url.trim_end_matches('/'));
+            let probe = tokio::time::timeout(
+                std::time::Duration::from_secs(1),
+                client.head(&probe_url).send(),
+            )
+            .await;
+            if let Ok(Ok(resp)) = probe {
+                if resp.status().is_success() {
+                    chosen = Some(h.host_url.clone());
+                }
+            }
+        }
+    }
+
+    json_response(
+        StatusCode::OK,
+        &crate::auth::portal_host::PortalHostResponse {
+            reachable: chosen.is_some(),
+            host_url: chosen,
+            all_hosts: all_urls,
+        },
+    )
+}
+
+/// Probe a portal host URL and return the URL if reachable, or None.
+///
+/// Used by `handle_exchange_session` to opportunistically populate
+/// `portal_host_url` without a full `handle_portal_host` round-trip.
+async fn probe_first_portal_host(storage_base: &str, agent_pub_key: &str) -> Option<String> {
+    let storage_url = format!(
+        "{}/api/v1/account/portal-hosts",
+        storage_base.trim_end_matches('/')
+    );
+    let client = reqwest::Client::new();
+    let hosts: Vec<StoragePortalHostRow> = client
+        .get(&storage_url)
+        .header("X-Agent-Id", agent_pub_key)
+        .send()
+        .await
+        .and_then(|r| r.error_for_status())
+        .ok()?
+        .json()
+        .await
+        .ok()?;
+
+    for h in &hosts {
+        let probe_url = format!("{}/healthz", h.host_url.trim_end_matches('/'));
+        let probe = tokio::time::timeout(
+            std::time::Duration::from_secs(1),
+            client.head(&probe_url).send(),
+        )
+        .await;
+        if let Ok(Ok(resp)) = probe {
+            if resp.status().is_success() {
+                return Some(h.host_url.clone());
+            }
+        }
+    }
+    None
+}
+
+// =============================================================================
 // Session Transfer Handlers
 // =============================================================================
 
@@ -3705,6 +3873,20 @@ async fn handle_exchange_session(
             let verification = jwt.verify_token(&new_token);
             let expires_at = verification.claims.map(|c| c.exp).unwrap_or(0);
 
+            // If the human is a steward, opportunistically probe for a
+            // reachable portal host so the receiving app can redirect
+            // immediately without a separate /auth/portal-host round-trip.
+            let portal_host_url = if is_steward {
+                let storage_base = state
+                    .args
+                    .storage_url
+                    .as_deref()
+                    .unwrap_or("http://127.0.0.1:8090");
+                probe_first_portal_host(storage_base, &agent_pub_key).await
+            } else {
+                None
+            };
+
             info!("Session token exchanged for JWT (user: {})", identifier);
 
             json_response(
@@ -3717,6 +3899,7 @@ async fn handle_exchange_session(
                     expires_at,
                     doorway_id,
                     doorway_url,
+                    portal_host_url,
                 },
             )
         }
@@ -3868,6 +4051,9 @@ pub async fn handle_auth_request(
         (&Method::GET, "/auth/session-token") => handle_session_token(req, state).await,
         (&Method::GET, "/auth/exchange-session") => handle_exchange_session(req, state).await,
 
+        // Portal-host discovery (steward redirect)
+        (&Method::GET, "/auth/portal-host") => handle_portal_host(req, state).await,
+
         // Stewardship migration endpoints
         (&Method::GET, "/auth/export-key") => handle_export_key(req, state).await,
         (&Method::POST, "/auth/confirm-stewardship")
@@ -3909,7 +4095,8 @@ pub async fn handle_auth_request(
         | (_, "/auth/elohim-verify/start")
         | (_, "/auth/elohim-verify/answer")
         | (_, "/auth/session-token")
-        | (_, "/auth/exchange-session") => json_response(
+        | (_, "/auth/exchange-session")
+        | (_, "/auth/portal-host") => json_response(
             StatusCode::METHOD_NOT_ALLOWED,
             &ErrorResponse {
                 error: "Method not allowed".into(),

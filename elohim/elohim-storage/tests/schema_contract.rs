@@ -23,6 +23,8 @@ fn schema_dir() -> PathBuf {
 }
 
 /// Load all schemas from enums/ and views/ into a ref map keyed by relative path.
+/// Also indexes by `$id` so that URI-style `$ref` values (e.g. `epr:schema:view:human`)
+/// resolve correctly for schemas like `account-view.schema.json`.
 fn load_ref_map() -> HashMap<String, Value> {
     let base = schema_dir();
     let mut refs = HashMap::new();
@@ -43,7 +45,12 @@ fn load_ref_map() -> HashMap<String, Value> {
                             // Cross-dir ref: "../enums/nat-status.schema.json"
                             refs.insert(format!("../{}/{}", subdir, filename), schema.clone());
                             // From views/ to views/: "replication-status-view.schema.json"
-                            refs.insert(format!("{}/{}", subdir, filename), schema);
+                            refs.insert(format!("{}/{}", subdir, filename), schema.clone());
+                            // URI-style $id ref: "epr:schema:view:human" / "epr:schema:enum:reach"
+                            // Allows account-view.schema.json $refs to resolve during inline_refs.
+                            if let Some(Value::String(id)) = schema.get("$id") {
+                                refs.insert(id.clone(), schema);
+                            }
                         }
                     }
                 }
@@ -1323,6 +1330,290 @@ fn revocation_vote_view_rejected_matches_schema() {
 
     validate_against_schema(
         "views/revocation-vote.schema.json",
+        &serde_json::to_value(&sample).unwrap(),
+    );
+}
+
+// =============================================================================
+// Recovery Protocol Phase 2 — M5 View Schema Contract Tests
+//
+// Auth Portal Convergence + Revocation UX + Stub Defender.
+// Source of truth: DHT (imagodei PortalHost + AgentPeerBinding) for sub-views;
+// composite DHT projection for AccountView.
+// =============================================================================
+
+#[test]
+fn human_view_matches_schema() {
+    use elohim_storage::views::HumanView;
+
+    let sample = HumanView {
+        id: "human-matthew".into(),
+        agent_pub_key: Some("uhCAkABCD1234567890".into()),
+        display_name: "Matthew".into(),
+        bio: Some("Protocol architect and household operator.".into()),
+        affinities: vec!["education".into(), "distributed-systems".into()],
+        profile_reach: "community".into(),
+        location: Some("Pacific Northwest".into()),
+        profile_photo_url: None,
+        h_app_id: "elohim-app-test-001".into(),
+        created_at: "2026-04-25T00:00:00Z".into(),
+        updated_at: "2026-04-25T00:00:00Z".into(),
+        dht_anchor_hash: Some("uhCkkHUMAN001".into()),
+    };
+
+    validate_against_schema(
+        "views/human.schema.json",
+        &serde_json::to_value(&sample).unwrap(),
+    );
+}
+
+#[test]
+fn human_view_pre_coherence_matches_schema() {
+    use elohim_storage::views::HumanView;
+
+    // Pre-coherence rows have no agentPubKey and no dhtAnchorHash.
+    let sample = HumanView {
+        id: "human-timothy".into(),
+        agent_pub_key: None,
+        display_name: "Timothy".into(),
+        bio: None,
+        affinities: vec![],
+        profile_reach: "intimate".into(),
+        location: None,
+        profile_photo_url: None,
+        h_app_id: "elohim-app-test-001".into(),
+        created_at: "2026-04-25T00:01:00Z".into(),
+        updated_at: "2026-04-25T00:01:00Z".into(),
+        dht_anchor_hash: None,
+    };
+
+    validate_against_schema(
+        "views/human.schema.json",
+        &serde_json::to_value(&sample).unwrap(),
+    );
+}
+
+#[test]
+fn human_relationship_view_matches_schema() {
+    use elohim_storage::views::HumanRelationshipView;
+    use elohim_storage::views::JsonVal;
+
+    let sample = HumanRelationshipView {
+        id: "rel-matthew-jessica-family".into(),
+        h_app_id: "elohim-app-test-001".into(),
+        party_a_id: "human-matthew".into(),
+        party_b_id: "human-jessica".into(),
+        relationship_type: "family".into(),
+        intimacy_level: "intimate".into(),
+        is_bidirectional: true,
+        consent_given_by_a: true,
+        consent_given_by_b: true,
+        custody_enabled_by_a: true,
+        custody_enabled_by_b: true,
+        auto_custody_enabled: true,
+        emergency_access_enabled: true,
+        initiated_by: "human-matthew".into(),
+        verified_at: Some("2026-04-25T00:00:00Z".into()),
+        governance_layer: Some("household".into()),
+        reach: "intimate".into(),
+        context: Some(JsonVal(serde_json::json!({ "notes": "spouse" }))),
+        created_at: "2026-04-25T00:00:00Z".into(),
+        updated_at: "2026-04-25T00:00:00Z".into(),
+        expires_at: None,
+        dht_anchor_hash: Some("uhCkkREL001".into()),
+    };
+
+    validate_against_schema(
+        "views/human-relationship.schema.json",
+        &serde_json::to_value(&sample).unwrap(),
+    );
+}
+
+#[test]
+fn human_relationship_view_emergency_contact_matches_schema() {
+    use elohim_storage::views::HumanRelationshipView;
+
+    // Minimal emergency-contact row — no optional fields.
+    let sample = HumanRelationshipView {
+        id: "rel-timothy-matthew-stewardship".into(),
+        h_app_id: "elohim-app-test-001".into(),
+        party_a_id: "human-timothy".into(),
+        party_b_id: "human-matthew".into(),
+        relationship_type: "stewardship".into(),
+        intimacy_level: "trusted".into(),
+        is_bidirectional: false,
+        consent_given_by_a: true,
+        consent_given_by_b: false,
+        custody_enabled_by_a: false,
+        custody_enabled_by_b: true,
+        auto_custody_enabled: false,
+        emergency_access_enabled: true,
+        initiated_by: "human-matthew".into(),
+        verified_at: None,
+        governance_layer: None,
+        reach: "trusted".into(),
+        context: None,
+        created_at: "2026-04-25T00:02:00Z".into(),
+        updated_at: "2026-04-25T00:02:00Z".into(),
+        expires_at: None,
+        dht_anchor_hash: None,
+    };
+
+    validate_against_schema(
+        "views/human-relationship.schema.json",
+        &serde_json::to_value(&sample).unwrap(),
+    );
+}
+
+#[test]
+fn portal_host_view_matches_schema() {
+    use elohim_storage::views::PortalHostView;
+
+    let sample = PortalHostView {
+        human_id: "uhCEkAbc123".into(),
+        host_url: "https://m.example.com/account".into(),
+        label: Some("main".into()),
+        added_at: "2026-04-25T12:00:00Z".into(),
+        last_reachable_at: Some("2026-04-25T12:30:00Z".into()),
+        reach: "trusted".into(),
+        dht_anchor_hash: "uhCkBcd456".into(),
+    };
+
+    validate_against_schema(
+        "views/portal-host-view.schema.json",
+        &serde_json::to_value(&sample).unwrap(),
+    );
+}
+
+#[test]
+fn portal_host_view_minimal_matches_schema() {
+    use elohim_storage::views::PortalHostView;
+
+    // Minimal: no label, no last_reachable_at.
+    let sample = PortalHostView {
+        human_id: "uhCEkDef789".into(),
+        host_url: "https://doorway.elohim.host/account".into(),
+        label: None,
+        added_at: "2026-04-25T12:00:00Z".into(),
+        last_reachable_at: None,
+        reach: "trusted".into(),
+        dht_anchor_hash: "uhCkGhi012".into(),
+    };
+
+    validate_against_schema(
+        "views/portal-host-view.schema.json",
+        &serde_json::to_value(&sample).unwrap(),
+    );
+}
+
+#[test]
+fn agent_peer_binding_view_matches_schema() {
+    use elohim_storage::views::AgentPeerBindingView;
+
+    let sample = AgentPeerBindingView {
+        agent_cid: "bafyreib2vq7agentcid01234567890123456789012345678901234567890".into(),
+        peer_id: "12D3KooWTestPeer001".into(),
+        valid_from: "2026-04-25T00:00:00Z".into(),
+        valid_until: Some("2027-04-25T00:00:00Z".into()),
+        signature: "a".repeat(128),
+        dht_anchor_hash: "uhCkBIND001".into(),
+    };
+
+    validate_against_schema(
+        "views/agent-peer-binding-view.schema.json",
+        &serde_json::to_value(&sample).unwrap(),
+    );
+}
+
+#[test]
+fn agent_peer_binding_view_non_expiring_matches_schema() {
+    use elohim_storage::views::AgentPeerBindingView;
+
+    // Non-expiring binding: valid_until is None.
+    let sample = AgentPeerBindingView {
+        agent_cid: "bafyreib2vq7agentcid-permanent-01234567890123456789012345678".into(),
+        peer_id: "12D3KooWPermanentPeer".into(),
+        valid_from: "2026-01-01T00:00:00Z".into(),
+        valid_until: None,
+        signature: "b".repeat(128),
+        dht_anchor_hash: "uhCkBINDPERM01".into(),
+    };
+
+    validate_against_schema(
+        "views/agent-peer-binding-view.schema.json",
+        &serde_json::to_value(&sample).unwrap(),
+    );
+}
+
+#[test]
+fn account_view_matches_schema() {
+    use elohim_storage::views::{
+        AccountView, HumanRelationshipView, HumanView, PortalHostView,
+    };
+
+    let human = HumanView {
+        id: "human-matthew".into(),
+        agent_pub_key: Some("uhCAkABCD1234567890".into()),
+        display_name: "Matthew".into(),
+        bio: None,
+        affinities: vec!["education".into()],
+        profile_reach: "community".into(),
+        location: None,
+        profile_photo_url: None,
+        h_app_id: "elohim-app-test-001".into(),
+        created_at: "2026-04-25T00:00:00Z".into(),
+        updated_at: "2026-04-25T00:00:00Z".into(),
+        dht_anchor_hash: Some("uhCkkHUMAN001".into()),
+    };
+
+    let emergency_contact = HumanRelationshipView {
+        id: "rel-timothy-matthew-stewardship".into(),
+        h_app_id: "elohim-app-test-001".into(),
+        party_a_id: "human-timothy".into(),
+        party_b_id: "human-matthew".into(),
+        relationship_type: "stewardship".into(),
+        intimacy_level: "trusted".into(),
+        is_bidirectional: false,
+        consent_given_by_a: true,
+        consent_given_by_b: true,
+        custody_enabled_by_a: false,
+        custody_enabled_by_b: true,
+        auto_custody_enabled: false,
+        emergency_access_enabled: true,
+        initiated_by: "human-matthew".into(),
+        verified_at: None,
+        governance_layer: None,
+        reach: "trusted".into(),
+        context: None,
+        created_at: "2026-04-25T00:00:00Z".into(),
+        updated_at: "2026-04-25T00:00:00Z".into(),
+        expires_at: None,
+        dht_anchor_hash: None,
+    };
+
+    let portal = PortalHostView {
+        human_id: "uhCEkAbc123".into(),
+        host_url: "https://doorway.elohim.host/account".into(),
+        label: None,
+        added_at: "2026-04-25T12:00:00Z".into(),
+        last_reachable_at: None,
+        reach: "trusted".into(),
+        dht_anchor_hash: "uhCkBcd456".into(),
+    };
+
+    let sample = AccountView {
+        human,
+        active_key_rotation: None,
+        recent_revocations: vec![],
+        pending_recovery_requests: vec![],
+        emergency_contacts: vec![emergency_contact],
+        portal_hosts: vec![portal],
+        is_steward: true,
+        has_local_conductor: true,
+    };
+
+    validate_against_schema(
+        "views/account-view.schema.json",
         &serde_json::to_value(&sample).unwrap(),
     );
 }

@@ -28,6 +28,7 @@ ts-rs = { workspace = true, optional = true }
 
 # Internal
 constitution.workspace = true
+elohim-agent-defender-specialist = { path = "../specialists/defender" }
 
 # Optional: llama.cpp bindings
 llama-cpp-2 = { version = "0.1", optional = true }

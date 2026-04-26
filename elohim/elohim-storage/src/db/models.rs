@@ -19,12 +19,12 @@ use super::diesel_schema::{
     enum_registry, governance_dispositions, governance_signals, governance_states, hazards,
     human_relationships, humans, imagodei_observations, key_revocations, key_rotations,
     knowledge_maps, local_sessions, node_stewardship, observation_entries, observation_sessions,
-    peer_identity_bindings, placement_gaps, places, precedents, premium_gates, proposal_options,
-    proposals, ranked_votes, rea_commitments, recovery_requests, recovery_witnesses, relationships,
-    responsibility_demand_configs, revocation_votes, risk_alerts, schedules, shard_locations,
-    shard_manifests, spatial_contexts, statement_votes, statements, steward_credentials,
-    stewarded_nodes, stewardship_allocations, token_balances, token_decay_events,
-    token_mint_events, token_transfers, votes,
+    peer_identity_bindings, placement_gaps, places, portal_hosts, precedents, premium_gates,
+    proposal_options, proposals, ranked_votes, rea_commitments, recovery_requests,
+    recovery_witnesses, relationships, responsibility_demand_configs, revocation_votes, risk_alerts,
+    schedules, shard_locations, shard_manifests, spatial_contexts, statement_votes, statements,
+    steward_credentials, stewarded_nodes, stewardship_allocations, token_balances,
+    token_decay_events, token_mint_events, token_transfers, votes,
 };
 
 // ============================================================================
@@ -3084,4 +3084,37 @@ pub struct InsertRevocationVoteRow {
     pub approved: i32,
     pub attestation: String,
     pub voted_at: String,
+}
+
+// ============================================================================
+// Recovery Protocol Phase 2 — M5 Portal Host projection
+// Source of truth: Holochain DHT (imagodei PortalHost entry — Category A).
+// This table is a Category A projection rebuildable from signal replay.
+// ============================================================================
+
+/// Queryable model for portal_hosts rows (SELECT).
+#[derive(Debug, Clone, Queryable, Identifiable)]
+#[diesel(table_name = portal_hosts, primary_key(rowid))]
+pub struct PortalHostRow {
+    pub rowid: i32,
+    pub human_id: String,
+    pub host_url: String,
+    pub label: Option<String>,
+    pub added_at: String,
+    pub last_reachable_at: Option<String>,
+    pub reach: String,
+    pub dht_anchor_hash: String,
+}
+
+/// Insertable model for portal_hosts rows (INSERT OR REPLACE).
+#[derive(Debug, Clone, Insertable)]
+#[diesel(table_name = portal_hosts)]
+pub struct NewPortalHostRow {
+    pub human_id: String,
+    pub host_url: String,
+    pub label: Option<String>,
+    pub added_at: String,
+    pub last_reachable_at: Option<String>,
+    pub reach: String,
+    pub dht_anchor_hash: String,
 }

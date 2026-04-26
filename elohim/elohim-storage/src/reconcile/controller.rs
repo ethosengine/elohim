@@ -13,10 +13,12 @@
 //!     └─► DnaSignal (via DnaSignalStream)
 //!             │
 //!             │  ReconcileController::dispatch
-//!             ├─► on_key_rotation         (Task A.6 — pubkey timeline cache)
-//!             ├─► on_key_revocation       (Task A.8 — sweep + cache invalidate)
-//!             ├─► on_agent_peer_binding   (Task A.5 — peer_identity_bindings table)
-//!             └─► on_revocation_attestation (Task A.10 — revocation_votes projection)
+//!             ├─► on_key_rotation           (Task A.6 — pubkey timeline cache)
+//!             ├─► on_key_revocation         (Task A.8 — sweep + cache invalidate)
+//!             ├─► on_agent_peer_binding     (Task A.5 — peer_identity_bindings table)
+//!             ├─► on_revocation_attestation (Task A.10 — revocation_votes projection)
+//!             ├─► on_portal_host_created    (M5 — portal_hosts upsert)
+//!             └─► on_portal_host_removed    (M5 — portal_hosts delete)
 //! ```
 //!
 //! ## Current state
@@ -36,9 +38,10 @@ use crate::p2p::P2PCommand;
 use crate::projector::sweep::sweep_projections_on_revocation;
 use crate::projector::ManifestRegistry;
 use crate::reconcile::pubkey_timeline::PubkeyTimelineCache;
+use crate::reconcile::portal_host_handlers;
 use crate::reconcile::signal_stream::{
     AgentPeerBindingSignal, DnaSignal, DnaSignalStream, KeyRevocationSignal, KeyRotationSignal,
-    RevocationAttestationSignal,
+    PortalHostCreatedSignal, PortalHostRemovedSignal, RevocationAttestationSignal,
 };
 use crate::reconcile::sweep::sweep_on_revocation;
 
@@ -80,9 +83,10 @@ pub enum ReconcileError {
 /// |------|-------------|
 /// | A.5  | `binding_cache: Arc<RwLock<PeerBindingCache>>` |
 /// | A.6  | `pubkey_cache: PubkeyTimelineCache` |
-/// | A.8  | `db_pool` + `pubkey_cache` (sweep + cache invalidate) — THIS TASK |
+/// | A.8  | `db_pool` + `pubkey_cache` (sweep + cache invalidate) |
 /// | A.10 | Uses `db_pool` for revocation_votes projection |
 /// | A.11 | `db_pool` wired from `HttpServer` / `Services` startup |
+/// | M5   | Uses `db_pool` for portal_hosts upsert/delete |
 pub struct ReconcileController<S: DnaSignalStream> {
     stream: S,
 
@@ -265,6 +269,16 @@ impl<S: DnaSignalStream> ReconcileController<S> {
                 debug!(revocation_id = %a.revocation_id, "dispatching RevocationAttestation signal");
                 self.observed_kinds.push("revocationAttestation".into());
                 self.on_revocation_attestation(a).await
+            }
+            DnaSignal::PortalHostCreated(p) => {
+                debug!(host_url = %p.host_url, "dispatching PortalHostCreated signal");
+                self.observed_kinds.push("portalHostCreated".into());
+                self.on_portal_host_created(p).await
+            }
+            DnaSignal::PortalHostRemoved(p) => {
+                debug!(host_url = %p.host_url, "dispatching PortalHostRemoved signal");
+                self.observed_kinds.push("portalHostRemoved".into());
+                self.on_portal_host_removed(p).await
             }
         }
     }
@@ -464,6 +478,30 @@ impl<S: DnaSignalStream> ReconcileController<S> {
         // Task A.10 replaces this stub.
         Ok(())
     }
+
+    /// M5: upsert the `portal_hosts` projection when a doorway registration is notarized.
+    ///
+    /// Delegates to [`portal_host_handlers::on_portal_host_created`].
+    /// If no DB pool is wired (test stub constructed via `new()`), the handler
+    /// logs a warning and returns `Ok(())`.
+    async fn on_portal_host_created(
+        &mut self,
+        signal: PortalHostCreatedSignal,
+    ) -> Result<(), ReconcileError> {
+        portal_host_handlers::on_portal_host_created(&self.db_pool, signal)
+    }
+
+    /// M5: delete the `portal_hosts` projection row when a doorway registration is removed.
+    ///
+    /// Delegates to [`portal_host_handlers::on_portal_host_removed`].
+    /// If no DB pool is wired (test stub constructed via `new()`), the handler
+    /// logs a warning and returns `Ok(())`.
+    async fn on_portal_host_removed(
+        &mut self,
+        signal: PortalHostRemovedSignal,
+    ) -> Result<(), ReconcileError> {
+        portal_host_handlers::on_portal_host_removed(&self.db_pool, signal)
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -476,7 +514,7 @@ mod tests {
     use crate::reconcile::signal_stream::{
         AgentPeerBindingSignal, AttestationKind, ChannelSignalStream, DeviceArchetype, DnaSignal,
         InMemoryDnaSignalStream, KeyRevocationSignal, KeyRotationSignal,
-        RevocationAttestationSignal,
+        PortalHostCreatedSignal, PortalHostRemovedSignal, RevocationAttestationSignal,
     };
     use chrono::Utc;
     use tokio::sync::mpsc;
@@ -533,6 +571,26 @@ mod tests {
             threshold_reached: false,
             attested_at: Utc::now(),
             emitted_at: Utc::now(),
+        }
+    }
+
+    fn sample_portal_host_created_signal() -> PortalHostCreatedSignal {
+        PortalHostCreatedSignal {
+            action_hash: "uhCAk-portal-create-hash".to_string(),
+            human_action_hash: "uhCAk-human-action-hash".to_string(),
+            host_url: "https://doorway.example.com".to_string(),
+            label: Some("Home doorway".to_string()),
+            added_at: "2026-04-25T00:00:00Z".to_string(),
+            reach: "Trusted".to_string(),
+        }
+    }
+
+    fn sample_portal_host_removed_signal() -> PortalHostRemovedSignal {
+        PortalHostRemovedSignal {
+            action_hash: "uhCAk-portal-delete-hash".to_string(),
+            original_action_hash: "uhCAk-portal-create-hash".to_string(),
+            human_action_hash: "uhCAk-human-action-hash".to_string(),
+            host_url: "https://doorway.example.com".to_string(),
         }
     }
 
@@ -831,5 +889,100 @@ mod tests {
         );
 
         assert!(rx.try_recv().is_err(), "no more commands after two signals");
+    }
+
+    // -----------------------------------------------------------------------
+    // M5: PortalHostCreated / PortalHostRemoved dispatch
+    // -----------------------------------------------------------------------
+
+    /// `PortalHostCreated` signal is routed and recorded when no DB pool is wired.
+    ///
+    /// Without `new_with_storage` the handler logs a warning and returns `Ok(())`.
+    /// This preserves backward compatibility with the A.4 stub-only test suite.
+    #[tokio::test]
+    async fn controller_routes_portal_host_created_no_pool_is_ok() {
+        let signals = vec![DnaSignal::PortalHostCreated(
+            sample_portal_host_created_signal(),
+        )];
+        let stream = InMemoryDnaSignalStream::with_signals(signals);
+        let mut controller = ReconcileController::new(stream);
+
+        controller.run_one_pass().await.unwrap();
+
+        assert_eq!(controller.observed_kinds(), &["portalHostCreated"]);
+    }
+
+    /// `PortalHostRemoved` signal is routed and recorded when no DB pool is wired.
+    #[tokio::test]
+    async fn controller_routes_portal_host_removed_no_pool_is_ok() {
+        let signals = vec![DnaSignal::PortalHostRemoved(
+            sample_portal_host_removed_signal(),
+        )];
+        let stream = InMemoryDnaSignalStream::with_signals(signals);
+        let mut controller = ReconcileController::new(stream);
+
+        controller.run_one_pass().await.unwrap();
+
+        assert_eq!(controller.observed_kinds(), &["portalHostRemoved"]);
+    }
+
+    /// End-to-end: `PortalHostCreated` through `new_with_storage` upserts a
+    /// projection row; `PortalHostRemoved` deletes it.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn controller_portal_host_created_then_removed_roundtrip() {
+        use crate::db::{portal_hosts, run_migrations, DbPool};
+        use crate::reconcile::pubkey_timeline::PubkeyTimelineCache;
+        use diesel::r2d2::{ConnectionManager, Pool};
+        use std::sync::Arc;
+        use tokio::sync::Mutex;
+
+        // Build an in-memory test DB.
+        let url = format!(
+            "file:ctrl_ph_test_{}?mode=memory&cache=shared",
+            uuid::Uuid::new_v4().as_simple()
+        );
+        let pool: DbPool = Pool::builder()
+            .max_size(1)
+            .build(ConnectionManager::new(&url))
+            .expect("pool");
+        run_migrations(&pool).expect("migrations");
+        let pool = Arc::new(pool);
+        let cache = Arc::new(Mutex::new(PubkeyTimelineCache::with_capacity(4)));
+
+        let created = sample_portal_host_created_signal();
+        let removed = sample_portal_host_removed_signal();
+
+        // --- Create pass ---
+        let stream = InMemoryDnaSignalStream::with_signals(vec![DnaSignal::PortalHostCreated(
+            created.clone(),
+        )]);
+        let mut ctrl =
+            ReconcileController::new_with_storage(stream, Arc::clone(&pool), Arc::clone(&cache));
+        ctrl.run_one_pass().await.expect("create pass");
+
+        // Row must now exist for the human.
+        let rows = tokio::task::block_in_place(|| {
+            let mut conn = pool.get().expect("conn");
+            portal_hosts::list_for_human(&mut conn, &created.human_action_hash)
+                .expect("list_for_human")
+        });
+        assert_eq!(rows.len(), 1, "expected one portal_host row after create signal");
+        assert_eq!(rows[0].host_url, created.host_url);
+        assert_eq!(rows[0].dht_anchor_hash, created.action_hash);
+
+        // --- Remove pass ---
+        let stream = InMemoryDnaSignalStream::with_signals(vec![DnaSignal::PortalHostRemoved(
+            removed.clone(),
+        )]);
+        let mut ctrl =
+            ReconcileController::new_with_storage(stream, Arc::clone(&pool), Arc::clone(&cache));
+        ctrl.run_one_pass().await.expect("remove pass");
+
+        let rows_after = tokio::task::block_in_place(|| {
+            let mut conn = pool.get().expect("conn");
+            portal_hosts::list_for_human(&mut conn, &created.human_action_hash)
+                .expect("list_for_human after")
+        });
+        assert!(rows_after.is_empty(), "portal_host row must be gone after remove signal");
     }
 }

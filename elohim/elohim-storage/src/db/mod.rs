@@ -114,6 +114,9 @@ pub mod peer_identity_bindings;
 pub mod key_revocations;
 pub mod revocation_votes;
 
+// Recovery Protocol Phase 2 — M5 portal host projection (imagodei PortalHost entry, Category A)
+pub mod portal_hosts;
+
 use std::path::Path;
 use std::time::Duration;
 

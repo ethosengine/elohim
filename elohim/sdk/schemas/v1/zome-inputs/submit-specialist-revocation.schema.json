@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "epr:schema:input:submit-specialist-revocation",
+  "title": "SubmitSpecialistRevocationInput",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["humanActionHash", "revokedPubKey", "anomalyAttestation"],
+  "properties": {
+    "humanActionHash":    { "type": "string", "description": "ActionHash (base64url) of the target Human" },
+    "revokedPubKey":      { "type": "string" },
+    "anomalyAttestation": { "$ref": "epr:schema:agent:anomaly-attestation" }
+  }
+}

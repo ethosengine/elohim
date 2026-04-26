@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "epr:schema:agent:anomaly-attestation",
+  "title": "AnomalyAttestation",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["observedAt", "anomalyKind", "evidence", "confidence"],
+  "properties": {
+    "observedAt":  { "type": "string", "format": "date-time" },
+    "anomalyKind": { "type": "string", "enum": ["none", "rapid_rotation", "quorum_evasion", "geographic_anomaly", "vulnerability_heuristic"] },
+    "evidence":    { "type": "array", "items": { "type": "object" } },
+    "confidence":  { "type": "number", "minimum": 0.0, "maximum": 1.0 }
+  }
+}

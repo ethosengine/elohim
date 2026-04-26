@@ -1231,6 +1231,21 @@ diesel::table! {
     }
 }
 
+// Recovery Protocol Phase 2 — M5 portal host projection (imagodei PortalHost entry)
+// Source of truth: Holochain DHT (PortalHost entry in imagodei DNA, Category A).
+diesel::table! {
+    portal_hosts (rowid) {
+        rowid               -> Integer,
+        human_id            -> Text,
+        host_url            -> Text,
+        label               -> Nullable<Text>,
+        added_at            -> Text,
+        last_reachable_at   -> Nullable<Text>,
+        reach               -> Text,
+        dht_anchor_hash     -> Text,
+    }
+}
+
 // EPR storage layer — Phase 2a
 // Source of truth: EPR atoms (self-notarized via content-derived CID + Ed25519).
 // Timestamps stored as TEXT (ISO-8601). Binary blobs stored as Binary/BLOB.
@@ -1344,6 +1359,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     peer_identity_bindings,
     peer_statuses,
     placement_gaps,
+    portal_hosts,
     precedents,
     premium_gates,
     proposal_options,
