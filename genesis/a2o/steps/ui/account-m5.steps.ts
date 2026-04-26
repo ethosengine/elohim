@@ -11,13 +11,16 @@
  *   - recovery-m5-defender-role-gate  (API-only, no browser)
  *
  * Framework: Playwright + @cucumber/cucumber (NOT Cypress).
- * Tag: @recovery-m5 — run with: npx cucumber-js --tags "@recovery-m5 and not @phase11-pending"
+ * Tag: @recovery-m5 — run with: npx cucumber-js --tags "@recovery-m5"
  *
- * Reality threading (Task 10):
- *   - POST mutations to /api/v1/account/* return 503 PHASE_11_PENDING until the
- *     Phase-11 bridge is wired. Scenarios that test the 503 response run now.
- *   - Scenarios tagged @phase11-pending test the success path; they are SKIPPED
- *     by running with "--tags 'not @phase11-pending'".
+ * Reality threading:
+ *   - The Phase-11 storage zome-forwarding bridge is live (POST/DELETE
+ *     mutations to /api/v1/account/* call the imagodei coordinator zome
+ *     in Tauri-direct mode). Browser-via-doorway returns 503
+ *     BROWSER_WRITE_PATH_PENDING (deferred to M6).
+ *   - The M5-era 503 PHASE_11_PENDING stub scenarios were deleted when
+ *     Phase 11 landed; the success-path scenarios that were tagged
+ *     @phase11-pending are now untagged and run by default.
  *
  * Field name contract (Tasks 19–20):
  *   KeyRotation:     newAgentPubkey, humanAgentPubkey, oldAgentPubkey, authorityKind, rotatedAt
@@ -390,15 +393,13 @@ When(
   }
 );
 
-
-// Phase-11-pending success path steps — these only run when @phase11-pending is not excluded
+// Phase-11 success-path steps — drive the live HTTP→zome bridge.
 
 Then(
   'a KeyRevocation entry is committed with triggerType {string}',
   async function (this: E2EWorld, expectedTriggerType: string) {
-    // This step only runs in the @phase11-pending success scenario.
-    // When the Phase-11 bridge is wired, the backend returns 200 and the UI
-    // updates the key list. For now, we assert on the UI refresh.
+    // The Phase-11 bridge returns 200 on successful self-revocation; the
+    // UI then refreshes the key list. We assert on the UI refresh here.
     const device = requirePlaywright(this);
     if (!device) return 'pending';
 
