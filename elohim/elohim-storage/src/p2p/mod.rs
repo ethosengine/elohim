@@ -485,6 +485,19 @@ pub enum P2PCommand {
     ///
     /// Best-effort: failure is logged but does NOT block the local put.
     PublishEprAnnounce { topic: String, payload: Vec<u8> },
+    /// D.5: direct-notify integrity event to a list of peers via
+    /// `/elohim/epr-atom/1.0.0` request-response. Used by
+    /// `ReconcileController::on_key_revocation` to send the revocation payload
+    /// directly to peers known to have been bound to the revoked agent.
+    ///
+    /// Best-effort: per-peer send failures are logged but do not block the
+    /// controller loop. Peers that miss the direct-notify will still learn of
+    /// the revocation via the gossipsub and Kademlia channels (D.2/D.3).
+    DirectNotifyIntegrity {
+        peer_ids: Vec<PeerId>,
+        kind: String,
+        payload_bytes: Vec<u8>,
+    },
 }
 
 /// RAII guard that resumes P2P sync when dropped.
@@ -581,6 +594,7 @@ impl P2PHandle {
                     P2PCommand::PublishRecoveryRevocation(_) => {} // fire-and-forget
                     P2PCommand::KadStartProviding { .. } => {} // fire-and-forget
                     P2PCommand::PublishEprAnnounce { .. } => {} // fire-and-forget
+                    P2PCommand::DirectNotifyIntegrity { .. } => {} // fire-and-forget (D.5 best-effort)
                 }
             }
         });
@@ -1590,6 +1604,36 @@ impl P2PNode {
                         "publish_epr_announce: gossipsub publish failed (often: no peers subscribed yet)"
                     ),
                 }
+            }
+            // D.5: send IntegrityNotify to each affected peer via /elohim/epr-atom/1.0.0.
+            // Best-effort: per-peer failures are logged but don't block.
+            P2PCommand::DirectNotifyIntegrity {
+                peer_ids,
+                kind,
+                payload_bytes,
+            } => {
+                for peer_id in &peer_ids {
+                    let req = EprAtomRequest::IntegrityNotify {
+                        kind: kind.clone(),
+                        payload_bytes: payload_bytes.clone(),
+                    };
+                    let _request_id = swarm
+                        .behaviour_mut()
+                        .epr_atom_protocol
+                        .send_request(peer_id, req);
+                    info!(
+                        target: "elohim_storage::integrity",
+                        peer = %peer_id,
+                        kind = %kind,
+                        "D.5: sent IntegrityNotify to peer"
+                    );
+                }
+                debug!(
+                    target: "elohim_storage::integrity",
+                    kind = %kind,
+                    peer_count = peer_ids.len(),
+                    "D.5: DirectNotifyIntegrity dispatched to all peers"
+                );
             }
         }
     }
@@ -3862,6 +3906,66 @@ impl P2PNode {
                     "EPR atom fetch batch completed"
                 );
                 EprAtomResponse::AtomBatch { atoms }
+            }
+            // D.5: direct-notify of an integrity event from a peer.
+            // Stage 1: only KeyRevocation is handled; other kinds are accepted
+            // but logged as not-yet-handled. Receivers decode by kind and route
+            // to the same handler the gossipsub receive path uses.
+            EprAtomRequest::IntegrityNotify {
+                kind,
+                payload_bytes,
+            } => {
+                match kind.as_str() {
+                    "KeyRevocation" => {
+                        match crate::p2p::recovery_revocation::RecoveryRevocationMessage::from_bytes(
+                            &payload_bytes,
+                        ) {
+                            Ok(msg) => {
+                                info!(
+                                    target: "elohim_storage::recovery",
+                                    from = %peer,
+                                    revocation_id = %msg.revocation_id,
+                                    human_id = %msg.human_id,
+                                    status = %msg.status,
+                                    "D.5: Received KeyRevocation via direct-notify"
+                                );
+                                // The gossipsub receive path for RECOVERY_REVOCATION_TOPIC
+                                // currently logs only. When that path adds projection logic,
+                                // factor it into a shared helper and call it from both
+                                // direct-notify + gossipsub paths. For now, structural
+                                // receive + log is sufficient.
+                                EprAtomResponse::IntegrityAck {
+                                    received: true,
+                                    reason: None,
+                                }
+                            }
+                            Err(e) => {
+                                warn!(
+                                    target: "elohim_storage::recovery",
+                                    from = %peer,
+                                    error = %e,
+                                    "D.5: Failed to decode RecoveryRevocationMessage from direct-notify"
+                                );
+                                EprAtomResponse::IntegrityAck {
+                                    received: false,
+                                    reason: Some(format!("decode failed: {e}")),
+                                }
+                            }
+                        }
+                    }
+                    _ => {
+                        warn!(
+                            target: "elohim_storage::integrity",
+                            from = %peer,
+                            kind = %kind,
+                            "D.5: Received IntegrityNotify with unhandled kind — Stage 2/3 will add handlers"
+                        );
+                        EprAtomResponse::IntegrityAck {
+                            received: false,
+                            reason: Some(format!("unhandled integrity kind: {kind}")),
+                        }
+                    }
+                }
             }
         }
     }

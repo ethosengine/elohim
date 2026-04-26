@@ -44,6 +44,7 @@ impl AsRef<str> for EprAtomProtocol {
 /// Request variants — transient wire types (no persistent source of truth).
 /// `tag` is the CBOR discriminator; shape matches the wire contract in
 /// `elohim/sdk/schemas/v1/p2p/epr-atom-message.schema.json`.
+// TODO(D.5): update epr-atom-message.schema.json with integrity_notify variant
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "tag", rename_all = "snake_case")]
 pub enum EprAtomRequest {
@@ -56,6 +57,19 @@ pub enum EprAtomRequest {
     },
     /// Fetch multiple atoms in one request. Bounded by `MAX_BATCH_CIDS`.
     FetchBatch { cids: Vec<String> },
+    /// D.5: direct-notify of integrity events (KeyRevocation, KeyRotation,
+    /// RevocationAttestation, AgentPeerBinding). The `kind` field discriminates
+    /// the encoding of `payload_bytes`. For `KeyRevocation` the payload is a
+    /// MessagePack-encoded `RecoveryRevocationMessage`. Receivers decode by
+    /// kind and route to the same handler the gossipsub receive path uses.
+    ///
+    /// Stage 1: only KeyRevocation is implemented on the receive side; other
+    /// integrity kinds are accepted but logged as not-yet-handled.
+    IntegrityNotify {
+        kind: String,
+        #[serde(with = "serde_bytes")]
+        payload_bytes: Vec<u8>,
+    },
 }
 
 /// Response variants — transient wire types.
@@ -81,6 +95,13 @@ pub enum EprAtomResponse {
     NotFound,
     /// Protocol-level error (malformed request, batch too large, etc.).
     Error { message: String },
+    /// D.5: ack for IntegrityNotify. `received: true` means the payload was
+    /// successfully decoded and routed; `false` means decode or routing failed,
+    /// with `reason` carrying a non-secret diagnostic string.
+    IntegrityAck {
+        received: bool,
+        reason: Option<String>,
+    },
 }
 
 /// Helper for `#[serde(with = "...")]` over `Vec<Option<Vec<u8>>>`.
@@ -282,4 +303,132 @@ pub enum VerifyError {
     Signature(String),
     #[error("validation: {0}")]
     Validation(String),
+}
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use libp2p::request_response::Codec as _;
+
+    /// Helper: encode a request to bytes via the codec, then decode from those bytes.
+    async fn encode_decode_request(req: EprAtomRequest) -> EprAtomRequest {
+        use futures::io::Cursor;
+        let mut codec = EprAtomCodec;
+        let proto = EprAtomProtocol;
+
+        // Write into a Vec<u8> buffer.
+        let mut buf: Vec<u8> = Vec::new();
+        codec
+            .write_request(&proto, &mut buf, req)
+            .await
+            .expect("write_request");
+
+        // Read back from a Cursor over the buffer.
+        let mut cursor = Cursor::new(buf);
+        codec
+            .read_request(&proto, &mut cursor)
+            .await
+            .expect("read_request")
+    }
+
+    /// Helper: encode a response to bytes via the codec, then decode from those bytes.
+    async fn encode_decode_response(resp: EprAtomResponse) -> EprAtomResponse {
+        use futures::io::Cursor;
+        let mut codec = EprAtomCodec;
+        let proto = EprAtomProtocol;
+
+        let mut buf: Vec<u8> = Vec::new();
+        codec
+            .write_response(&proto, &mut buf, resp)
+            .await
+            .expect("write_response");
+
+        let mut cursor = Cursor::new(buf);
+        codec
+            .read_response(&proto, &mut cursor)
+            .await
+            .expect("read_response")
+    }
+
+    /// D.5: IntegrityNotify request roundtrips through the CBOR codec with
+    /// kind and payload_bytes preserved exactly.
+    #[tokio::test]
+    async fn integrity_notify_request_roundtrip() {
+        let original = EprAtomRequest::IntegrityNotify {
+            kind: "KeyRevocation".to_string(),
+            payload_bytes: b"test-revocation-payload-bytes".to_vec(),
+        };
+
+        let decoded = encode_decode_request(original.clone()).await;
+
+        match (original, decoded) {
+            (
+                EprAtomRequest::IntegrityNotify {
+                    kind: k1,
+                    payload_bytes: p1,
+                },
+                EprAtomRequest::IntegrityNotify {
+                    kind: k2,
+                    payload_bytes: p2,
+                },
+            ) => {
+                assert_eq!(k1, k2, "kind must round-trip");
+                assert_eq!(p1, p2, "payload_bytes must round-trip");
+            }
+            _ => panic!("decoded variant did not match IntegrityNotify"),
+        }
+    }
+
+    /// D.5: IntegrityAck response (received=true) roundtrips through the CBOR codec.
+    #[tokio::test]
+    async fn integrity_ack_response_roundtrip() {
+        let original = EprAtomResponse::IntegrityAck {
+            received: true,
+            reason: None,
+        };
+
+        let decoded = encode_decode_response(original.clone()).await;
+
+        match (original, decoded) {
+            (
+                EprAtomResponse::IntegrityAck {
+                    received: r1,
+                    reason: reason1,
+                },
+                EprAtomResponse::IntegrityAck {
+                    received: r2,
+                    reason: reason2,
+                },
+            ) => {
+                assert_eq!(r1, r2, "received must round-trip");
+                assert_eq!(reason1, reason2, "reason must round-trip");
+            }
+            _ => panic!("decoded variant did not match IntegrityAck"),
+        }
+    }
+
+    /// D.5: IntegrityAck with reason preserves the reason string.
+    #[tokio::test]
+    async fn integrity_ack_with_reason_roundtrip() {
+        let original = EprAtomResponse::IntegrityAck {
+            received: false,
+            reason: Some("decode failed: unexpected EOF".to_string()),
+        };
+
+        let decoded = encode_decode_response(original).await;
+
+        match decoded {
+            EprAtomResponse::IntegrityAck {
+                received: false,
+                reason: Some(r),
+            } => {
+                assert!(r.contains("decode failed"), "reason must be preserved");
+            }
+            other => panic!("unexpected decoded variant: {other:?}"),
+        }
+    }
 }

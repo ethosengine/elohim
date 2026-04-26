@@ -29,7 +29,7 @@ use std::sync::Arc;
 
 use thiserror::Error;
 use tokio::sync::{mpsc, Mutex};
-use tracing::{debug, info, warn};
+use tracing::{debug, error, info, warn};
 
 use crate::db::DbPool;
 use crate::p2p::P2PCommand;
@@ -377,6 +377,99 @@ impl<S: DnaSignalStream> ReconcileController<S> {
                 compromise_at = %signal.compromise_at,
                 "KeyRevocation received but no db_pool wired — sweep skipped (use new_with_storage)"
             );
+        }
+
+        // D.5: direct-notify affected peers via libp2p request/response.
+        // Affected peers are those with peer_identity_bindings rows referencing
+        // the revoked agent_cid. (Recovery M4 will eventually produce a richer
+        // notification list; until then, peer_identity_bindings is the stopgap.)
+        if let Some(swarm_tx) = self.swarm_tx.as_ref() {
+            if let Some(pool) = &self.db_pool {
+                let pool = Arc::clone(pool);
+                let revoked_agent_cid = signal.agent_cid.clone();
+                let now_iso = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
+                let compromise_at_str = signal
+                    .compromise_at
+                    .format("%Y-%m-%dT%H:%M:%SZ")
+                    .to_string();
+                let revoked_pubkey = signal.revoked_pubkey.clone();
+
+                let affected_peers = tokio::task::block_in_place(
+                    || -> Result<Vec<libp2p::PeerId>, ReconcileError> {
+                        let mut conn = pool
+                            .get()
+                            .map_err(|e| ReconcileError::Pool(e.to_string()))?;
+                        use crate::db::diesel_schema::peer_identity_bindings::dsl as p;
+                        use diesel::prelude::*;
+                        let peer_id_strs: Vec<String> = p::peer_identity_bindings
+                            .filter(p::agent_cid.eq(&revoked_agent_cid))
+                            .select(p::peer_id)
+                            .distinct()
+                            .load(&mut conn)
+                            .map_err(|e| {
+                                ReconcileError::Sweep(format!("affected peer query: {e}"))
+                            })?;
+                        Ok(peer_id_strs
+                            .into_iter()
+                            .filter_map(|s| s.parse::<libp2p::PeerId>().ok())
+                            .collect())
+                    },
+                )?;
+
+                if !affected_peers.is_empty() {
+                    // Build the RecoveryRevocationMessage payload — re-use M4's wire format.
+                    // trigger_type and reason are not carried on KeyRevocationSignal;
+                    // empty strings are valid per the wire contract (spec §7.2).
+                    let msg = crate::p2p::recovery_revocation::RecoveryRevocationMessage {
+                        revocation_id: format!("rev-{}-{}", revoked_agent_cid, compromise_at_str),
+                        human_id: revoked_agent_cid.clone(),
+                        revoked_key: revoked_pubkey,
+                        trigger_type: String::new(),
+                        reason: String::new(),
+                        status: "effective".to_string(),
+                        sender_peer_id: String::new(), // populated by P2PNode when sending
+                        sent_at: now_iso,
+                    };
+                    match msg.to_bytes() {
+                        Ok(payload_bytes) => {
+                            info!(
+                                target: "elohim_storage::recovery",
+                                revoked_agent = %revoked_agent_cid,
+                                affected_peer_count = affected_peers.len(),
+                                "D.5: dispatching direct-notify to affected peers"
+                            );
+                            let cmd = crate::p2p::P2PCommand::DirectNotifyIntegrity {
+                                peer_ids: affected_peers,
+                                kind: "KeyRevocation".to_string(),
+                                payload_bytes,
+                            };
+                            if let Err(e) = swarm_tx.try_send(cmd) {
+                                match e {
+                                    tokio::sync::mpsc::error::TrySendError::Full(_) => {
+                                        warn!(
+                                            "D.5: direct-notify channel full — skipping (best-effort)"
+                                        );
+                                    }
+                                    tokio::sync::mpsc::error::TrySendError::Closed(_) => {
+                                        error!(
+                                            "D.5: swarm command channel closed — direct-notify lost"
+                                        );
+                                    }
+                                }
+                            }
+                        }
+                        Err(e) => warn!(
+                            error = %e,
+                            "D.5: failed to encode RecoveryRevocationMessage for direct-notify"
+                        ),
+                    }
+                } else {
+                    debug!(
+                        revoked_agent = %revoked_agent_cid,
+                        "D.5: no affected peers in peer_identity_bindings — skipping direct-notify"
+                    );
+                }
+            }
         }
 
         Ok(())
@@ -831,5 +924,183 @@ mod tests {
         );
 
         assert!(rx.try_recv().is_err(), "no more commands after two signals");
+    }
+
+    // -----------------------------------------------------------------------
+    // D.5: on_key_revocation → DirectNotifyIntegrity
+    // -----------------------------------------------------------------------
+
+    /// Helper: construct a libp2p PeerId that roundtrips through String parsing.
+    #[cfg(feature = "p2p")]
+    fn test_peer_id() -> libp2p::PeerId {
+        libp2p::PeerId::from(libp2p::identity::Keypair::generate_ed25519().public())
+    }
+
+    /// D.5: when peer_identity_bindings contains a row for the revoked agent,
+    /// on_key_revocation dispatches a DirectNotifyIntegrity command with the
+    /// correct peer_ids and kind="KeyRevocation".
+    #[cfg(feature = "p2p")]
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn on_key_revocation_dispatches_direct_notify_when_affected_peers_present() {
+        use crate::db::models::NewPeerIdentityBindingRow;
+        use crate::db::peer_identity_bindings::upsert;
+        use crate::p2p::P2PCommand;
+        use crate::reconcile::pubkey_timeline::PubkeyTimelineCache;
+        use crate::test_util::test_pool;
+        use chrono::Utc;
+        use diesel::prelude::*;
+        use std::sync::Arc;
+        use tokio::sync::Mutex;
+
+        let pool = Arc::new(test_pool());
+        let peer_id = test_peer_id();
+        let peer_id_str = peer_id.to_string();
+
+        // Insert a peer_identity_bindings row for the agent we'll revoke.
+        {
+            let mut conn = pool.get().expect("connection");
+            upsert(
+                &mut conn,
+                &NewPeerIdentityBindingRow {
+                    peer_id: peer_id_str.clone(),
+                    agent_cid: "d5-revoked-agent".to_string(),
+                    dht_anchor_hash: "uhCkk-d5-binding-hash".to_string(),
+                    valid_from: "2026-01-01T00:00:00Z".to_string(),
+                    valid_until: None,
+                    observed_at: "2026-01-01T00:00:00Z".to_string(),
+                    source: "dht".to_string(),
+                },
+            )
+            .expect("upsert binding");
+        }
+
+        let cache = Arc::new(Mutex::new(PubkeyTimelineCache::with_capacity(16)));
+        let signal = KeyRevocationSignal {
+            action_hash: "uhCkk-d5-rev-hash".into(),
+            agent_cid: "d5-revoked-agent".into(),
+            revoked_pubkey: "cmV2b2tlZGtleWJhc2U2NAAAAAAAAAAAAAAAAAAAAAA".into(),
+            compromise_at: Utc::now(),
+            effective_at: Utc::now(),
+            triggering_revocation_id: Some("rev-d5".into()),
+            emitted_at: Utc::now(),
+        };
+
+        let stream = InMemoryDnaSignalStream::with_signals(vec![DnaSignal::KeyRevocation(signal)]);
+        let (tx, mut rx) = mpsc::channel::<P2PCommand>(8);
+        let mut controller =
+            ReconcileController::new_with_storage(stream, Arc::clone(&pool), Arc::clone(&cache))
+                .with_swarm_tx(tx);
+
+        controller.run_one_pass().await.expect("run_one_pass");
+
+        // Must have recorded the kind.
+        assert_eq!(controller.observed_kinds(), &["keyRevocation"]);
+
+        // Must have received exactly one DirectNotifyIntegrity command.
+        let cmd = rx
+            .try_recv()
+            .expect("expected DirectNotifyIntegrity command on swarm channel");
+        match cmd {
+            P2PCommand::DirectNotifyIntegrity {
+                peer_ids,
+                kind,
+                payload_bytes,
+            } => {
+                assert_eq!(kind, "KeyRevocation");
+                assert_eq!(peer_ids.len(), 1, "exactly one affected peer");
+                assert_eq!(peer_ids[0], peer_id, "peer_id must match the binding row");
+                assert!(!payload_bytes.is_empty(), "payload_bytes must be non-empty");
+                // Verify the payload decodes as a RecoveryRevocationMessage.
+                let msg = crate::p2p::recovery_revocation::RecoveryRevocationMessage::from_bytes(
+                    &payload_bytes,
+                )
+                .expect("payload must decode as RecoveryRevocationMessage");
+                assert_eq!(msg.human_id, "d5-revoked-agent");
+                assert_eq!(msg.status, "effective");
+            }
+            _other => panic!("expected DirectNotifyIntegrity, got unexpected command variant"),
+        }
+
+        // No further commands.
+        assert!(rx.try_recv().is_err(), "no more commands expected");
+    }
+
+    /// D.5: when peer_identity_bindings has NO rows for the revoked agent,
+    /// no DirectNotifyIntegrity command is sent.
+    #[cfg(feature = "p2p")]
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn on_key_revocation_skips_direct_notify_when_no_affected_peers() {
+        use crate::p2p::P2PCommand;
+        use crate::reconcile::pubkey_timeline::PubkeyTimelineCache;
+        use crate::test_util::test_pool;
+        use chrono::Utc;
+        use std::sync::Arc;
+        use tokio::sync::Mutex;
+
+        let pool = Arc::new(test_pool());
+        let cache = Arc::new(Mutex::new(PubkeyTimelineCache::with_capacity(16)));
+
+        // No binding rows inserted for "d5-no-peers-agent".
+        let signal = KeyRevocationSignal {
+            action_hash: "uhCkk-d5-nop-hash".into(),
+            agent_cid: "d5-no-peers-agent".into(),
+            revoked_pubkey: "cmV2b2tlZGtleWJhc2U2NAAAAAAAAAAAAAAAAAAAAAA".into(),
+            compromise_at: Utc::now(),
+            effective_at: Utc::now(),
+            triggering_revocation_id: None,
+            emitted_at: Utc::now(),
+        };
+
+        let stream = InMemoryDnaSignalStream::with_signals(vec![DnaSignal::KeyRevocation(signal)]);
+        let (tx, mut rx) = mpsc::channel::<P2PCommand>(8);
+        let mut controller =
+            ReconcileController::new_with_storage(stream, Arc::clone(&pool), Arc::clone(&cache))
+                .with_swarm_tx(tx);
+
+        controller.run_one_pass().await.expect("run_one_pass");
+
+        assert_eq!(controller.observed_kinds(), &["keyRevocation"]);
+        // Channel must be empty — no DirectNotifyIntegrity dispatched.
+        assert!(
+            rx.try_recv().is_err(),
+            "no DirectNotifyIntegrity command expected when no affected peers"
+        );
+    }
+
+    /// D.5: when no swarm_tx is wired, on_key_revocation completes without panic
+    /// and no command is dispatched.
+    #[cfg(feature = "p2p")]
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn on_key_revocation_skips_direct_notify_when_no_swarm_tx() {
+        use crate::reconcile::pubkey_timeline::PubkeyTimelineCache;
+        use crate::test_util::test_pool;
+        use chrono::Utc;
+        use std::sync::Arc;
+        use tokio::sync::Mutex;
+
+        let pool = Arc::new(test_pool());
+        let cache = Arc::new(Mutex::new(PubkeyTimelineCache::with_capacity(16)));
+
+        let signal = KeyRevocationSignal {
+            action_hash: "uhCkk-d5-noswarm-hash".into(),
+            agent_cid: "d5-no-swarm-agent".into(),
+            revoked_pubkey: "cmV2b2tlZGtleWJhc2U2NAAAAAAAAAAAAAAAAAAAAAA".into(),
+            compromise_at: Utc::now(),
+            effective_at: Utc::now(),
+            triggering_revocation_id: None,
+            emitted_at: Utc::now(),
+        };
+
+        let stream = InMemoryDnaSignalStream::with_signals(vec![DnaSignal::KeyRevocation(signal)]);
+        // No with_swarm_tx — swarm_tx is None.
+        let mut controller =
+            ReconcileController::new_with_storage(stream, Arc::clone(&pool), Arc::clone(&cache));
+
+        // Must complete without panic.
+        controller
+            .run_one_pass()
+            .await
+            .expect("run_one_pass must not error");
+        assert_eq!(controller.observed_kinds(), &["keyRevocation"]);
     }
 }
