@@ -336,7 +336,7 @@ impl ProjectionStore {
             .collect();
 
         // Sort by projected_at descending
-        results.sort_by(|a, b| b.projected_at.cmp(&a.projected_at));
+        results.sort_by_key(|b| std::cmp::Reverse(b.projected_at));
 
         // Apply limit
         if let Some(limit) = query.limit {
