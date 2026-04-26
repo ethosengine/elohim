@@ -609,6 +609,36 @@ fn map_zome_err_to_http(err: &StorageError) -> Response<Full<Bytes>> {
 }
 
 // ---------------------------------------------------------------------------
+// Phase 11: generic zome-call forwarder
+// ---------------------------------------------------------------------------
+
+/// Forward a zome call to the imagodei coordinator and return the decoded
+/// output. MessagePack-encodes `input`, calls `hc.call_zome("imagodei",
+/// fn_name, payload)`, and MessagePack-decodes the response into `O`.
+///
+/// Errors are returned as `StorageError`; route handlers map them to HTTP
+/// via `map_zome_err_to_http`.
+#[allow(dead_code)]
+async fn forward_to_imagodei<I, O>(
+    hc: &crate::hc_client::HcClient,
+    fn_name: &str,
+    input: &I,
+) -> Result<O, StorageError>
+where
+    I: serde::Serialize,
+    O: serde::de::DeserializeOwned,
+{
+    let payload = rmp_serde::to_vec_named(input).map_err(|e| {
+        StorageError::Conductor(format!("encode {fn_name} input: {e}"))
+    })?;
+    let bytes = hc.call_zome("imagodei", fn_name, payload).await?;
+    let output: O = rmp_serde::from_slice(&bytes).map_err(|e| {
+        StorageError::Conductor(format!("decode {fn_name} output: {e}"))
+    })?;
+    Ok(output)
+}
+
+// ---------------------------------------------------------------------------
 // Phase 11 stub: zome bridge not yet wired
 // ---------------------------------------------------------------------------
 
