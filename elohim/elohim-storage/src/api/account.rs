@@ -52,7 +52,7 @@ pub async fn handle(
     method: Method,
     resource_path: &str,
     pool: &DbPool,
-    _hc_registry: Option<&Arc<crate::hc_client_registry::HcClientRegistry>>,
+    hc_registry: Option<&Arc<crate::hc_client_registry::HcClientRegistry>>,
 ) -> Result<Response<Full<Bytes>>, StorageError> {
     match (method, resource_path) {
         // ── Aggregate ──────────────────────────────────────────────────────
@@ -65,7 +65,9 @@ pub async fn handle(
         (Method::GET, "/revocations") => get_account_revocations(req, pool).await,
 
         // ── Self-revocation (zome write — Phase 11 bridge) ────────────────
-        (Method::POST, "/self-revocation") => Ok(zome_bridge_not_yet_wired("self-revocation")),
+        (Method::POST, "/self-revocation") => {
+            handle_self_revocation(req, hc_registry, pool).await
+        }
 
         // ── Pending recovery requests (where I am EC) ─────────────────────
         (Method::GET, "/pending-recovery") => get_pending_recovery(req, pool).await,
@@ -510,7 +512,7 @@ async fn get_portal_hosts(
 /// it is the early-exit response that route handlers return directly to the
 /// caller, avoiding an unwrap chain. Boxing would break the uniform response
 /// pattern used by every handler in this module.
-#[allow(dead_code, clippy::result_large_err)]
+#[allow(clippy::result_large_err)]
 fn verify_caller_owns_cell(
     owner: &dyn crate::hc_client::CellOwner,
     agent_key: &str,
@@ -524,7 +526,6 @@ fn verify_caller_owns_cell(
 /// Pure body builder for the BROWSER_WRITE_PATH_PENDING 503 contract.
 /// Extracted so unit tests can assert against the JSON Value directly
 /// without setting up async machinery to read a hyper Body.
-#[allow(dead_code)]
 fn browser_write_path_pending_body() -> serde_json::Value {
     serde_json::json!({
         "error": "browser write path not yet implemented",
@@ -536,7 +537,6 @@ fn browser_write_path_pending_body() -> serde_json::Value {
 }
 
 /// 503 response for the browser-via-doorway write path (M6+).
-#[allow(dead_code)]
 fn response_503_browser_write_path_pending() -> Response<Full<Bytes>> {
     response::json_response(
         hyper::StatusCode::SERVICE_UNAVAILABLE,
@@ -545,7 +545,6 @@ fn response_503_browser_write_path_pending() -> Response<Full<Bytes>> {
 }
 
 /// Pure body builder for the IMAGODEI_BRIDGE_OFFLINE 503 contract.
-#[allow(dead_code)]
 fn imagodei_bridge_offline_body() -> serde_json::Value {
     serde_json::json!({
         "error": "imagodei bridge offline",
@@ -559,7 +558,6 @@ fn imagodei_bridge_offline_body() -> serde_json::Value {
 
 /// 503 response when the imagodei HcClient failed to connect at startup.
 /// Recovery: restart storage with the imagodei DNA installed.
-#[allow(dead_code)]
 fn response_503_imagodei_bridge_offline() -> Response<Full<Bytes>> {
     response::json_response(
         hyper::StatusCode::SERVICE_UNAVAILABLE,
@@ -572,7 +570,6 @@ fn response_503_imagodei_bridge_offline() -> Response<Full<Bytes>> {
 /// PHASE-11-DEBT: this string-matches well-known zome error prefixes.
 /// Brittle by design — matches what `imagodei` returns today. Typed
 /// errors over the conductor wire are an M6+ refactor.
-#[allow(dead_code)]
 fn map_zome_err_to_http(err: &StorageError) -> Response<Full<Bytes>> {
     let msg = err.to_string();
 
@@ -618,7 +615,6 @@ fn map_zome_err_to_http(err: &StorageError) -> Response<Full<Bytes>> {
 ///
 /// Errors are returned as `StorageError`; route handlers map them to HTTP
 /// via `map_zome_err_to_http`.
-#[allow(dead_code)]
 async fn forward_to_imagodei<I, O>(
     hc: &crate::hc_client::HcClient,
     fn_name: &str,
@@ -636,6 +632,107 @@ where
         StorageError::Conductor(format!("decode {fn_name} output: {e}"))
     })?;
     Ok(output)
+}
+
+// ---------------------------------------------------------------------------
+// Phase 11: zome-input wrappers
+// ---------------------------------------------------------------------------
+//
+// Match the imagodei coordinator zome's input/output structs exactly. We
+// keep them in `account.rs` rather than `views.rs` because they are wire-
+// internal — they do NOT cross the HTTP boundary.
+
+#[derive(serde::Serialize)]
+struct CreateSelfRevocationZomeInput {
+    revoked_key: holochain_types::prelude::AgentPubKey,
+    reason: String,
+}
+
+#[derive(serde::Deserialize)]
+struct CreateSelfRevocationZomeOutput {
+    revocation_id: String,
+    action_hash: holochain_types::prelude::ActionHash,
+}
+
+// ---------------------------------------------------------------------------
+// Phase 11: request body reader
+// ---------------------------------------------------------------------------
+
+/// Read the entire request body into a `Bytes`. Hyper streams bodies; we
+/// collect to a `Bytes` for serde decode. Used by the four Phase 11
+/// forwarder helpers.
+async fn read_request_body(req: Request<Incoming>) -> Result<Bytes, StorageError> {
+    use http_body_util::BodyExt;
+    let body = req.into_body();
+    let collected = body.collect().await.map_err(|e| {
+        StorageError::InvalidInput(format!("read request body: {e}"))
+    })?;
+    Ok(collected.to_bytes())
+}
+
+// ---------------------------------------------------------------------------
+// Phase 11: handle_self_revocation
+// ---------------------------------------------------------------------------
+
+async fn handle_self_revocation(
+    req: Request<Incoming>,
+    hc_registry: Option<&std::sync::Arc<crate::hc_client_registry::HcClientRegistry>>,
+    pool: &DbPool,
+) -> Result<Response<Full<Bytes>>, StorageError> {
+    let mut conn = get_conn(pool)?;
+    let agent_key = match extract_agent_key(&req, &mut conn)? {
+        Some(k) => k,
+        None => {
+            return Ok(response::bad_request(
+                "missing X-Agent-Id and no active session",
+            ));
+        }
+    };
+
+    let registry = match hc_registry {
+        Some(r) => r,
+        None => return Ok(response_503_imagodei_bridge_offline()),
+    };
+    let hc = match registry.imagodei.as_ref() {
+        Some(h) => h,
+        None => return Ok(response_503_imagodei_bridge_offline()),
+    };
+
+    if let Err(resp) = verify_caller_owns_cell(hc.as_ref(), &agent_key) {
+        return Ok(resp);
+    }
+
+    let body_bytes = read_request_body(req).await?;
+    let input_view: crate::views::CreateSelfRevocationInputView =
+        serde_json::from_slice(&body_bytes)
+            .map_err(|e| StorageError::InvalidInput(format!("invalid request body: {e}")))?;
+
+    let revoked_key = holochain_types::prelude::AgentPubKey::try_from(
+        input_view.revoked_key.as_str(),
+    )
+    .map_err(|e| StorageError::InvalidInput(format!("invalid revokedKey: {e}")))?;
+
+    let zome_input = CreateSelfRevocationZomeInput {
+        revoked_key,
+        reason: input_view.reason,
+    };
+
+    match forward_to_imagodei::<_, CreateSelfRevocationZomeOutput>(
+        hc,
+        "create_self_revocation",
+        &zome_input,
+    )
+    .await
+    {
+        Ok(out) => {
+            let view = crate::views::CreateSelfRevocationOutputView {
+                revocation_id: out.revocation_id,
+                action_hash: out.action_hash.to_string(),
+            };
+            Ok(response::created(&view))
+        }
+        Err(e) => Ok(map_zome_err_to_http(&e)),
+    }
 }
 
 // ---------------------------------------------------------------------------
