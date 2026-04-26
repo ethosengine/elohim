@@ -30,14 +30,12 @@ Feature: Voting on recovery as an emergency contact
   # Success paths — will work once the Phase-11 bridge exists
   # ─────────────────────────────────────────────────────────
 
-  @phase11-pending
   Scenario: Approve a pending recovery
     When I navigate to /account/security
     And I click "Approve" on the pending recovery card
     Then a RevocationVote entry is committed with decision "approve"
     And the pending recovery card disappears from my view
 
-  @phase11-pending
   Scenario: Reject a pending recovery
     When I navigate to /account/security
     And I click "Reject" on the pending recovery card

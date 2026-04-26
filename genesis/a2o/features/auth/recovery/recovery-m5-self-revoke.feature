@@ -21,7 +21,6 @@ Feature: Self-revocation through the account-management surface
   # Success path — will work once the Phase-11 bridge exists
   # ─────────────────────────────────────────────────────────
 
-  @phase11-pending
   Scenario: Successful self-revocation
     Given I am authenticated with an active key
     And I navigate to /account/security

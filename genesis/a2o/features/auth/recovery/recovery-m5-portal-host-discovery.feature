@@ -18,7 +18,6 @@ Feature: Adding and listing portal hosts
   # Success path — will work once the Phase-11 bridge exists
   # ─────────────────────────────────────────────────────────
 
-  @phase11-pending
   Scenario: Add a portal host
     Given I am authenticated as a steward
     When I POST {"hostUrl": "https://matthew.steward.example/account", "label": "main"} to /api/v1/account/portal-hosts
