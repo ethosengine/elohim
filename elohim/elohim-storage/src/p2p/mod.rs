@@ -29,6 +29,7 @@
 //! ```
 
 pub mod behaviour;
+pub mod dedup;
 pub mod epr_atom_protocol;
 pub mod epr_protocol;
 pub mod fanout;
@@ -48,6 +49,8 @@ pub mod trust_protocol;
 
 // D.3: re-export topic helpers so callers have a single import surface.
 pub use topics::{topic_for, TOPIC_IDENTITY_BINDING, TOPIC_INTEGRITY_REVOCATION};
+// D.6: re-export DedupLru so callers can access it via the p2p module surface.
+pub use dedup::DedupLru;
 // D.4: re-export reach authorization types for callers (author-side earning +
 // receiver-side pre-authorization). The DB-backed resolver functions
 // (signer_is_known_agent, node_has_embodied_responsibility) are intentionally
@@ -282,6 +285,11 @@ pub struct P2PNode {
     /// (via `with_db_pool`). Falls back to `StubIdentityMap` (always-Anonymous)
     /// when no pool is present (e.g. unit tests without a DB).
     identity_map: Arc<dyn identity_map::PeerIdentityMap>,
+    /// D.6: bounded LRU dedup cache for inbound EPR atom receive paths.
+    /// Drops duplicates from gossipsub + Kad + direct-notify redundancy.
+    /// In-memory only — restart clears the cache (acceptable; DB writes are
+    /// idempotent, so duplicate processing on restart is a non-issue).
+    dedup: Arc<dedup::DedupLru>,
 }
 
 /// Cached identify protocol info for a connected peer.
@@ -1085,6 +1093,7 @@ impl P2PNode {
             peer_metrics: Arc::new(DashMap::new()),
             sync_paused: Arc::new(AtomicBool::new(false)),
             identity_map,
+            dedup: Arc::new(dedup::DedupLru::new()),
         })
     }
 
@@ -1108,6 +1117,19 @@ impl P2PNode {
     ) -> Self {
         self.policy_enforcement = Some(enforcement);
         self
+    }
+
+    /// D.6: Return dedup cache stats as `(unique_len, total_seen)`.
+    ///
+    /// `unique_len` is the current number of unique CIDs in the LRU window.
+    /// `total_seen` is the cumulative count of all insert calls (new + duplicate).
+    /// The ratio `(total_seen - unique_len) / total_seen` approximates duplication rate.
+    ///
+    /// Uses `DedupLru::stats()` for an atomic consistent snapshot.
+    ///
+    /// TODO(Z.1): expose these values in P2PStatusInfo so dashboards can read them.
+    pub fn dedup_stats(&self) -> (usize, usize) {
+        self.dedup.stats()
     }
 
     /// Set the extraction cache for delivery capability queries.
@@ -2918,24 +2940,132 @@ impl P2PNode {
                         } else if message.topic.as_str() == RECOVERY_REVOCATION_TOPIC {
                             // M4: subscribe/log stub. Active consumer logic lands in M5
                             // (elohim defender + UI). Log is the seam M5 hooks into.
+                            // TODO: factor shared body into handle_revocation_message helper
+                            // once the event-loop borrow structure allows it (see arm below).
                             match crate::p2p::recovery_revocation::RecoveryRevocationMessage::from_bytes(
                                 &message.data,
                             ) {
-                                Ok(msg) => info!(
-                                    target: "recovery.revocation.inbound",
-                                    from = %propagation_source,
-                                    message_id = ?message_id,
-                                    revocation_id = %msg.revocation_id,
-                                    human_id = %msg.human_id,
-                                    status = %msg.status,
-                                    "Received recovery revocation"
-                                ),
+                                Ok(msg) => {
+                                    // D.6 wire point B: dedup on the same synthetic key as
+                                    // the direct-notify path (wire point C) so a revocation
+                                    // arriving via gossipsub after direct-notify (or vice
+                                    // versa) is dropped before any projection work.
+                                    // Synthetic dedup key: `KeyRevocation:{revocation_id}` namespace. UUIDs
+                                    // don't collide with EPR CIDs (which start with "bafy"). Future integrity
+                                    // kinds should use `KeyRotation:{id}` / `AgentPeerBinding:{id}` etc. — the
+                                    // namespace prefix prevents cross-kind collisions even if id formats overlap.
+                                    let dedup_key =
+                                        format!("KeyRevocation:{}", msg.revocation_id);
+                                    if !self.dedup.insert(&dedup_key) {
+                                        debug!(
+                                            target: "elohim_storage::dedup",
+                                            from = %propagation_source,
+                                            revocation_id = %msg.revocation_id,
+                                            "duplicate gossip revocation — dropped"
+                                        );
+                                    } else {
+                                        info!(
+                                            target: "recovery.revocation.inbound",
+                                            from = %propagation_source,
+                                            message_id = ?message_id,
+                                            revocation_id = %msg.revocation_id,
+                                            human_id = %msg.human_id,
+                                            status = %msg.status,
+                                            "Received recovery revocation"
+                                        );
+                                    }
+                                }
                                 Err(e) => warn!(
                                     target: "recovery.revocation.inbound",
                                     from = %propagation_source,
                                     error = ?e,
                                     "Failed to decode RecoveryRevocationMessage"
                                 ),
+                            }
+                        } else if message.topic.as_str()
+                            == crate::p2p::topics::TOPIC_INTEGRITY_REVOCATION
+                        {
+                            // D.6 Fix 1 (CRITICAL): canonical integrity-revocation topic arm.
+                            // TOPIC_INTEGRITY_REVOCATION = "elohim/integrity/revocation" is the
+                            // new canonical name. M3/M4 publishers still use RECOVERY_REVOCATION_TOPIC
+                            // = "recovery.revocation" (arm above); new publishers (D.5+) use this name.
+                            // BOTH arms must route to the same handler with the same dedup key.
+                            // TODO: factor into handle_revocation_message helper when event-loop
+                            // borrow structure permits; body kept in sync with RECOVERY_REVOCATION_TOPIC arm.
+                            match crate::p2p::recovery_revocation::RecoveryRevocationMessage::from_bytes(
+                                &message.data,
+                            ) {
+                                Ok(msg) => {
+                                    // Same synthetic dedup key as wire points B and C — cross-channel
+                                    // dedup contract from D.6: regardless of which topic name a
+                                    // revocation arrives on, KeyRevocation:{revocation_id} is the key.
+                                    // See first KeyRevocation: dedup site for namespace rationale.
+                                    let dedup_key =
+                                        format!("KeyRevocation:{}", msg.revocation_id);
+                                    if !self.dedup.insert(&dedup_key) {
+                                        debug!(
+                                            target: "elohim_storage::dedup",
+                                            from = %propagation_source,
+                                            revocation_id = %msg.revocation_id,
+                                            topic = crate::p2p::topics::TOPIC_INTEGRITY_REVOCATION,
+                                            "duplicate integrity/revocation gossip — dropped"
+                                        );
+                                    } else {
+                                        info!(
+                                            target: "recovery.revocation.inbound",
+                                            from = %propagation_source,
+                                            message_id = ?message_id,
+                                            revocation_id = %msg.revocation_id,
+                                            human_id = %msg.human_id,
+                                            status = %msg.status,
+                                            topic = crate::p2p::topics::TOPIC_INTEGRITY_REVOCATION,
+                                            "Received recovery revocation (canonical topic)"
+                                        );
+                                    }
+                                }
+                                Err(e) => warn!(
+                                    target: "recovery.revocation.inbound",
+                                    from = %propagation_source,
+                                    error = ?e,
+                                    topic = crate::p2p::topics::TOPIC_INTEGRITY_REVOCATION,
+                                    "Failed to decode RecoveryRevocationMessage (canonical topic)"
+                                ),
+                            }
+                        } else if message.topic.as_str().starts_with("elohim/") {
+                            // D.6 wire point B (gossipsub EPR announce): per-pillar
+                            // reach-scoped topics carry a msgpack-encoded CID string
+                            // (announce-only; receivers fetch the full atom via EPR atom
+                            // protocol if wanted). Stage 1: decode CID + dedup only.
+                            // Full receive-side projection is downstream (Phase 3+).
+                            match rmp_serde::from_slice::<String>(&message.data) {
+                                Ok(cid) => {
+                                    if !self.dedup.insert(&cid) {
+                                        debug!(
+                                            target: "elohim_storage::dedup",
+                                            from = %propagation_source,
+                                            topic = %message.topic,
+                                            cid = %cid,
+                                            "duplicate gossip announce — dropped"
+                                        );
+                                    } else {
+                                        debug!(
+                                            target: "elohim_storage::epr",
+                                            from = %propagation_source,
+                                            topic = %message.topic,
+                                            cid = %cid,
+                                            "gossip EPR announce (deduped; full fetch deferred to Phase 3+)"
+                                        );
+                                    }
+                                }
+                                Err(e) => {
+                                    debug!(
+                                        target: "elohim_storage::epr",
+                                        from = %propagation_source,
+                                        topic = %message.topic,
+                                        error = %e,
+                                        "gossip EPR announce: msgpack decode failed"
+                                    );
+                                }
                             }
                         } else {
                             debug!(topic = %message.topic, "Gossipsub message on untracked topic");
@@ -3788,6 +3918,44 @@ impl P2PNode {
                 }
             }
             EprAtomRequest::Announce { envelope_bytes } => {
+                // D.6: decode the envelope first (CBOR only — no DB I/O) to
+                // extract the CID string cheaply, then dedup-check before
+                // committing the pool connection or running ingest.
+                let epr: elohim_epr::Epr =
+                    match ciborium::de::from_reader(envelope_bytes.as_slice()) {
+                        Ok(e) => e,
+                        Err(err) => {
+                            debug!(
+                                bytes = envelope_bytes.len(),
+                                reason = %err,
+                                "EPR atom announce: cbor decode failed"
+                            );
+                            return EprAtomResponse::Announced {
+                                accepted: false,
+                                reason: Some(format!("cbor decode: {err}")),
+                            };
+                        }
+                    };
+                let cid_str = epr.envelope.cid.to_string();
+
+                // D.6 wire point A: dedup on CID before DB connection + ingest.
+                if !self.dedup.insert(&cid_str) {
+                    debug!(
+                        target: "elohim_storage::dedup",
+                        from = %peer,
+                        cid = %cid_str,
+                        "duplicate Announce — dropped (no-op)"
+                    );
+                    // D.6: dedup hit. Respond accepted=false so the sender doesn't treat this
+                    // as a fresh acceptance, but include reason so they don't retry. The atom
+                    // is already persisted from the original delivery (LocalEprStore::put is
+                    // idempotent), so accepted=false here means "no NEW ingestion happened."
+                    return EprAtomResponse::Announced {
+                        accepted: false,
+                        reason: Some("duplicate (already seen)".to_string()),
+                    };
+                }
+
                 let Some(pool) = self.db_pool.as_ref() else {
                     warn!(
                         bytes = envelope_bytes.len(),
@@ -3809,10 +3977,9 @@ impl P2PNode {
                     }
                 };
 
-                match crate::services::epr_service::ingest_from_wire_bytes(
-                    &mut conn,
-                    &envelope_bytes,
-                ) {
+                // Call ingest() directly with the already-decoded Epr — avoids
+                // a second CBOR decode that ingest_from_wire_bytes would do.
+                match crate::services::epr_service::ingest(&mut conn, epr) {
                     Ok(ingested) => {
                         debug!(
                             cid = %ingested.cid,
@@ -3921,6 +4088,23 @@ impl P2PNode {
                             &payload_bytes,
                         ) {
                             Ok(msg) => {
+                                // D.6 wire point C: dedup on synthetic KeyRevocation:<id>
+                                // key. Same revocation arriving via direct-notify + gossipsub
+                                // will not double-process after the first delivery.
+                                // See first KeyRevocation: dedup site (wire B) for namespace rationale.
+                                let dedup_key = format!("KeyRevocation:{}", msg.revocation_id);
+                                if !self.dedup.insert(&dedup_key) {
+                                    debug!(
+                                        target: "elohim_storage::dedup",
+                                        from = %peer,
+                                        revocation_id = %msg.revocation_id,
+                                        "duplicate KeyRevocation direct-notify — dropped"
+                                    );
+                                    return EprAtomResponse::IntegrityAck {
+                                        received: true,
+                                        reason: Some("duplicate".to_string()),
+                                    };
+                                }
                                 info!(
                                     target: "elohim_storage::recovery",
                                     from = %peer,
