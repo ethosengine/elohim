@@ -73,6 +73,7 @@ pub async fn handle_api_request(
     path: &str,
     pool: DbPool,
     services: Option<Arc<Services>>,
+    hc_registry: Option<Arc<crate::hc_client_registry::HcClientRegistry>>,
 ) -> Result<Response<Full<Bytes>>, StorageError> {
     // Strip /api/v1/ prefix
     let sub_path = path.strip_prefix("/api/v1/").unwrap_or("");
@@ -83,7 +84,7 @@ pub async fn handle_api_request(
     // Dispatch to domain controllers
     if sub_path.starts_with("account") {
         let resource_path = sub_path.strip_prefix("account").unwrap_or("");
-        return account::handle(req, method, resource_path, &pool).await;
+        return account::handle(req, method, resource_path, &pool, hc_registry.as_ref()).await;
     } else if sub_path.starts_with("agreements") {
         let resource_path = sub_path.strip_prefix("agreements").unwrap_or("");
         agreements::handle(req, method, resource_path, &pool, &app_ctx).await

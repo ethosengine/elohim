@@ -390,88 +390,6 @@ When(
   }
 );
 
-Then('the POST to /api/v1/account/self-revocation returns 503', async function (this: E2EWorld) {
-  // This step verifies the M5 reality: the endpoint returns 503 PHASE_11_PENDING.
-  // The browser step (clicking "Revoke this key" + "Yes, revoke") already triggered
-  // the request. We validate the UI received and displayed the error (see next step).
-  // For the HTTP mode variant, we issue the raw call and check the status directly.
-  if (this.deviceMode === 'playwright') {
-    // In Playwright mode, the button click already triggered the POST.
-    // Store the expected code for the error message assertion.
-    this.contentIds.set('lastStatusCode', '503');
-  } else {
-    const doorwayUrl = requireDoorwayUrl(this);
-    const token = getFirstAuthToken(this);
-    const result = await rawPost(doorwayUrl, '/api/v1/account/self-revocation', {}, token);
-    this.contentIds.set('lastStatusCode', String(result.statusCode));
-    this.contentIds.set('lastResponseBody', result.body);
-    assert.strictEqual(
-      result.statusCode,
-      503,
-      `Expected 503 but got ${result.statusCode}: ${result.body}`
-    );
-  }
-});
-
-Then(
-  'the POST to /api/v1/account/recovery/{string}/vote returns 503',
-  async function (this: E2EWorld, _pathParam: string) {
-    if (this.deviceMode === 'playwright') {
-      this.contentIds.set('lastStatusCode', '503');
-    } else {
-      const doorwayUrl = requireDoorwayUrl(this);
-      const token = getFirstAuthToken(this);
-      // Use a wildcard-style path — actual hash not known at step time
-      const result = await rawPost(
-        doorwayUrl,
-        '/api/v1/account/recovery/test-anchor-hash/vote',
-        { decision: 'approve' },
-        token
-      );
-      this.contentIds.set('lastStatusCode', String(result.statusCode));
-      this.contentIds.set('lastResponseBody', result.body);
-      assert.strictEqual(
-        result.statusCode,
-        503,
-        `Expected 503 but got ${result.statusCode}: ${result.body}`
-      );
-    }
-  }
-);
-
-Then(
-  'the response body contains errorCode {string}',
-  function (this: E2EWorld, expectedErrorCode: string) {
-    const body = this.contentIds.get('lastResponseBody');
-    if (!body) {
-      // In Playwright mode the response body is not captured here —
-      // the UI error message assertion covers the contract instead.
-      return;
-    }
-    assert.ok(
-      body.includes(expectedErrorCode),
-      `Expected response body to contain errorCode "${expectedErrorCode}", got: ${body}`
-    );
-  }
-);
-
-Then(
-  'the UI displays an informative error message rather than crashing',
-  async function (this: E2EWorld) {
-    const device = requirePlaywright(this);
-    if (!device) return 'pending';
-
-    const shell = new AccountShellPage(device.page);
-    await shell.waitForSelfRevokeError(10_000);
-    const errorVisible = await shell.isSelfRevokeErrorVisible();
-    assert.ok(errorVisible, 'Expected an informative error message to be displayed after 503');
-
-    // Verify the page did not crash (app-root still present)
-    const appRoot = device.page.locator('app-root');
-    const rootCount = await appRoot.count();
-    assert.ok(rootCount > 0, 'app-root is gone — the UI crashed instead of showing an error');
-  }
-);
 
 // Phase-11-pending success path steps — these only run when @phase11-pending is not excluded
 
@@ -574,25 +492,6 @@ When(
     await btn.waitFor({ state: 'visible', timeout: 10_000 });
     await btn.click();
     await device.page.waitForLoadState('networkidle');
-  }
-);
-
-Then(
-  'the pending recovery card remains visible with an informative error',
-  async function (this: E2EWorld) {
-    const device = requirePlaywright(this);
-    if (!device) return 'pending';
-
-    // The pending card must still be visible (request failed, no state change)
-    const pendingCards = device.page.locator('[data-testid^="pending-"]');
-    const count = await pendingCards.count();
-    assert.ok(count > 0, 'Expected pending recovery card to remain visible after 503 error');
-
-    // An error indicator should be present
-    const shell = new AccountShellPage(device.page);
-    await shell.waitForVoteError(10_000);
-    const errorVisible = await shell.isVoteErrorVisible();
-    assert.ok(errorVisible, 'Expected a vote error message to be displayed after 503');
   }
 );
 
@@ -778,11 +677,6 @@ When(
     this.contentIds.set('lastResponseBody', result.body);
   }
 );
-
-Then('the response is 503', function (this: E2EWorld) {
-  const code = this.contentIds.get('lastStatusCode');
-  assert.strictEqual(code, '503', `Expected 503 but got ${code ?? '(none)'}`);
-});
 
 Then('the response is 200 with the new PortalHostView', function (this: E2EWorld) {
   const code = this.contentIds.get('lastStatusCode');

@@ -433,3 +433,43 @@ impl HcClient {
         Ok(())
     }
 }
+
+/// A `CellOwner` exposes the agent key of the cell a client is connected to.
+///
+/// The mode gate in `api/account.rs` uses this to assert that the caller's
+/// resolved human key matches the connected cell's owner — a Tauri-direct
+/// invariant. Trait-ifying it lets unit tests exercise the gate without
+/// touching the holochain_client websocket layer.
+pub trait CellOwner: Send + Sync {
+    /// Returns the connected cell's owner agent key as a hex string,
+    /// matching the encoding used by `api/identity::extract_agent_key`
+    /// (X-Agent-Id header / local session row).
+    fn agent_key_hex(&self) -> String;
+}
+
+impl CellOwner for HcClient {
+    fn agent_key_hex(&self) -> String {
+        hex::encode(self.cell_id.agent_pubkey().get_raw_39())
+    }
+}
+
+#[cfg(test)]
+mod cell_owner_tests {
+    use super::*;
+
+    /// A stub CellOwner used by `account.rs` mode-gate tests. Verifies the
+    /// trait dispatch lands on the stub's `agent_key_hex()` return.
+    struct StubOwner(String);
+    impl CellOwner for StubOwner {
+        fn agent_key_hex(&self) -> String {
+            self.0.clone()
+        }
+    }
+
+    #[test]
+    fn stub_cell_owner_returns_configured_hex() {
+        let stub = StubOwner("uhCAkSTUB".to_string());
+        let dyn_owner: &dyn CellOwner = &stub;
+        assert_eq!(dyn_owner.agent_key_hex(), "uhCAkSTUB");
+    }
+}

@@ -17,7 +17,6 @@ Feature: submit_specialist_revocation gated by local defender role marker
   # Success path — gated on Phase-11 bridge (imagodei → elohim-agent wiring)
   # ─────────────────────────────────────────────────────────
 
-  @phase11-pending
   Scenario: With role marker — coordinator accepts
     Given the calling elohim-agent has a DefenderManifest listing the target human
     When I call submit_specialist_revocation with a valid SubmitSpecialistRevocationInput

@@ -5,20 +5,9 @@ Feature: Adding and listing portal hosts
   So that doorway and trusted peers know where to redirect
 
   # ─────────────────────────────────────────────────────────
-  # M5 reality — POST mutations return 503 until Phase-11 bridge
+  # Success path
   # ─────────────────────────────────────────────────────────
 
-  Scenario: Add portal host mutation returns 503 PHASE_11_PENDING in M5
-    Given I am authenticated as a steward
-    When I POST {"hostUrl": "https://matthew.steward.example/account", "label": "main"} to /api/v1/account/portal-hosts
-    Then the response is 503
-    And the response body contains errorCode "PHASE_11_PENDING"
-
-  # ─────────────────────────────────────────────────────────
-  # Success path — will work once the Phase-11 bridge exists
-  # ─────────────────────────────────────────────────────────
-
-  @phase11-pending
   Scenario: Add a portal host
     Given I am authenticated as a steward
     When I POST {"hostUrl": "https://matthew.steward.example/account", "label": "main"} to /api/v1/account/portal-hosts

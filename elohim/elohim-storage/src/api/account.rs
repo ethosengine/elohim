@@ -14,6 +14,17 @@
 //! CRUD) require the conductor bridge, which is deferred to Phase 11 (threaded HcClient).
 //! Until then those routes return 503 with a machine-readable `notImplemented` code so the
 //! Angular layer can surface a graceful message instead of an unhandled error.
+//!
+//! ## Provenance assumption (Phase 11)
+//! `HcClient::call_zome` signs the call with admin-issued credentials, but
+//! the conductor presents the call to the zome as the cell's owner agent.
+//! Empirically verified by the heartbeat path: `record_peer_status` reads
+//! `agent_info()?.agent_initial_pubkey` and the resulting peer statuses are
+//! correctly attributed to peers (not to storage's signer). The mode gate
+//! `verify_caller_owns_cell` exploits this: if the connected cell's owner
+//! matches the resolved human key, the zome will see the human as caller.
+
+use std::sync::Arc;
 
 use bytes::Bytes;
 use http_body_util::Full;
@@ -41,6 +52,7 @@ pub async fn handle(
     method: Method,
     resource_path: &str,
     pool: &DbPool,
+    hc_registry: Option<&Arc<crate::hc_client_registry::HcClientRegistry>>,
 ) -> Result<Response<Full<Bytes>>, StorageError> {
     match (method, resource_path) {
         // ── Aggregate ──────────────────────────────────────────────────────
@@ -53,21 +65,29 @@ pub async fn handle(
         (Method::GET, "/revocations") => get_account_revocations(req, pool).await,
 
         // ── Self-revocation (zome write — Phase 11 bridge) ────────────────
-        (Method::POST, "/self-revocation") => Ok(zome_bridge_not_yet_wired("self-revocation")),
+        (Method::POST, "/self-revocation") => handle_self_revocation(req, hc_registry, pool).await,
 
         // ── Pending recovery requests (where I am EC) ─────────────────────
         (Method::GET, "/pending-recovery") => get_pending_recovery(req, pool).await,
 
         // ── Recovery vote (zome write — Phase 11 bridge) ──────────────────
         (Method::POST, p) if p.starts_with("/recovery/") && p.ends_with("/vote") => {
-            Ok(zome_bridge_not_yet_wired("recovery/vote"))
+            let revocation_id = p.trim_start_matches("/recovery/").trim_end_matches("/vote");
+            if revocation_id.is_empty() {
+                return Ok(response::bad_request("missing revocation id in URL path"));
+            }
+            handle_revocation_vote(req, hc_registry, pool, revocation_id.to_string()).await
         }
 
         // ── Portal hosts ──────────────────────────────────────────────────
         (Method::GET, "/portal-hosts") => get_portal_hosts(req, pool).await,
-        (Method::POST, "/portal-hosts") => Ok(zome_bridge_not_yet_wired("portal-hosts")),
+        (Method::POST, "/portal-hosts") => handle_add_portal_host(req, hc_registry, pool).await,
         (Method::DELETE, p) if p.starts_with("/portal-hosts/") => {
-            Ok(zome_bridge_not_yet_wired("portal-hosts/:url_b64"))
+            let url_b64 = p.trim_start_matches("/portal-hosts/");
+            if url_b64.is_empty() {
+                return Ok(response::bad_request("missing url_b64 in URL path"));
+            }
+            handle_remove_portal_host(req, hc_registry, pool, url_b64.to_string()).await
         }
 
         _ => Ok(response::not_found(&format!(
@@ -482,27 +502,440 @@ async fn get_portal_hosts(
 }
 
 // ---------------------------------------------------------------------------
-// Phase 11 stub: zome bridge not yet wired
+// Phase 11: mode gate + 503 contracts
 // ---------------------------------------------------------------------------
 
-/// Returns 503 with a machine-readable body indicating the conductor bridge
-/// is not yet wired. Angular should surface this as "coming soon" rather than
-/// an unhandled error.
+/// Asserts the caller's resolved agent key matches the connected cell's
+/// owner. The Tauri-direct invariant — when matched, the imagodei zome
+/// will see the human as caller (cell owner == caller per the provenance
+/// note in this module's doc).
 ///
-/// POST routes that require DHT writes (self-revocation, recovery vote,
-/// portal-host CRUD) defer to Phase 11 when `HcClient` is threaded through
-/// the API layer.
-fn zome_bridge_not_yet_wired(route_hint: &str) -> Response<Full<Bytes>> {
-    let body = serde_json::json!({
-        "error": "conductor bridge not yet wired",
-        "code": "PHASE_11_PENDING",
-        "route": route_hint,
-        "message": "This endpoint requires a live conductor connection. \
-                    The imagodei coordinator zome bridge is deferred to Phase 11. \
-                    Recovery and portal-host mutations are accepted via direct \
-                    Holochain conductor calls in the meantime."
-    });
-    response::json_response(hyper::StatusCode::SERVICE_UNAVAILABLE, &body)
+/// `Err(Response<...>)` is returned with `503 BROWSER_WRITE_PATH_PENDING`
+/// when the keys do not match — the browser-via-doorway path that lands
+/// in M6 once the hosting trust model is settled.
+///
+/// The `Response<Full<Bytes>>` in the `Err` variant is intentionally large —
+/// it is the early-exit response that route handlers return directly to the
+/// caller, avoiding an unwrap chain. Boxing would break the uniform response
+/// pattern used by every handler in this module.
+#[allow(clippy::result_large_err)]
+fn verify_caller_owns_cell(
+    owner: &dyn crate::hc_client::CellOwner,
+    agent_key: &str,
+) -> Result<(), Response<Full<Bytes>>> {
+    if owner.agent_key_hex() != agent_key {
+        return Err(response_503_browser_write_path_pending());
+    }
+    Ok(())
+}
+
+/// Pure body builder for the BROWSER_WRITE_PATH_PENDING 503 contract.
+/// Extracted so unit tests can assert against the JSON Value directly
+/// without setting up async machinery to read a hyper Body.
+fn browser_write_path_pending_body() -> serde_json::Value {
+    serde_json::json!({
+        "error": "browser write path not yet implemented",
+        "code": "BROWSER_WRITE_PATH_PENDING",
+        "message": "Self-sovereign writes require a peer the human controls. \
+                    The browser-via-doorway write path is deferred to M6 where \
+                    the hosting trust model is settled."
+    })
+}
+
+/// 503 response for the browser-via-doorway write path (M6+).
+fn response_503_browser_write_path_pending() -> Response<Full<Bytes>> {
+    response::json_response(
+        hyper::StatusCode::SERVICE_UNAVAILABLE,
+        &browser_write_path_pending_body(),
+    )
+}
+
+/// Pure body builder for the IMAGODEI_BRIDGE_OFFLINE 503 contract.
+fn imagodei_bridge_offline_body() -> serde_json::Value {
+    serde_json::json!({
+        "error": "imagodei bridge offline",
+        "code": "IMAGODEI_BRIDGE_OFFLINE",
+        "message": "The storage process did not connect to the imagodei \
+                    coordinator zome at startup. Account write routes are \
+                    unavailable until storage restarts with the imagodei DNA \
+                    installed."
+    })
+}
+
+/// 503 response when the imagodei HcClient failed to connect at startup.
+/// Recovery: restart storage with the imagodei DNA installed.
+fn response_503_imagodei_bridge_offline() -> Response<Full<Bytes>> {
+    response::json_response(
+        hyper::StatusCode::SERVICE_UNAVAILABLE,
+        &imagodei_bridge_offline_body(),
+    )
+}
+
+/// Maps a `StorageError` from a zome call to an HTTP response.
+///
+/// PHASE-11-DEBT: this string-matches well-known zome error prefixes.
+/// Brittle by design — matches what `imagodei` returns today. Typed
+/// errors over the conductor wire are an M6+ refactor.
+fn map_zome_err_to_http(err: &StorageError) -> Response<Full<Bytes>> {
+    let msg = err.to_string();
+
+    // 403 — gate rejections (defender, EC, ownership)
+    if msg.contains("not a configured defender")
+        || msg.contains("not an active emergency contact")
+        || msg.contains("does not control")
+        || msg.contains("does not belong to")
+    {
+        let body = serde_json::json!({
+            "error": "forbidden",
+            "code": "ZOME_GATE_REJECTED",
+            "message": msg,
+        });
+        return response::json_response(hyper::StatusCode::FORBIDDEN, &body);
+    }
+
+    // 400 — input validation
+    if msg.contains("invalid reason")
+        || msg.contains("already effective")
+        || msg.contains("votes not accepted")
+        || msg.contains("attestation cannot be empty")
+        || msg.contains("no KeyRevocation with id")
+    {
+        return response::bad_request(&msg);
+    }
+
+    // 503 — conductor connectivity
+    if matches!(err, StorageError::Connection(_)) {
+        return response::service_unavailable(&msg);
+    }
+
+    response::internal_error(&msg)
+}
+
+// ---------------------------------------------------------------------------
+// Phase 11: generic zome-call forwarder
+// ---------------------------------------------------------------------------
+
+/// Forward a zome call to the imagodei coordinator and return the decoded
+/// output. MessagePack-encodes `input`, calls `hc.call_zome("imagodei",
+/// fn_name, payload)`, and MessagePack-decodes the response into `O`.
+///
+/// Errors are returned as `StorageError`; route handlers map them to HTTP
+/// via `map_zome_err_to_http`.
+async fn forward_to_imagodei<I, O>(
+    hc: &crate::hc_client::HcClient,
+    fn_name: &str,
+    input: &I,
+) -> Result<O, StorageError>
+where
+    I: serde::Serialize,
+    O: serde::de::DeserializeOwned,
+{
+    let payload = rmp_serde::to_vec_named(input)
+        .map_err(|e| StorageError::Conductor(format!("encode {fn_name} input: {e}")))?;
+    let bytes = hc.call_zome("imagodei", fn_name, payload).await?;
+    let output: O = rmp_serde::from_slice(&bytes)
+        .map_err(|e| StorageError::Conductor(format!("decode {fn_name} output: {e}")))?;
+    Ok(output)
+}
+
+// ---------------------------------------------------------------------------
+// Phase 11: zome-input wrappers
+// ---------------------------------------------------------------------------
+//
+// Match the imagodei coordinator zome's input/output structs exactly. We
+// keep them in `account.rs` rather than `views.rs` because they are wire-
+// internal — they do NOT cross the HTTP boundary.
+
+#[derive(serde::Serialize)]
+struct CreateSelfRevocationZomeInput {
+    revoked_key: holochain_types::prelude::AgentPubKey,
+    reason: String,
+}
+
+#[derive(serde::Deserialize)]
+struct CreateSelfRevocationZomeOutput {
+    revocation_id: String,
+    action_hash: holochain_types::prelude::ActionHash,
+}
+
+#[derive(serde::Serialize)]
+struct SubmitRevocationVoteZomeInput {
+    revocation_id: String,
+    approved: bool,
+    attestation: String,
+}
+
+#[derive(serde::Deserialize)]
+struct SubmitRevocationVoteZomeOutput {
+    vote_id: String,
+    current_votes: u32,
+    required_votes: u32,
+    threshold_now_reached: bool,
+}
+
+#[derive(serde::Serialize)]
+struct AddPortalHostZomeInput {
+    host_url: String,
+    label: Option<String>,
+    /// One of "Public", "Trusted", "Private" — the zome enum's serde
+    /// representation. Defaults to "Trusted" when None at the InputView.
+    reach: Option<String>,
+}
+
+// ---------------------------------------------------------------------------
+// Phase 11: request body reader
+// ---------------------------------------------------------------------------
+
+/// Read the entire request body into a `Bytes`. Hyper streams bodies; we
+/// collect to a `Bytes` for serde decode. Used by the four Phase 11
+/// forwarder helpers.
+async fn read_request_body(req: Request<Incoming>) -> Result<Bytes, StorageError> {
+    use http_body_util::BodyExt;
+    let body = req.into_body();
+    let collected = body
+        .collect()
+        .await
+        .map_err(|e| StorageError::InvalidInput(format!("read request body: {e}")))?;
+    Ok(collected.to_bytes())
+}
+
+// ---------------------------------------------------------------------------
+// Phase 11: handle_self_revocation
+// ---------------------------------------------------------------------------
+
+async fn handle_self_revocation(
+    req: Request<Incoming>,
+    hc_registry: Option<&std::sync::Arc<crate::hc_client_registry::HcClientRegistry>>,
+    pool: &DbPool,
+) -> Result<Response<Full<Bytes>>, StorageError> {
+    let mut conn = get_conn(pool)?;
+    let agent_key = match extract_agent_key(&req, &mut conn)? {
+        Some(k) => k,
+        None => {
+            return Ok(response::bad_request(
+                "missing X-Agent-Id and no active session",
+            ));
+        }
+    };
+
+    let registry = match hc_registry {
+        Some(r) => r,
+        None => return Ok(response_503_imagodei_bridge_offline()),
+    };
+    let hc = match registry.imagodei.as_ref() {
+        Some(h) => h,
+        None => return Ok(response_503_imagodei_bridge_offline()),
+    };
+
+    if let Err(resp) = verify_caller_owns_cell(hc.as_ref(), &agent_key) {
+        return Ok(resp);
+    }
+
+    let body_bytes = read_request_body(req).await?;
+    let input_view: crate::views::CreateSelfRevocationInputView =
+        serde_json::from_slice(&body_bytes)
+            .map_err(|e| StorageError::InvalidInput(format!("invalid request body: {e}")))?;
+
+    let revoked_key =
+        holochain_types::prelude::AgentPubKey::try_from(input_view.revoked_key.as_str())
+            .map_err(|e| StorageError::InvalidInput(format!("invalid revokedKey: {e}")))?;
+
+    let zome_input = CreateSelfRevocationZomeInput {
+        revoked_key,
+        reason: input_view.reason,
+    };
+
+    match forward_to_imagodei::<_, CreateSelfRevocationZomeOutput>(
+        hc,
+        "create_self_revocation",
+        &zome_input,
+    )
+    .await
+    {
+        Ok(out) => {
+            let view = crate::views::CreateSelfRevocationOutputView {
+                revocation_id: out.revocation_id,
+                action_hash: out.action_hash.to_string(),
+            };
+            Ok(response::created(&view))
+        }
+        Err(e) => Ok(map_zome_err_to_http(&e)),
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Phase 11: handle_revocation_vote
+// ---------------------------------------------------------------------------
+
+async fn handle_revocation_vote(
+    req: Request<Incoming>,
+    hc_registry: Option<&std::sync::Arc<crate::hc_client_registry::HcClientRegistry>>,
+    pool: &DbPool,
+    revocation_id: String,
+) -> Result<Response<Full<Bytes>>, StorageError> {
+    let mut conn = get_conn(pool)?;
+    let agent_key = match extract_agent_key(&req, &mut conn)? {
+        Some(k) => k,
+        None => {
+            return Ok(response::bad_request(
+                "missing X-Agent-Id and no active session",
+            ));
+        }
+    };
+
+    let registry = match hc_registry {
+        Some(r) => r,
+        None => return Ok(response_503_imagodei_bridge_offline()),
+    };
+    let hc = match registry.imagodei.as_ref() {
+        Some(h) => h,
+        None => return Ok(response_503_imagodei_bridge_offline()),
+    };
+
+    if let Err(resp) = verify_caller_owns_cell(hc.as_ref(), &agent_key) {
+        return Ok(resp);
+    }
+
+    let body_bytes = read_request_body(req).await?;
+    let input_view: crate::views::SubmitRevocationVoteInputView =
+        serde_json::from_slice(&body_bytes)
+            .map_err(|e| StorageError::InvalidInput(format!("invalid request body: {e}")))?;
+
+    let zome_input = SubmitRevocationVoteZomeInput {
+        revocation_id,
+        approved: input_view.approved,
+        attestation: input_view.attestation,
+    };
+
+    match forward_to_imagodei::<_, SubmitRevocationVoteZomeOutput>(
+        hc,
+        "submit_revocation_vote",
+        &zome_input,
+    )
+    .await
+    {
+        Ok(out) => {
+            let view = crate::views::SubmitRevocationVoteOutputView {
+                vote_id: out.vote_id,
+                current_votes: out.current_votes,
+                required_votes: out.required_votes,
+                threshold_now_reached: out.threshold_now_reached,
+            };
+            Ok(response::ok(&view))
+        }
+        Err(e) => Ok(map_zome_err_to_http(&e)),
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Phase 11: handle_add_portal_host
+// ---------------------------------------------------------------------------
+
+async fn handle_add_portal_host(
+    req: Request<Incoming>,
+    hc_registry: Option<&std::sync::Arc<crate::hc_client_registry::HcClientRegistry>>,
+    pool: &DbPool,
+) -> Result<Response<Full<Bytes>>, StorageError> {
+    let mut conn = get_conn(pool)?;
+    let agent_key = match extract_agent_key(&req, &mut conn)? {
+        Some(k) => k,
+        None => {
+            return Ok(response::bad_request(
+                "missing X-Agent-Id and no active session",
+            ));
+        }
+    };
+
+    let registry = match hc_registry {
+        Some(r) => r,
+        None => return Ok(response_503_imagodei_bridge_offline()),
+    };
+    let hc = match registry.imagodei.as_ref() {
+        Some(h) => h,
+        None => return Ok(response_503_imagodei_bridge_offline()),
+    };
+
+    if let Err(resp) = verify_caller_owns_cell(hc.as_ref(), &agent_key) {
+        return Ok(resp);
+    }
+
+    let body_bytes = read_request_body(req).await?;
+    let input_view: crate::views::AddPortalHostInputView = serde_json::from_slice(&body_bytes)
+        .map_err(|e| StorageError::InvalidInput(format!("invalid request body: {e}")))?;
+
+    let zome_input = AddPortalHostZomeInput {
+        host_url: input_view.host_url,
+        label: input_view.label,
+        reach: input_view.reach,
+    };
+
+    match forward_to_imagodei::<_, holochain_types::prelude::ActionHash>(
+        hc,
+        "add_portal_host",
+        &zome_input,
+    )
+    .await
+    {
+        Ok(action_hash) => {
+            let view = crate::views::AddPortalHostOutputView {
+                action_hash: action_hash.to_string(),
+            };
+            Ok(response::created(&view))
+        }
+        Err(e) => Ok(map_zome_err_to_http(&e)),
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Phase 11: handle_remove_portal_host
+// ---------------------------------------------------------------------------
+
+async fn handle_remove_portal_host(
+    req: Request<Incoming>,
+    hc_registry: Option<&std::sync::Arc<crate::hc_client_registry::HcClientRegistry>>,
+    pool: &DbPool,
+    url_b64: String,
+) -> Result<Response<Full<Bytes>>, StorageError> {
+    let mut conn = get_conn(pool)?;
+    let agent_key = match extract_agent_key(&req, &mut conn)? {
+        Some(k) => k,
+        None => {
+            return Ok(response::bad_request(
+                "missing X-Agent-Id and no active session",
+            ));
+        }
+    };
+
+    let registry = match hc_registry {
+        Some(r) => r,
+        None => return Ok(response_503_imagodei_bridge_offline()),
+    };
+    let hc = match registry.imagodei.as_ref() {
+        Some(h) => h,
+        None => return Ok(response_503_imagodei_bridge_offline()),
+    };
+
+    if let Err(resp) = verify_caller_owns_cell(hc.as_ref(), &agent_key) {
+        return Ok(resp);
+    }
+
+    // The zome's `remove_portal_host` takes the URL as a plain `String`,
+    // so we URL-safe base64 decode the path segment back to the URL.
+    use base64::Engine;
+    let host_url_bytes = base64::engine::general_purpose::URL_SAFE_NO_PAD
+        .decode(url_b64.as_bytes())
+        .map_err(|e| StorageError::InvalidInput(format!("invalid url_b64: {e}")))?;
+    let host_url = String::from_utf8(host_url_bytes)
+        .map_err(|e| StorageError::InvalidInput(format!("url_b64 is not valid UTF-8: {e}")))?;
+
+    // Zome returns `()` on success.
+    match forward_to_imagodei::<_, ()>(hc, "remove_portal_host", &host_url).await {
+        Ok(()) => {
+            let view = crate::views::RemovePortalHostOutputView { deleted: true };
+            Ok(response::ok(&view))
+        }
+        Err(e) => Ok(map_zome_err_to_http(&e)),
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -545,13 +978,46 @@ fn extract_agent_key(
 mod tests {
     use super::*;
 
-    /// The zome bridge stub must return 503 with a machine-readable error body
-    /// so Angular can surface "conductor bridge not available" instead of an
-    /// unhandled error state.
+    use crate::hc_client::CellOwner;
+
+    struct StubOwner(&'static str);
+    impl CellOwner for StubOwner {
+        fn agent_key_hex(&self) -> String {
+            self.0.to_string()
+        }
+    }
+
+    /// When the caller's resolved agent key matches the connected cell's
+    /// owner (Tauri-direct invariant), the gate returns Ok.
     #[test]
-    fn zome_bridge_stub_returns_503() {
-        let resp = zome_bridge_not_yet_wired("self-revocation");
+    fn verify_caller_owns_cell_passes_when_keys_match() {
+        let owner = StubOwner("uhCAkMATCH");
+        let result = verify_caller_owns_cell(&owner, "uhCAkMATCH");
+        assert!(result.is_ok(), "expected Ok when keys match");
+    }
+
+    /// On mismatch, the gate returns Err. Verify by inspecting the body
+    /// helper directly (avoids async test machinery for body extraction).
+    #[test]
+    fn verify_caller_owns_cell_returns_browser_pending_on_mismatch() {
+        let owner = StubOwner("uhCAkOWNER");
+        let result = verify_caller_owns_cell(&owner, "uhCAkCALLER");
+        let resp = result.expect_err("expected Err with 503 response");
         assert_eq!(resp.status(), hyper::StatusCode::SERVICE_UNAVAILABLE);
+
+        // Body contents are asserted via the body-builder pure function.
+        let body = browser_write_path_pending_body();
+        assert_eq!(body["code"], "BROWSER_WRITE_PATH_PENDING");
+    }
+
+    /// IMAGODEI_BRIDGE_OFFLINE response has the correct status and code.
+    #[test]
+    fn imagodei_bridge_offline_response_has_correct_code() {
+        let resp = response_503_imagodei_bridge_offline();
+        assert_eq!(resp.status(), hyper::StatusCode::SERVICE_UNAVAILABLE);
+
+        let body = imagodei_bridge_offline_body();
+        assert_eq!(body["code"], "IMAGODEI_BRIDGE_OFFLINE");
     }
 
     /// PortalHostView must serialise with camelCase keys so the Angular SDK
@@ -607,23 +1073,63 @@ mod tests {
         assert_eq!(json["thresholdReached"], true);
     }
 
-    /// AccountView route stub for the `account` sub-path prefix stripping.
-    /// Verifies the dispatcher handles both `""` (bare) and `"/"` (trailing slash).
+    use crate::error::StorageError;
+
+    /// Gate-rejection messages from the imagodei coordinator map to 403.
     #[test]
-    fn zome_bridge_all_stub_routes_return_503() {
-        let routes = [
-            "self-revocation",
-            "recovery/vote",
-            "portal-hosts",
-            "portal-hosts/:url_b64",
+    fn map_zome_err_to_http_403_for_gate_rejection() {
+        let cases = [
+            "Conductor(\"create_self_revocation: caller does not control revoked_key (different human_id)\")",
+            "Conductor(\"submit_revocation_vote: caller is not an active emergency contact for human-x\")",
+            "Conductor(\"submit_specialist_revocation: caller is not a configured defender for this human\")",
+            "Conductor(\"submit_specialist_revocation: revoked_pub_key does not belong to target human\")",
         ];
-        for r in &routes {
-            let resp = zome_bridge_not_yet_wired(r);
+        for msg in cases {
+            let err = StorageError::Conductor(msg.to_string());
+            let resp = map_zome_err_to_http(&err);
             assert_eq!(
                 resp.status(),
-                hyper::StatusCode::SERVICE_UNAVAILABLE,
-                "route {r} should return 503"
+                hyper::StatusCode::FORBIDDEN,
+                "expected 403 for {msg}"
             );
         }
+    }
+
+    /// Input-validation failures map to 400.
+    #[test]
+    fn map_zome_err_to_http_400_for_invalid_input() {
+        let cases = [
+            "Conductor(\"create_self_revocation: invalid reason 'bogus'\")",
+            "Conductor(\"submit_revocation_vote: revocation rev-x already effective\")",
+            "Conductor(\"submit_revocation_vote: revocation rev-x has trigger_type=voluntary, votes not accepted\")",
+            "Conductor(\"submit_revocation_vote: attestation cannot be empty\")",
+            "Conductor(\"submit_revocation_vote: no KeyRevocation with id rev-missing\")",
+        ];
+        for msg in cases {
+            let err = StorageError::Conductor(msg.to_string());
+            let resp = map_zome_err_to_http(&err);
+            assert_eq!(
+                resp.status(),
+                hyper::StatusCode::BAD_REQUEST,
+                "expected 400 for {msg}"
+            );
+        }
+    }
+
+    /// Connectivity failures map to 503.
+    #[test]
+    fn map_zome_err_to_http_503_for_connection_error() {
+        let err = StorageError::Connection("Admin connect failed: refused".to_string());
+        let resp = map_zome_err_to_http(&err);
+        assert_eq!(resp.status(), hyper::StatusCode::SERVICE_UNAVAILABLE);
+    }
+
+    /// Anything else falls through to 500.
+    #[test]
+    fn map_zome_err_to_http_500_for_unknown() {
+        let err =
+            StorageError::Conductor("Zome call failed: unexpected internal error".to_string());
+        let resp = map_zome_err_to_http(&err);
+        assert_eq!(resp.status(), hyper::StatusCode::INTERNAL_SERVER_ERROR);
     }
 }

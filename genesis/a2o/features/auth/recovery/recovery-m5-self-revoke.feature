@@ -5,23 +5,9 @@ Feature: Self-revocation through the account-management surface
   So that peers stop trusting it immediately
 
   # ─────────────────────────────────────────────────────────
-  # M5 reality — POST mutations return 503 until Phase-11 bridge
+  # Success path
   # ─────────────────────────────────────────────────────────
 
-  Scenario: Self-revocation mutation returns 503 PHASE_11_PENDING in M5
-    Given I am authenticated with an active key
-    And I navigate to /account/security
-    When I click "Revoke this key"
-    And I click "Yes, revoke"
-    Then the POST to /api/v1/account/self-revocation returns 503
-    And the response body contains errorCode "PHASE_11_PENDING"
-    And the UI displays an informative error message rather than crashing
-
-  # ─────────────────────────────────────────────────────────
-  # Success path — will work once the Phase-11 bridge exists
-  # ─────────────────────────────────────────────────────────
-
-  @phase11-pending
   Scenario: Successful self-revocation
     Given I am authenticated with an active key
     And I navigate to /account/security

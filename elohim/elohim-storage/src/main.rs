@@ -433,6 +433,11 @@ async fn async_main(
     // does NOT abort startup — the node still serves HTTP/blobs.
     //
     let peer_policy_path = config.peer_policy_path.clone();
+    // Populated inside the Ok(policy_cfg) arm below; read by HTTP layer in Task 5.
+    // Underscore-prefixed until Task 5 threads it into the HTTP handler state.
+    let mut hc_registry_for_http: Option<
+        std::sync::Arc<elohim_storage::hc_client_registry::HcClientRegistry>,
+    > = None;
     if let Some(admin_url) = &args.admin_url {
         match elohim_storage::policy::PolicyConfig::load(&peer_policy_path) {
             Ok(policy_cfg) => {
@@ -465,98 +470,97 @@ async fn async_main(
                     }
                 }
 
-                match elohim_storage::hc_client::HcClient::connect(
-                    elohim_storage::hc_client::HcClientConfig {
+                let registry = elohim_storage::hc_client_registry::HcClientRegistry::connect(
+                    &elohim_storage::hc_client_registry::HcRegistryInputs {
                         admin_url: admin_url.clone(),
                         app_url: args.app_url.clone(),
                         app_id: args.app_id.clone(),
-                        role: Some("infrastructure".to_string()),
                     },
                 )
-                .await
-                {
-                    Ok(hc) => {
-                        let hc = Arc::new(hc);
-                        let agent = hc.cell_id().agent_pubkey().clone();
-                        let publisher =
-                            elohim_storage::heartbeat::ZomeCallPublisher::new(hc.clone(), agent);
-                        let probe = elohim_storage::heartbeat::DefaultProbe::new(
-                            blob_store.clone(),
-                            hc.clone(),
-                        );
-                        let mut heartbeat = elohim_storage::heartbeat::HeartbeatTask::new(
-                            policy_cfg, publisher, probe,
-                        );
-                        // Task C8: pipe DEVICE_ARCHETYPE through to PeerStatus
-                        // so consumers (/shefa/devices, /shefa/dashboard) can
-                        // correlate peer vitals with hardware archetype.
-                        if let Some(archetype) = config.device_archetype.clone() {
-                            heartbeat = heartbeat.with_archetype_class(archetype);
-                        }
-                        let hb_shutdown = shutdown_tx.subscribe();
-                        tokio::spawn(async move {
-                            heartbeat.run(hb_shutdown).await;
-                        });
-                        info!(
-                            policy_path = %peer_policy_path.display(),
-                            "PeerStatus heartbeat task started (infrastructure role)"
-                        );
+                .await;
+                let registry = std::sync::Arc::new(registry);
 
-                        // Peer-Stewarded Availability — subscribe to the conductor's
-                        // signal stream and project `InfrastructureSignal::PeerStatusRecorded`
-                        // into the SQLite `peer_statuses` table via `signals::handle_signal`.
-                        //
-                        // Shares the process-wide Diesel pool (created once at startup)
-                        // so subscriber activity is visible via /db/stats and we don't
-                        // multiply SQLite file handles. Non-fatal: if the pool is
-                        // unavailable we log and the node keeps serving HTTP
-                        // (consistent with the heartbeat startup precedent).
-                        if let Some(subscriber_pool) = db_pool.clone() {
-                            let hc_sub = hc.clone();
-                            tokio::spawn(async move {
-                                let pool = subscriber_pool;
-                                let handle_id = hc_sub
-                                    .subscribe_infrastructure_signals(
-                                        move |signal: elohim_storage::signals::InfrastructureSignal| {
-                                            match pool.get() {
-                                                Ok(mut conn) => {
-                                                    if let Err(e) =
-                                                        elohim_storage::signals::handle_signal(
-                                                            &mut conn, signal,
-                                                        )
-                                                    {
-                                                        warn!(
-                                                            error = %e,
-                                                            "InfrastructureSignal projection failed"
-                                                        );
-                                                    }
-                                                }
-                                                Err(e) => warn!(
-                                                    error = %e,
-                                                    "Failed to acquire DB connection for signal projection"
-                                                ),
-                                            }
-                                        },
-                                    )
-                                    .await;
-                                info!(
-                                    subscription_id = %handle_id,
-                                    "InfrastructureSignal subscriber registered (projects PeerStatusRecorded → SQLite)"
-                                );
-                            });
-                        } else {
-                            warn!(
-                                "InfrastructureSignal subscriber disabled: shared DB pool unavailable"
-                            );
-                        }
+                // Heartbeat path — consume registry.infrastructure.
+                if let Some(hc) = registry.infrastructure.clone() {
+                    let agent = hc.cell_id().agent_pubkey().clone();
+                    let publisher =
+                        elohim_storage::heartbeat::ZomeCallPublisher::new(hc.clone(), agent);
+                    let probe = elohim_storage::heartbeat::DefaultProbe::new(
+                        blob_store.clone(),
+                        hc.clone(),
+                    );
+                    let mut heartbeat =
+                        elohim_storage::heartbeat::HeartbeatTask::new(policy_cfg, publisher, probe);
+                    // Task C8: pipe DEVICE_ARCHETYPE through to PeerStatus
+                    // so consumers (/shefa/devices, /shefa/dashboard) can
+                    // correlate peer vitals with hardware archetype.
+                    if let Some(archetype) = config.device_archetype.clone() {
+                        heartbeat = heartbeat.with_archetype_class(archetype);
                     }
-                    Err(e) => {
+                    let hb_shutdown = shutdown_tx.subscribe();
+                    tokio::spawn(async move {
+                        heartbeat.run(hb_shutdown).await;
+                    });
+                    info!(
+                        policy_path = %peer_policy_path.display(),
+                        "PeerStatus heartbeat task started (infrastructure role)"
+                    );
+
+                    // Peer-Stewarded Availability — subscribe to the conductor's
+                    // signal stream and project `InfrastructureSignal::PeerStatusRecorded`
+                    // into the SQLite `peer_statuses` table via `signals::handle_signal`.
+                    //
+                    // Shares the process-wide Diesel pool (created once at startup)
+                    // so subscriber activity is visible via /db/stats and we don't
+                    // multiply SQLite file handles. Non-fatal: if the pool is
+                    // unavailable we log and the node keeps serving HTTP
+                    // (consistent with the heartbeat startup precedent).
+                    if let Some(subscriber_pool) = db_pool.clone() {
+                        let hc_sub = hc.clone();
+                        tokio::spawn(async move {
+                            let pool = subscriber_pool;
+                            let handle_id = hc_sub
+                                .subscribe_infrastructure_signals(
+                                    move |signal: elohim_storage::signals::InfrastructureSignal| {
+                                        match pool.get() {
+                                            Ok(mut conn) => {
+                                                if let Err(e) =
+                                                    elohim_storage::signals::handle_signal(
+                                                        &mut conn, signal,
+                                                    )
+                                                {
+                                                    warn!(
+                                                        error = %e,
+                                                        "InfrastructureSignal projection failed"
+                                                    );
+                                                }
+                                            }
+                                            Err(e) => warn!(
+                                                error = %e,
+                                                "Failed to acquire DB connection for signal projection"
+                                            ),
+                                        }
+                                    },
+                                )
+                                .await;
+                            info!(
+                                subscription_id = %handle_id,
+                                "InfrastructureSignal subscriber registered (projects PeerStatusRecorded → SQLite)"
+                            );
+                        });
+                    } else {
                         warn!(
-                            "PeerStatus heartbeat disabled: infrastructure HcClient connect failed: {}",
-                            e
+                            "InfrastructureSignal subscriber disabled: shared DB pool unavailable"
                         );
                     }
+                } else {
+                    warn!(
+                        "PeerStatus heartbeat disabled: infrastructure HcClient unavailable in registry"
+                    );
                 }
+
+                // Stash the registry in shared state for HTTP handlers.
+                hc_registry_for_http = Some(registry);
             }
             Err(e) => {
                 warn!(
@@ -940,6 +944,11 @@ async fn async_main(
         http_server = http_server.with_sync_manager(node.sync_manager().clone());
         http_server = http_server.with_p2p_handle(node.handle());
         info!("P2P node wired to HTTP server — Sync API and /p2p/status active");
+    }
+
+    // Wire HcClientRegistry into HTTP server for zome forwarding (Phase 11 Task 5).
+    if let Some(registry) = hc_registry_for_http.as_ref() {
+        http_server = http_server.with_hc_registry(registry.clone());
     }
 
     // Load slug index for HTML5 app caching

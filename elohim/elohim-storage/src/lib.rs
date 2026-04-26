@@ -55,6 +55,7 @@ pub mod epr_head;
 pub mod error;
 pub mod happ_manager;
 pub mod hc_client;
+pub mod hc_client_registry;
 pub mod http;
 pub mod import_handler;
 pub mod metadata;
