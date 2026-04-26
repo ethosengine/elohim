@@ -87,7 +87,11 @@ pub async fn handle(
         (Method::GET, "/portal-hosts") => get_portal_hosts(req, pool).await,
         (Method::POST, "/portal-hosts") => handle_add_portal_host(req, hc_registry, pool).await,
         (Method::DELETE, p) if p.starts_with("/portal-hosts/") => {
-            Ok(zome_bridge_not_yet_wired("portal-hosts/:url_b64"))
+            let url_b64 = p.trim_start_matches("/portal-hosts/");
+            if url_b64.is_empty() {
+                return Ok(response::bad_request("missing url_b64 in URL path"));
+            }
+            handle_remove_portal_host(req, hc_registry, pool, url_b64.to_string()).await
         }
 
         _ => Ok(response::not_found(&format!(
@@ -889,27 +893,55 @@ async fn handle_add_portal_host(
 }
 
 // ---------------------------------------------------------------------------
-// Phase 11 stub: zome bridge not yet wired
+// Phase 11: handle_remove_portal_host
 // ---------------------------------------------------------------------------
 
-/// Returns 503 with a machine-readable body indicating the conductor bridge
-/// is not yet wired. Angular should surface this as "coming soon" rather than
-/// an unhandled error.
-///
-/// POST routes that require DHT writes (self-revocation, recovery vote,
-/// portal-host CRUD) defer to Phase 11 when `HcClient` is threaded through
-/// the API layer.
-fn zome_bridge_not_yet_wired(route_hint: &str) -> Response<Full<Bytes>> {
-    let body = serde_json::json!({
-        "error": "conductor bridge not yet wired",
-        "code": "PHASE_11_PENDING",
-        "route": route_hint,
-        "message": "This endpoint requires a live conductor connection. \
-                    The imagodei coordinator zome bridge is deferred to Phase 11. \
-                    Recovery and portal-host mutations are accepted via direct \
-                    Holochain conductor calls in the meantime."
-    });
-    response::json_response(hyper::StatusCode::SERVICE_UNAVAILABLE, &body)
+async fn handle_remove_portal_host(
+    req: Request<Incoming>,
+    hc_registry: Option<&std::sync::Arc<crate::hc_client_registry::HcClientRegistry>>,
+    pool: &DbPool,
+    url_b64: String,
+) -> Result<Response<Full<Bytes>>, StorageError> {
+    let mut conn = get_conn(pool)?;
+    let agent_key = match extract_agent_key(&req, &mut conn)? {
+        Some(k) => k,
+        None => {
+            return Ok(response::bad_request(
+                "missing X-Agent-Id and no active session",
+            ));
+        }
+    };
+
+    let registry = match hc_registry {
+        Some(r) => r,
+        None => return Ok(response_503_imagodei_bridge_offline()),
+    };
+    let hc = match registry.imagodei.as_ref() {
+        Some(h) => h,
+        None => return Ok(response_503_imagodei_bridge_offline()),
+    };
+
+    if let Err(resp) = verify_caller_owns_cell(hc.as_ref(), &agent_key) {
+        return Ok(resp);
+    }
+
+    // The zome's `remove_portal_host` takes the URL as a plain `String`,
+    // so we URL-safe base64 decode the path segment back to the URL.
+    use base64::Engine;
+    let host_url_bytes = base64::engine::general_purpose::URL_SAFE_NO_PAD
+        .decode(url_b64.as_bytes())
+        .map_err(|e| StorageError::InvalidInput(format!("invalid url_b64: {e}")))?;
+    let host_url = String::from_utf8(host_url_bytes)
+        .map_err(|e| StorageError::InvalidInput(format!("url_b64 is not valid UTF-8: {e}")))?;
+
+    // Zome returns `()` on success.
+    match forward_to_imagodei::<_, ()>(hc, "remove_portal_host", &host_url).await {
+        Ok(()) => {
+            let view = crate::views::RemovePortalHostOutputView { deleted: true };
+            Ok(response::ok(&view))
+        }
+        Err(e) => Ok(map_zome_err_to_http(&e)),
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -994,15 +1026,6 @@ mod tests {
         assert_eq!(body["code"], "IMAGODEI_BRIDGE_OFFLINE");
     }
 
-    /// The zome bridge stub must return 503 with a machine-readable error body
-    /// so Angular can surface "conductor bridge not available" instead of an
-    /// unhandled error state.
-    #[test]
-    fn zome_bridge_stub_returns_503() {
-        let resp = zome_bridge_not_yet_wired("self-revocation");
-        assert_eq!(resp.status(), hyper::StatusCode::SERVICE_UNAVAILABLE);
-    }
-
     /// PortalHostView must serialise with camelCase keys so the Angular SDK
     /// receives clean field names without any TypeScript-side transformation.
     #[test]
@@ -1054,26 +1077,6 @@ mod tests {
         // Verify JSON output uses boolean
         let json = serde_json::to_value(&view).unwrap();
         assert_eq!(json["thresholdReached"], true);
-    }
-
-    /// AccountView route stub for the `account` sub-path prefix stripping.
-    /// Verifies the dispatcher handles both `""` (bare) and `"/"` (trailing slash).
-    #[test]
-    fn zome_bridge_all_stub_routes_return_503() {
-        let routes = [
-            "self-revocation",
-            "recovery/vote",
-            "portal-hosts",
-            "portal-hosts/:url_b64",
-        ];
-        for r in &routes {
-            let resp = zome_bridge_not_yet_wired(r);
-            assert_eq!(
-                resp.status(),
-                hyper::StatusCode::SERVICE_UNAVAILABLE,
-                "route {r} should return 503"
-            );
-        }
     }
 
     use crate::error::StorageError;
