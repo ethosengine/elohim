@@ -21,9 +21,9 @@ use super::diesel_schema::{
     knowledge_maps, local_sessions, node_stewardship, observation_entries, observation_sessions,
     peer_identity_bindings, placement_gaps, places, portal_hosts, precedents, premium_gates,
     proposal_options, proposals, ranked_votes, rea_commitments, recovery_requests,
-    recovery_witnesses, relationships, responsibility_demand_configs, revocation_votes, risk_alerts,
-    schedules, shard_locations, shard_manifests, spatial_contexts, statement_votes, statements,
-    steward_credentials, stewarded_nodes, stewardship_allocations, token_balances,
+    recovery_witnesses, relationships, responsibility_demand_configs, revocation_votes,
+    risk_alerts, schedules, shard_locations, shard_manifests, spatial_contexts, statement_votes,
+    statements, steward_credentials, stewarded_nodes, stewardship_allocations, token_balances,
     token_decay_events, token_mint_events, token_transfers, votes,
 };
 

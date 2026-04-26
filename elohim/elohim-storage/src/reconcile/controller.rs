@@ -37,8 +37,8 @@ use crate::db::DbPool;
 use crate::p2p::P2PCommand;
 use crate::projector::sweep::sweep_projections_on_revocation;
 use crate::projector::ManifestRegistry;
-use crate::reconcile::pubkey_timeline::PubkeyTimelineCache;
 use crate::reconcile::portal_host_handlers;
+use crate::reconcile::pubkey_timeline::PubkeyTimelineCache;
 use crate::reconcile::signal_stream::{
     AgentPeerBindingSignal, DnaSignal, DnaSignalStream, KeyRevocationSignal, KeyRotationSignal,
     PortalHostCreatedSignal, PortalHostRemovedSignal, RevocationAttestationSignal,
@@ -513,8 +513,8 @@ mod tests {
     use super::*;
     use crate::reconcile::signal_stream::{
         AgentPeerBindingSignal, AttestationKind, ChannelSignalStream, DeviceArchetype, DnaSignal,
-        InMemoryDnaSignalStream, KeyRevocationSignal, KeyRotationSignal,
-        PortalHostCreatedSignal, PortalHostRemovedSignal, RevocationAttestationSignal,
+        InMemoryDnaSignalStream, KeyRevocationSignal, KeyRotationSignal, PortalHostCreatedSignal,
+        PortalHostRemovedSignal, RevocationAttestationSignal,
     };
     use chrono::Utc;
     use tokio::sync::mpsc;
@@ -966,7 +966,11 @@ mod tests {
             portal_hosts::list_for_human(&mut conn, &created.human_action_hash)
                 .expect("list_for_human")
         });
-        assert_eq!(rows.len(), 1, "expected one portal_host row after create signal");
+        assert_eq!(
+            rows.len(),
+            1,
+            "expected one portal_host row after create signal"
+        );
         assert_eq!(rows[0].host_url, created.host_url);
         assert_eq!(rows[0].dht_anchor_hash, created.action_hash);
 
@@ -983,6 +987,9 @@ mod tests {
             portal_hosts::list_for_human(&mut conn, &created.human_action_hash)
                 .expect("list_for_human after")
         });
-        assert!(rows_after.is_empty(), "portal_host row must be gone after remove signal");
+        assert!(
+            rows_after.is_empty(),
+            "portal_host row must be gone after remove signal"
+        );
     }
 }

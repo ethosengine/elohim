@@ -1547,9 +1547,7 @@ fn agent_peer_binding_view_non_expiring_matches_schema() {
 
 #[test]
 fn account_view_matches_schema() {
-    use elohim_storage::views::{
-        AccountView, HumanRelationshipView, HumanView, PortalHostView,
-    };
+    use elohim_storage::views::{AccountView, HumanRelationshipView, HumanView, PortalHostView};
 
     let human = HumanView {
         id: "human-matthew".into(),

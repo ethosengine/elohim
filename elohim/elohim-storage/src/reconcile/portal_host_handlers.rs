@@ -62,8 +62,7 @@ pub fn on_portal_host_created(
         dht_anchor_hash: sig.action_hash,
     };
 
-    portal_hosts::upsert(&mut conn, &row)
-        .map_err(|e| ReconcileError::Sweep(e.to_string()))?;
+    portal_hosts::upsert(&mut conn, &row).map_err(|e| ReconcileError::Sweep(e.to_string()))?;
 
     debug!(
         human_id = %row.human_id,

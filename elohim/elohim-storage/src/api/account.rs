@@ -126,9 +126,7 @@ async fn get_account(
             .order(dsl::rotated_at.desc())
             .first::<crate::db::models::KeyRotationRow>(&mut conn)
             .optional()
-            .map_err(|e| {
-                StorageError::Internal(format!("key_rotations query failed: {e}"))
-            })?
+            .map_err(|e| StorageError::Internal(format!("key_rotations query failed: {e}")))?
             .map(|r| KeyRotationView {
                 dht_anchor_hash: r.dht_anchor_hash,
                 human_agent_pubkey: r.human_agent_pubkey,
@@ -151,9 +149,7 @@ async fn get_account(
             .limit(10)
             .select(crate::db::models::KeyRevocationRow::as_select())
             .load(&mut conn)
-            .map_err(|e| {
-                StorageError::Internal(format!("key_revocations query failed: {e}"))
-            })?
+            .map_err(|e| StorageError::Internal(format!("key_revocations query failed: {e}")))?
             .into_iter()
             .map(KeyRevocationView::from)
             .collect::<Vec<_>>()
@@ -172,9 +168,7 @@ async fn get_account(
             .filter(hr_dsl::emergency_access_enabled.eq(1))
             .select(hr_dsl::party_a_id)
             .load::<String>(&mut conn)
-            .map_err(|e| {
-                StorageError::Internal(format!("emergency contact query failed: {e}"))
-            })?;
+            .map_err(|e| StorageError::Internal(format!("emergency contact query failed: {e}")))?;
 
         if ec_of.is_empty() {
             Vec::new()
@@ -185,8 +179,7 @@ async fn get_account(
                 if let Some(other_human) = get_human_by_id(&mut conn, other_human_id)? {
                     // agent_pub_key is Option<String>; skip humans without one
                     if let Some(ref pubkey) = other_human.agent_pub_key {
-                        let rows =
-                            list_recovery_requests_for_agent(&mut conn, pubkey)?;
+                        let rows = list_recovery_requests_for_agent(&mut conn, pubkey)?;
                         for r in rows {
                             requests.push(RecoveryRequestView {
                                 dht_anchor_hash: r.dht_anchor_hash,
@@ -217,9 +210,7 @@ async fn get_account(
             .filter(hr_dsl::party_a_id.eq(&human_id))
             .filter(hr_dsl::emergency_access_enabled.eq(1))
             .load::<crate::db::models::HumanRelationship>(&mut conn)
-            .map_err(|e| {
-                StorageError::Internal(format!("emergency contacts query failed: {e}"))
-            })?
+            .map_err(|e| StorageError::Internal(format!("emergency contacts query failed: {e}")))?
             .into_iter()
             .map(HumanRelationshipView::from)
             .collect::<Vec<_>>()
@@ -411,9 +402,7 @@ async fn get_pending_recovery(
         .filter(hr_dsl::emergency_access_enabled.eq(1))
         .select(hr_dsl::party_a_id)
         .load::<String>(&mut conn)
-        .map_err(|e| {
-            StorageError::Internal(format!("emergency contact lookup failed: {e}"))
-        })?;
+        .map_err(|e| StorageError::Internal(format!("emergency contact lookup failed: {e}")))?;
 
     let mut views = Vec::new();
     for other_id in &principal_human_ids {
@@ -513,10 +502,7 @@ fn zome_bridge_not_yet_wired(route_hint: &str) -> Response<Full<Bytes>> {
                     Recovery and portal-host mutations are accepted via direct \
                     Holochain conductor calls in the meantime."
     });
-    response::json_response(
-        hyper::StatusCode::SERVICE_UNAVAILABLE,
-        &body,
-    )
+    response::json_response(hyper::StatusCode::SERVICE_UNAVAILABLE, &body)
 }
 
 // ---------------------------------------------------------------------------
@@ -609,7 +595,10 @@ mod tests {
             updated_at: "2026-04-25T00:00:00Z".into(),
         };
         let view = KeyRevocationView::from(row);
-        assert!(view.threshold_reached, "threshold_reached should be true when DB value is 1");
+        assert!(
+            view.threshold_reached,
+            "threshold_reached should be true when DB value is 1"
+        );
         assert_eq!(view.required_votes, 3);
         assert_eq!(view.current_votes, 3);
 

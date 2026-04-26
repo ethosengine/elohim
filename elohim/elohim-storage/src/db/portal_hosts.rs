@@ -300,9 +300,8 @@ mod tests {
         let pool = test_pool();
         let mut conn = pool.get().expect("conn");
 
-        let updated =
-            update_last_reachable(&mut conn, "no-such-anchor", "2026-04-25T12:00:00Z")
-                .expect("update missing");
+        let updated = update_last_reachable(&mut conn, "no-such-anchor", "2026-04-25T12:00:00Z")
+            .expect("update missing");
         assert_eq!(updated, 0);
     }
 }
