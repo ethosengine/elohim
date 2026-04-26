@@ -74,7 +74,13 @@ pub async fn handle(
 
         // ── Recovery vote (zome write — Phase 11 bridge) ──────────────────
         (Method::POST, p) if p.starts_with("/recovery/") && p.ends_with("/vote") => {
-            Ok(zome_bridge_not_yet_wired("recovery/vote"))
+            let revocation_id = p
+                .trim_start_matches("/recovery/")
+                .trim_end_matches("/vote");
+            if revocation_id.is_empty() {
+                return Ok(response::bad_request("missing revocation id in URL path"));
+            }
+            handle_revocation_vote(req, hc_registry, pool, revocation_id.to_string()).await
         }
 
         // ── Portal hosts ──────────────────────────────────────────────────
@@ -654,6 +660,21 @@ struct CreateSelfRevocationZomeOutput {
     action_hash: holochain_types::prelude::ActionHash,
 }
 
+#[derive(serde::Serialize)]
+struct SubmitRevocationVoteZomeInput {
+    revocation_id: String,
+    approved: bool,
+    attestation: String,
+}
+
+#[derive(serde::Deserialize)]
+struct SubmitRevocationVoteZomeOutput {
+    vote_id: String,
+    current_votes: u32,
+    required_votes: u32,
+    threshold_now_reached: bool,
+}
+
 // ---------------------------------------------------------------------------
 // Phase 11: request body reader
 // ---------------------------------------------------------------------------
@@ -730,6 +751,70 @@ async fn handle_self_revocation(
                 action_hash: out.action_hash.to_string(),
             };
             Ok(response::created(&view))
+        }
+        Err(e) => Ok(map_zome_err_to_http(&e)),
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Phase 11: handle_revocation_vote
+// ---------------------------------------------------------------------------
+
+async fn handle_revocation_vote(
+    req: Request<Incoming>,
+    hc_registry: Option<&std::sync::Arc<crate::hc_client_registry::HcClientRegistry>>,
+    pool: &DbPool,
+    revocation_id: String,
+) -> Result<Response<Full<Bytes>>, StorageError> {
+    let mut conn = get_conn(pool)?;
+    let agent_key = match extract_agent_key(&req, &mut conn)? {
+        Some(k) => k,
+        None => {
+            return Ok(response::bad_request(
+                "missing X-Agent-Id and no active session",
+            ));
+        }
+    };
+
+    let registry = match hc_registry {
+        Some(r) => r,
+        None => return Ok(response_503_imagodei_bridge_offline()),
+    };
+    let hc = match registry.imagodei.as_ref() {
+        Some(h) => h,
+        None => return Ok(response_503_imagodei_bridge_offline()),
+    };
+
+    if let Err(resp) = verify_caller_owns_cell(hc.as_ref(), &agent_key) {
+        return Ok(resp);
+    }
+
+    let body_bytes = read_request_body(req).await?;
+    let input_view: crate::views::SubmitRevocationVoteInputView =
+        serde_json::from_slice(&body_bytes)
+            .map_err(|e| StorageError::InvalidInput(format!("invalid request body: {e}")))?;
+
+    let zome_input = SubmitRevocationVoteZomeInput {
+        revocation_id,
+        approved: input_view.approved,
+        attestation: input_view.attestation,
+    };
+
+    match forward_to_imagodei::<_, SubmitRevocationVoteZomeOutput>(
+        hc,
+        "submit_revocation_vote",
+        &zome_input,
+    )
+    .await
+    {
+        Ok(out) => {
+            let view = crate::views::SubmitRevocationVoteOutputView {
+                vote_id: out.vote_id,
+                current_votes: out.current_votes,
+                required_votes: out.required_votes,
+                threshold_now_reached: out.threshold_now_reached,
+            };
+            Ok(response::ok(&view))
         }
         Err(e) => Ok(map_zome_err_to_http(&e)),
     }
