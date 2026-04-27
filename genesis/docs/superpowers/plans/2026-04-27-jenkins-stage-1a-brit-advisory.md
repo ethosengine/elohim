@@ -57,10 +57,10 @@ If compile fails, file an issue against brit and stop this plan — Stage 1a dep
 Run: `/projects/elohim/elohim/brit/target/release/brit-build-ref --help 2>&1 | head -5`
 Expected output begins with: `Manage build/deploy/validate/reach attestation refs`
 
-Run: `/projects/elohim/elohim/brit/target/release/brit --help 2>&1 | head -5` (note: brit-cli's binary may be named `brit` or similar — adjust based on actual `Cargo.toml` `[[bin]]` name)
-Expected: clap-formatted usage output with subcommands `plan`, `affected`, `fingerprint`, etc.
+Run: `/projects/elohim/elohim/brit/target/release/rakia --help 2>&1 | head -5`
+Expected: `Brit — covenant on git, EPR-native CLI` with subcommands `graph`, `affected`, `plan`, `fingerprint`, `baseline`.
 
-If the binary name differs from `brit`, note it for use in subsequent tasks; substitute the actual name everywhere this plan says `brit`.
+**Discovered during Task 1 verification:** The brit-cli binary is named `rakia` in the local build (not `brit` as initially assumed). The ci-builder image (Stage 1b) is expected to install it as `brit` on PATH. The Task 2 helper script detects BOTH names for robustness. Cargo build also requires `RUSTFLAGS=""` to override the workspace-level Holochain `--cfg getrandom_backend="custom"` flag — applies only to dev builds, not to invocation of pre-built binaries.
 
 ---
 
@@ -90,10 +90,15 @@ Path: `/projects/elohim/genesis/orchestrator/scripts/brit-helper.sh`
 
 set -e
 
-# Locate brit binaries: prefer system PATH, fall back to local submodule build.
+# Locate brit binaries: prefer system PATH (`brit` or `rakia` — local build names it `rakia`),
+# fall back to local submodule build at known path. Stage 1b ci-builder image installs as `brit`.
 BRIT_BIN=""
 if command -v brit >/dev/null 2>&1; then
     BRIT_BIN=brit
+elif command -v rakia >/dev/null 2>&1; then
+    BRIT_BIN=rakia
+elif [ -x "${REPO_ROOT:-/projects/elohim}/elohim/brit/target/release/rakia" ]; then
+    BRIT_BIN="${REPO_ROOT:-/projects/elohim}/elohim/brit/target/release/rakia"
 elif [ -x "${REPO_ROOT:-/projects/elohim}/elohim/brit/target/release/brit" ]; then
     BRIT_BIN="${REPO_ROOT:-/projects/elohim}/elohim/brit/target/release/brit"
 fi
@@ -161,14 +166,14 @@ Run: `chmod +x /projects/elohim/genesis/orchestrator/scripts/brit-helper.sh`
 - [ ] **Step 3: Smoke-test fallback path (no brit on PATH)**
 
 Run: `PATH=/usr/bin:/bin REPO_ROOT=/projects/elohim /projects/elohim/genesis/orchestrator/scripts/brit-helper.sh verify`
-Expected output: `[brit-helper] running: /projects/elohim/elohim/brit/target/release/brit verify` followed by either `WARN: brit verify exited <rc>` (if brit verify is stub) or actual verify output.
+Expected output: `[brit-helper] running: /projects/elohim/elohim/brit/target/release/rakia verify` followed by either `WARN: brit verify exited <rc>` (if brit verify is stub) or actual verify output. Local-fallback path resolves to `rakia` because that's the binary name in the dev build.
 
-If `brit` doesn't exist at the local path either, you should see: `[brit-helper] WARN: brit not installed; verify advisory skipped (Stage 1a)` — exit 0.
+If neither `brit` nor `rakia` exists at PATH or local path, you should see: `[brit-helper] WARN: brit not installed; verify advisory skipped (Stage 1a)` — exit 0.
 
-- [ ] **Step 4: Smoke-test forwarding path (with brit on PATH)**
+- [ ] **Step 4: Smoke-test forwarding path (with brit/rakia on PATH)**
 
 Run: `PATH="/projects/elohim/elohim/brit/target/release:$PATH" /projects/elohim/genesis/orchestrator/scripts/brit-helper.sh plan --files=README.md`
-Expected: `[brit-helper] running: brit plan --files=README.md` followed by JSON output (a build plan) or warn-and-exit-0 if the planner errors.
+Expected: `[brit-helper] running: rakia plan --files=README.md` (or `brit plan ...` if a `brit`-named binary also exists on PATH) followed by JSON output (a build plan) or warn-and-exit-0 if the planner errors.
 
 - [ ] **Step 5: Commit**
 
