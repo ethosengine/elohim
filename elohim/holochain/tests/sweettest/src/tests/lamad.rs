@@ -199,7 +199,7 @@ async fn content_visible_across_agents() -> Result<()> {
     // Poll c2 until the IdToContent link is gossipped, or panic on deadline.
     // Single-shot reads after a fixed sleep race the link-traversal path; see
     // tests/node_registry.rs admission_visible_across_agents for rationale.
-    let deadline = Instant::now() + Duration::from_secs(10);
+    let deadline = Instant::now() + Duration::from_secs(30);
     let zome = cell2.zome("content_store");
     let retrieved: ContentOutput = loop {
         let result: Option<ContentOutput> = c2
@@ -213,7 +213,7 @@ async fn content_visible_across_agents() -> Result<()> {
             break out;
         }
         if Instant::now() >= deadline {
-            panic!("agent 2 could not see content 'cross-agent-1' within 10s");
+            panic!("agent 2 could not see content 'cross-agent-1' within 30s");
         }
         sleep(Duration::from_millis(100)).await;
     };

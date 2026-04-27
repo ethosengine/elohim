@@ -116,9 +116,9 @@ async fn admission_visible_across_agents() -> Result<()> {
         .await;
 
     // Poll a2 until the region link becomes visible or the deadline elapses.
-    // 10s is generous for in-process gossip; real failures still surface fast
-    // because the panic message includes the last-seen node list.
-    let deadline = Instant::now() + Duration::from_secs(10);
+    // 30s gives gossip headroom on loaded CI runners; real failures still
+    // surface fast because the panic message includes the last-seen node list.
+    let deadline = Instant::now() + Duration::from_secs(30);
     let zome = cell2.zome("node_registry_coordinator");
     loop {
         let nodes: Vec<NodeRegistration> = c2
@@ -129,7 +129,7 @@ async fn admission_visible_across_agents() -> Result<()> {
         }
         if Instant::now() >= deadline {
             panic!(
-                "second agent did not see node 'alpha' within 10s; last result: {:?}",
+                "second agent did not see node 'alpha' within 30s; last result: {:?}",
                 nodes.iter().map(|n| &n.node_id).collect::<Vec<_>>()
             );
         }

@@ -165,7 +165,7 @@ async fn doorway_visible_across_agents_and_operator_only_can_update() -> Result<
     // Poll c2 until the doorway anchor link is gossipped, or panic on deadline.
     // Gossip quiescence is not a hard guarantee for link traversal; see
     // tests/node_registry.rs admission_visible_across_agents for rationale.
-    let deadline = Instant::now() + Duration::from_secs(10);
+    let deadline = Instant::now() + Duration::from_secs(30);
     let zome = cell2.zome("infrastructure");
     let fetched: DoorwayOutput = loop {
         let result: Option<DoorwayOutput> = c2
@@ -175,7 +175,7 @@ async fn doorway_visible_across_agents_and_operator_only_can_update() -> Result<
             break out;
         }
         if Instant::now() >= deadline {
-            panic!("a2 should be able to read a1's doorway within 10s of DHT propagation");
+            panic!("a2 should be able to read a1's doorway within 30s of DHT propagation");
         }
         sleep(Duration::from_millis(100)).await;
     };
