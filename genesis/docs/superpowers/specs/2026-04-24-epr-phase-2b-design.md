@@ -573,6 +573,10 @@ authorization. Mechanism: presents a capability grant? Delegation EPR?
 Reach-gated subscription enforcement needs a precise design. **Action:** Batch
 D task 4 design pass.
 
+Stage 1 implementation landed in Batch D.4: see `elohim/elohim-storage/src/p2p/subscription_auth.rs`. Stage 2/3 (capability proof) remains deferred.
+
+**Stage 1 implementation (Batch D.4):** Reframed from receive-side filtering to *graph-grounded reach with two faces*: (1) author-side earning at publish time (signer must have earned the declared reach; refused puts never enter local storage or hit the wire); (2) receiver-side pre-authorization classification (a topology decision: which scopes does this node have standing in?). Receive-side per-message filtering was rejected as the email-collapse anti-pattern (memory pin `project_reach_earned_at_authoring`): putting filter cost on receivers breaks the human-scale contract the protocol exists to preserve. Reach is coupled to embodied responsibilities at every node — authoring earning + receiver pre-authorization both derive from graph topology (memory pin `project_first_class_graph_pattern`). Stage 1 = structural projections (peer_identity_bindings); Stage 2/3 = graph walks (qahal household memberships, imagodei relationship attestations). Implementation: `elohim/elohim-storage/src/p2p/reach_authorization.rs` (author-side enforced at `FederatedEprStore::put`; receiver-side is a pure policy module ready for Phase 3+ subscription wiring).
+
 ### O3. Projector backfill semantics for non-idempotent historical EPRs
 Historical EPRs persisted before the projector existed — are they replayed
 on first projector start, or left unprojected until operator triggers? **Action:**

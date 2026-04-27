@@ -27,14 +27,14 @@
 //!      `provenance_gate_integration.rs`, `resilience_integration.rs`,
 //!      `schema_contract.rs`) are pure-Rust, no-conductor tests.
 //!    - The signal-subscription plumbing (Phase 1 Gap 1) IS now in place:
-//!        a) `HcClient::subscribe_infrastructure_signals(handler)` wraps
-//!           `AppWebsocket::on_signal` and msgpack-decodes the payload into
-//!           `InfrastructureSignal` — same pattern doorway uses for its
-//!           `ProjectionSignal` in `projection/subscriber.rs`.
-//!        b) `main.rs` spawns a subscriber task right after the heartbeat
-//!           `HcClient` connects on the `infrastructure` role; each decoded
-//!           `InfrastructureSignal` is routed into `signals::handle_signal`
-//!           against a dedicated Diesel pool.
+//!      a) `HcClient::subscribe_infrastructure_signals(handler)` wraps
+//!      `AppWebsocket::on_signal` and msgpack-decodes the payload into
+//!      `InfrastructureSignal` — same pattern doorway uses for its
+//!      `ProjectionSignal` in `projection/subscriber.rs`.
+//!      b) `main.rs` spawns a subscriber task right after the heartbeat
+//!      `HcClient` connects on the `infrastructure` role; each decoded
+//!      `InfrastructureSignal` is routed into `signals::handle_signal`
+//!      against a dedicated Diesel pool.
 //!      The only remaining blocker for deleting `#[ignore]` is the harness:
 //!      bring up a tmp conductor dir + happ (as `elohim-import`'s integration
 //!      tests do), hold the HTTP server up, and assert the SQLite projection

@@ -256,9 +256,9 @@ mod tests {
     #[test]
     fn test_multicodec_constants() {
         // Verify constants are in the private-use range (0x300000–0x3FFFFF)
-        assert!(EPR_HEAD_CODEC >= 0x300000 && EPR_HEAD_CODEC <= 0x3FFFFF);
-        assert!(EPR_DOCUMENT_CODEC >= 0x300000 && EPR_DOCUMENT_CODEC <= 0x3FFFFF);
-        assert!(EPR_RELATIONSHIP_CODEC >= 0x300000 && EPR_RELATIONSHIP_CODEC <= 0x3FFFFF);
+        const { assert!(EPR_HEAD_CODEC >= 0x300000 && EPR_HEAD_CODEC <= 0x3FFFFF) };
+        const { assert!(EPR_DOCUMENT_CODEC >= 0x300000 && EPR_DOCUMENT_CODEC <= 0x3FFFFF) };
+        const { assert!(EPR_RELATIONSHIP_CODEC >= 0x300000 && EPR_RELATIONSHIP_CODEC <= 0x3FFFFF) };
 
         // Verify they're distinct
         assert_ne!(EPR_HEAD_CODEC, EPR_DOCUMENT_CODEC);

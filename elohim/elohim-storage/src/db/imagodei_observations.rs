@@ -155,6 +155,7 @@ mod tests {
     fn test_ctx() -> AppContext {
         AppContext {
             h_app_id: "lamad".to_string(),
+            local_libp2p_peer_id: None,
         }
     }
 

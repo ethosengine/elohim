@@ -146,7 +146,7 @@ mod tests {
             .collect();
         let score = compute_anomaly_score(&obs);
         assert!(
-            score >= 0.0 && score <= 1.0,
+            (0.0..=1.0).contains(&score),
             "Score {} not in [0, 1]",
             score
         );

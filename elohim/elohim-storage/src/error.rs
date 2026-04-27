@@ -64,6 +64,13 @@ pub enum StorageError {
     #[error("Forbidden: {0}")]
     Forbidden(String),
 
+    /// Author-side reach earning refused (D.4 Stage 1).
+    ///
+    /// The signer has not earned the declared reach. The EPR was NOT persisted
+    /// and no network publication (Kad/gossip) occurred. HTTP 403.
+    #[error("Unauthorized: {0}")]
+    Unauthorized(String),
+
     #[error("Configuration error: {0}")]
     Config(String),
 

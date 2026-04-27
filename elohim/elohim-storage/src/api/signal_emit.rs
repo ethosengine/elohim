@@ -69,6 +69,7 @@ use tracing::{debug, warn};
 use crate::db::DbPool;
 use crate::error::StorageError;
 use crate::projector::mapping::{ManifestRegistry, RegisteredProjection};
+use crate::services::epr_kind::kind_canonical_str;
 use crate::services::epr_service::{ingest, EprIngestResult};
 use crate::services::response;
 use crate::signing::{ConductorSigningClient, SigningError};
@@ -243,10 +244,10 @@ pub fn prepare_signing_request(
     let kind = parse_epr_kind(&intent.signal_type)?;
 
     let projection = registry
-        .find_projection(&intent.pillar, kind_canonical(kind))
+        .find_projection(&intent.pillar, kind_canonical_str(kind))
         .ok_or_else(|| SignalEmitError::NoProjection {
             pillar: intent.pillar.clone(),
-            kind: kind_canonical(kind).to_string(),
+            kind: kind_canonical_str(kind).to_string(),
         })?;
 
     let agent_cid = Cid::from_str(&intent.agent_cid)
@@ -421,7 +422,7 @@ pub async fn handle(
     // Write-through gate (Task C.5). Failed before conductor round-trip so the
     // operator's intent (pillar OFF) costs no signing work. Integrity kinds
     // bypass via `WriteThroughState::effective_for`.
-    let kind_str = kind_canonical(prepared.kind);
+    let kind_str = kind_canonical_str(prepared.kind);
     let fallback_state = Arc::new(WriteThroughState::empty());
     let state_ref: &WriteThroughState = write_through_state
         .map(|arc| arc.as_ref())
@@ -510,20 +511,6 @@ fn parse_epr_kind(s: &str) -> Result<EprKind, SignalEmitError> {
         "Delegation" => EprKind::Delegation,
         other => return Err(SignalEmitError::UnsupportedKind(other.to_string())),
     })
-}
-
-fn kind_canonical(k: EprKind) -> &'static str {
-    match k {
-        EprKind::Content => "Content",
-        EprKind::Agent => "Agent",
-        EprKind::Manifest => "Manifest",
-        EprKind::Claim => "Claim",
-        EprKind::Observation => "Observation",
-        EprKind::EconomicEvent => "EconomicEvent",
-        EprKind::Commitment => "Commitment",
-        EprKind::Attestation => "Attestation",
-        EprKind::Delegation => "Delegation",
-    }
 }
 
 fn parse_reach(s: &str) -> Result<Reach, SignalEmitError> {

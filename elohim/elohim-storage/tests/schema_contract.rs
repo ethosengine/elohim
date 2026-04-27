@@ -162,6 +162,8 @@ fn p2p_status_view_matches_schema() {
             pending: 5,
         }),
         sync_paused: false,
+        dedup_unique_len: 42,
+        dedup_total_seen: 55,
     };
 
     let json = serde_json::to_value(&status).unwrap();
@@ -183,6 +185,8 @@ fn p2p_status_view_with_null_drain() {
         replication: ReplicationStatus::default(),
         drain: None,
         sync_paused: true,
+        dedup_unique_len: 0,
+        dedup_total_seen: 0,
     };
 
     let json = serde_json::to_value(&status).unwrap();

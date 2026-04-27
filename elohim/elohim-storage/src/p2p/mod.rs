@@ -29,19 +29,37 @@
 //! ```
 
 pub mod behaviour;
+pub mod dedup;
 pub mod epr_atom_protocol;
 pub mod epr_protocol;
+pub mod fanout;
 pub mod identity_binding_gossip;
 pub mod identity_handshake;
 pub mod identity_map;
 pub mod kad_store;
+pub mod reach_authorization;
 pub mod recovery_invitation;
 pub mod recovery_revocation;
 pub mod replication;
 pub mod shard_protocol;
 pub mod sync_protocol;
+pub mod topics;
 pub mod trust_cache;
 pub mod trust_protocol;
+
+// D.3: re-export topic helpers so callers have a single import surface.
+pub use topics::{topic_for, TOPIC_IDENTITY_BINDING, TOPIC_INTEGRITY_REVOCATION};
+// D.6: re-export DedupLru so callers can access it via the p2p module surface.
+pub use dedup::DedupLru;
+// D.4: re-export reach authorization types for callers (author-side earning +
+// receiver-side pre-authorization). The DB-backed resolver functions
+// (signer_is_known_agent, node_has_embodied_responsibility) are intentionally
+// NOT re-exported — they are internal to FederatedEprStore::put and the
+// Phase 3+ subscription wiring respectively.
+pub use reach_authorization::{
+    classify_pre_authorization, classify_reach_authorization, PreAuthorizationDecision,
+    ReachAuthDecision,
+};
 
 use futures::StreamExt;
 use libp2p::kad::{store::RecordStore, Record, RecordKey};
@@ -62,6 +80,28 @@ use tracing::{debug, error, info, warn};
 use ts_rs::TS;
 
 use crate::db::DbPool;
+
+// ---------------------------------------------------------------------------
+// EPR atom Kademlia constants
+// ---------------------------------------------------------------------------
+
+/// Kademlia key prefix for EPR atom provider records.
+///
+/// MUST stay consistent across `KadStartProviding` (D.4) and `KadGetProviders`
+/// (D.7). Both arms format the key as `"{EPR_ATOM_KAD_KEY_PREFIX}:{cid}"`.
+/// A single constant prevents silent key-space divergence from a typo.
+pub(crate) const EPR_ATOM_KAD_KEY_PREFIX: &str = "epr-atom";
+
+/// Timeout for Kademlia `get_providers` queries before falling back to
+/// local-only results.  epr_store.rs imports this constant so the value is
+/// expressed once and can be tuned from a single location.
+pub(crate) const KAD_GET_PROVIDERS_TIMEOUT: Duration = Duration::from_secs(5);
+
+/// Format a Kademlia key for an EPR atom CID.
+#[inline]
+pub(crate) fn kad_key_for_atom(cid: &str) -> String {
+    format!("{EPR_ATOM_KAD_KEY_PREFIX}:{cid}")
+}
 
 /// Map of pending EPR resolve requests: request ID → (requested content ID, reply sender)
 type PendingEprMap = Arc<
@@ -90,6 +130,16 @@ type PendingShardPushMap = Arc<
             request_response::OutboundRequestId,
             oneshot::Sender<Result<(), String>>,
         >,
+    >,
+>;
+
+/// D.7: Map of pending Kademlia `get_providers` queries.
+/// QueryId → (accumulated PeerIds, reply sender).
+/// Populated when `KadGetProviders` command is processed; resolved (and removed)
+/// when the query reaches `step.last == true` via `OutboundQueryProgressed`.
+type PendingKadGetProvidersMap = Arc<
+    tokio::sync::Mutex<
+        std::collections::HashMap<kad::QueryId, (Vec<PeerId>, oneshot::Sender<Vec<PeerId>>)>,
     >,
 >;
 
@@ -158,6 +208,7 @@ pub use epr_atom_protocol::{
     MAX_REQUEST_SIZE as EPR_ATOM_MAX_REQUEST_SIZE, MAX_RESPONSE_SIZE as EPR_ATOM_MAX_RESPONSE_SIZE,
 };
 pub use epr_protocol::{EprCodec, EprProtocol, EprRequest, EprResponse};
+pub use fanout::{channels_for_reach, FanoutChannel};
 pub use identity_map::{
     CallerIdentity, HolochainBackedPeerIdentityMap, PeerIdentityMap, StubIdentityMap,
 };
@@ -266,6 +317,15 @@ pub struct P2PNode {
     /// (via `with_db_pool`). Falls back to `StubIdentityMap` (always-Anonymous)
     /// when no pool is present (e.g. unit tests without a DB).
     identity_map: Arc<dyn identity_map::PeerIdentityMap>,
+    /// D.6: bounded LRU dedup cache for inbound EPR atom receive paths.
+    /// Drops duplicates from gossipsub + Kad + direct-notify redundancy.
+    /// In-memory only — restart clears the cache (acceptable; DB writes are
+    /// idempotent, so duplicate processing on restart is a non-issue).
+    dedup: Arc<dedup::DedupLru>,
+    /// D.7: pending Kademlia `get_providers` queries.
+    /// Populated by `handle_command(KadGetProviders)`, resolved when
+    /// `OutboundQueryProgressed { result: QueryResult::GetProviders(..), step.last }` fires.
+    pending_kad_get_providers: PendingKadGetProvidersMap,
 }
 
 /// Cached identify protocol info for a connected peer.
@@ -356,6 +416,13 @@ pub struct P2PStatusInfo {
     pub drain: Option<DrainStatusInfo>,
     /// True when sync/replication is paused for backpressure (bulk write in progress).
     pub sync_paused: bool,
+    /// D.7 dedup LRU: number of unique CIDs currently in the dedup window.
+    #[ts(type = "number")]
+    pub dedup_unique_len: usize,
+    /// D.7 dedup LRU: cumulative insert calls (new + duplicate).
+    /// Ratio `(dedup_total_seen - dedup_unique_len) / dedup_total_seen` approximates duplication rate.
+    #[ts(type = "number")]
+    pub dedup_total_seen: usize,
 }
 
 /// Per-peer detail from libp2p Swarm state.
@@ -450,6 +517,47 @@ pub enum P2PCommand {
     /// `KeyRevocationEffective` signals. Best-effort — subscriber discovery is
     /// eventual; publish failure does not affect projection correctness.
     PublishRecoveryRevocation(crate::p2p::recovery_revocation::RecoveryRevocationMessage),
+    /// Advertise that this node holds the EPR atom with the given CID by issuing
+    /// `kademlia.start_providing(...)`. Triggered by `FederatedEprStore::put`
+    /// when the fanout policy includes a Kad/KadLight channel for the EPR's reach.
+    /// Best-effort: failure to send (channel closed) or to start providing (DHT
+    /// rejection) is logged but does not affect the local put.
+    ///
+    /// Key prefix `epr-atom:{cid}` — distinct from `epr:{id}` used for EPR Head
+    /// put_record to clearly demarcate the atom federation track.
+    KadStartProviding { cid: String },
+    /// D.7: query Kademlia DHT for peers providing the given CID.
+    ///
+    /// The reply channel receives the accumulated list of PeerIds once the query
+    /// reaches `step.last == true` (or empty Vec on timeout / no providers).
+    /// Key `epr-atom:{cid}` — matches the key used by D.2's `KadStartProviding`.
+    KadGetProviders {
+        cid: String,
+        reply: oneshot::Sender<Vec<PeerId>>,
+    },
+    /// Publish an EPR atom announce to a gossipsub topic. Triggered by
+    /// `FederatedEprStore::put` when the fanout policy includes a Gossip channel.
+    ///
+    /// `topic` is the fully-qualified gossipsub topic name built by
+    /// `p2p::topics::topic_for`. `payload` is a MessagePack-encoded CID string
+    /// (announce-only; receivers fetch the full atom via the EPR atom protocol
+    /// if they want the payload).
+    ///
+    /// Best-effort: failure is logged but does NOT block the local put.
+    PublishEprAnnounce { topic: String, payload: Vec<u8> },
+    /// D.5: direct-notify integrity event to a list of peers via
+    /// `/elohim/epr-atom/1.0.0` request-response. Used by
+    /// `ReconcileController::on_key_revocation` to send the revocation payload
+    /// directly to peers known to have been bound to the revoked agent.
+    ///
+    /// Best-effort: per-peer send failures are logged but do not block the
+    /// controller loop. Peers that miss the direct-notify will still learn of
+    /// the revocation via the gossipsub and Kademlia channels (D.2/D.3).
+    DirectNotifyIntegrity {
+        peer_ids: Vec<PeerId>,
+        kind: String,
+        payload_bytes: Vec<u8>,
+    },
 }
 
 /// RAII guard that resumes P2P sync when dropped.
@@ -483,6 +591,14 @@ impl P2PHandle {
     /// Get the latest P2P status snapshot
     pub fn status(&self) -> P2PStatusInfo {
         self.status_rx.borrow().clone()
+    }
+
+    /// Return the local libp2p PeerId as a base58-encoded string.
+    ///
+    /// Used by `HttpServer` to populate `AppContext::local_libp2p_peer_id` so
+    /// that `FederatedEprStore` can dedup self-reports from the providers list.
+    pub fn local_peer_id(&self) -> String {
+        self.status_rx.borrow().peer_id.clone()
     }
 
     /// Return a clone of the P2P command sender.
@@ -544,6 +660,13 @@ impl P2PHandle {
                     P2PCommand::PublishRecoveryInvitation(_) => {} // fire-and-forget
                     P2PCommand::PublishIdentityBinding(_) => {} // fire-and-forget
                     P2PCommand::PublishRecoveryRevocation(_) => {} // fire-and-forget
+                    P2PCommand::KadStartProviding { .. } => {} // fire-and-forget
+                    P2PCommand::PublishEprAnnounce { .. } => {} // fire-and-forget
+                    P2PCommand::DirectNotifyIntegrity { .. } => {} // fire-and-forget (D.5 best-effort)
+                    P2PCommand::KadGetProviders { reply, .. } => {
+                        // D.7 stub: no swarm in test, always return empty.
+                        let _ = reply.send(vec![]);
+                    }
                 }
             }
         });
@@ -560,6 +683,8 @@ impl P2PHandle {
             replication: crate::p2p::replication::ReplicationStatus::default(),
             drain: None,
             sync_paused: false,
+            dedup_unique_len: 0,
+            dedup_total_seen: 0,
         };
         let (status_tx, status_rx) = watch::channel(initial_status);
         // Keep sender alive so the receiver never sees "sender dropped"
@@ -985,6 +1110,8 @@ impl P2PNode {
             replication: replication::ReplicationStatus::default(),
             drain: None,
             sync_paused: false,
+            dedup_unique_len: 0,
+            dedup_total_seen: 0,
         };
         let (status_tx, _) = tokio::sync::watch::channel(initial_status);
 
@@ -1034,6 +1161,10 @@ impl P2PNode {
             peer_metrics: Arc::new(DashMap::new()),
             sync_paused: Arc::new(AtomicBool::new(false)),
             identity_map,
+            dedup: Arc::new(dedup::DedupLru::new()),
+            pending_kad_get_providers: Arc::new(tokio::sync::Mutex::new(
+                std::collections::HashMap::new(),
+            )),
         })
     }
 
@@ -1057,6 +1188,18 @@ impl P2PNode {
     ) -> Self {
         self.policy_enforcement = Some(enforcement);
         self
+    }
+
+    /// D.6: Return dedup cache stats as `(unique_len, total_seen)`.
+    ///
+    /// `unique_len` is the current number of unique CIDs in the LRU window.
+    /// `total_seen` is the cumulative count of all insert calls (new + duplicate).
+    /// The ratio `(total_seen - unique_len) / total_seen` approximates duplication rate.
+    ///
+    /// Uses `DedupLru::stats()` for an atomic consistent snapshot.
+    /// Values are surfaced in `P2PStatusInfo::dedup_unique_len` / `dedup_total_seen`.
+    pub fn dedup_stats(&self) -> (usize, usize) {
+        self.dedup.stats()
     }
 
     /// Set the extraction cache for delivery capability queries.
@@ -1514,6 +1657,92 @@ impl P2PNode {
                         "Failed to encode RecoveryRevocationMessage"
                     ),
                 }
+            }
+            // D.2: announce atom provider record to Kademlia DHT.
+            // Key: EPR_ATOM_KAD_KEY_PREFIX + ":" + cid — distinct from `epr:{id}` (EPR Head put_record).
+            P2PCommand::KadStartProviding { cid } => {
+                let key = RecordKey::new(&kad_key_for_atom(&cid));
+                match swarm.behaviour_mut().kademlia.start_providing(key) {
+                    Ok(_) => info!(
+                        target: "elohim_storage::epr",
+                        cid = %cid,
+                        "kad_start_providing: advertised atom CID to DHT"
+                    ),
+                    Err(e) => warn!(
+                        target: "elohim_storage::epr",
+                        cid = %cid,
+                        error = ?e,
+                        "kad_start_providing: DHT start_providing failed"
+                    ),
+                }
+            }
+            // D.7: query Kademlia DHT for providers of the EPR atom CID.
+            // Issues `get_providers` and registers the query in `pending_kad_get_providers`
+            // so that `OutboundQueryProgressed { GetProviders }` events can resolve it.
+            P2PCommand::KadGetProviders { cid, reply } => {
+                let key = RecordKey::new(&kad_key_for_atom(&cid));
+                let query_id = swarm.behaviour_mut().kademlia.get_providers(key);
+                debug!(
+                    target: "elohim_storage::epr",
+                    cid = %cid,
+                    query_id = ?query_id,
+                    "kad_get_providers: issued DHT provider query"
+                );
+                self.pending_kad_get_providers
+                    .lock()
+                    .await
+                    .insert(query_id, (Vec::new(), reply));
+            }
+            // D.3: publish EPR atom announce to a reach-scoped gossipsub topic.
+            // topic built by p2p::topics::topic_for; payload is msgpack-encoded CID.
+            // Best-effort — publish failure (e.g. no peers subscribed) is logged and
+            // does not affect the local put or Kad advertisement.
+            P2PCommand::PublishEprAnnounce { topic, payload } => {
+                let gsub_topic = libp2p::gossipsub::IdentTopic::new(&topic);
+                match swarm.behaviour_mut().gossipsub.publish(gsub_topic, payload) {
+                    Ok(msg_id) => info!(
+                        target: "elohim_storage::epr",
+                        topic = %topic,
+                        message_id = ?msg_id,
+                        "publish_epr_announce: published atom announce to gossipsub"
+                    ),
+                    Err(e) => warn!(
+                        target: "elohim_storage::epr",
+                        topic = %topic,
+                        error = ?e,
+                        "publish_epr_announce: gossipsub publish failed (often: no peers subscribed yet)"
+                    ),
+                }
+            }
+            // D.5: send IntegrityNotify to each affected peer via /elohim/epr-atom/1.0.0.
+            // Best-effort: per-peer failures are logged but don't block.
+            P2PCommand::DirectNotifyIntegrity {
+                peer_ids,
+                kind,
+                payload_bytes,
+            } => {
+                for peer_id in &peer_ids {
+                    let req = EprAtomRequest::IntegrityNotify {
+                        kind: kind.clone(),
+                        payload_bytes: payload_bytes.clone(),
+                    };
+                    let _request_id = swarm
+                        .behaviour_mut()
+                        .epr_atom_protocol
+                        .send_request(peer_id, req);
+                    info!(
+                        target: "elohim_storage::integrity",
+                        peer = %peer_id,
+                        kind = %kind,
+                        "D.5: sent IntegrityNotify to peer"
+                    );
+                }
+                debug!(
+                    target: "elohim_storage::integrity",
+                    kind = %kind,
+                    peer_count = peer_ids.len(),
+                    "D.5: DirectNotifyIntegrity dispatched to all peers"
+                );
             }
         }
     }
@@ -2138,6 +2367,80 @@ impl P2PNode {
             }) => {
                 if is_new_peer {
                     debug!(peer = %peer, "New peer added to Kademlia routing table");
+                }
+            }
+            // D.7: handle progressive GetProviders results.
+            // `FoundProviders` may arrive multiple times for a single query (kad emits
+            // one event per batch of discovered providers). Accumulate into
+            // `pending_kad_get_providers` until `step.last` fires, then deliver.
+            behaviour::ElohimStorageBehaviourEvent::Kademlia(
+                kad::Event::OutboundQueryProgressed {
+                    id,
+                    result:
+                        kad::QueryResult::GetProviders(Ok(kad::GetProvidersOk::FoundProviders {
+                            providers,
+                            ..
+                        })),
+                    step,
+                    ..
+                },
+            ) => {
+                let mut pending = self.pending_kad_get_providers.lock().await;
+                if let Some((acc, _)) = pending.get_mut(&id) {
+                    acc.extend(providers);
+                }
+                if step.last {
+                    if let Some((acc, tx)) = pending.remove(&id) {
+                        debug!(
+                            target: "elohim_storage::epr",
+                            query_id = ?id,
+                            provider_count = acc.len(),
+                            "kad_get_providers: query finished with providers (step.last)"
+                        );
+                        let _ = tx.send(acc);
+                    }
+                }
+            }
+            behaviour::ElohimStorageBehaviourEvent::Kademlia(
+                kad::Event::OutboundQueryProgressed {
+                    id,
+                    result:
+                        kad::QueryResult::GetProviders(Ok(
+                            kad::GetProvidersOk::FinishedWithNoAdditionalRecord { .. },
+                        )),
+                    step,
+                    ..
+                },
+            ) => {
+                if step.last {
+                    let mut pending = self.pending_kad_get_providers.lock().await;
+                    if let Some((acc, tx)) = pending.remove(&id) {
+                        debug!(
+                            target: "elohim_storage::epr",
+                            query_id = ?id,
+                            provider_count = acc.len(),
+                            "kad_get_providers: query finished (no additional records, step.last)"
+                        );
+                        let _ = tx.send(acc);
+                    }
+                }
+            }
+            behaviour::ElohimStorageBehaviourEvent::Kademlia(
+                kad::Event::OutboundQueryProgressed {
+                    id,
+                    result: kad::QueryResult::GetProviders(Err(e)),
+                    ..
+                },
+            ) => {
+                let mut pending = self.pending_kad_get_providers.lock().await;
+                if let Some((_, tx)) = pending.remove(&id) {
+                    warn!(
+                        target: "elohim_storage::epr",
+                        query_id = ?id,
+                        error = ?e,
+                        "kad_get_providers: query failed — returning empty provider list"
+                    );
+                    let _ = tx.send(Vec::new());
                 }
             }
             behaviour::ElohimStorageBehaviourEvent::Kademlia(event) => {
@@ -2798,24 +3101,132 @@ impl P2PNode {
                         } else if message.topic.as_str() == RECOVERY_REVOCATION_TOPIC {
                             // M4: subscribe/log stub. Active consumer logic lands in M5
                             // (elohim defender + UI). Log is the seam M5 hooks into.
+                            // TODO: factor shared body into handle_revocation_message helper
+                            // once the event-loop borrow structure allows it (see arm below).
                             match crate::p2p::recovery_revocation::RecoveryRevocationMessage::from_bytes(
                                 &message.data,
                             ) {
-                                Ok(msg) => info!(
-                                    target: "recovery.revocation.inbound",
-                                    from = %propagation_source,
-                                    message_id = ?message_id,
-                                    revocation_id = %msg.revocation_id,
-                                    human_id = %msg.human_id,
-                                    status = %msg.status,
-                                    "Received recovery revocation"
-                                ),
+                                Ok(msg) => {
+                                    // D.6 wire point B: dedup on the same synthetic key as
+                                    // the direct-notify path (wire point C) so a revocation
+                                    // arriving via gossipsub after direct-notify (or vice
+                                    // versa) is dropped before any projection work.
+                                    // Synthetic dedup key: `KeyRevocation:{revocation_id}` namespace. UUIDs
+                                    // don't collide with EPR CIDs (which start with "bafy"). Future integrity
+                                    // kinds should use `KeyRotation:{id}` / `AgentPeerBinding:{id}` etc. — the
+                                    // namespace prefix prevents cross-kind collisions even if id formats overlap.
+                                    let dedup_key =
+                                        format!("KeyRevocation:{}", msg.revocation_id);
+                                    if !self.dedup.insert(&dedup_key) {
+                                        debug!(
+                                            target: "elohim_storage::dedup",
+                                            from = %propagation_source,
+                                            revocation_id = %msg.revocation_id,
+                                            "duplicate gossip revocation — dropped"
+                                        );
+                                    } else {
+                                        info!(
+                                            target: "recovery.revocation.inbound",
+                                            from = %propagation_source,
+                                            message_id = ?message_id,
+                                            revocation_id = %msg.revocation_id,
+                                            human_id = %msg.human_id,
+                                            status = %msg.status,
+                                            "Received recovery revocation"
+                                        );
+                                    }
+                                }
                                 Err(e) => warn!(
                                     target: "recovery.revocation.inbound",
                                     from = %propagation_source,
                                     error = ?e,
                                     "Failed to decode RecoveryRevocationMessage"
                                 ),
+                            }
+                        } else if message.topic.as_str()
+                            == crate::p2p::topics::TOPIC_INTEGRITY_REVOCATION
+                        {
+                            // D.6 Fix 1 (CRITICAL): canonical integrity-revocation topic arm.
+                            // TOPIC_INTEGRITY_REVOCATION = "elohim/integrity/revocation" is the
+                            // new canonical name. M3/M4 publishers still use RECOVERY_REVOCATION_TOPIC
+                            // = "recovery.revocation" (arm above); new publishers (D.5+) use this name.
+                            // BOTH arms must route to the same handler with the same dedup key.
+                            // TODO: factor into handle_revocation_message helper when event-loop
+                            // borrow structure permits; body kept in sync with RECOVERY_REVOCATION_TOPIC arm.
+                            match crate::p2p::recovery_revocation::RecoveryRevocationMessage::from_bytes(
+                                &message.data,
+                            ) {
+                                Ok(msg) => {
+                                    // Same synthetic dedup key as wire points B and C — cross-channel
+                                    // dedup contract from D.6: regardless of which topic name a
+                                    // revocation arrives on, KeyRevocation:{revocation_id} is the key.
+                                    // See first KeyRevocation: dedup site for namespace rationale.
+                                    let dedup_key =
+                                        format!("KeyRevocation:{}", msg.revocation_id);
+                                    if !self.dedup.insert(&dedup_key) {
+                                        debug!(
+                                            target: "elohim_storage::dedup",
+                                            from = %propagation_source,
+                                            revocation_id = %msg.revocation_id,
+                                            topic = crate::p2p::topics::TOPIC_INTEGRITY_REVOCATION,
+                                            "duplicate integrity/revocation gossip — dropped"
+                                        );
+                                    } else {
+                                        info!(
+                                            target: "recovery.revocation.inbound",
+                                            from = %propagation_source,
+                                            message_id = ?message_id,
+                                            revocation_id = %msg.revocation_id,
+                                            human_id = %msg.human_id,
+                                            status = %msg.status,
+                                            topic = crate::p2p::topics::TOPIC_INTEGRITY_REVOCATION,
+                                            "Received recovery revocation (canonical topic)"
+                                        );
+                                    }
+                                }
+                                Err(e) => warn!(
+                                    target: "recovery.revocation.inbound",
+                                    from = %propagation_source,
+                                    error = ?e,
+                                    topic = crate::p2p::topics::TOPIC_INTEGRITY_REVOCATION,
+                                    "Failed to decode RecoveryRevocationMessage (canonical topic)"
+                                ),
+                            }
+                        } else if message.topic.as_str().starts_with("elohim/") {
+                            // D.6 wire point B (gossipsub EPR announce): per-pillar
+                            // reach-scoped topics carry a msgpack-encoded CID string
+                            // (announce-only; receivers fetch the full atom via EPR atom
+                            // protocol if wanted). Stage 1: decode CID + dedup only.
+                            // Full receive-side projection is downstream (Phase 3+).
+                            match rmp_serde::from_slice::<String>(&message.data) {
+                                Ok(cid) => {
+                                    if !self.dedup.insert(&cid) {
+                                        debug!(
+                                            target: "elohim_storage::dedup",
+                                            from = %propagation_source,
+                                            topic = %message.topic,
+                                            cid = %cid,
+                                            "duplicate gossip announce — dropped"
+                                        );
+                                    } else {
+                                        debug!(
+                                            target: "elohim_storage::epr",
+                                            from = %propagation_source,
+                                            topic = %message.topic,
+                                            cid = %cid,
+                                            "gossip EPR announce (deduped; full fetch deferred to Phase 3+)"
+                                        );
+                                    }
+                                }
+                                Err(e) => {
+                                    debug!(
+                                        target: "elohim_storage::epr",
+                                        from = %propagation_source,
+                                        topic = %message.topic,
+                                        error = %e,
+                                        "gossip EPR announce: msgpack decode failed"
+                                    );
+                                }
                             }
                         } else {
                             debug!(topic = %message.topic, "Gossipsub message on untracked topic");
@@ -3668,6 +4079,44 @@ impl P2PNode {
                 }
             }
             EprAtomRequest::Announce { envelope_bytes } => {
+                // D.6: decode the envelope first (CBOR only — no DB I/O) to
+                // extract the CID string cheaply, then dedup-check before
+                // committing the pool connection or running ingest.
+                let epr: elohim_epr::Epr =
+                    match ciborium::de::from_reader(envelope_bytes.as_slice()) {
+                        Ok(e) => e,
+                        Err(err) => {
+                            debug!(
+                                bytes = envelope_bytes.len(),
+                                reason = %err,
+                                "EPR atom announce: cbor decode failed"
+                            );
+                            return EprAtomResponse::Announced {
+                                accepted: false,
+                                reason: Some(format!("cbor decode: {err}")),
+                            };
+                        }
+                    };
+                let cid_str = epr.envelope.cid.to_string();
+
+                // D.6 wire point A: dedup on CID before DB connection + ingest.
+                if !self.dedup.insert(&cid_str) {
+                    debug!(
+                        target: "elohim_storage::dedup",
+                        from = %peer,
+                        cid = %cid_str,
+                        "duplicate Announce — dropped (no-op)"
+                    );
+                    // D.6: dedup hit. Respond accepted=false so the sender doesn't treat this
+                    // as a fresh acceptance, but include reason so they don't retry. The atom
+                    // is already persisted from the original delivery (LocalEprStore::put is
+                    // idempotent), so accepted=false here means "no NEW ingestion happened."
+                    return EprAtomResponse::Announced {
+                        accepted: false,
+                        reason: Some("duplicate (already seen)".to_string()),
+                    };
+                }
+
                 let Some(pool) = self.db_pool.as_ref() else {
                     warn!(
                         bytes = envelope_bytes.len(),
@@ -3689,10 +4138,9 @@ impl P2PNode {
                     }
                 };
 
-                match crate::services::epr_service::ingest_from_wire_bytes(
-                    &mut conn,
-                    &envelope_bytes,
-                ) {
+                // Call ingest() directly with the already-decoded Epr — avoids
+                // a second CBOR decode that ingest_from_wire_bytes would do.
+                match crate::services::epr_service::ingest(&mut conn, epr) {
                     Ok(ingested) => {
                         debug!(
                             cid = %ingested.cid,
@@ -3786,6 +4234,83 @@ impl P2PNode {
                     "EPR atom fetch batch completed"
                 );
                 EprAtomResponse::AtomBatch { atoms }
+            }
+            // D.5: direct-notify of an integrity event from a peer.
+            // Stage 1: only KeyRevocation is handled; other kinds are accepted
+            // but logged as not-yet-handled. Receivers decode by kind and route
+            // to the same handler the gossipsub receive path uses.
+            EprAtomRequest::IntegrityNotify {
+                kind,
+                payload_bytes,
+            } => {
+                match kind.as_str() {
+                    "KeyRevocation" => {
+                        match crate::p2p::recovery_revocation::RecoveryRevocationMessage::from_bytes(
+                            &payload_bytes,
+                        ) {
+                            Ok(msg) => {
+                                // D.6 wire point C: dedup on synthetic KeyRevocation:<id>
+                                // key. Same revocation arriving via direct-notify + gossipsub
+                                // will not double-process after the first delivery.
+                                // See first KeyRevocation: dedup site (wire B) for namespace rationale.
+                                let dedup_key = format!("KeyRevocation:{}", msg.revocation_id);
+                                if !self.dedup.insert(&dedup_key) {
+                                    debug!(
+                                        target: "elohim_storage::dedup",
+                                        from = %peer,
+                                        revocation_id = %msg.revocation_id,
+                                        "duplicate KeyRevocation direct-notify — dropped"
+                                    );
+                                    return EprAtomResponse::IntegrityAck {
+                                        received: true,
+                                        reason: Some("duplicate".to_string()),
+                                    };
+                                }
+                                info!(
+                                    target: "elohim_storage::recovery",
+                                    from = %peer,
+                                    revocation_id = %msg.revocation_id,
+                                    human_id = %msg.human_id,
+                                    status = %msg.status,
+                                    "D.5: Received KeyRevocation via direct-notify"
+                                );
+                                // The gossipsub receive path for RECOVERY_REVOCATION_TOPIC
+                                // currently logs only. When that path adds projection logic,
+                                // factor it into a shared helper and call it from both
+                                // direct-notify + gossipsub paths. For now, structural
+                                // receive + log is sufficient.
+                                EprAtomResponse::IntegrityAck {
+                                    received: true,
+                                    reason: None,
+                                }
+                            }
+                            Err(e) => {
+                                warn!(
+                                    target: "elohim_storage::recovery",
+                                    from = %peer,
+                                    error = %e,
+                                    "D.5: Failed to decode RecoveryRevocationMessage from direct-notify"
+                                );
+                                EprAtomResponse::IntegrityAck {
+                                    received: false,
+                                    reason: Some(format!("decode failed: {e}")),
+                                }
+                            }
+                        }
+                    }
+                    _ => {
+                        warn!(
+                            target: "elohim_storage::integrity",
+                            from = %peer,
+                            kind = %kind,
+                            "D.5: Received IntegrityNotify with unhandled kind — Stage 2/3 will add handlers"
+                        );
+                        EprAtomResponse::IntegrityAck {
+                            received: false,
+                            reason: Some(format!("unhandled integrity kind: {kind}")),
+                        }
+                    }
+                }
             }
         }
     }
@@ -4301,6 +4826,7 @@ impl P2PNode {
             None
         };
 
+        let (dedup_unique_len, dedup_total_seen) = self.dedup.stats();
         let status = P2PStatusInfo {
             peer_id: self.peer_id().to_string(),
             listen_addresses,
@@ -4314,6 +4840,8 @@ impl P2PNode {
             replication,
             drain,
             sync_paused: self.sync_paused.load(Ordering::Acquire),
+            dedup_unique_len,
+            dedup_total_seen,
         };
         let _ = self.status_tx.send(status);
     }
