@@ -28,9 +28,15 @@ COPY elohim/constitution ./elohim/constitution
 COPY elohim/elohim-agent/elohim-agent-service ./elohim/elohim-agent/elohim-agent-service
 COPY elohim/elohim-agent/gate-client ./elohim/elohim-agent/gate-client
 COPY elohim/elohim-agent/gate-types ./elohim/elohim-agent/gate-types
+# elohim-agent-service path-deps elohim-agent-defender-specialist (the defender
+# stub crate added in dc945de2). The workspace lists it as a member, so cargo
+# resolves the path even from the agent-service dependency edge — must be
+# copied or the build fails with `failed to read .../specialists/defender/Cargo.toml`.
+COPY elohim/elohim-agent/specialists/defender ./elohim/elohim-agent/specialists/defender
 
 # Prune workspace members that aren't copied into the build context.
-# Keeps: constitution, elohim-agent-service, gate-client, gate-types (and elohim-compute via members list).
+# Keeps: constitution, elohim-agent-service, gate-client, gate-types,
+#   specialists/defender (and elohim-compute via members list).
 # Removes: gate-client-zome, eae, elohim-token (not needed for doorway build).
 RUN sed -i '/"elohim-agent\/gate-client-zome"/d; /"eae"/d; /"elohim-token"/d' elohim/Cargo.toml
 
