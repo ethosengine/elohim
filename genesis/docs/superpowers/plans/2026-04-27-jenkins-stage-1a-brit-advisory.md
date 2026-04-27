@@ -217,22 +217,32 @@ Locate the line just before the main script body (after all helper function defi
 # ── Brit advisory (Stage 1a) ─────────────────────────────────────
 # Runs brit verify + brit plan as advisory checks. Warn-only — never fails push.
 # Stage 2: becomes load-bearing (failure blocks push). Stage 1a: gather signal.
+#
+# IMPORTANT: REPO_ROOT is NOT set by git when invoking pre-push hooks in
+# production. We derive the helper path via git rev-parse — git hooks run with
+# CWD set to the repo root, but using rev-parse is more robust to future CWD
+# changes. The helper itself defaults its own ${REPO_ROOT:-/projects/elohim}
+# fallback when invoked without it being exported.
 brit_advisory() {
-    HELPER="${REPO_ROOT}/genesis/orchestrator/scripts/brit-helper.sh"
-    if [ ! -x "$HELPER" ]; then
-        return 0  # helper not present (e.g., older branch); silently skip
-    fi
-    echo ""
-    echo "── brit advisory (Stage 1a — warn-only) ─────────────────────"
-    REPO_ROOT="$REPO_ROOT" "$HELPER" verify
-    # plan against origin/dev (the merge target); if origin/dev is unreachable, skip.
-    if git rev-parse --verify origin/dev >/dev/null 2>&1; then
-        REPO_ROOT="$REPO_ROOT" "$HELPER" plan --since origin/dev
-    else
-        echo "[brit-helper] WARN: origin/dev not reachable; plan advisory skipped" >&2
-    fi
-    echo "── end brit advisory ─────────────────────────────────────────"
-    return 0  # never fails the hook
+  REPO_TOPLEVEL="$(git rev-parse --show-toplevel 2>/dev/null)"
+  if [ -z "$REPO_TOPLEVEL" ]; then
+    return 0  # not in a git repo (shouldn't happen for pre-push); silent skip
+  fi
+  HELPER="$REPO_TOPLEVEL/genesis/orchestrator/scripts/brit-helper.sh"
+  if [ ! -x "$HELPER" ]; then
+    return 0  # helper not present (e.g., older branch); silently skip
+  fi
+  echo ""
+  echo "── brit advisory (Stage 1a — warn-only) ─────────────────────"
+  REPO_ROOT="$REPO_TOPLEVEL" "$HELPER" verify
+  # plan against origin/dev (the merge target); if origin/dev is unreachable, skip.
+  if git rev-parse --verify origin/dev >/dev/null 2>&1; then
+    REPO_ROOT="$REPO_TOPLEVEL" "$HELPER" plan --since origin/dev
+  else
+    echo "[brit-helper] WARN: origin/dev not reachable; plan advisory skipped" >&2
+  fi
+  echo "── end brit advisory ─────────────────────────────────────────"
+  return 0  # never fails the hook
 }
 ```
 
