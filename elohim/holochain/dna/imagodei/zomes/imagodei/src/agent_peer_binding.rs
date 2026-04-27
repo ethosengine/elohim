@@ -58,10 +58,16 @@ pub struct CreateAgentPeerBindingOutput {
 ///
 /// `#[serde(rename_all = "camelCase")]` so the JSON keys (`peerId`, `agentCid`,
 /// `validFromMicros`, etc.) match what Angular / sweettests assert.
+///
+/// `action_hash` and `superseded_by` are `ActionHashB64` (base64 string with
+/// `uhCkk` prefix) rather than raw `ActionHash` so the view round-trips
+/// through `Vec<serde_json::Value>` reads in sweettests — msgpack `BIN`
+/// (raw bytes) has no `Value` variant. Typed Rust consumers can still
+/// recover the `ActionHash` via `ActionHash::from(b64)`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AgentPeerBindingView {
-    pub action_hash: ActionHash,
+    pub action_hash: ActionHashB64,
     pub peer_id: String,
     pub agent_cid: String,
     /// UTC validity start, microseconds since epoch.
@@ -70,7 +76,7 @@ pub struct AgentPeerBindingView {
     pub valid_until_micros: Option<i64>,
     pub device_archetype: String,
     /// ActionHash of the binding that supersedes this one; `None` when current.
-    pub superseded_by: Option<ActionHash>,
+    pub superseded_by: Option<ActionHashB64>,
 }
 
 impl AgentPeerBindingView {
@@ -82,13 +88,13 @@ impl AgentPeerBindingView {
             DeviceArchetype::Steward => "steward".to_string(),
         };
         AgentPeerBindingView {
-            action_hash,
+            action_hash: action_hash.into(),
             peer_id: b.peer_id,
             agent_cid: b.agent_cid,
             valid_from_micros: b.valid_from.as_micros(),
             valid_until_micros: b.valid_until.map(|t| t.as_micros()),
             device_archetype: archetype_str,
-            superseded_by: b.superseded_by,
+            superseded_by: b.superseded_by.map(|h| h.into()),
         }
     }
 }
