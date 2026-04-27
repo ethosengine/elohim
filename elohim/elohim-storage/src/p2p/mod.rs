@@ -586,6 +586,14 @@ impl P2PHandle {
         self.status_rx.borrow().clone()
     }
 
+    /// Return the local libp2p PeerId as a base58-encoded string.
+    ///
+    /// Used by `HttpServer` to populate `AppContext::local_libp2p_peer_id` so
+    /// that `FederatedEprStore` can dedup self-reports from the providers list.
+    pub fn local_peer_id(&self) -> String {
+        self.status_rx.borrow().peer_id.clone()
+    }
+
     /// Return a clone of the P2P command sender.
     ///
     /// Used by `ReconcileController::with_swarm_tx` (Task A.10) to wire the

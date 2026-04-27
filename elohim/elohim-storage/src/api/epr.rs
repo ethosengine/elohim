@@ -173,6 +173,7 @@ async fn get_epr(
         .map(|q| q.contains("includeCanonical=true"))
         .unwrap_or(false);
 
+    // TODO(phase-2b): wire ctx.local_libp2p_peer_id once fetch dedup is needed
     let store = default_epr_store(None, None, None, None);
     let mut conn = get_conn(pool)?;
 
@@ -205,6 +206,7 @@ async fn get_envelope(
     pool: &DbPool,
     _ctx: &AppContext,
 ) -> Result<Response<Full<Bytes>>, StorageError> {
+    // TODO(phase-2b): wire ctx.local_libp2p_peer_id once fetch dedup is needed
     let store = default_epr_store(None, None, None, None);
     let mut conn = get_conn(pool)?;
 
@@ -236,6 +238,7 @@ async fn get_payload(
     pool: &DbPool,
     _ctx: &AppContext,
 ) -> Result<Response<Full<Bytes>>, StorageError> {
+    // TODO(phase-2b): wire ctx.local_libp2p_peer_id once fetch dedup is needed
     let store = default_epr_store(None, None, None, None);
     let mut conn = get_conn(pool)?;
 
@@ -285,6 +288,7 @@ async fn get_verify(
     let mut pk = [0u8; 32];
     pk.copy_from_slice(&pk_bytes);
 
+    // TODO(phase-2b): wire ctx.local_libp2p_peer_id once verify dedup is needed
     let store = default_epr_store(None, None, None, None);
     let mut conn = get_conn(pool)?;
 
@@ -328,10 +332,16 @@ async fn get_providers(
     req: Request<Incoming>,
     cid: &str,
     pool: &DbPool,
-    _ctx: &AppContext,
+    ctx: &AppContext,
     swarm_tx: Option<tokio::sync::mpsc::Sender<crate::p2p::P2PCommand>>,
 ) -> Result<Response<Full<Bytes>>, StorageError> {
-    let store = default_epr_store(swarm_tx, Some(pool.clone()), None, None);
+    // D.7: pass local PeerId so FederatedEprStore deduplicates self from providers list
+    let store = default_epr_store(
+        swarm_tx,
+        Some(pool.clone()),
+        None,
+        ctx.local_libp2p_peer_id.clone(),
+    );
     let mut conn = get_conn(pool)?;
 
     // Reach check: we need to know the atom's reach to enforce, but if the
@@ -369,7 +379,7 @@ async fn put_epr(
     req: Request<Incoming>,
     path_cid: &str,
     pool: &DbPool,
-    _ctx: &AppContext,
+    ctx: &AppContext,
     swarm_tx: Option<tokio::sync::mpsc::Sender<crate::p2p::P2PCommand>>,
 ) -> Result<Response<Full<Bytes>>, StorageError> {
     use elohim_epr::{Coupling, Envelope, Epr, EprKind, Reach, Signature};
@@ -494,7 +504,13 @@ async fn put_epr(
 
     // D.4: pass pool so FederatedEprStore can resolve signer_is_known_agent.
     // local_agent_cid is None until the conductor signing client is wired (see TODO).
-    let store = default_epr_store(swarm_tx, Some(pool.clone()), None, None);
+    // D.7: pass local PeerId for self-dedup consistency with get_providers.
+    let store = default_epr_store(
+        swarm_tx,
+        Some(pool.clone()),
+        None,
+        ctx.local_libp2p_peer_id.clone(),
+    );
     let mut conn = get_conn(pool)?;
     let result = store.put(&mut conn, epr)?;
 
@@ -519,6 +535,7 @@ async fn list_epr(
     _ctx: &AppContext,
 ) -> Result<Response<Full<Bytes>>, StorageError> {
     use crate::db::epr_atoms::EprListQuery;
+    // TODO(phase-2b): wire ctx.local_libp2p_peer_id if list gains peer-aware filtering
 
     let query = req.uri().query().unwrap_or("");
 

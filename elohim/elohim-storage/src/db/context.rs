@@ -8,6 +8,9 @@
 pub struct AppContext {
     /// Holochain application identifier for scoping database operations
     pub h_app_id: String,
+    /// Local libp2p PeerId (base58-encoded) for self-dedup in FederatedEprStore.
+    /// None when no P2P swarm is configured (tests, Tauri-only builds).
+    pub local_libp2p_peer_id: Option<String>,
 }
 
 impl AppContext {
@@ -15,6 +18,7 @@ impl AppContext {
     pub fn new(h_app_id: impl Into<String>) -> Self {
         Self {
             h_app_id: h_app_id.into(),
+            local_libp2p_peer_id: None,
         }
     }
 

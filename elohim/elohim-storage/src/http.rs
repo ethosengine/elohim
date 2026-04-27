@@ -624,6 +624,7 @@ impl HttpServer {
                     if let Some(ref registry) = self.manifest_registry {
                         let app_ctx = crate::db::AppContext {
                             h_app_id: "elohim".to_string(),
+                            local_libp2p_peer_id: None,
                         };
                         crate::api::projector_status::handle(
                             req,
@@ -745,12 +746,18 @@ impl HttpServer {
                 if let Some(ref pool) = self.db_pool {
                     // D.2: thread swarm_tx into handle_api_request so epr::handle
                     // can issue KadStartProviding on successful puts.
+                    // D.7: also thread local_libp2p_peer_id so FederatedEprStore
+                    // can dedup self-reports from the providers list.
                     #[cfg(feature = "p2p")]
                     let swarm_tx = self.p2p_handle.as_ref().map(|h| h.command_sender());
                     #[cfg(not(feature = "p2p"))]
                     let swarm_tx: Option<
                         tokio::sync::mpsc::Sender<crate::p2p::P2PCommand>,
                     > = None;
+                    #[cfg(feature = "p2p")]
+                    let local_peer_id = self.p2p_handle.as_ref().map(|h| h.local_peer_id());
+                    #[cfg(not(feature = "p2p"))]
+                    let local_peer_id: Option<String> = None;
                     crate::api::handle_api_request(
                         req,
                         method,
@@ -758,6 +765,7 @@ impl HttpServer {
                         pool.clone(),
                         self.services.clone(),
                         swarm_tx,
+                        local_peer_id,
                     )
                     .await
                 } else {

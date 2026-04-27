@@ -85,6 +85,7 @@ fn distinct_households_counted_from_shard_locations() {
         &pool,
         &elohim_storage::db::AppContext {
             h_app_id: "lamad".into(),
+            local_libp2p_peer_id: None,
         },
         "content-via-shard-x",
         None,
@@ -129,6 +130,7 @@ fn snapshot_includes_placement_gaps_and_regional_distribution() {
         &pool,
         &elohim_storage::db::AppContext {
             h_app_id: "lamad".into(),
+            local_libp2p_peer_id: None,
         },
         "content-via-shard-x",
         None,

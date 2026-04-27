@@ -73,12 +73,14 @@ pub async fn handle_api_request(
     pool: DbPool,
     services: Option<Arc<Services>>,
     swarm_tx: Option<tokio::sync::mpsc::Sender<crate::p2p::P2PCommand>>,
+    local_peer_id: Option<String>,
 ) -> Result<Response<Full<Bytes>>, StorageError> {
     // Strip /api/v1/ prefix
     let sub_path = path.strip_prefix("/api/v1/").unwrap_or("");
 
-    // Extract app context from X-App-Id header, default to "lamad"
-    let app_ctx = extract_app_context(&req);
+    // Extract app context from X-App-Id header, default to "lamad".
+    // D.7: populate local_libp2p_peer_id so epr routes can dedup self-reports.
+    let app_ctx = extract_app_context(&req, local_peer_id);
 
     // Dispatch to domain controllers
     if sub_path.starts_with("agreements") {
@@ -203,15 +205,19 @@ pub async fn handle_api_request(
     }
 }
 
-/// Extract app context from request headers, defaulting to "lamad"
-fn extract_app_context(req: &Request<Incoming>) -> AppContext {
+/// Extract app context from request headers, defaulting to "lamad".
+/// `local_peer_id` is the swarm's PeerId (base58); passed through for EPR dedup.
+fn extract_app_context(req: &Request<Incoming>, local_peer_id: Option<String>) -> AppContext {
     let h_app_id = req
         .headers()
         .get("X-App-Id")
         .and_then(|v| v.to_str().ok())
         .unwrap_or("lamad")
         .to_string();
-    AppContext { h_app_id }
+    AppContext {
+        h_app_id,
+        local_libp2p_peer_id: local_peer_id,
+    }
 }
 
 /// Helper to get a Diesel connection from the pool
