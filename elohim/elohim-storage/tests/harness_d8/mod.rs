@@ -462,7 +462,11 @@ fn handle_d8_event(
             peer: _,
             message:
                 request_response::Message::Request {
-                    request: EprAtomRequest::IntegrityNotify { kind, payload_bytes },
+                    request:
+                        EprAtomRequest::IntegrityNotify {
+                            kind,
+                            payload_bytes,
+                        },
                     channel,
                     ..
                 },

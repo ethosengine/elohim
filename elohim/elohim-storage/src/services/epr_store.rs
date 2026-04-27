@@ -632,11 +632,8 @@ mod tests {
         rx: &mut mpsc::Receiver<crate::p2p::P2PCommand>,
     ) -> Vec<crate::p2p::P2PCommand> {
         let mut cmds = Vec::new();
-        loop {
-            match rx.try_recv() {
-                Ok(cmd) => cmds.push(cmd),
-                Err(_) => break,
-            }
+        while let Ok(cmd) = rx.try_recv() {
+            cmds.push(cmd);
         }
         cmds
     }

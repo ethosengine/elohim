@@ -950,7 +950,6 @@ mod tests {
         use crate::reconcile::pubkey_timeline::PubkeyTimelineCache;
         use crate::test_util::test_pool;
         use chrono::Utc;
-        use diesel::prelude::*;
         use std::sync::Arc;
         use tokio::sync::Mutex;
 
