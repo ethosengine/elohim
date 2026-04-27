@@ -1062,6 +1062,41 @@ spec:
             }
         }
 
+        stage('Brit Plan (advisory)') {
+            when {
+                expression {
+                    // Skip on [skip ci], status-only mode, or missing helper (older branches).
+                    // Stage 1a: silent skip on missing helper is intentional scaffolding.
+                    // Stage 2: replace fileExists check with an error() — helper will be required.
+                    env.SKIP_CI != 'true' &&
+                        params.MODE != 'status' &&
+                        fileExists('genesis/orchestrator/scripts/brit-helper.sh')
+                }
+            }
+            steps {
+                container('builder') {
+                    script {
+                        // brit-helper.sh wraps brit invocations with safe-fallback (logs WARN, exits 0
+                        // if brit is not yet on the ci-builder image — Stage 1a behavior). Once Stage 1b
+                        // lands brit on ci-builder, this stage produces a real advisory plan.
+                        sh '''
+                            export REPO_ROOT=$WORKSPACE
+                            chmod +x genesis/orchestrator/scripts/brit-helper.sh || true
+                            echo "── brit advisory (Stage 1a — warn-only) ──"
+                            ./genesis/orchestrator/scripts/brit-helper.sh verify || true
+                            # Ensure origin/dev is in local ref store before plan --since (Jenkins
+                            # checkout may not fetch all remote refs on shallow / branch-only clones).
+                            git fetch origin dev --no-tags --quiet || true
+                            ./genesis/orchestrator/scripts/brit-helper.sh plan --since origin/dev || true
+                            echo "── end brit advisory ──"
+                        '''
+                        // Compare to the legacy/graph dispatch decision for log-side observation.
+                        echo "ADVISORY: legacy + build-graph dispatched: ${env.PIPELINES_TO_RUN ?: '(none)'}"
+                    }
+                }
+            }
+        }
+
         stage('Execute Builds') {
             when {
                 expression {
