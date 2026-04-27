@@ -12,9 +12,10 @@ use anyhow::Result;
 use elohim_sweettest::common::{
     conductors::{load_dna, single_agent_conductor, two_agent_conductors},
     fixtures::{network_seed, node_registration, NodeRegistration},
-    mirrors::settle_dht,
 };
 use holo_hash::ActionHash;
+use std::time::{Duration, Instant};
+use tokio::time::sleep;
 
 const DNA: &str = "node_registry";
 
@@ -77,12 +78,13 @@ async fn register_node_round_trips() -> Result<()> {
 }
 
 /// Cross-agent: steward registers a node; a second agent can query it after
-/// DHT gossip settles.
+/// DHT gossip propagates the region links.
 ///
 /// Exercises the DHT propagation path: `register_node` writes links anchored
 /// by region; those links are gossipped to all peers on the same network seed.
-/// After `settle_dht` the second conductor should be able to traverse them via
-/// `get_nodes_by_region`.
+/// The second conductor polls `get_nodes_by_region` until the link is visible
+/// or the deadline elapses — gossip quiescence is not a hard guarantee for
+/// link traversal, so a single read after a fixed sleep is racy.
 #[tokio::test(flavor = "multi_thread")]
 async fn admission_visible_across_agents() -> Result<()> {
     let [(mut c1, a1), (mut c2, a2)] = two_agent_conductors().await?;
@@ -113,22 +115,26 @@ async fn admission_visible_across_agents() -> Result<()> {
         )
         .await;
 
-    // Allow DHT gossip to propagate to the second conductor.
-    settle_dht(&[&cell1, &cell2]).await;
+    // Poll a2 until the region link becomes visible or the deadline elapses.
+    // 10s is generous for in-process gossip; real failures still surface fast
+    // because the panic message includes the last-seen node list.
+    let deadline = Instant::now() + Duration::from_secs(10);
+    let zome = cell2.zome("node_registry_coordinator");
+    loop {
+        let nodes: Vec<NodeRegistration> = c2
+            .call(&zome, "get_nodes_by_region", region.clone())
+            .await;
+        if nodes.iter().any(|n| n.node_id == "alpha") {
+            break;
+        }
+        if Instant::now() >= deadline {
+            panic!(
+                "second agent did not see node 'alpha' within 10s; last result: {:?}",
+                nodes.iter().map(|n| &n.node_id).collect::<Vec<_>>()
+            );
+        }
+        sleep(Duration::from_millis(100)).await;
+    }
 
-    // a2 queries the same region — must see a1's registration.
-    let nodes: Vec<NodeRegistration> = c2
-        .call(
-            &cell2.zome("node_registry_coordinator"),
-            "get_nodes_by_region",
-            region,
-        )
-        .await;
-
-    assert!(
-        nodes.iter().any(|n| n.node_id == "alpha"),
-        "second agent should see node 'alpha' after DHT settle, got {:?}",
-        nodes.iter().map(|n| &n.node_id).collect::<Vec<_>>()
-    );
     Ok(())
 }
