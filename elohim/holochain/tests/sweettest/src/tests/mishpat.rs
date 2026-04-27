@@ -7,9 +7,10 @@ use anyhow::Result;
 use elohim_sweettest::common::{
     conductors::{load_dna, single_agent_conductor, two_agent_conductors},
     fixtures::network_seed,
-    mirrors,
 };
 use qahal_types::{CreateProposalInput, ProposalOutput};
+use std::time::{Duration, Instant};
+use tokio::time::sleep;
 
 const DNA: &str = "mishpat";
 
@@ -89,23 +90,23 @@ async fn proposal_round_trips_across_agents() -> Result<()> {
     assert_eq!(created.proposal.proposal_type, "sense-check");
     assert_eq!(created.proposal.status, "draft");
 
-    // Let DHT gossip propagate to a2's conductor.
-    mirrors::settle_dht(&[&cell1, &cell2]).await;
-
-    // a2 should now be able to read the proposal by id.
-    let fetched: Option<ProposalOutput> = c2
-        .call(
-            &cell2.zome("mishpat"),
-            "get_proposal_by_id",
-            "sweettest-prop-1".to_string(),
-        )
-        .await;
-
-    assert!(
-        fetched.is_some(),
-        "second agent should see steward's proposal after DHT settle"
-    );
-    let fetched = fetched.unwrap();
+    // Poll c2 until the proposal anchor link is gossipped, or panic on deadline.
+    // Gossip quiescence is not a hard guarantee for link traversal; see
+    // tests/node_registry.rs admission_visible_across_agents for rationale.
+    let deadline = Instant::now() + Duration::from_secs(10);
+    let zome = cell2.zome("mishpat");
+    let fetched: ProposalOutput = loop {
+        let result: Option<ProposalOutput> = c2
+            .call(&zome, "get_proposal_by_id", "sweettest-prop-1".to_string())
+            .await;
+        if let Some(out) = result {
+            break out;
+        }
+        if Instant::now() >= deadline {
+            panic!("second agent did not see steward's proposal within 10s");
+        }
+        sleep(Duration::from_millis(100)).await;
+    };
     assert_eq!(
         fetched.proposal.id, created.proposal.id,
         "fetched proposal id must match created proposal id"

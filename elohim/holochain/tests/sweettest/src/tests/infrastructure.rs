@@ -15,10 +15,11 @@ use anyhow::Result;
 use elohim_sweettest::common::{
     conductors::{load_dna, single_agent_conductor, two_agent_conductors},
     fixtures::network_seed,
-    mirrors,
 };
 use holo_hash::ActionHash;
 use serde::{Deserialize, Serialize};
+use std::time::{Duration, Instant};
+use tokio::time::sleep;
 
 const DNA: &str = "infrastructure";
 
@@ -161,18 +162,23 @@ async fn doorway_visible_across_agents_and_operator_only_can_update() -> Result<
         .call(&cell1.zome("infrastructure"), "register_doorway", alpha_doorway_input())
         .await;
 
-    // Allow DHT gossip to settle so the entry is visible to c2
-    mirrors::settle_dht(&[&cell1, &cell2]).await;
-
-    // a2 can read a1's doorway
-    let fetched: Option<DoorwayOutput> = c2
-        .call(&cell2.zome("infrastructure"), "get_doorway_by_id", "alpha".to_string())
-        .await;
-    assert!(
-        fetched.is_some(),
-        "a2 should be able to read a1's doorway after DHT propagation"
-    );
-    let fetched = fetched.unwrap();
+    // Poll c2 until the doorway anchor link is gossipped, or panic on deadline.
+    // Gossip quiescence is not a hard guarantee for link traversal; see
+    // tests/node_registry.rs admission_visible_across_agents for rationale.
+    let deadline = Instant::now() + Duration::from_secs(10);
+    let zome = cell2.zome("infrastructure");
+    let fetched: DoorwayOutput = loop {
+        let result: Option<DoorwayOutput> = c2
+            .call(&zome, "get_doorway_by_id", "alpha".to_string())
+            .await;
+        if let Some(out) = result {
+            break out;
+        }
+        if Instant::now() >= deadline {
+            panic!("a2 should be able to read a1's doorway within 10s of DHT propagation");
+        }
+        sleep(Duration::from_millis(100)).await;
+    };
     assert_eq!(
         fetched.doorway.operator_agent,
         a1.to_string(),

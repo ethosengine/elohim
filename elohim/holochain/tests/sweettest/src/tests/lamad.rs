@@ -11,11 +11,12 @@
 use anyhow::Result;
 use holo_hash::ActionHash;
 use serde::{Deserialize, Serialize};
+use std::time::{Duration, Instant};
+use tokio::time::sleep;
 
 use elohim_sweettest::common::{
     conductors::{load_dna, single_agent_conductor, two_agent_conductors},
     fixtures::network_seed,
-    mirrors::settle_dht,
 };
 
 const DNA: &str = "lamad";
@@ -165,8 +166,8 @@ async fn content_publishes_and_retrieves_by_id() -> Result<()> {
     Ok(())
 }
 
-/// Cross-agent visibility: agent A creates content, DHT settles via
-/// `mirrors::settle_dht`, agent B retrieves it via get_content_by_id.
+/// Cross-agent visibility: agent A creates content; agent B polls
+/// `get_content_by_id` until the IdToContent link gossips to its conductor.
 /// Validates that the IdToContent link gossips correctly to a second
 /// conductor sharing the same network seed.
 #[tokio::test(flavor = "multi_thread")]
@@ -195,19 +196,28 @@ async fn content_visible_across_agents() -> Result<()> {
         .await;
     assert_eq!(output.content.id, "cross-agent-1");
 
-    // Allow DHT gossip to propagate between in-process conductors
-    settle_dht(&[&cell1, &cell2]).await;
+    // Poll c2 until the IdToContent link is gossipped, or panic on deadline.
+    // Single-shot reads after a fixed sleep race the link-traversal path; see
+    // tests/node_registry.rs admission_visible_across_agents for rationale.
+    let deadline = Instant::now() + Duration::from_secs(10);
+    let zome = cell2.zome("content_store");
+    let retrieved: ContentOutput = loop {
+        let result: Option<ContentOutput> = c2
+            .call(
+                &zome,
+                "get_content_by_id",
+                QueryByIdInput { id: "cross-agent-1".to_string() },
+            )
+            .await;
+        if let Some(out) = result {
+            break out;
+        }
+        if Instant::now() >= deadline {
+            panic!("agent 2 could not see content 'cross-agent-1' within 10s");
+        }
+        sleep(Duration::from_millis(100)).await;
+    };
 
-    // Agent 2 retrieves the content by id
-    let result: Option<ContentOutput> = c2
-        .call(
-            &cell2.zome("content_store"),
-            "get_content_by_id",
-            QueryByIdInput { id: "cross-agent-1".to_string() },
-        )
-        .await;
-
-    let retrieved = result.expect("agent 2 could not see content created by agent 1");
     assert_eq!(retrieved.content.id, "cross-agent-1");
     assert_eq!(retrieved.content.title, "Test Concept cross-agent-1");
     assert_eq!(retrieved.content.content_type, "concept");

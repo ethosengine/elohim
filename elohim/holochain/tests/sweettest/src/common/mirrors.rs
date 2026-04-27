@@ -1,11 +1,13 @@
 //! Mirrors — DHT propagation / sync wait helpers.
 //!
 //! Sweettest conductors share a test network in-process, but DHT writes still
-//! propagate asynchronously. These helpers wrap the polling patterns so test
-//! files don't reinvent them.
+//! propagate asynchronously. Cross-agent assertions must poll the actual
+//! zome predicate they expect — gossip quiescence is not a hard guarantee
+//! for link traversal, so a fixed sleep races the read path. Use [`wait_for`]
+//! for predicate-shaped waits, or inline a poll loop modeled on
+//! `tests/node_registry.rs::admission_visible_across_agents`.
 
 use anyhow::Result;
-use holochain::sweettest::SweetCell;
 use std::time::Duration;
 use tokio::time::sleep;
 
@@ -33,13 +35,4 @@ where
         }
         sleep(Duration::from_millis(100)).await;
     }
-}
-
-/// Wait for DHT gossip between two cells to stabilize.
-///
-/// Simple cadence: short sleep to let the in-process network settle. Callers
-/// expecting a specific entry should prefer [`wait_for`] with a predicate
-/// that fetches the entry.
-pub async fn settle_dht(_cells: &[&SweetCell]) {
-    sleep(Duration::from_millis(250)).await;
 }
