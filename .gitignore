@@ -1,6 +1,7 @@
 # Claude Code
 .claude/settings.local.json
 .claude/hooks/.p2p-audit-cooldown.json
+.claude/scheduled_tasks.lock
 .mcp.json
 .worktrees/
 .claude/worktrees/
