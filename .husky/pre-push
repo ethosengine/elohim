@@ -481,6 +481,27 @@ resume_rust_analyzer() {
   fi
 }
 
+# ── Brit advisory (Stage 1a) ─────────────────────────────────────
+# Runs brit verify + brit plan as advisory checks. Warn-only — never fails push.
+# Stage 2: becomes load-bearing (failure blocks push). Stage 1a: gather signal.
+brit_advisory() {
+    HELPER="${REPO_ROOT}/genesis/orchestrator/scripts/brit-helper.sh"
+    if [ ! -x "$HELPER" ]; then
+        return 0  # helper not present (e.g., older branch); silently skip
+    fi
+    echo ""
+    echo "── brit advisory (Stage 1a — warn-only) ─────────────────────"
+    REPO_ROOT="$REPO_ROOT" "$HELPER" verify
+    # plan against origin/dev (the merge target); if origin/dev is unreachable, skip.
+    if git rev-parse --verify origin/dev >/dev/null 2>&1; then
+        REPO_ROOT="$REPO_ROOT" "$HELPER" plan --since origin/dev
+    else
+        echo "[brit-helper] WARN: origin/dev not reachable; plan advisory skipped" >&2
+    fi
+    echo "── end brit advisory ─────────────────────────────────────────"
+    return 0  # never fails the hook
+}
+
 if [ -n "$RA_PIDS" ]; then
   RA_COUNT=$(echo "$RA_PIDS" | wc -l | tr -d ' ')
   echo "  Pausing $RA_COUNT rust-analyzer process(es) to free RAM..."
@@ -586,5 +607,8 @@ echo "============================================"
 echo "  PRE-PUSH GATE: ALL CLEAR (${TOTAL_ELAPSED}s)"
 echo "============================================"
 echo ""
+
+# Stage 1a: advisory brit checks (never fail the push).
+brit_advisory
 
 exit 0
