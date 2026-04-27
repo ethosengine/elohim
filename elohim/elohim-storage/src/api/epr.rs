@@ -173,7 +173,7 @@ async fn get_epr(
         .map(|q| q.contains("includeCanonical=true"))
         .unwrap_or(false);
 
-    // TODO(phase-2b): wire ctx.local_libp2p_peer_id once fetch dedup is needed
+    // TODO(phase-3): wire ctx.local_libp2p_peer_id once fetch dedup is needed
     let store = default_epr_store(None, None, None, None);
     let mut conn = get_conn(pool)?;
 
@@ -206,7 +206,7 @@ async fn get_envelope(
     pool: &DbPool,
     _ctx: &AppContext,
 ) -> Result<Response<Full<Bytes>>, StorageError> {
-    // TODO(phase-2b): wire ctx.local_libp2p_peer_id once fetch dedup is needed
+    // TODO(phase-3): wire ctx.local_libp2p_peer_id once fetch dedup is needed
     let store = default_epr_store(None, None, None, None);
     let mut conn = get_conn(pool)?;
 
@@ -238,7 +238,7 @@ async fn get_payload(
     pool: &DbPool,
     _ctx: &AppContext,
 ) -> Result<Response<Full<Bytes>>, StorageError> {
-    // TODO(phase-2b): wire ctx.local_libp2p_peer_id once fetch dedup is needed
+    // TODO(phase-3): wire ctx.local_libp2p_peer_id once fetch dedup is needed
     let store = default_epr_store(None, None, None, None);
     let mut conn = get_conn(pool)?;
 
@@ -288,7 +288,7 @@ async fn get_verify(
     let mut pk = [0u8; 32];
     pk.copy_from_slice(&pk_bytes);
 
-    // TODO(phase-2b): wire ctx.local_libp2p_peer_id once verify dedup is needed
+    // TODO(phase-3): wire ctx.local_libp2p_peer_id once verify dedup is needed
     let store = default_epr_store(None, None, None, None);
     let mut conn = get_conn(pool)?;
 
@@ -535,7 +535,7 @@ async fn list_epr(
     _ctx: &AppContext,
 ) -> Result<Response<Full<Bytes>>, StorageError> {
     use crate::db::epr_atoms::EprListQuery;
-    // TODO(phase-2b): wire ctx.local_libp2p_peer_id if list gains peer-aware filtering
+    // TODO(phase-3): wire ctx.local_libp2p_peer_id if list gains peer-aware filtering
 
     let query = req.uri().query().unwrap_or("");
 

@@ -416,6 +416,13 @@ pub struct P2PStatusInfo {
     pub drain: Option<DrainStatusInfo>,
     /// True when sync/replication is paused for backpressure (bulk write in progress).
     pub sync_paused: bool,
+    /// D.7 dedup LRU: number of unique CIDs currently in the dedup window.
+    #[ts(type = "number")]
+    pub dedup_unique_len: usize,
+    /// D.7 dedup LRU: cumulative insert calls (new + duplicate).
+    /// Ratio `(dedup_total_seen - dedup_unique_len) / dedup_total_seen` approximates duplication rate.
+    #[ts(type = "number")]
+    pub dedup_total_seen: usize,
 }
 
 /// Per-peer detail from libp2p Swarm state.
@@ -676,6 +683,8 @@ impl P2PHandle {
             replication: crate::p2p::replication::ReplicationStatus::default(),
             drain: None,
             sync_paused: false,
+            dedup_unique_len: 0,
+            dedup_total_seen: 0,
         };
         let (status_tx, status_rx) = watch::channel(initial_status);
         // Keep sender alive so the receiver never sees "sender dropped"
@@ -1101,6 +1110,8 @@ impl P2PNode {
             replication: replication::ReplicationStatus::default(),
             drain: None,
             sync_paused: false,
+            dedup_unique_len: 0,
+            dedup_total_seen: 0,
         };
         let (status_tx, _) = tokio::sync::watch::channel(initial_status);
 
@@ -1186,8 +1197,7 @@ impl P2PNode {
     /// The ratio `(total_seen - unique_len) / total_seen` approximates duplication rate.
     ///
     /// Uses `DedupLru::stats()` for an atomic consistent snapshot.
-    ///
-    /// TODO(Z.1): expose these values in P2PStatusInfo so dashboards can read them.
+    /// Values are surfaced in `P2PStatusInfo::dedup_unique_len` / `dedup_total_seen`.
     pub fn dedup_stats(&self) -> (usize, usize) {
         self.dedup.stats()
     }
@@ -4816,6 +4826,7 @@ impl P2PNode {
             None
         };
 
+        let (dedup_unique_len, dedup_total_seen) = self.dedup.stats();
         let status = P2PStatusInfo {
             peer_id: self.peer_id().to_string(),
             listen_addresses,
@@ -4829,6 +4840,8 @@ impl P2PNode {
             replication,
             drain,
             sync_paused: self.sync_paused.load(Ordering::Acquire),
+            dedup_unique_len,
+            dedup_total_seen,
         };
         let _ = self.status_tx.send(status);
     }

@@ -15,7 +15,9 @@
     "announceAddresses",
     "relayMode",
     "replication",
-    "syncPaused"
+    "syncPaused",
+    "dedupUniqueLen",
+    "dedupTotalSeen"
   ],
   "properties": {
     "peerId": {
@@ -71,6 +73,14 @@
     "syncPaused": {
       "type": "boolean",
       "description": "True when sync/replication is paused for backpressure (bulk write in progress). Operators and elohim agents use this to understand node load state."
+    },
+    "dedupUniqueLen": {
+      "type": "integer",
+      "description": "D.7 dedup LRU: number of unique CIDs currently in the dedup window."
+    },
+    "dedupTotalSeen": {
+      "type": "integer",
+      "description": "D.7 dedup LRU: cumulative insert calls (new + duplicate). Ratio (dedupTotalSeen - dedupUniqueLen) / dedupTotalSeen approximates duplication rate."
     }
   },
   "additionalProperties": false

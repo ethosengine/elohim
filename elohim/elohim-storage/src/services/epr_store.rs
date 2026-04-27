@@ -1,11 +1,12 @@
 //! EprStore trait — the seam between REST routes and storage backends.
 //!
 //! LocalEprStore wraps the diesel layer (Phase 2a).
-//! FederatedEprStore wraps LocalEprStore + a libp2p swarm handle and, on local
-//! miss, issues EprRequest::Resolve via /elohim/epr/1.0.0 to discover peers
-//! that hold the atom. Phase 2a ships FederatedEprStore with the libp2p bridge
-//! stubbed as TODO(phase-2b); Phase 2b wires the swarm handle and flips the
-//! construction site from LocalEprStore → FederatedEprStore.
+//! FederatedEprStore wraps LocalEprStore + a libp2p swarm handle. Phase 2B
+//! wired the swarm handle and flipped the construction site from LocalEprStore
+//! → FederatedEprStore. Kad `start_providing` + gossipsub tiered fanout are
+//! live as of Phase 2B Batch D. On local miss, cold-fetch via
+//! `swarm_handle.resolve_epr(cid)` is the remaining Phase 3 work item
+//! (see `TODO(phase-3)` at the miss site below).
 //!
 //! ## D.4: Receiver-side pre-authorization (seam placeholder)
 //!
@@ -290,10 +291,12 @@ impl EprStore for FederatedEprStore {
         if let Some(outcome) = self.local.fetch(conn, cid)? {
             return Ok(Some(outcome));
         }
-        // TODO(phase-2b): on local miss, issue swarm_handle.resolve_epr(cid).
+        // TODO(phase-3): on local miss, issue swarm_handle.resolve_epr(cid).
         // For each returned peer, send EprRequest::Resolve { id: cid }; if
         // EprResponse::Head arrives, decode + validate + LocalEprStore::put + return
         // FetchOutcome::Peer(peer_id). Give up after N peers or T timeout.
+        // See genesis/docs/plans/2026-04-26-epr-phase-3-manifest-resolver-kickoff-prompt.md
+        // §Task: Cold-fetch via swarm.
         Ok(None)
     }
 

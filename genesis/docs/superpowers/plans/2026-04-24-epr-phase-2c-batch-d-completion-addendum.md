@@ -186,13 +186,26 @@ Once Batch D is green:
    - Kickoff prompt: `genesis/docs/plans/2026-04-24-epr-phase-2b-brainstorm-kickoff-prompt.md`
    - Design spec: `genesis/docs/superpowers/specs/2026-04-24-epr-phase-2b-design.md` (8 coupling decisions resolved, 9 projector invariants, 15 p2p-design-gate classifications, three-arc framing: resiliency producer → 2B hinge → Phase 3–7 graph surface consumer)
    - First-draft plan: `genesis/docs/superpowers/plans/2026-04-24-epr-phase-2b-plan.md` (39 tasks across 4 batches A/B/C/D mirroring Phase 2C shape)
-3. Phase 2B batches resolve all 7 addendum follow-ups:
-   - **Batch A** (12 tasks): `AgentPeerBinding` DNA entry type (Category A), `HolochainBackedPeerIdentityMap` replacing `StubIdentityMap`, DNA signal stream (converges with Recovery M4), `ReconcileController` + eager revocation sweep, libp2p handshake + gossipsub `elohim/identity/binding` topic
-   - **Batch B** (8 tasks): single elohim-storage projector (controller per Principle P1), manifest-declared pillar mapping, `EprHead` refactored to projector-derived (Category A2 from Envelope), shefa's `EconomicEvent → economic_events` first mapping
-   - **Batch C** (7 tasks): `/api/v1/signal/emit` endpoint (storage composes + signs + ingests), conductor signing API contract, Angular signal harness migration behind feature flag, 4-layer write-through flag (manifest / policy.toml / env-CLI / admin) with hardcoded integrity-always-on exception
-   - **Batch D** (8 tasks): tiered fanout by reach, Kad `start_providing`, gossipsub topic structure + reach-gated subscription, integrity-always-both exception + direct-notify, dedup LRU, `providers()` returning local + DHT providers
-4. `TODO(phase-2c)` markers in `epr_store.rs` are already relabeled to `TODO(phase-2b)` (commit `7f76082b` per kickoff prompt); all five resolve across Batch A and Batch D.
+3. ✅ **Phase 2B executed** — all four batches landed on dev:
+   - **Batch A** (12 tasks): `AgentPeerBinding` DNA entry type, `HolochainBackedPeerIdentityMap`, DNA signal stream (converges with Recovery M4), `ReconcileController`, libp2p handshake + gossipsub identity binding topic
+   - **Batch B** (8 tasks): single elohim-storage projector (Principle P1), manifest-declared pillar mapping, `EprHead` as projector-derived (Category A2), shefa `EconomicEvent` first mapping
+   - **Batch C** (7 tasks): `/api/v1/signal/emit`, conductor signing API, Angular signal harness migration, 4-layer write-through flag, integrity-always-on exception
+   - **Batch D** (8 tasks): tiered fanout, Kad `start_providing`, gossipsub topic enumeration + reach-gated subscription, integrity direct-notify (D.5: `IntegrityNotify`/`IntegrityAck` wire variants), dedup LRU with `P2PStatusInfo` observability, `providers()` returning local + DHT providers
+4. `TODO(phase-2b)` markers resolved via Z.1 close-out sweep (Batch D Z.1):
+   - 5x `epr.rs` read-only routes → re-tagged `TODO(phase-3)` (dedup wiring deferred; `providers()` route already wired)
+   - `epr_store.rs` module doc — updated to reflect Phase 2B reality (swarm wired, fanout live)
+   - `epr_store.rs` line 293 cold-fetch → re-tagged `TODO(phase-3)` with pointer to Phase 3 kickoff prompt
+   - `epr_atom_protocol.rs` TODO(Z.1) — removed; schema updated with `integrity_notify` + `integrity_ack` variants
+   - `mod.rs` TODO(Z.1) dedup stats → resolved; `P2PStatusInfo` now carries `dedupUniqueLen` / `dedupTotalSeen`
 5. Batch A's DNA signal stream contract converges with Recovery M4's fast-path revocation work — both epics share `dna-signal-stream.schema.json` as the coordination surface.
-6. Phase 3 kickoff prompt (manifest-graph resolver — prerequisite for Phase 4 GraphQL surface where hREA / VF-GraphQL lands) to be drafted at 2B completion per spec §7 O8.
+6. ✅ **Phase 3 kickoff prompt drafted** — see `genesis/docs/plans/2026-04-26-epr-phase-3-manifest-resolver-kickoff-prompt.md`
 
-Phase 2B execution begins per-batch at operator call; each batch may fork to its own `feature/epr-phase-2b-batch-{a,b,c,d}` branch at its kickoff session.
+### TODO(phase-3) markers planted by Z.1 (grep starting points for Phase 3)
+
+```
+elohim/elohim-storage/src/api/epr.rs          — 5x TODO(phase-3): local_libp2p_peer_id dedup wiring (fetch ×3, verify ×1, list ×1)
+elohim/elohim-storage/src/services/epr_store.rs — 1x TODO(phase-3): cold-fetch via swarm_handle.resolve_epr(cid)
+elohim/elohim-storage/src/services/epr_kind.rs  — 1x FIXME(phase-3): replace pillar_for_kind_provisional with ManifestRegistry
+```
+
+Phase 3 execution begins at operator call per `genesis/docs/plans/2026-04-26-epr-phase-3-manifest-resolver-kickoff-prompt.md`.

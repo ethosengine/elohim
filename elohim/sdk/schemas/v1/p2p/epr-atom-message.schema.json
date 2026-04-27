@@ -37,6 +37,23 @@
             }
           },
           "required": ["tag", "cids"]
+        },
+        {
+          "type": "object",
+          "description": "D.5: direct-notify of integrity events. `kind` discriminates the encoding of `payload_bytes`. Stage 1: only KeyRevocation is handled on the receive side; other integrity kinds are accepted and logged.",
+          "properties": {
+            "tag": { "const": "integrity_notify" },
+            "kind": {
+              "type": "string",
+              "description": "Integrity event discriminator: KeyRevocation | KeyRotation | RevocationAttestation | AgentPeerBinding"
+            },
+            "payload_bytes": {
+              "type": "string",
+              "contentEncoding": "base64",
+              "description": "Encoded integrity payload (MessagePack for KeyRevocation, CBOR for others)"
+            }
+          },
+          "required": ["tag", "kind", "payload_bytes"]
         }
       ]
     },
@@ -92,6 +109,22 @@
             "message": { "type": "string" }
           },
           "required": ["tag", "message"]
+        },
+        {
+          "type": "object",
+          "description": "D.5: ack for IntegrityNotify. `received: true` means the payload was successfully decoded and routed; `false` means decode or routing failed.",
+          "properties": {
+            "tag": { "const": "integrity_ack" },
+            "received": {
+              "type": "boolean",
+              "description": "True if payload was successfully decoded and routed to the integrity handler"
+            },
+            "reason": {
+              "type": ["string", "null"],
+              "description": "Non-secret diagnostic string when received is false"
+            }
+          },
+          "required": ["tag", "received"]
         }
       ]
     }

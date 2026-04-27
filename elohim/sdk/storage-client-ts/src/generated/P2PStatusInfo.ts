@@ -38,4 +38,13 @@ drain: DrainStatusInfo | null,
 /**
  * True when sync/replication is paused for backpressure (bulk write in progress).
  */
-syncPaused: boolean, };
+syncPaused: boolean, 
+/**
+ * D.7 dedup LRU: number of unique CIDs currently in the dedup window.
+ */
+dedupUniqueLen: number, 
+/**
+ * D.7 dedup LRU: cumulative insert calls (new + duplicate).
+ * Ratio `(dedup_total_seen - dedup_unique_len) / dedup_total_seen` approximates duplication rate.
+ */
+dedupTotalSeen: number, };
