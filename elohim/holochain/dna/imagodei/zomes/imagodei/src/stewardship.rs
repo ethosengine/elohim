@@ -248,8 +248,10 @@ fn get_my_steward_tier(subject_id: &str) -> ExternResult<String> {
     Ok("guide".to_string())
 }
 
-/// TODO: Unused — intended for hierarchical device policy inheritance?
-/// Review whether stewardship needs parent/child policy merging and complete integration.
+/// TODO: Unused — intended for hierarchical device policy inheritance.
+/// Review whether stewardship needs parent/child policy merging and complete
+/// integration. Annotated `#[allow(dead_code)]` until that decision is made.
+#[allow(dead_code)]
 fn merge_policies(parent: &DevicePolicy, child: &DevicePolicy) -> DevicePolicy {
     // Parse JSON arrays
     let mut blocked_categories: Vec<String> =
@@ -815,11 +817,10 @@ pub fn upsert_policy(input: UpsertPolicyInput) -> ExternResult<DevicePolicyOutpu
         effective_from: timestamp.clone(),
         effective_until: None,
         version,
-        created_at: if existing.is_some() {
-            existing.unwrap().policy.created_at
-        } else {
-            timestamp.clone()
-        },
+        created_at: existing
+            .as_ref()
+            .map(|e| e.policy.created_at.clone())
+            .unwrap_or_else(|| timestamp.clone()),
         updated_at: timestamp,
     };
 

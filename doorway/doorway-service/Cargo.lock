@@ -1208,6 +1208,7 @@ dependencies = [
  "bytes",
  "chrono",
  "constitution",
+ "elohim-agent-defender-specialist",
  "futures",
  "pin-project-lite",
  "reqwest",
@@ -1218,6 +1219,18 @@ dependencies = [
  "tokio-stream",
  "tracing",
  "uuid 1.18.1",
+]
+
+[[package]]
+name = "elohim-agent-defender-specialist"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.17",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]

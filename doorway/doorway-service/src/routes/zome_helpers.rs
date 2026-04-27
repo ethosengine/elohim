@@ -3,6 +3,7 @@
 //! Provides helper functions for calling specific zome functions from the
 //! doorway's HTTP handlers, particularly for identity management operations.
 
+use holo_hash::ActionHash;
 use tracing::{debug, warn};
 
 use crate::server::AppState;
@@ -43,13 +44,32 @@ pub async fn call_create_human(state: &AppState, input: CreateHumanInput) -> Res
         "Calling create_human on imagodei zome via ZomeCaller"
     );
 
-    let result: HumanOutput = zome_caller
+    // create_human now returns the bare ActionHash so its wire shape can be
+    // read by sweettests as either typed ActionHash or serde_json::Value.
+    // Chase with get_my_human to recover the full HumanOutput projection.
+    let action_hash: ActionHash = zome_caller
         .call("imagodei", "imagodei", "create_human", &input)
         .await
         .map_err(|e| DoorwayError::Holochain(format!("create_human failed: {e}")))?;
 
+    let projected: Option<HumanOutput> = zome_caller
+        .call("imagodei", "imagodei", "get_my_human", &())
+        .await
+        .map_err(|e| {
+            DoorwayError::Holochain(format!(
+                "create_human ok but get_my_human projection failed: {e}"
+            ))
+        })?;
+
+    let result = projected.ok_or_else(|| {
+        DoorwayError::Internal(
+            "create_human ok but get_my_human returned None — DHT projection lag?".into(),
+        )
+    })?;
+
     debug!(
         human_id = %result.human.id,
+        action_hash = %action_hash,
         "Successfully created human in imagodei zome"
     );
 
@@ -98,12 +118,31 @@ pub async fn call_create_human_on_conductor(
 
     let caller = crate::services::ZomeCaller::new(&admin_url, conductor_url, installed_app_id);
 
-    let result: HumanOutput = caller
+    // Same chase pattern as call_create_human — see that helper for rationale.
+    let action_hash: ActionHash = caller
         .call("imagodei", "imagodei", "create_human", &input)
         .await
         .map_err(|e| {
             crate::types::DoorwayError::Holochain(format!("create_human on conductor failed: {e}"))
         })?;
+
+    let projected: Option<HumanOutput> = caller
+        .call("imagodei", "imagodei", "get_my_human", &())
+        .await
+        .map_err(|e| {
+            crate::types::DoorwayError::Holochain(format!(
+                "create_human on conductor ok but get_my_human projection failed: {e}"
+            ))
+        })?;
+
+    let result = projected.ok_or_else(|| {
+        crate::types::DoorwayError::Internal(
+            "create_human on conductor ok but get_my_human returned None — DHT projection lag?"
+                .into(),
+        )
+    })?;
+
+    debug!(action_hash = %action_hash, "create_human on conductor succeeded");
 
     Ok(result)
 }

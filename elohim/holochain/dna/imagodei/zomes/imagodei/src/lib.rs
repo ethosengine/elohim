@@ -171,12 +171,9 @@ pub fn post_commit(committed_actions: Vec<SignedActionHashed>) -> ExternResult<(
         // `deletes_address` is the ActionHash of the original Create action.
         if let Action::Delete(ref delete) = action {
             let original_action_hash = delete.deletes_address.clone();
-            if let Some(original_record) =
-                get(original_action_hash.clone(), GetOptions::default())?
+            if let Some(original_record) = get(original_action_hash.clone(), GetOptions::default())?
             {
-                if let Ok(Some(ph)) =
-                    original_record.entry().to_app_option::<PortalHost>()
-                {
+                if let Ok(Some(ph)) = original_record.entry().to_app_option::<PortalHost>() {
                     let reach = format!("{:?}", ph.reach);
                     let _ = emit_signal(RecoveryV2Signal::PortalHostRemoved {
                         action_hash,
@@ -262,9 +259,18 @@ pub fn post_commit(committed_actions: Vec<SignedActionHashed>) -> ExternResult<(
 // Human Profile Functions
 // =============================================================================
 
-/// Create a new Human profile (bound to calling agent)
+/// Create a new Human profile (bound to calling agent).
+///
+/// Returns the `ActionHash` of the created Human entry. Use `get_my_human`
+/// or `get_human_by_agent_key` to fetch the full `HumanOutput { action_hash, human }`
+/// projection. Returning `ActionHash` directly keeps the wire shape compatible
+/// with both typed (`let h: ActionHash = ...`) and `serde_json::Value` reads
+/// from sweettests — a struct return type would break either side because
+/// msgpack `BIN` (the ActionHash bytes) cannot deserialize into
+/// `serde_json::Value` (no byte-array variant), and a struct return cannot
+/// deserialize into `ActionHash`.
 #[hdk_extern]
-pub fn create_human(input: CreateHumanInput) -> ExternResult<HumanOutput> {
+pub fn create_human(input: CreateHumanInput) -> ExternResult<ActionHash> {
     let agent_info = agent_info()?;
     let now = sys_time()?;
     let timestamp = format!("{:?}", now);
@@ -288,7 +294,7 @@ pub fn create_human(input: CreateHumanInput) -> ExternResult<HumanOutput> {
         updated_at: timestamp,
     };
 
-    let action_hash = create_entry(&EntryTypes::Human(human.clone()))?;
+    let action_hash = create_entry(&EntryTypes::Human(human))?;
 
     // Create ID lookup link
     let id_anchor = StringAnchor::new("human_id", &input.id);
@@ -320,19 +326,7 @@ pub fn create_human(input: CreateHumanInput) -> ExternResult<HumanOutput> {
         )?;
     }
 
-    Ok(HumanOutput {
-        action_hash,
-        human: imagodei_types::Human {
-            id: human.id,
-            display_name: human.display_name,
-            bio: human.bio,
-            affinities: human.affinities,
-            profile_reach: human.profile_reach,
-            location: human.location,
-            created_at: human.created_at,
-            updated_at: human.updated_at,
-        },
-    })
+    Ok(action_hash)
 }
 
 /// Get my Human profile (bound to calling agent)
@@ -407,9 +401,15 @@ pub fn get_human_by_id(id: String) -> ExternResult<Option<HumanOutput>> {
     Ok(None)
 }
 
-/// Update my Human profile
+/// Update my Human profile.
+///
+/// Returns the new `ActionHash` for the same reason as `create_human`:
+/// keeping the wire shape an opaque hash lets sweettests read it as either
+/// a typed `ActionHash` or a `serde_json::Value` (string), neither of which
+/// works for a struct return that contains hash bytes. Use `get_my_human`
+/// to fetch the projected `HumanOutput` after update.
 #[hdk_extern]
-pub fn update_human(input: CreateHumanInput) -> ExternResult<HumanOutput> {
+pub fn update_human(input: CreateHumanInput) -> ExternResult<ActionHash> {
     let agent_info = agent_info()?;
     let now = sys_time()?;
     let timestamp = format!("{:?}", now);
@@ -428,21 +428,7 @@ pub fn update_human(input: CreateHumanInput) -> ExternResult<HumanOutput> {
         updated_at: timestamp,
     };
 
-    let action_hash = update_entry(existing.action_hash, &EntryTypes::Human(human.clone()))?;
-
-    Ok(HumanOutput {
-        action_hash,
-        human: imagodei_types::Human {
-            id: human.id,
-            display_name: human.display_name,
-            bio: human.bio,
-            affinities: human.affinities,
-            profile_reach: human.profile_reach,
-            location: human.location,
-            created_at: human.created_at,
-            updated_at: human.updated_at,
-        },
-    })
+    update_entry(existing.action_hash, &EntryTypes::Human(human))
 }
 
 // =============================================================================
@@ -1778,7 +1764,7 @@ fn count_active_emergency_contacts(human_id: &str) -> ExternResult<u32> {
 /// Threshold formula per revised spec §5 / M3 design §4.2: `max(2, ceil(M/2) + 1)`.
 fn compute_required_witness_count(active_emergency_contacts: u32) -> u32 {
     let m = active_emergency_contacts;
-    let ceil_half_plus_one = (m + 1) / 2 + 1; // ceil(m/2) + 1 for u32
+    let ceil_half_plus_one = m.div_ceil(2) + 1; // ceil(m/2) + 1 for u32
     std::cmp::max(2, ceil_half_plus_one)
 }
 

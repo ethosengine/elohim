@@ -27,7 +27,7 @@
 //! - `HumanToKeyRevocation`     — by human_id (listing)
 //! - `RevokedKeyToRevocation`   — by revoked key (hot-gate query)
 //! - `EffectiveRevocations`     — specialist attestation is immediately effective
-//!                                (single-agent authority, no quorum)
+//!   (single-agent authority, no quorum)
 //! - Signal: `KeyRevocationRequested` + `KeyRevocationEffective` (same as
 //!   `create_self_revocation`).
 

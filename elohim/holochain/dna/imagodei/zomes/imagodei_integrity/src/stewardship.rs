@@ -26,22 +26,22 @@ use hdi::prelude::*;
 /// Graduated capability tiers - same surface, different depth
 /// Power scales with demonstrated responsibility, not assigned role
 pub const STEWARD_CAPABILITY_TIERS: [&str; 5] = [
-    "self",          // Manage own settings only
-    "guide",         // Help others navigate their settings (advisory)
-    "guardian",      // Manage settings for verified dependents
-    "coordinator",   // Manage settings across organization/community
+    "self",           // Manage own settings only
+    "guide",          // Help others navigate their settings (advisory)
+    "guardian",       // Manage settings for verified dependents
+    "coordinator",    // Manage settings across organization/community
     "constitutional", // Elohim-level governance capabilities
 ];
 
 /// Authority basis - how stewardship was established
 /// Must be verifiable and reviewable
 pub const AUTHORITY_BASIS_TYPES: [&str; 6] = [
-    "minor_guardianship",   // Legal guardian of minor
-    "court_order",          // Court-appointed custody
-    "medical_necessity",    // Disability requiring care
-    "community_consensus",  // Community-determined intervention
-    "organizational_role",  // Device managed by organization
-    "mutual_consent",       // Subject explicitly consented
+    "minor_guardianship",  // Legal guardian of minor
+    "court_order",         // Court-appointed custody
+    "medical_necessity",   // Disability requiring care
+    "community_consensus", // Community-determined intervention
+    "organizational_role", // Device managed by organization
+    "mutual_consent",      // Subject explicitly consented
 ];
 
 /// Grant status lifecycle
@@ -91,16 +91,16 @@ pub const AGE_RATINGS: [&str; 5] = [
 
 /// Features that can be restricted
 pub const RESTRICTABLE_FEATURES: [&str; 10] = [
-    "post",             // Create new content
-    "share",            // Share content with others
-    "vote",             // Participate in governance
-    "comment",          // Add comments/replies
-    "transfer",         // Transfer assets/points
-    "direct_message",   // Send DMs
-    "group_create",     // Create groups/communities
-    "profile_edit",     // Modify own profile
-    "external_links",   // Access external links
-    "download",         // Download content locally
+    "post",           // Create new content
+    "share",          // Share content with others
+    "vote",           // Participate in governance
+    "comment",        // Add comments/replies
+    "transfer",       // Transfer assets/points
+    "direct_message", // Send DMs
+    "group_create",   // Create groups/communities
+    "profile_edit",   // Modify own profile
+    "external_links", // Access external links
+    "download",       // Download content locally
 ];
 
 /// Inalienable rights that cannot be disabled even by coordinators
@@ -126,13 +126,13 @@ pub const INALIENABLE_FEATURES: [&str; 6] = [
 #[derive(Clone, PartialEq)]
 pub struct StewardshipGrant {
     pub id: String,
-    pub steward_id: String,  // Who has authority
-    pub subject_id: String,  // Whose capabilities are managed
+    pub steward_id: String, // Who has authority
+    pub subject_id: String, // Whose capabilities are managed
 
     // === AUTHORITY BASIS ===
-    pub authority_basis: String, // See AUTHORITY_BASIS_TYPES
+    pub authority_basis: String,       // See AUTHORITY_BASIS_TYPES
     pub evidence_hash: Option<String>, // Supporting documentation hash
-    pub verified_by: String, // Who verified (Elohim, council, etc.)
+    pub verified_by: String,           // Who verified (Elohim, council, etc.)
 
     // === CAPABILITY SCOPE ===
     pub content_filtering: bool,    // Block/allow content
@@ -142,15 +142,15 @@ pub struct StewardshipGrant {
     pub policy_delegation: bool,    // Delegate to other stewards
 
     // === DELEGATION ===
-    pub delegatable: bool, // Can this steward delegate to others?
+    pub delegatable: bool,              // Can this steward delegate to others?
     pub delegated_from: Option<String>, // Parent grant if delegated
-    pub delegation_depth: u32, // How many levels of delegation (0 = original)
+    pub delegation_depth: u32,          // How many levels of delegation (0 = original)
 
     // === LIFECYCLE ===
     pub granted_at: String,
-    pub expires_at: String,  // Mandatory expiry
-    pub review_at: String,   // Mandatory review date
-    pub status: String,      // See GRANT_STATUSES
+    pub expires_at: String, // Mandatory expiry
+    pub review_at: String,  // Mandatory review date
+    pub status: String,     // See GRANT_STATUSES
 
     // === APPEAL ===
     pub appeal_id: Option<String>, // Active appeal if any
@@ -176,7 +176,7 @@ pub struct DevicePolicy {
 
     // === AUTHORSHIP ===
     pub author_id: String,
-    pub author_tier: String, // See STEWARD_CAPABILITY_TIERS
+    pub author_tier: String,           // See STEWARD_CAPABILITY_TIERS
     pub inherits_from: Option<String>, // Parent policy ID
 
     // === CONTENT RULES ===
@@ -198,10 +198,10 @@ pub struct DevicePolicy {
 
     // === MONITORING RULES ===
     pub log_sessions: bool,
-    pub log_categories: bool,     // Aggregated, not individual
-    pub log_policy_events: bool,  // Violations/blocks
+    pub log_categories: bool,    // Aggregated, not individual
+    pub log_policy_events: bool, // Violations/blocks
     pub retention_days: u32,
-    pub subject_can_view: bool,   // Transparency - subject sees logs
+    pub subject_can_view: bool, // Transparency - subject sees logs
 
     // === LIFECYCLE ===
     pub effective_from: String,
@@ -227,7 +227,7 @@ pub struct DevicePolicy {
 pub struct PolicyInheritance {
     pub id: String,
     pub subject_id: String,
-    pub chain_json: String, // Vec<PolicyChainLink> as JSON
+    pub chain_json: String,         // Vec<PolicyChainLink> as JSON
     pub computed_policy_id: String, // Merged result policy ID
     pub computed_at: String,
     pub created_at: String,
@@ -244,13 +244,13 @@ pub struct PolicyInheritance {
 #[derive(Clone, PartialEq)]
 pub struct StewardshipAppeal {
     pub id: String,
-    pub appellant_id: String, // Subject or advocate
-    pub grant_id: String,     // Grant being appealed
+    pub appellant_id: String,      // Subject or advocate
+    pub grant_id: String,          // Grant being appealed
     pub policy_id: Option<String>, // Specific policy if applicable
 
     // === APPEAL DETAILS ===
-    pub appeal_type: String, // See APPEAL_TYPES
-    pub grounds_json: String, // Vec<String> as JSON - reasons for appeal
+    pub appeal_type: String,   // See APPEAL_TYPES
+    pub grounds_json: String,  // Vec<String> as JSON - reasons for appeal
     pub evidence_json: String, // Supporting evidence
 
     // === ADVOCACY ===
@@ -258,7 +258,7 @@ pub struct StewardshipAppeal {
     pub advocate_notes: Option<String>,
 
     // === ARBITRATION ===
-    pub arbitration_layer: String, // Constitutional layer handling
+    pub arbitration_layer: String,   // Constitutional layer handling
     pub assigned_to: Option<String>, // Arbitrator assigned
 
     // === STATUS ===
@@ -310,7 +310,9 @@ pub struct ActivityLog {
 // =============================================================================
 
 /// Validate StewardshipGrant entry
-pub fn validate_stewardship_grant(grant: &StewardshipGrant) -> ExternResult<ValidateCallbackResult> {
+pub fn validate_stewardship_grant(
+    grant: &StewardshipGrant,
+) -> ExternResult<ValidateCallbackResult> {
     if grant.id.is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "StewardshipGrant ID cannot be empty".to_string(),
@@ -424,7 +426,9 @@ pub fn validate_device_policy(policy: &DevicePolicy) -> ExternResult<ValidateCal
 }
 
 /// Validate PolicyInheritance entry
-pub fn validate_policy_inheritance(inheritance: &PolicyInheritance) -> ExternResult<ValidateCallbackResult> {
+pub fn validate_policy_inheritance(
+    inheritance: &PolicyInheritance,
+) -> ExternResult<ValidateCallbackResult> {
     if inheritance.id.is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "PolicyInheritance ID cannot be empty".to_string(),
@@ -447,7 +451,9 @@ pub fn validate_policy_inheritance(inheritance: &PolicyInheritance) -> ExternRes
 }
 
 /// Validate StewardshipAppeal entry
-pub fn validate_stewardship_appeal(appeal: &StewardshipAppeal) -> ExternResult<ValidateCallbackResult> {
+pub fn validate_stewardship_appeal(
+    appeal: &StewardshipAppeal,
+) -> ExternResult<ValidateCallbackResult> {
     if appeal.id.is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "StewardshipAppeal ID cannot be empty".to_string(),

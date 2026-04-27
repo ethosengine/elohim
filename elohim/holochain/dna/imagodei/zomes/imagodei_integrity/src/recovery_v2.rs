@@ -74,14 +74,10 @@ pub enum NetworkWitnessPurpose {
 pub enum RecoveryAuthority {
     /// Layer 1: Intimate-circle quorum via HumanityWitness entries from emergency contacts.
     /// Phase 2: IMPLEMENTED (structural shape; variant-specific validation lands in M2).
-    IntimateQuorum {
-        witness_hashes: Vec<ActionHash>,
-    },
+    IntimateQuorum { witness_hashes: Vec<ActionHash> },
     /// Layer 2: Extended community via IdentityChallenge resolution.
     /// Phase 2: STUB-REJECTED (Phase 2b).
-    CommunityConsensus {
-        challenge_hash: ActionHash,
-    },
+    CommunityConsensus { challenge_hash: ActionHash },
     /// Layer 3: Governance act via qahal/stewardship resolution.
     /// Phase 2: STUB-REJECTED (cross-DNA qahal/mishpat work pending).
     GovernanceAct {
@@ -183,19 +179,24 @@ pub fn check_intimate_quorum_rules(
 
     // Rule: all witnesses target the same human_id.
     let first_human_id = &resolved_witnesses[0].0.human_id;
-    if resolved_witnesses.iter().any(|(w, _)| &w.human_id != first_human_id) {
+    if resolved_witnesses
+        .iter()
+        .any(|(w, _)| &w.human_id != first_human_id)
+    {
         return ValidateCallbackResult::Invalid(
             "IntimateQuorum witnesses disagree on human_id target".to_string(),
         );
     }
 
     // Rule: target human_id matches request.human_id (coordinator must populate).
-    let req_human_id = match &request.human_id {
-        Some(id) => id,
-        None => return ValidateCallbackResult::Invalid(
-            "IntimateQuorum requires RecoveryRequest.human_id to be populated by coordinator".to_string(),
-        ),
-    };
+    let req_human_id =
+        match &request.human_id {
+            Some(id) => id,
+            None => return ValidateCallbackResult::Invalid(
+                "IntimateQuorum requires RecoveryRequest.human_id to be populated by coordinator"
+                    .to_string(),
+            ),
+        };
     if first_human_id != req_human_id {
         return ValidateCallbackResult::Invalid(
             "IntimateQuorum witness human_id does not match RecoveryRequest.human_id".to_string(),
@@ -203,7 +204,10 @@ pub fn check_intimate_quorum_rules(
     }
 
     // Rule: no witness is explicitly revoked.
-    if resolved_witnesses.iter().any(|(w, _)| w.revoked_at.is_some()) {
+    if resolved_witnesses
+        .iter()
+        .any(|(w, _)| w.revoked_at.is_some())
+    {
         return ValidateCallbackResult::Invalid(
             "IntimateQuorum includes a revoked HumanityWitness".to_string(),
         );
@@ -279,7 +283,8 @@ pub fn check_cryptographic_quorum_rules(
     };
 
     // Message: new_agent_pubkey (39 bytes) || recovery_request_hash (39 bytes).
-    let mut message: Vec<u8> = Vec::with_capacity(new_agent_pubkey_raw.len() + recovery_request_hash_raw.len());
+    let mut message: Vec<u8> =
+        Vec::with_capacity(new_agent_pubkey_raw.len() + recovery_request_hash_raw.len());
     message.extend_from_slice(new_agent_pubkey_raw);
     message.extend_from_slice(recovery_request_hash_raw);
 
@@ -434,11 +439,40 @@ mod tests {
 
     #[test]
     fn test_authority_layer_name_variants() {
-        assert_eq!(authority_layer_name(&RecoveryAuthority::IntimateQuorum { witness_hashes: vec![] }), LAYER_INTIMATE);
-        assert_eq!(authority_layer_name(&RecoveryAuthority::CommunityConsensus { challenge_hash: fake_action_hash() }), LAYER_COMMUNITY);
-        assert_eq!(authority_layer_name(&RecoveryAuthority::GovernanceAct { grant_hash: fake_action_hash(), resolution_hash: fake_action_hash() }), LAYER_GOVERNANCE);
-        assert_eq!(authority_layer_name(&RecoveryAuthority::NetworkWitness { witness_entries: vec![], consensus_threshold_met_at: Timestamp::from_micros(0), purpose: NetworkWitnessPurpose::Rescue }), LAYER_NETWORK);
-        assert_eq!(authority_layer_name(&RecoveryAuthority::CryptographicQuorum { stewardship_hash: fake_action_hash(), quorum_signature: vec![] }), LAYER_CRYPTOGRAPHIC);
+        assert_eq!(
+            authority_layer_name(&RecoveryAuthority::IntimateQuorum {
+                witness_hashes: vec![]
+            }),
+            LAYER_INTIMATE
+        );
+        assert_eq!(
+            authority_layer_name(&RecoveryAuthority::CommunityConsensus {
+                challenge_hash: fake_action_hash()
+            }),
+            LAYER_COMMUNITY
+        );
+        assert_eq!(
+            authority_layer_name(&RecoveryAuthority::GovernanceAct {
+                grant_hash: fake_action_hash(),
+                resolution_hash: fake_action_hash()
+            }),
+            LAYER_GOVERNANCE
+        );
+        assert_eq!(
+            authority_layer_name(&RecoveryAuthority::NetworkWitness {
+                witness_entries: vec![],
+                consensus_threshold_met_at: Timestamp::from_micros(0),
+                purpose: NetworkWitnessPurpose::Rescue
+            }),
+            LAYER_NETWORK
+        );
+        assert_eq!(
+            authority_layer_name(&RecoveryAuthority::CryptographicQuorum {
+                stewardship_hash: fake_action_hash(),
+                quorum_signature: vec![]
+            }),
+            LAYER_CRYPTOGRAPHIC
+        );
     }
 
     #[test]
@@ -468,14 +502,20 @@ mod tests {
             mk_witness("human-abc", None, fake_agent_pubkey(1)),
             mk_witness("human-abc", None, fake_agent_pubkey(2)),
         ];
-        assert!(matches!(check_intimate_quorum_rules(&req, &witnesses), ValidateCallbackResult::Valid));
+        assert!(matches!(
+            check_intimate_quorum_rules(&req, &witnesses),
+            ValidateCallbackResult::Valid
+        ));
     }
 
     #[test]
     fn test_intimate_below_absolute_floor() {
         let req = mk_request(Some("human-abc"), 2);
         let witnesses = vec![mk_witness("human-abc", None, fake_agent_pubkey(1))];
-        assert_rejects(check_intimate_quorum_rules(&req, &witnesses), "requires at least 2");
+        assert_rejects(
+            check_intimate_quorum_rules(&req, &witnesses),
+            "requires at least 2",
+        );
     }
 
     #[test]
@@ -496,7 +536,10 @@ mod tests {
             mk_witness("human-abc", None, dup.clone()),
             mk_witness("human-abc", None, dup),
         ];
-        assert_rejects(check_intimate_quorum_rules(&req, &witnesses), "distinct authors");
+        assert_rejects(
+            check_intimate_quorum_rules(&req, &witnesses),
+            "distinct authors",
+        );
     }
 
     #[test]
@@ -516,7 +559,10 @@ mod tests {
             mk_witness("human-abc", None, fake_agent_pubkey(1)),
             mk_witness("human-xyz", None, fake_agent_pubkey(2)),
         ];
-        assert_rejects(check_intimate_quorum_rules(&req, &witnesses), "disagree on human_id");
+        assert_rejects(
+            check_intimate_quorum_rules(&req, &witnesses),
+            "disagree on human_id",
+        );
     }
 
     #[test]
@@ -526,7 +572,10 @@ mod tests {
             mk_witness("human-xyz", None, fake_agent_pubkey(1)),
             mk_witness("human-xyz", None, fake_agent_pubkey(2)),
         ];
-        assert_rejects(check_intimate_quorum_rules(&req, &witnesses), "does not match RecoveryRequest.human_id");
+        assert_rejects(
+            check_intimate_quorum_rules(&req, &witnesses),
+            "does not match RecoveryRequest.human_id",
+        );
     }
 
     #[test]
@@ -536,7 +585,10 @@ mod tests {
             mk_witness("human-abc", None, fake_agent_pubkey(1)),
             mk_witness("human-abc", None, fake_agent_pubkey(2)),
         ];
-        assert_rejects(check_intimate_quorum_rules(&req, &witnesses), "RecoveryRequest.human_id");
+        assert_rejects(
+            check_intimate_quorum_rules(&req, &witnesses),
+            "RecoveryRequest.human_id",
+        );
     }
 
     // ---- CryptographicQuorum ----
@@ -627,21 +679,27 @@ mod tests {
 
     #[test]
     fn test_freeze_floor_no_freezes_passes() {
-        let authority = RecoveryAuthority::IntimateQuorum { witness_hashes: vec![] };
+        let authority = RecoveryAuthority::IntimateQuorum {
+            witness_hashes: vec![],
+        };
         assert_eq!(check_freeze_floor_rules(&authority, "human-abc", &[]), None);
     }
 
     #[test]
     fn test_freeze_floor_same_layer_rejects() {
         let freeze = mk_freeze("human-abc", true, Some("intimate"));
-        let authority = RecoveryAuthority::IntimateQuorum { witness_hashes: vec![] };
+        let authority = RecoveryAuthority::IntimateQuorum {
+            witness_hashes: vec![],
+        };
         assert!(check_freeze_floor_rules(&authority, "human-abc", &[&freeze]).is_some());
     }
 
     #[test]
     fn test_freeze_floor_lower_layer_rejects() {
         let freeze = mk_freeze("human-abc", true, Some("governance"));
-        let authority = RecoveryAuthority::IntimateQuorum { witness_hashes: vec![] };
+        let authority = RecoveryAuthority::IntimateQuorum {
+            witness_hashes: vec![],
+        };
         assert!(check_freeze_floor_rules(&authority, "human-abc", &[&freeze]).is_some());
     }
 
@@ -653,31 +711,51 @@ mod tests {
             consensus_threshold_met_at: Timestamp::from_micros(0),
             purpose: NetworkWitnessPurpose::Rescue,
         };
-        assert_eq!(check_freeze_floor_rules(&authority, "human-abc", &[&freeze]), None);
+        assert_eq!(
+            check_freeze_floor_rules(&authority, "human-abc", &[&freeze]),
+            None
+        );
     }
 
     #[test]
     fn test_freeze_floor_none_layer_treated_as_intimate() {
         let freeze = mk_freeze("human-abc", true, None);
-        let intimate = RecoveryAuthority::IntimateQuorum { witness_hashes: vec![] };
+        let intimate = RecoveryAuthority::IntimateQuorum {
+            witness_hashes: vec![],
+        };
         assert!(check_freeze_floor_rules(&intimate, "human-abc", &[&freeze]).is_some());
 
-        let community = RecoveryAuthority::CommunityConsensus { challenge_hash: fake_action_hash() };
-        assert_eq!(check_freeze_floor_rules(&community, "human-abc", &[&freeze]), None);
+        let community = RecoveryAuthority::CommunityConsensus {
+            challenge_hash: fake_action_hash(),
+        };
+        assert_eq!(
+            check_freeze_floor_rules(&community, "human-abc", &[&freeze]),
+            None
+        );
     }
 
     #[test]
     fn test_freeze_floor_lifted_freeze_passes() {
         let freeze = mk_freeze("human-abc", false, Some("intimate"));
-        let authority = RecoveryAuthority::IntimateQuorum { witness_hashes: vec![] };
-        assert_eq!(check_freeze_floor_rules(&authority, "human-abc", &[&freeze]), None);
+        let authority = RecoveryAuthority::IntimateQuorum {
+            witness_hashes: vec![],
+        };
+        assert_eq!(
+            check_freeze_floor_rules(&authority, "human-abc", &[&freeze]),
+            None
+        );
     }
 
     #[test]
     fn test_freeze_floor_different_human_passes() {
         let freeze = mk_freeze("human-other", true, Some("intimate"));
-        let authority = RecoveryAuthority::IntimateQuorum { witness_hashes: vec![] };
-        assert_eq!(check_freeze_floor_rules(&authority, "human-abc", &[&freeze]), None);
+        let authority = RecoveryAuthority::IntimateQuorum {
+            witness_hashes: vec![],
+        };
+        assert_eq!(
+            check_freeze_floor_rules(&authority, "human-abc", &[&freeze]),
+            None
+        );
     }
 
     // ---- Test fixtures ----
@@ -796,9 +874,7 @@ mod tests {
     }
 }
 
-pub fn validate_key_rotation(
-    rotation: &KeyRotation,
-) -> ExternResult<ValidateCallbackResult> {
+pub fn validate_key_rotation(rotation: &KeyRotation) -> ExternResult<ValidateCallbackResult> {
     // Rule 1: new_agent_pubkey must differ from superseded_agent_pubkey
     if rotation.new_agent_pubkey == rotation.superseded_agent_pubkey {
         return Ok(ValidateCallbackResult::Invalid(
@@ -811,9 +887,11 @@ pub fn validate_key_rotation(
     let request_entry: super::RecoveryRequest = request_record
         .entry()
         .to_app_option()
-        .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!(
-            "KeyRotation references non-RecoveryRequest entry: {e:?}"
-        ))))?
+        .map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "KeyRotation references non-RecoveryRequest entry: {e:?}"
+            )))
+        })?
         .ok_or(wasm_error!(WasmErrorInner::Guest(
             "KeyRotation recovery_request_hash entry missing".to_string()
         )))?;
@@ -830,7 +908,10 @@ pub fn validate_key_rotation(
     }
 
     // Rule 3: Freeze-floor check (CryptographicQuorum is orthogonal; exempt).
-    if !matches!(rotation.authority, RecoveryAuthority::CryptographicQuorum { .. }) {
+    if !matches!(
+        rotation.authority,
+        RecoveryAuthority::CryptographicQuorum { .. }
+    ) {
         if let Some(reason) = check_freeze_floor(&rotation.authority, &request_entry.human_id)? {
             return Ok(ValidateCallbackResult::Invalid(reason));
         }
@@ -856,4 +937,3 @@ pub fn validate_key_rotation(
         )),
     }
 }
-

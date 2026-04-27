@@ -40,10 +40,18 @@ pub const AGENT_TYPES: [&str; 4] = [
     "elohim",       // Governance/system entities
 ];
 
-/// Visibility levels for profiles and content
-pub const VISIBILITY_LEVELS: [&str; 3] = [
+/// Visibility levels for profiles and content.
+///
+/// Aligned with the canonical `path-visibility` schema core tier
+/// (`elohim/sdk/schemas/v1/enums/path-visibility.schema.json`):
+/// `private` → `unlisted` → `community` → `public`. The legacy
+/// `connections` value is kept for backward-compat with profile records
+/// authored before the schema-first IoC pass.
+pub const VISIBILITY_LEVELS: [&str; 5] = [
     "public",      // Visible to everyone
-    "connections", // Visible to connected agents
+    "community",   // Visible to community members (schema core)
+    "unlisted",    // Discoverable by direct link only (schema core)
+    "connections", // Legacy: visible to connected agents (pre-schema)
     "private",     // Visible only to self
 ];
 

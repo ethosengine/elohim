@@ -217,7 +217,9 @@ pub fn create_agent_peer_binding(
 /// Returns only currently-valid bindings (superseded entries are filtered out).
 /// Callers needing historical bindings should query the entry directly.
 #[hdk_extern]
-pub fn get_agent_peer_bindings(agent_pubkey: AgentPubKey) -> ExternResult<Vec<AgentPeerBindingView>> {
+pub fn get_agent_peer_bindings(
+    agent_pubkey: AgentPubKey,
+) -> ExternResult<Vec<AgentPeerBindingView>> {
     let query = LinkQuery::try_new(agent_pubkey, LinkTypes::AgentToPeerBinding)?;
     let links = get_links(query, GetStrategy::default())?;
 
