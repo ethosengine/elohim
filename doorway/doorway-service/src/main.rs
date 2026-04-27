@@ -129,14 +129,22 @@ async fn main() -> anyhow::Result<()> {
     //
     // The browser app needs admin commands (generate_agent_pub_key, list_apps, etc.)
     // which MUST go to the admin interface, not the app interface.
+    //
+    // The Holochain 0.6 app interface requires per-connection authentication: the client
+    // sends an `authenticate` message with a token issued via the admin interface's
+    // `issue_app_auth_token`. Without it the conductor closes every WebSocket immediately,
+    // so the app pool MUST have a token. The admin pool needs no token.
 
     // APP pool - for zome calls
     let worker_app_url = derive_app_url(&args.conductor_url, args.app_port_min);
+    let app_auth_token =
+        mint_app_auth_token(args.admin_url(), &args.installed_app_id, args.dev_mode).await;
     let app_pool = match WorkerPool::new(PoolConfig {
         worker_count: args.worker_count,
         conductor_url: worker_app_url.clone(),
         request_timeout_ms: args.request_timeout_ms,
         max_queue_size: 1000,
+        auth_token: app_auth_token.clone(),
     })
     .await
     {
@@ -162,12 +170,14 @@ async fn main() -> anyhow::Result<()> {
     };
 
     // ADMIN pool - for admin commands (generate_agent_pub_key, list_apps, etc.)
+    // Admin interface does not use app authentication, so auth_token stays None.
     let admin_url = args.admin_url().to_string();
     let admin_pool = match WorkerPool::new(PoolConfig {
         worker_count: args.worker_count,
         conductor_url: admin_url.clone(),
         request_timeout_ms: args.request_timeout_ms,
         max_queue_size: 1000,
+        auth_token: None,
     })
     .await
     {
@@ -295,11 +305,18 @@ async fn main() -> anyhow::Result<()> {
             // derive_app_url would replace the port with app_port_min (4445), which breaks
             // headless k8s services where the socat proxy listens on a different port (e.g. 8445).
             let app_url = url.clone();
+            // Mint a token from this conductor's admin interface — the app interface
+            // will close any unauthenticated connection.
+            let admin_url_for_pool = derive_admin_url_from_app(&app_url);
+            let pool_auth_token =
+                mint_app_auth_token(&admin_url_for_pool, &args.installed_app_id, args.dev_mode)
+                    .await;
             match WorkerPool::new(PoolConfig {
                 worker_count: 2, // Per-conductor pools are smaller than the main pool
                 conductor_url: app_url.clone(),
                 request_timeout_ms: args.request_timeout_ms,
                 max_queue_size: 500,
+                auth_token: pool_auth_token,
             })
             .await
             {
@@ -763,6 +780,93 @@ async fn main() -> anyhow::Result<()> {
 /// Delegates to the library implementation so there is a single source of truth.
 fn derive_admin_url_from_app(app_url: &str) -> String {
     doorway::derive_admin_url_from_app(app_url)
+}
+
+/// Mint an app authentication token by connecting to a conductor's admin interface
+/// and calling `issue_app_auth_token`.
+///
+/// Holochain 0.6's app interface requires every WebSocket connection to authenticate
+/// with a token; without it the conductor closes the socket immediately. The
+/// WorkerPool's app-interface workers need this token in their `PoolConfig`.
+///
+/// Strategy:
+/// - Retry a handful of times with short backoff to handle conductor warmup
+///   (admin interface is the first to come up, but the app may not be installed
+///   yet during a fresh boot).
+/// - In dev mode, return `None` on failure so the pool still starts (workers will
+///   fail to connect, which the existing dev-mode error handling tolerates).
+/// - In production, return `None` on failure too — the pool creation step will
+///   then start without auth and visibly fail to authenticate, which is preferable
+///   to refusing to start at all (same observable failure mode as before this fix,
+///   but with a clear log line).
+async fn mint_app_auth_token(
+    admin_url: &str,
+    installed_app_id: &str,
+    dev_mode: bool,
+) -> Option<Vec<u8>> {
+    use doorway::conductor::TypedAdminClient;
+
+    const MAX_ATTEMPTS: u32 = 5;
+    const BASE_DELAY: std::time::Duration = std::time::Duration::from_millis(500);
+    const TOKEN_EXPIRY_SECS: u64 = 24 * 60 * 60; // 24h — workers reuse on every reconnect
+
+    for attempt in 1..=MAX_ATTEMPTS {
+        match TypedAdminClient::connect(admin_url).await {
+            Ok(admin) => match admin
+                .issue_app_authentication_token(installed_app_id, TOKEN_EXPIRY_SECS)
+                .await
+            {
+                Ok(token) => {
+                    info!(
+                        admin_url = %admin_url,
+                        app_id = %installed_app_id,
+                        token_bytes = token.len(),
+                        "Minted app auth token for worker pool"
+                    );
+                    return Some(token);
+                }
+                Err(e) => {
+                    warn!(
+                        admin_url = %admin_url,
+                        app_id = %installed_app_id,
+                        attempt,
+                        error = %e,
+                        "issue_app_auth_token failed (will retry)"
+                    );
+                }
+            },
+            Err(e) => {
+                warn!(
+                    admin_url = %admin_url,
+                    attempt,
+                    error = %e,
+                    "Admin client connect failed while minting auth token (will retry)"
+                );
+            }
+        }
+
+        if attempt < MAX_ATTEMPTS {
+            let delay = BASE_DELAY * 2u32.saturating_pow(attempt - 1);
+            tokio::time::sleep(delay.min(std::time::Duration::from_secs(5))).await;
+        }
+    }
+
+    if dev_mode {
+        warn!(
+            admin_url = %admin_url,
+            app_id = %installed_app_id,
+            "Failed to mint app auth token after {} attempts (dev mode, continuing without — workers will retry)",
+            MAX_ATTEMPTS
+        );
+    } else {
+        error!(
+            admin_url = %admin_url,
+            app_id = %installed_app_id,
+            "Failed to mint app auth token after {} attempts — app pool will start unauthenticated and likely fail to connect",
+            MAX_ATTEMPTS
+        );
+    }
+    None
 }
 
 /// Discover existing agents by querying each conductor's admin API.

@@ -34,6 +34,11 @@ pub struct PoolConfig {
     pub request_timeout_ms: u64,
     /// Maximum queued requests
     pub max_queue_size: usize,
+    /// App authentication token bytes for the Holochain 0.6 app interface.
+    /// `None` for admin-interface pools (admin doesn't require auth);
+    /// `Some(token)` for app-interface pools (zome calls), minted via the
+    /// admin client's `issue_app_auth_token`.
+    pub auth_token: Option<Vec<u8>>,
 }
 
 impl Default for PoolConfig {
@@ -43,6 +48,7 @@ impl Default for PoolConfig {
             conductor_url: "ws://localhost:4444".to_string(),
             request_timeout_ms: 30000,
             max_queue_size: 1000,
+            auth_token: None,
         }
     }
 }
@@ -109,9 +115,18 @@ impl WorkerPool {
             let request_rx = Arc::clone(&request_rx);
             let timeout_ms = config.request_timeout_ms;
             let connected_workers = Arc::clone(&connected_workers);
+            let auth_token = config.auth_token.clone();
 
             tokio::spawn(async move {
-                worker_task(i, conductor_url, request_rx, timeout_ms, connected_workers).await;
+                worker_task(
+                    i,
+                    conductor_url,
+                    auth_token,
+                    request_rx,
+                    timeout_ms,
+                    connected_workers,
+                )
+                .await;
             });
         }
 
@@ -254,20 +269,34 @@ fn backoff_with_jitter(attempt: u32) -> Duration {
 async fn worker_task(
     worker_id: usize,
     conductor_url: String,
+    auth_token: Option<Vec<u8>>,
     request_rx: Arc<tokio::sync::Mutex<mpsc::Receiver<PoolRequest>>>,
     timeout_ms: u64,
     connected_workers: Arc<AtomicUsize>,
 ) {
     info!(
-        "Worker {} starting, connecting to {}",
-        worker_id, conductor_url
+        "Worker {} starting, connecting to {} ({})",
+        worker_id,
+        conductor_url,
+        if auth_token.is_some() {
+            "authenticated"
+        } else {
+            "unauthenticated"
+        }
     );
 
     let mut consecutive_failures: u32 = 0;
 
     loop {
-        // Connect to conductor with exponential backoff on failure
-        let conductor = match ConductorConnection::connect(&conductor_url).await {
+        // Connect to conductor with exponential backoff on failure.
+        // Pass the auth token if configured (app-interface pools); admin-interface
+        // pools have `auth_token: None` and skip the authenticate handshake.
+        let conductor = match ConductorConnection::connect_with_auth(
+            &conductor_url,
+            auth_token.clone(),
+        )
+        .await
+        {
             Ok(c) => {
                 // Reset failure counter on successful connect
                 consecutive_failures = 0;
@@ -358,6 +387,24 @@ mod tests {
         let config = PoolConfig::default();
         assert_eq!(config.worker_count, 4);
         assert_eq!(config.max_queue_size, 1000);
+        assert!(
+            config.auth_token.is_none(),
+            "Default config has no auth token; admin pools rely on this"
+        );
+    }
+
+    #[test]
+    fn test_config_with_auth_token() {
+        // App-interface pools must be able to carry an auth token
+        let token: Vec<u8> = vec![1, 2, 3, 4];
+        let config = PoolConfig {
+            worker_count: 2,
+            conductor_url: "ws://localhost:4445".to_string(),
+            request_timeout_ms: 5000,
+            max_queue_size: 100,
+            auth_token: Some(token.clone()),
+        };
+        assert_eq!(config.auth_token.as_deref(), Some(token.as_slice()));
     }
 
     #[test]

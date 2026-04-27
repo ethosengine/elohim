@@ -186,6 +186,7 @@ mod tests {
             conductor_url: "ws://test:4445".to_string(),
             request_timeout_ms: 5000,
             max_queue_size: 100,
+            auth_token: None,
         };
         // Pool creation requires async + running conductor
         // Integration tests should verify full flow
