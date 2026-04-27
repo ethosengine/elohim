@@ -578,6 +578,10 @@ fn handle_incoming_epr_request(
             }
             EprAtomResponse::AtomBatch { atoms }
         }
+        EprAtomRequest::IntegrityNotify { .. } => EprAtomResponse::IntegrityAck {
+            received: false,
+            reason: Some("harness: not handled".to_string()),
+        },
     }
 }
 
