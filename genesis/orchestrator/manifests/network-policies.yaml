@@ -37,11 +37,11 @@ spec:
     # Allow traffic from within the same namespace
     - from:
         - podSelector: {}
-    # Allow traffic from ingress controller
+    # Allow traffic from ingress controller (microk8s-bundled, ns is "ingress")
     - from:
         - namespaceSelector:
             matchLabels:
-              kubernetes.io/metadata.name: ingress-nginx
+              kubernetes.io/metadata.name: ingress
     # Allow DNS resolution
     - from:
         - namespaceSelector:
@@ -52,6 +52,20 @@ spec:
           port: 53
         - protocol: TCP
           port: 53
+    # Allow Jenkins runners (CI/CD operator surface) to reach storage + doorway.
+    # Jenkins is shared infra, not an environment — the cross-env policy's intent
+    # is to isolate envs from each other, not block trusted operator namespaces.
+    # Restricted to storage HTTP (8090) and doorway HTTP (8080); conductor
+    # admin/app ports (4444/4445) remain blocked.
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: jenkins
+      ports:
+        - protocol: TCP
+          port: 8090
+        - protocol: TCP
+          port: 8080
 
 ---
 # ============================================================================
