@@ -10,7 +10,7 @@
  *   - Post-deployment health verification
  *   - Clear decision matrix showing what will be built and why
  *   - Deployment manifest comparing expected vs actual versions
- *   - Commit message tags: [build:edge], [build:dna], [build:app], [build:all], [skip ci]
+ *   - Commit message tags: [build:edge], [build:dna], [build:app], [build:all], [skip ci], [deploy-only]
  *
  * Dependency Graph:
  *   elohim-holochain (DNA/hApp, WASM) [cascades: true]
@@ -570,7 +570,9 @@ def triggerPipeline(String name, String branch, boolean wait = true) {
         // their build stages and go straight to deploy. Safe to send to all
         // declared downstream pipelines — each one accepts the param as a no-op
         // when not deploy-bearing.
-        buildParams.add(booleanParam(name: 'DEPLOY_ONLY', value: params.DEPLOY_ONLY ?: false))
+        // Two activation paths: operator param OR [deploy-only] commit tag.
+        def deployOnlyDownstream = (params.DEPLOY_ONLY ?: false) || env.DEPLOY_ONLY_FROM_TAG == 'true'
+        buildParams.add(booleanParam(name: 'DEPLOY_ONLY', value: deployOnlyDownstream))
 
         def result = build(
             job: "${name}/${branch}",
@@ -858,6 +860,24 @@ spec:
                                 env.FORCE_BUILD_PIPELINES = buildTags.unique().join(',')
                                 echo "🔧 [build:*] tags detected — force-including: ${env.FORCE_BUILD_PIPELINES}"
                             }
+
+                            // [deploy-only] tag → behave as if operator triggered
+                            // Build with Parameters DEPLOY_ONLY=true. Lets a webhook
+                            // push communicate "I changed manifests/RBAC/Jenkinsfile,
+                            // existing Harbor tags are valid, just redeploy" without
+                            // an operator hand-trigger.
+                            //
+                            // Effect (read by Determine Build Plan + triggerPipeline):
+                            //   - bypasses changeset analysis
+                            //   - dispatches only elohim-edge (+ elohim-genesis if SKIP_GENESIS != true)
+                            //   - propagates DEPLOY_ONLY=true to every downstream pipeline
+                            //
+                            // Operator equivalent for non-webhook runs: Build with
+                            // Parameters → DEPLOY_ONLY=true.
+                            if (commitMsg =~ /(?i)\[deploy[-_ ]only\]/) {
+                                echo "🚀 [deploy-only] detected in commit message — DEPLOY_ONLY mode (skip builds, redeploy from env-file tags)"
+                                env.DEPLOY_ONLY_FROM_TAG = 'true'
+                            }
                         }
 
                         // Milestone 2: Abort older builds that reach this point after checkout
@@ -1058,12 +1078,17 @@ spec:
                         // Edge pipeline self-skips its build stages on DEPLOY_ONLY=true
                         // and runs only Deploy Edge Node - <Env>. Genesis runs unless
                         // operator sets SKIP_GENESIS=true.
-                        if (params.DEPLOY_ONLY) {
+                        //
+                        // Two activation paths: explicit operator param (params.DEPLOY_ONLY)
+                        // or [deploy-only] commit-message tag on the webhook push (env.DEPLOY_ONLY_FROM_TAG).
+                        def deployOnly = params.DEPLOY_ONLY || env.DEPLOY_ONLY_FROM_TAG == 'true'
+                        if (deployOnly) {
                             graphPipelines = ['elohim-edge']
                             if (!params.SKIP_GENESIS) {
                                 graphPipelines.add('elohim-genesis')
                             }
-                            echo "🚀 DEPLOY_ONLY=true: bypassing changeset analysis; dispatching ${graphPipelines.join(', ')}"
+                            def src = params.DEPLOY_ONLY ? 'param' : 'commit tag'
+                            echo "🚀 DEPLOY_ONLY=true (via ${src}): bypassing changeset analysis; dispatching ${graphPipelines.join(', ')}"
                         }
 
                         env.PIPELINES_TO_RUN = graphPipelines.join(',')
