@@ -1564,43 +1564,44 @@ async fn handle_request(
         }
 
         // ====================================================================
-        // Dynamic Route Registry — all remaining /api/v1/* and /account/* routes
+        // Dynamic Route Registry + SPA fallback — all remaining requests.
+        //
+        // The registry is consulted on every otherwise-unmatched request.
+        // Any path elohim-storage declared in its manifest (routes,
+        // blob_proxy, stream_proxy, …) is dispatched without doorway-side
+        // path-prefix changes — this is the contract written in
+        // doorway/CLAUDE.md ("Adding a new endpoint to elohim-storage
+        // automatically makes it routable through doorway").
+        //
+        // Registry miss + GET + slug configured → SPA bootstrap (Angular
+        // client-side routing). Anything else → 404.
         // ====================================================================
-        (_, p) if p.starts_with("/api/v1/") || p.starts_with("/account/") => {
-            let http_method = match *req.method() {
-                Method::GET => doorway_client::HttpMethod::Get,
-                Method::POST => doorway_client::HttpMethod::Post,
-                Method::PUT => doorway_client::HttpMethod::Put,
-                Method::DELETE => doorway_client::HttpMethod::Delete,
-                Method::PATCH => doorway_client::HttpMethod::Patch,
-                Method::HEAD => doorway_client::HttpMethod::Head,
-                _ => doorway_client::HttpMethod::Get,
-            };
+        (_, p) => {
+            let dispo = classify_dispatch(
+                &state.route_registry,
+                state.args.root_app_slug.as_deref(),
+                req.method(),
+                p,
+            )
+            .await;
 
-            let matches = state.route_registry.match_request(http_method, p).await;
-
-            if let Some(route) = matches.first() {
-                if let Some(endpoint) = route.storage_endpoint() {
-                    debug!(path = %p, endpoint = %endpoint, "Registry-routed to storage proxy");
-                    return Ok(to_boxed(routes::forward_to_storage(req, endpoint, p).await));
+            match dispo {
+                Disposition::StorageProxy { endpoint } => {
+                    debug!(path = %p, %endpoint, "Registry-routed to storage proxy");
+                    return Ok(to_boxed(
+                        routes::forward_to_storage(req, &endpoint, p).await,
+                    ));
                 }
-                // Future: handle ZomeCall, AgentProxy, BlobProxy, StreamProxy targets
-                debug!(path = %p, "Registry matched but target type not yet handled");
-                to_boxed(not_found_response(p))
-            } else {
-                debug!(path = %p, "No registry match");
-                to_boxed(not_found_response(p))
+                Disposition::RegistryUnhandled => {
+                    debug!(path = %p, "Registry matched but target type not yet handled");
+                    to_boxed(not_found_response(p))
+                }
+                Disposition::RootApp => {
+                    to_boxed(routes::handle_root_app_request(Arc::clone(&state), p).await)
+                }
+                Disposition::NotFound => to_boxed(not_found_response(p)),
             }
         }
-
-        // Root app catch-all: unmatched GET paths serve the SPA (if ROOT_APP_SLUG configured).
-        // Handles client-side routing — Angular paths like /learn/123 that aren't API routes.
-        (Method::GET, p) if state.args.root_app_slug.is_some() => {
-            to_boxed(routes::handle_root_app_request(Arc::clone(&state), p).await)
-        }
-
-        // Not found
-        _ => to_boxed(not_found_response(&path)),
     };
 
     // Fire-and-forget: contribute doorway-originated errors to the observation session.
