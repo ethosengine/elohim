@@ -72,3 +72,23 @@ The Jenkins → brit-attestation-producer migration is staged so each stage inde
 - **Stage 1c:** `git notes --ref=refs/notes/brit/builds/<pipeline>:<step> list` shows N entries after N successful builds of that step.
 - **Stage 2:** for the originating incident scenario (manifest-only commit), `env.PIPELINES_TO_RUN = "elohim-edge"` only, total dispatch time ~90s instead of ~75min.
 - **Stage 3:** `wc -l genesis/orchestrator/Jenkinsfile` shows ~750 lines (down from ~1532 after Stage 1a additions).
+
+## Stage 1a-bis — `[deploy-only]` commit-tag bridge (LANDED)
+
+A bridge between Stage 1a (advisory only) and Stage 2 (consumed plan). The orchestrator now recognizes `[deploy-only]` in the commit message of a webhook-triggered push and behaves as if the operator triggered Build with Parameters with `DEPLOY_ONLY=true`:
+
+- Bypasses changeset analysis
+- Dispatches only `elohim-edge` (and `elohim-genesis` unless `SKIP_GENESIS=true`)
+- Propagates `DEPLOY_ONLY=true` to every downstream pipeline
+
+**When to use:** any push that doesn't touch source code (manifest tweaks, RBAC, NetworkPolicy, storageClass, doc-only with deploy intent, post-incident k8s state restoration). Pair with the existing `[skip ci]` and `[build:*]` tags as needed.
+
+**Example:**
+
+```bash
+git commit -m "fix(infra): re-pin alpha-mongodb storageClass [deploy-only]"
+```
+
+**Why this isn't Stage 2:** Stage 2 derives the build plan from `brit plan` (content-addressed change graph). The `[deploy-only]` tag is operator-supplied intent, not derived. It's a reliable shortcut that doesn't depend on brit's signal pipeline being fully wired. When Stage 2 lands, brit's plan can either confirm or override the tag — but until then, the tag is the cheapest correct path through the matrix for the originating incident scenario.
+
+**Operator success criterion:** a commit message containing `[deploy-only]` produces an orchestrator log line `🚀 DEPLOY_ONLY=true (via commit tag): bypassing changeset analysis; dispatching elohim-edge, elohim-genesis`. Edge build skips its 9 build stages and runs only `Deploy Edge Node - <Env>`.
