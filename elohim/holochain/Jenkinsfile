@@ -1481,9 +1481,52 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
 
                                 echo "=== Deploying ${envHumans.size()} humans to ${targetEnv} ==="
 
-                                // Write env file with current build tags (preserve SITE_TAG)
-                                def currentSiteTag = readProperties(file: ec.envFile).SITE_TAG ?: 'dev-latest'
-                                writeFile file: ec.envFile, text: """# ${targetEnv.capitalize()} Environment - auto-updated by pipeline after each deploy
+                                // DEPLOY_ONLY: reuse the env file's existing tags (the
+                                // currently-deployed/known-good ones from a prior real build).
+                                // Build stages were skipped, so EDGENODE_TAG/DOORWAY_TAG/etc.
+                                // from Setup Version's loadBuildVars are computed-from-HEAD
+                                // and have NEVER been built or pushed to Harbor — applying
+                                // them to k8s would cause ImagePullBackOff (cf. edge #920
+                                // post-mortem). Skip the rewrite; readProperties(envFile)
+                                // downstream picks up the unchanged dev-latest tags.
+                                if (params.DEPLOY_ONLY) {
+                                    echo "DEPLOY_ONLY=true — preserving existing tags in ${ec.envFile} (no overwrite)"
+                                    def existing = readProperties(file: ec.envFile)
+                                    echo "  EDGENODE_TAG=${existing.EDGENODE_TAG}"
+                                    echo "  DOORWAY_TAG=${existing.DOORWAY_TAG}"
+                                    echo "  STORAGE_TAG=${existing.STORAGE_TAG}"
+                                    echo "  HAPP_INSTALLER_TAG=${existing.HAPP_INSTALLER_TAG}"
+                                    echo "  DOORWAY_APP_TAG=${existing.DOORWAY_APP_TAG}"
+                                    echo "  HAPP_TAG=${existing.HAPP_TAG}"
+                                    // Pre-flight: confirm each tag exists in Harbor before
+                                    // kubectl apply. Cheap (~1s per tag) and prevents the
+                                    // "deploy proceeds, pods crashloop" failure mode.
+                                    def checks = [
+                                        ['elohim-edgenode', existing.EDGENODE_TAG],
+                                        ['elohim-doorway', existing.DOORWAY_TAG],
+                                        ['elohim-storage', existing.STORAGE_TAG],
+                                        ['elohim-happ-installer', existing.HAPP_INSTALLER_TAG],
+                                        ['elohim-doorway-app', existing.DOORWAY_APP_TAG],
+                                    ]
+                                    def missing = []
+                                    checks.each { repo, tag ->
+                                        if (!tag || tag == 'null') return
+                                        def rc = sh(
+                                            script: "curl -sf -o /dev/null 'https://harbor.ethosengine.com/v2/ethosengine/${repo}/manifests/${tag}'",
+                                            returnStatus: true,
+                                        )
+                                        if (rc != 0) {
+                                            missing << "${repo}:${tag}"
+                                        }
+                                    }
+                                    if (missing) {
+                                        error "DEPLOY_ONLY pre-flight failed — missing Harbor manifests: ${missing.join(', ')}. Update ${ec.envFile} or run a non-DEPLOY_ONLY build first."
+                                    }
+                                    echo "✅ Harbor pre-flight passed — all tags exist"
+                                } else {
+                                    // Normal build: write env file with current build tags (preserve SITE_TAG)
+                                    def currentSiteTag = readProperties(file: ec.envFile).SITE_TAG ?: 'dev-latest'
+                                    writeFile file: ec.envFile, text: """# ${targetEnv.capitalize()} Environment - auto-updated by pipeline after each deploy
 # Format: COMPONENT_TAG=harbor-image-tag
 SITE_TAG=${currentSiteTag}
 EDGENODE_TAG=${EDGENODE_TAG}
@@ -1494,6 +1537,7 @@ DOORWAY_APP_TAG=${DOORWAY_APP_TAG}
 HAPP_TAG=${HAPP_TAG}
 AGENT_SDK_TAG=${AGENT_SDK_TAG}
 """
+                                }
 
                                 // Deploy infra (idempotent)
                                 ec.infraManifests.each { manifest ->
