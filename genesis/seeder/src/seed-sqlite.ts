@@ -28,6 +28,7 @@ import type { ConceptMetadata, PathMetadata } from './generated/metadata-types.j
 import type { Section, Item } from './generated/body-types.js';
 import { waitForDrain } from './wait-for-drain.js';
 import { applyPathThumbnail } from './path-thumbnail.js';
+import { recordBlobUploadOutcome } from './blob-upload-result.js';
 
 // Directory setup
 const __filename = fileURLToPath(import.meta.url);
@@ -952,21 +953,23 @@ async function main() {
     for (const app of html5Apps) {
       const blob = findHtml5AppBlob(app, contentDir);
       if (blob) {
-        // Check if already exists
         const exists = await blobExists(blob.hash);
         if (exists) {
           console.log(`   ✓ ${app.id}: already exists (${blob.hash.slice(0, 16)}...)`);
           blobsSkipped++;
+          recordBlobUploadOutcome(uploadedContentBlobs, app.id, { kind: 'existed', hash: blob.hash });
         } else {
           const hash = await uploadBlob(blob.data, 'application/zip', app.id);
           if (hash) {
             console.log(`   ✓ ${app.id}: uploaded ${(blob.data.length / 1024 / 1024).toFixed(2)} MB`);
             blobsUploaded++;
+            recordBlobUploadOutcome(uploadedContentBlobs, app.id, { kind: 'uploaded', hash: blob.hash });
           } else {
+            console.warn(`   ✗ ${app.id}: upload failed; skipping blobHash linkage`);
             blobsFailed++;
+            recordBlobUploadOutcome(uploadedContentBlobs, app.id, { kind: 'failed' });
           }
         }
-        uploadedContentBlobs.set(app.id, blob.hash);
       } else {
         // Check if there's a hash reference we should verify
         const existingHash = app.blobHash || app.blob_hash;
@@ -999,16 +1002,19 @@ async function main() {
         if (exists) {
           console.log(`   ✓ ${pathItem.id}: thumbnail already exists`);
           blobsSkipped++;
+          recordBlobUploadOutcome(uploadedThumbnails, pathItem.thumbnailUrl, { kind: 'existed', hash: thumbnail.hash });
         } else {
           const hash = await uploadBlob(thumbnail.data, thumbnail.mimeType, `${pathItem.id} thumbnail`);
           if (hash) {
             console.log(`   ✓ ${pathItem.id}: thumbnail uploaded ${(thumbnail.data.length / 1024).toFixed(1)} KB`);
             blobsUploaded++;
+            recordBlobUploadOutcome(uploadedThumbnails, pathItem.thumbnailUrl, { kind: 'uploaded', hash: thumbnail.hash });
           } else {
+            console.warn(`   ✗ ${pathItem.id}: thumbnail upload failed; skipping blobHash linkage`);
             blobsFailed++;
+            recordBlobUploadOutcome(uploadedThumbnails, pathItem.thumbnailUrl, { kind: 'failed' });
           }
         }
-        uploadedThumbnails.set(pathItem.thumbnailUrl, thumbnail.hash);
       }
     }
 
