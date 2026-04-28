@@ -784,6 +784,10 @@ function transformPathToContent(json: PathJson): CreateContentInput {
  *
  * We do NOT retry on:
  *  - HTTP 4xx (other than 429) — client-side bug, retry won't help
+ *
+ * In genesis #956 the storage WAL fix alone eliminated SQLITE_BUSY at the
+ * root, so this retry path was never exercised. It remains as
+ * defense-in-depth for genuine transient failures.
  */
 function isRetryable(status: number | null, bodyText: string): boolean {
   if (status === null) return true; // network error
