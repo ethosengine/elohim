@@ -1597,8 +1597,34 @@ AGENT_SDK_TAG=${AGENT_SDK_TAG}
                             def stagingHumans = allHumans.findAll { it.env == 'staging' }
 
                             def envFile = 'genesis/orchestrator/environments/staging.env'
-                            def currentSiteTag = readProperties(file: envFile).SITE_TAG ?: 'dev-latest'
-                            writeFile file: envFile, text: """# Staging Environment - auto-updated by pipeline after each deploy
+                            if (params.DEPLOY_ONLY) {
+                                echo "DEPLOY_ONLY=true — preserving existing tags in ${envFile} (no overwrite)"
+                                def existing = readProperties(file: envFile)
+                                def checks = [
+                                    ['elohim-edgenode', existing.EDGENODE_TAG],
+                                    ['elohim-doorway', existing.DOORWAY_TAG],
+                                    ['elohim-storage', existing.STORAGE_TAG],
+                                    ['elohim-happ-installer', existing.HAPP_INSTALLER_TAG],
+                                    ['elohim-doorway-app', existing.DOORWAY_APP_TAG],
+                                ]
+                                def missing = []
+                                checks.each { repo, tag ->
+                                    if (!tag || tag == 'null') return
+                                    def rc = sh(
+                                        script: "curl -sf -o /dev/null 'https://harbor.ethosengine.com/v2/ethosengine/${repo}/manifests/${tag}'",
+                                        returnStatus: true,
+                                    )
+                                    if (rc != 0) {
+                                        missing << "${repo}:${tag}"
+                                    }
+                                }
+                                if (missing) {
+                                    error "DEPLOY_ONLY pre-flight failed — missing Harbor manifests: ${missing.join(', ')}. Update ${envFile} or run a non-DEPLOY_ONLY build first."
+                                }
+                                echo "✅ Harbor pre-flight passed — all tags exist"
+                            } else {
+                                def currentSiteTag = readProperties(file: envFile).SITE_TAG ?: 'dev-latest'
+                                writeFile file: envFile, text: """# Staging Environment - auto-updated by pipeline after each deploy
 # Format: COMPONENT_TAG=harbor-image-tag
 SITE_TAG=${currentSiteTag}
 EDGENODE_TAG=${EDGENODE_TAG}
@@ -1609,6 +1635,7 @@ DOORWAY_APP_TAG=${DOORWAY_APP_TAG}
 HAPP_TAG=${HAPP_TAG}
 AGENT_SDK_TAG=${AGENT_SDK_TAG}
 """
+                            }
                             // Deploy infra (MongoDB + NATS) — idempotent
                             sh "kubectl apply -f genesis/orchestrator/manifests/infra/staging-mongodb.yaml"
                             sh "kubectl apply -f genesis/orchestrator/manifests/infra/staging-nats.yaml"
@@ -1705,8 +1732,34 @@ AGENT_SDK_TAG=${AGENT_SDK_TAG}
                             def prodHumans = allHumans.findAll { it.env == 'prod' }
 
                             def envFile = 'genesis/orchestrator/environments/prod.env'
-                            def currentSiteTag = readProperties(file: envFile).SITE_TAG ?: 'latest'
-                            writeFile file: envFile, text: """# Production Environment - auto-updated by pipeline after each deploy
+                            if (params.DEPLOY_ONLY) {
+                                echo "DEPLOY_ONLY=true — preserving existing tags in ${envFile} (no overwrite)"
+                                def existing = readProperties(file: envFile)
+                                def checks = [
+                                    ['elohim-edgenode', existing.EDGENODE_TAG],
+                                    ['elohim-doorway', existing.DOORWAY_TAG],
+                                    ['elohim-storage', existing.STORAGE_TAG],
+                                    ['elohim-happ-installer', existing.HAPP_INSTALLER_TAG],
+                                    ['elohim-doorway-app', existing.DOORWAY_APP_TAG],
+                                ]
+                                def missing = []
+                                checks.each { repo, tag ->
+                                    if (!tag || tag == 'null') return
+                                    def rc = sh(
+                                        script: "curl -sf -o /dev/null 'https://harbor.ethosengine.com/v2/ethosengine/${repo}/manifests/${tag}'",
+                                        returnStatus: true,
+                                    )
+                                    if (rc != 0) {
+                                        missing << "${repo}:${tag}"
+                                    }
+                                }
+                                if (missing) {
+                                    error "DEPLOY_ONLY pre-flight failed — missing Harbor manifests: ${missing.join(', ')}. Update ${envFile} or run a non-DEPLOY_ONLY build first."
+                                }
+                                echo "✅ Harbor pre-flight passed — all tags exist"
+                            } else {
+                                def currentSiteTag = readProperties(file: envFile).SITE_TAG ?: 'latest'
+                                writeFile file: envFile, text: """# Production Environment - auto-updated by pipeline after each deploy
 # Format: COMPONENT_TAG=harbor-image-tag
 SITE_TAG=${currentSiteTag}
 EDGENODE_TAG=${EDGENODE_TAG}
@@ -1717,6 +1770,7 @@ DOORWAY_APP_TAG=${DOORWAY_APP_TAG}
 HAPP_TAG=${HAPP_TAG}
 AGENT_SDK_TAG=${AGENT_SDK_TAG}
 """
+                            }
                             // Per-human manifests — topology-aware
                             prodHumans.each { humanConfig ->
                                 deployHumanManifest(humanConfig, envFile, allHumans)
