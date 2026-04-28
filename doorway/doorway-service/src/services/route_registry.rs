@@ -162,7 +162,7 @@ pub struct RouteRegistry {
     /// Routes from external agent registration (agent_pubkey -> entry)
     agent_routes: RwLock<HashMap<String, AgentRouteEntry>>,
     /// Compiled routes (recalculated when sources change)
-    compiled_routes: RwLock<Vec<CompiledRoute>>,
+    pub(crate) compiled_routes: RwLock<Vec<CompiledRoute>>,
     /// When routes were last compiled
     last_compiled: RwLock<Option<Instant>>,
 }

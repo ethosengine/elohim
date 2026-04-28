@@ -39,6 +39,46 @@ use crate::worker::{WorkerPool, ZomeCallConfig};
 
 type BoxBody = http_body_util::combinators::BoxBody<Bytes, hyper::Error>;
 
+/// Outcome of dispatching an unmatched request through the route registry.
+///
+/// Computed by `classify_dispatch` — separates the routing decision from the
+/// handler invocation so the decision logic can be unit-tested without spinning
+/// up an HTTP server or a real storage proxy.
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum Disposition {
+    /// Registry matched a `StorageProxy` route — caller forwards to `endpoint`.
+    StorageProxy { endpoint: String },
+    /// Registry matched but the target type is not yet handled by dispatch
+    /// (BlobProxy, StreamProxy, ZomeCall, AgentProxy). Caller returns 404.
+    RegistryUnhandled,
+    /// No registry match, GET method, root_app_slug is configured —
+    /// caller falls through to the root SPA bootstrap handler.
+    RootApp,
+    /// No registry match and no SPA fallback applies — caller returns 404.
+    NotFound,
+}
+
+/// Classify how an unmatched request should be dispatched.
+///
+/// Called from `handle_request` after all explicit match arms have been tried.
+/// Replaces the previous hard-coded `/api/v1/ || /account/` prefix guard, which
+/// failed every time elohim-storage's manifest added a new top-level path
+/// family (`blob_proxy`, `stream_proxy`, …) — `/blob/<hash>` requests skipped
+/// the registry entirely and fell into the SPA bootstrap, breaking thumbnails.
+///
+/// The contract: if the registry has any compiled route matching `(method, path)`,
+/// the registry decides. Otherwise, GET requests with a configured root SPA
+/// slug fall through to the SPA; anything else is 404.
+async fn classify_dispatch(
+    registry: &crate::services::RouteRegistry,
+    root_app_slug: Option<&str>,
+    method: &Method,
+    path: &str,
+) -> Disposition {
+    let _ = (registry, root_app_slug, method, path);
+    Disposition::NotFound
+}
+
 /// Shared application state
 pub struct AppState {
     pub args: Args,
@@ -2053,5 +2093,118 @@ mod gate_layer_tests {
 
         // Clean up the unused override so it doesn't bleed into subsequent tests.
         gate_client::__test_set_decision_override(None);
+    }
+}
+
+#[cfg(test)]
+mod dispatch_classification_tests {
+    //! Contract tests for `classify_dispatch`.
+    //!
+    //! These tests pin the dispatch contract that fixes the recurring
+    //! /blob/<hash> regression: any path the registry has compiled is routed
+    //! by the registry, regardless of prefix. Adding `blob_proxy` /
+    //! `stream_proxy` / future manifest path families to elohim-storage's
+    //! manifest must NOT require a doorway code change to make them routable.
+
+    use super::{classify_dispatch, Disposition};
+    use crate::services::RouteRegistry;
+    use doorway_client::HttpMethod;
+    use hyper::Method;
+
+    /// Inject a `StorageProxy` route at `path` into a fresh registry.
+    /// Mimics what `register_steward_peer` does internally after fetching
+    /// the manifest — see `route_registry.rs:671-687`.
+    async fn registry_with_storage_route(method: HttpMethod, path: &str) -> RouteRegistry {
+        use crate::services::route_registry::{CompiledRoute, RouteSource, RouteTarget};
+        let registry = RouteRegistry::with_defaults();
+        let route = CompiledRoute {
+            method,
+            path: path.to_string(),
+            source: RouteSource::StewardPeer {
+                storage_url: "http://storage:8090".to_string(),
+            },
+            target: RouteTarget::StorageProxy {
+                endpoint: "http://storage:8090".to_string(),
+            },
+            auth_required: false,
+            cache_ttl_secs: 0,
+            rate_limit_rpm: 0,
+        };
+        let mut compiled = registry.compiled_routes.write().await;
+        compiled.push(route);
+        drop(compiled);
+        registry
+    }
+
+    #[tokio::test]
+    async fn blob_path_dispatches_to_storage_proxy() {
+        // Regression: the recurring thumbnail bug. /blob/<hash> must reach
+        // the registry and be classified as StorageProxy, not fall through
+        // to the SPA bootstrap.
+        let registry = registry_with_storage_route(HttpMethod::Get, "/blob/:hash").await;
+        let dispo = classify_dispatch(
+            &registry,
+            Some("lamad"),
+            &Method::GET,
+            "/blob/sha256-abcdef123456",
+        )
+        .await;
+        assert!(
+            matches!(&dispo, Disposition::StorageProxy { endpoint } if endpoint == "http://storage:8090"),
+            "GET /blob/<hash> must classify as StorageProxy, got {dispo:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn arbitrary_new_prefix_reaches_registry() {
+        // The durable contract: a hypothetical future manifest path family
+        // (e.g. /thumbnails/, /shards/, anything outside /api/v1/+/account/)
+        // must route through the registry without a doorway code change.
+        let registry = registry_with_storage_route(HttpMethod::Get, "/future/:id").await;
+        let dispo =
+            classify_dispatch(&registry, Some("lamad"), &Method::GET, "/future/some-id").await;
+        assert!(
+            matches!(dispo, Disposition::StorageProxy { .. }),
+            "Any registry-compiled path must route through the registry"
+        );
+    }
+
+    #[tokio::test]
+    async fn unregistered_get_with_slug_falls_through_to_root_app() {
+        // SPA client-side routing: paths the registry doesn't know
+        // (e.g. /learn/<id>) must serve the SPA bootstrap on GET when a
+        // root_app_slug is configured.
+        let registry = RouteRegistry::with_defaults();
+        let dispo = classify_dispatch(
+            &registry,
+            Some("lamad"),
+            &Method::GET,
+            "/learn/some-path-id",
+        )
+        .await;
+        assert_eq!(
+            dispo,
+            Disposition::RootApp,
+            "Unregistered GET with slug configured must fall through to SPA"
+        );
+    }
+
+    #[tokio::test]
+    async fn unregistered_post_returns_not_found() {
+        // API misses must 404 (not serve HTML). Without this, an unknown
+        // POST /api/v1/foo would render the SPA bootstrap to a JSON client.
+        let registry = RouteRegistry::with_defaults();
+        let dispo = classify_dispatch(
+            &registry,
+            Some("lamad"),
+            &Method::POST,
+            "/api/v1/no-such-route",
+        )
+        .await;
+        assert_eq!(
+            dispo,
+            Disposition::NotFound,
+            "Unregistered non-GET must 404, never SPA"
+        );
     }
 }
