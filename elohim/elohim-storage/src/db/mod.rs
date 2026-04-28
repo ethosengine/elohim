@@ -154,12 +154,20 @@ struct SqlitePragmas;
 
 impl CustomizeConnection<SqliteConnection, diesel::r2d2::Error> for SqlitePragmas {
     fn on_acquire(&self, conn: &mut SqliteConnection) -> Result<(), diesel::r2d2::Error> {
-        // Wait up to 5 seconds for a locked database instead of failing immediately.
-        // This prevents "database is locked" errors during bulk seeding operations
-        // where multiple connections may contend for write access.
-        diesel::sql_query("PRAGMA busy_timeout = 5000")
-            .execute(conn)
-            .map_err(diesel::r2d2::Error::QueryError)?;
+        // High-concurrency SQLite setup. Multiple background writers share this
+        // pool (heartbeat, InfrastructureSignal subscriber, reconcile controller,
+        // import-handler drain) alongside HTTP request handlers and bulk content
+        // seeding, so we need WAL + a timeout long enough to absorb the worst
+        // overlap window without surfacing SQLITE_BUSY to clients.
+        for pragma in [
+            "PRAGMA journal_mode = WAL",
+            "PRAGMA synchronous = NORMAL",
+            "PRAGMA busy_timeout = 30000",
+        ] {
+            diesel::sql_query(pragma)
+                .execute(conn)
+                .map_err(diesel::r2d2::Error::QueryError)?;
+        }
         Ok(())
     }
 }
