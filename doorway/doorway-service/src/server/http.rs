@@ -1599,7 +1599,10 @@ async fn handle_request(
                 Disposition::RootApp => {
                     to_boxed(routes::handle_root_app_request(Arc::clone(&state), p).await)
                 }
-                Disposition::NotFound => to_boxed(not_found_response(p)),
+                Disposition::NotFound => {
+                    debug!(path = %p, "No registry match and no SPA fallback");
+                    to_boxed(not_found_response(p))
+                }
             }
         }
     };
