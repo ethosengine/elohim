@@ -120,6 +120,11 @@ spec:
             description: 'Force rebuild of DNA even without code changes'
         )
         string(name: 'STEPS', defaultValue: 'all', description: 'Comma-separated build steps to run. "all" runs everything.')
+        booleanParam(
+            name: 'DEPLOY_ONLY',
+            defaultValue: false,
+            description: 'No-op for this pipeline. Accepted so the orchestrator can propagate the flag uniformly; orchestrator skips triggering DNA when DEPLOY_ONLY=true.'
+        )
     }
 
     options {

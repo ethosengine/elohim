@@ -560,16 +560,23 @@ def triggerPipeline(String name, String branch, boolean wait = true) {
     try {
         // Only send FORCE_DEPLOY to pipelines that actually deploy (have a deploymentCheck)
         def config = PIPELINES[name]
-        def params = [booleanParam(name: 'FORCE_BUILD', value: true)]
+        // Note: local list named `buildParams` to avoid shadowing the pipeline-scope
+        // `params` accessor (needed below to forward DEPLOY_ONLY).
+        def buildParams = [booleanParam(name: 'FORCE_BUILD', value: true)]
         if (config?.deploymentCheck) {
-            params.add(booleanParam(name: 'FORCE_DEPLOY', value: true))
+            buildParams.add(booleanParam(name: 'FORCE_DEPLOY', value: true))
         }
+        // Propagate DEPLOY_ONLY so downstream pipelines (edge especially) skip
+        // their build stages and go straight to deploy. Safe to send to all
+        // declared downstream pipelines — each one accepts the param as a no-op
+        // when not deploy-bearing.
+        buildParams.add(booleanParam(name: 'DEPLOY_ONLY', value: params.DEPLOY_ONLY ?: false))
 
         def result = build(
             job: "${name}/${branch}",
             wait: wait,
             propagate: false,
-            parameters: params
+            parameters: buildParams
         )
 
         return [
@@ -742,6 +749,11 @@ spec:
             name: 'VERIFY_DEPLOYMENT',
             defaultValue: true,
             description: 'Verify deployed versions match built versions after deployment'
+        )
+        booleanParam(
+            name: 'DEPLOY_ONLY',
+            defaultValue: false,
+            description: 'Skip all build stages and dispatch only elohim-edge (and elohim-genesis if SKIP_GENESIS is false). Use after manifest/RBAC/storageClass-only changes to redeploy from existing Harbor tags. Operator-triggered only; do not combine with auto webhook flow.'
         )
         string(
             name: 'FORCE_COMMIT',
@@ -1037,6 +1049,21 @@ spec:
                         } else {
                             // Manual mode: use the explicitly requested pipelines
                             graphPipelines = pipelines
+                        }
+
+                        // DEPLOY_ONLY override: bypass changeset analysis and dispatch
+                        // only the deploy-bearing pipelines. Operator uses this after
+                        // manifest/RBAC/storageClass-only changes when existing Harbor
+                        // tags are valid and the build matrix would just burn ~75min.
+                        // Edge pipeline self-skips its build stages on DEPLOY_ONLY=true
+                        // and runs only Deploy Edge Node - <Env>. Genesis runs unless
+                        // operator sets SKIP_GENESIS=true.
+                        if (params.DEPLOY_ONLY) {
+                            graphPipelines = ['elohim-edge']
+                            if (!params.SKIP_GENESIS) {
+                                graphPipelines.add('elohim-genesis')
+                            }
+                            echo "🚀 DEPLOY_ONLY=true: bypassing changeset analysis; dispatching ${graphPipelines.join(', ')}"
                         }
 
                         env.PIPELINES_TO_RUN = graphPipelines.join(',')

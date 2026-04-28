@@ -157,6 +157,11 @@ spec:
             description: 'Reset storage databases before seeding (deletes content.db and restarts pods to run fresh migrations)'
         )
         string(name: 'STEPS', defaultValue: 'all', description: 'Comma-separated build steps to run. "all" runs everything.')
+        booleanParam(
+            name: 'DEPLOY_ONLY',
+            defaultValue: false,
+            description: 'No-op for this pipeline (genesis runs as a normal seed when triggered). Accepted so the orchestrator can propagate the flag uniformly. Operator can set SKIP_GENESIS on the orchestrator to skip seeding entirely on a deploy-only run.'
+        )
     }
 
     environment {

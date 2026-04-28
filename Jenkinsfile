@@ -357,6 +357,11 @@ spec:
 
     parameters {
         string(name: 'STEPS', defaultValue: 'all', description: 'Comma-separated list of build steps to run (from build-manifest.json). "all" runs everything.')
+        booleanParam(
+            name: 'DEPLOY_ONLY',
+            defaultValue: false,
+            description: 'No-op for this pipeline. Accepted so the orchestrator can propagate the flag uniformly; orchestrator skips triggering elohim-app when DEPLOY_ONLY=true.'
+        )
     }
 
     // No triggers - orchestrator handles all webhook events

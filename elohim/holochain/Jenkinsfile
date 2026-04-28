@@ -727,6 +727,11 @@ spec:
             defaultValue: false,
             description: 'Skip building edgenode and happ-installer images (humans using consolidated elohim-node mode)'
         )
+        booleanParam(
+            name: 'DEPLOY_ONLY',
+            defaultValue: false,
+            description: 'Skip all build stages and run only Deploy Edge Node - <Env>. Tags are read from genesis/orchestrator/environments/{env}.env. Use after manifest/RBAC-only changes when Harbor tags are already valid.'
+        )
     }
 
     options {
@@ -872,7 +877,10 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         // This pipeline now only builds infrastructure (container images)
 
         stage('Quality Gate: Doorway') {
-            when { expression { env.PIPELINE_SKIPPED != 'true' } }
+            when { allOf {
+                expression { env.PIPELINE_SKIPPED != 'true' }
+                expression { params.DEPLOY_ONLY != true }
+            }}
             steps {
                 container('builder') {
                     script {
@@ -900,6 +908,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         stage('Build Doorway') {
             when { allOf {
                 expression { env.PIPELINE_SKIPPED != 'true' }
+                expression { params.DEPLOY_ONLY != true }
                 expression { shouldRunStep('cargo-build-doorway') }
             }}
             steps {
@@ -933,7 +942,10 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         }
 
         stage('Quality Gate: Doorway App') {
-            when { expression { env.PIPELINE_SKIPPED != 'true' } }
+            when { allOf {
+                expression { env.PIPELINE_SKIPPED != 'true' }
+                expression { params.DEPLOY_ONLY != true }
+            }}
             steps {
                 container('builder') {
                     script {
@@ -951,7 +963,10 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         }
 
         stage('Build Doorway App') {
-            when { expression { env.PIPELINE_SKIPPED != 'true' } }
+            when { allOf {
+                expression { env.PIPELINE_SKIPPED != 'true' }
+                expression { params.DEPLOY_ONLY != true }
+            }}
             steps {
                 container('builder') {
                     script {
@@ -981,7 +996,10 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         }
 
         stage('Build Agent SDK') {
-            when { expression { env.PIPELINE_SKIPPED != 'true' } }
+            when { allOf {
+                expression { env.PIPELINE_SKIPPED != 'true' }
+                expression { params.DEPLOY_ONLY != true }
+            }}
             steps {
                 container('builder') {
                     script {
@@ -1013,6 +1031,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         stage('Build Storage') {
             when { allOf {
                 expression { env.PIPELINE_SKIPPED != 'true' }
+                expression { params.DEPLOY_ONLY != true }
                 expression { shouldRunStep('cargo-build-storage') }
             }}
             steps {
@@ -1053,6 +1072,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
             when {
                 allOf {
                     expression { env.PIPELINE_SKIPPED != 'true' }
+                    expression { params.DEPLOY_ONLY != true }
                     anyOf {
                         changeset "elohim/elohim-storage/src/p2p/**"
                         changeset "steward/node/simulation/**"
@@ -1074,6 +1094,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         stage('Build Edge Node Image') {
             when { allOf {
                 expression { env.PIPELINE_SKIPPED != 'true' }
+                expression { params.DEPLOY_ONLY != true }
                 expression { shouldRunStep('build-edge-image') }
                 expression { !(params.SKIP_LEGACY_IMAGES ?: false) }
             }}
@@ -1131,6 +1152,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         stage('Build hApp Installer') {
             when { allOf {
                 expression { env.PIPELINE_SKIPPED != 'true' }
+                expression { params.DEPLOY_ONLY != true }
                 expression { !(params.SKIP_LEGACY_IMAGES ?: false) }
             }}
             steps {
@@ -1181,7 +1203,10 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
         }
 
         stage('Push to Harbor') {
-            when { expression { env.PIPELINE_SKIPPED != 'true' } }
+            when { allOf {
+                expression { env.PIPELINE_SKIPPED != 'true' }
+                expression { params.DEPLOY_ONLY != true }
+            }}
             steps {
                 container('builder') {
                     script {
@@ -1360,7 +1385,8 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                             // Check if we have a reason to deploy
                             def shouldDeploy = (env.IMAGES_PUSHED == 'true') ||
                                                (params.FORCE_DEPLOY == true) ||
-                                               (params.FORCE_BUILD == true)
+                                               (params.FORCE_BUILD == true) ||
+                                               (params.DEPLOY_ONLY == true)
 
                             if (!shouldDeploy) {
                                 echo "No new images pushed and no force flags - checking edge node health..."
@@ -1585,7 +1611,8 @@ AGENT_SDK_TAG=${AGENT_SDK_TAG}
                         withBuildVars(props) {
                             def shouldDeploy = (env.IMAGES_PUSHED == 'true') ||
                                                (params.FORCE_DEPLOY == true) ||
-                                               (params.FORCE_BUILD == true)
+                                               (params.FORCE_BUILD == true) ||
+                                               (params.DEPLOY_ONLY == true)
 
                             if (!shouldDeploy) {
                                 if (checkEdgeNodeHealth('https://doorway.elohim.host')) {
