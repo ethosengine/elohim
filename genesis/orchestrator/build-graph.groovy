@@ -183,12 +183,32 @@ def matchesGlob(String filePath, String pattern) {
     def normalizedFile = filePath.startsWith('./') ? filePath.substring(2) : filePath
     def normalizedPattern = pattern.startsWith('./') ? pattern.substring(2) : pattern
 
+    // Sentinel-placeholder substitution for ** tokens. The naive sequence
+    // ('**' -> '.*', then '*' -> '[^/]*') corrupts '.*' into '.[^/]*',
+    // because the second replace also fires on the '*' that just landed
+    // from the first. The corrupted regex 'src/.[^/]*' only matches files
+    // one segment deep under src; anything nested fails silently.
+    //
+    // Found via the doorway thumbnail regression: edits to
+    // doorway/doorway-service/src/server/http.rs (three levels deep under
+    // src) bypassed change detection on orchestrator #765 because the
+    // pattern 'doorway/doorway-service/src/**' compiled to
+    // 'doorway/doorway-service/src/.[^/]*' instead of '.../src/.*'.
+    //
+    // Substituting ** tokens with long sentinel strings before the single-*
+    // pass, then resolving the sentinels last, keeps the two replacements
+    // from interfering. The sentinel strings are deliberately verbose so no
+    // legitimate path or glob can contain them literally.
+    final String SS = '__GLOBSTARSTARSLASH_SENTINEL__'
+    final String DS = '__GLOBSTARSTAR_SENTINEL__'
     def regex = normalizedPattern
         .replace('.', '\\.')
-        .replace('**/','(.+/)?')
-        .replace('**', '.*')
-        .replace('*', '[^/]*')
-        .replace('?', '[^/]')
+        .replace('**/', SS)         // **/  -> optional dir segments (resolved below)
+        .replace('**',  DS)         // **   -> any chars including / (resolved below)
+        .replace('*', '[^/]*')      // *    -> segment-bounded wildcard
+        .replace('?', '[^/]')       // ?    -> single non-slash char
+        .replace(SS, '(.+/)?')      // resolve **/  placeholder
+        .replace(DS, '.*')          // resolve **   placeholder
 
     return normalizedFile.matches(regex)
 }
