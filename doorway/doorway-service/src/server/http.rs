@@ -75,7 +75,32 @@ async fn classify_dispatch(
     method: &Method,
     path: &str,
 ) -> Disposition {
-    let _ = (registry, root_app_slug, method, path);
+    let http_method = match *method {
+        Method::GET => doorway_client::HttpMethod::Get,
+        Method::POST => doorway_client::HttpMethod::Post,
+        Method::PUT => doorway_client::HttpMethod::Put,
+        Method::DELETE => doorway_client::HttpMethod::Delete,
+        Method::PATCH => doorway_client::HttpMethod::Patch,
+        Method::HEAD => doorway_client::HttpMethod::Head,
+        _ => doorway_client::HttpMethod::Get,
+    };
+
+    let matches = registry.match_request(http_method, path).await;
+    if let Some(route) = matches.first() {
+        if let Some(endpoint) = route.storage_endpoint() {
+            return Disposition::StorageProxy {
+                endpoint: endpoint.to_string(),
+            };
+        }
+        // Future: handle ZomeCall, AgentProxy, BlobProxy, StreamProxy targets.
+        // For now any non-StorageProxy registry hit returns 404.
+        return Disposition::RegistryUnhandled;
+    }
+
+    if *method == Method::GET && root_app_slug.is_some() {
+        return Disposition::RootApp;
+    }
+
     Disposition::NotFound
 }
 
