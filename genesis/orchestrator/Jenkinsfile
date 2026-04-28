@@ -807,9 +807,16 @@ spec:
                         env.GIT_COMMIT_SHORT = getGitCommitHash()
                         env.GIT_COMMIT_FULL = getGitCommitHashFull()
 
-                        // Detect build trigger type
+                        // Detect build trigger type. "Push event to branch X" is the
+                        // shortDescription Jenkins emits for git-push webhook causes from
+                        // some plugin configurations (alongside the GitHub/SCM/webhook
+                        // strings other configurations emit). Match all known forms so
+                        // commit-msg tags still fire whichever plugin path is in play.
                         def buildCause = currentBuild.getBuildCauses()[0]?.shortDescription ?: 'Unknown'
-                        def isWebhook = buildCause.contains('GitHub') || buildCause.contains('webhook') || buildCause.contains('SCM')
+                        def isWebhook = buildCause.contains('GitHub') ||
+                                        buildCause.contains('webhook') ||
+                                        buildCause.contains('SCM') ||
+                                        buildCause.contains('Push event')
                         env.BUILD_TRIGGER = isWebhook ? 'WEBHOOK' : 'MANUAL'
 
                         echo """
