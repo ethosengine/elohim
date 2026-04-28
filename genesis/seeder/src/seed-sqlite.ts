@@ -772,27 +772,86 @@ function transformPathToContent(json: PathJson): CreateContentInput {
 // API Client
 // ============================================================================
 
+/**
+ * Retry classification for storage requests.
+ *
+ * We retry on:
+ *  - Network errors (fetch threw) — TCP reset, DNS hiccup, transient pod restart
+ *  - HTTP 5xx — storage temporarily unable to serve
+ *  - HTTP 429 — rate limit (storage may grow one in future)
+ *  - Body containing "database is locked" / "database is busy" — SQLITE_BUSY
+ *    surfaces as 500 today; the body text is the canonical signal.
+ *
+ * We do NOT retry on:
+ *  - HTTP 4xx (other than 429) — client-side bug, retry won't help
+ */
+function isRetryable(status: number | null, bodyText: string): boolean {
+  if (status === null) return true; // network error
+  if (status === 429) return true;
+  if (status >= 500 && status < 600) return true;
+  // Be defensive: some upstreams flatten errors to 200 with body — sniff.
+  if (/database is (locked|busy)|SQLITE_BUSY/i.test(bodyText)) return true;
+  return false;
+}
+
+/**
+ * Sleep with jitter to spread retry pressure across concurrent batches.
+ */
+async function backoffSleep(attempt: number): Promise<void> {
+  // 500ms, 1.5s, 4s, 8s, then capped at 15s. Plus 0-50% jitter.
+  const baseMs = Math.min(500 * Math.pow(3, attempt), 15000);
+  const jitter = Math.random() * baseMs * 0.5;
+  await new Promise(resolve => setTimeout(resolve, baseMs + jitter));
+}
+
 async function seedContent(items: CreateContentInput[]): Promise<{ inserted: number; skipped: number; errors: string[] }> {
   if (DRY_RUN) {
     console.log(`   [DRY RUN] Would seed ${items.length} content items`);
     return { inserted: items.length, skipped: 0, errors: [] };
   }
 
-  const response = await fetch(`${STORAGE_URL}/db/content/bulk`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(items),
-  });
+  const MAX_ATTEMPTS = 6;
+  let lastErr: Error | null = null;
 
-  if (!response.ok) {
-    throw new Error(`HTTP ${response.status}: ${await response.text()}`);
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+    let status: number | null = null;
+    let bodyText = '';
+    try {
+      const response = await fetch(`${STORAGE_URL}/db/content/bulk`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(items),
+      });
+      status = response.status;
+
+      if (response.ok) {
+        const data = await response.json();
+        assertResponseShape<{ inserted: number; skipped: number; errors: string[] }>(
+          data, ['inserted', 'skipped', 'errors'], '/db/content/bulk'
+        );
+        if (attempt > 0) {
+          console.log(`     ↻ recovered after ${attempt} retr${attempt === 1 ? 'y' : 'ies'}`);
+        }
+        return data;
+      }
+
+      bodyText = await response.text();
+      lastErr = new Error(`HTTP ${status}: ${bodyText}`);
+    } catch (err) {
+      // Network-level failure (fetch threw)
+      lastErr = err instanceof Error ? err : new Error(String(err));
+      bodyText = lastErr.message;
+    }
+
+    if (!isRetryable(status, bodyText) || attempt === MAX_ATTEMPTS - 1) break;
+
+    console.log(`     ↻ retryable error (attempt ${attempt + 1}/${MAX_ATTEMPTS}): ${
+      status !== null ? `HTTP ${status}` : 'network'
+    } — backing off`);
+    await backoffSleep(attempt);
   }
 
-  const data = await response.json();
-  assertResponseShape<{ inserted: number; skipped: number; errors: string[] }>(
-    data, ['inserted', 'skipped', 'errors'], '/db/content/bulk'
-  );
-  return data;
+  throw lastErr ?? new Error('seedContent: unknown failure');
 }
 
 /** Count total items across a sections tree (for logging) */
