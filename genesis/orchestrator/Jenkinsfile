@@ -505,18 +505,38 @@ def propagateDependencies(pipelines, analysis) {
 def loadPipelineBaselines() {
     def baselines = [:]
     try {
+        // Selector intentionally lastSuccessful (not lastCompleted): an ABORTED
+        // build (e.g. SCM checkout interrupted, pod evicted, Harbor outage) still
+        // runs its post.always archive step but has no per-pipeline baselines
+        // to record because Execute Builds never ran. lastCompleted() would pick
+        // that up and copy an empty/stub archive, leaving baselines = {} and
+        // tipping the next build into the "Large changeset / Building all
+        // matching pipelines" fallback for no good reason.
+        //
+        // lastSuccessful() (copyartifact plugin) treats SUCCESS *and* UNSTABLE
+        // as successful, which is what we want: the last orchestrator run that
+        // actually completed Execute Builds and saved real baselines.
         copyArtifacts(
             projectName: env.JOB_NAME,
             filter: 'pipeline-baselines.json',
-            selector: lastCompleted(),
+            selector: lastSuccessful(),
             optional: true,
             flatten: true
         )
         if (fileExists('pipeline-baselines.json')) {
             baselines = readJSON(file: 'pipeline-baselines.json')
-            echo "Loaded per-pipeline baselines from previous build"
-            baselines.each { name, commit ->
-                echo "   ${name}: ${commit.take(8)}"
+            // Defensive: an empty archive can still slip through (e.g. early
+            // post-action archive before Execute Builds populated the file).
+            // Treat empty baselines as missing so callers cold-start cleanly
+            // rather than silently cascading into rebuild-everything.
+            if (baselines.isEmpty()) {
+                echo "Loaded pipeline-baselines.json but it is empty — treating as cold start"
+                baselines = [:]
+            } else {
+                echo "Loaded per-pipeline baselines from previous successful build"
+                baselines.each { name, commit ->
+                    echo "   ${name}: ${commit.take(8)}"
+                }
             }
         } else if (env.GIT_PREVIOUS_SUCCESSFUL_COMMIT) {
             // Contradictory state: Jenkins remembers a prior successful build but
@@ -529,7 +549,7 @@ def loadPipelineBaselines() {
 ╔══════════════════════════════════════════════════════════════════════════════╗
 ║  ⚠️  BASELINE CASCADE WARNING                                                ║
 ╠══════════════════════════════════════════════════════════════════════════════╣
-║  copyArtifacts(lastCompleted) found NO pipeline-baselines.json               ║
+║  copyArtifacts(lastSuccessful) found NO pipeline-baselines.json              ║
 ║  but GIT_PREVIOUS_SUCCESSFUL_COMMIT = ${env.GIT_PREVIOUS_SUCCESSFUL_COMMIT.take(8)}
 ║  JOB_NAME = ${env.JOB_NAME}
 ║                                                                              ║
