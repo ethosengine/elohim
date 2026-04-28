@@ -41,6 +41,21 @@ closes with done or a clean bail.
 6. **You may not edit the judge.** The Objective, measure command, files
    the measure reads, test runners, and test fixtures are off-limits.
    Bail with a proposal if they need to change.
+7. **Validate change detection — every shift, every push.** A standing
+   secondary goal of every shift is to confirm the CI's change-detection,
+   build-graph, and dispatch decisions match what a developer would
+   reasonably expect from the changes that landed. After any push that
+   triggers Jenkins, glance at the orchestrator's "Determine Build Plan"
+   output (matched patterns per pipeline, baselines used, fallback
+   warnings like "Building all matching pipelines / baselines stale") and
+   confirm the dispatched set is what a developer reading the diff would
+   predict. If the orchestrator over-built (rebuilt a pipeline whose
+   sources didn't change), under-built (skipped a pipeline that should
+   have been triggered), or fell into a generic recovery mode without a
+   real reason, journal it and either fix it within the shift's scope
+   (when the fix is a Jenkinsfile/orchestrator change) or surface it as
+   a follow-up Objective candidate. CI efficiency is correctness too —
+   silent matrix rebuilds waste real time and mask real signal.
 
 ## Kickoff (interactive — first 2-3 minutes)
 
