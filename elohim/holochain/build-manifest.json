@@ -63,6 +63,27 @@
         "stage": "Build Edge Node Image",
         "function": null
       }
+    },
+    "deploy-manifests": {
+      "description": "k8s manifests applied during edge deploy (doorway ingress, infra). Listed here so manifest-only changes mark elohim-edge stale; actual kubectl apply runs in the existing Deploy Edge Node stages.",
+      "inputs": {
+        "sources": [
+          "genesis/orchestrator/manifests/doorway/**",
+          "genesis/orchestrator/manifests/infra/**",
+          "genesis/orchestrator/manifests/humans/**",
+          "genesis/orchestrator/environments/**"
+        ],
+        "buildProcess": ["elohim/holochain/Jenkinsfile"]
+      },
+      "outputs": {
+        "artifacts": [],
+        "verify": null
+      },
+      "depends": ["build-edge-image"],
+      "executor": {
+        "stage": "Deploy Edge Node - Alpha",
+        "function": null
+      }
     }
   },
   "gate": {
