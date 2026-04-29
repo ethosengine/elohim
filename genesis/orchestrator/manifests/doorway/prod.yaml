@@ -273,7 +273,10 @@ metadata:
     nginx.ingress.kubernetes.io/websocket-services: "elohim-doorway-prod"
     # Default 1 MB rejects HTML5-app ZIPs and bulk content/relationship POSTs.
     # 100m covers current 6.75 MB ZIP + 3424-item bulk content with headroom.
+    # Companion: 16k proxy-buffer-size handles large response headers from
+    # holochain admin/app responses (cell info, route registry dumps).
     nginx.ingress.kubernetes.io/proxy-body-size: "100m"
+    nginx.ingress.kubernetes.io/proxy-buffer-size: "16k"
     # Required for WebSocket upgrade headers
     nginx.ingress.kubernetes.io/configuration-snippet: |
       proxy_set_header Upgrade $http_upgrade;
