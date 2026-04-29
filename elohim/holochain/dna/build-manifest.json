@@ -52,7 +52,7 @@
       "description": "Verify DNA constants match protocol schema enums",
       "inputs": {
         "sources": [
-          "elohim/holochain/**",
+          "elohim/holochain/dna/**",
           "elohim/sdk/schemas/**"
         ],
         "buildProcess": []
