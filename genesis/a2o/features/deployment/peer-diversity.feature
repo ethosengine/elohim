@@ -91,6 +91,25 @@ Feature: Peer Diversity — Operations Adapt to Device Constraints
     Then the device capability level should be 1
     And the device NAT type should be "offline-first"
 
+  # --- Ingress Body-Size Budgets (diversity of payloads) ---
+
+  @wip
+  Scenario Outline: Each archetype declares a body-size budget for its ingress
+    Given device "<device>" from the device portfolio
+    Then the device ingress body-size budget should be "<budget>"
+    And operations that POST to its doorway must chunk payloads under that budget
+
+    Examples:
+      | device                 | budget |
+      | 2019 Android Phone     | 1m     |
+      | Raspberry Pi 4         | 10m    |
+      | Family Node (Base)     | 500m   |
+    # Operational parameters: budgets are nginx.ingress proxy-body-size values.
+    # Phones run on cellular — 1m protects the operator's data plan.
+    # Family nodes are backbone — 500m absorbs full HTML5 apps in one POST.
+    # Informs: NodeCapabilities preset, ingress manifest archetype defaults.
+    # Companion scenarios: features/deployment/ingress-body-size-budget.feature
+
   # --- Hardware Health Self-Awareness ---
 
   @wip
