@@ -5,6 +5,14 @@
 
 ---
 
+## **Prologue: Our Attention Is Sacred**
+
+The Torah commands a love offered with all heart, soul, and might — and what is attention if not the form love takes when it acts? The garden in Genesis is given to humans to *till and keep*; the first work was tending, not harvesting. Simone Weil wrote that attention is the rarest and purest form of generosity. Paul wrote that love rejoices in the truth. From the Sh'ma to the Center for Humane Technology's Ledger of Harms, from contemplative tradition to Tristan Harris's hard-won catalogue of how the modern feed strip-mines a child's developing mind, the same conviction surfaces: human attention is sacred, and how a system treats attention reveals what that system actually believes about human dignity.
+
+Eli Pariser named the filter bubble. Harris named the race to the bottom of the brain stem. The extractive web confessed, in every infinite scroll and every dopamine trap, what it believed: attention is a resource, and the resource is yours for the taking. The Elohim Medium begins from the inverse confession. Attention is sacred. Reach is earned. The medium itself encodes love. Everything that follows in this epic is the architecture of that single commitment.
+
+---
+
 ## **Part I: The Morning After - When the Old Web Died**
 
 ### **Wednesday, September 11, 2025 - 6:00 AM**
@@ -76,7 +84,69 @@ On the Elohim Medium, that first inflammatory post stays local. To reach neighbo
 
 ---
 
-## **Part IV: Protection Through Design**
+## **Part IV: Designing for Human Darkness**
+
+### **An Honest Welcome**
+
+Bob arrives at the network the way most newcomers do — from elsewhere, carrying habits. The platforms he came from rewarded the loud version of him: the take that landed hardest, the share that made the room flinch, the post that brought the dopamine hit and the followers and the small mean victory of being right at someone's expense. He expects the same shape here. He's looking for the angle, the crowd, the leverage.
+
+The protocol does not pretend not to notice. At the moment Bob joins, the network speaks plainly:
+
+> *Welcome. This is a virtue-centric network. It values truth, accountability, good-faith stewardship, paced attention, and the dignity of every participant — not as features, but as architectural commitments. If you are bringing baggage from extractive platforms — thinking you can use this place as a sewage dump for the bullying, grift, propaganda, or spectacle you got away with elsewhere — you will find friction here. That is not punishment. That is the structure. Growth is mutually beneficial, and it can be painful. Welcome to the network.*
+
+Bob signs. The signing is not a click-through; it is an acknowledgment that becomes part of his record. He has been told. There will be no surprise rules, no hidden gates — only an architecture honest about what it is.
+
+### **The Tech Industry's Carelessness**
+
+The extractive web was not built by villains. It was built by people who were *careless* about human darkness — who assumed engagement was a clean signal, who believed friction was always the enemy, who designed frictionless ecosystems where bullies, grifters, and bad-faith actors discovered they could move at the speed of attention itself. Mark Twain's lie traveled around the world while truth laced its boots, and the architecture rewarded the speed. The Center for Humane Technology's Ledger of Harms is the receipt for that carelessness — children's developing brains, civic discourse decaying, anger as the most viral emotion, six times the velocity for falsehood as for fact.
+
+The Elohim Medium begins from the opposite assumption. Not all participants come in good faith. The protocol must be honest about that, and the architecture must be the answer — not a content-moderation team in a building somewhere, deciding for everyone what may be said. The answer is structural, distributed, and paid edge by edge: distribution costs scale with trust, and trust is staked at every hop.
+
+Sacha Baron Cohen put it this way: freedom of speech is not freedom of reach. The medium honors the first absolutely. The second is earned, and earning has a cost.
+
+### **Standing — The Architecture of Consequence**
+
+When Bob authors content, his standing is staked on it. Standing is not a score. There is no scoreboard, no central tally, no number anyone could game or audit or weaponize. Standing is a *shape* — the shape of how Bob's contributions have been received, corrected, vouched for, repaired. It lives in the relationships, not in a database. Different communities see Bob through different lenses, because their commitments are different; that is pluralism, not inconsistency. But every community sees *something*, because every contribution leaves a trace in the relational fabric, and that fabric is what determines whether the next contribution travels.
+
+Popularity costs proportional standing to sustain. This is Dunbar by design. Within Bob's family — his closest trust-bubble — his speech reaches without friction. He could be wrong, careless, even cruel, and his family would still hear him. That floor is unconditional, because the protocol believes intimate relationships are sacred and must not be standing-gated. But to reach beyond Dunbar — to amplify into the district, the region, the world — costs Bob proportional standing. Every hop is paid for by some human whose attention and compute power it. Reach beyond the human-scale is not free, because it shouldn't be, because someone is bearing the burden.
+
+The trust-bubble boundary, where amplification gets expensive, is not a robustness limit the engineers will improve away. It is a humane property. It is what the architecture believes about human capacity to attend, to discern, to be in relationship.
+
+### **Carrot Before Stick**
+
+The primary vehicle of accountability is not the network's response after the fact. It is Maria's elohim, the tender, sitting beside her at the moment she is about to share. The conversation is gentle and concrete: *This take from Bob is one you might want to consider. It's been propagating in the district for twelve hours; three peers have already squelched it. The household had a hard conversation about a similar topic last week. Want to add context, narrow scope, or share with awareness?*
+
+Maria decides. The agency is hers. The elohim does not lecture, does not block, does not shame — it offers context the way a thoughtful friend would, before the door closes. If she shares anyway, her standing is staked on the share with informed agency on record. If she narrows or pauses, no one outside her own elohim ever knows the conversation happened.
+
+This is the architecture's deepest commitment to the human: the burden of accountability is pushed *left* in the flow, into the moment of authorial agency, where action is cheapest and most humane. The aggregate sense-making after the fact — the network noticing, the standing settling, the corrections traveling — is the safety net, not the mechanism. The stick is rare and recovery-oriented. The carrot is everywhere.
+
+### **Constitutional Revealability — "Who Told You That You Were Naked?"**
+
+When Adam and Eve eat of the fruit in the garden, the first divine question is one of provenance. Who told you? The question must be answerable. Disclosure is not punishment in the story; it is the mechanism by which responsibility becomes possible.
+
+The medium honors this. When content travels through the network, the chain of who-passed-it-to-whom is recorded — but recorded *sealed against the self*, encrypted in a form no single peer can open alone. Provenance is private by default. No casual reveal. No subpoena pressure on a single peer who happens to hold a copy. But provenance is *recoverable* through governance — when a coordinated rage-bait campaign is investigated, when harm crosses a constitutional threshold, the chain can be unwound through a handshake of governance bodies, with the subject's own elohim acting as their counsel during the disclosure. Each unwinding is itself recorded, attested, defended. Disclosure is accountability — visible, traceable, never a back-channel.
+
+No absolute opacity, which protects bad actors. No default transparency, which weaponizes the social graph. The protocol holds the harder middle: you can answer for what you sent, but only the right people, in the right room, by the right process, can ask.
+
+### **Restitution as Repair, Not Exile**
+
+When Cousin Sarah recognizes Bob's content as harmful and authors a correction with citations, the network does not banish Bob. His speech still reaches his trust-bubble. What changes is the cost of his amplification beyond it. His next attempt to reach the district fails — not because anyone struck him from a roll, but because the relational fabric no longer carries him there. He is not erased. He is held to scale.
+
+The path back is not silence and time. The path back is *repair*. Bob can publish his own correction, acknowledging the harm, citing Sarah's evidence. Sarah may sign a vouch attesting to good faith — the person harmed becomes a witness in the recovery. Time spent in good-faith stewardship of others' contributions, attested by the network's continued engagement, gradually rewires the relational fabric around him. The community doesn't need to convene a tribunal. The fabric self-heals through Bob's own actions and others' willingness to witness them.
+
+This is the humane shape: the system designs *redemption paths*, not exile. Standing recovers when the relational fabric rewires, and rewiring requires the human to do something a community can recognize. Dietrich Bonhoeffer worried about stupidity as moral capture under power upsurges; the architecture worries about the same thing, and answers it not with permanent quarantine but with a durable invitation to come back through repair.
+
+### **The Honest Ledger**
+
+Maria's elohim, the morning after the share, surfaces the recent debit gently. Not as accusation. As context. *You shared Bob's content yesterday; Sarah's correction propagated. Want to acknowledge it, or move on?* Maria decides. If she publishes a brief acknowledgment, that too becomes part of her record — a small public restitution, witnessed quietly. The household had a rough conversation last week, and now it has a small grace this week, and the relational fabric absorbs both.
+
+The point is not the bookkeeping. The point is that nothing important is lost. The lie does not get to travel free. The truth does not have to lace its boots while the falsehood circles the world. The careless re-share has a cost, and the careful repair has a credit, and the architecture remembers, and the elohim helps the human remember, and the network's collective discernment self-heals — without a megalith deciding for anyone what may be said.
+
+The old web's carelessness about human darkness produced a world in which bullies, grifters, and rage merchants moved at the speed of attention. The new web is honest about that darkness, and answers it structurally — not with surveillance, not with censorship, not with an algorithm in a building somewhere, but with the simple, unflinching commitment that reach must be earned, standing must be staked, repair must be possible, and no one is exempt because the system itself is honest about what humans sometimes do.
+
+---
+
+## **Part V: Protection Through Design**
 
 ### **Children Learning Digital Wisdom**
 
@@ -102,7 +172,7 @@ This same system protects against natural disasters. When hurricanes approach, n
 
 ---
 
-## **Part V: Spaces Where Humanity Happens**
+## **Part VI: Spaces Where Humanity Happens**
 
 ### **The Social Layer of Autonomous Entities**
 
@@ -118,7 +188,7 @@ These spaces can become legal entities when needed. The woodworking guild incorp
 
 ---
 
-## **Part VI: One Year Later - The Neighborhood Reborn**
+## **Part VII: One Year Later - The Neighborhood Reborn**
 
 ### **Measurable Transformation**
 
@@ -138,7 +208,7 @@ This happens without marketing, without influencers, without manipulation. Commu
 
 ---
 
-## **Part VII: The Constitutional Foundation**
+## **Part VIII: The Constitutional Foundation**
 
 ### **Immutable Principles**
 
