@@ -67,7 +67,7 @@ impl Decider {
 
         // Sort rules by priority (higher first)
         let mut sorted_rules: Vec<_> = self.rules.iter().enumerate().collect();
-        sorted_rules.sort_by(|a, b| b.1.priority.cmp(&a.1.priority));
+        sorted_rules.sort_by_key(|r| std::cmp::Reverse(r.1.priority));
 
         for (_idx, rule) in sorted_rules {
             if !rule.enabled {

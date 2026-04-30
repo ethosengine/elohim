@@ -188,7 +188,7 @@ impl UpdateApplier {
             .collect();
 
         // Sort by modification time, newest first
-        backups.sort_by(|a, b| b.1.cmp(&a.1));
+        backups.sort_by_key(|b| std::cmp::Reverse(b.1));
 
         Ok(backups.into_iter().map(|(p, _)| p).collect())
     }

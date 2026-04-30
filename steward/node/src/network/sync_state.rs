@@ -271,8 +271,8 @@ impl ConnectedApp {
             progress.items_synced = items_synced;
             progress.bytes_transferred = bytes;
             progress.current_item = current_item;
-            if progress.items_total > 0 {
-                progress.percent = ((items_synced * 100) / progress.items_total) as u8;
+            if let Some(percent) = (items_synced * 100).checked_div(progress.items_total) {
+                progress.percent = percent as u8;
             }
         }
     }

@@ -150,7 +150,7 @@ impl AdmissionController {
         });
 
         // Sort by priority (urgent first), then find actual position post-sort
-        queue.sort_by(|a, b| b.priority.cmp(&a.priority));
+        queue.sort_by_key(|r| std::cmp::Reverse(r.priority));
         let position = queue
             .iter()
             .position(|r| r.commitment_id == commitment_id)

@@ -83,9 +83,8 @@ impl UpdateDownloader {
 
             downloaded += chunk.len() as u64;
 
-            if total_size > 0 {
-                let progress = ((downloaded * 100) / total_size) as u8;
-                progress_callback(progress);
+            if let Some(progress) = (downloaded * 100).checked_div(total_size) {
+                progress_callback(progress as u8);
             }
         }
 
