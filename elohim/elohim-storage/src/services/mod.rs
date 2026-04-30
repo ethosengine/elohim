@@ -42,6 +42,7 @@ pub mod household_resilience;
 pub mod inference_engine;
 pub mod inference_router;
 pub mod knowledge_service;
+pub mod manifest_registry;
 pub mod mastery_depth;
 pub mod peer_selection;
 pub mod presence_service;
