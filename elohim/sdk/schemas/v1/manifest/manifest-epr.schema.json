@@ -1,0 +1,103 @@
+{
+  "$id": "epr:schema:manifest:manifest-epr",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ManifestEpr",
+  "description": "EPR envelope wrapping a manifest payload. The Manifest entry type in the elohim DNA's content_store_integrity zome stores instances; the projector controller mirrors them into the local manifests table for fast operational lookup. The integrity zome validates floor-protection invariants (kind whitelist, valid JSON, revision >= 1, pillar required for pillar-projection); this schema is the wire-format contract for clients composing or inspecting Manifest EPRs.",
+  "type": "object",
+  "required": ["envelope", "payload"],
+  "additionalProperties": false,
+  "properties": {
+    "envelope": {
+      "type": "object",
+      "required": ["kind", "reach", "signerPubkey", "createdAt", "signature"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "Manifest",
+          "description": "Constitutional EPR kind. Manifests are floor-protected — circulate at Standing::Unknown and below the gradient threshold."
+        },
+        "reach": {
+          "$ref": "../enums/reach.schema.json",
+          "description": "Reach level for this manifest. Pillar-projection and app manifests typically use Reach::Public or above; private manifests are local-only floor-protected."
+        },
+        "signerPubkey": {
+          "type": "string",
+          "contentEncoding": "base64",
+          "description": "Base64-encoded ed25519 public key of the signer (steward authoring this manifest)."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO 8601 timestamp of envelope authorship."
+        },
+        "signature": {
+          "type": "string",
+          "contentEncoding": "base64",
+          "description": "Base64-encoded ed25519 signature over canonical_bytes(envelope || payload)."
+        },
+        "schemaRef": {
+          "type": "string",
+          "description": "Optional CID of an EPR pointing to a more specific schema for this manifest. Resolved by the schemaRef walker (Phase 3 T9), depth-bounded by Standing for non-load-bearing kinds; protocol-load-bearing schemaRefs (Manifest itself) walk unbounded."
+        }
+      }
+    },
+    "payload": {
+      "type": "object",
+      "required": ["manifestKind", "revision"],
+      "properties": {
+        "manifestKind": {
+          "type": "string",
+          "enum": ["app", "pillar-projection", "standing-policy", "tending-policy", "onboarding"],
+          "description": "Bootstrap taxonomy of manifest kinds. Must match the integrity zome's Manifest::validate() whitelist (T7)."
+        },
+        "pillar": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Pillar name (e.g. 'lamad', 'shefa', 'qahal'). Required when manifestKind is pillar-projection — the projection rules bind EPR kinds to a pillar's read-model tables."
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Monotonic revision number. Insert-or-bump in the projection (T4) — higher revision wins on idempotent replay."
+        },
+        "kinds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1,
+          "uniqueItems": true,
+          "description": "EPR kinds this manifest claims projection authority over. Required when manifestKind is pillar-projection."
+        },
+        "writeThrough": {
+          "type": "object",
+          "description": "Optional write-through declaration (Phase 2B Batch C). Read by ManifestRegistry into WriteThroughState (T11) for signal-emit gating.",
+          "required": ["enabled"],
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "kinds": {
+              "type": "array",
+              "items": { "type": "string", "minLength": 1 },
+              "uniqueItems": true
+            }
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "manifestKind": { "const": "pillar-projection" } },
+            "required": ["manifestKind"]
+          },
+          "then": {
+            "required": ["pillar", "kinds"]
+          }
+        }
+      ]
+    }
+  }
+}

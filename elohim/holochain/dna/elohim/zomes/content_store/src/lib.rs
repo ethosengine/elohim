@@ -13,6 +13,8 @@ use std::collections::HashMap;
 
 // Bootstrap-steward pattern (lamad copy; reference lives in imagodei).
 pub mod bootstrap_steward;
+pub mod manifest;
+pub use manifest::*;
 pub use bootstrap_steward::{
     am_i_bootstrap_steward, bootstrap_steward, maybe_bootstrap_steward, BootstrapStewardError,
     DnaProperties as BootstrapStewardDnaProperties,
@@ -10115,6 +10117,13 @@ pub enum ProjectionSignal {
         content: Content,
         author: AgentPubKey,
     },
+    /// Manifest entry was created or updated (Phase 3 P3.2).
+    ManifestCommitted {
+        action_hash: ActionHash,
+        entry_hash: EntryHash,
+        manifest: Manifest,
+        author: AgentPubKey,
+    },
     /// LearningPath was created or updated
     PathCommitted {
         action_hash: ActionHash,
@@ -10346,6 +10355,13 @@ pub fn post_commit(committed_actions: Vec<SignedActionHashed>) -> ExternResult<(
             })?;
             // Emit cache signal (for Doorway)
             emit_signal(DoorwaySignal::new(CacheSignal::upsert(&content)))?;
+        } else if let Some(manifest) = record.entry().to_app_option::<Manifest>().ok().flatten() {
+            emit_signal(ProjectionSignal::ManifestCommitted {
+                action_hash,
+                entry_hash,
+                manifest,
+                author,
+            })?;
         } else if let Some(path) = record
             .entry()
             .to_app_option::<LearningPath>()

@@ -168,6 +168,17 @@ type PendingBlobPullMap = Arc<
     >,
 >;
 
+/// P3.4: Map of pending EPR atom fetch requests issued by FederatedEprStore::fetch.
+/// outbound request ID → reply oneshot (delivers Some(envelope_bytes) on success, None on failure).
+type PendingEprAtomFetchMap = Arc<
+    tokio::sync::Mutex<
+        std::collections::HashMap<
+            request_response::OutboundRequestId,
+            oneshot::Sender<Option<Vec<u8>>>,
+        >,
+    >,
+>;
+
 /// Ordered queue of content IDs discovered as replication gaps, awaiting dispatch.
 /// Populated by discover() on each ListContent response; drained by drain_gap_queue()
 /// at the 5-second dispatch interval, bounded by MAX_REPLICATION_INFLIGHT.
@@ -343,6 +354,10 @@ pub struct P2PNode {
     /// non-empty blob_hash.  Keyed by the OutboundRequestId of the follow-up
     /// ShardRequest::Get so the Data handler can store bytes without a caller channel.
     pending_blob_pulls: PendingBlobPullMap,
+    /// P3.4: pending EPR atom fetch requests from FederatedEprStore::fetch.
+    /// Populated by `handle_command(FetchEprAtomFromPeer)`, resolved in
+    /// `handle_epr_atom_response` on success/failure/timeout.
+    pending_epr_atom_fetches: PendingEprAtomFetchMap,
 }
 
 /// Cached identify protocol info for a connected peer.
@@ -562,6 +577,18 @@ pub enum P2PCommand {
     ///
     /// Best-effort: failure is logged but does NOT block the local put.
     PublishEprAnnounce { topic: String, payload: Vec<u8> },
+    /// P3.4: send `EprAtomRequest::Fetch { cid }` to a specific peer and reply
+    /// with the raw envelope bytes on success, or None if the peer responds
+    /// NotFound / Error or the request fails at the transport level.
+    ///
+    /// Composed at the FederatedEprStore level: one command per provider in
+    /// arrival order; the store blocks on the reply with a per-peer timeout
+    /// and tries the next provider on failure.
+    FetchEprAtomFromPeer {
+        peer_id: PeerId,
+        cid: String,
+        reply: oneshot::Sender<Option<Vec<u8>>>,
+    },
     /// D.5: direct-notify integrity event to a list of peers via
     /// `/elohim/epr-atom/1.0.0` request-response. Used by
     /// `ReconcileController::on_key_revocation` to send the revocation payload
@@ -683,6 +710,10 @@ impl P2PHandle {
                     P2PCommand::KadGetProviders { reply, .. } => {
                         // D.7 stub: no swarm in test, always return empty.
                         let _ = reply.send(vec![]);
+                    }
+                    P2PCommand::FetchEprAtomFromPeer { reply, .. } => {
+                        // P3.4 stub: no swarm in test, always miss.
+                        let _ = reply.send(None);
                     }
                 }
             }
@@ -1183,6 +1214,9 @@ impl P2PNode {
                 std::collections::HashMap::new(),
             )),
             pending_blob_pulls: Arc::new(tokio::sync::Mutex::new(std::collections::HashMap::new())),
+            pending_epr_atom_fetches: Arc::new(tokio::sync::Mutex::new(
+                std::collections::HashMap::new(),
+            )),
         })
     }
 
@@ -1761,6 +1795,31 @@ impl P2PNode {
                     peer_count = peer_ids.len(),
                     "D.5: DirectNotifyIntegrity dispatched to all peers"
                 );
+            }
+            // P3.4: send EprAtomRequest::Fetch to a specific peer and register the
+            // reply sender in `pending_epr_atom_fetches`. The response is delivered
+            // in `handle_epr_atom_response`; transport-level failure is delivered in
+            // the `OutboundFailure` arm below.
+            P2PCommand::FetchEprAtomFromPeer {
+                peer_id,
+                cid,
+                reply,
+            } => {
+                let req_id = swarm
+                    .behaviour_mut()
+                    .epr_atom_protocol
+                    .send_request(&peer_id, EprAtomRequest::Fetch { cid: cid.clone() });
+                debug!(
+                    target: "elohim_storage::epr",
+                    peer = %peer_id,
+                    cid = %cid,
+                    request_id = ?req_id,
+                    "P3.4: FetchEprAtomFromPeer — sent Fetch request to peer"
+                );
+                self.pending_epr_atom_fetches
+                    .lock()
+                    .await
+                    .insert(req_id, reply);
             }
         }
     }
@@ -2757,6 +2816,16 @@ impl P2PNode {
                 },
             ) => {
                 warn!(peer = %peer, request_id = ?request_id, error = ?error, "Outbound EPR atom request failed");
+                // P3.4: deliver None to any FetchEprAtomFromPeer waiter so the store
+                // caller doesn't hang waiting on a dead request.
+                if let Some(tx) = self
+                    .pending_epr_atom_fetches
+                    .lock()
+                    .await
+                    .remove(&request_id)
+                {
+                    let _ = tx.send(None);
+                }
             }
             behaviour::ElohimStorageBehaviourEvent::EprAtomProtocol(
                 request_response::Event::InboundFailure {
@@ -4452,12 +4521,67 @@ impl P2PNode {
         request_id: request_response::OutboundRequestId,
         response: EprAtomResponse,
     ) {
-        debug!(
-            peer = %peer,
-            request_id = ?request_id,
-            response = ?response,
-            "EPR atom response (Batch B stub — no pending-request tracker yet)"
-        );
+        // P3.4: deliver to FederatedEprStore::fetch callers waiting on this request.
+        if let Some(tx) = self
+            .pending_epr_atom_fetches
+            .lock()
+            .await
+            .remove(&request_id)
+        {
+            let result = match response {
+                EprAtomResponse::Atom { envelope_bytes } => {
+                    debug!(
+                        target: "elohim_storage::epr",
+                        peer = %peer,
+                        request_id = ?request_id,
+                        bytes = envelope_bytes.len(),
+                        "P3.4: EprAtomFetch — Atom received from peer"
+                    );
+                    Some(envelope_bytes)
+                }
+                EprAtomResponse::NotFound => {
+                    debug!(
+                        target: "elohim_storage::epr",
+                        peer = %peer,
+                        request_id = ?request_id,
+                        "P3.4: EprAtomFetch — peer reports NotFound"
+                    );
+                    None
+                }
+                EprAtomResponse::Error { message } => {
+                    warn!(
+                        target: "elohim_storage::epr",
+                        peer = %peer,
+                        request_id = ?request_id,
+                        error = %message,
+                        "P3.4: EprAtomFetch — peer responded with Error"
+                    );
+                    None
+                }
+                other => {
+                    // Announce, Announced, AtomBatch, AtomBatchResponse, IntegrityAck, etc.
+                    // are not valid responses to a Fetch request; treat as failure.
+                    debug!(
+                        target: "elohim_storage::epr",
+                        peer = %peer,
+                        request_id = ?request_id,
+                        response = ?other,
+                        "P3.4: EprAtomFetch — unexpected response variant; treating as miss"
+                    );
+                    None
+                }
+            };
+            let _ = tx.send(result);
+        } else {
+            // Response for an IntegrityNotify, FetchBatch, or other non-fetch request
+            // (no pending entry) — log at debug and ignore.
+            debug!(
+                peer = %peer,
+                request_id = ?request_id,
+                response = ?response,
+                "EPR atom response received (no pending fetch entry — likely Announce/Batch path)"
+            );
+        }
     }
 
     /// Handle an incoming EPR request from a peer

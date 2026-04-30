@@ -11,5 +11,6 @@ name = "content_store_integrity"
 hdi.workspace = true
 holochain_serialized_bytes.workspace = true
 serde.workspace = true
+serde_json.workspace = true
 hc-rna.workspace = true
 doorway-client.workspace = true

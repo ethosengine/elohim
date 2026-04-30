@@ -4,9 +4,9 @@
 //! FederatedEprStore wraps LocalEprStore + a libp2p swarm handle. Phase 2B
 //! wired the swarm handle and flipped the construction site from LocalEprStore
 //! → FederatedEprStore. Kad `start_providing` + gossipsub tiered fanout are
-//! live as of Phase 2B Batch D. On local miss, cold-fetch via
-//! `swarm_handle.resolve_epr(cid)` is the remaining Phase 3 work item
-//! (see `TODO(phase-3)` at the miss site below).
+//! live as of Phase 2B Batch D. Phase 3 (T10) closed the loop by adding
+//! cold-fetch on local miss: `KadGetProviders` → `FetchEprAtomFromPeer` →
+//! local persist, returning `FetchOutcome { source: EprSource::Peer(_) }`.
 //!
 //! ## D.4: Receiver-side pre-authorization (seam placeholder)
 //!
@@ -196,7 +196,10 @@ impl EprStore for LocalEprStore {
 // FederatedEprStore — Phase 2b wires libp2p Kad provider advertisement
 // ---------------------------------------------------------------------------
 
-use super::epr_kind::{kind_canonical_str, pillar_for_kind_provisional};
+use super::epr_kind::{kind_canonical_str, pillar_for_kind};
+use crate::services::manifest_registry::ManifestRegistry;
+use crate::services::standing::Standing;
+use std::sync::Arc;
 
 /// Federated store that bridges to the elohim-storage libp2p swarm for Kad
 /// provider advertisement (Phase 2b D.2). In Phase 2a the swarm_tx was
@@ -230,6 +233,10 @@ pub struct FederatedEprStore {
     /// Set via `with_local_libp2p_peer_id`. When `None`, self-advertisement
     /// dedup is skipped (safe: produces a harmless duplicate in that edge-case).
     local_libp2p_peer_id: Option<String>,
+    /// Phase 3 P3.1: pillar registry consulted on each `put` to resolve
+    /// `kind → pillar` for fanout topic naming. Initialized empty; populated
+    /// by the projector branch when a Manifest EPR is ingested (Task 8).
+    manifest_registry: Arc<ManifestRegistry>,
 }
 
 impl FederatedEprStore {
@@ -240,6 +247,7 @@ impl FederatedEprStore {
             db_pool: None,
             local_agent_cid: None,
             local_libp2p_peer_id: None,
+            manifest_registry: Arc::new(ManifestRegistry::new()),
         }
     }
 
@@ -274,6 +282,14 @@ impl FederatedEprStore {
         self.local_libp2p_peer_id = Some(peer_id);
         self
     }
+
+    /// Phase 3 P3.1: wire a shared ManifestRegistry. Defaults to an empty
+    /// registry (bootstrap path); production wiring shares a single registry
+    /// across the projector branch and read paths.
+    pub fn with_manifest_registry(mut self, registry: Arc<ManifestRegistry>) -> Self {
+        self.manifest_registry = registry;
+        self
+    }
 }
 
 impl Default for FederatedEprStore {
@@ -291,12 +307,83 @@ impl EprStore for FederatedEprStore {
         if let Some(outcome) = self.local.fetch(conn, cid)? {
             return Ok(Some(outcome));
         }
-        // TODO(phase-3): on local miss, issue swarm_handle.resolve_epr(cid).
-        // For each returned peer, send EprRequest::Resolve { id: cid }; if
-        // EprResponse::Head arrives, decode + validate + LocalEprStore::put + return
-        // FetchOutcome::Peer(peer_id). Give up after N peers or T timeout.
-        // See genesis/docs/plans/2026-04-26-epr-phase-3-manifest-resolver-kickoff-prompt.md
-        // §Task: Cold-fetch via swarm.
+        // Phase 3 P3.4: cold-fetch via swarm on local miss. Floor protection:
+        // CID-targeted lookup is unconditional regardless of standing (brainstorm
+        // §2.8). Phase 3.5 will modulate provider ordering and per-peer timeout by
+        // Standing; today: arrival order, fixed 5 s per provider, 10 s overall.
+        let Some(swarm_tx) = self.swarm_tx.as_ref() else {
+            // P2P disabled or no swarm wired — treat as cache miss.
+            return Ok(None);
+        };
+
+        // Phase A: query Kademlia DHT for providers of this CID.
+        let (providers_tx, providers_rx) = tokio::sync::oneshot::channel();
+        if swarm_tx
+            .blocking_send(crate::p2p::P2PCommand::KadGetProviders {
+                cid: cid.to_string(),
+                reply: providers_tx,
+            })
+            .is_err()
+        {
+            // Swarm task dead; treat as cache miss.
+            return Ok(None);
+        }
+        let providers = match providers_rx.blocking_recv() {
+            Ok(v) => v,
+            Err(_) => return Ok(None),
+        };
+        if providers.is_empty() {
+            return Ok(None);
+        }
+
+        // Phase B: try providers in arrival order. First successful fetch wins.
+        for peer_id in &providers {
+            let (atom_tx, atom_rx) = tokio::sync::oneshot::channel();
+            if swarm_tx
+                .blocking_send(crate::p2p::P2PCommand::FetchEprAtomFromPeer {
+                    peer_id: *peer_id,
+                    cid: cid.to_string(),
+                    reply: atom_tx,
+                })
+                .is_err()
+            {
+                continue;
+            }
+            match atom_rx.blocking_recv() {
+                Ok(Some(envelope_bytes)) => {
+                    // Phase C: structural verification (CID recompute + signature shape).
+                    match crate::p2p::epr_atom_protocol::verify_incoming_epr(&envelope_bytes) {
+                        Ok((epr, _verified_cid)) => {
+                            // Persist locally so subsequent fetches hit the cache.
+                            let peer_id_str = peer_id.to_string();
+                            let _ = self.local.put(conn, epr);
+                            // Re-fetch from local store to build FetchedEpr (joins all tables).
+                            if let Ok(Some(fetched)) = epr_service::fetch_by_cid(conn, cid) {
+                                return Ok(Some(FetchOutcome {
+                                    fetched,
+                                    source: EprSource::Peer(peer_id_str),
+                                }));
+                            }
+                            // put succeeded but re-fetch failed — storage inconsistency;
+                            // continue to try the next provider.
+                        }
+                        Err(e) => {
+                            tracing::warn!(
+                                target: "elohim_storage::epr",
+                                cid = %cid,
+                                peer = %peer_id,
+                                error = %e,
+                                "P3.4: cold-fetch verify_incoming_epr failed — trying next provider"
+                            );
+                        }
+                    }
+                }
+                Ok(None) | Err(_) => {
+                    // Provider didn't have it or request timed out — try next.
+                    continue;
+                }
+            }
+        }
         Ok(None)
     }
 
@@ -333,7 +420,28 @@ impl EprStore for FederatedEprStore {
         // Snapshot kind before consuming epr in local.put.
         let epr_kind = epr.envelope.kind;
 
+        // Phase 3 P3.2: capture a clone of the EPR before the move into
+        // local.put so that Manifest EPRs can be projected after the put
+        // without re-fetching payload bytes. Clone is cheap (Vec<u8> + Cid).
+        let epr_for_manifest = if epr_kind == elohim_epr::EprKind::Manifest {
+            Some(epr.clone())
+        } else {
+            None
+        };
+
         let result = self.local.put(conn, epr)?;
+
+        // Phase 3 P3.2: project Manifest EPRs to the local manifests table
+        // and refresh the registry so subsequent kind→pillar lookups see
+        // the new mapping.
+        if let Some(ref manifest_epr) = epr_for_manifest {
+            if let Err(e) = crate::services::manifest_registry::project_manifest(conn, manifest_epr)
+            {
+                tracing::warn!(cid = %result.cid, error = %e, "manifest projection failed — registry may lag");
+            } else if let Err(e) = self.manifest_registry.load_from_db(conn) {
+                tracing::warn!(cid = %result.cid, error = %e, "manifest registry refresh failed");
+            }
+        }
 
         // D.2: advertise atom to Kademlia DHT when the fanout policy includes
         // a Kad or KadLight channel. Best-effort — send failure is logged and
@@ -372,7 +480,7 @@ impl EprStore for FederatedEprStore {
         let needs_gossip = channels.iter().any(|c| matches!(c, FanoutChannel::Gossip));
         if needs_gossip {
             if let Some(tx) = &self.swarm_tx {
-                let pillar = pillar_for_kind_provisional(epr_kind);
+                let pillar = pillar_for_kind(epr_kind, &self.manifest_registry, Standing::Unknown);
                 let topic = crate::p2p::topics::topic_for(&pillar, reach, None);
                 match build_announce_payload(&result.cid) {
                     Ok(payload) => {

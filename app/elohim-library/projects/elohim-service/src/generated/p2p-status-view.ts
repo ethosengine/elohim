@@ -53,6 +53,14 @@ export interface P2PStatusView {
    * True when sync/replication is paused for backpressure (bulk write in progress). Operators and elohim agents use this to understand node load state.
    */
   syncPaused: boolean;
+  /**
+   * D.7 dedup LRU: number of unique CIDs currently in the dedup window.
+   */
+  dedupUniqueLen: number;
+  /**
+   * D.7 dedup LRU: cumulative insert calls (new + duplicate). Ratio (dedupTotalSeen - dedupUniqueLen) / dedupTotalSeen approximates duplication rate.
+   */
+  dedupTotalSeen: number;
 }
 /**
  * Identity-driven content replication progress
