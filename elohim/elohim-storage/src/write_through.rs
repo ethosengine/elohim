@@ -251,6 +251,46 @@ impl WriteThroughState {
         Self::from_manifest(HashMap::new())
     }
 
+    /// Phase 3 P3.5: build state from a populated [`ManifestRegistry`]. Reads
+    /// pillar-projection manifests' optional `writeThrough` payload field for
+    /// layer-1 defaults; pillars without that field inherit the global off
+    /// default (per memory pin `feedback_dev_branch_no_pr` — ramps are
+    /// deliberate operator acts).
+    ///
+    /// Used at startup once manifests are seeded; replaces the
+    /// `WriteThroughState::empty()` stub for production.
+    pub fn from_registry(
+        _registry: &crate::services::manifest_registry::ManifestRegistry,
+        conn: &mut diesel::SqliteConnection,
+    ) -> Result<Self, crate::error::StorageError> {
+        use crate::db::manifests::fetch_manifests_by_kind;
+        let rows = fetch_manifests_by_kind(conn, "pillar-projection")?;
+        let mut manifest = HashMap::new();
+        for row in rows {
+            let Ok(payload) = serde_json::from_str::<serde_json::Value>(&row.payload_json) else {
+                continue;
+            };
+            let Some(pillar) = payload.get("pillar").and_then(|v| v.as_str()) else {
+                continue;
+            };
+            // Optional writeThrough block — pillars without it stay off (default).
+            let Some(wt_value) = payload.get("writeThrough") else {
+                continue;
+            };
+            let Ok(config) = serde_json::from_value::<WriteThroughConfig>(wt_value.clone()) else {
+                continue;
+            };
+            manifest.insert(pillar.to_string(), config);
+        }
+        Ok(Self::from_manifest(manifest))
+    }
+
+    /// Returns true iff the manifest layer (layer 1) carries no pillar
+    /// declarations. Convenience for the projector + admin status views.
+    pub fn is_empty(&self) -> bool {
+        self.manifest.is_empty()
+    }
+
     /// Set the policy.toml override layer (layer 2).
     pub fn with_policy_override(mut self, ov: WriteThroughOverride) -> Self {
         self.policy = Some(ov);
@@ -648,5 +688,79 @@ mod tests {
 
         let snap = state.admin_snapshot().expect("admin should be set");
         assert_eq!(snap, admin);
+    }
+
+    // -----------------------------------------------------------------------
+    // P3.5 — from_registry + is_empty
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn from_registry_reads_pillar_projection_manifests() {
+        use crate::db::manifests::{insert_manifest, ManifestRow};
+        use crate::services::manifest_registry::ManifestRegistry;
+        use crate::test_util::test_pool;
+
+        let pool = test_pool();
+        let mut conn = pool.get().unwrap();
+        // Pillar with a writeThrough block.
+        let payload_with_wt = serde_json::json!({
+            "pillar": "lamad",
+            "kinds": ["Content"],
+            "writeThrough": { "enabled": true, "kinds": ["Content"] }
+        });
+        insert_manifest(
+            &mut conn,
+            &ManifestRow {
+                cid: "p1".to_string(),
+                manifest_kind: "pillar-projection".to_string(),
+                pillar: Some("lamad".to_string()),
+                payload_json: payload_with_wt.to_string(),
+                schema_ref: None,
+                signer_pubkey: vec![0u8; 32],
+                created_at: "2026-04-30T00:00:00Z".to_string(),
+                verified_at: None,
+                revision: 1,
+            },
+        )
+        .unwrap();
+        // Pillar without a writeThrough block — should not appear in state.
+        let payload_no_wt = serde_json::json!({
+            "pillar": "shefa",
+            "kinds": ["EconomicEvent"]
+        });
+        insert_manifest(
+            &mut conn,
+            &ManifestRow {
+                cid: "p2".to_string(),
+                manifest_kind: "pillar-projection".to_string(),
+                pillar: Some("shefa".to_string()),
+                payload_json: payload_no_wt.to_string(),
+                schema_ref: None,
+                signer_pubkey: vec![0u8; 32],
+                created_at: "2026-04-30T00:00:00Z".to_string(),
+                verified_at: None,
+                revision: 1,
+            },
+        )
+        .unwrap();
+
+        let registry = ManifestRegistry::new();
+        registry.load_from_db(&mut conn).unwrap();
+
+        let state = WriteThroughState::from_registry(&registry, &mut conn).unwrap();
+        assert!(
+            !state.is_empty(),
+            "from_registry should populate from manifests with writeThrough blocks"
+        );
+        // Lamad has writeThrough enabled for Content → should be On at manifest layer.
+        let eff = state.effective_for("lamad", "Content");
+        assert!(eff.is_on(), "lamad writeThrough config should be loaded");
+        assert_eq!(eff.source(), WriteThroughSource::ManifestDefault);
+        // Shefa has no writeThrough block → implicit off.
+        let eff_shefa = state.effective_for("shefa", "EconomicEvent");
+        assert!(
+            !eff_shefa.is_on(),
+            "shefa without writeThrough block stays off"
+        );
     }
 }
