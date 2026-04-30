@@ -165,7 +165,7 @@ async fn get_epr(
     req: Request<Incoming>,
     cid: &str,
     pool: &DbPool,
-    _ctx: &AppContext,
+    ctx: &AppContext,
 ) -> Result<Response<Full<Bytes>>, StorageError> {
     let include_canonical = req
         .uri()
@@ -173,8 +173,7 @@ async fn get_epr(
         .map(|q| q.contains("includeCanonical=true"))
         .unwrap_or(false);
 
-    // TODO(phase-3): wire ctx.local_libp2p_peer_id once fetch dedup is needed
-    let store = default_epr_store(None, None, None, None);
+    let store = default_epr_store(None, None, None, ctx.local_libp2p_peer_id.clone());
     let mut conn = get_conn(pool)?;
 
     let Some(outcome) = store.fetch(&mut conn, cid)? else {
@@ -204,10 +203,9 @@ async fn get_envelope(
     req: Request<Incoming>,
     cid: &str,
     pool: &DbPool,
-    _ctx: &AppContext,
+    ctx: &AppContext,
 ) -> Result<Response<Full<Bytes>>, StorageError> {
-    // TODO(phase-3): wire ctx.local_libp2p_peer_id once fetch dedup is needed
-    let store = default_epr_store(None, None, None, None);
+    let store = default_epr_store(None, None, None, ctx.local_libp2p_peer_id.clone());
     let mut conn = get_conn(pool)?;
 
     let Some(outcome) = store.fetch(&mut conn, cid)? else {
@@ -236,10 +234,9 @@ async fn get_payload(
     req: Request<Incoming>,
     cid: &str,
     pool: &DbPool,
-    _ctx: &AppContext,
+    ctx: &AppContext,
 ) -> Result<Response<Full<Bytes>>, StorageError> {
-    // TODO(phase-3): wire ctx.local_libp2p_peer_id once fetch dedup is needed
-    let store = default_epr_store(None, None, None, None);
+    let store = default_epr_store(None, None, None, ctx.local_libp2p_peer_id.clone());
     let mut conn = get_conn(pool)?;
 
     let Some(outcome) = store.fetch(&mut conn, cid)? else {
@@ -270,7 +267,7 @@ async fn get_verify(
     req: Request<Incoming>,
     cid: &str,
     pool: &DbPool,
-    _ctx: &AppContext,
+    ctx: &AppContext,
 ) -> Result<Response<Full<Bytes>>, StorageError> {
     // Caller provides publicKey as hex in query string:
     //   GET /api/v1/epr/:cid/verify?publicKey=<64-hex>
@@ -288,8 +285,7 @@ async fn get_verify(
     let mut pk = [0u8; 32];
     pk.copy_from_slice(&pk_bytes);
 
-    // TODO(phase-3): wire ctx.local_libp2p_peer_id once verify dedup is needed
-    let store = default_epr_store(None, None, None, None);
+    let store = default_epr_store(None, None, None, ctx.local_libp2p_peer_id.clone());
     let mut conn = get_conn(pool)?;
 
     // Reach check: if the EPR isn't visible to the caller, return 404.
@@ -535,7 +531,6 @@ async fn list_epr(
     _ctx: &AppContext,
 ) -> Result<Response<Full<Bytes>>, StorageError> {
     use crate::db::epr_atoms::EprListQuery;
-    // TODO(phase-3): wire ctx.local_libp2p_peer_id if list gains peer-aware filtering
 
     let query = req.uri().query().unwrap_or("");
 
