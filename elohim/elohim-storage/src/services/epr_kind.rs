@@ -30,15 +30,39 @@ pub(crate) fn kind_canonical_str(k: EprKind) -> &'static str {
     }
 }
 
+/// Resolve pillar for an EPR kind via the [`ManifestRegistry`], with a
+/// bootstrap fallback to the lowercased canonical kind name when no
+/// pillar-projection manifest has been registered yet.
+///
+/// `standing` is wired through to the registry; Phase 3 returns the same
+/// pillar regardless (registry is signal-agnostic). Phase 3.5 lights up
+/// gradient-modulated registry lookups.
+///
+/// The bootstrap fallback preserves the pre-Phase-3 subscriber convention
+/// (subscribers match on the lowercased kind name) so tests and existing
+/// flows continue to work until pillar-projection manifests are seeded.
+pub(crate) fn pillar_for_kind(
+    kind: elohim_epr::EprKind,
+    registry: &crate::services::manifest_registry::ManifestRegistry,
+    standing: crate::services::standing::Standing,
+) -> String {
+    if let Some(pillar) = registry.pillar_for_kind(kind, standing) {
+        return pillar;
+    }
+    kind_canonical_str(kind).to_lowercase()
+}
+
 /// Provisional pillar lookup for an EPR kind.
 ///
-/// FIXME(phase-3): replace with a `ManifestRegistry` lookup once Phase 3's
-/// Manifest-EPR resolver exists. Until then, return the kind name lowercased
-/// — sufficient for D.8's integration tests because subscribers match on the
-/// same provisional name. **Subscribers written against this naming MUST be
-/// updated when Phase 3 lands.** Find this function by grepping for
-/// `pillar_for_kind_provisional` or `FIXME(phase-3)`.
-pub(crate) fn pillar_for_kind_provisional(kind: EprKind) -> String {
+/// Retained as a `#[deprecated]` thin wrapper around the kind→lowercase
+/// canonical-name fallback for any callers still in transition. Phase 3.5
+/// removes it entirely.
+#[deprecated(
+    since = "0.3.0",
+    note = "use pillar_for_kind with a ManifestRegistry; falls back to the same behavior when registry is empty"
+)]
+#[allow(dead_code)]
+pub(crate) fn pillar_for_kind_provisional(kind: elohim_epr::EprKind) -> String {
     kind_canonical_str(kind).to_lowercase()
 }
 

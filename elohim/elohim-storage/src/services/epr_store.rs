@@ -196,7 +196,10 @@ impl EprStore for LocalEprStore {
 // FederatedEprStore — Phase 2b wires libp2p Kad provider advertisement
 // ---------------------------------------------------------------------------
 
-use super::epr_kind::{kind_canonical_str, pillar_for_kind_provisional};
+use super::epr_kind::{kind_canonical_str, pillar_for_kind};
+use crate::services::manifest_registry::ManifestRegistry;
+use crate::services::standing::Standing;
+use std::sync::Arc;
 
 /// Federated store that bridges to the elohim-storage libp2p swarm for Kad
 /// provider advertisement (Phase 2b D.2). In Phase 2a the swarm_tx was
@@ -230,6 +233,10 @@ pub struct FederatedEprStore {
     /// Set via `with_local_libp2p_peer_id`. When `None`, self-advertisement
     /// dedup is skipped (safe: produces a harmless duplicate in that edge-case).
     local_libp2p_peer_id: Option<String>,
+    /// Phase 3 P3.1: pillar registry consulted on each `put` to resolve
+    /// `kind → pillar` for fanout topic naming. Initialized empty; populated
+    /// by the projector branch when a Manifest EPR is ingested (Task 8).
+    manifest_registry: Arc<ManifestRegistry>,
 }
 
 impl FederatedEprStore {
@@ -240,6 +247,7 @@ impl FederatedEprStore {
             db_pool: None,
             local_agent_cid: None,
             local_libp2p_peer_id: None,
+            manifest_registry: Arc::new(ManifestRegistry::new()),
         }
     }
 
@@ -272,6 +280,14 @@ impl FederatedEprStore {
     /// PeerId is available (e.g. `P2PNode::peer_id().to_string()`).
     pub fn with_local_libp2p_peer_id(mut self, peer_id: String) -> Self {
         self.local_libp2p_peer_id = Some(peer_id);
+        self
+    }
+
+    /// Phase 3 P3.1: wire a shared ManifestRegistry. Defaults to an empty
+    /// registry (bootstrap path); production wiring shares a single registry
+    /// across the projector branch and read paths.
+    pub fn with_manifest_registry(mut self, registry: Arc<ManifestRegistry>) -> Self {
+        self.manifest_registry = registry;
         self
     }
 }
@@ -372,7 +388,7 @@ impl EprStore for FederatedEprStore {
         let needs_gossip = channels.iter().any(|c| matches!(c, FanoutChannel::Gossip));
         if needs_gossip {
             if let Some(tx) = &self.swarm_tx {
-                let pillar = pillar_for_kind_provisional(epr_kind);
+                let pillar = pillar_for_kind(epr_kind, &self.manifest_registry, Standing::Unknown);
                 let topic = crate::p2p::topics::topic_for(&pillar, reach, None);
                 match build_announce_payload(&result.cid) {
                     Ok(payload) => {
