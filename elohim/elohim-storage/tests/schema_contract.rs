@@ -1687,3 +1687,87 @@ fn feedback_signal_correction_without_evidence_rejected_by_schema() {
         "schema should reject a 'correction' signal missing evidenceCid (if/then clause)"
     );
 }
+
+// =============================================================================
+// AttentionTending — p2p/attention-tending.schema.json contract tests
+//
+// Three tests:
+//   1. A well-formed AttentionTending JSON passes the schema.
+//   2. A ttlSeconds value below the 3600 minimum is rejected.
+//   3. An empty tendedAt array is rejected (minItems: 1 constraint).
+// =============================================================================
+
+#[test]
+fn attention_tending_validates_against_schema() {
+    use elohim_storage::p2p::attention_tending::{AttentionTending, Classification};
+
+    let tending = AttentionTending {
+        filter_subject: serde_json::json!({"contentKind": "concept"}),
+        classification: Classification::ValuesForward,
+        reason: None,
+        ttl_seconds: 2_592_000, // 30 days
+        tended_at: vec![1_746_000_000],
+        context: serde_json::json!({"collective": "household"}),
+        signed_by: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=".to_string(),
+        signature: "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=".to_string(),
+    };
+    assert!(tending.validate().is_ok());
+    validate_against_schema(
+        "p2p/attention-tending.schema.json",
+        &serde_json::to_value(&tending).unwrap(),
+    );
+}
+
+#[test]
+fn attention_tending_with_short_ttl_rejected_by_schema() {
+    // Hand-crafted Value — NOT constructed through the Rust struct — so this
+    // proves the JSON Schema minimum constraint fires independently of Rust's
+    // validate() guard.
+    let bad_instance = serde_json::json!({
+        "filterSubject": {},
+        "classification": "fatigue",
+        "ttlSeconds": 100,
+        "tendedAt": [1746000000],
+        "context": {},
+        "signedBy": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+        "signature": "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB="
+        // ttlSeconds: 100 — below the 3600 minimum; schema must reject
+    });
+
+    let schema = load_schema("p2p/attention-tending.schema.json");
+    let validator = jsonschema::validator_for(&schema)
+        .expect("attention-tending schema should compile");
+
+    let has_errors = validator.iter_errors(&bad_instance).next().is_some();
+    assert!(
+        has_errors,
+        "schema should reject ttlSeconds: 100 (below minimum 3600)"
+    );
+}
+
+#[test]
+fn attention_tending_with_empty_tended_at_rejected_by_schema() {
+    // Hand-crafted Value — NOT constructed through the Rust struct — so this
+    // proves the JSON Schema minItems: 1 constraint fires independently of
+    // Rust's validate() guard.
+    let bad_instance = serde_json::json!({
+        "filterSubject": {},
+        "classification": "safety",
+        "ttlSeconds": 3600,
+        "tendedAt": [],
+        "context": {},
+        "signedBy": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+        "signature": "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB="
+        // tendedAt: [] — empty array; schema minItems: 1 must reject
+    });
+
+    let schema = load_schema("p2p/attention-tending.schema.json");
+    let validator = jsonschema::validator_for(&schema)
+        .expect("attention-tending schema should compile");
+
+    let has_errors = validator.iter_errors(&bad_instance).next().is_some();
+    assert!(
+        has_errors,
+        "schema should reject tendedAt: [] (minItems: 1 violated)"
+    );
+}

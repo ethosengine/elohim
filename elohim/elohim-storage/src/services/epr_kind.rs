@@ -28,6 +28,7 @@ pub(crate) fn kind_canonical_str(k: EprKind) -> &'static str {
         EprKind::Attestation => "Attestation",
         EprKind::Delegation => "Delegation",
         EprKind::FeedbackSignal => "FeedbackSignal",
+        EprKind::AttentionTending => "AttentionTending",
     }
 }
 
@@ -92,6 +93,7 @@ mod tests {
             (EprKind::Attestation, "Attestation"),
             (EprKind::Delegation, "Delegation"),
             (EprKind::FeedbackSignal, "FeedbackSignal"),
+            (EprKind::AttentionTending, "AttentionTending"),
         ];
 
         for (kind, expected) in cases {
@@ -102,7 +104,7 @@ mod tests {
             );
         }
 
-        // Also assert we covered all 10 variants (update when enum grows).
-        assert_eq!(cases.len(), 10, "expected 10 EprKind variants");
+        // Also assert we covered all 11 variants (update when enum grows).
+        assert_eq!(cases.len(), 11, "expected 11 EprKind variants");
     }
 }

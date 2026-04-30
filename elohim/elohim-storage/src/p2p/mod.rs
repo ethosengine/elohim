@@ -28,6 +28,7 @@
 //! node.start().await?;
 //! ```
 
+pub mod attention_tending;
 pub mod behaviour;
 pub mod dedup;
 pub mod epr_atom_protocol;

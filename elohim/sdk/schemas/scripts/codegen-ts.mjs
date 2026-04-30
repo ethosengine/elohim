@@ -63,6 +63,8 @@ const INTERFACE_FILES = [
   { src: 'p2p/identity-handshake.ts', dest: 'identity-handshake.ts' },
   // Phase 3.5 Trust-Compute Gradient substrate — B2 agent-scoped with attestation
   { src: 'p2p/feedback-signal.ts', dest: 'feedback-signal.ts' },
+  // Phase 3.5 Trust-Compute Gradient tending subsystem — B peer-private discernment
+  { src: 'p2p/attention-tending.ts', dest: 'attention-tending.ts' },
   { src: 'views/key-revocation.ts', dest: 'key-revocation.ts' },
   { src: 'views/revocation-vote.ts', dest: 'revocation-vote.ts' },
   // M5: Auth Portal Convergence + Revocation UX + Stub Defender

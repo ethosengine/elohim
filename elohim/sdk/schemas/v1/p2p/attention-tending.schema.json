@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://elohim.host/schemas/v1/p2p/attention-tending.schema.json",
+  "title": "AttentionTending",
+  "description": "Source of truth: peer-private discernment signal per brainstorm §6.1. The user tends the shape of their attention: a TTL-bounded classification of a filter pattern (content kind, topic, author scope, etc.) that feeds the elohim's tender conversation and the collective's anonymous wisdom layer. Peer-private by default — never gossiped; stays on the agent's source chain. T5 lands the Visibility::Private HDI integrity entry; T15 lands the tending lifecycle service.",
+  "type": "object",
+  "required": ["filterSubject", "classification", "ttlSeconds", "tendedAt", "context", "signedBy", "signature"],
+  "additionalProperties": false,
+  "properties": {
+    "filterSubject": {
+      "type": "object",
+      "description": "Pattern to tend: content kind, topic, author scope, etc. Schema is a stub for T2; T15 may extend.",
+      "additionalProperties": true
+    },
+    "classification": {
+      "type": "string",
+      "enum": ["values-forward", "fatigue", "scope-mismatch", "safety"],
+      "description": "Graduated tending classification. values-forward: human values-aligned discernment — 30-day TTL. fatigue: attention/bandwidth exhaustion — 7-day TTL. scope-mismatch: content outside current context — 90-day TTL. safety: constitutional-floor concern — no expiry (enforced by tending lifecycle service at T15)."
+    },
+    "reason": {
+      "type": "string",
+      "description": "Optional human-readable reason."
+    },
+    "ttlSeconds": {
+      "type": "integer",
+      "minimum": 3600,
+      "description": "TTL in seconds. Minimum 1 hour to prevent permanent moats; classification-default TTLs (values-forward=30d, fatigue=7d, scope-mismatch=90d, safety=no-expiry) enforced by the lifecycle service at T15."
+    },
+    "tendedAt": {
+      "type": "array",
+      "items": { "type": "integer" },
+      "minItems": 1,
+      "description": "Unix timestamps of tending events; the earliest is creation, later entries are re-tending. Non-empty required: an AttentionTending with no events is meaningless."
+    },
+    "context": {
+      "type": "object",
+      "description": "Scope where this tending applies: collective, mode, time-of-day, etc. Schema is a stub for T2; T15 may extend.",
+      "additionalProperties": true
+    },
+    "signedBy": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Base64-encoded ed25519 public key of the tending agent."
+    },
+    "signature": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Base64-encoded ed25519 signature over canonical_bytes(filterSubject || classification || ttlSeconds || tendedAt || context || signedBy)."
+    }
+  }
+}
