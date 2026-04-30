@@ -25,7 +25,7 @@ signalKind: SignalKind,
  * CIDv1 of a Correction EPR with claims and citations.
  * Required when `signal_kind == SignalKind::Correction`.
  */
-evidenceCid: string | null, 
+evidenceCid?: string, 
 /**
  * Graduated standing impact.
  */

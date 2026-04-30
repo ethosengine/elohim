@@ -1619,3 +1619,71 @@ fn account_view_matches_schema() {
         &serde_json::to_value(&sample).unwrap(),
     );
 }
+
+// =============================================================================
+// FeedbackSignal — p2p/feedback-signal.schema.json contract tests
+//
+// Mirrors the epr-atom-message.schema.json pattern above.  Three tests:
+//   1. squelch (evidenceCid absent) passes the schema.
+//   2. correction with evidenceCid passes the schema.
+//   3. correction WITHOUT evidenceCid is rejected by the schema's if/then clause.
+//      Uses a hand-crafted serde_json::Value — NOT the Rust struct's validate() —
+//      so the test proves the JSON Schema constraint fires at runtime even if a
+//      misbehaving producer bypasses Rust type safety.
+// =============================================================================
+
+#[test]
+fn feedback_signal_squelch_validates_against_schema() {
+    let instance = serde_json::json!({
+        "targetCid": "bafyreiabcdef1234567890",
+        "signalKind": "squelch",
+        "standingImpact": "advisory",
+        "signedBy": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+        "signature": "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB="
+    });
+    validate_against_schema("p2p/feedback-signal.schema.json", &instance);
+}
+
+#[test]
+fn feedback_signal_correction_with_evidence_validates_against_schema() {
+    use elohim_storage::p2p::feedback_signal::{FeedbackSignal, SignalKind, StandingImpact};
+
+    let signal = FeedbackSignal::new_correction(
+        "bafyreiabcdef1234567890".to_string(),
+        "bafyreicorrection_evidence_cid_abc".to_string(),
+        StandingImpact::DebitSoft,
+        "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=".to_string(),
+        "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=".to_string(),
+    );
+    assert_eq!(signal.signal_kind, SignalKind::Correction);
+    assert!(signal.evidence_cid.is_some());
+    validate_against_schema(
+        "p2p/feedback-signal.schema.json",
+        &serde_json::to_value(&signal).unwrap(),
+    );
+}
+
+#[test]
+fn feedback_signal_correction_without_evidence_rejected_by_schema() {
+    // Hand-crafted Value — NOT constructed through the Rust struct — so this
+    // proves the JSON Schema if/then clause fires independently of Rust's
+    // validate() guard.
+    let bad_instance = serde_json::json!({
+        "targetCid": "bafyreiabcdef1234567890",
+        "signalKind": "correction",
+        "standingImpact": "debit-soft",
+        "signedBy": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+        "signature": "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB="
+        // evidenceCid intentionally absent — schema if/then must reject this
+    });
+
+    let schema = load_schema("p2p/feedback-signal.schema.json");
+    let validator = jsonschema::validator_for(&schema)
+        .expect("feedback-signal schema should compile");
+
+    let has_errors = validator.iter_errors(&bad_instance).next().is_some();
+    assert!(
+        has_errors,
+        "schema should reject a 'correction' signal missing evidenceCid (if/then clause)"
+    );
+}

@@ -103,6 +103,7 @@ pub struct FeedbackSignal {
     /// CIDv1 of a Correction EPR with claims and citations.
     /// Required when `signal_kind == SignalKind::Correction`.
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
     pub evidence_cid: Option<String>,
 
     /// Graduated standing impact.
