@@ -155,6 +155,19 @@ type PendingVerificationMap = Arc<
 type PendingReplicationFetchMap =
     Arc<tokio::sync::Mutex<std::collections::HashMap<request_response::OutboundRequestId, String>>>;
 
+/// Map of pending blob-pull requests (issued after a replication GetContent returns a
+/// non-empty blob_hash): outbound request ID → (content_id, blob_hash).
+///
+/// When the `ShardResponse::Data` arrives the handler stores the bytes into the local
+/// BlobStore and emits a tracing event.  Kept separate from `pending_shard_fetches` (which
+/// delivers bytes to a caller via oneshot) because blob pulls are fire-and-store — there is
+/// no caller waiting on a channel.
+type PendingBlobPullMap = Arc<
+    tokio::sync::Mutex<
+        std::collections::HashMap<request_response::OutboundRequestId, (String, String)>,
+    >,
+>;
+
 /// Ordered queue of content IDs discovered as replication gaps, awaiting dispatch.
 /// Populated by discover() on each ListContent response; drained by drain_gap_queue()
 /// at the 5-second dispatch interval, bounded by MAX_REPLICATION_INFLIGHT.
@@ -326,6 +339,10 @@ pub struct P2PNode {
     /// Populated by `handle_command(KadGetProviders)`, resolved when
     /// `OutboundQueryProgressed { result: QueryResult::GetProviders(..), step.last }` fires.
     pending_kad_get_providers: PendingKadGetProvidersMap,
+    /// Pending blob-pull requests issued after replication GetContent returns a
+    /// non-empty blob_hash.  Keyed by the OutboundRequestId of the follow-up
+    /// ShardRequest::Get so the Data handler can store bytes without a caller channel.
+    pending_blob_pulls: PendingBlobPullMap,
 }
 
 /// Cached identify protocol info for a connected peer.
@@ -1165,6 +1182,7 @@ impl P2PNode {
             pending_kad_get_providers: Arc::new(tokio::sync::Mutex::new(
                 std::collections::HashMap::new(),
             )),
+            pending_blob_pulls: Arc::new(tokio::sync::Mutex::new(std::collections::HashMap::new())),
         })
     }
 
@@ -2105,202 +2123,303 @@ impl P2PNode {
                         request_id,
                         response,
                     } => {
-                        // Check pending fetch requests
-                        let pending_fetch_tx =
-                            self.pending_shard_fetches.lock().await.remove(&request_id);
-                        if let Some(tx) = pending_fetch_tx {
+                        // Check blob-pull requests (fire-and-store, no caller channel).
+                        // Must be checked BEFORE pending_shard_fetches so the pull
+                        // response is consumed here rather than delivered to a caller.
+                        let blob_pull_entry =
+                            self.pending_blob_pulls.lock().await.remove(&request_id);
+                        if let Some((content_id, blob_hash)) = blob_pull_entry {
                             match response {
                                 ShardResponse::Data(data) => {
-                                    debug!(request_id = ?request_id, size = data.len(), "Shard fetch completed");
-                                    let _ = tx.send(Some(data));
-                                }
-                                _ => {
-                                    debug!(request_id = ?request_id, response = ?response, "Shard fetch returned non-data");
-                                    let _ = tx.send(None);
-                                }
-                            }
-                        }
-                        // Check pending push requests
-                        else if let Some(tx) =
-                            self.pending_shard_pushes.lock().await.remove(&request_id)
-                        {
-                            match response {
-                                ShardResponse::PushAck => {
-                                    debug!(request_id = ?request_id, "Shard push acknowledged");
-                                    let _ = tx.send(Ok(()));
-                                }
-                                ShardResponse::Error(e) => {
-                                    debug!(request_id = ?request_id, error = %e, "Shard push rejected");
-                                    let _ = tx.send(Err(e));
-                                }
-                                _ => {
-                                    let _ = tx.send(Err("Unexpected response to push".to_string()));
-                                }
-                            }
-                        }
-                        // Check pending verification requests
-                        else if let Some((shard_hash, peer_id_str)) =
-                            self.pending_verifications.lock().await.remove(&request_id)
-                        {
-                            if let Some(ref pool) = self.db_pool {
-                                if let Ok(mut conn) = pool.get() {
-                                    match &response {
-                                        ShardResponse::Have(true) => {
-                                            let _ = crate::db::shard_locations::update_verified(
-                                                &mut conn,
-                                                &shard_hash,
-                                                &peer_id_str,
-                                            );
-                                        }
-                                        ShardResponse::Have(false) | ShardResponse::NotFound => {
-                                            let _ = crate::db::shard_locations::mark_lost(
-                                                &mut conn,
-                                                &shard_hash,
-                                                &peer_id_str,
-                                            );
-                                            info!(shard = %shard_hash, peer = %peer_id_str, "Shard lost — peer reports not having it");
-                                        }
-                                        _ => {}
-                                    }
-                                }
-                            }
-                        } else {
-                            // Handle replication discovery responses (no pending map entry)
-                            match response {
-                                ShardResponse::ContentList {
-                                    items,
-                                    total,
-                                    has_more,
-                                } => {
-                                    info!(
-                                        count = items.len(),
-                                        total = total,
-                                        has_more = has_more,
-                                        "Received content inventory from peer"
-                                    );
-                                    let remote_ids: Vec<String> =
-                                        items.into_iter().map(|i| i.id).collect();
-                                    let new_gaps =
-                                        self.replication_state.discover(remote_ids).await;
-
-                                    if new_gaps.is_empty() {
-                                        debug!("No new content to replicate");
-                                        self.replication_state.update_caught_up().await;
-                                    } else {
-                                        info!(
-                                            gaps = new_gaps.len(),
-                                            "Queued content gaps for replication"
-                                        );
-                                        // Enqueue — drain_gap_queue() dispatches adaptively
-                                        // on the 5s interval, bounded by MAX_REPLICATION_INFLIGHT.
-                                        self.gap_queue.lock().await.extend(new_gaps);
-                                    }
-                                }
-                                ShardResponse::Content(record) => {
-                                    let content_id = record.id.clone();
-                                    debug!(id = %content_id, "Received content record from peer");
-                                    // Remove the in-flight tracking entry (success path)
-                                    self.pending_replication_fetches
-                                        .lock()
-                                        .await
-                                        .remove(&request_id);
-
-                                    let pool = match self.db_pool.as_ref() {
-                                        Some(p) => p,
-                                        None => {
-                                            self.replication_state.mark_failed(&content_id).await;
-                                            return;
-                                        }
-                                    };
-                                    let mut conn = match pool.get() {
-                                        Ok(c) => c,
-                                        Err(_) => {
-                                            self.replication_state.mark_failed(&content_id).await;
-                                            return;
-                                        }
-                                    };
-
-                                    let input = crate::db::content_diesel::CreateContentInput {
-                                        id: record.id,
-                                        title: record.title,
-                                        description: record.description,
-                                        content_type: record.content_type,
-                                        content_format: record.content_format,
-                                        blob_hash: record.blob_hash,
-                                        blob_cid: record.blob_cid,
-                                        content_size_bytes: record.content_size_bytes,
-                                        metadata_json: record.metadata_json,
-                                        reach: record.reach,
-                                        created_by: record.created_by,
-                                        tags: record.tags,
-                                        content_body: record.content_body,
-                                    };
-
-                                    let app_ctx = crate::db::AppContext::default_lamad();
-                                    match crate::db::content_diesel::bulk_create_content(
-                                        &mut conn,
-                                        &app_ctx,
-                                        vec![input],
-                                    ) {
+                                    let blob_store = self.blob_store.clone();
+                                    match blob_store.store(&data).await {
                                         Ok(result) => {
-                                            if result.inserted > 0 || result.skipped > 0 {
-                                                self.replication_state
-                                                    .mark_completed(&content_id)
-                                                    .await;
+                                            info!(
+                                                content_id = %content_id,
+                                                blob_hash = %blob_hash,
+                                                size = data.len(),
+                                                already_existed = result.already_existed,
+                                                "quilt draw: blob stocked in pantry after replication"
+                                            );
+                                        }
+                                        Err(e) => {
+                                            warn!(
+                                                content_id = %content_id,
+                                                blob_hash = %blob_hash,
+                                                error = %e,
+                                                "quilt draw: failed to stock blob in pantry"
+                                            );
+                                        }
+                                    }
+                                }
+                                ShardResponse::NotFound => {
+                                    warn!(
+                                        content_id = %content_id,
+                                        blob_hash = %blob_hash,
+                                        "quilt draw: peer does not have blob (NotFound)"
+                                    );
+                                }
+                                _ => {
+                                    warn!(
+                                        content_id = %content_id,
+                                        blob_hash = %blob_hash,
+                                        "quilt draw: unexpected response to blob pull"
+                                    );
+                                }
+                            }
+                        }
+                        // Check pending fetch requests
+                        else {
+                            let pending_fetch_tx =
+                                self.pending_shard_fetches.lock().await.remove(&request_id);
+                            if let Some(tx) = pending_fetch_tx {
+                                match response {
+                                    ShardResponse::Data(data) => {
+                                        debug!(request_id = ?request_id, size = data.len(), "Shard fetch completed");
+                                        let _ = tx.send(Some(data));
+                                    }
+                                    _ => {
+                                        debug!(request_id = ?request_id, response = ?response, "Shard fetch returned non-data");
+                                        let _ = tx.send(None);
+                                    }
+                                }
+                            }
+                            // Check pending push requests
+                            else if let Some(tx) =
+                                self.pending_shard_pushes.lock().await.remove(&request_id)
+                            {
+                                match response {
+                                    ShardResponse::PushAck => {
+                                        debug!(request_id = ?request_id, "Shard push acknowledged");
+                                        let _ = tx.send(Ok(()));
+                                    }
+                                    ShardResponse::Error(e) => {
+                                        debug!(request_id = ?request_id, error = %e, "Shard push rejected");
+                                        let _ = tx.send(Err(e));
+                                    }
+                                    _ => {
+                                        let _ =
+                                            tx.send(Err("Unexpected response to push".to_string()));
+                                    }
+                                }
+                            }
+                            // Check pending verification requests
+                            else if let Some((shard_hash, peer_id_str)) =
+                                self.pending_verifications.lock().await.remove(&request_id)
+                            {
+                                if let Some(ref pool) = self.db_pool {
+                                    if let Ok(mut conn) = pool.get() {
+                                        match &response {
+                                            ShardResponse::Have(true) => {
+                                                let _ = crate::db::shard_locations::update_verified(
+                                                    &mut conn,
+                                                    &shard_hash,
+                                                    &peer_id_str,
+                                                );
+                                            }
+                                            ShardResponse::Have(false)
+                                            | ShardResponse::NotFound => {
+                                                let _ = crate::db::shard_locations::mark_lost(
+                                                    &mut conn,
+                                                    &shard_hash,
+                                                    &peer_id_str,
+                                                );
+                                                info!(shard = %shard_hash, peer = %peer_id_str, "Shard lost — peer reports not having it");
+                                            }
+                                            _ => {}
+                                        }
+                                    }
+                                }
+                            } else {
+                                // Handle replication discovery responses (no pending map entry)
+                                match response {
+                                    ShardResponse::ContentList {
+                                        items,
+                                        total,
+                                        has_more,
+                                    } => {
+                                        info!(
+                                            count = items.len(),
+                                            total = total,
+                                            has_more = has_more,
+                                            "Received content inventory from peer"
+                                        );
+                                        let remote_ids: Vec<String> =
+                                            items.into_iter().map(|i| i.id).collect();
+                                        let new_gaps =
+                                            self.replication_state.discover(remote_ids).await;
 
-                                                // Republish EPR Head so other peers can discover from us
-                                                if let Some(head_bytes) =
-                                                    self.resolve_epr_head_locally(&content_id)
-                                                {
-                                                    let key = RecordKey::new(&format!(
-                                                        "epr:{}",
-                                                        content_id
-                                                    ));
-                                                    let dht_record = Record {
-                                                        key,
-                                                        value: head_bytes,
-                                                        publisher: Some(*self.identity.peer_id()),
-                                                        expires: None,
-                                                    };
-                                                    let mut swarm = self.swarm.write().await;
-                                                    let _ =
-                                                        swarm.behaviour_mut().kademlia.put_record(
-                                                            dht_record,
-                                                            libp2p::kad::Quorum::One,
-                                                        );
+                                        if new_gaps.is_empty() {
+                                            debug!("No new content to replicate");
+                                            self.replication_state.update_caught_up().await;
+                                        } else {
+                                            info!(
+                                                gaps = new_gaps.len(),
+                                                "Queued content gaps for replication"
+                                            );
+                                            // Enqueue — drain_gap_queue() dispatches adaptively
+                                            // on the 5s interval, bounded by MAX_REPLICATION_INFLIGHT.
+                                            self.gap_queue.lock().await.extend(new_gaps);
+                                        }
+                                    }
+                                    ShardResponse::Content(record) => {
+                                        let content_id = record.id.clone();
+                                        // Capture blob_hash before record is moved into input.
+                                        let blob_hash_opt = record.blob_hash.clone();
+                                        debug!(id = %content_id, "Received content record from peer");
+                                        // Remove the in-flight tracking entry (success path)
+                                        self.pending_replication_fetches
+                                            .lock()
+                                            .await
+                                            .remove(&request_id);
+
+                                        let pool = match self.db_pool.as_ref() {
+                                            Some(p) => p,
+                                            None => {
+                                                self.replication_state
+                                                    .mark_failed(&content_id)
+                                                    .await;
+                                                return;
+                                            }
+                                        };
+                                        let mut conn = match pool.get() {
+                                            Ok(c) => c,
+                                            Err(_) => {
+                                                self.replication_state
+                                                    .mark_failed(&content_id)
+                                                    .await;
+                                                return;
+                                            }
+                                        };
+
+                                        let input = crate::db::content_diesel::CreateContentInput {
+                                            id: record.id,
+                                            title: record.title,
+                                            description: record.description,
+                                            content_type: record.content_type,
+                                            content_format: record.content_format,
+                                            blob_hash: record.blob_hash,
+                                            blob_cid: record.blob_cid,
+                                            content_size_bytes: record.content_size_bytes,
+                                            metadata_json: record.metadata_json,
+                                            reach: record.reach,
+                                            created_by: record.created_by,
+                                            tags: record.tags,
+                                            content_body: record.content_body,
+                                        };
+
+                                        let app_ctx = crate::db::AppContext::default_lamad();
+                                        match crate::db::content_diesel::bulk_create_content(
+                                            &mut conn,
+                                            &app_ctx,
+                                            vec![input],
+                                        ) {
+                                            Ok(result) => {
+                                                if result.inserted > 0 || result.skipped > 0 {
+                                                    self.replication_state
+                                                        .mark_completed(&content_id)
+                                                        .await;
+
+                                                    // Republish EPR Head so other peers can discover from us
+                                                    if let Some(head_bytes) =
+                                                        self.resolve_epr_head_locally(&content_id)
+                                                    {
+                                                        let key = RecordKey::new(&format!(
+                                                            "epr:{}",
+                                                            content_id
+                                                        ));
+                                                        let dht_record = Record {
+                                                            key,
+                                                            value: head_bytes,
+                                                            publisher: Some(
+                                                                *self.identity.peer_id(),
+                                                            ),
+                                                            expires: None,
+                                                        };
+                                                        let mut swarm = self.swarm.write().await;
+                                                        let _ = swarm
+                                                            .behaviour_mut()
+                                                            .kademlia
+                                                            .put_record(
+                                                                dht_record,
+                                                                libp2p::kad::Quorum::One,
+                                                            );
+                                                    }
+
+                                                    // Pull the blob bytes from the same peer that
+                                                    // served the content record, if this content
+                                                    // has an associated blob and we don't have it.
+                                                    //
+                                                    // This is the missing link: replication was
+                                                    // previously metadata-only.  The quilt draw
+                                                    // completes the pantry stock on each peer.
+                                                    if let Some(ref hash) = blob_hash_opt {
+                                                        if !hash.is_empty()
+                                                            && !self.blob_store.exists(hash).await
+                                                        {
+                                                            let pull_request = ShardRequest::Get {
+                                                                hash: hash.clone(),
+                                                            };
+                                                            let mut swarm =
+                                                                self.swarm.write().await;
+                                                            let pull_id = swarm
+                                                                .behaviour_mut()
+                                                                .shard_protocol
+                                                                .send_request(&peer, pull_request);
+                                                            drop(swarm);
+                                                            self.pending_blob_pulls
+                                                                .lock()
+                                                                .await
+                                                                .insert(
+                                                                    pull_id,
+                                                                    (
+                                                                        content_id.clone(),
+                                                                        hash.clone(),
+                                                                    ),
+                                                                );
+                                                            info!(
+                                                                content_id = %content_id,
+                                                                blob_hash = %hash,
+                                                                source_peer = %peer,
+                                                                "quilt draw: pulling blob from peer after content replication"
+                                                            );
+                                                        }
+                                                    }
+                                                } else {
+                                                    self.replication_state
+                                                        .mark_failed(&content_id)
+                                                        .await;
                                                 }
-                                            } else {
+                                            }
+                                            Err(e) => {
+                                                warn!(id = %content_id, error = %e, "Failed to store replicated content");
                                                 self.replication_state
                                                     .mark_failed(&content_id)
                                                     .await;
                                             }
                                         }
-                                        Err(e) => {
-                                            warn!(id = %content_id, error = %e, "Failed to store replicated content");
+                                        self.replication_state.update_caught_up().await;
+                                    }
+                                    ShardResponse::ContentNotFound => {
+                                        if let Some(content_id) = self
+                                            .pending_replication_fetches
+                                            .lock()
+                                            .await
+                                            .remove(&request_id)
+                                        {
+                                            debug!(content_id = %content_id, "Content not found on peer, marking failed");
                                             self.replication_state.mark_failed(&content_id).await;
+                                            self.replication_state.update_caught_up().await;
+                                        } else {
+                                            debug!("Content not found on peer (no pending replication request)");
                                         }
                                     }
-                                    self.replication_state.update_caught_up().await;
-                                }
-                                ShardResponse::ContentNotFound => {
-                                    if let Some(content_id) = self
-                                        .pending_replication_fetches
-                                        .lock()
-                                        .await
-                                        .remove(&request_id)
-                                    {
-                                        debug!(content_id = %content_id, "Content not found on peer, marking failed");
-                                        self.replication_state.mark_failed(&content_id).await;
-                                        self.replication_state.update_caught_up().await;
-                                    } else {
-                                        debug!("Content not found on peer (no pending replication request)");
+                                    _ => {
+                                        debug!(request_id = ?request_id, response = ?response, "Received shard response");
                                     }
                                 }
-                                _ => {
-                                    debug!(request_id = ?request_id, response = ?response, "Received shard response");
-                                }
                             }
-                        }
+                        } // close outer else { // Check pending fetch requests ... }
                     }
                 }
             }
@@ -2319,6 +2438,17 @@ impl P2PNode {
                 // Clean up any pending shard push so the caller gets an error instead of hanging
                 if let Some(tx) = self.pending_shard_pushes.lock().await.remove(&request_id) {
                     let _ = tx.send(Err(format!("Outbound failure: {error:?}")));
+                }
+                // Clean up any pending blob pull (fire-and-store, no channel to close)
+                if let Some((content_id, blob_hash)) =
+                    self.pending_blob_pulls.lock().await.remove(&request_id)
+                {
+                    warn!(
+                        content_id = %content_id,
+                        blob_hash = %blob_hash,
+                        error = ?error,
+                        "quilt draw: blob pull failed at transport level"
+                    );
                 }
                 // Mark lost for any pending verification request that failed
                 if let Some((shard_hash, peer_id_str)) =
