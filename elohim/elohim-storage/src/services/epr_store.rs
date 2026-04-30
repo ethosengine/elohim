@@ -307,12 +307,83 @@ impl EprStore for FederatedEprStore {
         if let Some(outcome) = self.local.fetch(conn, cid)? {
             return Ok(Some(outcome));
         }
-        // TODO(phase-3): on local miss, issue swarm_handle.resolve_epr(cid).
-        // For each returned peer, send EprRequest::Resolve { id: cid }; if
-        // EprResponse::Head arrives, decode + validate + LocalEprStore::put + return
-        // FetchOutcome::Peer(peer_id). Give up after N peers or T timeout.
-        // See genesis/docs/plans/2026-04-26-epr-phase-3-manifest-resolver-kickoff-prompt.md
-        // §Task: Cold-fetch via swarm.
+        // Phase 3 P3.4: cold-fetch via swarm on local miss. Floor protection:
+        // CID-targeted lookup is unconditional regardless of standing (brainstorm
+        // §2.8). Phase 3.5 will modulate provider ordering and per-peer timeout by
+        // Standing; today: arrival order, fixed 5 s per provider, 10 s overall.
+        let Some(swarm_tx) = self.swarm_tx.as_ref() else {
+            // P2P disabled or no swarm wired — treat as cache miss.
+            return Ok(None);
+        };
+
+        // Phase A: query Kademlia DHT for providers of this CID.
+        let (providers_tx, providers_rx) = tokio::sync::oneshot::channel();
+        if swarm_tx
+            .blocking_send(crate::p2p::P2PCommand::KadGetProviders {
+                cid: cid.to_string(),
+                reply: providers_tx,
+            })
+            .is_err()
+        {
+            // Swarm task dead; treat as cache miss.
+            return Ok(None);
+        }
+        let providers = match providers_rx.blocking_recv() {
+            Ok(v) => v,
+            Err(_) => return Ok(None),
+        };
+        if providers.is_empty() {
+            return Ok(None);
+        }
+
+        // Phase B: try providers in arrival order. First successful fetch wins.
+        for peer_id in &providers {
+            let (atom_tx, atom_rx) = tokio::sync::oneshot::channel();
+            if swarm_tx
+                .blocking_send(crate::p2p::P2PCommand::FetchEprAtomFromPeer {
+                    peer_id: *peer_id,
+                    cid: cid.to_string(),
+                    reply: atom_tx,
+                })
+                .is_err()
+            {
+                continue;
+            }
+            match atom_rx.blocking_recv() {
+                Ok(Some(envelope_bytes)) => {
+                    // Phase C: structural verification (CID recompute + signature shape).
+                    match crate::p2p::epr_atom_protocol::verify_incoming_epr(&envelope_bytes) {
+                        Ok((epr, _verified_cid)) => {
+                            // Persist locally so subsequent fetches hit the cache.
+                            let peer_id_str = peer_id.to_string();
+                            let _ = self.local.put(conn, epr);
+                            // Re-fetch from local store to build FetchedEpr (joins all tables).
+                            if let Ok(Some(fetched)) = epr_service::fetch_by_cid(conn, cid) {
+                                return Ok(Some(FetchOutcome {
+                                    fetched,
+                                    source: EprSource::Peer(peer_id_str),
+                                }));
+                            }
+                            // put succeeded but re-fetch failed — storage inconsistency;
+                            // continue to try the next provider.
+                        }
+                        Err(e) => {
+                            tracing::warn!(
+                                target: "elohim_storage::epr",
+                                cid = %cid,
+                                peer = %peer_id,
+                                error = %e,
+                                "P3.4: cold-fetch verify_incoming_epr failed — trying next provider"
+                            );
+                        }
+                    }
+                }
+                Ok(None) | Err(_) => {
+                    // Provider didn't have it or request timed out — try next.
+                    continue;
+                }
+            }
+        }
         Ok(None)
     }
 
