@@ -342,8 +342,24 @@ elohim/<pillar>/<reach>/[<collective-id>]
 elohim/identity/binding
 elohim/integrity/revocation
 ```
-Reach-gated subscription: a peer can only subscribe to topics it's authorized
-for per its agent's delegations / group memberships.
+**Reach authorization with two faces** (graph-grounded; not subscription-based filtering):
+
+(1) **Author-side earning at publish time** — the signer must have earned the
+declared reach. Refused puts never enter local storage or hit the wire.
+
+(2) **Receiver-side pre-authorization classification** — a topology decision:
+which scopes does this node have standing in? Standing = topology, not
+per-message filter.
+
+Receive-side per-message filtering is **rejected** as the email-collapse
+anti-pattern (memory pin `project_reach_earned_at_authoring`): putting filter
+cost on receivers breaks the human-scale contract the protocol exists to
+preserve. Reach is coupled to embodied responsibilities at every node —
+author-side earning + receiver-side pre-authorization both derive from graph
+topology (memory pin `project_first_class_graph_pattern`).
+
+See §7 O2 for Stage 1 implementation pointer (Batch D.4) and §6.4 for the
+trust→compute gradient that builds on this floor.
 
 **Three-arc weighting:**
 - Operational: tiered routing respects existing Reach enum semantics; no wasted Kad/gossip cost for Private atoms
@@ -535,6 +551,11 @@ Phase 2B's outputs are Phase 3's inputs:
 | `verified_at` trust state | Phase 4 resolvers filter on this without re-verify (critical for federated query performance) |
 | Signal emission per projection | Phase 6 GraphQL subscriptions map 1:1 to projector signals |
 | `EconomicEvent` EPRs with shefa's `schema_ref` → VF-GraphQL manifest CID | R&O #4 (hREA alignment) becomes a manifest-declaration exercise |
+| Reach earning + receiver-side pre-authorization (Batch D.4 `reach_authorization.rs`) | Phase 3 standing-aware code paths use this as the binary floor; Phase 3.5 lights up the continuous gradient on top |
+| Tiered fanout policy by reach + integrity exception (Batch D.1) | Phase 3+ standing-gradient modulates *within* each tier (high-standing → wider hop; low-standing → clipped); never breaks the integrity exception |
+| Dedup LRU window (Batch D.6) | Phase 3 dedup wiring (P3.6) makes window length standing-aware: shorter for high-standing peers, longer for low-standing |
+| Local-cache projection priority (current: flat) | Phase 3+ cache priority weighted by author-standing × content-citation-density; low-standing evicted first; back-prop signals invalidate cache (Phase 3.5) |
+| Cold-fetch peer selection (current: first-available) | Phase 3 P3.4 standing-aware: high-standing providers queried first, parallelism modulated; low-standing fallback mandatory if no high-standing provider exists (floor protection) |
 
 **What 2B does NOT build:** Phase 3's Manifest-EPR resolver, Phase 4's
 GraphQL surface, Phase 4's subgraph schema generation, Phase 5's pillar
@@ -556,6 +577,53 @@ Per memory `project_epr_substrate_vs_vf_graphql`:
 - Phase 2B must not introduce VF vocabulary into the projector
 - Shefa's EPRs carry `schema_ref: <vf-graphql-manifest-cid>` at envelope level; that's it. No VF resolvers, no VF types in 2B code.
 
+### 6.4 Trust as efficiency signal — the compute-burden gradient
+
+**Forward to:** `genesis/docs/superpowers/specs/2026-04-30-trust-compute-gradient-brainstorm.md`
+for the full architectural foundation. Summary follows.
+
+**Foundational thesis:** Our Attention Is Sacred. The architecture treats
+attention with dignity, reverence, and care at every layer of the substrate.
+Trustworthy/accurate/good-faith content reduces the computational cost of
+distribution, discovery, validation, and verification at every edge of the
+network. Untrustworthy/inaccurate/bad-faith content imposes structural cost.
+This is the anti-spam-megalith mechanism: distribution cost scales with
+trust, edge by edge, no central arbiter required.
+
+**Nine foundational principles** (see brainstorm artifact §2 for full text):
+
+1. Trust as efficiency signal (compute-economic, not just moral)
+2. Standing on agents, reach on content (the disambiguation)
+3. Power coupled to responsibility, Dunbar-by-design
+4. Constitutional revealability of provenance (Genesis 3:11)
+5. Paced reconciliation accountable to stewarded compute
+6. Carrot before stick — author-time tender conversation as primary, aggregate sensemaking as safety net
+7. Substrate-thin / manifest-medium / agent-thick-at-scale
+8. Constitutional floors — standing-immune (5 classes) + tending-immune (5 classes)
+9. Honesty at onboarding — virtue commitments declared up-front, no surprise rules
+
+**Standing vs reach disambiguation** (load-bearing):
+
+| Property | Lives on | Set when | Mutability |
+|---|---|---|---|
+| Reach | content envelope | at authoring | immutable post-publish |
+| Reach-earning | agent (author-side) | at authoring | derived from graph |
+| Standing | agent | continuously, via sense-respond | mutates via attestation/correction/restitution |
+| Provenance | envelope chain | at each forward | constitutionally revealable; private by default |
+
+Phase 2B's substrate establishes the binary reach floor (`reach_authorization.rs`
+in Batch D.4). Phase 3 introduces standing-aware code paths with placeholders
+(`Standing::Unknown` until lit). Phase 3.5 introduces the new substrate
+(`FeedbackSignal` EPR for back-prop, `AttentionTending` EPR for filters,
+constitutional floor manifest, edge-local back-prop with sealed predecessor
+records). See brainstorm artifact §9 for Phase 3.5's 10-task plan.
+
+**Critical architectural property:** standing is a **graph-derived view, not
+a stored score.** No central tabulation. No authoritative number. Each
+evaluator computes the agent's standing through their own constitutional
+lens (whichever manifests they subscribe to). Different evaluators see
+different views; this is pluralism, not inconsistency.
+
 ---
 
 ## 7. Open questions explicitly deferred
@@ -573,7 +641,7 @@ authorization. Mechanism: presents a capability grant? Delegation EPR?
 Reach-gated subscription enforcement needs a precise design. **Action:** Batch
 D task 4 design pass.
 
-Stage 1 implementation landed in Batch D.4: see `elohim/elohim-storage/src/p2p/subscription_auth.rs`. Stage 2/3 (capability proof) remains deferred.
+Stage 1 implementation landed in Batch D.4: see `elohim/elohim-storage/src/p2p/reach_authorization.rs`. Stage 2/3 (capability proof) remains deferred.
 
 **Stage 1 implementation (Batch D.4):** Reframed from receive-side filtering to *graph-grounded reach with two faces*: (1) author-side earning at publish time (signer must have earned the declared reach; refused puts never enter local storage or hit the wire); (2) receiver-side pre-authorization classification (a topology decision: which scopes does this node have standing in?). Receive-side per-message filtering was rejected as the email-collapse anti-pattern (memory pin `project_reach_earned_at_authoring`): putting filter cost on receivers breaks the human-scale contract the protocol exists to preserve. Reach is coupled to embodied responsibilities at every node — authoring earning + receiver pre-authorization both derive from graph topology (memory pin `project_first_class_graph_pattern`). Stage 1 = structural projections (peer_identity_bindings); Stage 2/3 = graph walks (qahal household memberships, imagodei relationship attestations). Implementation: `elohim/elohim-storage/src/p2p/reach_authorization.rs` (author-side enforced at `FederatedEprStore::put`; receiver-side is a pure policy module ready for Phase 3+ subscription wiring).
 
