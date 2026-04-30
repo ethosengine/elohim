@@ -20,13 +20,13 @@
 //!    limit 3 for non-Manifest kinds).  Uses direct DB seeding (ManifestRow
 //!    inserts) to avoid complex cross-CID chaining through EPR builder.
 
+use elohim_epr::{cid::compute_cid, proof::AgentKeypair, Coupling, EprKind, Reach};
 use elohim_storage::db::manifests::{insert_manifest, ManifestRow};
 use elohim_storage::services::epr_store::{EprStore, FederatedEprStore};
 use elohim_storage::services::manifest_registry::ManifestRegistry;
 use elohim_storage::services::schemaref_resolver::walk_schemaref;
 use elohim_storage::services::standing::{Standing, StandingScore};
 use elohim_storage::test_util::test_pool;
-use elohim_epr::{cid::compute_cid, proof::AgentKeypair, Coupling, EprKind, Reach};
 
 // ---------------------------------------------------------------------------
 // Test helpers
@@ -125,19 +125,20 @@ async fn manifest_creation_projects_to_registry() {
         loaded, 2,
         "registry must load 2 kind→pillar mappings (content, observation)"
     );
-    assert!(!registry.is_empty(), "registry must not be empty after load");
+    assert!(
+        !registry.is_empty(),
+        "registry must not be empty after load"
+    );
 
     // Floor assertion: CID lookup is unconditional; pillar resolve ignores standing.
-    let pillar =
-        registry.pillar_for_kind(EprKind::Content, Standing::Unknown);
+    let pillar = registry.pillar_for_kind(EprKind::Content, Standing::Unknown);
     assert_eq!(
         pillar,
         Some("lamad".to_string()),
         "pillar_for_kind(Content, Unknown) must return Some(lamad)"
     );
 
-    let pillar_obs =
-        registry.pillar_for_kind(EprKind::Observation, Standing::Unknown);
+    let pillar_obs = registry.pillar_for_kind(EprKind::Observation, Standing::Unknown);
     assert_eq!(
         pillar_obs,
         Some("lamad".to_string()),
@@ -145,8 +146,7 @@ async fn manifest_creation_projects_to_registry() {
     );
 
     // Manifest kind itself is not declared in the payload's kinds array.
-    let pillar_manifest =
-        registry.pillar_for_kind(EprKind::Manifest, Standing::Unknown);
+    let pillar_manifest = registry.pillar_for_kind(EprKind::Manifest, Standing::Unknown);
     assert!(
         pillar_manifest.is_none(),
         "pillar_for_kind(Manifest, Unknown) must return None (not in kinds array)"
@@ -191,8 +191,8 @@ async fn cold_fetch_resolves_manifest_from_peer() {
 
 #[test]
 fn floor_cid_lookup_unconditional_at_unknown_standing() {
-    use elohim_storage::services::epr_store::{EprStore, LocalEprStore};
     use elohim_storage::services::epr_service::ingest;
+    use elohim_storage::services::epr_store::{EprStore, LocalEprStore};
 
     let pool = test_pool();
     let mut conn = pool.get().expect("connection");
@@ -299,8 +299,7 @@ fn floor_protocol_load_bearing_schemaref_full_depth() {
     // Content requires Knowledge + Value + Governance coupling but walk_schemaref
     // reads from the manifests table only (not the epr_atoms table), so the
     // chain rows we inserted are sufficient.
-    let clip_result =
-        walk_schemaref(&mut conn, "t14-a", EprKind::Content, floor_standing);
+    let clip_result = walk_schemaref(&mut conn, "t14-a", EprKind::Content, floor_standing);
     match clip_result {
         Err(SchemaRefError::DepthExceeded { limit, .. }) => {
             assert_eq!(

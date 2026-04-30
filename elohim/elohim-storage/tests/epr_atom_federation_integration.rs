@@ -1051,8 +1051,8 @@ async fn gossipsub_identity_binding_propagates_to_peer_db() {
 
 #[tokio::test]
 async fn floor_local_relationship_reach_unconditional() {
-    use elohim_storage::services::floor_protections::is_local_relationship_reach;
     use elohim_epr::Reach;
+    use elohim_storage::services::floor_protections::is_local_relationship_reach;
 
     // Predicate assertion: Reach::Private is local-relationship.
     assert!(
@@ -1067,7 +1067,9 @@ async fn floor_local_relationship_reach_unconditional() {
 
     // author_test_atom uses EprKind::Manifest which only requires the governance
     // coupling leg — compatible with ingest's structural validator.
-    let epr = node.author_test_atom("private", b"floor: local relationship reach").await;
+    let epr = node
+        .author_test_atom("private", b"floor: local relationship reach")
+        .await;
     let cid = epr.envelope.cid.to_string();
 
     // ingest_local routes through Command::IngestLocal which calls epr_service::ingest.
@@ -1086,13 +1088,10 @@ async fn floor_local_relationship_reach_unconditional() {
         .wait_for_connection(&node.peer_id(), CONNECT_WAIT)
         .await;
 
-    let cross_peer_result = timeout(
-        FETCH_TIMEOUT,
-        node_b.fetch_atom_from(&node.peer_id(), &cid),
-    )
-    .await
-    .expect("fetch timed out")
-    .expect("channel error");
+    let cross_peer_result = timeout(FETCH_TIMEOUT, node_b.fetch_atom_from(&node.peer_id(), &cid))
+        .await
+        .expect("fetch timed out")
+        .expect("channel error");
 
     // Private atom is not served to anonymous peer — leak-free invariant.
     // This confirms the atom was ingested (otherwise it would also return None,
@@ -1117,8 +1116,8 @@ async fn floor_local_relationship_reach_unconditional() {
 
 #[tokio::test]
 async fn floor_constitutional_kind_validation_per_message() {
-    use elohim_storage::services::floor_protections::is_constitutional_kind;
     use elohim_epr::EprKind;
+    use elohim_storage::services::floor_protections::is_constitutional_kind;
 
     // Constitutional kinds — full per-message validation required.
     assert!(

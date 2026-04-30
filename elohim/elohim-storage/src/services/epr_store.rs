@@ -4,9 +4,9 @@
 //! FederatedEprStore wraps LocalEprStore + a libp2p swarm handle. Phase 2B
 //! wired the swarm handle and flipped the construction site from LocalEprStore
 //! → FederatedEprStore. Kad `start_providing` + gossipsub tiered fanout are
-//! live as of Phase 2B Batch D. On local miss, cold-fetch via
-//! `swarm_handle.resolve_epr(cid)` is the remaining Phase 3 work item
-//! (see `TODO(phase-3)` at the miss site below).
+//! live as of Phase 2B Batch D. Phase 3 (T10) closed the loop by adding
+//! cold-fetch on local miss: `KadGetProviders` → `FetchEprAtomFromPeer` →
+//! local persist, returning `FetchOutcome { source: EprSource::Peer(_) }`.
 //!
 //! ## D.4: Receiver-side pre-authorization (seam placeholder)
 //!

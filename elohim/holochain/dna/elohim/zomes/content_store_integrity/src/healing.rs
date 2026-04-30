@@ -4,20 +4,16 @@
 //! These implementations are defined here in the integrity crate to avoid
 //! Rust's orphan rule violations (both trait and types must have local ownership).
 
-use hc_rna::{SelfHealingEntry, ValidationStatus};
 use crate::*;
+use hc_rna::{SelfHealingEntry, ValidationStatus};
 
 // Healing uses ALL_* constants (full vocabulary including extensible types).
 // These are auto-generated from protocol JSON schemas.
 use crate::generated_enums::{
-    ALL_CONTENT_TYPES as CONTENT_TYPES,
-    ALL_CONTENT_FORMATS as CONTENT_FORMATS,
-    ALL_REACH_LEVELS as REACH_LEVELS,
-    ALL_MASTERY_LEVELS as MASTERY_LEVELS,
-    ALL_PATH_VISIBILITIES as PATH_VISIBILITIES,
-    ALL_STEP_TYPES as STEP_TYPES,
-    ALL_COMPLETION_CRITERIA as COMPLETION_CRITERIA,
-    ALL_ENGAGEMENT_TYPES as ENGAGEMENT_TYPES,
+    ALL_COMPLETION_CRITERIA as COMPLETION_CRITERIA, ALL_CONTENT_FORMATS as CONTENT_FORMATS,
+    ALL_CONTENT_TYPES as CONTENT_TYPES, ALL_ENGAGEMENT_TYPES as ENGAGEMENT_TYPES,
+    ALL_MASTERY_LEVELS as MASTERY_LEVELS, ALL_PATH_VISIBILITIES as PATH_VISIBILITIES,
+    ALL_REACH_LEVELS as REACH_LEVELS, ALL_STEP_TYPES as STEP_TYPES,
 };
 
 // ============================================================================
