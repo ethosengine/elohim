@@ -27,6 +27,31 @@ We deleted 13 identical ~150-line proxy files (governance, attestations, contrib
 
 A dedicated match arm in `http.rs` is only needed when the route requires **doorway-specific logic** that can't be expressed as a simple storage proxy: custom auth gating, path rewriting across domains, non-storage targets (agent sidecar), or WebSocket upgrades.
 
+## CRITICAL: No Blob Fan-Out — Doorway is Single-Target Dispatch
+
+**Doorway forwards each request to a SINGLE storage target.** It does NOT iterate `STORAGE_URLS` looking for which peer holds a particular blob. If a request lands on a peer that doesn't have the bytes, that is a substrate replication problem to fix in elohim-storage's P2P layer — never a doorway dispatcher fix.
+
+| Scenario | What To Do |
+|----------|-----------|
+| `GET /blob/<hash>` returns 404 because that peer doesn't have it | Fix it in elohim-storage P2P layer (commons-reach blobs must replicate to all eligible peers). NOT in doorway. |
+| "We need doorway to try peer A, then peer B, then peer C" | **NO.** That's reintroducing P2P-aware logic into the web2 projection. The bytes must be on the routed peer; if they aren't, that's a substrate bug. |
+| Singular `STORAGE_URL` points at the wrong peer for the content | Sharper symptom of the same substrate gap. Replication should make the choice irrelevant. |
+
+Two reasons this rule exists:
+
+1. **Three-layer truth model** (DHT / libp2p / doorway-projection). Doorway is the web2 projection of the network, not a P2P participant. Peer-aware blob routing in doorway would re-introduce the P2P logic that elohim-storage already owns, creating two competing sources of "where does this blob live" truth.
+
+2. **The substrate is responsible for byte mobility.** The self-healing P2P dataplane campaign (`genesis/docs/superpowers/specs/2026-04-19-self-healing-p2p-dataplane-design.md`) is what makes commons-reach blobs reachable from any peer. Inventory exchange between peers is not the same thing as byte replication — the latter requires Plan 1 (distribute at ingest) + Plan 2 (verifier) + Plan 3 (reconstruction).
+
+What doorway DOES do for blobs:
+- Forward `GET`/`HEAD` to its configured storage target (singular `STORAGE_URL` or a registry-routed peer).
+- Cache the response in the tiered blob cache so subsequent requests are served locally.
+- Never know or care which physical peer holds which blob.
+
+### Known TODO — blob-tier cache write-on-fetch
+
+The tiered blob cache (`TieredBlobCache`) is allocated and its cleanup loop runs, but its blob tier is never written on the storage-proxy path. `routes::forward_to_storage` returns the upstream response directly to the client without populating the cache. As a result every `/blob/<hash>` request round-trips to elohim-storage. Fixing this is independent of any P2P substrate work and is what makes doorway actually behave like a projection cache. Symptom in `/admin/cache/stats`: `appFileCache.cachedFiles: 0` and `Tiered cache cleanup completed expired_blobs=0` indefinitely.
+
 ## Architecture
 
 ### Three Consolidated Services
