@@ -1524,6 +1524,19 @@ async fn handle_request(
             match dispo {
                 Disposition::StorageProxy { endpoint } => {
                     debug!(path = %p, %endpoint, "Registry-routed to storage proxy");
+                    // Blob paths get cache-aware forwarding; all other registry
+                    // routes use the generic forwarder unchanged.
+                    if p.starts_with("/blob/") {
+                        return Ok(to_boxed(
+                            routes::forward_blob_to_storage(
+                                req,
+                                &endpoint,
+                                p,
+                                Arc::clone(&state.cache),
+                            )
+                            .await,
+                        ));
+                    }
                     return Ok(to_boxed(
                         routes::forward_to_storage(req, &endpoint, p).await,
                     ));
