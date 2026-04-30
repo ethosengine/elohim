@@ -33,6 +33,7 @@ pub mod epr_service;
 pub mod epr_store;
 pub mod events;
 pub mod exchange_service;
+pub mod floor_protections;
 pub mod governance_health;
 pub mod hazard;
 pub mod holochain_humans_replayer;
