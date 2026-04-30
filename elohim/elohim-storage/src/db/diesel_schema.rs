@@ -1196,6 +1196,25 @@ diesel::table! {
     }
 }
 
+// EPR Phase 3 — manifests projection (P3.2)
+// Source of truth: Holochain DHT (Manifest entry, content_store_integrity zome).
+// Category C operational projection rebuildable via signal replay.
+// Timestamps stored as TEXT (ISO-8601) per elohim-storage conventions.
+
+diesel::table! {
+    manifests (cid) {
+        cid             -> Text,
+        manifest_kind   -> Text,
+        pillar          -> Nullable<Text>,
+        payload_json    -> Text,
+        schema_ref      -> Nullable<Text>,
+        signer_pubkey   -> Binary,
+        created_at      -> Text,
+        verified_at     -> Nullable<Text>,
+        revision        -> Integer,
+    }
+}
+
 // Recovery Protocol Phase 2 — M4 revocation projection tables.
 // Source of truth: DHT (imagodei KeyRevocation + RevocationVote entries).
 // These tables are read-optimized projections rebuildable via signal replay.
@@ -1353,6 +1372,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     imagodei_observations,
     knowledge_maps,
     local_sessions,
+    manifests,
     node_stewardship,
     observation_entries,
     observation_sessions,

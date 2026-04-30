@@ -38,6 +38,7 @@ pub mod humans;
 pub mod imagodei_observations;
 pub mod knowledge_maps_diesel;
 pub mod local_sessions;
+pub mod manifests;
 pub mod places;
 pub mod rea_commitments;
 pub mod relationships_diesel;
