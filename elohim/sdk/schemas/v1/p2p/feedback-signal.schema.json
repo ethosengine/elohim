@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://elohim.host/schemas/v1/p2p/feedback-signal.schema.json",
+  "title": "FeedbackSignal",
+  "description": "Category B2 — agent-scoped with attestation. Wire contract for the FeedbackSignal EPR kind (Phase 3.5). Travels via the existing /elohim/epr-atom/1.0.0 libp2p protocol as a signed EPR atom. Four signal kinds implement a graduated sense-respond nervous system: squelch (steward discretion), correction (epistemic, references evidence), retraction (author-withdrawal), quarantine (governance-collective). Source: genesis/docs/superpowers/specs/2026-04-30-trust-compute-gradient-brainstorm.md §5.1",
+  "type": "object",
+  "required": ["targetCid", "signalKind", "standingImpact", "signedBy", "signature"],
+  "additionalProperties": false,
+  "properties": {
+    "targetCid": {
+      "type": "string",
+      "minLength": 1,
+      "description": "CIDv1 (dag-cbor sha256) of the content EPR being acted on."
+    },
+    "signalKind": {
+      "type": "string",
+      "enum": ["squelch", "correction", "retraction", "quarantine"],
+      "description": "Graduated signal kind. squelch: steward discretion — do not propagate further. correction: epistemic — claim was wrong; evidence_cid required. retraction: author-withdrawal — terminates propagation chain. quarantine: governance-collective determination — structural cost imposed; requires mishpat/qahal authorization."
+    },
+    "evidenceCid": {
+      "type": "string",
+      "minLength": 1,
+      "description": "CIDv1 of a Correction EPR with claims and citations. Required when signalKind is 'correction'; optional (and typically absent) for other kinds."
+    },
+    "standingImpact": {
+      "type": "string",
+      "enum": ["advisory", "debit-soft", "debit-firm"],
+      "description": "Graduated standing impact. advisory: informational — no score change, used for squelch and speculative corrections. debit-soft: standing debit recorded; reversal possible on successful appeal. debit-firm: standing debit applied immediately; requires mishpat authorization for reversal."
+    },
+    "signedBy": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Base64-encoded ed25519 public key of the issuing agent."
+    },
+    "signature": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Base64-encoded ed25519 signature over canonical_bytes(targetCid || signalKind || evidenceCid? || standingImpact || signedBy)."
+    }
+  },
+  "if": {
+    "properties": {
+      "signalKind": { "const": "correction" }
+    },
+    "required": ["signalKind"]
+  },
+  "then": {
+    "required": ["evidenceCid"]
+  }
+}

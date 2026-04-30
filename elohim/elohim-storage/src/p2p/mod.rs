@@ -33,6 +33,7 @@ pub mod dedup;
 pub mod epr_atom_protocol;
 pub mod epr_protocol;
 pub mod fanout;
+pub mod feedback_signal;
 pub mod identity_binding_gossip;
 pub mod identity_handshake;
 pub mod identity_map;

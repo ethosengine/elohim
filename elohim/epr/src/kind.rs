@@ -18,6 +18,11 @@ pub enum EprKind {
     Commitment,
     Attestation,
     Delegation,
+    /// Phase 3.5 — Trust-Compute Gradient substrate.
+    /// A signed signal about another EPR: squelch / correction / retraction /
+    /// quarantine. Carries graduated standing impact. Wire type:
+    /// `elohim_storage::p2p::feedback_signal::FeedbackSignal`.
+    FeedbackSignal,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, TS)]
@@ -43,6 +48,9 @@ impl EprKind {
             EprKind::Commitment => &[Value, Governance],
             EprKind::Attestation => &[Governance],
             EprKind::Delegation => &[Governance],
+            // FeedbackSignal: governance leg required (signed attestation about
+            // another EPR's standing impact; requires issuer accountability).
+            EprKind::FeedbackSignal => &[Governance],
         }
     }
 }
