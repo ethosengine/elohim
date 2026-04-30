@@ -577,7 +577,7 @@ The transition between stages is gradual and per-collective. Each collective's m
 
 ### §11.4 Related epics
 
-- **Social-reach epic** (`genesis/docs/content/elohim-protocol/social_medium/epic.md`) — narrative addition: "Designing for human darkness" section between Part III and Part IV; thesis-line addition: "Our Attention Is Sacred"
+- **Social-reach epic** (`genesis/docs/content/elohim-protocol/social_medium/epic.md`) — narrative addition: "Designing for Human Vulnerability" section between Part III and Part IV; thesis-line addition: "Our Attention Is Sacred"
 - **Recovery epic** (M-series at `genesis/docs/superpowers/specs/2026-04-22-recovery-protocol-phase-2-revised-design.md`) — DNA signal stream convergence
 - **Phase 4 / VF-GraphQL** — depends on Phase 3.5 standing/tending substrate being live before VF semantics layer adds nuance
 

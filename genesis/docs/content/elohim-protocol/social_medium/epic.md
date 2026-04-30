@@ -84,7 +84,7 @@ On the Elohim Medium, that first inflammatory post stays local. To reach neighbo
 
 ---
 
-## **Part IV: Designing for Human Darkness**
+## **Part IV: Designing for Human Vulnerability**
 
 ### **An Honest Welcome**
 
@@ -98,7 +98,7 @@ Bob signs. The signing is not a click-through; it is an acknowledgment that beco
 
 ### **The Tech Industry's Carelessness**
 
-The extractive web was not built by villains. It was built by people who were *careless* about human darkness — who assumed engagement was a clean signal, who believed friction was always the enemy, who designed frictionless ecosystems where bullies, grifters, and bad-faith actors discovered they could move at the speed of attention itself. Mark Twain's lie traveled around the world while truth laced its boots, and the architecture rewarded the speed. The Center for Humane Technology's Ledger of Harms is the receipt for that carelessness — children's developing brains, civic discourse decaying, anger as the most viral emotion, six times the velocity for falsehood as for fact.
+The extractive web was not built by villains. It was built by people who were *careless* about human vulnerability — who assumed engagement was a clean signal, who believed friction was always the enemy, who designed frictionless ecosystems where bullies, grifters, and bad-faith actors discovered they could move at the speed of attention itself. Mark Twain's lie traveled around the world while truth laced its boots, and the architecture rewarded the speed. The Center for Humane Technology's Ledger of Harms is the receipt for that carelessness — children's developing brains, civic discourse decaying, anger as the most viral emotion, six times the velocity for falsehood as for fact.
 
 The Elohim Medium begins from the opposite assumption. Not all participants come in good faith. The protocol must be honest about that, and the architecture must be the answer — not a content-moderation team in a building somewhere, deciding for everyone what may be said. The answer is structural, distributed, and paid edge by edge: distribution costs scale with trust, and trust is staked at every hop.
 
@@ -142,7 +142,7 @@ Maria's elohim, the morning after the share, surfaces the recent debit gently. N
 
 The point is not the bookkeeping. The point is that nothing important is lost. The lie does not get to travel free. The truth does not have to lace its boots while the falsehood circles the world. The careless re-share has a cost, and the careful repair has a credit, and the architecture remembers, and the elohim helps the human remember, and the network's collective discernment self-heals — without a megalith deciding for anyone what may be said.
 
-The old web's carelessness about human darkness produced a world in which bullies, grifters, and rage merchants moved at the speed of attention. The new web is honest about that darkness, and answers it structurally — not with surveillance, not with censorship, not with an algorithm in a building somewhere, but with the simple, unflinching commitment that reach must be earned, standing must be staked, repair must be possible, and no one is exempt because the system itself is honest about what humans sometimes do.
+The old web's carelessness about human vulnerability produced a world in which bullies, grifters, and rage merchants moved at the speed of attention. The new web is honest about that vulnerability, and answers it structurally — not with surveillance, not with censorship, not with an algorithm in a building somewhere, but with the simple, unflinching commitment that reach must be earned, standing must be staked, repair must be possible, and no one is exempt because the system itself is honest about what humans sometimes do.
 
 ---
 
