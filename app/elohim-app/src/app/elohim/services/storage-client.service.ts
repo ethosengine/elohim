@@ -9,10 +9,9 @@
  * - Doorway mode (browser): Blobs via /blob/{hash}, DB via /db/{table}
  * - Direct mode (Tauri): http://localhost:8090/blob/{hash}, /db/{table}
  *
- * Both modes use /blob/{hash} — doorway exposes this route via the storage
- * manifest registration in its RouteRegistry, which proxies to storage's
- * /blob/{hash}. The legacy /api/blob/{hash} alias in doorway's http.rs is
- * not reachable on deployed doorway (rewrites to a 404 /store/{hash} path).
+ * Both modes use the canonical /blob/{hash} path. Doorway exposes this
+ * via storage's manifest registration in the RouteRegistry, which proxies
+ * to storage's /blob/{hash}.
  *
  * In Eclipse Che, doorway is accessed via the hc-dev endpoint URL.
  */
@@ -96,9 +95,7 @@ export class StorageClientService {
 
     // Both doorway and direct modes serve blobs at /blob/{hash}. Doorway's
     // RouteRegistry exposes this from storage's manifest; direct mode hits
-    // elohim-storage directly. The /api/blob/{hash} alias at doorway's
-    // http.rs rewrites to /store/{hash} which isn't a reachable route on
-    // deployed doorway — using it 404s.
+    // elohim-storage directly.
     return `${this.getStorageBaseUrl()}/blob/${blobHash}`;
   }
 

@@ -218,7 +218,7 @@ async function fetchContentNode(doorwayUrl, nodeId, verbose) {
  * Fetch raw content from blob store
  */
 async function fetchBlobContent(doorwayUrl, contentHash, verbose) {
-  const url = `${doorwayUrl}/store/${contentHash}`;
+  const url = `${doorwayUrl}/blob/${contentHash}`;
 
   if (verbose) {
     console.log(`  Fetching blob: ${contentHash.substring(0, 16)}...`);

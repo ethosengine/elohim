@@ -475,7 +475,7 @@ export class TsContentResolver implements IContentResolver {
           url = `${source.baseUrl}/apps/${contentId}`;
           break;
         case 'blob':
-          url = `${source.baseUrl}/store/${contentId}`;
+          url = `${source.baseUrl}/blob/${contentId}`;
           break;
         case 'stream':
           url = `${source.baseUrl}/stream/${contentId}`;

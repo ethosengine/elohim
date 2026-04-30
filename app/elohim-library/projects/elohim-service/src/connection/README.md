@@ -115,7 +115,7 @@ For browser/web deployments where WebSocket connections must route through a pro
 **URL Resolution:**
 - Admin: `wss://doorway-alpha.elohim.host?apiKey=...`
 - App: `wss://doorway-alpha.elohim.host/app/{port}?apiKey=...`
-- Blob: `https://doorway-alpha.elohim.host/api/blob/{hash}?apiKey=...`
+- Blob: `https://doorway-alpha.elohim.host/blob/{hash}?apiKey=...`
 
 **Content Sources:**
 | Source | Tier | Priority | Description |
@@ -138,7 +138,7 @@ For native/Tauri deployments with direct conductor access.
 **URL Resolution:**
 - Admin: `ws://localhost:4444`
 - App: `ws://localhost:{port}`
-- Blob: `http://localhost:8090/store/{hash}`
+- Blob: `http://localhost:8090/blob/{hash}`
 
 **Content Sources:**
 | Source | Tier | Priority | Description |
@@ -356,14 +356,14 @@ if (result.success) {
 
 **Before:**
 ```typescript
-const blobUrl = `https://doorway-alpha.elohim.host/api/blob/${hash}`;
+const blobUrl = `https://doorway-alpha.elohim.host/blob/${hash}`;
 ```
 
 **After:**
 ```typescript
 const blobUrl = this.strategy.getBlobStorageUrl(config, hash);
-// Doorway: https://doorway-alpha.elohim.host/api/blob/{hash}
-// Direct:  http://localhost:8090/store/{hash}
+// Doorway: https://doorway-alpha.elohim.host/blob/{hash}
+// Direct:  http://localhost:8090/blob/{hash}
 ```
 
 ## Unified HTTP API Access
@@ -378,7 +378,7 @@ Both strategies access the **same** elohim-storage HTTP API - the only differenc
 │  Endpoints:                                                 │
 │  • /db/content, /db/paths, /db/relationships               │
 │  • /session (native auth)                                   │
-│  • /store/{hash} (blob storage)                            │
+│  • /blob/{hash} (blob storage)                             │
 │                                                             │
 │  All responses: camelCase JSON                             │
 └─────────────────────────────────────────────────────────────┘

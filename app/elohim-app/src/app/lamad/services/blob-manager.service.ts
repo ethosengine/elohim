@@ -153,8 +153,8 @@ export class BlobManagerService {
    * Uses the StorageClientService's connection strategy to determine
    * the appropriate blob storage endpoint:
    *
-   * - **Doorway mode**: `https://doorway-alpha.elohim.host/api/blob/{hash}`
-   * - **Direct mode**: `http://localhost:8090/store/{hash}`
+   * - **Doorway mode**: `https://doorway-alpha.elohim.host/blob/{hash}`
+   * - **Direct mode**: `http://localhost:8090/blob/{hash}`
    *
    * @param blobHash SHA256 hash of the blob
    * @returns URL string for the blob storage endpoint

@@ -173,7 +173,7 @@ Doorway A                                    Doorway B
 When a client requests content:
 
 ```
-1. Client ──► Doorway A: GET /api/blob/{hash}
+1. Client ──► Doorway A: GET /blob/{hash}
 2. Doorway A checks local cache → miss
 3. Doorway A queries custodian registry (from DHT projection)
 4. Doorway A probes Doorway B, C, D for health

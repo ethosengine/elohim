@@ -177,7 +177,7 @@ RawContentData                          ContentNode
   contentBody: "# Markdown..."    →    content: "# Markdown..."  (string for md)
   contentBody: '{"appId":...}'    →    content: { appId: ... }   (parsed for sophia/html5-app)
   metadata: { key: "val" }        →    metadata: { key: "val" }  (pass-through)
-  thumbnailUrl: "/blob/sha256-"   →    thumbnailUrl: "https://alpha.../api/blob/sha256-"  (resolved)
+  thumbnailUrl: "/blob/sha256-"   →    thumbnailUrl: "https://alpha.../blob/sha256-"  (resolved)
 ```
 
 Key transformations:

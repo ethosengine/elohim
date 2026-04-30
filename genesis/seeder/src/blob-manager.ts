@@ -224,7 +224,7 @@ export class BlobManager {
     const metadata: Record<string, unknown> = {
       ...content,
       blobHash: hash,
-      blobUrl: `${this.config.doorwayUrl}/store/${hash}`,
+      blobUrl: `${this.config.doorwayUrl}/blob/${hash}`,
     };
 
     if (entryPoint) {

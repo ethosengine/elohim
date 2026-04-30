@@ -1315,74 +1315,10 @@ async fn handle_request(
         // Blob verification endpoint
         (Method::POST, "/api/blob/verify") => handle_blob_verify(state, req).await,
 
-        // Content store streaming with Range support (HTTP 206)
-        // GET /store/{hash} - Stream entire content or byte range
-        // HEAD /store/{hash} - Get content metadata
-        // Falls back to elohim-storage proxy on cache miss
-        (Method::GET, p) if p.starts_with("/store/") => {
-            match routes::blob::handle_blob_request_with_storage_proxy(
-                req,
-                Arc::clone(&state.cache),
-                state.args.storage_url.clone(),
-            )
-            .await
-            {
-                Ok(resp) => to_boxed(resp),
-                Err(err) => to_boxed(routes::blob::error_response(err)),
-            }
-        }
-        (Method::HEAD, p) if p.starts_with("/store/") => {
-            match routes::blob::handle_blob_request_with_storage_proxy(
-                req,
-                Arc::clone(&state.cache),
-                state.args.storage_url.clone(),
-            )
-            .await
-            {
-                Ok(resp) => to_boxed(resp),
-                Err(err) => to_boxed(routes::blob::error_response(err)),
-            }
-        }
-
-        // Blob API alias for /store/* (used by Angular app in doorway mode)
-        // GET /api/blob/{hash} - Stream entire content or byte range
-        // HEAD /api/blob/{hash} - Get content metadata
-        // Falls back to elohim-storage proxy on cache miss
-        (Method::GET, p) if p.starts_with("/api/blob/") => {
-            // Rewrite path from /api/blob/{hash} to /store/{hash} for blob handler
-            let hash = p.strip_prefix("/api/blob/").unwrap_or("");
-            let new_uri = format!("/store/{hash}");
-            let (mut parts, body) = req.into_parts();
-            parts.uri = new_uri.parse().unwrap_or(parts.uri);
-            let req = Request::from_parts(parts, body);
-            match routes::blob::handle_blob_request_with_storage_proxy(
-                req,
-                Arc::clone(&state.cache),
-                state.args.storage_url.clone(),
-            )
-            .await
-            {
-                Ok(resp) => to_boxed(resp),
-                Err(err) => to_boxed(routes::blob::error_response(err)),
-            }
-        }
-        (Method::HEAD, p) if p.starts_with("/api/blob/") => {
-            let hash = p.strip_prefix("/api/blob/").unwrap_or("");
-            let new_uri = format!("/store/{hash}");
-            let (mut parts, body) = req.into_parts();
-            parts.uri = new_uri.parse().unwrap_or(parts.uri);
-            let req = Request::from_parts(parts, body);
-            match routes::blob::handle_blob_request_with_storage_proxy(
-                req,
-                Arc::clone(&state.cache),
-                state.args.storage_url.clone(),
-            )
-            .await
-            {
-                Ok(resp) => to_boxed(resp),
-                Err(err) => to_boxed(routes::blob::error_response(err)),
-            }
-        }
+        // Note: GET/HEAD /blob/{hash} is handled by the wildcard `classify_dispatch`
+        // arm via the storage manifest's blob_proxy registration. Legacy /store/{hash}
+        // and /api/blob/{hash} dispatch arms were removed in the 2026-04-30 vocabulary
+        // cleanup. See genesis/graphos/vocabulary.md.
 
         // Cache API routes: GET /api/v1/cache/{type}/{id?}
         (Method::GET, p) if p.starts_with("/api/v1/cache/") => {

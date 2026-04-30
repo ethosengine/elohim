@@ -225,8 +225,8 @@ export interface IConnectionStrategy {
   /**
    * Get blob storage URL for a given hash.
    *
-   * - Doorway: https://doorway-alpha.elohim.host/api/blob/{hash}
-   * - Direct: http://localhost:8090/store/{hash} (elohim-storage sidecar)
+   * - Doorway: https://doorway-alpha.elohim.host/blob/{hash}
+   * - Direct: http://localhost:8090/blob/{hash} (elohim-storage sidecar)
    */
   getBlobStorageUrl(config: ConnectionConfig, blobHash: string): string;
 

@@ -131,6 +131,10 @@ Doorway gates HTTP requests based on content reach levels:
 | local | denied | requires relationship |
 | private | denied | requires beneficiary match |
 
+## Design Vocabulary
+
+The protocol's storage/distribution language — `quilt`, `pantry`, `stock`, `draw`, `shard`, `RS(N,K)` — is defined in `genesis/graphos/vocabulary.md`. Wire-level identifiers (HTTP `/blob/{hash}`, `BlobStore`, `sha256-{hex}`) keep their existing names; the new vocabulary applies to design discussion, signal/event names, and any new identifier we invent. The legacy `/store/{hash}` and `/api/blob/{hash}` paths were retired in the 2026-04-30 vocabulary cleanup; the canonical path is `/blob/{hash}` (registry-routed via storage's manifest).
+
 ## Reference Documentation
 
 Detailed design docs live in `doorway-service/`:
@@ -140,3 +144,4 @@ Detailed design docs live in `doorway-service/`:
 - `REACH.md` — Reach enforcement rules, caching, DNA integration
 - `RECOVERY-PROTOCOL.md` — Social recovery, shard distribution, agency restoration
 - `RECOVERY-SPRINT-PLAN.md` — Recovery protocol implementation phases
+- `genesis/graphos/vocabulary.md` — Storage and distribution vocabulary register

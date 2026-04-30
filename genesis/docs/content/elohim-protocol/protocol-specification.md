@@ -237,7 +237,7 @@ Content Bytes:
                  (content-addressed = immutable)
 ```
 
-The existing `BlobStore`, `ShardManifest`, and doorway blob-serving infrastructure (`/store/{address}`) serve Tier 3 without modification. The EPR layers above are additive.
+The existing `BlobStore`, `ShardManifest`, and doorway blob-serving infrastructure (`/blob/{address}`) serve Tier 3 without modification. The EPR layers above are additive.
 
 ---
 
@@ -1027,12 +1027,10 @@ Note: The current HTTP API returns metadata and relationships separately. The P2
 
 | EPR URI | Web (Doorway) | P2P-Native Device | P2P (libp2p) |
 |---------|---------------|----------------------|--------------|
-| `epr:{id}/blob` | **Two-step**: resolve `epr:{id}` → get `blobHash` → `GET {doorway}/store/{hash}` | **Two-step**: resolve → `GET {storage}/blob/{hash}` | `ShardRequest::Get { hash }` |
-| (by hash directly) | `GET {doorway}/store/{hash}` | `GET {storage}/blob/{hash}` | `ShardRequest::Get { hash }` |
+| `epr:{id}/blob` | **Two-step**: resolve `epr:{id}` → get `blobHash` → `GET {doorway}/blob/{hash}` | **Two-step**: resolve → `GET {storage}/blob/{hash}` | `ShardRequest::Get { hash }` |
+| (by hash directly) | `GET {doorway}/blob/{hash}` | `GET {storage}/blob/{hash}` | `ShardRequest::Get { hash }` |
 
-**Critical difference**: Doorway serves blobs at `/store/{hash}` (with HTTP Range, ETag, CDN-friendly caching, shard-resolution fallback) — this is the gateway path for hosted users whose steward is a doorway. A P2P-native device's local steward (elohim-storage) serves blobs at `/blob/{hash}` (direct shard reassembly) — this is the native path where you ARE the steward.
-
-The doorway also proxies `/api/blob/{hash}` → storage's `/blob/{hash}` for admin tooling. In the browser (doorway mode), use `/store/{hash}` for user-facing content delivery and `/api/blob/{hash}` only for programmatic access that needs to bypass gateway caching.
+**Path is unified**: Both doorway and the local steward (elohim-storage) serve blobs at `/blob/{hash}`. The difference is in what's wrapped around the request, not the path name. On doorway, requests pass through the projection/caching layer and reach the configured steward via registry-routed proxy (HTTP Range, ETag, CDN-friendly caching, shard-resolution fallback all happen there). On a P2P-native device, the local steward (elohim-storage) is hit directly — same path, no projection layer in front. The vocabulary cleanup (2026-04-30) retired the legacy `/store/{hash}` (gateway-only) and `/api/blob/{hash}` (admin proxy alias) paths in favor of this single canonical route. `POST /api/blob/verify` remains as a separate verification endpoint.
 
 #### Path Steps (fragment resolution)
 
@@ -1121,8 +1119,7 @@ Step 1: Resolve EPR
 
 Step 2: Fetch blob (if content body is a blob reference)
   sha256-a7ffc6f8bf1ed76651c14756a061d662f580ff4de43b49fa82d80a4b80f8434a
-    → GET /store/sha256-a7ffc6f8...  (doorway, CDN-cached, Range-capable)
-    → GET /blob/sha256-a7ffc6f8...   (direct to storage)
+    → GET /blob/sha256-a7ffc6f8...   (canonical — through doorway with CDN/Range, or direct to storage)
     → ShardRequest::Get { hash: "sha256-a7ffc6f8..." }  (P2P)
     → raw bytes (markdown text, image data, video, etc.)
 
@@ -1136,7 +1133,7 @@ Step 3: Verify integrity
 **Decision tree**:
 ```
 content.contentBody
-  ├── starts with "sha256-" or "sha256:" → BLOB: fetch from /store/ or /blob/
+  ├── starts with "sha256-" or "sha256:" → BLOB: fetch from /blob/{hash}
   ├── starts with "{" or "[" → INLINE JSON: parse directly (sophia-quiz-json, html5-app config)
   └── otherwise → INLINE TEXT: render directly (short markdown, descriptions)
 ```
@@ -1168,14 +1165,13 @@ Am I a P2P-native device? (own conductor, own storage, own keys)
   └── NO: I'm a browser. Someone else stewards for me.
         ├── Doorway configured (production/hosted):
         │     Metadata: GET {doorway}/db/content/{id}
-        │     Blobs:    GET {doorway}/store/{hash}     (CDN-cached, Range-capable)
-        │               GET {doorway}/api/blob/{hash}   (programmatic only)
+        │     Blobs:    GET {doorway}/blob/{hash}      (CDN-cached, Range-capable, registry-routed to steward)
         │     Paths:    GET {doorway}/db/paths/{id}
         │     Graphs:   GET {doorway}/db/relationships/graph/{id}
         │     WS:       wss://{doorway}/hc/app/{port}?apiKey=...&token=...
         └── No doorway (dev server):
               Same paths, proxied through localhost:4200 → localhost:8888
-              (proxy.conf.mjs maps /db/, /store/, /api/ to doorway)
+              (proxy.conf.mjs maps /db/, /blob/, /api/ to doorway)
 ```
 
 ### E.8: Known Inconsistencies
@@ -1184,8 +1180,7 @@ Issues in the current codebase that this specification normalizes:
 
 | Issue | Current State | Correct Per This Spec | Fix |
 |-------|-------------|----------------------|-----|
-| P2P-native blob URL | `{storage}/store/{hash}` | `{storage}/blob/{hash}` | Change `tauri-connection-strategy.ts:339` (fixed) |
-| Doorway dual blob paths | `/store/{hash}` (gateway) + `/api/blob/{hash}` (proxy) | Both valid, different purposes | Document — `/store/` is CDN-facing, `/api/blob/` is proxy to storage |
+| Legacy doorway blob paths | `/store/{hash}` and `/api/blob/{hash}` historically routed to storage | Single canonical `/blob/{hash}` via registry | RESOLVED 2026-04-30 (vocabulary cleanup sprint) |
 | `sha256:` colon format | Accepted by `BlobManagerService` | Deprecated — accept, never produce | Add deprecation comment in `blob-manager.service.ts` |
 | DID host inconsistency | Models use `elohim.host`, doorway uses `hosted.elohim.host` | `hosted.elohim.host` for hosted humans | Align model examples |
 

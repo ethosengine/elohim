@@ -562,7 +562,7 @@ impl ContentResolver {
             // Build appropriate URL based on content type
             match content_type {
                 "app" => format!("{}/apps/{}", base, content_id),
-                "blob" => format!("{}/store/{}", base, content_id),
+                "blob" => format!("{}/blob/{}", base, content_id),
                 "stream" => format!("{}/stream/{}", base, content_id),
                 _ => format!("{}/api/v1/{}/{}", base, content_type, content_id),
             }

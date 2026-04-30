@@ -1,10 +1,15 @@
-//! Content store streaming routes with HTTP 206 Range request support
+//! Blob streaming routes with HTTP 206 Range request support
 //!
 //! Provides efficient media delivery without blocking conductor threads:
-//! - `GET /store/{address}` - Stream entire content or byte range
+//! - `GET /blob/{address}` - Stream entire content or byte range
 //! - Supports `Range: bytes=start-end` header for partial content
 //! - Returns `206 Partial Content` for range requests
 //! - Returns `200 OK` for full content requests
+//!
+//! Note: These handlers are not currently dispatched from `http.rs`. The
+//! canonical `/blob/{hash}` path is registry-routed via storage's manifest.
+//! These handlers exist as a custom-dispatch alternative if doorway-specific
+//! caching/range logic ever needs to live above the registry layer.
 //!
 //! ## Content Addressing
 //!
@@ -27,13 +32,13 @@
 //!
 //! ```bash
 //! # CID format (preferred)
-//! curl https://doorway.example.com/store/bafkreihdwdcefgh4dqkjv67uzcmw7ojee6xedzdetojuzjevtenxquvyku
+//! curl https://doorway.example.com/blob/bafkreihdwdcefgh4dqkjv67uzcmw7ojee6xedzdetojuzjevtenxquvyku
 //!
 //! # Legacy SHA256 format
-//! curl https://doorway.example.com/store/sha256-abc123
+//! curl https://doorway.example.com/blob/sha256-abc123
 //!
 //! # Partial content (video seeking)
-//! curl -H "Range: bytes=1000000-2000000" https://doorway.example.com/store/bafkreihdwdcefgh...
+//! curl -H "Range: bytes=1000000-2000000" https://doorway.example.com/blob/bafkreihdwdcefgh...
 //! ```
 
 use crate::cache::ContentCache;
@@ -163,11 +168,11 @@ fn parse_range_header(range_header: &str, total_size: usize) -> Option<(usize, u
     Some((start, end))
 }
 
-/// Handle content store requests with Range support.
+/// Handle blob requests with Range support.
 ///
 /// # Routes
-/// - `GET /store/{address}` - Get content (full or partial)
-/// - `HEAD /store/{address}` - Get content metadata only
+/// - `GET /blob/{address}` - Get content (full or partial)
+/// - `HEAD /blob/{address}` - Get content metadata only
 ///
 /// Address can be CID (bafkrei...), sha256-prefixed, or raw hex.
 ///
@@ -186,9 +191,9 @@ pub async fn handle_blob_request(
     req: Request<hyper::body::Incoming>,
     cache: Arc<ContentCache>,
 ) -> Result<Response<Full<Bytes>>, BlobError> {
-    // Extract address from path: /store/{address}
+    // Extract address from path: /blob/{address}
     let path = req.uri().path();
-    let raw_address = path.strip_prefix("/store/").ok_or(BlobError::NotFound)?;
+    let raw_address = path.strip_prefix("/blob/").ok_or(BlobError::NotFound)?;
 
     if raw_address.is_empty() {
         return Err(BlobError::NotFound);
@@ -206,7 +211,7 @@ pub async fn handle_blob_request(
     }
 }
 
-/// Handle GET /store/{hash}
+/// Handle GET /blob/{hash}
 async fn handle_get_blob(
     req: Request<hyper::body::Incoming>,
     cache: Arc<ContentCache>,
@@ -306,7 +311,7 @@ async fn handle_range_request(
         .unwrap())
 }
 
-/// Handle HEAD /store/{hash}
+/// Handle HEAD /blob/{hash}
 async fn handle_head_blob(
     _req: Request<hyper::body::Incoming>,
     cache: Arc<ContentCache>,
@@ -362,9 +367,9 @@ pub async fn handle_blob_request_with_storage_proxy(
     cache: Arc<ContentCache>,
     storage_url: Option<String>,
 ) -> Result<Response<Full<Bytes>>, BlobError> {
-    // Extract address from path: /store/{address}
+    // Extract address from path: /blob/{address}
     let path = req.uri().path();
-    let raw_address = path.strip_prefix("/store/").ok_or(BlobError::NotFound)?;
+    let raw_address = path.strip_prefix("/blob/").ok_or(BlobError::NotFound)?;
 
     if raw_address.is_empty() {
         return Err(BlobError::NotFound);
@@ -481,7 +486,7 @@ impl BlobContext {
     }
 }
 
-/// Handle content store requests with shard resolution fallback.
+/// Handle blob requests with shard resolution fallback.
 ///
 /// This is the enhanced handler that tries shard resolution when
 /// content is not in the local cache.
@@ -500,9 +505,9 @@ pub async fn handle_blob_request_with_fallback(
     req: Request<hyper::body::Incoming>,
     ctx: Arc<BlobContext>,
 ) -> Result<Response<Full<Bytes>>, BlobError> {
-    // Extract address from path: /store/{address}
+    // Extract address from path: /blob/{address}
     let path = req.uri().path();
-    let raw_address = path.strip_prefix("/store/").ok_or(BlobError::NotFound)?;
+    let raw_address = path.strip_prefix("/blob/").ok_or(BlobError::NotFound)?;
 
     if raw_address.is_empty() {
         return Err(BlobError::NotFound);

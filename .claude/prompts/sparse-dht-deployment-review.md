@@ -51,7 +51,7 @@ match batch.batch_type.as_str() {
 ### 3. Doorway Gateway (holochain/doorway/)
 
 **Blob proxy with shard fallback:**
-- `GET /store/{address}` - Serves blobs with CID/SHA256/hex address support
+- `GET /blob/{address}` - Serves blobs with CID/SHA256/hex address support
 - Range request support for video seeking (HTTP 206)
 - Shard resolution fallback for distributed content
 
@@ -77,8 +77,8 @@ match batch.batch_type.as_str() {
 
 **Already configured for blob storage:**
 - `BlobManagerService.getBlobUrl(hash)` - Strategy-aware URL construction
-- Doorway mode: `https://doorway-alpha.elohim.host/store/{hash}`
-- Direct mode: `http://localhost:8090/store/{hash}` (Tauri)
+- Doorway mode: `https://doorway-alpha.elohim.host/blob/{hash}`
+- Direct mode: `http://localhost:8090/blob/{hash}` (Tauri)
 
 ---
 
@@ -108,7 +108,7 @@ curl https://doorway-alpha.elohim.host/health
 curl https://doorway-alpha.elohim.host/status | jq
 
 # 3. Test blob retrieval (any content hash from seed data)
-curl -I https://doorway-alpha.elohim.host/store/sha256-$(cat genesis/blobs/* | head -1 | sha256sum | cut -d' ' -f1)
+curl -s -o /dev/null -w '%{http_code}' https://doorway-alpha.elohim.host/blob/sha256-$(cat genesis/blobs/* | head -1 | sha256sum | cut -d' ' -f1)
 
 # 4. Test content loading in app
 open https://alpha.elohim.host/lamad
@@ -157,7 +157,7 @@ SEED_IDS="manifesto,elohim-protocol" npm run seed
 │      │                                      │         DHT Manifest      ││
 │      │                                      │         (metadata only)   ││
 │      │                                      │              │            ││
-│      └── BlobManager.downloadBlob() ──► Doorway /store/{hash}          ││
+│      └── BlobManager.downloadBlob() ──► Doorway /blob/{hash}           ││
 │                                              │                          ││
 │                                              ▼                          ││
 │                                       elohim-storage                    ││

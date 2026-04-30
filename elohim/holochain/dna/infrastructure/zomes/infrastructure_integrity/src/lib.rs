@@ -162,7 +162,7 @@ const ATTESTATION_STATUSES: &[&str] = &["online", "degraded", "unreachable"];
 /// Content serving capabilities - what type of content an agent can serve.
 /// Used by doorways to route requests to appropriate publishers.
 pub const CONTENT_SERVER_CAPABILITIES: [&str; 5] = [
-    "blob",             // Raw blob serving (GET /store/{hash})
+    "blob",             // Raw blob serving (GET /blob/{hash})
     "html5_app",        // Zip extraction + file serving (GET /apps/{id}/{path})
     "media_stream",     // Range request support for video/audio
     "learning_package", // SCORM/xAPI packages
@@ -175,7 +175,7 @@ pub const CONTENT_SERVER_CAPABILITIES: [&str; 5] = [
 pub struct StorageEndpoint {
     /// Base URL for fetching content. The content hash is appended to form the full URL.
     /// Examples:
-    ///   - "http://192.168.1.100:8080/store" → GET /store/{hash}
+    ///   - "http://192.168.1.100:8080" → GET /blob/{hash}
     ///   - "https://my-node.example.com/api/v1/blob" → GET /api/v1/blob/{hash}
     pub url: String,
     /// Protocol type: "http", "https", "libp2p"

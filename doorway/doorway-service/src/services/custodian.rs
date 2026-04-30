@@ -179,17 +179,13 @@ impl CustodianCapability {
 
     /// Generate fallback URL for a content hash
     pub fn blob_url(&self, blob_hash: &str) -> String {
-        format!(
-            "{}/store/{}",
-            self.base_url.trim_end_matches('/'),
-            blob_hash
-        )
+        format!("{}/blob/{}", self.base_url.trim_end_matches('/'), blob_hash)
     }
 
     /// Generate chunk URL for a content hash and chunk index
     pub fn chunk_url(&self, blob_hash: &str, chunk_index: usize) -> String {
         format!(
-            "{}/store/{}/chunk/{}",
+            "{}/blob/{}/chunk/{}",
             self.base_url.trim_end_matches('/'),
             blob_hash,
             chunk_index

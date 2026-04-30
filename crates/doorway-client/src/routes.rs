@@ -90,7 +90,7 @@ pub struct DoorwayRoutes {
     #[serde(default)]
     pub routes: Vec<Route>,
 
-    /// Blob proxy configuration (for /store/{hash} style endpoints)
+    /// Blob proxy configuration (for /blob/{hash} style endpoints)
     #[serde(default)]
     pub blob_proxy: Option<BlobProxyConfig>,
 

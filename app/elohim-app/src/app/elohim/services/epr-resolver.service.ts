@@ -107,7 +107,7 @@ export class EprResolverService implements IEprUriResolver, IEprContentResolver 
    *   // → "http://localhost:8090/db/content/manifesto-foundations" (P2P-native)
    *
    *   const blobUrl = resolver.resolveUrl('epr:manifesto-foundations/blob', 'sha256-abc...');
-   *   // → "https://doorway.host/store/sha256-abc..." (doorway)
+   *   // → "https://doorway.host/blob/sha256-abc..." (doorway)
    *   // → "http://localhost:8090/blob/sha256-abc..." (P2P-native)
    */
   resolveUrl(input: string, blobHash?: string): ResolvedEpr {
@@ -129,7 +129,7 @@ export class EprResolverService implements IEprUriResolver, IEprContentResolver 
    * @example
    *   resolver.resolve('epr:manifesto-foundations').subscribe(resolved => {
    *     // resolved.content  → { id, title, description, contentType, blobHash, ... }
-   *     // resolved.blobUrl  → "https://doorway.host/store/sha256-abc..." or null
+   *     // resolved.blobUrl  → "https://doorway.host/blob/sha256-abc..." or null
    *     // resolved.route    → ['/resource', 'manifesto-foundations']
    *   });
    */

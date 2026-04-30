@@ -21,7 +21,7 @@ This HTTP API serves **both** deployment modes through a single codebase:
                     │         elohim-storage              │
                     │   (http.rs / views.rs unified API)  │
                     │                                     │
-                    │  /db/content, /session, /store/...  │
+                    │  /db/content, /session, /blob/...   │
                     │         camelCase boundary          │
                     └─────────────────────────────────────┘
                                     ▲
@@ -206,6 +206,10 @@ const response = await api.createContent(input);  // camelCase in, camelCase out
 ```
 
 ---
+
+## Design Vocabulary
+
+Storage and distribution language — `quilt` (RS-encoded distribution of a content unit), `pantry` (peer-tended container), `stock`/`draw` (deposit/retrieve verbs), `shard`, `RS(N,K)` — is defined in `genesis/graphos/vocabulary.md`. Wire-level identifiers (`/blob/{hash}`, `BlobStore`, `sha256-{hex}`) keep their existing names. New design discussion, signal/event names, and any fresh identifiers should use the new vocabulary. Legacy `/store/{hash}` paths were retired 2026-04-30 — the canonical HTTP path is `/blob/{hash}`.
 
 ## File Reference
 

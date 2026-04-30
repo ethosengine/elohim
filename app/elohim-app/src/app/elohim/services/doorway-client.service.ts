@@ -176,7 +176,7 @@ export class DoorwayClientService {
     }
 
     return this.http
-      .get(`${this.baseUrl}/api/blob/${hash}`, {
+      .get(`${this.baseUrl}/blob/${hash}`, {
         headers,
         responseType: 'arraybuffer',
       })

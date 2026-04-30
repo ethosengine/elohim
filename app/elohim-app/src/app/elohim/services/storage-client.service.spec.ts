@@ -67,10 +67,8 @@ describe('StorageClientService', () => {
 
     it('should construct doorway blob URL at /blob/{hash}', () => {
       // Doorway serves blobs via the storage-manifest-registered /blob/{hash}
-      // route through the RouteRegistry. The legacy /api/blob/{hash} alias at
-      // http.rs is not reachable on deployed doorway (returns 404), so using
-      // it breaks thumbnail rendering. Both doorway and direct modes now use
-      // /blob/{hash}.
+      // route through the RouteRegistry; both doorway and direct modes use
+      // the same canonical path.
       const url = service.getBlobUrl('sha256-abc123');
       expect(url).toBe('http://localhost:8888/blob/sha256-abc123');
     });

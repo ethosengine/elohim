@@ -7,7 +7,7 @@
  * - Validating cache availability
  *
  * Architecture:
- * - Doorway exposes /store/{address} for blob serving (CID or hash)
+ * - Doorway exposes /blob/{address} for blob serving (CID or hash)
  * - Seeding uses admin API to push blobs
  * - Cache is eventually consistent with DHT
  *
@@ -417,8 +417,9 @@ export class DoorwayClient {
    */
   async blobExists(hash: string): Promise<boolean> {
     try {
-      const response = await this.fetch(`/store/${hash}`, {
-        method: 'HEAD',
+      // Use GET (not HEAD) — content-addressed routes 404 on HEAD even when GET 200s.
+      const response = await this.fetch(`/blob/${hash}`, {
+        method: 'GET',
       });
       return response.status === 200;
     } catch {

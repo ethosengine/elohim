@@ -150,7 +150,7 @@ describe('DoorwayConnectionStrategy', () => {
       const config = createTestConfig();
       const url = strategy.getBlobStorageUrl(config, 'abc123hash');
       expect(url).toContain('https://doorway-alpha.elohim.host');
-      expect(url).toContain('/api/blob/abc123hash');
+      expect(url).toContain('/blob/abc123hash');
       expect(url).toContain('apiKey=test-api-key');
     });
 
@@ -250,13 +250,13 @@ describe('DirectConnectionStrategy', () => {
     it('should use elohim-storage URL', () => {
       const config = createDirectConfig();
       const url = strategy.getBlobStorageUrl(config, 'abc123hash');
-      expect(url).toBe('http://localhost:8090/store/abc123hash');
+      expect(url).toBe('http://localhost:8090/blob/abc123hash');
     });
 
     it('should use default storage URL if not configured', () => {
       const config = createDirectConfig({ storageUrl: undefined });
       const url = strategy.getBlobStorageUrl(config, 'abc123hash');
-      expect(url).toContain('/store/abc123hash');
+      expect(url).toContain('/blob/abc123hash');
     });
   });
 
@@ -324,7 +324,7 @@ describe('Connection Strategy Integration', () => {
     expect(doorway.name).not.toBe(direct.name);
   });
 
-  it('should produce different blob URLs for same hash', () => {
+  it('should produce host-distinct blob URLs sharing the canonical /blob/ path', () => {
     const doorway = new DoorwayConnectionStrategy();
     const direct = new DirectConnectionStrategy();
 
@@ -336,8 +336,10 @@ describe('Connection Strategy Integration', () => {
     const directUrl = direct.getBlobStorageUrl(directConfig, hash);
 
     expect(doorwayUrl).not.toBe(directUrl);
-    expect(doorwayUrl).toContain('api/blob');
-    expect(directUrl).toContain('store');
+    expect(doorwayUrl).toContain('/blob/');
+    expect(directUrl).toContain('/blob/');
+    expect(doorwayUrl).toContain('doorway-alpha.elohim.host');
+    expect(directUrl).toContain('localhost:8090');
   });
 
   it('should produce different content sources', () => {

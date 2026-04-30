@@ -224,7 +224,7 @@ The seeder is an admin tool that proves an edgenode can handle heavy multimedia 
 - Extend `__doorway_import_config` pattern to all routes
 - Remove hard-coded routes from doorway:
   - `/admin/seed/blob` → Agent's elohim-storage
-  - `/store/{hash}` → Proxied to agent, cached optionally
+  - `/blob/{hash}` → Proxied to agent, cached optionally
   - `/api/v1/cache/` → Agent's cache-core
   - `/api/blob/verify` → Agent's verification
   - `/api/stream/` → Proxied to agent

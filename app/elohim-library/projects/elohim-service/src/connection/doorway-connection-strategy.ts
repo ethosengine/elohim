@@ -8,7 +8,7 @@
  *   Browser → Doorway (wss://doorway-alpha.elohim.host) → Conductor
  *
  * Blob storage:
- *   Uses Doorway's /api/blob/{hash} endpoint
+ *   Uses Doorway's /blob/{hash} endpoint (canonical, registry-routed)
  *
  * ContentResolver sources:
  *   indexeddb (Local) → projection (Doorway MongoDB) → conductor (Authoritative)
@@ -220,7 +220,7 @@ export class DoorwayConnectionStrategy implements IConnectionStrategy {
       ? `?apiKey=${encodeURIComponent(config.proxyApiKey)}`
       : '';
 
-    return `${baseUrl}/api/blob/${encodeURIComponent(blobHash)}${apiKeyParam}`;
+    return `${baseUrl}/blob/${encodeURIComponent(blobHash)}${apiKeyParam}`;
   }
 
   getStorageBaseUrl(config: ConnectionConfig): string {

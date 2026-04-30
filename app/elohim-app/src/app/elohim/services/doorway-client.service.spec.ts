@@ -268,7 +268,7 @@ describe('DoorwayClientService', () => {
         result = data;
       });
 
-      const req = httpMock.expectOne('/api/blob/sha256-abc123');
+      const req = httpMock.expectOne('/blob/sha256-abc123');
       expect(req.request.method).toBe('GET');
       expect(req.request.responseType).toBe('arraybuffer');
       req.flush(mockBlob);
@@ -283,7 +283,7 @@ describe('DoorwayClientService', () => {
 
       service.getBlob('sha256-abc123', { start: 0, end: 511 }).subscribe();
 
-      const req = httpMock.expectOne('/api/blob/sha256-abc123');
+      const req = httpMock.expectOne('/blob/sha256-abc123');
       expect(req.request.headers.get('Range')).toBe('bytes=0-511');
       req.flush(mockBlob);
       tick();
@@ -300,7 +300,7 @@ describe('DoorwayClientService', () => {
         },
       });
 
-      const req = httpMock.expectOne('/api/blob/sha256-notfound');
+      const req = httpMock.expectOne('/blob/sha256-notfound');
       req.error(new ProgressEvent('error'), { status: 404, statusText: 'Not Found' });
       tick();
 
@@ -809,7 +809,7 @@ describe('DoorwayClientService', () => {
       service.setBaseUrl('https://custom-doorway.example.com');
 
       service.getBlob('sha256-test').subscribe();
-      const req = httpMock.expectOne('https://custom-doorway.example.com/api/blob/sha256-test');
+      const req = httpMock.expectOne('https://custom-doorway.example.com/blob/sha256-test');
       req.flush(new ArrayBuffer(0));
       tick();
     }));

@@ -127,7 +127,7 @@ pub struct ContentServer {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum ContentServerCapability {
-    /// Serve raw blob content (GET /store/{hash})
+    /// Serve raw blob content (GET /blob/{hash})
     Blob,
 
     /// Serve HTML5 app from zip (GET /apps/{id}/{path})

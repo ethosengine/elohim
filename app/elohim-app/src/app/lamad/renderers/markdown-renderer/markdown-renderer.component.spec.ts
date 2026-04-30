@@ -18,7 +18,7 @@ describe('MarkdownRendererComponent', () => {
 
   // Mock StorageClientService
   const mockStorageClientService = {
-    getBlobUrl: (hash: string) => `https://test-doorway.example.com/api/blob/${hash}`,
+    getBlobUrl: (hash: string) => `https://test-doorway.example.com/blob/${hash}`,
   };
 
   const mockPathService = {

@@ -354,7 +354,7 @@ export class ContentService {
    *
    * Resolution order:
    * 1. Helia verified-fetch (CID blobs only, 5s timeout)
-   * 2. Doorway HTTP (`/store/{cid}`)
+   * 2. Doorway HTTP (`/blob/{cid}`)
    */
   private fetchBlobContent(blobCid: string): Observable<string> {
     // Normalize content address: CIDv1 (bafkrei...) passes through,

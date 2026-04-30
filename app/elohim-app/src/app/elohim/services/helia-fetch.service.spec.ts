@@ -22,7 +22,7 @@ describe('HeliaFetchService (mock)', () => {
   let httpMock: HttpTestingController;
 
   const mockStorageClient = {
-    getBlobUrl: vi.fn().mockImplementation((cid: string) => `http://localhost:8888/store/${cid}`),
+    getBlobUrl: vi.fn().mockImplementation((cid: string) => `http://localhost:8888/blob/${cid}`),
   };
 
   /**
@@ -79,9 +79,9 @@ describe('HeliaFetchService (mock)', () => {
     expect(mockStorageClient.getBlobUrl).toHaveBeenCalledWith(cid);
   });
 
-  it('should return URL with /store/ prefix', () => {
+  it('should return URL with /blob/ prefix', () => {
     const hash = 'sha256-abc123def456abc123def456abc123def456abc123def456abc123def456abc1';
     const url = mockStorageClient.getBlobUrl(hash);
-    expect(url).toBe(`http://localhost:8888/store/${hash}`);
+    expect(url).toBe(`http://localhost:8888/blob/${hash}`);
   });
 });

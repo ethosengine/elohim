@@ -120,7 +120,7 @@ export class DirectConnectionStrategy implements IConnectionStrategy {
     // Direct to elohim-storage sidecar - NOT through Doorway
     // elohim-storage provides caching and R/W protection for the conductor
     const storageUrl = config.storageUrl || `http://localhost:${DEFAULT_STORAGE_PORT}`;
-    return `${storageUrl}/store/${encodeURIComponent(blobHash)}`;
+    return `${storageUrl}/blob/${encodeURIComponent(blobHash)}`;
   }
 
   getStorageBaseUrl(config: ConnectionConfig): string {
