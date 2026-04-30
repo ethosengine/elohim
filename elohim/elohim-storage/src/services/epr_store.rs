@@ -349,7 +349,28 @@ impl EprStore for FederatedEprStore {
         // Snapshot kind before consuming epr in local.put.
         let epr_kind = epr.envelope.kind;
 
+        // Phase 3 P3.2: capture a clone of the EPR before the move into
+        // local.put so that Manifest EPRs can be projected after the put
+        // without re-fetching payload bytes. Clone is cheap (Vec<u8> + Cid).
+        let epr_for_manifest = if epr_kind == elohim_epr::EprKind::Manifest {
+            Some(epr.clone())
+        } else {
+            None
+        };
+
         let result = self.local.put(conn, epr)?;
+
+        // Phase 3 P3.2: project Manifest EPRs to the local manifests table
+        // and refresh the registry so subsequent kind→pillar lookups see
+        // the new mapping.
+        if let Some(ref manifest_epr) = epr_for_manifest {
+            if let Err(e) = crate::services::manifest_registry::project_manifest(conn, manifest_epr)
+            {
+                tracing::warn!(cid = %result.cid, error = %e, "manifest projection failed — registry may lag");
+            } else if let Err(e) = self.manifest_registry.load_from_db(conn) {
+                tracing::warn!(cid = %result.cid, error = %e, "manifest registry refresh failed");
+            }
+        }
 
         // D.2: advertise atom to Kademlia DHT when the fanout policy includes
         // a Kad or KadLight channel. Best-effort — send failure is logged and

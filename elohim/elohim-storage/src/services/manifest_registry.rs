@@ -99,6 +99,59 @@ fn extract_kind_pillar_pairs(row: &ManifestRow, target: &mut HashMap<String, Str
     }
 }
 
+/// Project an EPR atom of `kind: Manifest` into the local manifests table.
+/// Called by the storage-side projector when an EprKind::Manifest atom is
+/// ingested via libp2p (cold-fetch or gossip).
+///
+/// Manifest payloads are JSON-encoded inside the EPR envelope payload bytes.
+/// This helper decodes the JSON, extracts the manifestKind/pillar/schemaRef
+/// fields, and inserts a row into the manifests projection table.
+///
+/// Field deviations from original spec:
+/// - `signer_pubkey` is derived from `epr.envelope.proof.signer` (a CID) via
+///   `to_bytes()` — the `Epr` struct has no `signer_pubkey` field directly.
+/// - `created_at` maps to `epr.envelope.issued_at` (not `created_at`).
+/// - The CID comes from `epr.envelope.cid.to_string()` (no `cid()` method).
+pub fn project_manifest(
+    conn: &mut diesel::SqliteConnection,
+    epr: &elohim_epr::Epr,
+) -> Result<(), crate::error::StorageError> {
+    use crate::db::manifests::{insert_manifest, ManifestRow};
+
+    let payload: serde_json::Value = serde_json::from_slice(&epr.payload).map_err(|e| {
+        crate::error::StorageError::Database(format!("manifest payload decode: {e}"))
+    })?;
+
+    let manifest_kind = payload
+        .get("manifestKind")
+        .and_then(|v| v.as_str())
+        .unwrap_or("unknown")
+        .to_string();
+    let pillar = payload
+        .get("pillar")
+        .and_then(|v| v.as_str())
+        .map(String::from);
+    let schema_ref = payload
+        .get("schemaRef")
+        .and_then(|v| v.as_str())
+        .map(String::from);
+
+    let row = ManifestRow {
+        cid: epr.envelope.cid.to_string(),
+        manifest_kind,
+        pillar,
+        payload_json: payload.to_string(),
+        schema_ref,
+        // Epr has no signer_pubkey field; derive raw bytes from the signer CID.
+        signer_pubkey: epr.envelope.proof.signer.to_bytes(),
+        created_at: epr.envelope.issued_at.to_rfc3339(),
+        verified_at: Some(chrono::Utc::now().to_rfc3339()),
+        revision: 1,
+    };
+    insert_manifest(conn, &row)?;
+    Ok(())
+}
+
 /// Mirror of EprKind canonical lowercase serialization. Restated locally to
 /// avoid a runtime dependency on the codec crate's specific serialization
 /// helpers.

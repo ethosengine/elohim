@@ -61,6 +61,10 @@ path = "src/tests/portal_host_crud.rs"
 name = "submit_specialist_revocation"
 path = "src/tests/submit_specialist_revocation.rs"
 
+[[test]]
+name = "manifest"
+path = "src/tests/manifest.rs"
+
 [dependencies]
 # Holochain runtime — sweettest embeds a real conductor in-process.
 # Versions are pinned to match the DNAs (HDK 0.6.0 / HDI 0.7.0).
