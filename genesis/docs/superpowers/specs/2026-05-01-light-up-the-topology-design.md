@@ -803,6 +803,33 @@ Static verification performed in Eclipse Che (no live Holochain stack available)
 - Pre-flight item 2 (auth `agent_cid` propagation): not in T00 scope, separate task.
 - Pre-flight item 3 (`rea_projection` stream populated): not in T00 scope, separate task.
 
+#### Pre-flight verification — T01 results (static, 2026-05-01)
+
+**Status: DONE — outcome = "not wired" through the proxy. Adds a T28 prerequisite for T22 (`bindings_resolver`).**
+
+Static verification only (Eclipse Che, no live stack). Step 2 (live `curl /api/v1/health` round-trip) defers to Jenkins / local-dev. Step 1 (grep) plus targeted reads of the JWT, storage_proxy, and account-handler files are sufficient for the design decision.
+
+**Step 1 grep result.** `grep -rn "x-agent-cid\|X-Agent-Cid\|agent_cid"` against `doorway/doorway-service/src/` returned **zero matches**. The same grep against `elohim/elohim-storage/src/` returned 41 matches — all referring to `agent_cid` as a *DHT content-address field* on entries (`AgentPeerBinding.agent_cid`, `EprHead.agent_cid`, `SignalEmitIntent.agent_cid`, etc.), never as an HTTP header. **No code anywhere reads, writes, or forwards an `X-Agent-Cid` header.**
+
+**What the JWT carries.** `doorway/doorway-service/src/auth/jwt.rs:22-58` defines `Claims` with `human_id`, `agent_pub_key` (Holochain pubkey hex string, line 25), `identifier`, `permission_level`, `session_id`, `doorway_id/url`, `conductor_id`, `installed_app_id`, `is_steward`, `has_local_conductor`. **There is no `agent_cid` claim.** The closest identifier is `agent_pub_key` — the Holochain agent pubkey, which is *not* the same as the imagodei DHT `agent_cid` that `AgentPeerBindingView` records.
+
+**What the proxy forwards.** `doorway/doorway-service/src/routes/storage_proxy.rs::forward_to_storage` (lines 64-179) — the canonical handler for every registry-routed request — explicitly forwards exactly three headers: `Content-Type` (line 102-106), `Authorization` (line 108-112), and `X-Observation-Id` (line 115-119). It does NOT decode the JWT, does NOT extract any claim, and does NOT inject any `X-Agent-*` header. The same is true of `forward_blob_to_storage` (lines 203-341) which forwards only the `Authorization` header (line 262-270). **Storage receives the bearer token but no extracted identity.**
+
+**What storage expects.** `elohim/elohim-storage/src/api/account.rs:945-971` — `extract_agent_key()` — reads `X-Agent-Id` from the request, falling back to the active local session's `agent_pub_key` for Tauri-direct mode. The doc comment at line 948 even says *"doorway JWT middleware injects this after validation"* — but **doorway does not.** Storage's CORS allow-headers list (`elohim/elohim-storage/src/http.rs:998`) includes `X-Agent-Id`, but no doorway middleware writes it.
+
+**The one place the header *is* set.** Two bespoke handlers in `doorway/doorway-service/src/routes/auth_routes.rs` — `handle_portal_host` at line 3561 and `probe_first_portal_host` at line 3623 — each manually set `X-Agent-Id: claims.agent_pub_key` for their hand-rolled `reqwest` calls to `/api/v1/account/portal-hosts`. **This is per-handler boilerplate, not middleware.** Routes that flow through the registry-routed proxy path (the path Phase 5 view-federation handlers will use) get nothing.
+
+**Outcome: not wired.** The agent identity required by Phase 4's `bindings_resolver` (T22) is not propagated by the proxy. Two distinct gaps:
+
+1. **Header name + identifier-kind mismatch.** Even if the proxy did forward, the available identifier is `agent_pub_key` (Holochain pubkey), and storage's `extract_agent_key` reads `X-Agent-Id`. The imagodei DHT key on `AgentPeerBinding.agent_cid` is a *different identifier* (a CID derived from the imagodei human entry, not the agent pubkey). T22 must clarify which it needs and either (a) wire `X-Agent-Id` and use `agent_pub_key → AgentPeerBinding` lookup, or (b) extend `Claims` and the JWT mint path with a real `agent_cid` claim and add `X-Agent-Cid` middleware.
+2. **Proxy never injects the header.** Whatever choice (a) or (b) above lands on, `storage_proxy::forward_to_storage` and `forward_blob_to_storage` need a JWT-decode + header-inject step. The cleanest spot is a single helper applied uniformly so we don't repeat the `auth_routes.rs:3561/3623` per-handler pattern across every view-federation route.
+
+**Adds a new prerequisite to T22.** Phase 4 task T22 (`bindings_resolver`) cannot resolve "the calling agent's bindings" until this is wired. **Suggested rewording for T28's task list (Phase 4):**
+
+> T28a (NEW, prerequisite for T22): wire JWT-derived agent identity through `storage_proxy::forward_to_storage` and `forward_blob_to_storage`. Decode the bearer JWT once, inject `X-Agent-Id: claims.agent_pub_key` (or `X-Agent-Cid` if a CID claim is added) on every forwarded request, mirror the existing `auth_routes.rs:3561/3623` pattern but in the shared forwarder. Update `extract_agent_key` doc comment in `elohim/elohim-storage/src/api/account.rs:948` to reflect the actual injection point. Decide explicitly whether T22 needs `agent_pub_key` (matches existing JWT) or `agent_cid` (requires Claims extension + JWT mint path change in `auth_routes.rs` token-issue handlers).
+
+Until T28a lands, T22 should accept the calling agent identifier as an explicit handler argument (not from the request) so unit tests are unblocked, and the integration-test pass (Phase 10, T54+) is what validates header propagation against a live doorway.
+
 ### CI quality gates (per CLAUDE.md)
 
 ```
