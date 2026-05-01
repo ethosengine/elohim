@@ -153,6 +153,70 @@ pub fn deserialize_score(s: &str) -> Option<StandingScore> {
 }
 
 // ============================================================================
+// ManifestDebitWeightPolicy
+// ============================================================================
+
+use crate::services::manifest_registry::ManifestRegistry;
+use std::collections::HashMap;
+
+/// Manifest-driven debit-weight lookup. Falls back to [`DefaultDebitWeightPolicy`]
+/// when a key is absent from the registered standing-policy manifest, or when no
+/// such manifest is registered at all.
+pub struct ManifestDebitWeightPolicy {
+    weights: HashMap<(SignalKind, StandingImpact), i32>,
+    fallback: DefaultDebitWeightPolicy,
+}
+
+impl ManifestDebitWeightPolicy {
+    pub fn from_registry(registry: &ManifestRegistry) -> Self {
+        let mut weights = HashMap::new();
+        if let Some(map) = registry.debit_weights() {
+            for ((kind_str, impact_str), w) in map {
+                if let (Some(kind), Some(impact)) = (
+                    parse_signal_kind(&kind_str),
+                    parse_standing_impact(&impact_str),
+                ) {
+                    weights.insert((kind, impact), w);
+                }
+            }
+        }
+        Self {
+            weights,
+            fallback: DefaultDebitWeightPolicy,
+        }
+    }
+}
+
+fn parse_signal_kind(s: &str) -> Option<SignalKind> {
+    match s {
+        "squelch" => Some(SignalKind::Squelch),
+        "correction" => Some(SignalKind::Correction),
+        "retraction" => Some(SignalKind::Retraction),
+        "quarantine" => Some(SignalKind::Quarantine),
+        "vouch" => Some(SignalKind::Vouch),
+        _ => None,
+    }
+}
+
+fn parse_standing_impact(s: &str) -> Option<StandingImpact> {
+    match s {
+        "advisory" => Some(StandingImpact::Advisory),
+        "debit-soft" => Some(StandingImpact::DebitSoft),
+        "debit-firm" => Some(StandingImpact::DebitFirm),
+        _ => None,
+    }
+}
+
+impl DebitWeightPolicy for ManifestDebitWeightPolicy {
+    fn debit_weight(&self, kind: SignalKind, impact: StandingImpact) -> i32 {
+        self.weights
+            .get(&(kind, impact))
+            .copied()
+            .unwrap_or_else(|| self.fallback.debit_weight(kind, impact))
+    }
+}
+
+// ============================================================================
 // Tests
 // ============================================================================
 
@@ -433,6 +497,49 @@ mod tests {
             score_for_debit_sum(100),
             StandingScore::Floor,
             "sum=100 → Floor"
+        );
+    }
+
+    // -------------------------------------------------------------------------
+    // T9 — ManifestDebitWeightPolicy tests
+    // -------------------------------------------------------------------------
+
+    #[test]
+    fn manifest_policy_returns_manifest_weights_when_registered() {
+        let json = r#"{
+            "manifestKind": "standing-policy", "revision": 1,
+            "floor": {"classes":[]},
+            "newVoiceBaseline": {"score":"floor","vulnerableClassLift":"low"},
+            "debitWeights": {
+                "squelch":    {"advisory":0,"debit-soft":1,"debit-firm":3},
+                "correction": {"advisory":0,"debit-soft":10,"debit-firm":20},
+                "retraction": {"advisory":0,"debit-soft":-5,"debit-firm":-10},
+                "quarantine": {"advisory":0,"debit-soft":12,"debit-firm":30},
+                "vouch":      {"advisory":0,"debit-soft":-3,"debit-firm":-8}
+            }
+        }"#;
+        let registry =
+            crate::services::manifest_registry::ManifestRegistry::from_payload_json(json)
+                .expect("parse");
+        let policy = ManifestDebitWeightPolicy::from_registry(&registry);
+        assert_eq!(
+            policy.debit_weight(SignalKind::Vouch, StandingImpact::DebitSoft),
+            -3
+        );
+        assert_eq!(
+            policy.debit_weight(SignalKind::Correction, StandingImpact::DebitFirm),
+            20
+        );
+    }
+
+    #[test]
+    fn manifest_policy_falls_back_to_default_when_empty() {
+        let registry = crate::services::manifest_registry::ManifestRegistry::default();
+        let policy = ManifestDebitWeightPolicy::from_registry(&registry);
+        // DefaultDebitWeightPolicy returns 1 for squelch/debit-soft.
+        assert_eq!(
+            policy.debit_weight(SignalKind::Squelch, StandingImpact::DebitSoft),
+            1
         );
     }
 }
