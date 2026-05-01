@@ -294,7 +294,10 @@ mod tests {
     #[test]
     fn validate_accepts_well_formed_instance() {
         let t = make_tending(Classification::ScopeMismatch, None);
-        assert!(t.validate().is_ok(), "well-formed instance should pass validate()");
+        assert!(
+            t.validate().is_ok(),
+            "well-formed instance should pass validate()"
+        );
     }
 
     // -----------------------------------------------------------------------

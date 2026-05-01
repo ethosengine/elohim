@@ -1653,7 +1653,8 @@ fn feedback_signal_correction_with_evidence_validates_against_schema() {
         "bafyreicorrection_evidence_cid_abc".to_string(),
         StandingImpact::DebitSoft,
         "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=".to_string(),
-        "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=".to_string(),
+        "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB="
+            .to_string(),
     );
     assert_eq!(signal.signal_kind, SignalKind::Correction);
     assert!(signal.evidence_cid.is_some());
@@ -1678,8 +1679,8 @@ fn feedback_signal_correction_without_evidence_rejected_by_schema() {
     });
 
     let schema = load_schema("p2p/feedback-signal.schema.json");
-    let validator = jsonschema::validator_for(&schema)
-        .expect("feedback-signal schema should compile");
+    let validator =
+        jsonschema::validator_for(&schema).expect("feedback-signal schema should compile");
 
     let has_errors = validator.iter_errors(&bad_instance).next().is_some();
     assert!(
@@ -1709,7 +1710,9 @@ fn attention_tending_validates_against_schema() {
         tended_at: vec![1_746_000_000],
         context: serde_json::json!({"collective": "household"}),
         signed_by: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=".to_string(),
-        signature: "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=".to_string(),
+        signature:
+            "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB="
+                .to_string(),
     };
     assert!(tending.validate().is_ok());
     validate_against_schema(
@@ -1735,8 +1738,8 @@ fn attention_tending_with_short_ttl_rejected_by_schema() {
     });
 
     let schema = load_schema("p2p/attention-tending.schema.json");
-    let validator = jsonschema::validator_for(&schema)
-        .expect("attention-tending schema should compile");
+    let validator =
+        jsonschema::validator_for(&schema).expect("attention-tending schema should compile");
 
     let has_errors = validator.iter_errors(&bad_instance).next().is_some();
     assert!(
@@ -1762,8 +1765,8 @@ fn attention_tending_with_empty_tended_at_rejected_by_schema() {
     });
 
     let schema = load_schema("p2p/attention-tending.schema.json");
-    let validator = jsonschema::validator_for(&schema)
-        .expect("attention-tending schema should compile");
+    let validator =
+        jsonschema::validator_for(&schema).expect("attention-tending schema should compile");
 
     let has_errors = validator.iter_errors(&bad_instance).next().is_some();
     assert!(
@@ -1790,8 +1793,8 @@ fn attention_tending_with_negative_tended_at_rejected_by_schema() {
     });
 
     let schema = load_schema("p2p/attention-tending.schema.json");
-    let validator = jsonschema::validator_for(&schema)
-        .expect("attention-tending schema should compile");
+    let validator =
+        jsonschema::validator_for(&schema).expect("attention-tending schema should compile");
 
     let has_errors = validator.iter_errors(&bad_instance).next().is_some();
     assert!(

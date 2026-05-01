@@ -155,7 +155,11 @@ impl FeedbackSignal {
 mod tests {
     use super::*;
 
-    fn make_signal(kind: SignalKind, impact: StandingImpact, evidence: Option<&str>) -> FeedbackSignal {
+    fn make_signal(
+        kind: SignalKind,
+        impact: StandingImpact,
+        evidence: Option<&str>,
+    ) -> FeedbackSignal {
         FeedbackSignal {
             target_cid: "bafyreiabcdef1234567890".to_string(),
             signal_kind: kind,
@@ -174,8 +178,14 @@ mod tests {
     fn json_roundtrip_squelch() {
         let sig = make_signal(SignalKind::Squelch, StandingImpact::Advisory, None);
         let json = serde_json::to_string(&sig).unwrap();
-        assert!(json.contains("\"squelch\""), "wire name should be squelch, got: {json}");
-        assert!(json.contains("\"advisory\""), "wire name should be advisory, got: {json}");
+        assert!(
+            json.contains("\"squelch\""),
+            "wire name should be squelch, got: {json}"
+        );
+        assert!(
+            json.contains("\"advisory\""),
+            "wire name should be advisory, got: {json}"
+        );
         let back: FeedbackSignal = serde_json::from_str(&json).unwrap();
         assert_eq!(back, sig);
     }
@@ -188,8 +198,14 @@ mod tests {
             Some("bafyreiabcdef_correction"),
         );
         let json = serde_json::to_string(&sig).unwrap();
-        assert!(json.contains("\"correction\""), "wire name should be correction, got: {json}");
-        assert!(json.contains("\"debit-soft\""), "wire name should be debit-soft, got: {json}");
+        assert!(
+            json.contains("\"correction\""),
+            "wire name should be correction, got: {json}"
+        );
+        assert!(
+            json.contains("\"debit-soft\""),
+            "wire name should be debit-soft, got: {json}"
+        );
         let back: FeedbackSignal = serde_json::from_str(&json).unwrap();
         assert_eq!(back, sig);
     }
@@ -198,8 +214,14 @@ mod tests {
     fn json_roundtrip_retraction() {
         let sig = make_signal(SignalKind::Retraction, StandingImpact::DebitFirm, None);
         let json = serde_json::to_string(&sig).unwrap();
-        assert!(json.contains("\"retraction\""), "wire name should be retraction, got: {json}");
-        assert!(json.contains("\"debit-firm\""), "wire name should be debit-firm, got: {json}");
+        assert!(
+            json.contains("\"retraction\""),
+            "wire name should be retraction, got: {json}"
+        );
+        assert!(
+            json.contains("\"debit-firm\""),
+            "wire name should be debit-firm, got: {json}"
+        );
         let back: FeedbackSignal = serde_json::from_str(&json).unwrap();
         assert_eq!(back, sig);
     }
@@ -208,7 +230,10 @@ mod tests {
     fn json_roundtrip_quarantine() {
         let sig = make_signal(SignalKind::Quarantine, StandingImpact::DebitFirm, None);
         let json = serde_json::to_string(&sig).unwrap();
-        assert!(json.contains("\"quarantine\""), "wire name should be quarantine, got: {json}");
+        assert!(
+            json.contains("\"quarantine\""),
+            "wire name should be quarantine, got: {json}"
+        );
         let back: FeedbackSignal = serde_json::from_str(&json).unwrap();
         assert_eq!(back, sig);
     }
@@ -345,7 +370,10 @@ mod tests {
     #[test]
     fn validate_allows_squelch_without_evidence_cid() {
         let sig = make_signal(SignalKind::Squelch, StandingImpact::Advisory, None);
-        assert!(sig.validate().is_ok(), "squelch without evidence_cid should be allowed");
+        assert!(
+            sig.validate().is_ok(),
+            "squelch without evidence_cid should be allowed"
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -401,7 +429,10 @@ mod tests {
         );
         let bytes1 = rmp_serde::to_vec_named(&sig).unwrap();
         let bytes2 = rmp_serde::to_vec_named(&sig).unwrap();
-        assert_eq!(bytes1, bytes2, "identical structs must produce identical MessagePack bytes");
+        assert_eq!(
+            bytes1, bytes2,
+            "identical structs must produce identical MessagePack bytes"
+        );
     }
 
     // -----------------------------------------------------------------------
