@@ -4308,9 +4308,24 @@ fn validate_content_succession(
 
 /// Validate entry update operations
 ///
-/// Updates are validated the same as creates - the new entry state must be valid.
+/// Most entry types fall through to create-time validation so the new state
+/// is still structurally valid.  **FeedbackSignal** is the exception: a
+/// squelch / correction / retraction / quarantine is an event — once authored
+/// and notarized on the DHT it is immutable.  Allowing an update would let an
+/// author silently change `target_cid`, `signal_kind`, or remove the
+/// `evidence_cid` from a correction after the fact.  Authors must create a
+/// new entry to supersede.
 fn validate_update_entry(app_entry: &EntryTypes) -> ExternResult<ValidateCallbackResult> {
-    // Updates follow the same validation rules as creates
+    // Per-kind update rules ─────────────────────────────────────────────────
+    if let EntryTypes::FeedbackSignal(_) = app_entry {
+        return Ok(ValidateCallbackResult::Invalid(
+            "FeedbackSignal entries are immutable; squelch/correction/retraction/quarantine \
+             events cannot be updated. Author a new entry instead."
+                .to_string(),
+        ));
+    }
+    // Fall through: all other entry types re-run create-time validation on the
+    // new state (structural correctness is the same requirement at update time).
     validate_create_entry(app_entry)
 }
 
