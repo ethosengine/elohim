@@ -134,7 +134,11 @@ pub fn flood_feedback(
     content_reach_topic: &str,
     publisher: &dyn GossipPublisher,
 ) -> Result<(), GossipFloodError> {
-    let _ = signal_cid; // available for caller tracing; not embedded in payload
+    tracing::trace!(
+        signal_cid = signal_cid,
+        topic = content_reach_topic,
+        "gossip_flood: publishing FeedbackSignal"
+    );
     let payload =
         rmp_serde::to_vec_named(signal).map_err(|e| GossipFloodError::Encode(e.to_string()))?;
     publisher
@@ -408,9 +412,9 @@ mod tests {
             "evicted CID must reprocess — dedup bound is best-effort, not authoritative"
         );
 
-        // B is still present (it was LRU but not yet evicted at step 3)
-        // After step 3 it's [B(LRU), C(MRU)]; after step 4 (A re-insert) it's [C(LRU), A(MRU)]
-        // So B was evicted by re-inserting A — B should now Process
+        // After insert(C): [B(LRU), C(MRU)]
+        // insert(A) above: capacity full → evicts B (LRU) → [C(LRU), A(MRU)]
+        // B was evicted by A's re-insertion; must Process again
         assert_eq!(
             handle_received_signal("cid-evict-B", &dedup),
             ReceiveDecision::Process,
