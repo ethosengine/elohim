@@ -1179,6 +1179,20 @@ diesel::table! {
     }
 }
 
+// EPR Phase 3.5 — predecessor_records (trust-compute gradient back-prop store)
+// Source of truth: libp2p gossip (Category C operational — durable across peer restarts).
+// sealed_blob holds the dryoc-encrypted 2-of-2 predecessor payload (T11 crypto).
+
+diesel::table! {
+    predecessor_records (id) {
+        id                  -> Integer,
+        target_cid          -> Text,
+        predecessor_peer_id -> Text,
+        received_at         -> Text,
+        sealed_blob         -> Binary,
+    }
+}
+
 // EPR Phase 2B — peer_identity_bindings
 // Source of truth: Holochain DHT (imagodei AgentPeerBinding entry — Task A.2).
 // This table is a Category C operational projection rebuildable from signal replay.
@@ -1380,6 +1394,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     peer_statuses,
     placement_gaps,
     portal_hosts,
+    predecessor_records,
     precedents,
     premium_gates,
     proposal_options,
