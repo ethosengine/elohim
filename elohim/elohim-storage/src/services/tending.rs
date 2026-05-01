@@ -128,6 +128,29 @@ pub fn enforce_ttls(conn: &mut SqliteConnection, now: i64) -> Result<usize, Tend
     Ok(delete_expired(conn, now)?)
 }
 
+/// Wall-clock TTL sweep — captures `now` internally and delegates to
+/// [`enforce_ttls`].
+///
+/// Preferred entry point for ReconcileController's periodic sweep task.
+/// Uses `Utc::now().timestamp()` (epoch seconds, matching `last_tended_at`
+/// column precision).
+///
+/// Safety classification is NEVER swept regardless of `ttl_seconds` on the
+/// row — constitutional floor protection per brainstorm §2.8.
+///
+/// Idempotent: a second call with no new expired rows returns 0.
+///
+/// # Returns
+///
+/// The number of expired non-safety rows that were deleted from
+/// `attention_tending`.
+pub fn sweep_expired(conn: &mut SqliteConnection) -> Result<usize, TendingError> {
+    let now_secs = chrono::Utc::now().timestamp();
+    let deleted = enforce_ttls(conn, now_secs)?;
+    tracing::debug!(deleted, "tending::sweep_expired completed");
+    Ok(deleted)
+}
+
 // ============================================================================
 // Helpers
 // ============================================================================
@@ -152,7 +175,7 @@ fn classification_str(c: Classification) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::db::tending::fetch_by_cid;
+    use crate::db::tending::{fetch_by_cid, insert_raw, list_all};
     use crate::db::{run_migrations, DbPool};
     use crate::p2p::attention_tending::Classification;
     use diesel::r2d2::{ConnectionManager, Pool};
@@ -404,5 +427,134 @@ mod tests {
             matches!(result, Err(TendingError::Invalid(_))),
             "ttl_seconds > i64::MAX must return TendingError::Invalid, got: {result:?}"
         );
+    }
+
+    // -----------------------------------------------------------------------
+    // T16 — sweep_expired tests (wall-clock sweep, safety floor protection)
+    //
+    // Timestamps use epoch seconds (matching last_tended_at column precision).
+    // "Now" is approximated by inserting rows with timestamps well in the past
+    // (expired) or well in the future (alive), then sweeping.
+    // -----------------------------------------------------------------------
+
+    fn test_pool_sweep() -> DbPool {
+        let url = format!(
+            "file:svc_tending_sweep_{}?mode=memory&cache=shared",
+            uuid::Uuid::new_v4().as_simple()
+        );
+        let pool = Pool::builder()
+            .max_size(1)
+            .build(ConnectionManager::<SqliteConnection>::new(&url))
+            .expect("pool");
+        run_migrations(&pool).expect("migrations");
+        pool
+    }
+
+    // Helper: get current epoch seconds
+    fn now_secs() -> i64 {
+        chrono::Utc::now().timestamp()
+    }
+
+    #[test]
+    fn sweep_deletes_expired_non_safety_rows() {
+        let pool = test_pool_sweep();
+        let mut conn = pool.get().unwrap();
+        let now = now_secs();
+
+        // Expired fatigue: last_tended = 2 * ttl ago → expiry is well past.
+        insert_raw(
+            &mut conn,
+            "sweep-filter1",
+            "fatigue",
+            3_600,
+            &[now - 7_200],
+            "{}",
+        )
+        .unwrap();
+        // Alive values-forward: last_tended recent → expiry is far in future.
+        insert_raw(
+            &mut conn,
+            "sweep-filter2",
+            "values-forward",
+            86_400,
+            &[now - 100],
+            "{}",
+        )
+        .unwrap();
+        // Safety: large ttl_seconds but old timestamp — must NOT be deleted.
+        insert_raw(
+            &mut conn,
+            "sweep-filter3",
+            "safety",
+            3_600,
+            &[now - 1_000_000],
+            "{}",
+        )
+        .unwrap();
+
+        let deleted = sweep_expired(&mut conn).expect("sweep");
+        assert_eq!(deleted, 1, "only the expired fatigue row should be deleted");
+
+        let remaining = list_all(&mut conn).unwrap();
+        assert_eq!(remaining.len(), 2);
+        assert!(
+            remaining.iter().any(|r| r.classification == "safety"),
+            "safety row must survive"
+        );
+        assert!(
+            remaining
+                .iter()
+                .any(|r| r.classification == "values-forward"),
+            "alive values-forward must survive"
+        );
+    }
+
+    #[test]
+    fn sweep_is_idempotent() {
+        let pool = test_pool_sweep();
+        let mut conn = pool.get().unwrap();
+        let now = now_secs();
+
+        // Insert one expired row.
+        insert_raw(
+            &mut conn,
+            "idempotent-filter1",
+            "fatigue",
+            3_600,
+            &[now - 7_200],
+            "{}",
+        )
+        .unwrap();
+
+        let first = sweep_expired(&mut conn).expect("first sweep");
+        assert_eq!(first, 1, "first sweep must delete the expired row");
+
+        let second = sweep_expired(&mut conn).expect("second sweep");
+        assert_eq!(second, 0, "second sweep must be a no-op");
+    }
+
+    #[test]
+    fn sweep_never_deletes_safety_classification() {
+        let pool = test_pool_sweep();
+        let mut conn = pool.get().unwrap();
+        let now = now_secs();
+
+        // Safety row with ttl=1 second, last_tended very far in the past.
+        // Would expire if sweep ignored the classification guard.
+        insert_raw(
+            &mut conn,
+            "safety-floor",
+            "safety",
+            1,
+            &[now - 1_000_000_000],
+            "{}",
+        )
+        .unwrap();
+
+        sweep_expired(&mut conn).unwrap();
+
+        let remaining = list_all(&mut conn).unwrap();
+        assert_eq!(remaining.len(), 1, "safety row must not be deleted");
+        assert_eq!(remaining[0].classification, "safety");
     }
 }

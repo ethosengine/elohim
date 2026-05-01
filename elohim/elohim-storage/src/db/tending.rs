@@ -171,6 +171,57 @@ pub fn list_recent_tending(
         .load::<TendingRow>(conn)
 }
 
+/// Convenience helper for tests: insert a row with minimal required fields.
+///
+/// `tended_at_secs` is a slice of epoch-second timestamps (at least one); the
+/// first becomes `created_at`, the last becomes `last_tended_at`. `ttl_seconds`
+/// is the TTL in seconds. `context_json` is passed through unchanged.
+///
+/// Not intended for production use — use the full [`insert`] API instead.
+#[doc(hidden)]
+pub fn insert_raw(
+    conn: &mut SqliteConnection,
+    tending_cid: &str,
+    classification: &str,
+    ttl_seconds: i64,
+    tended_at_secs: &[i64],
+    context_json: &str,
+) -> Result<i32, DieselError> {
+    assert!(
+        !tended_at_secs.is_empty(),
+        "insert_raw: tended_at_secs must be non-empty"
+    );
+    let created_at = *tended_at_secs.first().unwrap();
+    let last_tended_at = *tended_at_secs.last().unwrap();
+    let tended_at_history_json =
+        serde_json::to_string(&tended_at_secs).unwrap_or_else(|_| "[]".to_string());
+    let row = NewTendingRow {
+        tending_cid: tending_cid.to_string(),
+        signer_pubkey: vec![0u8; 32],
+        classification: classification.to_string(),
+        filter_subject_json: "{}".to_string(),
+        context_json: context_json.to_string(),
+        reason: None,
+        ttl_seconds,
+        created_at,
+        last_tended_at,
+        tended_at_history_json,
+    };
+    insert(conn, &row)
+}
+
+/// Return all rows in `attention_tending`, ordered by id ascending.
+///
+/// For use in tests to verify row counts without predicting CIDs. Not
+/// intended for production use.
+#[doc(hidden)]
+pub fn list_all(conn: &mut SqliteConnection) -> Result<Vec<TendingRow>, DieselError> {
+    use attention_tending::dsl;
+    dsl::attention_tending
+        .order_by(dsl::id.asc())
+        .load::<TendingRow>(conn)
+}
+
 /// Delete rows where `last_tended_at + ttl_seconds < now` AND classification != 'safety'.
 ///
 /// Safety classification rows are NEVER swept regardless of `ttl_seconds`.

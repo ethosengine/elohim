@@ -78,6 +78,7 @@ pub async fn handle_api_request(
     hc_registry: Option<Arc<crate::hc_client_registry::HcClientRegistry>>,
     swarm_tx: Option<tokio::sync::mpsc::Sender<crate::p2p::P2PCommand>>,
     local_peer_id: Option<String>,
+    fan_out_ctx: Option<Arc<crate::api::epr::EprFanOutCtx>>,
 ) -> Result<Response<Full<Bytes>>, StorageError> {
     // Strip /api/v1/ prefix
     let sub_path = path.strip_prefix("/api/v1/").unwrap_or("");
@@ -104,7 +105,16 @@ pub async fn handle_api_request(
         economic_events::handle(req, method, resource_path, &pool, &app_ctx).await
     } else if sub_path.starts_with("epr") {
         let resource_path = sub_path.strip_prefix("epr").unwrap_or("");
-        epr::handle(req, method, resource_path, &pool, &app_ctx, swarm_tx).await
+        epr::handle(
+            req,
+            method,
+            resource_path,
+            &pool,
+            &app_ctx,
+            swarm_tx,
+            fan_out_ctx,
+        )
+        .await
     } else if sub_path.starts_with("resources") {
         let resource_path = sub_path.strip_prefix("resources").unwrap_or("");
         resources::handle(req, method, resource_path, &pool, &app_ctx, services).await

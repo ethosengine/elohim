@@ -28,7 +28,11 @@ async fn node_registry_has_bootstrap_steward() -> Result<()> {
         .await?;
     let cell = app.cells().first().unwrap().clone();
     let who: Option<holo_hash::AgentPubKey> = conductor
-        .call(&cell.zome("node_registry_coordinator"), "get_bootstrap_steward", ())
+        .call(
+            &cell.zome("node_registry_coordinator"),
+            "get_bootstrap_steward",
+            (),
+        )
         .await;
     assert_eq!(who, Some(agent));
     Ok(())
@@ -121,9 +125,8 @@ async fn admission_visible_across_agents() -> Result<()> {
     let deadline = Instant::now() + Duration::from_secs(30);
     let zome = cell2.zome("node_registry_coordinator");
     loop {
-        let nodes: Vec<NodeRegistration> = c2
-            .call(&zome, "get_nodes_by_region", region.clone())
-            .await;
+        let nodes: Vec<NodeRegistration> =
+            c2.call(&zome, "get_nodes_by_region", region.clone()).await;
         if nodes.iter().any(|n| n.node_id == "alpha") {
             break;
         }

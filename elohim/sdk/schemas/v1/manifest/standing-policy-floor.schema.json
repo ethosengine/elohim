@@ -2,44 +2,115 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "epr:schema:manifest:standing-policy-floor",
   "title": "StandingPolicyFloor",
-  "description": "Source of truth: trust-compute gradient brainstorm §2.8 (standing-immune floor). Five classes that cannot be eroded by the standing gradient. Mishpat-DNA-notarized; collectives may be more protective, never less. T7 (Manifest validator extension) bundles this schema via include_str! and validates it at integrity-zome create-time when manifestKind == standing-policy.",
+  "description": "Source of truth: trust-compute gradient brainstorm §2.8 (standing-immune floor) plus light-up-the-graph spec (vouch primitive). Validates the full standing-policy manifest payload: the five standing-immune floor classes (which cannot be eroded by the standing gradient), the debitWeights map (per-signalKind standing impact, including the vouch positive-polarity weights for accept-correction and restitution), the unknownTreatment policy (how the receiving node treats unknown-author EPRs), and the per-reach standing thresholds. Mishpat-DNA-notarized; collectives may be more protective, never less. T7 (Manifest validator extension) bundles this schema via include_str! and validates it at integrity-zome create-time when manifestKind == standing-policy.",
   "type": "object",
-  "required": ["classes"],
-  "additionalProperties": false,
+  "required": ["manifestKind", "revision", "floor", "debitWeights"],
   "properties": {
-    "classes": {
-      "type": "array",
-      "minItems": 5,
-      "maxItems": 5,
-      "uniqueItems": true,
-      "description": "Exactly the five standing-immune floor classes. All five must be declared; order is not significant. Collectives may extend protection but not reduce below these declared floors.",
-      "items": {
-        "type": "object",
-        "required": ["class", "protection"],
-        "additionalProperties": false,
-        "properties": {
-          "class": {
-            "type": "string",
-            "enum": [
-              "local-relationship-reach",
-              "cid-targeted-lookup",
-              "constitutional-floor-signatures",
-              "new-voice-baseline",
-              "vulnerable-class-elevation"
-            ],
-            "description": "Standing-immune floor class identifier. local-relationship-reach: unconditional family/household propagation never standing-gated. cid-targeted-lookup: anyone with a CID can fetch; standing modulates discovery, not retrievability. constitutional-floor-signatures: mishpat decisions and imagodei-as-counsel signatures are always per-message verified regardless of author standing. new-voice-baseline: first-time author has nonzero floor derived from sponsor; never starts at zero. vulnerable-class-elevation: children, refugees, persecution-targets, and displaced persons receive elevated baseline floor."
-          },
-          "protection": {
-            "type": "string",
-            "minLength": 1,
-            "description": "Human-readable description of what this class protects. Bootstrap manifests (T17) fill this content; this schema enforces the shape."
-          },
-          "appliesWhen": {
-            "type": "string",
-            "description": "Optional context condition under which this protection activates. Omit for unconditional protections."
+    "manifestKind": {
+      "const": "standing-policy",
+      "description": "Discriminator. Must equal 'standing-policy' for this schema to apply."
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Monotonic revision number. Higher revision wins on idempotent replay."
+    },
+    "floor": {
+      "type": "object",
+      "required": ["classes"],
+      "additionalProperties": false,
+      "properties": {
+        "classes": {
+          "type": "array",
+          "minItems": 5,
+          "maxItems": 5,
+          "uniqueItems": true,
+          "description": "Exactly the five standing-immune floor classes. All five must be declared; order is not significant. Collectives may extend protection but not reduce below these declared floors.",
+          "items": {
+            "type": "object",
+            "required": ["class", "protection"],
+            "additionalProperties": false,
+            "properties": {
+              "class": {
+                "type": "string",
+                "enum": [
+                  "local-relationship-reach",
+                  "cid-targeted-lookup",
+                  "constitutional-floor-signatures",
+                  "new-voice-baseline",
+                  "vulnerable-class-elevation"
+                ],
+                "description": "Standing-immune floor class identifier. local-relationship-reach: unconditional family/household propagation never standing-gated. cid-targeted-lookup: anyone with a CID can fetch; standing modulates discovery, not retrievability. constitutional-floor-signatures: mishpat decisions and imagodei-as-counsel signatures are always per-message verified regardless of author standing. new-voice-baseline: first-time author has nonzero floor derived from sponsor; never starts at zero. vulnerable-class-elevation: children, refugees, persecution-targets, and displaced persons receive elevated baseline floor."
+              },
+              "protection": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Human-readable description of what this class protects. Bootstrap manifests (T17) fill this content; this schema enforces the shape."
+              },
+              "appliesWhen": {
+                "type": "string",
+                "description": "Optional context condition under which this protection activates. Omit for unconditional protections."
+              }
+            }
           }
         }
       }
+    },
+    "debitWeights": {
+      "type": "object",
+      "required": ["squelch", "correction", "retraction", "quarantine", "vouch"],
+      "additionalProperties": {
+        "type": "object",
+        "required": ["advisory", "debit-soft", "debit-firm"],
+        "additionalProperties": false,
+        "properties": {
+          "advisory": { "type": "integer" },
+          "debit-soft": { "type": "integer" },
+          "debit-firm": { "type": "integer" }
+        }
+      },
+      "description": "Map of feedback-signal kind to (impact -> standing delta) weights. Negative deltas (vouch, retraction) are recoveries; positive deltas (squelch, correction, quarantine) are debits. Resolved via ManifestDebitWeightPolicy at standing application time."
+    },
+    "newVoiceBaseline": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "score": {
+          "type": "string",
+          "description": "Baseline standing tier for a first-time author (e.g. 'floor', 'low')."
+        },
+        "vulnerableClassLift": {
+          "type": "string",
+          "description": "Optional lift applied to vulnerable-class authors above the new-voice baseline."
+        }
+      },
+      "description": "Optional new-voice baseline policy. Governs the floor a first-time author starts at and the lift applied to vulnerable-class attestations."
+    },
+    "unknownTreatment": {
+      "type": "object",
+      "required": ["default", "evidenceSources"],
+      "additionalProperties": false,
+      "properties": {
+        "default": {
+          "type": "string",
+          "enum": ["conservative", "newVoiceBaseline", "neutral"],
+          "description": "How the receiving node treats EPRs from unknown authors absent any standing evidence. conservative: floor-only, low-reach. newVoiceBaseline: apply newVoiceBaseline policy. neutral: middle-of-gradient until evidence arrives."
+        },
+        "evidenceSources": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Optional list of evidence-source identifiers (e.g. sponsor attestation kinds) the projector consults before applying the default treatment."
+        }
+      },
+      "description": "Policy for handling unknown-author EPRs at projector time."
+    },
+    "reachThresholds": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string",
+        "enum": ["any", "floor", "low", "neutral", "high", "trusted"]
+      },
+      "description": "Per-reach standing threshold required for an EPR to be eligible for projection at that reach. Reach::is_floor_allowed (T11) consults this to honor floor classes (e.g. local-relationship-reach is 'any' regardless of standing)."
     }
   }
 }

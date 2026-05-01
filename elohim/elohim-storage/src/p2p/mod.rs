@@ -28,6 +28,7 @@
 //! node.start().await?;
 //! ```
 
+pub mod adapters;
 pub mod attention_tending;
 pub mod behaviour;
 pub mod dedup;
@@ -604,6 +605,20 @@ pub enum P2PCommand {
         kind: String,
         payload_bytes: Vec<u8>,
     },
+    /// Phase 3.5 — Light Up the Graph: send raw bytes directly to a single peer.
+    ///
+    /// Used by [`crate::p2p::adapters::LibP2POutboundSink`] (back-prop) for
+    /// one-hop predecessor walks. Routes via `IntegrityNotify { kind:
+    /// "feedback-signal", .. }` on the existing `/elohim/epr-atom/1.0.0`
+    /// request-response protocol — best-effort, fire-and-forget at the command
+    /// level.
+    SendDirect { peer: PeerId, payload: Vec<u8> },
+    /// Phase 3.5 — Light Up the Graph: publish raw bytes to a gossipsub topic.
+    ///
+    /// Used by [`crate::p2p::adapters::LibP2PGossipPublisher`] (gossip-flood)
+    /// for content-reach broadcasts. Best-effort — publish failure (e.g. no
+    /// peers subscribed) is logged and does not block the caller.
+    GossipPublish { topic: String, payload: Vec<u8> },
 }
 
 /// RAII guard that resumes P2P sync when dropped.
@@ -709,6 +724,8 @@ impl P2PHandle {
                     P2PCommand::KadStartProviding { .. } => {} // fire-and-forget
                     P2PCommand::PublishEprAnnounce { .. } => {} // fire-and-forget
                     P2PCommand::DirectNotifyIntegrity { .. } => {} // fire-and-forget (D.5 best-effort)
+                    P2PCommand::SendDirect { .. } => {} // fire-and-forget (T14 back-prop stub)
+                    P2PCommand::GossipPublish { .. } => {} // fire-and-forget (T14 gossip-flood stub)
                     P2PCommand::KadGetProviders { reply, .. } => {
                         // D.7 stub: no swarm in test, always return empty.
                         let _ = reply.send(vec![]);
@@ -1822,6 +1839,47 @@ impl P2PNode {
                     .lock()
                     .await
                     .insert(req_id, reply);
+            }
+            // Phase 3.5 — Light Up the Graph: one-hop back-prop direct send.
+            // Routes the FeedbackSignal payload to the predecessor peer via the
+            // existing IntegrityNotify request-response channel (epr-atom/1.0.0).
+            // Best-effort: request_id is not tracked; the fire-and-forget contract
+            // matches back_prop_one_hop's best-effort sink semantics.
+            P2PCommand::SendDirect { peer, payload } => {
+                let req = EprAtomRequest::IntegrityNotify {
+                    kind: "feedback-signal".to_string(),
+                    payload_bytes: payload,
+                };
+                let _request_id = swarm
+                    .behaviour_mut()
+                    .epr_atom_protocol
+                    .send_request(&peer, req);
+                debug!(
+                    target: "elohim_storage::back_prop",
+                    peer = %peer,
+                    "SendDirect: forwarded FeedbackSignal to predecessor peer"
+                );
+            }
+            // Phase 3.5 — Light Up the Graph: gossip-flood publish to a reach topic.
+            // Mirrors PublishEprAnnounce but with a caller-supplied topic string so
+            // flood_feedback can target the content's reach gossipsub topic.
+            // Best-effort: publish failure is logged but does not abort the caller.
+            P2PCommand::GossipPublish { topic, payload } => {
+                let gsub_topic = libp2p::gossipsub::IdentTopic::new(&topic);
+                match swarm.behaviour_mut().gossipsub.publish(gsub_topic, payload) {
+                    Ok(msg_id) => debug!(
+                        target: "elohim_storage::gossip_flood",
+                        topic = %topic,
+                        message_id = ?msg_id,
+                        "GossipPublish: published FeedbackSignal to reach topic"
+                    ),
+                    Err(e) => warn!(
+                        target: "elohim_storage::gossip_flood",
+                        topic = %topic,
+                        error = ?e,
+                        "GossipPublish: gossipsub publish failed (often: no peers subscribed yet)"
+                    ),
+                }
             }
         }
     }
@@ -4348,6 +4406,29 @@ impl P2PNode {
                             bytes = envelope_bytes.len(),
                             "EPR atom announce accepted"
                         );
+                        // TODO(T22-followup): call record_predecessor here so the
+                        // libp2p ingest path records the sender for back-prop.
+                        //
+                        // The sender PeerId is available as `peer.to_string()`.
+                        // Wiring requires P2PNode to hold an Arc<SealingKeyPair>
+                        // (added via a `with_sealing_keys` builder method, mirroring
+                        // the existing `with_db_pool` / `with_policy_enforcement`
+                        // pattern). Example call site (once sealing_keys field added):
+                        //
+                        //   if let Some(keys) = &self.sealing_keys {
+                        //       let pub_keys = SealingPubKeys {
+                        //           mishpat_pk: &keys.mishpat_pk,
+                        //           imagodei_pk: &keys.imagodei_pk,
+                        //       };
+                        //       if let Err(e) = crate::services::back_prop::record_predecessor(
+                        //           &mut conn, &ingested.cid, &peer.to_string(), &pub_keys,
+                        //       ) {
+                        //           warn!(?e, cid = %ingested.cid, "record_predecessor failed (non-fatal)");
+                        //       }
+                        //   }
+                        //
+                        // Without this, back_prop_one_hop finds no predecessors and
+                        // returns Ok(vec![]) — correct, just not yet forward-propagating.
                         EprAtomResponse::Announced {
                             accepted: true,
                             reason: None,

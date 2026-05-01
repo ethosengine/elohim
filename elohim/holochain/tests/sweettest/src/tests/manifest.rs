@@ -50,7 +50,11 @@ async fn manifest_create_round_trip() -> Result<()> {
         revision: 1,
     };
     let action_hash: holo_hash::ActionHash = conductor
-        .call(&cell.zome("content_store"), "create_manifest", manifest.clone())
+        .call(
+            &cell.zome("content_store"),
+            "create_manifest",
+            manifest.clone(),
+        )
         .await;
     let fetched: Option<Manifest> = conductor
         .call(&cell.zome("content_store"), "get_manifest", action_hash)
@@ -79,7 +83,11 @@ async fn manifest_unknown_kind_rejected() -> Result<()> {
         revision: 1,
     };
     let result = conductor
-        .call_fallible::<_, holo_hash::ActionHash>(&cell.zome("content_store"), "create_manifest", bad)
+        .call_fallible::<_, holo_hash::ActionHash>(
+            &cell.zome("content_store"),
+            "create_manifest",
+            bad,
+        )
         .await;
     assert!(
         result.is_err(),

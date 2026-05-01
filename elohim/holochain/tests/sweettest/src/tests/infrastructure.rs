@@ -115,7 +115,11 @@ async fn doorway_self_registers() -> Result<()> {
     let cell = app.cells().first().unwrap().clone();
 
     let output: DoorwayOutput = conductor
-        .call(&cell.zome("infrastructure"), "register_doorway", alpha_doorway_input())
+        .call(
+            &cell.zome("infrastructure"),
+            "register_doorway",
+            alpha_doorway_input(),
+        )
         .await;
 
     assert_eq!(
@@ -129,9 +133,16 @@ async fn doorway_self_registers() -> Result<()> {
 
     // Retrieve by id — should round-trip successfully
     let fetched: Option<DoorwayOutput> = conductor
-        .call(&cell.zome("infrastructure"), "get_doorway_by_id", "alpha".to_string())
+        .call(
+            &cell.zome("infrastructure"),
+            "get_doorway_by_id",
+            "alpha".to_string(),
+        )
         .await;
-    assert!(fetched.is_some(), "get_doorway_by_id should return the registered doorway");
+    assert!(
+        fetched.is_some(),
+        "get_doorway_by_id should return the registered doorway"
+    );
     let fetched = fetched.unwrap();
     assert_eq!(fetched.doorway.operator_agent, agent.to_string());
 
@@ -159,7 +170,11 @@ async fn doorway_visible_across_agents_and_operator_only_can_update() -> Result<
 
     // a1 self-registers a doorway
     let _: DoorwayOutput = c1
-        .call(&cell1.zome("infrastructure"), "register_doorway", alpha_doorway_input())
+        .call(
+            &cell1.zome("infrastructure"),
+            "register_doorway",
+            alpha_doorway_input(),
+        )
         .await;
 
     // Poll c2 until the doorway anchor link is gossipped, or panic on deadline.

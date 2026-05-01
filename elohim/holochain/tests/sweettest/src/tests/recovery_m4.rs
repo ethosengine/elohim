@@ -269,7 +269,13 @@ async fn m4_emergency_contact_quorum_threshold_met() -> Result<()> {
     //   - Assert EffectiveRevocations link present, PendingRevocations link absent.
     let (mut _conductor, _agent) = single_agent_conductor().await?;
     let _dna = load_dna(DNA, &network_seed(DNA), None).await?;
-    let _ = (HUMAN_MATTHEW, HUMAN_JESSICA, HUMAN_TIMOTHY, HUMAN_DAVID, HUMAN_SARAH);
+    let _ = (
+        HUMAN_MATTHEW,
+        HUMAN_JESSICA,
+        HUMAN_TIMOTHY,
+        HUMAN_DAVID,
+        HUMAN_SARAH,
+    );
     Ok(())
 }
 
@@ -536,14 +542,28 @@ async fn m4_signal_replay_idempotency_storage() -> Result<()> {
     });
 
     // Verify the serde_json shape is parseable and key fields are present.
-    let id = _signal_shape.get("id").and_then(|v| v.as_str()).unwrap_or("");
-    assert!(id.starts_with("rev-"), "revocation_id must start with 'rev-'");
+    let id = _signal_shape
+        .get("id")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+    assert!(
+        id.starts_with("rev-"),
+        "revocation_id must start with 'rev-'"
+    );
     assert_eq!(
         _signal_shape["type"].as_str().unwrap_or(""),
         "KeyRevocationRequested"
     );
-    assert_eq!(_signal_shape["trigger_type"].as_str().unwrap_or(""), "voluntary");
-    assert_eq!(_signal_shape["threshold_reached"].as_bool().unwrap_or(false), true);
+    assert_eq!(
+        _signal_shape["trigger_type"].as_str().unwrap_or(""),
+        "voluntary"
+    );
+    assert_eq!(
+        _signal_shape["threshold_reached"]
+            .as_bool()
+            .unwrap_or(false),
+        true
+    );
 
     // The M4 design note: dht_anchor_hash == id (not an ActionHash format string).
     // Revocation IDs have the shape "rev-{human_id}-{sys_time_debug}".

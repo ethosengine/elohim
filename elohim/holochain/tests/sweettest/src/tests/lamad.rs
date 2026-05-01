@@ -146,7 +146,9 @@ async fn content_publishes_and_retrieves_by_id() -> Result<()> {
         .call(
             &cell.zome("content_store"),
             "get_content_by_id",
-            QueryByIdInput { id: "test-1".to_string() },
+            QueryByIdInput {
+                id: "test-1".to_string(),
+            },
         )
         .await;
 
@@ -206,7 +208,9 @@ async fn content_visible_across_agents() -> Result<()> {
             .call(
                 &zome,
                 "get_content_by_id",
-                QueryByIdInput { id: "cross-agent-1".to_string() },
+                QueryByIdInput {
+                    id: "cross-agent-1".to_string(),
+                },
             )
             .await;
         if let Some(out) = result {

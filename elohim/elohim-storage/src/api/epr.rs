@@ -13,12 +13,15 @@
 //!   GET  /api/v1/epr/:cid/providers         → get_providers
 //!   PUT  /api/v1/epr/:cid                   → put_epr
 //!
-//! TODO(T19): wire back_prop_one_hop on FeedbackSignal arrival.
-//!
-//! When a FeedbackSignal EPR is received from a remote peer (P2P ingest path),
-//! call `crate::services::back_prop::back_prop_one_hop` to forward the signal
-//! one hop upstream to the sealed predecessor(s). The ingest route does not
-//! exist yet — it lands as part of T19 (FeedbackSignal ingest route).
+//! Phase 3.5 — Light Up the Graph (T17/T19):
+//! FeedbackSignal arrival fan-out is wired in `put_epr`. When a FeedbackSignal
+//! EPR arrives, the fan-out (project_signal + back_prop_one_hop + flood_feedback)
+//! runs if the EPR is not local-origin. Dependencies (outbound_sink,
+//! gossip_publisher, manifest_registry, sealing_keys) are injected via
+//! `EprFanOutCtx`; T22 will wire real values from `main.rs`. Until then,
+//! call sites pass `None` and the fan-out steps are skipped gracefully.
+
+use std::sync::Arc;
 
 use bytes::Bytes;
 use http_body_util::Full;
@@ -26,12 +29,93 @@ use hyper::{body::Incoming, Method, Request, Response, StatusCode};
 
 use crate::db::{AppContext, DbPool};
 use crate::error::StorageError;
+use crate::services::back_prop::OutboundSink;
 use crate::services::epr_service::FetchedEpr;
 use crate::services::epr_store::{default_epr_store, EprStore};
+use crate::services::gossip_flood::GossipPublisher;
+use crate::services::manifest_registry::ManifestRegistry;
 use crate::services::response;
 use crate::views::{EprCouplingView, EprEnvelopeView, EprSignatureView, EprView};
 
 use super::get_conn;
+
+// ---------------------------------------------------------------------------
+// T17: Local-origin dedup helper
+// ---------------------------------------------------------------------------
+
+/// Returns true if the FeedbackSignal was sent by us (local node) — used to
+/// skip back-prop / flood / project fan-out to avoid loops when our own
+/// gossip-flood arrives back to us.
+///
+/// Comparison is a simple string equality on the peer ID. The caller passes
+/// the `signed_by` field from the EPR envelope and the local node's peer ID
+/// as reported by the swarm.
+fn is_local_origin(envelope_signed_by: &str, local_peer_id: &str) -> bool {
+    envelope_signed_by == local_peer_id
+}
+
+// ---------------------------------------------------------------------------
+// T19: FeedbackSignal fan-out context
+//
+// Carries the optional runtime dependencies for the FeedbackSignal fan-out in
+// `put_epr`. Fields are `None` until T22 wires the real values from `main.rs`.
+// All fan-out steps that require a `None` field are silently skipped.
+// ---------------------------------------------------------------------------
+
+/// Optional runtime context for FeedbackSignal arrival fan-out.
+///
+/// All fields default to `None`. T22 constructs and injects a fully-wired
+/// instance from `main.rs` startup. Call sites that do not need fan-out
+/// (tests, non-P2P paths) continue passing `None`.
+pub struct EprFanOutCtx {
+    /// Manifest registry providing the active standing-policy debit weights.
+    pub manifest_registry: Option<Arc<ManifestRegistry>>,
+    /// Outbound sink for back-prop one-hop sends (LibP2POutboundSink in production).
+    pub outbound_sink: Option<Arc<dyn OutboundSink>>,
+    /// Gossip publisher for flood-feedback broadcasts (LibP2PGossipPublisher in production).
+    pub gossip_publisher: Option<Arc<dyn GossipPublisher>>,
+    /// Sealing PUBLIC keys for `record_predecessor` (stores predecessor under 2-of-2).
+    pub sealing_keys: Option<Arc<SealingKeyPair>>,
+    /// Unsealing key bundle for `back_prop_one_hop` (both pub+priv keys required to
+    /// decrypt predecessor records). Absent in dev/test environments where key files
+    /// are not configured.
+    ///
+    /// TODO(T22-followup): Load from a persistent node-key file or PKCS#11 provider.
+    /// For local dev this is populated from ephemeral keys generated at startup.
+    pub unsealing_keys: Option<Arc<UnsealingKeyBundle>>,
+    /// Local peer ID (base58 multibase) for local-origin dedup.
+    pub local_peer_id: Option<String>,
+    /// Local agent pubkey (ed25519 raw bytes) passed as evaluator to project_signal.
+    pub local_pubkey: Option<Vec<u8>>,
+    /// CID of the active standing-policy manifest for standing projector provenance.
+    pub standing_policy_cid: Option<String>,
+}
+
+/// Private-key bundle for back_prop unsealing.
+///
+/// Wraps the four key components that `back_prop::UnsealingKeys` borrows.
+/// Stored in `Arc<UnsealingKeyBundle>` on the fan-out context so the key
+/// material is heap-allocated and reference-counted, never copied by value.
+///
+/// TODO(T22-followup): in production these should be loaded from a persisted
+/// node-key file (or HSM/PKCS#11 slot). Current dev path: ephemeral keys
+/// generated from deterministic seeds at startup (safe for dev/test; NOT for
+/// production use where predecessor records must survive process restart).
+pub struct UnsealingKeyBundle {
+    pub mishpat_pk: crate::services::sealed_against_self::MishpatQuorumPubKey,
+    pub mishpat_sk: crate::services::sealed_against_self::MishpatQuorumSecretKey,
+    pub imagodei_pk: crate::services::sealed_against_self::ImagodeiPubKey,
+    pub imagodei_sk: crate::services::sealed_against_self::ImagodeiSecretKey,
+}
+
+/// Public-key pair for `record_predecessor` sealing.
+///
+/// Wraps the two keys that `back_prop::SealingPubKeys` borrows. We own them
+/// here so they can be stored in `Arc<SealingKeyPair>` on the fan-out context.
+pub struct SealingKeyPair {
+    pub mishpat_pk: crate::services::sealed_against_self::MishpatQuorumPubKey,
+    pub imagodei_pk: crate::services::sealed_against_self::ImagodeiPubKey,
+}
 
 // ---------------------------------------------------------------------------
 // Dispatcher — matches existing controller signature convention
@@ -42,6 +126,9 @@ use super::get_conn;
 /// `swarm_tx` is threaded from `HttpServer` so that `PUT /api/v1/epr/:cid`
 /// can issue `KadStartProviding` after a successful local put (D.2). When
 /// `None` (no P2P swarm configured) Kad advertisement is silently skipped.
+///
+/// `fan_out_ctx` carries the optional Phase 3.5 dependencies for FeedbackSignal
+/// fan-out. Pass `None` until T22 wires the real values from `main.rs`.
 pub async fn handle(
     req: Request<Incoming>,
     method: Method,
@@ -49,6 +136,7 @@ pub async fn handle(
     pool: &DbPool,
     ctx: &AppContext,
     swarm_tx: Option<tokio::sync::mpsc::Sender<crate::p2p::P2PCommand>>,
+    fan_out_ctx: Option<Arc<EprFanOutCtx>>,
 ) -> Result<Response<Full<Bytes>>, StorageError> {
     // Normalise: strip leading slash, giving us "", "abc123", "abc123/envelope" …
     let path = resource_path.trim_start_matches('/');
@@ -59,7 +147,7 @@ pub async fn handle(
 
         // PUT /api/v1/epr/:cid  (content-addressed idempotent put)
         (&Method::PUT, cid) if !cid.is_empty() && !cid.contains('/') => {
-            put_epr(req, cid, pool, ctx, swarm_tx).await
+            put_epr(req, cid, pool, ctx, swarm_tx, fan_out_ctx).await
         }
 
         // GET /api/v1/epr/:cid/envelope
@@ -384,6 +472,7 @@ async fn put_epr(
     pool: &DbPool,
     ctx: &AppContext,
     swarm_tx: Option<tokio::sync::mpsc::Sender<crate::p2p::P2PCommand>>,
+    fan_out_ctx: Option<Arc<EprFanOutCtx>>,
 ) -> Result<Response<Full<Bytes>>, StorageError> {
     use elohim_epr::{Coupling, Envelope, Epr, EprKind, Reach, Signature};
     use std::str::FromStr;
@@ -417,6 +506,7 @@ async fn put_epr(
         "Commitment" => EprKind::Commitment,
         "Attestation" => EprKind::Attestation,
         "Delegation" => EprKind::Delegation,
+        "FeedbackSignal" => EprKind::FeedbackSignal,
         other => return Ok(response::bad_request(&format!("unknown kind: {other}"))),
     };
 
@@ -500,10 +590,18 @@ async fn put_epr(
         proof: Signature::ed25519(signer, sig_bytes),
     };
 
-    let payload = hex::decode(&input.payload)
+    // Capture `signer` field BEFORE the envelope is moved into Epr.
+    // Used for local-origin dedup in the T19 FeedbackSignal fan-out below.
+    let envelope_signer = input.envelope.proof.signer.clone();
+
+    // Decode payload bytes once; shared by Epr construction and fan-out decode.
+    let raw_payload = hex::decode(&input.payload)
         .map_err(|e| StorageError::InvalidInput(format!("bad payload hex: {e}")))?;
 
-    let epr = Epr { envelope, payload };
+    let epr = Epr {
+        envelope,
+        payload: raw_payload.clone(),
+    };
 
     // D.4: pass pool so FederatedEprStore can resolve signer_is_known_agent.
     // local_agent_cid is None until the conductor signing client is wired (see TODO).
@@ -517,20 +615,141 @@ async fn put_epr(
     let mut conn = get_conn(pool)?;
     let result = store.put(&mut conn, epr)?;
 
-    // TODO(T19): wire record_predecessor on EPR ingest path.
+    // T18: record_predecessor is NOT wired here.
     //
-    // After a successful remote-peer put, call:
-    //   crate::services::back_prop::record_predecessor(
-    //       &mut conn,
-    //       &path_cid,
-    //       &sender_peer_id,   // the PeerId of the remote peer that sent us this EPR
-    //       &sealing_pub_keys, // MishpatQuorumPubKey + ImagodeiPubKey from node config
-    //   )
+    // put_epr is the HTTP ingest path — the caller is the local HTTP client, not
+    // a remote peer. The sender PeerId (required for back-prop graph construction)
+    // is only available on the libp2p ingest path (EprAtomRequest::Announce handler
+    // in p2p/mod.rs), where the `peer` variable carries the PeerId of the sender.
     //
-    // Requires: (a) the sender PeerId to be threaded through from the P2P ingest
-    // path into this handler (currently unavailable — put_epr is only called via
-    // the HTTP route, not the P2P ingest path); (b) node sealing keys loaded from
-    // config. Wire in Phase 3.5 T19 when the P2P ingest callback lands.
+    // T22 wires record_predecessor in p2p/mod.rs on the Announce handler — see the
+    // `TODO(T22): record_predecessor` comment in handle_epr_atom_request.
+
+    // Phase 3.5 — Light Up the Graph T19: FeedbackSignal arrival fan-out.
+    //
+    // When a FeedbackSignal EPR arrives from a REMOTE peer (not our own message
+    // looping back), run three downstream effects:
+    //   1. project_signal  — update standing_view (DB write, non-fatal on error)
+    //   2. back_prop_one_hop — forward signal to sealed predecessors (best-effort)
+    //   3. flood_feedback  — gossip-flood to content reach topic (best-effort)
+    //
+    // All three steps are skipped when their runtime dependency is None (T22 not yet
+    // wired). DB errors from step 1 are logged and continued; network errors from
+    // steps 2-3 are logged at warn level and never bubble to the HTTP response.
+    if kind == EprKind::FeedbackSignal {
+        let local_peer_id_for_dedup = fan_out_ctx
+            .as_ref()
+            .and_then(|f| f.local_peer_id.as_deref())
+            .unwrap_or("");
+
+        if !is_local_origin(&envelope_signer, local_peer_id_for_dedup)
+            || local_peer_id_for_dedup.is_empty()
+        {
+            // Decode payload as FeedbackSignal via rmp_serde (MessagePack).
+            // Per memory: use rmp_serde, never serde_json::Value, to avoid
+            // SerializedBytes boundary corruption.
+            match rmp_serde::from_slice::<crate::p2p::feedback_signal::FeedbackSignal>(&raw_payload)
+            {
+                Ok(signal) => {
+                    // 1. project_signal — non-fatal, transactional with existing conn.
+                    if let Some(fan_out) = fan_out_ctx.as_ref() {
+                        if let (Some(registry), Some(local_pubkey)) = (
+                            fan_out.manifest_registry.as_ref(),
+                            fan_out.local_pubkey.as_ref(),
+                        ) {
+                            let policy = crate::services::standing_projector::ManifestDebitWeightPolicy::from_registry(registry);
+                            let manifest_cid = fan_out
+                                .standing_policy_cid
+                                .as_deref()
+                                .unwrap_or("bootstrap");
+                            if let Err(e) = crate::services::standing_projector::project_signal(
+                                &mut conn,
+                                &policy,
+                                local_pubkey.as_slice(),
+                                &signal,
+                                manifest_cid,
+                            ) {
+                                tracing::warn!(
+                                    ?e,
+                                    %path_cid,
+                                    "put_epr: project_signal failed (non-fatal)"
+                                );
+                            }
+                        }
+
+                        // 2. back_prop_one_hop — best-effort, unseals predecessor records
+                        //    and forwards signal one hop upstream. Skipped if unsealing
+                        //    keys or outbound sink are absent.
+                        if let (Some(bundle), Some(sink)) = (
+                            fan_out.unsealing_keys.as_ref(),
+                            fan_out.outbound_sink.as_ref(),
+                        ) {
+                            let unseal = crate::services::back_prop::UnsealingKeys {
+                                mishpat_pk: &bundle.mishpat_pk,
+                                mishpat_sk: &bundle.mishpat_sk,
+                                imagodei_pk: &bundle.imagodei_pk,
+                                imagodei_sk: &bundle.imagodei_sk,
+                            };
+                            let local_id = fan_out.local_peer_id.as_deref();
+                            match crate::services::back_prop::back_prop_one_hop(
+                                &mut conn,
+                                &signal,
+                                sink.as_ref(),
+                                &unseal,
+                                local_id,
+                            ) {
+                                Ok(forwarded) if !forwarded.is_empty() => {
+                                    tracing::debug!(
+                                        %path_cid,
+                                        peers = forwarded.len(),
+                                        "put_epr: back_prop_one_hop forwarded signal"
+                                    );
+                                }
+                                Ok(_) => {} // no predecessors recorded or origin
+                                Err(e) => {
+                                    tracing::warn!(
+                                        ?e,
+                                        %path_cid,
+                                        "put_epr: back_prop_one_hop failed (non-fatal)"
+                                    );
+                                }
+                            }
+                        }
+
+                        // 3. flood_feedback — best-effort publish on content reach topic.
+                        if let Some(publisher) = fan_out.gossip_publisher.as_ref() {
+                            let topic = format!("/elohim/feedback-signal/{}", signal.target_cid);
+                            // signal_cid: derive a stable identifier from the EPR CID we just ingested.
+                            if let Err(e) = crate::services::gossip_flood::flood_feedback(
+                                &signal,
+                                path_cid,
+                                &topic,
+                                publisher.as_ref(),
+                            ) {
+                                tracing::warn!(
+                                    ?e,
+                                    %path_cid,
+                                    "put_epr: flood_feedback failed (non-fatal)"
+                                );
+                            }
+                        }
+                    }
+                }
+                Err(e) => {
+                    tracing::warn!(
+                        ?e,
+                        %path_cid,
+                        "put_epr: FeedbackSignal payload decode failed — skipping fan-out"
+                    );
+                }
+            }
+        } else {
+            tracing::debug!(
+                %path_cid,
+                "put_epr: FeedbackSignal local-origin — skipping fan-out"
+            );
+        }
+    }
 
     // Idempotent: 200 on both new and exact-match re-put. Mismatched bytes under
     // the same CID are rejected as InvalidInput by LocalEprStore::put.
@@ -618,4 +837,39 @@ async fn list_epr(
         items,
         next_cursor,
     }))
+}
+
+// ---------------------------------------------------------------------------
+// T17 unit tests — local-origin dedup helper
+// ---------------------------------------------------------------------------
+
+#[cfg(test)]
+mod dedup_tests {
+    use super::*;
+
+    #[test]
+    fn local_origin_match() {
+        assert!(
+            is_local_origin("12D3KooWXyz", "12D3KooWXyz"),
+            "same peer ID should be identified as local origin"
+        );
+    }
+
+    #[test]
+    fn external_origin_no_match() {
+        assert!(
+            !is_local_origin("12D3KooWXyz", "12D3KooWQRS"),
+            "different peer IDs should not be identified as local origin"
+        );
+    }
+
+    #[test]
+    fn empty_local_peer_id_is_not_local_origin() {
+        // When local_peer_id is empty (T22 not yet wired), we treat the message
+        // as external so fan-out is not skipped inadvertently.
+        assert!(
+            !is_local_origin("12D3KooWXyz", ""),
+            "non-empty signed_by vs empty local_peer_id should NOT be local origin"
+        );
+    }
 }

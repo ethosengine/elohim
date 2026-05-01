@@ -59,6 +59,29 @@ pub enum SignalKind {
     /// Governance-collective determination — structural cost imposed.
     /// Requires mishpat/qahal authorization.
     Quarantine,
+    /// Positive attestation — a third party vouches on an existing
+    /// FeedbackSignal, endorsing its validity. Sub-semantics carried in
+    /// [`VouchKind`]. Signer MUST differ from the target signal's signer
+    /// (no-self-vouch; enforced by the coordinator and the integrity validator).
+    Vouch,
+}
+
+/// Sub-semantics for a vouch signal.
+///
+/// Required when `signal_kind == SignalKind::Vouch`. Distinguishes between
+/// endorsing an epistemic correction and endorsing a restorative act.
+///
+/// Wire encoding: kebab-case via `#[serde(rename_all = "kebab-case")]`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, TS)]
+#[serde(rename_all = "kebab-case")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub enum VouchKind {
+    /// Endorses a correction signal: the vouching party agrees that the
+    /// cited correction is epistemically valid.
+    AcceptCorrection,
+    /// Endorses a restitution act: the vouching party attests that the
+    /// original author has made good on the harm.
+    Restitution,
 }
 
 /// Graduated standing impact for a [`FeedbackSignal`].
@@ -100,6 +123,12 @@ pub struct FeedbackSignal {
     /// Graduated signal kind.
     pub signal_kind: SignalKind,
 
+    /// Vouch sub-semantics. Required when `signal_kind == SignalKind::Vouch`.
+    /// Omitted (not serialized) for all other signal kinds.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[ts(optional)]
+    pub vouch_kind: Option<VouchKind>,
+
     /// CIDv1 of a Correction EPR with claims and citations.
     /// Required when `signal_kind == SignalKind::Correction`.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -129,6 +158,7 @@ impl FeedbackSignal {
         Self {
             target_cid,
             signal_kind: SignalKind::Correction,
+            vouch_kind: None,
             evidence_cid: Some(evidence_cid),
             standing_impact,
             signed_by,
@@ -136,12 +166,21 @@ impl FeedbackSignal {
         }
     }
 
-    /// Validate the correction invariant: `correction` signals MUST have
-    /// `evidence_cid`. Returns `Ok(())` if valid, `Err` with a description
-    /// if not.
+    /// Validate signal invariants:
+    /// - `correction` signals MUST have `evidence_cid`.
+    /// - `vouch` signals MUST have `vouch_kind`.
+    /// - Non-vouch signals MUST NOT have `vouch_kind`.
+    ///
+    /// Returns `Ok(())` if valid, `Err` with a description if not.
     pub fn validate(&self) -> Result<(), &'static str> {
         if self.signal_kind == SignalKind::Correction && self.evidence_cid.is_none() {
             return Err("correction signal_kind requires evidence_cid");
+        }
+        if self.signal_kind == SignalKind::Vouch && self.vouch_kind.is_none() {
+            return Err("vouch signal_kind requires vouch_kind");
+        }
+        if self.signal_kind != SignalKind::Vouch && self.vouch_kind.is_some() {
+            return Err("vouch_kind must be None for non-vouch signals");
         }
         Ok(())
     }
@@ -163,6 +202,7 @@ mod tests {
         FeedbackSignal {
             target_cid: "bafyreiabcdef1234567890".to_string(),
             signal_kind: kind,
+            vouch_kind: None,
             evidence_cid: evidence.map(|s| s.to_string()),
             standing_impact: impact,
             signed_by: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=".to_string(),
@@ -451,5 +491,124 @@ mod tests {
         assert_eq!(sig.signal_kind, SignalKind::Correction);
         assert_eq!(sig.evidence_cid, Some("bafyreiabcdef_evidence".to_string()));
         assert!(sig.validate().is_ok());
+    }
+
+    // -----------------------------------------------------------------------
+    // Vouch variant — T4 additions
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn vouch_signal_round_trips() {
+        let signal = FeedbackSignal {
+            target_cid: "bafyreitarget".to_string(),
+            signal_kind: SignalKind::Vouch,
+            vouch_kind: Some(VouchKind::AcceptCorrection),
+            evidence_cid: None,
+            standing_impact: StandingImpact::DebitSoft,
+            signed_by: "AAA=".to_string(),
+            signature: "BBB=".to_string(),
+        };
+        let json = serde_json::to_string(&signal).unwrap();
+        assert!(
+            json.contains("\"signalKind\":\"vouch\""),
+            "expected signalKind=vouch in JSON, got: {json}"
+        );
+        assert!(
+            json.contains("\"vouchKind\":\"accept-correction\""),
+            "expected vouchKind=accept-correction in JSON, got: {json}"
+        );
+        let back: FeedbackSignal = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, signal);
+    }
+
+    #[test]
+    fn vouch_restitution_round_trips() {
+        let signal = FeedbackSignal {
+            target_cid: "bafyreitarget".to_string(),
+            signal_kind: SignalKind::Vouch,
+            vouch_kind: Some(VouchKind::Restitution),
+            evidence_cid: None,
+            standing_impact: StandingImpact::Advisory,
+            signed_by: "AAA=".to_string(),
+            signature: "BBB=".to_string(),
+        };
+        let json = serde_json::to_string(&signal).unwrap();
+        assert!(
+            json.contains("\"vouchKind\":\"restitution\""),
+            "expected vouchKind=restitution in JSON, got: {json}"
+        );
+        let back: FeedbackSignal = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, signal);
+    }
+
+    #[test]
+    fn non_vouch_signals_omit_vouch_kind() {
+        let signal = FeedbackSignal {
+            target_cid: "bafyreitarget".to_string(),
+            signal_kind: SignalKind::Correction,
+            vouch_kind: None,
+            evidence_cid: Some("bafyreievidence".to_string()),
+            standing_impact: StandingImpact::DebitSoft,
+            signed_by: "AAA=".to_string(),
+            signature: "BBB=".to_string(),
+        };
+        let json = serde_json::to_string(&signal).unwrap();
+        assert!(
+            !json.contains("vouchKind"),
+            "vouchKind must be omitted when None, got: {json}"
+        );
+    }
+
+    #[test]
+    fn validate_rejects_vouch_without_vouch_kind() {
+        let signal = FeedbackSignal {
+            target_cid: "bafyreitarget".to_string(),
+            signal_kind: SignalKind::Vouch,
+            vouch_kind: None,
+            evidence_cid: None,
+            standing_impact: StandingImpact::Advisory,
+            signed_by: "AAA=".to_string(),
+            signature: "BBB=".to_string(),
+        };
+        assert!(
+            signal.validate().is_err(),
+            "vouch without vouch_kind should fail validate()"
+        );
+    }
+
+    #[test]
+    fn validate_rejects_non_vouch_with_vouch_kind() {
+        let signal = FeedbackSignal {
+            target_cid: "bafyreitarget".to_string(),
+            signal_kind: SignalKind::Squelch,
+            vouch_kind: Some(VouchKind::AcceptCorrection),
+            evidence_cid: None,
+            standing_impact: StandingImpact::Advisory,
+            signed_by: "AAA=".to_string(),
+            signature: "BBB=".to_string(),
+        };
+        assert!(
+            signal.validate().is_err(),
+            "non-vouch with vouch_kind should fail validate()"
+        );
+    }
+
+    #[test]
+    fn msgpack_roundtrip_vouch() {
+        let signal = FeedbackSignal {
+            target_cid: "bafyreitarget".to_string(),
+            signal_kind: SignalKind::Vouch,
+            vouch_kind: Some(VouchKind::AcceptCorrection),
+            evidence_cid: None,
+            standing_impact: StandingImpact::DebitSoft,
+            signed_by: "AAA=".to_string(),
+            signature: "BBB=".to_string(),
+        };
+        let bytes = rmp_serde::to_vec_named(&signal).unwrap();
+        let back: FeedbackSignal = rmp_serde::from_slice(&bytes).unwrap();
+        assert_eq!(
+            back, signal,
+            "MessagePack round-trip failed for vouch signal"
+        );
     }
 }

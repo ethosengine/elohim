@@ -1,4 +1,7 @@
-//! Shared EprKind canonical string helpers for elohim-storage.
+//! Shared EprKind canonical string helpers and EPR-related domain types for elohim-storage.
+//!
+//! Also declares [`Reach`] — the reach-scope enum used by the reach-earning gate
+//! (Phase 3.5 Light-Up-Graph).
 //!
 //! `kind_canonical_str` is the single in-crate source of truth for
 //! `EprKind → &'static str` mapping.  It must be kept in sync with the
@@ -69,6 +72,57 @@ pub(crate) fn pillar_for_kind_provisional(kind: elohim_epr::EprKind) -> String {
 }
 
 // ---------------------------------------------------------------------------
+// Reach — EPR distribution scope
+// ---------------------------------------------------------------------------
+
+/// Distribution scope for an EPR. Used by the reach-earning gate to determine
+/// whether an author's standing is sufficient to compose at the requested scope.
+///
+/// The eight variants map to the `reachThresholds` keys in the standing-policy
+/// manifest. Personal/Intimate/Household/Neighborhood map to "any" (floor class;
+/// bypass the standing check). The remaining four require minimum standing.
+///
+/// See: genesis/docs/superpowers/specs/2026-05-01-light-up-the-graph-design.md §Components::ReachVerdict
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum Reach {
+    Personal,
+    Intimate,
+    Household,
+    Neighborhood,
+    Collective,
+    Community,
+    District,
+    Public,
+}
+
+impl Reach {
+    /// Returns `true` when the manifest's `reachThresholds` maps this reach to
+    /// `"any"` — i.e. these reach values bypass standing/floor checks (CID-targeted-
+    /// lookup and local-relationship-reach floor classes).
+    pub fn is_floor_allowed(self) -> bool {
+        matches!(
+            self,
+            Reach::Personal | Reach::Intimate | Reach::Household | Reach::Neighborhood
+        )
+    }
+
+    /// Returns the kebab-case identifier matching the manifest key.
+    pub fn as_kebab(self) -> &'static str {
+        match self {
+            Reach::Personal => "personal",
+            Reach::Intimate => "intimate",
+            Reach::Household => "household",
+            Reach::Neighborhood => "neighborhood",
+            Reach::Collective => "collective",
+            Reach::Community => "community",
+            Reach::District => "district",
+            Reach::Public => "public",
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -106,5 +160,22 @@ mod tests {
 
         // Also assert we covered all 11 variants (update when enum grows).
         assert_eq!(cases.len(), 11, "expected 11 EprKind variants");
+    }
+
+    // T11 — Reach::is_floor_allowed tests
+    #[test]
+    fn floor_reaches_bypass() {
+        assert!(Reach::Personal.is_floor_allowed());
+        assert!(Reach::Intimate.is_floor_allowed());
+        assert!(Reach::Household.is_floor_allowed());
+        assert!(Reach::Neighborhood.is_floor_allowed());
+    }
+
+    #[test]
+    fn non_floor_reaches_do_not_bypass() {
+        assert!(!Reach::Collective.is_floor_allowed());
+        assert!(!Reach::Community.is_floor_allowed());
+        assert!(!Reach::District.is_floor_allowed());
+        assert!(!Reach::Public.is_floor_allowed());
     }
 }

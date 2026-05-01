@@ -766,10 +766,12 @@ async fn epr_2b_batch_a_full_loop() -> Result<()> {
         "recovery_request_hash": "uhCkk-epr2b-a12-recovery-request-hash",
         "authority": { "type": "SelfSovereign" }
     });
-    let _rotation_result: holochain::conductor::api::error::ConductorApiResult<
-        serde_json::Value,
-    > = c1
-        .call_fallible(&cell1.zome("imagodei"), "commit_key_rotation", rotation_input)
+    let _rotation_result: holochain::conductor::api::error::ConductorApiResult<serde_json::Value> =
+        c1.call_fallible(
+            &cell1.zome("imagodei"),
+            "commit_key_rotation",
+            rotation_input,
+        )
         .await;
     // NOTE: rotation may fail if recovery_request_hash doesn't exist in DHT —
     // the coordinator gate checks for a valid recovery request. This is expected
@@ -785,7 +787,11 @@ async fn epr_2b_batch_a_full_loop() -> Result<()> {
     let _revocation_result: holochain::conductor::api::error::ConductorApiResult<
         serde_json::Value,
     > = c1
-        .call_fallible(&cell1.zome("imagodei"), "create_self_revocation", revocation_input)
+        .call_fallible(
+            &cell1.zome("imagodei"),
+            "create_self_revocation",
+            revocation_input,
+        )
         .await;
 
     // -----------------------------------------------------------------------
@@ -809,4 +815,3 @@ async fn epr_2b_batch_a_full_loop() -> Result<()> {
 // ---------------------------------------------------------------------------
 // Helper: fallible conductor call (returns Result instead of panicking)
 // ---------------------------------------------------------------------------
-

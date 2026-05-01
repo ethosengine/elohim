@@ -240,6 +240,7 @@ mod tests {
         FeedbackSignal {
             target_cid: target_cid.to_string(),
             signal_kind: SignalKind::Correction,
+            vouch_kind: None,
             evidence_cid: Some("bafyreievidence0001".to_string()),
             standing_impact: StandingImpact::DebitSoft,
             signed_by: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=".to_string(),
