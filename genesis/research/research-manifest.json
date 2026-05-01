@@ -7,6 +7,27 @@
       "path": "genesis/research/repos/polis",
       "relevance": "Sprint 7 sensemaking — cosine similarity clustering, PCA projection, bridging statement detection, real-time opinion visualization",
       "pillar": "qahal"
+    },
+    {
+      "name": "arweave",
+      "url": "https://github.com/ArweaveTeam/arweave.git",
+      "path": "genesis/research/repos/arweave",
+      "relevance": "Archival problem survey — blockweave structure, succinct random proofs, the storage-endowment funding model (one-time fee underwrites perpetual replication). DDS-WG identified as cold-path archival; investigate as informative comparison and possible doorway-projected archival target.",
+      "pillar": "elohim"
+    },
+    {
+      "name": "filecoin",
+      "url": "https://github.com/filecoin-project/specs.git",
+      "path": "genesis/research/repos/filecoin",
+      "relevance": "Archival problem survey — incentivized IPFS, market-based storage deals, proof-of-spacetime, proof-of-replication. Closest CID/IPLD overlap with our content-addressing stack; potential interop target via doorway projection rather than divergence point.",
+      "pillar": "elohim"
+    },
+    {
+      "name": "logos",
+      "url": "https://github.com/logos-co/logos-docs.git",
+      "path": "genesis/research/repos/logos",
+      "relevance": "Archival problem survey — entry point to the Status-incubated sovereign-network stack (Waku messaging, Codex storage, Nomos consensus). Closest peer to Elohim's full-stack civil-society framing; worth cloning the docs hub first before drilling into sub-protocol repos (waku-org, codex-storage, nomos-research).",
+      "pillar": "elohim"
     }
   ]
 }

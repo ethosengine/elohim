@@ -94,6 +94,26 @@ EPR content has three tiers — Head (gossipped metadata), Document (peer-cached
 
 ---
 
+## The Archival Problem
+
+Content addressing answers *how bytes get named and verified*. It does not answer *whether they survive a decade*. The protocol's hot path is steward-delivered shards on a trust-weighted mesh — fast, pluralistic, governed by relationship. But what about cold storage? What about content that has graduated past active stewardship and needs a substrate that will still answer in twenty years, even if no household-cluster steward chooses to keep carrying it?
+
+The DDS Working Group has converged on a trio — **Arweave**, **Filecoin**, and **Logos** — as their archival/storage substrate options. These communities have spent a decade building exactly the layer the protocol does *not* try to build natively. The survey question is whether (a) any of them are aligned enough that doorway projection makes sense as an optional cold-path bridge, (b) any are divergent enough that they're better treated as informative comparison points than interop targets, and (c) whether the user's working thesis holds: that **Elohim Protocol may be the comprehensive target for what these orgs say they are trying to do** — civil-society infrastructure, sovereign computation, permanent legibility — assembled around a stewardship model rather than a market or a token.
+
+That thesis is worth testing rather than asserted. The survey is the test.
+
+**Arweave** — Permanent storage as protocol primitive. The blockweave structure ties a new block to a randomly-sampled prior block, making storage-of-history the proof-of-work substrate; the storage endowment captures a one-time fee that funds perpetual replication actuarially. Closest to a "civilizational hard drive" framing — pay once, persist forever. Funding is endowment-based; governance leans toward minimal-protocol, market-driven.
+
+**Filecoin** — Incentivized IPFS. Storage providers stake FIL and prove they hold contracted bytes via proof-of-replication and proof-of-spacetime; clients pay per deal; the network polices delivery via slashing. Closest CID/IPLD lineage to our own rust-ipfs work — the wire formats are nearly cousins. The hardest question is whether market-priced storage deals fit a stewardship economy at all, or whether they belong in a different value language entirely.
+
+**Logos** (logos.co) — Status's broader sovereign-network stack. Frames itself as a social movement plus a unified technology stack: Waku (private p2p messaging), Codex (decentralised storage with durability guarantees), Nomos (consensus), plus networking and execution layers. Of the three, Logos is the closest peer to Elohim in scope — explicitly civil-society-oriented, full-stack, multi-protocol — and therefore the most important to read carefully for both alignment and divergence. *(Factual caveat: the Logos sub-protocols evolve fast; testnet was at v0.1.2 at survey time, and the public site does not always name Waku/Codex/Nomos directly. Confirm component status when cloning.)*
+
+The deliverable from this survey is not a comparison matrix. It is a decision: which of these belongs in our doorway's projection layer as an optional cold-path archival target, and which are simply prior art we should learn from before deciding our cold path doesn't need their help at all.
+
+[genesis/research/repos/arweave/](repos/arweave/) · [genesis/research/repos/filecoin/](repos/filecoin/) · [genesis/research/repos/logos/](repos/logos/)
+
+---
+
 ## The Networking Problem
 
 Steward nodes don't form flat peer networks — they form trust-weighted meshes where affinity to content determines topology. libp2p gives us the protocol primitives (request-response, gossipsub, Kademlia), but the research questions are about NAT traversal at scale (tx5, sbd relay), peer discovery that respects affinity, and how the steward topology emerges from individual stewardship decisions rather than being centrally planned.
@@ -115,3 +135,16 @@ Steward nodes don't form flat peer networks — they form trust-weighted meshes 
 How do you measure human growth without reducing it to a score? Sophia renders assessments in three modes — mastery (graded), discovery (psychometric), and reflection (open-ended). The research is about what makes each mode work: IRT for adaptive difficulty, instrument design that surfaces authentic values rather than socially desirable answers, and scoring models that inform the learning path without flattening the learner.
 
 [sophia/research/](../../sophia/research/)
+
+---
+
+## The Deliberation Problem
+
+How does the protocol surface, mediate, and verify collective deliberation without flattening it? qahal is the pillar where disagreement is supposed to be tended rather than averaged away, mishpat is the layer where binding governance acts get notarized, and elohim-as-counsel is the standing that lets a single voice survive when the room is structurally tilted against it. Each of these touches the same hard problem: how do you build infrastructure that approximates Habermas's ideal-speech conditions — equality of voice, freedom from coercion, openness to the better argument — at the scale and asynchrony of a distributed protocol, without importing his idealizations about culturally homogeneous publics or about consensus as the goal?
+
+The recent surge of AI-mediated deliberation tools (DeepMind's Habermas Machine, Polis's bridging-statement detection, ZKorum's DDS standard) makes this an urgent research area. The protocol's instinct is to treat AI-generated consensus statements as *attested computations* — auditable inputs to qahal, never binding outputs — and to preserve dissent as a first-class signal rather than a failure mode.
+
+**Key references:**
+
+- DeepMind, "AI can help humans find common ground in democratic deliberation", *Science*, October 2024 — The Habermas Machine. A two-LLM pipeline (generative model + personalized reward model) that drafts consensus statements and ranks them by predicted endorsement; outperformed human mediators on clarity, fairness-to-minorities, and informativeness in a 5,734-participant UK study. The system is impressive on its own terms and structurally misaligned with Habermas's own framework — it optimizes for *predicted endorsement* where Habermas asked for *defensibility under ideal-speech conditions*. Surfaced via the DDS-WG (ZKorum) author's stated admiration; the protocol's interest is in auditing rather than adopting this pattern. [Survey notes →](habermas-machine-2024.md)
+- Habermas, *The Theory of Communicative Action* (1981), *Discourse Ethics* (1990s), *Structural Transformation of the Public Sphere* (1962) — The intellectual scaffolding for any serious work on legitimate collective deliberation. The communicative-vs-strategic-rationality distinction maps directly onto the shefa-vs-qahal boundary; the ideal speech situation supplies a regulative ideal for measuring how well any deliberation infrastructure does its job; discourse ethics gives the universalizability-not-majoritarianism wedge that the protocol's constitutional floors rely on. Critiques from Fraser, Young, Mouffe, and Rancière name the places (cultural homogeneity, power asymmetry, idealization of consensus) where the protocol must revise rather than import the framework. [Survey notes →](habermas-legacy.md)
