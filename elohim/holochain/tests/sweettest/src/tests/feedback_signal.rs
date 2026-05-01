@@ -26,7 +26,7 @@ use holo_hash::{ActionHash, EntryHash};
 use holochain_serialized_bytes::prelude::*;
 use serde::{Deserialize, Serialize};
 
-const DNA: &str = "elohim";
+const DNA: &str = "lamad";
 
 // ---------------------------------------------------------------------------
 // Local mirror types (no path-dep on WASM coordinator crate allowed here).
