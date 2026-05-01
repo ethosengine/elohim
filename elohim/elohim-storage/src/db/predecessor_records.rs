@@ -10,8 +10,9 @@
 //! - `insert_predecessor` — idempotent receive; ON CONFLICT DO NOTHING so
 //!   duplicate gossip deliveries of the same `(target_cid, predecessor_peer_id)`
 //!   pair are silently ignored rather than erroring.
-//! - `get_predecessor_for_cid` — returns all predecessor rows for a given CID;
-//!   multiple peers may each contribute a predecessor record.
+//! - `list_predecessors_for_cid` — returns all predecessor rows for a given CID,
+//!   ordered by `received_at` ascending; multiple peers may each contribute a
+//!   predecessor record.
 //! - `delete_for_cid` — removes all rows matching `target_cid`; used on retraction.
 
 use crate::db::diesel_schema::predecessor_records;
@@ -80,7 +81,10 @@ pub fn insert_predecessor(
 ///
 /// Multiple peers may each hold a predecessor relationship to the same CID,
 /// so this may return more than one row.
-pub fn get_predecessor_for_cid(
+///
+/// Rows are ordered by `received_at` ascending so callers (e.g. T12 back-prop
+/// service) observe a stable chronological traversal order.
+pub fn list_predecessors_for_cid(
     conn: &mut SqliteConnection,
     target_cid: &str,
 ) -> QueryResult<Vec<PredecessorRecordRow>> {
@@ -88,6 +92,7 @@ pub fn get_predecessor_for_cid(
 
     dsl::predecessor_records
         .filter(dsl::target_cid.eq(target_cid))
+        .order_by(dsl::received_at.asc())
         .load::<PredecessorRecordRow>(conn)
 }
 
@@ -138,7 +143,7 @@ mod tests {
         .expect("insert");
         assert_eq!(n, 1, "first insert should affect 1 row");
 
-        let rows = get_predecessor_for_cid(&mut conn, "bafyreicid1").expect("get");
+        let rows = list_predecessors_for_cid(&mut conn, "bafyreicid1").expect("get");
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0].target_cid, "bafyreicid1");
         assert_eq!(rows[0].predecessor_peer_id, "12D3KooWPeer1");
@@ -172,7 +177,7 @@ mod tests {
 
         assert_eq!(n, 0, "duplicate insert should affect 0 rows");
 
-        let rows = get_predecessor_for_cid(&mut conn, "bafyreicid2").expect("get");
+        let rows = list_predecessors_for_cid(&mut conn, "bafyreicid2").expect("get");
         assert_eq!(
             rows.len(),
             1,
@@ -205,7 +210,7 @@ mod tests {
         )
         .expect("insert peer B");
 
-        let rows = get_predecessor_for_cid(&mut conn, "bafyreicid3").expect("get");
+        let rows = list_predecessors_for_cid(&mut conn, "bafyreicid3").expect("get");
         assert_eq!(rows.len(), 2, "two distinct peers = two rows");
 
         let peer_ids: Vec<&str> = rows
@@ -242,7 +247,7 @@ mod tests {
         let deleted = delete_for_cid(&mut conn, "bafyreicid4").expect("delete");
         assert_eq!(deleted, 2, "two rows should be deleted");
 
-        let rows = get_predecessor_for_cid(&mut conn, "bafyreicid4").expect("get after delete");
+        let rows = list_predecessors_for_cid(&mut conn, "bafyreicid4").expect("get after delete");
         assert!(rows.is_empty(), "no rows should remain after delete");
     }
 }
