@@ -778,6 +778,31 @@ Harvested scenarios go in `genesis/a2o/features/topology/` paired with implement
 
 Pre-flight failures → fix or descope before scope-locking.
 
+#### Pre-flight verification — T00 results (static, 2026-05-01)
+
+**Status: DONE_WITH_CONCERNS — gaps logged for T01-T03 to resolve.**
+
+Static verification performed in Eclipse Che (no live Holochain stack available). Steps requiring `pnpm run hc:start:seed`, `curl /api/v1/agents`, or `sqlite3 ~/.elohim-storage/storage.db` are deferred to Jenkins or local-dev runtime verification.
+
+**What is in place (static evidence):**
+
+- DNA layer (imagodei DNA): coordinator `create_agent_peer_binding` and queries `get_agent_peer_bindings` / `get_bindings_for_peer` exist at `elohim/holochain/dna/imagodei/zomes/imagodei/src/agent_peer_binding.rs`. Integrity entry + validator at `elohim/holochain/dna/imagodei/zomes/imagodei_integrity/src/agent_peer_binding.rs`. Sweettest coverage at `elohim/holochain/tests/sweettest/src/tests/imagodei_peer_binding.rs`.
+- DnaSignal projection: `ImagodeiSignal::AgentPeerBindingCreated` is emitted on commit. `HolochainAppSignalStream` (Task A.11) translates this to a storage projection event.
+- Schemas (notarized): `elohim/sdk/schemas/v1/objects/agent-peer-binding.schema.json`, `elohim/sdk/schemas/v1/views/agent-peer-binding-view.schema.json`, `elohim/sdk/schemas/v1/dna-signals/agent-peer-binding.schema.json`, `elohim/sdk/schemas/v1/enums/device-archetype.schema.json`.
+- TS bindings generated: `elohim/sdk/storage-client-ts/src/generated/AgentPeerBindingView.ts`, `app/elohim-app/src/app/generated/agent-peer-binding-view.ts`.
+- Storage projection table: migration `elohim/elohim-storage/migrations/2026-04-24-235000_peer_identity_bindings/up.sql`. Diesel schema and CRUD at `elohim/elohim-storage/src/db/peer_identity_bindings.rs`.
+
+**Gap 1 (BLOCKING for runtime): no AgentPeerBinding seeder.** Verbatim grep of `genesis/seeder/src/` for `AgentPeerBinding | agent_peer_binding | create_agent_peer_binding | peer_identity_binding` returned zero matches. No seeder file exists. The two device-related files (`genesis/seeder/src/generate-devices-json.ts`, `genesis/seeder/src/validate-devices.ts`) operate on the device *catalog* (`genesis/data/devices/*.md` -> `devices.json`) — a content-side reference, not an AgentPeerBinding writer. `seed.ts` does not call any binding seeder. **`pnpm run hc:start:seed` will produce zero AgentPeerBindings today.** This must be addressed by T01-T03 before Phases 4 and 7+ can demonstrate multi-device behaviour.
+
+**Gap 2 (schema drift): projection table missing columns the wire view exposes.** The `peer_identity_bindings` projection table columns are: `peer_id, agent_cid, dht_anchor_hash, valid_from, valid_until, observed_at, source` (PRIMARY KEY `(peer_id, dht_anchor_hash)`). The DHT entry and `AgentPeerBindingView` (wire) carry two additional fields the projection drops: `device_archetype` and `superseded_by`. Step 3 of the kickoff prompt assumed these columns exist (`SELECT agent_cid, peer_id, device_archetype FROM peer_identity_bindings WHERE superseded_by IS NULL ...`). Today that SQL would fail with `no such column`. The DNA-side data is fine; the projection just drops it. T01-T03 should add an ALTER TABLE migration so subsequent phases can filter on archetype and current-binding-only.
+
+**Runtime verification still required (defer to Jenkins / local-dev):**
+
+- Step 2: `pnpm run hc:start:seed` followed by `curl http://localhost:8090/api/v1/agents | jq '.[] | select(.bindings != null) | {id, bindings: .bindings | length}'` — expect at least one agent with 2+ bindings (multi-device demo). Cannot run from Eclipse Che.
+- Step 3: `sqlite3 ~/.elohim-storage/storage.db "SELECT agent_cid, peer_id, device_archetype FROM peer_identity_bindings WHERE superseded_by IS NULL LIMIT 10;"` — blocked on Gap 2 (column not present); blocked on Gap 1 (no rows would exist anyway). Re-run after T01-T03 land.
+- Pre-flight item 2 (auth `agent_cid` propagation): not in T00 scope, separate task.
+- Pre-flight item 3 (`rea_projection` stream populated): not in T00 scope, separate task.
+
 ### CI quality gates (per CLAUDE.md)
 
 ```
