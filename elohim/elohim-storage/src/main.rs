@@ -359,6 +359,35 @@ async fn async_main(
         }
     }
 
+    // T20: Bootstrap manifest seeding — seed standing-policy and tending-policy
+    // manifests on first run. Idempotent: subsequent runs skip kinds already
+    // present (peer-authored or previously bootstrapped). Fail-fast: these are
+    // foundational protocol manifests; a cold-start system without them cannot
+    // apply standing-policy debit weights correctly.
+    if let Some(pool) = db_pool.as_ref() {
+        match pool.get() {
+            Ok(mut conn) => {
+                let report = elohim_storage::services::bootstrap_manifests::seed_if_empty(&mut conn)
+                    .expect("bootstrap manifests seed must succeed at startup");
+                if report.standing_policy_seeded || report.tending_policy_seeded {
+                    info!(
+                        standing_policy = report.standing_policy_seeded,
+                        tending_policy = report.tending_policy_seeded,
+                        "Bootstrap manifests seeded on first run"
+                    );
+                } else {
+                    info!("Bootstrap manifests already present — seed skipped");
+                }
+            }
+            Err(e) => {
+                // Pool available but connection failed — non-fatal for startup
+                // (matching the pool-init warning pattern above), but warn loudly
+                // since standing-policy will be absent and fan-out will degrade.
+                warn!(error = %e, "Failed to acquire DB connection for bootstrap manifest seeding (non-fatal, fan-out degraded)");
+            }
+        }
+    }
+
     // One-shot household_id backfill — populates legacy null rows from DHT
     // humans entries. Tolerates DHT unavailability; logs and continues.
     // The replayer currently stubs an empty mapping; it will be wired to real
@@ -1106,6 +1135,57 @@ async fn async_main(
         }
     } else {
         info!("Reconcile controller disabled: --imagodei-app-id is empty");
+    }
+
+    // T21: Tending TTL sweep task — 5-minute interval, shutdown-aware.
+    //
+    // Deletes expired non-Safety attention_tending rows. Safety classification
+    // is never swept (§2.8 constitutional floor protection). Errors are logged
+    // at warn level; sweep failure is recoverable on next tick.
+    if let Some(pool) = db_pool.clone() {
+        let mut sweep_shutdown = shutdown_tx.subscribe();
+        tokio::spawn(async move {
+            use tokio::time::{interval, MissedTickBehavior};
+            let mut ticker = interval(std::time::Duration::from_secs(300));
+            ticker.set_missed_tick_behavior(MissedTickBehavior::Skip);
+            loop {
+                tokio::select! {
+                    _ = ticker.tick() => {
+                        match pool.get() {
+                            Ok(mut conn) => {
+                                match elohim_storage::services::tending::sweep_expired(&mut conn) {
+                                    Ok(deleted) => {
+                                        if deleted > 0 {
+                                            tracing::info!(
+                                                deleted,
+                                                "tending TTL sweep: removed expired rows"
+                                            );
+                                        }
+                                    }
+                                    Err(e) => {
+                                        tracing::warn!(
+                                            error = %e,
+                                            "tending TTL sweep failed (recoverable next tick)"
+                                        );
+                                    }
+                                }
+                            }
+                            Err(e) => {
+                                tracing::warn!(
+                                    error = %e,
+                                    "tending TTL sweep: failed to acquire DB connection (recoverable next tick)"
+                                );
+                            }
+                        }
+                    }
+                    _ = sweep_shutdown.recv() => {
+                        tracing::debug!("tending TTL sweep task: shutdown signal received, exiting");
+                        break;
+                    }
+                }
+            }
+        });
+        info!("Tending TTL sweep task started (5-min interval, shutdown-aware)");
     }
 
     info!("Press Ctrl+C to stop.");
