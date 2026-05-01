@@ -23,6 +23,13 @@ pub use feedback_signal::{
     CreateFeedbackSignalInput, FeedbackSignalRecord,
 };
 
+// EPR Phase 3.5 T9: AttentionTending coordinator functions.
+pub mod attention_tending;
+pub use attention_tending::{
+    create_attention_tending, list_my_tending, refresh_tending_ttl, AttentionTendingRecord,
+    CreateAttentionTendingInput, RefreshTendingTtlInput,
+};
+
 pub use bootstrap_steward::{
     am_i_bootstrap_steward, bootstrap_steward, maybe_bootstrap_steward, BootstrapStewardError,
     DnaProperties as BootstrapStewardDnaProperties,
