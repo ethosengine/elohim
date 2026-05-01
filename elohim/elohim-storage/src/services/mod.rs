@@ -70,6 +70,7 @@ pub mod spatial_capacity;
 pub mod spatial_dashboard;
 pub mod standing;
 pub mod standing_projector;
+pub mod standing_query;
 pub mod steward_affinity_service;
 pub mod steward_standing;
 pub mod stewardship_service;

@@ -48,6 +48,7 @@ pub mod routing;
 pub mod schedules;
 pub mod signal_emit;
 pub mod spatial;
+pub mod standing;
 pub mod steward;
 pub mod steward_affinity;
 pub mod stewardship;
@@ -173,6 +174,9 @@ pub async fn handle_api_request(
     } else if sub_path.starts_with("schedules") {
         let resource_path = sub_path.strip_prefix("schedules").unwrap_or("");
         schedules::handle(req, method, resource_path, &pool, &app_ctx).await
+    } else if sub_path.starts_with("standing") {
+        let resource_path = sub_path.strip_prefix("standing").unwrap_or("");
+        standing::handle(req, method, resource_path, &pool, &app_ctx).await
     } else if sub_path.starts_with("spatial-contexts") {
         let resource_path = sub_path.strip_prefix("spatial-contexts").unwrap_or("");
         spatial::handle(req, method, resource_path, &pool, &app_ctx).await
