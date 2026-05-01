@@ -40,6 +40,11 @@ use serde::{Deserialize, Serialize};
 // ---------------------------------------------------------------------------
 
 /// Input for `create_feedback_signal`.
+///
+/// `signer_pubkey` is intentionally absent from this struct. The coordinator
+/// derives it from `agent_info()?.agent_initial_pubkey.get_raw_39().to_vec()`
+/// at call time, making it impossible for a caller to spoof another agent's
+/// pubkey in the entry payload.
 #[derive(Debug, Clone, Serialize, Deserialize, SerializedBytes)]
 pub struct CreateFeedbackSignalInput {
     /// ActionHash of the target Content (or other EPR) that this signal acts on.
@@ -55,11 +60,6 @@ pub struct CreateFeedbackSignalInput {
 
     /// One of: advisory / debit-soft / debit-firm.
     pub standing_impact: String,
-
-    /// Raw ed25519 public key bytes of the issuing agent.
-    /// Must match `agent_info()?.agent_initial_pubkey` bytes — validated on-chain
-    /// so the integrity entry is auditable without re-deriving from the action header.
-    pub signer_pubkey: Vec<u8>,
 }
 
 /// One FeedbackSignal record returned from query functions.
@@ -82,6 +82,8 @@ pub struct FeedbackSignalRecord {
 ///    an existing valid record. Checked via `must_get_valid_record`.
 ///
 /// On success:
+/// - Derives `signer_pubkey` from `agent_info()?.agent_initial_pubkey` so the
+///   entry payload cannot be spoofed by the caller.
 /// - Creates the `FeedbackSignal` integrity entry.
 /// - Creates a `TargetToFeedbackSignal` link from the target action.
 /// - Creates a `SignerToFeedbackSignal` link from a per-agent anchor.
@@ -122,6 +124,12 @@ pub fn create_feedback_signal(input: CreateFeedbackSignalInput) -> ExternResult<
     // ------------------------------------------------------------------
     // Build the integrity entry.
     // ------------------------------------------------------------------
+    // Derive signer_pubkey from agent_info() — never accept it from the
+    // caller, which would allow a malicious caller to spoof another agent's
+    // pubkey in the entry payload while the action's author field remains
+    // correct.
+    let signer_pubkey = agent_info()?.agent_initial_pubkey.get_raw_39().to_vec();
+
     // Store the target action hash as a base64 string in target_cid so
     // the DHT entry is self-describing without requiring a separate lookup.
     let target_cid = format!("{}", input.target_action_hash);
@@ -137,7 +145,7 @@ pub fn create_feedback_signal(input: CreateFeedbackSignalInput) -> ExternResult<
         signal_kind: input.signal_kind.clone(),
         evidence_cid,
         standing_impact: input.standing_impact.clone(),
-        signer_pubkey: input.signer_pubkey.clone(),
+        signer_pubkey,
     };
 
     // create_entry validates via HDI before writing.
@@ -177,8 +185,7 @@ pub fn create_feedback_signal(input: CreateFeedbackSignalInput) -> ExternResult<
 pub fn get_feedback_signals_for_target(
     target_action_hash: ActionHash,
 ) -> ExternResult<Vec<FeedbackSignalRecord>> {
-    let query =
-        LinkQuery::try_new(target_action_hash, LinkTypes::TargetToFeedbackSignal)?;
+    let query = LinkQuery::try_new(target_action_hash, LinkTypes::TargetToFeedbackSignal)?;
     let links = get_links(query, GetStrategy::default())?;
 
     let mut results = Vec::new();

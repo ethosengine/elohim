@@ -101,8 +101,8 @@ impl Manifest {
         }
 
         // Floor 2: payload_json must parse as JSON.
-        let payload: serde_json::Value =
-            serde_json::from_str(&self.payload_json).map_err(|_| "payload_json is not valid JSON".to_string())?;
+        let payload: serde_json::Value = serde_json::from_str(&self.payload_json)
+            .map_err(|_| "payload_json is not valid JSON".to_string())?;
 
         // Floor 3: revision must be >= 1.
         if self.revision == 0 {
@@ -123,12 +123,12 @@ impl Manifest {
         // Cross-entity authority (mishpat-DNA-notarization gate) remains at
         // the coordinator level per project_hdi_no_get_links_in_validators.
         if self.manifest_kind == "standing-policy" || self.manifest_kind == "tending-policy" {
-            let floor = payload
-                .get("floor")
-                .ok_or_else(|| format!(
+            let floor = payload.get("floor").ok_or_else(|| {
+                format!(
                     "{} manifest requires payload.floor sub-object",
                     self.manifest_kind
-                ))?;
+                )
+            })?;
             let allowed_classes = match self.manifest_kind.as_str() {
                 "standing-policy" => STANDING_IMMUNE_CLASSES,
                 "tending-policy" => TENDING_IMMUNE_CLASSES,
@@ -302,7 +302,10 @@ mod tests {
         let result = m.validate();
         assert!(result.is_err());
         let msg = result.unwrap_err();
-        assert!(msg.contains("pillar-projection manifest requires pillar field"), "got: {msg}");
+        assert!(
+            msg.contains("pillar-projection manifest requires pillar field"),
+            "got: {msg}"
+        );
     }
 
     #[test]
@@ -318,19 +321,33 @@ mod tests {
     #[test]
     fn app_manifest_without_floor_accepted() {
         let m = make_manifest("app", None, r#"{"name":"elohim-app"}"#, 1);
-        assert!(m.validate().is_ok(), "app manifests must not require a floor");
+        assert!(
+            m.validate().is_ok(),
+            "app manifests must not require a floor"
+        );
     }
 
     #[test]
     fn pillar_projection_without_floor_accepted() {
-        let m = make_manifest("pillar-projection", Some("lamad"), r#"{"version":"1.0"}"#, 1);
-        assert!(m.validate().is_ok(), "pillar-projection manifests must not require a floor");
+        let m = make_manifest(
+            "pillar-projection",
+            Some("lamad"),
+            r#"{"version":"1.0"}"#,
+            1,
+        );
+        assert!(
+            m.validate().is_ok(),
+            "pillar-projection manifests must not require a floor"
+        );
     }
 
     #[test]
     fn onboarding_without_floor_accepted() {
         let m = make_manifest("onboarding", None, r#"{"steps":[]}"#, 1);
-        assert!(m.validate().is_ok(), "onboarding manifests must not require a floor");
+        assert!(
+            m.validate().is_ok(),
+            "onboarding manifests must not require a floor"
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -466,7 +483,10 @@ mod tests {
             msg.contains("unknown floor class"),
             "expected unknown-class error, got: {msg}"
         );
-        assert!(msg.contains("made-up-class"), "expected offending class in error, got: {msg}");
+        assert!(
+            msg.contains("made-up-class"),
+            "expected offending class in error, got: {msg}"
+        );
     }
 
     // -----------------------------------------------------------------------

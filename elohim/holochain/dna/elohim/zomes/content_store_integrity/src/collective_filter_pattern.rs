@@ -279,7 +279,10 @@ mod tests {
             msg.contains("unknown classification"),
             "expected 'unknown classification', got: {msg}"
         );
-        assert!(msg.contains("ban"), "expected offending value in error, got: {msg}");
+        assert!(
+            msg.contains("ban"),
+            "expected offending value in error, got: {msg}"
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -309,7 +312,10 @@ mod tests {
             msg.contains("participating_pct must be 0-100"),
             "expected pct message, got: {msg}"
         );
-        assert!(msg.contains("101"), "expected offending value in error, got: {msg}");
+        assert!(
+            msg.contains("101"),
+            "expected offending value in error, got: {msg}"
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -344,7 +350,10 @@ mod tests {
             msg.contains("unknown trend"),
             "expected 'unknown trend', got: {msg}"
         );
-        assert!(msg.contains("spiking"), "expected offending value in error, got: {msg}");
+        assert!(
+            msg.contains("spiking"),
+            "expected offending value in error, got: {msg}"
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -361,7 +370,10 @@ mod tests {
             msg.contains("context_window_seconds"),
             "expected 'context_window_seconds' in error, got: {msg}"
         );
-        assert!(msg.contains("3599"), "expected offending value in error, got: {msg}");
+        assert!(
+            msg.contains("3599"),
+            "expected offending value in error, got: {msg}"
+        );
     }
 
     #[test]

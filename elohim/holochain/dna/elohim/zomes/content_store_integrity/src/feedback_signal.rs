@@ -160,19 +160,25 @@ mod tests {
 
     #[test]
     fn accepts_correction_with_evidence() {
-        assert!(make_signal("correction", "debit-soft", Some("bafyreiabcdef_evidence"))
+        assert!(
+            make_signal("correction", "debit-soft", Some("bafyreiabcdef_evidence"))
+                .validate()
+                .is_ok()
+        );
+    }
+
+    #[test]
+    fn accepts_retraction() {
+        assert!(make_signal("retraction", "debit-soft", None)
             .validate()
             .is_ok());
     }
 
     #[test]
-    fn accepts_retraction() {
-        assert!(make_signal("retraction", "debit-soft", None).validate().is_ok());
-    }
-
-    #[test]
     fn accepts_quarantine() {
-        assert!(make_signal("quarantine", "debit-firm", None).validate().is_ok());
+        assert!(make_signal("quarantine", "debit-firm", None)
+            .validate()
+            .is_ok());
     }
 
     #[test]
@@ -180,8 +186,14 @@ mod tests {
         let result = make_signal("ban", "advisory", None).validate();
         assert!(result.is_err());
         let msg = result.unwrap_err();
-        assert!(msg.contains("unknown signal_kind"), "expected signal_kind mention, got: {msg}");
-        assert!(msg.contains("ban"), "expected offending value in error, got: {msg}");
+        assert!(
+            msg.contains("unknown signal_kind"),
+            "expected signal_kind mention, got: {msg}"
+        );
+        assert!(
+            msg.contains("ban"),
+            "expected offending value in error, got: {msg}"
+        );
     }
 
     #[test]
@@ -201,12 +213,16 @@ mod tests {
 
     #[test]
     fn accepts_debit_soft_impact() {
-        assert!(make_signal("retraction", "debit-soft", None).validate().is_ok());
+        assert!(make_signal("retraction", "debit-soft", None)
+            .validate()
+            .is_ok());
     }
 
     #[test]
     fn accepts_debit_firm_impact() {
-        assert!(make_signal("quarantine", "debit-firm", None).validate().is_ok());
+        assert!(make_signal("quarantine", "debit-firm", None)
+            .validate()
+            .is_ok());
     }
 
     #[test]
@@ -236,7 +252,10 @@ mod tests {
         let result = make_signal("squelch", "debit-soft", None).validate();
         assert!(result.is_err());
         let msg = result.unwrap_err();
-        assert!(msg.contains("squelch signal must have standing_impact=advisory"), "got: {msg}");
+        assert!(
+            msg.contains("squelch signal must have standing_impact=advisory"),
+            "got: {msg}"
+        );
         assert!(msg.contains("debit-soft"), "got: {msg}");
     }
 
@@ -257,14 +276,19 @@ mod tests {
         let result = make_signal("correction", "debit-soft", None).validate();
         assert!(result.is_err());
         let msg = result.unwrap_err();
-        assert!(msg.contains("correction signal requires evidence_cid"), "got: {msg}");
+        assert!(
+            msg.contains("correction signal requires evidence_cid"),
+            "got: {msg}"
+        );
     }
 
     #[test]
     fn accepts_correction_with_evidence_cid() {
-        assert!(make_signal("correction", "debit-firm", Some("bafyreiabcdef_evidence"))
-            .validate()
-            .is_ok());
+        assert!(
+            make_signal("correction", "debit-firm", Some("bafyreiabcdef_evidence"))
+                .validate()
+                .is_ok()
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -274,16 +298,20 @@ mod tests {
     #[test]
     fn accepts_retraction_with_evidence_cid() {
         // retraction may optionally carry evidence (not required)
-        assert!(make_signal("retraction", "debit-firm", Some("bafyreiabcdef_evidence"))
-            .validate()
-            .is_ok());
+        assert!(
+            make_signal("retraction", "debit-firm", Some("bafyreiabcdef_evidence"))
+                .validate()
+                .is_ok()
+        );
     }
 
     #[test]
     fn accepts_quarantine_with_evidence_cid() {
-        assert!(make_signal("quarantine", "debit-firm", Some("bafyreiabcdef_evidence"))
-            .validate()
-            .is_ok());
+        assert!(
+            make_signal("quarantine", "debit-firm", Some("bafyreiabcdef_evidence"))
+                .validate()
+                .is_ok()
+        );
     }
 
     #[test]

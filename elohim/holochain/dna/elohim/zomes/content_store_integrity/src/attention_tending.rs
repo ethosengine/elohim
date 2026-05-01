@@ -198,8 +198,14 @@ mod tests {
         let result = t.validate();
         assert!(result.is_err());
         let msg = result.unwrap_err();
-        assert!(msg.contains("unknown classification"), "expected 'unknown classification', got: {msg}");
-        assert!(msg.contains("ban"), "expected offending value in error, got: {msg}");
+        assert!(
+            msg.contains("unknown classification"),
+            "expected 'unknown classification', got: {msg}"
+        );
+        assert!(
+            msg.contains("ban"),
+            "expected offending value in error, got: {msg}"
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -212,8 +218,14 @@ mod tests {
         let result = t.validate();
         assert!(result.is_err());
         let msg = result.unwrap_err();
-        assert!(msg.contains("ttl_seconds"), "expected 'ttl_seconds' in error, got: {msg}");
-        assert!(msg.contains("3599"), "expected offending value in error, got: {msg}");
+        assert!(
+            msg.contains("ttl_seconds"),
+            "expected 'ttl_seconds' in error, got: {msg}"
+        );
+        assert!(
+            msg.contains("3599"),
+            "expected offending value in error, got: {msg}"
+        );
     }
 
     #[test]
@@ -232,7 +244,10 @@ mod tests {
         let result = t.validate();
         assert!(result.is_err());
         let msg = result.unwrap_err();
-        assert!(msg.contains("tended_at"), "expected 'tended_at' in error, got: {msg}");
+        assert!(
+            msg.contains("tended_at"),
+            "expected 'tended_at' in error, got: {msg}"
+        );
     }
 
     #[test]
@@ -265,7 +280,12 @@ mod tests {
 
     #[test]
     fn accepts_reason_some() {
-        let t = make_tending("fatigue", 3600, vec![1_746_000_000], Some("bandwidth exhaustion on ephemera"));
+        let t = make_tending(
+            "fatigue",
+            3600,
+            vec![1_746_000_000],
+            Some("bandwidth exhaustion on ephemera"),
+        );
         assert!(t.validate().is_ok());
     }
 

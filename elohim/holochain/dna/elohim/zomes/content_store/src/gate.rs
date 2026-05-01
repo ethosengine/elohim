@@ -141,10 +141,12 @@ fn build_content_publish_event(input: &CreateContentInput) -> ExternResult<Relat
 /// Phase 7 DevContext: the mock does not inspect `subject_hash`; the fallback
 /// is safe.  Phase 8+: callers should ensure `relatedExperienceStory` is
 /// populated before raising the activation gate.
-fn build_attestation_write_event(input: &CreateContentInput) -> ExternResult<RelationalImpactEvent> {
+fn build_attestation_write_event(
+    input: &CreateContentInput,
+) -> ExternResult<RelationalImpactEvent> {
     let issuer = agent_info()?.agent_initial_pubkey.to_string();
-    let subject_hash = extract_related_experience_story(&input.metadata_json)
-        .unwrap_or_else(|| input.id.clone());
+    let subject_hash =
+        extract_related_experience_story(&input.metadata_json).unwrap_or_else(|| input.id.clone());
     Ok(RelationalImpactEvent::AttestationWrite {
         subject_hash,
         claim_kind: EXPERIENCE_MOMENT_CLAIM_KIND.to_string(),
@@ -191,8 +193,8 @@ fn build_attestation_write_event_with_author(
     input: &CreateContentInput,
     issuer: &str,
 ) -> RelationalImpactEvent {
-    let subject_hash = extract_related_experience_story(&input.metadata_json)
-        .unwrap_or_else(|| input.id.clone());
+    let subject_hash =
+        extract_related_experience_story(&input.metadata_json).unwrap_or_else(|| input.id.clone());
     RelationalImpactEvent::AttestationWrite {
         subject_hash,
         claim_kind: EXPERIENCE_MOMENT_CLAIM_KIND.to_string(),
@@ -431,8 +433,7 @@ mod tests {
         // Types are re-exported flat from gate_types via `pub use gate_types::*`
         // in gate_client_zome — no ::types:: sub-module.
         use gate_client_zome::{
-            ConstitutionalReasoningSummary, DeclineGrounds, GateDecision, GateStatus,
-            Phase,
+            ConstitutionalReasoningSummary, DeclineGrounds, GateDecision, GateStatus, Phase,
         };
         let decline = GateDecision {
             status: GateStatus::Decline {

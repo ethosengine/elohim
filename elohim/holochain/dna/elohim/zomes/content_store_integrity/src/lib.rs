@@ -4212,15 +4212,15 @@ pub enum LinkTypes {
     // =========================================================================
     // Renewal Protocol: Content Succession links
     // =========================================================================
-    IdToContentSuccession, // Anchor(succession_id) -> ContentSuccession
-    ContentToSuccession,   // Anchor(content_id) -> ContentSuccession
+    IdToContentSuccession,       // Anchor(succession_id) -> ContentSuccession
+    ContentToSuccession,         // Anchor(content_id) -> ContentSuccession
     SuccessorAuthorToSuccession, // Anchor(successor_author_key) -> ContentSuccession
 
-                           // =========================================================================
-                           // REMOVED: Doorway links now in infrastructure DNA
-                           // - IdToDoorway, OperatorToDoorway, DoorwayToHeartbeat, DoorwayToSummary
-                           // See: holochain/dna/infrastructure/zomes/infrastructure_integrity
-                           // =========================================================================
+    // =========================================================================
+    // REMOVED: Doorway links now in infrastructure DNA
+    // - IdToDoorway, OperatorToDoorway, DoorwayToHeartbeat, DoorwayToSummary
+    // See: holochain/dna/infrastructure/zomes/infrastructure_integrity
+    // =========================================================================
 
     // =========================================================================
     // EPR Phase 3.5: FeedbackSignal links (T8)

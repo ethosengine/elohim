@@ -98,13 +98,15 @@ struct ContentOutput {
 }
 
 /// Mirror of `content_store::feedback_signal::CreateFeedbackSignalInput`.
+///
+/// `signer_pubkey` is absent — the coordinator derives it from `agent_info()`
+/// to prevent caller-side spoofing (I1 fix).
 #[derive(Debug, Clone, Serialize, Deserialize, SerializedBytes)]
 struct CreateFeedbackSignalInput {
     pub target_action_hash: ActionHash,
     pub signal_kind: String,
     pub evidence_action_hash: Option<ActionHash>,
     pub standing_impact: String,
-    pub signer_pubkey: Vec<u8>,
 }
 
 /// Mirror of `content_store::feedback_signal::FeedbackSignalRecord`.
@@ -173,11 +175,28 @@ async fn squelch_by_third_party_succeeds() -> Result<()> {
         signal_kind: "squelch".to_string(),
         evidence_action_hash: None,
         standing_impact: "advisory".to_string(),
-        signer_pubkey: a2.get_raw_39().to_vec(),
     };
-    let _fs_ah: ActionHash = cb
+    let fs_ah: ActionHash = cb
         .call(&cell_b.zome("content_store"), "create_feedback_signal", input)
         .await;
+
+    // I2: get_feedback_signals_for_target must return the committed signal.
+    let by_target: Vec<FeedbackSignalRecord> = cb
+        .call(
+            &cell_b.zome("content_store"),
+            "get_feedback_signals_for_target",
+            content_ah.clone(),
+        )
+        .await;
+    assert_eq!(by_target.len(), 1, "expected 1 signal for target content");
+    assert_eq!(
+        by_target[0].entry.signal_kind, "squelch",
+        "signal_kind must be squelch"
+    );
+    assert_eq!(
+        by_target[0].action_hash, fs_ah,
+        "returned action_hash must match created signal"
+    );
 
     // B's own list_feedback_signals_by_signer should include the new signal.
     let by_signer: Vec<FeedbackSignalRecord> = cb
@@ -240,7 +259,6 @@ async fn correction_with_evidence_succeeds() -> Result<()> {
         signal_kind: "correction".to_string(),
         evidence_action_hash: Some(evidence_ah.clone()),
         standing_impact: "debit-soft".to_string(),
-        signer_pubkey: a2.get_raw_39().to_vec(),
     };
     let _fs_ah: ActionHash = cb
         .call(&cell_b.zome("content_store"), "create_feedback_signal", input)
@@ -289,7 +307,6 @@ async fn retraction_by_original_author_succeeds() -> Result<()> {
         signal_kind: "retraction".to_string(),
         evidence_action_hash: None,
         standing_impact: "debit-firm".to_string(),
-        signer_pubkey: a1.get_raw_39().to_vec(),
     };
     let _fs_ah: ActionHash = ca
         .call(&cell.zome("content_store"), "create_feedback_signal", input)
@@ -342,7 +359,6 @@ async fn retraction_by_non_author_rejected() -> Result<()> {
         signal_kind: "retraction".to_string(),
         evidence_action_hash: None,
         standing_impact: "debit-firm".to_string(),
-        signer_pubkey: a2.get_raw_39().to_vec(),
     };
     let result = cb
         .call_fallible::<_, ActionHash>(
@@ -396,7 +412,6 @@ async fn correction_with_missing_evidence_rejected() -> Result<()> {
         signal_kind: "correction".to_string(),
         evidence_action_hash: Some(fake_evidence_ah),
         standing_impact: "debit-soft".to_string(),
-        signer_pubkey: a2.get_raw_39().to_vec(),
     };
     let result = cb
         .call_fallible::<_, ActionHash>(
@@ -446,7 +461,6 @@ async fn feedback_signal_update_rejected() -> Result<()> {
         signal_kind: "squelch".to_string(),
         evidence_action_hash: None,
         standing_impact: "advisory".to_string(),
-        signer_pubkey: a1.get_raw_39().to_vec(),
     };
     let _fs_ah: ActionHash = ca
         .call(&cell.zome("content_store"), "create_feedback_signal", input)
@@ -465,6 +479,60 @@ async fn feedback_signal_update_rejected() -> Result<()> {
         update_result.is_err(),
         "update_feedback_signal must not be exposed as a zome function"
     );
+
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Scenario 7 (I3): Quarantine by third party succeeds.
+// ---------------------------------------------------------------------------
+
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "Requires packed DNA from Jenkins pipeline"]
+async fn quarantine_by_third_party_succeeds() -> Result<()> {
+    // Agent A creates content; Agent B issues a quarantine signal (governance-collective
+    // determination). There is no authorship gate on quarantine — any agent may issue it.
+    // The canonical standing_impact pairing for quarantine is debit-firm.
+    let [(mut ca, a1), (mut cb, a2)] = two_agent_conductors().await?;
+    let dna = load_dna(DNA, &network_seed(DNA), Some(a1.clone())).await?;
+
+    let app_a = ca
+        .setup_app_for_agent("elohim-app-a", a1.clone(), &[dna.clone()])
+        .await?;
+    let app_b = cb
+        .setup_app_for_agent("elohim-app-b", a2.clone(), &[dna])
+        .await?;
+    let cell_a = app_a.cells().first().expect("cell A").clone();
+    let cell_b = app_b.cells().first().expect("cell B").clone();
+
+    // A creates content; extract action_hash from ContentOutput.
+    let output: ContentOutput = ca
+        .call(&cell_a.zome("content_store"), "create_content", make_content("t8-s7"))
+        .await;
+    let content_ah = output.action_hash;
+
+    // B issues a quarantine signal on A's content.
+    let input = CreateFeedbackSignalInput {
+        target_action_hash: content_ah.clone(),
+        signal_kind: "quarantine".to_string(),
+        evidence_action_hash: None,
+        standing_impact: "debit-firm".to_string(),
+    };
+    let _fs_ah: ActionHash = cb
+        .call(&cell_b.zome("content_store"), "create_feedback_signal", input)
+        .await;
+
+    // B's signer index must include the quarantine signal.
+    let by_signer: Vec<FeedbackSignalRecord> = cb
+        .call(
+            &cell_b.zome("content_store"),
+            "list_feedback_signals_by_signer",
+            a2.clone(),
+        )
+        .await;
+    assert_eq!(by_signer.len(), 1, "expected 1 signal from signer B");
+    assert_eq!(by_signer[0].entry.signal_kind, "quarantine");
+    assert_eq!(by_signer[0].entry.standing_impact, "debit-firm");
 
     Ok(())
 }
