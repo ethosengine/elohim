@@ -28,8 +28,8 @@
 //! The predecessor PeerId is sealed under the 2-of-2 nested scheme from T11
 //! (`sealed_against_self`). Sealing requires both public keys (mishpat quorum +
 //! imagodei). Unsealing requires both key-pairs. The sealed bytes stored in
-//! `predecessor_records.sealed_blob` are the `SealedBlob` bincode/msgpack
-//! serialisation — stored as raw `SealedBlob` bytes via `rmp_serde`.
+//! `predecessor_records.sealed_blob` are the `SealedBlob` msgpack serialisation —
+//! stored as raw `SealedBlob` bytes via `rmp_serde`.
 //!
 //! ## api/epr.rs wiring
 //!
@@ -174,6 +174,13 @@ pub fn record_predecessor(
 ///
 /// Returns the peer IDs in `received_at` ascending order (stable chronological
 /// traversal, as established by T10's `list_predecessors_for_cid` ordering).
+///
+/// ## Skip-on-failure semantics
+///
+/// Returns peer IDs from rows that successfully unsealed and decoded. Rows that
+/// fail to unseal (e.g. after a key rotation or a torn write) or fail msgpack
+/// decoding are logged at warn level and skipped — a single corrupted row never
+/// aborts the call or silences adjacent valid rows.
 pub fn read_predecessors(
     conn: &mut SqliteConnection,
     target_cid: &str,
@@ -183,32 +190,46 @@ pub fn read_predecessors(
 
     let mut peer_ids = Vec::with_capacity(rows.len());
     for row in rows {
-        let sealed: SealedBlob = rmp_serde::from_slice(&row.sealed_blob).map_err(|e| {
-            StorageError::Internal(format!(
-                "back_prop: deserialize sealed blob for cid={target_cid}: {e}"
-            ))
-        })?;
+        let sealed: SealedBlob = match rmp_serde::from_slice(&row.sealed_blob) {
+            Ok(s) => s,
+            Err(e) => {
+                tracing::warn!(
+                    target_cid = %target_cid,
+                    error = %e,
+                    "back_prop: skipping predecessor row that failed to deserialize"
+                );
+                continue;
+            }
+        };
 
-        let plaintext = unseal(
+        let plaintext = match unseal(
             &sealed,
             keys.mishpat_pk,
             keys.mishpat_sk,
             keys.imagodei_pk,
             keys.imagodei_sk,
-        )
-        .map_err(|e| {
-            StorageError::Internal(format!(
-                "back_prop: unseal predecessor for cid={target_cid}: {e}"
-            ))
-        })?;
+        ) {
+            Ok(p) => p,
+            Err(e) => {
+                tracing::warn!(
+                    target_cid = %target_cid,
+                    error = %e,
+                    "back_prop: skipping predecessor row that failed to unseal"
+                );
+                continue;
+            }
+        };
 
-        let payload: PredecessorPayload = rmp_serde::from_slice(&plaintext).map_err(|e| {
-            StorageError::Internal(format!(
-                "back_prop: deserialize payload for cid={target_cid}: {e}"
-            ))
-        })?;
-
-        peer_ids.push(payload.peer_id);
+        match rmp_serde::from_slice::<PredecessorPayload>(&plaintext) {
+            Ok(payload) => peer_ids.push(payload.peer_id),
+            Err(e) => {
+                tracing::warn!(
+                    target_cid = %target_cid,
+                    error = %e,
+                    "back_prop: skipping predecessor row that failed to deserialize"
+                );
+            }
+        }
     }
 
     Ok(peer_ids)
@@ -224,25 +245,36 @@ pub fn read_predecessors(
 /// at each hop; this matches brainstorm §5.2 "chain reconstructs through local
 /// memory of every participant in propagation."
 ///
+/// ## Self-filter invariant (§5.2 humane bounded walk)
+///
+/// If `local_peer_id` is `Some`, any predecessor whose peer ID equals the local
+/// node's own peer ID is skipped and logged at warn level. This prevents a
+/// self-loop if a peer ever recorded itself as its own predecessor (clock skew
+/// on self-replay, a T19 wiring bug, or a malicious spoofed record).
+///
 /// ## Best-effort
 ///
 /// Per-peer sink errors are logged (tracing `warn!`) but do NOT abort the
-/// loop — remaining predecessors still receive the signal. The function returns
-/// `Ok(Vec<String>)` containing the peer IDs that were successfully targeted
-/// (regardless of whether the sink delivered the bytes).
+/// loop — remaining predecessors still receive the signal.
 ///
 /// ## Returns
 ///
-/// - `Ok(vec![])` — no predecessor recorded; this peer is the origin (or the
-///   predecessor record has been deleted/expired). The sink is not called.
+/// Returns the list of predecessor peer IDs we ATTEMPTED to send the signal
+/// to. This is best-effort — sink failures are logged but not propagated;
+/// callers cannot use the return value to determine delivery success.
+///
+/// - `Ok(vec![])` — no predecessor recorded (or all were filtered); this peer
+///   is the origin, or the predecessor record has been deleted/expired. The
+///   sink is not called.
 /// - `Ok(peer_ids)` — predecessor(s) found; signal forwarded to all of them.
-///   `peer_ids` contains the string PeerIds that were attempted.
+///   `peer_ids` contains the string PeerIds that were ATTEMPTED.
 /// - `Err(...)` — DB or unseal failure (not a sink failure).
 pub fn back_prop_one_hop(
     conn: &mut SqliteConnection,
     signal: &FeedbackSignal,
-    keys: &UnsealingKeys<'_>,
     sink: &dyn OutboundSink,
+    keys: &UnsealingKeys<'_>,
+    local_peer_id: Option<&str>,
 ) -> Result<Vec<String>, StorageError> {
     let peer_ids = read_predecessors(conn, &signal.target_cid, keys)?;
 
@@ -256,7 +288,19 @@ pub fn back_prop_one_hop(
         .map_err(|e| StorageError::Internal(format!("back_prop: serialize signal: {e}")))?;
 
     let mut targeted = Vec::with_capacity(peer_ids.len());
+    let mut failure_count: usize = 0;
     for peer_id in &peer_ids {
+        // I1: skip self to prevent back-prop loops.
+        if let Some(local_id) = local_peer_id {
+            if peer_id == local_id {
+                tracing::warn!(
+                    target_cid = %signal.target_cid,
+                    "back_prop: skipping self-predecessor for cid={}", signal.target_cid
+                );
+                continue;
+            }
+        }
+
         match sink.send(peer_id, payload_bytes.clone()) {
             Ok(()) => {
                 targeted.push(peer_id.clone());
@@ -272,8 +316,18 @@ pub fn back_prop_one_hop(
                 );
                 // Still include the peer in targeted so callers know we tried.
                 targeted.push(peer_id.clone());
+                failure_count += 1;
             }
         }
+    }
+
+    // IS1: aggregate error when every attempted send failed — swarm may be unreachable.
+    if !targeted.is_empty() && failure_count == targeted.len() {
+        tracing::error!(
+            target_cid = %signal.target_cid,
+            peer_count = targeted.len(),
+            "back_prop: ALL sends failed — swarm may be unreachable"
+        );
     }
 
     Ok(targeted)
@@ -449,7 +503,7 @@ mod tests {
         let sink = MockSink::new();
         let signal = make_signal("bafyreiabcdef_t2_no_predecessor");
 
-        let result = back_prop_one_hop(&mut conn, &signal, &sec_keys, &sink)
+        let result = back_prop_one_hop(&mut conn, &signal, &sink, &sec_keys, None)
             .expect("back_prop_one_hop should not error");
 
         assert!(result.is_empty(), "no predecessors → empty result");
@@ -485,8 +539,8 @@ mod tests {
         let sink = MockSink::new();
         let signal = make_signal("bafyreiabcdef_t3");
 
-        let targeted =
-            back_prop_one_hop(&mut conn, &signal, &sec_keys, &sink).expect("back_prop_one_hop");
+        let targeted = back_prop_one_hop(&mut conn, &signal, &sink, &sec_keys, None)
+            .expect("back_prop_one_hop");
 
         assert_eq!(targeted.len(), 1, "one predecessor → one targeted peer");
         assert_eq!(targeted[0], "12D3KooWSendToPeer");
@@ -575,8 +629,8 @@ mod tests {
         let sink = MockSink::new();
         let signal = make_signal("bafyreiabcdef_t5");
 
-        let targeted =
-            back_prop_one_hop(&mut conn, &signal, &sec_keys, &sink).expect("back_prop_one_hop");
+        let targeted = back_prop_one_hop(&mut conn, &signal, &sink, &sec_keys, None)
+            .expect("back_prop_one_hop");
 
         assert_eq!(targeted.len(), 2, "two predecessors → two targeted peers");
 
@@ -611,6 +665,9 @@ mod tests {
 
     // -----------------------------------------------------------------------
     // Test 6 (bonus): sink failure is best-effort — peer still appears in result
+    //
+    // Confirms I3 contract: `targeted` is "peers we ATTEMPTED", not delivery
+    // proof. A sink failure must not surface as Err from back_prop_one_hop.
     // -----------------------------------------------------------------------
 
     #[test]
@@ -636,11 +693,93 @@ mod tests {
         let signal = make_signal("bafyreiabcdef_t6");
 
         // back_prop_one_hop must not propagate the sink error as Err.
-        let targeted = back_prop_one_hop(&mut conn, &signal, &sec_keys, &sink)
+        let targeted = back_prop_one_hop(&mut conn, &signal, &sink, &sec_keys, None)
             .expect("back_prop_one_hop must return Ok even on sink failure");
 
-        // The peer appears in targeted (we tried) even though the sink failed.
+        // The peer appears in targeted (we attempted) even though the sink failed.
         assert_eq!(targeted.len(), 1);
         assert_eq!(targeted[0], "12D3KooWFailingPeer");
+    }
+
+    // -----------------------------------------------------------------------
+    // Test 7 (I1): self-predecessor is filtered out — loop-breaker invariant
+    //
+    // If a peer recorded itself as its own predecessor (clock skew, T19 bug,
+    // or malicious spoofing), back_prop_one_hop must skip it rather than
+    // echo the signal back to the local node.
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn back_prop_skips_self_predecessor() {
+        let pool = test_pool();
+        let mut conn = pool.get().expect("conn");
+
+        let (mishpat_pk, mishpat_sk) = mishpat_keypair();
+        let (imagodei_pk, imagodei_sk) = imagodei_keypair();
+
+        let pub_keys = sealing_pub_keys(&mishpat_pk, &imagodei_pk);
+        let sec_keys = unsealing_keys(&mishpat_pk, &mishpat_sk, &imagodei_pk, &imagodei_sk);
+
+        // Record the local node itself as the predecessor — the anomaly case.
+        record_predecessor(&mut conn, "bafyreiabcdef_t7_self", "self-peer", &pub_keys)
+            .expect("record_predecessor");
+
+        let sink = MockSink::new();
+        let signal = make_signal("bafyreiabcdef_t7_self");
+
+        // Pass local_peer_id = Some("self-peer") — must be filtered.
+        let result = back_prop_one_hop(&mut conn, &signal, &sink, &sec_keys, Some("self-peer"))
+            .expect("back_prop_one_hop must not error");
+
+        assert!(
+            result.is_empty(),
+            "self-predecessor must be filtered → empty targeted list"
+        );
+        assert!(
+            sink.recorded_calls().is_empty(),
+            "sink must NOT be invoked for a self-predecessor"
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // Test 8 (I2): corrupted predecessor blob is skipped, valid ones survive
+    //
+    // Inserting a row with undecodable sealed bytes must not abort read_predecessors;
+    // the call returns the valid peer IDs from adjacent rows.
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn read_predecessors_skips_corrupted_blob() {
+        use crate::db::predecessor_records::insert_predecessor;
+
+        let pool = test_pool();
+        let mut conn = pool.get().expect("conn");
+
+        let (mishpat_pk, mishpat_sk) = mishpat_keypair();
+        let (imagodei_pk, imagodei_sk) = imagodei_keypair();
+
+        let pub_keys = sealing_pub_keys(&mishpat_pk, &imagodei_pk);
+        let sec_keys = unsealing_keys(&mishpat_pk, &mishpat_sk, &imagodei_pk, &imagodei_sk);
+
+        // Valid row — "alice".
+        record_predecessor(&mut conn, "bafyreiabcdef_t8", "alice", &pub_keys)
+            .expect("record alice");
+
+        // Corrupted row — raw garbage bytes that will never unseal.
+        let now = chrono::Utc::now().to_rfc3339();
+        insert_predecessor(
+            &mut conn,
+            "bafyreiabcdef_t8",
+            "corrupted-peer",
+            &now,
+            vec![0u8; 64],
+        )
+        .expect("insert corrupted row");
+
+        let peer_ids = read_predecessors(&mut conn, "bafyreiabcdef_t8", &sec_keys)
+            .expect("read_predecessors must not error on corrupted row");
+
+        // Only alice comes back; the corrupted row is silently skipped.
+        assert_eq!(peer_ids, vec!["alice".to_string()]);
     }
 }
