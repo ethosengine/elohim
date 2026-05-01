@@ -792,6 +792,12 @@ spec:
         timeout(time: 120, unit: 'MINUTES')
         disableConcurrentBuilds(abortPrevious: true)  // Abort older builds when new one starts
         buildDiscarder(logRotator(numToKeepStr: '100'))
+        // Skip implicit Declarative: Checkout SCM — its 10-min default per-attempt
+        // timeout has been exhausting on the 316MB / 65k-object repo (multiple
+        // FAILURE builds in the 781-785 run, all dying at ~10:15 elapsed during
+        // git fetch). The explicit Checkout stage below replaces it with a
+        // shallow clone + 30-min timeout that cleanly handles slow-link windows.
+        skipDefaultCheckout(true)
     }
 
     stages {
@@ -815,7 +821,11 @@ spec:
                             $class: 'GitSCM',
                             branches: [[name: "*/${env.BRANCH_NAME}"]],
                             extensions: [
-                                [$class: 'CloneOption', shallow: false, noTags: true, depth: 50],
+                                // shallow:true with depth:200 cuts clone size ~10x while
+                                // preserving enough history for orchestrator changeset diffs
+                                // against last-successful baselines. timeout:30 (per attempt)
+                                // replaces the git-plugin 10-min default that was exhausting.
+                                [$class: 'CloneOption', shallow: true, noTags: true, depth: 200, timeout: 30],
                                 [$class: 'CleanBeforeCheckout']
                             ],
                             userRemoteConfigs: [[

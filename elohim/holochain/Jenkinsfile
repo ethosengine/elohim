@@ -778,6 +778,9 @@ spec:
         disableConcurrentBuilds()
         preserveStashes(buildCount: 5)
         overrideIndexTriggers(false)  // Only orchestrator or manual triggers - no webhook/branch indexing
+        // Skip implicit Declarative: Checkout SCM — same fix as elohim-orchestrator;
+        // see orchestrator Jenkinsfile options block.
+        skipDefaultCheckout(true)
     }
 
     // No triggers - orchestrator handles all webhook events
@@ -823,7 +826,22 @@ spec:
                 container('builder') {
                     script {
                         sh 'git config --global --add safe.directory "*"'
-                        checkout scm
+
+                        // Explicit checkout — bypasses the 10-min default per-attempt
+                        // timeout in `checkout scm` that has been exhausting on this repo
+                        // (#1179 died "git-remote-https signal 15" at ~10:15).
+                        checkout([
+                            $class: 'GitSCM',
+                            branches: [[name: "*/${env.BRANCH_NAME ?: 'dev'}"]],
+                            extensions: [
+                                [$class: 'CloneOption', shallow: true, noTags: true, depth: 200, timeout: 30],
+                                [$class: 'CleanBeforeCheckout']
+                            ],
+                            userRemoteConfigs: [[
+                                url: 'https://github.com/ethosengine/elohim.git',
+                                credentialsId: 'ee-bot-pat'
+                            ]]
+                        ])
                         sh 'git clean -fdx'
                         sh 'git reset --hard HEAD'
 
