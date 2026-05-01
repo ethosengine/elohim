@@ -40,9 +40,13 @@ use elohim_storage::services::back_prop::{
     back_prop_one_hop, record_predecessor, SealingPubKeys, UnsealingKeys,
 };
 use elohim_storage::services::bootstrap_manifests::seed_if_empty;
+use elohim_storage::services::epr_compose::{compose_epr, ComposeError};
+use elohim_storage::services::epr_kind::Reach;
 use elohim_storage::services::gossip_flood::{
     flood_feedback, handle_received_signal, GossipPublisher, PublishError, ReceiveDecision,
 };
+use elohim_storage::services::manifest_registry::ManifestRegistry;
+use elohim_storage::services::reach_earning::{BlockReason, ReachVerdict};
 use elohim_storage::services::sealed_against_self::{
     seal, unseal, ImagodeiPubKey, ImagodeiSecretKey, MishpatQuorumPubKey, MishpatQuorumSecretKey,
 };
@@ -367,31 +371,16 @@ async fn aunt_and_rage_bait_three_peer_scenario() {
     }
 
     // =========================================================================
-    // Phase 5: MOCKED — Reach-earning gate (post-3.5 feature)
+    // Phase 5: Reach-earning gate — deferred to after Phase 8.
     //
-    // In a complete production system, Bob's ability to author district-reach
-    // content is gated by the reach-earning service. Before Bob can compose
-    // district-reach EPRs, his accumulated stewardship record must clear the
-    // reach threshold.
+    // compose_epr(District) requires Bob's standing to be evaluated.
+    // Bob's standing row is written in Phase 8 (project_signal). The gate
+    // check is placed there, immediately after the standing projection, where
+    // it can assert Blocked(StandingBelowThreshold) rather than Pending
+    // (which would be the verdict when the standing row does not yet exist).
     //
-    // This gate does NOT exist yet in the codebase. The planned implementation
-    // would live in services/reach_earning.rs and be invoked from api/epr.rs
-    // at the PUT /api/v1/epr endpoint when `reach == Reach::District`.
-    //
-    // The scaffold when this lands:
-    //
-    //   let gate_result = services::reach_earning::check_gate(
-    //       &mut bob_conn,
-    //       &bob_agent_key,
-    //       Reach::District,
-    //   );
-    //   assert_eq!(gate_result, ReachGateResult::Allowed);
-    //
-    // For T20: we assert the absence of the service as an explicit scope marker.
+    // See "Phase 5 gate check" immediately after Phase 8 below.
     // =========================================================================
-
-    // MOCKED STEP 5: reach-earning gate is post-3.5. No assertion needed here.
-    // The test documents the scaffold location. If this feature lands, update T20.
 
     // =========================================================================
     // Phase 6: Sarah authors a FeedbackSignal{kind=Correction, target=BOB_CONTENT_CID}.
@@ -531,6 +520,49 @@ async fn aunt_and_rage_bait_three_peer_scenario() {
     }
 
     // =========================================================================
+    // Phase 5 gate check (deferred from Phase 5 block above).
+    //
+    // Now that Bob's standing row is projected (Computed { score: Floor }),
+    // the reach-earning gate can return a definitive verdict:
+    //   - Reach::District threshold = "neutral" per bootstrap-standing-policy.
+    //   - Bob's score (Floor) < Neutral → Blocked(StandingBelowThreshold).
+    //
+    // The ManifestRegistry is loaded from Sarah's db (bootstrap standing-policy
+    // manifest seeded in Phase 2 via seed_if_empty).
+    //
+    // Direct service call: services::epr_compose::compose_epr.
+    // harness_d8: NOT used — gate is a local computation.
+    // =========================================================================
+
+    {
+        let registry = ManifestRegistry::new();
+        {
+            let mut sarah_conn = sarah.db_pool.get().expect("sarah db conn for registry");
+            registry
+                .load_from_db(&mut sarah_conn)
+                .expect("load_from_db must succeed after seed_if_empty");
+        }
+        let mut sarah_conn = sarah.db_pool.get().expect("sarah db conn for compose_epr");
+        let gate_result = compose_epr(
+            &SARAH_EVALUATOR_BYTES,
+            &BOB_SUBJECT_BYTES,
+            Reach::District,
+            &mut sarah_conn,
+            &registry,
+        );
+        match gate_result {
+            Err(ComposeError::ReachDenied(ReachVerdict::Blocked {
+                reason: BlockReason::StandingBelowThreshold,
+                ..
+            })) => {}
+            other => panic!(
+                "Phase 5: expected ReachDenied(Blocked(StandingBelowThreshold)) for Bob at \
+                 District reach after Correction, got: {other:?}"
+            ),
+        }
+    }
+
+    // =========================================================================
     // Phase 9: GOSSIP-FLOOD — publish correction signal on the district topic.
     //
     // Two sub-phases:
@@ -653,17 +685,9 @@ async fn aunt_and_rage_bait_three_peer_scenario() {
     // maps Retraction(DebitFirm) = -3 (restitution). Starting from sum=8 (Floor),
     // sum becomes 8 + (-3) = 5 → Low.
     //
-    // NOTE: Production restitution would require the Vouch primitive (post-3.5)
-    // and the full mishpat authorization flow. Here we mock the restitution as a
-    // direct Retraction signal through the projector. This scaffold proves the
-    // score rises when a retraction is applied and provides a regression anchor
-    // for when the Vouch primitive is implemented.
-    //
-    // MOCKED STEP 6 (Vouch + restitution): the production Vouch primitive does
-    // not exist yet. This phase substitutes a direct Retraction signal. When the
-    // Vouch primitive lands, extend this test to use:
-    //   services::vouch::apply_restitution(conn, &vouch_record, &mishpat_auth)
-    // rather than a raw Retraction signal.
+    // NOTE: Production restitution will use the Vouch primitive (T26 — lifted
+    // in the next commit). This phase retains the retraction scaffold until T26
+    // replaces it with the real Vouch path.
     //
     // Direct service call: services::standing_projector::project_signal.
     // =========================================================================
@@ -710,15 +734,4 @@ async fn aunt_and_rage_bait_three_peer_scenario() {
             "after Retraction, Standing::evaluate must return Computed(Low) — partial recovery"
         );
     }
-
-    // Production restitution path note:
-    //   Full recovery to Neutral requires sum ≤ 2 (i.e. 3+ more -3 retraction
-    //   units, or a mishpat-authorized Quarantine reversal). The Vouch primitive
-    //   (post-3.5) would orchestrate this with peer attestation and governance
-    //   authorization. Scaffold for that call site:
-    //
-    //   // POST-3.5 TODO: when services::vouch is implemented:
-    //   // let vouch = VouchRecord::new(bob_agent_key, sarah_agent_key, ...);
-    //   // services::vouch::apply_restitution(&mut sarah_conn, &vouch, &mishpat_auth)
-    //   //     .expect("vouch restitution must clear the debit to Neutral");
 }

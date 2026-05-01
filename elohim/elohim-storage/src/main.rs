@@ -1040,8 +1040,8 @@ async fn async_main(
         let imagodei_sk = ImagodeiSecretKey(imagodei_sk_raw);
 
         let sealing_keys = Arc::new(SealingKeyPair {
-            mishpat_pk: MishpatQuorumPubKey(mishpat_pk.0.clone()),
-            imagodei_pk: ImagodeiPubKey(imagodei_pk.0.clone()),
+            mishpat_pk: MishpatQuorumPubKey(mishpat_pk.0),
+            imagodei_pk: ImagodeiPubKey(imagodei_pk.0),
         });
         let unsealing_keys = Arc::new(UnsealingKeyBundle {
             mishpat_pk,
