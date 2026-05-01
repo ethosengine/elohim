@@ -26,8 +26,8 @@ pub use feedback_signal::{
 // EPR Phase 3.5 T9: AttentionTending coordinator functions.
 pub mod attention_tending;
 pub use attention_tending::{
-    create_attention_tending, list_my_tending, refresh_tending_ttl, AttentionTendingRecord,
-    CreateAttentionTendingInput, RefreshTendingTtlInput,
+    create_attention_tending, get_attention_tending, list_my_tending, refresh_tending_ttl,
+    AttentionTendingRecord, CreateAttentionTendingInput, RefreshTendingTtlInput,
 };
 
 pub use bootstrap_steward::{

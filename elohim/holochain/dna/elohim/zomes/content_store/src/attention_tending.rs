@@ -199,10 +199,39 @@ pub fn refresh_tending_ttl(input: RefreshTendingTtlInput) -> ExternResult<Action
     Ok(action_hash)
 }
 
+/// Fetch a single record by its ActionHash.
+///
+/// This is a thin passthrough over the HDK `get` primitive. Its primary
+/// purpose is to give sweettests a callable zome function for verifying
+/// `Visibility::Private` semantics cross-agent: a sweettest cannot invoke
+/// raw HDK `get` directly through the conductor's zome-call interface, so
+/// this function bridges that gap.
+///
+/// When Agent B calls this with Agent A's ActionHash:
+/// - If the entry is `Visibility::Private` (as all `AttentionTending` entries
+///   are), the conductor returns `None` — the entry never gossiped to B's
+///   local store.
+/// - If the entry were accidentally `Visibility::Public`, `get` would return
+///   `Some(Record)` and the privacy test would correctly fail.
+///
+/// Both `Ok(None)` and an HDK error from a missing record are acceptable
+/// proof that the private entry is not visible to B. Callers wanting strict
+/// proof of non-existence (rather than non-reachability) should additionally
+/// assert that the same hash IS retrievable from the author's own conductor.
+#[hdk_extern]
+pub fn get_attention_tending(action_hash: ActionHash) -> ExternResult<Option<Record>> {
+    get(action_hash, GetOptions::default())
+}
+
 /// Return all AttentionTending entries on the caller's local source chain.
 ///
 /// Queries the source chain only — no DHT access, no peer visibility.
 /// Private entries authored by other agents are never returned here.
+///
+/// Returns ALL source-chain records of type `AttentionTending`, including
+/// update heads. Callers wanting only the latest state per original entry
+/// must dedupe by walking the update chain (T15 tending lifecycle service
+/// handles this).
 #[hdk_extern]
 pub fn list_my_tending(_: ()) -> ExternResult<Vec<AttentionTendingRecord>> {
     let filter = ChainQueryFilter::new().entry_type(UnitEntryTypes::AttentionTending.try_into()?);

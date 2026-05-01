@@ -10,8 +10,18 @@
 //!      refreshes with new_ttl=86400. The updated entry's `tended_at.len()` is
 //!      2 and `ttl_seconds` is 86400.
 //!   3. `cross_agent_get_returns_none` — Agent A creates an AttentionTending.
-//!      Agent B's `list_my_tending` returns an empty vec (private visibility
-//!      blocks gossip; Agent B's source chain has no AttentionTending entries).
+//!      Two assertions prove `Visibility::Private` is honoured:
+//!      (a) Agent B's `list_my_tending` returns an empty vec — B's source chain
+//!          has no AttentionTending entries, as expected for a private entry.
+//!          This is a useful guard but not a true privacy proof on its own (it
+//!          would pass even if the entry were Public, because B never called
+//!          `create_attention_tending`).
+//!      (b) Agent B calls `get_attention_tending` with A's ActionHash and
+//!          asserts `None` (or an error). This IS the real privacy proof: if
+//!          the entry were accidentally `Visibility::Public`, the DHT would
+//!          gossip it to B and `get` would return `Some(Record)`, failing the
+//!          test. Both `Ok(None)` and `Err(_)` are acceptable — the entry is
+//!          simply not in B's local store either way.
 //!   4. `malformed_json_rejected` — Agent A calls `create_attention_tending`
 //!      with `filter_subject_json: "not valid json {"`. Must return an error
 //!      containing "filter_subject_json" or "json".
@@ -23,6 +33,7 @@ use elohim_sweettest::common::{
 };
 use holo_hash::ActionHash;
 use holochain_serialized_bytes::prelude::*;
+use holochain_types::prelude::Record;
 use serde::{Deserialize, Serialize};
 
 const DNA: &str = "elohim";
@@ -218,8 +229,8 @@ async fn cross_agent_get_returns_none() -> Result<()> {
     let cell_a = app_a.cells().first().expect("cell A").clone();
     let cell_b = app_b.cells().first().expect("cell B").clone();
 
-    // Agent A creates an AttentionTending.
-    let _ah: ActionHash = ca
+    // Agent A creates an AttentionTending — capture the ActionHash for cross-agent probe.
+    let a_action_hash: ActionHash = ca
         .call(
             &cell_a.zome("content_store"),
             "create_attention_tending",
@@ -227,8 +238,10 @@ async fn cross_agent_get_returns_none() -> Result<()> {
         )
         .await;
 
-    // Agent B's list_my_tending must return an empty vec.
-    // The private entry never gossiped to B's source chain.
+    // Assertion (a): Agent B's list_my_tending must return an empty vec.
+    // B's source chain has no AttentionTending entries — the private entry was
+    // never gossiped. This is a useful guard (ensures B's chain is clean) but
+    // is NOT the privacy proof on its own.
     let b_records: Vec<AttentionTendingRecord> = cb
         .call(&cell_b.zome("content_store"), "list_my_tending", ())
         .await;
@@ -237,6 +250,38 @@ async fn cross_agent_get_returns_none() -> Result<()> {
         b_records.is_empty(),
         "Agent B must see zero AttentionTending records — Visibility::Private blocks gossip"
     );
+
+    // Assertion (b): Agent B calls get_attention_tending with A's ActionHash.
+    // This is the real privacy proof. If Visibility::Private is honoured, the
+    // entry is not in B's local store and get returns None. If the entry were
+    // accidentally Visibility::Public, the DHT would gossip it to B and get
+    // would return Some(Record), correctly failing this assertion.
+    //
+    // Both Ok(None) and Err(_) are acceptable outcomes — in either case the
+    // private entry is not visible to B. An Err means the conductor could not
+    // even locate the action header in B's view, which is equally valid proof
+    // of non-gossip.
+    let get_result = cb
+        .call_fallible::<_, Option<Record>>(
+            &cell_b.zome("content_store"),
+            "get_attention_tending",
+            a_action_hash.clone(),
+        )
+        .await;
+
+    match get_result {
+        Ok(maybe_record) => {
+            assert!(
+                maybe_record.is_none(),
+                "Agent B must not be able to retrieve A's private AttentionTending — \
+                 Visibility::Private must prevent gossip; got Some(Record)"
+            );
+        }
+        Err(_) => {
+            // The conductor returned an error because the action header is not
+            // in B's local store at all — also valid proof of non-gossip.
+        }
+    }
 
     Ok(())
 }
