@@ -37,7 +37,13 @@ use hdi::prelude::*;
 /// Bootstrap `signal_kind` taxonomy.
 ///
 /// Values mirror `SignalKind` enum wire names (kebab-case) from T1.
-const SIGNAL_KINDS: &[&str] = &["squelch", "correction", "retraction", "quarantine"];
+/// `"vouch"` added in T5 (Light Up the Graph sprint).
+const SIGNAL_KINDS: &[&str] = &["squelch", "correction", "retraction", "quarantine", "vouch"];
+
+/// Bootstrap `vouch_kind` taxonomy.
+///
+/// Required when `signal_kind == "vouch"`. Mirrors `VouchKind` enum wire names.
+const VOUCH_KINDS: &[&str] = &["accept-correction", "restitution"];
 
 /// Bootstrap `standing_impact` taxonomy.
 ///
@@ -56,6 +62,9 @@ const STANDING_IMPACTS: &[&str] = &["advisory", "debit-soft", "debit-firm"];
 /// wire (T1) this is base64-encoded; in the integrity zome we store the raw
 /// bytes so the DHT anchor is compact and canonical. The coordinator (T8) is
 /// responsible for verifying the signature before calling `create_entry`.
+///
+/// `vouch_kind` added in T5 (Light Up the Graph sprint) — required when
+/// `signal_kind == "vouch"`, forbidden otherwise.
 #[hdk_entry_helper]
 #[derive(Clone)]
 pub struct FeedbackSignal {
@@ -63,8 +72,13 @@ pub struct FeedbackSignal {
     pub target_cid: String,
 
     /// Graduated signal kind. Whitelisted: squelch / correction /
-    /// retraction / quarantine.
+    /// retraction / quarantine / vouch.
     pub signal_kind: String,
+
+    /// Vouch sub-semantics. Required when `signal_kind == "vouch"`.
+    /// Whitelisted: accept-correction / restitution.
+    /// Must be `None` for all other signal kinds.
+    pub vouch_kind: Option<String>,
 
     /// CIDv1 of a Correction EPR with claims and citations.
     /// Required when `signal_kind == "correction"`.
@@ -79,7 +93,8 @@ pub struct FeedbackSignal {
 }
 
 impl FeedbackSignal {
-    /// Phase 3.5 create-time floor checks. Deterministic, no DHT lookups.
+    /// Phase 3.5 create-time floor checks. Deterministic — uses only
+    /// `must_get_*` primitives where DHT access is needed (vouch no-self-vouch).
     /// Returns `Ok(())` when valid; `Err(reason)` when a floor is violated.
     pub fn validate(&self) -> Result<(), String> {
         // Floor 1: signal_kind whitelist.
@@ -119,6 +134,30 @@ impl FeedbackSignal {
             return Err("correction signal requires evidence_cid".to_string());
         }
 
+        // Floor 5 (T5): vouch validation.
+        //
+        // vouch requires vouch_kind ∈ VOUCH_KINDS.
+        // Non-vouch must NOT carry vouch_kind (strict field invariant).
+        // No-self-vouch enforced in the coordinator (coordinator has access
+        // to must_get_valid_record for the target signal resolution).
+        if self.signal_kind == "vouch" {
+            let vk = match &self.vouch_kind {
+                Some(v) => v,
+                None => return Err("vouch signal requires vouch_kind".to_string()),
+            };
+            if !VOUCH_KINDS.contains(&vk.as_str()) {
+                return Err(format!(
+                    "unknown vouch_kind: {} (allowed: {:?})",
+                    vk, VOUCH_KINDS
+                ));
+            }
+        } else if self.vouch_kind.is_some() {
+            return Err(format!(
+                "vouch_kind must be None for signal_kind={}, got: {:?}",
+                self.signal_kind, self.vouch_kind
+            ));
+        }
+
         Ok(())
     }
 }
@@ -143,7 +182,19 @@ mod tests {
         FeedbackSignal {
             target_cid: "bafyreiabcdef1234567890".to_string(),
             signal_kind: signal_kind.to_string(),
+            vouch_kind: None,
             evidence_cid: evidence_cid.map(|s| s.to_string()),
+            standing_impact: standing_impact.to_string(),
+            signer_pubkey: vec![0u8; 32],
+        }
+    }
+
+    fn make_vouch(vouch_kind: &str, standing_impact: &str) -> FeedbackSignal {
+        FeedbackSignal {
+            target_cid: "bafyreiabcdef1234567890".to_string(),
+            signal_kind: "vouch".to_string(),
+            vouch_kind: Some(vouch_kind.to_string()),
+            evidence_cid: None,
             standing_impact: standing_impact.to_string(),
             signer_pubkey: vec![0u8; 32],
         }
@@ -343,4 +394,76 @@ mod tests {
     // coordinator (see module doc).  The update-rejection path is covered by
     // the T8 sweettest (`validate_feedback_signal_update_is_rejected`) which
     // runs inside a real Holochain conductor.
+
+    // -----------------------------------------------------------------------
+    // Floor 5: vouch validation (T5 additions)
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn accepts_vouch_accept_correction() {
+        assert!(make_vouch("accept-correction", "debit-soft").validate().is_ok());
+    }
+
+    #[test]
+    fn accepts_vouch_restitution() {
+        assert!(make_vouch("restitution", "advisory").validate().is_ok());
+    }
+
+    #[test]
+    fn rejects_vouch_without_vouch_kind() {
+        let mut sig = make_vouch("accept-correction", "debit-soft");
+        sig.vouch_kind = None;
+        let result = sig.validate();
+        assert!(result.is_err());
+        let msg = result.unwrap_err();
+        assert!(
+            msg.contains("vouch signal requires vouch_kind"),
+            "got: {msg}"
+        );
+    }
+
+    #[test]
+    fn rejects_vouch_with_unknown_vouch_kind() {
+        let mut sig = make_vouch("accept-correction", "debit-soft");
+        sig.vouch_kind = Some("endorse".to_string());
+        let result = sig.validate();
+        assert!(result.is_err());
+        let msg = result.unwrap_err();
+        assert!(msg.contains("unknown vouch_kind"), "got: {msg}");
+        assert!(msg.contains("endorse"), "got: {msg}");
+    }
+
+    #[test]
+    fn rejects_non_vouch_with_vouch_kind_set() {
+        let mut sig = make_signal("squelch", "advisory", None);
+        sig.vouch_kind = Some("accept-correction".to_string());
+        let result = sig.validate();
+        assert!(result.is_err());
+        let msg = result.unwrap_err();
+        assert!(
+            msg.contains("vouch_kind must be None for signal_kind=squelch"),
+            "got: {msg}"
+        );
+    }
+
+    #[test]
+    fn rejects_correction_with_vouch_kind_set() {
+        let mut sig = make_signal("correction", "debit-soft", Some("bafyreievidence"));
+        sig.vouch_kind = Some("accept-correction".to_string());
+        let result = sig.validate();
+        assert!(result.is_err());
+        let msg = result.unwrap_err();
+        assert!(msg.contains("vouch_kind must be None"), "got: {msg}");
+    }
+
+    #[test]
+    fn vouch_does_not_require_evidence_cid() {
+        // vouch targets a FeedbackSignal, not a content EPR — evidence is not required.
+        let sig = make_vouch("accept-correction", "debit-soft");
+        assert!(
+            sig.evidence_cid.is_none(),
+            "vouch must not require evidence_cid"
+        );
+        assert!(sig.validate().is_ok());
+    }
 }
