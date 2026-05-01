@@ -15,6 +15,14 @@ use std::collections::HashMap;
 pub mod bootstrap_steward;
 pub mod manifest;
 pub use manifest::*;
+
+// EPR Phase 3.5 T8: FeedbackSignal coordinator functions.
+pub mod feedback_signal;
+pub use feedback_signal::{
+    create_feedback_signal, get_feedback_signals_for_target, list_feedback_signals_by_signer,
+    CreateFeedbackSignalInput, FeedbackSignalRecord,
+};
+
 pub use bootstrap_steward::{
     am_i_bootstrap_steward, bootstrap_steward, maybe_bootstrap_steward, BootstrapStewardError,
     DnaProperties as BootstrapStewardDnaProperties,
@@ -10316,6 +10324,17 @@ pub enum ProjectionSignal {
         total_items: u32,
         fatal_error: String,
     },
+
+    // =========================================================================
+    // EPR Phase 3.5 signals (T8)
+    // =========================================================================
+    /// FeedbackSignal entry was created (Phase 3.5 P3.5.1 sense-respond signal).
+    FeedbackSignalCommitted {
+        action_hash: ActionHash,
+        entry_hash: EntryHash,
+        signal: FeedbackSignal,
+        author: AgentPubKey,
+    },
 }
 
 /// Post-commit callback - emits signals for projection.
@@ -10360,6 +10379,18 @@ pub fn post_commit(committed_actions: Vec<SignedActionHashed>) -> ExternResult<(
                 action_hash,
                 entry_hash,
                 manifest,
+                author,
+            })?;
+        } else if let Some(signal) = record
+            .entry()
+            .to_app_option::<FeedbackSignal>()
+            .ok()
+            .flatten()
+        {
+            emit_signal(ProjectionSignal::FeedbackSignalCommitted {
+                action_hash,
+                entry_hash,
+                signal,
                 author,
             })?;
         } else if let Some(path) = record

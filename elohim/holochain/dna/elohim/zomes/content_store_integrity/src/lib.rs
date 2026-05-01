@@ -4221,6 +4221,14 @@ pub enum LinkTypes {
                            // - IdToDoorway, OperatorToDoorway, DoorwayToHeartbeat, DoorwayToSummary
                            // See: holochain/dna/infrastructure/zomes/infrastructure_integrity
                            // =========================================================================
+
+    // =========================================================================
+    // EPR Phase 3.5: FeedbackSignal links (T8)
+    // =========================================================================
+    /// Target content action → FeedbackSignal action (for get_feedback_signals_for_target)
+    TargetToFeedbackSignal,
+    /// Per-agent anchor → FeedbackSignal action (for list_feedback_signals_by_signer)
+    SignerToFeedbackSignal,
 }
 
 // =============================================================================
