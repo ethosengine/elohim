@@ -330,6 +330,24 @@ async fn aunt_and_rage_bait_three_peer_scenario() {
         "decrypted predecessor payload must contain Bob's PeerId"
     );
 
+    // 2-of-2 negative case: substituting a wrong imagodei secret key MUST fail.
+    // (T11 unit tests cover this exhaustively — this assertion verifies the
+    // integration path uses the same crypto, not a degraded variant.)
+    {
+        let (_wrong_imagodei_pk, wrong_imagodei_sk) = crypto_box_seed_keypair(&[42u8; 32]);
+        let bad_decrypt = unseal(
+            &sealed,
+            &mishpat_pk,
+            &mishpat_sk,
+            &imagodei_pk,
+            &ImagodeiSecretKey(wrong_imagodei_sk),
+        );
+        assert!(
+            bad_decrypt.is_err(),
+            "decrypt with wrong imagodei secret key MUST fail (2-of-2 property)"
+        );
+    }
+
     // Also verify that record_predecessor + read_predecessors round-trips through
     // the actual back_prop API (T12 path, exercised in Phase 4 end-to-end).
     {
