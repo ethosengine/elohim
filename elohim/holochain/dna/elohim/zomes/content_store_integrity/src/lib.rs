@@ -37,6 +37,12 @@ pub mod attention_tending;
 pub use attention_tending::AttentionTending;
 
 // =============================================================================
+// EPR Phase 3.5: CollectiveFilterPattern Entry Type (public DHT; k-anonymous aggregate)
+// =============================================================================
+pub mod collective_filter_pattern;
+pub use collective_filter_pattern::CollectiveFilterPattern;
+
+// =============================================================================
 // Generated Protocol Constants (from JSON Schema single source of truth)
 // =============================================================================
 pub mod generated_enums;
@@ -3688,6 +3694,11 @@ pub enum EntryTypes {
     // Visibility::Private is the load-bearing flag (brainstorm §6.1).
     #[entry_type(visibility = "private")]
     AttentionTending(AttentionTending),
+    // EPR Phase 3.5 P3.5.6: CollectiveFilterPattern — k-anonymous aggregate
+    // published by T16 post-threshold. PUBLIC visibility (default, no attribute):
+    // entries gossip to the DHT so peers can discover collective filter patterns.
+    // NO signer_pubkey field — publisher identity is in the action header.
+    CollectiveFilterPattern(CollectiveFilterPattern),
 
     // Qahal: Community & Relationships
     Relationship(Relationship),
@@ -4259,6 +4270,11 @@ fn validate_create_entry(app_entry: &EntryTypes) -> ExternResult<ValidateCallbac
         // Updates are supported (re-tending appends to tended_at, extends TTL); the
         // validate_update_entry fallthrough to this function is intentional.
         EntryTypes::AttentionTending(tending) => adapt_validation(tending.validate()),
+
+        // EPR Phase 3.5 P3.5.6: CollectiveFilterPattern — public DHT k-anonymous aggregate.
+        // Updates re-run create-time validation; T16 aggregator may convention to
+        // always-create-new-entries (snapshot-per-window) rather than update.
+        EntryTypes::CollectiveFilterPattern(pattern) => adapt_validation(pattern.validate()),
 
         // Other entry types: accept for now (can add validation incrementally)
         _ => Ok(ValidateCallbackResult::Valid),
