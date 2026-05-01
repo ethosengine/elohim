@@ -42,8 +42,12 @@ async fn second_agent_is_not_bootstrap_steward() -> Result<()> {
     let [(mut c1, a1), (mut c2, a2)] = two_agent_conductors().await?;
     let dna_file = load_dna(DNA, &network_seed(DNA), Some(a1.clone())).await?;
 
-    let app1 = c1.setup_app_for_agent("imagodei", a1.clone(), &[dna_file.clone()]).await?;
-    let app2 = c2.setup_app_for_agent("imagodei", a2.clone(), &[dna_file]).await?;
+    let app1 = c1
+        .setup_app_for_agent("imagodei", a1.clone(), &[dna_file.clone()])
+        .await?;
+    let app2 = c2
+        .setup_app_for_agent("imagodei", a2.clone(), &[dna_file])
+        .await?;
 
     let cell1 = app1.cells().first().unwrap().clone();
     let cell2 = app2.cells().first().unwrap().clone();

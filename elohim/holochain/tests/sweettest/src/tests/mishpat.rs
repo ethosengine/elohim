@@ -112,7 +112,10 @@ async fn proposal_round_trips_across_agents() -> Result<()> {
         "fetched proposal id must match created proposal id"
     );
     assert_eq!(fetched.proposal.title, created.proposal.title);
-    assert_eq!(fetched.proposal.proposal_type, created.proposal.proposal_type);
+    assert_eq!(
+        fetched.proposal.proposal_type,
+        created.proposal.proposal_type
+    );
 
     Ok(())
 }

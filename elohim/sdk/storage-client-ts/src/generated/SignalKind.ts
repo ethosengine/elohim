@@ -5,4 +5,4 @@
  *
  * Wire encoding: kebab-case via `#[serde(rename_all = "kebab-case")]`.
  */
-export type SignalKind = "squelch" | "correction" | "retraction" | "quarantine";
+export type SignalKind = "squelch" | "correction" | "retraction" | "quarantine" | "vouch";

@@ -23,8 +23,8 @@ fn fresh_pool() -> elohim_storage::db::DbPool {
 fn seed_if_empty_seeds_manifests_first_time() {
     let pool = fresh_pool();
     let mut conn = pool.get().unwrap();
-    let report = elohim_storage::services::bootstrap_manifests::seed_if_empty(&mut conn)
-        .expect("seed");
+    let report =
+        elohim_storage::services::bootstrap_manifests::seed_if_empty(&mut conn).expect("seed");
     assert!(
         report.standing_policy_seeded || report.tending_policy_seeded,
         "at least one bootstrap manifest must be seeded on first run, got {:?}",
@@ -37,8 +37,8 @@ fn seed_if_empty_is_idempotent() {
     let pool = fresh_pool();
     let mut conn = pool.get().unwrap();
     let _ = elohim_storage::services::bootstrap_manifests::seed_if_empty(&mut conn).expect("first");
-    let report = elohim_storage::services::bootstrap_manifests::seed_if_empty(&mut conn)
-        .expect("second");
+    let report =
+        elohim_storage::services::bootstrap_manifests::seed_if_empty(&mut conn).expect("second");
     assert!(
         !report.standing_policy_seeded,
         "standing-policy should not re-seed: {:?}",

@@ -179,8 +179,11 @@ async fn submit_specialist_revocation_rejects_without_role_marker() -> Result<()
         human_action_hash: target_human_hash,
         revoked_pub_key: agent.clone(),
         reason: "key_compromise".to_string(),
-        anomaly_attestation_json: minimal_anomaly_attestation("human-target-m5", &agent.to_string())
-            .to_string(),
+        anomaly_attestation_json: minimal_anomaly_attestation(
+            "human-target-m5",
+            &agent.to_string(),
+        )
+        .to_string(),
     };
 
     // Expect rejection — the Stage 1 gate stub unconditionally returns false.

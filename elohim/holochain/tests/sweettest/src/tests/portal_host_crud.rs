@@ -256,7 +256,10 @@ async fn portal_host_wire_shape_guard() -> Result<()> {
         reach: Some(PortalHostReach::Trusted),
     };
     let json = serde_json::to_value(&input)?;
-    assert_eq!(json["hostUrl"].as_str().unwrap_or(""), "https://doorway.elohim.host");
+    assert_eq!(
+        json["hostUrl"].as_str().unwrap_or(""),
+        "https://doorway.elohim.host"
+    );
     assert_eq!(json["label"].as_str().unwrap_or(""), "Primary doorway");
     // reach variant name must be PascalCase (no rename on integrity enum).
     assert_eq!(json["reach"].as_str().unwrap_or(""), "Trusted");

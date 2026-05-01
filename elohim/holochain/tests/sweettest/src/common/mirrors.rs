@@ -15,10 +15,7 @@ use tokio::time::sleep;
 ///
 /// Default polling cadence is 100ms; callers that hit timeouts can increase
 /// the max wait via `max_wait_ms`.
-pub async fn wait_for<F, Fut>(
-    max_wait_ms: u64,
-    mut check: F,
-) -> Result<()>
+pub async fn wait_for<F, Fut>(max_wait_ms: u64, mut check: F) -> Result<()>
 where
     F: FnMut() -> Fut,
     Fut: std::future::Future<Output = Result<bool>>,

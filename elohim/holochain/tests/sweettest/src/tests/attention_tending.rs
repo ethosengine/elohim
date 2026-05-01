@@ -133,8 +133,7 @@ async fn create_and_list_succeeds() -> Result<()> {
         "ttl_seconds must match input"
     );
     assert_eq!(
-        records[0].entry.filter_subject_json,
-        r#"{"contentKind":"concept"}"#,
+        records[0].entry.filter_subject_json, r#"{"contentKind":"concept"}"#,
         "filter_subject_json must match input"
     );
     assert_eq!(
@@ -322,8 +321,7 @@ async fn malformed_json_rejected() -> Result<()> {
     );
     let err_str = format!("{:?}", result.unwrap_err());
     assert!(
-        err_str.to_lowercase().contains("json")
-            || err_str.contains("filter_subject_json"),
+        err_str.to_lowercase().contains("json") || err_str.contains("filter_subject_json"),
         "error must mention 'json' or 'filter_subject_json', got: {err_str}"
     );
 

@@ -290,4 +290,3 @@ async fn binding_rejects_wrong_signer() -> Result<()> {
     let _ = (a2, cell2); // keep imports used
     Ok(())
 }
-
