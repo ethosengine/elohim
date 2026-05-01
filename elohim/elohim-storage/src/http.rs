@@ -178,6 +178,11 @@ pub struct HttpServer {
     /// Registry of per-cell HcClient instances for zome forwarding (Phase 11).
     /// Wired at startup via `with_hc_registry`. None = conductor bridge unavailable.
     hc_registry: Option<Arc<crate::hc_client_registry::HcClientRegistry>>,
+    /// FeedbackSignal fan-out context (Phase 3.5 T22).
+    /// When set, `PUT /api/v1/epr` with FeedbackSignal kind runs
+    /// project_signal + back_prop_one_hop + flood_feedback end-to-end.
+    /// When absent (no P2P swarm, test fixtures), fan-out steps are skipped gracefully.
+    fan_out_ctx: Option<Arc<crate::api::epr::EprFanOutCtx>>,
 }
 
 /// Extract X-Schema-Version header from request and validate it.
@@ -237,6 +242,7 @@ impl HttpServer {
             signing_client: None,
             write_through_state: None,
             hc_registry: None,
+            fan_out_ctx: None,
         }
     }
 
@@ -305,6 +311,17 @@ impl HttpServer {
         registry: std::sync::Arc<crate::hc_client_registry::HcClientRegistry>,
     ) -> Self {
         self.hc_registry = Some(registry);
+        self
+    }
+
+    /// Wire the FeedbackSignal fan-out context (Phase 3.5 T22).
+    ///
+    /// When set, `PUT /api/v1/epr` with FeedbackSignal kind activates the full
+    /// fan-out: project_signal + back_prop_one_hop + flood_feedback. When absent
+    /// (no P2P swarm, test fixtures, dev without key config), fan-out steps that
+    /// require missing dependencies are skipped gracefully.
+    pub fn with_fan_out_ctx(mut self, ctx: Arc<crate::api::epr::EprFanOutCtx>) -> Self {
+        self.fan_out_ctx = Some(ctx);
         self
     }
 
@@ -780,6 +797,7 @@ impl HttpServer {
                         self.hc_registry.clone(),
                         swarm_tx,
                         local_peer_id,
+                        self.fan_out_ctx.clone(),
                     )
                     .await
                 } else {

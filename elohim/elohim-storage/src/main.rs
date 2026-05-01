@@ -367,8 +367,9 @@ async fn async_main(
     if let Some(pool) = db_pool.as_ref() {
         match pool.get() {
             Ok(mut conn) => {
-                let report = elohim_storage::services::bootstrap_manifests::seed_if_empty(&mut conn)
-                    .expect("bootstrap manifests seed must succeed at startup");
+                let report =
+                    elohim_storage::services::bootstrap_manifests::seed_if_empty(&mut conn)
+                        .expect("bootstrap manifests seed must succeed at startup");
                 if report.standing_policy_seeded || report.tending_policy_seeded {
                     info!(
                         standing_policy = report.standing_policy_seeded,
@@ -973,6 +974,139 @@ async fn async_main(
         http_server = http_server.with_sync_manager(node.sync_manager().clone());
         http_server = http_server.with_p2p_handle(node.handle());
         info!("P2P node wired to HTTP server — Sync API and /p2p/status active");
+    }
+
+    // T22: Construct EprFanOutCtx and inject into HTTP layer.
+    //
+    // The fan-out context activates the FeedbackSignal arrival pipeline:
+    //   1. project_signal  — debit-weighted standing update
+    //   2. back_prop_one_hop — forward signal one hop upstream (unseals predecessor records)
+    //   3. flood_feedback  — gossip-flood to content reach topic
+    //
+    // Construction is gated on db_pool being available. P2P adapters are wired
+    // from the swarm command channel; without P2P the outbound_sink and
+    // gossip_publisher remain None and those two steps are skipped gracefully.
+    //
+    // Sealing keys: generated ephemerally here for dev/test. These keys are used
+    // to seal predecessor records in SQLite. In production, they should be loaded
+    // from a persisted node-key file so predecessor records survive process
+    // restart. See TODO(T22-followup) in api/epr.rs::UnsealingKeyBundle.
+    if let Some(ref pool) = db_pool {
+        use dryoc::classic::crypto_box::crypto_box_seed_keypair;
+        use elohim_storage::api::epr::{EprFanOutCtx, SealingKeyPair, UnsealingKeyBundle};
+        use elohim_storage::services::sealed_against_self::{
+            ImagodeiPubKey, ImagodeiSecretKey, MishpatQuorumPubKey, MishpatQuorumSecretKey,
+        };
+
+        // Load (or generate) manifest registry from DB for standing-policy debit weights.
+        let manifest_registry = match pool.get() {
+            Ok(mut conn) => {
+                let registry = elohim_storage::services::manifest_registry::ManifestRegistry::new();
+                match registry.load_from_db(&mut conn) {
+                    Ok(count) => {
+                        info!(
+                            pillar_mappings = count,
+                            "T22: ManifestRegistry loaded from DB (standing-policy debit weights active)"
+                        );
+                    }
+                    Err(e) => {
+                        warn!(
+                            error = %e,
+                            "T22: ManifestRegistry load failed (debit weights will use defaults)"
+                        );
+                    }
+                }
+                Some(Arc::new(registry))
+            }
+            Err(e) => {
+                warn!(error = %e, "T22: DB connection failed for ManifestRegistry (fan-out degraded)");
+                None
+            }
+        };
+
+        // Ephemeral 2-of-2 sealing keys for local dev.
+        // TODO(T22-followup): load from persisted node-key file so predecessor
+        // records survive process restart. Ephemeral keys are acceptable for dev
+        // since back_prop_one_hop only needs them to read records written in the
+        // same process lifetime.
+        let mishpat_seed = [0xA0u8; 32]; // dev-only deterministic seed
+        let imagodei_seed = [0xB0u8; 32]; // dev-only deterministic seed
+        let (mishpat_pk_raw, mishpat_sk_raw) = crypto_box_seed_keypair(&mishpat_seed);
+        let (imagodei_pk_raw, imagodei_sk_raw) = crypto_box_seed_keypair(&imagodei_seed);
+
+        let mishpat_pk = MishpatQuorumPubKey(mishpat_pk_raw);
+        let mishpat_sk = MishpatQuorumSecretKey(mishpat_sk_raw);
+        let imagodei_pk = ImagodeiPubKey(imagodei_pk_raw);
+        let imagodei_sk = ImagodeiSecretKey(imagodei_sk_raw);
+
+        let sealing_keys = Arc::new(SealingKeyPair {
+            mishpat_pk: MishpatQuorumPubKey(mishpat_pk.0.clone()),
+            imagodei_pk: ImagodeiPubKey(imagodei_pk.0.clone()),
+        });
+        let unsealing_keys = Arc::new(UnsealingKeyBundle {
+            mishpat_pk,
+            mishpat_sk,
+            imagodei_pk,
+            imagodei_sk,
+        });
+
+        // P2P adapters — only wired when a live swarm is available.
+        #[cfg(feature = "p2p")]
+        let (outbound_sink, gossip_publisher, local_peer_id_opt) = if let Some(ref node) = p2p_node
+        {
+            let tx = node.handle().command_sender();
+            let sink: Arc<dyn elohim_storage::services::back_prop::OutboundSink> = Arc::new(
+                elohim_storage::p2p::adapters::LibP2POutboundSink::new(tx.clone()),
+            );
+            let publisher: Arc<dyn elohim_storage::services::gossip_flood::GossipPublisher> =
+                Arc::new(elohim_storage::p2p::adapters::LibP2PGossipPublisher::new(
+                    tx,
+                ));
+            let peer_id = node.handle().local_peer_id();
+            (Some(sink), Some(publisher), Some(peer_id))
+        } else {
+            (None, None, None)
+        };
+
+        #[cfg(not(feature = "p2p"))]
+        let (outbound_sink, gossip_publisher, local_peer_id_opt) = (
+            None::<Arc<dyn elohim_storage::services::back_prop::OutboundSink>>,
+            None::<Arc<dyn elohim_storage::services::gossip_flood::GossipPublisher>>,
+            None::<String>,
+        );
+
+        // Derive the standing-policy CID from the bootstrap manifest constant.
+        // Phase 4 will expose a way to discover the highest-revision policy CID
+        // from the ManifestRegistry; for now we hardcode the bootstrap CID.
+        let standing_policy_cid = Some("bootstrap:standing-policy:v1".to_string());
+
+        // Local pubkey: use the agent pubkey from config (a placeholder in dev;
+        // Phase 4 / conductor connection will provide the real ed25519 pubkey).
+        // project_signal uses this to scope the standing_view evaluator column.
+        // For now we derive 32 placeholder bytes from the storage dir path hash.
+        let local_pubkey = {
+            use std::hash::{Hash, Hasher};
+            let mut hasher = std::collections::hash_map::DefaultHasher::new();
+            config.storage_dir.hash(&mut hasher);
+            let h = hasher.finish();
+            let mut bytes = vec![0u8; 32];
+            bytes[..8].copy_from_slice(&h.to_le_bytes());
+            Some(bytes)
+        };
+
+        let fan_out_ctx = Arc::new(EprFanOutCtx {
+            manifest_registry,
+            outbound_sink,
+            gossip_publisher,
+            sealing_keys: Some(sealing_keys),
+            unsealing_keys: Some(unsealing_keys),
+            local_peer_id: local_peer_id_opt,
+            local_pubkey,
+            standing_policy_cid,
+        });
+
+        http_server = http_server.with_fan_out_ctx(fan_out_ctx);
+        info!("T22: EprFanOutCtx constructed and injected — FeedbackSignal fan-out active");
     }
 
     // Wire HcClientRegistry into HTTP server for zome forwarding (Phase 11 Task 5).

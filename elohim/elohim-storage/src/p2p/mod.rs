@@ -4406,6 +4406,29 @@ impl P2PNode {
                             bytes = envelope_bytes.len(),
                             "EPR atom announce accepted"
                         );
+                        // TODO(T22-followup): call record_predecessor here so the
+                        // libp2p ingest path records the sender for back-prop.
+                        //
+                        // The sender PeerId is available as `peer.to_string()`.
+                        // Wiring requires P2PNode to hold an Arc<SealingKeyPair>
+                        // (added via a `with_sealing_keys` builder method, mirroring
+                        // the existing `with_db_pool` / `with_policy_enforcement`
+                        // pattern). Example call site (once sealing_keys field added):
+                        //
+                        //   if let Some(keys) = &self.sealing_keys {
+                        //       let pub_keys = SealingPubKeys {
+                        //           mishpat_pk: &keys.mishpat_pk,
+                        //           imagodei_pk: &keys.imagodei_pk,
+                        //       };
+                        //       if let Err(e) = crate::services::back_prop::record_predecessor(
+                        //           &mut conn, &ingested.cid, &peer.to_string(), &pub_keys,
+                        //       ) {
+                        //           warn!(?e, cid = %ingested.cid, "record_predecessor failed (non-fatal)");
+                        //       }
+                        //   }
+                        //
+                        // Without this, back_prop_one_hop finds no predecessors and
+                        // returns Ok(vec![]) — correct, just not yet forward-propagating.
                         EprAtomResponse::Announced {
                             accepted: true,
                             reason: None,

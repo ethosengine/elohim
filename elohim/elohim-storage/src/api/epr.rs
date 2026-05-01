@@ -64,31 +64,48 @@ fn is_local_origin(envelope_signed_by: &str, local_peer_id: &str) -> bool {
 
 /// Optional runtime context for FeedbackSignal arrival fan-out.
 ///
-/// All fields default to `None`. T22 will construct and inject a fully-wired
-/// instance from `main.rs` startup. Until then, pass `None` and every fan-out
-/// step that needs a missing dependency is skipped gracefully.
+/// All fields default to `None`. T22 constructs and injects a fully-wired
+/// instance from `main.rs` startup. Call sites that do not need fan-out
+/// (tests, non-P2P paths) continue passing `None`.
 pub struct EprFanOutCtx {
     /// Manifest registry providing the active standing-policy debit weights.
-    /// TODO(T22): wire from main.rs
     pub manifest_registry: Option<Arc<ManifestRegistry>>,
-    /// Outbound sink for back-prop one-hop sends.
-    /// TODO(T22): wire from main.rs (LibP2POutboundSink)
+    /// Outbound sink for back-prop one-hop sends (LibP2POutboundSink in production).
     pub outbound_sink: Option<Arc<dyn OutboundSink>>,
-    /// Gossip publisher for flood-feedback broadcasts.
-    /// TODO(T22): wire from main.rs (LibP2PGossipPublisher)
+    /// Gossip publisher for flood-feedback broadcasts (LibP2PGossipPublisher in production).
     pub gossip_publisher: Option<Arc<dyn GossipPublisher>>,
-    /// Sealing public keys for `record_predecessor`.
-    /// TODO(T22): wire from main.rs (node key config)
+    /// Sealing PUBLIC keys for `record_predecessor` (stores predecessor under 2-of-2).
     pub sealing_keys: Option<Arc<SealingKeyPair>>,
+    /// Unsealing key bundle for `back_prop_one_hop` (both pub+priv keys required to
+    /// decrypt predecessor records). Absent in dev/test environments where key files
+    /// are not configured.
+    ///
+    /// TODO(T22-followup): Load from a persistent node-key file or PKCS#11 provider.
+    /// For local dev this is populated from ephemeral keys generated at startup.
+    pub unsealing_keys: Option<Arc<UnsealingKeyBundle>>,
     /// Local peer ID (base58 multibase) for local-origin dedup.
-    /// TODO(T22): wire from main.rs (P2PHandle::local_peer_id)
     pub local_peer_id: Option<String>,
     /// Local agent pubkey (ed25519 raw bytes) passed as evaluator to project_signal.
-    /// TODO(T22): wire from main.rs (conductor agent identity)
     pub local_pubkey: Option<Vec<u8>>,
     /// CID of the active standing-policy manifest for standing projector provenance.
-    /// TODO(T22): wire from main.rs (bootstrap manifest CID)
     pub standing_policy_cid: Option<String>,
+}
+
+/// Private-key bundle for back_prop unsealing.
+///
+/// Wraps the four key components that `back_prop::UnsealingKeys` borrows.
+/// Stored in `Arc<UnsealingKeyBundle>` on the fan-out context so the key
+/// material is heap-allocated and reference-counted, never copied by value.
+///
+/// TODO(T22-followup): in production these should be loaded from a persisted
+/// node-key file (or HSM/PKCS#11 slot). Current dev path: ephemeral keys
+/// generated from deterministic seeds at startup (safe for dev/test; NOT for
+/// production use where predecessor records must survive process restart).
+pub struct UnsealingKeyBundle {
+    pub mishpat_pk: crate::services::sealed_against_self::MishpatQuorumPubKey,
+    pub mishpat_sk: crate::services::sealed_against_self::MishpatQuorumSecretKey,
+    pub imagodei_pk: crate::services::sealed_against_self::ImagodeiPubKey,
+    pub imagodei_sk: crate::services::sealed_against_self::ImagodeiSecretKey,
 }
 
 /// Public-key pair for `record_predecessor` sealing.
@@ -598,21 +615,15 @@ async fn put_epr(
     let mut conn = get_conn(pool)?;
     let result = store.put(&mut conn, epr)?;
 
-    // T18: record_predecessor requires the sender PeerId from the P2P ingest path,
-    // which is NOT available here (put_epr is called via HTTP only, not the P2P
-    // ingest callback). The sender PeerId is unavailable in this handler signature.
-    // Dependency: T22 (main.rs wiring) must thread sender_peer_id through the P2P
-    // ingest path before this can be wired. Until then, record_predecessor is deferred.
-    // The TODO comment below marks the wiring point for T22.
+    // T18: record_predecessor is NOT wired here.
     //
-    // TODO(T22): wire record_predecessor when P2P ingest path threads sender_peer_id.
-    // Call site:
-    //   if let (Some(sender), Some(keys)) = (sender_peer_id, fan_out_ctx.as_ref().and_then(|f| f.sealing_keys.as_ref())) {
-    //       let pub_keys = SealingPubKeys { mishpat_pk: &keys.mishpat_pk, imagodei_pk: &keys.imagodei_pk };
-    //       if let Err(e) = crate::services::back_prop::record_predecessor(&mut conn, path_cid, sender, &pub_keys) {
-    //           tracing::warn!(?e, %path_cid, "record_predecessor failed (non-fatal)");
-    //       }
-    //   }
+    // put_epr is the HTTP ingest path — the caller is the local HTTP client, not
+    // a remote peer. The sender PeerId (required for back-prop graph construction)
+    // is only available on the libp2p ingest path (EprAtomRequest::Announce handler
+    // in p2p/mod.rs), where the `peer` variable carries the PeerId of the sender.
+    //
+    // T22 wires record_predecessor in p2p/mod.rs on the Announce handler — see the
+    // `TODO(T22): record_predecessor` comment in handle_epr_atom_request.
 
     // Phase 3.5 — Light Up the Graph T19: FeedbackSignal arrival fan-out.
     //
@@ -666,11 +677,44 @@ async fn put_epr(
                             }
                         }
 
-                        // 2. back_prop_one_hop — best-effort, needs sealing keys to unseal
-                        //    predecessor records. Skipped if keys not yet wired (T22).
-                        //    Note: back_prop_one_hop needs UnsealingKeys (both public + private);
-                        //    those require the full key-pair from node config, deferred to T22.
-                        //    TODO(T22): inject UnsealingKeys from SealingKeyPair config.
+                        // 2. back_prop_one_hop — best-effort, unseals predecessor records
+                        //    and forwards signal one hop upstream. Skipped if unsealing
+                        //    keys or outbound sink are absent.
+                        if let (Some(bundle), Some(sink)) = (
+                            fan_out.unsealing_keys.as_ref(),
+                            fan_out.outbound_sink.as_ref(),
+                        ) {
+                            let unseal = crate::services::back_prop::UnsealingKeys {
+                                mishpat_pk: &bundle.mishpat_pk,
+                                mishpat_sk: &bundle.mishpat_sk,
+                                imagodei_pk: &bundle.imagodei_pk,
+                                imagodei_sk: &bundle.imagodei_sk,
+                            };
+                            let local_id = fan_out.local_peer_id.as_deref();
+                            match crate::services::back_prop::back_prop_one_hop(
+                                &mut conn,
+                                &signal,
+                                sink.as_ref(),
+                                &unseal,
+                                local_id,
+                            ) {
+                                Ok(forwarded) if !forwarded.is_empty() => {
+                                    tracing::debug!(
+                                        %path_cid,
+                                        peers = forwarded.len(),
+                                        "put_epr: back_prop_one_hop forwarded signal"
+                                    );
+                                }
+                                Ok(_) => {} // no predecessors recorded or origin
+                                Err(e) => {
+                                    tracing::warn!(
+                                        ?e,
+                                        %path_cid,
+                                        "put_epr: back_prop_one_hop failed (non-fatal)"
+                                    );
+                                }
+                            }
+                        }
 
                         // 3. flood_feedback — best-effort publish on content reach topic.
                         if let Some(publisher) = fan_out.gossip_publisher.as_ref() {
