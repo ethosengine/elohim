@@ -25,6 +25,7 @@ pub mod anomaly_detection;
 pub mod back_prop;
 pub mod behavioral_trust;
 pub mod boot_registration;
+pub mod bootstrap_manifests;
 pub mod content_service;
 pub mod disposition_service;
 pub mod distribution;

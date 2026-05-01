@@ -1,0 +1,38 @@
+{
+  "manifestKind": "standing-policy",
+  "revision": 1,
+  "floor": {
+    "classes": [
+      {
+        "class": "local-relationship-reach",
+        "protection": "Family, household, and intimate-circle communications propagate unconditionally. Standing never gates messages between agents already in a verified relationship."
+      },
+      {
+        "class": "cid-targeted-lookup",
+        "protection": "Anyone holding a CID can fetch the content. Standing modulates discovery (what surfaces in feeds) but never retrievability (what an explicit fetch returns)."
+      },
+      {
+        "class": "constitutional-floor-signatures",
+        "protection": "Mishpat decisions, qahal ratifications, and imagodei-as-counsel signatures are always per-message verified. Author standing cannot suppress these signature checks."
+      },
+      {
+        "class": "new-voice-baseline",
+        "protection": "First-time authors receive a non-zero baseline floor derived from their sponsor's standing. No agent ever starts at zero — bootstrapping is itself a relationship event."
+      },
+      {
+        "class": "vulnerable-class-elevation",
+        "protection": "Children, refugees, persecution-targets, and displaced persons receive an elevated baseline floor. The protocol must not amplify existing structural disadvantage."
+      }
+    ]
+  },
+  "debitWeights": {
+    "squelch": { "advisory": 0, "debit-soft": 1, "debit-firm": 3 },
+    "correction": { "advisory": 0, "debit-soft": 10, "debit-firm": 20 },
+    "retraction": { "advisory": 0, "debit-soft": -5, "debit-firm": -10 },
+    "quarantine": { "advisory": 0, "debit-soft": 12, "debit-firm": 30 }
+  },
+  "newVoiceBaseline": {
+    "score": "floor",
+    "vulnerableClassLift": "low"
+  }
+}
