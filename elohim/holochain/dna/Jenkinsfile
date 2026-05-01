@@ -135,6 +135,11 @@ spec:
         disableConcurrentBuilds()
         preserveStashes(buildCount: 5)
         overrideIndexTriggers(false)  // Only orchestrator or manual triggers - no webhook/branch indexing
+        // Skip implicit Declarative: Checkout SCM — same fix as elohim-orchestrator;
+        // see orchestrator Jenkinsfile options block. #1180 died with `git-remote-https
+        // signal 15` after 10:13 because the implicit checkout uses the job-level
+        // 10-min timeout on a full clone of this 316MB / 65k-object repo.
+        skipDefaultCheckout(true)
     }
 
     // No triggers - orchestrator handles all webhook events
@@ -181,7 +186,23 @@ spec:
                 container('builder') {
                     script {
                         sh 'git config --global --add safe.directory "*"'
-                        checkout scm
+
+                        // Explicit checkout — bypasses the 10-min default per-attempt
+                        // timeout in `checkout scm` (#1180 died "git-remote-https signal 15"
+                        // at ~10:13). honorRefspec keeps fetch to the single target branch.
+                        checkout([
+                            $class: 'GitSCM',
+                            branches: [[name: "*/${env.BRANCH_NAME ?: 'dev'}"]],
+                            extensions: [
+                                [$class: 'CloneOption', shallow: true, noTags: true, depth: 200, timeout: 30, honorRefspec: true],
+                                [$class: 'CleanBeforeCheckout']
+                            ],
+                            userRemoteConfigs: [[
+                                url: 'https://github.com/ethosengine/elohim.git',
+                                credentialsId: 'ee-bot-pat',
+                                refspec: "+refs/heads/${env.BRANCH_NAME ?: 'dev'}:refs/remotes/origin/${env.BRANCH_NAME ?: 'dev'}"
+                            ]]
+                        ])
                         sh 'git clean -fdx'
                         sh 'git reset --hard HEAD'
 
