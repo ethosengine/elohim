@@ -104,7 +104,8 @@ pub async fn handle_api_request(
         economic_events::handle(req, method, resource_path, &pool, &app_ctx).await
     } else if sub_path.starts_with("epr") {
         let resource_path = sub_path.strip_prefix("epr").unwrap_or("");
-        epr::handle(req, method, resource_path, &pool, &app_ctx, swarm_tx).await
+        // TODO(T22): pass a real EprFanOutCtx when main.rs wires registry/adapters.
+        epr::handle(req, method, resource_path, &pool, &app_ctx, swarm_tx, None).await
     } else if sub_path.starts_with("resources") {
         let resource_path = sub_path.strip_prefix("resources").unwrap_or("");
         resources::handle(req, method, resource_path, &pool, &app_ctx, services).await
