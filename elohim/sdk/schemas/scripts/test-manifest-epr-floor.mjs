@@ -102,6 +102,13 @@ function validStandingPolicyPayload() {
     manifestKind: 'standing-policy',
     revision: 1,
     floor: { classes: standingFloorClasses() },
+    debitWeights: {
+      squelch: { advisory: 0, 'debit-soft': 1, 'debit-firm': 3 },
+      correction: { advisory: 0, 'debit-soft': 10, 'debit-firm': 20 },
+      retraction: { advisory: 0, 'debit-soft': -5, 'debit-firm': -10 },
+      quarantine: { advisory: 0, 'debit-soft': 12, 'debit-firm': 30 },
+      vouch: { advisory: 0, 'debit-soft': -3, 'debit-firm': -8 },
+    },
   };
 }
 

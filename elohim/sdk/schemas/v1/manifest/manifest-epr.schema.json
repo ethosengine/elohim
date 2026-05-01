@@ -103,13 +103,8 @@
             "required": ["manifestKind"]
           },
           "then": {
-            "required": ["floor"],
-            "properties": {
-              "floor": {
-                "$ref": "standing-policy-floor.schema.json",
-                "description": "Constitutional standing-immune floor declaration. Required when manifestKind is standing-policy. T7 bundles standing-policy-floor.schema.json via include_str! and validates this sub-object at integrity-zome create-time. All five standing-immune classes (§2.8) must be present."
-              }
-            }
+            "$ref": "standing-policy-floor.schema.json",
+            "description": "Constitutional standing-policy manifest payload. Required when manifestKind is standing-policy. T7 bundles standing-policy-floor.schema.json via include_str! and validates the full payload at integrity-zome create-time: all five standing-immune classes (§2.8) plus debitWeights (including the vouch recovery weights), unknownTreatment policy, and per-reach standing thresholds."
           }
         },
         {

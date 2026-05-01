@@ -29,10 +29,25 @@
     "squelch": { "advisory": 0, "debit-soft": 1, "debit-firm": 3 },
     "correction": { "advisory": 0, "debit-soft": 10, "debit-firm": 20 },
     "retraction": { "advisory": 0, "debit-soft": -5, "debit-firm": -10 },
-    "quarantine": { "advisory": 0, "debit-soft": 12, "debit-firm": 30 }
+    "quarantine": { "advisory": 0, "debit-soft": 12, "debit-firm": 30 },
+    "vouch": { "advisory": 0, "debit-soft": -3, "debit-firm": -8 }
   },
   "newVoiceBaseline": {
     "score": "floor",
     "vulnerableClassLift": "low"
+  },
+  "unknownTreatment": {
+    "default": "conservative",
+    "evidenceSources": []
+  },
+  "reachThresholds": {
+    "personal": "any",
+    "intimate": "any",
+    "household": "any",
+    "neighborhood": "any",
+    "collective": "neutral",
+    "community": "neutral",
+    "district": "neutral",
+    "public": "high"
   }
 }
