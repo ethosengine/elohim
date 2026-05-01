@@ -62,10 +62,14 @@ const CLASSIFICATIONS: &[&str] = &["values-forward", "fatigue", "scope-mismatch"
 #[hdk_entry_helper]
 #[derive(Clone)]
 pub struct AttentionTending {
-    /// JSON-encoded FilterSubject — schema will be defined by T15.
+    /// JSON-encoded FilterSubject — inner schema deferred to T15.
+    /// HDI accepts any String here; T9 coordinator must `serde_json::from_str`
+    /// to verify syntactic validity before calling `create_entry`. Malformed
+    /// JSON committed via the integrity zome is silently accepted by this layer.
     pub filter_subject_json: String,
 
-    /// values-forward / fatigue / scope-mismatch / safety
+    /// Whitelisted against `CLASSIFICATIONS` by `validate()`:
+    /// values-forward / fatigue / scope-mismatch / safety.
     pub classification: String,
 
     /// Optional human-readable reason.
@@ -77,10 +81,16 @@ pub struct AttentionTending {
     /// Unix timestamps; non-empty (creation + re-tendings).
     pub tended_at: Vec<u64>,
 
-    /// JSON-encoded ContextScope — schema will be defined by T15.
+    /// JSON-encoded ContextScope — inner schema deferred to T15.
+    /// Same rule as `filter_subject_json`: T9 coordinator gates JSON syntax;
+    /// the integrity zome only enforces `String` shape.
     pub context_json: String,
 
-    /// Raw bytes of signer's pubkey (T9 coordinator decodes from wire).
+    /// Raw bytes of signer's pubkey. On the wire (T2) this is base64-encoded;
+    /// the integrity zome stores raw bytes for compact, canonical DHT anchoring
+    /// (mirrors T4 FeedbackSignal's pattern). T9 coordinator verifies the
+    /// signature over the wire envelope before calling `create_entry`; the
+    /// integrity zome trusts this field's bytes are a valid pubkey.
     pub signer_pubkey: Vec<u8>,
 }
 
