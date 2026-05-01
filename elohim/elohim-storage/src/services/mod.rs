@@ -58,6 +58,7 @@ pub mod responsibility_demand_service;
 pub mod risk_alert;
 pub mod routing;
 pub mod schemaref_resolver;
+pub mod sealed_against_self;
 pub mod sidecar_engine;
 pub mod sla_service;
 pub mod spatial;

@@ -66,6 +66,11 @@ base64 = "0.22"
 blake3 = "1"
 # Ed25519 verify_strict for resolver-backed EPR signature check (Task A.7)
 ed25519-dalek = { version = "2.1", features = ["digest"] }
+# Sealed-against-self 2-of-2 crypto (Task T11 — EPR Phase 3.5)
+# Pure-Rust libsodium-compatible sealed boxes (X25519/XSalsa20/Poly1305).
+# default-features=false strips sodiumoxide compat tests; serde enables
+# Serialize/Deserialize on DryocBox types.
+dryoc = { version = "0.6", default-features = false, features = ["serde"] }
 hostname = "0.4"  # gethostname() for node-shape self-registration at boot
 url = "2"  # Query string parsing for HTTP sync API
 
