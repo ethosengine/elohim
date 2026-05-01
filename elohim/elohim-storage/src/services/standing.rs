@@ -34,6 +34,36 @@ pub enum StandingScore {
     Trusted, // long-running good-faith stewardship
 }
 
+impl StandingScore {
+    /// Ordinal rank for comparison. Used by `Standing::with_lift`.
+    pub fn rank(self) -> u8 {
+        match self {
+            StandingScore::Floor => 0,
+            StandingScore::Low => 1,
+            StandingScore::Neutral => 2,
+            StandingScore::High => 3,
+            StandingScore::Trusted => 4,
+        }
+    }
+}
+
+impl Standing {
+    /// Apply a vulnerable-class baseline lift.
+    ///
+    /// - `None` → returns self unchanged (identity)
+    /// - `Unknown + Some(l)` → `Computed { score: l }`
+    /// - `Computed { score } + Some(l)` → `Computed { score: max(score, l) }` (never demotes)
+    pub fn with_lift(self, lift: Option<StandingScore>) -> Self {
+        match (self, lift) {
+            (s, None) => s,
+            (Standing::Unknown, Some(l)) => Standing::Computed { score: l },
+            (Standing::Computed { score }, Some(l)) => Standing::Computed {
+                score: if score.rank() >= l.rank() { score } else { l },
+            },
+        }
+    }
+}
+
 impl Standing {
     /// Phase 3 placeholder evaluator. Returns Unknown.
     ///
@@ -110,6 +140,57 @@ impl Standing {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // -------------------------------------------------------------------------
+    // T10 — Standing::with_lift tests
+    // -------------------------------------------------------------------------
+
+    #[test]
+    fn with_lift_promotes_unknown_to_lifted_score() {
+        let lifted = Standing::Unknown.with_lift(Some(StandingScore::Low));
+        assert_eq!(
+            lifted,
+            Standing::Computed {
+                score: StandingScore::Low
+            }
+        );
+    }
+
+    #[test]
+    fn with_lift_takes_max_of_existing_and_lift() {
+        let s = Standing::Computed {
+            score: StandingScore::Floor,
+        };
+        let lifted = s.with_lift(Some(StandingScore::Low));
+        assert_eq!(
+            lifted,
+            Standing::Computed {
+                score: StandingScore::Low
+            }
+        );
+    }
+
+    #[test]
+    fn with_lift_does_not_demote() {
+        let s = Standing::Computed {
+            score: StandingScore::High,
+        };
+        let lifted = s.with_lift(Some(StandingScore::Low));
+        assert_eq!(
+            lifted,
+            Standing::Computed {
+                score: StandingScore::High
+            }
+        );
+    }
+
+    #[test]
+    fn with_lift_none_is_identity() {
+        let s = Standing::Computed {
+            score: StandingScore::Neutral,
+        };
+        assert_eq!(s.with_lift(None), s);
+    }
 
     #[allow(deprecated)]
     #[test]
