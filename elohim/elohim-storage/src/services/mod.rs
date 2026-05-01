@@ -52,6 +52,7 @@ pub mod peer_selection;
 pub mod presence_service;
 pub mod provenance_service;
 pub mod rea_commitment_service;
+pub mod reach_earning;
 pub mod recognition_pipeline_service;
 pub mod relationship_density;
 pub mod relationship_service;
