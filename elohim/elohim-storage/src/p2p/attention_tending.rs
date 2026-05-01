@@ -105,7 +105,7 @@ pub struct AttentionTending {
 
     /// Unix timestamps of tending events. The earliest is creation; later
     /// entries are re-tending events. Must be non-empty.
-    pub tended_at: Vec<i64>,
+    pub tended_at: Vec<u64>,
 
     /// Scope where this tending applies: collective, mode, time-of-day, etc.
     /// Open stub — T15 may enrich the inner shape.

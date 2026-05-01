@@ -28,7 +28,7 @@
     },
     "tendedAt": {
       "type": "array",
-      "items": { "type": "integer" },
+      "items": { "type": "integer", "minimum": 0 },
       "minItems": 1,
       "description": "Unix timestamps of tending events; the earliest is creation, later entries are re-tending. Non-empty required: an AttentionTending with no events is meaningless."
     },

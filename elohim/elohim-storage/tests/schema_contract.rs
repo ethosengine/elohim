@@ -1771,3 +1771,31 @@ fn attention_tending_with_empty_tended_at_rejected_by_schema() {
         "schema should reject tendedAt: [] (minItems: 1 violated)"
     );
 }
+
+#[test]
+fn attention_tending_with_negative_tended_at_rejected_by_schema() {
+    // Hand-crafted Value — NOT constructed through the Rust struct — so this
+    // proves the JSON Schema minimum: 0 constraint on tendedAt items fires
+    // independently of Rust's type system (Vec<u64> already blocks negatives
+    // at compile time; this test guards the schema layer end-to-end).
+    let bad_instance = serde_json::json!({
+        "filterSubject": {},
+        "classification": "values-forward",
+        "ttlSeconds": 3600,
+        "tendedAt": [-1],
+        "context": {},
+        "signedBy": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+        "signature": "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB="
+        // tendedAt: [-1] — negative timestamp; schema minimum: 0 must reject
+    });
+
+    let schema = load_schema("p2p/attention-tending.schema.json");
+    let validator = jsonschema::validator_for(&schema)
+        .expect("attention-tending schema should compile");
+
+    let has_errors = validator.iter_errors(&bad_instance).next().is_some();
+    assert!(
+        has_errors,
+        "schema should reject tendedAt: [-1] (items minimum: 0 violated)"
+    );
+}
