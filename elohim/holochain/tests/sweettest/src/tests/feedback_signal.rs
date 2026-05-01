@@ -121,9 +121,22 @@ struct FeedbackSignalRecord {
 struct FeedbackSignalEntry {
     pub target_cid: String,
     pub signal_kind: String,
+    /// T5 addition: vouch sub-semantics; None for non-vouch signals.
+    #[serde(default)]
+    pub vouch_kind: Option<String>,
     pub evidence_cid: Option<String>,
     pub standing_impact: String,
     pub signer_pubkey: Vec<u8>,
+}
+
+/// Mirror of `content_store::feedback_signal::CreateVouchInput` (T6).
+///
+/// No `signer_pubkey` — coordinator derives it from `agent_info()`.
+#[derive(Debug, Clone, Serialize, Deserialize, SerializedBytes)]
+struct CreateVouchInput {
+    pub target_action_hash: ActionHash,
+    pub vouch_kind: String,
+    pub standing_impact: String,
 }
 
 // ---------------------------------------------------------------------------
@@ -165,7 +178,11 @@ async fn squelch_by_third_party_succeeds() -> Result<()> {
 
     // A creates content; extract action_hash from ContentOutput.
     let output: ContentOutput = ca
-        .call(&cell_a.zome("content_store"), "create_content", make_content("t8-s1"))
+        .call(
+            &cell_a.zome("content_store"),
+            "create_content",
+            make_content("t8-s1"),
+        )
         .await;
     let content_ah = output.action_hash;
 
@@ -177,7 +194,11 @@ async fn squelch_by_third_party_succeeds() -> Result<()> {
         standing_impact: "advisory".to_string(),
     };
     let fs_ah: ActionHash = cb
-        .call(&cell_b.zome("content_store"), "create_feedback_signal", input)
+        .call(
+            &cell_b.zome("content_store"),
+            "create_feedback_signal",
+            input,
+        )
         .await;
 
     // I2: get_feedback_signals_for_target must return the committed signal.
@@ -261,7 +282,11 @@ async fn correction_with_evidence_succeeds() -> Result<()> {
         standing_impact: "debit-soft".to_string(),
     };
     let _fs_ah: ActionHash = cb
-        .call(&cell_b.zome("content_store"), "create_feedback_signal", input)
+        .call(
+            &cell_b.zome("content_store"),
+            "create_feedback_signal",
+            input,
+        )
         .await;
 
     // Verify signer index.
@@ -298,7 +323,11 @@ async fn retraction_by_original_author_succeeds() -> Result<()> {
 
     // A creates content and then retracts it (author == caller — gate passes).
     let output: ContentOutput = ca
-        .call(&cell.zome("content_store"), "create_content", make_content("t8-s3"))
+        .call(
+            &cell.zome("content_store"),
+            "create_content",
+            make_content("t8-s3"),
+        )
         .await;
     let content_ah = output.action_hash;
 
@@ -347,7 +376,11 @@ async fn retraction_by_non_author_rejected() -> Result<()> {
 
     // A creates content.
     let output: ContentOutput = ca
-        .call(&cell_a.zome("content_store"), "create_content", make_content("t8-s4"))
+        .call(
+            &cell_a.zome("content_store"),
+            "create_content",
+            make_content("t8-s4"),
+        )
         .await;
     let content_ah = output.action_hash;
 
@@ -400,7 +433,11 @@ async fn correction_with_missing_evidence_rejected() -> Result<()> {
 
     // A creates content.
     let output: ContentOutput = ca
-        .call(&cell_a.zome("content_store"), "create_content", make_content("t8-s5"))
+        .call(
+            &cell_a.zome("content_store"),
+            "create_content",
+            make_content("t8-s5"),
+        )
         .await;
     let content_ah = output.action_hash;
 
@@ -452,7 +489,11 @@ async fn feedback_signal_update_rejected() -> Result<()> {
 
     // A creates content and a FeedbackSignal.
     let content_output: ContentOutput = ca
-        .call(&cell.zome("content_store"), "create_content", make_content("t8-s6"))
+        .call(
+            &cell.zome("content_store"),
+            "create_content",
+            make_content("t8-s6"),
+        )
         .await;
     let content_ah = content_output.action_hash;
 
@@ -468,11 +509,7 @@ async fn feedback_signal_update_rejected() -> Result<()> {
 
     // Try to call a non-existent update function — must fail at the API boundary.
     let update_result = ca
-        .call_fallible::<_, ActionHash>(
-            &cell.zome("content_store"),
-            "update_feedback_signal",
-            (),
-        )
+        .call_fallible::<_, ActionHash>(&cell.zome("content_store"), "update_feedback_signal", ())
         .await;
 
     assert!(
@@ -507,7 +544,11 @@ async fn quarantine_by_third_party_succeeds() -> Result<()> {
 
     // A creates content; extract action_hash from ContentOutput.
     let output: ContentOutput = ca
-        .call(&cell_a.zome("content_store"), "create_content", make_content("t8-s7"))
+        .call(
+            &cell_a.zome("content_store"),
+            "create_content",
+            make_content("t8-s7"),
+        )
         .await;
     let content_ah = output.action_hash;
 
@@ -519,7 +560,11 @@ async fn quarantine_by_third_party_succeeds() -> Result<()> {
         standing_impact: "debit-firm".to_string(),
     };
     let _fs_ah: ActionHash = cb
-        .call(&cell_b.zome("content_store"), "create_feedback_signal", input)
+        .call(
+            &cell_b.zome("content_store"),
+            "create_feedback_signal",
+            input,
+        )
         .await;
 
     // B's signer index must include the quarantine signal.
@@ -533,6 +578,184 @@ async fn quarantine_by_third_party_succeeds() -> Result<()> {
     assert_eq!(by_signer.len(), 1, "expected 1 signal from signer B");
     assert_eq!(by_signer[0].entry.signal_kind, "quarantine");
     assert_eq!(by_signer[0].entry.standing_impact, "debit-firm");
+
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Scenario 8 (T7): Alice vouches on Bob's correction — succeeds.
+// ---------------------------------------------------------------------------
+
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "Requires packed DNA from Jenkins pipeline"]
+async fn create_vouch_succeeds_when_signer_differs_from_target() -> Result<()> {
+    // Bob creates a correction. Alice vouches on it.
+    // Alice and Bob have different agent keys → no-self-vouch guard allows this.
+    let [(mut ca, a1), (mut cb, a2)] = two_agent_conductors().await?;
+    let dna = load_dna(DNA, &network_seed(DNA), Some(a1.clone())).await?;
+
+    let app_a = ca
+        .setup_app_for_agent("elohim-app-a", a1.clone(), &[dna.clone()])
+        .await?;
+    let app_b = cb
+        .setup_app_for_agent("elohim-app-b", a2.clone(), &[dna])
+        .await?;
+    let cell_a = app_a.cells().first().expect("cell A").clone();
+    let cell_b = app_b.cells().first().expect("cell B").clone();
+
+    // Bob creates a content item and a correction signal against it.
+    let content_output: ContentOutput = cb
+        .call(
+            &cell_b.zome("content_store"),
+            "create_content",
+            make_content("t7-s8-target"),
+        )
+        .await;
+    let content_ah = content_output.action_hash;
+
+    let evidence_output: ContentOutput = cb
+        .call(
+            &cell_b.zome("content_store"),
+            "create_content",
+            make_content("t7-s8-evidence"),
+        )
+        .await;
+    let evidence_ah = evidence_output.action_hash;
+
+    let correction_input = CreateFeedbackSignalInput {
+        target_action_hash: content_ah.clone(),
+        signal_kind: "correction".to_string(),
+        evidence_action_hash: Some(evidence_ah),
+        standing_impact: "debit-soft".to_string(),
+    };
+    let bob_correction_hash: ActionHash = cb
+        .call(
+            &cell_b.zome("content_store"),
+            "create_feedback_signal",
+            correction_input,
+        )
+        .await;
+
+    // Alice vouches on Bob's correction. Different agents → must succeed.
+    let vouch_input = CreateVouchInput {
+        target_action_hash: bob_correction_hash.clone(),
+        vouch_kind: "accept-correction".to_string(),
+        standing_impact: "debit-soft".to_string(),
+    };
+    let result = ca
+        .call_fallible::<_, ActionHash>(&cell_a.zome("content_store"), "create_vouch", vouch_input)
+        .await;
+    assert!(
+        result.is_ok(),
+        "alice vouching on bob's correction should succeed: {:?}",
+        result
+    );
+
+    let vouch_ah = result.unwrap();
+
+    // Verify the vouch appears in get_feedback_signals_for_target on the correction.
+    let by_target: Vec<FeedbackSignalRecord> = ca
+        .call(
+            &cell_a.zome("content_store"),
+            "get_feedback_signals_for_target",
+            bob_correction_hash.clone(),
+        )
+        .await;
+    assert_eq!(
+        by_target.len(),
+        1,
+        "expected 1 vouch signal for bob's correction"
+    );
+    assert_eq!(by_target[0].entry.signal_kind, "vouch");
+    assert_eq!(
+        by_target[0].entry.vouch_kind,
+        Some("accept-correction".to_string())
+    );
+    assert_eq!(by_target[0].action_hash, vouch_ah);
+
+    // Alice's signer index must include the vouch.
+    let by_signer: Vec<FeedbackSignalRecord> = ca
+        .call(
+            &cell_a.zome("content_store"),
+            "list_feedback_signals_by_signer",
+            a1.clone(),
+        )
+        .await;
+    assert_eq!(by_signer.len(), 1, "expected 1 vouch from alice");
+    assert_eq!(by_signer[0].entry.signal_kind, "vouch");
+
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Scenario 9 (T7): Bob tries to vouch on his own correction — REJECTED.
+// ---------------------------------------------------------------------------
+
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "Requires packed DNA from Jenkins pipeline"]
+async fn create_vouch_rejects_self_vouch() -> Result<()> {
+    // Bob creates a correction, then tries to vouch on it himself.
+    // Same agent key → no-self-vouch guard must reject.
+    let (mut cb, a2) = single_agent_conductor().await?;
+    let dna = load_dna(DNA, &network_seed(DNA), Some(a2.clone())).await?;
+    let app_b = cb
+        .setup_app_for_agent("elohim-app-b", a2.clone(), &[dna])
+        .await?;
+    let cell_b = app_b.cells().first().expect("cell B").clone();
+
+    // Bob creates a content item and a correction signal.
+    let content_output: ContentOutput = cb
+        .call(
+            &cell_b.zome("content_store"),
+            "create_content",
+            make_content("t7-s9-target"),
+        )
+        .await;
+    let content_ah = content_output.action_hash;
+
+    let evidence_output: ContentOutput = cb
+        .call(
+            &cell_b.zome("content_store"),
+            "create_content",
+            make_content("t7-s9-evidence"),
+        )
+        .await;
+    let evidence_ah = evidence_output.action_hash;
+
+    let correction_input = CreateFeedbackSignalInput {
+        target_action_hash: content_ah.clone(),
+        signal_kind: "correction".to_string(),
+        evidence_action_hash: Some(evidence_ah),
+        standing_impact: "debit-soft".to_string(),
+    };
+    let bob_correction_hash: ActionHash = cb
+        .call(
+            &cell_b.zome("content_store"),
+            "create_feedback_signal",
+            correction_input,
+        )
+        .await;
+
+    // Bob tries to vouch on his own correction — MUST fail.
+    let self_vouch_input = CreateVouchInput {
+        target_action_hash: bob_correction_hash.clone(),
+        vouch_kind: "accept-correction".to_string(),
+        standing_impact: "debit-soft".to_string(),
+    };
+    let result = cb
+        .call_fallible::<_, ActionHash>(
+            &cell_b.zome("content_store"),
+            "create_vouch",
+            self_vouch_input,
+        )
+        .await;
+
+    assert!(result.is_err(), "self-vouch must be rejected");
+    let err_str = format!("{:?}", result.unwrap_err());
+    assert!(
+        err_str.contains("self-vouch forbidden") || err_str.contains("forbidden"),
+        "error message must mention self-vouch or forbidden: {err_str}"
+    );
 
     Ok(())
 }

@@ -401,7 +401,9 @@ mod tests {
 
     #[test]
     fn accepts_vouch_accept_correction() {
-        assert!(make_vouch("accept-correction", "debit-soft").validate().is_ok());
+        assert!(make_vouch("accept-correction", "debit-soft")
+            .validate()
+            .is_ok());
     }
 
     #[test]
