@@ -5,6 +5,13 @@
 //! [`CollectiveFilterPatternCandidate`] records when participation meets the
 //! k-threshold.
 //!
+//! ## Window semantics
+//!
+//! `list_recent_tending` uses `last_tended_at >= window_start` (inclusive lower
+//! bound). A row whose `last_tended_at` equals exactly `window_start` IS included
+//! in the aggregation. Future authors: do not change this to `>` without updating
+//! all callers and their tests.
+//!
 //! ## Privacy invariant (constitutional)
 //!
 //! The emitted [`CollectiveFilterPatternCandidate`] MUST NOT contain any peer
@@ -172,11 +179,7 @@ pub fn aggregate_and_emit(
 
     for (classification, group) in &by_classification {
         let count = group.len();
-        let pct = if total_count == 0 {
-            0u8
-        } else {
-            ((count * 100) / total_count).min(100) as u8
-        };
+        let pct = (count * 100).checked_div(total_count).unwrap_or(0).min(100) as u8;
 
         // Phase 3.5: trend is always "stable" — real trend needs
         // window-over-window comparison (deferred to Phase 4+).
@@ -475,7 +478,7 @@ mod tests {
 
         let noised_pct = safety_candidate.participating_pct;
         assert!(
-            noised_pct >= 20 && noised_pct <= 40,
+            (20u8..=40).contains(&noised_pct),
             "noised_pct must be in [20, 40] for scale_pct=10, raw_pct=30, got {noised_pct}"
         );
     }
@@ -581,7 +584,6 @@ mod tests {
 
         let now = 1_000_000i64;
         let window_seconds = 86_400u64;
-        let window_start = now - window_seconds as i64; // 913_600
 
         // 3 rows within window.
         insert_n(&mut conn, "fatigue", 3, now);
@@ -610,9 +612,5 @@ mod tests {
             candidates[0].participating_pct, 100,
             "3 of 3 in-window rows are fatigue → 100%"
         );
-
-        // Confirm that window_start is exclusive by checking that rows at
-        // last_tended_at = window_start are included (>= semantics).
-        let _ = window_start; // used above implicitly via the insert timestamps
     }
 }
