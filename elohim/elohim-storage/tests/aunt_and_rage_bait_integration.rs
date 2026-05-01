@@ -35,7 +35,7 @@ mod harness_d8;
 use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
 use dryoc::classic::crypto_box::crypto_box_seed_keypair;
 use elohim_storage::p2p::dedup::DedupLru;
-use elohim_storage::p2p::feedback_signal::{FeedbackSignal, SignalKind, StandingImpact};
+use elohim_storage::p2p::feedback_signal::{FeedbackSignal, SignalKind, StandingImpact, VouchKind};
 use elohim_storage::services::back_prop::{
     back_prop_one_hop, record_predecessor, SealingPubKeys, UnsealingKeys,
 };
@@ -679,46 +679,97 @@ async fn aunt_and_rage_bait_three_peer_scenario() {
     );
 
     // =========================================================================
-    // Phase 11: RECOVERY-PATH SCAFFOLD — Retraction signal raises Bob's standing.
+    // Phase 11: VOUCH — Sarah vouches for Bob, recovering his standing.
     //
-    // Applies a Retraction(DebitFirm) via project_signal. The DefaultDebitWeightPolicy
-    // maps Retraction(DebitFirm) = -3 (restitution). Starting from sum=8 (Floor),
-    // sum becomes 8 + (-3) = 5 → Low.
+    // The Vouch primitive is a FeedbackSignal with signal_kind = Vouch and
+    // vouch_kind = AcceptCorrection. Sarah (the third-party voucher) issues
+    // two Vouch(DebitSoft) signals targeting BOB_CONTENT_CID. Each carries
+    // DefaultDebitWeightPolicy weight = -3.
     //
-    // NOTE: Production restitution will use the Vouch primitive (T26 — lifted
-    // in the next commit). This phase retains the retraction scaffold until T26
-    // replaces it with the real Vouch path.
+    // Starting debit_weight_sum = 8 (from Phase 8 Correction(DebitFirm)):
+    //   vouch 1: sum = 8 + (-3) = 5  → Low
+    //   vouch 2: sum = 5 + (-3) = 2  → Neutral
     //
-    // Direct service call: services::standing_projector::project_signal.
+    // Neutral satisfies the District threshold ("neutral" in bootstrap policy),
+    // so Bob's subsequent compose_epr(District) must return Ok.
+    //
+    // No-self-vouch constraint: signed_by is set to BOB_SUBJECT_BYTES (same
+    // HONEST DEVIATION as Phase 6) so that project_signal targets Bob's
+    // standing_view row. In production, the projector resolves the content
+    // author from the EPR store; that lookup is post-3.5. The no-self-vouch
+    // invariant (signed_by ≠ vouched-subject's key) is enforced at the
+    // coordinator/integrity-zome level (T7 unit tests). Sarah's identity as
+    // the issuer is carried by the fact that this signal arrives from Sarah's
+    // node — the test models this by constructing the signal on the Sarah path.
+    //
+    // Direct service call: services::standing_projector::project_signal (×2).
+    // harness_d8: NOT used — projection is local to Sarah's DB.
     // =========================================================================
 
-    let retraction_signal = FeedbackSignal {
+    // Vouch #1: sum = 8 → 5 (Low)
+    let vouch_signal_1 = FeedbackSignal {
         target_cid: BOB_CONTENT_CID.to_string(),
-        signal_kind: SignalKind::Retraction,
-        vouch_kind: None,
+        signal_kind: SignalKind::Vouch,
+        vouch_kind: Some(VouchKind::AcceptCorrection),
         evidence_cid: None,
-        standing_impact: StandingImpact::DebitFirm,
+        standing_impact: StandingImpact::DebitSoft,
         signed_by: bob_subject_b64.clone(),
-        signature: BASE64.encode([0xFEu8; 64]),
+        signature: BASE64.encode([0xAAu8; 64]),
     };
+    vouch_signal_1
+        .validate()
+        .expect("vouch_signal_1 must pass validate()");
 
-    let recovered_score = {
+    let score_after_vouch_1 = {
         let mut sarah_conn = sarah.db_pool.get().expect("sarah db conn");
         project_signal(
             &mut sarah_conn,
             &DefaultDebitWeightPolicy,
             &SARAH_EVALUATOR_BYTES,
-            &retraction_signal,
+            &vouch_signal_1,
             "bootstrap:standing-policy:v1",
         )
-        .expect("project_signal (retraction) must succeed")
+        .expect("project_signal (vouch 1) must succeed")
     };
 
-    // sum = 8 (from Phase 8) + (-3) (Retraction DebitFirm) = 5 → Low.
+    // sum = 8 + (-3) = 5 → Low
     assert_eq!(
-        recovered_score,
+        score_after_vouch_1,
         StandingScore::Low,
-        "Retraction(DebitFirm) = -3; sum goes from 8 to 5 → Low (partial recovery)"
+        "Vouch(DebitSoft) #1: sum = 8 + (-3) = 5 → Low"
+    );
+
+    // Vouch #2: sum = 5 → 2 (Neutral)
+    let vouch_signal_2 = FeedbackSignal {
+        target_cid: BOB_CONTENT_CID.to_string(),
+        signal_kind: SignalKind::Vouch,
+        vouch_kind: Some(VouchKind::AcceptCorrection),
+        evidence_cid: None,
+        standing_impact: StandingImpact::DebitSoft,
+        signed_by: bob_subject_b64.clone(),
+        signature: BASE64.encode([0xABu8; 64]),
+    };
+    vouch_signal_2
+        .validate()
+        .expect("vouch_signal_2 must pass validate()");
+
+    let score_after_vouch_2 = {
+        let mut sarah_conn = sarah.db_pool.get().expect("sarah db conn");
+        project_signal(
+            &mut sarah_conn,
+            &DefaultDebitWeightPolicy,
+            &SARAH_EVALUATOR_BYTES,
+            &vouch_signal_2,
+            "bootstrap:standing-policy:v1",
+        )
+        .expect("project_signal (vouch 2) must succeed")
+    };
+
+    // sum = 5 + (-3) = 2 → Neutral (boundary: 0..=2 → Neutral)
+    assert_eq!(
+        score_after_vouch_2,
+        StandingScore::Neutral,
+        "Vouch(DebitSoft) #2: sum = 5 + (-3) = 2 → Neutral (District threshold)"
     );
 
     // Verify via Standing::evaluate.
@@ -729,9 +780,45 @@ async fn aunt_and_rage_bait_three_peer_scenario() {
         assert_eq!(
             standing,
             Standing::Computed {
-                score: StandingScore::Low
+                score: StandingScore::Neutral
             },
-            "after Retraction, Standing::evaluate must return Computed(Low) — partial recovery"
+            "after two Vouch(DebitSoft) signals, Standing::evaluate must return Computed(Neutral)"
+        );
+    }
+
+    // =========================================================================
+    // Phase 12: COMPOSE RECOVERY — Bob's District compose now succeeds.
+    //
+    // After the two vouch signals, Bob's debit_weight_sum = 2 → Neutral.
+    // The District threshold is "neutral" in the bootstrap standing-policy.
+    // Neutral ≥ Neutral → compose_epr must return Ok.
+    //
+    // Direct service call: services::epr_compose::compose_epr.
+    // =========================================================================
+
+    {
+        let registry = ManifestRegistry::new();
+        {
+            let mut sarah_conn = sarah.db_pool.get().expect("sarah db conn for registry");
+            registry
+                .load_from_db(&mut sarah_conn)
+                .expect("load_from_db must succeed for compose recovery check");
+        }
+        let mut sarah_conn = sarah
+            .db_pool
+            .get()
+            .expect("sarah db conn for compose recovery");
+        let recovery_result = compose_epr(
+            &SARAH_EVALUATOR_BYTES,
+            &BOB_SUBJECT_BYTES,
+            Reach::District,
+            &mut sarah_conn,
+            &registry,
+        );
+        assert!(
+            recovery_result.is_ok(),
+            "after Vouch recovery (sum=2 → Neutral), compose_epr(District) must return Ok; \
+             got: {recovery_result:?}"
         );
     }
 }
