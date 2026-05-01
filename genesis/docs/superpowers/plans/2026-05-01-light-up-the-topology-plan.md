@@ -3955,6 +3955,141 @@ git commit -am "feat(doorway): dashboard_topology service (operator view aggrega
 
 Each handler in this phase is a **thin projection layer** over the view services from Phase 4. No business logic in handlers; auth context resolution + service call + JSON serialization only. Routes are declared in `build_manifest()` per `project_doorway_manifest_driven_routes`.
 
+### Task T28a: Doorway → storage agent_cid header propagation
+
+**Why this is here:** T01 found that doorway's shared registry proxy (`storage_proxy::forward_to_storage`) does NOT inject any `X-Agent-*` header, and storage's `extract_agent_key` reads `X-Agent-Id` with a stale doc claim that "doorway middleware injects this." Phase 5 handlers (T30, T31, T32) all call into Phase 4 view services that take `agent_cid: &str` — without this task, they receive nothing and can't resolve bindings.
+
+The JWT today carries `agent_pub_key` (Holochain pubkey), not `agent_cid` (imagodei DHT CID). Two wiring options; the implementer must pick one explicitly:
+
+| Option | Where the resolution happens | Pros | Cons |
+|---|---|---|---|
+| **A — resolve at mint** | When doorway mints the JWT after login, look up `agent_pub_key → agent_cid` via imagodei coordinator and embed `agent_cid` in Claims | Static resolution, zero per-request cost | Mint path has to wait for imagodei round-trip |
+| **B — resolve at forward** | Storage proxy decodes bearer, looks up `agent_pub_key → agent_cid` via local projection cache, injects header | Simple to add later, no JWT shape change | Per-request cache lookup; cache miss = round-trip |
+
+Default to **Option A** unless a strong reason emerges during implementation. JWT mint is the natural binding moment.
+
+**Files:**
+- Modify: `doorway/doorway-service/src/auth/jwt.rs` (extend `Claims` with `agent_cid: Option<String>`; backwards-compatible default)
+- Modify: `doorway/doorway-service/src/routes/auth_routes.rs` (mint path: resolve agent_cid before signing)
+- Modify: `doorway/doorway-service/src/routes/storage_proxy.rs` (`forward_to_storage` and `forward_blob_to_storage`: decode bearer once, inject `X-Agent-Cid` header)
+- Modify: `elohim/elohim-storage/src/api/account.rs` (or its successor): add `extract_agent_cid` helper alongside the existing `extract_agent_key`; update doc comment to reflect what doorway actually does
+- Modify: `elohim/elohim-storage/src/http.rs` (CORS allow-list: add `X-Agent-Cid`)
+
+- [ ] **Step 1: Write failing test for header injection**
+
+In `doorway/doorway-service/src/routes/storage_proxy.rs` test module:
+
+```rust
+#[tokio::test]
+async fn forward_injects_agent_cid_header_from_jwt() {
+    let claims = Claims {
+        sub: "test_user".into(),
+        agent_pub_key: "uhCAk1234567890abcdef".into(),
+        agent_cid: Some("bafyreigtest_agent_cid".into()),
+        exp: 9999999999,
+        ..Default::default()
+    };
+    let token = encode_test_token(&claims);
+    let mut req = make_test_request("/api/v1/cluster", "GET");
+    req.headers_mut().insert(AUTHORIZATION, format!("Bearer {token}").parse().unwrap());
+
+    let captured = capture_forwarded_headers(req).await;
+    assert_eq!(captured.get("x-agent-cid").and_then(|v| v.to_str().ok()), Some("bafyreigtest_agent_cid"));
+}
+```
+
+- [ ] **Step 2: Run — expect fail (Claims has no agent_cid field, no injection logic)**
+
+```bash
+cd doorway/doorway-service
+RUSTFLAGS="" cargo test --lib forward_injects_agent_cid_header_from_jwt
+```
+
+Expected: compile error on `agent_cid` field of Claims.
+
+- [ ] **Step 3: Extend Claims**
+
+In `doorway/doorway-service/src/auth/jwt.rs`:
+
+```rust
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct Claims {
+    pub sub: String,
+    pub agent_pub_key: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub agent_cid: Option<String>,
+    pub exp: usize,
+    // ... existing fields preserved
+}
+```
+
+- [ ] **Step 4: Resolve agent_cid at mint**
+
+In the JWT mint path (login handler), after authenticating the user and resolving their `agent_pub_key`, look up the corresponding agent_cid:
+
+```rust
+let agent_cid = imagodei_lookup::resolve_agent_cid_for_pub_key(&conductor, &agent_pub_key).await
+    .ok();   // None if lookup fails — backwards-compatible; storage falls back to extract_agent_key
+let claims = Claims {
+    sub: user_id,
+    agent_pub_key,
+    agent_cid,
+    exp: ...,
+};
+```
+
+If `imagodei_lookup::resolve_agent_cid_for_pub_key` doesn't exist, add a thin helper that calls `imagodei::get_agent_for_pub_key` zome function and returns the EPR CID. The existing imagodei zome should already expose this; if not, escalate as a sub-blocker.
+
+- [ ] **Step 5: Inject header in forward**
+
+In `doorway/doorway-service/src/routes/storage_proxy.rs`, decode the bearer once at the top of `forward_to_storage` (and `forward_blob_to_storage`):
+
+```rust
+let claims = jwt::decode_bearer(req.headers().get(AUTHORIZATION))?;
+if let Some(cid) = claims.as_ref().and_then(|c| c.agent_cid.as_ref()) {
+    forwarded_headers.insert("x-agent-cid", cid.parse().unwrap());
+}
+// existing forwards (Content-Type, Authorization, X-Observation-Id) preserved
+```
+
+- [ ] **Step 6: CORS allow-list update**
+
+In `elohim/elohim-storage/src/http.rs`, add `X-Agent-Cid` to the allowed-headers list (next to the existing `X-Agent-Id`). Don't remove `X-Agent-Id` — keep both during the transition.
+
+- [ ] **Step 7: Add `extract_agent_cid` helper in storage**
+
+In `elohim/elohim-storage/src/api/account.rs` (or the successor module), add:
+
+```rust
+pub fn extract_agent_cid(headers: &HeaderMap) -> Option<&str> {
+    headers.get("x-agent-cid").and_then(|v| v.to_str().ok())
+}
+```
+
+Update the doc comment on `extract_agent_key` to reflect actual behavior (today's claim that doorway middleware injects it is wrong; either delete the claim or note that it's set by the bespoke portal-host handlers in `auth_routes.rs`).
+
+- [ ] **Step 8: Run — expect pass**
+
+```bash
+cd doorway/doorway-service
+RUSTFLAGS="" cargo test --lib forward_injects_agent_cid_header_from_jwt
+RUSTFLAGS="" cargo clippy -- -D warnings
+RUSTFLAGS="" cargo fmt --check
+```
+
+Expected: tests pass, clippy clean.
+
+- [ ] **Step 9: Commit**
+
+```bash
+git add doorway/doorway-service/src/auth/jwt.rs \
+        doorway/doorway-service/src/routes/auth_routes.rs \
+        doorway/doorway-service/src/routes/storage_proxy.rs \
+        elohim/elohim-storage/src/api/account.rs \
+        elohim/elohim-storage/src/http.rs
+git commit -m "feat(doorway,storage): T28a — propagate agent_cid via X-Agent-Cid header (JWT mint resolves; proxy injects)"
+```
+
 ### Task T29: Handler — GET /api/v1/blob/{hash}/distribution/details
 
 **Files:**
