@@ -1330,6 +1330,21 @@ diesel::table! {
     }
 }
 
+// EPR Phase 3.5 — standing_view (trust-compute gradient standing projection)
+// Source of truth: FeedbackSignal subgraph (Category C operational — recomputable).
+// Per-evaluator derived view; different evaluators project different scores
+// (pluralism property per brainstorm §4.2).
+diesel::table! {
+    standing_view (evaluator_pubkey, subject_pubkey) {
+        evaluator_pubkey -> Binary,
+        subject_pubkey -> Binary,
+        score -> Text,
+        debit_weight_sum -> Integer,
+        last_signal_at -> Text,
+        manifest_cid -> Text,
+    }
+}
+
 // EPR Phase 2B — B.3: projector cursor (Category C operational)
 diesel::table! {
     projector_cursor (pillar, kind) {
@@ -1415,6 +1430,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     shard_locations,
     shard_manifests,
     statement_votes,
+    standing_view,
     statements,
     steward_affinity,
     steward_credentials,

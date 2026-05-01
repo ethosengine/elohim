@@ -121,6 +121,9 @@ pub mod portal_hosts;
 // EPR Phase 3.5 — predecessor records (trust-compute gradient back-prop, Category C operational)
 pub mod predecessor_records;
 
+// EPR Phase 3.5 — standing_view (per-evaluator StandingScore projection, Category C operational)
+pub mod standing_view;
+
 use std::path::Path;
 use std::time::Duration;
 
