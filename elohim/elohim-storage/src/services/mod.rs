@@ -19,6 +19,7 @@
 //! SQLite Database
 //! ```
 
+pub mod aggregator;
 pub mod agreement_service;
 pub mod anomaly_detection;
 pub mod back_prop;
