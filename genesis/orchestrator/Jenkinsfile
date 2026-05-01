@@ -825,12 +825,15 @@ spec:
                                 // preserving enough history for orchestrator changeset diffs
                                 // against last-successful baselines. timeout:30 (per attempt)
                                 // replaces the git-plugin 10-min default that was exhausting.
-                                [$class: 'CloneOption', shallow: true, noTags: true, depth: 200, timeout: 30],
+                                // honorRefspec: only fetch the target branch, not +refs/heads/*
+                                // (#787 spent 27min on all-heads fetch even with depth:200).
+                                [$class: 'CloneOption', shallow: true, noTags: true, depth: 200, timeout: 30, honorRefspec: true],
                                 [$class: 'CleanBeforeCheckout']
                             ],
                             userRemoteConfigs: [[
                                 url: 'https://github.com/ethosengine/elohim.git',
-                                credentialsId: 'ee-bot-pat'
+                                credentialsId: 'ee-bot-pat',
+                                refspec: "+refs/heads/${env.BRANCH_NAME}:refs/remotes/origin/${env.BRANCH_NAME}"
                             ]]
                         ])
 
