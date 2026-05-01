@@ -31,6 +31,12 @@ pub mod feedback_signal;
 pub use feedback_signal::FeedbackSignal;
 
 // =============================================================================
+// EPR Phase 3.5: AttentionTending Entry Type (source-chain private; never DHT)
+// =============================================================================
+pub mod attention_tending;
+pub use attention_tending::AttentionTending;
+
+// =============================================================================
 // Generated Protocol Constants (from JSON Schema single source of truth)
 // =============================================================================
 pub mod generated_enums;
@@ -3677,6 +3683,11 @@ pub enum EntryTypes {
     Manifest(Manifest),
     // EPR Phase 3.5: FeedbackSignal — sense-respond signal on a content EPR.
     FeedbackSignal(FeedbackSignal),
+    // EPR Phase 3.5 P3.5.5: AttentionTending — peer-private discernment; stays
+    // on the agent's source chain, never gossiped to the DHT.
+    // Visibility::Private is the load-bearing flag (brainstorm §6.1).
+    #[entry_type(visibility = "private")]
+    AttentionTending(AttentionTending),
 
     // Qahal: Community & Relationships
     Relationship(Relationship),
@@ -4243,6 +4254,11 @@ fn validate_create_entry(app_entry: &EntryTypes) -> ExternResult<ValidateCallbac
 
         // EPR Phase 3.5 P3.5.1: FeedbackSignal — deterministic floor checks.
         EntryTypes::FeedbackSignal(signal) => adapt_validation(signal.validate()),
+
+        // EPR Phase 3.5 P3.5.5: AttentionTending — source-chain private; floor checks.
+        // Updates are supported (re-tending appends to tended_at, extends TTL); the
+        // validate_update_entry fallthrough to this function is intentional.
+        EntryTypes::AttentionTending(tending) => adapt_validation(tending.validate()),
 
         // Other entry types: accept for now (can add validation incrementally)
         _ => Ok(ValidateCallbackResult::Valid),
