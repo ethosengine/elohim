@@ -64,7 +64,15 @@ impl Standing {
         match fetch(conn, evaluator, subject) {
             Ok(Some(row)) => match deserialize_score(&row.score) {
                 Some(score) => Standing::Computed { score },
-                None => Standing::Unknown,
+                None => {
+                    tracing::warn!(
+                        score = %row.score,
+                        evaluator_len = evaluator.len(),
+                        subject_len = subject.len(),
+                        "unrecognized standing score in DB row, defaulting to Unknown"
+                    );
+                    Standing::Unknown
+                }
             },
             _ => Standing::Unknown,
         }

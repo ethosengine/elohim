@@ -114,7 +114,7 @@ pub fn project_signal(
 // Score/sum helpers (public so standing.rs can use deserialize_score)
 // ============================================================================
 
-fn score_for_debit_sum(sum: i32) -> StandingScore {
+pub(crate) fn score_for_debit_sum(sum: i32) -> StandingScore {
     // Cumulative debit thresholds. Negative sum = restitution beyond baseline.
     // Bootstrap thresholds; T17 replaces with manifest-driven values.
     match sum {
@@ -304,16 +304,20 @@ mod tests {
         );
     }
 
-    // Test 5: two evaluators project independently for same subject+signal.
+    // Test 5: pluralism isolation — two evaluators receive the IDENTICAL signal through
+    // the SAME default policy and each project into their OWN row. Row identity is
+    // (evaluator_pubkey, subject_pubkey), so a wrong WHERE clause that bled state from
+    // eval1's row into eval2's would produce sum=16 on eval2 instead of sum=8 and fail.
     #[test]
     fn two_evaluators_independent_state() {
         let pool = test_pool();
         let mut conn = pool.get().expect("conn");
         let policy = DefaultDebitWeightPolicy;
 
+        // SAME signal sent to both evaluators.
         let signal = make_signal(SignalKind::Correction, StandingImpact::DebitFirm);
 
-        // Evaluator 1 applies the signal.
+        // Evaluator 1 projects the signal (manifest_cid distinguishes ownership row).
         project_signal(
             &mut conn,
             &policy,
@@ -323,13 +327,12 @@ mod tests {
         )
         .expect("eval1 project");
 
-        // Evaluator 2 applies a different (advisory) signal for the same subject.
-        let advisory = make_signal(SignalKind::Squelch, StandingImpact::Advisory);
+        // Evaluator 2 projects the SAME signal (different manifest_cid = different steward).
         project_signal(
             &mut conn,
             &policy,
             &evaluator2(),
-            &advisory,
+            &signal,
             "bafyreimanifest_b",
         )
         .expect("eval2 project");
@@ -344,14 +347,82 @@ mod tests {
             .expect("fetch eval2")
             .expect("eval2 row exists");
 
-        // Evaluator 1 sees sum=8 (Correction DebitFirm), evaluator 2 sees sum=0 (Advisory).
-        assert_eq!(row1.debit_weight_sum, 8);
-        assert_eq!(row2.debit_weight_sum, 0);
-        assert_ne!(
-            row1.score, row2.score,
-            "evaluators must have independent standing views"
+        // Pluralism property: identical input + identical policy → identical output
+        // value, but each evaluator owns its OWN row. Both sums must be 8, not 16
+        // (state bleed) and not 0 (missing projection).
+        // Correction(DebitFirm) = 8 debit weight → sum=8 → Floor (threshold: 3..=7 → Low, ≥8 → Floor).
+        assert_eq!(row1.debit_weight_sum, 8, "eval1 sum must be 8");
+        assert_eq!(
+            row2.debit_weight_sum, 8,
+            "eval2 sum must be 8 (not 16 from bleed)"
         );
+        assert_eq!(
+            row1.score, "floor",
+            "eval1 score must be floor (sum=8 crosses Low threshold)"
+        );
+        assert_eq!(
+            row2.score, "floor",
+            "eval2 score must be floor (sum=8 crosses Low threshold)"
+        );
+        // Each row carries its own manifest_cid — independent stewardship identity.
         assert_eq!(row1.manifest_cid, "bafyreimanifest_a");
         assert_eq!(row2.manifest_cid, "bafyreimanifest_b");
+    }
+
+    // Test 6: threshold boundary walk — calls score_for_debit_sum at every breakpoint.
+    // An off-by-one in any match arm boundary would be caught here.
+    #[test]
+    fn score_thresholds_walk_boundaries() {
+        // sum ≤ -3  → Trusted
+        assert_eq!(
+            score_for_debit_sum(-3),
+            StandingScore::Trusted,
+            "sum=-3 → Trusted"
+        );
+        assert_eq!(
+            score_for_debit_sum(-100),
+            StandingScore::Trusted,
+            "sum=-100 → Trusted"
+        );
+
+        // -2 ..= -1 → High
+        assert_eq!(
+            score_for_debit_sum(-2),
+            StandingScore::High,
+            "sum=-2 → High"
+        );
+        assert_eq!(
+            score_for_debit_sum(-1),
+            StandingScore::High,
+            "sum=-1 → High"
+        );
+
+        // 0 ..= 2   → Neutral
+        assert_eq!(
+            score_for_debit_sum(0),
+            StandingScore::Neutral,
+            "sum=0 → Neutral"
+        );
+        assert_eq!(
+            score_for_debit_sum(2),
+            StandingScore::Neutral,
+            "sum=2 → Neutral"
+        );
+
+        // 3 ..= 7   → Low
+        assert_eq!(score_for_debit_sum(3), StandingScore::Low, "sum=3 → Low");
+        assert_eq!(score_for_debit_sum(7), StandingScore::Low, "sum=7 → Low");
+
+        // 8+        → Floor
+        assert_eq!(
+            score_for_debit_sum(8),
+            StandingScore::Floor,
+            "sum=8 → Floor"
+        );
+        assert_eq!(
+            score_for_debit_sum(100),
+            StandingScore::Floor,
+            "sum=100 → Floor"
+        );
     }
 }
