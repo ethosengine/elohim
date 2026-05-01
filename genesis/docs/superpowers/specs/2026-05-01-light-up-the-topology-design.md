@@ -830,6 +830,67 @@ Static verification only (Eclipse Che, no live stack). Step 2 (live `curl /api/v
 
 Until T28a lands, T22 should accept the calling agent identifier as an explicit handler argument (not from the request) so unit tests are unblocked, and the integration-test pass (Phase 10, T54+) is what validates header propagation against a live doorway.
 
+#### Pre-flight verification — T02 results (static, 2026-05-01)
+
+**Status: DONE_WITH_CONCERNS — outcome = "no table, no writer, no helper data". This is the largest pre-flight gap so far. Phase 4's T23 (`compose_distribution_summary`) cannot be implemented as written; it requires either a new table + writer pair (substrate work) or a fundamental rework of how projector ack state is sourced.**
+
+Static verification only (Eclipse Che, no live SQLite). The kickoff prompt's `sqlite3 ... SELECT COUNT(*) FROM rea_projection ...` cannot run against a live DB; static schema review against `migrations/` and a writer search across `src/` are sufficient to determine the design state.
+
+**Step 1 — schema review.** `grep -rni "create table"` across `elohim/elohim-storage/migrations/` enumerates every table that exists on a fresh storage.db. **There is no `rea_projection` table.** The closest neighbours are:
+
+- `projector_cursor` (migration `2026-04-25-010000_projector_cursor`, columns `pillar`, `kind`, `last_epr_cid`, `last_issued_at`, `updated_at`, PK `(pillar, kind)`) — a Category-C operational watermark table; tracks "how far has the projector advanced" per (pillar, kind), not per content unit.
+- `epr_atoms` (migration `2026-04-22-050000_add_epr_tables`) — the canonical projection of EPR atoms (CID-keyed); sibling tables `epr_coupling`, `epr_claims`, `epr_supersedence`. None carry projector ack state.
+- `agreements`, `rea_commitments`, `economic_events` (migration `2026-01-08-000000_initial`) — the three REA tables that `src/rea_projection.rs` *does* write to.
+
+Verbatim grep across `elohim/`: `projector_acks`, `ack_count`, `replica_peers`, `replica_count`, `projector_peer_id` are **not present in any migration, schema file, Rust struct, or test fixture in the entire repo** (the one match for `replica_count` is `total_replica_count` on a derived view struct in `views.rs:3172`, unrelated to a column).
+
+**Step 2 — writer search.** `src/rea_projection.rs` is **the signal-handler module**, not a backing store for a `rea_projection` table. The module name is misleading-by-coincidence with the kickoff prompt's expected table name. What it actually does (lines 124-206): receives `ReaProjectionSignal::{AgreementCommitted | ReaCommitmentCommitted | ReaEconomicEventCommitted}` from the conductor's post-commit hook and upserts into the corresponding REA table (`agreements`, `rea_commitments`, `economic_events`) with `dht_anchor_hash` set. **It does not emit a per-blob projector-ack record anywhere.** It also has a TODO at line 19-24 noting that it isn't even wired into the conductor's signal-receive loop yet — meaning even those three REA tables likely don't see projection writes outside dedicated tests.
+
+There is no other module in `src/` that writes to a `rea_projection` table. The grep `rea_projection` returns exactly one hit across all of `elohim/elohim-storage/`: the `pub mod rea_projection;` declaration in `src/lib.rs:62`.
+
+**Step 3 — what T23 assumes.** Plan T23 (`distribution_view::compose_summary`, lines 2935-3160) implements `load_projector_acks` as:
+
+```rust
+use crate::db::diesel_schema::rea_projection::dsl as r;
+Ok(r::rea_projection
+    .filter(r::cid.eq(blob_hash))
+    .filter(r::ack_count.gt(0))
+    .select(r::projector_peer_id)
+    .load::<String>(conn)?)
+```
+
+That is, the plan expects a `rea_projection` table with at minimum these columns:
+
+| Plan T23 expects | Actual |
+|---|---|
+| `cid: TEXT` (blob hash, content CID) | absent |
+| `ack_count: INTEGER` | absent |
+| `projector_peer_id: TEXT` | absent |
+
+Plan T23 also assumes two further tables that this static pass surfaced as similarly absent — flagged here for the controller, even though they are out of T02's stated scope:
+
+- `custodian_blob_commitments` (`load_replica_peer_ids`, `compute_reciprocity_hint`): expected columns `blob_hash`, `status` (`'healthy'|'probing'|...`), `custodian_id`, `committed_bytes`, `beneficiary_peer`. **Not in any migration.** `grep -rn "custodian_blob_commitments"` in `migrations/` returns zero.
+- `content_store` (`load_reach_class`): expected columns `blob_hash`, `reach_class`. **Not in any migration.** `grep -rn "content_store"` in `migrations/` returns zero.
+
+Together these are three load-bearing tables that T23 reads from and that do not exist. T02's specific charter is `rea_projection` only, but the controller should know the gap is wider before scoping a remediation task.
+
+**Outcome: no writer (and no table).** This is the third pre-flight outcome class beyond Gap-1 (no seeder) and Gap-2 (schema drift): "no projection at all". The plan's kickoff text anticipated this exact path — *"If 0 → projector signals aren't landing; T20 (`compose_distribution_summary`) should default `projectorCount = 0` and the demo will render 'peer-only' badges."* The substrate state is one step further than that: not zero rows, but zero tables.
+
+**What T23 needs that isn't there.** Two distinct things, in priority order:
+
+1. **A table to hold per-blob projector acks.** A Category-C operational table keyed by `(blob_hash, projector_peer_id)` with at least an `ack_count` (or `acked_at` timestamp + a count derived by query). Schema-first: the column names in the kickoff prompt (`projector_acks`, `ack_count`) and the plan T23 query (`cid`, `ack_count`, `projector_peer_id`) **diverge** — the migration that adds this table needs to pick one and update T23 if it isn't `(cid, ack_count, projector_peer_id)`. The kickoff prompt's `projector_acks IS NOT NULL` phrasing implies a JSON-list column, while T23's `r::projector_peer_id` and `r::ack_count` imply normalized FK rows. The latter is the one the implementation actually consumes; recommend the migration follow it.
+2. **A writer that populates it.** The current `rea_projection.rs` handler only writes the three REA tables, all of which are CID/id-keyed REA entities, not blob-hash-keyed projection acks. A new pathway is needed: either an additional signal variant `BlobProjectionAcked { blob_hash, projector_peer_id }` from a coordinator that watches for "this peer has projected the EPR for this blob", or — simpler — a doorway-side writer that marks an ack when the doorway successfully projects/serves a blob through its registry-routed path.
+
+**Suggested remediation pattern for the plan (parallel to T03a/b for AgentPeerBinding):**
+
+> T03c (NEW): migration adding `rea_projection` table with columns matching T23's query (`cid TEXT`, `projector_peer_id TEXT`, `ack_count INTEGER`, `last_acked_at TEXT`, PK `(cid, projector_peer_id)`); add Diesel schema entry; wire the writer either (a) into `rea_projection.rs` as a fourth signal variant once the underlying coordinator exists, or (b) as a doorway-side write at successful blob fetch time. Decision point: where the ack semantically originates (DHT-notarized vs. operational best-effort).
+>
+> Pending T03c, T23's Phase-4 implementation should **degrade gracefully**: if the table is absent (no migration applied, table-not-found error), `projector_count` defaults to 0 and `MyRole` cannot include the `Projector` axis (only `Replica | NotHosting | SoleReplica`). The simple-tier render then shows the "peer-only" badge described in the kickoff prompt's expected-zero-rows path. This matches the plan's stated graceful-degradation contract and unblocks the rest of Phase 4 from a substrate dep.
+
+**Adds a sub-task to T34 (operator dashboard).** Per kickoff prompt step 2: when the table eventually does exist, the operator topology view should expose `rea_projection` row counts (per-cid and per-projector_peer_id histograms) as a debug pane so live "are projector signals landing?" can be answered without sqlite shell access. This is a Phase 5 dashboard add, not Phase 0 work; logged here for inclusion when T34 is detailed.
+
+**Runtime verification still required (defer to Jenkins / local-dev once T03c lands):** `sqlite3 ~/.elohim-storage/storage.db "SELECT COUNT(*) FROM rea_projection WHERE ack_count > 0;"` — must run against a seeded + signal-wired stack. Until T03c, the query fails with `no such table: rea_projection`. After T03c with no writer wired: returns 0, and T23 graceful-degradation kicks in. After T03c with writer wired: positive count is the green light to drop the graceful-degradation branch.
+
 ### CI quality gates (per CLAUDE.md)
 
 ```
