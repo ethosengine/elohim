@@ -200,12 +200,14 @@ pub async fn spawn_d8_node(_name: &str, extra_topics: &[&str]) -> D8Node {
     let (p2p_cmd_tx, p2p_cmd_rx) = mpsc::channel::<P2PCommand>(64);
     let driver_p2p_cmd_rx = p2p_cmd_rx;
 
+    let driver_db_pool = db_pool.clone();
     tokio::spawn(run_d8_driver(
         swarm,
         cmd_rx,
         driver_p2p_cmd_rx,
         gossip_fwd_tx,
         integrity_fwd_tx,
+        driver_db_pool,
     ));
 
     D8Node {
@@ -230,12 +232,18 @@ async fn run_d8_driver(
     mut p2p_cmd_rx: mpsc::Receiver<P2PCommand>,
     gossip_fwd: mpsc::Sender<(String, Vec<u8>)>,
     integrity_fwd: mpsc::Sender<(String, Vec<u8>)>,
+    db_pool: DbPool,
 ) {
     let mut connected: std::collections::HashSet<PeerId> = Default::default();
     // KadGetProviders: query_id → (accumulated_providers, reply_oneshot)
     let mut pending_kad_providers: HashMap<
         kad::QueryId,
         (Vec<PeerId>, oneshot::Sender<Vec<PeerId>>),
+    > = HashMap::new();
+    // FetchEprAtomFromPeer: outbound_request_id → reply_oneshot
+    let mut pending_epr_fetches: HashMap<
+        request_response::OutboundRequestId,
+        oneshot::Sender<Option<Vec<u8>>>,
     > = HashMap::new();
     // Deferred DrainP2PCommands replies — accumulate commands until requested
     let mut buffered_p2p_cmds: Vec<P2PCommand> = Vec::new();
@@ -314,6 +322,7 @@ async fn run_d8_driver(
                     &mut swarm,
                     p2p_cmd,
                     &mut pending_kad_providers,
+                    &mut pending_epr_fetches,
                     &mut buffered_p2p_cmds,
                     &mut drain_reply,
                 );
@@ -327,8 +336,10 @@ async fn run_d8_driver(
                     &mut swarm,
                     &mut connected,
                     &mut pending_kad_providers,
+                    &mut pending_epr_fetches,
                     &gossip_fwd,
                     &integrity_fwd,
+                    &db_pool,
                 );
             }
         }
@@ -339,6 +350,10 @@ fn handle_p2p_command(
     swarm: &mut libp2p::Swarm<D8Behaviour>,
     cmd: P2PCommand,
     pending_kad_providers: &mut HashMap<kad::QueryId, (Vec<PeerId>, oneshot::Sender<Vec<PeerId>>)>,
+    pending_epr_fetches: &mut HashMap<
+        request_response::OutboundRequestId,
+        oneshot::Sender<Option<Vec<u8>>>,
+    >,
     buffered_p2p_cmds: &mut Vec<P2PCommand>,
     drain_reply: &mut Option<oneshot::Sender<Vec<P2PCommand>>>,
 ) {
@@ -356,6 +371,20 @@ fn handle_p2p_command(
             let query_id = swarm.behaviour_mut().kademlia.get_providers(key);
             pending_kad_providers.insert(query_id, (Vec::new(), reply));
             // KadGetProviders is handled inline; no buffering needed.
+            return;
+        }
+        P2PCommand::FetchEprAtomFromPeer {
+            peer_id,
+            ref cid,
+            reply,
+        } => {
+            // P3.4: send an EprAtomRequest::Fetch to the target peer via
+            // request-response and register the reply channel so the response
+            // can be delivered when the swarm event arrives.
+            let req = EprAtomRequest::Fetch { cid: cid.clone() };
+            let req_id = swarm.behaviour_mut().epr_atom.send_request(&peer_id, req);
+            pending_epr_fetches.insert(req_id, reply);
+            // FetchEprAtomFromPeer is handled inline; no buffering needed.
             return;
         }
         P2PCommand::PublishEprAnnounce {
@@ -393,13 +422,19 @@ fn handle_p2p_command(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn handle_d8_event(
     event: SwarmEvent<D8BehaviourEvent>,
     swarm: &mut libp2p::Swarm<D8Behaviour>,
     connected: &mut std::collections::HashSet<PeerId>,
     pending_kad_providers: &mut HashMap<kad::QueryId, (Vec<PeerId>, oneshot::Sender<Vec<PeerId>>)>,
+    pending_epr_fetches: &mut HashMap<
+        request_response::OutboundRequestId,
+        oneshot::Sender<Option<Vec<u8>>>,
+    >,
     gossip_fwd: &mpsc::Sender<(String, Vec<u8>)>,
     integrity_fwd: &mpsc::Sender<(String, Vec<u8>)>,
+    db_pool: &DbPool,
 ) {
     match event {
         SwarmEvent::ConnectionEstablished { peer_id, .. } => {
@@ -457,6 +492,35 @@ fn handle_d8_event(
             let topic = message.topic.as_str().to_string();
             let _ = gossip_fwd.try_send((topic, message.data));
         }
+        // EprAtom request-response: handle incoming Fetch (P3.4 — serve atom from local DB)
+        SwarmEvent::Behaviour(D8BehaviourEvent::EprAtom(request_response::Event::Message {
+            peer: _,
+            message:
+                request_response::Message::Request {
+                    request: EprAtomRequest::Fetch { cid },
+                    channel,
+                    ..
+                },
+        })) => {
+            let response = match db_pool.get() {
+                Ok(mut conn) => {
+                    match elohim_storage::services::epr_service::fetch_wire_bytes_by_cid(
+                        &mut conn, &cid,
+                    ) {
+                        Ok(Some(fetched)) => EprAtomResponse::Atom {
+                            envelope_bytes: fetched.wire_bytes,
+                        },
+                        Ok(None) => EprAtomResponse::NotFound,
+                        Err(_) => EprAtomResponse::NotFound,
+                    }
+                }
+                Err(_) => EprAtomResponse::NotFound,
+            };
+            let _ = swarm
+                .behaviour_mut()
+                .epr_atom
+                .send_response(channel, response);
+        }
         // EprAtom request-response: handle IntegrityNotify
         SwarmEvent::Behaviour(D8BehaviourEvent::EprAtom(request_response::Event::Message {
             peer: _,
@@ -479,6 +543,31 @@ fn handle_d8_event(
                     reason: None,
                 },
             );
+        }
+        // EprAtom request-response: handle outbound response (P3.4 cold-fetch reply)
+        SwarmEvent::Behaviour(D8BehaviourEvent::EprAtom(request_response::Event::Message {
+            peer: _,
+            message:
+                request_response::Message::Response {
+                    request_id,
+                    response,
+                },
+        })) => {
+            if let Some(reply) = pending_epr_fetches.remove(&request_id) {
+                let bytes = match response {
+                    EprAtomResponse::Atom { envelope_bytes } => Some(envelope_bytes),
+                    _ => None,
+                };
+                let _ = reply.send(bytes);
+            }
+        }
+        // EprAtom outbound failure: deliver None to any waiting fetch
+        SwarmEvent::Behaviour(D8BehaviourEvent::EprAtom(
+            request_response::Event::OutboundFailure { request_id, .. },
+        )) => {
+            if let Some(reply) = pending_epr_fetches.remove(&request_id) {
+                let _ = reply.send(None);
+            }
         }
         // Identify — needed for Gossipsub mesh formation
         SwarmEvent::Behaviour(D8BehaviourEvent::Identify(identify::Event::Received {

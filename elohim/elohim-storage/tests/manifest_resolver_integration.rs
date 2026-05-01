@@ -1,4 +1,4 @@
-//! T14 — Manifest resolver integration tests (EPR Phase 3).
+//! T14 — Manifest resolver integration tests (EPR Phase 3 / Phase 3.5).
 //!
 //! Four scenarios:
 //!
@@ -7,9 +7,10 @@
 //!    mapping.
 //!
 //! 2. `cold_fetch_resolves_manifest_from_peer` — Cross-peer manifest cold-fetch.
-//!    IGNORED (Phase 3.5): real cross-peer harness required; the harness today does
-//!    not expose a connect_nodes helper that drives both swarms inside put's
-//!    blocking_send path.
+//!    Phase 3.5: lifted from #[ignore] using the existing harness_d8 infrastructure.
+//!    Two D8Nodes are spawned; node_a holds a Manifest EPR; node_b cold-fetches via
+//!    FederatedEprStore wired to node_b's swarm. The test exercises the full
+//!    KadGetProviders → FetchEprAtomFromPeer → EprAtomRequest::Fetch round-trip.
 //!
 //! 3. `floor_cid_lookup_unconditional_at_unknown_standing` — CID lookup via
 //!    LocalEprStore::fetch succeeds regardless of standing; floor protection
@@ -20,13 +21,18 @@
 //!    limit 3 for non-Manifest kinds).  Uses direct DB seeding (ManifestRow
 //!    inserts) to avoid complex cross-CID chaining through EPR builder.
 
+mod harness_d8;
+
 use elohim_epr::{cid::compute_cid, proof::AgentKeypair, Coupling, EprKind, Reach};
 use elohim_storage::db::manifests::{insert_manifest, ManifestRow};
-use elohim_storage::services::epr_store::{EprStore, FederatedEprStore};
+use elohim_storage::services::epr_service::ingest;
+use elohim_storage::services::epr_store::{EprStore, FederatedEprStore, LocalEprStore};
 use elohim_storage::services::manifest_registry::ManifestRegistry;
 use elohim_storage::services::schemaref_resolver::walk_schemaref;
 use elohim_storage::services::standing::{Standing, StandingScore};
 use elohim_storage::test_util::test_pool;
+use harness_d8::{connect, spawn_d8_node};
+use std::time::Duration;
 
 // ---------------------------------------------------------------------------
 // Test helpers
@@ -158,27 +164,107 @@ async fn manifest_creation_projects_to_registry() {
 //
 // Phase 3.5: real cross-peer harness lifts the ignore.
 //
-// Rationale for ignore: cold-fetch via FederatedEprStore::fetch uses
-// blocking_send into the swarm command channel, which requires the libp2p
-// swarm driver task to be running inside the same tokio runtime and the
-// KadGetProviders responder to be wired up.  The harness in
-// `tests/harness/mod.rs` exposes request-response (EPR atom protocol) but
-// not a KadGetProviders command responder, so we cannot drive the swarm's
-// provider lookup from an integration test without non-trivial harness
-// extension.  The LocalEprStore::fetch (no swarm) path and the
-// FederatedEprStore::fetch local-hit path are covered by tests 1 and 3;
-// the cold-fetch-via-Kad path is exercised by the existing epr_store unit
-// tests in src/services/epr_store.rs (`providers_includes_kad_results_when_swarm_provides`).
+// Two D8Nodes (node_a = author, node_b = cold-fetcher) are wired together
+// via the existing harness_d8 infrastructure.  Node_a ingests a Manifest EPR
+// and publishes a Kad provider record.  Node_b's FederatedEprStore::fetch
+// exercises the full KadGetProviders → FetchEprAtomFromPeer → EprAtomRequest::
+// Fetch round-trip.  Harness_d8 was extended (T19) to handle FetchEprAtomFromPeer
+// P2PCommands and serve incoming EprAtomRequest::Fetch from the node's local DB.
+//
+// Design: harness_d8 reuse instead of a new multi_peer.rs module.  The
+// harness_d8 already has Kad + Gossipsub + request-response (683 lines); a
+// parallel module would duplicate working code (YAGNI).
 // ---------------------------------------------------------------------------
 
-#[tokio::test]
-#[ignore = "Phase 3.5: real cross-peer harness lifts the ignore"]
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn cold_fetch_resolves_manifest_from_peer() {
-    // Placeholder: two nodes, node_a holds a Manifest EPR, node_b cold-fetches
-    // via FederatedEprStore with swarm_tx wired to node_b's swarm handle.
-    // Requires a cross-node harness that drives KadGetProviders + FetchEprAtomFromPeer
-    // command round-trips inside a tokio multi_thread runtime.
-    todo!("Phase 3.5")
+    // -----------------------------------------------------------------------
+    // Step 1: spawn two nodes and connect them.
+    // -----------------------------------------------------------------------
+    let node_a = spawn_d8_node("t19-a", &[]).await;
+    let node_b = spawn_d8_node("t19-b", &[]).await;
+
+    connect(&node_a, &node_b).await;
+
+    // -----------------------------------------------------------------------
+    // Step 2: author a Manifest EPR on node_a and ingest it into node_a's DB.
+    // -----------------------------------------------------------------------
+    let epr = build_manifest_epr("shefa", &["EconomicEvent", "Stewardship"]);
+    let expected_cid = epr.envelope.cid.to_string();
+
+    {
+        let pool_a = node_a.db_pool.clone();
+        let mut conn_a = pool_a.get().expect("node_a db connection");
+        ingest(&mut conn_a, epr).expect("ingest must succeed on node_a");
+    }
+
+    // -----------------------------------------------------------------------
+    // Step 3: publish a Kad provider record on node_a for this CID.
+    // FederatedEprStore::put would do this automatically, but we ingested
+    // directly (bypassing put) to keep the EPR out of node_b's DB.
+    // -----------------------------------------------------------------------
+    node_a.kad_start_providing(&expected_cid).await;
+
+    // Give Kad a moment to propagate the provider record across the in-process
+    // mesh.  Same reasoning as the D.8 scenario 1 harness-limitation comment.
+    tokio::time::sleep(Duration::from_millis(500)).await;
+
+    // -----------------------------------------------------------------------
+    // Step 4: cold-fetch from node_b via FederatedEprStore.
+    //
+    // FederatedEprStore::fetch uses blocking_send + blocking_recv internally;
+    // we call it from a spawn_blocking so the tokio executor threads remain
+    // free to drive the swarms.
+    // -----------------------------------------------------------------------
+    let pool_b = node_b.db_pool.clone();
+    let swarm_tx_b = node_b.p2p_cmd_tx();
+    let cid_for_fetch = expected_cid.clone();
+
+    let fetch_result = tokio::time::timeout(
+        Duration::from_secs(10),
+        tokio::task::spawn_blocking(move || {
+            let store = FederatedEprStore::new().with_swarm_tx(swarm_tx_b);
+            let mut conn = pool_b.get().expect("node_b db connection");
+            store.fetch(&mut conn, &cid_for_fetch)
+        }),
+    )
+    .await
+    .expect("cold_fetch_resolves_manifest_from_peer: 10s timeout exceeded")
+    .expect("spawn_blocking join error")
+    .expect("FederatedEprStore::fetch must not error");
+
+    // -----------------------------------------------------------------------
+    // Step 5: assert node_b received and cached the EPR.
+    // -----------------------------------------------------------------------
+    assert!(
+        fetch_result.is_some(),
+        "cold_fetch_resolves_manifest_from_peer: FederatedEprStore::fetch must return Some(_) \
+         after resolving via Kad + request-response from node_a; got None — \
+         CID: {expected_cid}"
+    );
+
+    let outcome = fetch_result.unwrap();
+    assert_eq!(
+        outcome.fetched.atom.cid, expected_cid,
+        "cold-fetched CID must match the authored Manifest EPR CID"
+    );
+
+    // The EPR must now be cached locally in node_b's DB.
+    let pool_b2 = node_b.db_pool.clone();
+    let cid_for_local = expected_cid.clone();
+    let local_hit = tokio::task::spawn_blocking(move || {
+        let store = LocalEprStore::new();
+        let mut conn = pool_b2.get().expect("node_b db connection (local check)");
+        store.fetch(&mut conn, &cid_for_local)
+    })
+    .await
+    .expect("spawn_blocking join error")
+    .expect("LocalEprStore::fetch must not error");
+
+    assert!(
+        local_hit.is_some(),
+        "after cold-fetch, the EPR must be cached in node_b's local store (CID: {expected_cid})"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -191,9 +277,6 @@ async fn cold_fetch_resolves_manifest_from_peer() {
 
 #[test]
 fn floor_cid_lookup_unconditional_at_unknown_standing() {
-    use elohim_storage::services::epr_service::ingest;
-    use elohim_storage::services::epr_store::{EprStore, LocalEprStore};
-
     let pool = test_pool();
     let mut conn = pool.get().expect("connection");
 

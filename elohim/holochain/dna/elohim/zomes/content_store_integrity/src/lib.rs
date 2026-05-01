@@ -25,6 +25,38 @@ pub mod manifest;
 pub use manifest::Manifest;
 
 // =============================================================================
+// EPR Phase 3.5: FeedbackSignal Entry Type (DHT layer)
+// =============================================================================
+pub mod feedback_signal;
+pub use feedback_signal::FeedbackSignal;
+
+// =============================================================================
+// EPR Phase 3.5: AttentionTending Entry Type (source-chain private; never DHT)
+// =============================================================================
+pub mod attention_tending;
+pub use attention_tending::AttentionTending;
+
+// =============================================================================
+// EPR Phase 3.5: CollectiveFilterPattern Entry Type (public DHT; k-anonymous aggregate)
+// =============================================================================
+pub mod collective_filter_pattern;
+pub use collective_filter_pattern::CollectiveFilterPattern;
+
+// =============================================================================
+// EPR Phase 3.5: Shared classification vocabulary
+//
+// Vocabulary-parity invariant: TENDING_CLASSIFICATIONS is the single source of
+// truth for the four bootstrap attention-tending classification values. Both
+// AttentionTending (T5, individual record) and CollectiveFilterPattern (T6,
+// k-anonymous aggregate) import from here. Future vocabulary extensions
+// (T15/T16) update ONE place and both entry types stay in sync automatically.
+//
+// Wire values are kebab-case, matching the T2 `Classification` enum wire names.
+// =============================================================================
+pub(crate) const TENDING_CLASSIFICATIONS: &[&str] =
+    &["values-forward", "fatigue", "scope-mismatch", "safety"];
+
+// =============================================================================
 // Generated Protocol Constants (from JSON Schema single source of truth)
 // =============================================================================
 pub mod generated_enums;
@@ -3669,6 +3701,18 @@ pub enum EntryTypes {
     ContentAttestation(ContentAttestation),
     // EPR Phase 3: Manifest entry — pillar projection mappings, app vocabularies, standing policies.
     Manifest(Manifest),
+    // EPR Phase 3.5: FeedbackSignal — sense-respond signal on a content EPR.
+    FeedbackSignal(FeedbackSignal),
+    // EPR Phase 3.5 P3.5.5: AttentionTending — peer-private discernment; stays
+    // on the agent's source chain, never gossiped to the DHT.
+    // Visibility::Private is the load-bearing flag (brainstorm §6.1).
+    #[entry_type(visibility = "private")]
+    AttentionTending(AttentionTending),
+    // EPR Phase 3.5 P3.5.6: CollectiveFilterPattern — k-anonymous aggregate
+    // published by T16 post-threshold. PUBLIC visibility (default, no attribute):
+    // entries gossip to the DHT so peers can discover collective filter patterns.
+    // NO signer_pubkey field — publisher identity is in the action header.
+    CollectiveFilterPattern(CollectiveFilterPattern),
 
     // Qahal: Community & Relationships
     Relationship(Relationship),
@@ -4168,15 +4212,23 @@ pub enum LinkTypes {
     // =========================================================================
     // Renewal Protocol: Content Succession links
     // =========================================================================
-    IdToContentSuccession, // Anchor(succession_id) -> ContentSuccession
-    ContentToSuccession,   // Anchor(content_id) -> ContentSuccession
+    IdToContentSuccession,       // Anchor(succession_id) -> ContentSuccession
+    ContentToSuccession,         // Anchor(content_id) -> ContentSuccession
     SuccessorAuthorToSuccession, // Anchor(successor_author_key) -> ContentSuccession
 
-                           // =========================================================================
-                           // REMOVED: Doorway links now in infrastructure DNA
-                           // - IdToDoorway, OperatorToDoorway, DoorwayToHeartbeat, DoorwayToSummary
-                           // See: holochain/dna/infrastructure/zomes/infrastructure_integrity
-                           // =========================================================================
+    // =========================================================================
+    // REMOVED: Doorway links now in infrastructure DNA
+    // - IdToDoorway, OperatorToDoorway, DoorwayToHeartbeat, DoorwayToSummary
+    // See: holochain/dna/infrastructure/zomes/infrastructure_integrity
+    // =========================================================================
+
+    // =========================================================================
+    // EPR Phase 3.5: FeedbackSignal links (T8)
+    // =========================================================================
+    /// Target content action → FeedbackSignal action (for get_feedback_signals_for_target)
+    TargetToFeedbackSignal,
+    /// Per-agent anchor → FeedbackSignal action (for list_feedback_signals_by_signer)
+    SignerToFeedbackSignal,
 }
 
 // =============================================================================
@@ -4232,6 +4284,19 @@ fn validate_create_entry(app_entry: &EntryTypes) -> ExternResult<ValidateCallbac
 
         // EPR Phase 3 P3.2: Manifest constitutional entry — full per-message validation.
         EntryTypes::Manifest(manifest) => adapt_validation(manifest.validate()),
+
+        // EPR Phase 3.5 P3.5.1: FeedbackSignal — deterministic floor checks.
+        EntryTypes::FeedbackSignal(signal) => adapt_validation(signal.validate()),
+
+        // EPR Phase 3.5 P3.5.5: AttentionTending — source-chain private; floor checks.
+        // Updates are supported (re-tending appends to tended_at, extends TTL); the
+        // validate_update_entry fallthrough to this function is intentional.
+        EntryTypes::AttentionTending(tending) => adapt_validation(tending.validate()),
+
+        // EPR Phase 3.5 P3.5.6: CollectiveFilterPattern — public DHT k-anonymous aggregate.
+        // Updates re-run create-time validation; T16 aggregator may convention to
+        // always-create-new-entries (snapshot-per-window) rather than update.
+        EntryTypes::CollectiveFilterPattern(pattern) => adapt_validation(pattern.validate()),
 
         // Other entry types: accept for now (can add validation incrementally)
         _ => Ok(ValidateCallbackResult::Valid),
@@ -4297,9 +4362,24 @@ fn validate_content_succession(
 
 /// Validate entry update operations
 ///
-/// Updates are validated the same as creates - the new entry state must be valid.
+/// Most entry types fall through to create-time validation so the new state
+/// is still structurally valid.  **FeedbackSignal** is the exception: a
+/// squelch / correction / retraction / quarantine is an event — once authored
+/// and notarized on the DHT it is immutable.  Allowing an update would let an
+/// author silently change `target_cid`, `signal_kind`, or remove the
+/// `evidence_cid` from a correction after the fact.  Authors must create a
+/// new entry to supersede.
 fn validate_update_entry(app_entry: &EntryTypes) -> ExternResult<ValidateCallbackResult> {
-    // Updates follow the same validation rules as creates
+    // Per-kind update rules ─────────────────────────────────────────────────
+    if let EntryTypes::FeedbackSignal(_) = app_entry {
+        return Ok(ValidateCallbackResult::Invalid(
+            "FeedbackSignal entries are immutable; squelch/correction/retraction/quarantine \
+             events cannot be updated. Author a new entry instead."
+                .to_string(),
+        ));
+    }
+    // Fall through: all other entry types re-run create-time validation on the
+    // new state (structural correctness is the same requirement at update time).
     validate_create_entry(app_entry)
 }
 

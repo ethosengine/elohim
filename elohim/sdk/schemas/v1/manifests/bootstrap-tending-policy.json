@@ -1,0 +1,36 @@
+{
+  "manifestKind": "tending-policy",
+  "revision": 1,
+  "floor": {
+    "classes": [
+      {
+        "class": "accountability-information",
+        "protection": "Corrections, peer-review, and restitution requests targeting the receiving agent bypass all attention-tending filters. The agent cannot opt out of being told they may have caused harm."
+      },
+      {
+        "class": "community-facts",
+        "protection": "Civic emergencies, public-health information, and governance decisions are never filterable. The collective's wisdom layer always reaches members."
+      },
+      {
+        "class": "custodial-communications",
+        "protection": "Under stewardship-graduated authority, ward-targeting messages bypass the steward's filter entirely. The steward observes but does not gate."
+      },
+      {
+        "class": "constitutional-updates",
+        "protection": "Mishpat rule changes, qahal ratifications, and charter amendments always reach recipients. The constitution cannot be filtered into invisibility."
+      },
+      {
+        "class": "elohim-as-counsel-notifications",
+        "protection": "An agent's own elohim has standing to override filters when its judgment requires surfacing information. Imagodei right to defense is non-optional."
+      }
+    ]
+  },
+  "ttlDefaults": {
+    "safety": -1,
+    "fatigue": 604800,
+    "values-forward": 2592000,
+    "scope-mismatch": 7776000
+  },
+  "kAnonymityThreshold": 5,
+  "belowThresholdMode": "suppress"
+}

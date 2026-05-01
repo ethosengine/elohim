@@ -29,7 +29,10 @@ impl core::fmt::Display for BootstrapStewardError {
                  set modifiers.properties.progenitor_pubkey in happ.yaml before publishing"
             ),
             Self::Malformed(e) => {
-                write!(f, "bootstrap steward pubkey in DNA modifiers is malformed: {e}")
+                write!(
+                    f,
+                    "bootstrap steward pubkey in DNA modifiers is malformed: {e}"
+                )
             }
             Self::DnaInfo(e) => write!(f, "failed to read DNA info: {e}"),
         }
@@ -55,11 +58,9 @@ impl DnaProperties {
         if bytes.bytes().is_empty() {
             return Err(BootstrapStewardError::NotConfigured.into());
         }
-        bytes
-            .try_into()
-            .map_err(|e: SerializedBytesError| {
-                BootstrapStewardError::Malformed(e.to_string()).into()
-            })
+        bytes.try_into().map_err(|e: SerializedBytesError| {
+            BootstrapStewardError::Malformed(e.to_string()).into()
+        })
     }
 }
 

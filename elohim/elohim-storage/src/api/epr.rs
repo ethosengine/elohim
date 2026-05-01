@@ -12,6 +12,13 @@
 //!   GET  /api/v1/epr/:cid/verify            → get_verify
 //!   GET  /api/v1/epr/:cid/providers         → get_providers
 //!   PUT  /api/v1/epr/:cid                   → put_epr
+//!
+//! TODO(T19): wire back_prop_one_hop on FeedbackSignal arrival.
+//!
+//! When a FeedbackSignal EPR is received from a remote peer (P2P ingest path),
+//! call `crate::services::back_prop::back_prop_one_hop` to forward the signal
+//! one hop upstream to the sealed predecessor(s). The ingest route does not
+//! exist yet — it lands as part of T19 (FeedbackSignal ingest route).
 
 use bytes::Bytes;
 use http_body_util::Full;
@@ -509,6 +516,21 @@ async fn put_epr(
     );
     let mut conn = get_conn(pool)?;
     let result = store.put(&mut conn, epr)?;
+
+    // TODO(T19): wire record_predecessor on EPR ingest path.
+    //
+    // After a successful remote-peer put, call:
+    //   crate::services::back_prop::record_predecessor(
+    //       &mut conn,
+    //       &path_cid,
+    //       &sender_peer_id,   // the PeerId of the remote peer that sent us this EPR
+    //       &sealing_pub_keys, // MishpatQuorumPubKey + ImagodeiPubKey from node config
+    //   )
+    //
+    // Requires: (a) the sender PeerId to be threaded through from the P2P ingest
+    // path into this handler (currently unavailable — put_epr is only called via
+    // the HTTP route, not the P2P ingest path); (b) node sealing keys loaded from
+    // config. Wire in Phase 3.5 T19 when the P2P ingest callback lands.
 
     // Idempotent: 200 on both new and exact-match re-put. Mismatched bytes under
     // the same CID are rejected as InvalidInput by LocalEprStore::put.

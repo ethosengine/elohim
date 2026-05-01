@@ -113,6 +113,8 @@ fn kind_canonical(k: EprKind) -> String {
         EprKind::Commitment => "Commitment",
         EprKind::Attestation => "Attestation",
         EprKind::Delegation => "Delegation",
+        EprKind::FeedbackSignal => "FeedbackSignal",
+        EprKind::AttentionTending => "AttentionTending",
     }
     .into()
 }

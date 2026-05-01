@@ -1179,6 +1179,20 @@ diesel::table! {
     }
 }
 
+// EPR Phase 3.5 — predecessor_records (trust-compute gradient back-prop store)
+// Source of truth: libp2p gossip (Category C operational — durable across peer restarts).
+// sealed_blob holds the dryoc-encrypted 2-of-2 predecessor payload (T11 crypto).
+
+diesel::table! {
+    predecessor_records (id) {
+        id                  -> Integer,
+        target_cid          -> Text,
+        predecessor_peer_id -> Text,
+        received_at         -> Text,
+        sealed_blob         -> Binary,
+    }
+}
+
 // EPR Phase 2B — peer_identity_bindings
 // Source of truth: Holochain DHT (imagodei AgentPeerBinding entry — Task A.2).
 // This table is a Category C operational projection rebuildable from signal replay.
@@ -1316,6 +1330,41 @@ diesel::table! {
     }
 }
 
+// EPR Phase 3.5 — attention_tending (trust-compute gradient tending lifecycle cache)
+// Source of truth: Holochain source-chain AttentionTending entries (Visibility::Private, T5/T9).
+// Category C operational — recomputable from source-chain subgraph. Fast-read surface for
+// aggregator (T16) and TTL sweep (services::tending::enforce_ttls).
+diesel::table! {
+    attention_tending (id) {
+        id -> Integer,
+        tending_cid -> Text,
+        signer_pubkey -> Binary,
+        classification -> Text,
+        filter_subject_json -> Text,
+        context_json -> Text,
+        reason -> Nullable<Text>,
+        ttl_seconds -> BigInt,
+        created_at -> BigInt,
+        last_tended_at -> BigInt,
+        tended_at_history_json -> Text,
+    }
+}
+
+// EPR Phase 3.5 — standing_view (trust-compute gradient standing projection)
+// Source of truth: FeedbackSignal subgraph (Category C operational — recomputable).
+// Per-evaluator derived view; different evaluators project different scores
+// (pluralism property per brainstorm §4.2).
+diesel::table! {
+    standing_view (evaluator_pubkey, subject_pubkey) {
+        evaluator_pubkey -> Binary,
+        subject_pubkey -> Binary,
+        score -> Text,
+        debit_weight_sum -> Integer,
+        last_signal_at -> Text,
+        manifest_cid -> Text,
+    }
+}
+
 // EPR Phase 2B — B.3: projector cursor (Category C operational)
 diesel::table! {
     projector_cursor (pillar, kind) {
@@ -1339,6 +1388,7 @@ diesel::joinable!(node_stewardship -> humans (human_id));
 diesel::allow_tables_to_appear_in_same_query!(
     access_grants,
     agreements,
+    attention_tending,
     appeals,
     apps,
     challenge_outcomes,
@@ -1381,6 +1431,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     placement_gaps,
     portal_hosts,
     precedents,
+    predecessor_records,
     premium_gates,
     proposal_options,
     projector_cursor,
@@ -1400,6 +1451,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     shard_locations,
     shard_manifests,
     statement_votes,
+    standing_view,
     statements,
     steward_affinity,
     steward_credentials,

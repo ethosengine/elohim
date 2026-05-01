@@ -19,10 +19,13 @@
 //! SQLite Database
 //! ```
 
+pub mod aggregator;
 pub mod agreement_service;
 pub mod anomaly_detection;
+pub mod back_prop;
 pub mod behavioral_trust;
 pub mod boot_registration;
+pub mod bootstrap_manifests;
 pub mod content_service;
 pub mod disposition_service;
 pub mod distribution;
@@ -34,6 +37,7 @@ pub mod epr_store;
 pub mod events;
 pub mod exchange_service;
 pub mod floor_protections;
+pub mod gossip_flood;
 pub mod governance_health;
 pub mod hazard;
 pub mod holochain_humans_replayer;
@@ -58,15 +62,19 @@ pub mod responsibility_demand_service;
 pub mod risk_alert;
 pub mod routing;
 pub mod schemaref_resolver;
+pub mod sealed_against_self;
 pub mod sidecar_engine;
 pub mod sla_service;
 pub mod spatial;
 pub mod spatial_capacity;
 pub mod spatial_dashboard;
 pub mod standing;
+pub mod standing_projector;
+pub mod standing_query;
 pub mod steward_affinity_service;
 pub mod steward_standing;
 pub mod stewardship_service;
+pub mod tending;
 pub mod token_decay_service;
 pub mod token_ledger_service;
 pub mod token_mint_service;

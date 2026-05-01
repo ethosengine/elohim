@@ -118,6 +118,15 @@ pub mod revocation_votes;
 // Recovery Protocol Phase 2 — M5 portal host projection (imagodei PortalHost entry, Category A)
 pub mod portal_hosts;
 
+// EPR Phase 3.5 — predecessor records (trust-compute gradient back-prop, Category C operational)
+pub mod predecessor_records;
+
+// EPR Phase 3.5 — attention_tending (tending lifecycle cache, Category C operational)
+pub mod tending;
+
+// EPR Phase 3.5 — standing_view (per-evaluator StandingScore projection, Category C operational)
+pub mod standing_view;
+
 use std::path::Path;
 use std::time::Duration;
 

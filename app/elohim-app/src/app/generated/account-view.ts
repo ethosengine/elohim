@@ -4,51 +4,19 @@
 /**
  * Visibility of this human's profile
  */
-export type Reach =
-  | 'private'
-  | 'self'
-  | 'intimate'
-  | 'trusted'
-  | 'familiar'
-  | 'community'
-  | 'public'
-  | 'commons';
+export type Reach = 'private' | 'self' | 'intimate' | 'trusted' | 'familiar' | 'community' | 'public' | 'commons';
 /**
  * Reach level corresponding to intimacy (private → commons)
  */
-export type Reach1 =
-  | 'private'
-  | 'self'
-  | 'intimate'
-  | 'trusted'
-  | 'familiar'
-  | 'community'
-  | 'public'
-  | 'commons';
+export type Reach1 = 'private' | 'self' | 'intimate' | 'trusted' | 'familiar' | 'community' | 'public' | 'commons';
 /**
  * Content reach/visibility level. Ordered from most restrictive to most open. Source of truth: DNA-notarized CORE_REACH_LEVELS constant in content_store_integrity zome. Category A — enumeration values are part of the protocol vocabulary enforced by gateways without parsing payload.
  */
-export type Reach2 =
-  | 'private'
-  | 'self'
-  | 'intimate'
-  | 'trusted'
-  | 'familiar'
-  | 'community'
-  | 'public'
-  | 'commons';
+export type Reach2 = 'private' | 'self' | 'intimate' | 'trusted' | 'familiar' | 'community' | 'public' | 'commons';
 /**
  * M5 ships only 'trusted'
  */
-export type Reach3 =
-  | 'private'
-  | 'self'
-  | 'intimate'
-  | 'trusted'
-  | 'familiar'
-  | 'community'
-  | 'public'
-  | 'commons';
+export type Reach3 = 'private' | 'self' | 'intimate' | 'trusted' | 'familiar' | 'community' | 'public' | 'commons';
 
 /**
  * Source of truth: aggregate (DHT-derived projections). Composes Human + KeyRotation + KeyRevocation + RecoveryRequest + HumanRelationship + PortalHost views into one snapshot for the account-management surface.
@@ -110,12 +78,7 @@ export interface KeyRotationView {
   newAgentPubkey: string;
   supersededAgentPubkey: string;
   recoveryRequestHash: string;
-  authorityKind:
-    | 'intimateQuorum'
-    | 'communityConsensus'
-    | 'governanceAct'
-    | 'networkWitness'
-    | 'cryptographicQuorum';
+  authorityKind: 'intimateQuorum' | 'communityConsensus' | 'governanceAct' | 'networkWitness' | 'cryptographicQuorum';
   authorityJson: string;
   rotatedAt: string;
 }

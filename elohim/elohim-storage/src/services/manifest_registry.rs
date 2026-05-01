@@ -166,6 +166,8 @@ fn kind_canonical_str(kind: EprKind) -> &'static str {
         EprKind::Commitment => "commitment",
         EprKind::Attestation => "attestation",
         EprKind::Delegation => "delegation",
+        EprKind::FeedbackSignal => "feedbacksignal",
+        EprKind::AttentionTending => "attentiontending",
     }
 }
 

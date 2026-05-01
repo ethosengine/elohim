@@ -78,7 +78,7 @@ cargo test export_bindings         # Regenerate TypeScript types
 
 ### Protocol Schema Validation
 ```bash
-pnpm run schema:test        # Schema self-tests (24 assertions)
+pnpm run schema:test        # Schema self-tests (drop-in tests; count grows over time)
 pnpm run schema:validate    # Validate seed JSON against protocol schemas
 pnpm run schema:check-dna   # Verify DNA constants match schema enums
 pnpm run schema:codegen:ts  # Generate TypeScript from schemas (verification mode)
