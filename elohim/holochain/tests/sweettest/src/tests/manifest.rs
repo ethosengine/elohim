@@ -19,7 +19,7 @@ use elohim_sweettest::common::{
 use holochain_serialized_bytes::prelude::*;
 use serde::{Deserialize, Serialize};
 
-const DNA: &str = "elohim";
+const DNA: &str = "lamad";
 
 /// Mirror of `content_store_integrity::Manifest` (coordinator crate is WASM-only).
 /// Field names and order MUST match the integrity struct exactly.
