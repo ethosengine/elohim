@@ -1330,6 +1330,26 @@ diesel::table! {
     }
 }
 
+// EPR Phase 3.5 — attention_tending (trust-compute gradient tending lifecycle cache)
+// Source of truth: Holochain source-chain AttentionTending entries (Visibility::Private, T5/T9).
+// Category C operational — recomputable from source-chain subgraph. Fast-read surface for
+// aggregator (T16) and TTL sweep (services::tending::enforce_ttls).
+diesel::table! {
+    attention_tending (id) {
+        id -> Integer,
+        tending_cid -> Text,
+        signer_pubkey -> Binary,
+        classification -> Text,
+        filter_subject_json -> Text,
+        context_json -> Text,
+        reason -> Nullable<Text>,
+        ttl_seconds -> BigInt,
+        created_at -> BigInt,
+        last_tended_at -> BigInt,
+        tended_at_history_json -> Text,
+    }
+}
+
 // EPR Phase 3.5 — standing_view (trust-compute gradient standing projection)
 // Source of truth: FeedbackSignal subgraph (Category C operational — recomputable).
 // Per-evaluator derived view; different evaluators project different scores
@@ -1368,6 +1388,7 @@ diesel::joinable!(node_stewardship -> humans (human_id));
 diesel::allow_tables_to_appear_in_same_query!(
     access_grants,
     agreements,
+    attention_tending,
     appeals,
     apps,
     challenge_outcomes,

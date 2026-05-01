@@ -71,6 +71,7 @@ pub mod standing_projector;
 pub mod steward_affinity_service;
 pub mod steward_standing;
 pub mod stewardship_service;
+pub mod tending;
 pub mod token_decay_service;
 pub mod token_ledger_service;
 pub mod token_mint_service;
