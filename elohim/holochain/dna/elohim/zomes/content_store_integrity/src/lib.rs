@@ -43,6 +43,20 @@ pub mod collective_filter_pattern;
 pub use collective_filter_pattern::CollectiveFilterPattern;
 
 // =============================================================================
+// EPR Phase 3.5: Shared classification vocabulary
+//
+// Vocabulary-parity invariant: TENDING_CLASSIFICATIONS is the single source of
+// truth for the four bootstrap attention-tending classification values. Both
+// AttentionTending (T5, individual record) and CollectiveFilterPattern (T6,
+// k-anonymous aggregate) import from here. Future vocabulary extensions
+// (T15/T16) update ONE place and both entry types stay in sync automatically.
+//
+// Wire values are kebab-case, matching the T2 `Classification` enum wire names.
+// =============================================================================
+pub(crate) const TENDING_CLASSIFICATIONS: &[&str] =
+    &["values-forward", "fatigue", "scope-mismatch", "safety"];
+
+// =============================================================================
 // Generated Protocol Constants (from JSON Schema single source of truth)
 // =============================================================================
 pub mod generated_enums;

@@ -42,10 +42,7 @@
 
 use hdi::prelude::*;
 
-/// Bootstrap classification whitelist.
-///
-/// Wire values are kebab-case, matching the T2 `Classification` enum wire names.
-const CLASSIFICATIONS: &[&str] = &["values-forward", "fatigue", "scope-mismatch", "safety"];
+use crate::TENDING_CLASSIFICATIONS;
 
 /// AttentionTending integrity entry — Phase 3.5 tending subsystem.
 ///
@@ -68,7 +65,7 @@ pub struct AttentionTending {
     /// JSON committed via the integrity zome is silently accepted by this layer.
     pub filter_subject_json: String,
 
-    /// Whitelisted against `CLASSIFICATIONS` by `validate()`:
+    /// Whitelisted against `TENDING_CLASSIFICATIONS` by `validate()`:
     /// values-forward / fatigue / scope-mismatch / safety.
     pub classification: String,
 
@@ -99,10 +96,10 @@ impl AttentionTending {
     /// Returns `Ok(())` when valid; `Err(reason)` when a floor is violated.
     pub fn validate(&self) -> Result<(), String> {
         // Floor 1: classification whitelist.
-        if !CLASSIFICATIONS.contains(&self.classification.as_str()) {
+        if !TENDING_CLASSIFICATIONS.contains(&self.classification.as_str()) {
             return Err(format!(
                 "unknown classification: {} (allowed: {:?})",
-                self.classification, CLASSIFICATIONS
+                self.classification, TENDING_CLASSIFICATIONS
             ));
         }
 

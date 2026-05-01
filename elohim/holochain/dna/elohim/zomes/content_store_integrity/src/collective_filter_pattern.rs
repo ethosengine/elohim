@@ -44,12 +44,7 @@
 
 use hdi::prelude::*;
 
-/// Bootstrap classification whitelist.
-///
-/// Mirrors T5 (`AttentionTending`) CLASSIFICATIONS — both entry types use the
-/// same four values, which ensures the individual tending record (T5) and the
-/// aggregate (T6) speak the same vocabulary.
-const CLASSIFICATIONS: &[&str] = &["values-forward", "fatigue", "scope-mismatch", "safety"];
+use crate::TENDING_CLASSIFICATIONS;
 
 /// Bootstrap trend whitelist.
 ///
@@ -134,10 +129,10 @@ impl CollectiveFilterPattern {
         // Same four bootstrap values as T5 AttentionTending — vocabulary parity
         // is intentional so individual tendings and aggregates speak the same
         // classification language.
-        if !CLASSIFICATIONS.contains(&self.classification.as_str()) {
+        if !TENDING_CLASSIFICATIONS.contains(&self.classification.as_str()) {
             return Err(format!(
                 "unknown classification: {} (allowed: {:?})",
-                self.classification, CLASSIFICATIONS
+                self.classification, TENDING_CLASSIFICATIONS
             ));
         }
 
