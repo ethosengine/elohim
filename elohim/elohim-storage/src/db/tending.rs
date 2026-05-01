@@ -126,9 +126,21 @@ pub fn refresh(
     // Fetch current row to read history.
     let current: TendingRow = dsl::attention_tending.filter(dsl::id.eq(id)).first(conn)?;
 
-    // Extend the history.
-    let mut history: Vec<i64> =
-        serde_json::from_str(&current.tended_at_history_json).unwrap_or_default();
+    // Extend the history. Log a warning if the stored JSON is corrupt rather
+    // than silently discarding it — same observability principle as T14
+    // corrupt-score handling.
+    let mut history: Vec<i64> = match serde_json::from_str(&current.tended_at_history_json) {
+        Ok(h) => h,
+        Err(e) => {
+            tracing::warn!(
+                tending_id = current.id,
+                error = %e,
+                history_len = current.tended_at_history_json.len(),
+                "corrupt tended_at_history_json in attention_tending row, defaulting to empty"
+            );
+            Vec::new()
+        }
+    };
     history.push(new_tended_at);
     let new_history_json =
         serde_json::to_string(&history).unwrap_or_else(|_| current.tended_at_history_json.clone());

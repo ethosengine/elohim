@@ -72,6 +72,15 @@ pub fn record_tending(
             "tended_at must be non-empty".to_string(),
         ));
     }
+    // Guard: a ttl_seconds value above i64::MAX would wrap to a negative integer
+    // via `as i64`, causing `last_tended_at + ttl_seconds < now` to evaluate true
+    // immediately on the next sweep — silent data loss for the signer.
+    if tending.ttl_seconds > i64::MAX as u64 {
+        return Err(TendingError::Invalid(format!(
+            "ttl_seconds {} exceeds i64::MAX; would silently truncate to negative",
+            tending.ttl_seconds
+        )));
+    }
     // Safety: is_empty() guard above ensures both unwrap() calls are safe.
     let created_at = *tending.tended_at.first().unwrap() as i64;
     let last_tended_at = *tending.tended_at.last().unwrap() as i64;
@@ -374,5 +383,26 @@ mod tests {
             ),
             other => panic!("expected TendingError::Invalid, got: {other:?}"),
         }
+    }
+
+    // -----------------------------------------------------------------------
+    // T6: record_tending rejects ttl_seconds > i64::MAX
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn record_tending_rejects_ttl_exceeding_i64_max() {
+        let pool = test_pool();
+        let mut conn = pool.get().expect("conn");
+
+        // u64::MAX is well above i64::MAX; the `as i64` cast would wrap to -1,
+        // causing the row to expire immediately on first sweep.
+        let mut t = make_tending(Classification::Fatigue, vec![1_000_000], 3_600);
+        t.ttl_seconds = u64::MAX;
+        let result = record_tending(&mut conn, "cid-overflow", &[0u8; 32], &t);
+
+        assert!(
+            matches!(result, Err(TendingError::Invalid(_))),
+            "ttl_seconds > i64::MAX must return TendingError::Invalid, got: {result:?}"
+        );
     }
 }
