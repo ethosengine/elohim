@@ -96,6 +96,36 @@
           "then": {
             "required": ["pillar", "kinds"]
           }
+        },
+        {
+          "if": {
+            "properties": { "manifestKind": { "const": "standing-policy" } },
+            "required": ["manifestKind"]
+          },
+          "then": {
+            "required": ["floor"],
+            "properties": {
+              "floor": {
+                "$ref": "standing-policy-floor.schema.json",
+                "description": "Constitutional standing-immune floor declaration. Required when manifestKind is standing-policy. T7 bundles standing-policy-floor.schema.json via include_str! and validates this sub-object at integrity-zome create-time. All five standing-immune classes (§2.8) must be present."
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": { "manifestKind": { "const": "tending-policy" } },
+            "required": ["manifestKind"]
+          },
+          "then": {
+            "required": ["floor"],
+            "properties": {
+              "floor": {
+                "$ref": "tending-policy-floor.schema.json",
+                "description": "Constitutional tending-immune floor declaration. Required when manifestKind is tending-policy. T7 bundles tending-policy-floor.schema.json via include_str! and validates this sub-object at integrity-zome create-time. All five tending-immune classes (§2.8) must be present."
+              }
+            }
+          }
         }
       ]
     }

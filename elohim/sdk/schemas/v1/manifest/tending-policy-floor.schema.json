@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "epr:schema:manifest:tending-policy-floor",
+  "title": "TendingPolicyFloor",
+  "description": "Source of truth: trust-compute gradient brainstorm §2.8 (tending-immune floor). Five classes that cannot be silenced by attention-tending filters. Mishpat-DNA-notarized; collectives may be more permissive, never more restrictive than these floors. T7 (Manifest validator extension) bundles this schema via include_str! and validates it at integrity-zome create-time when manifestKind == tending-policy.",
+  "type": "object",
+  "required": ["classes"],
+  "additionalProperties": false,
+  "properties": {
+    "classes": {
+      "type": "array",
+      "minItems": 5,
+      "maxItems": 5,
+      "uniqueItems": true,
+      "description": "Exactly the five tending-immune floor classes. All five must be declared; order is not significant. Collectives may extend bypass coverage but not silence any of these declared floors.",
+      "items": {
+        "type": "object",
+        "required": ["class", "protection"],
+        "additionalProperties": false,
+        "properties": {
+          "class": {
+            "type": "string",
+            "enum": [
+              "accountability-information",
+              "community-facts",
+              "custodial-communications",
+              "constitutional-updates",
+              "elohim-as-counsel-notifications"
+            ],
+            "description": "Tending-immune floor class identifier. accountability-information: corrections, peer-review, and restitution requests targeting the receiving agent bypass all attention-tending filters. community-facts: civic emergencies, public-health information, and governance decisions are never filterable. custodial-communications: under stewardship-graduated authority, ward-targeting messages bypass the steward's filter entirely. constitutional-updates: mishpat rule changes, qahal ratifications, and charter amendments always reach recipients. elohim-as-counsel-notifications: an agent's own elohim has standing to override filters when its judgment requires it to surface information to the agent."
+          },
+          "protection": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Human-readable description of what this class protects from filtering. Bootstrap manifests (T17) fill this content; this schema enforces the shape."
+          },
+          "appliesWhen": {
+            "type": "string",
+            "description": "Optional context condition under which this tending-bypass activates. Omit for unconditional protections."
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "epr:schema:manifest:standing-policy-floor",
+  "title": "StandingPolicyFloor",
+  "description": "Source of truth: trust-compute gradient brainstorm §2.8 (standing-immune floor). Five classes that cannot be eroded by the standing gradient. Mishpat-DNA-notarized; collectives may be more protective, never less. T7 (Manifest validator extension) bundles this schema via include_str! and validates it at integrity-zome create-time when manifestKind == standing-policy.",
+  "type": "object",
+  "required": ["classes"],
+  "additionalProperties": false,
+  "properties": {
+    "classes": {
+      "type": "array",
+      "minItems": 5,
+      "maxItems": 5,
+      "uniqueItems": true,
+      "description": "Exactly the five standing-immune floor classes. All five must be declared; order is not significant. Collectives may extend protection but not reduce below these declared floors.",
+      "items": {
+        "type": "object",
+        "required": ["class", "protection"],
+        "additionalProperties": false,
+        "properties": {
+          "class": {
+            "type": "string",
+            "enum": [
+              "local-relationship-reach",
+              "cid-targeted-lookup",
+              "constitutional-floor-signatures",
+              "new-voice-baseline",
+              "vulnerable-class-elevation"
+            ],
+            "description": "Standing-immune floor class identifier. local-relationship-reach: unconditional family/household propagation never standing-gated. cid-targeted-lookup: anyone with a CID can fetch; standing modulates discovery, not retrievability. constitutional-floor-signatures: mishpat decisions and imagodei-as-counsel signatures are always per-message verified regardless of author standing. new-voice-baseline: first-time author has nonzero floor derived from sponsor; never starts at zero. vulnerable-class-elevation: children, refugees, persecution-targets, and displaced persons receive elevated baseline floor."
+          },
+          "protection": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Human-readable description of what this class protects. Bootstrap manifests (T17) fill this content; this schema enforces the shape."
+          },
+          "appliesWhen": {
+            "type": "string",
+            "description": "Optional context condition under which this protection activates. Omit for unconditional protections."
+          }
+        }
+      }
+    }
+  }
+}
