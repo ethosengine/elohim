@@ -39,7 +39,7 @@ The survey produced four committed artifacts:
 - [`habermas-machine-2024.md`](habermas-machine-2024.md) and [`habermas-legacy.md`](habermas-legacy.md) — Habermas reference markers
 - [`README.md`](README.md) — new **The Deliberation Problem** and **The Archival Problem** sections
 
-A cross-pollination issue was opened at the dds-wg repository as a thank-you and invitation to engage further: *[issue link added after posting]*.
+A cross-pollination issue was opened at the dds-wg repository as a thank-you and invitation to engage further: [dds-wg/dds#16](https://github.com/dds-wg/dds/issues/16).
 
 ## Credit
 
