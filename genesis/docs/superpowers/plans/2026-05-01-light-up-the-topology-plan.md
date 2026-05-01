@@ -321,6 +321,296 @@ git add app/elohim-app/scripts/hc-start.sh
 git commit -m "chore(dev): raise SEED_LIMIT default to 200 for diverse-format demo"
 ```
 
+### Task T03a: Migration — extend peer_identity_bindings with device_archetype + superseded_by
+
+**Why this is here:** T00 found that the projection table drops `device_archetype` and `superseded_by`, even though both are on the DHT entry, the wire view, and the TS bindings. The plan's T22 (bindings_resolver), T25 (cluster_view), T26 (peer_topology_view) all filter on these. Without this migration, the rest of the sprint can't run.
+
+**Files:**
+- Create: `elohim/elohim-storage/migrations/2026-05-01-120000_peer_identity_bindings_archetype_superseded/up.sql`
+- Create: `elohim/elohim-storage/migrations/2026-05-01-120000_peer_identity_bindings_archetype_superseded/down.sql`
+- Modify: `elohim/elohim-storage/src/db/diesel_schema.rs` (add the two columns to the `peer_identity_bindings` table macro)
+- Modify: `elohim/elohim-storage/src/views.rs` if a view exposes these fields (likely `AgentPeerBindingView` already includes them — verify; if `peer_identity_bindings` is queried via a struct, extend it)
+
+- [ ] **Step 1: Write migration up.sql**
+
+```sql
+-- Add device_archetype + superseded_by columns the projection was dropping.
+-- Source of truth remains the DHT entry; this migration extends the projection so
+-- queries can filter to current bindings (superseded_by IS NULL) and group/aggregate
+-- by archetype. Backfill device_archetype to 'node' for any existing rows; superseded_by
+-- defaults to NULL (current).
+
+ALTER TABLE peer_identity_bindings ADD COLUMN device_archetype TEXT NOT NULL DEFAULT 'node';
+ALTER TABLE peer_identity_bindings ADD COLUMN superseded_by TEXT;
+
+CREATE INDEX idx_peer_identity_bindings_current_per_agent
+    ON peer_identity_bindings(agent_cid)
+    WHERE superseded_by IS NULL;
+
+CREATE INDEX idx_peer_identity_bindings_archetype
+    ON peer_identity_bindings(device_archetype);
+```
+
+- [ ] **Step 2: Write migration down.sql**
+
+```sql
+DROP INDEX IF EXISTS idx_peer_identity_bindings_archetype;
+DROP INDEX IF EXISTS idx_peer_identity_bindings_current_per_agent;
+ALTER TABLE peer_identity_bindings DROP COLUMN superseded_by;
+ALTER TABLE peer_identity_bindings DROP COLUMN device_archetype;
+```
+
+- [ ] **Step 3: Update diesel_schema.rs**
+
+Append the two columns to the table macro:
+
+```rust
+diesel::table! {
+    peer_identity_bindings (peer_id, dht_anchor_hash) {
+        peer_id          -> Text,
+        agent_cid        -> Text,
+        dht_anchor_hash  -> Text,
+        valid_from       -> Text,
+        valid_until      -> Nullable<Text>,
+        observed_at      -> Text,
+        source           -> Text,
+        device_archetype -> Text,
+        superseded_by    -> Nullable<Text>,
+    }
+}
+```
+
+- [ ] **Step 4: Run the test suite to confirm migration applies**
+
+```bash
+cd elohim/elohim-storage
+RUSTFLAGS='--cfg getrandom_backend="custom"' cargo test --lib peer_identity_bindings
+```
+
+Expected: tests pass, no migration errors.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add elohim/elohim-storage/migrations/2026-05-01-120000_peer_identity_bindings_archetype_superseded/ \
+        elohim/elohim-storage/src/db/diesel_schema.rs
+git commit -m "feat(storage): T03a — extend peer_identity_bindings with device_archetype + superseded_by"
+```
+
+### Task T03b: Projection writer — populate device_archetype + superseded_by from signals
+
+**Files:**
+- Modify: `elohim/elohim-storage/src/db/peer_identity_bindings.rs` (or whichever module owns the upsert)
+- Modify: `elohim/elohim-storage/src/holochain_signal_stream.rs` (or wherever `ImagodeiSignal::AgentPeerBindingCreated` lands)
+
+- [ ] **Step 1: Locate the existing projection writer**
+
+```bash
+grep -rn "AgentPeerBindingCreated\|insert_peer_identity_binding\|upsert_peer_identity_binding" elohim/elohim-storage/src/
+```
+
+Expected: a handler exists. If not, the missing-handler is itself the bug — write one.
+
+- [ ] **Step 2: Write a failing test**
+
+In `elohim/elohim-storage/src/db/peer_identity_bindings.rs` add:
+
+```rust
+#[test]
+fn upsert_writes_archetype_and_superseded_by() {
+    let pool = test_pool();
+    let mut conn = pool.get().unwrap();
+    let row = NewPeerIdentityBinding {
+        peer_id: "peer_A".into(),
+        agent_cid: "agent_M".into(),
+        dht_anchor_hash: "hash1".into(),
+        valid_from: "2026-05-01T00:00:00Z".into(),
+        valid_until: None,
+        observed_at: "2026-05-01T00:00:01Z".into(),
+        source: "dht".into(),
+        device_archetype: "desktop".into(),
+        superseded_by: None,
+    };
+    upsert(&mut conn, &row).unwrap();
+
+    let stored: PeerIdentityBindingRow = peer_identity_bindings::table
+        .filter(peer_identity_bindings::peer_id.eq("peer_A"))
+        .first(&mut conn)
+        .unwrap();
+    assert_eq!(stored.device_archetype, "desktop");
+    assert_eq!(stored.superseded_by, None);
+}
+```
+
+- [ ] **Step 3: Run — expect fail (struct shape mismatch)**
+
+```bash
+RUSTFLAGS='--cfg getrandom_backend="custom"' cargo test --lib upsert_writes_archetype_and_superseded_by
+```
+
+Expected: compile error or assertion fail because the struct doesn't have these fields.
+
+- [ ] **Step 4: Implement**
+
+Extend `NewPeerIdentityBinding` and `PeerIdentityBindingRow` to carry the two fields. Wire them through the diesel `Insertable` impl. In the `holochain_signal_stream.rs` handler, copy from the signal payload:
+
+```rust
+ImagodeiSignal::AgentPeerBindingCreated(binding) => {
+    let row = NewPeerIdentityBinding {
+        peer_id: binding.peer_id.clone(),
+        agent_cid: binding.agent_cid.clone(),
+        dht_anchor_hash: binding.action_hash.clone(),
+        valid_from: binding.valid_from.clone(),
+        valid_until: binding.valid_until.clone(),
+        observed_at: now_rfc3339(),
+        source: "dht".into(),
+        device_archetype: binding.device_archetype.to_str().to_string(),
+        superseded_by: binding.superseded_by.clone(),
+    };
+    db::peer_identity_bindings::upsert(&mut conn, &row)?;
+}
+```
+
+- [ ] **Step 5: Run — expect pass**
+
+```bash
+RUSTFLAGS='--cfg getrandom_backend="custom"' cargo test --lib upsert_writes_archetype_and_superseded_by
+```
+
+Expected: pass.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git commit -am "feat(storage): T03b — projection writer populates device_archetype + superseded_by"
+```
+
+### Task T03c: Seeder — write AgentPeerBindings for demo agents
+
+**Why this is here:** T00 found that no `genesis/seeder/src/seed-agent-bindings.ts` exists. `pnpm run hc:start:seed` produces zero `peer_identity_bindings` rows today, so multi-device aggregation in Phases 4 + 7 can't be demonstrated end-to-end.
+
+**Files:**
+- Create: `genesis/seeder/src/seed-agent-bindings.ts`
+- Modify: `genesis/seeder/src/seed.ts` (call the new seeder after agents are created)
+- Read (for patterns): `genesis/seeder/src/seed-humans.ts`, `genesis/seeder/src/seed-entities.ts`
+
+- [ ] **Step 1: Plan the seed pattern**
+
+Each demo human's agent gets between 2 and 4 bindings, deterministically generated from the human's slug:
+
+| Human archetype | Bindings (peer_id deterministic from slug) |
+|---|---|
+| Operator (Matthew) | desktop + node + steward (3) |
+| Steward (Jessica) | desktop + mobile (2) |
+| Member adult | desktop (1 — single device, no multi-device demo for them) |
+| Member household | desktop + mobile (2) |
+
+Two human archetypes (Matthew, Jessica) produce the multi-device-demo evidence. Singletons keep the dataset realistic.
+
+- [ ] **Step 2: Write the seeder skeleton**
+
+```ts
+// genesis/seeder/src/seed-agent-bindings.ts
+import { CallableCell } from '@holochain/client';
+import { sha256 } from '@noble/hashes/sha256';
+import type { SeedContext } from './types';
+
+type Archetype = 'node' | 'desktop' | 'mobile' | 'steward';
+
+interface BindingPlan {
+  agentCid: string;
+  archetype: Archetype;
+}
+
+function plansForHuman(slug: string, agentCid: string): BindingPlan[] {
+  // Deterministic: which archetypes each human gets is keyed off their slug.
+  switch (slug) {
+    case 'matthew-dowell':
+      return [
+        { agentCid, archetype: 'desktop' },
+        { agentCid, archetype: 'node' },
+        { agentCid, archetype: 'steward' },
+      ];
+    case 'jessica-dowell':
+      return [
+        { agentCid, archetype: 'desktop' },
+        { agentCid, archetype: 'mobile' },
+      ];
+    default:
+      return [{ agentCid, archetype: 'desktop' }];
+  }
+}
+
+async function callCreateBinding(cell: CallableCell, plan: BindingPlan, peerId: string) {
+  return cell.callZome({
+    zome_name: 'imagodei',
+    fn_name: 'create_agent_peer_binding',
+    payload: {
+      peer_id: peerId,
+      agent_cid: plan.agentCid,
+      device_archetype: plan.archetype,
+      valid_from: new Date().toISOString(),
+      valid_until: null,
+    },
+  });
+}
+
+function deterministicPeerId(slug: string, archetype: Archetype): string {
+  const bytes = sha256(new TextEncoder().encode(`${slug}:${archetype}`));
+  return `12D3KooW${Buffer.from(bytes).toString('base64url').slice(0, 40)}`;
+}
+
+export async function seedAgentBindings(ctx: SeedContext): Promise<void> {
+  const { humans, agentCells } = ctx;
+  let total = 0;
+  for (const human of humans) {
+    const cell = agentCells.get(human.slug);
+    if (!cell) continue;
+    const agentCid = ctx.humanAgentCids.get(human.slug);
+    if (!agentCid) continue;
+    for (const plan of plansForHuman(human.slug, agentCid)) {
+      const peerId = deterministicPeerId(human.slug, plan.archetype);
+      await callCreateBinding(cell, plan, peerId);
+      total += 1;
+    }
+  }
+  console.log(`[seed-agent-bindings] wrote ${total} bindings across ${humans.length} humans`);
+}
+```
+
+- [ ] **Step 3: Wire into seed.ts**
+
+Inside the main seed orchestrator, after agents/humans are created:
+
+```ts
+import { seedAgentBindings } from './seed-agent-bindings';
+// ...
+await seedAgentBindings(ctx);
+```
+
+(The exact insertion point depends on `seed.ts` structure — read it first; the call must happen after `agentCells` is populated.)
+
+- [ ] **Step 4: Manually test the seeder compiles and types**
+
+```bash
+cd genesis/seeder
+pnpm run build   # if a build script exists, otherwise:
+pnpm exec tsc --noEmit
+```
+
+Expected: zero errors. Runtime invocation (`pnpm run hc:start:seed`) is a Jenkins step.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add genesis/seeder/src/seed-agent-bindings.ts genesis/seeder/src/seed.ts
+git commit -m "feat(seeder): T03c — AgentPeerBinding seeder for multi-device demo agents"
+```
+
+- [ ] **Step 6: Mark T00 verified once Jenkins runs**
+
+The post-merge Jenkins job (orchestrator) will run `pnpm run hc:start:seed` and confirm Step 2 + Step 3 from T00. Update the spec's Pre-flight section after that run completes; this is a runtime confirmation step, not a code task.
+
 ---
 
 ## Phase 1 — Schemas (Schema-first IoC)
