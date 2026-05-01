@@ -671,6 +671,7 @@ async fn aunt_and_rage_bait_three_peer_scenario() {
     let retraction_signal = FeedbackSignal {
         target_cid: BOB_CONTENT_CID.to_string(),
         signal_kind: SignalKind::Retraction,
+        vouch_kind: None,
         evidence_cid: None,
         standing_impact: StandingImpact::DebitFirm,
         signed_by: bob_subject_b64.clone(),

@@ -201,6 +201,7 @@ mod tests {
         let signal = FeedbackSignal {
             target_cid: "bafyreitarget".to_string(),
             signal_kind: SignalKind::Squelch,
+            vouch_kind: None,
             evidence_cid: None,
             standing_impact: StandingImpact::Advisory,
             signed_by: subj_b64,

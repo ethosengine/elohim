@@ -450,6 +450,7 @@ mod tests {
         FeedbackSignal {
             target_cid: target_cid.to_string(),
             signal_kind: SignalKind::Squelch,
+            vouch_kind: None,
             evidence_cid: None,
             standing_impact: StandingImpact::Advisory,
             signed_by: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=".to_string(),

@@ -54,6 +54,10 @@ impl DebitWeightPolicy for DefaultDebitWeightPolicy {
             (SignalKind::Retraction, StandingImpact::DebitFirm) => -3, // restitution
             (SignalKind::Quarantine, StandingImpact::DebitSoft) => 4,
             (SignalKind::Quarantine, StandingImpact::DebitFirm) => 12,
+            // Vouch is a positive signal — negative weight reduces the debit sum.
+            // Bootstrap values mirror bootstrap-standing-policy.json debitWeights.
+            (SignalKind::Vouch, StandingImpact::DebitSoft) => -3,
+            (SignalKind::Vouch, StandingImpact::DebitFirm) => -8,
         }
     }
 }
@@ -185,9 +189,15 @@ mod tests {
     }
 
     fn make_signal(kind: SignalKind, impact: StandingImpact) -> FeedbackSignal {
+        use crate::p2p::feedback_signal::VouchKind;
         FeedbackSignal {
             target_cid: "bafyreitarget".to_string(),
             signal_kind: kind,
+            vouch_kind: if kind == SignalKind::Vouch {
+                Some(VouchKind::AcceptCorrection)
+            } else {
+                None
+            },
             evidence_cid: if kind == SignalKind::Correction {
                 Some("bafyreievi".to_string())
             } else {
