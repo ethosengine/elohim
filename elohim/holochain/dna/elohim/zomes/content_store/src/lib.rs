@@ -19,8 +19,9 @@ pub use manifest::*;
 // EPR Phase 3.5 T8: FeedbackSignal coordinator functions.
 pub mod feedback_signal;
 pub use feedback_signal::{
-    create_feedback_signal, get_feedback_signals_for_target, list_feedback_signals_by_signer,
-    CreateFeedbackSignalInput, FeedbackSignalRecord,
+    create_feedback_signal, create_vouch, get_feedback_signals_for_target,
+    list_feedback_signals_by_signer, CreateFeedbackSignalInput, CreateVouchInput,
+    FeedbackSignalRecord,
 };
 
 // EPR Phase 3.5 T9: AttentionTending coordinator functions.

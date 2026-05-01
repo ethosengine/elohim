@@ -143,6 +143,7 @@ pub fn create_feedback_signal(input: CreateFeedbackSignalInput) -> ExternResult<
     let fs = FeedbackSignal {
         target_cid,
         signal_kind: input.signal_kind.clone(),
+        vouch_kind: None, // create_feedback_signal handles non-vouch kinds only; use create_vouch for vouches
         evidence_cid,
         standing_impact: input.standing_impact.clone(),
         signer_pubkey,
@@ -165,6 +166,124 @@ pub fn create_feedback_signal(input: CreateFeedbackSignalInput) -> ExternResult<
 
     // SignerToFeedbackSignal: base = per-agent StringAnchor.
     // Anchor key: "feedback_signer/<pubkey_base64>"
+    let signer_anchor_key = format!("feedback_signer/{}", agent_info()?.agent_initial_pubkey);
+    let signer_anchor = StringAnchor::new("feedback_signer", &signer_anchor_key);
+    let signer_anchor_hash = hash_entry(&EntryTypes::StringAnchor(signer_anchor))?;
+    create_link(
+        signer_anchor_hash,
+        action_hash.clone(),
+        LinkTypes::SignerToFeedbackSignal,
+        (),
+    )?;
+
+    Ok(action_hash)
+}
+
+// ---------------------------------------------------------------------------
+// create_vouch — T6 addition (Light Up the Graph sprint)
+// ---------------------------------------------------------------------------
+
+/// Input for `create_vouch`.
+///
+/// The vouching agent's pubkey is derived from `agent_info()` and cannot be
+/// caller-supplied (prevents signer spoofing, same pattern as `create_feedback_signal`).
+#[derive(Debug, Clone, Serialize, Deserialize, SerializedBytes)]
+pub struct CreateVouchInput {
+    /// ActionHash (encoded as ActionHash) of the FeedbackSignal being vouched on.
+    /// Must resolve to an existing FeedbackSignal entry in the DHT.
+    pub target_action_hash: ActionHash,
+
+    /// "accept-correction" or "restitution". Validated against VOUCH_KINDS
+    /// in the integrity layer; the coordinator also pre-checks for clarity.
+    pub vouch_kind: String,
+
+    /// "advisory", "debit-soft", or "debit-firm". Whitelisted by the integrity
+    /// validator; passed through without coordinator-side override.
+    pub standing_impact: String,
+}
+
+/// Create a vouch signal on an existing FeedbackSignal.
+///
+/// A vouch is a positive attestation that endorses the validity of another
+/// agent's signal. The vouching agent MUST differ from the original signer
+/// (no-self-vouch). This guard is enforced both here (returns a clean error
+/// to the caller) and in the integrity validator (validator backstop).
+///
+/// On success:
+/// - Derives `signer_pubkey` from `agent_info()?.agent_initial_pubkey`.
+/// - Creates a FeedbackSignal entry with `signal_kind = "vouch"`.
+/// - Creates a `TargetToFeedbackSignal` link from the target FeedbackSignal.
+/// - Creates a `SignerToFeedbackSignal` link from the per-agent anchor.
+/// - Returns the new `ActionHash`.
+///
+/// `post_commit` emits `ProjectionSignal::FeedbackSignalCommitted` automatically.
+#[hdk_extern]
+pub fn create_vouch(input: CreateVouchInput) -> ExternResult<ActionHash> {
+    // ------------------------------------------------------------------
+    // Resolve target — validates it is a real, valid DHT record.
+    // ------------------------------------------------------------------
+    let target_record = must_get_valid_record(input.target_action_hash.clone())?;
+    let target_signal: FeedbackSignal = target_record
+        .entry()
+        .to_app_option()
+        .map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "target entry decode failed: {}",
+                e
+            )))
+        })?
+        .ok_or_else(|| {
+            wasm_error!(WasmErrorInner::Guest(
+                "target_action_hash does not point to a FeedbackSignal".to_string()
+            ))
+        })?;
+
+    // ------------------------------------------------------------------
+    // Derive signer_pubkey from agent_info — caller cannot spoof.
+    // ------------------------------------------------------------------
+    let signer_pubkey = agent_info()?.agent_initial_pubkey.get_raw_39().to_vec();
+
+    // ------------------------------------------------------------------
+    // Coordinator-side no-self-vouch guard.
+    // (Integrity validator backstops this; coordinator provides caller UX.)
+    // ------------------------------------------------------------------
+    if signer_pubkey == target_signal.signer_pubkey {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "self-vouch forbidden: vouch signer must differ from target signal signer".to_string()
+        )));
+    }
+
+    // ------------------------------------------------------------------
+    // Build the FeedbackSignal entry.
+    // ------------------------------------------------------------------
+    let target_cid = format!("{}", input.target_action_hash);
+
+    let fs = FeedbackSignal {
+        target_cid,
+        signal_kind: "vouch".to_string(),
+        vouch_kind: Some(input.vouch_kind),
+        evidence_cid: None,
+        standing_impact: input.standing_impact,
+        signer_pubkey,
+    };
+
+    // create_entry validates through HDI before writing to source chain.
+    let action_hash = create_entry(&EntryTypes::FeedbackSignal(fs))?;
+
+    // ------------------------------------------------------------------
+    // Index links.
+    // ------------------------------------------------------------------
+
+    // TargetToFeedbackSignal: base = target FeedbackSignal action hash.
+    // Supports get_feedback_signals_for_target querying vouches on a signal.
+    create_link(
+        input.target_action_hash.clone(),
+        action_hash.clone(),
+        LinkTypes::TargetToFeedbackSignal,
+        (),
+    )?;
+
+    // SignerToFeedbackSignal: base = per-agent StringAnchor.
     let signer_anchor_key = format!("feedback_signer/{}", agent_info()?.agent_initial_pubkey);
     let signer_anchor = StringAnchor::new("feedback_signer", &signer_anchor_key);
     let signer_anchor_hash = hash_entry(&EntryTypes::StringAnchor(signer_anchor))?;
