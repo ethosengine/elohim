@@ -758,18 +758,36 @@ VEOF
                             def sonarConfig = getSonarProjectConfig()
                             echo "SonarQube Analysis: project=${sonarConfig.projectKey}, env=${sonarConfig.env}, enforce=${sonarConfig.shouldEnforce}"
 
-                            withSonarQubeEnv('ee-sonarqube') {
-                                sh """
-                                sonar-scanner \
-                                    -Dsonar.projectKey=${sonarConfig.projectKey} \
-                                    -Dsonar.sources=src \
-                                    -Dsonar.tests=src \
-                                    -Dsonar.test.inclusions=**/*.spec.ts \
-                                    -Dsonar.typescript.lcov.reportPaths=coverage/vitest/lcov.info \
-                                    -Dsonar.javascript.lcov.reportPaths=coverage/vitest/lcov.info \
-                                    -Dsonar.coverage.exclusions=**/*.module.ts,**/*-routing.module.ts,**/*.model.ts,**/models/**,**/environments/**,**/main.ts,**/polyfills.ts,**/*.spec.ts,**/index.ts,**/components/**,**/renderers/**,**/content-io/**,**/guards/**,**/interceptors/**,**/pipes/**,**/directives/**,**/parsers/**,**/*.routes.ts \
-                                    -Dsonar.qualitygate.wait=false
-                                """
+                            def scannerFailed = false
+                            try {
+                                withSonarQubeEnv('ee-sonarqube') {
+                                    sh """
+                                    sonar-scanner \
+                                        -Dsonar.projectKey=${sonarConfig.projectKey} \
+                                        -Dsonar.sources=src \
+                                        -Dsonar.tests=src \
+                                        -Dsonar.test.inclusions=**/*.spec.ts \
+                                        -Dsonar.typescript.lcov.reportPaths=coverage/vitest/lcov.info \
+                                        -Dsonar.javascript.lcov.reportPaths=coverage/vitest/lcov.info \
+                                        -Dsonar.coverage.exclusions=**/*.module.ts,**/*-routing.module.ts,**/*.model.ts,**/models/**,**/environments/**,**/main.ts,**/polyfills.ts,**/*.spec.ts,**/index.ts,**/components/**,**/renderers/**,**/content-io/**,**/guards/**,**/interceptors/**,**/pipes/**,**/directives/**,**/parsers/**,**/*.routes.ts \
+                                        -Dsonar.qualitygate.wait=false
+                                    """
+                                }
+                            } catch (Exception scannerErr) {
+                                scannerFailed = true
+                                echo "⚠️ SonarQube scanner CLI failed: ${scannerErr.message}"
+                                echo "Most common cause: SonarQube server transient outage (HTTP 5xx) at ${env.SONAR_HOST_URL}."
+                                if (sonarConfig.shouldEnforce) {
+                                    error "❌ SonarQube scanner failed and quality gate is enforced for this branch — failing build."
+                                } else {
+                                    echo "Alpha/Staging: marking build UNSTABLE and skipping quality-gate wait."
+                                    currentBuild.result = 'UNSTABLE'
+                                }
+                            }
+
+                            if (scannerFailed) {
+                                echo "Skipping waitForQualityGate (no analysis was uploaded)."
+                                return
                             }
 
                             echo "Waiting for SonarQube quality gate..."
