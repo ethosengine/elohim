@@ -25,6 +25,12 @@ pub mod manifest;
 pub use manifest::Manifest;
 
 // =============================================================================
+// EPR Phase 3.5: FeedbackSignal Entry Type (DHT layer)
+// =============================================================================
+pub mod feedback_signal;
+pub use feedback_signal::FeedbackSignal;
+
+// =============================================================================
 // Generated Protocol Constants (from JSON Schema single source of truth)
 // =============================================================================
 pub mod generated_enums;
@@ -3669,6 +3675,8 @@ pub enum EntryTypes {
     ContentAttestation(ContentAttestation),
     // EPR Phase 3: Manifest entry — pillar projection mappings, app vocabularies, standing policies.
     Manifest(Manifest),
+    // EPR Phase 3.5: FeedbackSignal — sense-respond signal on a content EPR.
+    FeedbackSignal(FeedbackSignal),
 
     // Qahal: Community & Relationships
     Relationship(Relationship),
@@ -4232,6 +4240,9 @@ fn validate_create_entry(app_entry: &EntryTypes) -> ExternResult<ValidateCallbac
 
         // EPR Phase 3 P3.2: Manifest constitutional entry — full per-message validation.
         EntryTypes::Manifest(manifest) => adapt_validation(manifest.validate()),
+
+        // EPR Phase 3.5 P3.5.1: FeedbackSignal — deterministic floor checks.
+        EntryTypes::FeedbackSignal(signal) => adapt_validation(signal.validate()),
 
         // Other entry types: accept for now (can add validation incrementally)
         _ => Ok(ValidateCallbackResult::Valid),
