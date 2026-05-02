@@ -22,6 +22,7 @@
 //! flow, hash verification, persistence, and serve-blob emission are verified
 //! by unit tests without requiring a running swarm.
 
+use crate::blob_store::BlobStore;
 use crate::config::Config;
 use crate::db::peer_blob_inventory::record_fetch_success;
 use crate::error::StorageError;
@@ -140,23 +141,35 @@ pub async fn race_fetch(
 /// Persist verified bytes to the local blob store, record fetch-success in
 /// `peer_blob_inventory`, and emit a `serve-blob` REA event.
 ///
-/// `blob_store_persist` is a caller-supplied closure that writes the bytes
-/// (allows the HTTP handler to call `blob_store.store()` without this module
-/// taking a direct dependency on `BlobStore`).
-pub fn finalize_fetch_success(
+/// **Ordering contract — persist filesystem first, then SQL.**
+/// A crash between filesystem and SQL leaves a benign orphan blob on disk;
+/// the parity sweep (T18, `/api/v1/diagnostics/inventory-parity`) reconciles
+/// by triggering a re-fetch on the next gossip round. The opposite order
+/// (SQL first) would create the worse failure mode: an inventory row
+/// claiming we host a blob whose bytes we never managed to write.
+///
+/// Sequence inside this function:
+/// 1. `blob_store.store(bytes).await` — write bytes to local filesystem.
+/// 2. `record_fetch_success` — promote `peer_blob_inventory` to evidence
+///    `fetch-success`.
+/// 3. `insert_into(economic_events)` — emit `serve-blob` REA event.
+pub async fn finalize_fetch_success(
     conn: &mut SqliteConnection,
     blob_hash: &str,
     source_peer: &str,
     bytes: &[u8],
     self_cid: &str,
-    blob_store_persist: impl FnOnce(&[u8]) -> Result<(), StorageError>,
+    blob_store: &BlobStore,
 ) -> Result<(), StorageError> {
-    blob_store_persist(bytes)?;
+    // Step 1: persist to filesystem first. On error, return without writing
+    // any SQL — leaving inventory clean.
+    blob_store.store(bytes).await?;
 
     let now_iso = Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
+    // Step 2: record fetch-success in peer_blob_inventory.
     record_fetch_success(conn, source_peer, blob_hash, &now_iso)?;
 
-    // Emit serve-blob REA event.
+    // Step 3: emit serve-blob REA event.
     // Bind owned strings so we can borrow them into NewEconomicEvent<'_>
     // (same pattern as reconcile/custody.rs T16).
     use crate::db::diesel_schema::economic_events;
@@ -309,5 +322,72 @@ mod tests {
             "FuturesUnordered must yield the fastest future first; \
              sequential .await would yield 'slow' (spawn-order head)"
         );
+    }
+
+    /// T20 contract test: `finalize_fetch_success` must persist the bytes
+    /// to the BlobStore FIRST, then write the `peer_blob_inventory` row
+    /// (source = `fetch-success`), then emit exactly one `serve-blob`
+    /// REA `economic_events` row. The persist-first ordering is what
+    /// makes the T18 parity sweep correct: a crash mid-finalize leaves
+    /// a benign orphan blob on disk that the sweep reconciles via
+    /// re-fetch — never an inventory row pointing at bytes we don't
+    /// actually have.
+    #[tokio::test]
+    async fn finalize_persists_bytes_then_writes_sql() {
+        use crate::blob_store::BlobStore;
+        use crate::db::peer_blob_inventory::lookup_hosts;
+        use crate::test_util::test_pool;
+
+        let blob_store = BlobStore::new_memory();
+        let pool = test_pool();
+        let mut conn = pool.get().expect("conn");
+
+        let bytes = b"finalize-test-payload".to_vec();
+        let hash = {
+            let mut h = Sha256::new();
+            h.update(&bytes);
+            format!("sha256-{}", hex::encode(h.finalize()))
+        };
+
+        finalize_fetch_success(
+            &mut conn,
+            &hash,
+            "peer_X",
+            &bytes,
+            "self_cid_Y",
+            &blob_store,
+        )
+        .await
+        .expect("finalize ok");
+
+        // Filesystem first: BlobStore filenames are canonical
+        // `sha256-<hex>`, so probe with the prefixed form.
+        assert!(
+            blob_store.exists(&hash).await,
+            "blob persisted to filesystem before SQL writes"
+        );
+
+        // SQL second: peer_blob_inventory row written with source='fetch-success'.
+        // Use a fresh_after cutoff well in the past so the lookup window
+        // includes our just-written row.
+        let rows = lookup_hosts(&mut conn, &hash, "2020-01-01T00:00:00Z").unwrap();
+        assert!(
+            rows.iter()
+                .any(|r| r.peer_id == "peer_X" && r.source == "fetch-success"),
+            "peer_blob_inventory row written with source='fetch-success'; \
+             got rows: {rows:?}"
+        );
+
+        // SQL third: exactly one serve-blob REA event present, scoped to
+        // this blob hash.
+        use crate::db::diesel_schema::economic_events::dsl as ee;
+        use diesel::prelude::*;
+        let count: i64 = ee::economic_events
+            .filter(ee::action.eq("serve-blob"))
+            .filter(ee::resource_inventoried_as.eq(&hash))
+            .count()
+            .get_result(&mut conn)
+            .unwrap();
+        assert_eq!(count, 1, "exactly one serve-blob event");
     }
 }

@@ -1605,59 +1605,55 @@ impl HttpServer {
                                         bytes,
                                         source_peer,
                                     } => {
-                                        // T19 Fix #1: persist-first.
+                                        // T20: persist + SQL collapse into a single async
+                                        // `finalize_fetch_success` call.
                                         //
-                                        // Previously the persist was best-effort *after* finalize,
-                                        // which meant a failed write could leave inventory state
-                                        // claiming we host a blob we couldn't actually store on
-                                        // disk. We now persist FIRST: on persist failure we log
-                                        // and 404 without writing any SQL (no rollback needed).
-                                        // Tradeoff: a successful persist that then fails to record
-                                        // the serve-blob event leaves a benign orphan blob on disk
-                                        // (re-served from local on next GET). T20 will collapse
-                                        // this whole path into a single async finalize.
+                                        // Ordering inside finalize: filesystem persist FIRST,
+                                        // then `record_fetch_success`, then `serve-blob` REA
+                                        // event. The 503 below covers BOTH legs: either the
+                                        // filesystem write failed (no SQL written) or one of
+                                        // the SQL writes failed (orphan blob on disk that the
+                                        // T18 parity sweep reconciles via re-fetch). Either
+                                        // way the blob is not yet usable through this gateway,
+                                        // and 503 (not 404) preserves retry semantics on the
+                                        // downstream cache.
                                         let bytes_len = bytes.len();
                                         let self_cid = self.self_cid.clone();
                                         let blob_store = self.blob_store.clone();
 
-                                        if let Err(e) = blob_store.store(&bytes).await {
-                                            error!(
-                                                hash = %hash,
-                                                source_peer = %source_peer,
-                                                error = %e,
-                                                "T19: race-fetch hit but local persist failed; \
-                                                 declining to record fetch-success or emit \
-                                                 serve-blob event — returning 503"
-                                            );
-                                            // 503, not 404: the blob exists upstream and we
-                                            // just failed to land it locally. A 404 would
-                                            // cache as "permanently absent" downstream and
-                                            // poison subsequent retries.
-                                            return Ok(
-                                                Self::with_cors_headers(Response::builder())
-                                                    .status(StatusCode::SERVICE_UNAVAILABLE)
-                                                    .body(Full::new(Bytes::from(
-                                                        "Blob fetched from peer but local \
-                                                         persist failed; retry",
-                                                    )))
-                                                    .unwrap(),
-                                            );
+                                        if let Ok(mut conn) = pool.get() {
+                                            if let Err(e) =
+                                                crate::p2p::blob_fetch::finalize_fetch_success(
+                                                    &mut conn,
+                                                    hash,
+                                                    &source_peer,
+                                                    &bytes,
+                                                    &self_cid,
+                                                    &blob_store,
+                                                )
+                                                .await
+                                            {
+                                                error!(
+                                                    hash = %hash,
+                                                    source_peer = %source_peer,
+                                                    error = %e,
+                                                    "T20: race-fetch hit but finalize failed \
+                                                     (filesystem or SQL); the T18 parity sweep \
+                                                     reconciles orphan blobs on disk — \
+                                                     returning 503"
+                                                );
+                                                return Ok(Self::with_cors_headers(
+                                                    Response::builder(),
+                                                )
+                                                .status(StatusCode::SERVICE_UNAVAILABLE)
+                                                .body(Full::new(Bytes::from(
+                                                    "Blob fetched from peer but local \
+                                                             persist failed; retry",
+                                                )))
+                                                .unwrap());
+                                            }
                                         }
 
-                                        if let Ok(mut conn) = pool.get() {
-                                            let _ = crate::p2p::blob_fetch::finalize_fetch_success(
-                                                &mut conn,
-                                                hash,
-                                                &source_peer,
-                                                &bytes,
-                                                &self_cid,
-                                                |_b| {
-                                                    // Persist already happened above; finalize
-                                                    // only records the inventory row + REA event.
-                                                    Ok(())
-                                                },
-                                            );
-                                        }
                                         info!(
                                             hash = %hash,
                                             source_peer = %source_peer,
