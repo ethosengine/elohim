@@ -356,10 +356,26 @@ elohim-storage/tests/                          regression: filesystem-count pari
                                                  after kill-peer-bring-peer-back cycle
 ```
 
+#### REA Action Conventions for Blob Projection
+
+Blob distribution facts (replicas, projector acks, custody) are NOT stored in dedicated tables. They live in the existing REA tables (`rea_commitments`, `economic_events`) using these action conventions:
+
+| Action | Table | Resource column | Semantic |
+|---|---|---|---|
+| `project-blob` | `rea_commitments` | `resource_classified_as` = blob_hash | Doorway-steward commits to project a specific blob for a content steward. `provider`=doorway-steward-cid, `receiver`=content-steward-cid, `resource_quantity_value`=expected projection lifetime in seconds. |
+| `serve-blob` | `economic_events` | `resource_inventoried_as` = blob_hash | Doorway-steward fulfills a projection commitment by serving the blob. `provider`=doorway-steward-cid, `receiver`=peer-cid (the requester), `output_of`=action_hash of the matching `project-blob` commitment. |
+| `custody-blob` | `rea_commitments` | `resource_classified_as` = blob_hash | Peer steward commits to keep N bytes of a specific blob hosted. `provider`=peer-steward-cid, `receiver`=content-steward-cid, `resource_quantity_value`=committed bytes. |
+
+Column choice rationale: `economic_events` carries `resource_inventoried_as` for the inventoried instance the event acted on; `rea_commitments` carries `resource_classified_as` (it has no `resource_inventoried_as` column). Blob hashes are content-addressed identifiers that fit either column semantically — the convention uses whichever the table provides.
+
+This convention is the source of truth for `compose_distribution_summary` (T23), `compose_distribution_details` (T24), and `reciprocity_view::aggregate` (T27). No new tables; query the existing REA tables filtered by `action` and the appropriate resource column.
+
+The matching SQL indexes (T03d) are `idx_rea_commitments_action_resource` and `idx_economic_events_action_resource`.
+
 ### What's NOT touched
 
 - No DNA changes (no new entry types, no zome modifications)
-- No new SQLite migrations (live aggregation over existing tables)
+- No new SQLite tables (live aggregation over existing tables; T03d adds two indexes-only on existing REA tables for the action conventions above)
 - No doorway proxy logic changes for steward routes (registry handles them)
 - Sophia, holochain runtime, conductor: untouched
 
