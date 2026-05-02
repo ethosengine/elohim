@@ -699,6 +699,11 @@ pub struct P2PHandle {
     delivery_peers: Arc<DashMap<String, DeliveryPeer>>,
     /// Shared backpressure flag — set by bulk write handlers, read by event loop
     sync_paused: Arc<AtomicBool>,
+    /// Last gossiped inventory snapshot hashes.
+    /// Stage 1: initialized empty. Stage 2 broadcaster timer populates via
+    /// `set_last_gossiped_inventory`. The diagnostic endpoint reads this to
+    /// compute filesystem parity without needing live P2P connectivity.
+    last_gossiped: Arc<std::sync::RwLock<Vec<String>>>,
 }
 
 impl P2PHandle {
@@ -823,6 +828,7 @@ impl P2PHandle {
             agent_pubkey: "stub-agent".to_string(),
             delivery_peers: Arc::new(DashMap::new()),
             sync_paused: Arc::new(AtomicBool::new(false)),
+            last_gossiped: Arc::new(std::sync::RwLock::new(Vec::new())),
         }
     }
 
@@ -833,6 +839,31 @@ impl P2PHandle {
             .iter()
             .map(|entry| entry.value().clone())
             .collect()
+    }
+
+    /// Return the most recently gossiped inventory snapshot hashes, or `None`
+    /// if no snapshot has been published yet (Stage 1: always `None`).
+    ///
+    /// Stage 2 (broadcaster timer) will call `set_last_gossiped_inventory`
+    /// after each successful snapshot publish, making this return `Some`.
+    pub fn last_gossiped_inventory(&self) -> Option<Vec<String>> {
+        let guard = self.last_gossiped.read().ok()?;
+        if guard.is_empty() {
+            None
+        } else {
+            Some(guard.clone())
+        }
+    }
+
+    /// Record the hashes that were just gossiped in the most recent snapshot.
+    ///
+    /// Called by the Stage 2 broadcaster timer after a successful
+    /// `BlobInventorySnapshot` publish. Not called in Stage 1 (diagnostic
+    /// endpoint will report `gossiped_count = 0` until Stage 2 is wired).
+    pub fn set_last_gossiped_inventory(&self, hashes: Vec<String>) {
+        if let Ok(mut guard) = self.last_gossiped.write() {
+            *guard = hashes;
+        }
     }
 
     /// List connected peers with identify protocol info.
@@ -5241,6 +5272,7 @@ impl P2PNode {
             agent_pubkey: self.identity.agent_pubkey().to_string(),
             delivery_peers: Arc::clone(&self.delivery_peers),
             sync_paused: Arc::clone(&self.sync_paused),
+            last_gossiped: Arc::new(std::sync::RwLock::new(Vec::new())),
         }
     }
 

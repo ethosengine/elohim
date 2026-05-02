@@ -753,6 +753,13 @@ impl HttpServer {
                 }
             }
 
+            // Filesystem parity sweep — T18 diagnostic endpoint.
+            // Reports the diff between local pantry and last gossiped inventory.
+            // Matched before the /api/v1/ catch-all.
+            (Method::GET, "/api/v1/diagnostics/inventory-parity") => {
+                self.handle_inventory_parity().await
+            }
+
             // Signal-emit endpoint — composes EPR Envelope, signs via conductor,
             // ingests. Matched before the /api/v1/ catch-all so the manifest
             // registry + signing client are injected directly from HttpServer
@@ -1795,6 +1802,51 @@ impl HttpServer {
                 .body(Full::new(Bytes::from("[]")))
                 .unwrap())
         }
+    }
+
+    /// GET /api/v1/diagnostics/inventory-parity
+    ///
+    /// Returns a `ParityReport` comparing the local filesystem blob inventory
+    /// against the last gossiped inventory snapshot.  This defends against the
+    /// failure mode where gossip runs cleanly but bytes never replicate.
+    ///
+    /// Stage 1: `gossiped_count` will always be 0 (no broadcaster timer yet).
+    /// Stage 2: broadcaster timer populates `P2PHandle::set_last_gossiped_inventory`.
+    async fn handle_inventory_parity(&self) -> Result<Response<Full<Bytes>>, StorageError> {
+        use crate::p2p::inventory_broadcaster::{compute_parity, ParityReport};
+
+        // StoreAdapter satisfies LocalInventory by delegating to BlobStore::list_hashes.
+        struct StoreAdapter<'a>(&'a crate::blob_store::BlobStore);
+        impl crate::p2p::inventory_broadcaster::LocalInventory for StoreAdapter<'_> {
+            fn current_hashes(&self) -> Vec<String> {
+                self.0.list_hashes().unwrap_or_default()
+            }
+        }
+
+        let adapter = StoreAdapter(&self.blob_store);
+
+        #[cfg(feature = "p2p")]
+        let gossiped: Vec<String> = self
+            .p2p_handle
+            .as_ref()
+            .and_then(|h| h.last_gossiped_inventory())
+            .unwrap_or_default();
+
+        #[cfg(not(feature = "p2p"))]
+        let gossiped: Vec<String> = vec![];
+
+        let now_iso = chrono::Utc::now().to_rfc3339();
+        let report: ParityReport = compute_parity(&adapter, &gossiped, &now_iso);
+
+        let json = serde_json::to_string(&report).map_err(|e| {
+            StorageError::Internal(format!("Failed to serialize parity report: {}", e))
+        })?;
+
+        Ok(Response::builder()
+            .status(StatusCode::OK)
+            .header(header::CONTENT_TYPE, "application/json")
+            .body(Full::new(Bytes::from(json)))
+            .unwrap())
     }
 
     /// Handle sync API requests

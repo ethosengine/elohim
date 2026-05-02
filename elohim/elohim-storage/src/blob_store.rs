@@ -600,6 +600,51 @@ impl BlobStore {
             chunked_blobs,
         })
     }
+
+    /// List all blob hashes currently stored in the local pantry.
+    ///
+    /// Returns the file names from the two-level `blobs/<4-char-prefix>/<hash>`
+    /// directory tree. Chunk index files (`.chunks` extension) and deleted
+    /// markers (`.d` extension) are excluded — only the primary blob files are
+    /// returned, matching the set that would be reported in an inventory snapshot.
+    ///
+    /// This is a synchronous walk; call from a blocking context or
+    /// `tokio::task::spawn_blocking` when latency matters.
+    pub fn list_hashes(&self) -> Result<Vec<String>, StorageError> {
+        let blobs_dir = self.root_dir.join("blobs");
+        let mut hashes = Vec::new();
+
+        let top = match std::fs::read_dir(&blobs_dir) {
+            Ok(d) => d,
+            Err(_) => return Ok(hashes), // directory absent → no blobs
+        };
+
+        for top_entry in top.flatten() {
+            if !top_entry.path().is_dir() {
+                continue;
+            }
+            let sub = match std::fs::read_dir(top_entry.path()) {
+                Ok(d) => d,
+                Err(_) => continue,
+            };
+            for entry in sub.flatten() {
+                let path = entry.path();
+                let name = path
+                    .file_name()
+                    .map(|f| f.to_string_lossy().to_string())
+                    .unwrap_or_default();
+                // Skip chunk index files and deleted markers
+                if name.contains(".chunks") || name.ends_with(".d") {
+                    continue;
+                }
+                if !name.is_empty() {
+                    hashes.push(name);
+                }
+            }
+        }
+
+        Ok(hashes)
+    }
 }
 
 /// Storage statistics

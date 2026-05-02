@@ -12,6 +12,7 @@
 //! enumeration is delegated to `LocalInventory` so it can be mocked in tests.
 
 use crate::p2p::inventory_gossip::{BlobInventoryDelta, BlobInventorySnapshot};
+use std::collections::HashSet;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
@@ -155,5 +156,107 @@ mod tests {
     #[test]
     fn resolved_cadence_zero_override_disables() {
         assert_eq!(resolved_cadence(Some("node"), Some(0)), None);
+    }
+}
+
+/// Filesystem-vs-gossip parity report.
+///
+/// Populated by `compute_parity` and served at
+/// `GET /api/v1/diagnostics/inventory-parity`.  Defends against the failure
+/// mode where gossip runs cleanly but bytes never replicate — inventory lists
+/// diverge before blob mobility does.
+#[derive(Debug, Clone, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
+pub struct ParityReport {
+    /// Hashes that were included in the last gossiped snapshot but are absent
+    /// from the local filesystem.  Non-empty means gossip over-reports custody.
+    pub gossiped_but_missing: Vec<String>,
+    /// Hashes present on the local filesystem that were not in the last gossiped
+    /// snapshot.  Non-empty means gossip under-reports custody.
+    pub local_but_not_gossiped: Vec<String>,
+    /// Number of blobs actually on the local filesystem at time of check.
+    pub filesystem_count: usize,
+    /// Number of hashes in the last gossiped snapshot (0 when no snapshot has
+    /// been published yet — Stage 1 baseline).
+    pub gossiped_count: usize,
+    /// ISO-8601 timestamp of when this report was generated.
+    pub checked_at: String,
+}
+
+/// Compute a `ParityReport` by diffing `local_store.current_hashes()` against
+/// `last_gossiped`.
+///
+/// Uses `HashSet::difference` for O(n) comparison; the returned vecs are
+/// sorted for deterministic output.
+pub fn compute_parity<I: LocalInventory>(
+    local_store: &I,
+    last_gossiped: &[String],
+    now_iso: &str,
+) -> ParityReport {
+    let local: HashSet<String> = local_store.current_hashes().into_iter().collect();
+    let gossiped: HashSet<String> = last_gossiped.iter().cloned().collect();
+
+    let mut gossiped_but_missing: Vec<String> = gossiped.difference(&local).cloned().collect();
+    gossiped_but_missing.sort();
+
+    let mut local_but_not_gossiped: Vec<String> = local.difference(&gossiped).cloned().collect();
+    local_but_not_gossiped.sort();
+
+    ParityReport {
+        filesystem_count: local.len(),
+        gossiped_count: gossiped.len(),
+        gossiped_but_missing,
+        local_but_not_gossiped,
+        checked_at: now_iso.to_string(),
+    }
+}
+
+#[cfg(test)]
+mod parity_tests {
+    use super::*;
+
+    struct MockInventory(Vec<String>);
+    impl LocalInventory for MockInventory {
+        fn current_hashes(&self) -> Vec<String> {
+            self.0.clone()
+        }
+    }
+
+    #[test]
+    fn parity_clean_when_sets_match() {
+        let hashes = vec!["aaa".to_string(), "bbb".to_string()];
+        let inv = MockInventory(hashes.clone());
+        let report = compute_parity(&inv, &hashes, "2026-05-02T00:00:00Z");
+
+        assert!(report.gossiped_but_missing.is_empty());
+        assert!(report.local_but_not_gossiped.is_empty());
+        assert_eq!(report.filesystem_count, 2);
+        assert_eq!(report.gossiped_count, 2);
+        assert_eq!(report.checked_at, "2026-05-02T00:00:00Z");
+    }
+
+    #[test]
+    fn parity_detects_gossiped_but_missing() {
+        // Gossip claims "ccc" is hosted but filesystem only has "aaa" and "bbb"
+        let local = MockInventory(vec!["aaa".to_string(), "bbb".to_string()]);
+        let gossiped = vec!["aaa".to_string(), "bbb".to_string(), "ccc".to_string()];
+        let report = compute_parity(&local, &gossiped, "2026-05-02T00:00:00Z");
+
+        assert_eq!(report.gossiped_but_missing, vec!["ccc".to_string()]);
+        assert!(report.local_but_not_gossiped.is_empty());
+        assert_eq!(report.filesystem_count, 2);
+        assert_eq!(report.gossiped_count, 3);
+    }
+
+    #[test]
+    fn parity_detects_local_but_not_gossiped() {
+        // Filesystem has "ddd" that was never included in the gossip snapshot
+        let local = MockInventory(vec!["aaa".to_string(), "ddd".to_string()]);
+        let gossiped = vec!["aaa".to_string()];
+        let report = compute_parity(&local, &gossiped, "2026-05-02T00:00:00Z");
+
+        assert!(report.gossiped_but_missing.is_empty());
+        assert_eq!(report.local_but_not_gossiped, vec!["ddd".to_string()]);
+        assert_eq!(report.filesystem_count, 2);
+        assert_eq!(report.gossiped_count, 1);
     }
 }
