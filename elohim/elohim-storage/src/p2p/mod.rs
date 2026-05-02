@@ -374,6 +374,11 @@ pub struct P2PNode {
     pending_epr_atom_fetches: PendingEprAtomFetchMap,
     /// T16: custody reconciliation counters — incremented by reconcile_pass.
     pub reconciliation_metrics: std::sync::Arc<ReconciliationMetrics>,
+    /// T18: shared cache of last gossiped inventory hashes.
+    /// Stage 2 broadcaster timer will write here; the parity diagnostic HTTP
+    /// endpoint reads via `P2PHandle::last_gossiped_inventory()`.
+    /// Both sides share this Arc — initialized in `new()`, cloned into `handle()`.
+    pub last_gossiped: Arc<std::sync::RwLock<Vec<String>>>,
 }
 
 /// Cached identify protocol info for a connected peer.
@@ -1329,6 +1334,7 @@ impl P2PNode {
                 std::collections::HashMap::new(),
             )),
             reconciliation_metrics: std::sync::Arc::new(ReconciliationMetrics::default()),
+            last_gossiped: Arc::new(std::sync::RwLock::new(Vec::new())),
         })
     }
 
@@ -5272,7 +5278,7 @@ impl P2PNode {
             agent_pubkey: self.identity.agent_pubkey().to_string(),
             delivery_peers: Arc::clone(&self.delivery_peers),
             sync_paused: Arc::clone(&self.sync_paused),
-            last_gossiped: Arc::new(std::sync::RwLock::new(Vec::new())),
+            last_gossiped: Arc::clone(&self.last_gossiped),
         }
     }
 
