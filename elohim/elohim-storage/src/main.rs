@@ -311,6 +311,31 @@ async fn async_main(
             config.inventory_broadcast_seconds = Some(n);
         }
     }
+    if let Ok(v) = std::env::var("CUSTODY_SWEEP_SECONDS") {
+        if let Ok(n) = v.parse::<u64>() {
+            config.custody_sweep_seconds = n;
+        }
+    }
+    if let Ok(v) = std::env::var("PLACEMENT_GRACE_SECONDS") {
+        if let Ok(n) = v.parse::<u64>() {
+            config.placement_grace_seconds = n;
+        }
+    }
+    if let Ok(v) = std::env::var("PLACEMENT_GAP_COOLDOWN_SECONDS") {
+        if let Ok(n) = v.parse::<u64>() {
+            config.placement_gap_cooldown_seconds = n;
+        }
+    }
+    if let Ok(v) = std::env::var("KICK_FETCH_PER_PEER_PER_MINUTE") {
+        if let Ok(n) = v.parse::<u32>() {
+            config.kick_fetch_per_peer_per_minute = n;
+        }
+    }
+    if let Ok(v) = std::env::var("INVENTORY_FRESHNESS_SECONDS") {
+        if let Ok(n) = v.parse::<u64>() {
+            config.inventory_freshness_seconds = n;
+        }
+    }
 
     info!(
         storage_dir = %config.storage_dir.display(),

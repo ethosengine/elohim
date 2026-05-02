@@ -371,6 +371,8 @@ pub struct P2PNode {
     /// Populated by `handle_command(FetchEprAtomFromPeer)`, resolved in
     /// `handle_epr_atom_response` on success/failure/timeout.
     pending_epr_atom_fetches: PendingEprAtomFetchMap,
+    /// T16: custody reconciliation counters — incremented by reconcile_pass.
+    pub reconciliation_metrics: std::sync::Arc<ReconciliationMetrics>,
 }
 
 /// Cached identify protocol info for a connected peer.
@@ -383,12 +385,32 @@ struct CachedIdentifyInfo {
 
 /// Per-peer runtime metrics tracked from swarm events.
 struct PeerMetrics {
+    /// Whether this peer currently has an active libp2p connection.
+    /// Set to true on ConnectionEstablished; false on ConnectionClosed
+    /// (entry is also removed on disconnect, so false entries are transient).
+    is_connected: bool,
     /// Connection direction: "inbound" or "outbound"
     direction: &'static str,
     /// Unix epoch millis of last peer activity
     last_seen_ms: u64,
     /// Ring buffer of RTT samples from ping (max 8)
     rtt_samples: std::collections::VecDeque<Duration>,
+}
+
+/// Atomic counters for custody reconciliation — incremented each pass.
+#[derive(Debug, Default)]
+pub struct ReconciliationMetrics {
+    pub reconcile_passes_total: std::sync::atomic::AtomicU64,
+    pub kicks_fired_total: std::sync::atomic::AtomicU64,
+    pub placement_gaps_emitted_total: std::sync::atomic::AtomicU64,
+}
+
+/// Snapshot copy of `ReconciliationMetrics` for external callers.
+#[derive(Debug, Clone, Copy)]
+pub struct ReconciliationMetricsSnapshot {
+    pub reconcile_passes_total: u64,
+    pub kicks_fired_total: u64,
+    pub placement_gaps_emitted_total: u64,
 }
 
 /// Current unix epoch in milliseconds.
@@ -1253,6 +1275,7 @@ impl P2PNode {
             pending_epr_atom_fetches: Arc::new(tokio::sync::Mutex::new(
                 std::collections::HashMap::new(),
             )),
+            reconciliation_metrics: std::sync::Arc::new(ReconciliationMetrics::default()),
         })
     }
 
@@ -1299,6 +1322,43 @@ impl P2PNode {
     /// Get the local PeerId
     pub fn peer_id(&self) -> &PeerId {
         self.identity.peer_id()
+    }
+
+    /// Whether the named peer has an active libp2p connection right now.
+    /// Backed by the existing `peer_metrics` DashMap (entries are created
+    /// on connect and removed on disconnect).
+    pub fn is_connected(&self, peer_id: &libp2p::PeerId) -> bool {
+        self.peer_metrics
+            .get(&peer_id.to_string())
+            .map(|m| m.is_connected)
+            .unwrap_or(false)
+    }
+
+    /// Snapshot of currently connected peers.
+    pub fn connected_peers(&self) -> Vec<libp2p::PeerId> {
+        self.peer_metrics
+            .iter()
+            .filter(|m| m.is_connected)
+            .filter_map(|m| m.key().parse().ok())
+            .collect()
+    }
+
+    /// Read-only snapshot of the reconciliation metrics counters.
+    pub fn reconciliation_metrics(&self) -> ReconciliationMetricsSnapshot {
+        ReconciliationMetricsSnapshot {
+            reconcile_passes_total: self
+                .reconciliation_metrics
+                .reconcile_passes_total
+                .load(std::sync::atomic::Ordering::Relaxed),
+            kicks_fired_total: self
+                .reconciliation_metrics
+                .kicks_fired_total
+                .load(std::sync::atomic::Ordering::Relaxed),
+            placement_gaps_emitted_total: self
+                .reconciliation_metrics
+                .placement_gaps_emitted_total
+                .load(std::sync::atomic::Ordering::Relaxed),
+        }
     }
 
     /// Start listening and event loop
@@ -2154,9 +2214,11 @@ impl P2PNode {
                 self.peer_metrics
                     .entry(peer_id.to_string())
                     .and_modify(|m| {
+                        m.is_connected = true;
                         m.last_seen_ms = now_unix_ms();
                     })
                     .or_insert_with(|| PeerMetrics {
+                        is_connected: true,
                         direction,
                         last_seen_ms: now_unix_ms(),
                         rtt_samples: std::collections::VecDeque::with_capacity(8),
@@ -3224,6 +3286,7 @@ impl P2PNode {
                         let mut samples = std::collections::VecDeque::with_capacity(8);
                         samples.push_back(rtt);
                         PeerMetrics {
+                            is_connected: true,
                             direction: "unknown",
                             last_seen_ms: now_unix_ms(),
                             rtt_samples: samples,
