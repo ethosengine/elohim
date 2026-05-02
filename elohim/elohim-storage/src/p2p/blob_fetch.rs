@@ -24,9 +24,12 @@
 
 use crate::blob_store::BlobStore;
 use crate::config::Config;
+use crate::db::diesel_schema::economic_events;
+use crate::db::models::NewEconomicEvent;
 use crate::db::peer_blob_inventory::record_fetch_success;
 use crate::error::StorageError;
 use chrono::Utc;
+use diesel::Connection;
 use diesel::RunQueryDsl;
 use diesel::SqliteConnection;
 use futures::stream::{FuturesUnordered, StreamExt};
@@ -148,11 +151,20 @@ pub async fn race_fetch(
 /// (SQL first) would create the worse failure mode: an inventory row
 /// claiming we host a blob whose bytes we never managed to write.
 ///
+/// **Atomicity contract — the two SQL writes are wrapped in a single
+/// transaction.** `record_fetch_success` and the `serve-blob` event insert
+/// run inside one `conn.transaction(|txn| ...)` block so a crash or
+/// constraint-violation between them leaves no half-state. (SQLite via
+/// Diesel emits a SAVEPOINT for the inner `record_fetch_success` call,
+/// which already opens its own transaction; nested transactions on
+/// SqliteConnection are supported and roll back together on outer error.)
+/// The T18 parity sweep can then assume: if a `peer_blob_inventory` row
+/// with `source='fetch-success'` exists for `(self, hash)`, the matching
+/// `serve-blob` REA event also exists.
+///
 /// Sequence inside this function:
 /// 1. `blob_store.store(bytes).await` — write bytes to local filesystem.
-/// 2. `record_fetch_success` — promote `peer_blob_inventory` to evidence
-///    `fetch-success`.
-/// 3. `insert_into(economic_events)` — emit `serve-blob` REA event.
+/// 2. `conn.transaction(|txn| { record_fetch_success(txn, ...); insert serve-blob event })`.
 pub async fn finalize_fetch_success(
     conn: &mut SqliteConnection,
     blob_hash: &str,
@@ -166,52 +178,61 @@ pub async fn finalize_fetch_success(
     blob_store.store(bytes).await?;
 
     let now_iso = Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
-    // Step 2: record fetch-success in peer_blob_inventory.
-    record_fetch_success(conn, source_peer, blob_hash, &now_iso)?;
-
-    // Step 3: emit serve-blob REA event.
-    // Bind owned strings so we can borrow them into NewEconomicEvent<'_>
-    // (same pattern as reconcile/custody.rs T16).
-    use crate::db::diesel_schema::economic_events;
-    use crate::db::models::NewEconomicEvent;
-
     let event_id = uuid::Uuid::new_v4().to_string();
+    // TODO(stewardship-precision): `economic_events.resource_quantity_value`
+    // is f32 in the schema, which loses precision for blobs >16 MB.
+    // Migrating to f64 (or fixed-point) requires a Diesel migration; tracked
+    // separately from this T20 review pass.
     let qty_value = bytes.len() as f32;
-    let new_event = NewEconomicEvent {
-        id: &event_id,
-        h_app_id: "elohim",
-        action: "serve-blob",
-        provider: source_peer,
-        receiver: self_cid,
-        resource_conforms_to: None,
-        resource_inventoried_as: Some(blob_hash),
-        resource_classified_as_json: None,
-        resource_quantity_value: Some(qty_value),
-        resource_quantity_unit: Some("bytes"),
-        effort_quantity_value: None,
-        effort_quantity_unit: None,
-        has_point_in_time: &now_iso,
-        has_duration: None,
-        input_of: None,
-        // The matching custody-blob commitment hash is not always known at this layer.
-        output_of: None,
-        lamad_event_type: None,
-        content_id: None,
-        contributor_presence_id: None,
-        path_id: None,
-        triggered_by: None,
-        state: "completed",
-        note: None,
-        metadata_json: None,
-        dht_anchor_hash: None,
-        at_location: None,
-        verified_at: None,
-    };
-    diesel::insert_into(economic_events::table)
-        .values(&new_event)
-        .execute(conn)
-        .map(|_| ())
-        .map_err(|e| StorageError::Database(format!("insert serve-blob event: {e}")))
+
+    // Step 2 + 3 (atomic): record fetch-success AND emit the serve-blob REA
+    // event in a single transaction so a crash between them cannot leave a
+    // peer_blob_inventory row without its matching event (or vice versa).
+    //
+    // REA event direction: a remote peer SERVED the bytes to us, so the remote
+    // peer is the provider (source_peer) and we are the receiver (self_cid).
+    // Note: T16's custody-blob events use the opposite convention (custodian
+    // is provider, content steward is receiver). Cross-event analytics joining
+    // on these fields must be aware of the per-action semantics.
+    conn.transaction::<(), StorageError, _>(|txn| {
+        record_fetch_success(txn, source_peer, blob_hash, &now_iso)?;
+
+        let new_event = NewEconomicEvent {
+            id: &event_id,
+            h_app_id: "elohim",
+            action: "serve-blob",
+            provider: source_peer,
+            receiver: self_cid,
+            resource_conforms_to: None,
+            resource_inventoried_as: Some(blob_hash),
+            resource_classified_as_json: None,
+            resource_quantity_value: Some(qty_value),
+            resource_quantity_unit: Some("bytes"),
+            effort_quantity_value: None,
+            effort_quantity_unit: None,
+            has_point_in_time: &now_iso,
+            has_duration: None,
+            input_of: None,
+            // The matching custody-blob commitment hash is not always known at this layer.
+            output_of: None,
+            lamad_event_type: None,
+            content_id: None,
+            contributor_presence_id: None,
+            path_id: None,
+            triggered_by: None,
+            state: "completed",
+            note: None,
+            metadata_json: None,
+            dht_anchor_hash: None,
+            at_location: None,
+            verified_at: None,
+        };
+        diesel::insert_into(economic_events::table)
+            .values(&new_event)
+            .execute(txn)
+            .map_err(|e| StorageError::Database(format!("insert serve-blob event: {e}")))?;
+        Ok(())
+    })
 }
 
 /// Verify that `bytes` has the sha256 hex digest matching `expected_hex`.
@@ -389,5 +410,75 @@ mod tests {
             .get_result(&mut conn)
             .unwrap();
         assert_eq!(count, 1, "exactly one serve-blob event");
+    }
+
+    /// T20 review Fix #2 regression: the two SQL writes inside
+    /// `finalize_fetch_success` (record_fetch_success + serve-blob event
+    /// insert) MUST be wrapped in a single transaction so a failure in the
+    /// serve-blob insert rolls back the peer_blob_inventory row that was
+    /// just written. Otherwise a crash between them leaves an inventory row
+    /// with `source='fetch-success'` that the T18 parity sweep cannot
+    /// detect (because the row says we host the blob and the filesystem
+    /// agrees) but no matching REA event exists.
+    ///
+    /// We induce a SQL failure cheaply by dropping the `economic_events`
+    /// table BEFORE calling finalize. The first SQL statement
+    /// (record_fetch_success on peer_blob_inventory) succeeds, but the
+    /// second (insert into economic_events) fails because the table is
+    /// missing. With the transaction wrap in place, the inventory row must
+    /// also be rolled back.
+    #[tokio::test]
+    async fn finalize_rolls_back_inventory_on_event_insert_failure() {
+        use crate::blob_store::BlobStore;
+        use crate::db::peer_blob_inventory::lookup_hosts;
+        use crate::test_util::test_pool;
+        use diesel::RunQueryDsl;
+
+        let blob_store = BlobStore::new_memory();
+        let pool = test_pool();
+        let mut conn = pool.get().expect("conn");
+
+        let bytes = b"rollback-test-payload".to_vec();
+        let hash = {
+            let mut h = Sha256::new();
+            h.update(&bytes);
+            format!("sha256-{}", hex::encode(h.finalize()))
+        };
+
+        // Force the second SQL write to fail by dropping its target table.
+        diesel::sql_query("DROP TABLE economic_events;")
+            .execute(&mut conn)
+            .expect("drop economic_events");
+
+        let result = finalize_fetch_success(
+            &mut conn,
+            &hash,
+            "peer_R",
+            &bytes,
+            "self_cid_R",
+            &blob_store,
+        )
+        .await;
+        assert!(
+            result.is_err(),
+            "finalize must fail when economic_events insert fails"
+        );
+
+        // The filesystem write happened first (and is intentionally NOT
+        // rolled back; the parity sweep handles orphan blobs).
+        assert!(
+            blob_store.exists(&hash).await,
+            "blob persisted to filesystem before SQL transaction"
+        );
+
+        // Critical assertion: the peer_blob_inventory row must NOT exist,
+        // because the wrapping transaction rolled it back when the
+        // serve-blob insert failed.
+        let rows = lookup_hosts(&mut conn, &hash, "2020-01-01T00:00:00Z").unwrap();
+        assert!(
+            !rows.iter().any(|r| r.peer_id == "peer_R"),
+            "peer_blob_inventory row must be rolled back when serve-blob \
+             insert fails; got rows: {rows:?}"
+        );
     }
 }
