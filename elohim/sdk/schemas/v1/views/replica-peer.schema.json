@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "epr:schema:view:replica-peer",
+  "title": "ReplicaPeer",
+  "description": "Per-peer replica row for a CID's distribution-details view. Source of truth: peer_identity_bindings (Category A from imagodei DHT, projected via signal stream) joined with libp2p swarm liveness (Operational, Category C). Reconstructed per request; not persisted.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["peerId", "deviceArchetype", "lastSeenSeconds"],
+  "properties": {
+    "peerId": {
+      "type": "string",
+      "description": "libp2p PeerId of the replica."
+    },
+    "deviceArchetype": {
+      "$ref": "../enums/device-archetype.schema.json",
+      "description": "Hardware/deployment archetype carried on the AgentPeerBinding."
+    },
+    "lastSeenSeconds": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Seconds since this peer was last observed online."
+    },
+    "hopHint": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Approximate libp2p Kad hop distance from the requester."
+    },
+    "householdId": {
+      "type": "string",
+      "description": "Household this peer belongs to, when known."
+    },
+    "regionTier": {
+      "type": "string",
+      "description": "Coarse region tier (e.g. 'us-central') for diversity reasoning."
+    }
+  }
+}

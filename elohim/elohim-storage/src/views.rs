@@ -7180,3 +7180,65 @@ pub struct DistributionSummary {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reciprocity_hint: Option<i64>,
 }
+
+/// Hardware/deployment archetype carried on an AgentPeerBinding (Category A
+/// from imagodei DHT). Mirrors the protocol enum at
+/// `elohim/sdk/schemas/v1/enums/device-archetype.schema.json`.
+#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq, Hash)]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+#[serde(rename_all = "snake_case")]
+pub enum DeviceArchetype {
+    Node,
+    Desktop,
+    Mobile,
+    Steward,
+}
+
+/// Per-replica row in a CID's distribution-details view.
+#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+#[serde(rename_all = "camelCase")]
+pub struct ReplicaPeer {
+    pub peer_id: String,
+    pub device_archetype: DeviceArchetype,
+    pub last_seen_seconds: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hop_hint: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub household_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub region_tier: Option<String>,
+}
+
+/// Per-doorway projector row in a CID's distribution-details view.
+#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectorIdentity {
+    pub doorway_hostname: String,
+    pub last_ack_seconds: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub region_tier: Option<String>,
+}
+
+/// Lazy-fetched per-CID developer-grade distribution view. Strict superset of
+/// `DistributionSummary`. Operational (Category C) projection; not persisted.
+///
+/// `reciprocityEdges` is intentionally omitted at T05 — it references
+/// `PeerHouseholdEdge` which lands in T07. T07 (or a follow-up) extends both
+/// the schema and this struct with the optional field.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+#[serde(rename_all = "camelCase")]
+pub struct DistributionDetails {
+    pub summary: DistributionSummary,
+    pub replica_peers: Vec<ReplicaPeer>,
+    pub projector_identities: Vec<ProjectorIdentity>,
+    /// Open-shape placement-gap records during bring-up; will graduate to a
+    /// typed schema once stable.
+    pub placement_gaps: Vec<JsonVal>,
+    /// Open-shape rea projection-event records relevant to this CID.
+    pub recent_projection_events: Vec<JsonVal>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub commitment_references: Option<Vec<String>>,
+}

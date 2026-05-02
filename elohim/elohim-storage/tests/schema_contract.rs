@@ -1807,6 +1807,87 @@ fn distribution_summary_matches_schema() {
 }
 
 #[test]
+fn distribution_details_matches_schema() {
+    use elohim_storage::views::{
+        DeviceArchetype, DistributionDetails, DistributionSummary, DiversityHint, FetchSource,
+        ProjectorIdentity, ReachClass, ReplicaHealth, ReplicaPeer,
+    };
+
+    let summary = DistributionSummary {
+        replica_count: 12,
+        replica_target: 14,
+        replica_health: ReplicaHealth::Healthy,
+        projector_count: 2,
+        reach_class: ReachClass::Public,
+        diversity_hint: DiversityHint::RegionMetro(vec!["us-central".into(), "eu-west".into()]),
+        this_fetch_source: FetchSource::ProjectedViaDoorway,
+        last_verified_seconds: 420,
+        my_role: None,
+        reciprocity_hint: None,
+    };
+
+    let sample = DistributionDetails {
+        summary,
+        replica_peers: vec![ReplicaPeer {
+            peer_id: "12D3KooWReplica1".into(),
+            device_archetype: DeviceArchetype::Desktop,
+            last_seen_seconds: 30,
+            hop_hint: Some(2),
+            household_id: Some("household-mathew".into()),
+            region_tier: Some("us-central".into()),
+        }],
+        projector_identities: vec![ProjectorIdentity {
+            doorway_hostname: "matthew.elohim.host".into(),
+            last_ack_seconds: 5,
+            region_tier: Some("us-central".into()),
+        }],
+        placement_gaps: vec![],
+        recent_projection_events: vec![],
+        commitment_references: Some(vec!["bafy-commit-1".into()]),
+    };
+
+    let json = serde_json::to_value(&sample).unwrap();
+    validate_against_schema("views/distribution-details.schema.json", &json);
+
+    let raw_schema: Value = serde_json::from_str(
+        &fs::read_to_string(schema_dir().join("views/distribution-details.schema.json")).unwrap(),
+    )
+    .unwrap();
+    assert_source_of_truth_declared(&raw_schema, "distribution-details.schema.json");
+}
+
+#[test]
+fn replica_peer_matches_schema() {
+    use elohim_storage::views::{DeviceArchetype, ReplicaPeer};
+
+    let sample = ReplicaPeer {
+        peer_id: "12D3KooWReplica1".into(),
+        device_archetype: DeviceArchetype::Mobile,
+        last_seen_seconds: 90,
+        hop_hint: None,
+        household_id: None,
+        region_tier: None,
+    };
+
+    let json = serde_json::to_value(&sample).unwrap();
+    validate_against_schema("views/replica-peer.schema.json", &json);
+}
+
+#[test]
+fn projector_identity_matches_schema() {
+    use elohim_storage::views::ProjectorIdentity;
+
+    let sample = ProjectorIdentity {
+        doorway_hostname: "shem.elohim.host".into(),
+        last_ack_seconds: 12,
+        region_tier: None,
+    };
+
+    let json = serde_json::to_value(&sample).unwrap();
+    validate_against_schema("views/projector-identity.schema.json", &json);
+}
+
+#[test]
 fn distribution_summary_with_diversity_none_matches_schema() {
     use elohim_storage::views::{
         DiversityHint, DistributionSummary, FetchSource, ReachClass, ReplicaHealth,

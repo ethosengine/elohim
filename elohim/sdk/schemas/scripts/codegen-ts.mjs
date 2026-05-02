@@ -76,6 +76,9 @@ const INTERFACE_FILES = [
   // Light-Up-Topology Phase 1 — operational distribution + cluster + reciprocity (Category C)
   { src: 'views/distribution-summary.ts', dest: 'distribution-summary.ts' },
   { src: 'views/diversity-hint.ts', dest: 'diversity-hint.ts' },
+  { src: 'views/distribution-details.ts', dest: 'distribution-details.ts' },
+  { src: 'views/replica-peer.ts', dest: 'replica-peer.ts' },
+  { src: 'views/projector-identity.ts', dest: 'projector-identity.ts' },
 ];
 
 /**
