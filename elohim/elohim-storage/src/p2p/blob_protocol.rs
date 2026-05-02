@@ -36,6 +36,13 @@ pub const DEFAULT_MAX_RESPONSE_SIZE: usize = 16 * 1024 * 1024;
 /// a malicious peer claiming a multi-GB length prefix.
 pub const HARD_MAX_RESPONSE_SIZE: usize = 64 * 1024 * 1024;
 
+/// Hard cap on the size of an inbound `BlobFetchRequest` frame. The request
+/// payload is just a content-address string (≤ ~80 bytes for sha256-hex);
+/// 4 KiB is generous and bounds the receive buffer regardless of what a peer
+/// claims to send. Distinct from the response cap so a small request channel
+/// does not get sized to the much larger blob payload limit.
+pub const MAX_REQUEST_SIZE: usize = 4 * 1024;
+
 /// Blob protocol marker type for the request-response behaviour.
 #[derive(Debug, Clone)]
 pub struct BlobProtocol;
@@ -115,13 +122,13 @@ impl request_response::Codec for BlobCodec {
         let mut len_buf = [0u8; 4];
         io.read_exact(&mut len_buf).await?;
         let len = u32::from_be_bytes(len_buf) as usize;
-        if len > self.max_response_size {
+        // T21 review fix #3: bound inbound requests by a tight `MAX_REQUEST_SIZE`
+        // (4 KiB) rather than the much larger response cap. A request payload is
+        // just a content-address string and never approaches the response limit.
+        if len > MAX_REQUEST_SIZE {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
-                format!(
-                    "blob fetch request too large: {len} > {}",
-                    self.max_response_size
-                ),
+                format!("blob fetch request too large: {len} > {MAX_REQUEST_SIZE}"),
             ));
         }
         let mut buf = vec![0u8; len];
@@ -165,7 +172,20 @@ impl request_response::Codec for BlobCodec {
     {
         let data = rmp_serde::to_vec(&request)
             .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
-        io.write_all(&(data.len() as u32).to_be_bytes()).await?;
+        // T21 review fix #2: guard against silent truncation in the `usize → u32`
+        // length-prefix conversion. The receive side caps payload size, but the
+        // write side could otherwise emit a corrupted frame if a caller bypassed
+        // the cap (e.g. constructing `BlobFetchResponse::Found(huge_vec)` directly).
+        let len: u32 = data.len().try_into().map_err(|_| {
+            io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!(
+                    "serialized blob request too large for u32 length prefix: {} bytes",
+                    data.len()
+                ),
+            )
+        })?;
+        io.write_all(&len.to_be_bytes()).await?;
         io.write_all(&data).await?;
         io.flush().await
     }
@@ -181,7 +201,17 @@ impl request_response::Codec for BlobCodec {
     {
         let data = rmp_serde::to_vec(&response)
             .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
-        io.write_all(&(data.len() as u32).to_be_bytes()).await?;
+        // T21 review fix #2: see `write_request`.
+        let len: u32 = data.len().try_into().map_err(|_| {
+            io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!(
+                    "serialized blob response too large for u32 length prefix: {} bytes",
+                    data.len()
+                ),
+            )
+        })?;
+        io.write_all(&len.to_be_bytes()).await?;
         io.write_all(&data).await?;
         io.flush().await
     }
@@ -252,5 +282,65 @@ mod tests {
     #[test]
     fn protocol_id_is_canonical() {
         assert_eq!(BlobProtocol.as_ref(), "/elohim/blob/1.0.0");
+    }
+
+    /// T21 review fix #1: validate-or-die assumption — `parse_content_address`
+    /// rejects path-traversal payloads. The inbound BlobProtocol handler runs
+    /// requests through this gate before touching the filesystem, so any input
+    /// that this rejects is treated as `NotFound` upstream. Re-asserting it here
+    /// guards against future drift in the validator contract.
+    #[test]
+    fn parse_content_address_rejects_path_traversal() {
+        use crate::blob_store::BlobStore;
+        // Classic traversal payloads
+        assert!(BlobStore::parse_content_address("../../etc/passwd").is_err());
+        assert!(BlobStore::parse_content_address("/etc/passwd").is_err());
+        assert!(BlobStore::parse_content_address("..").is_err());
+        assert!(BlobStore::parse_content_address("../").is_err());
+        assert!(BlobStore::parse_content_address("sha256-../../etc/passwd").is_err());
+        // And the happy path still works
+        let valid = format!("sha256-{}", "a".repeat(64));
+        assert!(BlobStore::parse_content_address(&valid).is_ok());
+        let valid_raw = "a".repeat(64);
+        assert!(BlobStore::parse_content_address(&valid_raw).is_ok());
+    }
+
+    /// T21 review fix #2/#6: round-trip a sizable response through the codec
+    /// over an in-memory `futures::io::Cursor` to prove the wire format works
+    /// end-to-end at sizes well above the 100-byte happy path. Catches future
+    /// regressions in length-prefix handling without requiring a real swarm.
+    #[tokio::test]
+    async fn codec_roundtrips_large_response_through_async_buffer() {
+        use futures::io::Cursor;
+        use libp2p::request_response::Codec;
+
+        let payload = vec![0xAB_u8; 1_000_000];
+        let response = BlobFetchResponse::Found(payload.clone());
+
+        // Write side: encode via the codec into an in-memory buffer.
+        let mut buf: Vec<u8> = Vec::new();
+        {
+            let mut writer = Cursor::new(&mut buf);
+            let mut codec = BlobCodec::default();
+            codec
+                .write_response(&BlobProtocol, &mut writer, response)
+                .await
+                .expect("write_response");
+        }
+
+        // Read side: decode the buffer back.
+        let mut reader = Cursor::new(buf);
+        let mut codec = BlobCodec::default();
+        let decoded = codec
+            .read_response(&BlobProtocol, &mut reader)
+            .await
+            .expect("read_response");
+        match decoded {
+            BlobFetchResponse::Found(bytes) => {
+                assert_eq!(bytes.len(), payload.len());
+                assert_eq!(bytes, payload);
+            }
+            other => panic!("expected Found, got {other:?}"),
+        }
     }
 }

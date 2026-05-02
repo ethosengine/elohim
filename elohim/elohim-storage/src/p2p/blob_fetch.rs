@@ -14,13 +14,16 @@
 //!
 //! Hash verification: sha256-hex matches the requested hash (case-insensitive).
 //!
-//! # Stage 1 note
-//! `P2PCommand::FetchBlob` is a Stage 1 stub that always returns
-//! `Err("FetchBlob not yet implemented; Stage 1 placeholder")`.  That means
-//! `race_fetch` will always yield `Miss` in a live swarm until Stage 2 wires
-//! the command to a real request-response protocol.  The helper's control
-//! flow, hash verification, persistence, and serve-blob emission are verified
-//! by unit tests without requiring a running swarm.
+//! # Stage 2 (T21 onward)
+//! `P2PCommand::FetchBlob` issues a `/elohim/blob/1.0.0` request-response
+//! exchange to the named peer (see `p2p/blob_protocol.rs`). The reply oneshot
+//! is delivered when the response arrives, the outbound times out, or the
+//! connection fails — all three cases produce a deterministic
+//! `Result<Vec<u8>, String>` the helper can act on. The helper's control flow,
+//! hash verification, persistence, and serve-blob emission are still exercised
+//! by unit tests without requiring a running swarm — those tests use the
+//! `for_testing()` handle, which keeps the Stage-1 placeholder error so race
+//! batches resolve to `Miss` deterministically.
 
 use crate::blob_store::BlobStore;
 use crate::config::Config;

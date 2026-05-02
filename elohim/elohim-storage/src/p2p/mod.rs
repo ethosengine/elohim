@@ -699,12 +699,17 @@ pub enum P2PCommand {
     /// T17: fetch a blob from a specific peer. Used by the race-fetch helper
     /// (`p2p::blob_fetch::race_fetch`) for GET-time fallback and custody-driven kicks.
     ///
-    /// Stage 1 stub — sends `Err("FetchBlob not yet implemented; Stage 1 placeholder")`
-    /// via the reply oneshot. The race-fetch helper's control flow, hash verification,
-    /// persistence, and serve-blob emission are all exercised by unit tests; the actual
-    /// shard-protocol wiring is Stage 2 work (requires a dedicated blob-fetch request-
-    /// response channel distinct from the shard channel, which picks any peer not a
-    /// specific one).
+    /// # Stage 2 (T21 onward)
+    /// In a live swarm this issues a `/elohim/blob/1.0.0` request-response exchange
+    /// to the named peer (see `p2p/blob_protocol.rs`). The reply oneshot is delivered
+    /// when the response arrives, the outbound times out, or the connection fails —
+    /// all three cases produce a deterministic `Result<Vec<u8>, String>` the helper
+    /// can act on. The error string in the failure path encodes the
+    /// `OutboundFailure` variant ("timeout", "connection_closed", "dial_failure",
+    /// "unsupported_protocols", or "io_error: …") so the consumer can classify it.
+    ///
+    /// The `for_testing()` stub still returns `Err("FetchBlob not yet implemented;
+    /// Stage 1 placeholder")` because no real swarm runs in unit tests.
     FetchBlob {
         peer_id: libp2p::PeerId,
         hash: String,
@@ -2844,37 +2849,56 @@ impl P2PNode {
                 request_response::Message::Request {
                     request, channel, ..
                 } => {
-                    let response = match self.blob_store.get(&request.hash).await {
-                        Ok(bytes) => {
-                            debug!(
-                                target: "elohim_storage::blob_fetch",
-                                peer = %peer,
-                                hash = %request.hash,
-                                size = bytes.len(),
-                                "T21: serving blob to peer"
-                            );
-                            BlobFetchResponse::Found(bytes)
-                        }
-                        Err(StorageError::NotFound(_)) | Err(StorageError::BlobNotFound(_)) => {
-                            debug!(
-                                target: "elohim_storage::blob_fetch",
-                                peer = %peer,
-                                hash = %request.hash,
-                                "T21: blob not found locally; replying NotFound"
-                            );
-                            BlobFetchResponse::NotFound
-                        }
-                        Err(e) => {
-                            warn!(
-                                target: "elohim_storage::blob_fetch",
-                                peer = %peer,
-                                hash = %request.hash,
-                                error = %e,
-                                "T21: blob fetch error; replying Error"
-                            );
-                            BlobFetchResponse::Error(e.to_string())
-                        }
-                    };
+                    // T21 review fix #1: validate the requested hash before touching the
+                    // filesystem. `BlobStore::blob_path` does not normalize `..` components,
+                    // so a crafted `BlobFetchRequest { hash: "../../etc/passwd" }` could
+                    // otherwise read arbitrary files outside the blob root. Treat any
+                    // invalid content address as `NotFound` — do not leak that the path was
+                    // malformed.
+                    let response =
+                        match crate::blob_store::BlobStore::parse_content_address(&request.hash) {
+                            Ok(_) => match self.blob_store.get(&request.hash).await {
+                                Ok(bytes) => {
+                                    debug!(
+                                        target: "elohim_storage::blob_fetch",
+                                        peer = %peer,
+                                        hash = %request.hash,
+                                        size = bytes.len(),
+                                        "T21: serving blob to peer"
+                                    );
+                                    BlobFetchResponse::Found(bytes)
+                                }
+                                Err(StorageError::NotFound(_))
+                                | Err(StorageError::BlobNotFound(_)) => {
+                                    debug!(
+                                        target: "elohim_storage::blob_fetch",
+                                        peer = %peer,
+                                        hash = %request.hash,
+                                        "T21: blob not found locally; replying NotFound"
+                                    );
+                                    BlobFetchResponse::NotFound
+                                }
+                                Err(e) => {
+                                    warn!(
+                                        target: "elohim_storage::blob_fetch",
+                                        peer = %peer,
+                                        hash = %request.hash,
+                                        error = %e,
+                                        "T21: blob fetch error; replying Error"
+                                    );
+                                    BlobFetchResponse::Error(e.to_string())
+                                }
+                            },
+                            Err(_) => {
+                                warn!(
+                                    target: "elohim_storage::blob_fetch",
+                                    peer = %peer,
+                                    hash = %request.hash,
+                                    "T21: rejected blob request with invalid content address"
+                                );
+                                BlobFetchResponse::NotFound
+                            }
+                        };
                     let mut swarm = self.swarm.write().await;
                     if let Err(e) = swarm
                         .behaviour_mut()
@@ -2946,8 +2970,23 @@ impl P2PNode {
                     error = ?error,
                     "T21: outbound blob fetch failed"
                 );
+                // T21 review fix #4: preserve OutboundFailure variant identity so the
+                // race-fetch consumer can distinguish timeout from dial-failure from
+                // protocol-mismatch. libp2p-request-response 0.27 (libp2p 0.54) defines
+                // exactly five variants: DialFailure, Timeout, ConnectionClosed,
+                // UnsupportedProtocols, Io. There is no NotConnected variant.
                 if let Some(reply) = self.pending_blob_fetches.lock().await.remove(&request_id) {
-                    let _ = reply.send(Err(format!("outbound failure: {error}")));
+                    use libp2p::request_response::OutboundFailure;
+                    let err_str = match &error {
+                        OutboundFailure::Timeout => "timeout".to_string(),
+                        OutboundFailure::ConnectionClosed => "connection_closed".to_string(),
+                        OutboundFailure::DialFailure => "dial_failure".to_string(),
+                        OutboundFailure::UnsupportedProtocols => {
+                            "unsupported_protocols".to_string()
+                        }
+                        OutboundFailure::Io(_) => format!("io_error: {error}"),
+                    };
+                    let _ = reply.send(Err(err_str));
                 }
             }
             behaviour::ElohimStorageBehaviourEvent::BlobProtocol(
