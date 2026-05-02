@@ -400,6 +400,13 @@ impl ElohimStorageBehaviour {
         gossipsub
             .subscribe(&integrity_revocation_topic)
             .expect("subscribe to elohim/integrity/revocation");
+        // T14: subscribe to blob inventory topic for peer-to-peer inventory reconciliation.
+        // Broadcaster peers publish `BlobInventorySnapshot` and `BlobInventoryDelta` on this topic.
+        // The receive arm in p2p/mod.rs projects arrivals into `peer_blob_inventory` (SQLite).
+        let inventory_topic = gossipsub::IdentTopic::new(super::inventory_gossip::INVENTORY_TOPIC);
+        gossipsub
+            .subscribe(&inventory_topic)
+            .expect("subscribe to elohim/inventory/blob");
 
         Self {
             kademlia,

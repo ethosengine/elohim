@@ -208,6 +208,14 @@ pub const RECOVERY_INVITATION_TOPIC: &str = "recovery.invitation";
 /// revocation semantics differ from invitation (see spec §7.1 decision #6).
 pub const RECOVERY_REVOCATION_TOPIC: &str = "recovery.revocation";
 
+/// Convert microseconds-since-epoch to an ISO-8601 UTC string.
+/// Returns `None` if the timestamp is out of range.
+/// Used by the inventory gossip receive arm (T14).
+fn micros_to_iso(micros: i64) -> Option<String> {
+    chrono::DateTime::<chrono::Utc>::from_timestamp_micros(micros)
+        .map(|dt| dt.format("%Y-%m-%dT%H:%M:%SZ").to_string())
+}
+
 /// A peer discovered on the network with its delivery capabilities.
 /// Populated from mDNS discovery + identify protocol info.
 #[derive(Debug, Clone, Serialize)]
@@ -620,6 +628,12 @@ pub enum P2PCommand {
     /// for content-reach broadcasts. Best-effort — publish failure (e.g. no
     /// peers subscribed) is logged and does not block the caller.
     GossipPublish { topic: String, payload: Vec<u8> },
+    /// T14: request a fresh `BlobInventorySnapshot` from the named peer.
+    /// Issued by the projection writer when it detects a sequence gap.
+    /// Stage 1 placeholder — just logs and drops; Stage 2 will route this
+    /// as a libp2p request-response message. The next periodic snapshot from
+    /// the source peer will close the gap naturally in the interim.
+    SnapshotRequest { peer_id: libp2p::PeerId },
 }
 
 /// RAII guard that resumes P2P sync when dropped.
@@ -735,6 +749,7 @@ impl P2PHandle {
                         // P3.4 stub: no swarm in test, always miss.
                         let _ = reply.send(None);
                     }
+                    P2PCommand::SnapshotRequest { .. } => {} // T14 Stage-1 placeholder
                 }
             }
         });
@@ -1881,6 +1896,16 @@ impl P2PNode {
                         "GossipPublish: gossipsub publish failed (often: no peers subscribed yet)"
                     ),
                 }
+            }
+            // T14: Stage-1 placeholder — log and drop. Stage 2 will route this as a
+            // libp2p request-response message to the named peer. The next periodic
+            // snapshot from the source peer closes the gap naturally in the interim.
+            P2PCommand::SnapshotRequest { peer_id } => {
+                debug!(
+                    target: "elohim_storage::inventory",
+                    peer_id = %peer_id,
+                    "SnapshotRequest queued; Stage 1 placeholder — relying on next periodic snapshot"
+                );
             }
         }
     }
@@ -3449,6 +3474,148 @@ impl P2PNode {
                                     topic = crate::p2p::topics::TOPIC_INTEGRITY_REVOCATION,
                                     "Failed to decode RecoveryRevocationMessage (canonical topic)"
                                 ),
+                            }
+                        } else if message.topic.as_str()
+                            == crate::p2p::inventory_gossip::INVENTORY_TOPIC
+                        {
+                            // T14: receive blob inventory snapshot or delta from a peer.
+                            // Try snapshot first, then delta. We don't have a wire-level
+                            // discriminator; distinguishing relies on serde — snapshots have
+                            // `hashes` (no `added`/`removed`) and deltas have `added`/`removed`
+                            // (no `hashes`). serde will fail one and accept the other.
+
+                            use crate::p2p::inventory_gossip::{
+                                BlobInventoryDelta, BlobInventorySnapshot,
+                            };
+
+                            if let Ok(snapshot) = BlobInventorySnapshot::from_bytes(&message.data) {
+                                if let Err(e) = snapshot.verify_structural() {
+                                    warn!(
+                                        target: "elohim_storage::inventory",
+                                        from = %propagation_source,
+                                        error = ?e,
+                                        "Inventory snapshot failed structural verify — dropped"
+                                    );
+                                } else if let Some(pool) = self.db_pool.as_ref() {
+                                    match pool.get() {
+                                        Ok(mut conn) => {
+                                            let now_iso = chrono::Utc::now()
+                                                .format("%Y-%m-%dT%H:%M:%SZ")
+                                                .to_string();
+                                            let when = micros_to_iso(snapshot.snapshot_at)
+                                                .unwrap_or(now_iso);
+                                            match crate::db::peer_blob_inventory::apply_snapshot(
+                                                &mut conn,
+                                                &snapshot.peer_id,
+                                                &snapshot.hashes,
+                                                snapshot.sequence as i64,
+                                                &when,
+                                            ) {
+                                                Ok(()) => debug!(
+                                                    target: "elohim_storage::inventory",
+                                                    from = %propagation_source,
+                                                    peer_id = %snapshot.peer_id,
+                                                    count = snapshot.hashes.len(),
+                                                    sequence = snapshot.sequence,
+                                                    "Inventory snapshot applied"
+                                                ),
+                                                Err(e) => warn!(
+                                                    target: "elohim_storage::inventory",
+                                                    from = %propagation_source,
+                                                    error = %e,
+                                                    "apply_snapshot failed"
+                                                ),
+                                            }
+                                        }
+                                        Err(e) => warn!(
+                                            target: "elohim_storage::inventory",
+                                            error = %e,
+                                            "inventory: db pool exhausted"
+                                        ),
+                                    }
+                                }
+                            } else if let Ok(delta) = BlobInventoryDelta::from_bytes(&message.data)
+                            {
+                                if let Err(e) = delta.verify_structural() {
+                                    warn!(
+                                        target: "elohim_storage::inventory",
+                                        from = %propagation_source,
+                                        error = ?e,
+                                        "Inventory delta failed structural verify — dropped"
+                                    );
+                                } else if let Some(pool) = self.db_pool.as_ref() {
+                                    match pool.get() {
+                                        Ok(mut conn) => {
+                                            let when = micros_to_iso(delta.emitted_at)
+                                                .unwrap_or_else(|| {
+                                                    chrono::Utc::now()
+                                                        .format("%Y-%m-%dT%H:%M:%SZ")
+                                                        .to_string()
+                                                });
+                                            match crate::db::peer_blob_inventory::apply_delta(
+                                                &mut conn,
+                                                &delta.peer_id,
+                                                &delta.added,
+                                                &delta.removed,
+                                                delta.sequence as i64,
+                                                &when,
+                                            ) {
+                                                Ok(crate::db::peer_blob_inventory::DeltaApplyOutcome::Applied) => {
+                                                    debug!(
+                                                        target: "elohim_storage::inventory",
+                                                        peer_id = %delta.peer_id,
+                                                        sequence = delta.sequence,
+                                                        added = delta.added.len(),
+                                                        removed = delta.removed.len(),
+                                                        "Inventory delta applied"
+                                                    );
+                                                }
+                                                Ok(crate::db::peer_blob_inventory::DeltaApplyOutcome::Replay) => {
+                                                    debug!(
+                                                        target: "elohim_storage::inventory",
+                                                        peer_id = %delta.peer_id,
+                                                        sequence = delta.sequence,
+                                                        "Inventory delta replay — dropped silently"
+                                                    );
+                                                }
+                                                Ok(crate::db::peer_blob_inventory::DeltaApplyOutcome::Gap {
+                                                    expected,
+                                                    received,
+                                                }) => {
+                                                    warn!(
+                                                        target: "elohim_storage::inventory",
+                                                        peer_id = %delta.peer_id,
+                                                        expected,
+                                                        received,
+                                                        "Inventory delta gap — requesting snapshot"
+                                                    );
+                                                    // Best-effort: send the snapshot-request command.
+                                                    // Parse the peer_id string into a libp2p::PeerId.
+                                                    if let Ok(pid) = delta.peer_id.parse::<libp2p::PeerId>() {
+                                                        let cmd = P2PCommand::SnapshotRequest { peer_id: pid };
+                                                        let _ = self.command_tx.try_send(cmd);
+                                                    }
+                                                }
+                                                Err(e) => warn!(
+                                                    target: "elohim_storage::inventory",
+                                                    error = %e,
+                                                    "apply_delta failed"
+                                                ),
+                                            }
+                                        }
+                                        Err(e) => warn!(
+                                            target: "elohim_storage::inventory",
+                                            error = %e,
+                                            "inventory: db pool exhausted"
+                                        ),
+                                    }
+                                }
+                            } else {
+                                debug!(
+                                    target: "elohim_storage::inventory",
+                                    from = %propagation_source,
+                                    "Inventory message decoded as neither snapshot nor delta — dropped"
+                                );
                             }
                         } else if message.topic.as_str().starts_with("elohim/") {
                             // D.6 wire point B (gossipsub EPR announce): per-pillar
