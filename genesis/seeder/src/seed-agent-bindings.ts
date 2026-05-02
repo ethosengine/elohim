@@ -42,7 +42,7 @@ import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { AdminWebsocket, AppWebsocket, type AppInfo } from '@holochain/client';
+import { AdminWebsocket, AppWebsocket } from '@holochain/client';
 
 // =============================================================================
 // Types — match seed-conductor-identities.ts (no shared types module exists)
@@ -107,20 +107,24 @@ function plansForHuman(human: HumansJsonHuman): Archetype[] {
 }
 
 /**
- * Deterministic peer_id derivation.
+ * Deterministic test-only peer_id. Not a valid libp2p PeerId (suffix is
+ * hex, not base58btc) — opaque string at Stage 1; replace with
+ * keypair-derived IDs in Stage 2 that round-trip through `PeerId::from_str`.
  *
- * Same (humanId, archetype) → same peer_id across re-runs. Uses the
- * `12D3KooW...` libp2p PeerId multibase prefix — sufficient for test
- * seeding; not cryptographically derived from a real keypair (Stage 2
- * concern).
+ * Same (humanId, archetype) → same peer_id across re-runs. The
+ * `12D3KooW` prefix mimics libp2p shape for ergonomic logs only; the
+ * hex suffix is deterministic, alphanumeric, and clearly not a real
+ * libp2p PeerId.
  */
 function deterministicPeerId(humanId: string, archetype: Archetype): string {
-  const hash = createHash('sha256');
-  hash.update(`${humanId}:${archetype}`, 'utf8');
-  const bytes = hash.digest();
-  // base64url, sliced to keep total length stable (12D3KooW + 38 = 46 chars)
-  const suffix = bytes.toString('base64url').slice(0, 38);
-  return `12D3KooW${suffix}`;
+  const digest = createHash('sha256')
+    .update(`${humanId}:${archetype}`, 'utf8')
+    .digest();
+  // Lowercase hex suffix — deterministic, alphanumeric, and clearly not a
+  // real libp2p PeerId. Stage 1 stores peer_id as an opaque string; Stage 2
+  // will generate keypair-derived IDs that round-trip through PeerId::from_str.
+  // Sliced to 38 chars to keep total length stable (12D3KooW + 38 = 46 chars).
+  return `12D3KooW${digest.toString('hex').slice(0, 38)}`;
 }
 
 // =============================================================================
@@ -144,7 +148,6 @@ function toAdminUrl(appUrl: string): string {
 interface ConductorSession {
   appWs: AppWebsocket;
   cellId: [Uint8Array, Uint8Array];
-  appInfo: AppInfo;
 }
 
 /**
@@ -223,7 +226,7 @@ async function connectToConductor(
       wsClientOptions: { origin: 'http://localhost' },
     });
 
-    return { appWs, cellId, appInfo: matchingApp };
+    return { appWs, cellId };
   } catch (err) {
     try {
       await adminWs.client.close();
@@ -237,8 +240,10 @@ async function connectToConductor(
 /**
  * Call imagodei.create_agent_peer_binding on the given cell.
  *
- * Stage 1: signature is empty (the zome's signer-match gate is the only
- * authorization check; signature verification is Stage 2).
+ * Stage 1: signature is a single zero byte (Stage 1 structural non-empty;
+ * Ed25519 verification is Stage 2). The integrity validator's Rule 4
+ * rejects an empty signature, but at Stage 1 the zome's signer-match gate
+ * is the only authorization check.
  */
 async function callCreateBinding(
   appWs: AppWebsocket,
@@ -307,7 +312,10 @@ async function seedBindingsForHuman(
           valid_from_micros: validFromMicros,
           valid_until_micros: null,
           device_archetype: archetype,
-          signature: new Uint8Array(0),
+          // Single zero byte (Stage 1 structural non-empty; Ed25519
+          // verification is Stage 2). The integrity validator's Rule 4
+          // rejects an empty signature, so we cannot send zero bytes.
+          signature: new Uint8Array([0x00]),
         };
 
         try {
