@@ -17,6 +17,7 @@
 //! - **ElohimVerifier**: AI-assisted identity verification for disaster recovery
 
 pub mod custodian;
+pub mod dashboard_topology;
 pub mod did_resolver;
 pub mod discovery;
 pub mod elohim_verifier;
