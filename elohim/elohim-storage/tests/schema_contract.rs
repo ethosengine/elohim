@@ -1116,6 +1116,24 @@ fn view_schemas_declare_source_of_truth() {
         "views/epr-verify-view.schema.json",
         "views/epr-list-view.schema.json",
         "views/epr-providers-view.schema.json",
+        // Phase 1: light-up-topology view schemas
+        "views/distribution-summary.schema.json",
+        "views/distribution-details.schema.json",
+        "views/replica-peer.schema.json",
+        "views/projector-identity.schema.json",
+        "views/diversity-hint.schema.json",
+        "views/my-cluster-view.schema.json",
+        "views/freshness.schema.json",
+        "views/peer-topology-view.schema.json",
+        "views/peer-household-edge.schema.json",
+        "views/reciprocity-view.schema.json",
+        "views/reciprocity-row.schema.json",
+        "views/doorway-dashboard-view.schema.json",
+        "views/dashboard-steward.schema.json",
+        "views/dashboard-federation-peer.schema.json",
+        "views/projection-coverage.schema.json",
+        "views/public-surface-state.schema.json",
+        "views/view-slice.schema.json",
     ];
 
     for schema_name in &view_schemas {
