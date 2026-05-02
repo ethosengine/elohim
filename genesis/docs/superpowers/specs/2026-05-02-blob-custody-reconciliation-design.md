@@ -184,20 +184,26 @@ on local store miss:
                  WHERE blob_hash = ? AND last_seen_at > now - freshness_horizon
                  ORDER BY (source = 'fetch-success' DESC, last_seen_at DESC)
     filter candidates: only those is_connected(peer_id) (per the new accessor)
-    iterate candidates with per-peer timeout (default 5s):
-        send P2PCommand::FetchShard { peer_id, hash, reply: oneshot }
-        if reply is Ok(bytes) and verify_blob_hash(bytes, hash):
+    while candidates is non-empty:
+        batch = candidates.take(fetch_parallelism)        # default 3
+        race the batch in parallel:
+            for each peer in batch concurrently:
+                send P2PCommand::FetchBlob { peer_id, hash, reply: oneshot }
+                with per-peer timeout (default 5s)
+        on first reply that returns Ok(bytes) AND verify_blob_hash(bytes, hash):
+            cancel/drop pending replies in this batch
             persist locally to blob store
-            record_fetch_success(peer_id, hash)
+            record_fetch_success(winning_peer_id, hash)
             emit serve-blob REA event:
                 action='serve-blob'
-                provider=<peer_id-steward-cid>
+                provider=<winning_peer_id-steward-cid>
                 receiver=<this-peer-cid>
                 resource_inventoried_as=<blob_hash>
                 output_of=<matching custody-blob commitment action_hash, if known; else NULL>
             return bytes to HTTP requester
-        else:
-            continue
+        if all replies in batch failed (timeout / error / hash-mismatch):
+            log per-peer failure (drives peer-quality metrics later)
+            continue with next batch
     if all candidates exhausted:
         return 404 (existing behavior preserved)
 ```
@@ -205,6 +211,8 @@ on local store miss:
 `FetchShard` is extended from single-peer to peer-iteration (or a new sibling command `FetchBlob { peer_id, hash, reply }` if the existing `FetchShard` semantics are too tied to shard storage). Implementation choice deferred to the implementer with a clear contract: per-peer timeout, fail-fast on hash mismatch, emit `serve-blob` only on verified success.
 
 **Verification.** The blob's content hash MUST match the requested hash before persisting locally. Mismatch is a protocol violation; log + drop + do not record fetch-success. (This is the symmetric protection to T03c's signature-non-empty fix: integrity is enforced at every layer that writes durable state.)
+
+**Why race in parallel rather than iterate sequentially.** Sequential iteration with a 5s per-peer timeout means tail latency is `(slow_peer_count × 5s)` in the bad case — one wedged custodian gates every request behind it. Racing N=3 candidates in parallel means tail latency is `min(per-peer latency)` for the batch; a single fast hit returns immediately and pending replies are cancelled. Bandwidth cost is small (only the winner's bytes are kept; losing replies are short response messages); CPU cost is small (one oneshot per peer). The default `fetch_parallelism=3` balances opportunistic concurrency against load amplification on heavily-pinned blobs. Operator preset `fetch-blob-parallelism`.
 
 ### 7. Filesystem parity sweep
 
@@ -261,6 +269,20 @@ This catches the failure mode from `feedback_storage_quilt` (and its predecessor
 - **Multi-peer integration tests in Eclipse Che**: deferred to Jenkins per `feedback_shift_measure_jenkins`. Local TDD uses unit-level tests against mocked P2P channels and a unit-mockable reconciliation pass.
 - **Bandwidth optimization** at large blob counts: at alpha topology scale (~6 peers, hundreds of blobs) the snapshot bandwidth is comfortable. Graduation to delta-only with periodic snapshot-resync (which this design's wire format already supports) becomes worth measuring at 10K+ blobs; not measured in this sprint.
 
+## Scale ceiling
+
+This design targets the **alpha topology**: households (~6 peers per household, bootstrap-pair pattern per `project_alpha_topology_bootstrap_pair`) plus small collectives that look topologically like enlarged households. The architecture is honest about its ceiling: it is a *full-mesh inventory broadcast* with O(N²) gossip overhead in peer count and O(M) per-peer overhead in blob count. At alpha scale (N≈10², M≈10³) bandwidth is comfortable; at global UGC scale (N→10⁶, M→10⁹) it does not work as designed.
+
+Three concrete extensions handle scale graduation when measurement makes them necessary. None of them are in this sprint's scope, but the substrate this sprint lands does not block any of them — each is a layer added on top of the trinity.
+
+**Bloom-filter inventory** (bandwidth optimization). Replace `BlobInventorySnapshot.hashes: Vec<String>` (N hashes × 32 bytes each = ~32 KB at 1K blobs) with a Bloom filter (~1.5 KB for 1K blobs at 1% false-positive rate). The cost is occasional false-positive fetch attempts (fetch a blob the peer doesn't actually have, get an empty 404 back, learn nothing); the benefit is two orders of magnitude bandwidth reduction. The trinity is unchanged: gossip wire becomes Bloom-filtered; `peer_blob_inventory` becomes "peers whose Bloom said they probably have this blob" with the false-positive caveat handled by the existing `record_fetch_success` strongest-evidence path. Future sprint when alpha bandwidth measurement crosses a threshold.
+
+**Household aggregation** (peer-count optimization). Within a household (memory pin: `project_household_is_resilience_unit` — resilience is household-to-household, not peer-to-peer), peers don't gossip individual inventory across the wider mesh; instead one *household-aggregate* node (probably the household's elohim-operator blade per `project_household_fabric`) speaks the household's combined inventory to outsiders. Inside the household, full-detail gossip continues. This collapses N peers to roughly N/household_size at the cross-household level. The trinity is unchanged: each household exposes a single aggregate `peer_blob_inventory` row per blob; the inner household's per-peer detail is a household-internal concern. Compatible with alpha topology because alpha households today already have a clear primary host; no schema changes required, just an additive aggregator.
+
+**Hierarchical routing** (mesh-scale graduation). At global UGC scale, full-mesh broadcast doesn't work — a peer can't know about every blob on the network. The graduation is to a layered routing pattern: bloom-filtered gossip within a "zone" (collective, region, or some clustering); cross-zone discovery via a directory service (likely DHT-routed at that point — but for *zone summaries*, not individual blob hashes, so the DHT-narrow principle is still honored). T17's fetch helper consumes whichever discovery layer is active without changing its contract. Compatible with alpha because alpha is a single zone; cross-zone work begins when there is more than one zone.
+
+**The substrate this sprint lands does not have to be re-done at scale.** The trinity (manifest / reality / diff), the reconciliation controller's multi-trigger pattern, the `serve-blob` event ledger, the `placement-gap` signal, the topology UI's view aggregators — all of these survive each scale extension. What changes is the gossip wire format and the discovery layer underneath `peer_blob_inventory`. The seam is the candidate-list query inside T17's fetch helper: today it is `SELECT peer_id FROM peer_blob_inventory WHERE blob_hash = ?`; tomorrow it consults a Bloom-filtered local cache; the day after, it routes through a zone directory. The fetch helper's contract — "give me a candidate list for this blob hash" — does not change.
+
 ## Migration Plan
 
 Seven tasks, dependency-ordered:
@@ -299,7 +321,8 @@ This sprint introduces (or formalizes) these tunable knobs (4-layer cadence patt
 | `placement-grace-seconds` | 300 | How long a commitment can be unhonored before a `placement-gap` event fires |
 | `placement-gap-cooldown-seconds` | 1800 | Minimum time between repeated `placement-gap` events for the same commitment |
 | `kick-fetch-per-peer-per-minute` | 10 | Rate limit on reconciliation-driven fetches per peer |
-| `fetch-blob-timeout-seconds` | 5 | Per-peer timeout in T17's iteration |
+| `fetch-blob-timeout-seconds` | 5 | Per-peer timeout within T17's racing batch |
+| `fetch-blob-parallelism` | 3 | How many candidates T17 races concurrently per batch |
 
 ## Test plan
 
