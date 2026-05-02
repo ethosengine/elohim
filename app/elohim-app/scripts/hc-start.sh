@@ -14,7 +14,7 @@
 # ENVIRONMENT VARIABLES:
 #   STORAGE_PORT     Storage HTTP port (default: 8090)
 #   STORAGE_DIR      Storage data directory (default: /tmp/elohim-storage)
-#   SEED_LIMIT       Number of items to seed with --seed (default: 20)
+#   SEED_LIMIT       Number of items to seed with --seed (default: 200)
 #
 # COMPONENTS:
 #   1. Holochain Conductor - Cryptographic provenance & agent identity
@@ -50,7 +50,7 @@ HC_PORTS_FILE="$LOCAL_DEV_DIR/.hc_ports"
 
 # Environment with defaults
 : "${STORAGE_PORT:=8090}"
-: "${SEED_LIMIT:=20}"
+: "${SEED_LIMIT:=200}"
 
 # Options
 RUN_SEED=false
