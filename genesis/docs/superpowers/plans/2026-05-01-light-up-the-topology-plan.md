@@ -4059,6 +4059,24 @@ git commit -am "feat(doorway): dashboard_topology service (operator view aggrega
 
 Each handler in this phase is a **thin projection layer** over the view services from Phase 4. No business logic in handlers; auth context resolution + service call + JSON serialization only. Routes are declared in `build_manifest()` per `project_doorway_manifest_driven_routes`.
 
+### Doorway anti-pattern guardrails (read FIRST)
+
+The temptation when wiring "topology" views is to add doorway-side route files (`doorway/doorway-service/src/routes/cluster.rs`, `routes/reciprocity.rs`, etc.). **Do not.** All four read handlers (T29–T32) land in `elohim/elohim-storage/src/api/`. Doorway picks them up via the route registry once T33 declares them in storage's `build_manifest()`. Zero doorway code change for these routes — that is the canonical shape per `project_doorway_manifest_driven_routes`. Doorway already has 13 deleted per-domain proxy files (governance, attestations, contributors, …); reintroducing one is a regression.
+
+Per `project_doorway_views_through_not_owned`: any view served from doorway A must be servable from doorway B projecting the same canonical content. Doorways federate by DNS bonding records into a CDN layer over canonical substrate. They do not author content. The `/me` views (cluster, peer-topology, reciprocity) are agent-scoped AT THE STORAGE LAYER — both doorways resolve the same agent_cid against the same DHT-notarized bindings, so the same agent gets the same content from either edge. That CDN-shape is preserved by keeping handlers in storage.
+
+The ONLY legitimate doorway-resident handlers added in this sprint are:
+- **T28a**'s auth/proxy infrastructure (JWT mint + header injection — generic, not per-route).
+- The doorway dashboard view (T28 service + a future admin route — see "Phase 5 closeout" at the end of this section).
+
+Anything else surfacing from a "we need a doorway-side handler for X" instinct is the anti-pattern. Push it back into elohim-storage's manifest.
+
+### Hub-shape future scope (don't widen the contract)
+
+Per `project_doorway_hub_sister_brother` and `project_hub_optional_floor`: hubs (HouseholdHub, school-hub, parish-hub) are the peer-native projection sister to doorway's web2 brother. They will eventually serve aggregated views (`/cluster/household/{id}`, `/peer-topology/hub/{id}`) for nearby peers. **Phase 5 stays agent-scoped (`/me`) — that is correct.** Hub-aggregation is a Phase 6+ design conversation, gated by a fresh P2P-design-gate brainstorm. Do NOT widen the agent-scoped contract in ways that would conflict with later hub-scoped variants. Keep view-service signatures scope-parametric where it is cheap to do so (e.g., `aggregate_cluster_view(pool, federator, scope: ClusterScope)` rather than `…(…, agent_cid: &str)`), but do not invent the hub scope ahead of design.
+
+The protocol's design floor is "one laptop, no hub required, full participant" (Kolibri / community-credit pattern). Hubs are graduations on top, never gates. Any handler whose `/me` shape would prevent later hub-aggregation is a smell.
+
 ### Task T28a: Doorway → storage agent_cid header propagation
 
 **Why this is here:** T01 found that doorway's shared registry proxy (`storage_proxy::forward_to_storage`) does NOT inject any `X-Agent-*` header, and storage's `extract_agent_key` reads `X-Agent-Id` with a stale doc claim that "doorway middleware injects this." Phase 5 handlers (T30, T31, T32) all call into Phase 4 view services that take `agent_cid: &str` — without this task, they receive nothing and can't resolve bindings.
@@ -4078,6 +4096,23 @@ Default to **Option A** unless a strong reason emerges during implementation. JW
 - Modify: `doorway/doorway-service/src/routes/storage_proxy.rs` (`forward_to_storage` and `forward_blob_to_storage`: decode bearer once, inject `X-Agent-Cid` header)
 - Modify: `elohim/elohim-storage/src/api/account.rs` (or its successor): add `extract_agent_cid` helper alongside the existing `extract_agent_key`; update doc comment to reflect what doorway actually does
 - Modify: `elohim/elohim-storage/src/http.rs` (CORS allow-list: add `X-Agent-Cid`)
+
+- [ ] **Pre-flight: scout the imagodei lookup (substrate-vs-plan landmine)**
+
+The plan calls `imagodei_lookup::resolve_agent_cid_for_pub_key` (Step 4). This helper may not exist in the worktree. Before starting:
+
+```bash
+grep -rn "resolve_agent_cid_for_pub_key\|get_agent_for_pub_key\|imagodei_lookup" \
+  doorway/doorway-service/src/ elohim/holochain/dna/ 2>/dev/null
+```
+
+Three outcomes:
+
+1. **Helper + zome function both exist** → proceed to Step 1.
+2. **Zome function `get_agent_for_pub_key` (or equivalent) exists, but no doorway-side helper** → add a thin helper in `doorway/doorway-service/src/services/imagodei_lookup.rs` (new file) that calls the zome via the conductor and returns the EPR CID. This is in-scope for T28a.
+3. **Neither exists** → STOP. This is a sub-blocker. Escalate to the user. Do NOT invent a new zome function as part of T28a. Either Option B (resolve at forward via local projection cache, no zome call needed) becomes the right answer, or T28a needs to wait on imagodei zome work.
+
+Choose Option A (resolve at mint) only if outcome 1 or 2. Choose Option B (resolve at forward) only with explicit user confirmation if outcome 3.
 
 - [ ] **Step 1: Write failing test for header injection**
 
@@ -4654,8 +4689,20 @@ git commit -m "feat(epr): hydrate DistributionSummary onto EPR head response"
 ### Task T35: Doorway operator dashboard route
 
 **Files:**
-- Create: `doorway/doorway-service/src/routes/admin/dashboard_topology.rs`
+- Create: `doorway/doorway-service/src/routes/admin/dashboard_topology.rs` (or alongside existing admin routes — see pre-flight)
 - Modify: `doorway/doorway-service/src/server/http.rs`
+- Modify: `doorway/doorway-service/src/server/http.rs` AppState (add `dashboard_topology: Arc<DashboardTopologyService>` field + constructor wiring)
+
+**Substrate-vs-plan context (read FIRST):**
+
+T28 (Phase 4) already built `DashboardTopologyService` at `doorway/doorway-service/src/services/dashboard_topology.rs` with three integration tests passing. T35 wires it onto a route. The plan as written has three substrate-vs-plan mismatches T28's dispatch hit and T35 will re-hit:
+
+1. **No `DoorwayHarness::start()` test helper exists.** Use the unit-test pattern T28 used: construct deps inline (CacheStats, PeerCache, RouteRegistry) and call `DashboardTopologyService::with_hostname(...)` directly. Or, if route-level testing is needed, set up a minimal `axum::Router` with the handler attached. Do NOT invent a `DoorwayHarness` for this task.
+2. **`AppState` does not yet hold a `dashboard_topology` field.** Adding it is in-scope for T35: locate `AppState` in `src/server/http.rs` (~line 175), add `pub dashboard_topology: Arc<crate::services::dashboard_topology::DashboardTopologyService>`, and update every test/constructor site that builds `AppState` (T28 reviewer noted ~6 of these in `http.rs`). This is mechanical but touches several lines.
+3. **`admin/` is not currently a subdirectory of `routes/`.** Existing admin route handlers (e.g., `handle_admin_federation_peers`) live directly in `doorway/doorway-service/src/routes/admin.rs`. Two options: (a) create `routes/admin/` subdirectory and migrate existing admin routes (out of scope — do NOT do this), or (b) add `handle_admin_dashboard_topology` to the existing `routes/admin.rs` file alongside the others. **Choose (b).** The plan's path `routes/admin/dashboard_topology.rs` is aspirational; substrate is `routes/admin.rs`.
+4. **Admin auth gate**: confirm by reading `src/server/http.rs` whether existing `/admin/*` routes share a single auth middleware or each handler checks its own. T28a's JWT mint work may or may not be required here — the existing admin routes likely use a shared admin-key/operator-key check, not user JWTs. Match the existing pattern.
+
+Path will be `GET /admin/dashboard/topology` (path slash, not the original `/admin/dashboard-topology` — keeps consistency with `/admin/federation-peers` siblings; verify the existing convention before committing).
 
 - [ ] **Step 1: Failing test**
 
