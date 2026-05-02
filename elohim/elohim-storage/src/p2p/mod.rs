@@ -3304,10 +3304,9 @@ impl P2PNode {
                                                 valid_until: payload.valid_until.clone(),
                                                 observed_at: now_iso,
                                                 source: "gossip".to_string(),
-                                                // T03a: defaults preserved here; T03b
-                                                // wires real values from the gossip
-                                                // payload when the signal handler is
-                                                // updated.
+                                                // TODO(T03b): wire real values from IdentityBindingGossip
+                                                // (device_archetype field — superseded_by is not in the gossip wire struct,
+                                                // so leave superseded_by: None at gossip receive time).
                                                 device_archetype: "node".to_string(),
                                                 superseded_by: None,
                                             };
@@ -3346,9 +3345,10 @@ impl P2PNode {
                                                     "IdentityBindingGossip: no db_pool configured, skipping persistence"
                                                 ),
                                             }
-                                            // device_archetype is carried in the wire payload (Category C) but not
-                                            // persisted in peer_identity_bindings yet — column addition deferred to a
-                                            // later batch. Available for inspection via gossip but not for SQL filtering.
+                                            // T03a added device_archetype + superseded_by columns to the projection.
+                                            // T03b wires real values from IdentityBindingGossip into NewPeerIdentityBindingRow
+                                            // (device_archetype only — IdentityBindingGossip does not carry superseded_by;
+                                            // keep superseded_by: None at gossip receive time).
 
                                             // NOTE: reconcile signal emission deferred — the controller processes only
                                             // DNA signals in Stage 1. A P2P-received binding reaching the reconcile layer
