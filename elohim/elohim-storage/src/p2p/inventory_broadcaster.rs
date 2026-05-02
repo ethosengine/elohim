@@ -22,30 +22,24 @@ pub trait LocalInventory: Send + Sync {
     fn current_hashes(&self) -> Vec<String>;
 }
 
-/// T22: Adapter wrapping a `BlobStore` to satisfy the `LocalInventory` trait.
+/// T22 review fix #1: wraps a pre-fetched list of hashes for `LocalInventory`.
 ///
-/// Logs and returns an empty vec on `list_hashes` failure — broadcasting an
-/// empty snapshot is preferable to skipping the tick. Receivers treat the
-/// empty snapshot as "this peer hosts nothing right now," which is the
-/// truthful interpretation when our own enumeration has gone sideways
-/// (vs. silently skipping, which would make the parity diagnostic stale).
-pub struct BlobStoreInventory {
-    pub store: Arc<crate::blob_store::BlobStore>,
+/// Production callers fetch via `BlobStore::list_hashes()` first and pass the
+/// result here so I/O failure can return early *before* ever entering
+/// `build_snapshot`. Previously `BlobStoreInventory` swallowed the error and
+/// returned an empty `Vec`, which caused `apply_snapshot` on every remote peer
+/// to evict this peer's inventory entries during a transient I/O blip.
+pub struct StaticInventory(Vec<String>);
+
+impl StaticInventory {
+    pub fn new(hashes: Vec<String>) -> Self {
+        Self(hashes)
+    }
 }
 
-impl LocalInventory for BlobStoreInventory {
+impl LocalInventory for StaticInventory {
     fn current_hashes(&self) -> Vec<String> {
-        match self.store.list_hashes() {
-            Ok(hashes) => hashes,
-            Err(e) => {
-                tracing::warn!(
-                    target: "elohim_storage::inventory",
-                    error = %e,
-                    "T22: list_hashes failed; broadcasting empty snapshot"
-                );
-                Vec::new()
-            }
-        }
+        self.0.clone()
     }
 }
 
@@ -185,23 +179,28 @@ mod tests {
         assert_eq!(resolved_cadence(Some("node"), Some(0)), None);
     }
 
-    /// T22: BlobStoreInventory adapter walks the blob store and returns its
-    /// hashes. Verifies the adapter wires `BlobStore::list_hashes()` into the
-    /// `LocalInventory` trait without transformation.
-    #[tokio::test]
-    async fn blob_store_inventory_returns_stored_hashes() {
-        let blob_store = Arc::new(crate::blob_store::BlobStore::new_memory());
-        let r1 = blob_store.store(b"hello world").await.expect("store h1");
-        let r2 = blob_store.store(b"goodbye world").await.expect("store h2");
+    /// T22 review fix #1: `StaticInventory` round-trips its provided hashes
+    /// through `LocalInventory::current_hashes`. The production caller fetches
+    /// hashes via `BlobStore::list_hashes()` *before* constructing this and
+    /// returns early on I/O failure; the adapter itself is intentionally
+    /// dumb so the failure path can never reach `build_snapshot`. BlobStore's
+    /// own `list_hashes` tests cover the I/O behavior.
+    #[test]
+    fn static_inventory_returns_provided_hashes() {
+        let inv = StaticInventory::new(vec!["aaa".to_string(), "bbb".to_string()]);
+        let hashes = inv.current_hashes();
+        assert_eq!(hashes, vec!["aaa".to_string(), "bbb".to_string()]);
+    }
 
-        let inventory = BlobStoreInventory {
-            store: Arc::clone(&blob_store),
-        };
-        let mut hashes = inventory.current_hashes();
-        hashes.sort();
-        let mut expected = vec![r1.hash, r2.hash];
-        expected.sort();
-        assert_eq!(hashes, expected);
+    /// T22 review fix #4: unknown archetype strings (typos, future archetypes
+    /// not yet known to this build) fall back to the conservative `node`
+    /// cadence and emit a `tracing::warn!` so the misconfiguration surfaces.
+    /// We assert the return value here; the warn is exercised at runtime.
+    #[test]
+    fn unknown_archetype_logs_warn_and_defaults_to_node() {
+        // Misspelled "nod" (missing 'e') and a plausible future archetype "tablet".
+        assert_eq!(resolved_cadence(Some("tablet"), None), Some(60));
+        assert_eq!(resolved_cadence(Some("nod"), None), Some(60));
     }
 }
 

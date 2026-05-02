@@ -244,13 +244,27 @@ impl Default for Config {
 
 /// Default snapshot broadcast cadence per archetype.
 /// `None` means broadcasting is disabled by default for this archetype.
+///
+/// T22 review fix #4: unknown archetype strings now emit a `tracing::warn!`
+/// before falling back to the conservative `node` default. This surfaces
+/// typos like `DEVICE_ARCHETYPE=nod` (missing 'e'), which previously
+/// silently enabled the most aggressive cadence.
 pub fn inventory_broadcast_seconds_default(archetype: Option<&str>) -> Option<u64> {
     match archetype {
-        Some("node") => Some(60),
+        Some("node") | Some("steward") => Some(60),
         Some("desktop") => Some(300),
         Some("mobile") => None,
-        Some("steward") => Some(60),
-        _ => Some(60),
+        // unset archetype → conservative node default (no warn — a missing
+        // value is a normal config state, not a misconfiguration).
+        None => Some(60),
+        Some(other) => {
+            tracing::warn!(
+                target: "elohim_storage::inventory",
+                archetype = %other,
+                "unknown device archetype; defaulting to 60s inventory broadcast cadence (node)"
+            );
+            Some(60)
+        }
     }
 }
 

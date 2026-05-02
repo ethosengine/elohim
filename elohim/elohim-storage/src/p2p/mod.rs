@@ -1595,6 +1595,14 @@ impl P2PNode {
         // archetype default + config override. None means "broadcasting
         // disabled" (mobile archetype, or explicit `0` override) — the
         // tokio::select! arm uses `std::future::pending()` so it never fires.
+        //
+        // TODO(T22-live-reconfig): cadence is resolved once at run() entry. The
+        // 4-layer cadence pattern's "sync admin trigger" layer (per
+        // project_cadence_archetype_tunable_with_dev_overrides) needs a future
+        // P2PCommand::ReconfigureCadence variant that re-resolves and replaces
+        // inventory_broadcast_interval here. Acceptable for the demo: archetype
+        // is set at boot, no live reconfiguration is required for replicas-grow
+        // or placement-gap flows.
         let mut inventory_broadcast_interval: Option<tokio::time::Interval> =
             match inventory_broadcaster::resolved_cadence(
                 self.config.device_archetype.as_deref(),
@@ -1753,24 +1761,52 @@ impl P2PNode {
     /// T22: Build and publish a `BlobInventorySnapshot` to the inventory
     /// gossip topic.
     ///
-    /// Idempotent and safe to call repeatedly. On a successful publish, the
-    /// shared `last_gossiped` Arc is updated so the parity diagnostic at
-    /// `/api/v1/diagnostics/inventory-parity` reflects what was just gossiped.
-    /// Failures (serialize, publish) log warn and do not update the record —
-    /// the diagnostic continues to report the previous successful snapshot.
+    /// **Lock contract:** This method ACQUIRES `self.swarm.write()` internally
+    /// for the duration of `gossipsub.publish`. Callers MUST drop any swarm
+    /// guard they hold before invoking this method. The interval-tick arm in
+    /// `run()` does this via an explicit `drop(swarm)` at the start of the arm
+    /// body, matching the pattern used by `initiate_sync_round`,
+    /// `run_replication_cycle`, and `drain_publish_queue`.
+    ///
+    /// Idempotent and safe to call repeatedly. Failures (`list_hashes`,
+    /// serialize, publish) log warn at the relevant target and leave the
+    /// parity-diagnostic `last_gossiped` record unchanged so the diagnostic
+    /// continues to report the previous successful snapshot.
+    ///
+    /// T22 review fix #1: `list_hashes` failure skips the tick rather than
+    /// broadcasting an empty snapshot. `apply_snapshot` on remote peers
+    /// evicts all of this peer's per-peer inventory entries on snapshot
+    /// arrival — broadcasting empty during a transient I/O blip would
+    /// corrupt every remote peer's projection of our custody.
     async fn broadcast_inventory_snapshot(&self) {
-        use crate::p2p::inventory_broadcaster::{build_snapshot, BlobStoreInventory};
+        use crate::p2p::inventory_broadcaster::{build_snapshot, StaticInventory};
         use crate::p2p::inventory_gossip::INVENTORY_TOPIC;
 
-        let inventory = BlobStoreInventory {
-            store: Arc::clone(&self.blob_store),
+        // Fetch hashes directly so I/O failure can skip the tick. Must happen
+        // before constructing StaticInventory + entering build_snapshot.
+        let hashes = match self.blob_store.list_hashes() {
+            Ok(h) => h,
+            Err(e) => {
+                warn!(
+                    target: "elohim_storage::inventory",
+                    error = %e,
+                    "T22: list_hashes failed; skipping inventory snapshot tick \
+                     (would have corrupted remote projection)"
+                );
+                return;
+            }
         };
+
+        let inventory = StaticInventory::new(hashes);
         let local_peer_id = self.peer_id().to_string();
         let now_micros = chrono::Utc::now().timestamp_micros();
 
         let snapshot = build_snapshot(&local_peer_id, &inventory, &self.inventory_seq, now_micros);
         let hashes_for_record = snapshot.hashes.clone();
         let snapshot_sequence = snapshot.sequence;
+        // T22 review fix #2: capture count BEFORE the move so the success
+        // arm can move-not-clone hashes_for_record into the parity record.
+        let count = hashes_for_record.len();
 
         let bytes = match snapshot.to_bytes() {
             Ok(b) => b,
@@ -1791,23 +1827,14 @@ impl P2PNode {
 
         match publish_result {
             Ok(msg_id) => {
-                // Update the shared parity-tracking record so the diagnostic
-                // endpoint (read via `P2PHandle::last_gossiped_inventory`) reflects
-                // what was just gossiped. Mirrors `P2PHandle::set_last_gossiped_inventory`
-                // — write inline because the Arc is shared and we want to
-                // avoid round-tripping through the command channel.
-                if let Ok(mut guard) = self.last_gossiped.write() {
-                    *guard = hashes_for_record.clone();
-                } else {
-                    warn!(
-                        target: "elohim_storage::inventory",
-                        "T22: last_gossiped lock poisoned; parity diagnostic may be stale"
-                    );
-                }
+                // T22 review fix #3: delegate the parity-record write to the
+                // shared method so poisoned-lock handling stays consistent
+                // with `P2PHandle::set_last_gossiped_inventory`.
+                self.set_last_gossiped_inventory(hashes_for_record);
                 info!(
                     target: "elohim_storage::inventory",
                     msg_id = ?msg_id,
-                    count = hashes_for_record.len(),
+                    count,
                     sequence = snapshot_sequence,
                     "T22: published inventory snapshot"
                 );
@@ -1819,6 +1846,22 @@ impl P2PNode {
                     "T22: gossipsub publish failed (often: no subscribed peers yet)"
                 );
             }
+        }
+    }
+
+    /// T22 review fix #3: write the parity-tracking record from the P2PNode
+    /// run-loop side. Mirrors `P2PHandle::set_last_gossiped_inventory` — both
+    /// share the same `Arc<RwLock<Vec<String>>>`, so a method on each side
+    /// keeps the poisoned-lock warn pattern consistent without round-tripping
+    /// through the command channel.
+    fn set_last_gossiped_inventory(&self, hashes: Vec<String>) {
+        if let Ok(mut guard) = self.last_gossiped.write() {
+            *guard = hashes;
+        } else {
+            warn!(
+                target: "elohim_storage::inventory",
+                "T22: last_gossiped lock poisoned; parity diagnostic may be stale"
+            );
         }
     }
 
