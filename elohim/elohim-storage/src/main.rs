@@ -306,6 +306,11 @@ async fn async_main(
     if let Ok(v) = std::env::var("REGION") {
         config.region = Some(v);
     }
+    if let Ok(v) = std::env::var("INVENTORY_BROADCAST_SECONDS") {
+        if let Ok(n) = v.parse::<u64>() {
+            config.inventory_broadcast_seconds = Some(n);
+        }
+    }
 
     info!(
         storage_dir = %config.storage_dir.display(),

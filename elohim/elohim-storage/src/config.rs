@@ -94,6 +94,12 @@ pub struct Config {
     /// Geographic region label. Loaded from env `REGION`.
     #[serde(default)]
     pub region: Option<String>,
+
+    /// Cadence for inventory snapshot broadcasts on `elohim/inventory/blob`.
+    /// Defaults are archetype-driven (see `inventory_broadcast_seconds_default`).
+    /// Operator preset; 4-layer override pattern (archetype → policy.toml → env/CLI → admin trigger).
+    #[serde(default)]
+    pub inventory_broadcast_seconds: Option<u64>,
 }
 
 fn default_peer_policy_path() -> PathBuf {
@@ -158,7 +164,20 @@ impl Default for Config {
             household_id: None,
             node_role: None,
             region: None,
+            inventory_broadcast_seconds: None,
         }
+    }
+}
+
+/// Default snapshot broadcast cadence per archetype.
+/// `None` means broadcasting is disabled by default for this archetype.
+pub fn inventory_broadcast_seconds_default(archetype: Option<&str>) -> Option<u64> {
+    match archetype {
+        Some("node") => Some(60),
+        Some("desktop") => Some(300),
+        Some("mobile") => None,
+        Some("steward") => Some(60),
+        _ => Some(60),
     }
 }
 

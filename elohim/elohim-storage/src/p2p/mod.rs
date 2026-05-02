@@ -39,6 +39,7 @@ pub mod feedback_signal;
 pub mod identity_binding_gossip;
 pub mod identity_handshake;
 pub mod identity_map;
+pub mod inventory_broadcaster;
 pub mod inventory_gossip;
 pub mod kad_store;
 pub mod reach_authorization;
