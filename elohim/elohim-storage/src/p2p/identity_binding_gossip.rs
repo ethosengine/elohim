@@ -128,6 +128,32 @@ pub const IDENTITY_BINDING_TOPIC: &str = "elohim/identity/binding";
 /// clearly not a real signature. Replaced by a real Ed25519 signature in Stage 2.
 pub const STAGE1_SIGNATURE_SENTINEL: &str = "c3RhZ2UtMS1zaWduYXR1cmU=";
 
+/// Build a `NewPeerIdentityBindingRow` from a verified gossip payload.
+///
+/// Centralises the field-flow contract for the gossip receive arm in
+/// `p2p/mod.rs` so that the writer logic and its T03b regression test exercise
+/// the same code path. `device_archetype` propagates from the wire payload;
+/// `superseded_by` stays `None` because the gossip wire format does not carry
+/// supersession state — only the DHT-arrival path is authoritative on that
+/// field, and the `upsert_preserving_supersession` writer that consumes this
+/// row will preserve any prior DHT-set value.
+pub fn binding_row_from_gossip(
+    payload: &IdentityBindingGossip,
+    now_iso: &str,
+) -> crate::db::models::NewPeerIdentityBindingRow {
+    crate::db::models::NewPeerIdentityBindingRow {
+        peer_id: payload.peer_id.clone(),
+        agent_cid: payload.agent_cid.clone(),
+        dht_anchor_hash: payload.binding_action_hash.clone(),
+        valid_from: payload.valid_from.clone(),
+        valid_until: payload.valid_until.clone(),
+        observed_at: now_iso.to_string(),
+        source: "gossip".to_string(),
+        device_archetype: payload.device_archetype.clone(),
+        superseded_by: None,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -212,6 +238,11 @@ mod tests {
     /// T03b: gossip writer carries `device_archetype` from the wire payload.
     /// `superseded_by` stays `None` because the gossip wire format does not
     /// carry supersession state — only the DHT-arrival path is authoritative.
+    ///
+    /// This test calls `binding_row_from_gossip` directly — the same helper
+    /// invoked by the gossip receive arm in `p2p/mod.rs` — so a regression
+    /// that hardcoded `device_archetype` (or fudged any other field) would
+    /// fail the assertion.
     #[test]
     fn gossip_writer_propagates_device_archetype() {
         // Decode a gossip payload announcing a "mobile" peer.
@@ -221,22 +252,16 @@ mod tests {
         let decoded = IdentityBindingGossip::from_bytes(&bytes).expect("decode");
         assert!(decoded.verify_structural().is_ok());
 
-        // Replicate the row construction performed by p2p/mod.rs at gossip
-        // receive time. This codifies the field-flow contract that T03b wires:
-        // device_archetype propagated; superseded_by always None at gossip time.
-        let row = crate::db::models::NewPeerIdentityBindingRow {
-            peer_id: decoded.peer_id.clone(),
-            agent_cid: decoded.agent_cid.clone(),
-            dht_anchor_hash: decoded.binding_action_hash.clone(),
-            valid_from: decoded.valid_from.clone(),
-            valid_until: decoded.valid_until.clone(),
-            observed_at: "2026-04-25T12:00:00Z".to_string(),
-            source: "gossip".to_string(),
-            device_archetype: decoded.device_archetype.clone(),
-            superseded_by: None,
-        };
+        let row = binding_row_from_gossip(&decoded, "2026-04-25T12:00:00Z");
+
         assert_eq!(row.device_archetype, "mobile");
         assert!(row.superseded_by.is_none());
         assert_eq!(row.source, "gossip");
+        assert_eq!(row.peer_id, decoded.peer_id);
+        assert_eq!(row.agent_cid, decoded.agent_cid);
+        assert_eq!(row.dht_anchor_hash, decoded.binding_action_hash);
+        assert_eq!(row.valid_from, decoded.valid_from);
+        assert_eq!(row.valid_until, decoded.valid_until);
+        assert_eq!(row.observed_at, "2026-04-25T12:00:00Z");
     }
 }

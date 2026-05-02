@@ -343,6 +343,43 @@ pub fn synthesise_dht_anchor_hash(peer_id: &str, agent_cid: &str) -> String {
     format!("handshake:{}", hex::encode(h.finalize()))
 }
 
+/// Build a `NewPeerIdentityBindingRow` from a verified handshake request.
+///
+/// Centralises the field-flow contract for the handshake receive arm in
+/// `p2p/mod.rs` so that the writer logic and its T03b regression test exercise
+/// the same code path. `peer_id_str` is the authoritative PeerId reported by
+/// the transport layer (NOT trusting the payload's `peer_id` field). The
+/// `dht_anchor_hash` falls through to [`synthesise_dht_anchor_hash`] when the
+/// payload omits one. `device_archetype` propagates from the handshake wire;
+/// `superseded_by` stays `None` because the handshake wire does not carry
+/// supersession state — only the DHT-arrival path is authoritative there, and
+/// the `upsert_preserving_supersession` writer that consumes this row will
+/// preserve any prior DHT-set value.
+pub fn binding_row_from_handshake_request(
+    request: &IdentityHandshakeRequest,
+    peer_id_str: &str,
+    now_iso: &str,
+) -> crate::db::models::NewPeerIdentityBindingRow {
+    let b = &request.binding;
+    let dht_anchor_hash = b
+        .dht_anchor_hash
+        .clone()
+        .unwrap_or_else(|| synthesise_dht_anchor_hash(&b.peer_id, &b.agent_cid));
+    crate::db::models::NewPeerIdentityBindingRow {
+        peer_id: peer_id_str.to_string(),
+        agent_cid: b.agent_cid.clone(),
+        dht_anchor_hash,
+        valid_from: b.valid_from.clone(),
+        valid_until: b.valid_until.clone(),
+        observed_at: now_iso.to_string(),
+        source: "handshake".to_string(),
+        device_archetype: b.device_archetype.clone(),
+        // Non-authoritative writer; `upsert_preserving_supersession` keeps
+        // any prior DHT-set supersession.
+        superseded_by: None,
+    }
+}
+
 // =============================================================================
 // Tests
 // =============================================================================
@@ -546,34 +583,70 @@ mod tests {
     /// T03b: the handshake writer carries `device_archetype` from the wire payload.
     /// `superseded_by` stays `None` because the handshake wire format does not
     /// carry supersession state — only the DHT-arrival path is authoritative there.
+    ///
+    /// This test calls `binding_row_from_handshake_request` directly — the same
+    /// helper invoked by the handshake receive arm in `p2p/mod.rs` — so a
+    /// regression that hardcoded `device_archetype` (or fudged any other
+    /// field) would fail the assertion.
     #[test]
     fn handshake_writer_propagates_device_archetype() {
-        // Construct a payload that mirrors a "desktop" peer's handshake.
-        let binding = HandshakeBindingPayload {
-            peer_id: "12D3KooWDesktopPeer".to_string(),
-            agent_cid: "bafyreidesktop".to_string(),
-            valid_from: "2026-01-01T00:00:00Z".to_string(),
-            valid_until: None,
-            device_archetype: "desktop".to_string(),
-            signature: "dGVzdA==".to_string(),
-            dht_anchor_hash: Some("uhCkk-handshake-anchor".to_string()),
+        let request = IdentityHandshakeRequest {
+            binding: HandshakeBindingPayload {
+                peer_id: "12D3KooWDesktopPeer".to_string(),
+                agent_cid: "bafyreidesktop".to_string(),
+                valid_from: "2026-01-01T00:00:00Z".to_string(),
+                valid_until: None,
+                device_archetype: "desktop".to_string(),
+                signature: "dGVzdA==".to_string(),
+                dht_anchor_hash: Some("uhCkk-handshake-anchor".to_string()),
+            },
+            timestamp: "2026-04-25T12:00:00Z".to_string(),
+            nonce: "AAAAAAAAAAAAAAAAAAAAAA==".to_string(),
         };
-        // Replicate the row construction performed by p2p/mod.rs at handshake
-        // receive time. This codifies the field-flow contract that T03b wires:
-        // device_archetype propagated; superseded_by always None.
-        let row = crate::db::models::NewPeerIdentityBindingRow {
-            peer_id: binding.peer_id.clone(),
-            agent_cid: binding.agent_cid.clone(),
-            dht_anchor_hash: binding.dht_anchor_hash.clone().unwrap(),
-            valid_from: binding.valid_from.clone(),
-            valid_until: binding.valid_until.clone(),
-            observed_at: "2026-04-25T12:00:00Z".to_string(),
-            source: "handshake".to_string(),
-            device_archetype: binding.device_archetype.clone(),
-            superseded_by: None,
-        };
+
+        let row = binding_row_from_handshake_request(
+            &request,
+            "12D3KooWDesktopPeer",
+            "2026-04-25T12:00:00Z",
+        );
+
         assert_eq!(row.device_archetype, "desktop");
         assert!(row.superseded_by.is_none());
         assert_eq!(row.source, "handshake");
+        assert_eq!(row.peer_id, "12D3KooWDesktopPeer");
+        assert_eq!(row.agent_cid, "bafyreidesktop");
+        assert_eq!(row.dht_anchor_hash, "uhCkk-handshake-anchor");
+        assert_eq!(row.observed_at, "2026-04-25T12:00:00Z");
+    }
+
+    /// When the handshake payload omits `dht_anchor_hash`, the writer helper
+    /// must fall through to `synthesise_dht_anchor_hash` so the row is keyed
+    /// deterministically.
+    #[test]
+    fn handshake_writer_synthesises_anchor_when_payload_omits_one() {
+        let request = IdentityHandshakeRequest {
+            binding: HandshakeBindingPayload {
+                peer_id: "12D3KooWNoAnchor".to_string(),
+                agent_cid: "bafyreinoanchor".to_string(),
+                valid_from: "2026-01-01T00:00:00Z".to_string(),
+                valid_until: None,
+                device_archetype: "mobile".to_string(),
+                signature: "dGVzdA==".to_string(),
+                dht_anchor_hash: None,
+            },
+            timestamp: "2026-04-25T12:00:00Z".to_string(),
+            nonce: "AAAAAAAAAAAAAAAAAAAAAA==".to_string(),
+        };
+
+        let row = binding_row_from_handshake_request(
+            &request,
+            "12D3KooWNoAnchor",
+            "2026-04-25T12:00:00Z",
+        );
+
+        let expected = synthesise_dht_anchor_hash("12D3KooWNoAnchor", "bafyreinoanchor");
+        assert_eq!(row.dht_anchor_hash, expected);
+        assert_eq!(row.device_archetype, "mobile");
+        assert!(row.superseded_by.is_none());
     }
 }

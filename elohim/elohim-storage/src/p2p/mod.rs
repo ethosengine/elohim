@@ -3008,36 +3008,28 @@ impl P2PNode {
                         }
                         identity_handshake::VerifyOutcome::Valid => {
                             // Insert into peer_identity_bindings with source='handshake'.
-                            let b = &request.binding;
-                            let dht_anchor_hash = b.dht_anchor_hash.clone().unwrap_or_else(|| {
-                                identity_handshake::synthesise_dht_anchor_hash(
-                                    &b.peer_id,
-                                    &b.agent_cid,
-                                )
-                            });
-                            let row = crate::db::models::NewPeerIdentityBindingRow {
-                                peer_id: peer_id_str.clone(),
-                                agent_cid: b.agent_cid.clone(),
-                                dht_anchor_hash,
-                                valid_from: b.valid_from.clone(),
-                                valid_until: b.valid_until.clone(),
-                                observed_at: now_iso,
-                                source: "handshake".to_string(),
-                                device_archetype: b.device_archetype.clone(),
-                                // superseded_by stays None at handshake time — only the
-                                // DHT-arrival path is authoritative on supersession state.
-                                superseded_by: None,
-                            };
+                            // The row construction is centralised in
+                            // `binding_row_from_handshake_request` so that the field-flow
+                            // contract is exercised by the writer here AND the T03b
+                            // regression test in identity_handshake.rs.
+                            let row = identity_handshake::binding_row_from_handshake_request(
+                                &request,
+                                &peer_id_str,
+                                &now_iso,
+                            );
                             match self.db_pool.as_ref() {
                                 Some(pool) => match pool.get() {
                                     Ok(mut conn) => {
-                                        match crate::db::peer_identity_bindings::upsert(
+                                        // Non-authoritative writer: must NOT clobber any
+                                        // `superseded_by` previously written by the
+                                        // DHT-arrival path. Use the preserving variant.
+                                        match crate::db::peer_identity_bindings::upsert_preserving_supersession(
                                             &mut conn, &row,
                                         ) {
                                             Ok(()) => {
                                                 debug!(
                                                     peer = %peer,
-                                                    agent_cid = %b.agent_cid,
+                                                    agent_cid = %row.agent_cid,
                                                     "Identity handshake: binding recorded"
                                                 );
                                                 identity_handshake::IdentityHandshakeResponse::Accepted
@@ -3295,25 +3287,23 @@ impl P2PNode {
                                             let now_iso = chrono::Utc::now()
                                                 .format("%Y-%m-%dT%H:%M:%SZ")
                                                 .to_string();
-                                            let row = crate::db::models::NewPeerIdentityBindingRow {
-                                                peer_id: payload.peer_id.clone(),
-                                                agent_cid: payload.agent_cid.clone(),
-                                                dht_anchor_hash: payload.binding_action_hash.clone(),
-                                                valid_from: payload.valid_from.clone(),
-                                                valid_until: payload.valid_until.clone(),
-                                                observed_at: now_iso,
-                                                source: "gossip".to_string(),
-                                                // device_archetype propagated from gossip wire;
-                                                // superseded_by stays None because the gossip wire
-                                                // format does not carry supersession state.
-                                                device_archetype: payload.device_archetype.clone(),
-                                                superseded_by: None,
-                                            };
+                                            // Row construction centralised in
+                                            // `binding_row_from_gossip` so the field-flow
+                                            // contract is exercised by the writer here AND
+                                            // the T03b regression test in
+                                            // identity_binding_gossip.rs.
+                                            let row =
+                                                crate::p2p::identity_binding_gossip::binding_row_from_gossip(
+                                                    &payload, &now_iso,
+                                                );
                                             match self.db_pool.as_ref() {
                                                 Some(pool) => {
                                                     match pool.get() {
                                                         Ok(mut conn) => {
-                                                            match crate::db::peer_identity_bindings::upsert(&mut conn, &row) {
+                                                            // Non-authoritative writer: must NOT clobber a
+                                                            // `superseded_by` previously set by the DHT-arrival
+                                                            // path. Use the preserving variant.
+                                                            match crate::db::peer_identity_bindings::upsert_preserving_supersession(&mut conn, &row) {
                                                                 Ok(()) => info!(
                                                                     target: "elohim_storage::identity",
                                                                     from = %propagation_source,

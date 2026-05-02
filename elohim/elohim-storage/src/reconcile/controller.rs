@@ -491,12 +491,20 @@ impl<S: DnaSignalStream> ReconcileController<S> {
         Ok(())
     }
 
-    /// Task A.10: publish AgentPeerBinding to the `elohim/identity/binding` gossipsub topic.
+    /// Task A.10 + T03b: project an `AgentPeerBinding` DHT signal into the
+    /// `peer_identity_bindings` table AND publish it to the
+    /// `elohim/identity/binding` gossipsub topic.
     ///
-    /// When a local agent creates a new `AgentPeerBinding` DHT entry, the DNA
-    /// emits an `AgentPeerBinding` signal. The controller propagates this to all
-    /// subscribed peers by sending `P2PCommand::PublishIdentityBinding` to the
-    /// P2P event loop.
+    /// Two responsibilities, in order:
+    ///
+    /// 1. **Project** — write the authoritative DHT-arrival row into
+    ///    `peer_identity_bindings`. This is the canonical writer for the
+    ///    `superseded_by` column; handshake and gossip writers run through
+    ///    `upsert_preserving_supersession` which forwards any prior value
+    ///    written here.
+    /// 2. **Publish** — send `P2PCommand::PublishIdentityBinding` to the P2P
+    ///    event loop so subscribed peers can mirror the binding into their
+    ///    own `peer_identity_bindings` projection.
     ///
     /// ## Stage 1 signature
     ///
@@ -504,11 +512,13 @@ impl<S: DnaSignalStream> ReconcileController<S> {
     /// in the gossip payload is a non-empty sentinel for Stage 1. Stage 2 (A.13
     /// or later) replaces this with a real Ed25519 signature.
     ///
-    /// ## No-swarm path
+    /// ## No-pool / no-swarm paths
     ///
-    /// If the controller was constructed without `with_swarm_tx(tx)`, the
-    /// method logs at debug level and returns `Ok(())` — preserving backward
-    /// compatibility with the A.4 test suite that doesn't wire a live swarm.
+    /// If the controller has no DB pool wired, projection writes are logged
+    /// at debug level and skipped (the A.4 stub-only test suite hits this
+    /// path). If the controller was constructed without `with_swarm_tx(tx)`,
+    /// publish is logged at debug level and skipped. Both behaviours preserve
+    /// backward compatibility with stub-only test fixtures.
     async fn on_agent_peer_binding(
         &mut self,
         signal: AgentPeerBindingSignal,
@@ -533,7 +543,6 @@ impl<S: DnaSignalStream> ReconcileController<S> {
                         valid_from: signal.valid_from.format("%Y-%m-%dT%H:%M:%SZ").to_string(),
                         valid_until: signal
                             .valid_until
-                            .as_ref()
                             .map(|dt| dt.format("%Y-%m-%dT%H:%M:%SZ").to_string()),
                         observed_at: now_iso,
                         source: "dht".to_string(),
