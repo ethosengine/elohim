@@ -79,6 +79,8 @@ const INTERFACE_FILES = [
   { src: 'views/distribution-details.ts', dest: 'distribution-details.ts' },
   { src: 'views/replica-peer.ts', dest: 'replica-peer.ts' },
   { src: 'views/projector-identity.ts', dest: 'projector-identity.ts' },
+  { src: 'views/my-cluster-view.ts', dest: 'my-cluster-view.ts' },
+  { src: 'views/freshness.ts', dest: 'freshness.ts' },
 ];
 
 /**

@@ -1888,6 +1888,60 @@ fn projector_identity_matches_schema() {
 }
 
 #[test]
+fn my_cluster_view_matches_schema() {
+    use elohim_storage::views::{
+        DeviceArchetype, DeviceSummary, DeviceTotals, Freshness, FreshnessState, MyClusterView,
+    };
+
+    let sample = MyClusterView {
+        agent_cid: "agent_abc123".into(),
+        devices: vec![DeviceSummary {
+            peer_id: "12D3KooWMatthewLaptop".into(),
+            archetype: DeviceArchetype::Desktop,
+            display_name: Some("Matthew's laptop".into()),
+            online: true,
+            freshness: Freshness {
+                state: FreshnessState::Live,
+                stale_since_ms: None,
+            },
+            storage_used_bytes: Some(18_400_000_000),
+            storage_total_bytes: Some(250_000_000_000),
+            memory_used_bytes: None,
+            memory_total_bytes: None,
+            hosting_count: Some(1247),
+            projecting_count: Some(802),
+            beacon_age_ms: Some(0),
+        }],
+        totals: DeviceTotals {
+            storage_used_bytes: 25_200_000_000,
+            storage_total_bytes: 298_000_000_000,
+            external_committed_bytes: 14_800_000_000,
+            reciprocity_net_bytes: 5_200_000_000,
+        },
+        freshness: Freshness {
+            state: FreshnessState::Live,
+            stale_since_ms: None,
+        },
+    };
+
+    let json = serde_json::to_value(&sample).unwrap();
+    validate_against_schema("views/my-cluster-view.schema.json", &json);
+}
+
+#[test]
+fn freshness_offline_matches_schema() {
+    use elohim_storage::views::{Freshness, FreshnessState};
+
+    let sample = Freshness {
+        state: FreshnessState::Offline,
+        stale_since_ms: Some(120_000),
+    };
+
+    let json = serde_json::to_value(&sample).unwrap();
+    validate_against_schema("views/freshness.schema.json", &json);
+}
+
+#[test]
 fn distribution_summary_with_diversity_none_matches_schema() {
     use elohim_storage::views::{
         DiversityHint, DistributionSummary, FetchSource, ReachClass, ReplicaHealth,

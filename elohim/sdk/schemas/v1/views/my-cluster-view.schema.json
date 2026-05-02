@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "epr:schema:view:my-cluster-view",
+  "title": "MyClusterView",
+  "description": "Federated view of all devices belonging to a single agent (the viewer). Source of truth: peer_identity_bindings filtered by agent_cid (Category A from imagodei DHT), federated across household peers via the view-slice aggregator (Operational, Category C). Reconstructed per request; not persisted.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["agentCid", "devices", "totals", "freshness"],
+  "properties": {
+    "agentCid": {
+      "type": "string",
+      "description": "Agent CID this cluster view is scoped to."
+    },
+    "devices": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["peerId", "archetype", "online", "freshness"],
+        "properties": {
+          "peerId": { "type": "string" },
+          "archetype": { "$ref": "../enums/device-archetype.schema.json" },
+          "displayName": { "type": "string" },
+          "online": { "type": "boolean" },
+          "freshness": { "$ref": "freshness.schema.json" },
+          "storageUsedBytes": { "type": "integer", "minimum": 0 },
+          "storageTotalBytes": { "type": "integer", "minimum": 0 },
+          "memoryUsedBytes": { "type": "integer", "minimum": 0 },
+          "memoryTotalBytes": { "type": "integer", "minimum": 0 },
+          "hostingCount": { "type": "integer", "minimum": 0 },
+          "projectingCount": { "type": "integer", "minimum": 0 },
+          "beaconAgeMs": { "type": "integer", "minimum": 0 }
+        }
+      },
+      "description": "Per-device summary rows, one per registered AgentPeerBinding for this agent."
+    },
+    "totals": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "storageUsedBytes",
+        "storageTotalBytes",
+        "externalCommittedBytes",
+        "reciprocityNetBytes"
+      ],
+      "properties": {
+        "storageUsedBytes": { "type": "integer", "minimum": 0 },
+        "storageTotalBytes": { "type": "integer", "minimum": 0 },
+        "externalCommittedBytes": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Bytes committed to peers outside this agent's cluster."
+        },
+        "reciprocityNetBytes": {
+          "type": "integer",
+          "description": "Net reciprocation bytes across this agent's devices (signed)."
+        }
+      },
+      "description": "Aggregated totals across all devices in the cluster."
+    },
+    "freshness": {
+      "$ref": "freshness.schema.json",
+      "description": "Overall cluster freshness — worst-of-devices when any device is offline, live when all live."
+    }
+  }
+}

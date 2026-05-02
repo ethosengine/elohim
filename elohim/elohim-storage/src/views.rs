@@ -7242,3 +7242,75 @@ pub struct DistributionDetails {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub commitment_references: Option<Vec<String>>,
 }
+
+/// Freshness state bucket for cluster + topology + slice views.
+#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+#[serde(rename_all = "snake_case")]
+pub enum FreshnessState {
+    Live,
+    Stale,
+    Offline,
+    CachedOfflineUntilReconnect,
+    Unverifiable,
+    AllOffline,
+}
+
+/// Liveness/staleness indicator. `staleSinceMs` is populated when state ≠ live.
+#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+#[serde(rename_all = "camelCase")]
+pub struct Freshness {
+    pub state: FreshnessState,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stale_since_ms: Option<u64>,
+}
+
+/// Per-device summary in `MyClusterView`.
+#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+#[serde(rename_all = "camelCase")]
+pub struct DeviceSummary {
+    pub peer_id: String,
+    pub archetype: DeviceArchetype,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub display_name: Option<String>,
+    pub online: bool,
+    pub freshness: Freshness,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub storage_used_bytes: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub storage_total_bytes: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub memory_used_bytes: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub memory_total_bytes: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hosting_count: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub projecting_count: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub beacon_age_ms: Option<u64>,
+}
+
+/// Aggregated totals across the agent's devices.
+#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+#[serde(rename_all = "camelCase")]
+pub struct DeviceTotals {
+    pub storage_used_bytes: u64,
+    pub storage_total_bytes: u64,
+    pub external_committed_bytes: u64,
+    pub reciprocity_net_bytes: i64,
+}
+
+/// Federated cluster view of an agent's devices.
+#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+#[serde(rename_all = "camelCase")]
+pub struct MyClusterView {
+    pub agent_cid: String,
+    pub devices: Vec<DeviceSummary>,
+    pub totals: DeviceTotals,
+    pub freshness: Freshness,
+}
