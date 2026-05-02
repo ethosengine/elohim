@@ -7386,3 +7386,79 @@ pub struct ReciprocityView {
     pub net_hosted_bytes: i64,
     pub capacity_available_bytes: u64,
 }
+
+/// Per-storage-steward row in a doorway dashboard.
+#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+#[serde(rename_all = "camelCase")]
+pub struct DashboardSteward {
+    pub peer_id: String,
+    pub archetype: DeviceArchetype,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub display_name: Option<String>,
+    pub online: bool,
+    pub hosting_count: u32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hop_hint: Option<u32>,
+}
+
+/// Direction of byte flow across a doorway federation edge.
+#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+#[serde(rename_all = "snake_case")]
+pub enum FederationDirection {
+    Bidirectional,
+    OutboundOnly,
+    InboundOnly,
+}
+
+/// Per-doorway federation row in a doorway dashboard.
+#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+#[serde(rename_all = "camelCase")]
+pub struct DashboardFederationPeer {
+    pub doorway_hostname: String,
+    pub online: bool,
+    pub direction: FederationDirection,
+    pub shared_cid_count: u32,
+}
+
+/// Projection cache + lag aggregate for a doorway.
+///
+/// `cache_hit_rate_24h` is `f64` so PartialEq only.
+#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq)]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectionCoverage {
+    pub projected_cid_count: u32,
+    pub known_cid_count: u32,
+    pub cache_hit_rate_24h: f64,
+    pub projection_lag_ms_avg: u64,
+}
+
+/// DNS/TLS/reachability surface for a doorway hostname.
+#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+#[serde(rename_all = "camelCase")]
+pub struct PublicSurfaceState {
+    pub dns_resolves: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub dns_target: Option<String>,
+    pub tls_valid: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tls_expires_in_days: Option<i32>,
+    pub public_reachable: bool,
+}
+
+/// Doorway operator dashboard view — composed at request time from cluster +
+/// reciprocity views over view-federation/1.0.0.
+#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq)]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+#[serde(rename_all = "camelCase")]
+pub struct DoorwayDashboardView {
+    pub doorway_hostname: String,
+    pub storage_stewards: Vec<DashboardSteward>,
+    pub federation_peers: Vec<DashboardFederationPeer>,
+    pub projection_coverage: ProjectionCoverage,
+    pub public_surface: PublicSurfaceState,
+}

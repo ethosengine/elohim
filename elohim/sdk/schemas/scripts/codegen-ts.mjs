@@ -85,6 +85,11 @@ const INTERFACE_FILES = [
   { src: 'views/peer-household-edge.ts', dest: 'peer-household-edge.ts' },
   { src: 'views/reciprocity-view.ts', dest: 'reciprocity-view.ts' },
   { src: 'views/reciprocity-row.ts', dest: 'reciprocity-row.ts' },
+  { src: 'views/doorway-dashboard-view.ts', dest: 'doorway-dashboard-view.ts' },
+  { src: 'views/dashboard-steward.ts', dest: 'dashboard-steward.ts' },
+  { src: 'views/dashboard-federation-peer.ts', dest: 'dashboard-federation-peer.ts' },
+  { src: 'views/projection-coverage.ts', dest: 'projection-coverage.ts' },
+  { src: 'views/public-surface-state.ts', dest: 'public-surface-state.ts' },
 ];
 
 /**

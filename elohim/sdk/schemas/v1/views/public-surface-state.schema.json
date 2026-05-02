@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "epr:schema:view:public-surface-state",
+  "title": "PublicSurfaceState",
+  "description": "DNS/TLS/reachability surface for a doorway hostname. Source of truth: external probes (Operational, Category C). Reconstructed per request; not persisted.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["dnsResolves", "tlsValid", "publicReachable"],
+  "properties": {
+    "dnsResolves": { "type": "boolean" },
+    "dnsTarget": {
+      "type": "string",
+      "description": "Resolved A/AAAA target, when DNS resolves."
+    },
+    "tlsValid": { "type": "boolean" },
+    "tlsExpiresInDays": {
+      "type": "integer",
+      "description": "Days until TLS cert expires (negative if already expired)."
+    },
+    "publicReachable": {
+      "type": "boolean",
+      "description": "True when an external probe can reach the doorway."
+    }
+  }
+}

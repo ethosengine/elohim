@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "epr:schema:view:doorway-dashboard-view",
+  "title": "DoorwayDashboardView",
+  "description": "Doorway operator dashboard payload — storage stewards, federation peers, projection coverage, and public-surface health. Source of truth: doorway-side aggregation of cluster + reciprocity views over the libp2p view-federation protocol (Operational, Category C). Reconstructed per request; not persisted as a new entity.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "doorwayHostname",
+    "storageStewards",
+    "federationPeers",
+    "projectionCoverage",
+    "publicSurface"
+  ],
+  "properties": {
+    "doorwayHostname": {
+      "type": "string",
+      "description": "Public hostname of this doorway."
+    },
+    "storageStewards": {
+      "type": "array",
+      "items": { "$ref": "dashboard-steward.schema.json" },
+      "description": "Per-storage-steward rows for peers registered with this doorway."
+    },
+    "federationPeers": {
+      "type": "array",
+      "items": { "$ref": "dashboard-federation-peer.schema.json" },
+      "description": "Per-doorway federation rows."
+    },
+    "projectionCoverage": {
+      "$ref": "projection-coverage.schema.json",
+      "description": "Projection cache and lag aggregate for this doorway."
+    },
+    "publicSurface": {
+      "$ref": "public-surface-state.schema.json",
+      "description": "DNS/TLS/reachability surface for the doorway hostname."
+    }
+  }
+}

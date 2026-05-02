@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "epr:schema:view:dashboard-steward",
+  "title": "DashboardSteward",
+  "description": "Per-storage-steward row in a doorway dashboard. Source of truth: peer_identity_bindings (Category A from imagodei DHT) joined with hosting counts derived from rea_commitments (Operational, Category C). Reconstructed per request; not persisted.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["peerId", "archetype", "online", "hostingCount"],
+  "properties": {
+    "peerId": { "type": "string" },
+    "archetype": { "$ref": "../enums/device-archetype.schema.json" },
+    "displayName": { "type": "string" },
+    "online": { "type": "boolean" },
+    "hostingCount": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Count of CIDs this steward currently hosts."
+    },
+    "hopHint": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Approximate libp2p Kad hop distance from the doorway."
+    }
+  }
+}

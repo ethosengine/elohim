@@ -1993,6 +1993,48 @@ fn reciprocity_view_matches_schema() {
 }
 
 #[test]
+fn doorway_dashboard_view_matches_schema() {
+    use elohim_storage::views::{
+        DashboardFederationPeer, DashboardSteward, DeviceArchetype, DoorwayDashboardView,
+        FederationDirection, ProjectionCoverage, PublicSurfaceState,
+    };
+
+    let sample = DoorwayDashboardView {
+        doorway_hostname: "matthew.elohim.host".into(),
+        storage_stewards: vec![DashboardSteward {
+            peer_id: "12D3KooWMatthew".into(),
+            archetype: DeviceArchetype::Node,
+            display_name: Some("matthew-blade-01".into()),
+            online: true,
+            hosting_count: 2_134,
+            hop_hint: Some(1),
+        }],
+        federation_peers: vec![DashboardFederationPeer {
+            doorway_hostname: "shem.elohim.host".into(),
+            online: true,
+            direction: FederationDirection::Bidirectional,
+            shared_cid_count: 412,
+        }],
+        projection_coverage: ProjectionCoverage {
+            projected_cid_count: 4_318,
+            known_cid_count: 5_672,
+            cache_hit_rate_24h: 0.87,
+            projection_lag_ms_avg: 340,
+        },
+        public_surface: PublicSurfaceState {
+            dns_resolves: true,
+            dns_target: Some("203.0.113.42".into()),
+            tls_valid: true,
+            tls_expires_in_days: Some(64),
+            public_reachable: true,
+        },
+    };
+
+    let json = serde_json::to_value(&sample).unwrap();
+    validate_against_schema("views/doorway-dashboard-view.schema.json", &json);
+}
+
+#[test]
 fn reciprocity_row_matches_schema() {
     use elohim_storage::views::ReciprocityRow;
 

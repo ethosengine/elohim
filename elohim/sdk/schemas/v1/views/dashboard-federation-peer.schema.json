@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "epr:schema:view:dashboard-federation-peer",
+  "title": "DashboardFederationPeer",
+  "description": "Per-doorway federation row in a doorway dashboard. Source of truth: doorway-to-doorway federation registry observed via libp2p (Operational, Category C). Reconstructed per request; not persisted.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["doorwayHostname", "online", "direction", "sharedCidCount"],
+  "properties": {
+    "doorwayHostname": { "type": "string" },
+    "online": { "type": "boolean" },
+    "direction": {
+      "enum": ["bidirectional", "outbound_only", "inbound_only"],
+      "description": "Which way bytes flow across this federation edge."
+    },
+    "sharedCidCount": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Count of CIDs both doorways project."
+    }
+  }
+}
