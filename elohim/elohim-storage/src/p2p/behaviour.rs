@@ -14,6 +14,7 @@ use super::kad_store::SledRecordStore;
 
 use std::time::Duration;
 
+use super::blob_protocol::{BlobCodec, BlobProtocol};
 use super::epr_atom_protocol::{EprAtomCodec, EprAtomProtocol};
 use super::epr_protocol::{EprCodec, EprProtocol};
 use super::identity_binding_gossip::IDENTITY_BINDING_TOPIC;
@@ -69,6 +70,12 @@ pub struct ElohimStorageBehaviour {
     pub kademlia: Kademlia<SledRecordStore>,
     /// Request-response for shard transfer
     pub shard_protocol: RequestResponse<ShardCodec>,
+    /// Request-response for explicit-peer blob fetch (`/elohim/blob/1.0.0`).
+    ///
+    /// T21: Stage-2 wiring of the T17/T20 race-fetch helper. Differs from
+    /// `shard_protocol` in that the caller routes to a specific `peer_id`
+    /// rather than any-connected-peer.
+    pub blob_protocol: RequestResponse<BlobCodec>,
     /// Request-response for CRDT sync
     pub sync_protocol: RequestResponse<SyncCodec>,
     /// Request-response for EPR Head resolution (legacy /elohim/epr/1.0.0)
@@ -108,6 +115,8 @@ pub enum ElohimStorageBehaviourEvent {
     Kademlia(kad::Event),
     /// Shard protocol event
     ShardProtocol(request_response::Event<super::ShardRequest, super::ShardResponse>),
+    /// Blob protocol event (`/elohim/blob/1.0.0`)
+    BlobProtocol(request_response::Event<super::BlobFetchRequest, super::BlobFetchResponse>),
     /// Sync protocol event
     SyncProtocol(request_response::Event<super::SyncRequest, super::SyncResponse>),
     /// EPR protocol event (legacy /elohim/epr/1.0.0)
@@ -157,6 +166,16 @@ impl From<request_response::Event<super::ShardRequest, super::ShardResponse>>
 {
     fn from(event: request_response::Event<super::ShardRequest, super::ShardResponse>) -> Self {
         Self::ShardProtocol(event)
+    }
+}
+
+impl From<request_response::Event<super::BlobFetchRequest, super::BlobFetchResponse>>
+    for ElohimStorageBehaviourEvent
+{
+    fn from(
+        event: request_response::Event<super::BlobFetchRequest, super::BlobFetchResponse>,
+    ) -> Self {
+        Self::BlobProtocol(event)
     }
 }
 
@@ -291,6 +310,15 @@ impl ElohimStorageBehaviour {
             request_response::Config::default().with_request_timeout(config.request_timeout),
         );
 
+        // T21: Blob fetch request-response protocol — explicit-peer fetch for
+        // the T17/T20 race-fetch helper. `with_codec` lets us plumb the
+        // configurable max response size (default 16 MiB, hard-capped at 64 MiB).
+        let blob_protocol = RequestResponse::with_codec(
+            BlobCodec::with_max_response_size(config.max_blob_response_size),
+            [(BlobProtocol, ProtocolSupport::Full)],
+            request_response::Config::default().with_request_timeout(config.request_timeout),
+        );
+
         // Sync request-response protocol
         let sync_protocol = RequestResponse::new(
             [(SyncProtocol, ProtocolSupport::Full)],
@@ -411,6 +439,7 @@ impl ElohimStorageBehaviour {
         Self {
             kademlia,
             shard_protocol,
+            blob_protocol,
             sync_protocol,
             epr_protocol,
             epr_atom_protocol,

@@ -32,6 +32,7 @@ pub mod adapters;
 pub mod attention_tending;
 pub mod behaviour;
 pub mod blob_fetch;
+pub mod blob_protocol;
 pub mod dedup;
 pub mod epr_atom_protocol;
 pub mod epr_protocol;
@@ -125,6 +126,25 @@ type PendingShardMap = Arc<
         std::collections::HashMap<
             request_response::OutboundRequestId,
             oneshot::Sender<Option<Vec<u8>>>,
+        >,
+    >,
+>;
+
+/// T21: Map of in-flight blob fetch requests on the `/elohim/blob/1.0.0` channel.
+///
+/// Resolved when the blob-protocol `Message::Response` or `OutboundFailure`
+/// event matches the `request_id`; the oneshot sender delivers the result back
+/// to the caller (typically the race-fetch helper in `p2p::blob_fetch`).
+///
+/// Distinct from `PendingShardMap` because the value type is
+/// `Result<Vec<u8>, String>` rather than `Option<Vec<u8>>` — the explicit-peer
+/// fetch path surfaces precise failure reasons (NotFound, codec error, transport
+/// failure) for parallel-batch first-responder logic.
+type PendingBlobFetchMap = Arc<
+    tokio::sync::Mutex<
+        std::collections::HashMap<
+            request_response::OutboundRequestId,
+            oneshot::Sender<Result<Vec<u8>, String>>,
         >,
     >,
 >;
@@ -240,6 +260,11 @@ use crate::sync::{DocStore, StreamTracker, SyncManager};
 use elohim_cache_core::extraction::ExtractionCache;
 
 pub use behaviour::{ElohimStorageBehaviour, RelayMode};
+pub use blob_protocol::{
+    BlobCodec, BlobFetchRequest, BlobFetchResponse, BlobProtocol, BLOB_PROTOCOL_ID,
+    DEFAULT_MAX_RESPONSE_SIZE as BLOB_DEFAULT_MAX_RESPONSE_SIZE,
+    HARD_MAX_RESPONSE_SIZE as BLOB_HARD_MAX_RESPONSE_SIZE,
+};
 pub use epr_atom_protocol::{
     verify_incoming_epr, EprAtomCodec, EprAtomProtocol, EprAtomRequest, EprAtomResponse,
     VerifyError, EPR_ATOM_PROTOCOL_ID, MAX_BATCH_CIDS,
@@ -272,6 +297,10 @@ pub struct P2PConfig {
     pub relay_mode: RelayMode,
     /// Addresses to announce to the network (e.g., public IP/DNS multiaddrs)
     pub announce_addresses: Vec<String>,
+    /// T21: maximum response size for the `/elohim/blob/1.0.0` request-response
+    /// protocol. Default 16 MiB (matches `MAX_INLINE_SIZE` in `blob_store.rs`);
+    /// hard-capped at 64 MiB by the codec regardless of this value.
+    pub max_blob_response_size: usize,
 }
 
 impl Default for P2PConfig {
@@ -287,6 +316,7 @@ impl Default for P2PConfig {
                 .join("elohim-storage"),
             relay_mode: RelayMode::default(),
             announce_addresses: Vec::new(),
+            max_blob_response_size: BLOB_DEFAULT_MAX_RESPONSE_SIZE,
         }
     }
 }
@@ -325,6 +355,9 @@ pub struct P2PNode {
     pending_epr_resolves: PendingEprMap,
     /// Pending shard fetch requests awaiting responses from peers
     pending_shard_fetches: PendingShardMap,
+    /// T21: explicit-peer blob fetch responses awaiting delivery on the
+    /// `/elohim/blob/1.0.0` request-response channel.
+    pending_blob_fetches: PendingBlobFetchMap,
     /// Pending shard push requests awaiting acknowledgment
     pending_shard_pushes: PendingShardPushMap,
     /// Pending shard verification (Have) requests
@@ -1324,6 +1357,9 @@ impl P2PNode {
             pending_shard_fetches: Arc::new(tokio::sync::Mutex::new(
                 std::collections::HashMap::new(),
             )),
+            pending_blob_fetches: Arc::new(tokio::sync::Mutex::new(
+                std::collections::HashMap::new(),
+            )),
             pending_shard_pushes: Arc::new(tokio::sync::Mutex::new(
                 std::collections::HashMap::new(),
             )),
@@ -2043,25 +2079,31 @@ impl P2PNode {
                     "SnapshotRequest queued; Stage 1 placeholder — relying on next periodic snapshot"
                 );
             }
-            // T17: Stage-1 placeholder — send Err so the race-fetch helper
-            // can exercise its full control-flow (Miss) path. Stage 2 will wire
-            // this to a dedicated blob-fetch request-response channel that targets
-            // the explicit peer_id (FetchShard picks any connected peer, not one
-            // specific peer — a different shape that requires new infrastructure).
+            // T21: Stage-2 wiring — issue a real `/elohim/blob/1.0.0` request to
+            // the explicit peer_id and stash the reply oneshot in
+            // `pending_blob_fetches`. The blob-protocol event handler resolves
+            // the entry on `Message::Response` or cleans up on `OutboundFailure`.
             P2PCommand::FetchBlob {
                 peer_id,
                 hash,
                 reply,
             } => {
+                let request = BlobFetchRequest { hash: hash.clone() };
+                let request_id = swarm
+                    .behaviour_mut()
+                    .blob_protocol
+                    .send_request(&peer_id, request);
                 debug!(
                     target: "elohim_storage::blob_fetch",
                     peer_id = %peer_id,
                     hash = %hash,
-                    "FetchBlob: Stage 1 placeholder — not yet wired to shard protocol"
+                    request_id = ?request_id,
+                    "T21: blob fetch request sent on /elohim/blob/1.0.0"
                 );
-                let _ = reply.send(Err(
-                    "FetchBlob not yet implemented; Stage 1 placeholder".to_string()
-                ));
+                self.pending_blob_fetches
+                    .lock()
+                    .await
+                    .insert(request_id, reply);
             }
         }
     }
@@ -2792,6 +2834,146 @@ impl P2PNode {
                 request_response::Event::ResponseSent { peer, request_id },
             ) => {
                 debug!(peer = %peer, request_id = ?request_id, "Shard response sent");
+            }
+            // T21: /elohim/blob/1.0.0 — explicit-peer blob fetch protocol.
+            // Inbound: read local blob_store and respond Found/NotFound/Error.
+            // Outbound: resolve the matching pending_blob_fetches entry.
+            behaviour::ElohimStorageBehaviourEvent::BlobProtocol(
+                request_response::Event::Message { peer, message },
+            ) => match message {
+                request_response::Message::Request {
+                    request, channel, ..
+                } => {
+                    let response = match self.blob_store.get(&request.hash).await {
+                        Ok(bytes) => {
+                            debug!(
+                                target: "elohim_storage::blob_fetch",
+                                peer = %peer,
+                                hash = %request.hash,
+                                size = bytes.len(),
+                                "T21: serving blob to peer"
+                            );
+                            BlobFetchResponse::Found(bytes)
+                        }
+                        Err(StorageError::NotFound(_)) | Err(StorageError::BlobNotFound(_)) => {
+                            debug!(
+                                target: "elohim_storage::blob_fetch",
+                                peer = %peer,
+                                hash = %request.hash,
+                                "T21: blob not found locally; replying NotFound"
+                            );
+                            BlobFetchResponse::NotFound
+                        }
+                        Err(e) => {
+                            warn!(
+                                target: "elohim_storage::blob_fetch",
+                                peer = %peer,
+                                hash = %request.hash,
+                                error = %e,
+                                "T21: blob fetch error; replying Error"
+                            );
+                            BlobFetchResponse::Error(e.to_string())
+                        }
+                    };
+                    let mut swarm = self.swarm.write().await;
+                    if let Err(e) = swarm
+                        .behaviour_mut()
+                        .blob_protocol
+                        .send_response(channel, response)
+                    {
+                        warn!(
+                            target: "elohim_storage::blob_fetch",
+                            peer = %peer,
+                            error = ?e,
+                            "T21: failed to send blob response"
+                        );
+                    }
+                }
+                request_response::Message::Response {
+                    request_id,
+                    response,
+                } => {
+                    if let Some(reply) = self.pending_blob_fetches.lock().await.remove(&request_id)
+                    {
+                        match response {
+                            BlobFetchResponse::Found(bytes) => {
+                                debug!(
+                                    target: "elohim_storage::blob_fetch",
+                                    request_id = ?request_id,
+                                    size = bytes.len(),
+                                    "T21: blob fetch returned Found"
+                                );
+                                let _ = reply.send(Ok(bytes));
+                            }
+                            BlobFetchResponse::NotFound => {
+                                debug!(
+                                    target: "elohim_storage::blob_fetch",
+                                    request_id = ?request_id,
+                                    "T21: blob fetch returned NotFound"
+                                );
+                                let _ = reply.send(Err("not found".to_string()));
+                            }
+                            BlobFetchResponse::Error(msg) => {
+                                debug!(
+                                    target: "elohim_storage::blob_fetch",
+                                    request_id = ?request_id,
+                                    error = %msg,
+                                    "T21: blob fetch returned Error"
+                                );
+                                let _ = reply.send(Err(msg));
+                            }
+                        }
+                    } else {
+                        debug!(
+                            target: "elohim_storage::blob_fetch",
+                            request_id = ?request_id,
+                            "T21: response with no pending entry (already resolved or unknown)"
+                        );
+                    }
+                }
+            },
+            behaviour::ElohimStorageBehaviourEvent::BlobProtocol(
+                request_response::Event::OutboundFailure {
+                    peer,
+                    request_id,
+                    error,
+                },
+            ) => {
+                warn!(
+                    target: "elohim_storage::blob_fetch",
+                    peer = %peer,
+                    request_id = ?request_id,
+                    error = ?error,
+                    "T21: outbound blob fetch failed"
+                );
+                if let Some(reply) = self.pending_blob_fetches.lock().await.remove(&request_id) {
+                    let _ = reply.send(Err(format!("outbound failure: {error}")));
+                }
+            }
+            behaviour::ElohimStorageBehaviourEvent::BlobProtocol(
+                request_response::Event::InboundFailure {
+                    peer,
+                    request_id,
+                    error,
+                },
+            ) => {
+                debug!(
+                    target: "elohim_storage::blob_fetch",
+                    peer = %peer,
+                    request_id = ?request_id,
+                    error = ?error,
+                    "T21: inbound blob fetch failed"
+                );
+            }
+            behaviour::ElohimStorageBehaviourEvent::BlobProtocol(
+                request_response::Event::ResponseSent { peer, request_id },
+            ) => {
+                debug!(
+                    target: "elohim_storage::blob_fetch",
+                    peer = %peer,
+                    request_id = ?request_id,
+                    "T21: blob response sent"
+                );
             }
             behaviour::ElohimStorageBehaviourEvent::Kademlia(kad::Event::RoutingUpdated {
                 peer,
