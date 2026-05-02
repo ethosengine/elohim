@@ -125,6 +125,35 @@ pub fn delete_all_for_peer(
         .map_err(|e| StorageError::Database(format!("peer_identity_bindings delete: {e}")))
 }
 
+/// List every currently-active binding for `agent_cid`.
+///
+/// "Active" means: `valid_until IS NULL OR valid_until > now_iso`, AND
+/// `superseded_by IS NULL`. Each row represents one of the agent's known
+/// peer-stewarded devices. Order is by `observed_at DESC` so the most
+/// recently observed binding for a (peer_id, agent_cid) pair appears first.
+///
+/// This is the input to view-federation (Phase 4 view services + F-T21
+/// `Federator::query`): one outbound view-federation request per row.
+///
+/// Returns an empty `Vec` if the agent has no active bindings.
+pub fn list_active_for_agent(
+    conn: &mut SqliteConnection,
+    agent_cid: &str,
+    now_iso: &str,
+) -> Result<Vec<PeerIdentityBindingRow>, StorageError> {
+    use peer_identity_bindings::dsl;
+
+    dsl::peer_identity_bindings
+        .filter(dsl::agent_cid.eq(agent_cid))
+        .filter(dsl::valid_until.is_null().or(dsl::valid_until.gt(now_iso)))
+        .filter(dsl::superseded_by.is_null())
+        .order(dsl::observed_at.desc())
+        .load::<PeerIdentityBindingRow>(conn)
+        .map_err(|e| {
+            StorageError::Database(format!("peer_identity_bindings list_active_for_agent: {e}"))
+        })
+}
+
 // ============================================================================
 // Tests
 // ============================================================================
@@ -409,5 +438,109 @@ mod tests {
             row.superseded_by.is_none(),
             "active row must have superseded_by == NULL"
         );
+    }
+
+    #[test]
+    fn list_active_for_agent_returns_all_devices() {
+        let pool = test_pool();
+        let mut conn = pool.get().expect("conn");
+
+        for (peer, archetype) in [
+            ("12D3KooW_M_desktop", "desktop"),
+            ("12D3KooW_M_node", "node"),
+            ("12D3KooW_M_mobile", "mobile"),
+        ] {
+            let mut row = binding(
+                peer,
+                "agent_M",
+                &format!("anchor-{peer}"),
+                "2026-01-01T00:00:00Z",
+                None,
+                "2026-04-24T00:00:00Z",
+                "dht",
+            );
+            row.device_archetype = archetype.to_string();
+            upsert(&mut conn, &row).expect("upsert");
+        }
+
+        let bindings = list_active_for_agent(&mut conn, "agent_M", "2026-04-24T12:00:00Z")
+            .expect("list_active_for_agent");
+        assert_eq!(bindings.len(), 3);
+        assert!(bindings
+            .iter()
+            .any(|b| b.peer_id == "12D3KooW_M_desktop" && b.device_archetype == "desktop"));
+    }
+
+    #[test]
+    fn list_active_for_agent_filters_superseded() {
+        let pool = test_pool();
+        let mut conn = pool.get().expect("conn");
+
+        // Active binding for agent_M.
+        upsert(
+            &mut conn,
+            &binding(
+                "12D3KooW_active",
+                "agent_M",
+                "anchor-active",
+                "2026-01-01T00:00:00Z",
+                None,
+                "2026-04-24T00:00:00Z",
+                "dht",
+            ),
+        )
+        .expect("upsert active");
+
+        // Superseded binding for the same agent — should be filtered out.
+        let mut superseded = binding(
+            "12D3KooW_old",
+            "agent_M",
+            "anchor-old",
+            "2026-01-01T00:00:00Z",
+            None,
+            "2026-04-24T00:00:00Z",
+            "dht",
+        );
+        superseded.superseded_by = Some("anchor-newer".to_string());
+        upsert(&mut conn, &superseded).expect("upsert superseded");
+
+        let bindings = list_active_for_agent(&mut conn, "agent_M", "2026-04-24T12:00:00Z")
+            .expect("list_active_for_agent");
+        assert_eq!(bindings.len(), 1, "superseded row must be filtered out");
+        assert_eq!(bindings[0].peer_id, "12D3KooW_active");
+    }
+
+    #[test]
+    fn list_active_for_agent_empty_for_unknown_agent() {
+        let pool = test_pool();
+        let mut conn = pool.get().expect("conn");
+
+        let bindings = list_active_for_agent(&mut conn, "agent_unknown", "2026-04-24T12:00:00Z")
+            .expect("list_active_for_agent");
+        assert!(bindings.is_empty());
+    }
+
+    #[test]
+    fn list_active_for_agent_excludes_expired() {
+        let pool = test_pool();
+        let mut conn = pool.get().expect("conn");
+
+        upsert(
+            &mut conn,
+            &binding(
+                "12D3KooW_expired",
+                "agent_M",
+                "anchor-expired",
+                "2026-01-01T00:00:00Z",
+                Some("2026-02-01T00:00:00Z"),
+                "2026-04-24T00:00:00Z",
+                "dht",
+            ),
+        )
+        .expect("upsert expired");
+
+        let bindings = list_active_for_agent(&mut conn, "agent_M", "2026-04-24T12:00:00Z")
+            .expect("list_active_for_agent");
+        assert!(bindings.is_empty(), "expired bindings must not be returned");
     }
 }
