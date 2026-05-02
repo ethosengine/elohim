@@ -7356,3 +7356,33 @@ pub struct PeerTopologyView {
     pub resilience_cliffs: Vec<ResilienceCliff>,
     pub freshness: Freshness,
 }
+
+/// Per-counterparty row in a reciprocity view's inflow/outflow ledger.
+///
+/// `honored_percent` is `f64` so PartialEq is impl'd but Eq is not — matches
+/// JSON Schema's `number` with `minimum: 0`.
+#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq)]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+#[serde(rename_all = "camelCase")]
+pub struct ReciprocityRow {
+    pub counterparty_household_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub display_name: Option<String>,
+    pub committed_bytes: u64,
+    pub delivered_bytes: u64,
+    pub honored_percent: f64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub online: Option<bool>,
+}
+
+/// Per-agent reciprocity ledger.
+#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq)]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+#[serde(rename_all = "camelCase")]
+pub struct ReciprocityView {
+    pub agent_cid: String,
+    pub inflow: Vec<ReciprocityRow>,
+    pub outflow: Vec<ReciprocityRow>,
+    pub net_hosted_bytes: i64,
+    pub capacity_available_bytes: u64,
+}

@@ -83,6 +83,8 @@ const INTERFACE_FILES = [
   { src: 'views/freshness.ts', dest: 'freshness.ts' },
   { src: 'views/peer-topology-view.ts', dest: 'peer-topology-view.ts' },
   { src: 'views/peer-household-edge.ts', dest: 'peer-household-edge.ts' },
+  { src: 'views/reciprocity-view.ts', dest: 'reciprocity-view.ts' },
+  { src: 'views/reciprocity-row.ts', dest: 'reciprocity-row.ts' },
 ];
 
 /**

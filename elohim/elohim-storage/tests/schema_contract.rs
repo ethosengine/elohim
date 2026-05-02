@@ -1963,6 +1963,53 @@ fn peer_topology_view_matches_schema() {
 }
 
 #[test]
+fn reciprocity_view_matches_schema() {
+    use elohim_storage::views::{ReciprocityRow, ReciprocityView};
+
+    let sample = ReciprocityView {
+        agent_cid: "agent_abc123".into(),
+        inflow: vec![ReciprocityRow {
+            counterparty_household_id: "household-jessica".into(),
+            display_name: Some("Jessica".into()),
+            committed_bytes: 5_000_000_000,
+            delivered_bytes: 4_750_000_000,
+            honored_percent: 0.95,
+            online: Some(true),
+        }],
+        outflow: vec![ReciprocityRow {
+            counterparty_household_id: "household-shem".into(),
+            display_name: None,
+            committed_bytes: 8_000_000_000,
+            delivered_bytes: 8_400_000_000,
+            honored_percent: 1.05,
+            online: None,
+        }],
+        net_hosted_bytes: -3_650_000_000,
+        capacity_available_bytes: 12_500_000_000,
+    };
+
+    let json = serde_json::to_value(&sample).unwrap();
+    validate_against_schema("views/reciprocity-view.schema.json", &json);
+}
+
+#[test]
+fn reciprocity_row_matches_schema() {
+    use elohim_storage::views::ReciprocityRow;
+
+    let sample = ReciprocityRow {
+        counterparty_household_id: "household-x".into(),
+        display_name: None,
+        committed_bytes: 0,
+        delivered_bytes: 0,
+        honored_percent: 0.0,
+        online: None,
+    };
+
+    let json = serde_json::to_value(&sample).unwrap();
+    validate_against_schema("views/reciprocity-row.schema.json", &json);
+}
+
+#[test]
 fn peer_household_edge_minimal_matches_schema() {
     use elohim_storage::views::PeerHouseholdEdge;
 
