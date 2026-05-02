@@ -611,6 +611,104 @@ git commit -m "feat(seeder): T03c — AgentPeerBinding seeder for multi-device d
 
 The post-merge Jenkins job (orchestrator) will run `pnpm run hc:start:seed` and confirm Step 2 + Step 3 from T00. Update the spec's Pre-flight section after that run completes; this is a runtime confirmation step, not a code task.
 
+### Task T03d: REA action conventions + indexes for blob projection contracts
+
+**Why this is here:** T02 found that the plan invented three tables (`rea_projection`, `custodian_blob_commitments`, `content_store`) that don't exist as migrations. The user reframed: "projections to doorway are contracts with the doorway-steward for a service (web2.0) conveniences. Doorway is basically a replacement for the holo-host in that sense." That reframe collapses the question — projection acks ARE already represented as REA records:
+
+| Concept (originally invented) | Actual representation in existing substrate |
+|---|---|
+| `rea_projection.projector_peer_id` (per-blob projector ack) | `economic_events` row, `action='serve-blob'`, `provider=<doorway-steward-cid>`, `resource_inventoried_as=<blob_hash>` |
+| `custodian_blob_commitments.committed_bytes` (per-blob custody contract) | `rea_commitments` row, `action='custody-blob'`, `provider=<custodian-cid>`, `resource_inventoried_as=<blob_hash>`, `resource_quantity_value=<bytes>` |
+| `content_store.reach_class` (reach-tier filter) | `epr_atoms.reach` (column already exists) |
+
+This task documents the convention and adds query indexes. **No new tables.** The notarized provenance everyone wants comes for free — both `rea_commitments` and `economic_events` carry `dht_anchor_hash` already.
+
+**Files:**
+- Create: `elohim/elohim-storage/migrations/2026-05-02-100000_rea_blob_action_indexes/up.sql`
+- Create: `elohim/elohim-storage/migrations/2026-05-02-100000_rea_blob_action_indexes/down.sql`
+- Modify: `elohim/sdk/schemas/v1/enums/rea-action.schema.json` (add `serve-blob`, `project-blob`, `custody-blob` if not present — confirm with `grep` first)
+- Modify: `genesis/docs/superpowers/specs/2026-05-01-light-up-the-topology-design.md` (add a "REA Action Conventions for Blob Projection" subsection under the Components heading)
+
+- [ ] **Step 1: Confirm REA action enum coverage**
+
+```bash
+cat elohim/sdk/schemas/v1/enums/rea-action.schema.json 2>/dev/null || echo "(no enum schema; actions are free-text TEXT in REA tables)"
+grep -rn "serve-blob\|project-blob\|custody-blob" elohim/sdk/schemas/ | head -5
+```
+
+If the enum schema exists and these actions aren't in it, add them. If REA actions are free-text, document the convention in the spec without schema changes.
+
+- [ ] **Step 2: Write migration up.sql**
+
+```sql
+-- Indexes for the blob projection / custody / serve query patterns the
+-- topology view services use. No new tables — projection acks live in
+-- the existing REA tables (economic_events, rea_commitments). The
+-- 'action' column carries the convention: 'project-blob' (commitment),
+-- 'serve-blob' (event = projection ack), 'custody-blob' (custody contract).
+
+CREATE INDEX idx_rea_commitments_action_resource
+    ON rea_commitments(action, resource_inventoried_as);
+
+CREATE INDEX idx_economic_events_action_resource
+    ON economic_events(action, resource_inventoried_as);
+```
+
+- [ ] **Step 3: Write migration down.sql**
+
+```sql
+DROP INDEX IF EXISTS idx_economic_events_action_resource;
+DROP INDEX IF EXISTS idx_rea_commitments_action_resource;
+```
+
+Note: schema migration only; no Diesel schema change since indexes don't appear in `table!` macros.
+
+- [ ] **Step 4: Document the convention in the design spec**
+
+Append to `genesis/docs/superpowers/specs/2026-05-01-light-up-the-topology-design.md`, under the existing "Components" section:
+
+```markdown
+#### REA Action Conventions for Blob Projection
+
+Blob distribution facts (replicas, projector acks, custody) are NOT stored in dedicated tables. They live in the existing REA tables (`rea_commitments`, `economic_events`) using these action conventions:
+
+| Action | Table | Semantic |
+|---|---|---|
+| `project-blob` | `rea_commitments` | Doorway-steward commits to project a specific blob CID for a content steward. `provider`=doorway-steward-cid, `receiver`=content-steward-cid, `resource_inventoried_as`=blob_hash, `resource_quantity_value`=expected projection lifetime in seconds. |
+| `serve-blob` | `economic_events` | Doorway-steward fulfills a projection commitment by serving the blob. `provider`=doorway-steward-cid, `receiver`=peer-cid (the requester), `resource_inventoried_as`=blob_hash, `output_of`=action_hash of the matching `project-blob` commitment. |
+| `custody-blob` | `rea_commitments` | Peer steward commits to keep N bytes of a specific blob hosted. `provider`=peer-steward-cid, `receiver`=content-steward-cid, `resource_inventoried_as`=blob_hash, `resource_quantity_value`=committed bytes. |
+
+This convention is the source of truth for `compose_distribution_summary` (T23), `compose_distribution_details` (T24), and `reciprocity_view::aggregate` (T27). No new tables; query the existing REA tables filtered by action and resource.
+```
+
+- [ ] **Step 5: Run migration tests**
+
+```bash
+cd elohim/elohim-storage
+RUSTFLAGS='--cfg getrandom_backend="custom"' cargo test --lib --quiet
+```
+
+Expected: tests pass; new migration applies without breaking existing tests.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add elohim/elohim-storage/migrations/2026-05-02-100000_rea_blob_action_indexes/ \
+        elohim/sdk/schemas/v1/enums/rea-action.schema.json \
+        genesis/docs/superpowers/specs/2026-05-01-light-up-the-topology-design.md
+git commit -m "feat(rea): T03d — action conventions + indexes for blob projection contracts (no new tables)"
+```
+
+**Plan revision note for T23, T24, T27** (DO NOT skip — implementer subagents read these tasks fresh):
+
+When implementing T23 / T24 / T27, **do NOT use the table names `rea_projection` or `custodian_blob_commitments`** that appear in those tasks' example code. They were placeholders for the actual substrate. Substitute as follows:
+
+- `rea_projection` reads (e.g. `r::rea_projection.filter(r::cid.eq(blob_hash))`) → query `economic_events` filtered by `action.eq("serve-blob")` and `resource_inventoried_as.eq(blob_hash)`. The `provider` column gives you the doorway-steward CID; join through `peer_identity_bindings` to find the peer_id. Distinct providers = projector_count.
+- `custodian_blob_commitments` reads → query `rea_commitments` filtered by `action.eq("custody-blob")` (or the relevant kind), `resource_inventoried_as.eq(blob_hash)`. Distinct providers = replica peers (custodian stewards). `resource_quantity_value` is the bytes committed.
+- `content_store.reach_class` reads → `epr_atoms.reach` (column already exists; join via blob_hash → epr_atom mapping if needed, or read reach from a related epr_atom row).
+
+The schemas and view shapes (T04-T11) do not change — only the SQL queries inside the service implementations.
+
 ---
 
 ## Phase 1 — Schemas (Schema-first IoC)
