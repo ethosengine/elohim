@@ -53,6 +53,7 @@ pub mod sync_protocol;
 pub mod topics;
 pub mod trust_cache;
 pub mod trust_protocol;
+pub mod view_federation;
 
 // D.3: re-export topic helpers so callers have a single import surface.
 pub use topics::{topic_for, TOPIC_IDENTITY_BINDING, TOPIC_INTEGRITY_REVOCATION};
@@ -277,6 +278,10 @@ pub use identity_map::{
 };
 pub use shard_protocol::{ShardCodec, ShardProtocol, ShardRequest, ShardResponse};
 pub use sync_protocol::{DocumentInfo, SyncCodec, SyncProtocol, SyncRequest, SyncResponse};
+pub use view_federation::{
+    ViewFederationCodec, ViewFederationProtocol, MAX_PAYLOAD as VIEW_FEDERATION_MAX_PAYLOAD,
+    VIEW_FEDERATION_PROTOCOL_ID,
+};
 
 /// Configuration for P2P node
 #[derive(Debug, Clone)]
