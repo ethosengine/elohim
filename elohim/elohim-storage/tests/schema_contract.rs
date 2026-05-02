@@ -1798,7 +1798,7 @@ fn attention_tending_with_empty_tended_at_rejected_by_schema() {
 #[test]
 fn distribution_summary_matches_schema() {
     use elohim_storage::views::{
-        DiversityHint, DistributionSummary, FetchSource, MyRole, ReachClass, ReplicaHealth,
+        DistributionSummary, DiversityHint, FetchSource, MyRole, ReachClass, ReplicaHealth,
     };
 
     let sample = DistributionSummary {
@@ -2032,7 +2032,9 @@ fn view_slice_cluster_matches_schema() {
             },
             "freshness": {"state": "live"}
         })),
-        signature: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA".into(),
+        signature:
+            "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                .into(),
     };
 
     let json = serde_json::to_value(&sample).unwrap();
@@ -2057,7 +2059,9 @@ fn view_slice_peer_topology_matches_schema() {
             "resilienceCliffs": [],
             "freshness": {"state": "stale", "staleSinceMs": 60000}
         })),
-        signature: "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB".into(),
+        signature:
+            "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB"
+                .into(),
     };
 
     let json = serde_json::to_value(&sample).unwrap();
@@ -2159,7 +2163,7 @@ fn freshness_offline_matches_schema() {
 #[test]
 fn distribution_summary_with_diversity_none_matches_schema() {
     use elohim_storage::views::{
-        DiversityHint, DistributionSummary, FetchSource, ReachClass, ReplicaHealth,
+        DistributionSummary, DiversityHint, FetchSource, ReachClass, ReplicaHealth,
     };
 
     let sample = DistributionSummary {
