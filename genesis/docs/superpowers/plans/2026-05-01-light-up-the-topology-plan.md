@@ -182,8 +182,8 @@ doorway/doorway-app/src/app/admin/...
 |-------|-------|------|
 | 0 — Pre-flight | T00–T03 | Verify substrate prerequisites are alive |
 | 1 — Schemas | T04–T11 | Schema-first IoC: declare wire shapes |
-| 2 — Substrate fixes | T12–T15 | Peer-fallback + on-connect kick + regression test |
-| 3 — Federation protocol | T16–T21 | view-federation/1.0.0 codec + handler + aggregator |
+| 2 — Substrate redesign | T12–T23 | **Redesigned mid-sprint** as blob custody reconciliation (manifest / reality / diff). See [`2026-05-02-blob-custody-reconciliation-design.md`](../specs/2026-05-02-blob-custody-reconciliation-design.md). Original T12–T15 scope superseded. |
+| 3 — Federation protocol | T16–T21 | view-federation/1.0.0 codec + handler + aggregator (F-T16/T17/T18 landed; F-T19/T20/T21 next). Now framed as **hub-to-hub** federation per [`2026-05-02-elohim-hub-boundaries-design.md`](../specs/2026-05-02-elohim-hub-boundaries-design.md). |
 | 4 — View services | T22–T28 | Compose summaries + topology aggregators |
 | 5 — HTTP handlers + manifest | T29–T34 | Wire routes through `build_manifest()` + EPR head extension |
 | 6 — TS codegen | T35–T36 | ts-rs + schema:codegen:ts pass clean |
@@ -1777,6 +1777,8 @@ git commit -m "chore(codegen): regenerate TS bindings for Phase 1 view schemas"
 
 ## Phase 2 — Substrate Fixes
 
+> **Mid-sprint redesign (2026-05-02).** The original Phase 2 (T12–T15: peer-fallback helper, GET-time blob fallback, on-connect kick, filesystem-count regression) was BLOCKED before code by an implementer who surfaced six substrate-vs-plan mismatches (no `SwarmClient` abstraction, no Kad provider track for blob hashes, no multi-peer test harness, etc.). The redesign — **blob custody reconciliation** (manifest / reality / diff trinity) — shipped as T12–T23 across two batches and is documented in [`2026-05-02-blob-custody-reconciliation-design.md`](../specs/2026-05-02-blob-custody-reconciliation-design.md). The text below preserves the original task content for historical reference; do not implement it as written. The test counts at end of sprint reflect the redesign (1189 → 1209 over T19–T23, then 1209 → 1220 over Phase 3 F-T16/T17/T18).
+
 These two fixes are independent of the view layer but load-bearing for the demo. Without them, the resilience claim ("page still loads when a peer goes offline; bytes arrive when a peer comes online") cannot be verified.
 
 ### Task T12: Extract peer-fallback helper from epr_store
@@ -2245,6 +2247,10 @@ git commit -m "test(storage): filesystem-count parity + kill/restore distributio
 ---
 
 ## Phase 3 — View-Federation Protocol
+
+> **Hub framing (2026-05-02).** What this protocol expresses, when both ends sit on different households, is **hub-to-hub federation** — the substrate scaling story per `project_substrate_scale_ceiling` and `project_elohim_hub_elevation`. The wire stays peer-to-peer (the substrate is oblivious to hubs), but the design intent is that Phase 3+ federation primitives compose into hub-aware aggregation in elohim-node. See [`2026-05-02-elohim-hub-boundaries-design.md`](../specs/2026-05-02-elohim-hub-boundaries-design.md) for the three-layer responsibility split (elohim-storage / elohim-node / future elohim-hub). Concrete implication for tasks below: design the request/response so a future `HubId` could ride alongside `agent_cid` without a wire break — even though only `agent_cid` is meaningful today.
+>
+> **Status:** F-T16/F-T17/F-T18 landed (commits `8807e6c7`, `590f18d6`, `e5accc02`; tests 1209 → 1220). F-T19/F-T20/F-T21 next.
 
 ### Task T16: View-federation wire types
 
