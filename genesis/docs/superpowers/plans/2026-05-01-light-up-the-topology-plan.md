@@ -618,7 +618,7 @@ The post-merge Jenkins job (orchestrator) will run `pnpm run hc:start:seed` and 
 | Concept (originally invented) | Actual representation in existing substrate |
 |---|---|
 | `rea_projection.projector_peer_id` (per-blob projector ack) | `economic_events` row, `action='serve-blob'`, `provider=<doorway-steward-cid>`, `resource_inventoried_as=<blob_hash>` |
-| `custodian_blob_commitments.committed_bytes` (per-blob custody contract) | `rea_commitments` row, `action='custody-blob'`, `provider=<custodian-cid>`, `resource_inventoried_as=<blob_hash>`, `resource_quantity_value=<bytes>` |
+| `custodian_blob_commitments.committed_bytes` (per-blob custody contract) | `rea_commitments` row, `action='custody-blob'`, `provider=<custodian-cid>`, `resource_classified_as=<blob_hash>`, `resource_quantity_value=<bytes>` (rea_commitments uses the classified-as column for blob_hash — see T03d migration for the index that backs this). |
 | `content_store.reach_class` (reach-tier filter) | `epr_atoms.reach` (column already exists) |
 
 This task documents the convention and adds query indexes. **No new tables.** The notarized provenance everyone wants comes for free — both `rea_commitments` and `economic_events` carry `dht_anchor_hash` already.
@@ -648,7 +648,7 @@ If the enum schema exists and these actions aren't in it, add them. If REA actio
 -- 'serve-blob' (event = projection ack), 'custody-blob' (custody contract).
 
 CREATE INDEX idx_rea_commitments_action_resource
-    ON rea_commitments(action, resource_inventoried_as);
+    ON rea_commitments(action, resource_classified_as);
 
 CREATE INDEX idx_economic_events_action_resource
     ON economic_events(action, resource_inventoried_as);
@@ -674,9 +674,9 @@ Blob distribution facts (replicas, projector acks, custody) are NOT stored in de
 
 | Action | Table | Semantic |
 |---|---|---|
-| `project-blob` | `rea_commitments` | Doorway-steward commits to project a specific blob CID for a content steward. `provider`=doorway-steward-cid, `receiver`=content-steward-cid, `resource_inventoried_as`=blob_hash, `resource_quantity_value`=expected projection lifetime in seconds. |
+| `project-blob` | `rea_commitments` | Doorway-steward commits to project a specific blob CID for a content steward. `provider`=doorway-steward-cid, `receiver`=content-steward-cid, `resource_classified_as`=blob_hash, `resource_quantity_value`=expected projection lifetime in seconds. |
 | `serve-blob` | `economic_events` | Doorway-steward fulfills a projection commitment by serving the blob. `provider`=doorway-steward-cid, `receiver`=peer-cid (the requester), `resource_inventoried_as`=blob_hash, `output_of`=action_hash of the matching `project-blob` commitment. |
-| `custody-blob` | `rea_commitments` | Peer steward commits to keep N bytes of a specific blob hosted. `provider`=peer-steward-cid, `receiver`=content-steward-cid, `resource_inventoried_as`=blob_hash, `resource_quantity_value`=committed bytes. |
+| `custody-blob` | `rea_commitments` | Peer steward commits to keep N bytes of a specific blob hosted. `provider`=peer-steward-cid, `receiver`=content-steward-cid, `resource_classified_as`=blob_hash, `resource_quantity_value`=committed bytes. |
 
 This convention is the source of truth for `compose_distribution_summary` (T23), `compose_distribution_details` (T24), and `reciprocity_view::aggregate` (T27). No new tables; query the existing REA tables filtered by action and resource.
 ```
@@ -704,7 +704,7 @@ git commit -m "feat(rea): T03d — action conventions + indexes for blob project
 When implementing T23 / T24 / T27, **do NOT use the table names `rea_projection` or `custodian_blob_commitments`** that appear in those tasks' example code. They were placeholders for the actual substrate. Substitute as follows:
 
 - `rea_projection` reads (e.g. `r::rea_projection.filter(r::cid.eq(blob_hash))`) → query `economic_events` filtered by `action.eq("serve-blob")` and `resource_inventoried_as.eq(blob_hash)`. The `provider` column gives you the doorway-steward CID; join through `peer_identity_bindings` to find the peer_id. Distinct providers = projector_count.
-- `custodian_blob_commitments` reads → query `rea_commitments` filtered by `action.eq("custody-blob")` (or the relevant kind), `resource_inventoried_as.eq(blob_hash)`. Distinct providers = replica peers (custodian stewards). `resource_quantity_value` is the bytes committed.
+- `custodian_blob_commitments` reads → query `rea_commitments` filtered by `action.eq("custody-blob")` (or the relevant kind), `resource_classified_as.eq(blob_hash)`. Distinct providers = replica peers (custodian stewards). `resource_quantity_value` is the bytes committed.
 - `content_store.reach_class` reads → `epr_atoms.reach` (column already exists; join via blob_hash → epr_atom mapping if needed, or read reach from a related epr_atom row).
 
 The schemas and view shapes (T04-T11) do not change — only the SQL queries inside the service implementations.

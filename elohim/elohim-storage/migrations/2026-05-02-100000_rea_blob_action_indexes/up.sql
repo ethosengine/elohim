@@ -7,6 +7,11 @@
 --   serve-blob   (event)      — doorway-steward fulfills the projection
 --   custody-blob (commitment) — peer steward commits N bytes of custody
 --
+-- Note: extends the existing single-column action indexes
+-- (idx_rea_commitment_action, idx_event_action) with resource-column
+-- coverage for the (action, blob_hash) query pattern. Not redundant —
+-- SQLite cannot satisfy the composite filter from the single-column index.
+--
 -- Index choice:
 --   - economic_events has `resource_inventoried_as` (the blob_hash for serve-blob).
 --   - rea_commitments has `resource_classified_as` (the blob_hash for
