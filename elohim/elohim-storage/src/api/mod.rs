@@ -17,6 +17,7 @@
 pub mod account;
 pub mod agreements;
 pub mod attestations;
+pub mod blob;
 pub mod comments;
 pub mod compute;
 pub mod contributors;
@@ -145,6 +146,12 @@ pub async fn handle_api_request(
     } else if sub_path.starts_with("attestations") {
         let resource_path = sub_path.strip_prefix("attestations").unwrap_or("");
         attestations::handle(req, method, resource_path, &pool, &app_ctx).await
+    } else if sub_path.starts_with("blob/") {
+        // Phase 5 T29: /api/v1/blob/{hash}/distribution/details
+        // Note: the `/blob/` raw-bytes route is NOT under /api/v1/ (handled at
+        // the outer http.rs dispatcher); this prefix is for blob-scoped views only.
+        let resource_path = sub_path.strip_prefix("blob").unwrap_or("");
+        blob::handle(req, method, resource_path, &pool, &app_ctx).await
     } else if sub_path.starts_with("comments") {
         let resource_path = sub_path.strip_prefix("comments").unwrap_or("");
         comments::handle(req, method, resource_path, &pool, &app_ctx, services).await

@@ -997,8 +997,7 @@ fn extract_agent_key(
 /// gains a parallel `agent_cid` column. This helper's signature does not
 /// change. The P2P design gate fires again at that point to add the cache
 /// fields and audit the SQL JOIN behavior.
-#[allow(dead_code)] // Wired by Phase 5 handlers (T29-T32) following this commit.
-fn extract_agent_cid(
+pub(crate) fn extract_agent_cid(
     req: &Request<Incoming>,
     conn: &mut diesel::SqliteConnection,
 ) -> Result<Option<String>, StorageError> {
