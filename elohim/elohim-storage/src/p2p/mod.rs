@@ -772,6 +772,17 @@ pub enum P2PCommand {
         hash: String,
         reply: tokio::sync::oneshot::Sender<Result<Vec<u8>, String>>,
     },
+    /// T23 review fix #2: trigger a custody reconcile pass from the
+    /// `ConnectionEstablished` swarm event, decoupling the reconcile work
+    /// from the swarm event-loop task. Without this, the event loop awaits
+    /// `run_custody_reconcile()` inline (which runs sync diesel queries),
+    /// head-of-line-blocking inventory snapshots and identity handshakes
+    /// from peers that just connected during a reconnect burst.
+    ///
+    /// Sent via `command_tx.try_send` (non-blocking) so a saturated queue
+    /// drops the trigger and the timer-tick cadence picks up the slack.
+    /// Fire-and-forget; no reply.
+    TriggerCustodyReconcile,
 }
 
 /// RAII guard that resumes P2P sync when dropped.
@@ -900,6 +911,7 @@ impl P2PHandle {
                                 .send(Err("FetchBlob not yet implemented; Stage 1 placeholder"
                                     .to_string()));
                     }
+                    P2PCommand::TriggerCustodyReconcile => {} // T23: no swarm in test, no-op
                 }
             }
         });
@@ -1597,6 +1609,32 @@ impl P2PNode {
             }
         };
 
+        // T23 review fix #4: warn (once per pass) if a misconfigured
+        // 0-value will be silently clamped to 1 inside `RaceFetchKicker`.
+        // Single warn at construction; per-kick warnings would spam.
+        if self.config.fetch_blob_timeout_seconds == 0 {
+            warn!(
+                target: "elohim_storage::reconcile",
+                "T23: fetch_blob_timeout_seconds is 0; clamping to 1s"
+            );
+        }
+        if self.config.fetch_blob_parallelism == 0 {
+            warn!(
+                target: "elohim_storage::reconcile",
+                "T23: fetch_blob_parallelism is 0; clamping to 1"
+            );
+        }
+
+        // T23 review fix #1: bound concurrent in-flight kicks at
+        // parallelism * 4 (12 with default parallelism=3). Derived from
+        // existing config so we don't add a new knob. Per-pass scope:
+        // each call to `run_custody_reconcile` constructs a fresh
+        // semaphore. With ConnectionEstablished now routed through
+        // `P2PCommand::TriggerCustodyReconcile` (review fix #2),
+        // reconcile passes serialize on the command lane, so per-pass
+        // bounding is sufficient.
+        let kick_concurrency = self.config.fetch_blob_parallelism.max(1) * 4;
+
         let kicker = RaceFetchKicker {
             command_tx: self.command_tx.clone(),
             connected_peers: self.peer_metrics.clone(),
@@ -1606,6 +1644,7 @@ impl P2PNode {
             fetch_blob_parallelism: self.config.fetch_blob_parallelism,
             fetch_blob_timeout_seconds: self.config.fetch_blob_timeout_seconds,
             metrics: self.reconciliation_metrics.clone(),
+            kick_semaphore: Arc::new(tokio::sync::Semaphore::new(kick_concurrency)),
         };
 
         let cfg = ReconcileConfig {
@@ -2479,6 +2518,13 @@ impl P2PNode {
                     .await
                     .insert(request_id, reply);
             }
+            // T23 review fix #2: ConnectionEstablished triggers reconcile via
+            // this command instead of awaiting it inline, so swarm events
+            // (inventory snapshots, identity handshakes) from a reconnect
+            // burst are not head-of-line-blocked by sync diesel queries.
+            P2PCommand::TriggerCustodyReconcile => {
+                self.run_custody_reconcile().await;
+            }
         }
     }
 
@@ -2804,12 +2850,30 @@ impl P2PNode {
                 // connection so own commitments where this peer is now a
                 // candidate get a kick chance immediately, and other peers'
                 // commitments to us get re-evaluated against fresh
-                // peer_blob_inventory state. The pass acquires no swarm lock
-                // (the inner block above already dropped its guard) and
-                // no-ops silently when self_cid / db_pool are absent. The
-                // placement-gap cooldown inside `reconcile_pass` prevents
-                // duplicate events when many peers connect in a short window.
-                self.run_custody_reconcile().await;
+                // peer_blob_inventory state. No-ops silently when self_cid /
+                // db_pool are absent. The placement-gap cooldown inside
+                // `reconcile_pass` prevents duplicate events when many peers
+                // connect in a short window.
+                //
+                // T23 review fix #2: dispatch via the command channel
+                // instead of awaiting `run_custody_reconcile().await` inline
+                // here. The reconcile pass runs sync diesel queries; under
+                // a reconnect burst, awaiting inline serializes those
+                // queries on the swarm event-loop task and head-of-line-
+                // blocks inventory snapshots / identity handshakes from the
+                // very peers that just connected. `try_send` is
+                // non-blocking — when the queue is full (extreme overload),
+                // the trigger is dropped and the timer tick recovers.
+                if let Err(e) = self
+                    .command_tx
+                    .try_send(P2PCommand::TriggerCustodyReconcile)
+                {
+                    debug!(
+                        target: "elohim_storage::reconcile",
+                        error = ?e,
+                        "T23: failed to queue ConnectionEstablished reconcile trigger; will retry on timer tick"
+                    );
+                }
             }
             SwarmEvent::ConnectionClosed { peer_id, cause, .. } => {
                 debug!(peer = %peer_id, cause = ?cause, "Disconnected from peer");

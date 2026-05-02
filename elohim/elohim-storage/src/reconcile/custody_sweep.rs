@@ -14,12 +14,12 @@
 //!   `reconcile_pass`, and folds the [`super::custody::ReconcileOutcome`]
 //!   into [`crate::p2p::ReconciliationMetrics`].
 //!
-//! The `kicks_fired_total` atomic is incremented inside the spawned task
-//! (one increment per kick) rather than from the synchronous fold path, so
-//! the count reflects work actually scheduled rather than work merely
-//! intended. This matches the spec language ("increments atomics on each
-//! pass") with one extra guarantee: the kick atomic and the spawned fetch
-//! attempt cannot diverge.
+//! The `kicks_fired_total` atomic is incremented synchronously _before_
+//! `tokio::spawn` is called. This counts work _scheduled_ at kick time,
+//! including kicks that race-fetch later finds have no connected
+//! candidates (NoCandidates outcome). The metric serves as a backpressure
+//! signal independent of tokio scheduling. Note that semaphore-dropped
+//! kicks are NOT counted (they didn't reach the metric increment site).
 
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
@@ -66,10 +66,44 @@ pub struct RaceFetchKicker {
     /// task so the atomic survives even if `RaceFetchKicker` is dropped
     /// between `kick()` and resolution.
     pub metrics: Arc<ReconciliationMetrics>,
+    /// Bounds the number of concurrently in-flight spawned kicks.
+    /// When saturated, additional kicks are dropped with a debug log; the
+    /// next sweep tick will retry. Sized at `fetch_blob_parallelism * 4`
+    /// by default (12 with default parallelism=3).
+    ///
+    /// **Scope:** the semaphore is constructed per-reconcile-pass in
+    /// [`crate::p2p::P2PNode::run_custody_reconcile`] (not stored on
+    /// `P2PNode`). This means the bound applies within a single pass's
+    /// spawned tasks; overlapping passes (timer + ConnectionEstablished
+    /// trigger collision) each get their own fresh full semaphore. With
+    /// the T23 review-fix #2 change that routes ConnectionEstablished
+    /// through `P2PCommand::TriggerCustodyReconcile`, reconciliation is
+    /// serialized on a single execution lane, so in-pass-only bounding
+    /// is the correct shape.
+    pub kick_semaphore: Arc<tokio::sync::Semaphore>,
 }
 
 impl FetchKicker for RaceFetchKicker {
     fn kick(&self, blob_hash: &str, candidates: Vec<String>) {
+        // T23 review fix #1: bound concurrent in-flight kicks via a
+        // semaphore. Under reconnect bursts (cluster restart) an unbounded
+        // spawn-per-(missing × candidate) explosion could exhaust the r2d2
+        // pool and overload the scheduler. When saturated we drop the kick
+        // and log; the next sweep tick will retry. Dropped kicks are NOT
+        // counted in `kicks_fired_total` (the metric increments below this
+        // gate), so the metric reflects work actually scheduled.
+        let permit = match self.kick_semaphore.clone().try_acquire_owned() {
+            Ok(p) => p,
+            Err(_) => {
+                debug!(
+                    target: "elohim_storage::reconcile",
+                    hash = %blob_hash,
+                    "T23: kick backpressure — semaphore saturated, dropping; next sweep will retry"
+                );
+                return;
+            }
+        };
+
         let cmd_tx = self.command_tx.clone();
         let connected = self.connected_peers.clone();
         let pool = self.db_pool.clone();
@@ -85,7 +119,14 @@ impl FetchKicker for RaceFetchKicker {
         metrics.kicks_fired_total.fetch_add(1, Ordering::Relaxed);
 
         tokio::spawn(async move {
-            // Snapshot connected peers at kick time. `race_fetch` then
+            // Hold the semaphore permit for the lifetime of the spawned
+            // task; it drops (releasing one slot) when this future
+            // resolves, making the bound a true in-flight cap.
+            let _permit = permit;
+            // Snapshot connected peers at task start (post-spawn).
+            // Disconnects racing with this snapshot cause benign fetch
+            // misses; reconnects are picked up on the next sweep tick.
+            // DashMap iter is atomic at entry granularity. `race_fetch`
             // filters its candidate batch through this `is_connected`
             // closure so disconnects mid-batch are observed but
             // reconnects mid-batch are not (acceptable; the next sweep
@@ -208,6 +249,7 @@ mod tests {
             fetch_blob_parallelism: 2,
             fetch_blob_timeout_seconds: 1,
             metrics: metrics.clone(),
+            kick_semaphore: Arc::new(tokio::sync::Semaphore::new(8)),
         };
 
         kicker.kick(
@@ -226,5 +268,42 @@ mod tests {
         // Yield so the spawned tasks can resolve to NoCandidates without
         // leaking into other tests.
         tokio::task::yield_now().await;
+    }
+
+    /// T23 review fix #1: when the kick semaphore is saturated (here: zero
+    /// permits ever issued), `kick()` must drop the kick — no spawn, no
+    /// metric increment. The next sweep tick is the recovery path.
+    #[tokio::test]
+    async fn kick_dropped_when_semaphore_saturated() {
+        let (cmd_tx, _cmd_rx) = mpsc::channel::<P2PCommand>(8);
+        let metrics = Arc::new(ReconciliationMetrics::default());
+        let kicker = RaceFetchKicker {
+            command_tx: cmd_tx,
+            connected_peers: Arc::new(DashMap::new()),
+            db_pool: test_pool(),
+            blob_store: Arc::new(BlobStore::new_memory()),
+            self_cid: "self-cid-fixture".into(),
+            fetch_blob_parallelism: 2,
+            fetch_blob_timeout_seconds: 1,
+            metrics: metrics.clone(),
+            // Zero permits: every try_acquire_owned() fails immediately.
+            kick_semaphore: Arc::new(tokio::sync::Semaphore::new(0)),
+        };
+
+        kicker.kick(
+            "sha256-cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            vec!["peer-A".into()],
+        );
+
+        // Yield so any (unexpected) spawned task could run; semaphore drop
+        // is synchronous so this assertion would already hold without the
+        // yield, but we want to be defensive about scheduling races.
+        tokio::task::yield_now().await;
+
+        assert_eq!(
+            metrics.kicks_fired_total.load(Ordering::Relaxed),
+            0,
+            "saturated-semaphore kicks must NOT increment kicks_fired_total"
+        );
     }
 }
