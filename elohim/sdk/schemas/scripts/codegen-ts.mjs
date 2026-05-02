@@ -90,6 +90,7 @@ const INTERFACE_FILES = [
   { src: 'views/dashboard-federation-peer.ts', dest: 'dashboard-federation-peer.ts' },
   { src: 'views/projection-coverage.ts', dest: 'projection-coverage.ts' },
   { src: 'views/public-surface-state.ts', dest: 'public-surface-state.ts' },
+  { src: 'views/view-slice.ts', dest: 'view-slice.ts' },
 ];
 
 /**

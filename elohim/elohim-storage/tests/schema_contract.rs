@@ -1993,6 +1993,60 @@ fn reciprocity_view_matches_schema() {
 }
 
 #[test]
+fn view_slice_cluster_matches_schema() {
+    use elohim_storage::views::{Freshness, FreshnessState, JsonVal, ViewKind, ViewSlice};
+
+    let sample = ViewSlice {
+        peer_id: "12D3KooWMatthewLaptop".into(),
+        view_kind: ViewKind::Cluster,
+        freshness: Freshness {
+            state: FreshnessState::Live,
+            stale_since_ms: None,
+        },
+        payload: JsonVal(serde_json::json!({
+            "agentCid": "agent_abc123",
+            "devices": [],
+            "totals": {
+                "storageUsedBytes": 0,
+                "storageTotalBytes": 0,
+                "externalCommittedBytes": 0,
+                "reciprocityNetBytes": 0
+            },
+            "freshness": {"state": "live"}
+        })),
+        signature: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA".into(),
+    };
+
+    let json = serde_json::to_value(&sample).unwrap();
+    validate_against_schema("views/view-slice.schema.json", &json);
+}
+
+#[test]
+fn view_slice_peer_topology_matches_schema() {
+    use elohim_storage::views::{Freshness, FreshnessState, JsonVal, ViewKind, ViewSlice};
+
+    let sample = ViewSlice {
+        peer_id: "12D3KooWJessicaPhone".into(),
+        view_kind: ViewKind::PeerTopology,
+        freshness: Freshness {
+            state: FreshnessState::Stale,
+            stale_since_ms: Some(60_000),
+        },
+        payload: JsonVal(serde_json::json!({
+            "agentCid": "agent_jess",
+            "edges": [],
+            "reciprocationCount": 0,
+            "resilienceCliffs": [],
+            "freshness": {"state": "stale", "staleSinceMs": 60000}
+        })),
+        signature: "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB".into(),
+    };
+
+    let json = serde_json::to_value(&sample).unwrap();
+    validate_against_schema("views/view-slice.schema.json", &json);
+}
+
+#[test]
 fn doorway_dashboard_view_matches_schema() {
     use elohim_storage::views::{
         DashboardFederationPeer, DashboardSteward, DeviceArchetype, DoorwayDashboardView,

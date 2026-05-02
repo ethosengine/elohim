@@ -7462,3 +7462,26 @@ pub struct DoorwayDashboardView {
     pub projection_coverage: ProjectionCoverage,
     pub public_surface: PublicSurfaceState,
 }
+
+/// Which kind of view a federation slice represents.
+#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq, Hash)]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+#[serde(rename_all = "snake_case")]
+pub enum ViewKind {
+    Cluster,
+    PeerTopology,
+}
+
+/// Per-device slice returned over the view-federation/1.0.0 libp2p protocol;
+/// signed by the responding peer's agent key. The meta-shape that federates
+/// cluster + topology views across household peers.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+#[serde(rename_all = "camelCase")]
+pub struct ViewSlice {
+    pub peer_id: String,
+    pub view_kind: ViewKind,
+    pub freshness: Freshness,
+    pub payload: JsonVal,
+    pub signature: String,
+}
