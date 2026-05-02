@@ -56,7 +56,11 @@ pub struct DoorwayDashboardView {
 pub struct DashboardSteward {
     /// Peer identifier (agent pub key or node id).
     pub peer_id: String,
-    /// Device archetype string — uses String for now; enum import deferred.
+    /// Device archetype string.
+    ///
+    /// TODO(Phase 5): replace with the DeviceArchetype enum once it is published
+    /// in a doorway-reachable crate. Field is currently unreachable because
+    /// `storage_stewards` is empty in Phase 4.
     pub archetype: String,
     /// Human-readable display name, when known.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -142,9 +146,15 @@ pub struct PublicSurfaceState {
 /// Errors produced by the dashboard topology service.
 #[derive(Debug, Error)]
 pub enum DashboardError {
+    /// Returned when federation peer enumeration fails.
+    /// TODO(Phase 5): constructed once `collect_federation_peers` performs
+    /// liveness/direction probes that can fail.
     #[error("federation error: {0}")]
     Federation(String),
 
+    /// Returned when projection-coverage metrics cannot be read.
+    /// TODO(Phase 5): constructed once projection cache exposes its own
+    /// hits/misses split distinct from `CacheStats`.
     #[error("metrics error: {0}")]
     Metrics(String),
 }
@@ -294,13 +304,13 @@ pub fn build_public_surface(hostname: &str) -> PublicSurfaceState {
     let _ = hostname; // consumed by Phase 5 probes
     PublicSurfaceState {
         // Phase 4 stub: assume DNS resolves for any configured hostname.
-        dns_resolves: true,
+        dns_resolves: true, // Phase 4 stub: no probe; assume the configured hostname is resolvable.
         dns_target: Some("127.0.0.1".into()),
         // Phase 4 stub: TLS probe not wired; assume invalid until probed.
         tls_valid: false,
         tls_expires_in_days: None,
         // Phase 4 stub: reachability probe not wired.
-        public_reachable: true,
+        public_reachable: true, // Phase 4 stub: no external probe yet.
     }
 }
 
@@ -324,6 +334,10 @@ pub fn parse_direction(s: &str) -> FederationDirection {
 /// - `"https://parish.elohim.host"` → `"parish.elohim.host"`
 /// - `"https://parish.elohim.host/path"` → `"parish.elohim.host"`
 /// - `"parish.elohim.host"` → `"parish.elohim.host"`
+///
+/// Best-effort host extraction from a peer URL. Trims scheme + path; does NOT
+/// strip ports or handle IPv6 brackets. Peer URLs are expected to be
+/// well-formed and host-only or host:port for display.
 pub fn parse_hostname_from_url(url: &str) -> String {
     url.trim_start_matches("https://")
         .trim_start_matches("http://")
