@@ -31,6 +31,7 @@
 pub mod adapters;
 pub mod attention_tending;
 pub mod behaviour;
+pub mod blob_fetch;
 pub mod dedup;
 pub mod epr_atom_protocol;
 pub mod epr_protocol;
@@ -657,6 +658,20 @@ pub enum P2PCommand {
     /// as a libp2p request-response message. The next periodic snapshot from
     /// the source peer will close the gap naturally in the interim.
     SnapshotRequest { peer_id: libp2p::PeerId },
+    /// T17: fetch a blob from a specific peer. Used by the race-fetch helper
+    /// (`p2p::blob_fetch::race_fetch`) for GET-time fallback and custody-driven kicks.
+    ///
+    /// Stage 1 stub — sends `Err("FetchBlob not yet implemented; Stage 1 placeholder")`
+    /// via the reply oneshot. The race-fetch helper's control flow, hash verification,
+    /// persistence, and serve-blob emission are all exercised by unit tests; the actual
+    /// shard-protocol wiring is Stage 2 work (requires a dedicated blob-fetch request-
+    /// response channel distinct from the shard channel, which picks any peer not a
+    /// specific one).
+    FetchBlob {
+        peer_id: libp2p::PeerId,
+        hash: String,
+        reply: tokio::sync::oneshot::Sender<Result<Vec<u8>, String>>,
+    },
 }
 
 /// RAII guard that resumes P2P sync when dropped.
@@ -773,6 +788,13 @@ impl P2PHandle {
                         let _ = reply.send(None);
                     }
                     P2PCommand::SnapshotRequest { .. } => {} // T14 Stage-1 placeholder
+                    P2PCommand::FetchBlob { reply, .. } => {
+                        // T17 Stage-1 stub: no swarm in test.
+                        let _ =
+                            reply
+                                .send(Err("FetchBlob not yet implemented; Stage 1 placeholder"
+                                    .to_string()));
+                    }
                 }
             }
         });
@@ -1967,6 +1989,26 @@ impl P2PNode {
                     peer_id = %peer_id,
                     "SnapshotRequest queued; Stage 1 placeholder — relying on next periodic snapshot"
                 );
+            }
+            // T17: Stage-1 placeholder — send Err so the race-fetch helper
+            // can exercise its full control-flow (Miss) path. Stage 2 will wire
+            // this to a dedicated blob-fetch request-response channel that targets
+            // the explicit peer_id (FetchShard picks any connected peer, not one
+            // specific peer — a different shape that requires new infrastructure).
+            P2PCommand::FetchBlob {
+                peer_id,
+                hash,
+                reply,
+            } => {
+                debug!(
+                    target: "elohim_storage::blob_fetch",
+                    peer_id = %peer_id,
+                    hash = %hash,
+                    "FetchBlob: Stage 1 placeholder — not yet wired to shard protocol"
+                );
+                let _ = reply.send(Err(
+                    "FetchBlob not yet implemented; Stage 1 placeholder".to_string()
+                ));
             }
         }
     }

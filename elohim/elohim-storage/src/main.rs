@@ -336,6 +336,23 @@ async fn async_main(
             config.inventory_freshness_seconds = n;
         }
     }
+    if let Ok(v) = std::env::var("FETCH_BLOB_TIMEOUT_SECONDS") {
+        if let Ok(n) = v.parse::<u64>() {
+            config.fetch_blob_timeout_seconds = n;
+        }
+    }
+    if let Ok(v) = std::env::var("FETCH_BLOB_PARALLELISM") {
+        if let Ok(n) = v.parse::<usize>() {
+            if n > 0 {
+                config.fetch_blob_parallelism = n;
+            }
+        }
+    }
+    if let Ok(v) = std::env::var("SELF_CID") {
+        if !v.is_empty() {
+            config.self_cid = Some(v);
+        }
+    }
 
     info!(
         storage_dir = %config.storage_dir.display(),
@@ -845,7 +862,9 @@ async fn async_main(
     let mut http_server = HttpServer::new(blob_store.clone(), http_addr)
         .with_progress_hub(Arc::clone(&progress_hub))
         .with_elohim_capability(elohim_capability)
-        .with_write_through_state(write_through_state.clone());
+        .with_write_through_state(write_through_state.clone())
+        // T17: race-fetch parameters (timeout, parallelism, self-CID).
+        .with_fetch_config(&config);
 
     if args.embedded_conductor {
         http_server = http_server.with_embedded_conductor();

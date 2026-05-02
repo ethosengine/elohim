@@ -183,6 +183,14 @@ pub struct HttpServer {
     /// project_signal + back_prop_one_hop + flood_feedback end-to-end.
     /// When absent (no P2P swarm, test fixtures), fan-out steps are skipped gracefully.
     fan_out_ctx: Option<Arc<crate::api::epr::EprFanOutCtx>>,
+    /// T17: CID of this peer's steward. Populated from `Config::self_cid` at startup.
+    /// Used as the `receiver` field in `serve-blob` REA events emitted on a
+    /// successful GET-time race-fetch.  Empty string when not configured.
+    self_cid: String,
+    /// T17: per-peer timeout for race-fetch (seconds). From `Config::fetch_blob_timeout_seconds`.
+    fetch_blob_timeout_seconds: u64,
+    /// T17: max parallel peer attempts per race-fetch batch. From `Config::fetch_blob_parallelism`.
+    fetch_blob_parallelism: usize,
 }
 
 /// Extract X-Schema-Version header from request and validate it.
@@ -243,6 +251,9 @@ impl HttpServer {
             write_through_state: None,
             hc_registry: None,
             fan_out_ctx: None,
+            self_cid: String::new(),
+            fetch_blob_timeout_seconds: 5,
+            fetch_blob_parallelism: 3,
         }
     }
 
@@ -380,6 +391,16 @@ impl HttpServer {
     #[cfg(feature = "p2p")]
     pub fn with_p2p_handle(mut self, handle: crate::p2p::P2PHandle) -> Self {
         self.p2p_handle = Some(handle);
+        self
+    }
+
+    /// Wire T17 race-fetch parameters from the runtime Config.
+    /// Call this at startup when a `Config` is available so the GET-time
+    /// blob fallback knows its timeout, parallelism, and self-CID.
+    pub fn with_fetch_config(mut self, config: &crate::config::Config) -> Self {
+        self.self_cid = config.self_cid.clone().unwrap_or_default();
+        self.fetch_blob_timeout_seconds = config.fetch_blob_timeout_seconds;
+        self.fetch_blob_parallelism = config.fetch_blob_parallelism;
         self
     }
 
@@ -1521,6 +1542,117 @@ impl HttpServer {
                             .unwrap());
                     }
                     Err(_) => {
+                        // Local miss — attempt peer fallback before returning 404.
+                        // T17: race-fetch helper. Requires P2P feature + db pool.
+                        #[cfg(feature = "p2p")]
+                        if let (Some(ref handle), Some(ref pool)) =
+                            (&self.p2p_handle, &self.db_pool)
+                        {
+                            let fresh_after = (chrono::Utc::now()
+                                - chrono::Duration::seconds(
+                                    // default to 600s if not set
+                                    600,
+                                ))
+                            .format("%Y-%m-%dT%H:%M:%SZ")
+                            .to_string();
+                            let candidates = pool
+                                .get()
+                                .ok()
+                                .and_then(|mut conn| {
+                                    crate::db::peer_blob_inventory::lookup_hosts(
+                                        &mut conn,
+                                        hash,
+                                        &fresh_after,
+                                    )
+                                    .ok()
+                                })
+                                .map(|rows| rows.into_iter().map(|r| r.peer_id).collect::<Vec<_>>())
+                                .unwrap_or_default();
+
+                            if !candidates.is_empty() {
+                                let cmd_tx = handle.command_sender();
+                                let parallelism = self.fetch_blob_parallelism;
+                                let per_peer_timeout =
+                                    std::time::Duration::from_secs(self.fetch_blob_timeout_seconds);
+                                // Snapshot the connected-peer set via ListPeers command;
+                                // use a sync closure for race_fetch that checks membership.
+                                let connected_set: std::collections::HashSet<String> = handle
+                                    .list_peers()
+                                    .await
+                                    .into_iter()
+                                    .map(|p| p.peer_id)
+                                    .collect();
+                                let is_connected = move |peer: &str| connected_set.contains(peer);
+                                let outcome = crate::p2p::blob_fetch::race_fetch(
+                                    hash,
+                                    candidates,
+                                    &cmd_tx,
+                                    is_connected,
+                                    parallelism,
+                                    per_peer_timeout,
+                                )
+                                .await;
+
+                                match outcome {
+                                    crate::p2p::blob_fetch::FetchOutcome::Hit {
+                                        bytes,
+                                        source_peer,
+                                    } => {
+                                        // Persist locally and emit serve-blob event.
+                                        let bytes_len = bytes.len();
+                                        let self_cid = self.self_cid.clone();
+                                        let blob_store = self.blob_store.clone();
+                                        let blob_hash_owned = hash.to_string();
+                                        if let Ok(mut conn) = pool.get() {
+                                            let _ = crate::p2p::blob_fetch::finalize_fetch_success(
+                                                &mut conn,
+                                                hash,
+                                                &source_peer,
+                                                &bytes,
+                                                &self_cid,
+                                                |b| {
+                                                    // blob_store.store is async — we can't call it
+                                                    // inside a sync FnOnce here. Queue a best-effort
+                                                    // background store so finalize records the event
+                                                    // immediately; the bytes are returned in-response.
+                                                    // TODO(T18): replace with blocking_store or
+                                                    // extract finalize into async.
+                                                    let _ = blob_hash_owned.as_str();
+                                                    let _ = b;
+                                                    Ok(())
+                                                },
+                                            );
+                                        }
+                                        // Best-effort async persist (outside finalize).
+                                        let _ = blob_store.store(&bytes).await;
+                                        info!(
+                                            hash = %hash,
+                                            source_peer = %source_peer,
+                                            size = bytes_len,
+                                            "T17: race-fetch hit — blob fetched from peer"
+                                        );
+                                        return Ok(Self::with_cors_headers(Response::builder())
+                                            .status(StatusCode::OK)
+                                            .header(
+                                                header::CONTENT_TYPE,
+                                                "application/octet-stream",
+                                            )
+                                            .header(header::CONTENT_LENGTH, bytes_len)
+                                            .header(
+                                                header::CACHE_CONTROL,
+                                                "public, max-age=31536000, immutable",
+                                            )
+                                            .body(Full::new(Bytes::from(bytes)))
+                                            .unwrap());
+                                    }
+                                    crate::p2p::blob_fetch::FetchOutcome::Miss
+                                    | crate::p2p::blob_fetch::FetchOutcome::NoCandidates => {
+                                        debug!(hash = %hash, "T17: race-fetch miss — returning 404");
+                                    }
+                                }
+                            }
+                        }
+
                         return Ok(Self::with_cors_headers(Response::builder())
                             .status(StatusCode::NOT_FOUND)
                             .body(Full::new(Bytes::from("Blob not found")))

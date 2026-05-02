@@ -120,6 +120,23 @@ pub struct Config {
     /// TTL for peer_blob_inventory entries before they're considered stale.
     #[serde(default = "default_inventory_freshness_seconds")]
     pub inventory_freshness_seconds: u64,
+
+    /// Per-peer timeout for race-fetch blob retrieval (seconds).
+    /// Controls how long the GET-time fallback waits for each peer before
+    /// marking it as a miss and trying the next candidate in the batch.
+    #[serde(default = "default_fetch_blob_timeout_seconds")]
+    pub fetch_blob_timeout_seconds: u64,
+
+    /// Maximum number of peer fetch attempts to run in parallel per batch
+    /// during race-fetch blob retrieval. First verified reply wins.
+    #[serde(default = "default_fetch_blob_parallelism")]
+    pub fetch_blob_parallelism: usize,
+
+    /// CID of this peer's steward (its agent's content-addressed identity).
+    /// Used as `receiver` field in serve-blob REA events emitted on successful
+    /// GET-time race-fetch. Loaded from env `SELF_CID` at boot.
+    #[serde(default)]
+    pub self_cid: Option<String>,
 }
 
 fn default_peer_policy_path() -> PathBuf {
@@ -182,6 +199,14 @@ fn default_inventory_freshness_seconds() -> u64 {
     600
 }
 
+fn default_fetch_blob_timeout_seconds() -> u64 {
+    5
+}
+
+fn default_fetch_blob_parallelism() -> usize {
+    3
+}
+
 impl Default for Config {
     fn default() -> Self {
         Self {
@@ -210,6 +235,9 @@ impl Default for Config {
             placement_gap_cooldown_seconds: default_placement_gap_cooldown_seconds(),
             kick_fetch_per_peer_per_minute: default_kick_fetch_per_peer_per_minute(),
             inventory_freshness_seconds: default_inventory_freshness_seconds(),
+            fetch_blob_timeout_seconds: default_fetch_blob_timeout_seconds(),
+            fetch_blob_parallelism: default_fetch_blob_parallelism(),
+            self_cid: None,
         }
     }
 }
