@@ -1023,7 +1023,7 @@ impl HttpServer {
                 headers.insert(
                     "Access-Control-Allow-Headers",
                     hyper::header::HeaderValue::from_static(
-                        "Content-Type, Authorization, X-Agent-Id, X-Schema-Version, X-Observation-Id",
+                        "Content-Type, Authorization, X-Agent-Id, X-Agent-Cid, X-Schema-Version, X-Observation-Id",
                     ),
                 );
                 Ok(response.map(Either::Left))
@@ -1440,7 +1440,7 @@ impl HttpServer {
             )
             .header(
                 "Access-Control-Allow-Headers",
-                "Content-Type, Authorization, X-Agent-Id, X-Schema-Version",
+                "Content-Type, Authorization, X-Agent-Id, X-Agent-Cid, X-Schema-Version",
             )
             .header("Access-Control-Max-Age", "86400")
             .body(Full::new(Bytes::new()))
