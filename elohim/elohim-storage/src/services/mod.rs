@@ -37,6 +37,7 @@ pub mod epr_service;
 pub mod epr_store;
 pub mod events;
 pub mod exchange_service;
+pub mod federator;
 pub mod floor_protections;
 pub mod gossip_flood;
 pub mod governance_health;
