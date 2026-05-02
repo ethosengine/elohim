@@ -1193,6 +1193,24 @@ diesel::table! {
     }
 }
 
+diesel::table! {
+    peer_blob_inventory (peer_id, blob_hash) {
+        peer_id      -> Text,
+        blob_hash    -> Text,
+        last_seen_at -> Text,
+        source       -> Text,
+        sequence     -> BigInt,
+    }
+}
+
+diesel::table! {
+    peer_inventory_cursor (peer_id) {
+        peer_id       -> Text,
+        last_sequence -> BigInt,
+        last_updated  -> Text,
+    }
+}
+
 // EPR Phase 2B — peer_identity_bindings
 // Source of truth: Holochain DHT (imagodei AgentPeerBinding entry — Task A.2).
 // This table is a Category C operational projection rebuildable from signal replay.
@@ -1428,7 +1446,9 @@ diesel::allow_tables_to_appear_in_same_query!(
     node_stewardship,
     observation_entries,
     observation_sessions,
+    peer_blob_inventory,
     peer_identity_bindings,
+    peer_inventory_cursor,
     peer_statuses,
     placement_gaps,
     portal_hosts,

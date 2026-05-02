@@ -111,6 +111,9 @@ pub mod recovery_witnesses;
 // EPR Phase 2B — peer identity bindings projection (AgentPeerBinding DHT signal)
 pub mod peer_identity_bindings;
 
+// T12 — peer_blob_inventory projection (libp2p gossipsub inventory, Category C operational)
+pub mod peer_blob_inventory;
+
 // Recovery Protocol Phase 2 — M4 revocation projection (KeyRevocation + RevocationVote)
 pub mod key_revocations;
 pub mod revocation_votes;
