@@ -9,16 +9,17 @@
 
 use std::collections::HashSet;
 
-use chrono::DateTime;
+use chrono::{DateTime, Utc};
 use diesel::dsl::sql;
 use diesel::prelude::*;
 use diesel::sql_types::{Float, Nullable};
 use thiserror::Error;
 
-use crate::db::models::PeerIdentityBindingRow;
+use crate::db::models::{PeerIdentityBindingRow, PlacementGapRow};
 use crate::db::DbPool;
 use crate::views::{
-    DistributionSummary, DiversityHint, FetchSource, MyRole, ReachClass, ReplicaHealth,
+    DeviceArchetype, DistributionDetails, DistributionSummary, DiversityHint, FetchSource, JsonVal,
+    MyRole, ProjectorIdentity, ReachClass, ReplicaHealth, ReplicaPeer,
 };
 
 // ============================================================================
@@ -230,6 +231,186 @@ fn parse_reach_class(s: &str) -> Option<ReachClass> {
         _ => None,
     }
 }
+
+// ============================================================================
+// compose_distribution_details (T24)
+// ============================================================================
+
+/// Compose a `DistributionDetails` — a lazy-fetched superset of the summary
+/// for developer/operator drill-down. Stubs `projector_identities` and
+/// `recent_projection_events` until those substrate sources land.
+pub async fn compose_distribution_details(
+    pool: &DbPool,
+    blob_hash: &str,
+    ctx: DistributionContext<'_>,
+) -> Result<DistributionDetails, DistributionViewError> {
+    // Fan-in: build the summary first (reuses T23's logic).
+    let summary_ctx = ctx_for_summary(&ctx);
+    let summary = compose_distribution_summary(pool, blob_hash, summary_ctx).await?;
+
+    let mut conn = pool
+        .get()
+        .map_err(|e| DistributionViewError::Pool(e.to_string()))?;
+
+    let replica_peers = load_replica_peers_full(&mut conn, blob_hash)?;
+    // TODO(Phase 4 follow-up): wire projector identities once doorway_projector_acks lands.
+    let projector_identities: Vec<ProjectorIdentity> = vec![];
+    let placement_gaps = load_placement_gaps_for(&mut conn, blob_hash)?;
+    // TODO(Phase 4 follow-up): wire projection events once a projection-events log exists.
+    let recent_projection_events: Vec<JsonVal> = vec![];
+
+    let commitment_references = match &ctx {
+        DistributionContext::Visitor => None,
+        DistributionContext::Steward { bindings, .. } => {
+            let my_peers: Vec<&str> = bindings.iter().map(|b| b.peer_id.as_str()).collect();
+            Some(load_commitment_refs(&mut conn, blob_hash, &my_peers)?)
+        }
+    };
+
+    Ok(DistributionDetails {
+        summary,
+        replica_peers,
+        projector_identities,
+        placement_gaps,
+        recent_projection_events,
+        commitment_references,
+    })
+}
+
+/// Re-construct a `DistributionContext` for re-use without consuming `ctx`.
+fn ctx_for_summary<'a>(ctx: &'a DistributionContext<'a>) -> DistributionContext<'a> {
+    match ctx {
+        DistributionContext::Visitor => DistributionContext::Visitor,
+        DistributionContext::Steward {
+            agent_cid,
+            bindings,
+        } => DistributionContext::Steward {
+            agent_cid,
+            bindings,
+        },
+    }
+}
+
+/// Load full `ReplicaPeer` rows for the given blob from `peer_blob_inventory`,
+/// left-joined with `peer_identity_bindings` to pick up `device_archetype`.
+///
+/// Multiple binding rows for the same `peer_id` (different agent_cids sharing
+/// a node) are deduplicated: the first archetype returned by the LEFT JOIN is
+/// used. If no binding row exists for a peer, `DeviceArchetype::Node` is used.
+fn load_replica_peers_full(
+    conn: &mut diesel::SqliteConnection,
+    blob_hash: &str,
+) -> Result<Vec<ReplicaPeer>, DistributionViewError> {
+    use crate::db::diesel_schema::peer_blob_inventory::dsl as inv;
+    use crate::db::diesel_schema::peer_identity_bindings::dsl as bind;
+
+    let rows: Vec<(String, String, Option<String>)> = inv::peer_blob_inventory
+        .filter(inv::blob_hash.eq(blob_hash))
+        .left_join(bind::peer_identity_bindings.on(bind::peer_id.eq(inv::peer_id)))
+        .select((
+            inv::peer_id,
+            inv::last_seen_at,
+            bind::device_archetype.nullable(),
+        ))
+        .load::<(String, String, Option<String>)>(conn)?;
+
+    // Deduplicate by peer_id (the LEFT JOIN can multiply rows when a peer has
+    // bindings under multiple agent_cids).
+    let mut seen: HashSet<String> = HashSet::new();
+    let now_seconds = Utc::now().timestamp().max(0) as u64;
+    let mut out: Vec<ReplicaPeer> = Vec::new();
+    for (peer_id, last_seen_at, archetype) in rows {
+        if !seen.insert(peer_id.clone()) {
+            continue;
+        }
+        let last_seen_seconds = DateTime::parse_from_rfc3339(&last_seen_at)
+            .map(|dt| {
+                let secs = dt.timestamp().max(0) as u64;
+                now_seconds.saturating_sub(secs)
+            })
+            .unwrap_or(0);
+        out.push(ReplicaPeer {
+            peer_id,
+            device_archetype: parse_archetype(archetype.as_deref().unwrap_or("node")),
+            last_seen_seconds,
+            hop_hint: None,
+            household_id: None,
+            region_tier: None,
+        });
+    }
+    Ok(out)
+}
+
+/// Parse a `device_archetype` string from the `peer_identity_bindings` row
+/// into the `DeviceArchetype` enum. Defaults to `Node` for unrecognized
+/// values (matches the schema's default-on-backfill behaviour).
+fn parse_archetype(s: &str) -> DeviceArchetype {
+    match s {
+        "desktop" => DeviceArchetype::Desktop,
+        "mobile" => DeviceArchetype::Mobile,
+        "steward" => DeviceArchetype::Steward,
+        _ => DeviceArchetype::Node,
+    }
+}
+
+/// Load placement_gap rows for the given blob_hash (matched on `shard_hash`).
+/// Each row is serialized as a `JsonVal` for the open-shape view field.
+fn load_placement_gaps_for(
+    conn: &mut diesel::SqliteConnection,
+    blob_hash: &str,
+) -> Result<Vec<JsonVal>, DistributionViewError> {
+    use crate::db::diesel_schema::placement_gaps::dsl as g;
+
+    let rows: Vec<PlacementGapRow> = g::placement_gaps
+        .filter(g::shard_hash.eq(blob_hash))
+        .load::<PlacementGapRow>(conn)?;
+
+    Ok(rows
+        .into_iter()
+        .map(|r| {
+            JsonVal(serde_json::json!({
+                "id": r.id,
+                "contentId": r.content_id,
+                "shardHash": r.shard_hash,
+                "hAppId": r.h_app_id,
+                "requestedStewardCount": r.requested_steward_count,
+                "achievedStewardCount": r.achieved_steward_count,
+                "contractCoverage": r.contract_coverage,
+                "gapKind": r.gap_kind,
+                "firstSeenAt": r.first_seen_at,
+                "lastSeenAt": r.last_seen_at,
+            }))
+        })
+        .collect())
+}
+
+/// Load rea_commitment IDs where (`action='custody-blob'` AND
+/// `resource_classified_as=blob_hash`) AND (provider OR receiver is one of my_peers).
+fn load_commitment_refs(
+    conn: &mut diesel::SqliteConnection,
+    blob_hash: &str,
+    my_peers: &[&str],
+) -> Result<Vec<String>, DistributionViewError> {
+    if my_peers.is_empty() {
+        return Ok(vec![]);
+    }
+    use crate::db::diesel_schema::rea_commitments::dsl as rc;
+    let rows: Vec<String> = rc::rea_commitments
+        .filter(rc::action.eq("custody-blob"))
+        .filter(rc::resource_classified_as.eq(blob_hash))
+        .filter(
+            rc::provider
+                .eq_any(my_peers)
+                .or(rc::receiver.eq_any(my_peers)),
+        )
+        .select(rc::id)
+        .load::<String>(conn)?;
+    Ok(rows)
+}
+
+// ============================================================================
+// Internal helpers (T23)
+// ============================================================================
 
 /// Compute the steward's reciprocity hint:
 ///   outflow = SUM(resource_quantity_value) WHERE provider IN (my_peer_ids)

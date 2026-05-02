@@ -1,21 +1,23 @@
-//! Integration tests for `services::distribution_view::compose_distribution_summary`.
+//! Integration tests for `services::distribution_view` — both
+//! `compose_distribution_summary` (T23) and `compose_distribution_details` (T24).
 //!
 //! Uses the shared `elohim_storage::test_util::test_pool` in-memory SQLite pattern.
-//! All tests are async (tokio) because `compose_distribution_summary` is async.
+//! All tests are async (tokio) because the compose functions are async.
 
 use diesel::prelude::*;
 use diesel::RunQueryDsl;
 use elohim_storage::db::diesel_schema::{
-    content, peer_blob_inventory, peer_identity_bindings, rea_commitments,
+    content, peer_blob_inventory, peer_identity_bindings, placement_gaps, rea_commitments,
 };
 use elohim_storage::db::models::{
-    NewPeerBlobInventoryRow, NewPeerIdentityBindingRow, NewReaCommitment,
+    NewPeerBlobInventoryRow, NewPeerIdentityBindingRow, NewPlacementGap, NewReaCommitment,
 };
 use elohim_storage::services::distribution_view::{
-    compose_distribution_summary, replica_health_for, replica_target_for, DistributionContext,
+    compose_distribution_details, compose_distribution_summary, replica_health_for,
+    replica_target_for, DistributionContext,
 };
 use elohim_storage::test_util::test_pool;
-use elohim_storage::views::{DiversityHint, MyRole, ReachClass, ReplicaHealth};
+use elohim_storage::views::{DeviceArchetype, DiversityHint, MyRole, ReachClass, ReplicaHealth};
 
 // ============================================================================
 // Pure function tests
@@ -348,5 +350,315 @@ async fn reciprocity_hint_steward_outflow_only() {
         summary.reciprocity_hint,
         Some(150),
         "outflow-only reciprocity should be 150"
+    );
+}
+
+// ============================================================================
+// T24 seeding helpers
+// ============================================================================
+
+fn seed_placement_gap(conn: &mut SqliteConnection, id: &str, shard_hash: &str) {
+    diesel::insert_or_ignore_into(placement_gaps::table)
+        .values(&NewPlacementGap {
+            id,
+            content_id: &format!("content-{shard_hash}"),
+            shard_hash,
+            h_app_id: "lamad",
+            requested_steward_count: 6,
+            achieved_steward_count: 2,
+            contract_coverage: 0.33,
+            gap_kind: "under-replicated",
+            first_seen_at: "2026-05-01T00:00:00Z",
+            last_seen_at: "2026-05-02T00:00:00Z",
+        })
+        .execute(conn)
+        .expect("seed placement_gap");
+}
+
+fn seed_rea_commitment_for_blob(
+    conn: &mut SqliteConnection,
+    id: &str,
+    blob_hash: &str,
+    provider: &str,
+    receiver: &str,
+) {
+    diesel::insert_or_ignore_into(rea_commitments::table)
+        .values(&NewReaCommitment {
+            id,
+            h_app_id: "lamad",
+            action: "custody-blob",
+            provider,
+            receiver,
+            resource_conforms_to: None,
+            resource_classified_as: Some(blob_hash),
+            resource_quantity_value: Some(1024.0),
+            resource_quantity_unit: Some("bytes"),
+            effort_quantity_value: None,
+            effort_quantity_unit: None,
+            has_beginning: None,
+            has_end: None,
+            due: None,
+            clause_of: None,
+            in_scope_of: None,
+            medium_of_exchange_id: None,
+            state: "active",
+            finished: 0,
+            note: None,
+            metadata_json: None,
+            dht_anchor_hash: None,
+        })
+        .execute(conn)
+        .expect("seed rea_commitment_for_blob");
+}
+
+fn seed_binding_with_archetype(
+    conn: &mut SqliteConnection,
+    peer_id: &str,
+    agent_cid: &str,
+    archetype: &str,
+) {
+    diesel::insert_or_ignore_into(peer_identity_bindings::table)
+        .values(&NewPeerIdentityBindingRow {
+            peer_id: peer_id.to_string(),
+            agent_cid: agent_cid.to_string(),
+            dht_anchor_hash: format!("anchor-{peer_id}"),
+            valid_from: "2026-04-01T00:00:00Z".to_string(),
+            valid_until: None,
+            observed_at: "2026-04-01T00:00:00Z".to_string(),
+            source: "dht".to_string(),
+            device_archetype: archetype.to_string(),
+            superseded_by: None,
+        })
+        .execute(conn)
+        .expect("seed binding with archetype");
+}
+
+fn load_bindings_for_agent(
+    pool: &elohim_storage::db::DbPool,
+    agent_cid: &str,
+) -> Vec<elohim_storage::db::models::PeerIdentityBindingRow> {
+    let mut conn = pool.get().unwrap();
+    use elohim_storage::db::diesel_schema::peer_identity_bindings::dsl as pib;
+    pib::peer_identity_bindings
+        .filter(pib::agent_cid.eq(agent_cid))
+        .load::<elohim_storage::db::models::PeerIdentityBindingRow>(&mut conn)
+        .unwrap()
+}
+
+// ============================================================================
+// T24 integration tests — compose_distribution_details
+// ============================================================================
+
+#[tokio::test]
+async fn details_includes_full_replica_peers() {
+    let pool = test_pool();
+    let hash = "hash_details_5peers";
+    {
+        let mut conn = pool.get().unwrap();
+        seed_content_with_reach(&mut conn, hash, "neighborhood");
+        for i in 0..5 {
+            seed_inventory(&mut conn, &format!("peer-det-{i}"), hash);
+        }
+    }
+
+    let details = compose_distribution_details(&pool, hash, DistributionContext::Visitor)
+        .await
+        .expect("compose_distribution_details should succeed");
+
+    assert_eq!(
+        details.summary.replica_count, 5,
+        "summary replica_count == 5"
+    );
+    assert_eq!(details.replica_peers.len(), 5, "replica_peers.len() == 5");
+    // All archetypes must be valid DeviceArchetype variants (no binding rows → Node)
+    for peer in &details.replica_peers {
+        assert_eq!(
+            peer.device_archetype,
+            DeviceArchetype::Node,
+            "no binding → Node default"
+        );
+    }
+}
+
+#[tokio::test]
+async fn details_replica_peers_pick_up_archetype_from_bindings() {
+    let pool = test_pool();
+    let hash = "hash_archetype_pickup";
+    let agent_cid = "agent-archetype-test";
+    {
+        let mut conn = pool.get().unwrap();
+        seed_content_with_reach(&mut conn, hash, "household");
+        // Seed peers with different archetypes via bindings
+        seed_inventory(&mut conn, "peer-arch-desktop", hash);
+        seed_inventory(&mut conn, "peer-arch-mobile", hash);
+        seed_inventory(&mut conn, "peer-arch-node", hash);
+        seed_binding_with_archetype(&mut conn, "peer-arch-desktop", agent_cid, "desktop");
+        seed_binding_with_archetype(&mut conn, "peer-arch-mobile", agent_cid, "mobile");
+        seed_binding_with_archetype(&mut conn, "peer-arch-node", agent_cid, "node");
+    }
+
+    let details = compose_distribution_details(&pool, hash, DistributionContext::Visitor)
+        .await
+        .expect("compose should succeed");
+
+    assert_eq!(details.replica_peers.len(), 3);
+
+    let by_id: std::collections::HashMap<_, _> = details
+        .replica_peers
+        .iter()
+        .map(|p| (p.peer_id.as_str(), &p.device_archetype))
+        .collect();
+
+    assert_eq!(by_id["peer-arch-desktop"], &DeviceArchetype::Desktop);
+    assert_eq!(by_id["peer-arch-mobile"], &DeviceArchetype::Mobile);
+    assert_eq!(by_id["peer-arch-node"], &DeviceArchetype::Node);
+}
+
+#[tokio::test]
+async fn details_replica_peers_default_to_node_without_binding() {
+    let pool = test_pool();
+    let hash = "hash_no_binding_node_default";
+    {
+        let mut conn = pool.get().unwrap();
+        seed_content_with_reach(&mut conn, hash, "private");
+        seed_inventory(&mut conn, "peer-unbound-1", hash);
+        seed_inventory(&mut conn, "peer-unbound-2", hash);
+        // No peer_identity_bindings rows for these peers
+    }
+
+    let details = compose_distribution_details(&pool, hash, DistributionContext::Visitor)
+        .await
+        .expect("compose should succeed");
+
+    assert_eq!(details.replica_peers.len(), 2);
+    for peer in &details.replica_peers {
+        assert_eq!(
+            peer.device_archetype,
+            DeviceArchetype::Node,
+            "peers without binding row must default to Node"
+        );
+    }
+}
+
+#[tokio::test]
+async fn details_visitor_no_commitment_references() {
+    let pool = test_pool();
+    let hash = "hash_visitor_no_refs";
+    {
+        let mut conn = pool.get().unwrap();
+        seed_content_with_reach(&mut conn, hash, "community");
+        seed_inventory(&mut conn, "peer-x", hash);
+    }
+
+    let details = compose_distribution_details(&pool, hash, DistributionContext::Visitor)
+        .await
+        .expect("compose should succeed");
+
+    assert!(
+        details.commitment_references.is_none(),
+        "Visitor context must yield None commitment_references"
+    );
+}
+
+#[tokio::test]
+async fn details_steward_includes_commitment_references() {
+    let pool = test_pool();
+    let hash = "hash_test";
+    let agent_cid = "agent-steward-refs";
+    let my_peer = "peer_M_desktop";
+    {
+        let mut conn = pool.get().unwrap();
+        seed_content_with_reach(&mut conn, hash, "household");
+        seed_inventory(&mut conn, my_peer, hash);
+        seed_binding(&mut conn, my_peer, agent_cid);
+        seed_rea_commitment_for_blob(&mut conn, "commitment_id", hash, my_peer, "peer-other");
+    }
+
+    let bindings = load_bindings_for_agent(&pool, agent_cid);
+    let details = compose_distribution_details(
+        &pool,
+        hash,
+        DistributionContext::Steward {
+            agent_cid,
+            bindings: &bindings,
+        },
+    )
+    .await
+    .expect("compose should succeed");
+
+    assert_eq!(
+        details.commitment_references,
+        Some(vec!["commitment_id".to_string()]),
+        "steward must see their commitment IDs"
+    );
+}
+
+#[tokio::test]
+async fn details_includes_placement_gaps_for_blob() {
+    let pool = test_pool();
+    let hash = "hash_gap_test";
+    {
+        let mut conn = pool.get().unwrap();
+        seed_content_with_reach(&mut conn, hash, "collective");
+        seed_inventory(&mut conn, "peer-gap-1", hash);
+        seed_placement_gap(&mut conn, "gap-001", hash);
+    }
+
+    let details = compose_distribution_details(&pool, hash, DistributionContext::Visitor)
+        .await
+        .expect("compose should succeed");
+
+    assert_eq!(
+        details.placement_gaps.len(),
+        1,
+        "should return one placement_gap for the blob"
+    );
+    let gap_val = &details.placement_gaps[0].0;
+    assert_eq!(
+        gap_val.get("shardHash").and_then(|v| v.as_str()),
+        Some(hash),
+        "placement_gap shardHash must match the queried blob_hash"
+    );
+}
+
+#[tokio::test]
+async fn details_projector_identities_stubbed_empty() {
+    let pool = test_pool();
+    let hash = "hash_projector_stub";
+    {
+        let mut conn = pool.get().unwrap();
+        seed_content_with_reach(&mut conn, hash, "private");
+        seed_inventory(&mut conn, "peer-proj-1", hash);
+    }
+
+    let details = compose_distribution_details(&pool, hash, DistributionContext::Visitor)
+        .await
+        .expect("compose should succeed");
+
+    assert!(
+        details.projector_identities.is_empty(),
+        // TODO(Phase 4 follow-up): remove stub once doorway_projector_acks lands
+        "projector_identities must be empty (stubbed) until projector source lands"
+    );
+}
+
+#[tokio::test]
+async fn details_recent_projection_events_stubbed_empty() {
+    let pool = test_pool();
+    let hash = "hash_proj_events_stub";
+    {
+        let mut conn = pool.get().unwrap();
+        seed_content_with_reach(&mut conn, hash, "private");
+        seed_inventory(&mut conn, "peer-pev-1", hash);
+    }
+
+    let details = compose_distribution_details(&pool, hash, DistributionContext::Visitor)
+        .await
+        .expect("compose should succeed");
+
+    assert!(
+        details.recent_projection_events.is_empty(),
+        // TODO(Phase 4 follow-up): remove stub once projection-events log exists
+        "recent_projection_events must be empty (stubbed) until projection-events source lands"
     );
 }
