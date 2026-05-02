@@ -868,6 +868,14 @@ impl P2PHandle {
     pub fn set_last_gossiped_inventory(&self, hashes: Vec<String>) {
         if let Ok(mut guard) = self.last_gossiped.write() {
             *guard = hashes;
+        } else {
+            // T19 Fix #4: poisoned-lock case used to silently drop the
+            // inventory record, which made gossip-state divergence
+            // invisible. Surface it via tracing::warn so operators can
+            // correlate with the panic that poisoned the lock.
+            tracing::warn!(
+                "set_last_gossiped_inventory: RwLock poisoned; inventory record dropped"
+            );
         }
     }
 

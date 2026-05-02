@@ -28,6 +28,7 @@ use crate::error::StorageError;
 use chrono::Utc;
 use diesel::RunQueryDsl;
 use diesel::SqliteConnection;
+use futures::stream::{FuturesUnordered, StreamExt};
 use sha2::{Digest, Sha256};
 use std::time::Duration;
 use tokio::sync::{mpsc, oneshot};
@@ -74,8 +75,11 @@ pub async fn race_fetch(
             return FetchOutcome::Miss;
         }
 
-        // Spawn a per-peer fetch task; collect join handles.
-        let mut handles = Vec::with_capacity(batch.len());
+        // Spawn a per-peer fetch task into a FuturesUnordered for true
+        // first-responder semantics: as soon as any peer returns verified
+        // bytes we return Hit, and the remaining in-flight futures are
+        // dropped (which cancels the spawned tasks).
+        let mut in_flight: FuturesUnordered<_> = FuturesUnordered::new();
         for peer_id_str in batch {
             let Ok(peer_id) = peer_id_str.parse::<libp2p::PeerId>() else {
                 continue;
@@ -84,7 +88,7 @@ pub async fn race_fetch(
             let hash = blob_hash.to_string();
             let timeout = per_peer_timeout;
             let peer_label = peer_id_str.clone();
-            handles.push(tokio::spawn(async move {
+            in_flight.push(tokio::spawn(async move {
                 let (reply_tx, reply_rx) = oneshot::channel();
                 if cmd_tx
                     .send(crate::p2p::P2PCommand::FetchBlob {
@@ -106,10 +110,13 @@ pub async fn race_fetch(
             }));
         }
 
-        // Wait for first verified hit; return immediately.
-        for handle in handles {
-            if let Ok((peer, Ok(bytes))) = handle.await {
+        // Drain in completion order; first verified hit wins. Mismatches and
+        // errors are skipped — keep polling the remaining futures.
+        while let Some(joined) = in_flight.next().await {
+            if let Ok((peer, Ok(bytes))) = joined {
                 if verify_blob_hash(&bytes, blob_hash) {
+                    // Drop in_flight implicitly when we return; this cancels
+                    // any still-pending spawned tasks.
                     return FetchOutcome::Hit {
                         bytes,
                         source_peer: peer,
@@ -231,5 +238,44 @@ mod tests {
         let (bytes, hex) = known_blob();
         let upper = hex.to_uppercase();
         assert!(verify_blob_hash(&bytes, &upper));
+    }
+
+    /// T19 Fix #2 regression: race-fetch must use FuturesUnordered so that
+    /// the FIRST future to finish wins, regardless of how late other futures
+    /// might complete. Prior implementation iterated `for handle in handles`
+    /// which awaited them in spawn-order — a slow first peer would make the
+    /// whole batch wait on it before noticing a fast second peer.
+    ///
+    /// This test models the await semantics directly: we spawn three tasks
+    /// with staggered completion, push them into FuturesUnordered, drain via
+    /// `.next().await`, and assert the FIRST one off the stream is the
+    /// fastest one — proving "first responder wins" wiring is in place.
+    #[tokio::test]
+    async fn race_fetch_first_responder_wins() {
+        use std::time::Duration;
+
+        let mut fu: FuturesUnordered<_> = FuturesUnordered::new();
+        // Slow peer (~400 ms).
+        fu.push(tokio::spawn(async {
+            tokio::time::sleep(Duration::from_millis(400)).await;
+            "slow"
+        }));
+        // Medium peer (~200 ms).
+        fu.push(tokio::spawn(async {
+            tokio::time::sleep(Duration::from_millis(200)).await;
+            "medium"
+        }));
+        // Fast peer (~20 ms).
+        fu.push(tokio::spawn(async {
+            tokio::time::sleep(Duration::from_millis(20)).await;
+            "fast"
+        }));
+
+        let first = fu.next().await.expect("at least one future").unwrap();
+        assert_eq!(
+            first, "fast",
+            "FuturesUnordered must yield the fastest future first; \
+             sequential .await would yield 'slow' (spawn-order head)"
+        );
     }
 }

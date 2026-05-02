@@ -1605,11 +1605,38 @@ impl HttpServer {
                                         bytes,
                                         source_peer,
                                     } => {
-                                        // Persist locally and emit serve-blob event.
+                                        // T19 Fix #1: persist-first.
+                                        //
+                                        // Previously the persist was best-effort *after* finalize,
+                                        // which meant a failed write could leave inventory state
+                                        // claiming we host a blob we couldn't actually store on
+                                        // disk. We now persist FIRST: on persist failure we log
+                                        // and 404 without writing any SQL (no rollback needed).
+                                        // Tradeoff: a successful persist that then fails to record
+                                        // the serve-blob event leaves a benign orphan blob on disk
+                                        // (re-served from local on next GET). T20 will collapse
+                                        // this whole path into a single async finalize.
                                         let bytes_len = bytes.len();
                                         let self_cid = self.self_cid.clone();
                                         let blob_store = self.blob_store.clone();
-                                        let blob_hash_owned = hash.to_string();
+
+                                        if let Err(e) = blob_store.store(&bytes).await {
+                                            error!(
+                                                hash = %hash,
+                                                source_peer = %source_peer,
+                                                error = %e,
+                                                "T19: race-fetch hit but local persist failed; \
+                                                 declining to record fetch-success or emit \
+                                                 serve-blob event — returning 404"
+                                            );
+                                            return Ok(
+                                                Self::with_cors_headers(Response::builder())
+                                                    .status(StatusCode::NOT_FOUND)
+                                                    .body(Full::new(Bytes::from("Blob not found")))
+                                                    .unwrap(),
+                                            );
+                                        }
+
                                         if let Ok(mut conn) = pool.get() {
                                             let _ = crate::p2p::blob_fetch::finalize_fetch_success(
                                                 &mut conn,
@@ -1617,21 +1644,13 @@ impl HttpServer {
                                                 &source_peer,
                                                 &bytes,
                                                 &self_cid,
-                                                |b| {
-                                                    // blob_store.store is async — we can't call it
-                                                    // inside a sync FnOnce here. Queue a best-effort
-                                                    // background store so finalize records the event
-                                                    // immediately; the bytes are returned in-response.
-                                                    // TODO(T18): replace with blocking_store or
-                                                    // extract finalize into async.
-                                                    let _ = blob_hash_owned.as_str();
-                                                    let _ = b;
+                                                |_b| {
+                                                    // Persist already happened above; finalize
+                                                    // only records the inventory row + REA event.
                                                     Ok(())
                                                 },
                                             );
                                         }
-                                        // Best-effort async persist (outside finalize).
-                                        let _ = blob_store.store(&bytes).await;
                                         info!(
                                             hash = %hash,
                                             source_peer = %source_peer,
