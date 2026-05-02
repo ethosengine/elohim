@@ -32,17 +32,21 @@ pub fn apply_snapshot(
         diesel::delete(peer_blob_inventory::table.filter(peer_blob_inventory::peer_id.eq(peer_id)))
             .execute(conn)?;
 
-        // Insert the new set.
-        for hash in hashes {
-            let row = NewPeerBlobInventoryRow {
+        // Insert the new set as a single batch.
+        let rows: Vec<NewPeerBlobInventoryRow> = hashes
+            .iter()
+            .map(|hash| NewPeerBlobInventoryRow {
                 peer_id: peer_id.to_string(),
                 blob_hash: hash.clone(),
                 last_seen_at: snapshot_at.to_string(),
                 source: "gossip-snapshot".to_string(),
                 sequence,
-            };
+            })
+            .collect();
+
+        if !rows.is_empty() {
             diesel::insert_into(peer_blob_inventory::table)
-                .values(&row)
+                .values(&rows)
                 .execute(conn)?;
         }
 
@@ -54,9 +58,14 @@ pub fn apply_snapshot(
     .map_err(|e| StorageError::Database(format!("apply_snapshot: {e}")))
 }
 
-/// Apply a delta for a peer. Returns `Ok(false)` if a gap was detected
-/// (caller should request a snapshot); `Ok(true)` if applied; `Ok(false)`
-/// silently for replays. Errors only on actual DB failures.
+/// Apply a delta for a peer.
+///
+/// Returns:
+/// - `Ok(DeltaApplyOutcome::Applied)` — delta was applied and cursor advanced.
+/// - `Ok(DeltaApplyOutcome::Replay)` — sequence ≤ stored max; drop silently.
+/// - `Ok(DeltaApplyOutcome::Gap { expected, received })` — sequence skipped;
+///   caller should request a fresh snapshot from the source peer.
+/// - `Err(_)` — actual database failure.
 pub fn apply_delta(
     conn: &mut SqliteConnection,
     peer_id: &str,
@@ -119,29 +128,27 @@ pub fn record_fetch_success(
     blob_hash: &str,
     observed_at: &str,
 ) -> Result<(), StorageError> {
-    // Read the current sequence for this (peer, blob) if any; preserve it.
-    // For fresh entries, use 0 — fetch-success entries don't participate in
-    // sequence-based gap detection.
-    let existing_seq: Option<i64> = peer_blob_inventory::table
-        .filter(peer_blob_inventory::peer_id.eq(peer_id))
-        .filter(peer_blob_inventory::blob_hash.eq(blob_hash))
-        .select(peer_blob_inventory::sequence)
-        .first::<i64>(conn)
-        .optional()
-        .map_err(|e| StorageError::Database(format!("record_fetch_success lookup: {e}")))?;
+    conn.transaction(|conn| {
+        let existing_seq: Option<i64> = peer_blob_inventory::table
+            .filter(peer_blob_inventory::peer_id.eq(peer_id))
+            .filter(peer_blob_inventory::blob_hash.eq(blob_hash))
+            .select(peer_blob_inventory::sequence)
+            .first::<i64>(conn)
+            .optional()?;
 
-    let row = NewPeerBlobInventoryRow {
-        peer_id: peer_id.to_string(),
-        blob_hash: blob_hash.to_string(),
-        last_seen_at: observed_at.to_string(),
-        source: "fetch-success".to_string(),
-        sequence: existing_seq.unwrap_or(0),
-    };
-    diesel::replace_into(peer_blob_inventory::table)
-        .values(&row)
-        .execute(conn)
-        .map(|_| ())
-        .map_err(|e| StorageError::Database(format!("record_fetch_success upsert: {e}")))
+        let row = NewPeerBlobInventoryRow {
+            peer_id: peer_id.to_string(),
+            blob_hash: blob_hash.to_string(),
+            last_seen_at: observed_at.to_string(),
+            source: "fetch-success".to_string(),
+            sequence: existing_seq.unwrap_or(0),
+        };
+        diesel::replace_into(peer_blob_inventory::table)
+            .values(&row)
+            .execute(conn)?;
+        Ok::<(), diesel::result::Error>(())
+    })
+    .map_err(|e| StorageError::Database(format!("record_fetch_success: {e}")))
 }
 
 /// Look up the set of peers known to host a blob, ordered by evidence
@@ -225,8 +232,14 @@ mod tests {
     use diesel::r2d2::{ConnectionManager, Pool};
 
     fn test_pool() -> DbPool {
-        let manager = ConnectionManager::<SqliteConnection>::new(":memory:");
-        let pool = Pool::builder().build(manager).expect("build pool");
+        let url = format!(
+            "file:pbi_test_{}?mode=memory&cache=shared",
+            uuid::Uuid::new_v4().as_simple()
+        );
+        let pool = Pool::builder()
+            .max_size(1)
+            .build(ConnectionManager::<SqliteConnection>::new(&url))
+            .expect("pool");
         run_migrations(&pool).expect("migrations");
         pool
     }
