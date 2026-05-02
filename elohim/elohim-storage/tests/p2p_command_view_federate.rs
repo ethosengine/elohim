@@ -1,16 +1,28 @@
-//! F-T19: Unit tests for `P2PCommand::ViewFederate` dispatch and `P2PHandle::view_federate`.
+//! F-T19/F-T20: Unit tests for `P2PCommand::ViewFederate` dispatch, `P2PHandle::view_federate`,
+//! and the `build_response_slice` responder helper.
 //!
-//! These tests exercise the command-dispatch and oneshot-resolution paths in
+//! F-T19 tests exercise the command-dispatch and oneshot-resolution paths in
 //! isolation — no real swarm, no two-peer harness. Two-peer integration coverage
-//! is deferred to F-T20 + Jenkins (`feedback_shift_measure_jenkins` memory).
+//! is measured in Jenkins (`feedback_shift_measure_jenkins` memory).
 //!
-//! Three cases:
+//! F-T20 tests exercise `build_response_slice` as a pure helper, verifying signing
+//! correctness and envelope echoing without touching the swarm event loop.
+//!
+//! F-T19 cases (3):
 //!  1. **channel_dispatch** — calling `view_federate` on the `for_testing()` stub
 //!     reaches the `ViewFederate` arm and returns the stub sentinel error, proving
 //!     the command is dispatched (not panicked or silently dropped).
 //!  2. **timeout** — a receiver that never replies produces `FederationError::Timeout`.
 //!  3. **swarm_gone** — dropping the receiver before the call produces
 //!     `FederationError::SwarmGone`.
+//!
+//! F-T20 cases (+3):
+//!  4. **responder_signs_live** — agent_cid matches local → Live freshness, non-Null payload,
+//!     signature verifies.
+//!  5. **responder_offline** — agent_cid differs → Offline freshness, Null payload, signature
+//!     still verifies.
+//!  6. **responder_echoes_envelope** — response envelope echoes view_kind, agent_cid,
+//!     request_id supplied to the helper (needed by F-T21 dedup).
 
 use std::time::Duration;
 
@@ -135,4 +147,142 @@ async fn view_federate_swarm_gone_when_channel_closed() {
         "expected FederationError::SwarmGone; got: {:?}",
         result
     );
+}
+
+// ── F-T20 tests: build_response_slice ──────────────────────────────────────
+
+/// Test 4 (responder_signs_live): when `agent_cid` matches `local_agent_cid`,
+/// `build_response_slice` returns:
+///   - `FreshnessState::Live`
+///   - a non-Null payload (`json!({})` stub)
+///   - a base64 signature that verifies against `slice.canonical_bytes_for_signing()`
+#[test]
+fn responder_signs_slice_with_agent_key_when_agent_matches() {
+    use base64::Engine as _;
+    use elohim_storage::{
+        p2p::view_federation::build_response_slice,
+        views::{FreshnessState, ViewKind},
+    };
+
+    let keypair = libp2p::identity::Keypair::generate_ed25519();
+    let local_agent_cid = "local_agent_test";
+    let local_peer_id = "12D3KooWTestPeer".to_string();
+
+    let response = build_response_slice(
+        ViewKind::Cluster,
+        local_agent_cid.to_string(), // agent_cid == local_agent_cid
+        "req-live-001".to_string(),
+        local_agent_cid,
+        local_peer_id,
+        &keypair,
+    )
+    .expect("build_response_slice should not fail for a valid keypair");
+
+    // Freshness is Live when agent matches.
+    assert_eq!(
+        response.slice.freshness.state,
+        FreshnessState::Live,
+        "expected FreshnessState::Live for matching agent"
+    );
+
+    // Payload is the stub empty object, not Null.
+    assert!(
+        response.slice.payload.0 != serde_json::Value::Null,
+        "expected non-Null payload for matching agent"
+    );
+
+    // Signature base64-decodes without error.
+    let sig_bytes = base64::engine::general_purpose::STANDARD
+        .decode(&response.slice.signature)
+        .expect("signature should be valid base64");
+
+    // The public key verifies the canonical bytes of the signed slice.
+    let canonical = response.slice.canonical_bytes_for_signing();
+    assert!(
+        keypair.public().verify(&canonical, &sig_bytes),
+        "signature must verify against the slice canonical bytes"
+    );
+}
+
+/// Test 5 (responder_offline): when `agent_cid` differs from `local_agent_cid`,
+/// `build_response_slice` returns:
+///   - `FreshnessState::Offline`
+///   - `serde_json::Value::Null` payload
+///   - a signature that still verifies (the slice is signed regardless of payload)
+#[test]
+fn responder_returns_offline_for_unknown_agent_cid() {
+    use base64::Engine as _;
+    use elohim_storage::{
+        p2p::view_federation::build_response_slice,
+        views::{FreshnessState, ViewKind},
+    };
+
+    let keypair = libp2p::identity::Keypair::generate_ed25519();
+    let local_agent_cid = "local_agent_test";
+    let other_agent_cid = "some_other_agent_cid";
+    let local_peer_id = "12D3KooWTestPeer".to_string();
+
+    let response = build_response_slice(
+        ViewKind::PeerTopology,
+        other_agent_cid.to_string(), // agent_cid != local_agent_cid
+        "req-offline-001".to_string(),
+        local_agent_cid,
+        local_peer_id,
+        &keypair,
+    )
+    .expect("build_response_slice should not fail for a valid keypair");
+
+    // Freshness is Offline when agent does not match.
+    assert_eq!(
+        response.slice.freshness.state,
+        FreshnessState::Offline,
+        "expected FreshnessState::Offline for non-local agent"
+    );
+
+    // Payload is Null for an agent we don't host.
+    assert_eq!(
+        response.slice.payload.0,
+        serde_json::Value::Null,
+        "expected Null payload for non-local agent"
+    );
+
+    // Signature still verifies — signing is unconditional.
+    let sig_bytes = base64::engine::general_purpose::STANDARD
+        .decode(&response.slice.signature)
+        .expect("signature should be valid base64");
+    let canonical = response.slice.canonical_bytes_for_signing();
+    assert!(
+        keypair.public().verify(&canonical, &sig_bytes),
+        "signature must verify even when payload is Null"
+    );
+}
+
+/// Test 6 (responder_echoes_envelope): the response envelope echoes `view_kind`,
+/// `agent_cid`, and `request_id` exactly as supplied — required by the F-T21 dedup map.
+#[test]
+fn responder_echoes_view_kind_and_request_id() {
+    use elohim_storage::{p2p::view_federation::build_response_slice, views::ViewKind};
+
+    let keypair = libp2p::identity::Keypair::generate_ed25519();
+    let agent_cid = "echo_agent_cid_test";
+    let request_id = "echo-req-999";
+    let local_peer_id = "12D3KooWTestPeer".to_string();
+
+    let response = build_response_slice(
+        ViewKind::PeerTopology,
+        agent_cid.to_string(),
+        request_id.to_string(),
+        "different_local_agent",
+        local_peer_id,
+        &keypair,
+    )
+    .expect("build_response_slice should not fail");
+
+    assert_eq!(
+        response.view_kind,
+        ViewKind::PeerTopology,
+        "view_kind must be echoed"
+    );
+    assert_eq!(response.agent_cid, agent_cid, "agent_cid must be echoed");
+    assert_eq!(response.request_id, request_id, "request_id must be echoed");
 }

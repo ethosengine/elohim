@@ -4158,18 +4158,55 @@ impl P2PNode {
                 request_response::Message::Request {
                     request, channel, ..
                 } => {
-                    // Dropping the channel without send_response causes libp2p to deliver
-                    // OutboundFailure::ConnectionClosed to the requester (which maps to
-                    // FederationError::TransportError). F-T20 replaces this with a real
-                    // responder that calls send_response.
+                    // F-T20: real responder — build and sign a ViewFederationResponse
+                    // synchronously (ed25519 sign is microseconds), then send_response
+                    // in the same event-loop arm. No spawn needed; mirrors the blob
+                    // protocol's inbound arm pattern.
+                    use crate::p2p::view_federation::build_response_slice;
                     debug!(
                         target: "elohim_storage::view_federation",
                         peer = %peer,
                         view_kind = ?request.view_kind,
                         agent_cid = %request.agent_cid,
-                        "F-T19: inbound view-federation request received; responder lands in F-T20"
+                        request_id = %request.request_id,
+                        "F-T20: received view-federation request"
                     );
-                    drop(channel);
+                    let local_agent_cid = self.identity.agent_pubkey().to_string();
+                    let local_peer_id = self.identity.peer_id_string();
+                    let keypair = self.identity.keypair();
+                    match build_response_slice(
+                        request.view_kind,
+                        request.agent_cid,
+                        request.request_id,
+                        &local_agent_cid,
+                        local_peer_id,
+                        keypair,
+                    ) {
+                        Ok(response) => {
+                            let mut swarm = self.swarm.write().await;
+                            if let Err(_response) = swarm
+                                .behaviour_mut()
+                                .view_federation
+                                .send_response(channel, response)
+                            {
+                                warn!(
+                                    target: "elohim_storage::view_federation",
+                                    peer = %peer,
+                                    "F-T20: failed to send view-federation response (peer disconnected?)"
+                                );
+                            }
+                        }
+                        Err(e) => {
+                            warn!(
+                                target: "elohim_storage::view_federation",
+                                peer = %peer,
+                                error = %e,
+                                "F-T20: failed to sign view-federation slice; dropping channel"
+                            );
+                            // Dropping channel triggers OutboundFailure::ConnectionClosed
+                            // at the requester, mapping to FederationError::TransportError.
+                        }
+                    }
                 }
             },
             behaviour::ElohimStorageBehaviourEvent::ViewFederation(

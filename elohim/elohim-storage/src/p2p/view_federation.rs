@@ -32,7 +32,10 @@ use futures::prelude::*;
 use libp2p::request_response;
 use std::io;
 
-use crate::views::{ViewFederationRequest, ViewFederationResponse};
+use crate::views::{
+    Freshness, FreshnessState, JsonVal, ViewFederationRequest, ViewFederationResponse, ViewKind,
+    ViewSlice,
+};
 
 /// Protocol identifier for federated view-slice fetch.
 pub const VIEW_FEDERATION_PROTOCOL_ID: &str = "/elohim/view-federation/1.0.0";
@@ -176,6 +179,62 @@ impl request_response::Codec for ViewFederationCodec {
         io.write_all(&data).await?;
         io.flush().await
     }
+}
+
+/// Build a signed [`ViewFederationResponse`] for an inbound request.
+///
+/// F-T20 stub: payload is `serde_json::json!({})` when `agent_cid` matches the
+/// local agent (Live freshness), else `serde_json::Value::Null` (Offline). Phase 4
+/// (T22–T28) will replace the stub with calls to `services::cluster_view` and
+/// `services::peer_topology_view` to build the real per-device slice.
+///
+/// The `ViewSlice` is signed with `keypair` using
+/// [`ViewSlice::canonical_bytes_for_signing`]. The signature is base64-encoded
+/// (standard alphabet, with padding) in `slice.signature`.
+///
+/// # Errors
+///
+/// Returns `libp2p::identity::SigningError` if the keypair cannot sign (e.g. it is
+/// a public-key-only handle without a private key).
+pub fn build_response_slice(
+    view_kind: ViewKind,
+    agent_cid: String,
+    request_id: String,
+    local_agent_cid: &str,
+    local_peer_id: String,
+    keypair: &libp2p::identity::Keypair,
+) -> Result<ViewFederationResponse, libp2p::identity::SigningError> {
+    let owns_agent = agent_cid == local_agent_cid;
+    let payload = if owns_agent {
+        JsonVal(serde_json::json!({})) // Phase 4 replaces stub with real cluster/topology slice
+    } else {
+        JsonVal(serde_json::Value::Null)
+    };
+    let freshness_state = if owns_agent {
+        FreshnessState::Live
+    } else {
+        FreshnessState::Offline
+    };
+    let mut slice = ViewSlice {
+        peer_id: local_peer_id,
+        view_kind: view_kind.clone(),
+        freshness: Freshness {
+            state: freshness_state,
+            stale_since_ms: None,
+        },
+        payload,
+        signature: String::new(),
+    };
+    let canonical = slice.canonical_bytes_for_signing();
+    let sig_bytes = keypair.sign(&canonical)?;
+    use base64::Engine as _;
+    slice.signature = base64::engine::general_purpose::STANDARD.encode(&sig_bytes);
+    Ok(ViewFederationResponse {
+        view_kind,
+        agent_cid,
+        request_id,
+        slice,
+    })
 }
 
 #[cfg(test)]
