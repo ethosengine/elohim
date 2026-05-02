@@ -4077,156 +4077,177 @@ Per `project_doorway_hub_sister_brother` and `project_hub_optional_floor`: hubs 
 
 The protocol's design floor is "one laptop, no hub required, full participant" (Kolibri / community-credit pattern). Hubs are graduations on top, never gates. Any handler whose `/me` shape would prevent later hub-aggregation is a smell.
 
-### Task T28a: Doorway → storage agent_cid header propagation
+### Phase 5 substrate adaptation (revised 2026-05-02)
 
-**Why this is here:** T01 found that doorway's shared registry proxy (`storage_proxy::forward_to_storage`) does NOT inject any `X-Agent-*` header, and storage's `extract_agent_key` reads `X-Agent-Id` with a stale doc claim that "doorway middleware injects this." Phase 5 handlers (T30, T31, T32) all call into Phase 4 view services that take `agent_cid: &str` — without this task, they receive nothing and can't resolve bindings.
+The plan-as-originally-written assumed several substrate shapes that don't match reality. These adaptations apply to every task in Phase 5:
 
-The JWT today carries `agent_pub_key` (Holochain pubkey), not `agent_cid` (imagodei DHT CID). Two wiring options; the implementer must pick one explicitly:
+**1. HTTP framework — hyper, not axum.** Both elohim-storage and doorway-service use hyper directly (manual `match (method, path)` dispatch in `Server::handle_request`), NOT axum. Storage uses hyper for SSE streaming bodies (`Either<Full<Bytes>, SseBody>`) + WebSocket upgrades for `/import/progress`. Doorway uses hyper for tx5 signal-relay WebSocket upgrades + explicit closure-capture state passing. Code blocks below that show `Router::new().route(...)`, `State<AppState>` extractors, `impl IntoResponse`, `Json(...)` / `Path(...)` extractors, `axum::extract::*` are all WRONG. Real handlers:
+- Storage: `async fn handle_X(&self, req: Request<Incoming>, ...) -> Result<Response<Full<Bytes>>, StorageError>` — method on `HttpServer`, manual response builder, JSON via `serde_json::to_string()` + `Full::new(Bytes::from(...))`
+- Doorway: `pub async fn handle_X(state: Arc<AppState>) -> Response<Full<Bytes>>` — free function in `routes/`, state via closure capture, JSON via local `json_response(status, body)` helper
 
-| Option | Where the resolution happens | Pros | Cons |
-|---|---|---|---|
-| **A — resolve at mint** | When doorway mints the JWT after login, look up `agent_pub_key → agent_cid` via imagodei coordinator and embed `agent_cid` in Claims | Static resolution, zero per-request cost | Mint path has to wait for imagodei round-trip |
-| **B — resolve at forward** | Storage proxy decodes bearer, looks up `agent_pub_key → agent_cid` via local projection cache, injects header | Simple to add later, no JWT shape change | Per-request cache lookup; cache miss = round-trip |
+**2. agent_cid == human_id in the alpha substrate.** The seeder at `genesis/seeder/src/seed-agent-bindings.ts:311` writes `agent_cid: human.id` directly. View-service tests at `elohim-storage/tests/distribution_view.rs:177` use slug-style strings like `"agent-matthew"`. The "CIDv1 base32 of the agent's EPR atom" comment in `views.rs` is forward-looking; CIDv1 derivation is not enforced anywhere in the running stack. Implication for T28a: **no new fields on UserDoc or local_sessions are needed.** Doorway sources `agent_cid` from `claims.human_id` at JWT-forward time; storage reads from `X-Agent-Cid` header (fallback: `local_sessions.human_id`). Source-of-truth doc-comments explicitly note this alpha equivalence and the future migration to CIDv1 dag-cbor sha256 of the Agent EPR entry.
 
-Default to **Option A** unless a strong reason emerges during implementation. JWT mint is the natural binding moment.
+**3. No `crate::auth::bindings_resolver` module.** Phase 4 implementations resolve bindings inline via `db::peer_identity_bindings::list_active_for_agent(&mut conn, agent_cid, &now_iso)`. The plan's `resolve_bindings(&pool, &agent_cid)` path doesn't exist. View services (T29-T32 callers) already do their own resolution; handlers don't need to.
 
-**Files:**
-- Modify: `doorway/doorway-service/src/auth/jwt.rs` (extend `Claims` with `agent_cid: Option<String>`; backwards-compatible default)
-- Modify: `doorway/doorway-service/src/routes/auth_routes.rs` (mint path: resolve agent_cid before signing)
-- Modify: `doorway/doorway-service/src/routes/storage_proxy.rs` (`forward_to_storage` and `forward_blob_to_storage`: decode bearer once, inject `X-Agent-Cid` header)
-- Modify: `elohim/elohim-storage/src/api/account.rs` (or its successor): add `extract_agent_cid` helper alongside the existing `extract_agent_key`; update doc comment to reflect what doorway actually does
-- Modify: `elohim/elohim-storage/src/http.rs` (CORS allow-list: add `X-Agent-Cid`)
+**4. Function name correction:** plan calls `aggregate_cluster_view`; actual name is `aggregate_my_cluster_view` (the `_my_` is meaningful — it's the agent's own cluster view, federated). Plan's `compose_distribution_summary`/`compose_distribution_details` names match reality.
 
-- [ ] **Pre-flight: scout the imagodei lookup (substrate-vs-plan landmine)**
+**5. `extract_agent_key` already exists** at `elohim-storage/src/api/account.rs:953`, returning `Option<String>` of the calling agent's pubkey. Pattern: header (`X-Agent-Id`) → local_sessions fallback. T28a adds a parallel `extract_agent_cid` helper following the same cascade.
 
-The plan calls `imagodei_lookup::resolve_agent_cid_for_pub_key` (Step 4). This helper may not exist in the worktree. Before starting:
+**6. `build_manifest()` uses `DoorwayRoutesBuilder` + `Route::get(...).handler(...).build()`** at `elohim-storage/src/http.rs:7563`, NOT the literal `ManifestRoute { ... }` struct shown in the plan. Routes are registered via the builder pattern; doorway picks them up at next manifest fetch.
 
-```bash
-grep -rn "resolve_agent_cid_for_pub_key\|get_agent_for_pub_key\|imagodei_lookup" \
-  doorway/doorway-service/src/ elohim/holochain/dna/ 2>/dev/null
-```
+**7. Route shape: drop the `/me` suffix.** Per the architectural design discussion, `/cluster`, `/peer-topology`, `/reciprocity` (auth-implicit) replace `/cluster/me`, `/peer-topology/me`, `/reciprocity/me`. Auth context determines scope — every call is implicitly "by you" in Holochain idiom. Future hub variants (`/cluster/household/{id}`, `/cluster/hub/{id}`) extend the path tree without forcing a leading `/me` namespace.
 
-Three outcomes:
+**8. P2P design gate output (2026-05-02):** Phase 5 adds **no new entities, no new DHT entry types, no new sync messages.** All five new HTTP routes (T29-T35) project Category C views over already-notarized state. Source-of-truth doc-comments land in T28a's commit. Future SQL JOIN on `agent_cid` re-triggers the gate.
 
-1. **Helper + zome function both exist** → proceed to Step 1.
-2. **Zome function `get_agent_for_pub_key` (or equivalent) exists, but no doorway-side helper** → add a thin helper in `doorway/doorway-service/src/services/imagodei_lookup.rs` (new file) that calls the zome via the conductor and returns the EPR CID. This is in-scope for T28a.
-3. **Neither exists** → STOP. This is a sub-blocker. Escalate to the user. Do NOT invent a new zome function as part of T28a. Either Option B (resolve at forward via local projection cache, no zome call needed) becomes the right answer, or T28a needs to wait on imagodei zome work.
+### Task T28a: Doorway → storage agent_cid header propagation (revised)
 
-Choose Option A (resolve at mint) only if outcome 1 or 2. Choose Option B (resolve at forward) only with explicit user confirmation if outcome 3.
+**Why this is here:** Phase 5 handlers (T29-T32) call view services that take `agent_cid: &str`. Today's auth path lands `agent_pub_key` (Holochain pubkey) and `human_id` (slug) in the JWT, but neither is exposed as a header to storage. Without this task, handlers can't resolve bindings.
+
+**Substrate finding (replaces the original Options A/B framework):** In the alpha cluster, `agent_cid == human_id`. The seeder authors bindings with `agent_cid: human.id` (`genesis/seeder/src/seed-agent-bindings.ts:311`). View-service tests use slug-style strings (`elohim/elohim-storage/tests/distribution_view.rs:177`). The "CIDv1 base32 of the agent's EPR atom" comment in `views.rs:6951` is forward-looking; CIDv1 derivation is not enforced anywhere in the running stack. So the resolution at this stage is **trivial — pass `human_id` as `agent_cid`**, with a documented forward-compat note for when CIDv1 derivation lands.
+
+**Identity tier coverage** (`project_progressive_onboarding`):
+- **Session Visitor** — no auth, no header, no session. `extract_agent_cid` returns `None`. `/cluster`, `/peer-topology`, `/reciprocity` → 401. `/blob/{hash}/distribution/details` → visitor branch.
+- **Hosted Human** *(in scope)* — JWT carries `human_id`. Doorway's `forward_to_storage` injects `X-Agent-Cid: <human_id>`. Storage's `extract_agent_cid` reads the header.
+- **Returning Steward via doorway** — same code path as Hosted Human; doorway minted JWT carries `human_id`.
+- **Returning Steward via Tauri/native** — no doorway; storage falls back to `local_sessions.human_id` via the same helper cascade as `extract_agent_key`.
+- **Doorway Steward (operator)** — own `/me` views: same path as Returning Steward. Operator dashboard (T35): separate admin auth, separate handler.
+
+**Files (revised, smaller scope):**
+- Modify: `doorway/doorway-service/src/routes/storage_proxy.rs` — decode bearer once at the top of `forward_to_storage` (and `forward_blob_to_storage`); inject `X-Agent-Cid: <claims.human_id>` header.
+- Modify: `elohim/elohim-storage/src/http.rs` — CORS allow-list: add `X-Agent-Cid` next to existing `X-Agent-Id`. Keep both.
+- Modify: `elohim/elohim-storage/src/api/account.rs` — add `extract_agent_cid` helper following the same header-then-session-fallback cascade as `extract_agent_key`. Source-of-truth doc-comment notes alpha-substrate equivalence + future CIDv1 migration. Update `extract_agent_key`'s stale doc-comment about doorway middleware injection.
+
+**NOT in scope** (vs. original plan):
+- ~~Extend `Claims` with `agent_cid: Option<String>`~~ — `human_id` is already in claims; no JWT shape change needed.
+- ~~Add `imagodei_lookup::resolve_agent_cid_for_pub_key`~~ — not needed; agent_cid == human_id today.
+- ~~UserDoc.agent_cid field~~ — not needed today.
+- ~~local_sessions.agent_cid column~~ — not needed today.
+- ~~Schema migrations~~ — none.
+
+When CIDv1 enforcement lands (separate sprint), the migration is: compute CIDv1 once at user creation, persist on UserDoc + local_sessions, switch the header source from `claims.human_id` to `userdoc.agent_cid`. The rest of the system (storage handlers, view services) doesn't move. The P2P design gate fires again at that point.
 
 - [ ] **Step 1: Write failing test for header injection**
 
-In `doorway/doorway-service/src/routes/storage_proxy.rs` test module:
+In `doorway/doorway-service/src/routes/storage_proxy.rs` test module — adapt to the existing test patterns there (hyper requests, captured forwarded headers via a stub backend or unit-style introspection of the builder):
 
 ```rust
 #[tokio::test]
-async fn forward_injects_agent_cid_header_from_jwt() {
-    let claims = Claims {
-        sub: "test_user".into(),
-        agent_pub_key: "uhCAk1234567890abcdef".into(),
-        agent_cid: Some("bafyreigtest_agent_cid".into()),
-        exp: 9999999999,
-        ..Default::default()
-    };
-    let token = encode_test_token(&claims);
-    let mut req = make_test_request("/api/v1/cluster", "GET");
-    req.headers_mut().insert(AUTHORIZATION, format!("Bearer {token}").parse().unwrap());
+async fn forward_injects_x_agent_cid_from_human_id_in_bearer() {
+    // Construct a Claims with human_id, sign with the dev JwtValidator.
+    // Build a Request<...> carrying Bearer <token>.
+    // Forward via the function-under-test (or its header-prep extracted helper).
+    // Assert: forwarded headers contain x-agent-cid == "matthew" (or whatever
+    // the test claims used as human_id).
+}
 
-    let captured = capture_forwarded_headers(req).await;
-    assert_eq!(captured.get("x-agent-cid").and_then(|v| v.to_str().ok()), Some("bafyreigtest_agent_cid"));
+#[tokio::test]
+async fn forward_omits_x_agent_cid_when_no_bearer() {
+    // No Authorization header → no X-Agent-Cid injected.
 }
 ```
 
-- [ ] **Step 2: Run — expect fail (Claims has no agent_cid field, no injection logic)**
+- [ ] **Step 2: Run — expect fail**
 
 ```bash
-cd doorway/doorway-service
-RUSTFLAGS="" cargo test --lib forward_injects_agent_cid_header_from_jwt
+RUSTFLAGS="" cargo test --lib --bins forward_injects_x_agent_cid -- --nocapture
 ```
 
-Expected: compile error on `agent_cid` field of Claims.
+- [ ] **Step 3: Implement header injection in `forward_to_storage`**
 
-- [ ] **Step 3: Extend Claims**
-
-In `doorway/doorway-service/src/auth/jwt.rs`:
+In `doorway/doorway-service/src/routes/storage_proxy.rs`, after the existing `Authorization` header forward and before the body collection block, decode the bearer and pull `human_id`:
 
 ```rust
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct Claims {
-    pub sub: String,
-    pub agent_pub_key: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub agent_cid: Option<String>,
-    pub exp: usize,
-    // ... existing fields preserved
+// Source the agent_cid from the bearer's human_id claim. In the alpha
+// substrate, agent_cid == human_id (see plan §"Phase 5 substrate adaptation").
+// When CIDv1 derivation lands, this source switches to claims.agent_cid.
+if let Some(token) = req.headers().get(hyper::header::AUTHORIZATION)
+    .and_then(|v| v.to_str().ok())
+    .and_then(crate::auth::jwt::extract_token_from_header)
+{
+    if let Some(claims) = state.jwt_validator.verify_token(token).claims.as_ref() {
+        builder = builder.header("X-Agent-Cid", claims.human_id.as_str());
+    }
 }
 ```
 
-- [ ] **Step 4: Resolve agent_cid at mint**
+(Pattern: graceful fall-through on missing/invalid token — header is simply omitted, storage falls back to local_sessions or returns 401. No proxy-side errors on bad bearers; storage decides.)
 
-In the JWT mint path (login handler), after authenticating the user and resolving their `agent_pub_key`, look up the corresponding agent_cid:
+Apply the same to `forward_blob_to_storage`.
 
-```rust
-let agent_cid = imagodei_lookup::resolve_agent_cid_for_pub_key(&conductor, &agent_pub_key).await
-    .ok();   // None if lookup fails — backwards-compatible; storage falls back to extract_agent_key
-let claims = Claims {
-    sub: user_id,
-    agent_pub_key,
-    agent_cid,
-    exp: ...,
-};
-```
+- [ ] **Step 4: CORS allow-list update**
 
-If `imagodei_lookup::resolve_agent_cid_for_pub_key` doesn't exist, add a thin helper that calls `imagodei::get_agent_for_pub_key` zome function and returns the EPR CID. The existing imagodei zome should already expose this; if not, escalate as a sub-blocker.
+In `elohim/elohim-storage/src/http.rs`, find the CORS `Access-Control-Allow-Headers` strings (multiple match arms — see line ~1026 and ~1443) and add `X-Agent-Cid` after `X-Agent-Id`. Keep both.
 
-- [ ] **Step 5: Inject header in forward**
+- [ ] **Step 5: Add `extract_agent_cid` helper in storage**
 
-In `doorway/doorway-service/src/routes/storage_proxy.rs`, decode the bearer once at the top of `forward_to_storage` (and `forward_blob_to_storage`):
+In `elohim/elohim-storage/src/api/account.rs`, add (mirroring the existing `extract_agent_key` cascade):
 
 ```rust
-let claims = jwt::decode_bearer(req.headers().get(AUTHORIZATION))?;
-if let Some(cid) = claims.as_ref().and_then(|c| c.agent_cid.as_ref()) {
-    forwarded_headers.insert("x-agent-cid", cid.parse().unwrap());
+/// Resolve the calling agent's `agent_cid` for view services and reach gates.
+///
+/// **Source of truth:** the imagodei DHT (Agent EPR entry).
+/// **Alpha-substrate equivalence:** `agent_cid` is currently sourced from
+/// `human_id` (the slug). The seeder authors bindings with
+/// `agent_cid: human.id`; tests use slug strings. CIDv1 dag-cbor sha256 of
+/// the Agent EPR is the long-term derivation but is not enforced today.
+///
+/// **Resolution cascade:**
+///   1. `X-Agent-Cid` header — doorway injects from JWT `claims.human_id`
+///   2. Active local_sessions row's `human_id` — Tauri direct-connection fallback
+///   3. None — Session Visitor or unauthenticated request
+///
+/// **Future migration:** when CIDv1 enforcement lands, doorway will resolve
+/// `human_id → agent_cid` once at user creation, persist on UserDoc, and
+/// inject the persisted CID. local_sessions gains a parallel `agent_cid`
+/// column. This helper's signature does not change.
+fn extract_agent_cid(
+    req: &Request<Incoming>,
+    conn: &mut diesel::SqliteConnection,
+) -> Result<Option<String>, StorageError> {
+    if let Some(cid) = req
+        .headers()
+        .get("X-Agent-Cid")
+        .and_then(|v| v.to_str().ok())
+        .map(|s| s.to_string())
+    {
+        return Ok(Some(cid));
+    }
+    if let Some(session) = crate::db::local_sessions::get_active_session(conn)? {
+        return Ok(Some(session.human_id));
+    }
+    Ok(None)
 }
-// existing forwards (Content-Type, Authorization, X-Observation-Id) preserved
 ```
 
-- [ ] **Step 6: CORS allow-list update**
+Also update the doc-comment on `extract_agent_key` (line 945-952): the current claim "doorway JWT middleware injects this" is wrong — `X-Agent-Id` is set by the bespoke portal-host handlers in `auth_routes.rs`, not generic middleware. Correct it.
 
-In `elohim/elohim-storage/src/http.rs`, add `X-Agent-Cid` to the allowed-headers list (next to the existing `X-Agent-Id`). Don't remove `X-Agent-Id` — keep both during the transition.
-
-- [ ] **Step 7: Add `extract_agent_cid` helper in storage**
-
-In `elohim/elohim-storage/src/api/account.rs` (or the successor module), add:
-
-```rust
-pub fn extract_agent_cid(headers: &HeaderMap) -> Option<&str> {
-    headers.get("x-agent-cid").and_then(|v| v.to_str().ok())
-}
-```
-
-Update the doc comment on `extract_agent_key` to reflect actual behavior (today's claim that doorway middleware injects it is wrong; either delete the claim or note that it's set by the bespoke portal-host handlers in `auth_routes.rs`).
-
-- [ ] **Step 8: Run — expect pass**
+- [ ] **Step 6: Run — expect pass**
 
 ```bash
-cd doorway/doorway-service
-RUSTFLAGS="" cargo test --lib forward_injects_agent_cid_header_from_jwt
-RUSTFLAGS="" cargo clippy -- -D warnings
+cd doorway/doorway-service && RUSTFLAGS="" cargo test --lib --bins forward_injects -- --nocapture
+cd elohim/elohim-storage && cargo test --lib extract_agent_cid -- --nocapture
+RUSTFLAGS="" cargo clippy -- -D warnings   # in doorway-service
 RUSTFLAGS="" cargo fmt --check
 ```
 
-Expected: tests pass, clippy clean.
-
-- [ ] **Step 9: Commit**
+- [ ] **Step 7: Commit**
 
 ```bash
-git add doorway/doorway-service/src/auth/jwt.rs \
-        doorway/doorway-service/src/routes/auth_routes.rs \
-        doorway/doorway-service/src/routes/storage_proxy.rs \
+git add doorway/doorway-service/src/routes/storage_proxy.rs \
         elohim/elohim-storage/src/api/account.rs \
         elohim/elohim-storage/src/http.rs
-git commit -m "feat(doorway,storage): T28a — propagate agent_cid via X-Agent-Cid header (JWT mint resolves; proxy injects)"
+git commit -m "feat(doorway,storage): T28a — propagate agent_cid via X-Agent-Cid header
+
+Alpha-substrate: agent_cid == human_id. Doorway sources from claims.human_id
+in storage_proxy; storage extract_agent_cid reads header → local_sessions
+fallback. No new entities, no schema migration. Source-of-truth comments
+note the future CIDv1 migration path.
+
+Identity tier coverage:
+- Session Visitor: no header, no session, helper returns None
+- Hosted Human / Steward via doorway: header injected from JWT
+- Steward via Tauri/native: local_sessions.human_id fallback
+- Doorway Steward (admin role T35): separate auth path"
 ```
 
 ### Task T29: Handler — GET /api/v1/blob/{hash}/distribution/details
