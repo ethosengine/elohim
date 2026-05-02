@@ -7485,3 +7485,155 @@ pub struct ViewSlice {
     pub payload: JsonVal,
     pub signature: String,
 }
+
+/// Request envelope for `/elohim/view-federation/1.0.0` — peer A asks peer B
+/// for a signed `ViewSlice` of `view_kind` on behalf of `agent_cid`.
+///
+/// F-T16: wire envelope only. The codec lands in F-T17 and the responder
+/// handler in F-T20.
+#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+#[serde(rename_all = "camelCase")]
+pub struct ViewFederationRequest {
+    pub view_kind: ViewKind,
+    pub agent_cid: String,
+    pub request_id: String,
+}
+
+/// Response envelope for `/elohim/view-federation/1.0.0` — peer B returns the
+/// signed slice. Echoes `view_kind` + `agent_cid` + `request_id` so the caller
+/// can dedup replies in the F-T21 aggregator.
+///
+/// PartialEq is intentionally NOT derived: `ViewSlice.payload` is `JsonVal`
+/// (`serde_json::Value`), which does not implement `PartialEq` cleanly.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+#[serde(rename_all = "camelCase")]
+pub struct ViewFederationResponse {
+    pub view_kind: ViewKind,
+    pub agent_cid: String,
+    pub request_id: String,
+    pub slice: ViewSlice,
+}
+
+impl ViewFederationRequest {
+    /// Canonical bytes for signing/dedup keys. MessagePack named-fields encoding
+    /// — same shape as the wire codec uses, so request bytes used by the codec
+    /// and request bytes used as a dedup-key are byte-identical.
+    pub fn canonical_bytes(&self) -> Vec<u8> {
+        rmp_serde::to_vec_named(self).expect("canonical request msgpack should not fail")
+    }
+}
+
+impl ViewSlice {
+    /// Bytes-to-sign for the slice's `signature` field:
+    /// `view_kind || peer_id || freshness_state || payload` in MessagePack
+    /// named-fields canonical form.
+    ///
+    /// Receivers verify this against the responding peer's agent ed25519
+    /// public key from the `AgentPeerBinding`.
+    ///
+    /// `Freshness::stale_since_ms` is intentionally excluded from the signing
+    /// canonical: it is operational metric data (when did this peer last hear
+    /// from a beacon?) that varies per-observer and per-clock, not a protocol
+    /// fact about the slice itself. Including it would break signature
+    /// verification across receivers whose clocks drift apart, even when the
+    /// underlying slice is identical.
+    pub fn canonical_bytes_for_signing(&self) -> Vec<u8> {
+        #[derive(serde::Serialize)]
+        #[serde(rename_all = "camelCase")]
+        struct Canonical<'a> {
+            view_kind: &'a ViewKind,
+            peer_id: &'a str,
+            freshness_state: &'a FreshnessState,
+            payload: &'a JsonVal,
+        }
+        rmp_serde::to_vec_named(&Canonical {
+            view_kind: &self.view_kind,
+            peer_id: &self.peer_id,
+            freshness_state: &self.freshness.state,
+            payload: &self.payload,
+        })
+        .expect("canonical slice msgpack should not fail")
+    }
+}
+
+#[cfg(test)]
+mod federation_canonical_tests {
+    use super::*;
+
+    #[test]
+    fn request_canonical_round_trips() {
+        let req = ViewFederationRequest {
+            view_kind: ViewKind::Cluster,
+            agent_cid: "agent_test".to_string(),
+            request_id: "req_001".to_string(),
+        };
+        let bytes = req.canonical_bytes();
+        let back: ViewFederationRequest = rmp_serde::from_slice(&bytes).unwrap();
+        assert_eq!(back, req);
+    }
+
+    #[test]
+    fn slice_canonical_excludes_stale_since_ms() {
+        // Two slices identical except for stale_since_ms must produce the SAME
+        // canonical signing bytes — that's the contract that makes signatures
+        // verifiable across receivers with drifting clocks.
+        let base = ViewSlice {
+            peer_id: "12D3KooWAAA".to_string(),
+            view_kind: ViewKind::Cluster,
+            freshness: Freshness {
+                state: FreshnessState::Live,
+                stale_since_ms: Some(12_345),
+            },
+            payload: JsonVal(serde_json::Value::Null),
+            signature: String::new(),
+        };
+        let mut other = base.clone();
+        other.freshness.stale_since_ms = Some(99_999);
+        assert_eq!(
+            base.canonical_bytes_for_signing(),
+            other.canonical_bytes_for_signing(),
+            "stale_since_ms must NOT influence the signing canonical"
+        );
+
+        // And signature must NOT influence the canonical either — that would
+        // be circular (you can't sign something whose bytes depend on the
+        // signature you're producing).
+        let mut signed = base.clone();
+        signed.signature = "fake-base64-signature".to_string();
+        assert_eq!(
+            base.canonical_bytes_for_signing(),
+            signed.canonical_bytes_for_signing(),
+            "signature field must NOT be self-referential in the canonical"
+        );
+    }
+
+    #[test]
+    fn slice_canonical_serializes_freshness_state_as_camel_case_field() {
+        // Sanity check: confirm the canonical bytes parse back as a msgpack
+        // map whose `freshnessState` value is "live" (snake_case enum
+        // serialization, camelCase field name to match the wire format).
+        let slice = ViewSlice {
+            peer_id: "12D3KooWAAA".to_string(),
+            view_kind: ViewKind::Cluster,
+            freshness: Freshness {
+                state: FreshnessState::Live,
+                stale_since_ms: Some(12_345),
+            },
+            payload: JsonVal(serde_json::json!({"hello": "world"})),
+            signature: String::new(),
+        };
+        let bytes = slice.canonical_bytes_for_signing();
+        let parsed: serde_json::Value = rmp_serde::from_slice(&bytes).unwrap();
+        assert_eq!(parsed["freshnessState"], serde_json::json!("live"));
+        assert_eq!(parsed["viewKind"], serde_json::json!("cluster"));
+        assert_eq!(parsed["peerId"], serde_json::json!("12D3KooWAAA"));
+        assert_eq!(parsed["payload"], serde_json::json!({"hello": "world"}));
+        // staleSinceMs must NOT appear in the canonical.
+        assert!(
+            parsed.get("staleSinceMs").is_none(),
+            "staleSinceMs must not appear in signing canonical"
+        );
+    }
+}
