@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "epr:schema:view:diversity-hint",
+  "title": "DiversityHint",
+  "description": "Tagged variant carrying a peer-diversity hint for a CID's replica set. Source of truth: composed from peer_identity_bindings + libp2p swarm metadata (Operational, Category C). Value shape depends on `kind`: region_metro/household_archetypes carry an array of strings, collective_member_count carries an integer, none carries null.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["kind"],
+  "properties": {
+    "kind": {
+      "enum": ["region_metro", "household_archetypes", "collective_member_count", "none"],
+      "description": "Which diversity dimension the hint addresses."
+    },
+    "value": {
+      "oneOf": [
+        { "type": "array", "items": { "type": "string" } },
+        { "type": "integer" },
+        { "type": "null" }
+      ],
+      "description": "Hint payload. Array of region/archetype strings, an integer count, or null/absent when kind=none. Serde tag/content adjacent tagging omits this key for unit variants."
+    }
+  }
+}

@@ -73,6 +73,9 @@ const INTERFACE_FILES = [
   { src: 'views/portal-host-view.ts', dest: 'portal-host-view.ts' },
   { src: 'views/agent-peer-binding-view.ts', dest: 'agent-peer-binding-view.ts' },
   { src: 'views/account-view.ts', dest: 'account-view.ts' },
+  // Light-Up-Topology Phase 1 — operational distribution + cluster + reciprocity (Category C)
+  { src: 'views/distribution-summary.ts', dest: 'distribution-summary.ts' },
+  { src: 'views/diversity-hint.ts', dest: 'diversity-hint.ts' },
 ];
 
 /**

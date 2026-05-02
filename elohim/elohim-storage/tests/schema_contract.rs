@@ -1775,6 +1775,60 @@ fn attention_tending_with_empty_tended_at_rejected_by_schema() {
     );
 }
 
+// ── Light-Up-Topology Phase 1 — Distribution / Cluster / Reciprocity ────
+
+#[test]
+fn distribution_summary_matches_schema() {
+    use elohim_storage::views::{
+        DiversityHint, DistributionSummary, FetchSource, MyRole, ReachClass, ReplicaHealth,
+    };
+
+    let sample = DistributionSummary {
+        replica_count: 12,
+        replica_target: 14,
+        replica_health: ReplicaHealth::Healthy,
+        projector_count: 2,
+        reach_class: ReachClass::Public,
+        diversity_hint: DiversityHint::RegionMetro(vec!["us-central".into(), "eu-west".into()]),
+        this_fetch_source: FetchSource::ProjectedViaDoorway,
+        last_verified_seconds: 420,
+        my_role: Some(MyRole::Replica),
+        reciprocity_hint: Some(0),
+    };
+
+    let json = serde_json::to_value(&sample).unwrap();
+    validate_against_schema("views/distribution-summary.schema.json", &json);
+
+    let raw_schema: Value = serde_json::from_str(
+        &fs::read_to_string(schema_dir().join("views/distribution-summary.schema.json")).unwrap(),
+    )
+    .unwrap();
+    assert_source_of_truth_declared(&raw_schema, "distribution-summary.schema.json");
+}
+
+#[test]
+fn distribution_summary_with_diversity_none_matches_schema() {
+    use elohim_storage::views::{
+        DiversityHint, DistributionSummary, FetchSource, ReachClass, ReplicaHealth,
+    };
+
+    let sample = DistributionSummary {
+        replica_count: 1,
+        replica_target: 3,
+        replica_health: ReplicaHealth::AtRisk,
+        projector_count: 0,
+        reach_class: ReachClass::Private,
+        diversity_hint: DiversityHint::None,
+        this_fetch_source: FetchSource::LocalPantry,
+        last_verified_seconds: 0,
+        my_role: None,
+        reciprocity_hint: None,
+    };
+
+    let json = serde_json::to_value(&sample).unwrap();
+    validate_against_schema("views/distribution-summary.schema.json", &json);
+}
+
 #[test]
 fn attention_tending_with_negative_tended_at_rejected_by_schema() {
     // Hand-crafted Value — NOT constructed through the Rust struct — so this

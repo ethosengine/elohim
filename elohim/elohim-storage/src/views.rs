@@ -7086,3 +7086,97 @@ pub struct RemovePortalHostOutputView {
     /// this as a presence check.
     pub deleted: bool,
 }
+
+// ───────────────────────────────────────────────────────────────────────────
+// Light-Up-Topology Phase 1 — operational distribution + cluster + reciprocity
+// ───────────────────────────────────────────────────────────────────────────
+//
+// Wire shapes for the light-up-topology epic. These are Operational (Category
+// C) projections — composed per request from rea_commitments + economic_events
+// + peer_identity_bindings + libp2p swarm state. None of them introduce a new
+// DHT entry type; none of them are persisted on the elohim-storage side.
+
+/// Replica health bucket for a CID's distribution summary.
+#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+#[serde(rename_all = "snake_case")]
+pub enum ReplicaHealth {
+    Healthy,
+    AtRisk,
+    Critical,
+}
+
+/// Reach class for a CID — mirrors the protocol Reach enum's content-distribution
+/// classes. Drives target replica count and badge tier.
+#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+#[serde(rename_all = "snake_case")]
+pub enum ReachClass {
+    Private,
+    Intimate,
+    Household,
+    Neighborhood,
+    Collective,
+    Community,
+    District,
+    Public,
+}
+
+/// Where the bytes for the current fetch were sourced from.
+#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+#[serde(rename_all = "snake_case")]
+pub enum FetchSource {
+    ProjectedViaDoorway,
+    PeerDirect,
+    LocalPantry,
+}
+
+/// Viewer's role for a CID.
+#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+#[serde(rename_all = "snake_case")]
+pub enum MyRole {
+    SoleReplica,
+    Replica,
+    ReplicaAndProjector,
+    NotHosting,
+}
+
+/// Tagged peer-diversity hint for a CID's replica set. Tag/content layout
+/// matches the schema's `{ kind, value }` envelope so downstream consumers can
+/// branch on `kind` without untagged-enum heuristics. The `None` unit variant
+/// serializes as `{"kind":"none","value":null}`.
+#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+#[serde(tag = "kind", content = "value", rename_all = "snake_case")]
+pub enum DiversityHint {
+    /// Replicas span these region-metro tiers.
+    RegionMetro(Vec<String>),
+    /// Replicas span these household device archetypes.
+    HouseholdArchetypes(Vec<String>),
+    /// Replicas live within a single collective; carries member count.
+    CollectiveMemberCount(u32),
+    /// No diversity hint available.
+    None,
+}
+
+/// Inline per-CID distribution payload hydrated onto EPR/content responses.
+/// Operational (Category C) projection; not persisted.
+#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+#[serde(rename_all = "camelCase")]
+pub struct DistributionSummary {
+    pub replica_count: u32,
+    pub replica_target: u32,
+    pub replica_health: ReplicaHealth,
+    pub projector_count: u32,
+    pub reach_class: ReachClass,
+    pub diversity_hint: DiversityHint,
+    pub this_fetch_source: FetchSource,
+    pub last_verified_seconds: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub my_role: Option<MyRole>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reciprocity_hint: Option<i64>,
+}
