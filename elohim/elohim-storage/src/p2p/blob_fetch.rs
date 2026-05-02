@@ -75,10 +75,16 @@ pub async fn race_fetch(
             return FetchOutcome::Miss;
         }
 
-        // Spawn a per-peer fetch task into a FuturesUnordered for true
+        // Spawn a per-peer fetch task into a FuturesUnordered for
         // first-responder semantics: as soon as any peer returns verified
-        // bytes we return Hit, and the remaining in-flight futures are
-        // dropped (which cancels the spawned tasks).
+        // bytes we return Hit and stop awaiting the rest of the batch.
+        //
+        // Note: `tokio::spawn` detaches the task — dropping the JoinHandle
+        // does NOT abort it. The spawned future runs to completion (bounded
+        // by the per_peer_timeout in `tokio::time::timeout`). At Stage 2 with
+        // real network I/O, replace `tokio::spawn` with unboxed futures
+        // inside `FuturesUnordered` so drop = cancel for true cooperative
+        // cancellation.
         let mut in_flight: FuturesUnordered<_> = FuturesUnordered::new();
         for peer_id_str in batch {
             let Ok(peer_id) = peer_id_str.parse::<libp2p::PeerId>() else {
@@ -115,8 +121,11 @@ pub async fn race_fetch(
         while let Some(joined) = in_flight.next().await {
             if let Ok((peer, Ok(bytes))) = joined {
                 if verify_blob_hash(&bytes, blob_hash) {
-                    // Drop in_flight implicitly when we return; this cancels
-                    // any still-pending spawned tasks.
+                    // Returning here drops `in_flight`, which stops awaiting
+                    // the remaining JoinHandles. The detached tokio tasks
+                    // continue running to completion (bounded by
+                    // per_peer_timeout) — see Stage 2 note on the spawn
+                    // block above.
                     return FetchOutcome::Hit {
                         bytes,
                         source_peer: peer,
@@ -194,11 +203,18 @@ pub fn finalize_fetch_success(
 
 /// Verify that `bytes` has the sha256 hex digest matching `expected_hex`.
 /// Comparison is case-insensitive (both sides lowercased).
+///
+/// Accepts both raw hex (`"a7ffc6f8..."`) and the canonical `"sha256-<hex>"`
+/// form used at the HTTP boundary. The `sha256-` prefix is stripped before
+/// comparison; without this, callers that normalize to the prefixed form
+/// (see `http.rs` `handle_get_blob`) would always see a hash mismatch and
+/// silently return `FetchOutcome::Miss`.
 pub fn verify_blob_hash(bytes: &[u8], expected_hex: &str) -> bool {
+    let hex_part = expected_hex.strip_prefix("sha256-").unwrap_or(expected_hex);
     let mut hasher = Sha256::new();
     hasher.update(bytes);
     let actual_hex = hex::encode(hasher.finalize());
-    actual_hex == expected_hex.to_lowercase()
+    actual_hex == hex_part.to_lowercase()
 }
 
 /// Extract race-fetch parameters from the runtime `Config`.
@@ -238,6 +254,22 @@ mod tests {
         let (bytes, hex) = known_blob();
         let upper = hex.to_uppercase();
         assert!(verify_blob_hash(&bytes, &upper));
+    }
+
+    /// T19 review Fix #1 regression: the call site in `http.rs::race_fetch`
+    /// passes the canonical `"sha256-<64hex>"` form (set by
+    /// `handle_get_blob`'s `normalized_hash`), not the raw hex. Prior to
+    /// the fix, `verify_blob_hash` compared raw-hex against prefixed-hex
+    /// and always returned false, causing every Stage 2 race-fetch with
+    /// real bytes to silently degrade to `FetchOutcome::Miss`.
+    #[test]
+    fn verify_blob_hash_handles_sha256_prefix() {
+        let (bytes, hex) = known_blob();
+        let prefixed = format!("sha256-{}", hex);
+        assert!(
+            verify_blob_hash(&bytes, &prefixed),
+            "verify_blob_hash must accept canonical 'sha256-<hex>' form"
+        );
     }
 
     /// T19 Fix #2 regression: race-fetch must use FuturesUnordered so that

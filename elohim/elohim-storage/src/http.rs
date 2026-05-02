@@ -1627,12 +1627,19 @@ impl HttpServer {
                                                 error = %e,
                                                 "T19: race-fetch hit but local persist failed; \
                                                  declining to record fetch-success or emit \
-                                                 serve-blob event — returning 404"
+                                                 serve-blob event — returning 503"
                                             );
+                                            // 503, not 404: the blob exists upstream and we
+                                            // just failed to land it locally. A 404 would
+                                            // cache as "permanently absent" downstream and
+                                            // poison subsequent retries.
                                             return Ok(
                                                 Self::with_cors_headers(Response::builder())
-                                                    .status(StatusCode::NOT_FOUND)
-                                                    .body(Full::new(Bytes::from("Blob not found")))
+                                                    .status(StatusCode::SERVICE_UNAVAILABLE)
+                                                    .body(Full::new(Bytes::from(
+                                                        "Blob fetched from peer but local \
+                                                         persist failed; retry",
+                                                    )))
                                                     .unwrap(),
                                             );
                                         }

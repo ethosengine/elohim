@@ -852,7 +852,15 @@ impl P2PHandle {
     /// Stage 2 (broadcaster timer) will call `set_last_gossiped_inventory`
     /// after each successful snapshot publish, making this return `Some`.
     pub fn last_gossiped_inventory(&self) -> Option<Vec<String>> {
-        let guard = self.last_gossiped.read().ok()?;
+        // T19 review Fix #4: previously used `.read().ok()?` which silently
+        // returned `None` on poison — asymmetric with the setter, which
+        // (post-T19) warns. Recover the inner value (Vec<String> has no
+        // invariant to violate) and warn so operators can correlate with
+        // the panic that poisoned the lock.
+        let guard = self.last_gossiped.read().unwrap_or_else(|e| {
+            tracing::warn!("last_gossiped_inventory: RwLock poisoned; recovering inner value");
+            e.into_inner()
+        });
         if guard.is_empty() {
             None
         } else {
