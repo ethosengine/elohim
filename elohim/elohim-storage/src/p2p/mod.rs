@@ -221,21 +221,27 @@ type PendingViewFederationMap = Arc<
 /// F-T19: Error type for the requester-side view-federation dispatch path.
 ///
 /// Returned by `P2PHandle::view_federate` when the peer does not respond in time,
-/// the swarm channel is closed, or the remote side signals an inbound error.
+/// the swarm channel is closed, or a transport-level failure occurs.
 ///
 /// `HubId` can ride alongside this enum in a future sprint without a wire break
 /// (it lives entirely in the caller layer, not on the wire).
 #[derive(Debug, thiserror::Error)]
 pub enum FederationError {
-    /// The peer did not respond before the supplied deadline expired.
+    /// The peer did not respond before the deadline expired — either the
+    /// caller-supplied timeout in `P2PHandle::view_federate` or libp2p's
+    /// internal request_timeout configured on the behaviour.
     #[error("federation timeout")]
     Timeout,
     /// The P2P command channel was closed — swarm task is gone.
     #[error("swarm channel closed")]
     SwarmGone,
-    /// The remote peer rejected or failed to process the inbound request.
-    #[error("inbound request error")]
-    InboundError,
+    /// Outbound transport failure — the local peer could not reach the remote,
+    /// the connection closed mid-flight, the remote did not support
+    /// `/elohim/view-federation/1.0.0`, or an I/O error occurred. Distinct from
+    /// `Timeout` (peer reachable but slow) and from a future application-level
+    /// rejection variant.
+    #[error("transport error")]
+    TransportError,
 }
 
 /// Ordered queue of content IDs discovered as replication gaps, awaiting dispatch.
@@ -967,9 +973,9 @@ impl P2PHandle {
                     }
                     P2PCommand::TriggerCustodyReconcile => {} // T23: no swarm in test, no-op
                     P2PCommand::ViewFederate { respond, .. } => {
-                        // F-T19 stub: no swarm in test — signal InboundError so callers
+                        // F-T19 stub: no swarm in test — signal TransportError so callers
                         // get a deterministic non-panic result from for_testing() handles.
-                        let _ = respond.send(Err(FederationError::InboundError));
+                        let _ = respond.send(Err(FederationError::TransportError));
                     }
                 }
             }
@@ -1105,7 +1111,7 @@ impl P2PHandle {
     /// # Errors
     /// - `FederationError::Timeout` — peer did not respond within `timeout`.
     /// - `FederationError::SwarmGone` — command channel closed (swarm task exited).
-    /// - `FederationError::InboundError` — peer rejected the request or transport failed.
+    /// - `FederationError::TransportError` — transport-level failure (connection closed, dial failure, unsupported protocol, I/O error).
     pub async fn view_federate(
         &self,
         peer: libp2p::PeerId,
@@ -1125,6 +1131,10 @@ impl P2PHandle {
             Ok(Ok(Ok(response))) => Ok(response),
             Ok(Ok(Err(e))) => Err(e),
             Ok(Err(_)) => Err(FederationError::SwarmGone),
+            // Caller's deadline elapsed before swarm replied. The Receiver is dropped here,
+            // but the libp2p OutboundFailure event will eventually fire and clear the
+            // pending_view_federations entry — the orphan window is bounded by the
+            // libp2p request_timeout. Safe to drop: send-on-closed-receiver is a no-op.
             Err(_) => Err(FederationError::Timeout),
         }
     }
@@ -4148,8 +4158,10 @@ impl P2PNode {
                 request_response::Message::Request {
                     request, channel, ..
                 } => {
-                    // F-T20 will handle the inbound request and call send_response.
-                    // Until then, log and drop — the channel will close automatically.
+                    // Dropping the channel without send_response causes libp2p to deliver
+                    // OutboundFailure::ConnectionClosed to the requester (which maps to
+                    // FederationError::TransportError). F-T20 replaces this with a real
+                    // responder that calls send_response.
                     debug!(
                         target: "elohim_storage::view_federation",
                         peer = %peer,
@@ -4186,7 +4198,7 @@ impl P2PNode {
                         OutboundFailure::ConnectionClosed
                         | OutboundFailure::DialFailure
                         | OutboundFailure::UnsupportedProtocols
-                        | OutboundFailure::Io(_) => FederationError::InboundError,
+                        | OutboundFailure::Io(_) => FederationError::TransportError,
                     };
                     let _ = respond.send(Err(fed_err));
                 }

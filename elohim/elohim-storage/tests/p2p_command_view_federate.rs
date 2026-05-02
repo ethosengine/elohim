@@ -52,7 +52,7 @@ fn test_request() -> ViewFederationRequest {
 
 /// Test 1 (channel-dispatch): calling `view_federate` on a `for_testing()` handle
 /// reaches the `P2PCommand::ViewFederate` arm in the stub drainer and returns
-/// `Err(FederationError::InboundError)` — the sentinel the stub sends back.
+/// `Err(FederationError::TransportError)` — the sentinel the stub sends back.
 ///
 /// This proves the command is dispatched (not panicked on a missing arm or
 /// silently dropped on the floor).
@@ -66,8 +66,8 @@ async fn channel_dispatch_sends_view_federate_command() {
         .await;
 
     assert!(
-        matches!(result, Err(FederationError::InboundError)),
-        "expected FederationError::InboundError from for_testing() stub; got: {:?}",
+        matches!(result, Err(FederationError::TransportError)),
+        "expected FederationError::TransportError from for_testing() stub; got: {:?}",
         result
     );
 }
@@ -94,6 +94,7 @@ async fn view_federate_timeout_when_no_reply() {
     });
 
     let (status_tx, status_rx) = watch::channel(test_status());
+    // keep the watch sender alive so the receiver stays valid for the test duration
     std::mem::forget(status_tx);
 
     let handle = P2PHandle::from_parts_for_testing(status_rx, command_tx, "test-agent".to_string());
@@ -120,6 +121,7 @@ async fn view_federate_swarm_gone_when_channel_closed() {
     drop(command_rx);
 
     let (status_tx, status_rx) = watch::channel(test_status());
+    // keep the watch sender alive so the receiver stays valid for the test duration
     std::mem::forget(status_tx);
 
     let handle = P2PHandle::from_parts_for_testing(status_rx, command_tx, "test-agent".to_string());
