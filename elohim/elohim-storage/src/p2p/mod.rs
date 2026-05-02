@@ -301,6 +301,15 @@ pub struct P2PConfig {
     /// protocol. Default 16 MiB (matches `MAX_INLINE_SIZE` in `blob_store.rs`);
     /// hard-capped at 64 MiB by the codec regardless of this value.
     pub max_blob_response_size: usize,
+    /// T22: device archetype this peer reports as (e.g. `"node"`, `"desktop"`,
+    /// `"mobile"`, `"steward"`). Drives the default cadence for the inventory
+    /// broadcaster timer; the canonical source is `Config::device_archetype`
+    /// (see `config.rs::inventory_broadcast_seconds_default`).
+    pub device_archetype: Option<String>,
+    /// T22: explicit inventory-broadcast cadence override in seconds. `Some(0)`
+    /// disables broadcasting entirely; `None` falls back to the archetype
+    /// default (mobile → disabled, node/steward → 60s, desktop → 300s).
+    pub inventory_broadcast_seconds: Option<u64>,
 }
 
 impl Default for P2PConfig {
@@ -317,6 +326,8 @@ impl Default for P2PConfig {
             relay_mode: RelayMode::default(),
             announce_addresses: Vec::new(),
             max_blob_response_size: BLOB_DEFAULT_MAX_RESPONSE_SIZE,
+            device_archetype: None,
+            inventory_broadcast_seconds: None,
         }
     }
 }
@@ -412,6 +423,11 @@ pub struct P2PNode {
     /// endpoint reads via `P2PHandle::last_gossiped_inventory()`.
     /// Both sides share this Arc — initialized in `new()`, cloned into `handle()`.
     pub last_gossiped: Arc<std::sync::RwLock<Vec<String>>>,
+    /// T22: monotonic per-peer sequence allocator for outgoing
+    /// `BlobInventorySnapshot` messages. Initialized at 0 in `new()`; the
+    /// run-loop broadcaster tick allocates the next value before each
+    /// publish via `inventory_broadcaster::build_snapshot`.
+    inventory_seq: inventory_broadcaster::SequenceAllocator,
 }
 
 /// Cached identify protocol info for a connected peer.
@@ -1392,6 +1408,7 @@ impl P2PNode {
             )),
             reconciliation_metrics: std::sync::Arc::new(ReconciliationMetrics::default()),
             last_gossiped: Arc::new(std::sync::RwLock::new(Vec::new())),
+            inventory_seq: inventory_broadcaster::SequenceAllocator::new(0),
         })
     }
 
@@ -1574,6 +1591,35 @@ impl P2PNode {
             Duration::from_secs(DRAIN_INTERVAL_SECS),
         );
         drain_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+        // T22: inventory broadcast cadence — resolved once at run() entry from
+        // archetype default + config override. None means "broadcasting
+        // disabled" (mobile archetype, or explicit `0` override) — the
+        // tokio::select! arm uses `std::future::pending()` so it never fires.
+        let mut inventory_broadcast_interval: Option<tokio::time::Interval> =
+            match inventory_broadcaster::resolved_cadence(
+                self.config.device_archetype.as_deref(),
+                self.config.inventory_broadcast_seconds,
+            ) {
+                Some(secs) => {
+                    info!(
+                        target: "elohim_storage::inventory",
+                        secs = secs,
+                        archetype = ?self.config.device_archetype,
+                        "T22: inventory broadcast enabled"
+                    );
+                    let mut iv = tokio::time::interval(Duration::from_secs(secs));
+                    iv.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+                    Some(iv)
+                }
+                None => {
+                    info!(
+                        target: "elohim_storage::inventory",
+                        archetype = ?self.config.device_archetype,
+                        "T22: inventory broadcast disabled (archetype or 0-override)"
+                    );
+                    None
+                }
+            };
         // Track consecutive retry attempts for exponential backoff cap.
         let mut consecutive_empty_ticks: u32 = 0;
         let mut command_rx = self.command_rx.lock().await;
@@ -1683,10 +1729,95 @@ impl P2PNode {
                     }
                     drop(swarm);
                 }
+                _ = async {
+                    // T22: inventory broadcast tick. When the cadence is None
+                    // (mobile archetype / disabled), `pending()` ensures this
+                    // arm never fires.
+                    if let Some(iv) = &mut inventory_broadcast_interval {
+                        iv.tick().await
+                    } else {
+                        std::future::pending().await
+                    }
+                } => {
+                    drop(swarm);
+                    self.broadcast_inventory_snapshot().await;
+                }
                 _ = shutdown.recv() => {
                     info!("P2P node shutting down");
                     break;
                 }
+            }
+        }
+    }
+
+    /// T22: Build and publish a `BlobInventorySnapshot` to the inventory
+    /// gossip topic.
+    ///
+    /// Idempotent and safe to call repeatedly. On a successful publish, the
+    /// shared `last_gossiped` Arc is updated so the parity diagnostic at
+    /// `/api/v1/diagnostics/inventory-parity` reflects what was just gossiped.
+    /// Failures (serialize, publish) log warn and do not update the record —
+    /// the diagnostic continues to report the previous successful snapshot.
+    async fn broadcast_inventory_snapshot(&self) {
+        use crate::p2p::inventory_broadcaster::{build_snapshot, BlobStoreInventory};
+        use crate::p2p::inventory_gossip::INVENTORY_TOPIC;
+
+        let inventory = BlobStoreInventory {
+            store: Arc::clone(&self.blob_store),
+        };
+        let local_peer_id = self.peer_id().to_string();
+        let now_micros = chrono::Utc::now().timestamp_micros();
+
+        let snapshot = build_snapshot(&local_peer_id, &inventory, &self.inventory_seq, now_micros);
+        let hashes_for_record = snapshot.hashes.clone();
+        let snapshot_sequence = snapshot.sequence;
+
+        let bytes = match snapshot.to_bytes() {
+            Ok(b) => b,
+            Err(e) => {
+                warn!(
+                    target: "elohim_storage::inventory",
+                    error = %e,
+                    "T22: failed to serialize inventory snapshot"
+                );
+                return;
+            }
+        };
+
+        let topic = libp2p::gossipsub::IdentTopic::new(INVENTORY_TOPIC);
+        let mut swarm = self.swarm.write().await;
+        let publish_result = swarm.behaviour_mut().gossipsub.publish(topic, bytes);
+        drop(swarm);
+
+        match publish_result {
+            Ok(msg_id) => {
+                // Update the shared parity-tracking record so the diagnostic
+                // endpoint (read via `P2PHandle::last_gossiped_inventory`) reflects
+                // what was just gossiped. Mirrors `P2PHandle::set_last_gossiped_inventory`
+                // — write inline because the Arc is shared and we want to
+                // avoid round-tripping through the command channel.
+                if let Ok(mut guard) = self.last_gossiped.write() {
+                    *guard = hashes_for_record.clone();
+                } else {
+                    warn!(
+                        target: "elohim_storage::inventory",
+                        "T22: last_gossiped lock poisoned; parity diagnostic may be stale"
+                    );
+                }
+                info!(
+                    target: "elohim_storage::inventory",
+                    msg_id = ?msg_id,
+                    count = hashes_for_record.len(),
+                    sequence = snapshot_sequence,
+                    "T22: published inventory snapshot"
+                );
+            }
+            Err(e) => {
+                warn!(
+                    target: "elohim_storage::inventory",
+                    error = ?e,
+                    "T22: gossipsub publish failed (often: no subscribed peers yet)"
+                );
             }
         }
     }

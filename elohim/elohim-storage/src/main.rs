@@ -721,6 +721,10 @@ async fn async_main(
             storage_dir: config.storage_dir.clone(),
             relay_mode,
             announce_addresses: args.announce_addrs.clone(),
+            // T22: wire archetype + cadence override from top-level Config so
+            // the broadcaster timer in P2PNode::run can resolve cadence.
+            device_archetype: config.device_archetype.clone(),
+            inventory_broadcast_seconds: config.inventory_broadcast_seconds,
             ..Default::default()
         };
 

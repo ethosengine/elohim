@@ -22,6 +22,33 @@ pub trait LocalInventory: Send + Sync {
     fn current_hashes(&self) -> Vec<String>;
 }
 
+/// T22: Adapter wrapping a `BlobStore` to satisfy the `LocalInventory` trait.
+///
+/// Logs and returns an empty vec on `list_hashes` failure — broadcasting an
+/// empty snapshot is preferable to skipping the tick. Receivers treat the
+/// empty snapshot as "this peer hosts nothing right now," which is the
+/// truthful interpretation when our own enumeration has gone sideways
+/// (vs. silently skipping, which would make the parity diagnostic stale).
+pub struct BlobStoreInventory {
+    pub store: Arc<crate::blob_store::BlobStore>,
+}
+
+impl LocalInventory for BlobStoreInventory {
+    fn current_hashes(&self) -> Vec<String> {
+        match self.store.list_hashes() {
+            Ok(hashes) => hashes,
+            Err(e) => {
+                tracing::warn!(
+                    target: "elohim_storage::inventory",
+                    error = %e,
+                    "T22: list_hashes failed; broadcasting empty snapshot"
+                );
+                Vec::new()
+            }
+        }
+    }
+}
+
 /// Per-this-peer monotonic sequence allocator.
 #[derive(Debug, Clone, Default)]
 pub struct SequenceAllocator {
@@ -156,6 +183,25 @@ mod tests {
     #[test]
     fn resolved_cadence_zero_override_disables() {
         assert_eq!(resolved_cadence(Some("node"), Some(0)), None);
+    }
+
+    /// T22: BlobStoreInventory adapter walks the blob store and returns its
+    /// hashes. Verifies the adapter wires `BlobStore::list_hashes()` into the
+    /// `LocalInventory` trait without transformation.
+    #[tokio::test]
+    async fn blob_store_inventory_returns_stored_hashes() {
+        let blob_store = Arc::new(crate::blob_store::BlobStore::new_memory());
+        let r1 = blob_store.store(b"hello world").await.expect("store h1");
+        let r2 = blob_store.store(b"goodbye world").await.expect("store h2");
+
+        let inventory = BlobStoreInventory {
+            store: Arc::clone(&blob_store),
+        };
+        let mut hashes = inventory.current_hashes();
+        hashes.sort();
+        let mut expected = vec![r1.hash, r2.hash];
+        expected.sort();
+        assert_eq!(hashes, expected);
     }
 }
 
