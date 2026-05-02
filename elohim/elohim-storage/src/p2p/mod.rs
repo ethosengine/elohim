@@ -3023,6 +3023,11 @@ impl P2PNode {
                                 valid_until: b.valid_until.clone(),
                                 observed_at: now_iso,
                                 source: "handshake".to_string(),
+                                // T03a: defaults preserved here; T03b wires real values
+                                // from the AgentPeerBindingPayload (device_archetype,
+                                // superseded_by) when the signal handler is updated.
+                                device_archetype: "node".to_string(),
+                                superseded_by: None,
                             };
                             match self.db_pool.as_ref() {
                                 Some(pool) => match pool.get() {
@@ -3299,6 +3304,12 @@ impl P2PNode {
                                                 valid_until: payload.valid_until.clone(),
                                                 observed_at: now_iso,
                                                 source: "gossip".to_string(),
+                                                // T03a: defaults preserved here; T03b
+                                                // wires real values from the gossip
+                                                // payload when the signal handler is
+                                                // updated.
+                                                device_archetype: "node".to_string(),
+                                                superseded_by: None,
                                             };
                                             match self.db_pool.as_ref() {
                                                 Some(pool) => {

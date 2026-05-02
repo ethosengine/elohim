@@ -1200,13 +1200,15 @@ diesel::table! {
 
 diesel::table! {
     peer_identity_bindings (peer_id, dht_anchor_hash) {
-        peer_id         -> Text,
-        agent_cid       -> Text,
-        dht_anchor_hash -> Text,
-        valid_from      -> Text,
-        valid_until     -> Nullable<Text>,
-        observed_at     -> Text,
-        source          -> Text,
+        peer_id          -> Text,
+        agent_cid        -> Text,
+        dht_anchor_hash  -> Text,
+        valid_from       -> Text,
+        valid_until      -> Nullable<Text>,
+        observed_at      -> Text,
+        source           -> Text,
+        device_archetype -> Text,
+        superseded_by    -> Nullable<Text>,
     }
 }
 

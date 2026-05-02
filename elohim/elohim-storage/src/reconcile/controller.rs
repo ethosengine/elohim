@@ -1130,6 +1130,8 @@ mod tests {
                     valid_until: None,
                     observed_at: "2026-01-01T00:00:00Z".to_string(),
                     source: "dht".to_string(),
+                    device_archetype: "node".to_string(),
+                    superseded_by: None,
                 },
             )
             .expect("upsert binding");

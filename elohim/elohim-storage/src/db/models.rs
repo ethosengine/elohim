@@ -2997,6 +2997,12 @@ pub struct PeerIdentityBindingRow {
     pub observed_at: String,
     /// Provenance: 'dht' | 'gossip' | 'handshake'
     pub source: String,
+    /// Device archetype the agent bound this peer as ('node', 'mobile', 'desktop', ...).
+    /// Backfilled to 'node' for rows projected before this column existed.
+    pub device_archetype: String,
+    /// Action hash of the AgentPeerBinding DHT entry that supersedes this row, if any.
+    /// NULL means this is the current binding for (agent_cid, peer_id).
+    pub superseded_by: Option<String>,
 }
 
 /// Insert model for peer identity bindings (INSERT/REPLACE on primary key).
@@ -3010,6 +3016,8 @@ pub struct NewPeerIdentityBindingRow {
     pub valid_until: Option<String>,
     pub observed_at: String,
     pub source: String,
+    pub device_archetype: String,
+    pub superseded_by: Option<String>,
 }
 
 // Recovery Protocol Phase 2 — M4 Revocation Projection

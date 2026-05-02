@@ -495,6 +495,8 @@ fn handle_incoming_handshake(
         valid_until: b.valid_until.clone(),
         observed_at: now_iso,
         source: "handshake".to_string(),
+        device_archetype: "node".to_string(),
+        superseded_by: None,
     };
 
     match pool.get() {

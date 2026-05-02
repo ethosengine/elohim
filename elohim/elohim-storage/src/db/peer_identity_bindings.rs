@@ -107,6 +107,8 @@ mod tests {
             valid_until: valid_until.map(|s| s.to_string()),
             observed_at: observed_at.to_string(),
             source: source.to_string(),
+            device_archetype: "node".to_string(),
+            superseded_by: None,
         }
     }
 
