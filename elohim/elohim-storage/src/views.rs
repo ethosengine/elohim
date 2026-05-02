@@ -7314,3 +7314,45 @@ pub struct MyClusterView {
     pub totals: DeviceTotals,
     pub freshness: Freshness,
 }
+
+/// Per-household reciprocation edge in a peer topology view.
+#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+#[serde(rename_all = "camelCase")]
+pub struct PeerHouseholdEdge {
+    pub household_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub display_name: Option<String>,
+    pub online: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_sync_sec: Option<u64>,
+    pub my_cids_hosted_by_them: u32,
+    pub their_cids_hosted_by_me: u32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub net_diff: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub is_critical_for_me: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub i_am_critical_for_them: Option<bool>,
+}
+
+/// Sole-replica risk row in a peer topology view.
+#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+#[serde(rename_all = "camelCase")]
+pub struct ResilienceCliff {
+    pub household_id: String,
+    pub sole_replica_cid_count: u32,
+}
+
+/// Per-agent peer topology — reciprocation edges + resilience cliffs.
+#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+#[serde(rename_all = "camelCase")]
+pub struct PeerTopologyView {
+    pub agent_cid: String,
+    pub edges: Vec<PeerHouseholdEdge>,
+    pub reciprocation_count: u32,
+    pub resilience_cliffs: Vec<ResilienceCliff>,
+    pub freshness: Freshness,
+}

@@ -1929,6 +1929,60 @@ fn my_cluster_view_matches_schema() {
 }
 
 #[test]
+fn peer_topology_view_matches_schema() {
+    use elohim_storage::views::{
+        Freshness, FreshnessState, PeerHouseholdEdge, PeerTopologyView, ResilienceCliff,
+    };
+
+    let sample = PeerTopologyView {
+        agent_cid: "agent_abc123".into(),
+        edges: vec![PeerHouseholdEdge {
+            household_id: "household-jessica".into(),
+            display_name: Some("Jessica".into()),
+            online: true,
+            last_sync_sec: Some(45),
+            my_cids_hosted_by_them: 412,
+            their_cids_hosted_by_me: 380,
+            net_diff: Some(-32),
+            is_critical_for_me: Some(false),
+            i_am_critical_for_them: Some(true),
+        }],
+        reciprocation_count: 3,
+        resilience_cliffs: vec![ResilienceCliff {
+            household_id: "household-shem".into(),
+            sole_replica_cid_count: 7,
+        }],
+        freshness: Freshness {
+            state: FreshnessState::Live,
+            stale_since_ms: None,
+        },
+    };
+
+    let json = serde_json::to_value(&sample).unwrap();
+    validate_against_schema("views/peer-topology-view.schema.json", &json);
+}
+
+#[test]
+fn peer_household_edge_minimal_matches_schema() {
+    use elohim_storage::views::PeerHouseholdEdge;
+
+    let sample = PeerHouseholdEdge {
+        household_id: "household-x".into(),
+        display_name: None,
+        online: false,
+        last_sync_sec: None,
+        my_cids_hosted_by_them: 0,
+        their_cids_hosted_by_me: 0,
+        net_diff: None,
+        is_critical_for_me: None,
+        i_am_critical_for_them: None,
+    };
+
+    let json = serde_json::to_value(&sample).unwrap();
+    validate_against_schema("views/peer-household-edge.schema.json", &json);
+}
+
+#[test]
 fn freshness_offline_matches_schema() {
     use elohim_storage::views::{Freshness, FreshnessState};
 
