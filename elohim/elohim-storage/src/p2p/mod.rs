@@ -206,6 +206,38 @@ type PendingEprAtomFetchMap = Arc<
     >,
 >;
 
+/// F-T19: Map of pending view-federation requests on `/elohim/view-federation/1.0.0`.
+/// Resolved when the behaviour event delivers `Message::Response` or `OutboundFailure`.
+/// Mirrors `PendingBlobFetchMap` with typed result error.
+type PendingViewFederationMap = Arc<
+    tokio::sync::Mutex<
+        std::collections::HashMap<
+            request_response::OutboundRequestId,
+            oneshot::Sender<Result<crate::views::ViewFederationResponse, FederationError>>,
+        >,
+    >,
+>;
+
+/// F-T19: Error type for the requester-side view-federation dispatch path.
+///
+/// Returned by `P2PHandle::view_federate` when the peer does not respond in time,
+/// the swarm channel is closed, or the remote side signals an inbound error.
+///
+/// `HubId` can ride alongside this enum in a future sprint without a wire break
+/// (it lives entirely in the caller layer, not on the wire).
+#[derive(Debug, thiserror::Error)]
+pub enum FederationError {
+    /// The peer did not respond before the supplied deadline expired.
+    #[error("federation timeout")]
+    Timeout,
+    /// The P2P command channel was closed — swarm task is gone.
+    #[error("swarm channel closed")]
+    SwarmGone,
+    /// The remote peer rejected or failed to process the inbound request.
+    #[error("inbound request error")]
+    InboundError,
+}
+
 /// Ordered queue of content IDs discovered as replication gaps, awaiting dispatch.
 /// Populated by discover() on each ListContent response; drained by drain_gap_queue()
 /// at the 5-second dispatch interval, bounded by MAX_REPLICATION_INFLIGHT.
@@ -456,6 +488,10 @@ pub struct P2PNode {
     /// Populated by `handle_command(FetchEprAtomFromPeer)`, resolved in
     /// `handle_epr_atom_response` on success/failure/timeout.
     pending_epr_atom_fetches: PendingEprAtomFetchMap,
+    /// F-T19: pending view-federation requests on `/elohim/view-federation/1.0.0`.
+    /// Populated by `handle_command(ViewFederate)`, resolved in the behaviour
+    /// event arm when `Message::Response` or `OutboundFailure` fires.
+    pending_view_federations: PendingViewFederationMap,
     /// T16: custody reconciliation counters — incremented by reconcile_pass.
     pub reconciliation_metrics: std::sync::Arc<ReconciliationMetrics>,
     /// T18: shared cache of last gossiped inventory hashes.
@@ -788,6 +824,19 @@ pub enum P2PCommand {
     /// drops the trigger and the timer-tick cadence picks up the slack.
     /// Fire-and-forget; no reply.
     TriggerCustodyReconcile,
+    /// F-T19: issue a `/elohim/view-federation/1.0.0` request to `peer` for the
+    /// given `request`, then deliver the result via `respond`.
+    ///
+    /// The in-flight entry is stored in `pending_view_federations` keyed by the
+    /// `OutboundRequestId` returned by `send_request`. On `Message::Response`
+    /// or `OutboundFailure` the event handler removes and resolves it.
+    ///
+    /// Callers drive the deadline via `P2PHandle::view_federate(…, timeout)`.
+    ViewFederate {
+        peer: libp2p::PeerId,
+        request: crate::views::ViewFederationRequest,
+        respond: oneshot::Sender<Result<crate::views::ViewFederationResponse, FederationError>>,
+    },
 }
 
 /// RAII guard that resumes P2P sync when dropped.
@@ -917,6 +966,11 @@ impl P2PHandle {
                                     .to_string()));
                     }
                     P2PCommand::TriggerCustodyReconcile => {} // T23: no swarm in test, no-op
+                    P2PCommand::ViewFederate { respond, .. } => {
+                        // F-T19 stub: no swarm in test — signal InboundError so callers
+                        // get a deterministic non-panic result from for_testing() handles.
+                        let _ = respond.send(Err(FederationError::InboundError));
+                    }
                 }
             }
         });
@@ -943,6 +997,30 @@ impl P2PHandle {
             status_rx,
             command_tx,
             agent_pubkey: "stub-agent".to_string(),
+            delivery_peers: Arc::new(DashMap::new()),
+            sync_paused: Arc::new(AtomicBool::new(false)),
+            last_gossiped: Arc::new(std::sync::RwLock::new(Vec::new())),
+        }
+    }
+
+    /// Construct a `P2PHandle` from explicit parts for fine-grained unit tests.
+    ///
+    /// Unlike `for_testing()`, the caller supplies the command channel so it can
+    /// control what happens when a command is received (e.g. never reply to test
+    /// timeout behaviour, drop the receiver to test swarm-gone behaviour).
+    ///
+    /// The status receiver, command sender, and agent pubkey must be consistent.
+    /// Intended for test utilities only — not for production use.
+    #[doc(hidden)]
+    pub fn from_parts_for_testing(
+        status_rx: tokio::sync::watch::Receiver<P2PStatusInfo>,
+        command_tx: mpsc::Sender<P2PCommand>,
+        agent_pubkey: String,
+    ) -> Self {
+        P2PHandle {
+            status_rx,
+            command_tx,
+            agent_pubkey,
             delivery_peers: Arc::new(DashMap::new()),
             sync_paused: Arc::new(AtomicBool::new(false)),
             last_gossiped: Arc::new(std::sync::RwLock::new(Vec::new())),
@@ -1012,6 +1090,43 @@ impl P2PHandle {
             return vec![];
         }
         rx.await.unwrap_or_default()
+    }
+
+    /// F-T19: Issue a `/elohim/view-federation/1.0.0` request to `peer` and await the response.
+    ///
+    /// Sends `P2PCommand::ViewFederate` to the swarm event loop, which calls
+    /// `behaviour.view_federation.send_request` and stores the oneshot in
+    /// `pending_view_federations`. The event loop resolves the oneshot when
+    /// `Message::Response` or `OutboundFailure` arrives.
+    ///
+    /// `timeout` is the caller-supplied deadline; the event loop does **not** impose
+    /// its own deadline so callers can tune per-context (aggregator vs. one-shot lookup).
+    ///
+    /// # Errors
+    /// - `FederationError::Timeout` — peer did not respond within `timeout`.
+    /// - `FederationError::SwarmGone` — command channel closed (swarm task exited).
+    /// - `FederationError::InboundError` — peer rejected the request or transport failed.
+    pub async fn view_federate(
+        &self,
+        peer: libp2p::PeerId,
+        request: crate::views::ViewFederationRequest,
+        timeout: Duration,
+    ) -> Result<crate::views::ViewFederationResponse, FederationError> {
+        let (tx, rx) = oneshot::channel();
+        self.command_tx
+            .send(P2PCommand::ViewFederate {
+                peer,
+                request,
+                respond: tx,
+            })
+            .await
+            .map_err(|_| FederationError::SwarmGone)?;
+        match tokio::time::timeout(timeout, rx).await {
+            Ok(Ok(Ok(response))) => Ok(response),
+            Ok(Ok(Err(e))) => Err(e),
+            Ok(Err(_)) => Err(FederationError::SwarmGone),
+            Err(_) => Err(FederationError::Timeout),
+        }
     }
 
     /// Publish an EPR Head to the DHT. Fire-and-forget.
@@ -1462,6 +1577,9 @@ impl P2PNode {
             )),
             pending_blob_pulls: Arc::new(tokio::sync::Mutex::new(std::collections::HashMap::new())),
             pending_epr_atom_fetches: Arc::new(tokio::sync::Mutex::new(
+                std::collections::HashMap::new(),
+            )),
+            pending_view_federations: Arc::new(tokio::sync::Mutex::new(
                 std::collections::HashMap::new(),
             )),
             reconciliation_metrics: std::sync::Arc::new(ReconciliationMetrics::default()),
@@ -2529,6 +2647,30 @@ impl P2PNode {
             // burst are not head-of-line-blocked by sync diesel queries.
             P2PCommand::TriggerCustodyReconcile => {
                 self.run_custody_reconcile().await;
+            }
+            // F-T19: issue a `/elohim/view-federation/1.0.0` request to the named peer
+            // and store the oneshot sender in `pending_view_federations`, keyed by the
+            // `OutboundRequestId` returned by `send_request`. The event handler below
+            // resolves it when `Message::Response` or `OutboundFailure` arrives.
+            P2PCommand::ViewFederate {
+                peer,
+                request,
+                respond,
+            } => {
+                let request_id = swarm
+                    .behaviour_mut()
+                    .view_federation
+                    .send_request(&peer, request);
+                debug!(
+                    target: "elohim_storage::view_federation",
+                    peer = %peer,
+                    request_id = ?request_id,
+                    "F-T19: view-federation request sent on /elohim/view-federation/1.0.0"
+                );
+                self.pending_view_federations
+                    .lock()
+                    .await
+                    .insert(request_id, respond);
             }
         }
     }
@@ -3970,16 +4112,108 @@ impl P2PNode {
                 debug!(peer = %peer, "Identity handshake response sent");
             }
 
-            // F-T18: View federation events arrive but have no dispatcher yet.
-            // The caller-side dispatcher (Message::Response) lands in F-T19 and
-            // the responder-side handler (Message::Request) in F-T20. Until
-            // then we drop them at debug level so peers can advertise the
-            // protocol without producing a `non_exhaustive_patterns` build break.
-            behaviour::ElohimStorageBehaviourEvent::ViewFederation(event) => {
+            // F-T19: View federation outbound response/failure dispatch.
+            // Message::Response — resolve the pending oneshot with Ok(response).
+            // OutboundFailure — map to FederationError and resolve with Err.
+            // Message::Request (inbound) — responder side, lands in F-T20; log for now.
+            behaviour::ElohimStorageBehaviourEvent::ViewFederation(
+                request_response::Event::Message { peer, message },
+            ) => match message {
+                request_response::Message::Response {
+                    request_id,
+                    response,
+                } => {
+                    if let Some(respond) = self
+                        .pending_view_federations
+                        .lock()
+                        .await
+                        .remove(&request_id)
+                    {
+                        debug!(
+                            target: "elohim_storage::view_federation",
+                            peer = %peer,
+                            request_id = ?request_id,
+                            "F-T19: view-federation response received; resolving oneshot"
+                        );
+                        let _ = respond.send(Ok(response));
+                    } else {
+                        debug!(
+                            target: "elohim_storage::view_federation",
+                            peer = %peer,
+                            request_id = ?request_id,
+                            "F-T19: view-federation response with no pending entry (already resolved or unknown)"
+                        );
+                    }
+                }
+                request_response::Message::Request {
+                    request, channel, ..
+                } => {
+                    // F-T20 will handle the inbound request and call send_response.
+                    // Until then, log and drop — the channel will close automatically.
+                    debug!(
+                        target: "elohim_storage::view_federation",
+                        peer = %peer,
+                        view_kind = ?request.view_kind,
+                        agent_cid = %request.agent_cid,
+                        "F-T19: inbound view-federation request received; responder lands in F-T20"
+                    );
+                    drop(channel);
+                }
+            },
+            behaviour::ElohimStorageBehaviourEvent::ViewFederation(
+                request_response::Event::OutboundFailure {
+                    peer,
+                    request_id,
+                    error,
+                },
+            ) => {
+                warn!(
+                    target: "elohim_storage::view_federation",
+                    peer = %peer,
+                    request_id = ?request_id,
+                    error = ?error,
+                    "F-T19: outbound view-federation request failed"
+                );
+                if let Some(respond) = self
+                    .pending_view_federations
+                    .lock()
+                    .await
+                    .remove(&request_id)
+                {
+                    use libp2p::request_response::OutboundFailure;
+                    let fed_err = match &error {
+                        OutboundFailure::Timeout => FederationError::Timeout,
+                        OutboundFailure::ConnectionClosed
+                        | OutboundFailure::DialFailure
+                        | OutboundFailure::UnsupportedProtocols
+                        | OutboundFailure::Io(_) => FederationError::InboundError,
+                    };
+                    let _ = respond.send(Err(fed_err));
+                }
+            }
+            behaviour::ElohimStorageBehaviourEvent::ViewFederation(
+                request_response::Event::InboundFailure {
+                    peer,
+                    request_id,
+                    error,
+                },
+            ) => {
                 debug!(
                     target: "elohim_storage::view_federation",
-                    event = ?event,
-                    "view-federation event (handler lands in F-T19/F-T20)"
+                    peer = %peer,
+                    request_id = ?request_id,
+                    error = ?error,
+                    "F-T19: inbound view-federation request failed"
+                );
+            }
+            behaviour::ElohimStorageBehaviourEvent::ViewFederation(
+                request_response::Event::ResponseSent { peer, request_id },
+            ) => {
+                debug!(
+                    target: "elohim_storage::view_federation",
+                    peer = %peer,
+                    request_id = ?request_id,
+                    "F-T19: view-federation response sent"
                 );
             }
 
