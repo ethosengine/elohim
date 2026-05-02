@@ -310,6 +310,32 @@ pub struct P2PConfig {
     /// disables broadcasting entirely; `None` falls back to the archetype
     /// default (mobile → disabled, node/steward → 60s, desktop → 300s).
     pub inventory_broadcast_seconds: Option<u64>,
+    /// T23: CID of this peer's steward, threaded from `Config::self_cid`.
+    /// `None` disables the custody reconcile sweep — without a self CID the
+    /// reconcile pass cannot tell whether a custody-blob commitment is "own"
+    /// (kick on miss) or "other" (emit placement-gap), and any guess would
+    /// emit spurious events.
+    pub self_cid: Option<String>,
+    /// T23: periodic custody reconcile cadence in seconds. `Some(0)` disables
+    /// the timer arm (event-driven sweeps via `ConnectionEstablished` still
+    /// fire when the trigger is enabled). `None` falls back to the
+    /// `Config::custody_sweep_seconds` default (120s).
+    pub custody_sweep_seconds: Option<u64>,
+    /// T23: how long a custody commitment can be unhonored before
+    /// placement-gap fires. Threaded from `Config::placement_grace_seconds`.
+    pub placement_grace_seconds: u64,
+    /// T23: minimum time between repeated placement-gap events for the same
+    /// commitment. Threaded from `Config::placement_gap_cooldown_seconds`.
+    pub placement_gap_cooldown_seconds: u64,
+    /// T23: TTL for `peer_blob_inventory` entries before they're considered
+    /// stale during reconcile. Threaded from `Config::inventory_freshness_seconds`.
+    pub inventory_freshness_seconds: u64,
+    /// T23: per-peer timeout (seconds) for the kicked race-fetch.
+    /// Threaded from `Config::fetch_blob_timeout_seconds`.
+    pub fetch_blob_timeout_seconds: u64,
+    /// T23: parallelism bound for the kicked race-fetch.
+    /// Threaded from `Config::fetch_blob_parallelism`.
+    pub fetch_blob_parallelism: usize,
 }
 
 impl Default for P2PConfig {
@@ -328,6 +354,15 @@ impl Default for P2PConfig {
             max_blob_response_size: BLOB_DEFAULT_MAX_RESPONSE_SIZE,
             device_archetype: None,
             inventory_broadcast_seconds: None,
+            self_cid: None,
+            // T23 defaults mirror `config.rs::default_*`. Production callers
+            // override via `main.rs::p2p_config` from top-level Config.
+            custody_sweep_seconds: None,
+            placement_grace_seconds: 300,
+            placement_gap_cooldown_seconds: 1800,
+            inventory_freshness_seconds: 600,
+            fetch_blob_timeout_seconds: 5,
+            fetch_blob_parallelism: 3,
         }
     }
 }
@@ -439,17 +474,23 @@ struct CachedIdentifyInfo {
 }
 
 /// Per-peer runtime metrics tracked from swarm events.
-struct PeerMetrics {
+///
+/// Visibility is `pub` (rather than module-private) so the T23 custody
+/// reconcile sweep adapter (`reconcile::custody_sweep::RaceFetchKicker`) can
+/// hold an `Arc<DashMap<String, PeerMetrics>>` and snapshot connected peers
+/// at kick time. The fields stay module-private — external callers should
+/// route through `is_connected` / `connected_peers` accessors.
+pub struct PeerMetrics {
     /// Whether this peer currently has an active libp2p connection.
     /// Set to true on ConnectionEstablished; false on ConnectionClosed
     /// (entry is also removed on disconnect, so false entries are transient).
-    is_connected: bool,
+    pub(crate) is_connected: bool,
     /// Connection direction: "inbound" or "outbound"
-    direction: &'static str,
+    pub(crate) direction: &'static str,
     /// Unix epoch millis of last peer activity
-    last_seen_ms: u64,
+    pub(crate) last_seen_ms: u64,
     /// Ring buffer of RTT samples from ping (max 8)
-    rtt_samples: std::collections::VecDeque<Duration>,
+    pub(crate) rtt_samples: std::collections::VecDeque<Duration>,
 }
 
 /// Atomic counters for custody reconciliation — incremented each pass.
@@ -1494,6 +1535,121 @@ impl P2PNode {
         }
     }
 
+    /// T23: Run one custody reconcile pass.
+    ///
+    /// Builds a [`crate::reconcile::custody::BlobStoreSnapshot`] +
+    /// [`crate::reconcile::custody_sweep::RaceFetchKicker`], invokes
+    /// `reconcile_pass`, and folds the outcome into
+    /// [`ReconciliationMetrics`]. Idempotent and safe to call from both the
+    /// timer arm and the `ConnectionEstablished` event arm; cooldowns inside
+    /// `reconcile_pass` suppress duplicate placement-gap events.
+    ///
+    /// Skips silently (with a `debug!` trace) when the prerequisites for a
+    /// meaningful sweep are absent: no DB pool attached, no `self_cid`
+    /// configured, or the local pantry walk fails.
+    ///
+    /// **Lock contract:** does NOT acquire the swarm lock. Callers from the
+    /// `run()` select! arms must drop their swarm guard before invoking.
+    pub(crate) async fn run_custody_reconcile(&self) {
+        use crate::reconcile::custody::{reconcile_pass, BlobStoreSnapshot, ReconcileConfig};
+        use crate::reconcile::custody_sweep::RaceFetchKicker;
+        use std::sync::atomic::Ordering;
+
+        let Some(self_cid) = self.config.self_cid.clone() else {
+            debug!(
+                target: "elohim_storage::reconcile",
+                "T23: self_cid not configured; skipping custody reconcile pass"
+            );
+            return;
+        };
+
+        let pool = match &self.db_pool {
+            Some(p) => p.clone(),
+            None => {
+                debug!(
+                    target: "elohim_storage::reconcile",
+                    "T23: db_pool not attached; skipping custody reconcile pass"
+                );
+                return;
+            }
+        };
+        let mut conn = match pool.get() {
+            Ok(c) => c,
+            Err(e) => {
+                warn!(
+                    target: "elohim_storage::reconcile",
+                    error = %e,
+                    "T23: pool exhausted; skipping custody reconcile pass"
+                );
+                return;
+            }
+        };
+
+        let snapshot = match BlobStoreSnapshot::from_store(&self.blob_store) {
+            Ok(s) => s,
+            Err(e) => {
+                warn!(
+                    target: "elohim_storage::reconcile",
+                    error = %e,
+                    "T23: BlobStoreSnapshot build failed; skipping custody reconcile pass"
+                );
+                return;
+            }
+        };
+
+        let kicker = RaceFetchKicker {
+            command_tx: self.command_tx.clone(),
+            connected_peers: self.peer_metrics.clone(),
+            db_pool: pool.clone(),
+            blob_store: self.blob_store.clone(),
+            self_cid: self_cid.clone(),
+            fetch_blob_parallelism: self.config.fetch_blob_parallelism,
+            fetch_blob_timeout_seconds: self.config.fetch_blob_timeout_seconds,
+            metrics: self.reconciliation_metrics.clone(),
+        };
+
+        let cfg = ReconcileConfig {
+            placement_grace_seconds: self.config.placement_grace_seconds,
+            placement_gap_cooldown_seconds: self.config.placement_gap_cooldown_seconds,
+            inventory_freshness_seconds: self.config.inventory_freshness_seconds,
+        };
+
+        match reconcile_pass(
+            &mut conn,
+            &self_cid,
+            &snapshot,
+            &kicker,
+            cfg,
+            chrono::Utc::now(),
+        ) {
+            Ok(outcome) => {
+                self.reconciliation_metrics
+                    .reconcile_passes_total
+                    .fetch_add(1, Ordering::Relaxed);
+                self.reconciliation_metrics
+                    .placement_gaps_emitted_total
+                    .fetch_add(outcome.placement_gaps_emitted as u64, Ordering::Relaxed);
+                // kicks_fired_total is incremented inside RaceFetchKicker::kick
+                // so the count reflects work scheduled (one increment per kick).
+                debug!(
+                    target: "elohim_storage::reconcile",
+                    snapshot_size = snapshot.len(),
+                    commitments_examined = outcome.commitments_examined,
+                    kicks_fired = outcome.kicks_fired,
+                    placement_gaps = outcome.placement_gaps_emitted,
+                    "T23: custody reconcile pass completed"
+                );
+            }
+            Err(e) => {
+                warn!(
+                    target: "elohim_storage::reconcile",
+                    error = %e,
+                    "T23: reconcile_pass failed"
+                );
+            }
+        }
+    }
+
     /// Start listening and event loop
     pub async fn start(&self) -> Result<(), StorageError> {
         let mut swarm = self.swarm.write().await;
@@ -1628,6 +1784,33 @@ impl P2PNode {
                     None
                 }
             };
+        // T23: custody reconcile sweep cadence — resolved once at run() entry
+        // from `Config::custody_sweep_seconds`. `Some(0)` disables the timer
+        // arm (event-driven `ConnectionEstablished` sweeps still fire if
+        // `self_cid` is configured); `None` resolves to the 120s default.
+        // Sweeps additionally no-op silently when `self_cid` is unset, so the
+        // timer is safe to enable unconditionally here.
+        let mut custody_sweep_interval: Option<tokio::time::Interval> =
+            match self.config.custody_sweep_seconds {
+                Some(0) => {
+                    info!(
+                        target: "elohim_storage::reconcile",
+                        "T23: custody sweep timer disabled (0-override)"
+                    );
+                    None
+                }
+                resolved => {
+                    let secs = resolved.unwrap_or(120);
+                    info!(
+                        target: "elohim_storage::reconcile",
+                        secs = secs,
+                        "T23: custody sweep timer enabled"
+                    );
+                    let mut iv = tokio::time::interval(Duration::from_secs(secs));
+                    iv.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+                    Some(iv)
+                }
+            };
         // Track consecutive retry attempts for exponential backoff cap.
         let mut consecutive_empty_ticks: u32 = 0;
         let mut command_rx = self.command_rx.lock().await;
@@ -1749,6 +1932,18 @@ impl P2PNode {
                 } => {
                     drop(swarm);
                     self.broadcast_inventory_snapshot().await;
+                }
+                _ = async {
+                    // T23: custody reconcile sweep tick. When disabled
+                    // (0-override), `pending()` ensures this arm never fires.
+                    if let Some(iv) = &mut custody_sweep_interval {
+                        iv.tick().await
+                    } else {
+                        std::future::pending().await
+                    }
+                } => {
+                    drop(swarm);
+                    self.run_custody_reconcile().await;
                 }
                 _ = shutdown.recv() => {
                     info!("P2P node shutting down");
@@ -2605,6 +2800,16 @@ impl P2PNode {
                         .send_request(&peer_id, identity_request);
                 }
                 self.refresh_status().await;
+                // T23: trigger a custody reconcile pass on every successful
+                // connection so own commitments where this peer is now a
+                // candidate get a kick chance immediately, and other peers'
+                // commitments to us get re-evaluated against fresh
+                // peer_blob_inventory state. The pass acquires no swarm lock
+                // (the inner block above already dropped its guard) and
+                // no-ops silently when self_cid / db_pool are absent. The
+                // placement-gap cooldown inside `reconcile_pass` prevents
+                // duplicate events when many peers connect in a short window.
+                self.run_custody_reconcile().await;
             }
             SwarmEvent::ConnectionClosed { peer_id, cause, .. } => {
                 debug!(peer = %peer_id, cause = ?cause, "Disconnected from peer");

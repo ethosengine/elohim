@@ -725,6 +725,17 @@ async fn async_main(
             // the broadcaster timer in P2PNode::run can resolve cadence.
             device_archetype: config.device_archetype.clone(),
             inventory_broadcast_seconds: config.inventory_broadcast_seconds,
+            // T23: wire custody reconcile sweep parameters from top-level
+            // Config so the timer + ConnectionEstablished trigger in
+            // P2PNode::run_custody_reconcile see the same values used by the
+            // HTTP-side race-fetch path (config.rs defaults).
+            self_cid: config.self_cid.clone(),
+            custody_sweep_seconds: Some(config.custody_sweep_seconds),
+            placement_grace_seconds: config.placement_grace_seconds,
+            placement_gap_cooldown_seconds: config.placement_gap_cooldown_seconds,
+            inventory_freshness_seconds: config.inventory_freshness_seconds,
+            fetch_blob_timeout_seconds: config.fetch_blob_timeout_seconds,
+            fetch_blob_parallelism: config.fetch_blob_parallelism,
             ..Default::default()
         };
 

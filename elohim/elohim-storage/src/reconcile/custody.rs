@@ -36,6 +36,48 @@ pub trait FetchKicker: Send + Sync {
     fn kick(&self, blob_hash: &str, candidates: Vec<String>);
 }
 
+/// Snapshot of the local blob store taken at reconcile-pass start.
+///
+/// Implements [`LocalBlobStore`] for the duration of a single pass by
+/// pre-fetching the full hash set once via [`crate::blob_store::BlobStore::list_hashes`]
+/// and answering `has` from a [`std::collections::HashSet`]. This is cheaper
+/// (and avoids holding the blob store across diesel queries) than calling
+/// `BlobStore::exists` per commitment.
+///
+/// Hash format: matches whatever `list_hashes` returns (currently
+/// `sha256-<hex>`); reconcile_pass does string-equality lookups against
+/// `rea_commitments.resource_classified_as`, so the two stores must share a
+/// canonical form. T17 / T22 already standardised on `sha256-<hex>`.
+pub struct BlobStoreSnapshot {
+    hashes: std::collections::HashSet<String>,
+}
+
+impl BlobStoreSnapshot {
+    /// Build a snapshot by reading the local pantry once. Returns
+    /// [`StorageError`] if the directory walk fails; the caller should skip
+    /// the reconcile tick rather than running with a partial view.
+    pub fn from_store(store: &crate::blob_store::BlobStore) -> Result<Self, StorageError> {
+        let hashes = store.list_hashes()?.into_iter().collect();
+        Ok(Self { hashes })
+    }
+
+    /// Number of hashes captured in the snapshot. Useful for tests + tracing.
+    pub fn len(&self) -> usize {
+        self.hashes.len()
+    }
+
+    /// `true` when the snapshot captured no hashes.
+    pub fn is_empty(&self) -> bool {
+        self.hashes.is_empty()
+    }
+}
+
+impl LocalBlobStore for BlobStoreSnapshot {
+    fn has(&self, blob_hash: &str) -> bool {
+        self.hashes.contains(blob_hash)
+    }
+}
+
 /// Outcome of a single reconcile pass; useful for tests + metrics.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct ReconcileOutcome {
@@ -462,5 +504,32 @@ mod tests {
         .unwrap();
 
         assert_eq!(outcome.placement_gaps_emitted, 0);
+    }
+
+    // -----------------------------------------------------------------------
+    // T23: BlobStoreSnapshot adapter
+    // -----------------------------------------------------------------------
+
+    /// Snapshot taken after a blob is stored reports `has(hash) == true`,
+    /// and reports `has` of an absent hash as `false`.
+    #[tokio::test]
+    async fn blob_store_snapshot_reflects_local_pantry() {
+        let store = crate::blob_store::BlobStore::new_memory();
+        let payload = b"reconcile-snapshot-fixture-v1";
+        let result = store.store(payload).await.expect("store fixture blob");
+
+        let snapshot = BlobStoreSnapshot::from_store(&store).expect("snapshot");
+
+        assert!(
+            snapshot.has(&result.hash),
+            "snapshot must report stored hash present"
+        );
+        assert!(
+            !snapshot
+                .has("sha256-deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef"),
+            "snapshot must report unknown hash absent"
+        );
+        assert_eq!(snapshot.len(), 1, "snapshot captured one hash");
+        assert!(!snapshot.is_empty(), "snapshot is non-empty after store");
     }
 }
