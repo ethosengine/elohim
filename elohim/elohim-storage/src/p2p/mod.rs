@@ -3970,6 +3970,19 @@ impl P2PNode {
                 debug!(peer = %peer, "Identity handshake response sent");
             }
 
+            // F-T18: View federation events arrive but have no dispatcher yet.
+            // The caller-side dispatcher (Message::Response) lands in F-T19 and
+            // the responder-side handler (Message::Request) in F-T20. Until
+            // then we drop them at debug level so peers can advertise the
+            // protocol without producing a `non_exhaustive_patterns` build break.
+            behaviour::ElohimStorageBehaviourEvent::ViewFederation(event) => {
+                debug!(
+                    target: "elohim_storage::view_federation",
+                    event = ?event,
+                    "view-federation event (handler lands in F-T19/F-T20)"
+                );
+            }
+
             // === NAT traversal events ===
             behaviour::ElohimStorageBehaviourEvent::Identify(identify::Event::Received {
                 peer_id,

@@ -23,6 +23,7 @@ use super::recovery_invitation::RECOVERY_INVITATION_TOPIC;
 use super::shard_protocol::{ShardCodec, ShardProtocol};
 use super::sync_protocol::{SyncCodec, SyncProtocol};
 use super::trust_protocol::{TrustCodec, TrustProtocol};
+use super::view_federation::{ViewFederationCodec, ViewFederationProtocol};
 use super::P2PConfig;
 
 /// Relay operating mode
@@ -90,6 +91,13 @@ pub struct ElohimStorageBehaviour {
     /// Fires on ConnectionEstablished; receiver verifies and writes into
     /// `peer_identity_bindings` with source='handshake'.
     pub identity_handshake: RequestResponse<IdentityHandshakeCodec>,
+    /// Request-response for federated view-slice fetch (/elohim/view-federation/1.0.0).
+    ///
+    /// F-T18: Phase 3 wiring — peers ask each other for signed cluster /
+    /// peer-topology slices. The dispatcher (caller side) and responder
+    /// handler land in F-T19/F-T20; until then the behaviour is registered
+    /// (so peers advertise the protocol) but produces no handled events.
+    pub view_federation: RequestResponse<ViewFederationCodec>,
     /// Local network discovery (mDNS)
     pub mdns: mdns::tokio::Behaviour,
     /// Relay client for NAT traversal (connect through relay servers)
@@ -135,6 +143,16 @@ pub enum ElohimStorageBehaviourEvent {
         request_response::Event<
             super::identity_handshake::IdentityHandshakeRequest,
             super::identity_handshake::IdentityHandshakeResponse,
+        >,
+    ),
+    /// View federation event (/elohim/view-federation/1.0.0).
+    ///
+    /// F-T18: variant constructed via the `From` impl below. The match arm
+    /// in `p2p/mod.rs`'s swarm event loop is wired in F-T19/F-T20.
+    ViewFederation(
+        request_response::Event<
+            crate::views::ViewFederationRequest,
+            crate::views::ViewFederationResponse,
         >,
     ),
     /// mDNS event
@@ -245,6 +263,24 @@ impl
     }
 }
 
+impl
+    From<
+        request_response::Event<
+            crate::views::ViewFederationRequest,
+            crate::views::ViewFederationResponse,
+        >,
+    > for ElohimStorageBehaviourEvent
+{
+    fn from(
+        event: request_response::Event<
+            crate::views::ViewFederationRequest,
+            crate::views::ViewFederationResponse,
+        >,
+    ) -> Self {
+        Self::ViewFederation(event)
+    }
+}
+
 impl From<relay::client::Event> for ElohimStorageBehaviourEvent {
     fn from(event: relay::client::Event) -> Self {
         Self::RelayClient(event)
@@ -350,6 +386,19 @@ impl ElohimStorageBehaviour {
             request_response::Config::default().with_request_timeout(config.request_timeout),
         );
 
+        // F-T18: View federation protocol — explicit-peer fetch of signed
+        // cluster + peer-topology slices on behalf of an agent. Tighter
+        // 3-second timeout than the general `config.request_timeout` because
+        // view slices are small (≤ 256 KiB cap) and must respond fast enough
+        // for the F-T21 aggregator's deadline budget. The dispatcher and
+        // responder handler land in F-T19/F-T20.
+        let view_federation = RequestResponse::with_codec(
+            ViewFederationCodec,
+            [(ViewFederationProtocol, ProtocolSupport::Full)],
+            request_response::Config::default()
+                .with_request_timeout(std::time::Duration::from_secs(3)),
+        );
+
         // mDNS for local discovery
         let mdns = mdns::tokio::Behaviour::new(mdns::Config::default(), peer_id)
             .expect("mDNS behaviour should be created");
@@ -445,6 +494,7 @@ impl ElohimStorageBehaviour {
             epr_atom_protocol,
             trust_protocol,
             identity_handshake,
+            view_federation,
             mdns,
             relay_client,
             relay_server,
