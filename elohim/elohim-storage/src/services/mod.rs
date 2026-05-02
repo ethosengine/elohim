@@ -29,6 +29,7 @@ pub mod bootstrap_manifests;
 pub mod content_service;
 pub mod disposition_service;
 pub mod distribution;
+pub mod distribution_view;
 pub mod economic_event_service;
 pub mod elohim_gate;
 pub mod epr_compose;
