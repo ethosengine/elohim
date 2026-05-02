@@ -130,7 +130,7 @@ impl BlobInventoryDelta {
 
 /// Sha256 hex shape check: 64 lowercase hex chars (defensive structural rule).
 fn is_blob_hash_shaped(s: &str) -> bool {
-    s.len() == 64 && s.chars().all(|c| c.is_ascii_hexdigit())
+    s.len() == 64 && s.bytes().all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f'))
 }
 
 #[cfg(test)]
