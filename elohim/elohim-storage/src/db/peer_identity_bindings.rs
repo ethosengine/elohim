@@ -33,8 +33,12 @@ pub fn upsert(
 
 /// Look up the most recently observed, currently-active binding for `peer_id`.
 ///
-/// "Active" means: `valid_until IS NULL OR valid_until > now_iso`.
-/// The query returns at most one row — the one with the latest `observed_at`.
+/// "Active" means: `valid_until IS NULL OR valid_until > now_iso`, AND
+/// `superseded_by IS NULL`. The query returns at most one row — the one with
+/// the latest `observed_at`. The partial index
+/// `idx_peer_identity_bindings_current_per_agent` (keyed on `agent_cid`) covers
+/// supersession-aware filtering for agent-side queries; the per-peer lookup
+/// here uses the existing `idx_peer_identity_bindings_peer_id` index.
 ///
 /// Returns `None` if no active binding exists for the peer.
 pub fn lookup_active(
@@ -47,6 +51,7 @@ pub fn lookup_active(
     dsl::peer_identity_bindings
         .filter(dsl::peer_id.eq(peer_id))
         .filter(dsl::valid_until.is_null().or(dsl::valid_until.gt(now_iso)))
+        .filter(dsl::superseded_by.is_null())
         .order(dsl::observed_at.desc())
         .first::<PeerIdentityBindingRow>(conn)
         .optional()
@@ -206,5 +211,55 @@ mod tests {
         assert!(result.is_some());
         // Most recently observed should win
         assert_eq!(result.unwrap().agent_cid, "bafyreinew");
+    }
+
+    #[test]
+    fn lookup_excludes_superseded_binding() {
+        // Two rows for the same peer:
+        //   - older row, NOT superseded → must be the active binding
+        //   - newer row, superseded_by = Some(...) → must NOT be returned
+        // even though it has the latest observed_at.
+        let pool = test_pool();
+        let mut conn = pool.get().expect("conn");
+
+        // Older row: un-superseded, observed earlier.
+        let older = NewPeerIdentityBindingRow {
+            peer_id: "12D3KooWXyz".to_string(),
+            agent_cid: "bafyreiabc".to_string(),
+            dht_anchor_hash: "anchor-current".to_string(),
+            valid_from: "2026-01-01T00:00:00Z".to_string(),
+            valid_until: None,
+            observed_at: "2026-04-20T00:00:00Z".to_string(),
+            source: "dht".to_string(),
+            device_archetype: "node".to_string(),
+            superseded_by: None,
+        };
+        upsert(&mut conn, &older).expect("upsert older");
+
+        // Newer row: superseded, observed later. Must be excluded by the filter.
+        let newer_superseded = NewPeerIdentityBindingRow {
+            peer_id: "12D3KooWXyz".to_string(),
+            agent_cid: "bafyreiabc".to_string(),
+            dht_anchor_hash: "anchor-stale".to_string(),
+            valid_from: "2026-01-01T00:00:00Z".to_string(),
+            valid_until: None,
+            observed_at: "2026-04-24T00:00:00Z".to_string(),
+            source: "dht".to_string(),
+            device_archetype: "node".to_string(),
+            superseded_by: Some("uhCkk-supersedes-this".to_string()),
+        };
+        upsert(&mut conn, &newer_superseded).expect("upsert newer-superseded");
+
+        let result =
+            lookup_active(&mut conn, "12D3KooWXyz", "2026-04-24T12:00:00Z").expect("lookup");
+        let row = result.expect("expected an active (un-superseded) binding");
+        assert_eq!(
+            row.dht_anchor_hash, "anchor-current",
+            "lookup_active must skip superseded rows even when their observed_at is later"
+        );
+        assert!(
+            row.superseded_by.is_none(),
+            "active row must have superseded_by == NULL"
+        );
     }
 }

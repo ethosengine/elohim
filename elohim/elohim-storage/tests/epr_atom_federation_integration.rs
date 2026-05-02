@@ -760,6 +760,7 @@ async fn controller_on_agent_peer_binding_sends_publish_command() {
         valid_until: None,
         device_archetype: DeviceArchetype::Node,
         binding_action_hash: "uhCkk-ctrl-binding-hash".into(),
+        superseded_by: None,
         emitted_at: Utc::now(),
     };
 

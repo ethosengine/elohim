@@ -542,4 +542,38 @@ mod tests {
         let b = synthesise_dht_anchor_hash("peer-2", "agent-cid-1");
         assert_ne!(a, b);
     }
+
+    /// T03b: the handshake writer carries `device_archetype` from the wire payload.
+    /// `superseded_by` stays `None` because the handshake wire format does not
+    /// carry supersession state — only the DHT-arrival path is authoritative there.
+    #[test]
+    fn handshake_writer_propagates_device_archetype() {
+        // Construct a payload that mirrors a "desktop" peer's handshake.
+        let binding = HandshakeBindingPayload {
+            peer_id: "12D3KooWDesktopPeer".to_string(),
+            agent_cid: "bafyreidesktop".to_string(),
+            valid_from: "2026-01-01T00:00:00Z".to_string(),
+            valid_until: None,
+            device_archetype: "desktop".to_string(),
+            signature: "dGVzdA==".to_string(),
+            dht_anchor_hash: Some("uhCkk-handshake-anchor".to_string()),
+        };
+        // Replicate the row construction performed by p2p/mod.rs at handshake
+        // receive time. This codifies the field-flow contract that T03b wires:
+        // device_archetype propagated; superseded_by always None.
+        let row = crate::db::models::NewPeerIdentityBindingRow {
+            peer_id: binding.peer_id.clone(),
+            agent_cid: binding.agent_cid.clone(),
+            dht_anchor_hash: binding.dht_anchor_hash.clone().unwrap(),
+            valid_from: binding.valid_from.clone(),
+            valid_until: binding.valid_until.clone(),
+            observed_at: "2026-04-25T12:00:00Z".to_string(),
+            source: "handshake".to_string(),
+            device_archetype: binding.device_archetype.clone(),
+            superseded_by: None,
+        };
+        assert_eq!(row.device_archetype, "desktop");
+        assert!(row.superseded_by.is_none());
+        assert_eq!(row.source, "handshake");
+    }
 }

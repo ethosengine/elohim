@@ -155,6 +155,11 @@ pub struct AgentPeerBindingSignal {
     /// Semantic alias for `action_hash` — the DHT ActionHash of the `AgentPeerBinding`
     /// entry. Consumers tracking binding provenance specifically should use this field.
     pub binding_action_hash: String,
+    /// Action hash of the binding this entry supersedes, if any. Authoritative
+    /// DHT-side supersession reference. Stored verbatim into
+    /// `peer_identity_bindings.superseded_by` so cluster/peer-topology views can
+    /// filter to current bindings (`superseded_by IS NULL`).
+    pub superseded_by: Option<String>,
     /// Timestamp at which the signal was emitted from the conductor.
     pub emitted_at: DateTime<Utc>,
 }
@@ -534,6 +539,7 @@ mod tests {
             valid_until: None,
             device_archetype: DeviceArchetype::Node,
             binding_action_hash: "uhCkk-binding-action-hash".to_string(),
+            superseded_by: None,
             emitted_at: Utc::now(),
         })
     }

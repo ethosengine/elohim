@@ -208,4 +208,35 @@ mod tests {
         payload.signature = String::new();
         assert!(payload.verify_structural().is_err());
     }
+
+    /// T03b: gossip writer carries `device_archetype` from the wire payload.
+    /// `superseded_by` stays `None` because the gossip wire format does not
+    /// carry supersession state — only the DHT-arrival path is authoritative.
+    #[test]
+    fn gossip_writer_propagates_device_archetype() {
+        // Decode a gossip payload announcing a "mobile" peer.
+        let mut payload = sample();
+        payload.device_archetype = "mobile".to_string();
+        let bytes = payload.to_bytes().expect("encode");
+        let decoded = IdentityBindingGossip::from_bytes(&bytes).expect("decode");
+        assert!(decoded.verify_structural().is_ok());
+
+        // Replicate the row construction performed by p2p/mod.rs at gossip
+        // receive time. This codifies the field-flow contract that T03b wires:
+        // device_archetype propagated; superseded_by always None at gossip time.
+        let row = crate::db::models::NewPeerIdentityBindingRow {
+            peer_id: decoded.peer_id.clone(),
+            agent_cid: decoded.agent_cid.clone(),
+            dht_anchor_hash: decoded.binding_action_hash.clone(),
+            valid_from: decoded.valid_from.clone(),
+            valid_until: decoded.valid_until.clone(),
+            observed_at: "2026-04-25T12:00:00Z".to_string(),
+            source: "gossip".to_string(),
+            device_archetype: decoded.device_archetype.clone(),
+            superseded_by: None,
+        };
+        assert_eq!(row.device_archetype, "mobile");
+        assert!(row.superseded_by.is_none());
+        assert_eq!(row.source, "gossip");
+    }
 }

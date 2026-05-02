@@ -3023,10 +3023,9 @@ impl P2PNode {
                                 valid_until: b.valid_until.clone(),
                                 observed_at: now_iso,
                                 source: "handshake".to_string(),
-                                // T03a: defaults preserved here; T03b wires real values
-                                // from the AgentPeerBindingPayload (device_archetype,
-                                // superseded_by) when the signal handler is updated.
-                                device_archetype: "node".to_string(),
+                                device_archetype: b.device_archetype.clone(),
+                                // superseded_by stays None at handshake time — only the
+                                // DHT-arrival path is authoritative on supersession state.
                                 superseded_by: None,
                             };
                             match self.db_pool.as_ref() {
@@ -3304,10 +3303,10 @@ impl P2PNode {
                                                 valid_until: payload.valid_until.clone(),
                                                 observed_at: now_iso,
                                                 source: "gossip".to_string(),
-                                                // TODO(T03b): wire real values from IdentityBindingGossip
-                                                // (device_archetype field — superseded_by is not in the gossip wire struct,
-                                                // so leave superseded_by: None at gossip receive time).
-                                                device_archetype: "node".to_string(),
+                                                // device_archetype propagated from gossip wire;
+                                                // superseded_by stays None because the gossip wire
+                                                // format does not carry supersession state.
+                                                device_archetype: payload.device_archetype.clone(),
                                                 superseded_by: None,
                                             };
                                             match self.db_pool.as_ref() {
@@ -3345,10 +3344,8 @@ impl P2PNode {
                                                     "IdentityBindingGossip: no db_pool configured, skipping persistence"
                                                 ),
                                             }
-                                            // T03a added device_archetype + superseded_by columns to the projection.
-                                            // T03b wires real values from IdentityBindingGossip into NewPeerIdentityBindingRow
-                                            // (device_archetype only — IdentityBindingGossip does not carry superseded_by;
-                                            // keep superseded_by: None at gossip receive time).
+                                            // device_archetype is wired from the gossip wire; superseded_by
+                                            // relies on the DHT-arrival path for authoritative supersession.
 
                                             // NOTE: reconcile signal emission deferred — the controller processes only
                                             // DNA signals in Stage 1. A P2P-received binding reaching the reconcile layer
