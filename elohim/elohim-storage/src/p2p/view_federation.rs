@@ -184,10 +184,15 @@ impl request_response::Codec for ViewFederationCodec {
 
 /// Build a signed [`ViewFederationResponse`] for an inbound request.
 ///
-/// F-T20 stub: payload is `serde_json::json!({})` when `agent_cid` matches the
-/// local agent (Live freshness), else `serde_json::Value::Null` (Offline). Phase 4
-/// (T22–T28) will replace the stub with calls to `services::cluster_view` and
-/// `services::peer_topology_view` to build the real per-device slice.
+/// T26 wires real per-view-kind slice sources: when `agent_cid` matches the
+/// local agent and `pool` is `Some`, dispatches to
+/// `services::cluster_view::build_local_slice` (Cluster) or
+/// `services::peer_topology_view::build_local_slice` (PeerTopology).
+/// When `pool` is `None` (test contexts), falls back to `serde_json::json!({})`
+/// preserving the F-T20 stub behavior that tests verify.
+///
+/// When `agent_cid` does not match, payload is `serde_json::Value::Null`
+/// (Offline freshness) regardless of pool.
 ///
 /// The `ViewSlice` is signed with `keypair` using
 /// [`ViewSlice::canonical_bytes_for_signing`]. The signature is base64-encoded
@@ -197,19 +202,28 @@ impl request_response::Codec for ViewFederationCodec {
 ///
 /// Returns `libp2p::identity::SigningError` if the keypair cannot sign (e.g. it is
 /// a public-key-only handle without a private key).
-pub fn build_response_slice(
+pub async fn build_response_slice(
     view_kind: ViewKind,
     agent_cid: String,
     request_id: String,
     local_agent_cid: &str,
     local_peer_id: String,
     keypair: &libp2p::identity::Keypair,
+    pool: Option<&crate::db::DbPool>,
 ) -> Result<ViewFederationResponse, libp2p::identity::SigningError> {
     let owns_agent = agent_cid == local_agent_cid;
     let payload = if owns_agent {
-        JsonVal(serde_json::json!({})) // Phase 4 replaces stub with real cluster/topology slice
+        match pool {
+            Some(p) => match view_kind {
+                ViewKind::Cluster => crate::services::cluster_view::build_local_slice(p).await,
+                ViewKind::PeerTopology => {
+                    crate::services::peer_topology_view::build_local_slice(p).await
+                }
+            },
+            None => serde_json::json!({}),
+        }
     } else {
-        JsonVal(serde_json::Value::Null)
+        serde_json::Value::Null
     };
     let freshness_state = if owns_agent {
         FreshnessState::Live
@@ -223,7 +237,7 @@ pub fn build_response_slice(
             state: freshness_state,
             stale_since_ms: None,
         },
-        payload,
+        payload: JsonVal(payload),
         signature: String::new(),
     };
     let canonical = slice.canonical_bytes_for_signing();

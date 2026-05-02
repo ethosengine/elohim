@@ -4158,10 +4158,12 @@ impl P2PNode {
                 request_response::Message::Request {
                     request, channel, ..
                 } => {
-                    // F-T20: real responder — build and sign a ViewFederationResponse
-                    // synchronously (ed25519 sign is microseconds), then send_response
-                    // in the same event-loop arm. No spawn needed; mirrors the blob
-                    // protocol's inbound arm pattern.
+                    // F-T20: real responder — build and sign a ViewFederationResponse,
+                    // then send_response in the same event-loop arm. Awaiting
+                    // build_response_slice (async since T26) happens before the swarm
+                    // write lock is acquired, so the event loop is not blocked on the
+                    // lock during the async slice-build. Mirrors the blob protocol's
+                    // inbound arm pattern.
                     use crate::p2p::view_federation::build_response_slice;
                     debug!(
                         target: "elohim_storage::view_federation",
@@ -4174,6 +4176,7 @@ impl P2PNode {
                     let local_agent_cid = self.identity.agent_pubkey().to_string();
                     let local_peer_id = self.identity.peer_id_string();
                     let keypair = self.identity.keypair();
+                    let pool_ref = self.db_pool.as_ref();
                     match build_response_slice(
                         request.view_kind,
                         request.agent_cid,
@@ -4181,7 +4184,10 @@ impl P2PNode {
                         &local_agent_cid,
                         local_peer_id,
                         keypair,
-                    ) {
+                        pool_ref,
+                    )
+                    .await
+                    {
                         Ok(response) => {
                             let mut swarm = self.swarm.write().await;
                             if let Err(_response) = swarm

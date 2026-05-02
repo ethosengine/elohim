@@ -53,6 +53,7 @@ pub mod knowledge_service;
 pub mod manifest_registry;
 pub mod mastery_depth;
 pub mod peer_selection;
+pub mod peer_topology_view;
 pub mod presence_service;
 pub mod provenance_service;
 pub mod rea_commitment_service;

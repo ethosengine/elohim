@@ -154,10 +154,10 @@ async fn view_federate_swarm_gone_when_channel_closed() {
 /// Test 4 (responder_signs_live): when `agent_cid` matches `local_agent_cid`,
 /// `build_response_slice` returns:
 ///   - `FreshnessState::Live`
-///   - a non-Null payload (`json!({})` stub)
+///   - a non-Null payload (`json!({})` when pool=None)
 ///   - a base64 signature that verifies against `slice.canonical_bytes_for_signing()`
-#[test]
-fn responder_signs_slice_with_agent_key_when_agent_matches() {
+#[tokio::test]
+async fn responder_signs_slice_with_agent_key_when_agent_matches() {
     use base64::Engine as _;
     use elohim_storage::{
         p2p::view_federation::build_response_slice,
@@ -175,7 +175,9 @@ fn responder_signs_slice_with_agent_key_when_agent_matches() {
         local_agent_cid,
         local_peer_id,
         &keypair,
+        None, // pool=None → stub json!({}) payload
     )
+    .await
     .expect("build_response_slice should not fail for a valid keypair");
 
     // Freshness is Live when agent matches.
@@ -185,7 +187,7 @@ fn responder_signs_slice_with_agent_key_when_agent_matches() {
         "expected FreshnessState::Live for matching agent"
     );
 
-    // Payload is the stub empty object, not Null.
+    // Payload is the stub empty object, not Null (pool=None returns json!({})).
     assert!(
         response.slice.payload.0 != serde_json::Value::Null,
         "expected non-Null payload for matching agent"
@@ -209,8 +211,8 @@ fn responder_signs_slice_with_agent_key_when_agent_matches() {
 ///   - `FreshnessState::Offline`
 ///   - `serde_json::Value::Null` payload
 ///   - a signature that still verifies (the slice is signed regardless of payload)
-#[test]
-fn responder_returns_offline_for_unknown_agent_cid() {
+#[tokio::test]
+async fn responder_returns_offline_for_unknown_agent_cid() {
     use base64::Engine as _;
     use elohim_storage::{
         p2p::view_federation::build_response_slice,
@@ -229,7 +231,9 @@ fn responder_returns_offline_for_unknown_agent_cid() {
         local_agent_cid,
         local_peer_id,
         &keypair,
+        None, // pool=None; non-matching agent always returns Null regardless
     )
+    .await
     .expect("build_response_slice should not fail for a valid keypair");
 
     // Freshness is Offline when agent does not match.
@@ -259,8 +263,8 @@ fn responder_returns_offline_for_unknown_agent_cid() {
 
 /// Test 6 (responder_echoes_envelope): the response envelope echoes `view_kind`,
 /// `agent_cid`, and `request_id` exactly as supplied — required by the F-T21 dedup map.
-#[test]
-fn responder_echoes_view_kind_and_request_id() {
+#[tokio::test]
+async fn responder_echoes_view_kind_and_request_id() {
     use elohim_storage::{p2p::view_federation::build_response_slice, views::ViewKind};
 
     let keypair = libp2p::identity::Keypair::generate_ed25519();
@@ -275,7 +279,9 @@ fn responder_echoes_view_kind_and_request_id() {
         "different_local_agent",
         local_peer_id,
         &keypair,
+        None, // pool=None
     )
+    .await
     .expect("build_response_slice should not fail");
 
     assert_eq!(
