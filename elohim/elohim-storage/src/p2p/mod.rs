@@ -4203,8 +4203,11 @@ impl P2PNode {
                                 error = %e,
                                 "F-T20: failed to sign view-federation slice; dropping channel"
                             );
-                            // Dropping channel triggers OutboundFailure::ConnectionClosed
-                            // at the requester, mapping to FederationError::TransportError.
+                            // Dropping `channel` without calling `send_response` causes
+                            // libp2p to emit InboundFailure::ResponseOmission here and an
+                            // OutboundFailure at the requester. The view-federation
+                            // OutboundFailure arm (below) maps non-Timeout variants to
+                            // FederationError::TransportError, which is the correct outcome.
                         }
                     }
                 }

@@ -28,6 +28,7 @@
 //! multi-MB length prefix.
 
 use async_trait::async_trait;
+use base64::Engine as _;
 use futures::prelude::*;
 use libp2p::request_response;
 use std::io;
@@ -227,7 +228,6 @@ pub fn build_response_slice(
     };
     let canonical = slice.canonical_bytes_for_signing();
     let sig_bytes = keypair.sign(&canonical)?;
-    use base64::Engine as _;
     slice.signature = base64::engine::general_purpose::STANDARD.encode(&sig_bytes);
     Ok(ViewFederationResponse {
         view_kind,
