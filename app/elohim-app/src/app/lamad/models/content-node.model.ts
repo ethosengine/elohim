@@ -36,7 +36,9 @@ import {
   type ContentFormat as WireContentFormat,
 } from '@app/generated/schema-enums';
 
+import type { ContentBlob, ContentSteward } from './content-extensions.model';
 import type { LamadContentType } from '../generated/manifest-types';
+import type { DistributionSummary } from '@app/generated/distribution-summary';
 
 // Re-export blob/stewardship types (moved to content-extensions.model.ts)
 export type {
@@ -46,7 +48,6 @@ export type {
   ContentSteward,
   StewardshipRole,
 } from './content-extensions.model';
-import type { ContentBlob, ContentSteward } from './content-extensions.model';
 
 // Re-export generated typed metadata and type guards
 export type {
@@ -59,10 +60,6 @@ export { isConceptNode, isAssessmentNode, isPathNode } from '../generated/conten
 
 // Re-export GeographicContext for backward compatibility
 export type { GeographicContext } from '@app/elohim/models/protocol-core.model';
-
-// Distribution telemetry surfaced by the substrate on EPR head responses (T34/T49).
-import type { DistributionSummary } from '@app/generated/distribution-summary';
-export type { DistributionSummary };
 
 export interface ContentNode {
   /** Unique identifier (ActionHash in Holochain) */
@@ -779,3 +776,5 @@ export interface CreateRelationshipInput {
   provenanceChain?: string[];
   metadataJson?: string;
 }
+
+export { type DistributionSummary } from '@app/generated/distribution-summary';

@@ -1,9 +1,10 @@
 import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, Input, inject, signal } from '@angular/core';
 
+import { DistributionService } from '../distribution.service';
+
 import type { DistributionDetails } from '../../generated/distribution-details';
 import type { DistributionSummary } from '../../generated/distribution-summary';
-import { DistributionService } from '../distribution.service';
 
 @Component({
   selector: 'elohim-distribution-badge',

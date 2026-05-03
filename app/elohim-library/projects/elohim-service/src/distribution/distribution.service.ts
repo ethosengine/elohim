@@ -18,7 +18,7 @@ export class DistributionService {
 
   async getDetails(blobHash: string): Promise<DistributionDetails> {
     return firstValueFrom(
-      this.http.get<DistributionDetails>(`/api/v1/blob/${blobHash}/distribution/details`),
+      this.http.get<DistributionDetails>(`/api/v1/blob/${blobHash}/distribution/details`)
     );
   }
 }
