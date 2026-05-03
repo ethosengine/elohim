@@ -22,11 +22,11 @@ export interface DistributionDetails {
   /**
    * Open-shape placement-gap records describing missing target capacity. Schema kept loose during the lit-up topology bring-up; will graduate to a dedicated schema when stable.
    */
-  placementGaps: {}[];
+  placementGaps: Record<string, unknown>[];
   /**
    * Recent rea projection-event records relevant to this CID. Open-shape during bring-up.
    */
-  recentProjectionEvents: {}[];
+  recentProjectionEvents: Record<string, unknown>[];
   /**
    * CustodianCommitment CID references (rea_commitments rows) backing this distribution snapshot.
    */

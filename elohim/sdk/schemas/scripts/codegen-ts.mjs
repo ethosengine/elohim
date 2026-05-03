@@ -199,6 +199,8 @@ async function generateFromDir(subdir, refMap) {
       // to satisfy @typescript-eslint/no-empty-object-type rule
       ts = ts.replace(/\?: \{\}/g, '?: Record<string, unknown>');
       ts = ts.replace(/\| \{\}/g, '| Record<string, unknown>');
+      ts = ts.replace(/: \{\}\[\]/g, ': Record<string, unknown>[]');
+      ts = ts.replace(/: \{\};/g, ': Record<string, unknown>;');
 
       const outFile = `${name}.ts`;
       await writeFile(join(outDir, outFile), ts);

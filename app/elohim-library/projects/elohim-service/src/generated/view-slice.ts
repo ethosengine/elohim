@@ -17,7 +17,7 @@ export interface ViewSlice {
   /**
    * View-kind-specific slice body. Open shape at the envelope level — the consumer interprets payload per viewKind.
    */
-  payload: {};
+  payload: Record<string, unknown>;
   /**
    * Base64 signature over canonical_bytes(viewKind, peerId, freshness, payload).
    */
