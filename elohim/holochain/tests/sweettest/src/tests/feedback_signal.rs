@@ -652,6 +652,23 @@ async fn create_vouch_succeeds_when_signer_differs_from_target() -> Result<()> {
         )
         .await;
 
+    // Exchange peer info + wait for DHT consistency so Alice's coordinator can
+    // resolve Bob's correction action via must_get_valid_record. Without this,
+    // create_vouch fails with "Failed to get Record" before the no-self-vouch
+    // gate can run. Same pattern as retraction_by_non_author_rejected (T8) and
+    // imagodei_peer_binding (P2B).
+    tokio::time::timeout(std::time::Duration::from_secs(10), async {
+        while !SweetConductor::exchange_peer_info([&ca, &cb]).await {
+            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        }
+    })
+    .await
+    .map_err(|_| anyhow::anyhow!("Timeout waiting for peer info exchange"))?;
+
+    await_consistency(10, [&cell_a, &cell_b])
+        .await
+        .map_err(|e| anyhow::anyhow!("DHT consistency timeout: {e}"))?;
+
     // Alice vouches on Bob's correction. Different agents → must succeed.
     let vouch_input = CreateVouchInput {
         target_action_hash: bob_correction_hash.clone(),
