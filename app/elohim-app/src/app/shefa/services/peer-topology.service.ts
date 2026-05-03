@@ -1,5 +1,6 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject, signal } from '@angular/core';
+
 import { firstValueFrom } from 'rxjs';
 
 import type { PeerTopologyView } from '@app/generated/peer-topology-view';
@@ -14,9 +15,7 @@ export class PeerTopologyService {
   async getMyPeerTopology(): Promise<PeerTopologyView> {
     this.loading.set(true);
     try {
-      const view = await firstValueFrom(
-        this.http.get<PeerTopologyView>('/api/v1/peer-topology'),
-      );
+      const view = await firstValueFrom(this.http.get<PeerTopologyView>('/api/v1/peer-topology'));
       this.topology.set(view);
       return view;
     } finally {

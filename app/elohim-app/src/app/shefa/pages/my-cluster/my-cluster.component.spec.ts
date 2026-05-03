@@ -1,14 +1,11 @@
 import { provideHttpClient } from '@angular/common/http';
-import {
-  HttpTestingController,
-  provideHttpClientTesting,
-} from '@angular/common/http/testing';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 
 import { MyClusterComponent } from './my-cluster.component';
 
-const flushAsync = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
+const flushAsync = () => new Promise<void>(resolve => setTimeout(resolve, 0));
 
 describe('MyClusterComponent', () => {
   let fixture: ComponentFixture<MyClusterComponent>;

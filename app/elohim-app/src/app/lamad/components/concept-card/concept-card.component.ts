@@ -51,9 +51,7 @@ import { RelationshipType } from '../../models/exploration-context.model';
       </div>
 
       @if (concept.distribution) {
-        <elohim-distribution-badge
-          [summary]="concept.distribution"
-        ></elohim-distribution-badge>
+        <app-distribution-badge [summary]="concept.distribution"></app-distribution-badge>
       }
 
       @if (showMastery) {

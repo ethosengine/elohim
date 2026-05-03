@@ -14,7 +14,7 @@
 
     <div class="device-list">
       @for (d of v.devices; track d.peerId) {
-        <elohim-device-tile [device]="d"></elohim-device-tile>
+        <app-device-tile [device]="d"></app-device-tile>
       }
     </div>
 
@@ -33,11 +33,7 @@
       <dd data-testid="my-cluster-status">{{ statusText(v) }}</dd>
     </dl>
 
-    <button
-      type="button"
-      (click)="toggleDetails()"
-      data-testid="my-cluster-show-details-toggle"
-    >
+    <button type="button" (click)="toggleDetails()" data-testid="my-cluster-show-details-toggle">
       [{{ showDetails() ? 'hide' : 'show' }} details]
     </button>
 

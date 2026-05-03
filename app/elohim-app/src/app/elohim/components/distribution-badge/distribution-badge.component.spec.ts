@@ -38,13 +38,17 @@ describe('DistributionBadgeComponent', () => {
     component.summary = makeSummary({ replicaCount: 12 });
     fixture.detectChanges();
     const el = fixture.nativeElement.querySelector(
-      '[data-testid="distribution-badge-replica-count"]',
+      '[data-testid="distribution-badge-replica-count"]'
     );
     expect(el?.textContent).toContain('12');
   });
 
   it('applies the critical class when health is critical', () => {
-    component.summary = makeSummary({ replicaHealth: 'critical', replicaCount: 1, replicaTarget: 4 });
+    component.summary = makeSummary({
+      replicaHealth: 'critical',
+      replicaCount: 1,
+      replicaTarget: 4,
+    });
     fixture.detectChanges();
     const badge = fixture.nativeElement.querySelector('[data-testid="distribution-badge"]');
     expect(badge?.classList.contains('critical')).toBe(true);
@@ -61,7 +65,7 @@ describe('DistributionBadgeComponent', () => {
     component.summary = makeSummary({ myRole: 'replica' });
     fixture.detectChanges();
     expect(
-      fixture.nativeElement.querySelector('[data-testid="distribution-badge-my-role"]'),
+      fixture.nativeElement.querySelector('[data-testid="distribution-badge-my-role"]')
     ).toBeTruthy();
   });
 
@@ -70,7 +74,7 @@ describe('DistributionBadgeComponent', () => {
     delete component.summary.myRole;
     fixture.detectChanges();
     expect(
-      fixture.nativeElement.querySelector('[data-testid="distribution-badge-my-role"]'),
+      fixture.nativeElement.querySelector('[data-testid="distribution-badge-my-role"]')
     ).toBeFalsy();
   });
 });

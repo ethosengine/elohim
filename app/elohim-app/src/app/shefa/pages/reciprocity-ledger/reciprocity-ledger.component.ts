@@ -1,18 +1,12 @@
 import { CommonModule } from '@angular/common';
-import {
-  ChangeDetectionStrategy,
-  Component,
-  OnDestroy,
-  OnInit,
-  inject,
-  signal,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, inject } from '@angular/core';
 
-import { CommitmentBarComponent } from '../../../elohim/components/commitment-bar/commitment-bar.component';
+import { CommitmentBarComponent } from '@app/elohim/components/commitment-bar/commitment-bar.component';
+
 import { ReciprocityService } from '../../services/reciprocity.service';
 
 @Component({
-  selector: 'shefa-reciprocity-ledger',
+  selector: 'app-shefa-reciprocity-ledger',
   standalone: true,
   imports: [CommonModule, CommitmentBarComponent],
   template: `
@@ -27,13 +21,13 @@ import { ReciprocityService } from '../../services/reciprocity.service';
         <ul class="rows">
           @for (row of v.inflow; track row.counterpartyHouseholdId) {
             <li data-testid="reciprocity-inflow-row">
-              <strong>{{ row.displayName ?? row.counterpartyHouseholdId }}</strong> —
-              {{ formatBytes(row.committedBytes) }} committed,
+              <strong>{{ row.displayName ?? row.counterpartyHouseholdId }}</strong>
+              — {{ formatBytes(row.committedBytes) }} committed,
               {{ formatBytes(row.deliveredBytes) }} delivered
-              <elohim-commitment-bar
+              <app-commitment-bar
                 [committedBytes]="row.committedBytes"
                 [deliveredBytes]="row.deliveredBytes"
-              ></elohim-commitment-bar>
+              ></app-commitment-bar>
             </li>
           }
         </ul>
@@ -45,13 +39,13 @@ import { ReciprocityService } from '../../services/reciprocity.service';
         <ul class="rows">
           @for (row of v.outflow; track row.counterpartyHouseholdId) {
             <li data-testid="reciprocity-outflow-row">
-              <strong>{{ row.displayName ?? row.counterpartyHouseholdId }}</strong> —
-              {{ formatBytes(row.committedBytes) }} committed,
+              <strong>{{ row.displayName ?? row.counterpartyHouseholdId }}</strong>
+              — {{ formatBytes(row.committedBytes) }} committed,
               {{ formatBytes(row.deliveredBytes) }} hosting
-              <elohim-commitment-bar
+              <app-commitment-bar
                 [committedBytes]="row.committedBytes"
                 [deliveredBytes]="row.deliveredBytes"
-              ></elohim-commitment-bar>
+              ></app-commitment-bar>
             </li>
           }
         </ul>
@@ -60,12 +54,12 @@ import { ReciprocityService } from '../../services/reciprocity.service';
           <dt>Net</dt>
           <dd data-testid="reciprocity-net">
             {{ formatBytes(v.netHostedBytes) }}
-            {{
-              v.netHostedBytes >= 0 ? 'hosted on my behalf' : 'I host more than I am hosted'
-            }}
+            {{ v.netHostedBytes >= 0 ? 'hosted on my behalf' : 'I host more than I am hosted' }}
           </dd>
           <dt>Capacity</dt>
-          <dd data-testid="reciprocity-capacity">{{ formatBytes(v.capacityAvailableBytes) }} free</dd>
+          <dd data-testid="reciprocity-capacity">
+            {{ formatBytes(v.capacityAvailableBytes) }} free
+          </dd>
         </dl>
       }
     </section>

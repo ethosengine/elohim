@@ -11,9 +11,13 @@
       <span aria-hidden="true">●</span>
     }
   </span>
-  <span class="count" data-testid="distribution-badge-replica-count">{{ summary.replicaCount }}</span>
+  <span class="count" data-testid="distribution-badge-replica-count">
+    {{ summary.replicaCount }}
+  </span>
 
-  <span class="reach" data-testid="distribution-badge-reach">{{ reachIcon(summary.reachClass) }}</span>
+  <span class="reach" data-testid="distribution-badge-reach">
+    {{ reachIcon(summary.reachClass) }}
+  </span>
 
   @if (summary.myRole) {
     <span class="my-role" data-testid="distribution-badge-my-role">★ I host this</span>
@@ -22,7 +26,9 @@
   @if (expanded()) {
     <div class="tooltip" data-testid="distribution-badge-tooltip">
       <div class="tooltip-row">Reach: {{ summary.reachClass }}</div>
-      <div class="tooltip-row">Replicas: {{ summary.replicaCount }} / {{ summary.replicaTarget }}</div>
+      <div class="tooltip-row">
+        Replicas: {{ summary.replicaCount }} / {{ summary.replicaTarget }}
+      </div>
       <div class="tooltip-row">Projectors: {{ summary.projectorCount }}</div>
       <div class="tooltip-row">Health: {{ summary.replicaHealth }}</div>
       <div class="tooltip-row">This fetch: {{ summary.thisFetchSource }}</div>

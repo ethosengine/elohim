@@ -4,7 +4,7 @@ import { ChangeDetectionStrategy, Component, Input } from '@angular/core';
 import type { PeerHouseholdEdge } from '@app/generated/peer-household-edge';
 
 @Component({
-  selector: 'elohim-peer-household-card',
+  selector: 'app-peer-household-card',
   standalone: true,
   imports: [CommonModule],
   template: `
@@ -14,8 +14,8 @@ import type { PeerHouseholdEdge } from '@app/generated/peer-household-edge';
         <span data-testid="peer-card-status">{{ edge.online ? 'reachable' : 'dark' }}</span>
       </header>
       <div class="reciprocity">
-        hosts {{ edge.myCidsHostedByThem }} of mine ·
-        I host {{ edge.theirCidsHostedByMe }} of theirs ·
+        hosts {{ edge.myCidsHostedByThem }} of mine · I host {{ edge.theirCidsHostedByMe }} of
+        theirs ·
         <span
           data-testid="peer-card-net-diff"
           [class.positive]="(edge.netDiff ?? 0) > 0"

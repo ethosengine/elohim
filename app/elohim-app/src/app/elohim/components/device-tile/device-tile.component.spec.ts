@@ -25,7 +25,7 @@ describe('DeviceTileComponent', () => {
     fixture.componentInstance.device = mk({ archetype: 'node', displayName: 'matthew' });
     fixture.detectChanges();
     const label = fixture.nativeElement.querySelector(
-      '[data-testid="device-tile-archetype-label"]',
+      '[data-testid="device-tile-archetype-label"]'
     );
     expect(label?.textContent).toMatch(/home server/i);
   });
@@ -34,7 +34,7 @@ describe('DeviceTileComponent', () => {
     fixture.componentInstance.device = mk({ archetype: 'desktop', displayName: 'jessica' });
     fixture.detectChanges();
     const label = fixture.nativeElement.querySelector(
-      '[data-testid="device-tile-archetype-label"]',
+      '[data-testid="device-tile-archetype-label"]'
     );
     expect(label?.textContent).toMatch(/laptop/i);
   });

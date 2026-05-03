@@ -105,7 +105,7 @@ export interface DoorwayDashboardView {
             </li>
             <li data-testid="surface-tls">
               TLS: {{ v.publicSurface.tlsValid ? '✓ valid' : '✗ invalid' }}
-              @if (v.publicSurface.tlsExpiresInDays != null) {
+              @if (v.publicSurface.tlsExpiresInDays !== undefined && v.publicSurface.tlsExpiresInDays !== null) {
                 — expires in {{ v.publicSurface.tlsExpiresInDays }} days
               }
             </li>

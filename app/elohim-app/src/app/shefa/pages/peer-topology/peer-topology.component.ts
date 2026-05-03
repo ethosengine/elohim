@@ -8,11 +8,12 @@ import {
   signal,
 } from '@angular/core';
 
-import { PeerHouseholdCardComponent } from '../../../elohim/components/peer-household-card/peer-household-card.component';
+import { PeerHouseholdCardComponent } from '@app/elohim/components/peer-household-card/peer-household-card.component';
+
 import { PeerTopologyService } from '../../services/peer-topology.service';
 
 @Component({
-  selector: 'shefa-peer-topology',
+  selector: 'app-shefa-peer-topology',
   standalone: true,
   imports: [CommonModule, PeerHouseholdCardComponent],
   template: `
@@ -25,7 +26,7 @@ import { PeerTopologyService } from '../../services/peer-topology.service';
         </div>
 
         @for (edge of v.edges; track edge.householdId) {
-          <elohim-peer-household-card [edge]="edge"></elohim-peer-household-card>
+          <app-peer-household-card [edge]="edge"></app-peer-household-card>
         }
 
         @if (v.resilienceCliffs.length > 0) {
@@ -35,7 +36,11 @@ import { PeerTopologyService } from '../../services/peer-topology.service';
           </div>
         }
 
-        <button type="button" (click)="toggleDetails()" data-testid="peer-topology-show-details-toggle">
+        <button
+          type="button"
+          (click)="toggleDetails()"
+          data-testid="peer-topology-show-details-toggle"
+        >
           [{{ showDetails() ? 'hide' : 'show' }} details]
         </button>
 
@@ -84,6 +89,6 @@ export class PeerTopologyComponent implements OnInit, OnDestroy {
   }
 
   toggleDetails(): void {
-    this.showDetails.update((v) => !v);
+    this.showDetails.update(v => !v);
   }
 }

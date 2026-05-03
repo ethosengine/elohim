@@ -69,20 +69,18 @@ describe('ConceptCardComponent', () => {
       return { ...mockConcept, distribution: summary };
     }
 
-    it('renders <elohim-distribution-badge> when concept.distribution is present', () => {
+    it('renders <app-distribution-badge> when concept.distribution is present', () => {
       fixture.componentRef.setInput('concept', withDistribution({}));
       fixture.detectChanges();
       expect(
-        fixture.nativeElement.querySelector('[data-testid="distribution-badge"]'),
+        fixture.nativeElement.querySelector('[data-testid="distribution-badge"]')
       ).toBeTruthy();
     });
 
     it('hides the badge when concept.distribution is absent', () => {
       fixture.componentRef.setInput('concept', { ...mockConcept, distribution: undefined });
       fixture.detectChanges();
-      expect(
-        fixture.nativeElement.querySelector('[data-testid="distribution-badge"]'),
-      ).toBeFalsy();
+      expect(fixture.nativeElement.querySelector('[data-testid="distribution-badge"]')).toBeFalsy();
     });
   });
 });

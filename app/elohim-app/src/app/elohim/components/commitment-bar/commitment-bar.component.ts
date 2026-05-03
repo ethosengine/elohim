@@ -2,7 +2,7 @@ import { CommonModule } from '@angular/common';
 import { ChangeDetectionStrategy, Component, Input, computed, signal } from '@angular/core';
 
 @Component({
-  selector: 'elohim-commitment-bar',
+  selector: 'app-commitment-bar',
   standalone: true,
   imports: [CommonModule],
   template: `

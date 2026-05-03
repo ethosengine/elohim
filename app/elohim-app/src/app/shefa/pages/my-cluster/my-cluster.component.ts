@@ -8,13 +8,14 @@ import {
   signal,
 } from '@angular/core';
 
-import type { MyClusterView } from '@app/generated/my-cluster-view';
+import { DeviceTileComponent } from '@app/elohim/components/device-tile/device-tile.component';
 
-import { DeviceTileComponent } from '../../../elohim/components/device-tile/device-tile.component';
 import { ClusterService } from '../../services/cluster.service';
 
+import type { MyClusterView } from '@app/generated/my-cluster-view';
+
 @Component({
-  selector: 'shefa-my-cluster',
+  selector: 'app-shefa-my-cluster',
   standalone: true,
   imports: [CommonModule, DeviceTileComponent],
   templateUrl: './my-cluster.component.html',
@@ -40,15 +41,15 @@ export class MyClusterComponent implements OnInit, OnDestroy {
   }
 
   toggleDetails(): void {
-    this.showDetails.update((v) => !v);
+    this.showDetails.update(v => !v);
   }
 
   onlineCount(devices: MyClusterView['devices']): number {
-    return devices.filter((d) => d.online).length;
+    return devices.filter(d => d.online).length;
   }
 
   offlineCount(devices: MyClusterView['devices']): number {
-    return devices.filter((d) => !d.online).length;
+    return devices.filter(d => !d.online).length;
   }
 
   formatBytes(n: number): string {

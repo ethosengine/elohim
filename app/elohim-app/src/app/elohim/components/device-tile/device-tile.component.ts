@@ -14,7 +14,7 @@ const ARCHETYPE_LABEL: Record<DeviceArchetype, string> = {
 };
 
 @Component({
-  selector: 'elohim-device-tile',
+  selector: 'app-device-tile',
   standalone: true,
   imports: [CommonModule],
   template: `
@@ -26,10 +26,13 @@ const ARCHETYPE_LABEL: Record<DeviceArchetype, string> = {
     >
       <span class="dot" data-testid="device-tile-dot"></span>
       <span class="label" data-testid="device-tile-archetype-label">
-        {{ archetypeLabel(device.archetype) }}{{ device.displayName ? ' (' + device.displayName + ')' : '' }}
+        {{ archetypeLabel(device.archetype)
+        }}{{ device.displayName ? ' (' + device.displayName + ')' : '' }}
       </span>
       @if (device.hostingCount != null) {
-        <span class="hosting" data-testid="device-tile-hosting">{{ device.hostingCount }} files</span>
+        <span class="hosting" data-testid="device-tile-hosting">
+          {{ device.hostingCount }} files
+        </span>
       }
       <span class="status" data-testid="device-tile-status">
         @if (device.online) {
@@ -51,7 +54,7 @@ export class DeviceTileComponent {
   }
 
   staleAgo(ms?: number): string {
-    if (ms == null) return '';
+    if (ms === undefined) return '';
     const sec = Math.floor(ms / 1000);
     if (sec < 60) return `${sec}s ago`;
     const min = Math.floor(sec / 60);

@@ -1,5 +1,6 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject, signal } from '@angular/core';
+
 import { firstValueFrom } from 'rxjs';
 
 import type { MyClusterView } from '@app/generated/my-cluster-view';

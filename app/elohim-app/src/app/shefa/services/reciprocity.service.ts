@@ -1,5 +1,6 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject, signal } from '@angular/core';
+
 import { firstValueFrom } from 'rxjs';
 
 import type { ReciprocityView } from '@app/generated/reciprocity-view';
@@ -14,9 +15,7 @@ export class ReciprocityService {
   async getMyReciprocity(): Promise<ReciprocityView> {
     this.loading.set(true);
     try {
-      const view = await firstValueFrom(
-        this.http.get<ReciprocityView>('/api/v1/reciprocity'),
-      );
+      const view = await firstValueFrom(this.http.get<ReciprocityView>('/api/v1/reciprocity'));
       this.reciprocity.set(view);
       return view;
     } finally {

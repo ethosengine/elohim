@@ -1,14 +1,11 @@
 import { provideHttpClient } from '@angular/common/http';
-import {
-  HttpTestingController,
-  provideHttpClientTesting,
-} from '@angular/common/http/testing';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 
 import { ReciprocityLedgerComponent } from './reciprocity-ledger.component';
 
-const flushAsync = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
+const flushAsync = () => new Promise<void>(resolve => setTimeout(resolve, 0));
 
 describe('ReciprocityLedgerComponent', () => {
   let fixture: ComponentFixture<ReciprocityLedgerComponent>;
@@ -56,10 +53,10 @@ describe('ReciprocityLedgerComponent', () => {
     await flushAsync();
     fixture.detectChanges();
     expect(
-      fixture.nativeElement.querySelectorAll('[data-testid="reciprocity-inflow-row"]').length,
+      fixture.nativeElement.querySelectorAll('[data-testid="reciprocity-inflow-row"]').length
     ).toBe(1);
     expect(
-      fixture.nativeElement.querySelectorAll('[data-testid="reciprocity-outflow-row"]').length,
+      fixture.nativeElement.querySelectorAll('[data-testid="reciprocity-outflow-row"]').length
     ).toBe(1);
   });
 

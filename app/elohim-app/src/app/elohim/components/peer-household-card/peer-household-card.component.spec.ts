@@ -41,7 +41,7 @@ describe('PeerHouseholdCardComponent', () => {
     fixture.componentInstance.edge = mk({ isCriticalForMe: true });
     fixture.detectChanges();
     expect(
-      fixture.nativeElement.querySelector('[data-testid="peer-card-critical-for-me"]'),
+      fixture.nativeElement.querySelector('[data-testid="peer-card-critical-for-me"]')
     ).toBeTruthy();
   });
 

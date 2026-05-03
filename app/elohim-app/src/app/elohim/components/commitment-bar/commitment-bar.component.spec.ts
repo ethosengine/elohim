@@ -26,7 +26,7 @@ describe('CommitmentBarComponent', () => {
     fixture.componentInstance.deliveredBytes = 3_100_000_000;
     fixture.detectChanges();
     expect(
-      fixture.nativeElement.querySelector('[data-testid="commitment-bar-over-delivered"]'),
+      fixture.nativeElement.querySelector('[data-testid="commitment-bar-over-delivered"]')
     ).toBeTruthy();
   });
 

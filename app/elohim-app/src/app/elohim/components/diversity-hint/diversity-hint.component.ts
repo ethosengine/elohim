@@ -13,7 +13,7 @@ const ARCHETYPE_HUMAN: Record<string, string> = {
 };
 
 @Component({
-  selector: 'elohim-diversity-hint',
+  selector: 'app-diversity-hint',
   standalone: true,
   imports: [CommonModule],
   template: `
@@ -50,6 +50,6 @@ export class DiversityHintComponent {
   }
 
   archetypeLabels(values: string[]): string[] {
-    return values.map((a) => ARCHETYPE_HUMAN[a] ?? a);
+    return values.map(a => ARCHETYPE_HUMAN[a] ?? a);
   }
 }
