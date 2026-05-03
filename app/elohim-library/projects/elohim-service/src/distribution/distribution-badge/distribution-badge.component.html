@@ -1,0 +1,56 @@
+<div
+  class="badge"
+  [class.healthy]="summary.replicaHealth === 'healthy'"
+  [class.at_risk]="summary.replicaHealth === 'at_risk'"
+  [class.critical]="summary.replicaHealth === 'critical'"
+  data-testid="distribution-badge"
+  (mouseenter)="onTooltipExpand()"
+>
+  <span class="dots" data-testid="distribution-badge-dots">
+    @for (_ of dotIndices(summary.replicaCount); track $index) {
+      <span aria-hidden="true">●</span>
+    }
+  </span>
+  <span class="count" data-testid="distribution-badge-replica-count">
+    {{ summary.replicaCount }}
+  </span>
+
+  <span class="reach" data-testid="distribution-badge-reach">
+    {{ reachIcon(summary.reachClass) }}
+  </span>
+
+  @if (summary.myRole) {
+    <span class="my-role" data-testid="distribution-badge-my-role">★ I host this</span>
+  }
+
+  @if (expanded()) {
+    <div class="tooltip" data-testid="distribution-badge-tooltip">
+      <div class="tooltip-row">Reach: {{ summary.reachClass }}</div>
+      <div class="tooltip-row">
+        Replicas: {{ summary.replicaCount }} / {{ summary.replicaTarget }}
+      </div>
+      <div class="tooltip-row">Projectors: {{ summary.projectorCount }}</div>
+      <div class="tooltip-row">Health: {{ summary.replicaHealth }}</div>
+      <div class="tooltip-row">This fetch: {{ summary.thisFetchSource }}</div>
+
+      @if (blobHash) {
+        <details data-testid="distribution-badge-show-details">
+          <summary>show details</summary>
+          @if (loadingDetails()) {
+            <span>loading…</span>
+          }
+          @if (details(); as d) {
+            @for (p of d.replicaPeers; track p.peerId) {
+              <div class="peer-row">
+                {{ p.deviceArchetype }} · last seen {{ p.lastSeenSeconds }}s ago
+              </div>
+            }
+            @for (pj of d.projectorIdentities; track pj.doorwayHostname) {
+              <div class="projector-row">{{ pj.doorwayHostname }}</div>
+            }
+          }
+        </details>
+      }
+    </div>
+  }
+</div>
