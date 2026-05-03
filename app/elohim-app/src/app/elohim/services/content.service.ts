@@ -160,6 +160,11 @@ interface RawContentData {
   blobCid?: string;
   createdAt?: string;
   updatedAt?: string;
+  /**
+   * Distribution telemetry surfaced by the substrate on EPR head responses (T34/T49).
+   * Optional — pre-distribution content lacks a blob_hash and therefore lacks a summary.
+   */
+  distribution?: import('../../lamad/models/content-node.model').DistributionSummary;
 }
 
 /** Raw path step from storage/API */
@@ -710,6 +715,8 @@ export class ContentService {
       ),
       createdAt: data.createdAt,
       updatedAt: data.updatedAt,
+      // T49: pass-through substrate distribution summary when present.
+      distribution: data.distribution,
     } as ContentNode;
   }
 

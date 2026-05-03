@@ -60,6 +60,10 @@ export { isConceptNode, isAssessmentNode, isPathNode } from '../generated/conten
 // Re-export GeographicContext for backward compatibility
 export type { GeographicContext } from '@app/elohim/models/protocol-core.model';
 
+// Distribution telemetry surfaced by the substrate on EPR head responses (T34/T49).
+import type { DistributionSummary } from '@app/generated/distribution-summary';
+export type { DistributionSummary };
+
 export interface ContentNode {
   /** Unique identifier (ActionHash in Holochain) */
   id: string;
@@ -271,6 +275,21 @@ export interface ContentNode {
    * See create-context.model.ts for ContentBirthContext details.
    */
   birthContext?: import('@app/elohim/models/create-context.model').ContentBirthContext;
+
+  // =========================================================================
+  // Distribution Telemetry (Operational, Category C — projected, not stored)
+  // =========================================================================
+
+  /**
+   * Inline distribution summary, hydrated by the substrate on EPR head responses.
+   * Drives the `<elohim-distribution-badge>` simple tier; details fetched lazily
+   * via `DistributionService.getDetails(blobHash)`.
+   *
+   * Source: `compose_distribution_summary` in elohim-storage (Phase 5 T34).
+   * `undefined` for content that has no blob_hash yet (pre-distribution) and for
+   * historical projections not re-hydrated through the EPR head path.
+   */
+  distribution?: DistributionSummary;
 }
 
 /**

@@ -10,6 +10,9 @@ import { identityGuard } from '@app/imagodei/guards/identity.guard';
  * - /shefa/accounts - Plaid banking accounts (placeholder)
  * - /shefa/transactions - hREA economic events (placeholder)
  * - /shefa/devices - Device stewardship
+ * - /shefa/cluster - Federated multi-device view (T44 — light-up-the-topology)
+ * - /shefa/peers - Per-household reciprocation topology (T45)
+ * - /shefa/reciprocity - Inflow/outflow reciprocity ledger (T46)
  * - /shefa/dashboard - Network health and custodian metrics (operator view)
  * - /shefa/resources/* - Property, Energy, Knowledge stewardship (placeholders)
  * - /shefa/exchange - Requests & Offers marketplace (placeholder)
@@ -87,6 +90,48 @@ export const SHEFA_ROUTES: Routes = [
           ),
         data: {
           title: 'Shefa - Your Stewardship',
+        },
+      },
+      {
+        path: 'cluster',
+        loadComponent: async () =>
+          import('./pages/my-cluster/my-cluster.component').then(m => m.MyClusterComponent),
+        data: {
+          title: 'Your devices',
+          seo: {
+            title: 'Your devices',
+            description:
+              'Federated view of every device that signs as you — laptop, home server, phone, steward.',
+          },
+        },
+      },
+      {
+        path: 'peers',
+        loadComponent: async () =>
+          import('./pages/peer-topology/peer-topology.component').then(
+            m => m.PeerTopologyComponent
+          ),
+        data: {
+          title: 'Your peer households',
+          seo: {
+            title: 'Peer households',
+            description:
+              'Households you reciprocate with — who hosts your content, whose content you host, where the resilience cliffs are.',
+          },
+        },
+      },
+      {
+        path: 'reciprocity',
+        loadComponent: async () =>
+          import('./pages/reciprocity-ledger/reciprocity-ledger.component').then(
+            m => m.ReciprocityLedgerComponent
+          ),
+        data: {
+          title: 'Reciprocity',
+          seo: {
+            title: 'Reciprocity',
+            description: 'Your inflow + outflow hosting commitments and net reciprocation.',
+          },
         },
       },
       {
