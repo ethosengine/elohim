@@ -99,6 +99,13 @@ ARG RUSTC_VERSION=unknown
 COPY elohim/elohim-storage/migrations ./migrations
 COPY elohim/elohim-storage/src ./src
 
+# bootstrap_manifests.rs uses include_str!("../../../sdk/schemas/v1/manifests/...")
+# which resolves to /sdk/... in this WORKDIR /app layout (../../.. from
+# /app/src/services/ lands at /). Copying elohim/sdk to /sdk satisfies that
+# compile-time path. Without this, cargo build fails with "couldn't read
+# bootstrap-{standing,tending}-policy.json: No such file or directory".
+COPY elohim/sdk /sdk
+
 # Build the release binary
 # CACHE_BUST is interpolated into the command so BuildKit treats it as a new layer
 # when the value changes (ARG alone is insufficient for BuildKit cache invalidation)
