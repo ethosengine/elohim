@@ -225,6 +225,26 @@ fn is_content_address(identifier: &str) -> bool {
     identifier.starts_with("sha256-") && identifier.len() > 10
 }
 
+/// Fetch the `blob_hash` for a content row by its stable id (slug), respecting
+/// the same provenance gate (`require_provenance = true`) that
+/// `derive_epr_head` uses for HTTP callers.
+///
+/// Returns `None` when the row is missing, fails the provenance gate, or has
+/// no `blob_hash` populated yet (pre-distribution content). Used by the EPR
+/// head handler to hydrate `DistributionSummary` (Phase 5 T34) — distribution
+/// is best-effort, so any miss collapses to `None` rather than surfacing an
+/// error onto the head response.
+fn view_blob_hash_for_id(
+    conn: &mut diesel::SqliteConnection,
+    app_ctx: &db::AppContext,
+    id: &str,
+) -> Option<String> {
+    db::content_diesel::get_content_with_tags(conn, app_ctx, id, true)
+        .ok()
+        .flatten()
+        .and_then(|cwt| cwt.content.blob_hash)
+}
+
 impl HttpServer {
     /// Create a new HTTP server
     pub fn new(blob_store: Arc<BlobStore>, bind_addr: SocketAddr) -> Self {
@@ -6047,6 +6067,48 @@ impl HttpServer {
                 let mut view: EprHeadView = head.clone().into();
                 if let Ok((_bytes, cid)) = crate::epr_codec::encode_epr_head(&head) {
                     view.cid = Some(cid.to_string());
+                }
+
+                // Phase 5 T34: best-effort distribution-summary hydration.
+                // Distribution is purely operational (Category C) — it must
+                // never contaminate the canonical CBOR-encoded EprHead, so it
+                // lives on the JSON view only. Visitor vs Steward branching
+                // mirrors api/blob.rs::handle_distribution_details: if the
+                // caller resolves to an agent_cid AND has active peer
+                // bindings, hydrate as Steward; otherwise as Visitor.
+                if let (Some(pool), Some(blob_hash)) = (
+                    self.db_pool.as_ref(),
+                    view_blob_hash_for_id(&mut conn, &app_ctx, id),
+                ) {
+                    let agent_cid_opt = crate::api::account::extract_agent_cid(&req, &mut conn)
+                        .ok()
+                        .flatten();
+                    let bindings = if let Some(ref cid) = agent_cid_opt {
+                        let now_iso = chrono::Utc::now().to_rfc3339();
+                        crate::db::peer_identity_bindings::list_active_for_agent(
+                            &mut conn, cid, &now_iso,
+                        )
+                        .unwrap_or_default()
+                    } else {
+                        Vec::new()
+                    };
+                    let dist_ctx = match (&agent_cid_opt, bindings.is_empty()) {
+                        (Some(cid), false) => {
+                            crate::services::distribution_view::DistributionContext::Steward {
+                                agent_cid: cid.as_str(),
+                                bindings: &bindings,
+                            }
+                        }
+                        _ => crate::services::distribution_view::DistributionContext::Visitor,
+                    };
+                    if let Ok(summary) =
+                        crate::services::distribution_view::compose_distribution_summary(
+                            pool, &blob_hash, dist_ctx,
+                        )
+                        .await
+                    {
+                        view.distribution = Some(summary);
+                    }
                 }
 
                 return Ok(Response::builder()

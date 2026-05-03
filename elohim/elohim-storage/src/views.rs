@@ -2241,6 +2241,13 @@ impl From<EprHeadInputView> for EprHead {
 }
 
 /// EPR Head response — camelCase output for TypeScript clients.
+///
+/// **Note on distribution**: this is a *response wrapper*, not the canonical
+/// EPR Head. The canonical [`EprHead`] (in `epr_codec`) is the deterministic
+/// IPLD document whose CID is derived from its bytes — operational fields
+/// like `distribution` MUST NOT contaminate it. The DAG-CBOR encoding path in
+/// `handle_get_epr_head` serializes the canonical struct, so distribution is
+/// only ever surfaced via this JSON view.
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct EprHeadView {
@@ -2258,6 +2265,13 @@ pub struct EprHeadView {
     /// CID of the DAG-CBOR encoded head (set after encoding)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cid: Option<String>,
+    /// Inline distribution summary (Phase 5 T34). Hydrated by the HTTP handler
+    /// from `compose_distribution_summary` over the content's blob_hash.
+    /// `None` when the content row has no blob_hash yet (pre-distribution),
+    /// or when summary composition failed (best-effort hydration — distribution
+    /// surfacing must never break the head response).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub distribution: Option<DistributionSummary>,
 }
 
 impl From<EprHead> for EprHeadView {
@@ -2273,6 +2287,7 @@ impl From<EprHead> for EprHeadView {
             author: h.author,
             updated: h.updated,
             cid: None,
+            distribution: None,
         }
     }
 }
