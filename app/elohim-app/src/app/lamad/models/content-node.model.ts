@@ -282,8 +282,8 @@ export interface ContentNode {
 
   /**
    * Inline distribution summary, hydrated by the substrate on EPR head responses.
-   * Drives the `<app-distribution-badge>` simple tier; details fetched lazily
-   * via `DistributionService.getDetails(blobHash)`.
+   * Drives the `<elohim-distribution-badge>` library component; details fetched
+   * lazily via `DistributionService.getDetails(blobHash)`.
    *
    * Source: `compose_distribution_summary` in elohim-storage (Phase 5 T34).
    * `undefined` for content that has no blob_hash yet (pre-distribution) and for
