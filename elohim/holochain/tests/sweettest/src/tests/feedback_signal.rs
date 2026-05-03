@@ -23,6 +23,7 @@ use elohim_sweettest::common::{
     fixtures::network_seed,
 };
 use holo_hash::{ActionHash, EntryHash};
+use holochain::sweettest::{await_consistency, SweetConductor};
 use holochain_serialized_bytes::prelude::*;
 use serde::{Deserialize, Serialize};
 
@@ -384,9 +385,24 @@ async fn retraction_by_non_author_rejected() -> Result<()> {
         .await;
     let content_ah = output.action_hash;
 
-    // B tries to retract A's content — this MUST fail.
-    // two_agent_conductors() shares an in-process network so DHT gossips immediately;
-    // must_get_valid_record on content_ah will succeed, revealing a1 as author != a2.
+    // Exchange peer info + wait for DHT consistency so B's coordinator can resolve
+    // A's content via must_get_valid_record. Without this, must_get fails with
+    // "Failed to get Record" before the authorship gate runs, and the test asserts
+    // on the wrong error message. Same pattern used by imagodei_peer_binding +
+    // epr_phase_2b_batch_a_e2e for cross-agent reads.
+    tokio::time::timeout(std::time::Duration::from_secs(10), async {
+        while !SweetConductor::exchange_peer_info([&ca, &cb]).await {
+            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        }
+    })
+    .await
+    .map_err(|_| anyhow::anyhow!("Timeout waiting for peer info exchange"))?;
+
+    await_consistency(10, [&cell_a, &cell_b])
+        .await
+        .map_err(|e| anyhow::anyhow!("DHT consistency timeout: {e}"))?;
+
+    // B tries to retract A's content — this MUST fail at the authorship gate.
     let input = CreateFeedbackSignalInput {
         target_action_hash: content_ah.clone(),
         signal_kind: "retraction".to_string(),
