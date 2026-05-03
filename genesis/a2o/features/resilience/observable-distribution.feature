@@ -135,3 +135,38 @@ Feature: Observable + contract-aware auto-distribute
     Then the card renders no "elohim-distribution-badge" element
     # Boundary: undefined distribution is a valid state (pre-distribution
     # content, or historical projections not re-hydrated through EPR head).
+
+  # --- Two-dimension coherence (distribution + resilience side-by-side) ----
+  # 2026-05-03 coherence sub-pass. Distribution ("where are the bytes?") and
+  # resilience ("is it safe?") are orthogonal dimensions surfaced together
+  # on the content-viewer header so a steward sees both at once. The two
+  # widgets share a row; they do NOT merge data shapes.
+
+  @wip @resilience-p1
+  Scenario: Content-viewer header renders distribution and resilience together
+    Given content "content-alpha" has been distributed to at least 2 households
+    And the EPR head response hydrates both "resilience" and "distribution" fields
+    When Matthew opens the content-viewer for "content-alpha"
+    Then the header renders an "elohim-resilience-snapshot" element
+    And the header also renders an "elohim-distribution-badge" element
+    And both widgets are siblings on the same header row
+    # Constraint: a grandmother needs to see "where is my photo" AND "is it
+    # safe" at a glance, in the same place at the same time. Stacking or
+    # tab-switching the two dimensions raises cognitive load past the
+    # "credible to a grandmother" bar. Operational: both widgets render off
+    # the single EPR head response — no extra round-trip.
+
+  @wip @resilience-p1
+  Scenario: Distribution badge defers details fetch until tooltip opens
+    Given a content-viewer is open for "content-alpha"
+    And the distribution badge has a "blobHash" but no expanded details yet
+    When Matthew first views the page
+    Then no request is made to "/api/v1/blob/{hash}/distribution/details"
+    When Matthew expands the distribution tooltip
+    Then exactly one request is made to "/api/v1/blob/{hash}/distribution/details"
+    And subsequent expansions reuse the cached response
+    # Constraint: at card-grid scale (a learning path with 30+ concept cards)
+    # eager detail fetch would be 30+ round-trips on render. The badge MUST
+    # fetch only on tooltip-open and cache the result.
+    # Operational parameters: 1 round-trip per blob_hash per session; informs
+    # path-page rendering budget (≤1 head fetch + lazy details on demand).
