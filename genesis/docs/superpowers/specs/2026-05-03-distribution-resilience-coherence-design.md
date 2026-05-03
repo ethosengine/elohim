@@ -7,6 +7,16 @@
 into one widget. That draft mistook redundancy for two-dimensional truth;
 this version treats distribution and resilience as orthogonal readings.
 
+**Mission frame.** This is foundational substrate work. The Elohim Protocol
+seeks to subsume Google, Facebook, and Amazon by reaching the Apple-mantra
+bar of **"it just works"** peer-to-peer for *everyone*. That requires
+foundational trust signals grandma can read ambiently — distribution and
+resilience are two of those signals. Bar: **credible to a grandmother whose
+family photos are on the line**, not "good enough for an internal demo".
+Power has to extend safely from below (humans, households, collectives) to
+the hubs; if the foundational surfaces fail, every downstream stewardship
+flow inherits the failure.
+
 ## Two dimensions, not one
 
 The protocol surfaces two distinct readings on every piece of content. They
@@ -258,11 +268,26 @@ unifying the surfaces. Logging:
 
 ## Why this matters
 
-Distribution and resilience are two questions every human should be able to
-ask of every piece of content they touch. Conflating them into one widget
-hides the fact that they can answer differently — high reach without
-commitment is fragile, narrow stewardship without reach is unread. Keeping
-them as two single-purpose widgets, both in the protocol-vocabulary library,
-side-by-side where it matters, is what gives grandma the right confidence
-ambiently and gives Matthew two distinct readings during recovery: where it
-was, and what was actually protected.
+The Elohim Protocol's mission is to subsume Google, Facebook, and Amazon —
+to displace surveillance-and-extraction architectures with a peer-to-peer
+substrate that reaches the Apple-mantra bar of **"it just works"** for
+*everyone*, including grandma, the Canadian podcaster, and the church
+family that just wants its website to stay up. That requires foundational
+trust at the substrate so power can extend safely **from below** (humans,
+households, collectives) to the hubs — never the other way around.
+
+These two widgets are load-bearing primitives for that mission. Distribution
+and resilience are two questions every human must be able to ask of every
+piece of content they touch. Conflating them into one widget hides the fact
+that they can answer differently — high reach without commitment is
+fragile, narrow stewardship without reach is unread. The standard for
+getting this right is not "good enough for an internal demo" — it is
+**credible to a grandmother whose family photos are on the line**.
+
+Keeping them as two single-purpose widgets, both in the protocol-vocabulary
+library, side-by-side where it matters, is what gives grandma the right
+confidence ambiently and gives Matthew two distinct readings during
+recovery: where it was, and what was actually protected. Future moments
+(release, recruit-help, offline-carry → REA-credit) build on this same
+foundation. We are not laying out badges; we are laying the foundational
+trust signals that the rest of the protocol's promises rest on.
