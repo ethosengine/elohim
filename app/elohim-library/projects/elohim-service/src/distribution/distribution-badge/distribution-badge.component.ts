@@ -20,7 +20,6 @@ export class DistributionBadgeComponent {
   protected readonly expanded = signal(false);
   protected readonly details = signal<DistributionDetails | null>(null);
   protected readonly loadingDetails = signal(false);
-  protected readonly Math = Math;
 
   private readonly distribution = inject(DistributionService);
 

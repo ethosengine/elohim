@@ -65,6 +65,6 @@ describe('DistributionBadgeComponent (elohim-library)', () => {
     const root = fixture.nativeElement.querySelector('[data-testid="distribution-badge"]');
     root.dispatchEvent(new MouseEvent('mouseenter'));
     await fixture.whenStable();
-    http.expectNone('/api/v1/blob/undefined/distribution/details');
+    http.expectNone((req) => req.url.includes('/distribution/details'));
   });
 });
