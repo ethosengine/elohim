@@ -123,7 +123,7 @@ Feature: Observable + contract-aware auto-distribute
     Given content "concept-foo" has been distributed to multiple replicas
     And the substrate hydrates "concept.distribution" on the head response
     When Matthew sees a concept card for "concept-foo"
-    Then the card renders an "app-distribution-badge" element
+    Then the card renders an "elohim-distribution-badge" element
     And the badge shows reach, replica count and freshness
     # Constraint: the learner experience must not pay an extra round-trip per
     # card. Hydration happens once on the head response; the card just renders.
@@ -132,6 +132,6 @@ Feature: Observable + contract-aware auto-distribute
   Scenario: Concept card hides badge when distribution is not yet known
     Given content "concept-bar" has no blob_hash yet (pre-distribution)
     When Matthew sees a concept card for "concept-bar"
-    Then the card renders no "app-distribution-badge" element
+    Then the card renders no "elohim-distribution-badge" element
     # Boundary: undefined distribution is a valid state (pre-distribution
     # content, or historical projections not re-hydrated through EPR head).
