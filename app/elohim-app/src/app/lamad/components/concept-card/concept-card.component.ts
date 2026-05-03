@@ -3,7 +3,7 @@ import { Component, Input, Output, EventEmitter, ChangeDetectionStrategy } from 
 
 // @coverage: 52.9% (2026-02-24)
 
-import { DistributionBadgeComponent } from '@app/elohim/components/distribution-badge/distribution-badge.component';
+import { DistributionBadgeComponent } from '@elohim/service/public-api';
 
 import { ContentNode } from '../../models/content-node.model';
 import { RelationshipType } from '../../models/exploration-context.model';
@@ -51,7 +51,7 @@ import { RelationshipType } from '../../models/exploration-context.model';
       </div>
 
       @if (concept.distribution) {
-        <app-distribution-badge [summary]="concept.distribution"></app-distribution-badge>
+        <elohim-distribution-badge [summary]="concept.distribution"></elohim-distribution-badge>
       }
 
       @if (showMastery) {

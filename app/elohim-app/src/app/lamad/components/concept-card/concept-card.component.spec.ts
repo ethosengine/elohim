@@ -69,7 +69,7 @@ describe('ConceptCardComponent', () => {
       return { ...mockConcept, distribution: summary };
     }
 
-    it('renders <app-distribution-badge> when concept.distribution is present', () => {
+    it('renders <elohim-distribution-badge> when concept.distribution is present', () => {
       fixture.componentRef.setInput('concept', withDistribution({}));
       fixture.detectChanges();
       expect(
