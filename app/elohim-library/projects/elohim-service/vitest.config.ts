@@ -7,7 +7,7 @@ export default defineConfig({
     environment: 'node',
     root: './src',
     include: ['**/*.spec.ts'],
-    exclude: ['node_modules', 'dist', 'resilience/**'],
+    exclude: ['node_modules', 'dist', 'resilience/**', 'distribution/**'],
     pool: 'forks',
     maxForks: 8,
     reporters: ['default'],
