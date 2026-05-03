@@ -816,6 +816,9 @@ impl HttpServer {
                     let local_peer_id = self.p2p_handle.as_ref().map(|h| h.local_peer_id());
                     #[cfg(not(feature = "p2p"))]
                     let local_peer_id: Option<String> = None;
+                    // Phase 5: thread p2p_handle so cluster/peer-topology handlers
+                    // can construct a Federator for view-federation fan-out.
+                    let p2p_handle = self.p2p_handle.clone();
                     crate::api::handle_api_request(
                         req,
                         method,
@@ -826,6 +829,7 @@ impl HttpServer {
                         swarm_tx,
                         local_peer_id,
                         self.fan_out_ctx.clone(),
+                        p2p_handle,
                     )
                     .await
                 } else {
