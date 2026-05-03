@@ -9228,6 +9228,53 @@ pub fn build_manifest() -> doorway_client::DoorwayRoutes {
                 .auth_required()
                 .build(),
         )
+        // =====================================================================
+        // /api/v1/blob — Blob-scoped views (Phase 5 T29)
+        // =====================================================================
+        .route(
+            // Visitor-permitted distribution surface; the storage handler branches
+            // Visitor vs Steward via the agent_cid cascade in account::extract_agent_cid.
+            // No auth_required() so the public surface (replicas, health, reach,
+            // freshness) remains addressable without a session.
+            Route::get("/api/v1/blob/{hash}/distribution/details")
+                .handler("get_blob_distribution_details")
+                .cache_ttl(5)
+                .rate_limit(60)
+                .build(),
+        )
+        // =====================================================================
+        // /api/v1/cluster — Federated agent-scoped cluster view (Phase 5 T30)
+        // =====================================================================
+        .route(
+            Route::get("/api/v1/cluster")
+                .handler("get_cluster")
+                .auth_required()
+                .cache_ttl(2)
+                .rate_limit(30)
+                .build(),
+        )
+        // =====================================================================
+        // /api/v1/peer-topology — Peer-household topology view (Phase 5 T31)
+        // =====================================================================
+        .route(
+            Route::get("/api/v1/peer-topology")
+                .handler("get_peer_topology")
+                .auth_required()
+                .cache_ttl(2)
+                .rate_limit(30)
+                .build(),
+        )
+        // =====================================================================
+        // /api/v1/reciprocity — Local REA reciprocity ledger (Phase 5 T32)
+        // =====================================================================
+        .route(
+            Route::get("/api/v1/reciprocity")
+                .handler("get_reciprocity")
+                .auth_required()
+                .cache_ttl(10)
+                .rate_limit(20)
+                .build(),
+        )
         // Blob proxy: doorway caches blobs from /blob/{hash}
         .with_blobs_at("/blob")
         .build()
@@ -9298,6 +9345,23 @@ mod tests {
         assert!(
             paths.contains(&"/db/challenge-outcomes/{cid}"),
             "missing /db/challenge-outcomes/{{cid}}"
+        );
+        // Phase 5 topology routes — Light-Up-The-Topology sprint
+        assert!(
+            paths.contains(&"/api/v1/blob/{hash}/distribution/details"),
+            "missing /api/v1/blob/{{hash}}/distribution/details (T29)"
+        );
+        assert!(
+            paths.contains(&"/api/v1/cluster"),
+            "missing /api/v1/cluster (T30)"
+        );
+        assert!(
+            paths.contains(&"/api/v1/peer-topology"),
+            "missing /api/v1/peer-topology (T31)"
+        );
+        assert!(
+            paths.contains(&"/api/v1/reciprocity"),
+            "missing /api/v1/reciprocity (T32)"
         );
         // Ensure infrastructure routes are NOT in the manifest
         assert!(
