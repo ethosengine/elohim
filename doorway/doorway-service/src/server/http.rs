@@ -1180,6 +1180,14 @@ async fn handle_request(
             to_boxed(routes::handle_admin_pipeline(Arc::clone(&state)).await)
         }
 
+        // Dashboard topology — operator panel aggregate (Phase 5 T35)
+        // DoorwayDashboardView: storage stewards + federation peers +
+        // projection coverage + public surface. Composed per request from
+        // RouteRegistry / PeerCache / ContentCache snapshots.
+        (Method::GET, "/admin/dashboard/topology") => {
+            to_boxed(routes::handle_admin_dashboard_topology(Arc::clone(&state)).await)
+        }
+
         // Graduation endpoints — conductor retirement for steward users
         (Method::GET, "/admin/graduation/pending") => {
             to_boxed(routes::handle_graduation_pending(Arc::clone(&state)).await)

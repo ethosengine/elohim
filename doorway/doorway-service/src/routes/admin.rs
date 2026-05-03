@@ -897,6 +897,58 @@ pub async fn handle_capabilities(state: Arc<AppState>) -> Response<Full<Bytes>> 
     json_response(StatusCode::OK, response)
 }
 
+// ============================================================================
+// Dashboard Topology — Phase 5 T35
+// ============================================================================
+
+/// Handle GET /admin/dashboard/topology
+///
+/// Returns a [`DoorwayDashboardView`] aggregating storage steward rows,
+/// federation peer rows, projection coverage, and public surface state.
+///
+/// ## Auth
+///
+/// Follows the same convention as the surrounding `/admin/*` handlers
+/// (`handle_capabilities`, `handle_admin_federation_peers`,
+/// `handle_admin_pipeline`): no in-handler gate. Operator access to the
+/// `/admin/*` namespace is enforced at the network/deployment boundary.
+///
+/// ## Source of Truth
+///
+/// Operational (Category C). The view is doorway-resident operator state —
+/// no DHT entry, no SQLite projection, no notarization. Composed live each
+/// request from `RouteRegistry` (steward rows), `PeerCache` (federation
+/// rows), and `ContentCache::stats()` (projection coverage).
+///
+/// The `DashboardTopologyService` is constructed per request: it carries no
+/// expensive state and `build_view()` only reads snapshots. Holding the
+/// service on `AppState` would require touching six AppState constructor
+/// sites — deferred until profiling shows it matters.
+pub async fn handle_admin_dashboard_topology(state: Arc<AppState>) -> Response<Full<Bytes>> {
+    use std::sync::Arc as StdArc;
+    use tokio::sync::RwLock as TokioRwLock;
+
+    use crate::services::dashboard_topology::DashboardTopologyService;
+
+    // Snapshot live cache stats into the RwLock shape the service expects.
+    let stats_snapshot = state.cache.stats();
+    let cache_stats = StdArc::new(TokioRwLock::new(stats_snapshot));
+
+    let service = DashboardTopologyService::new(
+        cache_stats,
+        state.peer_cache.clone(),
+        state.route_registry.clone(),
+    );
+
+    match service.build_view().await {
+        Ok(view) => json_response(StatusCode::OK, view),
+        Err(e) => json_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            serde_json::json!({"reason": format!("dashboard_failed: {e}")}),
+        ),
+    }
+}
+
 fn json_response<T: Serialize>(status: StatusCode, body: T) -> Response<Full<Bytes>> {
     match serde_json::to_string_pretty(&body) {
         Ok(json) => Response::builder()

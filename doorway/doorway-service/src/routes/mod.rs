@@ -29,8 +29,9 @@ pub mod threshold;
 pub mod zome_helpers;
 
 pub use admin::{
-    handle_admin_pipeline, handle_capabilities, handle_cluster_metrics, handle_custodians,
-    handle_node_by_id, handle_nodes, handle_resources, handle_route_registry,
+    handle_admin_dashboard_topology, handle_admin_pipeline, handle_capabilities,
+    handle_cluster_metrics, handle_custodians, handle_node_by_id, handle_nodes, handle_resources,
+    handle_route_registry,
 };
 pub use admin_conductors::{
     handle_agent_conductor, handle_assign_agent, handle_conductor_agents, handle_deprovision_user,
