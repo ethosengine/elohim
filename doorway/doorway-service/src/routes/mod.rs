@@ -29,8 +29,9 @@ pub mod threshold;
 pub mod zome_helpers;
 
 pub use admin::{
-    handle_admin_pipeline, handle_capabilities, handle_cluster_metrics, handle_custodians,
-    handle_node_by_id, handle_nodes, handle_resources, handle_route_registry,
+    handle_admin_dashboard_topology, handle_admin_pipeline, handle_capabilities,
+    handle_cluster_metrics, handle_custodians, handle_node_by_id, handle_nodes, handle_resources,
+    handle_route_registry,
 };
 pub use admin_conductors::{
     handle_agent_conductor, handle_assign_agent, handle_conductor_agents, handle_deprovision_user,
@@ -71,7 +72,7 @@ pub use import::{handle_import_request, match_import_route};
 pub use import_ws::handle_import_progress_ws;
 pub use seed::{handle_check_blob, handle_seed_blob, BlobUploadResponse};
 pub use status::{status_check, status_page};
-pub use storage_proxy::{forward_blob_to_storage, forward_to_storage};
+pub use storage_proxy::{forward_blob_to_storage, forward_to_storage, ForwardCtx};
 pub use stream::handle_stream_request;
 pub use threshold::handle_threshold_request;
 

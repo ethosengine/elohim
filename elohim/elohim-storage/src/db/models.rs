@@ -19,12 +19,13 @@ use super::diesel_schema::{
     enum_registry, governance_dispositions, governance_signals, governance_states, hazards,
     human_relationships, humans, imagodei_observations, key_revocations, key_rotations,
     knowledge_maps, local_sessions, node_stewardship, observation_entries, observation_sessions,
-    peer_identity_bindings, placement_gaps, places, portal_hosts, precedents, premium_gates,
-    proposal_options, proposals, ranked_votes, rea_commitments, recovery_requests,
-    recovery_witnesses, relationships, responsibility_demand_configs, revocation_votes,
-    risk_alerts, schedules, shard_locations, shard_manifests, spatial_contexts, statement_votes,
-    statements, steward_credentials, stewarded_nodes, stewardship_allocations, token_balances,
-    token_decay_events, token_mint_events, token_transfers, votes,
+    peer_blob_inventory, peer_identity_bindings, peer_inventory_cursor, placement_gaps, places,
+    portal_hosts, precedents, premium_gates, proposal_options, proposals, ranked_votes,
+    rea_commitments, recovery_requests, recovery_witnesses, relationships,
+    responsibility_demand_configs, revocation_votes, risk_alerts, schedules, shard_locations,
+    shard_manifests, spatial_contexts, statement_votes, statements, steward_credentials,
+    stewarded_nodes, stewardship_allocations, token_balances, token_decay_events,
+    token_mint_events, token_transfers, votes,
 };
 
 // ============================================================================
@@ -2997,6 +2998,12 @@ pub struct PeerIdentityBindingRow {
     pub observed_at: String,
     /// Provenance: 'dht' | 'gossip' | 'handshake'
     pub source: String,
+    /// Device archetype the agent bound this peer as ('node', 'mobile', 'desktop', ...).
+    /// Backfilled to 'node' for rows projected before this column existed.
+    pub device_archetype: String,
+    /// Action hash of the AgentPeerBinding DHT entry that supersedes this row, if any.
+    /// NULL means this is the current binding for (agent_cid, peer_id).
+    pub superseded_by: Option<String>,
 }
 
 /// Insert model for peer identity bindings (INSERT/REPLACE on primary key).
@@ -3010,6 +3017,8 @@ pub struct NewPeerIdentityBindingRow {
     pub valid_until: Option<String>,
     pub observed_at: String,
     pub source: String,
+    pub device_archetype: String,
+    pub superseded_by: Option<String>,
 }
 
 // Recovery Protocol Phase 2 — M4 Revocation Projection
@@ -3117,4 +3126,54 @@ pub struct NewPortalHostRow {
     pub last_reachable_at: Option<String>,
     pub reach: String,
     pub dht_anchor_hash: String,
+}
+
+// ============================================================================
+// peer_blob_inventory (Category C — operational projection from libp2p gossip)
+// ============================================================================
+//
+// Source of truth: libp2p gossipsub on topic 'elohim/inventory/blob'.
+// Manifest counterpart: rea_commitments(action='custody-blob').
+
+#[derive(Debug, Clone, Queryable, Selectable)]
+#[diesel(table_name = peer_blob_inventory)]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+pub struct PeerBlobInventoryRow {
+    pub peer_id: String,
+    pub blob_hash: String,
+    pub last_seen_at: String,
+    /// 'gossip-snapshot' | 'gossip-delta' | 'fetch-success'
+    pub source: String,
+    pub sequence: i64,
+}
+
+#[derive(Debug, Clone, Insertable)]
+#[diesel(table_name = peer_blob_inventory)]
+pub struct NewPeerBlobInventoryRow {
+    pub peer_id: String,
+    pub blob_hash: String,
+    pub last_seen_at: String,
+    pub source: String,
+    pub sequence: i64,
+}
+
+// ============================================================================
+// peer_inventory_cursor (Category C — operational sequence high-watermark)
+// ============================================================================
+
+#[derive(Debug, Clone, Queryable, Selectable)]
+#[diesel(table_name = peer_inventory_cursor)]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+pub struct PeerInventoryCursorRow {
+    pub peer_id: String,
+    pub last_sequence: i64,
+    pub last_updated: String,
+}
+
+#[derive(Debug, Clone, Insertable)]
+#[diesel(table_name = peer_inventory_cursor)]
+pub struct NewPeerInventoryCursorRow {
+    pub peer_id: String,
+    pub last_sequence: i64,
+    pub last_updated: String,
 }

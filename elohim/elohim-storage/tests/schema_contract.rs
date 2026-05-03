@@ -1116,6 +1116,24 @@ fn view_schemas_declare_source_of_truth() {
         "views/epr-verify-view.schema.json",
         "views/epr-list-view.schema.json",
         "views/epr-providers-view.schema.json",
+        // Phase 1: light-up-topology view schemas
+        "views/distribution-summary.schema.json",
+        "views/distribution-details.schema.json",
+        "views/replica-peer.schema.json",
+        "views/projector-identity.schema.json",
+        "views/diversity-hint.schema.json",
+        "views/my-cluster-view.schema.json",
+        "views/freshness.schema.json",
+        "views/peer-topology-view.schema.json",
+        "views/peer-household-edge.schema.json",
+        "views/reciprocity-view.schema.json",
+        "views/reciprocity-row.schema.json",
+        "views/doorway-dashboard-view.schema.json",
+        "views/dashboard-steward.schema.json",
+        "views/dashboard-federation-peer.schema.json",
+        "views/projection-coverage.schema.json",
+        "views/public-surface-state.schema.json",
+        "views/view-slice.schema.json",
     ];
 
     for schema_name in &view_schemas {
@@ -1773,6 +1791,396 @@ fn attention_tending_with_empty_tended_at_rejected_by_schema() {
         has_errors,
         "schema should reject tendedAt: [] (minItems: 1 violated)"
     );
+}
+
+// ── Light-Up-Topology Phase 1 — Distribution / Cluster / Reciprocity ────
+
+#[test]
+fn distribution_summary_matches_schema() {
+    use elohim_storage::views::{
+        DistributionSummary, DiversityHint, FetchSource, MyRole, ReachClass, ReplicaHealth,
+    };
+
+    let sample = DistributionSummary {
+        replica_count: 12,
+        replica_target: 14,
+        replica_health: ReplicaHealth::Healthy,
+        projector_count: 2,
+        reach_class: ReachClass::Public,
+        diversity_hint: DiversityHint::RegionMetro(vec!["us-central".into(), "eu-west".into()]),
+        this_fetch_source: FetchSource::ProjectedViaDoorway,
+        last_verified_seconds: 420,
+        my_role: Some(MyRole::Replica),
+        reciprocity_hint: Some(0),
+    };
+
+    let json = serde_json::to_value(&sample).unwrap();
+    validate_against_schema("views/distribution-summary.schema.json", &json);
+
+    let raw_schema: Value = serde_json::from_str(
+        &fs::read_to_string(schema_dir().join("views/distribution-summary.schema.json")).unwrap(),
+    )
+    .unwrap();
+    assert_source_of_truth_declared(&raw_schema, "distribution-summary.schema.json");
+}
+
+#[test]
+fn distribution_details_matches_schema() {
+    use elohim_storage::views::{
+        DeviceArchetype, DistributionDetails, DistributionSummary, DiversityHint, FetchSource,
+        ProjectorIdentity, ReachClass, ReplicaHealth, ReplicaPeer,
+    };
+
+    let summary = DistributionSummary {
+        replica_count: 12,
+        replica_target: 14,
+        replica_health: ReplicaHealth::Healthy,
+        projector_count: 2,
+        reach_class: ReachClass::Public,
+        diversity_hint: DiversityHint::RegionMetro(vec!["us-central".into(), "eu-west".into()]),
+        this_fetch_source: FetchSource::ProjectedViaDoorway,
+        last_verified_seconds: 420,
+        my_role: None,
+        reciprocity_hint: None,
+    };
+
+    let sample = DistributionDetails {
+        summary,
+        replica_peers: vec![ReplicaPeer {
+            peer_id: "12D3KooWReplica1".into(),
+            device_archetype: DeviceArchetype::Desktop,
+            last_seen_seconds: 30,
+            hop_hint: Some(2),
+            household_id: Some("household-mathew".into()),
+            region_tier: Some("us-central".into()),
+        }],
+        projector_identities: vec![ProjectorIdentity {
+            doorway_hostname: "matthew.elohim.host".into(),
+            last_ack_seconds: 5,
+            region_tier: Some("us-central".into()),
+        }],
+        placement_gaps: vec![],
+        recent_projection_events: vec![],
+        commitment_references: Some(vec!["bafy-commit-1".into()]),
+    };
+
+    let json = serde_json::to_value(&sample).unwrap();
+    validate_against_schema("views/distribution-details.schema.json", &json);
+
+    let raw_schema: Value = serde_json::from_str(
+        &fs::read_to_string(schema_dir().join("views/distribution-details.schema.json")).unwrap(),
+    )
+    .unwrap();
+    assert_source_of_truth_declared(&raw_schema, "distribution-details.schema.json");
+}
+
+#[test]
+fn replica_peer_matches_schema() {
+    use elohim_storage::views::{DeviceArchetype, ReplicaPeer};
+
+    let sample = ReplicaPeer {
+        peer_id: "12D3KooWReplica1".into(),
+        device_archetype: DeviceArchetype::Mobile,
+        last_seen_seconds: 90,
+        hop_hint: None,
+        household_id: None,
+        region_tier: None,
+    };
+
+    let json = serde_json::to_value(&sample).unwrap();
+    validate_against_schema("views/replica-peer.schema.json", &json);
+}
+
+#[test]
+fn projector_identity_matches_schema() {
+    use elohim_storage::views::ProjectorIdentity;
+
+    let sample = ProjectorIdentity {
+        doorway_hostname: "shem.elohim.host".into(),
+        last_ack_seconds: 12,
+        region_tier: None,
+    };
+
+    let json = serde_json::to_value(&sample).unwrap();
+    validate_against_schema("views/projector-identity.schema.json", &json);
+}
+
+#[test]
+fn my_cluster_view_matches_schema() {
+    use elohim_storage::views::{
+        DeviceArchetype, DeviceSummary, DeviceTotals, Freshness, FreshnessState, MyClusterView,
+    };
+
+    let sample = MyClusterView {
+        agent_cid: "agent_abc123".into(),
+        devices: vec![DeviceSummary {
+            peer_id: "12D3KooWMatthewLaptop".into(),
+            archetype: DeviceArchetype::Desktop,
+            display_name: Some("Matthew's laptop".into()),
+            online: true,
+            freshness: Freshness {
+                state: FreshnessState::Live,
+                stale_since_ms: None,
+            },
+            storage_used_bytes: Some(18_400_000_000),
+            storage_total_bytes: Some(250_000_000_000),
+            memory_used_bytes: None,
+            memory_total_bytes: None,
+            hosting_count: Some(1247),
+            projecting_count: Some(802),
+            beacon_age_ms: Some(0),
+        }],
+        totals: DeviceTotals {
+            storage_used_bytes: 25_200_000_000,
+            storage_total_bytes: 298_000_000_000,
+            external_committed_bytes: 14_800_000_000,
+            reciprocity_net_bytes: 5_200_000_000,
+        },
+        freshness: Freshness {
+            state: FreshnessState::Live,
+            stale_since_ms: None,
+        },
+    };
+
+    let json = serde_json::to_value(&sample).unwrap();
+    validate_against_schema("views/my-cluster-view.schema.json", &json);
+}
+
+#[test]
+fn peer_topology_view_matches_schema() {
+    use elohim_storage::views::{
+        Freshness, FreshnessState, PeerHouseholdEdge, PeerTopologyView, ResilienceCliff,
+    };
+
+    let sample = PeerTopologyView {
+        agent_cid: "agent_abc123".into(),
+        edges: vec![PeerHouseholdEdge {
+            household_id: "household-jessica".into(),
+            display_name: Some("Jessica".into()),
+            online: true,
+            last_sync_sec: Some(45),
+            my_cids_hosted_by_them: 412,
+            their_cids_hosted_by_me: 380,
+            net_diff: Some(-32),
+            is_critical_for_me: Some(false),
+            i_am_critical_for_them: Some(true),
+        }],
+        reciprocation_count: 3,
+        resilience_cliffs: vec![ResilienceCliff {
+            household_id: "household-shem".into(),
+            sole_replica_cid_count: 7,
+        }],
+        freshness: Freshness {
+            state: FreshnessState::Live,
+            stale_since_ms: None,
+        },
+    };
+
+    let json = serde_json::to_value(&sample).unwrap();
+    validate_against_schema("views/peer-topology-view.schema.json", &json);
+}
+
+#[test]
+fn reciprocity_view_matches_schema() {
+    use elohim_storage::views::{ReciprocityRow, ReciprocityView};
+
+    let sample = ReciprocityView {
+        agent_cid: "agent_abc123".into(),
+        inflow: vec![ReciprocityRow {
+            counterparty_household_id: "household-jessica".into(),
+            display_name: Some("Jessica".into()),
+            committed_bytes: 5_000_000_000,
+            delivered_bytes: 4_750_000_000,
+            honored_percent: 0.95,
+            online: Some(true),
+        }],
+        outflow: vec![ReciprocityRow {
+            counterparty_household_id: "household-shem".into(),
+            display_name: None,
+            committed_bytes: 8_000_000_000,
+            delivered_bytes: 8_400_000_000,
+            honored_percent: 1.05,
+            online: None,
+        }],
+        net_hosted_bytes: -3_650_000_000,
+        capacity_available_bytes: 12_500_000_000,
+    };
+
+    let json = serde_json::to_value(&sample).unwrap();
+    validate_against_schema("views/reciprocity-view.schema.json", &json);
+}
+
+#[test]
+fn view_slice_cluster_matches_schema() {
+    use elohim_storage::views::{Freshness, FreshnessState, JsonVal, ViewKind, ViewSlice};
+
+    let sample = ViewSlice {
+        peer_id: "12D3KooWMatthewLaptop".into(),
+        view_kind: ViewKind::Cluster,
+        freshness: Freshness {
+            state: FreshnessState::Live,
+            stale_since_ms: None,
+        },
+        payload: JsonVal(serde_json::json!({
+            "agentCid": "agent_abc123",
+            "devices": [],
+            "totals": {
+                "storageUsedBytes": 0,
+                "storageTotalBytes": 0,
+                "externalCommittedBytes": 0,
+                "reciprocityNetBytes": 0
+            },
+            "freshness": {"state": "live"}
+        })),
+        signature:
+            "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                .into(),
+    };
+
+    let json = serde_json::to_value(&sample).unwrap();
+    validate_against_schema("views/view-slice.schema.json", &json);
+}
+
+#[test]
+fn view_slice_peer_topology_matches_schema() {
+    use elohim_storage::views::{Freshness, FreshnessState, JsonVal, ViewKind, ViewSlice};
+
+    let sample = ViewSlice {
+        peer_id: "12D3KooWJessicaPhone".into(),
+        view_kind: ViewKind::PeerTopology,
+        freshness: Freshness {
+            state: FreshnessState::Stale,
+            stale_since_ms: Some(60_000),
+        },
+        payload: JsonVal(serde_json::json!({
+            "agentCid": "agent_jess",
+            "edges": [],
+            "reciprocationCount": 0,
+            "resilienceCliffs": [],
+            "freshness": {"state": "stale", "staleSinceMs": 60000}
+        })),
+        signature:
+            "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB"
+                .into(),
+    };
+
+    let json = serde_json::to_value(&sample).unwrap();
+    validate_against_schema("views/view-slice.schema.json", &json);
+}
+
+#[test]
+fn doorway_dashboard_view_matches_schema() {
+    use elohim_storage::views::{
+        DashboardFederationPeer, DashboardSteward, DeviceArchetype, DoorwayDashboardView,
+        FederationDirection, ProjectionCoverage, PublicSurfaceState,
+    };
+
+    let sample = DoorwayDashboardView {
+        doorway_hostname: "matthew.elohim.host".into(),
+        storage_stewards: vec![DashboardSteward {
+            peer_id: "12D3KooWMatthew".into(),
+            archetype: DeviceArchetype::Node,
+            display_name: Some("matthew-blade-01".into()),
+            online: true,
+            hosting_count: 2_134,
+            hop_hint: Some(1),
+        }],
+        federation_peers: vec![DashboardFederationPeer {
+            doorway_hostname: "shem.elohim.host".into(),
+            online: true,
+            direction: FederationDirection::Bidirectional,
+            shared_cid_count: 412,
+        }],
+        projection_coverage: ProjectionCoverage {
+            projected_cid_count: 4_318,
+            known_cid_count: 5_672,
+            cache_hit_rate_24h: 0.87,
+            projection_lag_ms_avg: 340,
+        },
+        public_surface: PublicSurfaceState {
+            dns_resolves: true,
+            dns_target: Some("203.0.113.42".into()),
+            tls_valid: true,
+            tls_expires_in_days: Some(64),
+            public_reachable: true,
+        },
+    };
+
+    let json = serde_json::to_value(&sample).unwrap();
+    validate_against_schema("views/doorway-dashboard-view.schema.json", &json);
+}
+
+#[test]
+fn reciprocity_row_matches_schema() {
+    use elohim_storage::views::ReciprocityRow;
+
+    let sample = ReciprocityRow {
+        counterparty_household_id: "household-x".into(),
+        display_name: None,
+        committed_bytes: 0,
+        delivered_bytes: 0,
+        honored_percent: 0.0,
+        online: None,
+    };
+
+    let json = serde_json::to_value(&sample).unwrap();
+    validate_against_schema("views/reciprocity-row.schema.json", &json);
+}
+
+#[test]
+fn peer_household_edge_minimal_matches_schema() {
+    use elohim_storage::views::PeerHouseholdEdge;
+
+    let sample = PeerHouseholdEdge {
+        household_id: "household-x".into(),
+        display_name: None,
+        online: false,
+        last_sync_sec: None,
+        my_cids_hosted_by_them: 0,
+        their_cids_hosted_by_me: 0,
+        net_diff: None,
+        is_critical_for_me: None,
+        i_am_critical_for_them: None,
+    };
+
+    let json = serde_json::to_value(&sample).unwrap();
+    validate_against_schema("views/peer-household-edge.schema.json", &json);
+}
+
+#[test]
+fn freshness_offline_matches_schema() {
+    use elohim_storage::views::{Freshness, FreshnessState};
+
+    let sample = Freshness {
+        state: FreshnessState::Offline,
+        stale_since_ms: Some(120_000),
+    };
+
+    let json = serde_json::to_value(&sample).unwrap();
+    validate_against_schema("views/freshness.schema.json", &json);
+}
+
+#[test]
+fn distribution_summary_with_diversity_none_matches_schema() {
+    use elohim_storage::views::{
+        DistributionSummary, DiversityHint, FetchSource, ReachClass, ReplicaHealth,
+    };
+
+    let sample = DistributionSummary {
+        replica_count: 1,
+        replica_target: 3,
+        replica_health: ReplicaHealth::AtRisk,
+        projector_count: 0,
+        reach_class: ReachClass::Private,
+        diversity_hint: DiversityHint::None,
+        this_fetch_source: FetchSource::LocalPantry,
+        last_verified_seconds: 0,
+        my_role: None,
+        reciprocity_hint: None,
+    };
+
+    let json = serde_json::to_value(&sample).unwrap();
+    validate_against_schema("views/distribution-summary.schema.json", &json);
 }
 
 #[test]

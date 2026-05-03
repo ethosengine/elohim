@@ -15,6 +15,7 @@ use std::sync::Arc;
 use tokio::net::TcpListener;
 use tracing::{debug, error, info, warn};
 
+use crate::auth::{extract_token_from_header, JwtValidator};
 use crate::bootstrap::{self, BootstrapStore};
 use crate::cache::{
     self, spawn_tiered_cleanup_task, AppFileCacheService, CacheConfig, CacheRuleStore,
@@ -604,6 +605,45 @@ impl AppState {
     }
 }
 
+/// Resolve the calling agent's `agent_cid` from the request's bearer token.
+///
+/// Returns `Some(human_id)` when:
+/// - the request carries a `Bearer <token>` Authorization header AND
+/// - the token validates against the configured JWT validator (or the dev-mode
+///   validator when `args.dev_mode` is set)
+///
+/// Returns `None` for Session Visitors (no bearer), invalid/expired tokens, or
+/// when no JWT secret is configured in production mode. Storage handlers fall
+/// back to their `local_sessions`-based resolution when this header is absent.
+///
+/// **Alpha-substrate equivalence:** `agent_cid` is sourced from `claims.human_id`
+/// today. The seeder authors AgentPeerBinding entries with
+/// `agent_cid: human.id`; tests use slug-style strings. CIDv1 dag-cbor sha256
+/// derivation of the Agent EPR is not enforced anywhere yet. When CIDv1
+/// enforcement lands, doorway will resolve `human_id → agent_cid` once at user
+/// creation, persist on UserDoc, and source from there. The wire shape
+/// (`X-Agent-Cid` header) does not change.
+fn resolve_agent_cid_from_request<B>(state: &AppState, req: &Request<B>) -> Option<String> {
+    let auth_header = req
+        .headers()
+        .get(hyper::header::AUTHORIZATION)
+        .and_then(|v| v.to_str().ok());
+    let token = extract_token_from_header(auth_header)?;
+
+    let validator = if state.args.dev_mode {
+        JwtValidator::new_dev()
+    } else {
+        let secret = state.args.jwt_secret.as_ref()?;
+        JwtValidator::new(secret.clone(), state.args.jwt_expiry_seconds).ok()?
+    };
+
+    let result = validator.verify_token(token);
+    if !result.valid {
+        return None;
+    }
+    result.claims.map(|c| c.human_id)
+}
+
 /// Start the HTTP server
 pub async fn run(state: Arc<AppState>) -> Result<(), DoorwayError> {
     let listener = TcpListener::bind(state.args.listen).await?;
@@ -1140,6 +1180,14 @@ async fn handle_request(
             to_boxed(routes::handle_admin_pipeline(Arc::clone(&state)).await)
         }
 
+        // Dashboard topology — operator panel aggregate (Phase 5 T35)
+        // DoorwayDashboardView: storage stewards + federation peers +
+        // projection coverage + public surface. Composed per request from
+        // RouteRegistry / PeerCache / ContentCache snapshots.
+        (Method::GET, "/admin/dashboard/topology") => {
+            to_boxed(routes::handle_admin_dashboard_topology(Arc::clone(&state)).await)
+        }
+
         // Graduation endpoints — conductor retirement for steward users
         (Method::GET, "/admin/graduation/pending") => {
             to_boxed(routes::handle_graduation_pending(Arc::clone(&state)).await)
@@ -1524,6 +1572,16 @@ async fn handle_request(
             match dispo {
                 Disposition::StorageProxy { endpoint } => {
                     debug!(path = %p, %endpoint, "Registry-routed to storage proxy");
+                    // Resolve agent_cid from the bearer's claims (alpha-substrate:
+                    // claims.human_id IS agent_cid). Storage's view services use
+                    // X-Agent-Cid for identity-scoped views (`/cluster`,
+                    // `/peer-topology`, `/reciprocity`) and reach gating on private
+                    // blobs. Visitor / invalid-bearer paths get None and storage
+                    // falls back to its local_sessions resolution or visitor branch.
+                    let agent_cid_owned = resolve_agent_cid_from_request(&state, &req);
+                    let ctx = routes::ForwardCtx {
+                        agent_cid: agent_cid_owned.as_deref(),
+                    };
                     // Blob paths get cache-aware forwarding; all other registry
                     // routes use the generic forwarder unchanged.
                     if p.starts_with("/blob/") {
@@ -1533,12 +1591,13 @@ async fn handle_request(
                                 &endpoint,
                                 p,
                                 Arc::clone(&state.cache),
+                                ctx,
                             )
                             .await,
                         ));
                     }
                     return Ok(to_boxed(
-                        routes::forward_to_storage(req, &endpoint, p).await,
+                        routes::forward_to_storage(req, &endpoint, p, ctx).await,
                     ));
                 }
                 Disposition::RegistryUnhandled => {

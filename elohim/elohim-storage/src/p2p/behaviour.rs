@@ -14,6 +14,7 @@ use super::kad_store::SledRecordStore;
 
 use std::time::Duration;
 
+use super::blob_protocol::{BlobCodec, BlobProtocol};
 use super::epr_atom_protocol::{EprAtomCodec, EprAtomProtocol};
 use super::epr_protocol::{EprCodec, EprProtocol};
 use super::identity_binding_gossip::IDENTITY_BINDING_TOPIC;
@@ -22,6 +23,7 @@ use super::recovery_invitation::RECOVERY_INVITATION_TOPIC;
 use super::shard_protocol::{ShardCodec, ShardProtocol};
 use super::sync_protocol::{SyncCodec, SyncProtocol};
 use super::trust_protocol::{TrustCodec, TrustProtocol};
+use super::view_federation::{ViewFederationCodec, ViewFederationProtocol};
 use super::P2PConfig;
 
 /// Relay operating mode
@@ -69,6 +71,12 @@ pub struct ElohimStorageBehaviour {
     pub kademlia: Kademlia<SledRecordStore>,
     /// Request-response for shard transfer
     pub shard_protocol: RequestResponse<ShardCodec>,
+    /// Request-response for explicit-peer blob fetch (`/elohim/blob/1.0.0`).
+    ///
+    /// T21: Stage-2 wiring of the T17/T20 race-fetch helper. Differs from
+    /// `shard_protocol` in that the caller routes to a specific `peer_id`
+    /// rather than any-connected-peer.
+    pub blob_protocol: RequestResponse<BlobCodec>,
     /// Request-response for CRDT sync
     pub sync_protocol: RequestResponse<SyncCodec>,
     /// Request-response for EPR Head resolution (legacy /elohim/epr/1.0.0)
@@ -83,6 +91,13 @@ pub struct ElohimStorageBehaviour {
     /// Fires on ConnectionEstablished; receiver verifies and writes into
     /// `peer_identity_bindings` with source='handshake'.
     pub identity_handshake: RequestResponse<IdentityHandshakeCodec>,
+    /// Request-response for federated view-slice fetch (/elohim/view-federation/1.0.0).
+    ///
+    /// F-T18: Phase 3 wiring — peers ask each other for signed cluster /
+    /// peer-topology slices. The dispatcher (caller side) and responder
+    /// handler land in F-T19/F-T20; until then the behaviour is registered
+    /// (so peers advertise the protocol) but produces no handled events.
+    pub view_federation: RequestResponse<ViewFederationCodec>,
     /// Local network discovery (mDNS)
     pub mdns: mdns::tokio::Behaviour,
     /// Relay client for NAT traversal (connect through relay servers)
@@ -108,6 +123,8 @@ pub enum ElohimStorageBehaviourEvent {
     Kademlia(kad::Event),
     /// Shard protocol event
     ShardProtocol(request_response::Event<super::ShardRequest, super::ShardResponse>),
+    /// Blob protocol event (`/elohim/blob/1.0.0`)
+    BlobProtocol(request_response::Event<super::BlobFetchRequest, super::BlobFetchResponse>),
     /// Sync protocol event
     SyncProtocol(request_response::Event<super::SyncRequest, super::SyncResponse>),
     /// EPR protocol event (legacy /elohim/epr/1.0.0)
@@ -126,6 +143,16 @@ pub enum ElohimStorageBehaviourEvent {
         request_response::Event<
             super::identity_handshake::IdentityHandshakeRequest,
             super::identity_handshake::IdentityHandshakeResponse,
+        >,
+    ),
+    /// View federation event (/elohim/view-federation/1.0.0).
+    ///
+    /// F-T18: variant constructed via the `From` impl below. The match arm
+    /// in `p2p/mod.rs`'s swarm event loop is wired in F-T19/F-T20.
+    ViewFederation(
+        request_response::Event<
+            crate::views::ViewFederationRequest,
+            crate::views::ViewFederationResponse,
         >,
     ),
     /// mDNS event
@@ -157,6 +184,16 @@ impl From<request_response::Event<super::ShardRequest, super::ShardResponse>>
 {
     fn from(event: request_response::Event<super::ShardRequest, super::ShardResponse>) -> Self {
         Self::ShardProtocol(event)
+    }
+}
+
+impl From<request_response::Event<super::BlobFetchRequest, super::BlobFetchResponse>>
+    for ElohimStorageBehaviourEvent
+{
+    fn from(
+        event: request_response::Event<super::BlobFetchRequest, super::BlobFetchResponse>,
+    ) -> Self {
+        Self::BlobProtocol(event)
     }
 }
 
@@ -226,6 +263,24 @@ impl
     }
 }
 
+impl
+    From<
+        request_response::Event<
+            crate::views::ViewFederationRequest,
+            crate::views::ViewFederationResponse,
+        >,
+    > for ElohimStorageBehaviourEvent
+{
+    fn from(
+        event: request_response::Event<
+            crate::views::ViewFederationRequest,
+            crate::views::ViewFederationResponse,
+        >,
+    ) -> Self {
+        Self::ViewFederation(event)
+    }
+}
+
 impl From<relay::client::Event> for ElohimStorageBehaviourEvent {
     fn from(event: relay::client::Event) -> Self {
         Self::RelayClient(event)
@@ -291,6 +346,15 @@ impl ElohimStorageBehaviour {
             request_response::Config::default().with_request_timeout(config.request_timeout),
         );
 
+        // T21: Blob fetch request-response protocol — explicit-peer fetch for
+        // the T17/T20 race-fetch helper. `with_codec` lets us plumb the
+        // configurable max response size (default 16 MiB, hard-capped at 64 MiB).
+        let blob_protocol = RequestResponse::with_codec(
+            BlobCodec::with_max_response_size(config.max_blob_response_size),
+            [(BlobProtocol, ProtocolSupport::Full)],
+            request_response::Config::default().with_request_timeout(config.request_timeout),
+        );
+
         // Sync request-response protocol
         let sync_protocol = RequestResponse::new(
             [(SyncProtocol, ProtocolSupport::Full)],
@@ -320,6 +384,19 @@ impl ElohimStorageBehaviour {
         let identity_handshake = RequestResponse::new(
             [(IdentityHandshakeProtocol, ProtocolSupport::Full)],
             request_response::Config::default().with_request_timeout(config.request_timeout),
+        );
+
+        // F-T18: View federation protocol — explicit-peer fetch of signed
+        // cluster + peer-topology slices on behalf of an agent. Tighter
+        // 3-second timeout than the general `config.request_timeout` because
+        // view slices are small (≤ 256 KiB cap) and must respond fast enough
+        // for the F-T21 aggregator's deadline budget. The dispatcher and
+        // responder handler land in F-T19/F-T20.
+        let view_federation = RequestResponse::with_codec(
+            ViewFederationCodec,
+            [(ViewFederationProtocol, ProtocolSupport::Full)],
+            request_response::Config::default()
+                .with_request_timeout(std::time::Duration::from_secs(3)),
         );
 
         // mDNS for local discovery
@@ -400,15 +477,24 @@ impl ElohimStorageBehaviour {
         gossipsub
             .subscribe(&integrity_revocation_topic)
             .expect("subscribe to elohim/integrity/revocation");
+        // T14: subscribe to blob inventory topic for peer-to-peer inventory reconciliation.
+        // Broadcaster peers publish `BlobInventorySnapshot` and `BlobInventoryDelta` on this topic.
+        // The receive arm in p2p/mod.rs projects arrivals into `peer_blob_inventory` (SQLite).
+        let inventory_topic = gossipsub::IdentTopic::new(super::inventory_gossip::INVENTORY_TOPIC);
+        gossipsub
+            .subscribe(&inventory_topic)
+            .expect("subscribe to elohim/inventory/blob");
 
         Self {
             kademlia,
             shard_protocol,
+            blob_protocol,
             sync_protocol,
             epr_protocol,
             epr_atom_protocol,
             trust_protocol,
             identity_handshake,
+            view_federation,
             mdns,
             relay_client,
             relay_server,

@@ -27,6 +27,20 @@ use tracing::{debug, warn};
 
 use crate::cache::ContentCache;
 
+/// Bundle of doorway-resolved context that the forwarder injects as headers on the
+/// outbound request to elohim-storage.
+///
+/// Keeping the surface as a struct (vs. positional args) lets new context fields
+/// (e.g. permission level, doorway operator id) land without churning every call site.
+#[derive(Default, Debug, Clone, Copy)]
+pub struct ForwardCtx<'a> {
+    /// `agent_cid` resolved from the bearer's claims (alpha-substrate: `claims.human_id`).
+    /// When `Some`, the forwarder emits `X-Agent-Cid: <value>` to storage. When `None`
+    /// (no bearer / invalid bearer / Session Visitor), no header is set and storage
+    /// falls back to its `local_sessions`-based resolution or treats as visitor.
+    pub agent_cid: Option<&'a str>,
+}
+
 /// Maximum blob size (in bytes) written to the local pantry via the registry path.
 ///
 /// Blobs larger than this are served through but not stocked in the ContentCache,
@@ -65,6 +79,7 @@ pub async fn forward_to_storage<B>(
     req: Request<B>,
     storage_url: &str,
     path: &str,
+    ctx: ForwardCtx<'_>,
 ) -> Response<Full<Bytes>>
 where
     B: hyper::body::Body + Send + 'static,
@@ -116,6 +131,15 @@ where
         if let Ok(obs_str) = obs_id.to_str() {
             builder = builder.header("X-Observation-Id", obs_str);
         }
+    }
+
+    // Inject X-Agent-Cid from doorway-resolved context. In the alpha substrate
+    // this is sourced from `claims.human_id` upstream; storage's `extract_agent_cid`
+    // helper reads this header for view-service identity resolution. When CIDv1
+    // enforcement lands, the source switches to a persisted CID without changing
+    // the wire shape.
+    if let Some(cid) = ctx.agent_cid {
+        builder = builder.header("X-Agent-Cid", cid);
     }
 
     if matches!(method, Method::POST | Method::PUT | Method::PATCH) {
@@ -205,6 +229,7 @@ pub async fn forward_blob_to_storage<B>(
     storage_url: &str,
     path: &str,
     cache: Arc<ContentCache>,
+    ctx: ForwardCtx<'_>,
 ) -> Response<Full<Bytes>>
 where
     B: hyper::body::Body + Send + 'static,
@@ -216,7 +241,7 @@ where
         Some(h) if !h.is_empty() => h.to_string(),
         _ => {
             // Not a blob path — fall through to generic forwarder
-            return forward_to_storage(req, storage_url, path).await;
+            return forward_to_storage(req, storage_url, path, ctx).await;
         }
     };
 
@@ -224,7 +249,7 @@ where
     let has_range_header = req.headers().contains_key(hyper::header::RANGE);
     if has_range_header {
         debug!(hash = %hash, "Range request — skipping pantry, forwarding directly");
-        return forward_to_storage(req, storage_url, path).await;
+        return forward_to_storage(req, storage_url, path, ctx).await;
     }
 
     // --- Cache-first: pantry hit? ------------------------------------------------
@@ -267,6 +292,13 @@ where
         }
     } else {
         builder
+    };
+
+    // Inject X-Agent-Cid from doorway-resolved context (see ForwardCtx docs).
+    // Storage uses this for reach gating on private blobs.
+    let builder = match ctx.agent_cid {
+        Some(cid) => builder.header("X-Agent-Cid", cid),
+        None => builder,
     };
 
     match builder.send().await {
@@ -513,7 +545,14 @@ mod tests {
 
         // First request: cache miss, fetches from storage
         let req = make_get_request(&format!("http://doorway{path}"));
-        let resp = forward_blob_to_storage(req, &storage_url, &path, Arc::clone(&cache)).await;
+        let resp = forward_blob_to_storage(
+            req,
+            &storage_url,
+            &path,
+            Arc::clone(&cache),
+            ForwardCtx::default(),
+        )
+        .await;
         assert_eq!(resp.status(), StatusCode::OK);
 
         // After first request: pantry should be stocked
@@ -546,7 +585,14 @@ mod tests {
         let path = format!("/blob/{hash}");
 
         let req = make_get_request(&format!("http://doorway{path}"));
-        let resp = forward_blob_to_storage(req, &storage_url, &path, Arc::clone(&cache)).await;
+        let resp = forward_blob_to_storage(
+            req,
+            &storage_url,
+            &path,
+            Arc::clone(&cache),
+            ForwardCtx::default(),
+        )
+        .await;
 
         // Response is forwarded
         assert_eq!(resp.status(), StatusCode::PARTIAL_CONTENT);
@@ -576,7 +622,14 @@ mod tests {
             .header(hyper::header::RANGE, "bytes=0-99")
             .body(Empty::<Bytes>::new())
             .unwrap();
-        let _resp = forward_blob_to_storage(req, &storage_url, &path, Arc::clone(&cache)).await;
+        let _resp = forward_blob_to_storage(
+            req,
+            &storage_url,
+            &path,
+            Arc::clone(&cache),
+            ForwardCtx::default(),
+        )
+        .await;
 
         assert!(
             cache.blob_size(hash).is_none(),
@@ -603,7 +656,14 @@ mod tests {
         let path = format!("/blob/{hash}");
 
         let req = make_get_request(&format!("http://doorway{path}"));
-        let resp = forward_blob_to_storage(req, &storage_url, &path, Arc::clone(&cache)).await;
+        let resp = forward_blob_to_storage(
+            req,
+            &storage_url,
+            &path,
+            Arc::clone(&cache),
+            ForwardCtx::default(),
+        )
+        .await;
 
         // Response is still served correctly
         assert_eq!(resp.status(), StatusCode::OK);
@@ -674,7 +734,14 @@ mod tests {
 
         // First request — cache miss, hits storage
         let req1 = make_get_request(&format!("http://doorway{path}"));
-        let resp1 = forward_blob_to_storage(req1, &storage_url, &path, Arc::clone(&cache)).await;
+        let resp1 = forward_blob_to_storage(
+            req1,
+            &storage_url,
+            &path,
+            Arc::clone(&cache),
+            ForwardCtx::default(),
+        )
+        .await;
         assert_eq!(resp1.status(), StatusCode::OK);
 
         // Confirm pantry is now stocked
@@ -686,7 +753,14 @@ mod tests {
 
         // Second request — cache hit, must NOT hit storage
         let req2 = make_get_request(&format!("http://doorway{path}"));
-        let resp2 = forward_blob_to_storage(req2, &storage_url, &path, Arc::clone(&cache)).await;
+        let resp2 = forward_blob_to_storage(
+            req2,
+            &storage_url,
+            &path,
+            Arc::clone(&cache),
+            ForwardCtx::default(),
+        )
+        .await;
         assert_eq!(resp2.status(), StatusCode::OK);
 
         // Storage must still have been hit only once
@@ -694,6 +768,105 @@ mod tests {
             hit_counter.load(Ordering::SeqCst),
             1,
             "second request must be served from pantry, storage must not be hit again"
+        );
+    }
+
+    // ========================================================================
+    // X-Agent-Cid header injection (T28a)
+    // ========================================================================
+
+    /// Spawn a mock storage that captures the most recent X-Agent-Cid header
+    /// observed on inbound requests. Returns the address and a shared slot
+    /// the test can read after the forward completes.
+    async fn spawn_capturing_mock_storage() -> (
+        SocketAddr,
+        Arc<tokio::sync::Mutex<Option<String>>>,
+        tokio::task::JoinHandle<()>,
+    ) {
+        use std::sync::Arc as StdArc;
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let captured: StdArc<tokio::sync::Mutex<Option<String>>> =
+            StdArc::new(tokio::sync::Mutex::new(None));
+        let captured_clone = StdArc::clone(&captured);
+
+        let handle = tokio::spawn(async move {
+            loop {
+                let Ok((stream, _)) = listener.accept().await else {
+                    break;
+                };
+                let io = TokioIo::new(stream);
+                let captured_per_conn = StdArc::clone(&captured_clone);
+                tokio::spawn(async move {
+                    let _ = http1::Builder::new()
+                        .serve_connection(
+                            io,
+                            service_fn(move |req: Request<hyper::body::Incoming>| {
+                                let captured_per_req = StdArc::clone(&captured_per_conn);
+                                async move {
+                                    let cid = req
+                                        .headers()
+                                        .get("X-Agent-Cid")
+                                        .and_then(|v| v.to_str().ok())
+                                        .map(String::from);
+                                    *captured_per_req.lock().await = cid;
+                                    let resp: Result<Response<Full<Bytes>>, Infallible> =
+                                        Ok(Response::builder()
+                                            .status(200u16)
+                                            .header("Content-Type", "application/json")
+                                            .body(Full::new(Bytes::from("{}")))
+                                            .unwrap());
+                                    resp
+                                }
+                            }),
+                        )
+                        .await;
+                });
+            }
+        });
+
+        (addr, captured, handle)
+    }
+
+    /// When `ForwardCtx { agent_cid: Some(...) }` is supplied, the forwarder
+    /// emits `X-Agent-Cid` to storage with that exact value.
+    #[tokio::test]
+    async fn forward_to_storage_injects_x_agent_cid_when_present() {
+        let (addr, captured, _handle) = spawn_capturing_mock_storage().await;
+        let storage_url = format!("http://{addr}");
+
+        let req = make_get_request(&format!("http://doorway/api/v1/cluster"));
+        let ctx = ForwardCtx {
+            agent_cid: Some("matthew"),
+        };
+        let resp = forward_to_storage(req, &storage_url, "/api/v1/cluster", ctx).await;
+        assert_eq!(resp.status(), StatusCode::OK);
+
+        let captured_value = captured.lock().await.clone();
+        assert_eq!(
+            captured_value,
+            Some("matthew".to_string()),
+            "X-Agent-Cid must be forwarded when ctx.agent_cid is Some"
+        );
+    }
+
+    /// When `ForwardCtx::default()` is supplied (no agent_cid), the forwarder
+    /// emits NO `X-Agent-Cid` header — storage falls back to its own
+    /// resolution (local_sessions or visitor branch).
+    #[tokio::test]
+    async fn forward_to_storage_omits_x_agent_cid_when_absent() {
+        let (addr, captured, _handle) = spawn_capturing_mock_storage().await;
+        let storage_url = format!("http://{addr}");
+
+        let req = make_get_request(&format!("http://doorway/api/v1/cluster"));
+        let resp =
+            forward_to_storage(req, &storage_url, "/api/v1/cluster", ForwardCtx::default()).await;
+        assert_eq!(resp.status(), StatusCode::OK);
+
+        let captured_value = captured.lock().await.clone();
+        assert_eq!(
+            captured_value, None,
+            "X-Agent-Cid must NOT be set when ctx.agent_cid is None"
         );
     }
 }

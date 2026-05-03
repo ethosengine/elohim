@@ -168,6 +168,8 @@ mod tests {
                 valid_until: None,
                 observed_at: "2026-04-24T00:00:00Z".to_string(),
                 source: source.to_string(),
+                device_archetype: "node".to_string(),
+                superseded_by: None,
             })
             .execute(&mut conn)
             .expect("insert binding");
@@ -190,6 +192,8 @@ mod tests {
                 valid_until: Some(valid_until.to_string()),
                 observed_at: "2026-04-24T00:00:00Z".to_string(),
                 source: "dht".to_string(),
+                device_archetype: "node".to_string(),
+                superseded_by: None,
             })
             .execute(&mut conn)
             .expect("insert expiring binding");

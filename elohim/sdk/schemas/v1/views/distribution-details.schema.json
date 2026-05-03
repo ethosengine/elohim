@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "epr:schema:view:distribution-details",
+  "title": "DistributionDetails",
+  "description": "Lazy-fetched per-CID developer-grade distribution view. Strict superset of DistributionSummary: includes per-replica peer rows, projector identities, placement gaps, and recent projection events. Source of truth: composed from rea_commitments + economic_events + peer_identity_bindings + libp2p swarm state (Operational, Category C). Reconstructed per request; not persisted.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "summary",
+    "replicaPeers",
+    "projectorIdentities",
+    "placementGaps",
+    "recentProjectionEvents"
+  ],
+  "properties": {
+    "summary": {
+      "$ref": "distribution-summary.schema.json",
+      "description": "Inline summary — same shape returned on every CID-bearing response."
+    },
+    "replicaPeers": {
+      "type": "array",
+      "items": { "$ref": "replica-peer.schema.json" },
+      "description": "Per-replica detail (peer id, archetype, freshness, hop hint, etc)."
+    },
+    "projectorIdentities": {
+      "type": "array",
+      "items": { "$ref": "projector-identity.schema.json" },
+      "description": "Per-doorway projection ack rows."
+    },
+    "placementGaps": {
+      "type": "array",
+      "items": { "type": "object" },
+      "description": "Open-shape placement-gap records describing missing target capacity. Schema kept loose during the lit-up topology bring-up; will graduate to a dedicated schema when stable."
+    },
+    "recentProjectionEvents": {
+      "type": "array",
+      "items": { "type": "object" },
+      "description": "Recent rea projection-event records relevant to this CID. Open-shape during bring-up."
+    },
+    "commitmentReferences": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "CustodianCommitment CID references (rea_commitments rows) backing this distribution snapshot."
+    }
+  }
+}

@@ -2241,6 +2241,13 @@ impl From<EprHeadInputView> for EprHead {
 }
 
 /// EPR Head response — camelCase output for TypeScript clients.
+///
+/// **Note on distribution**: this is a *response wrapper*, not the canonical
+/// EPR Head. The canonical [`EprHead`] (in `epr_codec`) is the deterministic
+/// IPLD document whose CID is derived from its bytes — operational fields
+/// like `distribution` MUST NOT contaminate it. The DAG-CBOR encoding path in
+/// `handle_get_epr_head` serializes the canonical struct, so distribution is
+/// only ever surfaced via this JSON view.
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct EprHeadView {
@@ -2258,6 +2265,13 @@ pub struct EprHeadView {
     /// CID of the DAG-CBOR encoded head (set after encoding)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cid: Option<String>,
+    /// Inline distribution summary (Phase 5 T34). Hydrated by the HTTP handler
+    /// from `compose_distribution_summary` over the content's blob_hash.
+    /// `None` when the content row has no blob_hash yet (pre-distribution),
+    /// or when summary composition failed (best-effort hydration — distribution
+    /// surfacing must never break the head response).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub distribution: Option<DistributionSummary>,
 }
 
 impl From<EprHead> for EprHeadView {
@@ -2273,6 +2287,7 @@ impl From<EprHead> for EprHeadView {
             author: h.author,
             updated: h.updated,
             cid: None,
+            distribution: None,
         }
     }
 }
@@ -7085,4 +7100,555 @@ pub struct RemovePortalHostOutputView {
     /// Always `true` — the zome returns `()` on success; clients can use
     /// this as a presence check.
     pub deleted: bool,
+}
+
+// ───────────────────────────────────────────────────────────────────────────
+// Light-Up-Topology Phase 1 — operational distribution + cluster + reciprocity
+// ───────────────────────────────────────────────────────────────────────────
+//
+// Wire shapes for the light-up-topology epic. These are Operational (Category
+// C) projections — composed per request from rea_commitments + economic_events
+// + peer_identity_bindings + libp2p swarm state. None of them introduce a new
+// DHT entry type; none of them are persisted on the elohim-storage side.
+
+/// Replica health bucket for a CID's distribution summary.
+#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+#[serde(rename_all = "snake_case")]
+pub enum ReplicaHealth {
+    Healthy,
+    AtRisk,
+    Critical,
+}
+
+/// Reach class for a CID — mirrors the protocol Reach enum's content-distribution
+/// classes. Drives target replica count and badge tier.
+#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+#[serde(rename_all = "snake_case")]
+pub enum ReachClass {
+    Private,
+    Intimate,
+    Household,
+    Neighborhood,
+    Collective,
+    Community,
+    District,
+    Public,
+}
+
+/// Where the bytes for the current fetch were sourced from.
+#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+#[serde(rename_all = "snake_case")]
+pub enum FetchSource {
+    ProjectedViaDoorway,
+    PeerDirect,
+    LocalPantry,
+}
+
+/// Viewer's role for a CID.
+#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+#[serde(rename_all = "snake_case")]
+pub enum MyRole {
+    SoleReplica,
+    Replica,
+    ReplicaAndProjector,
+    NotHosting,
+}
+
+/// Tagged peer-diversity hint for a CID's replica set. Tag/content layout
+/// matches the schema's `{ kind, value }` envelope so downstream consumers can
+/// branch on `kind` without untagged-enum heuristics. The `None` unit variant
+/// serializes as `{"kind":"none","value":null}`.
+#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+#[serde(tag = "kind", content = "value", rename_all = "snake_case")]
+pub enum DiversityHint {
+    /// Replicas span these region-metro tiers.
+    RegionMetro(Vec<String>),
+    /// Replicas span these household device archetypes.
+    HouseholdArchetypes(Vec<String>),
+    /// Replicas live within a single collective; carries member count.
+    CollectiveMemberCount(u32),
+    /// No diversity hint available.
+    None,
+}
+
+/// Inline per-CID distribution payload hydrated onto EPR/content responses.
+/// Operational (Category C) projection; not persisted.
+#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+#[serde(rename_all = "camelCase")]
+pub struct DistributionSummary {
+    pub replica_count: u32,
+    pub replica_target: u32,
+    pub replica_health: ReplicaHealth,
+    pub projector_count: u32,
+    pub reach_class: ReachClass,
+    pub diversity_hint: DiversityHint,
+    pub this_fetch_source: FetchSource,
+    pub last_verified_seconds: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub my_role: Option<MyRole>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reciprocity_hint: Option<i64>,
+}
+
+/// Hardware/deployment archetype carried on an AgentPeerBinding (Category A
+/// from imagodei DHT). Mirrors the protocol enum at
+/// `elohim/sdk/schemas/v1/enums/device-archetype.schema.json`.
+#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq, Hash)]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+#[serde(rename_all = "snake_case")]
+pub enum DeviceArchetype {
+    Node,
+    Desktop,
+    Mobile,
+    Steward,
+}
+
+/// Per-replica row in a CID's distribution-details view.
+#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+#[serde(rename_all = "camelCase")]
+pub struct ReplicaPeer {
+    pub peer_id: String,
+    pub device_archetype: DeviceArchetype,
+    pub last_seen_seconds: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hop_hint: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub household_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub region_tier: Option<String>,
+}
+
+/// Per-doorway projector row in a CID's distribution-details view.
+#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectorIdentity {
+    pub doorway_hostname: String,
+    pub last_ack_seconds: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub region_tier: Option<String>,
+}
+
+/// Lazy-fetched per-CID developer-grade distribution view. Strict superset of
+/// `DistributionSummary`. Operational (Category C) projection; not persisted.
+///
+/// `reciprocityEdges` is intentionally omitted at T05 — it references
+/// `PeerHouseholdEdge` which lands in T07. T07 (or a follow-up) extends both
+/// the schema and this struct with the optional field.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+#[serde(rename_all = "camelCase")]
+pub struct DistributionDetails {
+    pub summary: DistributionSummary,
+    pub replica_peers: Vec<ReplicaPeer>,
+    pub projector_identities: Vec<ProjectorIdentity>,
+    /// Open-shape placement-gap records during bring-up; will graduate to a
+    /// typed schema once stable.
+    pub placement_gaps: Vec<JsonVal>,
+    /// Open-shape rea projection-event records relevant to this CID.
+    pub recent_projection_events: Vec<JsonVal>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub commitment_references: Option<Vec<String>>,
+}
+
+/// Freshness state bucket for cluster + topology + slice views.
+#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+#[serde(rename_all = "snake_case")]
+pub enum FreshnessState {
+    Live,
+    Stale,
+    Offline,
+    CachedOfflineUntilReconnect,
+    Unverifiable,
+    AllOffline,
+}
+
+/// Liveness/staleness indicator. `staleSinceMs` is populated when state ≠ live.
+#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+#[serde(rename_all = "camelCase")]
+pub struct Freshness {
+    pub state: FreshnessState,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stale_since_ms: Option<u64>,
+}
+
+/// Per-device summary in `MyClusterView`.
+#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+#[serde(rename_all = "camelCase")]
+pub struct DeviceSummary {
+    pub peer_id: String,
+    pub archetype: DeviceArchetype,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub display_name: Option<String>,
+    pub online: bool,
+    pub freshness: Freshness,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub storage_used_bytes: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub storage_total_bytes: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub memory_used_bytes: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub memory_total_bytes: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hosting_count: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub projecting_count: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub beacon_age_ms: Option<u64>,
+}
+
+/// Aggregated totals across the agent's devices.
+#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+#[serde(rename_all = "camelCase")]
+pub struct DeviceTotals {
+    pub storage_used_bytes: u64,
+    pub storage_total_bytes: u64,
+    pub external_committed_bytes: u64,
+    pub reciprocity_net_bytes: i64,
+}
+
+/// Federated cluster view of an agent's devices.
+#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+#[serde(rename_all = "camelCase")]
+pub struct MyClusterView {
+    pub agent_cid: String,
+    pub devices: Vec<DeviceSummary>,
+    pub totals: DeviceTotals,
+    pub freshness: Freshness,
+}
+
+/// Per-household reciprocation edge in a peer topology view.
+#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+#[serde(rename_all = "camelCase")]
+pub struct PeerHouseholdEdge {
+    pub household_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub display_name: Option<String>,
+    pub online: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_sync_sec: Option<u64>,
+    pub my_cids_hosted_by_them: u32,
+    pub their_cids_hosted_by_me: u32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub net_diff: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub is_critical_for_me: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub i_am_critical_for_them: Option<bool>,
+}
+
+/// Sole-replica risk row in a peer topology view.
+#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+#[serde(rename_all = "camelCase")]
+pub struct ResilienceCliff {
+    pub household_id: String,
+    pub sole_replica_cid_count: u32,
+}
+
+/// Per-agent peer topology — reciprocation edges + resilience cliffs.
+#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+#[serde(rename_all = "camelCase")]
+pub struct PeerTopologyView {
+    pub agent_cid: String,
+    pub edges: Vec<PeerHouseholdEdge>,
+    pub reciprocation_count: u32,
+    pub resilience_cliffs: Vec<ResilienceCliff>,
+    pub freshness: Freshness,
+}
+
+/// Per-counterparty row in a reciprocity view's inflow/outflow ledger.
+///
+/// `honored_percent` is `f64` so PartialEq is impl'd but Eq is not — matches
+/// JSON Schema's `number` with `minimum: 0`.
+#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq)]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+#[serde(rename_all = "camelCase")]
+pub struct ReciprocityRow {
+    pub counterparty_household_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub display_name: Option<String>,
+    pub committed_bytes: u64,
+    pub delivered_bytes: u64,
+    pub honored_percent: f64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub online: Option<bool>,
+}
+
+/// Per-agent reciprocity ledger.
+#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq)]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+#[serde(rename_all = "camelCase")]
+pub struct ReciprocityView {
+    pub agent_cid: String,
+    pub inflow: Vec<ReciprocityRow>,
+    pub outflow: Vec<ReciprocityRow>,
+    pub net_hosted_bytes: i64,
+    pub capacity_available_bytes: u64,
+}
+
+/// Per-storage-steward row in a doorway dashboard.
+#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+#[serde(rename_all = "camelCase")]
+pub struct DashboardSteward {
+    pub peer_id: String,
+    pub archetype: DeviceArchetype,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub display_name: Option<String>,
+    pub online: bool,
+    pub hosting_count: u32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hop_hint: Option<u32>,
+}
+
+/// Direction of byte flow across a doorway federation edge.
+#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+#[serde(rename_all = "snake_case")]
+pub enum FederationDirection {
+    Bidirectional,
+    OutboundOnly,
+    InboundOnly,
+}
+
+/// Per-doorway federation row in a doorway dashboard.
+#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+#[serde(rename_all = "camelCase")]
+pub struct DashboardFederationPeer {
+    pub doorway_hostname: String,
+    pub online: bool,
+    pub direction: FederationDirection,
+    pub shared_cid_count: u32,
+}
+
+/// Projection cache + lag aggregate for a doorway.
+///
+/// `cache_hit_rate_24h` is `f64` so PartialEq only.
+#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq)]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectionCoverage {
+    pub projected_cid_count: u32,
+    pub known_cid_count: u32,
+    pub cache_hit_rate_24h: f64,
+    pub projection_lag_ms_avg: u64,
+}
+
+/// DNS/TLS/reachability surface for a doorway hostname.
+#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+#[serde(rename_all = "camelCase")]
+pub struct PublicSurfaceState {
+    pub dns_resolves: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub dns_target: Option<String>,
+    pub tls_valid: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tls_expires_in_days: Option<i32>,
+    pub public_reachable: bool,
+}
+
+/// Doorway operator dashboard view — composed at request time from cluster +
+/// reciprocity views over view-federation/1.0.0.
+#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq)]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+#[serde(rename_all = "camelCase")]
+pub struct DoorwayDashboardView {
+    pub doorway_hostname: String,
+    pub storage_stewards: Vec<DashboardSteward>,
+    pub federation_peers: Vec<DashboardFederationPeer>,
+    pub projection_coverage: ProjectionCoverage,
+    pub public_surface: PublicSurfaceState,
+}
+
+/// Which kind of view a federation slice represents.
+#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq, Hash)]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+#[serde(rename_all = "snake_case")]
+pub enum ViewKind {
+    Cluster,
+    PeerTopology,
+}
+
+/// Per-device slice returned over the view-federation/1.0.0 libp2p protocol;
+/// signed by the responding peer's agent key. The meta-shape that federates
+/// cluster + topology views across household peers.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+#[serde(rename_all = "camelCase")]
+pub struct ViewSlice {
+    pub peer_id: String,
+    pub view_kind: ViewKind,
+    pub freshness: Freshness,
+    pub payload: JsonVal,
+    pub signature: String,
+}
+
+/// Request envelope for `/elohim/view-federation/1.0.0` — peer A asks peer B
+/// for a signed `ViewSlice` of `view_kind` on behalf of `agent_cid`.
+///
+/// F-T16: wire envelope only. The codec lands in F-T17 and the responder
+/// handler in F-T20.
+#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+#[serde(rename_all = "camelCase")]
+pub struct ViewFederationRequest {
+    pub view_kind: ViewKind,
+    pub agent_cid: String,
+    pub request_id: String,
+}
+
+/// Response envelope for `/elohim/view-federation/1.0.0` — peer B returns the
+/// signed slice. Echoes `view_kind` + `agent_cid` + `request_id` so the caller
+/// can dedup replies in the F-T21 aggregator.
+///
+/// PartialEq is intentionally NOT derived: `ViewSlice.payload` is `JsonVal`
+/// (`serde_json::Value`), which does not implement `PartialEq` cleanly.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+#[serde(rename_all = "camelCase")]
+pub struct ViewFederationResponse {
+    pub view_kind: ViewKind,
+    pub agent_cid: String,
+    pub request_id: String,
+    pub slice: ViewSlice,
+}
+
+impl ViewFederationRequest {
+    /// Canonical bytes for signing/dedup keys. MessagePack named-fields encoding
+    /// — same shape as the wire codec uses, so request bytes used by the codec
+    /// and request bytes used as a dedup-key are byte-identical.
+    pub fn canonical_bytes(&self) -> Vec<u8> {
+        rmp_serde::to_vec_named(self).expect("canonical request msgpack should not fail")
+    }
+}
+
+impl ViewSlice {
+    /// Bytes-to-sign for the slice's `signature` field:
+    /// `view_kind || peer_id || freshness_state || payload` in MessagePack
+    /// named-fields canonical form.
+    ///
+    /// Receivers verify this against the responding peer's agent ed25519
+    /// public key from the `AgentPeerBinding`.
+    ///
+    /// `Freshness::stale_since_ms` is intentionally excluded from the signing
+    /// canonical: it is operational metric data (when did this peer last hear
+    /// from a beacon?) that varies per-observer and per-clock, not a protocol
+    /// fact about the slice itself. Including it would break signature
+    /// verification across receivers whose clocks drift apart, even when the
+    /// underlying slice is identical.
+    pub fn canonical_bytes_for_signing(&self) -> Vec<u8> {
+        #[derive(serde::Serialize)]
+        #[serde(rename_all = "camelCase")]
+        struct Canonical<'a> {
+            view_kind: &'a ViewKind,
+            peer_id: &'a str,
+            freshness_state: &'a FreshnessState,
+            payload: &'a JsonVal,
+        }
+        rmp_serde::to_vec_named(&Canonical {
+            view_kind: &self.view_kind,
+            peer_id: &self.peer_id,
+            freshness_state: &self.freshness.state,
+            payload: &self.payload,
+        })
+        .expect("canonical slice msgpack should not fail")
+    }
+}
+
+#[cfg(test)]
+mod federation_canonical_tests {
+    use super::*;
+
+    #[test]
+    fn request_canonical_round_trips() {
+        let req = ViewFederationRequest {
+            view_kind: ViewKind::Cluster,
+            agent_cid: "agent_test".to_string(),
+            request_id: "req_001".to_string(),
+        };
+        let bytes = req.canonical_bytes();
+        let back: ViewFederationRequest = rmp_serde::from_slice(&bytes).unwrap();
+        assert_eq!(back, req);
+    }
+
+    #[test]
+    fn slice_canonical_excludes_stale_since_ms() {
+        // Two slices identical except for stale_since_ms must produce the SAME
+        // canonical signing bytes — that's the contract that makes signatures
+        // verifiable across receivers with drifting clocks.
+        let base = ViewSlice {
+            peer_id: "12D3KooWAAA".to_string(),
+            view_kind: ViewKind::Cluster,
+            freshness: Freshness {
+                state: FreshnessState::Live,
+                stale_since_ms: Some(12_345),
+            },
+            payload: JsonVal(serde_json::Value::Null),
+            signature: String::new(),
+        };
+        let mut other = base.clone();
+        other.freshness.stale_since_ms = Some(99_999);
+        assert_eq!(
+            base.canonical_bytes_for_signing(),
+            other.canonical_bytes_for_signing(),
+            "stale_since_ms must NOT influence the signing canonical"
+        );
+
+        // And signature must NOT influence the canonical either — that would
+        // be circular (you can't sign something whose bytes depend on the
+        // signature you're producing).
+        let mut signed = base.clone();
+        signed.signature = "fake-base64-signature".to_string();
+        assert_eq!(
+            base.canonical_bytes_for_signing(),
+            signed.canonical_bytes_for_signing(),
+            "signature field must NOT be self-referential in the canonical"
+        );
+    }
+
+    #[test]
+    fn slice_canonical_serializes_freshness_state_as_camel_case_field() {
+        // Sanity check: confirm the canonical bytes parse back as a msgpack
+        // map whose `freshnessState` value is "live" (snake_case enum
+        // serialization, camelCase field name to match the wire format).
+        let slice = ViewSlice {
+            peer_id: "12D3KooWAAA".to_string(),
+            view_kind: ViewKind::Cluster,
+            freshness: Freshness {
+                state: FreshnessState::Live,
+                stale_since_ms: Some(12_345),
+            },
+            payload: JsonVal(serde_json::json!({"hello": "world"})),
+            signature: String::new(),
+        };
+        let bytes = slice.canonical_bytes_for_signing();
+        let parsed: serde_json::Value = rmp_serde::from_slice(&bytes).unwrap();
+        assert_eq!(parsed["freshnessState"], serde_json::json!("live"));
+        assert_eq!(parsed["viewKind"], serde_json::json!("cluster"));
+        assert_eq!(parsed["peerId"], serde_json::json!("12D3KooWAAA"));
+        assert_eq!(parsed["payload"], serde_json::json!({"hello": "world"}));
+        // staleSinceMs must NOT appear in the canonical.
+        assert!(
+            parsed.get("staleSinceMs").is_none(),
+            "staleSinceMs must not appear in signing canonical"
+        );
+    }
 }

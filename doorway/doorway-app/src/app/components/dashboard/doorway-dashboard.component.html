@@ -143,6 +143,15 @@
         data-testid="dashboard-tab-graduation">
         Graduation
       </button>
+      <button
+        class="tab"
+        role="tab"
+        [attr.aria-selected]="activeTab() === 'topology'"
+        [class.active]="activeTab() === 'topology'"
+        (click)="setTab('topology')"
+        data-testid="dashboard-tab-topology">
+        Topology
+      </button>
     </nav>
 
     <!-- Tab Content -->
@@ -524,6 +533,11 @@
       <!-- Graduation Tab -->
       @if (activeTab() === 'graduation') {
         <app-graduation-tab />
+      }
+
+      <!-- Topology Tab -->
+      @if (activeTab() === 'topology') {
+        <app-topology-tab />
       }
 
       <!-- Users Tab -->

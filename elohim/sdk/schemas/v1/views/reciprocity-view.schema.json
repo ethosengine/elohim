@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "epr:schema:view:reciprocity-view",
+  "title": "ReciprocityView",
+  "description": "Per-agent reciprocity ledger — inflow (others hosting for me) + outflow (me hosting for others) + net + capacity. Source of truth: derived from rea_commitments and economic_events using the T03d action conventions (Operational, Category C). Reconstructed per request; not persisted.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "agentCid",
+    "inflow",
+    "outflow",
+    "netHostedBytes",
+    "capacityAvailableBytes"
+  ],
+  "properties": {
+    "agentCid": {
+      "type": "string",
+      "description": "Agent CID this reciprocity view is scoped to."
+    },
+    "inflow": {
+      "type": "array",
+      "items": { "$ref": "reciprocity-row.schema.json" },
+      "description": "Reciprocity rows where the counterparty hosts content for the viewer."
+    },
+    "outflow": {
+      "type": "array",
+      "items": { "$ref": "reciprocity-row.schema.json" },
+      "description": "Reciprocity rows where the viewer hosts content for the counterparty."
+    },
+    "netHostedBytes": {
+      "type": "integer",
+      "description": "Signed net hosting position. Positive = others hold more for me than I do for them."
+    },
+    "capacityAvailableBytes": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Spare capacity the viewer can offer to expand reciprocity."
+    }
+  }
+}

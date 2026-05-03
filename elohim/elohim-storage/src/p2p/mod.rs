@@ -31,6 +31,8 @@
 pub mod adapters;
 pub mod attention_tending;
 pub mod behaviour;
+pub mod blob_fetch;
+pub mod blob_protocol;
 pub mod dedup;
 pub mod epr_atom_protocol;
 pub mod epr_protocol;
@@ -39,6 +41,8 @@ pub mod feedback_signal;
 pub mod identity_binding_gossip;
 pub mod identity_handshake;
 pub mod identity_map;
+pub mod inventory_broadcaster;
+pub mod inventory_gossip;
 pub mod kad_store;
 pub mod reach_authorization;
 pub mod recovery_invitation;
@@ -49,6 +53,7 @@ pub mod sync_protocol;
 pub mod topics;
 pub mod trust_cache;
 pub mod trust_protocol;
+pub mod view_federation;
 
 // D.3: re-export topic helpers so callers have a single import surface.
 pub use topics::{topic_for, TOPIC_IDENTITY_BINDING, TOPIC_INTEGRITY_REVOCATION};
@@ -126,6 +131,25 @@ type PendingShardMap = Arc<
     >,
 >;
 
+/// T21: Map of in-flight blob fetch requests on the `/elohim/blob/1.0.0` channel.
+///
+/// Resolved when the blob-protocol `Message::Response` or `OutboundFailure`
+/// event matches the `request_id`; the oneshot sender delivers the result back
+/// to the caller (typically the race-fetch helper in `p2p::blob_fetch`).
+///
+/// Distinct from `PendingShardMap` because the value type is
+/// `Result<Vec<u8>, String>` rather than `Option<Vec<u8>>` — the explicit-peer
+/// fetch path surfaces precise failure reasons (NotFound, codec error, transport
+/// failure) for parallel-batch first-responder logic.
+type PendingBlobFetchMap = Arc<
+    tokio::sync::Mutex<
+        std::collections::HashMap<
+            request_response::OutboundRequestId,
+            oneshot::Sender<Result<Vec<u8>, String>>,
+        >,
+    >,
+>;
+
 /// Map of pending shard push requests: outbound request ID → reply sender
 type PendingShardPushMap = Arc<
     tokio::sync::Mutex<
@@ -182,6 +206,44 @@ type PendingEprAtomFetchMap = Arc<
     >,
 >;
 
+/// F-T19: Map of pending view-federation requests on `/elohim/view-federation/1.0.0`.
+/// Resolved when the behaviour event delivers `Message::Response` or `OutboundFailure`.
+/// Mirrors `PendingBlobFetchMap` with typed result error.
+type PendingViewFederationMap = Arc<
+    tokio::sync::Mutex<
+        std::collections::HashMap<
+            request_response::OutboundRequestId,
+            oneshot::Sender<Result<crate::views::ViewFederationResponse, FederationError>>,
+        >,
+    >,
+>;
+
+/// F-T19: Error type for the requester-side view-federation dispatch path.
+///
+/// Returned by `P2PHandle::view_federate` when the peer does not respond in time,
+/// the swarm channel is closed, or a transport-level failure occurs.
+///
+/// `HubId` can ride alongside this enum in a future sprint without a wire break
+/// (it lives entirely in the caller layer, not on the wire).
+#[derive(Debug, thiserror::Error)]
+pub enum FederationError {
+    /// The peer did not respond before the deadline expired — either the
+    /// caller-supplied timeout in `P2PHandle::view_federate` or libp2p's
+    /// internal request_timeout configured on the behaviour.
+    #[error("federation timeout")]
+    Timeout,
+    /// The P2P command channel was closed — swarm task is gone.
+    #[error("swarm channel closed")]
+    SwarmGone,
+    /// Outbound transport failure — the local peer could not reach the remote,
+    /// the connection closed mid-flight, the remote did not support
+    /// `/elohim/view-federation/1.0.0`, or an I/O error occurred. Distinct from
+    /// `Timeout` (peer reachable but slow) and from a future application-level
+    /// rejection variant.
+    #[error("transport error")]
+    TransportError,
+}
+
 /// Ordered queue of content IDs discovered as replication gaps, awaiting dispatch.
 /// Populated by discover() on each ListContent response; drained by drain_gap_queue()
 /// at the 5-second dispatch interval, bounded by MAX_REPLICATION_INFLIGHT.
@@ -207,6 +269,14 @@ pub const RECOVERY_INVITATION_TOPIC: &str = "recovery.invitation";
 /// revocation semantics differ from invitation (see spec §7.1 decision #6).
 pub const RECOVERY_REVOCATION_TOPIC: &str = "recovery.revocation";
 
+/// Convert microseconds-since-epoch to an ISO-8601 UTC string.
+/// Returns `None` if the timestamp is out of range.
+/// Used by the inventory gossip receive arm (T14).
+fn micros_to_iso(micros: i64) -> Option<String> {
+    chrono::DateTime::<chrono::Utc>::from_timestamp_micros(micros)
+        .map(|dt| dt.format("%Y-%m-%dT%H:%M:%SZ").to_string())
+}
+
 /// A peer discovered on the network with its delivery capabilities.
 /// Populated from mDNS discovery + identify protocol info.
 #[derive(Debug, Clone, Serialize)]
@@ -229,6 +299,11 @@ use crate::sync::{DocStore, StreamTracker, SyncManager};
 use elohim_cache_core::extraction::ExtractionCache;
 
 pub use behaviour::{ElohimStorageBehaviour, RelayMode};
+pub use blob_protocol::{
+    BlobCodec, BlobFetchRequest, BlobFetchResponse, BlobProtocol, BLOB_PROTOCOL_ID,
+    DEFAULT_MAX_RESPONSE_SIZE as BLOB_DEFAULT_MAX_RESPONSE_SIZE,
+    HARD_MAX_RESPONSE_SIZE as BLOB_HARD_MAX_RESPONSE_SIZE,
+};
 pub use epr_atom_protocol::{
     verify_incoming_epr, EprAtomCodec, EprAtomProtocol, EprAtomRequest, EprAtomResponse,
     VerifyError, EPR_ATOM_PROTOCOL_ID, MAX_BATCH_CIDS,
@@ -241,6 +316,10 @@ pub use identity_map::{
 };
 pub use shard_protocol::{ShardCodec, ShardProtocol, ShardRequest, ShardResponse};
 pub use sync_protocol::{DocumentInfo, SyncCodec, SyncProtocol, SyncRequest, SyncResponse};
+pub use view_federation::{
+    ViewFederationCodec, ViewFederationProtocol, MAX_PAYLOAD as VIEW_FEDERATION_MAX_PAYLOAD,
+    VIEW_FEDERATION_PROTOCOL_ID,
+};
 
 /// Configuration for P2P node
 #[derive(Debug, Clone)]
@@ -261,6 +340,45 @@ pub struct P2PConfig {
     pub relay_mode: RelayMode,
     /// Addresses to announce to the network (e.g., public IP/DNS multiaddrs)
     pub announce_addresses: Vec<String>,
+    /// T21: maximum response size for the `/elohim/blob/1.0.0` request-response
+    /// protocol. Default 16 MiB (matches `MAX_INLINE_SIZE` in `blob_store.rs`);
+    /// hard-capped at 64 MiB by the codec regardless of this value.
+    pub max_blob_response_size: usize,
+    /// T22: device archetype this peer reports as (e.g. `"node"`, `"desktop"`,
+    /// `"mobile"`, `"steward"`). Drives the default cadence for the inventory
+    /// broadcaster timer; the canonical source is `Config::device_archetype`
+    /// (see `config.rs::inventory_broadcast_seconds_default`).
+    pub device_archetype: Option<String>,
+    /// T22: explicit inventory-broadcast cadence override in seconds. `Some(0)`
+    /// disables broadcasting entirely; `None` falls back to the archetype
+    /// default (mobile → disabled, node/steward → 60s, desktop → 300s).
+    pub inventory_broadcast_seconds: Option<u64>,
+    /// T23: CID of this peer's steward, threaded from `Config::self_cid`.
+    /// `None` disables the custody reconcile sweep — without a self CID the
+    /// reconcile pass cannot tell whether a custody-blob commitment is "own"
+    /// (kick on miss) or "other" (emit placement-gap), and any guess would
+    /// emit spurious events.
+    pub self_cid: Option<String>,
+    /// T23: periodic custody reconcile cadence in seconds. `Some(0)` disables
+    /// the timer arm (event-driven sweeps via `ConnectionEstablished` still
+    /// fire when the trigger is enabled). `None` falls back to the
+    /// `Config::custody_sweep_seconds` default (120s).
+    pub custody_sweep_seconds: Option<u64>,
+    /// T23: how long a custody commitment can be unhonored before
+    /// placement-gap fires. Threaded from `Config::placement_grace_seconds`.
+    pub placement_grace_seconds: u64,
+    /// T23: minimum time between repeated placement-gap events for the same
+    /// commitment. Threaded from `Config::placement_gap_cooldown_seconds`.
+    pub placement_gap_cooldown_seconds: u64,
+    /// T23: TTL for `peer_blob_inventory` entries before they're considered
+    /// stale during reconcile. Threaded from `Config::inventory_freshness_seconds`.
+    pub inventory_freshness_seconds: u64,
+    /// T23: per-peer timeout (seconds) for the kicked race-fetch.
+    /// Threaded from `Config::fetch_blob_timeout_seconds`.
+    pub fetch_blob_timeout_seconds: u64,
+    /// T23: parallelism bound for the kicked race-fetch.
+    /// Threaded from `Config::fetch_blob_parallelism`.
+    pub fetch_blob_parallelism: usize,
 }
 
 impl Default for P2PConfig {
@@ -276,6 +394,18 @@ impl Default for P2PConfig {
                 .join("elohim-storage"),
             relay_mode: RelayMode::default(),
             announce_addresses: Vec::new(),
+            max_blob_response_size: BLOB_DEFAULT_MAX_RESPONSE_SIZE,
+            device_archetype: None,
+            inventory_broadcast_seconds: None,
+            self_cid: None,
+            // T23 defaults mirror `config.rs::default_*`. Production callers
+            // override via `main.rs::p2p_config` from top-level Config.
+            custody_sweep_seconds: None,
+            placement_grace_seconds: 300,
+            placement_gap_cooldown_seconds: 1800,
+            inventory_freshness_seconds: 600,
+            fetch_blob_timeout_seconds: 5,
+            fetch_blob_parallelism: 3,
         }
     }
 }
@@ -314,6 +444,9 @@ pub struct P2PNode {
     pending_epr_resolves: PendingEprMap,
     /// Pending shard fetch requests awaiting responses from peers
     pending_shard_fetches: PendingShardMap,
+    /// T21: explicit-peer blob fetch responses awaiting delivery on the
+    /// `/elohim/blob/1.0.0` request-response channel.
+    pending_blob_fetches: PendingBlobFetchMap,
     /// Pending shard push requests awaiting acknowledgment
     pending_shard_pushes: PendingShardPushMap,
     /// Pending shard verification (Have) requests
@@ -361,6 +494,22 @@ pub struct P2PNode {
     /// Populated by `handle_command(FetchEprAtomFromPeer)`, resolved in
     /// `handle_epr_atom_response` on success/failure/timeout.
     pending_epr_atom_fetches: PendingEprAtomFetchMap,
+    /// F-T19: pending view-federation requests on `/elohim/view-federation/1.0.0`.
+    /// Populated by `handle_command(ViewFederate)`, resolved in the behaviour
+    /// event arm when `Message::Response` or `OutboundFailure` fires.
+    pending_view_federations: PendingViewFederationMap,
+    /// T16: custody reconciliation counters — incremented by reconcile_pass.
+    pub reconciliation_metrics: std::sync::Arc<ReconciliationMetrics>,
+    /// T18: shared cache of last gossiped inventory hashes.
+    /// Stage 2 broadcaster timer will write here; the parity diagnostic HTTP
+    /// endpoint reads via `P2PHandle::last_gossiped_inventory()`.
+    /// Both sides share this Arc — initialized in `new()`, cloned into `handle()`.
+    pub last_gossiped: Arc<std::sync::RwLock<Vec<String>>>,
+    /// T22: monotonic per-peer sequence allocator for outgoing
+    /// `BlobInventorySnapshot` messages. Initialized at 0 in `new()`; the
+    /// run-loop broadcaster tick allocates the next value before each
+    /// publish via `inventory_broadcaster::build_snapshot`.
+    inventory_seq: inventory_broadcaster::SequenceAllocator,
 }
 
 /// Cached identify protocol info for a connected peer.
@@ -372,13 +521,39 @@ struct CachedIdentifyInfo {
 }
 
 /// Per-peer runtime metrics tracked from swarm events.
-struct PeerMetrics {
+///
+/// Visibility is `pub` (rather than module-private) so the T23 custody
+/// reconcile sweep adapter (`reconcile::custody_sweep::RaceFetchKicker`) can
+/// hold an `Arc<DashMap<String, PeerMetrics>>` and snapshot connected peers
+/// at kick time. The fields stay module-private — external callers should
+/// route through `is_connected` / `connected_peers` accessors.
+pub struct PeerMetrics {
+    /// Whether this peer currently has an active libp2p connection.
+    /// Set to true on ConnectionEstablished; false on ConnectionClosed
+    /// (entry is also removed on disconnect, so false entries are transient).
+    pub(crate) is_connected: bool,
     /// Connection direction: "inbound" or "outbound"
-    direction: &'static str,
+    pub(crate) direction: &'static str,
     /// Unix epoch millis of last peer activity
-    last_seen_ms: u64,
+    pub(crate) last_seen_ms: u64,
     /// Ring buffer of RTT samples from ping (max 8)
-    rtt_samples: std::collections::VecDeque<Duration>,
+    pub(crate) rtt_samples: std::collections::VecDeque<Duration>,
+}
+
+/// Atomic counters for custody reconciliation — incremented each pass.
+#[derive(Debug, Default)]
+pub struct ReconciliationMetrics {
+    pub reconcile_passes_total: std::sync::atomic::AtomicU64,
+    pub kicks_fired_total: std::sync::atomic::AtomicU64,
+    pub placement_gaps_emitted_total: std::sync::atomic::AtomicU64,
+}
+
+/// Snapshot copy of `ReconciliationMetrics` for external callers.
+#[derive(Debug, Clone, Copy)]
+pub struct ReconciliationMetricsSnapshot {
+    pub reconcile_passes_total: u64,
+    pub kicks_fired_total: u64,
+    pub placement_gaps_emitted_total: u64,
 }
 
 /// Current unix epoch in milliseconds.
@@ -619,6 +794,55 @@ pub enum P2PCommand {
     /// for content-reach broadcasts. Best-effort — publish failure (e.g. no
     /// peers subscribed) is logged and does not block the caller.
     GossipPublish { topic: String, payload: Vec<u8> },
+    /// T14: request a fresh `BlobInventorySnapshot` from the named peer.
+    /// Issued by the projection writer when it detects a sequence gap.
+    /// Stage 1 placeholder — just logs and drops; Stage 2 will route this
+    /// as a libp2p request-response message. The next periodic snapshot from
+    /// the source peer will close the gap naturally in the interim.
+    SnapshotRequest { peer_id: libp2p::PeerId },
+    /// T17: fetch a blob from a specific peer. Used by the race-fetch helper
+    /// (`p2p::blob_fetch::race_fetch`) for GET-time fallback and custody-driven kicks.
+    ///
+    /// # Stage 2 (T21 onward)
+    /// In a live swarm this issues a `/elohim/blob/1.0.0` request-response exchange
+    /// to the named peer (see `p2p/blob_protocol.rs`). The reply oneshot is delivered
+    /// when the response arrives, the outbound times out, or the connection fails —
+    /// all three cases produce a deterministic `Result<Vec<u8>, String>` the helper
+    /// can act on. The error string in the failure path encodes the
+    /// `OutboundFailure` variant ("timeout", "connection_closed", "dial_failure",
+    /// "unsupported_protocols", or "io_error: …") so the consumer can classify it.
+    ///
+    /// The `for_testing()` stub still returns `Err("FetchBlob not yet implemented;
+    /// Stage 1 placeholder")` because no real swarm runs in unit tests.
+    FetchBlob {
+        peer_id: libp2p::PeerId,
+        hash: String,
+        reply: tokio::sync::oneshot::Sender<Result<Vec<u8>, String>>,
+    },
+    /// T23 review fix #2: trigger a custody reconcile pass from the
+    /// `ConnectionEstablished` swarm event, decoupling the reconcile work
+    /// from the swarm event-loop task. Without this, the event loop awaits
+    /// `run_custody_reconcile()` inline (which runs sync diesel queries),
+    /// head-of-line-blocking inventory snapshots and identity handshakes
+    /// from peers that just connected during a reconnect burst.
+    ///
+    /// Sent via `command_tx.try_send` (non-blocking) so a saturated queue
+    /// drops the trigger and the timer-tick cadence picks up the slack.
+    /// Fire-and-forget; no reply.
+    TriggerCustodyReconcile,
+    /// F-T19: issue a `/elohim/view-federation/1.0.0` request to `peer` for the
+    /// given `request`, then deliver the result via `respond`.
+    ///
+    /// The in-flight entry is stored in `pending_view_federations` keyed by the
+    /// `OutboundRequestId` returned by `send_request`. On `Message::Response`
+    /// or `OutboundFailure` the event handler removes and resolves it.
+    ///
+    /// Callers drive the deadline via `P2PHandle::view_federate(…, timeout)`.
+    ViewFederate {
+        peer: libp2p::PeerId,
+        request: crate::views::ViewFederationRequest,
+        respond: oneshot::Sender<Result<crate::views::ViewFederationResponse, FederationError>>,
+    },
 }
 
 /// RAII guard that resumes P2P sync when dropped.
@@ -646,6 +870,11 @@ pub struct P2PHandle {
     delivery_peers: Arc<DashMap<String, DeliveryPeer>>,
     /// Shared backpressure flag — set by bulk write handlers, read by event loop
     sync_paused: Arc<AtomicBool>,
+    /// Last gossiped inventory snapshot hashes.
+    /// Stage 1: initialized empty. Stage 2 broadcaster timer populates via
+    /// `set_last_gossiped_inventory`. The diagnostic endpoint reads this to
+    /// compute filesystem parity without needing live P2P connectivity.
+    last_gossiped: Arc<std::sync::RwLock<Vec<String>>>,
 }
 
 impl P2PHandle {
@@ -734,6 +963,20 @@ impl P2PHandle {
                         // P3.4 stub: no swarm in test, always miss.
                         let _ = reply.send(None);
                     }
+                    P2PCommand::SnapshotRequest { .. } => {} // T14 Stage-1 placeholder
+                    P2PCommand::FetchBlob { reply, .. } => {
+                        // T17 Stage-1 stub: no swarm in test.
+                        let _ =
+                            reply
+                                .send(Err("FetchBlob not yet implemented; Stage 1 placeholder"
+                                    .to_string()));
+                    }
+                    P2PCommand::TriggerCustodyReconcile => {} // T23: no swarm in test, no-op
+                    P2PCommand::ViewFederate { respond, .. } => {
+                        // F-T19 stub: no swarm in test — signal TransportError so callers
+                        // get a deterministic non-panic result from for_testing() handles.
+                        let _ = respond.send(Err(FederationError::TransportError));
+                    }
                 }
             }
         });
@@ -762,6 +1005,31 @@ impl P2PHandle {
             agent_pubkey: "stub-agent".to_string(),
             delivery_peers: Arc::new(DashMap::new()),
             sync_paused: Arc::new(AtomicBool::new(false)),
+            last_gossiped: Arc::new(std::sync::RwLock::new(Vec::new())),
+        }
+    }
+
+    /// Construct a `P2PHandle` from explicit parts for fine-grained unit tests.
+    ///
+    /// Unlike `for_testing()`, the caller supplies the command channel so it can
+    /// control what happens when a command is received (e.g. never reply to test
+    /// timeout behaviour, drop the receiver to test swarm-gone behaviour).
+    ///
+    /// The status receiver, command sender, and agent pubkey must be consistent.
+    /// Intended for test utilities only — not for production use.
+    #[doc(hidden)]
+    pub fn from_parts_for_testing(
+        status_rx: tokio::sync::watch::Receiver<P2PStatusInfo>,
+        command_tx: mpsc::Sender<P2PCommand>,
+        agent_pubkey: String,
+    ) -> Self {
+        P2PHandle {
+            status_rx,
+            command_tx,
+            agent_pubkey,
+            delivery_peers: Arc::new(DashMap::new()),
+            sync_paused: Arc::new(AtomicBool::new(false)),
+            last_gossiped: Arc::new(std::sync::RwLock::new(Vec::new())),
         }
     }
 
@@ -772,6 +1040,47 @@ impl P2PHandle {
             .iter()
             .map(|entry| entry.value().clone())
             .collect()
+    }
+
+    /// Return the most recently gossiped inventory snapshot hashes, or `None`
+    /// if no snapshot has been published yet (Stage 1: always `None`).
+    ///
+    /// Stage 2 (broadcaster timer) will call `set_last_gossiped_inventory`
+    /// after each successful snapshot publish, making this return `Some`.
+    pub fn last_gossiped_inventory(&self) -> Option<Vec<String>> {
+        // T19 review Fix #4: previously used `.read().ok()?` which silently
+        // returned `None` on poison — asymmetric with the setter, which
+        // (post-T19) warns. Recover the inner value (Vec<String> has no
+        // invariant to violate) and warn so operators can correlate with
+        // the panic that poisoned the lock.
+        let guard = self.last_gossiped.read().unwrap_or_else(|e| {
+            tracing::warn!("last_gossiped_inventory: RwLock poisoned; recovering inner value");
+            e.into_inner()
+        });
+        if guard.is_empty() {
+            None
+        } else {
+            Some(guard.clone())
+        }
+    }
+
+    /// Record the hashes that were just gossiped in the most recent snapshot.
+    ///
+    /// Called by the Stage 2 broadcaster timer after a successful
+    /// `BlobInventorySnapshot` publish. Not called in Stage 1 (diagnostic
+    /// endpoint will report `gossiped_count = 0` until Stage 2 is wired).
+    pub fn set_last_gossiped_inventory(&self, hashes: Vec<String>) {
+        if let Ok(mut guard) = self.last_gossiped.write() {
+            *guard = hashes;
+        } else {
+            // T19 Fix #4: poisoned-lock case used to silently drop the
+            // inventory record, which made gossip-state divergence
+            // invisible. Surface it via tracing::warn so operators can
+            // correlate with the panic that poisoned the lock.
+            tracing::warn!(
+                "set_last_gossiped_inventory: RwLock poisoned; inventory record dropped"
+            );
+        }
     }
 
     /// List connected peers with identify protocol info.
@@ -787,6 +1096,47 @@ impl P2PHandle {
             return vec![];
         }
         rx.await.unwrap_or_default()
+    }
+
+    /// F-T19: Issue a `/elohim/view-federation/1.0.0` request to `peer` and await the response.
+    ///
+    /// Sends `P2PCommand::ViewFederate` to the swarm event loop, which calls
+    /// `behaviour.view_federation.send_request` and stores the oneshot in
+    /// `pending_view_federations`. The event loop resolves the oneshot when
+    /// `Message::Response` or `OutboundFailure` arrives.
+    ///
+    /// `timeout` is the caller-supplied deadline; the event loop does **not** impose
+    /// its own deadline so callers can tune per-context (aggregator vs. one-shot lookup).
+    ///
+    /// # Errors
+    /// - `FederationError::Timeout` — peer did not respond within `timeout`.
+    /// - `FederationError::SwarmGone` — command channel closed (swarm task exited).
+    /// - `FederationError::TransportError` — transport-level failure (connection closed, dial failure, unsupported protocol, I/O error).
+    pub async fn view_federate(
+        &self,
+        peer: libp2p::PeerId,
+        request: crate::views::ViewFederationRequest,
+        timeout: Duration,
+    ) -> Result<crate::views::ViewFederationResponse, FederationError> {
+        let (tx, rx) = oneshot::channel();
+        self.command_tx
+            .send(P2PCommand::ViewFederate {
+                peer,
+                request,
+                respond: tx,
+            })
+            .await
+            .map_err(|_| FederationError::SwarmGone)?;
+        match tokio::time::timeout(timeout, rx).await {
+            Ok(Ok(Ok(response))) => Ok(response),
+            Ok(Ok(Err(e))) => Err(e),
+            Ok(Err(_)) => Err(FederationError::SwarmGone),
+            // Caller's deadline elapsed before swarm replied. The Receiver is dropped here,
+            // but the libp2p OutboundFailure event will eventually fire and clear the
+            // pending_view_federations entry — the orphan window is bounded by the
+            // libp2p request_timeout. Safe to drop: send-on-closed-receiver is a no-op.
+            Err(_) => Err(FederationError::Timeout),
+        }
     }
 
     /// Publish an EPR Head to the DHT. Fire-and-forget.
@@ -1211,6 +1561,9 @@ impl P2PNode {
             pending_shard_fetches: Arc::new(tokio::sync::Mutex::new(
                 std::collections::HashMap::new(),
             )),
+            pending_blob_fetches: Arc::new(tokio::sync::Mutex::new(
+                std::collections::HashMap::new(),
+            )),
             pending_shard_pushes: Arc::new(tokio::sync::Mutex::new(
                 std::collections::HashMap::new(),
             )),
@@ -1236,6 +1589,12 @@ impl P2PNode {
             pending_epr_atom_fetches: Arc::new(tokio::sync::Mutex::new(
                 std::collections::HashMap::new(),
             )),
+            pending_view_federations: Arc::new(tokio::sync::Mutex::new(
+                std::collections::HashMap::new(),
+            )),
+            reconciliation_metrics: std::sync::Arc::new(ReconciliationMetrics::default()),
+            last_gossiped: Arc::new(std::sync::RwLock::new(Vec::new())),
+            inventory_seq: inventory_broadcaster::SequenceAllocator::new(0),
         })
     }
 
@@ -1282,6 +1641,185 @@ impl P2PNode {
     /// Get the local PeerId
     pub fn peer_id(&self) -> &PeerId {
         self.identity.peer_id()
+    }
+
+    /// Whether the named peer has an active libp2p connection right now.
+    /// Backed by the existing `peer_metrics` DashMap (entries are created
+    /// on connect and removed on disconnect).
+    pub fn is_connected(&self, peer_id: &libp2p::PeerId) -> bool {
+        self.peer_metrics
+            .get(&peer_id.to_string())
+            .map(|m| m.is_connected)
+            .unwrap_or(false)
+    }
+
+    /// Snapshot of currently connected peers.
+    pub fn connected_peers(&self) -> Vec<libp2p::PeerId> {
+        self.peer_metrics
+            .iter()
+            .filter(|m| m.is_connected)
+            .filter_map(|m| m.key().parse().ok())
+            .collect()
+    }
+
+    /// Read-only snapshot of the reconciliation metrics counters.
+    pub fn reconciliation_metrics(&self) -> ReconciliationMetricsSnapshot {
+        ReconciliationMetricsSnapshot {
+            reconcile_passes_total: self
+                .reconciliation_metrics
+                .reconcile_passes_total
+                .load(std::sync::atomic::Ordering::Relaxed),
+            kicks_fired_total: self
+                .reconciliation_metrics
+                .kicks_fired_total
+                .load(std::sync::atomic::Ordering::Relaxed),
+            placement_gaps_emitted_total: self
+                .reconciliation_metrics
+                .placement_gaps_emitted_total
+                .load(std::sync::atomic::Ordering::Relaxed),
+        }
+    }
+
+    /// T23: Run one custody reconcile pass.
+    ///
+    /// Builds a [`crate::reconcile::custody::BlobStoreSnapshot`] +
+    /// [`crate::reconcile::custody_sweep::RaceFetchKicker`], invokes
+    /// `reconcile_pass`, and folds the outcome into
+    /// [`ReconciliationMetrics`]. Idempotent and safe to call from both the
+    /// timer arm and the `ConnectionEstablished` event arm; cooldowns inside
+    /// `reconcile_pass` suppress duplicate placement-gap events.
+    ///
+    /// Skips silently (with a `debug!` trace) when the prerequisites for a
+    /// meaningful sweep are absent: no DB pool attached, no `self_cid`
+    /// configured, or the local pantry walk fails.
+    ///
+    /// **Lock contract:** does NOT acquire the swarm lock. Callers from the
+    /// `run()` select! arms must drop their swarm guard before invoking.
+    pub(crate) async fn run_custody_reconcile(&self) {
+        use crate::reconcile::custody::{reconcile_pass, BlobStoreSnapshot, ReconcileConfig};
+        use crate::reconcile::custody_sweep::RaceFetchKicker;
+        use std::sync::atomic::Ordering;
+
+        let Some(self_cid) = self.config.self_cid.clone() else {
+            debug!(
+                target: "elohim_storage::reconcile",
+                "T23: self_cid not configured; skipping custody reconcile pass"
+            );
+            return;
+        };
+
+        let pool = match &self.db_pool {
+            Some(p) => p.clone(),
+            None => {
+                debug!(
+                    target: "elohim_storage::reconcile",
+                    "T23: db_pool not attached; skipping custody reconcile pass"
+                );
+                return;
+            }
+        };
+        let mut conn = match pool.get() {
+            Ok(c) => c,
+            Err(e) => {
+                warn!(
+                    target: "elohim_storage::reconcile",
+                    error = %e,
+                    "T23: pool exhausted; skipping custody reconcile pass"
+                );
+                return;
+            }
+        };
+
+        let snapshot = match BlobStoreSnapshot::from_store(&self.blob_store) {
+            Ok(s) => s,
+            Err(e) => {
+                warn!(
+                    target: "elohim_storage::reconcile",
+                    error = %e,
+                    "T23: BlobStoreSnapshot build failed; skipping custody reconcile pass"
+                );
+                return;
+            }
+        };
+
+        // T23 review fix #4: warn (once per pass) if a misconfigured
+        // 0-value will be silently clamped to 1 inside `RaceFetchKicker`.
+        // Single warn at construction; per-kick warnings would spam.
+        if self.config.fetch_blob_timeout_seconds == 0 {
+            warn!(
+                target: "elohim_storage::reconcile",
+                "T23: fetch_blob_timeout_seconds is 0; clamping to 1s"
+            );
+        }
+        if self.config.fetch_blob_parallelism == 0 {
+            warn!(
+                target: "elohim_storage::reconcile",
+                "T23: fetch_blob_parallelism is 0; clamping to 1"
+            );
+        }
+
+        // T23 review fix #1: bound concurrent in-flight kicks at
+        // parallelism * 4 (12 with default parallelism=3). Derived from
+        // existing config so we don't add a new knob. Per-pass scope:
+        // each call to `run_custody_reconcile` constructs a fresh
+        // semaphore. With ConnectionEstablished now routed through
+        // `P2PCommand::TriggerCustodyReconcile` (review fix #2),
+        // reconcile passes serialize on the command lane, so per-pass
+        // bounding is sufficient.
+        let kick_concurrency = self.config.fetch_blob_parallelism.max(1) * 4;
+
+        let kicker = RaceFetchKicker {
+            command_tx: self.command_tx.clone(),
+            connected_peers: self.peer_metrics.clone(),
+            db_pool: pool.clone(),
+            blob_store: self.blob_store.clone(),
+            self_cid: self_cid.clone(),
+            fetch_blob_parallelism: self.config.fetch_blob_parallelism,
+            fetch_blob_timeout_seconds: self.config.fetch_blob_timeout_seconds,
+            metrics: self.reconciliation_metrics.clone(),
+            kick_semaphore: Arc::new(tokio::sync::Semaphore::new(kick_concurrency)),
+        };
+
+        let cfg = ReconcileConfig {
+            placement_grace_seconds: self.config.placement_grace_seconds,
+            placement_gap_cooldown_seconds: self.config.placement_gap_cooldown_seconds,
+            inventory_freshness_seconds: self.config.inventory_freshness_seconds,
+        };
+
+        match reconcile_pass(
+            &mut conn,
+            &self_cid,
+            &snapshot,
+            &kicker,
+            cfg,
+            chrono::Utc::now(),
+        ) {
+            Ok(outcome) => {
+                self.reconciliation_metrics
+                    .reconcile_passes_total
+                    .fetch_add(1, Ordering::Relaxed);
+                self.reconciliation_metrics
+                    .placement_gaps_emitted_total
+                    .fetch_add(outcome.placement_gaps_emitted as u64, Ordering::Relaxed);
+                // kicks_fired_total is incremented inside RaceFetchKicker::kick
+                // so the count reflects work scheduled (one increment per kick).
+                debug!(
+                    target: "elohim_storage::reconcile",
+                    snapshot_size = snapshot.len(),
+                    commitments_examined = outcome.commitments_examined,
+                    kicks_fired = outcome.kicks_fired,
+                    placement_gaps = outcome.placement_gaps_emitted,
+                    "T23: custody reconcile pass completed"
+                );
+            }
+            Err(e) => {
+                warn!(
+                    target: "elohim_storage::reconcile",
+                    error = %e,
+                    "T23: reconcile_pass failed"
+                );
+            }
+        }
     }
 
     /// Start listening and event loop
@@ -1381,6 +1919,70 @@ impl P2PNode {
             Duration::from_secs(DRAIN_INTERVAL_SECS),
         );
         drain_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+        // T22: inventory broadcast cadence — resolved once at run() entry from
+        // archetype default + config override. None means "broadcasting
+        // disabled" (mobile archetype, or explicit `0` override) — the
+        // tokio::select! arm uses `std::future::pending()` so it never fires.
+        //
+        // TODO(T22-live-reconfig): cadence is resolved once at run() entry. The
+        // 4-layer cadence pattern's "sync admin trigger" layer (per
+        // project_cadence_archetype_tunable_with_dev_overrides) needs a future
+        // P2PCommand::ReconfigureCadence variant that re-resolves and replaces
+        // inventory_broadcast_interval here. Acceptable for the demo: archetype
+        // is set at boot, no live reconfiguration is required for replicas-grow
+        // or placement-gap flows.
+        let mut inventory_broadcast_interval: Option<tokio::time::Interval> =
+            match inventory_broadcaster::resolved_cadence(
+                self.config.device_archetype.as_deref(),
+                self.config.inventory_broadcast_seconds,
+            ) {
+                Some(secs) => {
+                    info!(
+                        target: "elohim_storage::inventory",
+                        secs = secs,
+                        archetype = ?self.config.device_archetype,
+                        "T22: inventory broadcast enabled"
+                    );
+                    let mut iv = tokio::time::interval(Duration::from_secs(secs));
+                    iv.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+                    Some(iv)
+                }
+                None => {
+                    info!(
+                        target: "elohim_storage::inventory",
+                        archetype = ?self.config.device_archetype,
+                        "T22: inventory broadcast disabled (archetype or 0-override)"
+                    );
+                    None
+                }
+            };
+        // T23: custody reconcile sweep cadence — resolved once at run() entry
+        // from `Config::custody_sweep_seconds`. `Some(0)` disables the timer
+        // arm (event-driven `ConnectionEstablished` sweeps still fire if
+        // `self_cid` is configured); `None` resolves to the 120s default.
+        // Sweeps additionally no-op silently when `self_cid` is unset, so the
+        // timer is safe to enable unconditionally here.
+        let mut custody_sweep_interval: Option<tokio::time::Interval> =
+            match self.config.custody_sweep_seconds {
+                Some(0) => {
+                    info!(
+                        target: "elohim_storage::reconcile",
+                        "T23: custody sweep timer disabled (0-override)"
+                    );
+                    None
+                }
+                resolved => {
+                    let secs = resolved.unwrap_or(120);
+                    info!(
+                        target: "elohim_storage::reconcile",
+                        secs = secs,
+                        "T23: custody sweep timer enabled"
+                    );
+                    let mut iv = tokio::time::interval(Duration::from_secs(secs));
+                    iv.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+                    Some(iv)
+                }
+            };
         // Track consecutive retry attempts for exponential backoff cap.
         let mut consecutive_empty_ticks: u32 = 0;
         let mut command_rx = self.command_rx.lock().await;
@@ -1490,11 +2092,143 @@ impl P2PNode {
                     }
                     drop(swarm);
                 }
+                _ = async {
+                    // T22: inventory broadcast tick. When the cadence is None
+                    // (mobile archetype / disabled), `pending()` ensures this
+                    // arm never fires.
+                    if let Some(iv) = &mut inventory_broadcast_interval {
+                        iv.tick().await
+                    } else {
+                        std::future::pending().await
+                    }
+                } => {
+                    drop(swarm);
+                    self.broadcast_inventory_snapshot().await;
+                }
+                _ = async {
+                    // T23: custody reconcile sweep tick. When disabled
+                    // (0-override), `pending()` ensures this arm never fires.
+                    if let Some(iv) = &mut custody_sweep_interval {
+                        iv.tick().await
+                    } else {
+                        std::future::pending().await
+                    }
+                } => {
+                    drop(swarm);
+                    self.run_custody_reconcile().await;
+                }
                 _ = shutdown.recv() => {
                     info!("P2P node shutting down");
                     break;
                 }
             }
+        }
+    }
+
+    /// T22: Build and publish a `BlobInventorySnapshot` to the inventory
+    /// gossip topic.
+    ///
+    /// **Lock contract:** This method ACQUIRES `self.swarm.write()` internally
+    /// for the duration of `gossipsub.publish`. Callers MUST drop any swarm
+    /// guard they hold before invoking this method. The interval-tick arm in
+    /// `run()` does this via an explicit `drop(swarm)` at the start of the arm
+    /// body, matching the pattern used by `initiate_sync_round`,
+    /// `run_replication_cycle`, and `drain_publish_queue`.
+    ///
+    /// Idempotent and safe to call repeatedly. Failures (`list_hashes`,
+    /// serialize, publish) log warn at the relevant target and leave the
+    /// parity-diagnostic `last_gossiped` record unchanged so the diagnostic
+    /// continues to report the previous successful snapshot.
+    ///
+    /// T22 review fix #1: `list_hashes` failure skips the tick rather than
+    /// broadcasting an empty snapshot. `apply_snapshot` on remote peers
+    /// evicts all of this peer's per-peer inventory entries on snapshot
+    /// arrival — broadcasting empty during a transient I/O blip would
+    /// corrupt every remote peer's projection of our custody.
+    async fn broadcast_inventory_snapshot(&self) {
+        use crate::p2p::inventory_broadcaster::{build_snapshot, StaticInventory};
+        use crate::p2p::inventory_gossip::INVENTORY_TOPIC;
+
+        // Fetch hashes directly so I/O failure can skip the tick. Must happen
+        // before constructing StaticInventory + entering build_snapshot.
+        let hashes = match self.blob_store.list_hashes() {
+            Ok(h) => h,
+            Err(e) => {
+                warn!(
+                    target: "elohim_storage::inventory",
+                    error = %e,
+                    "T22: list_hashes failed; skipping inventory snapshot tick \
+                     (would have corrupted remote projection)"
+                );
+                return;
+            }
+        };
+
+        let inventory = StaticInventory::new(hashes);
+        let local_peer_id = self.peer_id().to_string();
+        let now_micros = chrono::Utc::now().timestamp_micros();
+
+        let snapshot = build_snapshot(&local_peer_id, &inventory, &self.inventory_seq, now_micros);
+        let hashes_for_record = snapshot.hashes.clone();
+        let snapshot_sequence = snapshot.sequence;
+        // T22 review fix #2: capture count BEFORE the move so the success
+        // arm can move-not-clone hashes_for_record into the parity record.
+        let count = hashes_for_record.len();
+
+        let bytes = match snapshot.to_bytes() {
+            Ok(b) => b,
+            Err(e) => {
+                warn!(
+                    target: "elohim_storage::inventory",
+                    error = %e,
+                    "T22: failed to serialize inventory snapshot"
+                );
+                return;
+            }
+        };
+
+        let topic = libp2p::gossipsub::IdentTopic::new(INVENTORY_TOPIC);
+        let mut swarm = self.swarm.write().await;
+        let publish_result = swarm.behaviour_mut().gossipsub.publish(topic, bytes);
+        drop(swarm);
+
+        match publish_result {
+            Ok(msg_id) => {
+                // T22 review fix #3: delegate the parity-record write to the
+                // shared method so poisoned-lock handling stays consistent
+                // with `P2PHandle::set_last_gossiped_inventory`.
+                self.set_last_gossiped_inventory(hashes_for_record);
+                info!(
+                    target: "elohim_storage::inventory",
+                    msg_id = ?msg_id,
+                    count,
+                    sequence = snapshot_sequence,
+                    "T22: published inventory snapshot"
+                );
+            }
+            Err(e) => {
+                warn!(
+                    target: "elohim_storage::inventory",
+                    error = ?e,
+                    "T22: gossipsub publish failed (often: no subscribed peers yet)"
+                );
+            }
+        }
+    }
+
+    /// T22 review fix #3: write the parity-tracking record from the P2PNode
+    /// run-loop side. Mirrors `P2PHandle::set_last_gossiped_inventory` — both
+    /// share the same `Arc<RwLock<Vec<String>>>`, so a method on each side
+    /// keeps the poisoned-lock warn pattern consistent without round-tripping
+    /// through the command channel.
+    fn set_last_gossiped_inventory(&self, hashes: Vec<String>) {
+        if let Ok(mut guard) = self.last_gossiped.write() {
+            *guard = hashes;
+        } else {
+            warn!(
+                target: "elohim_storage::inventory",
+                "T22: last_gossiped lock poisoned; parity diagnostic may be stale"
+            );
         }
     }
 
@@ -1881,6 +2615,73 @@ impl P2PNode {
                     ),
                 }
             }
+            // T14: Stage-1 placeholder — log and drop. Stage 2 will route this as a
+            // libp2p request-response message to the named peer. The next periodic
+            // snapshot from the source peer closes the gap naturally in the interim.
+            P2PCommand::SnapshotRequest { peer_id } => {
+                debug!(
+                    target: "elohim_storage::inventory",
+                    peer_id = %peer_id,
+                    "SnapshotRequest queued; Stage 1 placeholder — relying on next periodic snapshot"
+                );
+            }
+            // T21: Stage-2 wiring — issue a real `/elohim/blob/1.0.0` request to
+            // the explicit peer_id and stash the reply oneshot in
+            // `pending_blob_fetches`. The blob-protocol event handler resolves
+            // the entry on `Message::Response` or cleans up on `OutboundFailure`.
+            P2PCommand::FetchBlob {
+                peer_id,
+                hash,
+                reply,
+            } => {
+                let request = BlobFetchRequest { hash: hash.clone() };
+                let request_id = swarm
+                    .behaviour_mut()
+                    .blob_protocol
+                    .send_request(&peer_id, request);
+                debug!(
+                    target: "elohim_storage::blob_fetch",
+                    peer_id = %peer_id,
+                    hash = %hash,
+                    request_id = ?request_id,
+                    "T21: blob fetch request sent on /elohim/blob/1.0.0"
+                );
+                self.pending_blob_fetches
+                    .lock()
+                    .await
+                    .insert(request_id, reply);
+            }
+            // T23 review fix #2: ConnectionEstablished triggers reconcile via
+            // this command instead of awaiting it inline, so swarm events
+            // (inventory snapshots, identity handshakes) from a reconnect
+            // burst are not head-of-line-blocked by sync diesel queries.
+            P2PCommand::TriggerCustodyReconcile => {
+                self.run_custody_reconcile().await;
+            }
+            // F-T19: issue a `/elohim/view-federation/1.0.0` request to the named peer
+            // and store the oneshot sender in `pending_view_federations`, keyed by the
+            // `OutboundRequestId` returned by `send_request`. The event handler below
+            // resolves it when `Message::Response` or `OutboundFailure` arrives.
+            P2PCommand::ViewFederate {
+                peer,
+                request,
+                respond,
+            } => {
+                let request_id = swarm
+                    .behaviour_mut()
+                    .view_federation
+                    .send_request(&peer, request);
+                debug!(
+                    target: "elohim_storage::view_federation",
+                    peer = %peer,
+                    request_id = ?request_id,
+                    "F-T19: view-federation request sent on /elohim/view-federation/1.0.0"
+                );
+                self.pending_view_federations
+                    .lock()
+                    .await
+                    .insert(request_id, respond);
+            }
         }
     }
 
@@ -2127,9 +2928,11 @@ impl P2PNode {
                 self.peer_metrics
                     .entry(peer_id.to_string())
                     .and_modify(|m| {
+                        m.is_connected = true;
                         m.last_seen_ms = now_unix_ms();
                     })
                     .or_insert_with(|| PeerMetrics {
+                        is_connected: true,
                         direction,
                         last_seen_ms: now_unix_ms(),
                         rtt_samples: std::collections::VecDeque::with_capacity(8),
@@ -2200,6 +3003,34 @@ impl P2PNode {
                         .send_request(&peer_id, identity_request);
                 }
                 self.refresh_status().await;
+                // T23: trigger a custody reconcile pass on every successful
+                // connection so own commitments where this peer is now a
+                // candidate get a kick chance immediately, and other peers'
+                // commitments to us get re-evaluated against fresh
+                // peer_blob_inventory state. No-ops silently when self_cid /
+                // db_pool are absent. The placement-gap cooldown inside
+                // `reconcile_pass` prevents duplicate events when many peers
+                // connect in a short window.
+                //
+                // T23 review fix #2: dispatch via the command channel
+                // instead of awaiting `run_custody_reconcile().await` inline
+                // here. The reconcile pass runs sync diesel queries; under
+                // a reconnect burst, awaiting inline serializes those
+                // queries on the swarm event-loop task and head-of-line-
+                // blocks inventory snapshots / identity handshakes from the
+                // very peers that just connected. `try_send` is
+                // non-blocking — when the queue is full (extreme overload),
+                // the trigger is dropped and the timer tick recovers.
+                if let Err(e) = self
+                    .command_tx
+                    .try_send(P2PCommand::TriggerCustodyReconcile)
+                {
+                    debug!(
+                        target: "elohim_storage::reconcile",
+                        error = ?e,
+                        "T23: failed to queue ConnectionEstablished reconcile trigger; will retry on timer tick"
+                    );
+                }
             }
             SwarmEvent::ConnectionClosed { peer_id, cause, .. } => {
                 debug!(peer = %peer_id, cause = ?cause, "Disconnected from peer");
@@ -2609,6 +3440,180 @@ impl P2PNode {
             ) => {
                 debug!(peer = %peer, request_id = ?request_id, "Shard response sent");
             }
+            // T21: /elohim/blob/1.0.0 — explicit-peer blob fetch protocol.
+            // Inbound: read local blob_store and respond Found/NotFound/Error.
+            // Outbound: resolve the matching pending_blob_fetches entry.
+            behaviour::ElohimStorageBehaviourEvent::BlobProtocol(
+                request_response::Event::Message { peer, message },
+            ) => match message {
+                request_response::Message::Request {
+                    request, channel, ..
+                } => {
+                    // T21 review fix #1: validate the requested hash before touching the
+                    // filesystem. `BlobStore::blob_path` does not normalize `..` components,
+                    // so a crafted `BlobFetchRequest { hash: "../../etc/passwd" }` could
+                    // otherwise read arbitrary files outside the blob root. Treat any
+                    // invalid content address as `NotFound` — do not leak that the path was
+                    // malformed.
+                    let response =
+                        match crate::blob_store::BlobStore::parse_content_address(&request.hash) {
+                            Ok(_) => match self.blob_store.get(&request.hash).await {
+                                Ok(bytes) => {
+                                    debug!(
+                                        target: "elohim_storage::blob_fetch",
+                                        peer = %peer,
+                                        hash = %request.hash,
+                                        size = bytes.len(),
+                                        "T21: serving blob to peer"
+                                    );
+                                    BlobFetchResponse::Found(bytes)
+                                }
+                                Err(StorageError::NotFound(_))
+                                | Err(StorageError::BlobNotFound(_)) => {
+                                    debug!(
+                                        target: "elohim_storage::blob_fetch",
+                                        peer = %peer,
+                                        hash = %request.hash,
+                                        "T21: blob not found locally; replying NotFound"
+                                    );
+                                    BlobFetchResponse::NotFound
+                                }
+                                Err(e) => {
+                                    warn!(
+                                        target: "elohim_storage::blob_fetch",
+                                        peer = %peer,
+                                        hash = %request.hash,
+                                        error = %e,
+                                        "T21: blob fetch error; replying Error"
+                                    );
+                                    BlobFetchResponse::Error(e.to_string())
+                                }
+                            },
+                            Err(_) => {
+                                warn!(
+                                    target: "elohim_storage::blob_fetch",
+                                    peer = %peer,
+                                    hash = %request.hash,
+                                    "T21: rejected blob request with invalid content address"
+                                );
+                                BlobFetchResponse::NotFound
+                            }
+                        };
+                    let mut swarm = self.swarm.write().await;
+                    if let Err(e) = swarm
+                        .behaviour_mut()
+                        .blob_protocol
+                        .send_response(channel, response)
+                    {
+                        warn!(
+                            target: "elohim_storage::blob_fetch",
+                            peer = %peer,
+                            error = ?e,
+                            "T21: failed to send blob response"
+                        );
+                    }
+                }
+                request_response::Message::Response {
+                    request_id,
+                    response,
+                } => {
+                    if let Some(reply) = self.pending_blob_fetches.lock().await.remove(&request_id)
+                    {
+                        match response {
+                            BlobFetchResponse::Found(bytes) => {
+                                debug!(
+                                    target: "elohim_storage::blob_fetch",
+                                    request_id = ?request_id,
+                                    size = bytes.len(),
+                                    "T21: blob fetch returned Found"
+                                );
+                                let _ = reply.send(Ok(bytes));
+                            }
+                            BlobFetchResponse::NotFound => {
+                                debug!(
+                                    target: "elohim_storage::blob_fetch",
+                                    request_id = ?request_id,
+                                    "T21: blob fetch returned NotFound"
+                                );
+                                let _ = reply.send(Err("not found".to_string()));
+                            }
+                            BlobFetchResponse::Error(msg) => {
+                                debug!(
+                                    target: "elohim_storage::blob_fetch",
+                                    request_id = ?request_id,
+                                    error = %msg,
+                                    "T21: blob fetch returned Error"
+                                );
+                                let _ = reply.send(Err(msg));
+                            }
+                        }
+                    } else {
+                        debug!(
+                            target: "elohim_storage::blob_fetch",
+                            request_id = ?request_id,
+                            "T21: response with no pending entry (already resolved or unknown)"
+                        );
+                    }
+                }
+            },
+            behaviour::ElohimStorageBehaviourEvent::BlobProtocol(
+                request_response::Event::OutboundFailure {
+                    peer,
+                    request_id,
+                    error,
+                },
+            ) => {
+                warn!(
+                    target: "elohim_storage::blob_fetch",
+                    peer = %peer,
+                    request_id = ?request_id,
+                    error = ?error,
+                    "T21: outbound blob fetch failed"
+                );
+                // T21 review fix #4: preserve OutboundFailure variant identity so the
+                // race-fetch consumer can distinguish timeout from dial-failure from
+                // protocol-mismatch. libp2p-request-response 0.27 (libp2p 0.54) defines
+                // exactly five variants: DialFailure, Timeout, ConnectionClosed,
+                // UnsupportedProtocols, Io. There is no NotConnected variant.
+                if let Some(reply) = self.pending_blob_fetches.lock().await.remove(&request_id) {
+                    use libp2p::request_response::OutboundFailure;
+                    let err_str = match &error {
+                        OutboundFailure::Timeout => "timeout".to_string(),
+                        OutboundFailure::ConnectionClosed => "connection_closed".to_string(),
+                        OutboundFailure::DialFailure => "dial_failure".to_string(),
+                        OutboundFailure::UnsupportedProtocols => {
+                            "unsupported_protocols".to_string()
+                        }
+                        OutboundFailure::Io(_) => format!("io_error: {error}"),
+                    };
+                    let _ = reply.send(Err(err_str));
+                }
+            }
+            behaviour::ElohimStorageBehaviourEvent::BlobProtocol(
+                request_response::Event::InboundFailure {
+                    peer,
+                    request_id,
+                    error,
+                },
+            ) => {
+                debug!(
+                    target: "elohim_storage::blob_fetch",
+                    peer = %peer,
+                    request_id = ?request_id,
+                    error = ?error,
+                    "T21: inbound blob fetch failed"
+                );
+            }
+            behaviour::ElohimStorageBehaviourEvent::BlobProtocol(
+                request_response::Event::ResponseSent { peer, request_id },
+            ) => {
+                debug!(
+                    target: "elohim_storage::blob_fetch",
+                    peer = %peer,
+                    request_id = ?request_id,
+                    "T21: blob response sent"
+                );
+            }
             behaviour::ElohimStorageBehaviourEvent::Kademlia(kad::Event::RoutingUpdated {
                 peer,
                 is_new_peer,
@@ -3008,32 +4013,28 @@ impl P2PNode {
                         }
                         identity_handshake::VerifyOutcome::Valid => {
                             // Insert into peer_identity_bindings with source='handshake'.
-                            let b = &request.binding;
-                            let dht_anchor_hash = b.dht_anchor_hash.clone().unwrap_or_else(|| {
-                                identity_handshake::synthesise_dht_anchor_hash(
-                                    &b.peer_id,
-                                    &b.agent_cid,
-                                )
-                            });
-                            let row = crate::db::models::NewPeerIdentityBindingRow {
-                                peer_id: peer_id_str.clone(),
-                                agent_cid: b.agent_cid.clone(),
-                                dht_anchor_hash,
-                                valid_from: b.valid_from.clone(),
-                                valid_until: b.valid_until.clone(),
-                                observed_at: now_iso,
-                                source: "handshake".to_string(),
-                            };
+                            // The row construction is centralised in
+                            // `binding_row_from_handshake_request` so that the field-flow
+                            // contract is exercised by the writer here AND the T03b
+                            // regression test in identity_handshake.rs.
+                            let row = identity_handshake::binding_row_from_handshake_request(
+                                &request,
+                                &peer_id_str,
+                                &now_iso,
+                            );
                             match self.db_pool.as_ref() {
                                 Some(pool) => match pool.get() {
                                     Ok(mut conn) => {
-                                        match crate::db::peer_identity_bindings::upsert(
+                                        // Non-authoritative writer: must NOT clobber any
+                                        // `superseded_by` previously written by the
+                                        // DHT-arrival path. Use the preserving variant.
+                                        match crate::db::peer_identity_bindings::upsert_preserving_supersession(
                                             &mut conn, &row,
                                         ) {
                                             Ok(()) => {
                                                 debug!(
                                                     peer = %peer,
-                                                    agent_cid = %b.agent_cid,
+                                                    agent_cid = %row.agent_cid,
                                                     "Identity handshake: binding recorded"
                                                 );
                                                 identity_handshake::IdentityHandshakeResponse::Accepted
@@ -3121,6 +4122,159 @@ impl P2PNode {
                 debug!(peer = %peer, "Identity handshake response sent");
             }
 
+            // F-T19: View federation outbound response/failure dispatch.
+            // Message::Response — resolve the pending oneshot with Ok(response).
+            // OutboundFailure — map to FederationError and resolve with Err.
+            // Message::Request (inbound) — responder side, lands in F-T20; log for now.
+            behaviour::ElohimStorageBehaviourEvent::ViewFederation(
+                request_response::Event::Message { peer, message },
+            ) => match message {
+                request_response::Message::Response {
+                    request_id,
+                    response,
+                } => {
+                    if let Some(respond) = self
+                        .pending_view_federations
+                        .lock()
+                        .await
+                        .remove(&request_id)
+                    {
+                        debug!(
+                            target: "elohim_storage::view_federation",
+                            peer = %peer,
+                            request_id = ?request_id,
+                            "F-T19: view-federation response received; resolving oneshot"
+                        );
+                        let _ = respond.send(Ok(response));
+                    } else {
+                        debug!(
+                            target: "elohim_storage::view_federation",
+                            peer = %peer,
+                            request_id = ?request_id,
+                            "F-T19: view-federation response with no pending entry (already resolved or unknown)"
+                        );
+                    }
+                }
+                request_response::Message::Request {
+                    request, channel, ..
+                } => {
+                    // F-T20: real responder — build and sign a ViewFederationResponse,
+                    // then send_response in the same event-loop arm. Awaiting
+                    // build_response_slice (async since T26) happens before the swarm
+                    // write lock is acquired, so the event loop is not blocked on the
+                    // lock during the async slice-build. Mirrors the blob protocol's
+                    // inbound arm pattern.
+                    use crate::p2p::view_federation::build_response_slice;
+                    debug!(
+                        target: "elohim_storage::view_federation",
+                        peer = %peer,
+                        view_kind = ?request.view_kind,
+                        agent_cid = %request.agent_cid,
+                        request_id = %request.request_id,
+                        "F-T20: received view-federation request"
+                    );
+                    let local_agent_cid = self.identity.agent_pubkey().to_string();
+                    let local_peer_id = self.identity.peer_id_string();
+                    let keypair = self.identity.keypair();
+                    let pool_ref = self.db_pool.as_ref();
+                    match build_response_slice(
+                        request.view_kind,
+                        request.agent_cid,
+                        request.request_id,
+                        &local_agent_cid,
+                        local_peer_id,
+                        keypair,
+                        pool_ref,
+                    )
+                    .await
+                    {
+                        Ok(response) => {
+                            let mut swarm = self.swarm.write().await;
+                            if let Err(_response) = swarm
+                                .behaviour_mut()
+                                .view_federation
+                                .send_response(channel, response)
+                            {
+                                warn!(
+                                    target: "elohim_storage::view_federation",
+                                    peer = %peer,
+                                    "F-T20: failed to send view-federation response (peer disconnected?)"
+                                );
+                            }
+                        }
+                        Err(e) => {
+                            warn!(
+                                target: "elohim_storage::view_federation",
+                                peer = %peer,
+                                error = %e,
+                                "F-T20: failed to sign view-federation slice; dropping channel"
+                            );
+                            // Dropping `channel` without calling `send_response` causes
+                            // libp2p to emit InboundFailure::ResponseOmission here and an
+                            // OutboundFailure at the requester. The view-federation
+                            // OutboundFailure arm (below) maps non-Timeout variants to
+                            // FederationError::TransportError, which is the correct outcome.
+                        }
+                    }
+                }
+            },
+            behaviour::ElohimStorageBehaviourEvent::ViewFederation(
+                request_response::Event::OutboundFailure {
+                    peer,
+                    request_id,
+                    error,
+                },
+            ) => {
+                warn!(
+                    target: "elohim_storage::view_federation",
+                    peer = %peer,
+                    request_id = ?request_id,
+                    error = ?error,
+                    "F-T19: outbound view-federation request failed"
+                );
+                if let Some(respond) = self
+                    .pending_view_federations
+                    .lock()
+                    .await
+                    .remove(&request_id)
+                {
+                    use libp2p::request_response::OutboundFailure;
+                    let fed_err = match &error {
+                        OutboundFailure::Timeout => FederationError::Timeout,
+                        OutboundFailure::ConnectionClosed
+                        | OutboundFailure::DialFailure
+                        | OutboundFailure::UnsupportedProtocols
+                        | OutboundFailure::Io(_) => FederationError::TransportError,
+                    };
+                    let _ = respond.send(Err(fed_err));
+                }
+            }
+            behaviour::ElohimStorageBehaviourEvent::ViewFederation(
+                request_response::Event::InboundFailure {
+                    peer,
+                    request_id,
+                    error,
+                },
+            ) => {
+                debug!(
+                    target: "elohim_storage::view_federation",
+                    peer = %peer,
+                    request_id = ?request_id,
+                    error = ?error,
+                    "F-T19: inbound view-federation request failed"
+                );
+            }
+            behaviour::ElohimStorageBehaviourEvent::ViewFederation(
+                request_response::Event::ResponseSent { peer, request_id },
+            ) => {
+                debug!(
+                    target: "elohim_storage::view_federation",
+                    peer = %peer,
+                    request_id = ?request_id,
+                    "F-T19: view-federation response sent"
+                );
+            }
+
             // === NAT traversal events ===
             behaviour::ElohimStorageBehaviourEvent::Identify(identify::Event::Received {
                 peer_id,
@@ -3201,6 +4355,7 @@ impl P2PNode {
                         let mut samples = std::collections::VecDeque::with_capacity(8);
                         samples.push_back(rtt);
                         PeerMetrics {
+                            is_connected: true,
                             direction: "unknown",
                             last_seen_ms: now_unix_ms(),
                             rtt_samples: samples,
@@ -3291,20 +4446,23 @@ impl P2PNode {
                                             let now_iso = chrono::Utc::now()
                                                 .format("%Y-%m-%dT%H:%M:%SZ")
                                                 .to_string();
-                                            let row = crate::db::models::NewPeerIdentityBindingRow {
-                                                peer_id: payload.peer_id.clone(),
-                                                agent_cid: payload.agent_cid.clone(),
-                                                dht_anchor_hash: payload.binding_action_hash.clone(),
-                                                valid_from: payload.valid_from.clone(),
-                                                valid_until: payload.valid_until.clone(),
-                                                observed_at: now_iso,
-                                                source: "gossip".to_string(),
-                                            };
+                                            // Row construction centralised in
+                                            // `binding_row_from_gossip` so the field-flow
+                                            // contract is exercised by the writer here AND
+                                            // the T03b regression test in
+                                            // identity_binding_gossip.rs.
+                                            let row =
+                                                crate::p2p::identity_binding_gossip::binding_row_from_gossip(
+                                                    &payload, &now_iso,
+                                                );
                                             match self.db_pool.as_ref() {
                                                 Some(pool) => {
                                                     match pool.get() {
                                                         Ok(mut conn) => {
-                                                            match crate::db::peer_identity_bindings::upsert(&mut conn, &row) {
+                                                            // Non-authoritative writer: must NOT clobber a
+                                                            // `superseded_by` previously set by the DHT-arrival
+                                                            // path. Use the preserving variant.
+                                                            match crate::db::peer_identity_bindings::upsert_preserving_supersession(&mut conn, &row) {
                                                                 Ok(()) => info!(
                                                                     target: "elohim_storage::identity",
                                                                     from = %propagation_source,
@@ -3335,9 +4493,8 @@ impl P2PNode {
                                                     "IdentityBindingGossip: no db_pool configured, skipping persistence"
                                                 ),
                                             }
-                                            // device_archetype is carried in the wire payload (Category C) but not
-                                            // persisted in peer_identity_bindings yet — column addition deferred to a
-                                            // later batch. Available for inspection via gossip but not for SQL filtering.
+                                            // device_archetype is wired from the gossip wire; superseded_by
+                                            // relies on the DHT-arrival path for authoritative supersession.
 
                                             // NOTE: reconcile signal emission deferred — the controller processes only
                                             // DNA signals in Stage 1. A P2P-received binding reaching the reconcile layer
@@ -3450,6 +4607,148 @@ impl P2PNode {
                                     topic = crate::p2p::topics::TOPIC_INTEGRITY_REVOCATION,
                                     "Failed to decode RecoveryRevocationMessage (canonical topic)"
                                 ),
+                            }
+                        } else if message.topic.as_str()
+                            == crate::p2p::inventory_gossip::INVENTORY_TOPIC
+                        {
+                            // T14: receive blob inventory snapshot or delta from a peer.
+                            // Try snapshot first, then delta. We don't have a wire-level
+                            // discriminator; distinguishing relies on serde — snapshots have
+                            // `hashes` (no `added`/`removed`) and deltas have `added`/`removed`
+                            // (no `hashes`). serde will fail one and accept the other.
+
+                            use crate::p2p::inventory_gossip::{
+                                BlobInventoryDelta, BlobInventorySnapshot,
+                            };
+
+                            if let Ok(snapshot) = BlobInventorySnapshot::from_bytes(&message.data) {
+                                if let Err(e) = snapshot.verify_structural() {
+                                    warn!(
+                                        target: "elohim_storage::inventory",
+                                        from = %propagation_source,
+                                        error = ?e,
+                                        "Inventory snapshot failed structural verify — dropped"
+                                    );
+                                } else if let Some(pool) = self.db_pool.as_ref() {
+                                    match pool.get() {
+                                        Ok(mut conn) => {
+                                            let now_iso = chrono::Utc::now()
+                                                .format("%Y-%m-%dT%H:%M:%SZ")
+                                                .to_string();
+                                            let when = micros_to_iso(snapshot.snapshot_at)
+                                                .unwrap_or(now_iso);
+                                            match crate::db::peer_blob_inventory::apply_snapshot(
+                                                &mut conn,
+                                                &snapshot.peer_id,
+                                                &snapshot.hashes,
+                                                snapshot.sequence as i64,
+                                                &when,
+                                            ) {
+                                                Ok(()) => debug!(
+                                                    target: "elohim_storage::inventory",
+                                                    from = %propagation_source,
+                                                    peer_id = %snapshot.peer_id,
+                                                    count = snapshot.hashes.len(),
+                                                    sequence = snapshot.sequence,
+                                                    "Inventory snapshot applied"
+                                                ),
+                                                Err(e) => warn!(
+                                                    target: "elohim_storage::inventory",
+                                                    from = %propagation_source,
+                                                    error = %e,
+                                                    "apply_snapshot failed"
+                                                ),
+                                            }
+                                        }
+                                        Err(e) => warn!(
+                                            target: "elohim_storage::inventory",
+                                            error = %e,
+                                            "inventory: db pool exhausted"
+                                        ),
+                                    }
+                                }
+                            } else if let Ok(delta) = BlobInventoryDelta::from_bytes(&message.data)
+                            {
+                                if let Err(e) = delta.verify_structural() {
+                                    warn!(
+                                        target: "elohim_storage::inventory",
+                                        from = %propagation_source,
+                                        error = ?e,
+                                        "Inventory delta failed structural verify — dropped"
+                                    );
+                                } else if let Some(pool) = self.db_pool.as_ref() {
+                                    match pool.get() {
+                                        Ok(mut conn) => {
+                                            let when = micros_to_iso(delta.emitted_at)
+                                                .unwrap_or_else(|| {
+                                                    chrono::Utc::now()
+                                                        .format("%Y-%m-%dT%H:%M:%SZ")
+                                                        .to_string()
+                                                });
+                                            match crate::db::peer_blob_inventory::apply_delta(
+                                                &mut conn,
+                                                &delta.peer_id,
+                                                &delta.added,
+                                                &delta.removed,
+                                                delta.sequence as i64,
+                                                &when,
+                                            ) {
+                                                Ok(crate::db::peer_blob_inventory::DeltaApplyOutcome::Applied) => {
+                                                    debug!(
+                                                        target: "elohim_storage::inventory",
+                                                        peer_id = %delta.peer_id,
+                                                        sequence = delta.sequence,
+                                                        added = delta.added.len(),
+                                                        removed = delta.removed.len(),
+                                                        "Inventory delta applied"
+                                                    );
+                                                }
+                                                Ok(crate::db::peer_blob_inventory::DeltaApplyOutcome::Replay) => {
+                                                    debug!(
+                                                        target: "elohim_storage::inventory",
+                                                        peer_id = %delta.peer_id,
+                                                        sequence = delta.sequence,
+                                                        "Inventory delta replay — dropped silently"
+                                                    );
+                                                }
+                                                Ok(crate::db::peer_blob_inventory::DeltaApplyOutcome::Gap {
+                                                    expected,
+                                                    received,
+                                                }) => {
+                                                    warn!(
+                                                        target: "elohim_storage::inventory",
+                                                        peer_id = %delta.peer_id,
+                                                        expected,
+                                                        received,
+                                                        "Inventory delta gap — requesting snapshot"
+                                                    );
+                                                    // Best-effort: send the snapshot-request command.
+                                                    // Parse the peer_id string into a libp2p::PeerId.
+                                                    if let Ok(pid) = delta.peer_id.parse::<libp2p::PeerId>() {
+                                                        let cmd = P2PCommand::SnapshotRequest { peer_id: pid };
+                                                        let _ = self.command_tx.try_send(cmd);
+                                                    }
+                                                }
+                                                Err(e) => warn!(
+                                                    target: "elohim_storage::inventory",
+                                                    error = %e,
+                                                    "apply_delta failed"
+                                                ),
+                                            }
+                                        }
+                                        Err(e) => warn!(
+                                            target: "elohim_storage::inventory",
+                                            error = %e,
+                                            "inventory: db pool exhausted"
+                                        ),
+                                    }
+                                }
+                            } else {
+                                debug!(
+                                    target: "elohim_storage::inventory",
+                                    from = %propagation_source,
+                                    "Inventory message decoded as neither snapshot nor delta — dropped"
+                                );
                             }
                         } else if message.topic.as_str().starts_with("elohim/") {
                             // D.6 wire point B (gossipsub EPR announce): per-pillar
@@ -4969,6 +6268,7 @@ impl P2PNode {
             agent_pubkey: self.identity.agent_pubkey().to_string(),
             delivery_peers: Arc::clone(&self.delivery_peers),
             sync_paused: Arc::clone(&self.sync_paused),
+            last_gossiped: Arc::clone(&self.last_gossiped),
         }
     }
 

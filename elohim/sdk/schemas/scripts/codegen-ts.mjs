@@ -73,6 +73,24 @@ const INTERFACE_FILES = [
   { src: 'views/portal-host-view.ts', dest: 'portal-host-view.ts' },
   { src: 'views/agent-peer-binding-view.ts', dest: 'agent-peer-binding-view.ts' },
   { src: 'views/account-view.ts', dest: 'account-view.ts' },
+  // Light-Up-Topology Phase 1 — operational distribution + cluster + reciprocity (Category C)
+  { src: 'views/distribution-summary.ts', dest: 'distribution-summary.ts' },
+  { src: 'views/diversity-hint.ts', dest: 'diversity-hint.ts' },
+  { src: 'views/distribution-details.ts', dest: 'distribution-details.ts' },
+  { src: 'views/replica-peer.ts', dest: 'replica-peer.ts' },
+  { src: 'views/projector-identity.ts', dest: 'projector-identity.ts' },
+  { src: 'views/my-cluster-view.ts', dest: 'my-cluster-view.ts' },
+  { src: 'views/freshness.ts', dest: 'freshness.ts' },
+  { src: 'views/peer-topology-view.ts', dest: 'peer-topology-view.ts' },
+  { src: 'views/peer-household-edge.ts', dest: 'peer-household-edge.ts' },
+  { src: 'views/reciprocity-view.ts', dest: 'reciprocity-view.ts' },
+  { src: 'views/reciprocity-row.ts', dest: 'reciprocity-row.ts' },
+  { src: 'views/doorway-dashboard-view.ts', dest: 'doorway-dashboard-view.ts' },
+  { src: 'views/dashboard-steward.ts', dest: 'dashboard-steward.ts' },
+  { src: 'views/dashboard-federation-peer.ts', dest: 'dashboard-federation-peer.ts' },
+  { src: 'views/projection-coverage.ts', dest: 'projection-coverage.ts' },
+  { src: 'views/public-surface-state.ts', dest: 'public-surface-state.ts' },
+  { src: 'views/view-slice.ts', dest: 'view-slice.ts' },
 ];
 
 /**

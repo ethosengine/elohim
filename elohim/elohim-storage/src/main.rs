@@ -306,6 +306,53 @@ async fn async_main(
     if let Ok(v) = std::env::var("REGION") {
         config.region = Some(v);
     }
+    if let Ok(v) = std::env::var("INVENTORY_BROADCAST_SECONDS") {
+        if let Ok(n) = v.parse::<u64>() {
+            config.inventory_broadcast_seconds = Some(n);
+        }
+    }
+    if let Ok(v) = std::env::var("CUSTODY_SWEEP_SECONDS") {
+        if let Ok(n) = v.parse::<u64>() {
+            config.custody_sweep_seconds = n;
+        }
+    }
+    if let Ok(v) = std::env::var("PLACEMENT_GRACE_SECONDS") {
+        if let Ok(n) = v.parse::<u64>() {
+            config.placement_grace_seconds = n;
+        }
+    }
+    if let Ok(v) = std::env::var("PLACEMENT_GAP_COOLDOWN_SECONDS") {
+        if let Ok(n) = v.parse::<u64>() {
+            config.placement_gap_cooldown_seconds = n;
+        }
+    }
+    if let Ok(v) = std::env::var("KICK_FETCH_PER_PEER_PER_MINUTE") {
+        if let Ok(n) = v.parse::<u32>() {
+            config.kick_fetch_per_peer_per_minute = n;
+        }
+    }
+    if let Ok(v) = std::env::var("INVENTORY_FRESHNESS_SECONDS") {
+        if let Ok(n) = v.parse::<u64>() {
+            config.inventory_freshness_seconds = n;
+        }
+    }
+    if let Ok(v) = std::env::var("FETCH_BLOB_TIMEOUT_SECONDS") {
+        if let Ok(n) = v.parse::<u64>() {
+            config.fetch_blob_timeout_seconds = n;
+        }
+    }
+    if let Ok(v) = std::env::var("FETCH_BLOB_PARALLELISM") {
+        if let Ok(n) = v.parse::<usize>() {
+            if n > 0 {
+                config.fetch_blob_parallelism = n;
+            }
+        }
+    }
+    if let Ok(v) = std::env::var("SELF_CID") {
+        if !v.is_empty() {
+            config.self_cid = Some(v);
+        }
+    }
 
     info!(
         storage_dir = %config.storage_dir.display(),
@@ -674,6 +721,21 @@ async fn async_main(
             storage_dir: config.storage_dir.clone(),
             relay_mode,
             announce_addresses: args.announce_addrs.clone(),
+            // T22: wire archetype + cadence override from top-level Config so
+            // the broadcaster timer in P2PNode::run can resolve cadence.
+            device_archetype: config.device_archetype.clone(),
+            inventory_broadcast_seconds: config.inventory_broadcast_seconds,
+            // T23: wire custody reconcile sweep parameters from top-level
+            // Config so the timer + ConnectionEstablished trigger in
+            // P2PNode::run_custody_reconcile see the same values used by the
+            // HTTP-side race-fetch path (config.rs defaults).
+            self_cid: config.self_cid.clone(),
+            custody_sweep_seconds: Some(config.custody_sweep_seconds),
+            placement_grace_seconds: config.placement_grace_seconds,
+            placement_gap_cooldown_seconds: config.placement_gap_cooldown_seconds,
+            inventory_freshness_seconds: config.inventory_freshness_seconds,
+            fetch_blob_timeout_seconds: config.fetch_blob_timeout_seconds,
+            fetch_blob_parallelism: config.fetch_blob_parallelism,
             ..Default::default()
         };
 
@@ -815,7 +877,9 @@ async fn async_main(
     let mut http_server = HttpServer::new(blob_store.clone(), http_addr)
         .with_progress_hub(Arc::clone(&progress_hub))
         .with_elohim_capability(elohim_capability)
-        .with_write_through_state(write_through_state.clone());
+        .with_write_through_state(write_through_state.clone())
+        // T17: race-fetch parameters (timeout, parallelism, self-CID).
+        .with_fetch_config(&config);
 
     if args.embedded_conductor {
         http_server = http_server.with_embedded_conductor();

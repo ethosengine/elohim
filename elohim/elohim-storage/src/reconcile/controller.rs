@@ -491,12 +491,20 @@ impl<S: DnaSignalStream> ReconcileController<S> {
         Ok(())
     }
 
-    /// Task A.10: publish AgentPeerBinding to the `elohim/identity/binding` gossipsub topic.
+    /// Task A.10 + T03b: project an `AgentPeerBinding` DHT signal into the
+    /// `peer_identity_bindings` table AND publish it to the
+    /// `elohim/identity/binding` gossipsub topic.
     ///
-    /// When a local agent creates a new `AgentPeerBinding` DHT entry, the DNA
-    /// emits an `AgentPeerBinding` signal. The controller propagates this to all
-    /// subscribed peers by sending `P2PCommand::PublishIdentityBinding` to the
-    /// P2P event loop.
+    /// Two responsibilities, in order:
+    ///
+    /// 1. **Project** — write the authoritative DHT-arrival row into
+    ///    `peer_identity_bindings`. This is the canonical writer for the
+    ///    `superseded_by` column; handshake and gossip writers run through
+    ///    `upsert_preserving_supersession` which forwards any prior value
+    ///    written here.
+    /// 2. **Publish** — send `P2PCommand::PublishIdentityBinding` to the P2P
+    ///    event loop so subscribed peers can mirror the binding into their
+    ///    own `peer_identity_bindings` projection.
     ///
     /// ## Stage 1 signature
     ///
@@ -504,16 +512,73 @@ impl<S: DnaSignalStream> ReconcileController<S> {
     /// in the gossip payload is a non-empty sentinel for Stage 1. Stage 2 (A.13
     /// or later) replaces this with a real Ed25519 signature.
     ///
-    /// ## No-swarm path
+    /// ## No-pool / no-swarm paths
     ///
-    /// If the controller was constructed without `with_swarm_tx(tx)`, the
-    /// method logs at debug level and returns `Ok(())` — preserving backward
-    /// compatibility with the A.4 test suite that doesn't wire a live swarm.
+    /// If the controller has no DB pool wired, projection writes are logged
+    /// at debug level and skipped (the A.4 stub-only test suite hits this
+    /// path). If the controller was constructed without `with_swarm_tx(tx)`,
+    /// publish is logged at debug level and skipped. Both behaviours preserve
+    /// backward compatibility with stub-only test fixtures.
     async fn on_agent_peer_binding(
         &mut self,
         signal: AgentPeerBindingSignal,
     ) -> Result<(), ReconcileError> {
-        // Build the gossip payload from the DHT signal fields.
+        // Step 1: write the authoritative DHT-arrival row into the
+        // `peer_identity_bindings` projection. The DNA-arrival path is the
+        // canonical writer (handshake + gossip writers also fill this table,
+        // but only the DHT path is authoritative on `superseded_by`).
+        //
+        // If no pool is wired (test stubs constructed via `new()` without
+        // `new_with_storage`), log at debug level and skip persistence — do NOT
+        // propagate as an error. This preserves backward compatibility with the
+        // A.4 stub-only test suite.
+        match self.db_pool.as_ref() {
+            Some(pool) => match pool.get() {
+                Ok(mut conn) => {
+                    let now_iso = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
+                    let row = crate::db::models::NewPeerIdentityBindingRow {
+                        peer_id: signal.peer_id.clone(),
+                        agent_cid: signal.agent_cid.clone(),
+                        dht_anchor_hash: signal.binding_action_hash.clone(),
+                        valid_from: signal.valid_from.format("%Y-%m-%dT%H:%M:%SZ").to_string(),
+                        valid_until: signal
+                            .valid_until
+                            .map(|dt| dt.format("%Y-%m-%dT%H:%M:%SZ").to_string()),
+                        observed_at: now_iso,
+                        source: "dht".to_string(),
+                        device_archetype: signal.device_archetype.as_str().to_string(),
+                        superseded_by: signal.superseded_by.clone(),
+                    };
+                    match crate::db::peer_identity_bindings::upsert(&mut conn, &row) {
+                        Ok(()) => debug!(
+                            peer_id = %signal.peer_id,
+                            agent_cid = %signal.agent_cid,
+                            "peer_identity_bindings upserted from DHT signal (source='dht')"
+                        ),
+                        Err(e) => warn!(
+                            peer_id = %signal.peer_id,
+                            agent_cid = %signal.agent_cid,
+                            error = %e,
+                            "peer_identity_bindings upsert failed for DHT signal"
+                        ),
+                    }
+                }
+                Err(e) => warn!(
+                    peer_id = %signal.peer_id,
+                    agent_cid = %signal.agent_cid,
+                    error = %e,
+                    "on_agent_peer_binding: db pool checkout failed — projection write skipped"
+                ),
+            },
+            None => debug!(
+                peer_id = %signal.peer_id,
+                agent_cid = %signal.agent_cid,
+                "on_agent_peer_binding: no db_pool wired — projection write skipped \
+                 (use new_with_storage for production or persistence tests)"
+            ),
+        }
+
+        // Step 2: build the gossip payload from the DHT signal fields.
         // Note: action_hash is intentionally excluded from the gossip wire payload —
         // binding_action_hash is the canonical DHT provenance field for P2P gossip.
         let payload = crate::p2p::identity_binding_gossip::IdentityBindingGossip {
@@ -650,6 +715,7 @@ mod tests {
             valid_until: None,
             device_archetype: DeviceArchetype::Node,
             binding_action_hash: "uhCkk-binding-action-hash".to_string(),
+            superseded_by: None,
             emitted_at: Utc::now(),
         }
     }
@@ -986,6 +1052,82 @@ mod tests {
         assert!(rx.try_recv().is_err(), "no more commands after two signals");
     }
 
+    /// T03b: DNA-arrival writer populates `peer_identity_bindings` with both
+    /// `device_archetype` and `superseded_by` carried verbatim from the signal.
+    /// The DHT path is the authoritative writer for supersession (handshake +
+    /// gossip writers always leave `superseded_by: None`).
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn controller_on_agent_peer_binding_persists_archetype_and_superseded_by() {
+        use crate::db::{run_migrations, DbPool};
+        use crate::reconcile::pubkey_timeline::PubkeyTimelineCache;
+        use diesel::r2d2::{ConnectionManager, Pool};
+        use std::sync::Arc;
+        use tokio::sync::Mutex;
+
+        // Build an in-memory test DB.
+        let url = format!(
+            "file:ctrl_apb_test_{}?mode=memory&cache=shared",
+            uuid::Uuid::new_v4().as_simple()
+        );
+        let pool: DbPool = Pool::builder()
+            .max_size(1)
+            .build(ConnectionManager::new(&url))
+            .expect("pool");
+        run_migrations(&pool).expect("migrations");
+        let pool = Arc::new(pool);
+        let cache = Arc::new(Mutex::new(PubkeyTimelineCache::with_capacity(8)));
+
+        let signal = AgentPeerBindingSignal {
+            action_hash: "uhCkk-dht-binding-hash".into(),
+            peer_id: "12D3KooWDhtPeer".into(),
+            agent_cid: "bafybeicid-dht-agent".into(),
+            valid_from: Utc::now(),
+            valid_until: None,
+            device_archetype: DeviceArchetype::Mobile,
+            binding_action_hash: "uhCkk-dht-binding-hash".into(),
+            superseded_by: Some("uhCkk-prev-binding".to_string()),
+            emitted_at: Utc::now(),
+        };
+
+        let stream = InMemoryDnaSignalStream::with_signals(vec![DnaSignal::AgentPeerBinding(
+            signal.clone(),
+        )]);
+        let mut controller =
+            ReconcileController::new_with_storage(stream, pool.clone(), cache.clone());
+        controller.run_one_pass().await.unwrap();
+
+        // Verify the projection row landed with the wire-supplied archetype + supersession.
+        // lookup_active filters out superseded rows, so we cannot use it here.
+        // Read the row directly via the table to verify both fields landed.
+        let mut conn = pool.get().expect("conn");
+        use crate::db::diesel_schema::peer_identity_bindings::dsl;
+        use diesel::prelude::*;
+        let row: crate::db::models::PeerIdentityBindingRow = dsl::peer_identity_bindings
+            .filter(dsl::peer_id.eq(&signal.peer_id))
+            .first(&mut conn)
+            .expect("expected projection row from DHT signal");
+        assert_eq!(row.device_archetype, "mobile");
+        assert_eq!(row.superseded_by, Some("uhCkk-prev-binding".to_string()));
+        assert_eq!(row.source, "dht");
+        assert_eq!(row.dht_anchor_hash, "uhCkk-dht-binding-hash");
+    }
+
+    /// T03b: DNA-arrival writer survives missing pool (test stub via `new()`).
+    /// Logs at debug level and skips persistence — must not error the dispatch.
+    #[tokio::test]
+    async fn controller_on_agent_peer_binding_no_pool_skips_persistence() {
+        let signal = AgentPeerBindingSignal {
+            superseded_by: Some("uhCkk-prev".to_string()),
+            ..sample_binding_signal()
+        };
+        let stream =
+            InMemoryDnaSignalStream::with_signals(vec![DnaSignal::AgentPeerBinding(signal)]);
+        let mut controller = ReconcileController::new(stream);
+        // run_one_pass must not error even though pool is absent.
+        controller.run_one_pass().await.unwrap();
+        assert_eq!(controller.observed_kinds(), &["agentPeerBinding"]);
+    }
+
     // -----------------------------------------------------------------------
     // M5: PortalHostCreated / PortalHostRemoved dispatch
     // -----------------------------------------------------------------------
@@ -1130,6 +1272,8 @@ mod tests {
                     valid_until: None,
                     observed_at: "2026-01-01T00:00:00Z".to_string(),
                     source: "dht".to_string(),
+                    device_archetype: "node".to_string(),
+                    superseded_by: None,
                 },
             )
             .expect("upsert binding");

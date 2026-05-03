@@ -1,0 +1,48 @@
+<section class="my-cluster" data-testid="my-cluster-page">
+  <header>
+    <h2>Your devices</h2>
+    @if (cluster.loading()) {
+      <span data-testid="my-cluster-loading">…</span>
+    }
+  </header>
+
+  @if (cluster.cluster(); as v) {
+    <div class="summary" data-testid="my-cluster-summary">
+      {{ v.devices.length }} devices · {{ onlineCount(v.devices) }} online ·
+      {{ offlineCount(v.devices) }} sleeping
+    </div>
+
+    <div class="device-list">
+      @for (d of v.devices; track d.peerId) {
+        <app-device-tile [device]="d"></app-device-tile>
+      }
+    </div>
+
+    <dl class="totals" data-testid="my-cluster-totals">
+      <dt>Storage</dt>
+      <dd>
+        {{ formatBytes(v.totals.storageUsedBytes) }} of
+        {{ formatBytes(v.totals.storageTotalBytes) }} used
+      </dd>
+      <dt>Hosting</dt>
+      <dd>
+        {{ formatBytes(v.totals.externalCommittedBytes) }} for friends · they host
+        {{ formatBytes(reciprocityInBytes(v.totals.reciprocityNetBytes)) }} of mine
+      </dd>
+      <dt>Status</dt>
+      <dd data-testid="my-cluster-status">{{ statusText(v) }}</dd>
+    </dl>
+
+    <button type="button" (click)="toggleDetails()" data-testid="my-cluster-show-details-toggle">
+      [{{ showDetails() ? 'hide' : 'show' }} details]
+    </button>
+
+    @if (showDetails()) {
+      <pre data-testid="my-cluster-detail-json">{{ v | json }}</pre>
+    }
+  }
+
+  @if (cluster.error(); as err) {
+    <div class="error" data-testid="my-cluster-error">{{ err }}</div>
+  }
+</section>

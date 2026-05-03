@@ -760,6 +760,7 @@ async fn controller_on_agent_peer_binding_sends_publish_command() {
         valid_until: None,
         device_archetype: DeviceArchetype::Node,
         binding_action_hash: "uhCkk-ctrl-binding-hash".into(),
+        superseded_by: None,
         emitted_at: Utc::now(),
     };
 
@@ -930,6 +931,8 @@ async fn gossipsub_identity_binding_propagates_to_peer_db() {
                         valid_until: received.valid_until.clone(),
                         observed_at: now_iso,
                         source: "gossip".to_string(),
+                        device_archetype: "node".to_string(),
+                        superseded_by: None,
                     };
                     let mut conn = pool_b_task.get().expect("conn");
                     elohim_storage::db::peer_identity_bindings::upsert(&mut conn, &row)

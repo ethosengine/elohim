@@ -311,6 +311,14 @@ fn translate_imagodei(signal: ImagodeiSignal) -> Option<DnaSignal> {
             let valid_from = micros_to_datetime(binding.valid_from);
             let valid_until = binding.valid_until.map(micros_to_datetime);
             let device_archetype = parse_device_archetype(&binding.device_archetype);
+            // The DNA emits superseded_by as a JSON string when present (the
+            // ActionHash of the binding being superseded), or null/absent when
+            // this is a fresh binding. Pull the string out of the Value if it
+            // is a string; treat anything else (null, object, etc.) as absent.
+            let superseded_by = binding
+                .superseded_by
+                .as_ref()
+                .and_then(|v| v.as_str().map(|s| s.to_string()));
 
             Some(DnaSignal::AgentPeerBinding(AgentPeerBindingSignal {
                 action_hash: action_hash.clone(),
@@ -320,6 +328,7 @@ fn translate_imagodei(signal: ImagodeiSignal) -> Option<DnaSignal> {
                 valid_until,
                 device_archetype,
                 binding_action_hash: action_hash,
+                superseded_by,
                 emitted_at,
             }))
         }
@@ -870,6 +879,44 @@ mod tests {
                 assert_eq!(sig.device_archetype, DeviceArchetype::Node);
                 assert!(sig.valid_until.is_none());
                 assert!(sig.valid_from.timestamp() > 0);
+                // superseded_by is null in the fixture — translator must yield None.
+                assert!(sig.superseded_by.is_none());
+            }
+            other => panic!("expected AgentPeerBinding, got {other:?}"),
+        }
+    }
+
+    /// T03b: the translator extracts `superseded_by` from the binding payload
+    /// when the DNA emits a JSON-string ActionHash. This is the authoritative
+    /// supersession reference — the controller writes it verbatim to the
+    /// `peer_identity_bindings` projection.
+    #[test]
+    fn translates_agent_peer_binding_created_with_superseded_by() {
+        let value = serde_json::json!({
+            "type": "AgentPeerBindingCreated",
+            "payload": {
+                "action_hash": "uhCkk-binding-action-hash-new",
+                "binding": {
+                    "peer_id": "12D3KooWTestPeerId",
+                    "agent_cid": "bafybeicid-agent-1",
+                    "valid_from": 1_700_000_000_000_000i64,
+                    "valid_until": null,
+                    "device_archetype": "mobile",
+                    "signature": [1u8, 2, 3],
+                    "superseded_by": "uhCkk-prev-binding-action-hash"
+                }
+            }
+        });
+        let bytes = to_msgpack(&value);
+        let dns = try_decode_and_translate(&bytes, None).expect("should translate");
+        match dns {
+            DnaSignal::AgentPeerBinding(sig) => {
+                assert_eq!(sig.device_archetype, DeviceArchetype::Mobile);
+                assert_eq!(
+                    sig.superseded_by,
+                    Some("uhCkk-prev-binding-action-hash".to_string()),
+                    "translator must lift superseded_by out of the binding payload"
+                );
             }
             other => panic!("expected AgentPeerBinding, got {other:?}"),
         }

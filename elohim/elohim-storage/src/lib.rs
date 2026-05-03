@@ -143,7 +143,8 @@ pub use identity::{NodeCapabilities, NodeIdentityInfo};
 pub use identity::NodeIdentity;
 #[cfg(feature = "p2p")]
 pub use p2p::{
-    P2PConfig, P2PHandle, P2PNode, P2PStatusInfo, PeerInfoView, PeerListView, RelayMode,
+    FederationError, P2PConfig, P2PHandle, P2PNode, P2PStatusInfo, PeerInfoView, PeerListView,
+    RelayMode,
 };
 
 // Sync re-exports

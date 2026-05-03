@@ -17,6 +17,8 @@
 pub mod account;
 pub mod agreements;
 pub mod attestations;
+pub mod blob;
+pub mod cluster;
 pub mod comments;
 pub mod compute;
 pub mod contributors;
@@ -34,11 +36,13 @@ pub mod mastery;
 pub mod network_posture;
 pub mod node_shape;
 pub mod peer_statuses;
+pub mod peer_topology;
 pub mod placement_gaps;
 pub mod places;
 pub mod presence;
 pub mod projector_status;
 pub mod rea_commitments;
+pub mod reciprocity;
 pub mod recognition;
 pub mod registry;
 pub mod resilience;
@@ -79,6 +83,7 @@ pub async fn handle_api_request(
     swarm_tx: Option<tokio::sync::mpsc::Sender<crate::p2p::P2PCommand>>,
     local_peer_id: Option<String>,
     fan_out_ctx: Option<Arc<crate::api::epr::EprFanOutCtx>>,
+    p2p_handle: Option<crate::p2p::P2PHandle>,
 ) -> Result<Response<Full<Bytes>>, StorageError> {
     // Strip /api/v1/ prefix
     let sub_path = path.strip_prefix("/api/v1/").unwrap_or("");
@@ -145,6 +150,28 @@ pub async fn handle_api_request(
     } else if sub_path.starts_with("attestations") {
         let resource_path = sub_path.strip_prefix("attestations").unwrap_or("");
         attestations::handle(req, method, resource_path, &pool, &app_ctx).await
+    } else if sub_path.starts_with("blob/") {
+        // Phase 5 T29: /api/v1/blob/{hash}/distribution/details
+        // Note: the `/blob/` raw-bytes route is NOT under /api/v1/ (handled at
+        // the outer http.rs dispatcher); this prefix is for blob-scoped views only.
+        let resource_path = sub_path.strip_prefix("blob").unwrap_or("");
+        blob::handle(req, method, resource_path, &pool, &app_ctx).await
+    } else if sub_path == "cluster" {
+        // Phase 5 T30: GET /api/v1/cluster — agent-scoped cluster view.
+        // Auth implicit (Holochain idiom): the calling agent's identity (resolved
+        // via X-Agent-Cid or local_sessions) determines scope. Future hub variants
+        // (`/cluster/household/{id}`, `/cluster/hub/{id}`) extend the path tree.
+        cluster::handle(req, method, &pool, p2p_handle.as_ref()).await
+    } else if sub_path == "peer-topology" {
+        // Phase 5 T31: GET /api/v1/peer-topology — agent-scoped peer-household
+        // topology view. Same auth-implicit pattern as `/cluster`; federated
+        // through the swarm via Federator.
+        peer_topology::handle(req, method, &pool, p2p_handle.as_ref()).await
+    } else if sub_path == "reciprocity" {
+        // Phase 5 T32: GET /api/v1/reciprocity — agent-scoped reciprocity ledger.
+        // Local SQLite roll-up over the steward's REA projection (no federation),
+        // so no `p2p_handle` plumbed. Auth-implicit identity determines scope.
+        reciprocity::handle(req, method, &pool).await
     } else if sub_path.starts_with("comments") {
         let resource_path = sub_path.strip_prefix("comments").unwrap_or("");
         comments::handle(req, method, resource_path, &pool, &app_ctx, services).await

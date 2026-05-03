@@ -28,6 +28,8 @@
 //! - [`controller`] — `ReconcileController` k8s-style loop (Task A.4).
 
 pub mod controller;
+pub mod custody;
+pub mod custody_sweep;
 pub mod holochain_app_signal;
 pub mod portal_host_handlers;
 pub mod pubkey_timeline;

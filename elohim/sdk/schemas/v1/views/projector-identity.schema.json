@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "epr:schema:view:projector-identity",
+  "title": "ProjectorIdentity",
+  "description": "Per-doorway projector row for a CID's distribution-details view. Source of truth: doorway projection registry observed via libp2p (Operational, Category C). Reconstructed per request; not persisted.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["doorwayHostname", "lastAckSeconds"],
+  "properties": {
+    "doorwayHostname": {
+      "type": "string",
+      "description": "Public hostname of the projecting doorway (e.g. 'matthew.elohim.host')."
+    },
+    "lastAckSeconds": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Seconds since the projector last acknowledged this CID."
+    },
+    "regionTier": {
+      "type": "string",
+      "description": "Coarse region tier of the doorway, when known."
+    }
+  }
+}

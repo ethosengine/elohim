@@ -726,8 +726,8 @@ pub enum RecoveryV2Signal {
 /// Mirrors `imagodei_integrity::AgentPeerBinding`. `valid_from` / `valid_until`
 /// are Holochain Timestamps (microseconds i64). `device_archetype` is a
 /// snake_case string (`node`, `desktop`, `mobile`, `steward`).
-/// `signature` and `superseded_by` are present on the wire but not needed by
-/// the translator.
+/// `signature` is present on the wire but not needed by the translator;
+/// `superseded_by` is extracted by `translate_imagodei`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AgentPeerBindingPayload {
     pub peer_id: String,
@@ -738,7 +738,8 @@ pub struct AgentPeerBindingPayload {
     pub valid_until: Option<i64>,
     /// snake_case device archetype string.
     pub device_archetype: String,
-    // signature / superseded_by are present on the wire but unused by the translator.
+    // signature is present on the wire but unused by the translator.
+    // superseded_by is extracted by translate_imagodei.
     #[serde(default)]
     pub signature: Vec<u8>,
     #[serde(default)]

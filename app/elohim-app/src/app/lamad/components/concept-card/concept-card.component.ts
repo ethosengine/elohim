@@ -3,6 +3,8 @@ import { Component, Input, Output, EventEmitter, ChangeDetectionStrategy } from 
 
 // @coverage: 52.9% (2026-02-24)
 
+import { DistributionBadgeComponent } from '@elohim/service/public-api';
+
 import { ContentNode } from '../../models/content-node.model';
 import { RelationshipType } from '../../models/exploration-context.model';
 
@@ -26,7 +28,7 @@ import { RelationshipType } from '../../models/exploration-context.model';
 @Component({
   selector: 'app-concept-card',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, DistributionBadgeComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <button
@@ -47,6 +49,10 @@ import { RelationshipType } from '../../models/exploration-context.model';
           <span class="card-description">{{ truncateDescription(concept.description) }}</span>
         }
       </div>
+
+      @if (concept.distribution) {
+        <elohim-distribution-badge [summary]="concept.distribution"></elohim-distribution-badge>
+      }
 
       @if (showMastery) {
         <span

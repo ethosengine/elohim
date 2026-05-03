@@ -1,0 +1,31 @@
+.tile {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0;
+
+  &.offline {
+    opacity: 0.55;
+  }
+
+  .dot {
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 50%;
+    background: var(--device-online, #2a7);
+  }
+
+  &.offline .dot {
+    background: var(--device-offline, #888);
+  }
+
+  .label {
+    font-weight: 500;
+  }
+
+  .hosting,
+  .status {
+    font-size: 0.85rem;
+    color: var(--text-secondary, #666);
+  }
+}

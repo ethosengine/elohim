@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "epr:schema:view:peer-household-edge",
+  "title": "PeerHouseholdEdge",
+  "description": "Per-household reciprocation edge in a peer topology view. Source of truth: peer_identity_bindings (Category A from imagodei DHT) joined with rea_commitments + economic_events for hosting accounting (Operational, Category C). Reconstructed per request; not persisted.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "householdId",
+    "online",
+    "myCidsHostedByThem",
+    "theirCidsHostedByMe"
+  ],
+  "properties": {
+    "householdId": {
+      "type": "string",
+      "description": "Stable identifier for the counterparty household."
+    },
+    "displayName": {
+      "type": "string",
+      "description": "Human-readable label for the household, when known."
+    },
+    "online": {
+      "type": "boolean",
+      "description": "Whether at least one peer in the household is currently online."
+    },
+    "lastSyncSec": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Seconds since the last successful sync with the counterparty."
+    },
+    "myCidsHostedByThem": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Count of viewer's CIDs currently replicated by the counterparty household."
+    },
+    "theirCidsHostedByMe": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Count of counterparty CIDs currently replicated by the viewer's household."
+    },
+    "netDiff": {
+      "type": "integer",
+      "description": "Signed difference (theirCidsHostedByMe - myCidsHostedByThem)."
+    },
+    "isCriticalForMe": {
+      "type": "boolean",
+      "description": "True when this household holds CIDs for which the viewer would lose sole-replica protection if it goes dark."
+    },
+    "iAmCriticalForThem": {
+      "type": "boolean",
+      "description": "True when the viewer is the only off-household replica of CIDs the counterparty owns."
+    }
+  }
+}

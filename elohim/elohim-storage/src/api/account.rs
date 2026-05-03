@@ -945,7 +945,8 @@ async fn handle_remove_portal_host(
 /// Resolve the current agent public key from the request.
 ///
 /// Resolution order:
-/// 1. `X-Agent-Id` header — doorway JWT middleware injects this after validation
+/// 1. `X-Agent-Id` header — set by doorway's bespoke portal-host handlers in
+///    `auth_routes.rs` after JWT validation (NOT by generic middleware)
 /// 2. Active local session's `agent_pub_key` — Tauri direct-connection fallback
 ///
 /// Returns `Ok(Some(key))` when resolved, `Ok(None)` when no identity signal
@@ -965,6 +966,52 @@ fn extract_agent_key(
 
     if let Some(session) = crate::db::local_sessions::get_active_session(conn)? {
         return Ok(Some(session.agent_pub_key));
+    }
+
+    Ok(None)
+}
+
+/// Resolve the calling agent's `agent_cid` for view services and reach gates.
+///
+/// **Source of truth:** the imagodei DHT (Agent EPR entry).
+///
+/// **Alpha-substrate equivalence:** `agent_cid` is currently sourced from
+/// `human_id` (the slug). The seeder authors `AgentPeerBinding` entries with
+/// `agent_cid: human.id` (`genesis/seeder/src/seed-agent-bindings.ts:311`)
+/// and view-service tests use slug-style strings like `"agent-matthew"`
+/// (`tests/distribution_view.rs:177`). The "CIDv1 base32 of the agent's EPR
+/// atom" comment in `views.rs` is forward-looking; CIDv1 dag-cbor sha256
+/// derivation of the Agent entry is not enforced anywhere in the running
+/// stack today.
+///
+/// **Resolution cascade** (mirrors `extract_agent_key`):
+/// 1. `X-Agent-Cid` header — doorway's `forward_to_storage` injects this from
+///    the JWT's `claims.human_id` after bearer validation
+/// 2. Active `local_sessions.human_id` — Tauri direct-connection fallback
+/// 3. `None` — Session Visitor or unauthenticated request; the caller decides
+///    whether to 401 or fall through to a visitor-shaped response
+///
+/// **Future migration (out of Phase 5 scope):** when CIDv1 enforcement lands,
+/// doorway will resolve `human_id → agent_cid` once at user creation, persist
+/// on `UserDoc.agent_cid`, and source the header from there. `local_sessions`
+/// gains a parallel `agent_cid` column. This helper's signature does not
+/// change. The P2P design gate fires again at that point to add the cache
+/// fields and audit the SQL JOIN behavior.
+pub(crate) fn extract_agent_cid(
+    req: &Request<Incoming>,
+    conn: &mut diesel::SqliteConnection,
+) -> Result<Option<String>, StorageError> {
+    if let Some(cid) = req
+        .headers()
+        .get("X-Agent-Cid")
+        .and_then(|v| v.to_str().ok())
+        .map(|s| s.to_string())
+    {
+        return Ok(Some(cid));
+    }
+
+    if let Some(session) = crate::db::local_sessions::get_active_session(conn)? {
+        return Ok(Some(session.human_id));
     }
 
     Ok(None)

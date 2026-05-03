@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "epr:schema:view:projection-coverage",
+  "title": "ProjectionCoverage",
+  "description": "Projection cache and lag aggregate for a doorway. Source of truth: doorway projection cache + REA observation events (Operational, Category C). Reconstructed per request; not persisted.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["projectedCidCount", "knownCidCount", "cacheHitRate24h", "projectionLagMsAvg"],
+  "properties": {
+    "projectedCidCount": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of CIDs the doorway is currently projecting."
+    },
+    "knownCidCount": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Total CIDs the doorway is aware of (projected + known but unprojected)."
+    },
+    "cacheHitRate24h": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "Trailing 24h cache hit ratio (0.0-1.0)."
+    },
+    "projectionLagMsAvg": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Average milliseconds between source observation and projection ack over last 24h."
+    }
+  }
+}

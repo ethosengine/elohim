@@ -600,6 +600,60 @@ impl BlobStore {
             chunked_blobs,
         })
     }
+
+    /// List all blob hashes currently stored in the local pantry.
+    ///
+    /// Returns the file names from the two-level `blobs/<4-char-prefix>/<hash>`
+    /// directory tree. Chunk index files (`.chunks` extension) and deleted
+    /// markers (`.d` extension) are excluded — only the primary blob files are
+    /// returned, matching the set that would be reported in an inventory snapshot.
+    ///
+    /// This is a synchronous walk; call from a blocking context or
+    /// `tokio::task::spawn_blocking` when latency matters.
+    pub fn list_hashes(&self) -> Result<Vec<String>, StorageError> {
+        let blobs_dir = self.root_dir.join("blobs");
+        let mut hashes = Vec::new();
+
+        let top = match std::fs::read_dir(&blobs_dir) {
+            Ok(d) => d,
+            Err(_) => return Ok(hashes), // directory absent → no blobs
+        };
+
+        for top_entry in top.flatten() {
+            if !top_entry.path().is_dir() {
+                continue;
+            }
+            let sub = match std::fs::read_dir(top_entry.path()) {
+                Ok(d) => d,
+                Err(_) => continue,
+            };
+            for entry in sub.flatten() {
+                let path = entry.path();
+                let name = path
+                    .file_name()
+                    .map(|f| f.to_string_lossy().to_string())
+                    .unwrap_or_default();
+                // Skip chunk index files and deleted markers
+                if name.contains(".chunks") || name.ends_with(".d") {
+                    continue;
+                }
+                // T19 Fix #3: skip zero-byte placeholder files. A failed
+                // partial write can leave a 0-byte file in the blob tree;
+                // including it in inventory would advertise we host bytes
+                // we cannot actually serve. Real chunked-blob markers
+                // contain b"CHUNKED" (7 bytes) and pass this guard.
+                let has_payload = path.metadata().map(|m| m.len() > 0).unwrap_or(false);
+                if !has_payload {
+                    continue;
+                }
+                if !name.is_empty() {
+                    hashes.push(name);
+                }
+            }
+        }
+
+        Ok(hashes)
+    }
 }
 
 /// Storage statistics
@@ -699,6 +753,45 @@ mod tests {
         let reconstructed_cid = BlobStore::hash_to_cid(&hash).unwrap();
 
         assert_eq!(original_cid.to_string(), reconstructed_cid.to_string());
+    }
+
+    /// T19 Fix #3 regression: zero-byte placeholder files in the blob tree
+    /// (a known partial-write failure mode) must NOT be reported as
+    /// "we have this hash" by `list_hashes`. Inventory broadcasts derive
+    /// from this list, and advertising a hash we cannot serve poisons
+    /// peer fetch attempts.
+    ///
+    /// We write a real blob (so the directory exists), then drop a zero-byte
+    /// file alongside it, and assert only the real one comes back.
+    #[tokio::test]
+    async fn list_hashes_skips_zero_byte_placeholders() {
+        let temp_dir = TempDir::new().unwrap();
+        let store = BlobStore::new(temp_dir.path()).await.unwrap();
+
+        let real = store.store(b"real bytes").await.unwrap();
+
+        // Drop a zero-byte file in the same prefix bucket as a real blob.
+        let hash_part = real.hash.strip_prefix("sha256-").unwrap();
+        let subdir = &hash_part[..4];
+        let bucket = temp_dir.path().join("blobs").join(subdir);
+        let placeholder_name = format!("sha256-{}", "0".repeat(64));
+        let placeholder_path = bucket.join(&placeholder_name);
+        std::fs::write(&placeholder_path, b"").unwrap();
+        assert_eq!(
+            std::fs::metadata(&placeholder_path).unwrap().len(),
+            0,
+            "test-setup invariant: placeholder must be zero bytes"
+        );
+
+        let listed = store.list_hashes().unwrap();
+        assert!(
+            listed.contains(&real.hash),
+            "real blob should be listed: got {listed:?}"
+        );
+        assert!(
+            !listed.contains(&placeholder_name),
+            "zero-byte placeholder must be skipped: got {listed:?}"
+        );
     }
 
     #[tokio::test]

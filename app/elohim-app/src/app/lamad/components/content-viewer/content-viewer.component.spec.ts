@@ -1080,4 +1080,57 @@ describe('ContentViewerComponent', () => {
       expect(panel).toBeFalsy();
     }));
   });
+
+  describe('Header — distribution + resilience side-by-side', () => {
+    it('renders <elohim-distribution-badge> when node.distribution is hydrated', fakeAsync(() => {
+      fixture.detectChanges();
+      tick();
+      fixture.detectChanges();
+
+      component.node = {
+        ...(component.node as ContentNode),
+        blobs: [
+          {
+            hash: 'sha256-content-viewer-test',
+            mimeType: 'application/json',
+            sizeBytes: 0,
+            fallbackUrls: [],
+          },
+        ],
+        distribution: {
+          replicaCount: 3,
+          replicaTarget: 4,
+          replicaHealth: 'at_risk',
+          projectorCount: 1,
+          reachClass: 'public',
+          diversityHint: { kind: 'region_metro', value: ['us-central'] },
+          thisFetchSource: 'projected_via_doorway',
+          lastVerifiedSeconds: 30,
+        },
+      };
+      component.isLoading = false;
+      fixture.detectChanges();
+
+      expect(
+        fixture.nativeElement.querySelector('[data-testid="viewer-distribution-info"]'),
+      ).toBeTruthy();
+    }));
+
+    it('hides the distribution badge when node.distribution is absent', fakeAsync(() => {
+      fixture.detectChanges();
+      tick();
+      fixture.detectChanges();
+
+      component.node = {
+        ...(component.node as ContentNode),
+        distribution: undefined,
+      };
+      component.isLoading = false;
+      fixture.detectChanges();
+
+      expect(
+        fixture.nativeElement.querySelector('[data-testid="viewer-distribution-info"]'),
+      ).toBeFalsy();
+    }));
+  });
 });

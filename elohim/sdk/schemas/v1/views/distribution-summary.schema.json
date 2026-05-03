@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "epr:schema:view:distribution-summary",
+  "title": "DistributionSummary",
+  "description": "Inline per-CID distribution payload, hydrated onto every EPR/content response. ~100 bytes/item; drives badge state and simple-tier tooltips. Source of truth: composed from rea_commitments + economic_events using the T03d action conventions (Operational, Category C). Reconstructed per request; not persisted as a new entity.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "replicaCount",
+    "replicaTarget",
+    "replicaHealth",
+    "projectorCount",
+    "reachClass",
+    "diversityHint",
+    "thisFetchSource",
+    "lastVerifiedSeconds"
+  ],
+  "properties": {
+    "replicaCount": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of replicas currently observed for this CID."
+    },
+    "replicaTarget": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Target replica count derived from the CID's reach + policy."
+    },
+    "replicaHealth": {
+      "enum": ["healthy", "at_risk", "critical"],
+      "description": "Health bucket: healthy = at/above target, at_risk = below target, critical = below floor."
+    },
+    "projectorCount": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of doorways currently projecting this CID."
+    },
+    "reachClass": {
+      "enum": [
+        "private",
+        "intimate",
+        "household",
+        "neighborhood",
+        "collective",
+        "community",
+        "district",
+        "public"
+      ],
+      "description": "Reach band the content is authored at — drives target replica count."
+    },
+    "diversityHint": {
+      "$ref": "diversity-hint.schema.json",
+      "description": "Peer-diversity hint for the replica set."
+    },
+    "thisFetchSource": {
+      "enum": ["projected_via_doorway", "peer_direct", "local_pantry"],
+      "description": "Where the bytes for this fetch came from."
+    },
+    "lastVerifiedSeconds": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Seconds since the last custodian probe verified the replica."
+    },
+    "myRole": {
+      "enum": ["sole_replica", "replica", "replica_and_projector", "not_hosting"],
+      "description": "Viewer's role for this CID, when known."
+    },
+    "reciprocityHint": {
+      "type": "integer",
+      "description": "Net diff: positive = viewer hosts more than is hosted for them."
+    }
+  }
+}

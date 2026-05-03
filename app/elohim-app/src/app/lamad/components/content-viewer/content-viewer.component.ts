@@ -55,6 +55,7 @@ import { ReactionBarComponent } from '@app/qahal/components/reaction-bar/reactio
 import { AttentionTrackerService } from '@app/shefa/services/attention-tracker.service';
 
 import {
+  DistributionBadgeComponent,
   ResilienceService as LibResilienceService,
   ResilienceSnapshotComponent,
 } from '@elohim/service/public-api';
@@ -103,6 +104,7 @@ import type { ContentStewardshipView } from '@elohim/storage-client/generated';
     ProtocolOmnibarComponent,
     EprRelationshipsPanelComponent,
     ResilienceSnapshotComponent,
+    DistributionBadgeComponent,
   ],
   templateUrl: './content-viewer.component.html',
   styleUrls: ['./content-viewer.component.css'],

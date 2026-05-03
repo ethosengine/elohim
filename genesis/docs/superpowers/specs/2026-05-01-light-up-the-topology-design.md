@@ -356,10 +356,26 @@ elohim-storage/tests/                          regression: filesystem-count pari
                                                  after kill-peer-bring-peer-back cycle
 ```
 
+#### REA Action Conventions for Blob Projection
+
+Blob distribution facts (replicas, projector acks, custody) are NOT stored in dedicated tables. They live in the existing REA tables (`rea_commitments`, `economic_events`) using these action conventions:
+
+| Action | Table | Resource column | Semantic |
+|---|---|---|---|
+| `project-blob` | `rea_commitments` | `resource_classified_as` = blob_hash | Doorway-steward commits to project a specific blob for a content steward. `provider`=doorway-steward-cid, `receiver`=content-steward-cid, `resource_quantity_value`=expected projection lifetime in seconds. |
+| `serve-blob` | `economic_events` | `resource_inventoried_as` = blob_hash | Doorway-steward fulfills a projection commitment by serving the blob. `provider`=doorway-steward-cid, `receiver`=peer-cid (the requester), `output_of`=action_hash of the matching `project-blob` commitment. |
+| `custody-blob` | `rea_commitments` | `resource_classified_as` = blob_hash | Peer steward commits to keep N bytes of a specific blob hosted. `provider`=peer-steward-cid, `receiver`=content-steward-cid, `resource_quantity_value`=committed bytes. |
+
+Column choice rationale: `economic_events` carries `resource_inventoried_as` for the inventoried instance the event acted on; `rea_commitments` carries `resource_classified_as` (it has no `resource_inventoried_as` column). Blob hashes are content-addressed identifiers that fit either column semantically — the convention uses whichever the table provides.
+
+This convention is the source of truth for `compose_distribution_summary` (T23), `compose_distribution_details` (T24), and `reciprocity_view::aggregate` (T27). No new tables; query the existing REA tables filtered by `action` and the appropriate resource column.
+
+The matching SQL indexes (T03d) are `idx_rea_commitments_action_resource` and `idx_economic_events_action_resource`.
+
 ### What's NOT touched
 
 - No DNA changes (no new entry types, no zome modifications)
-- No new SQLite migrations (live aggregation over existing tables)
+- No new SQLite tables (live aggregation over existing tables; T03d adds two indexes-only on existing REA tables for the action conventions above)
 - No doorway proxy logic changes for steward routes (registry handles them)
 - Sophia, holochain runtime, conductor: untouched
 
@@ -777,6 +793,119 @@ Harvested scenarios go in `genesis/a2o/features/topology/` paired with implement
 3. **rea_projection signal stream populated**: verify projector acks are landing.
 
 Pre-flight failures → fix or descope before scope-locking.
+
+#### Pre-flight verification — T00 results (static, 2026-05-01)
+
+**Status: DONE_WITH_CONCERNS — gaps logged for T01-T03 to resolve.**
+
+Static verification performed in Eclipse Che (no live Holochain stack available). Steps requiring `pnpm run hc:start:seed`, `curl /api/v1/agents`, or `sqlite3 ~/.elohim-storage/storage.db` are deferred to Jenkins or local-dev runtime verification.
+
+**What is in place (static evidence):**
+
+- DNA layer (imagodei DNA): coordinator `create_agent_peer_binding` and queries `get_agent_peer_bindings` / `get_bindings_for_peer` exist at `elohim/holochain/dna/imagodei/zomes/imagodei/src/agent_peer_binding.rs`. Integrity entry + validator at `elohim/holochain/dna/imagodei/zomes/imagodei_integrity/src/agent_peer_binding.rs`. Sweettest coverage at `elohim/holochain/tests/sweettest/src/tests/imagodei_peer_binding.rs`.
+- DnaSignal projection: `ImagodeiSignal::AgentPeerBindingCreated` is emitted on commit. `HolochainAppSignalStream` (Task A.11) translates this to a storage projection event.
+- Schemas (notarized): `elohim/sdk/schemas/v1/objects/agent-peer-binding.schema.json`, `elohim/sdk/schemas/v1/views/agent-peer-binding-view.schema.json`, `elohim/sdk/schemas/v1/dna-signals/agent-peer-binding.schema.json`, `elohim/sdk/schemas/v1/enums/device-archetype.schema.json`.
+- TS bindings generated: `elohim/sdk/storage-client-ts/src/generated/AgentPeerBindingView.ts`, `app/elohim-app/src/app/generated/agent-peer-binding-view.ts`.
+- Storage projection table: migration `elohim/elohim-storage/migrations/2026-04-24-235000_peer_identity_bindings/up.sql`. Diesel schema and CRUD at `elohim/elohim-storage/src/db/peer_identity_bindings.rs`.
+
+**Gap 1 (BLOCKING for runtime): no AgentPeerBinding seeder.** Verbatim grep of `genesis/seeder/src/` for `AgentPeerBinding | agent_peer_binding | create_agent_peer_binding | peer_identity_binding` returned zero matches. No seeder file exists. The two device-related files (`genesis/seeder/src/generate-devices-json.ts`, `genesis/seeder/src/validate-devices.ts`) operate on the device *catalog* (`genesis/data/devices/*.md` -> `devices.json`) — a content-side reference, not an AgentPeerBinding writer. `seed.ts` does not call any binding seeder. **`pnpm run hc:start:seed` will produce zero AgentPeerBindings today.** This must be addressed by T01-T03 before Phases 4 and 7+ can demonstrate multi-device behaviour.
+
+**Gap 2 (schema drift): projection table missing columns the wire view exposes.** The `peer_identity_bindings` projection table columns are: `peer_id, agent_cid, dht_anchor_hash, valid_from, valid_until, observed_at, source` (PRIMARY KEY `(peer_id, dht_anchor_hash)`). The DHT entry and `AgentPeerBindingView` (wire) carry two additional fields the projection drops: `device_archetype` and `superseded_by`. Step 3 of the kickoff prompt assumed these columns exist (`SELECT agent_cid, peer_id, device_archetype FROM peer_identity_bindings WHERE superseded_by IS NULL ...`). Today that SQL would fail with `no such column`. The DNA-side data is fine; the projection just drops it. T01-T03 should add an ALTER TABLE migration so subsequent phases can filter on archetype and current-binding-only.
+
+**Runtime verification still required (defer to Jenkins / local-dev):**
+
+- Step 2: `pnpm run hc:start:seed` followed by `curl http://localhost:8090/api/v1/agents | jq '.[] | select(.bindings != null) | {id, bindings: .bindings | length}'` — expect at least one agent with 2+ bindings (multi-device demo). Cannot run from Eclipse Che.
+- Step 3: `sqlite3 ~/.elohim-storage/storage.db "SELECT agent_cid, peer_id, device_archetype FROM peer_identity_bindings WHERE superseded_by IS NULL LIMIT 10;"` — blocked on Gap 2 (column not present); blocked on Gap 1 (no rows would exist anyway). Re-run after T01-T03 land.
+- Pre-flight item 2 (auth `agent_cid` propagation): not in T00 scope, separate task.
+- Pre-flight item 3 (`rea_projection` stream populated): not in T00 scope, separate task.
+
+#### Pre-flight verification — T01 results (static, 2026-05-01)
+
+**Status: DONE — outcome = "not wired" through the proxy. Adds a T28 prerequisite for T22 (`bindings_resolver`).**
+
+Static verification only (Eclipse Che, no live stack). Step 2 (live `curl /api/v1/health` round-trip) defers to Jenkins / local-dev. Step 1 (grep) plus targeted reads of the JWT, storage_proxy, and account-handler files are sufficient for the design decision.
+
+**Step 1 grep result.** `grep -rn "x-agent-cid\|X-Agent-Cid\|agent_cid"` against `doorway/doorway-service/src/` returned **zero matches**. The same grep against `elohim/elohim-storage/src/` returned 41 matches — all referring to `agent_cid` as a *DHT content-address field* on entries (`AgentPeerBinding.agent_cid`, `EprHead.agent_cid`, `SignalEmitIntent.agent_cid`, etc.), never as an HTTP header. **No code anywhere reads, writes, or forwards an `X-Agent-Cid` header.**
+
+**What the JWT carries.** `doorway/doorway-service/src/auth/jwt.rs:22-58` defines `Claims` with `human_id`, `agent_pub_key` (Holochain pubkey hex string, line 25), `identifier`, `permission_level`, `session_id`, `doorway_id/url`, `conductor_id`, `installed_app_id`, `is_steward`, `has_local_conductor`. **There is no `agent_cid` claim.** The closest identifier is `agent_pub_key` — the Holochain agent pubkey, which is *not* the same as the imagodei DHT `agent_cid` that `AgentPeerBindingView` records.
+
+**What the proxy forwards.** `doorway/doorway-service/src/routes/storage_proxy.rs::forward_to_storage` (lines 64-179) — the canonical handler for every registry-routed request — explicitly forwards exactly three headers: `Content-Type` (line 102-106), `Authorization` (line 108-112), and `X-Observation-Id` (line 115-119). It does NOT decode the JWT, does NOT extract any claim, and does NOT inject any `X-Agent-*` header. The same is true of `forward_blob_to_storage` (lines 203-341) which forwards only the `Authorization` header (line 262-270). **Storage receives the bearer token but no extracted identity.**
+
+**What storage expects.** `elohim/elohim-storage/src/api/account.rs:945-971` — `extract_agent_key()` — reads `X-Agent-Id` from the request, falling back to the active local session's `agent_pub_key` for Tauri-direct mode. The doc comment at line 948 even says *"doorway JWT middleware injects this after validation"* — but **doorway does not.** Storage's CORS allow-headers list (`elohim/elohim-storage/src/http.rs:998`) includes `X-Agent-Id`, but no doorway middleware writes it.
+
+**The one place the header *is* set.** Two bespoke handlers in `doorway/doorway-service/src/routes/auth_routes.rs` — `handle_portal_host` at line 3561 and `probe_first_portal_host` at line 3623 — each manually set `X-Agent-Id: claims.agent_pub_key` for their hand-rolled `reqwest` calls to `/api/v1/account/portal-hosts`. **This is per-handler boilerplate, not middleware.** Routes that flow through the registry-routed proxy path (the path Phase 5 view-federation handlers will use) get nothing.
+
+**Outcome: not wired.** The agent identity required by Phase 4's `bindings_resolver` (T22) is not propagated by the proxy. Two distinct gaps:
+
+1. **Header name + identifier-kind mismatch.** Even if the proxy did forward, the available identifier is `agent_pub_key` (Holochain pubkey), and storage's `extract_agent_key` reads `X-Agent-Id`. The imagodei DHT key on `AgentPeerBinding.agent_cid` is a *different identifier* (a CID derived from the imagodei human entry, not the agent pubkey). T22 must clarify which it needs and either (a) wire `X-Agent-Id` and use `agent_pub_key → AgentPeerBinding` lookup, or (b) extend `Claims` and the JWT mint path with a real `agent_cid` claim and add `X-Agent-Cid` middleware.
+2. **Proxy never injects the header.** Whatever choice (a) or (b) above lands on, `storage_proxy::forward_to_storage` and `forward_blob_to_storage` need a JWT-decode + header-inject step. The cleanest spot is a single helper applied uniformly so we don't repeat the `auth_routes.rs:3561/3623` per-handler pattern across every view-federation route.
+
+**Adds a new prerequisite to T22.** Phase 4 task T22 (`bindings_resolver`) cannot resolve "the calling agent's bindings" until this is wired. **Suggested rewording for T28's task list (Phase 4):**
+
+> T28a (NEW, prerequisite for T22): wire JWT-derived agent identity through `storage_proxy::forward_to_storage` and `forward_blob_to_storage`. Decode the bearer JWT once, inject `X-Agent-Id: claims.agent_pub_key` (or `X-Agent-Cid` if a CID claim is added) on every forwarded request, mirror the existing `auth_routes.rs:3561/3623` pattern but in the shared forwarder. Update `extract_agent_key` doc comment in `elohim/elohim-storage/src/api/account.rs:948` to reflect the actual injection point. Decide explicitly whether T22 needs `agent_pub_key` (matches existing JWT) or `agent_cid` (requires Claims extension + JWT mint path change in `auth_routes.rs` token-issue handlers).
+
+Until T28a lands, T22 should accept the calling agent identifier as an explicit handler argument (not from the request) so unit tests are unblocked, and the integration-test pass (Phase 10, T54+) is what validates header propagation against a live doorway.
+
+#### Pre-flight verification — T02 results (static, 2026-05-01)
+
+**Status: DONE_WITH_CONCERNS — outcome = "no table, no writer, no helper data". This is the largest pre-flight gap so far. Phase 4's T23 (`compose_distribution_summary`) cannot be implemented as written; it requires either a new table + writer pair (substrate work) or a fundamental rework of how projector ack state is sourced.**
+
+Static verification only (Eclipse Che, no live SQLite). The kickoff prompt's `sqlite3 ... SELECT COUNT(*) FROM rea_projection ...` cannot run against a live DB; static schema review against `migrations/` and a writer search across `src/` are sufficient to determine the design state.
+
+**Step 1 — schema review.** `grep -rni "create table"` across `elohim/elohim-storage/migrations/` enumerates every table that exists on a fresh storage.db. **There is no `rea_projection` table.** The closest neighbours are:
+
+- `projector_cursor` (migration `2026-04-25-010000_projector_cursor`, columns `pillar`, `kind`, `last_epr_cid`, `last_issued_at`, `updated_at`, PK `(pillar, kind)`) — a Category-C operational watermark table; tracks "how far has the projector advanced" per (pillar, kind), not per content unit.
+- `epr_atoms` (migration `2026-04-22-050000_add_epr_tables`) — the canonical projection of EPR atoms (CID-keyed); sibling tables `epr_coupling`, `epr_claims`, `epr_supersedence`. None carry projector ack state.
+- `agreements`, `rea_commitments`, `economic_events` (migration `2026-01-08-000000_initial`) — the three REA tables that `src/rea_projection.rs` *does* write to.
+
+Verbatim grep across `elohim/`: `projector_acks`, `ack_count`, `replica_peers`, `replica_count`, `projector_peer_id` are **not present in any migration, schema file, Rust struct, or test fixture in the entire repo** (the one match for `replica_count` is `total_replica_count` on a derived view struct in `views.rs:3172`, unrelated to a column).
+
+**Step 2 — writer search.** `src/rea_projection.rs` is **the signal-handler module**, not a backing store for a `rea_projection` table. The module name is misleading-by-coincidence with the kickoff prompt's expected table name. What it actually does (lines 124-206): receives `ReaProjectionSignal::{AgreementCommitted | ReaCommitmentCommitted | ReaEconomicEventCommitted}` from the conductor's post-commit hook and upserts into the corresponding REA table (`agreements`, `rea_commitments`, `economic_events`) with `dht_anchor_hash` set. **It does not emit a per-blob projector-ack record anywhere.** It also has a TODO at line 19-24 noting that it isn't even wired into the conductor's signal-receive loop yet — meaning even those three REA tables likely don't see projection writes outside dedicated tests.
+
+There is no other module in `src/` that writes to a `rea_projection` table. The grep `rea_projection` returns exactly one hit across all of `elohim/elohim-storage/`: the `pub mod rea_projection;` declaration in `src/lib.rs:62`.
+
+**Step 3 — what T23 assumes.** Plan T23 (`distribution_view::compose_summary`, lines 2935-3160) implements `load_projector_acks` as:
+
+```rust
+use crate::db::diesel_schema::rea_projection::dsl as r;
+Ok(r::rea_projection
+    .filter(r::cid.eq(blob_hash))
+    .filter(r::ack_count.gt(0))
+    .select(r::projector_peer_id)
+    .load::<String>(conn)?)
+```
+
+That is, the plan expects a `rea_projection` table with at minimum these columns:
+
+| Plan T23 expects | Actual |
+|---|---|
+| `cid: TEXT` (blob hash, content CID) | absent |
+| `ack_count: INTEGER` | absent |
+| `projector_peer_id: TEXT` | absent |
+
+Plan T23 also assumes two further tables that this static pass surfaced as similarly absent — flagged here for the controller, even though they are out of T02's stated scope:
+
+- `custodian_blob_commitments` (`load_replica_peer_ids`, `compute_reciprocity_hint`): expected columns `blob_hash`, `status` (`'healthy'|'probing'|...`), `custodian_id`, `committed_bytes`, `beneficiary_peer`. **Not in any migration.** `grep -rn "custodian_blob_commitments"` in `migrations/` returns zero.
+- `content_store` (`load_reach_class`): expected columns `blob_hash`, `reach_class`. **Not in any migration.** `grep -rn "content_store"` in `migrations/` returns zero.
+
+Together these are three load-bearing tables that T23 reads from and that do not exist. T02's specific charter is `rea_projection` only, but the controller should know the gap is wider before scoping a remediation task.
+
+**Outcome: no writer (and no table).** This is the third pre-flight outcome class beyond Gap-1 (no seeder) and Gap-2 (schema drift): "no projection at all". The plan's kickoff text anticipated this exact path — *"If 0 → projector signals aren't landing; T20 (`compose_distribution_summary`) should default `projectorCount = 0` and the demo will render 'peer-only' badges."* The substrate state is one step further than that: not zero rows, but zero tables.
+
+**What T23 needs that isn't there.** Two distinct things, in priority order:
+
+1. **A table to hold per-blob projector acks.** A Category-C operational table keyed by `(blob_hash, projector_peer_id)` with at least an `ack_count` (or `acked_at` timestamp + a count derived by query). Schema-first: the column names in the kickoff prompt (`projector_acks`, `ack_count`) and the plan T23 query (`cid`, `ack_count`, `projector_peer_id`) **diverge** — the migration that adds this table needs to pick one and update T23 if it isn't `(cid, ack_count, projector_peer_id)`. The kickoff prompt's `projector_acks IS NOT NULL` phrasing implies a JSON-list column, while T23's `r::projector_peer_id` and `r::ack_count` imply normalized FK rows. The latter is the one the implementation actually consumes; recommend the migration follow it.
+2. **A writer that populates it.** The current `rea_projection.rs` handler only writes the three REA tables, all of which are CID/id-keyed REA entities, not blob-hash-keyed projection acks. A new pathway is needed: either an additional signal variant `BlobProjectionAcked { blob_hash, projector_peer_id }` from a coordinator that watches for "this peer has projected the EPR for this blob", or — simpler — a doorway-side writer that marks an ack when the doorway successfully projects/serves a blob through its registry-routed path.
+
+**Suggested remediation pattern for the plan (parallel to T03a/b for AgentPeerBinding):**
+
+> T03c (NEW): migration adding `rea_projection` table with columns matching T23's query (`cid TEXT`, `projector_peer_id TEXT`, `ack_count INTEGER`, `last_acked_at TEXT`, PK `(cid, projector_peer_id)`); add Diesel schema entry; wire the writer either (a) into `rea_projection.rs` as a fourth signal variant once the underlying coordinator exists, or (b) as a doorway-side write at successful blob fetch time. Decision point: where the ack semantically originates (DHT-notarized vs. operational best-effort).
+>
+> Pending T03c, T23's Phase-4 implementation should **degrade gracefully**: if the table is absent (no migration applied, table-not-found error), `projector_count` defaults to 0 and `MyRole` cannot include the `Projector` axis (only `Replica | NotHosting | SoleReplica`). The simple-tier render then shows the "peer-only" badge described in the kickoff prompt's expected-zero-rows path. This matches the plan's stated graceful-degradation contract and unblocks the rest of Phase 4 from a substrate dep.
+
+**Adds a sub-task to T34 (operator dashboard).** Per kickoff prompt step 2: when the table eventually does exist, the operator topology view should expose `rea_projection` row counts (per-cid and per-projector_peer_id histograms) as a debug pane so live "are projector signals landing?" can be answered without sqlite shell access. This is a Phase 5 dashboard add, not Phase 0 work; logged here for inclusion when T34 is detailed.
+
+**Runtime verification still required (defer to Jenkins / local-dev once T03c lands):** `sqlite3 ~/.elohim-storage/storage.db "SELECT COUNT(*) FROM rea_projection WHERE ack_count > 0;"` — must run against a seeded + signal-wired stack. Until T03c, the query fails with `no such table: rea_projection`. After T03c with no writer wired: returns 0, and T23 graceful-degradation kicks in. After T03c with writer wired: positive count is the green light to drop the graceful-degradation branch.
 
 ### CI quality gates (per CLAUDE.md)
 

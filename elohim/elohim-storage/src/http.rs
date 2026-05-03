@@ -183,6 +183,14 @@ pub struct HttpServer {
     /// project_signal + back_prop_one_hop + flood_feedback end-to-end.
     /// When absent (no P2P swarm, test fixtures), fan-out steps are skipped gracefully.
     fan_out_ctx: Option<Arc<crate::api::epr::EprFanOutCtx>>,
+    /// T17: CID of this peer's steward. Populated from `Config::self_cid` at startup.
+    /// Used as the `receiver` field in `serve-blob` REA events emitted on a
+    /// successful GET-time race-fetch.  Empty string when not configured.
+    self_cid: String,
+    /// T17: per-peer timeout for race-fetch (seconds). From `Config::fetch_blob_timeout_seconds`.
+    fetch_blob_timeout_seconds: u64,
+    /// T17: max parallel peer attempts per race-fetch batch. From `Config::fetch_blob_parallelism`.
+    fetch_blob_parallelism: usize,
 }
 
 /// Extract X-Schema-Version header from request and validate it.
@@ -217,6 +225,26 @@ fn is_content_address(identifier: &str) -> bool {
     identifier.starts_with("sha256-") && identifier.len() > 10
 }
 
+/// Fetch the `blob_hash` for a content row by its stable id (slug), respecting
+/// the same provenance gate (`require_provenance = true`) that
+/// `derive_epr_head` uses for HTTP callers.
+///
+/// Returns `None` when the row is missing, fails the provenance gate, or has
+/// no `blob_hash` populated yet (pre-distribution content). Used by the EPR
+/// head handler to hydrate `DistributionSummary` (Phase 5 T34) — distribution
+/// is best-effort, so any miss collapses to `None` rather than surfacing an
+/// error onto the head response.
+fn view_blob_hash_for_id(
+    conn: &mut diesel::SqliteConnection,
+    app_ctx: &db::AppContext,
+    id: &str,
+) -> Option<String> {
+    db::content_diesel::get_content_with_tags(conn, app_ctx, id, true)
+        .ok()
+        .flatten()
+        .and_then(|cwt| cwt.content.blob_hash)
+}
+
 impl HttpServer {
     /// Create a new HTTP server
     pub fn new(blob_store: Arc<BlobStore>, bind_addr: SocketAddr) -> Self {
@@ -243,6 +271,9 @@ impl HttpServer {
             write_through_state: None,
             hc_registry: None,
             fan_out_ctx: None,
+            self_cid: String::new(),
+            fetch_blob_timeout_seconds: 5,
+            fetch_blob_parallelism: 3,
         }
     }
 
@@ -380,6 +411,16 @@ impl HttpServer {
     #[cfg(feature = "p2p")]
     pub fn with_p2p_handle(mut self, handle: crate::p2p::P2PHandle) -> Self {
         self.p2p_handle = Some(handle);
+        self
+    }
+
+    /// Wire T17 race-fetch parameters from the runtime Config.
+    /// Call this at startup when a `Config` is available so the GET-time
+    /// blob fallback knows its timeout, parallelism, and self-CID.
+    pub fn with_fetch_config(mut self, config: &crate::config::Config) -> Self {
+        self.self_cid = config.self_cid.clone().unwrap_or_default();
+        self.fetch_blob_timeout_seconds = config.fetch_blob_timeout_seconds;
+        self.fetch_blob_parallelism = config.fetch_blob_parallelism;
         self
     }
 
@@ -732,6 +773,13 @@ impl HttpServer {
                 }
             }
 
+            // Filesystem parity sweep — T18 diagnostic endpoint.
+            // Reports the diff between local pantry and last gossiped inventory.
+            // Matched before the /api/v1/ catch-all.
+            (Method::GET, "/api/v1/diagnostics/inventory-parity") => {
+                self.handle_inventory_parity().await
+            }
+
             // Signal-emit endpoint — composes EPR Envelope, signs via conductor,
             // ingests. Matched before the /api/v1/ catch-all so the manifest
             // registry + signing client are injected directly from HttpServer
@@ -788,6 +836,9 @@ impl HttpServer {
                     let local_peer_id = self.p2p_handle.as_ref().map(|h| h.local_peer_id());
                     #[cfg(not(feature = "p2p"))]
                     let local_peer_id: Option<String> = None;
+                    // Phase 5: thread p2p_handle so cluster/peer-topology handlers
+                    // can construct a Federator for view-federation fan-out.
+                    let p2p_handle = self.p2p_handle.clone();
                     crate::api::handle_api_request(
                         req,
                         method,
@@ -798,6 +849,7 @@ impl HttpServer {
                         swarm_tx,
                         local_peer_id,
                         self.fan_out_ctx.clone(),
+                        p2p_handle,
                     )
                     .await
                 } else {
@@ -995,7 +1047,7 @@ impl HttpServer {
                 headers.insert(
                     "Access-Control-Allow-Headers",
                     hyper::header::HeaderValue::from_static(
-                        "Content-Type, Authorization, X-Agent-Id, X-Schema-Version, X-Observation-Id",
+                        "Content-Type, Authorization, X-Agent-Id, X-Agent-Cid, X-Schema-Version, X-Observation-Id",
                     ),
                 );
                 Ok(response.map(Either::Left))
@@ -1412,7 +1464,7 @@ impl HttpServer {
             )
             .header(
                 "Access-Control-Allow-Headers",
-                "Content-Type, Authorization, X-Agent-Id, X-Schema-Version",
+                "Content-Type, Authorization, X-Agent-Id, X-Agent-Cid, X-Schema-Version",
             )
             .header("Access-Control-Max-Age", "86400")
             .body(Full::new(Bytes::new()))
@@ -1521,6 +1573,153 @@ impl HttpServer {
                             .unwrap());
                     }
                     Err(_) => {
+                        // Local miss — attempt peer fallback before returning 404.
+                        // T17: race-fetch helper. Requires P2P feature + db pool.
+                        #[cfg(feature = "p2p")]
+                        if let (Some(ref handle), Some(ref pool)) =
+                            (&self.p2p_handle, &self.db_pool)
+                        {
+                            let fresh_after = (chrono::Utc::now()
+                                - chrono::Duration::seconds(
+                                    // default to 600s if not set
+                                    600,
+                                ))
+                            .format("%Y-%m-%dT%H:%M:%SZ")
+                            .to_string();
+                            let candidates = pool
+                                .get()
+                                .ok()
+                                .and_then(|mut conn| {
+                                    crate::db::peer_blob_inventory::lookup_hosts(
+                                        &mut conn,
+                                        hash,
+                                        &fresh_after,
+                                    )
+                                    .ok()
+                                })
+                                .map(|rows| rows.into_iter().map(|r| r.peer_id).collect::<Vec<_>>())
+                                .unwrap_or_default();
+
+                            if !candidates.is_empty() {
+                                let cmd_tx = handle.command_sender();
+                                let parallelism = self.fetch_blob_parallelism;
+                                let per_peer_timeout =
+                                    std::time::Duration::from_secs(self.fetch_blob_timeout_seconds);
+                                // Snapshot the connected-peer set via ListPeers command;
+                                // use a sync closure for race_fetch that checks membership.
+                                let connected_set: std::collections::HashSet<String> = handle
+                                    .list_peers()
+                                    .await
+                                    .into_iter()
+                                    .map(|p| p.peer_id)
+                                    .collect();
+                                let is_connected = move |peer: &str| connected_set.contains(peer);
+                                let outcome = crate::p2p::blob_fetch::race_fetch(
+                                    hash,
+                                    candidates,
+                                    &cmd_tx,
+                                    is_connected,
+                                    parallelism,
+                                    per_peer_timeout,
+                                )
+                                .await;
+
+                                match outcome {
+                                    crate::p2p::blob_fetch::FetchOutcome::Hit {
+                                        bytes,
+                                        source_peer,
+                                    } => {
+                                        // T20: persist + SQL collapse into a single async
+                                        // `finalize_fetch_success` call.
+                                        //
+                                        // Ordering inside finalize: filesystem persist FIRST,
+                                        // then `record_fetch_success`, then `serve-blob` REA
+                                        // event (the latter two atomic via a single
+                                        // `conn.transaction`). The 503 below covers all three
+                                        // failure legs: pool exhaustion (cannot acquire conn),
+                                        // filesystem write failure (no SQL written), or SQL
+                                        // failure inside the wrapping transaction (rolled back
+                                        // by Diesel; orphan blob on disk reconciled by the T18
+                                        // parity sweep). Either way the blob is not yet
+                                        // durably accounted for through this gateway, and 503
+                                        // (not 404) preserves retry semantics on the
+                                        // downstream cache.
+                                        let bytes_len = bytes.len();
+                                        let blob_store = self.blob_store.clone();
+
+                                        let mut conn = match pool.get() {
+                                            Ok(c) => c,
+                                            Err(e) => {
+                                                error!(
+                                                    hash = %hash,
+                                                    error = %e,
+                                                    "T20: pool exhausted, cannot finalize fetch"
+                                                );
+                                                return Ok(Self::with_cors_headers(
+                                                    Response::builder(),
+                                                )
+                                                .status(StatusCode::SERVICE_UNAVAILABLE)
+                                                .body(Full::new(Bytes::from(
+                                                    "Storage unavailable; retry",
+                                                )))
+                                                .unwrap());
+                                            }
+                                        };
+                                        if let Err(e) =
+                                            crate::p2p::blob_fetch::finalize_fetch_success(
+                                                &mut conn,
+                                                hash,
+                                                &source_peer,
+                                                &bytes,
+                                                &self.self_cid,
+                                                &blob_store,
+                                            )
+                                            .await
+                                        {
+                                            error!(
+                                                hash = %hash,
+                                                source_peer = %source_peer,
+                                                error = %e,
+                                                "T20: finalize_fetch_success failed; returning 503"
+                                            );
+                                            return Ok(Self::with_cors_headers(
+                                                Response::builder(),
+                                            )
+                                            .status(StatusCode::SERVICE_UNAVAILABLE)
+                                            .body(Full::new(Bytes::from(
+                                                "Blob fetched from peer but local persist failed; retry",
+                                            )))
+                                            .unwrap());
+                                        }
+
+                                        info!(
+                                            hash = %hash,
+                                            source_peer = %source_peer,
+                                            size = bytes_len,
+                                            "T20: race-fetch hit — blob persisted and recorded"
+                                        );
+                                        return Ok(Self::with_cors_headers(Response::builder())
+                                            .status(StatusCode::OK)
+                                            .header(
+                                                header::CONTENT_TYPE,
+                                                "application/octet-stream",
+                                            )
+                                            .header(header::CONTENT_LENGTH, bytes_len)
+                                            .header(
+                                                header::CACHE_CONTROL,
+                                                "public, max-age=31536000, immutable",
+                                            )
+                                            .body(Full::new(Bytes::from(bytes)))
+                                            .unwrap());
+                                    }
+                                    crate::p2p::blob_fetch::FetchOutcome::Miss
+                                    | crate::p2p::blob_fetch::FetchOutcome::NoCandidates => {
+                                        debug!(hash = %hash, "T17: race-fetch miss — returning 404");
+                                    }
+                                }
+                            }
+                        }
+
                         return Ok(Self::with_cors_headers(Response::builder())
                             .status(StatusCode::NOT_FOUND)
                             .body(Full::new(Bytes::from("Blob not found")))
@@ -1663,6 +1862,51 @@ impl HttpServer {
                 .body(Full::new(Bytes::from("[]")))
                 .unwrap())
         }
+    }
+
+    /// GET /api/v1/diagnostics/inventory-parity
+    ///
+    /// Returns a `ParityReport` comparing the local filesystem blob inventory
+    /// against the last gossiped inventory snapshot.  This defends against the
+    /// failure mode where gossip runs cleanly but bytes never replicate.
+    ///
+    /// Stage 1: `gossiped_count` will always be 0 (no broadcaster timer yet).
+    /// Stage 2: broadcaster timer populates `P2PHandle::set_last_gossiped_inventory`.
+    async fn handle_inventory_parity(&self) -> Result<Response<Full<Bytes>>, StorageError> {
+        use crate::p2p::inventory_broadcaster::{compute_parity, ParityReport};
+
+        // StoreAdapter satisfies LocalInventory by delegating to BlobStore::list_hashes.
+        struct StoreAdapter<'a>(&'a crate::blob_store::BlobStore);
+        impl crate::p2p::inventory_broadcaster::LocalInventory for StoreAdapter<'_> {
+            fn current_hashes(&self) -> Vec<String> {
+                self.0.list_hashes().unwrap_or_default()
+            }
+        }
+
+        let adapter = StoreAdapter(&self.blob_store);
+
+        #[cfg(feature = "p2p")]
+        let gossiped: Vec<String> = self
+            .p2p_handle
+            .as_ref()
+            .and_then(|h| h.last_gossiped_inventory())
+            .unwrap_or_default();
+
+        #[cfg(not(feature = "p2p"))]
+        let gossiped: Vec<String> = vec![];
+
+        let now_iso = chrono::Utc::now().to_rfc3339();
+        let report: ParityReport = compute_parity(&adapter, &gossiped, &now_iso);
+
+        let json = serde_json::to_string(&report).map_err(|e| {
+            StorageError::Internal(format!("Failed to serialize parity report: {}", e))
+        })?;
+
+        Ok(Response::builder()
+            .status(StatusCode::OK)
+            .header(header::CONTENT_TYPE, "application/json")
+            .body(Full::new(Bytes::from(json)))
+            .unwrap())
     }
 
     /// Handle sync API requests
@@ -5825,6 +6069,48 @@ impl HttpServer {
                     view.cid = Some(cid.to_string());
                 }
 
+                // Phase 5 T34: best-effort distribution-summary hydration.
+                // Distribution is purely operational (Category C) — it must
+                // never contaminate the canonical CBOR-encoded EprHead, so it
+                // lives on the JSON view only. Visitor vs Steward branching
+                // mirrors api/blob.rs::handle_distribution_details: if the
+                // caller resolves to an agent_cid AND has active peer
+                // bindings, hydrate as Steward; otherwise as Visitor.
+                if let (Some(pool), Some(blob_hash)) = (
+                    self.db_pool.as_ref(),
+                    view_blob_hash_for_id(&mut conn, &app_ctx, id),
+                ) {
+                    let agent_cid_opt = crate::api::account::extract_agent_cid(&req, &mut conn)
+                        .ok()
+                        .flatten();
+                    let bindings = if let Some(ref cid) = agent_cid_opt {
+                        let now_iso = chrono::Utc::now().to_rfc3339();
+                        crate::db::peer_identity_bindings::list_active_for_agent(
+                            &mut conn, cid, &now_iso,
+                        )
+                        .unwrap_or_default()
+                    } else {
+                        Vec::new()
+                    };
+                    let dist_ctx = match (&agent_cid_opt, bindings.is_empty()) {
+                        (Some(cid), false) => {
+                            crate::services::distribution_view::DistributionContext::Steward {
+                                agent_cid: cid.as_str(),
+                                bindings: &bindings,
+                            }
+                        }
+                        _ => crate::services::distribution_view::DistributionContext::Visitor,
+                    };
+                    if let Ok(summary) =
+                        crate::services::distribution_view::compose_distribution_summary(
+                            pool, &blob_hash, dist_ctx,
+                        )
+                        .await
+                    {
+                        view.distribution = Some(summary);
+                    }
+                }
+
                 return Ok(Response::builder()
                     .status(StatusCode::OK)
                     .header(header::CONTENT_TYPE, "application/json")
@@ -9004,6 +9290,53 @@ pub fn build_manifest() -> doorway_client::DoorwayRoutes {
                 .auth_required()
                 .build(),
         )
+        // =====================================================================
+        // /api/v1/blob — Blob-scoped views (Phase 5 T29)
+        // =====================================================================
+        .route(
+            // Visitor-permitted distribution surface; the storage handler branches
+            // Visitor vs Steward via the agent_cid cascade in account::extract_agent_cid.
+            // No auth_required() so the public surface (replicas, health, reach,
+            // freshness) remains addressable without a session.
+            Route::get("/api/v1/blob/{hash}/distribution/details")
+                .handler("get_blob_distribution_details")
+                .cache_ttl(5)
+                .rate_limit(60)
+                .build(),
+        )
+        // =====================================================================
+        // /api/v1/cluster — Federated agent-scoped cluster view (Phase 5 T30)
+        // =====================================================================
+        .route(
+            Route::get("/api/v1/cluster")
+                .handler("get_cluster")
+                .auth_required()
+                .cache_ttl(2)
+                .rate_limit(30)
+                .build(),
+        )
+        // =====================================================================
+        // /api/v1/peer-topology — Peer-household topology view (Phase 5 T31)
+        // =====================================================================
+        .route(
+            Route::get("/api/v1/peer-topology")
+                .handler("get_peer_topology")
+                .auth_required()
+                .cache_ttl(2)
+                .rate_limit(30)
+                .build(),
+        )
+        // =====================================================================
+        // /api/v1/reciprocity — Local REA reciprocity ledger (Phase 5 T32)
+        // =====================================================================
+        .route(
+            Route::get("/api/v1/reciprocity")
+                .handler("get_reciprocity")
+                .auth_required()
+                .cache_ttl(10)
+                .rate_limit(20)
+                .build(),
+        )
         // Blob proxy: doorway caches blobs from /blob/{hash}
         .with_blobs_at("/blob")
         .build()
@@ -9074,6 +9407,23 @@ mod tests {
         assert!(
             paths.contains(&"/db/challenge-outcomes/{cid}"),
             "missing /db/challenge-outcomes/{{cid}}"
+        );
+        // Phase 5 topology routes — Light-Up-The-Topology sprint
+        assert!(
+            paths.contains(&"/api/v1/blob/{hash}/distribution/details"),
+            "missing /api/v1/blob/{{hash}}/distribution/details (T29)"
+        );
+        assert!(
+            paths.contains(&"/api/v1/cluster"),
+            "missing /api/v1/cluster (T30)"
+        );
+        assert!(
+            paths.contains(&"/api/v1/peer-topology"),
+            "missing /api/v1/peer-topology (T31)"
+        );
+        assert!(
+            paths.contains(&"/api/v1/reciprocity"),
+            "missing /api/v1/reciprocity (T32)"
         );
         // Ensure infrastructure routes are NOT in the manifest
         assert!(

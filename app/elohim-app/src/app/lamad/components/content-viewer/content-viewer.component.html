@@ -74,6 +74,13 @@
             density="icon"
             data-testid="viewer-resilience-info"
           ></elohim-resilience-snapshot>
+          @if (node.distribution) {
+            <elohim-distribution-badge
+              [summary]="node.distribution"
+              [blobHash]="node.blobs?.[0]?.hash"
+              data-testid="viewer-distribution-info"
+            ></elohim-distribution-badge>
+          }
         </h1>
         <p class="content-description">{{ node.description }}</p>
 

@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "epr:schema:view:peer-topology-view",
+  "title": "PeerTopologyView",
+  "description": "Per-agent peer topology — household-to-household reciprocation edges + resilience cliffs. Source of truth: peer_identity_bindings (Category A) + libp2p swarm state, federated across household peers via the T26 aggregator (Operational, Category C). Reconstructed per request; not persisted.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "agentCid",
+    "edges",
+    "reciprocationCount",
+    "resilienceCliffs",
+    "freshness"
+  ],
+  "properties": {
+    "agentCid": {
+      "type": "string",
+      "description": "Agent CID this topology view is scoped to."
+    },
+    "edges": {
+      "type": "array",
+      "items": { "$ref": "peer-household-edge.schema.json" },
+      "description": "Per-household reciprocation edges from the viewer's perspective."
+    },
+    "reciprocationCount": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Count of households the viewer reciprocates with (top-card metric per the household-is-resilience-unit principle)."
+    },
+    "resilienceCliffs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["householdId", "soleReplicaCidCount"],
+        "properties": {
+          "householdId": { "type": "string" },
+          "soleReplicaCidCount": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Count of CIDs that would lose sole-replica protection if this household goes dark."
+          }
+        }
+      },
+      "description": "Households whose disappearance would create sole-replica risk for the viewer."
+    },
+    "freshness": {
+      "$ref": "freshness.schema.json",
+      "description": "Topology freshness — composed from edge liveness."
+    }
+  }
+}
