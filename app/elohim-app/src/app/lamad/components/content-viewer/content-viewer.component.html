@@ -74,7 +74,7 @@
             density="icon"
             data-testid="viewer-resilience-info"
           ></elohim-resilience-snapshot>
-          @if (node && node.distribution) {
+          @if (node.distribution) {
             <elohim-distribution-badge
               [summary]="node.distribution"
               [blobHash]="node.blobs?.[0]?.hash"
