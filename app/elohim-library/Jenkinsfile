@@ -1,0 +1,298 @@
+/**
+ * Elohim Storybook Pipeline (elohim-storybook)
+ *
+ * Builds the @app/elohim-library Storybook 10 static bundle and deploys it
+ * to https://storybook.elohim.host (alpha env, latest from dev branch).
+ *
+ * Triggered by orchestrator when files in app/elohim-library/ change.
+ *
+ * Build flow:
+ *   pnpm install (workspace) → pnpm build-storybook → buildkit image →
+ *   nerdctl push to Harbor → kubectl apply to elohim-alpha →
+ *   curl /index.json verification
+ *
+ * @see genesis/orchestrator/Jenkinsfile for central trigger logic
+ * @see genesis/docs/superpowers/specs/2026-05-04-storybook-deployment-design.md
+ */
+
+pipeline {
+    agent {
+        kubernetes {
+            cloud 'kubernetes'
+            yaml '''
+apiVersion: v1
+kind: Pod
+spec:
+ serviceAccount: jenkins-deployer
+ nodeSelector:
+    node-type: edge
+ volumes:
+  - name: containerd-sock
+    hostPath:
+     path: /var/snap/microk8s/common/run/containerd.sock
+     type: Socket
+  - name: buildkit-run
+    emptyDir: {}
+ containers:
+ - name: builder
+   image: harbor.ethosengine.com/ethosengine/ci-builder:latest
+   command:
+   - cat
+   tty: true
+   resources:
+     requests:
+       ephemeral-storage: "2Gi"
+       memory: "1Gi"
+     limits:
+       ephemeral-storage: "4Gi"
+       memory: "3Gi"
+   volumeMounts:
+   - name: containerd-sock
+     mountPath: /run/containerd/containerd.sock
+   - name: buildkit-run
+     mountPath: /run/buildkit
+ - name: buildkitd
+   image: moby/buildkit:v0.12.5
+   securityContext:
+     privileged: true
+   args:
+   - --addr
+   - unix:///run/buildkit/buildkitd.sock
+   - --oci-worker=true
+   - --containerd-worker=false
+   volumeMounts:
+   - name: containerd-sock
+     mountPath: /run/containerd/containerd.sock
+   - name: buildkit-run
+     mountPath: /run/buildkit
+'''
+        }
+    }
+
+    environment {
+        BRANCH_NAME = "${env.BRANCH_NAME ?: 'dev'}"
+        NPM_TOKEN = credentials('ee-nexus-npm-token')
+        IMAGE_NAME = 'elohim-storybook'
+        HARBOR_REGISTRY = 'harbor.ethosengine.com'
+        HARBOR_PROJECT = 'ethosengine'
+    }
+
+    options {
+        skipDefaultCheckout(true)
+        overrideIndexTriggers(false)
+        timeout(time: 30, unit: 'MINUTES')
+        disableConcurrentBuilds()
+    }
+
+    stages {
+        stage('Check Trigger') {
+            steps {
+                script {
+                    def validTrigger = currentBuild.getBuildCauses().any { cause ->
+                        cause._class.contains('UserIdCause') ||
+                        cause._class.contains('UpstreamCause')
+                    }
+                    if (!validTrigger) {
+                        echo """
+                        ═══════════════════════════════════════════════════════════
+                        PIPELINE SKIPPED — managed by elohim-orchestrator.
+                        Triggered by: ${currentBuild.getBuildCauses()*.shortDescription.join(', ')}
+                        ═══════════════════════════════════════════════════════════
+                        """
+                        currentBuild.result = 'NOT_BUILT'
+                        currentBuild.displayName = "#${env.BUILD_NUMBER} SKIPPED"
+                        env.PIPELINE_SKIPPED = 'true'
+                    } else {
+                        echo "Valid trigger: ${currentBuild.getBuildCauses()*.shortDescription.join(', ')}"
+                    }
+                }
+            }
+        }
+
+        stage('Checkout') {
+            when { expression { env.PIPELINE_SKIPPED != 'true' } }
+            steps {
+                container('builder') {
+                    checkout scm
+                    script {
+                        env.GIT_COMMIT_HASH = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
+                        env.GIT_COMMIT_FULL = sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
+                    }
+                }
+            }
+        }
+
+        stage('Setup Version') {
+            when { expression { env.PIPELINE_SKIPPED != 'true' } }
+            steps {
+                container('builder') {
+                    script {
+                        def baseVersion = sh(script: 'grep "^APP_VERSION=" VERSION | cut -d= -f2 | tr -d "[:space:]" || echo "0.1.0"', returnStdout: true).trim()
+                        if (!baseVersion) { baseVersion = '0.1.0' }
+                        env.IMAGE_TAG = "${baseVersion}-dev-${env.GIT_COMMIT_HASH}"
+                        echo "Storybook image tag: ${env.IMAGE_TAG}"
+                    }
+                }
+            }
+        }
+
+        stage('Install Dependencies') {
+            when { expression { env.PIPELINE_SKIPPED != 'true' } }
+            steps {
+                container('builder') {
+                    sh '''#!/bin/bash
+                        set -euo pipefail
+                        echo "Installing workspace dependencies via pnpm..."
+                        pnpm install --frozen-lockfile
+                    '''
+                }
+            }
+        }
+
+        stage('Build Storybook') {
+            when { expression { env.PIPELINE_SKIPPED != 'true' } }
+            steps {
+                container('builder') {
+                    sh '''#!/bin/bash
+                        set -euo pipefail
+                        echo "Building Storybook static bundle..."
+                        pnpm --filter elohim-library run build-storybook
+
+                        if [ ! -f app/elohim-library/dist/storybook/index.html ]; then
+                            echo "ERROR: dist/storybook/index.html missing after build"
+                            exit 1
+                        fi
+                        if [ ! -f app/elohim-library/dist/storybook/index.json ]; then
+                            echo "ERROR: dist/storybook/index.json missing after build"
+                            exit 1
+                        fi
+                        ENTRIES=$(python3 -c 'import json; print(len(json.load(open("app/elohim-library/dist/storybook/index.json"))["entries"]))')
+                        echo "Built storybook with ${ENTRIES} indexed entries"
+                        if [ "${ENTRIES}" -eq 0 ]; then
+                            echo "ERROR: storybook index has 0 entries — silent regression"
+                            exit 1
+                        fi
+                    '''
+                }
+            }
+        }
+
+        stage('Build Image') {
+            when { expression { env.PIPELINE_SKIPPED != 'true' } }
+            steps {
+                container('buildkitd') {
+                    sh '''#!/bin/sh
+                        set -e
+                        cd app
+                        cp elohim-library/images/Dockerfile ./Dockerfile.storybook
+                        cp elohim-library/images/nginx.conf ./nginx.conf
+
+                        buildctl --addr unix:///run/buildkit/buildkitd.sock \\
+                            build \\
+                            --frontend dockerfile.v0 \\
+                            --opt filename=Dockerfile.storybook \\
+                            --local context=. \\
+                            --local dockerfile=. \\
+                            --output type=image,name=elohim-storybook:${IMAGE_TAG},push=false,oci-mediatypes=true
+
+                        rm -f Dockerfile.storybook nginx.conf
+                    '''
+                }
+            }
+        }
+
+        stage('Push to Harbor Registry') {
+            when { expression { env.PIPELINE_SKIPPED != 'true' } }
+            steps {
+                container('builder') {
+                    withCredentials([usernamePassword(credentialsId: 'harbor-robot-registry', passwordVariable: 'HARBOR_PASSWORD', usernameVariable: 'HARBOR_USERNAME')]) {
+                        sh '''#!/bin/bash
+                            set -euo pipefail
+                            echo $HARBOR_PASSWORD | nerdctl -n k8s.io login ${HARBOR_REGISTRY} -u $HARBOR_USERNAME --password-stdin
+
+                            nerdctl -n k8s.io tag elohim-storybook:${IMAGE_TAG} ${HARBOR_REGISTRY}/${HARBOR_PROJECT}/elohim-storybook:${IMAGE_TAG}
+                            nerdctl -n k8s.io tag elohim-storybook:${IMAGE_TAG} ${HARBOR_REGISTRY}/${HARBOR_PROJECT}/elohim-storybook:${GIT_COMMIT_HASH}
+                            nerdctl -n k8s.io tag elohim-storybook:${IMAGE_TAG} ${HARBOR_REGISTRY}/${HARBOR_PROJECT}/elohim-storybook:latest
+
+                            nerdctl -n k8s.io push ${HARBOR_REGISTRY}/${HARBOR_PROJECT}/elohim-storybook:${IMAGE_TAG}
+                            nerdctl -n k8s.io push ${HARBOR_REGISTRY}/${HARBOR_PROJECT}/elohim-storybook:${GIT_COMMIT_HASH}
+                            nerdctl -n k8s.io push ${HARBOR_REGISTRY}/${HARBOR_PROJECT}/elohim-storybook:latest
+                        '''
+                    }
+                }
+            }
+        }
+
+        stage('Deploy to Alpha') {
+            when { expression { env.PIPELINE_SKIPPED != 'true' } }
+            steps {
+                container('builder') {
+                    script {
+                        def helpers = load 'genesis/orchestrator/scripts/deploy-helpers.groovy'
+                        helpers.deployStaticToEnvironment(
+                            'alpha',
+                            'elohim-alpha',
+                            'elohim-storybook-alpha',
+                            'genesis/orchestrator/manifests/elohim-storybook/alpha.yaml',
+                            env.IMAGE_TAG,
+                            'elohim-storybook'
+                        )
+                        sh "kubectl apply -f genesis/orchestrator/manifests/elohim-storybook/alpha/service.yaml"
+                        sh "kubectl apply -f genesis/orchestrator/manifests/elohim-storybook/alpha/ingress.yaml"
+                    }
+                }
+            }
+        }
+
+        stage('Verify Deploy') {
+            when { expression { env.PIPELINE_SKIPPED != 'true' } }
+            steps {
+                container('builder') {
+                    sh '''#!/bin/bash
+                        set -euo pipefail
+                        URL="https://storybook.elohim.host/index.json"
+                        echo "Verifying ${URL} ..."
+                        for i in $(seq 1 12); do
+                            HTTP_CODE=$(curl -s -o /tmp/index.json -w '%{http_code}' --max-time 10 ${URL} || echo "000")
+                            if [ "${HTTP_CODE}" = "200" ]; then
+                                ENTRIES=$(python3 -c 'import json; print(len(json.load(open("/tmp/index.json"))["entries"]))')
+                                echo "VERIFIED: ${ENTRIES} stories indexed at ${URL}"
+                                if [ "${ENTRIES}" -eq 0 ]; then
+                                    echo "ERROR: Deployed storybook has 0 entries"
+                                    exit 1
+                                fi
+                                exit 0
+                            fi
+                            echo "Attempt ${i}/12 returned ${HTTP_CODE}, retrying in 5s..."
+                            sleep 5
+                        done
+                        echo "FAILED: ${URL} did not return 200 within 60s"
+                        exit 1
+                    '''
+                }
+            }
+        }
+
+        stage('Cleanup') {
+            when { expression { env.PIPELINE_SKIPPED != 'true' } }
+            steps {
+                container('builder') {
+                    sh 'rm -rf app/elohim-library/dist || true'
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            script {
+                if (env.PIPELINE_SKIPPED != 'true') {
+                    echo "elohim-storybook deployed: ${env.IMAGE_TAG} → https://storybook.elohim.host"
+                }
+            }
+        }
+        failure {
+            echo "elohim-storybook FAILED at stage: ${env.STAGE_NAME ?: 'unknown'}"
+        }
+    }
+}
