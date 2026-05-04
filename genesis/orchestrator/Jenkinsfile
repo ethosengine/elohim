@@ -100,6 +100,26 @@ import groovy.transform.Field
         cascades: false,
         triggersGenesis: false,
         deploymentCheck: null   // Codec library, not a deployed service
+    ],
+    'elohim-storybook': [
+        jenkinsPath: 'app/elohim-library/Jenkinsfile',
+        changePatterns: [
+            'app/elohim-library/projects/**',
+            'app/elohim-library/.storybook/**',
+            'app/elohim-library/package.json',
+            'app/elohim-library/tsconfig.storybook.json',
+            'app/elohim-library/angular.json',
+            'app/elohim-library/Jenkinsfile',
+            'app/elohim-library/images/**',
+            'genesis/orchestrator/manifests/elohim-storybook/**'
+        ],
+        artifacts: ['elohim-storybook'],
+        dependsOn: [],
+        cascades: false,
+        triggersGenesis: false,
+        deploymentCheck: [
+            dev: 'https://storybook.elohim.host/index.json'
+        ]
     ]
 ]
 

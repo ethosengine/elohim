@@ -70,6 +70,31 @@ export const PIPELINES = {
     manualOnly: false,
     triggersGenesis: false,
   },
+  'elohim-epr': {
+    jenkinsPath: 'elohim/epr/Jenkinsfile',
+    changePatterns: ['elohim/epr/', 'elohim/sdk/epr-ts/'],
+    dependsOn: [],
+    cascades: false,
+    manualOnly: false,
+    triggersGenesis: false,
+  },
+  'elohim-storybook': {
+    jenkinsPath: 'app/elohim-library/Jenkinsfile',
+    changePatterns: [
+      'app/elohim-library/projects/**',
+      'app/elohim-library/.storybook/**',
+      'app/elohim-library/package.json',
+      'app/elohim-library/tsconfig.storybook.json',
+      'app/elohim-library/angular.json',
+      'app/elohim-library/Jenkinsfile',
+      'app/elohim-library/images/**',
+      'genesis/orchestrator/manifests/elohim-storybook/**',
+    ],
+    dependsOn: [],
+    cascades: false,
+    manualOnly: false,
+    triggersGenesis: false,
+  },
 };
 
 // ══════════════════════════════════════════════════════════════════
