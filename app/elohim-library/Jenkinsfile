@@ -180,21 +180,25 @@ spec:
         stage('Build Image') {
             when { expression { env.PIPELINE_SKIPPED != 'true' } }
             steps {
-                container('buildkitd') {
-                    sh '''#!/bin/sh
-                        set -e
+                // Run in builder container (has nerdctl). Use buildkit as the
+                // build backend via BUILDKIT_HOST, but route the image through
+                // nerdctl so it lands in containerd's k8s.io namespace —
+                // otherwise subsequent `nerdctl tag/push` can't find it
+                // (buildkit's OCI store is invisible to nerdctl).
+                // Mirrors the pattern in root Jenkinsfile:838-840 (elohim-app).
+                container('builder') {
+                    sh '''#!/bin/bash
+                        set -euo pipefail
                         cd app
                         cp elohim-library/images/Dockerfile ./Dockerfile.storybook
                         cp elohim-library/images/nginx.conf ./nginx.conf
                         trap 'rm -f Dockerfile.storybook nginx.conf' EXIT
 
-                        buildctl --addr unix:///run/buildkit/buildkitd.sock \\
-                            build \\
-                            --frontend dockerfile.v0 \\
-                            --opt filename=Dockerfile.storybook \\
-                            --local context=. \\
-                            --local dockerfile=. \\
-                            --output type=image,name=elohim-storybook:${IMAGE_TAG},push=false,oci-mediatypes=true
+                        BUILDKIT_HOST=unix:///run/buildkit/buildkitd.sock \\
+                            nerdctl -n k8s.io build \\
+                                -t elohim-storybook:${IMAGE_TAG} \\
+                                -f Dockerfile.storybook \\
+                                .
                     '''
                 }
             }
@@ -280,16 +284,9 @@ spec:
     }
 
     post {
-        always {
-            script {
-                if (env.PIPELINE_SKIPPED != 'true') {
-                    // Defensive: trap in Build Image stage handles primary cleanup,
-                    // but cover the case where the trap was bypassed somehow.
-                    sh 'rm -rf app/elohim-library/dist || true'
-                    sh 'rm -f app/Dockerfile.storybook app/nginx.conf || true'
-                }
-            }
-        }
+        // No always-block cleanup needed — k8s destroys the pod after the build,
+        // so the workspace is ephemeral. Earlier defensive rm -rf hit Permission
+        // denied on root-owned files written by buildkit and added noise.
         success {
             script {
                 if (env.PIPELINE_SKIPPED != 'true') {
