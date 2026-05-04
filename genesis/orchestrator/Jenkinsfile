@@ -117,9 +117,12 @@ import groovy.transform.Field
         dependsOn: [],
         cascades: false,
         triggersGenesis: false,
-        deploymentCheck: [
-            dev: 'https://storybook.elohim.host/index.json'
-        ]
+        // No deploymentCheck — storybook is an optional design surface, not a
+        // gating service. Its own pipeline runs Verify Deploy with /index.json
+        // retries; we don't want a missed cert or slow rollout to mark the
+        // entire orchestrator UNSTABLE. propagate:false on triggerPipeline
+        // already isolates build failures; this isolates deploy failures.
+        deploymentCheck: null
     ]
 ]
 
