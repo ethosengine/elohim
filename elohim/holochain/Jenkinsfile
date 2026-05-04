@@ -249,7 +249,12 @@ def getHumanRegistry() {
  * Returns list of maps with both identity and topology fields.
  */
 def resolveHumanAssignments(String strategy, String customAssignments) {
-    def registry = getHumanRegistry()
+    // Filter suspended humans from the registry. cleanupOrphanedHumans (later in
+    // this file) will scale their StatefulSets to 0 because they no longer
+    // appear in allHumans. See genesis/orchestrator/data/deployments.json
+    // $suspendedComment for the per-human reason. To re-enable a human,
+    // remove "suspended": true from their deployments.json record.
+    def registry = getHumanRegistry().findAll { !it.suspended }
     def assignments = [:]
 
     switch (strategy) {
@@ -257,8 +262,13 @@ def resolveHumanAssignments(String strategy, String customAssignments) {
             registry.each { h -> assignments[h.name] = 'alpha' }
             break
         case 'distributed':
-            // Adam stays in alpha as the genesis/seed peer regardless of strategy.
-            assignments = [adam: 'alpha', matthew: 'alpha', jessica: 'alpha', pete: 'staging', timothy: 'staging', frank: 'prod']
+            // shem decommissioned 2026-05-04: adam, pete, frank suspended at
+            // human-level. pete-staging and frank-prod were on intel-nuc
+            // (healthy) but are also gated — accepted simplification per plan
+            // Q-A (default A2). When shem replacement lands, restoring those
+            // entries here is part of the un-suspend workflow.
+            def fullDistribution = [adam: 'alpha', matthew: 'alpha', jessica: 'alpha', pete: 'staging', timothy: 'staging', frank: 'prod']
+            assignments = fullDistribution.findAll { name, _env -> registry.any { it.name == name } }
             break
         case 'custom':
             customAssignments.split(',').each { pair ->
@@ -267,6 +277,8 @@ def resolveHumanAssignments(String strategy, String customAssignments) {
                     assignments[parts[0].trim()] = parts[1].trim()
                 }
             }
+            // Drop assignments for suspended humans even if user provided them.
+            assignments = assignments.findAll { name, _env -> registry.any { it.name == name } }
             break
         default:
             error "Unknown deploy strategy: ${strategy}"

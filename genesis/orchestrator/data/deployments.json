@@ -11,7 +11,9 @@
       "manifest": "genesis/orchestrator/manifests/humans/adam-firstman.yaml",
       "deviceArchetype": "device-family-node-base",
       "affinityComment": "Adam: remote-side bootstrap anchor on shem — mirrors Matthew's role across WireGuard",
-      "nodeTypes": ["remote"]
+      "nodeTypes": ["remote"],
+      "suspended": true,
+      "$suspendedComment": "shem decommissioned 2026-05-04 (PSU failure, physical death). 40 GiB openebs-hostpath PVC unrecoverable. Re-enable requires either replacement remote-labeled hardware OR re-bootstrap with new agent key (seeded chain lost). See COMPUTE-CAPACITY-REVIEW.md."
     },
     {
       "name": "matthew",
@@ -54,6 +56,8 @@
       "deviceArchetype": "device-home-nuc",
       "affinityComment": "Pete: remote peer on shem — external device steward over WireGuard",
       "nodeTypes": ["remote"],
+      "suspended": true,
+      "$suspendedComment": "shem decommissioned 2026-05-04. 40 GiB pete-alpha PVC lost. Note: pete-staging on intel-nuc was healthy but multi-env distributed strategy is also gated by this human-level flag (see plan Q-A); accepted as cost of the simpler suspension model.",
       "edgenodeMemoryRequest": "512Mi",
       "edgenodeMemoryLimit": "1536Mi",
       "edgenodeCpuRequest": "250m",
@@ -91,6 +95,8 @@
       "deviceArchetype": "device-raspberry-pi-4",
       "affinityComment": "Frank: remote peer on shem — external device steward over WireGuard",
       "nodeTypes": ["remote"],
+      "suspended": true,
+      "$suspendedComment": "shem decommissioned 2026-05-04. 40 GiB frank-alpha PVC lost. frank-prod on intel-nuc was healthy but is gated by this human-level flag.",
       "edgenodeMemoryRequest": "512Mi",
       "edgenodeMemoryLimit": "1536Mi",
       "edgenodeCpuRequest": "250m",
