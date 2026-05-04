@@ -1,0 +1,345 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://elohim.host/schemas/rakia/compute-capacity-1.0.json",
+  "title": "Elohim Steward Commitment: Compute Capacity",
+  "description": "Operator-authored declaration of cluster resources, steward commitments, story groups, and settled state. Today: a Category C (operational) devops artifact authored in git by the cluster steward (Matthew). Future: migrates to a B2 (agent-scoped, attestation-gated) DHT entry when rakia DNA work resumes. The shape here is intentionally migration-friendly. See genesis/data/rakia/README.md (when authored) and the original spec in /projects/.claude-config/plans/ok-we-ve-lost-our-luminous-puppy.md.",
+  "type": "object",
+  "required": [
+    "version",
+    "$schemaVersion",
+    "snapshotTimestamp",
+    "snapshotMethod",
+    "cluster",
+    "stewardCommitments",
+    "elohimHumans",
+    "storyGroups",
+    "settledState",
+    "anomalies"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "type": "string",
+      "pattern": "^1\\.\\d+$",
+      "description": "Document version. Bump on breaking shape changes."
+    },
+    "$schemaVersion": {
+      "type": "string",
+      "description": "Logical schema identifier. Tracks future rakia DNA entry-type version."
+    },
+    "description": { "type": "string" },
+    "snapshotTimestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When this declaration was last refreshed from cluster reality."
+    },
+    "snapshotMethod": {
+      "type": "string",
+      "description": "How the numbers were obtained — kubectl commands, scripts, or human estimate."
+    },
+
+    "cluster": {
+      "type": "object",
+      "required": ["name", "kubernetesVersion", "totalAllocatable", "totalCommitted", "totalHeadroom", "nodeTypes"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string" },
+        "kubernetesVersion": { "type": "string" },
+        "nodeCount": { "type": "integer", "minimum": 1 },
+        "readyNodeCount": { "type": "integer", "minimum": 0 },
+        "notReadyNodes": {
+          "type": "array",
+          "description": "Names of NotReady nodes plus reason.",
+          "items": { "type": "string" }
+        },
+        "totalAllocatable": { "$ref": "#/definitions/resourceBundle" },
+        "totalCommitted": { "$ref": "#/definitions/resourceBundle" },
+        "totalHeadroom": { "$ref": "#/definitions/resourceBundle" },
+        "actuals": {
+          "type": "object",
+          "description": "Per-node live actuals from kubectl top, when metrics-server is available.",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "cpu_m": { "type": "integer" },
+              "cpu_pct": { "type": "integer" },
+              "mem_Mi": { "type": "integer" },
+              "mem_pct": { "type": "integer" },
+              "note": { "type": "string" },
+              "status": { "type": "string" }
+            }
+          }
+        },
+        "nodeTypes": {
+          "type": "object",
+          "description": "Keyed by node-type label (performance, operations, edge, storage, remote, ...).",
+          "additionalProperties": { "$ref": "#/definitions/nodeTypeBucket" }
+        }
+      }
+    },
+
+    "stewardCommitments": {
+      "type": "object",
+      "description": "Non-elohim workloads that the cluster operator has agreed to host (CI, registry, IDE, etc.). These reduce the headroom available for elohim humans.",
+      "additionalProperties": { "$ref": "#/definitions/stewardCommitment" }
+    },
+
+    "elohimHumans": {
+      "type": "object",
+      "description": "Per-human deployment cost across environments. Mirrors deployments.json but adds observed actuals where available.",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["humanLabel", "deployments"],
+        "additionalProperties": false,
+        "properties": {
+          "humanLabel": { "type": "string" },
+          "storyGroup": { "type": "string" },
+          "suspended": { "type": "boolean" },
+          "deployments": {
+            "type": "object",
+            "additionalProperties": { "$ref": "#/definitions/humanDeployment" }
+          }
+        }
+      }
+    },
+
+    "elohimSharedInfra": {
+      "type": "object",
+      "description": "Shared elohim workloads (doorway, mongodb, nats, site, ...) keyed by environment.",
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": ["workload", "node"],
+          "properties": {
+            "workload": { "type": "string" },
+            "node": { "type": "string" },
+            "requests": { "$ref": "#/definitions/resourceBundle" },
+            "limits": { "$ref": "#/definitions/resourceBundle" }
+          }
+        }
+      }
+    },
+
+    "storyGroups": {
+      "type": "array",
+      "description": "Fate-sharing groups. Each group dies as a unit when its host node fails. Distinct from narrative groupings (those live in humans.json relationships).",
+      "items": { "$ref": "#/definitions/storyGroup" }
+    },
+
+    "settledState": {
+      "type": "object",
+      "required": ["timestamp", "activeGroups", "suspendedGroups", "reasoning", "aggregateCost", "headroomRemaining", "status", "action"],
+      "additionalProperties": false,
+      "properties": {
+        "timestamp": { "type": "string", "format": "date" },
+        "activeGroups": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Story group names currently deployed."
+        },
+        "suspendedGroups": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Story group names declared but not currently deployed (e.g. shem-remote)."
+        },
+        "reasoning": { "type": "string" },
+        "aggregateCost": { "$ref": "#/definitions/resourceBundle" },
+        "headroomRemaining": { "$ref": "#/definitions/resourceBundle" },
+        "status": {
+          "type": "string",
+          "enum": ["SUSTAINABLE", "OVERSPENT", "CRITICAL"]
+        },
+        "action": {
+          "type": "string",
+          "description": "Operator-authored remediation guidance when status != SUSTAINABLE."
+        }
+      }
+    },
+
+    "anomalies": {
+      "type": "array",
+      "description": "First-class flagged risks from the latest snapshot. Each anomaly has a stable id so future commits can reference (or close) it.",
+      "items": {
+        "type": "object",
+        "required": ["id", "severity", "message"],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-]*$",
+            "description": "Stable kebab-case identifier."
+          },
+          "severity": {
+            "type": "string",
+            "enum": ["info", "low", "medium", "high", "critical"]
+          },
+          "message": { "type": "string" }
+        }
+      }
+    }
+  },
+
+  "definitions": {
+    "resourceBundle": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "cpu_m": { "type": "integer", "minimum": 0 },
+        "memory_Mi": { "type": "integer", "minimum": 0 },
+        "ephemeralStorage_Gi": { "type": "integer", "minimum": 0 },
+        "persistentVolume_Gi": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "nodeBlock": {
+      "type": "object",
+      "required": ["name", "ready", "allocatable"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string" },
+        "ready": { "type": "boolean" },
+        "role": { "type": "string" },
+        "allocatable": { "$ref": "#/definitions/resourceBundle" },
+        "committed": { "$ref": "#/definitions/resourceBundle" },
+        "limits": { "$ref": "#/definitions/resourceBundle" },
+        "headroom": { "$ref": "#/definitions/resourceBundle" },
+        "utilizationPctRequests": {
+          "type": "object",
+          "properties": {
+            "cpu": { "type": "integer" },
+            "memory": { "type": "integer" }
+          }
+        },
+        "utilizationPctLimits": {
+          "type": "object",
+          "properties": {
+            "cpu": { "type": "integer" },
+            "memory": { "type": "integer" }
+          }
+        },
+        "warning": { "type": "string" },
+        "lastSeenReady": { "type": "string" },
+        "outageTaintAge": { "type": "string" },
+        "orphanedPods": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "nodeTypeBucket": {
+      "type": "object",
+      "required": ["nodes", "totals"],
+      "additionalProperties": false,
+      "properties": {
+        "nodes": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/nodeBlock" }
+        },
+        "totals": { "$ref": "#/definitions/resourceBundle" }
+      }
+    },
+    "stewardCommitment": {
+      "type": "object",
+      "required": ["namespace", "stewardWorkload"],
+      "additionalProperties": false,
+      "properties": {
+        "namespace": { "type": "string" },
+        "stewardWorkload": { "type": "string" },
+        "node": { "type": "string" },
+        "nodes": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "requests": { "$ref": "#/definitions/resourceBundleWithNote" },
+        "limits": { "$ref": "#/definitions/resourceBundleWithNote" },
+        "actual": {
+          "oneOf": [
+            { "$ref": "#/definitions/resourceBundle" },
+            { "type": "null" }
+          ]
+        },
+        "pvcs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "size_Gi"],
+            "properties": {
+              "name": { "type": "string" },
+              "size_Gi": { "type": "integer" },
+              "sc": { "type": "string" }
+            }
+          }
+        },
+        "totalPvc_Gi": { "type": "integer" },
+        "note": { "type": "string" },
+        "warning": { "type": "string" }
+      }
+    },
+    "resourceBundleWithNote": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "cpu_m": { "type": "integer", "minimum": 0 },
+        "memory_Mi": { "type": "integer", "minimum": 0 },
+        "ephemeralStorage_Gi": { "type": "integer", "minimum": 0 },
+        "persistentVolume_Gi": { "type": "integer", "minimum": 0 },
+        "note": { "type": "string" }
+      }
+    },
+    "humanDeployment": {
+      "type": "object",
+      "required": ["pod", "node"],
+      "additionalProperties": false,
+      "properties": {
+        "pod": { "type": "string" },
+        "node": { "type": "string" },
+        "requests": { "$ref": "#/definitions/resourceBundle" },
+        "limits": { "$ref": "#/definitions/resourceBundle" },
+        "requests_sum": { "$ref": "#/definitions/resourceBundle" },
+        "limits_sum": { "$ref": "#/definitions/resourceBundle" },
+        "pvc_Gi": { "type": "integer" },
+        "note": { "type": "string" },
+        "warning": { "type": "string" }
+      }
+    },
+    "storyGroup": {
+      "type": "object",
+      "required": ["name", "description", "priority", "fateSharingNode", "humans", "addedAt"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]*$",
+          "description": "Stable kebab-case identifier."
+        },
+        "description": { "type": "string" },
+        "priority": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "0 = highest (genesis-peer); higher numbers = lower priority."
+        },
+        "fateSharingNode": {
+          "type": "string",
+          "description": "The k8s node whose loss takes this group down. 'multi' or 'edge-pool' acceptable for groups that span nodes."
+        },
+        "humans": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Lower-cased human names matching deployments.json."
+        },
+        "stewardWorkloads": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Non-elohim workloads (jenkins, harbor, ...) that share fate with this group."
+        },
+        "addedAt": { "type": "string", "format": "date" },
+        "active": {
+          "type": "boolean",
+          "description": "Currently deployed. False when fate-sharing node is dead (see settledState.suspendedGroups)."
+        },
+        "costSummary": { "$ref": "#/definitions/resourceBundle" },
+        "notes": { "type": "string" }
+      }
+    }
+  }
+}
