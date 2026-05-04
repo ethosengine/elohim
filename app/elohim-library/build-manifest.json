@@ -1,0 +1,59 @@
+{
+  "manifestVersion": "1.0",
+  "pipeline": "elohim-storybook",
+  "description": "Elohim Storybook static design surface — build, image, deploy",
+  "steps": {
+    "build-storybook": {
+      "description": "Build Storybook 10 static bundle (pnpm --filter elohim-library run build-storybook)",
+      "inputs": {
+        "sources": [
+          "app/elohim-library/projects/**",
+          "app/elohim-library/.storybook/**",
+          "app/elohim-library/package.json",
+          "app/elohim-library/tsconfig.json",
+          "app/elohim-library/tsconfig.storybook.json",
+          "app/elohim-library/angular.json"
+        ],
+        "buildProcess": ["app/elohim-library/Jenkinsfile"]
+      },
+      "outputs": {
+        "artifacts": ["storybook-dist"],
+        "verify": "test -f app/elohim-library/dist/storybook/index.html && test -f app/elohim-library/dist/storybook/index.json"
+      },
+      "depends": [],
+      "executor": {
+        "stage": "Build Storybook",
+        "function": null
+      }
+    },
+    "build-storybook-image": {
+      "description": "Package Storybook static bundle into nginx:alpine container image",
+      "inputs": {
+        "sources": [
+          "app/elohim-library/images/Dockerfile",
+          "app/elohim-library/images/nginx.conf"
+        ],
+        "buildProcess": ["app/elohim-library/Jenkinsfile"]
+      },
+      "outputs": {
+        "artifacts": ["storybook-image"],
+        "verify": null
+      },
+      "depends": ["build-storybook"],
+      "executor": {
+        "stage": "Build Image",
+        "function": null
+      }
+    }
+  },
+  "gate": {
+    "projects": {
+      "elohim-storybook": { "dir": "app/elohim-library", "steps": ["build-storybook", "build-storybook-image"] }
+    }
+  },
+  "deployment": {
+    "targets": {
+      "alpha": { "healthCheck": "https://storybook.elohim.host/index.json" }
+    }
+  }
+}
