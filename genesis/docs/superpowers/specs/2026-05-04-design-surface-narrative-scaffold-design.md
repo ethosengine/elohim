@@ -20,6 +20,14 @@ The architecture pattern here — Foundations as shared substrate, Domains as op
 
 The design system itself is **graphos** — the elohim-protocol-native design language seeded by `genesis/graphos/` (vocabulary register + brand spec) and grown into a navigable surface inside Storybook. The new library project is named `graphos` to make the concept explicit at the codebase level.
 
+### Naming: graphos is the brand, Storybook is (currently) the engine
+
+The surface being built **is graphos**. Storybook 10 is its current rendering technology, not its identity. Treat "Storybook" as the render engine the way an Angular app treats Webpack — load-bearing today, replaceable tomorrow. Eventually graphos may migrate off Storybook to elohim-native rendering (likely an Angular shell + Holochain content plumbing that consumes the same MDX/wrapper pattern). The MDX wrappers and `sync-genesis.mjs` are designed to survive that migration — they're not Storybook-coupled beyond the `<Meta>` and `<Markdown>` blocks.
+
+**Deploy target stays at `storybook.elohim.host` for sprint 1.** Hostname migration is not in scope and not a near-term concern.
+
+For sprint 1, the Storybook page title (`manager.ts` theme) and any user-visible chrome should read "graphos" rather than the default Storybook branding. This is the cheapest signal that the rename is real — pure cosmetic, no infra change.
+
 ## Information architecture
 
 The Storybook sidebar surfaces four top-level sections plus per-domain sub-trees:
