@@ -15,12 +15,13 @@
 def deployAppToEnvironment(String environment, String namespace, String deploymentName, String manifestPath, String imageTag) {
     echo "Deploying to ${environment}: ${imageTag}"
 
-    // Validate ConfigMap exists (skipped automatically when caller does not require one)
+    // Validate ConfigMap exists — required for the app (runtime config injection).
+    // Static deployments use deployStaticToEnvironment, which omits this check.
     sh "kubectl get configmap elohim-config-${environment} -n ${namespace} || { echo 'ConfigMap missing'; exit 1; }"
 
     // Update deployment manifest with image tag and deploy version label
     def outputFile = manifestPath.replace('.yaml', "-${environment}.rendered.yaml")
-    sh "sed -e 's/SITE_TAG_PLACEHOLDER/${imageTag}/g' -e 's/DEPLOY_VERSION_PLACEHOLDER/${imageTag}/g' ${manifestPath} > ${outputFile}"
+    sh "sed -e 's|SITE_TAG_PLACEHOLDER|${imageTag}|g' -e 's|DEPLOY_VERSION_PLACEHOLDER|${imageTag}|g' ${manifestPath} > ${outputFile}"
 
     // Fail fast if any placeholders remain
     def remaining = sh(script: "grep -c '_PLACEHOLDER' ${outputFile} || true", returnStdout: true).trim()
@@ -51,7 +52,9 @@ def deployAppToEnvironment(String environment, String namespace, String deployme
         echo '=================================='
     """
 
-    // Post-deploy: detect stale resources (advisory only)
+    // Post-deploy: detect stale resources (advisory only).
+    // Hardcoded to elohim-site — all app manifests use app.kubernetes.io/name=elohim-site.
+    // (deployStaticToEnvironment parameterizes this since storybook uses a different label.)
     sh "bash genesis/orchestrator/scripts/detect-stale-resources.sh ${namespace} ${imageTag} elohim-site || true"
 
     echo "${environment} deployment completed!"
@@ -66,7 +69,7 @@ def deployStaticToEnvironment(String environment, String namespace, String deplo
 
     // Update deployment manifest with image tag and deploy version label
     def outputFile = manifestPath.replace('.yaml', "-${environment}.rendered.yaml")
-    sh "sed -e 's/STORYBOOK_TAG_PLACEHOLDER/${imageTag}/g' -e 's/DEPLOY_VERSION_PLACEHOLDER/${imageTag}/g' ${manifestPath} > ${outputFile}"
+    sh "sed -e 's|STORYBOOK_TAG_PLACEHOLDER|${imageTag}|g' -e 's|DEPLOY_VERSION_PLACEHOLDER|${imageTag}|g' ${manifestPath} > ${outputFile}"
 
     // Fail fast if any placeholders remain
     def remaining = sh(script: "grep -c '_PLACEHOLDER' ${outputFile} || true", returnStdout: true).trim()
