@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: elohim-storybook-alpha
+  namespace: elohim-alpha
+  labels:
+    app: elohim-storybook-alpha
+    app.kubernetes.io/name: elohim-storybook
+    app.kubernetes.io/instance: elohim-storybook-alpha
+    app.kubernetes.io/version: "DEPLOY_VERSION_PLACEHOLDER"
+    app.kubernetes.io/component: design-surface
+    app.kubernetes.io/part-of: elohim
+    app.kubernetes.io/managed-by: jenkins
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: elohim-storybook-alpha
+  template:
+    metadata:
+      labels:
+        app: elohim-storybook-alpha
+        app.kubernetes.io/name: elohim-storybook
+        app.kubernetes.io/instance: elohim-storybook-alpha
+        app.kubernetes.io/version: "DEPLOY_VERSION_PLACEHOLDER"
+        app.kubernetes.io/component: design-surface
+        app.kubernetes.io/part-of: elohim
+        app.kubernetes.io/managed-by: jenkins
+    spec:
+      containers:
+      - name: elohim-storybook-alpha
+        image: harbor.ethosengine.com/ethosengine/elohim-storybook:STORYBOOK_TAG_PLACEHOLDER
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 80
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: 80
+          initialDelaySeconds: 2
+          periodSeconds: 5
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 80
+          initialDelaySeconds: 10
+          periodSeconds: 20
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "50m"
+          limits:
+            memory: "128Mi"
+            cpu: "100m"
