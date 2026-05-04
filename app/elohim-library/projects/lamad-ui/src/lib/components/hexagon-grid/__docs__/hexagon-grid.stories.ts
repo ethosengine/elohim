@@ -1,10 +1,9 @@
-// eslint-disable-next-line import/no-extraneous-dependencies
-import { action } from '@storybook/addon-actions';
+import { action } from 'storybook/actions';
 
 import { HexagonGridComponent } from '../hexagon-grid.component';
 import { HexNode } from '../hexagon-grid.model';
 
-const DARK_BG = DARK_BG;
+const DARK_BG = 'stone-dark';
 
 import {
   makeAdamEveLoveMap,

@@ -959,14 +959,14 @@ function computeConvexHull(nodes: HexNode[], padding: number): { x: number; y: n
 
   const lower: { x: number; y: number }[] = [];
   for (const p of sorted) {
-    while (lower.length >= 2 && cross(lower.at(-2), lower.at(-1), p) <= 0) lower.pop();
+    while (lower.length >= 2 && cross(lower.at(-2)!, lower.at(-1)!, p) <= 0) lower.pop();
     lower.push(p);
   }
 
   const upper: { x: number; y: number }[] = [];
   const sortedReversed = [...sorted].reverse();
   for (const p of sortedReversed) {
-    while (upper.length >= 2 && cross(upper.at(-2), upper.at(-1), p) <= 0) upper.pop();
+    while (upper.length >= 2 && cross(upper.at(-2)!, upper.at(-1)!, p) <= 0) upper.pop();
     upper.push(p);
   }
 
