@@ -27,6 +27,7 @@
     "test:genesis:epic": "cucumber-js --dry-run --tags '@epic:$npm_config_name' '../docs/content/elohim-protocol/**/*.feature'",
     "test:genesis:layer": "cucumber-js --dry-run --tags '@governance_layer:$npm_config_name' '../docs/content/elohim-protocol/**/*.feature'",
     "generate:skeletons": "tsx scripts/generate-step-skeletons.ts",
+    "test:unit": "tsx --test 'src/**/__tests__/*.test.ts' 'scripts/__tests__/*.test.ts'",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",

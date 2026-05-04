@@ -13,7 +13,7 @@ import { Given } from '@cucumber/cucumber';
 
 import { BrowserDevice } from '../src/framework/devices/browser-device.js';
 import { PlaywrightDevice } from '../src/framework/devices/playwright-device.js';
-import { getFixture } from '../src/framework/fixtures/humans.js';
+import { getFixture, isHumanDeployed } from '../src/framework/fixtures/humans.js';
 import { Human } from '../src/framework/human.js';
 import { DoorwayDashboardPage } from '../src/framework/pages/index.js';
 import { doorwayToAppUrl } from '../src/framework/utils/url.js';
@@ -28,6 +28,12 @@ import { E2EWorld } from '../src/framework/world.js';
 Given(
   'human {string} is logged in on doorway {string}',
   async function (this: E2EWorld, humanName: string, doorwayId: string) {
+    if (!isHumanDeployed(humanName)) {
+      // Conductor suspended in deployments.json (e.g. shem outage). The
+      // human's account may not be seeded; skip the scenario rather than
+      // fail. Toggle "suspended": false in deployments.json to re-enable.
+      return 'pending';
+    }
     const fixture = getFixture(humanName);
     const doorway = this.getDoorway(doorwayId);
 
@@ -57,6 +63,9 @@ Given(
 Given(
   'human {string} is logged in on doorway {string} with device',
   async function (this: E2EWorld, humanName: string, doorwayId: string) {
+    if (!isHumanDeployed(humanName)) {
+      return 'pending';
+    }
     const fixture = getFixture(humanName);
     const doorway = this.getDoorway(doorwayId);
 
@@ -107,6 +116,9 @@ Given(
 Given(
   'human {string} is logged in on doorway-app {string} with device',
   async function (this: E2EWorld, humanName: string, doorwayId: string) {
+    if (!isHumanDeployed(humanName)) {
+      return 'pending';
+    }
     const fixture = getFixture(humanName);
     const doorway = this.getDoorway(doorwayId);
 

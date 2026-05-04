@@ -206,3 +206,87 @@ export function allDisplayNames(): string[] {
 export function relationshipsFor(humanId: string): HumansJsonRelationship[] {
   return ensureLoaded().relationships.filter(r => r.source === humanId || r.target === humanId);
 }
+
+// ---------------------------------------------------------------------------
+// Deployment topology awareness (reads deployments.json)
+// ---------------------------------------------------------------------------
+//
+// Some fixture humans (matthew, jessica, timothy, adam, pete, frank) have
+// k8s pods declared in genesis/orchestrator/data/deployments.json. Others
+// (Susan, Tommy, Georgina, Maria, etc.) are doorway-seeded personas without
+// a k8s pod. When a node fails (e.g. shem 2026-05-04), affected humans get
+// "suspended": true in deployments.json. isHumanDeployed() lets a2o steps
+// auto-skip scenarios that depend on a suspended conductor — without any
+// feature-file edits.
+
+interface DeploymentRecord {
+  name: string;
+  suspended?: boolean;
+}
+
+interface DeploymentsCache {
+  /** lowercased name → suspended boolean. Empty when file is unreadable (fail-open). */
+  byName: Map<string, boolean>;
+}
+
+let _deploymentsCache: DeploymentsCache | null = null;
+
+function loadDeployments(): DeploymentsCache {
+  try {
+    // Allow tests to point at a fixture deployments.json without touching the real one.
+    const override = process.env.ELOHIM_DEPLOYMENTS_PATH_OVERRIDE;
+    let jsonPath: string;
+    if (override) {
+      jsonPath = override;
+    } else {
+      const __dirname = dirname(fileURLToPath(import.meta.url));
+      // genesis/a2o/src/framework/fixtures/ → genesis/orchestrator/data/deployments.json
+      jsonPath = resolve(__dirname, '../../../../orchestrator/data/deployments.json');
+    }
+    const raw = readFileSync(jsonPath, 'utf-8');
+    const data = JSON.parse(raw) as { humans?: DeploymentRecord[] };
+    const byName = new Map<string, boolean>();
+    for (const h of data.humans ?? []) {
+      byName.set(h.name.toLowerCase(), Boolean(h.suspended));
+    }
+    return { byName };
+  } catch {
+    // Fail-open: tests should still run if deployments.json is unreadable.
+    return { byName: new Map() };
+  }
+}
+
+function ensureDeploymentsLoaded(): DeploymentsCache {
+  _deploymentsCache ??= loadDeployments();
+  return _deploymentsCache;
+}
+
+/**
+ * Returns true if the named human is currently deployable for live testing:
+ *   - matthew/jessica/timothy → true (in deployments.json, not suspended)
+ *   - adam/pete/frank (suspended) → false (conductor pod won't run)
+ *   - Susan/Tommy/Georgina/etc. → true (doorway-only personas, no k8s pod)
+ *
+ * Used by step definitions to return 'pending' for suspended humans, so
+ * scenarios auto-skip when their conductors are unavailable. Toggling
+ * "suspended": true in deployments.json gates every scenario for that
+ * human across all feature files — no manual @wip tags required.
+ */
+export function isHumanDeployed(displayName: string): boolean {
+  const cache = ensureDeploymentsLoaded();
+  // Empty registry = fail-open (file unreadable, missing, or no humans declared).
+  if (cache.byName.size === 0) return true;
+  const suspended = cache.byName.get(displayName.toLowerCase());
+  // Not in registry = doorway-only persona; treat as deployed.
+  if (suspended === undefined) return true;
+  return !suspended;
+}
+
+/**
+ * Reset the deployments.json cache. For unit tests only — production code
+ * should never call this. Lets a test write a fixture deployments.json,
+ * reset the cache, then assert behavior on the next isHumanDeployed call.
+ */
+export function _resetDeploymentsCacheForTests(): void {
+  _deploymentsCache = null;
+}
