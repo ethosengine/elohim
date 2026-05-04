@@ -1,0 +1,349 @@
+{
+  "snapshotTimestamp": "2026-05-04T00:00:00Z",
+  "snapshotMethod": "live kubectl from intel-nuc; metrics-server enabled mid-snapshot; live actuals captured at end",
+  "cluster": {
+    "name": "alpha",
+    "kubernetesVersion": "microk8s v1.29.15",
+    "nodeCount": 7,
+    "readyNodeCount": 6,
+    "notReadyNodes": ["shem (cordoned 2026-05-04, physically dead, will not boot — treat as decommissioned)"],
+    "actuals_top_2026_05_04": {
+      "ethosengine": { "cpu_m": 3477, "cpu_pct": 14, "mem_Mi": 24747, "mem_pct": 38 },
+      "intel-nuc":   { "cpu_m": 2749, "cpu_pct": 34, "mem_Mi": 7103,  "mem_pct": 45 },
+      "hp-micro10":  { "cpu_m": 315,  "cpu_pct": 15, "mem_Mi": 3925,  "mem_pct": 25 },
+      "thinkc-p0h":  { "cpu_m": 3780, "cpu_pct": 94, "mem_Mi": 4082,  "mem_pct": 52, "note": "transient Jenkins build storm" },
+      "thinkc-p0t":  { "cpu_m": 3197, "cpu_pct": 79, "mem_Mi": 4898,  "mem_pct": 63, "note": "transient Jenkins build storm" },
+      "thinkc-p1s":  { "cpu_m": 3060, "cpu_pct": 76, "mem_Mi": 4117,  "mem_pct": 53, "note": "transient Jenkins build storm" },
+      "shem":        { "status": "unreachable; cordoned" }
+    },
+    "topMemoryConsumers_top_2026_05_04": [
+      { "ns": "mbd06b-gmail-com-che-3nkyak", "pod": "workspace48851cf439434f53", "mem_Mi": 10827, "note": "Eclipse Che workspace, no requests/limits visible" },
+      { "ns": "observability", "pod": "prometheus-kube-prom-stack-...prometheus-0", "mem_Mi": 4330 },
+      { "ns": "jenkins", "pod": "ee-jenkins-0", "cpu_m": 1908, "mem_Mi": 3770, "note": "near 4Gi limit — bump candidate" },
+      { "ns": "nexus", "pod": "nexus-nexus3-0", "mem_Mi": 2028 },
+      { "ns": "elohim-alpha", "pod": "elohim-matthew-alpha-0", "mem_Mi": 1993, "note": "near 2Gi request, within 8Gi TEMP BUMP limit" }
+    ]
+  },
+  "nodeTypes": {
+    "performance": {
+      "nodes": [
+        {
+          "name": "ethosengine",
+          "ready": true,
+          "role": "control-plane",
+          "allocatable": { "cpu_m": 24000, "memory_Mi": 64126, "ephemeralStorage_Gi": 909 },
+          "committed": { "cpu_m": 4030, "memory_Mi": 9350 },
+          "limits": { "cpu_m": 13400, "memory_Mi": 33886 },
+          "headroom": { "cpu_m": 19970, "memory_Mi": 54776 },
+          "utilizationPctRequests": { "cpu": 17, "memory": 15 },
+          "utilizationPctLimits": { "cpu": 56, "memory": 53 }
+        }
+      ],
+      "totals": { "cpu_m": 24000, "memory_Mi": 64126, "ephemeralStorage_Gi": 909 }
+    },
+    "operations": {
+      "nodes": [
+        {
+          "name": "intel-nuc",
+          "ready": true,
+          "role": "control-plane",
+          "allocatable": { "cpu_m": 8000, "memory_Mi": 15598, "ephemeralStorage_Gi": 465 },
+          "committed": { "cpu_m": 3050, "memory_Mi": 7340 },
+          "limits": { "cpu_m": 10850, "memory_Mi": 17548 },
+          "headroom": { "cpu_m": 4950, "memory_Mi": 8258 },
+          "utilizationPctRequests": { "cpu": 38, "memory": 47 },
+          "utilizationPctLimits": { "cpu": 135, "memory": 112 },
+          "warning": "limits overcommitted on both CPU and memory"
+        }
+      ],
+      "totals": { "cpu_m": 8000, "memory_Mi": 15598, "ephemeralStorage_Gi": 465 }
+    },
+    "edge": {
+      "nodes": [
+        {
+          "name": "thinkc-p0h",
+          "ready": true,
+          "role": "control-plane",
+          "allocatable": { "cpu_m": 4000, "memory_Mi": 7731, "ephemeralStorage_Gi": 466 },
+          "committed": { "cpu_m": 1250, "memory_Mi": 2192 },
+          "limits": { "cpu_m": 2400, "memory_Mi": 6555 },
+          "headroom": { "cpu_m": 2750, "memory_Mi": 5539 },
+          "utilizationPctRequests": { "cpu": 31, "memory": 28 },
+          "utilizationPctLimits": { "cpu": 60, "memory": 84 }
+        },
+        {
+          "name": "thinkc-p0t",
+          "ready": true,
+          "role": "control-plane",
+          "allocatable": { "cpu_m": 4000, "memory_Mi": 7731, "ephemeralStorage_Gi": 457 },
+          "committed": { "cpu_m": 1000, "memory_Mi": 612 },
+          "limits": { "cpu_m": 4000, "memory_Mi": 6144 },
+          "headroom": { "cpu_m": 3000, "memory_Mi": 7119 },
+          "utilizationPctRequests": { "cpu": 25, "memory": 7 },
+          "utilizationPctLimits": { "cpu": 100, "memory": 79 }
+        },
+        {
+          "name": "thinkc-p1s",
+          "ready": true,
+          "role": "control-plane",
+          "allocatable": { "cpu_m": 4000, "memory_Mi": 7731, "ephemeralStorage_Gi": 457 },
+          "committed": { "cpu_m": 1000, "memory_Mi": 1472 },
+          "limits": { "cpu_m": 1500, "memory_Mi": 9472 },
+          "headroom": { "cpu_m": 3000, "memory_Mi": 6259 },
+          "utilizationPctRequests": { "cpu": 25, "memory": 19 },
+          "utilizationPctLimits": { "cpu": 37, "memory": 122 },
+          "warning": "memory limits overcommitted"
+        }
+      ],
+      "totals": { "cpu_m": 12000, "memory_Mi": 23193, "ephemeralStorage_Gi": 1380 }
+    },
+    "storage": {
+      "nodes": [
+        {
+          "name": "hp-micro10",
+          "ready": true,
+          "role": "worker",
+          "allocatable": { "cpu_m": 2000, "memory_Mi": 15347, "ephemeralStorage_Gi": 3666 },
+          "committed": { "cpu_m": 850, "memory_Mi": 2176 },
+          "limits": { "cpu_m": 3000, "memory_Mi": 5120 },
+          "headroom": { "cpu_m": 1150, "memory_Mi": 13171 },
+          "utilizationPctRequests": { "cpu": 42, "memory": 14 },
+          "utilizationPctLimits": { "cpu": 150, "memory": 33 },
+          "warning": "CPU limits overcommitted 1.5x; only 2 cores available"
+        }
+      ],
+      "totals": { "cpu_m": 2000, "memory_Mi": 15347, "ephemeralStorage_Gi": 3666 }
+    },
+    "remote": {
+      "nodes": [
+        {
+          "name": "shem",
+          "ready": false,
+          "role": "worker",
+          "lastSeenReady": "before 2026-04-30T19:11:21Z",
+          "outageTaintAge": "4 days",
+          "allocatable": { "cpu_m": 24000, "memory_Mi": 128751, "ephemeralStorage_Gi": 294 },
+          "committed": { "cpu_m": 2250, "memory_Mi": 7168 },
+          "orphanedPods": [
+            "elohim-alpha/elohim-adam-alpha-0",
+            "elohim-alpha/elohim-frank-alpha-0",
+            "elohim-alpha/elohim-pete-alpha-0",
+            "sonarqube/ee-sonarqube-sonarqube-0 (Terminating since 2026-04-30T19:16:56Z)"
+          ],
+          "warning": "node Unknown; 4 pods stranded; openebs-hostpath PVCs on shem cannot be migrated without data loss"
+        }
+      ],
+      "totals": { "cpu_m": 24000, "memory_Mi": 128751, "ephemeralStorage_Gi": 294 }
+    }
+  },
+  "stewardCommitments": {
+    "jenkins": {
+      "namespace": "jenkins",
+      "stewardWorkload": "ee-jenkins (StatefulSet, replicas=1)",
+      "node": "ethosengine",
+      "requests": { "cpu_m": 50, "memory_Mi": 256 },
+      "limits": { "cpu_m": 2000, "memory_Mi": 4096 },
+      "actual": null,
+      "pvcs": [
+        { "name": "ee-jenkins", "size_Gi": 8, "sc": "microk8s-hostpath" },
+        { "name": "nix-cache-holochain", "size_Gi": 50, "sc": "openebs-jiva-csi-default" },
+        { "name": "cargo-cache-holochain", "size_Gi": 20, "sc": "openebs-jiva-csi-default" }
+      ],
+      "totalPvc_Gi": 78,
+      "note": "jenkins ns also hosts ephemeral build agents (holochain-dev, orchestrator-dev) which can spike to 4c/8Gi each"
+    },
+    "harbor": {
+      "namespace": "harbor",
+      "stewardWorkload": "8 workloads (5 Deployments, 3 StatefulSets)",
+      "nodes": ["ethosengine", "thinkc-p1s", "hp-micro10"],
+      "requests": { "cpu_m": 200, "memory_Mi": 512, "note": "ONLY trivy has requests; 8 of 9 containers unset" },
+      "limits": { "cpu_m": 1000, "memory_Mi": 1024, "note": "ONLY trivy has limits; 8 of 9 containers unset" },
+      "actual": null,
+      "pvcs": [
+        { "name": "data-ee-harbor-redis-0", "size_Gi": 1, "sc": "microk8s-hostpath" },
+        { "name": "data-ee-harbor-trivy-0", "size_Gi": 5, "sc": "microk8s-hostpath" },
+        { "name": "database-data-ee-harbor-database-0", "size_Gi": 1, "sc": "microk8s-hostpath" },
+        { "name": "ee-harbor-jobservice", "size_Gi": 1, "sc": "openebs-rwx" },
+        { "name": "ee-harbor-registry", "size_Gi": 100, "sc": "openebs-jiva-csi-default" }
+      ],
+      "totalPvc_Gi": 108,
+      "warning": "core/database/portal/redis/registry/jobservice/exporter have NO requests OR limits — uncapped CPU/memory"
+    },
+    "nexus": {
+      "namespace": "nexus",
+      "stewardWorkload": "nexus-nexus3 (StatefulSet, replicas=1)",
+      "node": "hp-micro10",
+      "requests": { "cpu_m": 500, "memory_Mi": 2048 },
+      "limits": { "cpu_m": 2000, "memory_Mi": 4096 },
+      "actual": null,
+      "pvcs": [
+        { "name": "data-nexus-nexus3-0", "size_Gi": 100, "sc": "openebs-jiva-csi-default" }
+      ],
+      "totalPvc_Gi": 100,
+      "warning": "nexus alone limits up to 100% of hp-micro10's 2 cores"
+    },
+    "eclipse-che": {
+      "namespace": "eclipse-che",
+      "stewardWorkload": "4 Deployments (che, che-dashboard, che-gateway[4 containers], che-operator)",
+      "nodes": ["thinkc-p1s", "thinkc-p0h"],
+      "requests": { "cpu_m": 650, "memory_Mi": 992 },
+      "limits": { "cpu_m": 500, "memory_Mi": 9472, "note": "most containers have memory limits but no CPU limit" },
+      "actual": null,
+      "pvcs": [],
+      "totalPvc_Gi": 0,
+      "note": "eclipse-che workspaces themselves live in per-user namespaces (mbd06b-gmail-com-che-3nkyak, etc.) and consume openebs-jiva-csi-default PVCs"
+    }
+  },
+  "elohimHumans": {
+    "matthew": {
+      "humanLabel": "matthew-manager",
+      "deployments": {
+        "alpha": {
+          "pod": "elohim-matthew-alpha-0",
+          "node": "ethosengine",
+          "requests": { "cpu_m": 1000, "memory_Mi": 2048 },
+          "limits": { "cpu_m": 3000, "memory_Mi": 8192 },
+          "pvc_Gi": 40,
+          "note": "TEMP BUMP per deployments.json $comment — was 4Gi/2000m, OOMed under seeder load. Currently 3c/8Gi limit. No actuals (metrics-server down)."
+        }
+      }
+    },
+    "jessica": {
+      "humanLabel": "jessica-spouse",
+      "deployments": {
+        "alpha": {
+          "pod": "elohim-jessica-alpha-0",
+          "node": "intel-nuc",
+          "requests": { "cpu_m": 250, "memory_Mi": 512 },
+          "limits": { "cpu_m": 1000, "memory_Mi": 1536 },
+          "pvc_Gi": 40
+        }
+      }
+    },
+    "timothy": {
+      "humanLabel": "timothy-tutor",
+      "deployments": {
+        "alpha": {
+          "pod": "elohim-timothy-alpha-0",
+          "node": "thinkc-p0h",
+          "requests": { "cpu_m": 250, "memory_Mi": 1024 },
+          "limits": { "cpu_m": 1000, "memory_Mi": 3072 },
+          "pvc_Gi": 40
+        },
+        "staging": {
+          "pod": "elohim-timothy-staging-0",
+          "node": "intel-nuc",
+          "requests_sum": { "cpu_m": 330, "memory_Mi": 616 },
+          "limits_sum": { "cpu_m": 1400, "memory_Mi": 1952 },
+          "pvc_Gi": 15
+        }
+      }
+    },
+    "adam": {
+      "humanLabel": "adam-firstman",
+      "deployments": {
+        "alpha": {
+          "pod": "elohim-adam-alpha-0",
+          "node": "shem",
+          "requests": { "cpu_m": 500, "memory_Mi": 2048 },
+          "limits": { "cpu_m": 2000, "memory_Mi": 6144 },
+          "pvc_Gi": 40,
+          "warning": "STRANDED on NotReady shem; openebs-hostpath PVC tied to node"
+        }
+      }
+    },
+    "frank": {
+      "humanLabel": "frank-farmer",
+      "deployments": {
+        "alpha": {
+          "pod": "elohim-frank-alpha-0",
+          "node": "shem",
+          "requests": { "cpu_m": 250, "memory_Mi": 512 },
+          "limits": { "cpu_m": 1000, "memory_Mi": 1536 },
+          "pvc_Gi": 40,
+          "warning": "STRANDED on NotReady shem"
+        },
+        "prod": {
+          "pod": "elohim-frank-prod-0",
+          "node": "intel-nuc",
+          "requests_sum": { "cpu_m": 330, "memory_Mi": 616 },
+          "limits_sum": { "cpu_m": 1400, "memory_Mi": 1952 },
+          "pvc_Gi": 15
+        }
+      }
+    },
+    "pete": {
+      "humanLabel": "pete-pastor",
+      "deployments": {
+        "alpha": {
+          "pod": "elohim-pete-alpha-0",
+          "node": "shem",
+          "requests": { "cpu_m": 250, "memory_Mi": 512 },
+          "limits": { "cpu_m": 1000, "memory_Mi": 1536 },
+          "pvc_Gi": 40,
+          "warning": "STRANDED on NotReady shem"
+        },
+        "staging": {
+          "pod": "elohim-pete-staging-0",
+          "node": "intel-nuc",
+          "requests_sum": { "cpu_m": 330, "memory_Mi": 616 },
+          "limits_sum": { "cpu_m": 1400, "memory_Mi": 1952 },
+          "pvc_Gi": 15
+        }
+      }
+    }
+  },
+  "elohimSharedInfra": {
+    "alpha": [
+      { "workload": "elohim-doorway-alpha", "node": "intel-nuc", "requests": { "cpu_m": 110, "memory_Mi": 160 }, "limits": { "cpu_m": 500, "memory_Mi": 640 } },
+      { "workload": "elohim-site-alpha", "node": "intel-nuc", "requests": { "cpu_m": 100, "memory_Mi": 128 }, "limits": { "cpu_m": 200, "memory_Mi": 256 } },
+      { "workload": "mongodb-alpha", "node": "intel-nuc", "requests": { "cpu_m": 100, "memory_Mi": 256 }, "limits": { "cpu_m": 500, "memory_Mi": 512 } },
+      { "workload": "nats-alpha", "node": "intel-nuc", "requests": { "cpu_m": 50, "memory_Mi": 64 }, "limits": { "cpu_m": 250, "memory_Mi": 256 } }
+    ]
+  },
+  "headroom": {
+    "scope": "Ready nodes only (excludes shem)",
+    "totalAllocatable": { "cpu_m": 46000, "memory_Mi": 133726, "ephemeralStorage_Gi": 6943 },
+    "totalCommitted": { "cpu_m": 11180, "memory_Mi": 23142 },
+    "totalHeadroom": { "cpu_m": 34820, "memory_Mi": 110584 },
+    "byNodeType": {
+      "performance": { "headroom_cpu_m": 19970, "headroom_memory_Mi": 54776 },
+      "operations":  { "headroom_cpu_m": 4950,  "headroom_memory_Mi": 8258  },
+      "edge":        { "headroom_cpu_m": 8750,  "headroom_memory_Mi": 18917 },
+      "storage":     { "headroom_cpu_m": 1150,  "headroom_memory_Mi": 13171 }
+    },
+    "shemUnavailable": { "cpu_m": 24000, "memory_Mi": 128751, "ephemeralStorage_Gi": 294 }
+  },
+  "anomalies": [
+    "shem (remote, 24c/128Gi) NotReady since 2026-04-30T19:11:21Z — 4 days. Tainted unreachable. Holds 3 stranded elohim humans (adam, frank-alpha, pete-alpha) and 1 Terminating sonarqube pod. openebs-hostpath PVCs on shem cannot move without data loss.",
+    "ee-sonarqube-sonarqube-0 stuck Terminating on shem since 2026-04-30T19:16:56Z (deletionTimestamp set, node unreachable).",
+    "Harbor: 7 of 9 containers (core, database, portal, redis, registry, registryctl, jobservice, exporter) have NO requests AND NO limits set. Uncapped — could starve neighbors on ethosengine/thinkc-p1s/hp-micro10 if Harbor is hit hard (e.g., during a build storm pulling many images).",
+    "intel-nuc limits overcommitted: 135% CPU, 112% memory. If the 7+ pods scheduled here all spike, OOMKills are possible. This is also where mongodb-alpha and nats-alpha live — single point of failure for elohim-alpha and elohim-staging/prod.",
+    "thinkc-p1s memory limits overcommitted at 122%.",
+    "thinkc-p0t CPU limits at 100% (no headroom for spikes).",
+    "hp-micro10 CPU limits 150% on a 2-core node — nexus alone can claim all of it.",
+    "kube-prom-stack-prometheus-node-exporter-sk5mh on thinkc-p0t has 7215 lifetime restarts (last 12d ago, currently stable). Worth investigating cause even though it's not crashing now.",
+    "openebs jiva replica pvc-0b391c00-…-rep-1 on thinkc-p0t in CrashLoopBackOff with 2894 restarts. Consistent with the known jiva snapshot-chain issue (per memory feedback_openebs_jiva_snapshot_chain.md) — patch MAX_CHAIN_LENGTH on the jiva-ctrl Deployment.",
+    "metrics-server is NOT running on this cluster — `kubectl top` returns 'Metrics API not available'. The actual-usage column of this ledger cannot be filled until metrics-server is restored or Prometheus queries are added.",
+    "ee-harbor-database-0 (postgres) PVC is only 1Gi on microk8s-hostpath. If Harbor is used heavily, this fills fast; no replication.",
+    "ethosengine (which memory said was NotReady 2026-04-24) is currently Ready. The cluster known-issues memory may be stale — only shem is NotReady right now.",
+    "openebs ns hosts 127 running pods; this is the largest single namespace by pod count and dominates control-plane chatter.",
+    "Cluster is using v1.29.15 — within microk8s LTS but k8s 1.29 reaches upstream EOL Feb 2026; consider planning an upgrade window."
+  ],
+  "stewardCommitmentsTotal": {
+    "requests_cpu_m": 1400,
+    "requests_memory_Mi": 3808,
+    "limits_cpu_m": 5500,
+    "limits_memory_Mi": 18688,
+    "pvc_Gi": 286,
+    "note": "Excludes the 7 unset Harbor containers and the dynamic Jenkins build agents; real footprint is higher."
+  },
+  "elohimCommitmentsTotal": {
+    "requests_cpu_m": 4090,
+    "requests_memory_Mi": 9080,
+    "limits_cpu_m": 15800,
+    "limits_memory_Mi": 35968,
+    "pvc_Gi": 320,
+    "note": "Sum across alpha + prod + staging + shared infra; includes stranded shem pods."
+  }
+}

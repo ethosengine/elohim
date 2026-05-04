@@ -3,7 +3,7 @@
   "$schemaVersion": "rakia-steward-commitment-1.0",
   "description": "Operator-authored ledger of cluster compute commitments. Genesis devops artifact (Category C). Derived from compute-capacity-snapshot.json (live kubectl snapshot).",
   "snapshotTimestamp": "2026-05-04T00:00:00Z",
-  "snapshotMethod": "live kubectl from intel-nuc, hand-curated by operator (Matthew). See compute-capacity-snapshot.json at repo root for the raw audit trail. Future: regenerate via genesis/orchestrator/scripts/snapshot-capacity.sh.",
+  "snapshotMethod": "live kubectl from intel-nuc, hand-curated by operator (Matthew). Raw audit trail archived at genesis/data/rakia/snapshots/2026-05-04/snapshot.json with operator's narrative at .../REVIEW.md. Future: regenerate via genesis/orchestrator/scripts/snapshot-capacity.sh.",
 
   "cluster": {
     "name": "alpha",
