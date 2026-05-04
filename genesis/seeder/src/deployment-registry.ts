@@ -1,9 +1,19 @@
 /**
  * Deployment Registry Loader
  *
- * Single source of truth for "which humans have StatefulSets provisioned
- * on the cluster right now." Consumed by the seeder to filter packages;
- * also the file the elohim-edge Jenkinsfile stage reads for provisioning.
+ * Returns the PRESENCE set — every human declared in deployments.json,
+ * regardless of `suspended` flag. This set drives "whose account package
+ * should be imported into the network" — i.e., whose ContributorPresence,
+ * relationships, stewardship, and authored content should land on a peer's
+ * storage. Per the contract in
+ * docs/superpowers/specs/2026-05-04-compute-commitment-substrate-floor-design.md,
+ * presence is attribution-class and is independent of compute liveness.
+ *
+ * Note: the field name `deployedHumanIds` predates the presence/compute
+ * decoupling. It is preserved for back-compat; semantically it is the
+ * presence set. The active-compute set (humans whose storage can receive
+ * imports) is derived separately from topology.json by the genesis pipeline,
+ * passed in as SEEDER_TARGET_PEERS, and consumed by seed-accounts.ts.
  *
  * Resolution order:
  *   1. opts.deployedHumans (explicit list, from --deployed-humans flag

@@ -861,11 +861,33 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                 container('builder') {
                     script {
                         def doorwayHost = env.RESOLVED_DOORWAY_HOST
-                        // SEEDER_TARGET_PEERS (optional): comma-separated storage URLs.
-                        // When set, accounts are hash-mod distributed across peers instead
-                        // of all going through the single doorway. Spreads author load and
-                        // diversifies the DHT genesis authorship across bootstrap anchors.
-                        def targetPeers = (env.SEEDER_TARGET_PEERS ?: '').trim()
+                        // SEEDER_TARGET_PEERS: comma-separated storage URLs for active
+                        // compute peers (storage that is online and can receive imports).
+                        //
+                        // The package set being imported is the PRESENCE set — every human
+                        // in deployments.json regardless of suspended flag, so suspended
+                        // contributors retain their ContributorPresence on the network.
+                        // The TARGET set is the COMPUTE set — only non-suspended humans'
+                        // storage URLs, derived from topology.json (already filtered by the
+                        // edge pipeline's `findAll { !it.suspended }`).
+                        //
+                        // Suspended humans (e.g. adam/pete/frank during shem outage) appear
+                        // as authored sources in imported packages — never as POST targets.
+                        // Contract: docs/superpowers/specs/2026-05-04-compute-commitment-substrate-floor-design.md.
+                        //
+                        // Override via env.SEEDER_TARGET_PEERS to force a specific target list
+                        // (e.g. for staged rollouts or a single-peer dev seed).
+                        def targetPeers
+                        if ((env.SEEDER_TARGET_PEERS ?: '').trim()) {
+                            targetPeers = env.SEEDER_TARGET_PEERS.trim()
+                        } else {
+                            def humans = getHumanStorageUrls('alpha')
+                            // getHumanStorageUrls reads topology.json which is already filtered
+                            // to non-suspended humans by the edge pipeline. Each storage URL is
+                            // an active compute peer that can receive /account/import POSTs.
+                            def computeUrls = humans.collect { "http://${it.storageUrl}" }
+                            targetPeers = computeUrls.join(',')
+                        }
                         catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
                             dir('genesis/seeder') {
                                 sh """#!/bin/bash
