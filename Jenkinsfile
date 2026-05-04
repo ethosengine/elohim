@@ -87,48 +87,8 @@ def shouldRunStep(String stepName) {
 }
 
 def deployAppToEnvironment(String environment, String namespace, String deploymentName, String manifestPath, String imageTag) {
-    echo "Deploying to ${environment}: ${imageTag}"
-
-    // Validate ConfigMap exists
-    sh "kubectl get configmap elohim-config-${environment} -n ${namespace} || { echo 'ConfigMap missing'; exit 1; }"
-
-    // Update deployment manifest with image tag and deploy version label
-    def outputFile = manifestPath.replace('.yaml', "-${environment}.rendered.yaml")
-    sh "sed -e 's/SITE_TAG_PLACEHOLDER/${imageTag}/g' -e 's/DEPLOY_VERSION_PLACEHOLDER/${imageTag}/g' ${manifestPath} > ${outputFile}"
-
-    // Fail fast if any placeholders remain
-    def remaining = sh(script: "grep -c '_PLACEHOLDER' ${outputFile} || true", returnStdout: true).trim()
-    if (remaining != '0') {
-        error "Unresolved placeholders in ${outputFile}!"
-    }
-
-    // Preview manifest
-    sh """
-        echo '==== Deployment manifest preview ===='
-        grep 'image:\\|app.kubernetes.io/version:' ${outputFile}
-        echo '===================================='
-    """
-
-    // Pre-deploy: check for ingress hostname conflicts
-    sh "bash genesis/orchestrator/scripts/check-ingress-conflicts.sh ${outputFile} ${namespace}"
-
-    // Deploy and rollout
-    sh "kubectl apply -f ${outputFile}"
-    sh "kubectl rollout restart deployment/${deploymentName} -n ${namespace}"
-    sh "kubectl rollout status deployment/${deploymentName} -n ${namespace} --timeout=300s"
-
-    // Verify deployed image
-    sh """
-        echo '==== Verifying deployed image ===='
-        kubectl get deployment ${deploymentName} -n ${namespace} -o jsonpath='{.spec.template.spec.containers[0].image}'
-        echo ''
-        echo '=================================='
-    """
-
-    // Post-deploy: detect stale resources (advisory only)
-    sh "bash genesis/orchestrator/scripts/detect-stale-resources.sh ${namespace} ${imageTag} elohim-site || true"
-
-    echo "${environment} deployment completed!"
+    def helpers = load 'genesis/orchestrator/scripts/deploy-helpers.groovy'
+    helpers.deployAppToEnvironment(environment, namespace, deploymentName, manifestPath, imageTag)
 }
 
 def buildSophiaPlugin() {
