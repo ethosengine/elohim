@@ -116,7 +116,6 @@ spec:
                     checkout scm
                     script {
                         env.GIT_COMMIT_HASH = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
-                        env.GIT_COMMIT_FULL = sh(script: 'git rev-parse HEAD', returnStdout: true).trim()
                     }
                 }
             }
@@ -186,6 +185,7 @@ spec:
                         cd app
                         cp elohim-library/images/Dockerfile ./Dockerfile.storybook
                         cp elohim-library/images/nginx.conf ./nginx.conf
+                        trap 'rm -f Dockerfile.storybook nginx.conf' EXIT
 
                         buildctl --addr unix:///run/buildkit/buildkitd.sock \\
                             build \\
@@ -194,8 +194,6 @@ spec:
                             --local context=. \\
                             --local dockerfile=. \\
                             --output type=image,name=elohim-storybook:${IMAGE_TAG},push=false,oci-mediatypes=true
-
-                        rm -f Dockerfile.storybook nginx.conf
                     '''
                 }
             }
@@ -228,6 +226,12 @@ spec:
             steps {
                 container('builder') {
                     script {
+                        // Apply networking first — idempotent, no image dependency.
+                        // If these fail, old Deployment + old networking still serve.
+                        sh "kubectl apply -f genesis/orchestrator/manifests/elohim-storybook/alpha/service.yaml"
+                        sh "kubectl apply -f genesis/orchestrator/manifests/elohim-storybook/alpha/ingress.yaml"
+
+                        // Then Deployment via helper (waits for rollout status).
                         def helpers = load 'genesis/orchestrator/scripts/deploy-helpers.groovy'
                         helpers.deployStaticToEnvironment(
                             'alpha',
@@ -237,8 +241,6 @@ spec:
                             env.IMAGE_TAG,
                             'elohim-storybook'
                         )
-                        sh "kubectl apply -f genesis/orchestrator/manifests/elohim-storybook/alpha/service.yaml"
-                        sh "kubectl apply -f genesis/orchestrator/manifests/elohim-storybook/alpha/ingress.yaml"
                     }
                 }
             }
@@ -252,8 +254,9 @@ spec:
                         set -euo pipefail
                         URL="https://storybook.elohim.host/index.json"
                         echo "Verifying ${URL} ..."
-                        for i in $(seq 1 12); do
-                            HTTP_CODE=$(curl -s -o /tmp/index.json -w '%{http_code}' --max-time 10 ${URL} || echo "000")
+                        # 36 × 10s = 6 min budget — covers cert-manager LetsEncrypt issuance on first deploy
+                        for i in $(seq 1 36); do
+                            HTTP_CODE=$(curl -s -o /tmp/index.json -w '%{http_code}' --max-time 15 ${URL} || echo "000")
                             if [ "${HTTP_CODE}" = "200" ]; then
                                 ENTRIES=$(python3 -c 'import json; print(len(json.load(open("/tmp/index.json"))["entries"]))')
                                 echo "VERIFIED: ${ENTRIES} stories indexed at ${URL}"
@@ -263,27 +266,29 @@ spec:
                                 fi
                                 exit 0
                             fi
-                            echo "Attempt ${i}/12 returned ${HTTP_CODE}, retrying in 5s..."
-                            sleep 5
+                            echo "Attempt ${i}/36 returned ${HTTP_CODE}, retrying in 10s..."
+                            sleep 10
                         done
-                        echo "FAILED: ${URL} did not return 200 within 60s"
+                        echo "FAILED: ${URL} did not return 200 within 360s"
                         exit 1
                     '''
                 }
             }
         }
 
-        stage('Cleanup') {
-            when { expression { env.PIPELINE_SKIPPED != 'true' } }
-            steps {
-                container('builder') {
-                    sh 'rm -rf app/elohim-library/dist || true'
-                }
-            }
-        }
     }
 
     post {
+        always {
+            script {
+                if (env.PIPELINE_SKIPPED != 'true') {
+                    // Defensive: trap in Build Image stage handles primary cleanup,
+                    // but cover the case where the trap was bypassed somehow.
+                    sh 'rm -rf app/elohim-library/dist || true'
+                    sh 'rm -f app/Dockerfile.storybook app/nginx.conf || true'
+                }
+            }
+        }
         success {
             script {
                 if (env.PIPELINE_SKIPPED != 'true') {
