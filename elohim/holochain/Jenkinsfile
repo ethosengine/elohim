@@ -1536,6 +1536,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                         namespace: h.namespace,
                                         resourcePrefix: h.resourcePrefix,
                                         storageUrl: "http://${h.resourcePrefix}.${h.namespace}.svc.cluster.local:8090",
+                                        genesisPeer: (h.genesisPeer == true),
                                     ]}
                                 ])
                             )

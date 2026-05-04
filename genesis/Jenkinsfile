@@ -47,10 +47,18 @@ def resolveInternalDoorwayUrl(String doorwayHost) {
 }
 
 def resolveInternalStorageUrl(String doorwayHost) {
-    // Points to the genesis peer's per-human storage for preflight checks.
-    // Alpha: Adam is the genesis peer (direct seed recipient).
+    // Points to a genesis peer's per-human storage for preflight checks.
+    // The genesis peer set is declared in genesis/orchestrator/data/deployments.json
+    // (genesisPeer:true) — but this resolver fires before topology.json is read,
+    // so the per-env mapping is hardcoded. Keep these in sync with the active
+    // genesis peer for each env.
+    //   alpha:   matthew (adam is suspended pending shem replacement)
+    //   staging: pete-staging was the genesis peer; suspended along with pete
+    //            at the human level — point at matthew-staging when staging is
+    //            re-enabled, otherwise this URL is dormant.
+    //   prod:    frank-prod, same suspension story; revisit before prod runs.
     if (doorwayHost.contains('alpha.elohim.host')) {
-        return 'elohim-adam-alpha.elohim-alpha.svc.cluster.local:8090'
+        return 'elohim-matthew-alpha.elohim-alpha.svc.cluster.local:8090'
     } else if (doorwayHost.contains('staging.elohim.host')) {
         return 'elohim-pete-staging.elohim-staging.svc.cluster.local:8090'
     } else if (doorwayHost.contains('elohim.host') && !doorwayHost.contains('alpha') && !doorwayHost.contains('staging')) {
@@ -75,10 +83,11 @@ def getHumanStorageUrls(String ignored) {
             def topo = new groovy.json.JsonSlurper().parseText(readFile(topoPath))
             return topo.humans.collect { h ->
                 [
-                    humanId:    h.humanId,
-                    service:    h.resourcePrefix,
-                    namespace:  h.namespace,
-                    storageUrl: h.storageUrl.replaceFirst('^https?://', ''),
+                    humanId:     h.humanId,
+                    service:     h.resourcePrefix,
+                    namespace:   h.namespace,
+                    storageUrl:  h.storageUrl.replaceFirst('^https?://', ''),
+                    genesisPeer: (h.genesisPeer == true),
                 ]
             }
         } catch (Exception e) {
@@ -86,16 +95,15 @@ def getHumanStorageUrls(String ignored) {
         }
     }
 
-    // Fallback: all humans in alpha — proper replication before environment splitting
-    // Adam is first: he is the genesis peer that receives the direct seed write.
-    // All other peers replicate from Adam via P2P identity-driven replication.
+    // Fallback: alpha-concentration when topology.json is missing/unparseable.
+    // Genesis peers (genesisPeer:true) ingest content directly during seeding;
+    // everyone else replicates via P2P. Both flags below mirror the active
+    // entries in genesis/orchestrator/data/deployments.json — when adam returns
+    // (shem replacement), restore his row with genesisPeer:true.
     def humans = [
-        [humanId: 'human-adam-firstman',    service: 'elohim-adam-alpha',      namespace: 'elohim-alpha'],
-        [humanId: 'human-matthew-manager',  service: 'elohim-matthew-alpha',   namespace: 'elohim-alpha'],
-        [humanId: 'human-jessica-spouse',   service: 'elohim-jessica-alpha',   namespace: 'elohim-alpha'],
-        [humanId: 'human-pete-pastor',      service: 'elohim-pete-alpha',      namespace: 'elohim-alpha'],
-        [humanId: 'human-timothy-tutor',    service: 'elohim-timothy-alpha',   namespace: 'elohim-alpha'],
-        [humanId: 'human-frank-farmer',     service: 'elohim-frank-alpha',     namespace: 'elohim-alpha'],
+        [humanId: 'human-matthew-manager',  service: 'elohim-matthew-alpha',   namespace: 'elohim-alpha', genesisPeer: true],
+        [humanId: 'human-jessica-spouse',   service: 'elohim-jessica-alpha',   namespace: 'elohim-alpha', genesisPeer: false],
+        [humanId: 'human-timothy-tutor',    service: 'elohim-timothy-alpha',   namespace: 'elohim-alpha', genesisPeer: false],
     ]
     return humans.collect { h ->
         h + [storageUrl: "${h.service}.${h.namespace}.svc.cluster.local:8090"]
@@ -557,46 +565,53 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                 container('builder') {
                     script {
                         def humans = getHumanStorageUrls('alpha')
-                        def adam = humans.find { it.humanId == 'human-adam-firstman' }
-                        if (adam == null) {
-                            error("Genesis peer 'human-adam-firstman' not found in topology")
+                        def genesisPeers = humans.findAll { it.genesisPeer == true }
+                        if (genesisPeers.isEmpty()) {
+                            error("No genesis peer found in topology — at least one human in deployments.json must have genesisPeer:true (and must not be suspended). See genesis/orchestrator/data/deployments.json.")
                         }
-                        def otherPeers = humans.findAll { it.humanId != 'human-adam-firstman' }
+                        def replicaPeers = humans.findAll { it.genesisPeer != true }
+
+                        echo "Genesis peers (direct ingest): ${genesisPeers.collect { it.humanId }.join(', ')}"
+                        echo "Replica peers (P2P replication): ${replicaPeers.collect { it.humanId }.join(', ')}"
 
                         dir('genesis/seeder') {
-                            sh """#!/bin/bash
-                                set -euo pipefail
+                            for (gp in genesisPeers) {
+                                sh """#!/bin/bash
+                                    set -euo pipefail
 
-                                echo "═══════════════════════════════════════════════════════════"
-                                echo "🌱 SEEDING GENESIS PEER: ${adam.humanId}"
-                                echo "═══════════════════════════════════════════════════════════"
-                                echo "Storage: ${adam.storageUrl}"
-                                echo ""
+                                    echo "═══════════════════════════════════════════════════════════"
+                                    echo "🌱 SEEDING GENESIS PEER: ${gp.humanId}"
+                                    echo "═══════════════════════════════════════════════════════════"
+                                    echo "Storage: ${gp.storageUrl}"
+                                    echo ""
 
-                                # Wait for Adam's storage to be ready
-                                for i in \$(seq 1 60); do
-                                    if curl -sf "http://${adam.storageUrl}/health" > /dev/null 2>&1; then
-                                        echo "✅ ${adam.service} storage is ready"
-                                        break
-                                    fi
-                                    if [ \$i -eq 60 ]; then
-                                        echo "❌ ${adam.service} storage not ready after 60 attempts"
-                                        exit 1
-                                    fi
-                                    echo "   Waiting for ${adam.service} storage... (\$i/60)"
-                                    sleep 2
-                                done
+                                    # Wait for genesis peer's storage to be ready
+                                    for i in \$(seq 1 60); do
+                                        if curl -sf "http://${gp.storageUrl}/health" > /dev/null 2>&1; then
+                                            echo "✅ ${gp.service} storage is ready"
+                                            break
+                                        fi
+                                        if [ \$i -eq 60 ]; then
+                                            echo "❌ ${gp.service} storage not ready after 60 attempts"
+                                            exit 1
+                                        fi
+                                        echo "   Waiting for ${gp.service} storage... (\$i/60)"
+                                        sleep 2
+                                    done
 
-                                # Direct seed: Adam ingests all content via SQLite write.
-                                # Other peers replicate from Adam via P2P identity-driven replication.
-                                STORAGE_URL="http://${adam.storageUrl}" npx tsx src/seed-sqlite.ts
+                                    # Direct seed: genesis peers ingest content via SQLite write.
+                                    # Replica peers receive it via P2P identity-driven replication.
+                                    # Idempotent — safe to run across multiple genesis peers in
+                                    # sequence; each peer's SQLite settles to the same content set.
+                                    STORAGE_URL="http://${gp.storageUrl}" npx tsx src/seed-sqlite.ts
 
-                                echo ""
-                                echo "✅ ${adam.humanId} seeded successfully"
-                                echo ""
-                            """
+                                    echo ""
+                                    echo "✅ ${gp.humanId} seeded successfully"
+                                    echo ""
+                                """
+                            }
 
-                            for (peer in otherPeers) {
+                            for (peer in replicaPeers) {
                                 sh """#!/bin/bash
                                     set -euo pipefail
 
@@ -669,7 +684,12 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                 container('builder') {
                     script {
                         def humans = getHumanStorageUrls('alpha')
-                        def genesisUrl = humans[0].storageUrl
+                        def genesisPeers = humans.findAll { it.genesisPeer == true }
+                        if (genesisPeers.isEmpty()) {
+                            error("No genesis peer found in topology — at least one human in deployments.json must have genesisPeer:true (and must not be suspended).")
+                        }
+                        def genesisPeer = genesisPeers[0]
+                        def genesisUrl = genesisPeer.storageUrl
 
                         sh '''#!/bin/bash
                             echo "═══════════════════════════════════════════════════════════"
@@ -690,11 +710,13 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                             """
                         }
 
-                        // Verify sophia assessment content on the genesis peer (Adam)
+                        // Verify sophia assessment content on the first genesis peer.
+                        // (Idempotent direct seeding means every genesis peer has the
+                        // same content; the first one is sufficient for the spot-check.)
                         sh """#!/bin/bash
                             set -euo pipefail
                             echo ""
-                            echo "🔬 Verifying assessment content on genesis peer (Adam)..."
+                            echo "🔬 Verifying assessment content on genesis peer (${genesisPeer.humanId})..."
                             for ASSESSMENT_ID in assessment-personal-values assessment-values-hierarchy; do
                                 ASSESSMENT=\$(curl -sf "http://${genesisUrl}/db/content/\$ASSESSMENT_ID" || echo '{}')
                                 FMT=\$(echo "\$ASSESSMENT" | jq -r '.contentFormat // empty')

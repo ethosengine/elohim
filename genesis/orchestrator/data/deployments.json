@@ -12,6 +12,8 @@
       "deviceArchetype": "device-family-node-base",
       "affinityComment": "Adam: remote-side bootstrap anchor on shem — mirrors Matthew's role across WireGuard",
       "nodeTypes": ["remote"],
+      "genesisPeer": true,
+      "$genesisPeerComment": "Adam + Matthew form the genesis pair: each ingests content directly during seeding so the payload settles across two peers in parallel rather than serially through one. Currently masked by suspended:true (shem dead) — when adam returns, this flag re-activates the pair without a pipeline edit.",
       "suspended": true,
       "$suspendedComment": "shem decommissioned 2026-05-04 (PSU failure, physical death). 40 GiB openebs-hostpath PVC unrecoverable. Re-enable requires either replacement remote-labeled hardware OR re-bootstrap with new agent key (seeded chain lost). See COMPUTE-CAPACITY-REVIEW.md."
     },
@@ -25,6 +27,8 @@
       "deviceArchetype": "device-family-node-base",
       "affinityComment": "Matthew: household bootstrap anchor + doorway host — requires performance node",
       "nodeTypes": ["performance"],
+      "genesisPeer": true,
+      "$genesisPeerComment": "Matthew + Adam form the genesis pair (see adam.$genesisPeerComment). With adam suspended, matthew is the sole genesis peer until shem is replaced; the pipeline tolerates 1..N genesis peers.",
       "$comment": "TEMP BUMP (2026-04-17): seeder routes all /account/import traffic through matthew-alpha's storage; 4Gi/2000m OOMed with RESTARTS=2 serving 3409 content items to 33 parallel imports. Archetype floor for device-family-node-base is 1Gi/4Gi + 500m/2000m — restore once seeder import is split across peers or backpressure lands.",
       "edgenodeMemoryRequest": "2Gi",
       "edgenodeMemoryLimit": "8Gi",
