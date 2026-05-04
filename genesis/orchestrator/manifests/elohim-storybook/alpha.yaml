@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: elohim-storybook-alpha
-  namespace: elohim-alpha
+  namespace: ethosengine
   labels:
     app: elohim-storybook-alpha
     app.kubernetes.io/name: elohim-storybook

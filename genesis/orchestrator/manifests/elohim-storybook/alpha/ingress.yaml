@@ -2,7 +2,7 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: elohim-storybook-alpha-ingress
-  namespace: elohim-alpha
+  namespace: ethosengine
   labels:
     app.kubernetes.io/name: elohim-storybook
     app.kubernetes.io/instance: elohim-storybook-alpha

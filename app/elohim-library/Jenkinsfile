@@ -226,21 +226,28 @@ spec:
             }
         }
 
-        stage('Deploy to Alpha') {
+        stage('Deploy') {
             when { expression { env.PIPELINE_SKIPPED != 'true' } }
             steps {
                 container('builder') {
                     script {
+                        // Storybook lives in the ethosengine tooling namespace,
+                        // not elohim-<env> — it's a dev surface, not a P2P peer
+                        // environment. ethosengine has no default-deny-cross-env
+                        // NetworkPolicy, so ingress-nginx hostNetwork traffic
+                        // reaches the backend pod regardless of which node it
+                        // landed on. (See memory: storybook routing diagnosis
+                        // 2026-05-04.)
+                        //
                         // Apply networking first — idempotent, no image dependency.
-                        // If these fail, old Deployment + old networking still serve.
                         sh "kubectl apply -f genesis/orchestrator/manifests/elohim-storybook/alpha/service.yaml"
                         sh "kubectl apply -f genesis/orchestrator/manifests/elohim-storybook/alpha/ingress.yaml"
 
                         // Then Deployment via helper (waits for rollout status).
                         def helpers = load 'genesis/orchestrator/scripts/deploy-helpers.groovy'
                         helpers.deployStaticToEnvironment(
-                            'alpha',
-                            'elohim-alpha',
+                            'tooling',
+                            'ethosengine',
                             'elohim-storybook-alpha',
                             'genesis/orchestrator/manifests/elohim-storybook/alpha.yaml',
                             env.IMAGE_TAG,
