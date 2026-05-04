@@ -12,6 +12,7 @@
 #   elohim/elohim-compute/   → cargo fmt + clippy + tests
 #   steward/node/            → cargo fmt + clippy + tests
 #   app/elohim-library/      → tsc type-check + vitest tests
+#   elohim-storybook         → Storybook 10 static build (when storybook sources or build-manifest change)
 #   genesis/                 → schema validation + tests
 #   schema-validate          → protocol schema seed validation (genesis/ or schema changes)
 #   schema-dna               → DNA conformance check (holochain/ or schema changes)
@@ -388,6 +389,11 @@ run_gate() {
         pnpm exec eslint projects/elohim-service/src projects/lamad-ui/src projects/html5-app-plugin/src 2>&1 && \
         (cd projects/elohim-service && pnpm exec tsc --noEmit) 2>&1 && \
         (cd projects/elohim-service && pnpm exec vitest run) 2>&1
+        rc=$?
+        ;;
+      elohim-storybook)
+        echo "[$PROJECT_NAME] Running Storybook 10 build (validates .storybook config + story discovery + index)..."
+        pnpm run build-storybook 2>&1
         rc=$?
         ;;
       genesis)
