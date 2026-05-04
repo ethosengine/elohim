@@ -531,6 +531,35 @@ describe('drift detection: mirror vs live Jenkinsfile', () => {
       `Mirror: ${JSON.stringify(mirror)}\n` +
       `Live:   ${JSON.stringify(live)}`);
   });
+
+  it('PIPELINES changePatterns in mirror match each pipeline block in Jenkinsfile', () => {
+    // Catches the exact drift class that bit 57f15bd5 (added genesis/orchestrator/data/
+    // to elohim-edge changePatterns in Jenkinsfile, forgot to mirror in .mjs).
+    // For each pipeline name, regex its changePatterns array out of the Groovy block
+    // and compare to the JS mirror's array (sorted, since order is not semantic).
+    const re = /'([a-z][a-z0-9-]*)'\s*:\s*\[[^\]]*?changePatterns\s*:\s*\[([^\]]*)\]/gs;
+    const live = {};
+    let m;
+    while ((m = re.exec(source)) !== null) {
+      const items = [...m[2].matchAll(/'([^']+)'/g)].map((x) => x[1]);
+      live[m[1]] = items;
+    }
+    const drifted = [];
+    for (const [name, mirror] of Object.entries(PIPELINES)) {
+      const livePatterns = live[name];
+      if (!livePatterns) continue; // pipelines without changePatterns blocks are fine
+      const a = [...mirror.changePatterns].sort();
+      const b = [...livePatterns].sort();
+      if (JSON.stringify(a) !== JSON.stringify(b)) {
+        drifted.push({ name, mirror: a, live: b });
+      }
+    }
+    assert.deepEqual(drifted, [],
+      `Mirror PIPELINES changePatterns drifted from Jenkinsfile @Field def PIPELINES blocks.\n` +
+      drifted.map((d) =>
+        `  ${d.name}:\n    mirror: ${JSON.stringify(d.mirror)}\n    live:   ${JSON.stringify(d.live)}`
+      ).join('\n'));
+  });
 });
 
 // ══════════════════════════════════════════════════════════════════

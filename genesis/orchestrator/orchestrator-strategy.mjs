@@ -32,7 +32,7 @@ export const PIPELINES = {
   },
   'elohim-edge': {
     jenkinsPath: 'elohim/holochain/Jenkinsfile',
-    changePatterns: ['doorway/doorway-service/', 'doorway/doorway-app/', 'elohim/elohim-agent/elohim-agent-sdk/', 'elohim/holochain/edgenode/', 'elohim/elohim-storage/', 'elohim/elohim-cache-core/', 'crates/', 'genesis/orchestrator/manifests/', 'genesis/orchestrator/environments/', 'VERSION'],
+    changePatterns: ['doorway/doorway-service/', 'doorway/doorway-app/', 'elohim/elohim-agent/elohim-agent-sdk/', 'elohim/holochain/edgenode/', 'elohim/elohim-storage/', 'elohim/elohim-cache-core/', 'crates/', 'genesis/orchestrator/manifests/', 'genesis/orchestrator/environments/', 'genesis/orchestrator/data/', 'VERSION'],
     dependsOn: ['elohim-holochain'],
     cascades: undefined,
     manualOnly: false,
