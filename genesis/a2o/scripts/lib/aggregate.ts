@@ -5,6 +5,14 @@ import type { ConsoleArtifact } from './load-console.js';
 import type { GapFinding } from './load-coverage-gap.js';
 import type { ScenarioResult } from './load-cucumber.js';
 
+const VISUAL_VALIDATION_TAG = '@elohim-visually-validated';
+
+const PLAYWRIGHT_PROFILES = new Set(['browser', 'delivery-browser']);
+
+function isPlaywrightProfile(profile: string): boolean {
+  return PLAYWRIGHT_PROFILES.has(profile);
+}
+
 export type FindingSource =
   | 'console-error'
   | 'page-error'
@@ -39,6 +47,12 @@ export interface SprintReport {
   summary: {
     scenarios: { total: number; passed: number; failed: number; skipped: number; pending: number };
     findings: { total: number; bySource: Record<string, number>; byPillar: Record<string, number> };
+    visualValidation?: {
+      validatedPassing: number;
+      validatedRegressed: number;
+      pendingPassing: number;
+      pendingFailing: number;
+    };
   };
   findings: Finding[];
 }
@@ -194,6 +208,25 @@ function computeSummary(scenarios: ScenarioResult[], findings: Finding[]): Sprin
   };
 }
 
+function computeVisualValidation(
+  scenarios: ScenarioResult[]
+): NonNullable<SprintReport['summary']['visualValidation']> {
+  const counts = {
+    validatedPassing: 0,
+    validatedRegressed: 0,
+    pendingPassing: 0,
+    pendingFailing: 0,
+  };
+  for (const s of scenarios) {
+    const validated = s.tags.includes(VISUAL_VALIDATION_TAG);
+    if (validated && s.status === 'passed') counts.validatedPassing += 1;
+    else if (validated && s.status === 'failed') counts.validatedRegressed += 1;
+    else if (!validated && s.status === 'passed') counts.pendingPassing += 1;
+    else if (!validated && s.status === 'failed') counts.pendingFailing += 1;
+  }
+  return counts;
+}
+
 export function aggregate(input: AggregateInput): SprintReport {
   const raws = [
     ...buildScenarioRaws(input.scenarios),
@@ -203,6 +236,10 @@ export function aggregate(input: AggregateInput): SprintReport {
 
   const findings = groupIntoFindings(raws);
   const summary = computeSummary(input.scenarios, findings);
+
+  if (isPlaywrightProfile(input.profile)) {
+    summary.visualValidation = computeVisualValidation(input.scenarios);
+  }
 
   return {
     generatedAt: new Date().toISOString(),

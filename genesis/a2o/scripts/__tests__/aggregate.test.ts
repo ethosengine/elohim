@@ -173,4 +173,87 @@ void describe('aggregate', () => {
       assert.ok(f.suggestedObjective && f.suggestedObjective.length > 0);
     }
   });
+
+  function visualScenarios(): ScenarioResult[] {
+    return [
+      // validated-passing
+      {
+        name: 'Validated and passing',
+        feature: 'features/lamad/a.feature',
+        status: 'passed',
+        tags: ['@e2e', '@elohim-visually-validated'],
+      },
+      // validated-regressed
+      {
+        name: 'Validated but failed',
+        feature: 'features/lamad/b.feature',
+        status: 'failed',
+        failureMessage: 'AssertionError: visual element missing',
+        tags: ['@e2e', '@elohim-visually-validated'],
+      },
+      // pending-passing
+      {
+        name: 'Untagged passing',
+        feature: 'features/lamad/c.feature',
+        status: 'passed',
+        tags: ['@e2e'],
+      },
+      // pending-failing
+      {
+        name: 'Untagged failed',
+        feature: 'features/lamad/d.feature',
+        status: 'failed',
+        failureMessage: 'AssertionError: nope',
+        tags: ['@e2e'],
+      },
+    ];
+  }
+
+  void it('emits summary.visualValidation when profile is browser', () => {
+    const r = aggregate({
+      scenarios: visualScenarios(),
+      consoleArtifacts: [],
+      gaps: [],
+      runId: 'r1',
+      profile: 'browser',
+    });
+    assert.ok(r.summary.visualValidation, 'visualValidation should be present');
+    assert.equal(r.summary.visualValidation!.validatedPassing, 1);
+    assert.equal(r.summary.visualValidation!.validatedRegressed, 1);
+    assert.equal(r.summary.visualValidation!.pendingPassing, 1);
+    assert.equal(r.summary.visualValidation!.pendingFailing, 1);
+  });
+
+  void it('emits summary.visualValidation when profile is delivery-browser', () => {
+    const r = aggregate({
+      scenarios: visualScenarios(),
+      consoleArtifacts: [],
+      gaps: [],
+      runId: 'r1',
+      profile: 'delivery-browser',
+    });
+    assert.ok(r.summary.visualValidation);
+  });
+
+  void it('omits summary.visualValidation when profile is alpha', () => {
+    const r = aggregate({
+      scenarios: visualScenarios(),
+      consoleArtifacts: [],
+      gaps: [],
+      runId: 'r1',
+      profile: 'alpha',
+    });
+    assert.equal(r.summary.visualValidation, undefined);
+  });
+
+  void it('omits summary.visualValidation when profile is local', () => {
+    const r = aggregate({
+      scenarios: visualScenarios(),
+      consoleArtifacts: [],
+      gaps: [],
+      runId: 'r1',
+      profile: 'local',
+    });
+    assert.equal(r.summary.visualValidation, undefined);
+  });
 });
