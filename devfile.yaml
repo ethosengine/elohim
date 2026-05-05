@@ -176,14 +176,13 @@ commands:
           --env SONARQUBE_TOKEN="$SONARQUBE_TOKEN" \
           --env SONARQUBE_URL="$SONARQUBE_URL" \
           -- java -jar /opt/mcp/sonarqube-mcp.jar
-        # Configure Jenkins MCP (requires mcp-server plugin and allowTokenAccessWithoutOicSession)
+        # Jenkins MCP is NOT registered globally. It's scoped per-subagent via inline
+        # `mcpServers` frontmatter in .claude/agents/{ci-observer,ci-investigator,after-action}.md
+        # so the parent context doesn't load ~14 Jenkins tool schemas. The agents that
+        # need Jenkins materialize the connection on dispatch; everyone else stays clean.
+        # Anonymous transport (no Authorization header — OIDC would redirect-loop) is
+        # configured inside each agent file. See the agent file frontmatter for details.
         claude mcp remove jenkins 2>/dev/null || true
-        if [ -n "$JENKINS_USERNAME" ] && [ -n "$JENKINS_TOKEN" ]; then
-          JENKINS_AUTH=$(echo -n "$JENKINS_USERNAME:$JENKINS_TOKEN" | base64)
-          claude mcp add jenkins "$JENKINS_URL/mcp-server/mcp" \
-            --transport http \
-            --header "Authorization: Basic $JENKINS_AUTH"
-        fi
 
         # Configure GitHub CLI authentication
         if [ -n "$GH_TOKEN" ]; then
