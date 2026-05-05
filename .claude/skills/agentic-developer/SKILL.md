@@ -65,9 +65,61 @@ closes with done or a clean bail.
    a follow-up Objective candidate. CI efficiency is correctness too —
    silent matrix rebuilds waste real time and mask real signal.
 
+## Shift modes
+
+A shift runs in one of two modes, decided at kickoff and encoded in the journal header. The mode shapes the iteration loop's shape, the observer/investigator dispatch pattern, and how aggressively you parallelize fix attempts during build waits.
+
+### Bring-up mode (default when CI is broken)
+
+The shift's job is to get back to stable delivery. Single Objective, single failing dimension you're driving down — typically *"failing pipeline X from FAILURE to SUCCESS / UNSTABLE on dev"*.
+
+- ci-observer returns the **single first failing stage** with its error_class. That's enough to act on.
+- Iteration loop is the classic shape: ground → observe → verify → act on ONE hypothesis → measure → judge → journal.
+- Build waits are mostly idle; you may use them for diagnostic reads, never for parallel fix attempts (a parallel attempt risks confusing measurement when the bring-up build returns).
+- Done = stable delivery achieved, two consecutive passing measurements with at least one fresh trigger.
+
+### Integration iteration mode (when CI is already stable enough to run)
+
+The cluster is up, deploys are landing, scenarios are running. The work is grinding the long tail: **multiple classes** of test failures, missing implementations to finish, console errors to clear, CI dispatch efficiency to improve. The Objective for an integration shift is plural — drive down the failure surface across as many classes as the budget allows.
+
+- ci-observer returns **multiple candidate failures** (top N classes by occurrence or impact), not just the first one. Schema change: see "Follow-up: multi-candidate haiku-output" below.
+- ci-investigator may be dispatched in **parallel** against several candidates' artifact pointers — the candidates are independent.
+- The iteration loop interleaves: while a build is running with attempt-A's commit, you investigate candidates B, C, D and prepare their attempts. When the build returns, judge attempt-A; on its result, push the next batch (B+C if independent, just B if A taught you something that affects C).
+- Budget: **5 iteration loops** by default for integration mode (vs the user-specified iteration budget in bring-up). Within those 5, the goal is breadth — touch as many classes as the dispatch graph allows without breaking each other.
+- The "validate change detection" principle (principle 7) is doubly load-bearing in integration mode — silent over-builds eat the wait windows you'd otherwise spend on candidate fixes.
+
+### Mode detection at kickoff
+
+The kickoff routine determines mode by reading the last orchestrator build's result on the shift's branch:
+
+```
+mcp__jenkins__getBuild jobFullName="elohim-orchestrator/dev"  # or matching branch
+```
+
+| Last orchestrator result | Likely mode |
+|---|---|
+| `SUCCESS` or `UNSTABLE` (deployed, stable enough) | **integration iteration** |
+| `FAILURE`, `ABORTED`, `NOT_BUILT` | **bring-up** |
+| Build is currently running | wait for it (use `ScheduleWakeup`); decide on its result |
+| No recent builds (cold branch) | **bring-up** (treat as broken until proven otherwise) |
+
+Confirm the mode read with the user during the Objective interview — they may have context the build status doesn't reflect ("yes deploy is green but I'm here to fix one specific scenario, run as bring-up"). Mode is recorded in the journal header.
+
+### Follow-up: multi-candidate haiku-output
+
+Integration mode requires `ci-observer` to return multiple failure candidates per dispatch, not just `primary_failure`. Today the haiku-output schema has `primary_failure: object | null`; it needs an additional `failure_candidates: array` for integration mode (or for any time the orchestrator wants the broader picture). Scope of that change:
+
+- Schema change in `.claude/schemas/haiku-output.schema.json` — add optional `failure_candidates` array, each entry shaped like `primary_failure`.
+- Update `.claude/agents/ci-observer.md` to populate it in integration-mode dispatches.
+- Update orchestrator dispatch prompts to opt into multi-candidate mode explicitly.
+
+Until that change lands, integration-mode shifts work by dispatching `ci-observer` multiple times against the same build with different artifact pointers, and the orchestrator manually composing the candidate set.
+
 ## Kickoff (interactive — first 2-3 minutes)
 
 When `/shift` invokes this skill:
+
+0. **Detect shift mode.** Before the Objective interview, read the last orchestrator build on the shift's branch (typically `dev`) per "Mode detection at kickoff" above. Record the detected mode in your kickoff context — `bring-up` or `integration-iteration` — and surface it during the interview so the user can confirm or override. The mode shapes the questions you ask in step 1 (an integration-mode Objective is plural; a bring-up Objective is singular) and the budget defaults you propose.
 
 1. **Interview the user for the Objective.** Ask short, pointed questions:
 
@@ -134,11 +186,20 @@ logs, test results, orchestrator output, changesets. **You never read
 raw Jenkins logs directly.** The observer absorbs the text bomb and
 returns a structured summary on `.claude/schemas/haiku-output.schema.json`.
 
+The observer reports **only** API-grounded facts (build_id, status,
+first_failing_stage, counts) and closed-taxonomy classifications
+(`error_class` from failure-taxonomy, `pattern_id` from
+anti-patterns). It **never** quotes log content, names files
+mentioned in logs, or infers line numbers — Haiku confidently
+hallucinates specifics, so it's been structurally prevented from
+making them. Specifics are step 3's job.
+
 Two modes:
 
 - **Summarize** (default) — pass `iteration`, `build_id`, prior
-  measurement context. Observer returns failure summary, anti-patterns,
-  confidence.
+  measurement context. Observer returns the categorical summary,
+  anti-pattern IDs, and an `artifacts_pulled` list (URLs/MCP refs the
+  caller can re-dispatch against).
 - **Validate** — pass a predicted pipeline set (from step 4's
   graph-walker pre-flight) plus the orchestrator's `build_id`. Observer
   returns the same summary plus a `dispatch_drift` verdict (`expected`,
@@ -148,21 +209,36 @@ For non-Jenkins observation (filesystem state, command output that's
 not from CI), an inline Haiku `Task` dispatch is fine. Always pin the
 output schema in the prompt.
 
-If `confidence: low` comes back from the observer, escalate to step 3.
+Whenever you need a specific claim — a quoted error, a file path
+mentioned in the log, a line number, cross-build correlation — escalate
+to step 3. `confidence: low` is one trigger; needing specifics to act
+is the more common one.
 
-### 3. Verify (Sonnet dispatch, optional)
+### 3. Verify (Sonnet dispatch — the only path to specifics)
 
-If the observer's `confidence` is `low`, OR you suspect the summary:
+You dispatch `ci-investigator` (Sonnet, read-only) whenever you need a
+**specific factual claim**. Common triggers:
 
-- contradicts prior iteration findings
-- is suspiciously clean given the change surface
-- is missing critical detail (line numbers, file paths, timing)
-- needs cross-build correlation (flake history, deploy chain)
+- The observer reported an `error_class` but you need the actual error
+  text to pick a fix.
+- A failure references a file path you need to read or edit.
+- You suspect the summary contradicts prior iteration findings or is
+  suspiciously clean given the change surface.
+- You need cross-build correlation (flake history, regression bisection,
+  deploy chain).
+- The observer returned `confidence: low`.
 
-For CI/CD-shaped questions, dispatch the `ci-investigator` agent
-(Sonnet, read-only). It already knows pipeline architecture, changeset
-patterns, and triage order — no need to re-brief. Return analysis,
-not directives.
+Hand the investigator:
+- The artifact URLs / MCP refs from the observer's `artifacts_pulled`.
+- A specific question ("what file did the cucumber-expression error at
+  first_failing_stage reference?", "give me the exact stderr at the
+  WASM build failure", "has this scenario failed in any of the last 10
+  builds on dev?").
+
+The investigator reads the actual artifact, quotes what it sees, and
+distinguishes read-from-source vs inferred. Every specific claim it
+returns is traceable to a tool result it can name. If it can't ground
+a claim, it says so — that's a useful answer.
 
 For non-CI verification (project-domain code analysis, test logic),
 dispatch Sonnet via `Task` tool with a specific directive AND the
@@ -202,6 +278,22 @@ Pick ONE action:
   the trigger surface. The `[build:<pipeline>]` tag overrides
   changeset analysis, so for retriggers the predicted set is exactly
   what the tag names.
+- **Parameterized rebuild (authenticated).** When the rebuild needs a
+  parameter value the Jenkinsfile default doesn't carry — canonical case
+  `RESET_STORAGE=true` for elohim-genesis schema-drift recovery — the
+  empty-commit path is insufficient. You (the orchestrator, not
+  subagents) may issue `curl -u "$JENKINS_USERNAME:$JENKINS_TOKEN"
+  ... /buildWithParameters?...` autonomously, with no per-use user
+  prompt — but only after **verifying** that no alpha-touching pipeline
+  is in flight and no recent trigger of the target pipeline is too
+  fresh. The gate is verified Jenkins state (from `mcp__jenkins__getJob`
+  reads), not user consent. If you can't verify — MCP unavailable,
+  ambiguous responses, partial reads — defer and re-check, or bail with
+  an explicit question. Guessing is disqualifying. Read
+  `.claude/skills/pipeline-diagnostics/SKILL.md` → "Parameterized
+  rebuild (authenticated)" for guardrails (queue check, build-storm
+  prevention, leaves-not-roots, destructive-parameter awareness, token
+  never logged) and the curl pattern.
 - **Nothing.** You're waiting on a prior action; next iteration is
   `observe-only`.
 
@@ -246,6 +338,30 @@ In the same write:
 - Done or bail → go to Close.
 - Otherwise → `ScheduleWakeup` with an appropriate delay, then return to
   step 1 next wake.
+
+## Iteration loop adaptations in integration mode
+
+The 8-step skeleton is the same, but four steps adapt:
+
+**Step 2 (Observe).** Dispatch ci-observer with multi-candidate intent — ask for the top N (3-5) candidate failures across the build, not just `first_failing_stage`. Until the multi-candidate schema lands, do this by either (a) one observer dispatch with a prompt that asks for primary + secondary candidates inline (less rigorous, schema doesn't enforce it), or (b) sequential observer dispatches each scoped to a different artifact (sprint-report findings, console errors per scenario, ci-summary). Compose the candidate set yourself.
+
+**Step 3 (Verify — parallel).** Dispatch ci-investigator in parallel against multiple candidates' artifact pointers. Each dispatch is a separate Agent invocation with its own scoped question. Collect the specific findings, then fan back in to the orchestrator's decision step. The candidates should be **independent** for parallel investigation — if candidate B's diagnosis depends on candidate A's outcome, sequence them.
+
+**Step 4 (Act — fill the wait productively).** Bring-up mode treats the build wait as idle. Integration mode treats it as work time. While attempt-A's build is running:
+- Investigate candidates B, C, D (parallel ci-investigator dispatches).
+- Stage candidate B's edit and run graph-walker on it to predict its dispatch set.
+- Do NOT push B before A's build returns — pushing both compounds change-detection signal and you can't attribute outcomes. Push sequentially: A returns → judge → push B → continue investigation on C, D.
+- Exception: when A's build is running and B is **provably independent** (different pillar, no shared changeset paths, no overlapping CI surface), you may push B as a separate empty-or-edit commit. The orchestrator's webhook supersedes A's run with the new diff if A is still in flight, so this is rarely worth the risk. Default sequential.
+
+**Step 6 (Judge).** Decision table extends:
+
+| Decision | Meaning | Next iteration |
+|----------|---------|----------------|
+| (existing rows still apply) | | |
+| candidate-cleared | one candidate's measurement passed; others remain | continue with next candidate |
+| candidate-stalled | this candidate didn't move; demote it, advance to next | continue |
+
+Stability still requires two consecutive passing measurements, but in integration mode the predicate is per-candidate. The shift is "done" when the per-candidate measurements all stabilize OR the 5-loop budget is exhausted — whichever first. Bail if you've exhausted the candidate set without progress on any.
 
 ## Sonnet delegation patterns
 

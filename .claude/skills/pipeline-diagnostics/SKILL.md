@@ -1,11 +1,23 @@
 ---
 name: pipeline-diagnostics
-description: Use when a build failed, when comparing two Jenkins builds to measure a fix's impact, when checking whether a specific commit landed in a build, when reading a2o sprint-report findings, or when retrieving any archived CI artifact. Also use when `mcp__jenkins__*` tools are absent from your tool list and you'd otherwise give up or grep the repo blindly — public Jenkins URLs + WebFetch work. Triggers: "did my fix land?", "why is the next build still failing?", "what's in the sprint-report?"
+description: Use when a build failed, when comparing two Jenkins builds to measure a fix's impact, when checking whether a specific commit landed in a build, when reading a2o sprint-report findings, or when retrieving any archived CI artifact. Also use when `mcp__jenkins__*` tools are absent from your tool list (some subagent contexts) and you'd otherwise give up or grep the repo blindly — public Jenkins URLs + WebFetch work as a fallback. Triggers: "did my fix land?", "why is the next build still failing?", "what's in the sprint-report?"
 ---
 
 # Pipeline Diagnostics
 
-This skill helps diagnose CI/CD pipeline issues for the Elohim project using Jenkins. It covers two access paths — Jenkins MCP (preferred when connected) and direct WebFetch against public URLs (fallback, always works) — plus the retrieval workflows for sprint-reports, cucumber reports, and build-to-commit correlation.
+This skill helps diagnose CI/CD pipeline issues for the Elohim project using Jenkins. It covers two access paths — Jenkins MCP (preferred, primary) and direct WebFetch against public URLs (fallback for contexts where MCP isn't loaded) — plus the retrieval workflows for sprint-reports, cucumber reports, and build-to-commit correlation.
+
+## Auth model — read this first
+
+Jenkins is OIDC-protected. There are **two access paths**, with sharply different guardrails:
+
+**1. Anonymous (default — used by the MCP and unauthenticated WebFetch).** No `Authorization` header — explicit auth would trigger an interactive OIDC login flow and break the connection. The MCP transport runs in this mode. Consequences:
+- **All read tools work.** `getBuild`, `getBuildLog`, `searchBuildLog`, `getJob`, `getJobs`, `getBuildChangeSets`, `getTestResults`, `getFlakyFailures`, `getStatus`, `getBuildScm`, `getJobScm` — the anonymous role has Overall.Read and Job.Read on `https://jenkins.ethosengine.com`. Use these freely.
+- **Write tools fail.** `mcp__jenkins__triggerBuild` and `mcp__jenkins__updateBuild` won't work via the MCP — anonymous lacks `Job.Build`. For un-parameterized retriggers, use the webhook-driven path: push a commit (optionally with a `[build:<pipeline>]` tag — see "Forcing a pipeline" below).
+
+**2. Authenticated (`JENKINS_USERNAME` + `JENKINS_TOKEN`, orchestrator-only).** Devspace env carries `JENKINS_USERNAME`, `JENKINS_TOKEN`, and `JENKINS_URL`. A direct `curl -u "$JENKINS_USERNAME:$JENKINS_TOKEN"` call against the Jenkins API can do what anonymous can't — **including parameterized builds** (e.g. `RESET_STORAGE=true` for elohim-genesis schema-drift recovery, where the `[build:*]` tag mechanism is insufficient because tags carry pipeline membership but not parameter values).
+
+This second path is **reserved for the shift Opus orchestrator** and may be used autonomously — no per-use user confirmation — but only against **verified** Jenkins state. The orchestrator must KNOW (from reading actual Jenkins responses) that the trigger won't cause pipeline interruptions or build storms. Guessing, "should be fine," or "probably nothing else is running" is disqualifying. See "Parameterized rebuild (authenticated)" below for what verified means, the workflow, and the curl pattern.
 
 ## Quickstart: "I pushed a fix — is it in a build yet and did it help?"
 
@@ -72,11 +84,11 @@ This is the workflow run 90% of the time. Don't grep the repo, don't guess URLs 
 | `elohim-genesis` | Per-scenario console errors | `genesis/a2o/reports/console/<scenario>.json` |
 | `elohim-app` | Test results | check job's test trend; surface via `mcp__jenkins__getTestResults` |
 
-## Two access paths — pick based on what's available in the session
+## Two access paths — MCP first, WebFetch as fallback
 
-### Path A — Jenkins MCP (when `mcp__jenkins__*` tools appear in your tool list)
+### Path A — Jenkins MCP (primary)
 
-Use MCP tools for anything involving large log searches or test-result enumeration. They return structured data and handle auth.
+The MCP is registered as anonymous in the devspace devfile and connects on workspace start. All read tools work; trigger tools don't (see "Auth model" above). Use MCP for anything involving large log searches, test-result enumeration, or structured changeset queries.
 
 ```
 mcp__jenkins__getJob jobFullName="elohim-genesis/dev"
@@ -84,14 +96,15 @@ mcp__jenkins__getBuild jobFullName="elohim-genesis/dev" buildNumber=935
 mcp__jenkins__searchBuildLog jobFullName="elohim-genesis/dev" pattern="error|failed" ignoreCase=true contextLines=3
 mcp__jenkins__getTestResults jobFullName="elohim-app/dev" onlyFailingTests=true
 mcp__jenkins__getBuildChangeSets jobFullName="elohim-genesis/dev" buildNumber=935
-mcp__jenkins__triggerBuild jobFullName="elohim-genesis/dev"
 ```
 
-### Path B — WebFetch (when MCP isn't connected, e.g., many agent contexts, some Che sessions)
+To trigger a build, do not call `mcp__jenkins__triggerBuild` — anonymous lacks Job.Build. Push a commit, optionally with a `[build:<pipeline>]` tag (see below) to force the orchestrator to dispatch.
 
-**This is proven to work against the public Jenkins — no auth needed for read.** Use the URL patterns from the address book above with `WebFetch`. Pros: always available, no session-bootstrap dance. Cons: no log search, no test-result extraction, no trigger.
+### Path B — WebFetch (fallback)
 
-Detection: check your tool list for `mcp__jenkins__*`. If absent, **do not** waste a turn asking an agent to try MCP — it'll fail the same way. Go straight to WebFetch.
+Use when MCP isn't loaded — typically subagent contexts that don't inherit the parent's MCP set, or new Che sessions before postStart finishes. The URL patterns in the address book above don't need auth for reads. Pros: always available, no session-bootstrap dance. Cons: no log search, no test-result extraction.
+
+Detection: check your tool list for `mcp__jenkins__*`. If absent in a subagent, **do not** waste a turn re-dispatching to ask MCP — it won't appear retroactively. Go straight to WebFetch.
 
 ## Pipeline timing reference
 
@@ -148,9 +161,11 @@ Don't abuse `[build:all]` — each pipeline costs minutes. Prefer the narrowest 
 
 | Thought | Reality |
 |--------|---------|
-| "Jenkins MCP isn't connected, I can't check the build." | WebFetch against the public Jenkins works. The URL patterns in the address book above don't need auth for reads. |
+| "Jenkins MCP isn't connected, I can't check the build." | MCP is anonymous-mode and connects automatically on workspace start. If it's truly missing in a subagent, fall back to WebFetch — public Jenkins reads need no auth. |
+| "Let me call `mcp__jenkins__triggerBuild` to retry." | Anonymous can't trigger builds. Push an empty commit with `[build:<pipeline>]` in the message; the orchestrator webhook will dispatch. |
+| "I'll add `Authorization: Basic <token>` to make MCP authenticated." | Don't. OIDC will intercept the auth attempt and 302 you into a redirect loop. Anonymous reads cover the entire diagnostic workflow. |
 | "Let me grep the repo for the error." | The repo doesn't know what happened in CI. Fetch the sprint-report or console log. |
-| "Let me spawn a ci-pipeline subagent to check." | Subagent has the same MCP availability you do. If it's missing for you, it's missing for them. Use WebFetch directly. |
+| "Let me spawn a ci-investigator subagent to check." | Subagent may or may not have MCP loaded. If missing, it falls back to WebFetch. Either way, scope its task tightly. Prefer `ci-observer` (Haiku) for surface scans; reserve `ci-investigator` (Sonnet) for cross-build correlation or low-confidence escalation. |
 | "I'll assume the build ran against my latest commit." | Assume nothing. Correlate SHA via `changeSets[].items[].commitId` before reading findings as proof-of-fix. |
 | "99 → 90 failures means my fix barely worked." | Check fingerprints, not raw counts. A cascade-root fix drops 5 fingerprints at once; net failures may stay flat if pendings change. |
 | "The build status is green, so we're done." | Sprint-report aggregator is non-blocking — build can be SUCCESS with 90 scenario failures. Always pull the report. |
@@ -400,19 +415,154 @@ Look at the failed stage name to determine which pipeline component failed:
 ### 5. Check artifacts (if the stage produced output)
 The sprint-report is the fastest path to understanding which tests failed and why. Don't read cucumber-report.json directly unless you need the full stack — the sprint-report has the fingerprinted findings ranked by occurrence.
 
-## Triggering Builds
+## Triggering Builds — webhook + commit-tags, not MCP
 
-### Retry Failed Build
+`mcp__jenkins__triggerBuild` is unavailable to the anonymous MCP user. The canonical trigger surface is the GitHub webhook landing on `elohim-orchestrator`, which analyzes the changeset and dispatches downstream pipelines.
+
+### Retry a failed build for the same commit
+Make an empty commit (or amend with `--no-edit` and force-push only on a feature branch you own) and push:
 ```
-Use mcp__jenkins__triggerBuild with jobFullName="elohim-holochain"
+git commit --allow-empty -m "ci: retrigger [build:edge]"
+git push
 ```
 
-### Trigger with Parameters
+### Force a pipeline whose changeset analysis missed
+Push a commit (or amend the head commit's message) containing a `[build:<pipeline>]` tag:
 ```
-Use mcp__jenkins__triggerBuild with:
-  jobFullName="elohim-genesis"
-  parameters={"SKIP_SEEDING": "false", "ENVIRONMENT": "dev"}
+[build:edge]      # elohim-edge (Rust doorway + storage + deploy)
+[build:dna]       # elohim-holochain (DNA/hApp only)
+[build:app]       # elohim (Angular)
+[build:genesis]   # elohim-genesis (a2o + seed)
+[build:sophia]    # elohim-sophia
+[build:steward]   # elohim-steward
+[build:all]       # every non-manualOnly pipeline
 ```
+Comma-separated forms work: `[build:edge,genesis]`. See "Forcing a pipeline with `[build:*]` commit tags" above for full details.
+
+### Trigger with parameters
+The webhook path doesn't accept arbitrary build parameters — those are pipeline-defined defaults. To vary `SKIP_SEEDING`, `ENVIRONMENT`, `RESET_STORAGE`, etc., use the **authenticated path** below. (Editing Jenkinsfile defaults and pushing also works for permanent changes, but is wrong for one-off operational unblocks.)
+
+## Parameterized rebuild (authenticated)
+
+This section governs the only sanctioned way for Claude to trigger parameterized Jenkins builds. The credentials live in env (`JENKINS_USERNAME`, `JENKINS_TOKEN`, `JENKINS_URL`) and authenticate against `Job.Build` permission, which the anonymous MCP lacks. Power comes with a strict guardrail surface — read both halves before reaching for the curl.
+
+### Who may use this
+
+**Only the shift Opus orchestrator** — and even within /shift, only the orchestrator itself, never the subagents. ci-observer and ci-investigator are read-only instruments that feed Jenkins state to the orchestrator; they do not invoke triggers. The orchestrator owns diagnosis, verification, and the curl.
+
+### When it's appropriate
+
+The `[build:*]` tag mechanism on commit messages forces pipeline membership but cannot pass parameter values. Use the authenticated path when:
+
+- A parameterized stage gates the actual fix. Canonical case: `elohim-genesis` Seed Database stage's `RESET_STORAGE=true` parameter, which clears `content.db` to recover from schema drift (see `feedback_seed_lock_means_schema_drift` memory). Tag-based retrigger inherits the default `false` and reproduces the failure.
+- A diagnostic rebuild needs a value other than the Jenkinsfile default (`SKIP_SEEDING=true`, narrowed `STEPS=...`, alternate `ENVIRONMENT`).
+- The webhook path can't carry the operational intent.
+
+Do **not** reach for the authenticated path when an empty commit with `[build:<pipeline>]` would do — that path is the default for the same reason.
+
+### Hard guardrails
+
+These are structural preconditions, not procedural confirmations. The orchestrator decides — but only on verified Jenkins state, never on guesses.
+
+1. **Verified safety, not user consent, is the gate.** Auto mode covers the routine call; per-use user confirmation is **not** required. What's required is that the orchestrator KNOWS (from actual `getJob`/`getStatus` reads) that triggering won't stomp a concurrent build or cause a build storm. "Guessed," "should be fine," "MCP didn't respond but probably ok" → do not curl. Either re-check after a wait, or bail with an explicit question.
+
+2. **Queue/in-flight verification.** Before triggering, read each alpha-touching pipeline (`elohim-orchestrator`, `elohim-genesis`, `elohim-edge`, `elohim-holochain`, `elohim`) and confirm `lastBuild.building: false`:
+
+   ```
+   mcp__jenkins__getJob jobFullName="<pipeline>/dev"
+   ```
+
+   If any read fails or returns ambiguous data, the precondition is **not met** — do not proceed. Record the queue snapshot in the journal as the evidence basis for the trigger.
+
+3. **Build-storm prevention.** Don't re-trigger the same pipeline within its typical build-cycle time of a prior trigger you (or anyone) issued. Genesis is ~10-15 min, edge is ~25-35 min — see "Pipeline timing reference" above. Track recent trigger timestamps in the shift journal so successive iterations don't compound. If a recent trigger is in flight or just-finished, examine its result first.
+
+4. **Trigger leaves, not roots.** Do not authenticated-trigger `elohim-orchestrator` with parameters — orchestrator dispatches downstream pipelines, multiplying any storm risk. Stick to leaf pipelines (`elohim-genesis` is the canonical leaf for this pattern; `elohim-edge` is acceptable but rarely needs parameterized triggers).
+
+5. **Destructive-parameter awareness.** `RESET_STORAGE=true` does `kubectl exec rm content.db && kubectl delete pod` for each alpha human (`genesis/Jenkinsfile:285-334`). That **stomps any concurrent reader/writer** — a parallel test run against the same pod will see corruption or 503s. Tighten the in-flight check to its strictest reading: if anything alpha-touching is `building: true`, defer.
+
+6. **Token never appears in logs, journals, transcripts, commit messages, or skill files.** Reference only as `$JENKINS_TOKEN`. Same for `$JENKINS_USERNAME` and `$JENKINS_URL`. If a curl needs to be quoted in the journal, use env-var placeholders, never resolved values. Capture only the resulting build number / queue id, not the request headers.
+
+7. **First-use credential verification.** Before the first authenticated request in a session, run a no-op authenticated read to confirm credentials work:
+
+   ```bash
+   curl -sS -u "$JENKINS_USERNAME:$JENKINS_TOKEN" "$JENKINS_URL/api/json?tree=mode" | head -c 200
+   ```
+
+   If that returns Jenkins JSON (not an HTML login page or 403), credentials are good — proceed. If not, journal the failure mode and bail with a question; do not retry blindly. This is sanity, not permission — failed creds mean the env isn't set up right, not that user consent is needed.
+
+### The workflow
+
+1. **Diagnose.** Opus, with ci-observer and ci-investigator evidence, identifies a parameterized rebuild as the right next move. Subagents surface evidence; the orchestrator owns the call.
+
+2. **Verify preconditions.** Per guardrails #2, #3, #4, #5: queue check on each alpha pipeline, recent-trigger check, leaf-not-root check, destructive-parameter strict-reading. If any fails: defer (re-check after a delay) or bail (explicit question to user). Do not curl on partial verification.
+
+3. **Verify credentials** (first use of the session only — guardrail #7). One no-op authenticated read.
+
+4. **Issue the curl.** See pattern below. Record curl invocation in the journal using env-var placeholders, never resolved values.
+
+5. **Capture the response.** Jenkins responds with a queue item Location header on success (`Location: .../queue/item/<n>/`). Record the queue id and the resulting build number. Update the recent-trigger timestamp in the journal for guardrail #3 on next iteration.
+
+6. **Re-enter the observation loop.** From here, normal observer/investigator dispatch applies — wait for the build to run, ci-observer summarizes, ci-investigator escalates if needed.
+
+### Curl pattern
+
+Jenkins API tokens generally bypass CSRF crumb requirements. The minimal trigger:
+
+```bash
+curl -sS -X POST \
+  -u "$JENKINS_USERNAME:$JENKINS_TOKEN" \
+  -D /tmp/jenkins-trigger-headers.txt \
+  "$JENKINS_URL/job/elohim-genesis/job/dev/buildWithParameters?RESET_STORAGE=true"
+
+# Check the Location header for the queue item
+grep -i '^Location:' /tmp/jenkins-trigger-headers.txt
+```
+
+If the install requires a crumb (some hardened setups do), the call will return 403 with a `No valid crumb` message. Recovery:
+
+```bash
+CRUMB=$(curl -sS -u "$JENKINS_USERNAME:$JENKINS_TOKEN" \
+  "$JENKINS_URL/crumbIssuer/api/json" | jq -r '.crumb')
+
+curl -sS -X POST \
+  -u "$JENKINS_USERNAME:$JENKINS_TOKEN" \
+  -H "Jenkins-Crumb: $CRUMB" \
+  "$JENKINS_URL/job/elohim-genesis/job/dev/buildWithParameters?RESET_STORAGE=true"
+```
+
+The exact crumb requirement is install-specific — first-use verification (guardrail #5) tells you which path applies.
+
+### Multiple parameters
+
+Pass each as a separate query parameter:
+
+```
+.../buildWithParameters?RESET_STORAGE=true&SKIP_SEEDING=false&STEPS=all
+```
+
+URL-encode any value containing spaces or special characters.
+
+### Branched job paths
+
+The job path mirrors the multibranch pipeline structure. For `dev`:
+
+| Pipeline | Path fragment |
+|---|---|
+| elohim-genesis on dev | `/job/elohim-genesis/job/dev/` |
+| elohim-edge on dev | `/job/elohim-edge/job/dev/` |
+| elohim-orchestrator on dev | `/job/elohim-orchestrator/job/dev/` |
+
+Append `buildWithParameters?...` to invoke a parameterized build, or `build` to invoke with defaults (which the webhook path also does).
+
+### Failure modes
+
+| Symptom | Likely cause | Recovery |
+|---|---|---|
+| 401 Unauthorized | Wrong username/token | Check env vars; do not retry blindly |
+| 403 Forbidden, "No valid crumb" | CSRF protection on, token alone insufficient | Use the crumb pattern above |
+| 403 Forbidden, "missing Job.Build permission" | Token lacks build permission | Stop. User must regenerate token with correct scope |
+| 404 Not Found | Wrong job path (branch encoding, pipeline name) | Verify with `curl ... /api/json?tree=jobs[name]` |
+| 200 OK but no Location header | Build was queued but routing changed | Check `getJob` for the new build |
 
 ## Key Jenkinsfile Locations
 

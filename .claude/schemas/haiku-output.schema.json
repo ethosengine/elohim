@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://elohim.protocol/schemas/agentic/haiku-output.schema.json",
   "title": "Haiku Observation Output",
-  "description": "Bounded structured summary returned by Haiku-tier observation (the shift loop's step 2 dispatch and the ci-observer agent). The optional dispatch_drift field is populated only by ci-observer when invoked in validate mode against a predicted pipeline set.",
+  "description": "Bounded structured summary returned by Haiku-tier observation (the shift loop's step 2 dispatch and the ci-observer agent). Haiku-tier observers report only API-grounded facts (status codes, build IDs, counts) and closed-taxonomy classifications (anti-pattern IDs, error_class enum). They do NOT quote log content, name files mentioned in logs, or infer line numbers — that work belongs to ci-investigator (Sonnet) which the caller dispatches when specifics are needed. The dispatch_drift field is populated only by ci-observer in validate mode against a predicted pipeline set.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -11,6 +11,7 @@
     "context",
     "primary_failure",
     "observed_anti_patterns",
+    "artifacts_pulled",
     "confidence"
   ],
   "properties": {
@@ -35,23 +36,30 @@
       "properties": {
         "build_id": { "type": ["integer", "null"] },
         "status": { "enum": ["passed", "failed", "running", "unknown"] },
-        "first_failing_stage": { "type": ["string", "null"] }
+        "first_failing_stage": {
+          "type": ["string", "null"],
+          "description": "Name of the first failing Jenkins stage as returned by mcp__jenkins__getBuild — NOT inferred from log content."
+        }
       }
     },
 
     "primary_failure": {
+      "description": "Categorical classification of the failure — what kind of bucket it falls in. NOT a description of the specific error. Use error_class from the failure-taxonomy.json categories. The source_artifact pointer tells the caller where to dispatch ci-investigator if specifics are needed.",
       "oneOf": [
         { "type": "null" },
         {
           "type": "object",
           "additionalProperties": false,
-          "required": ["error_class", "evidence", "files_mentioned"],
+          "required": ["error_class", "source_artifact"],
           "properties": {
-            "error_class": { "type": "string", "minLength": 1 },
-            "evidence": { "type": "string", "minLength": 1 },
-            "files_mentioned": {
-              "type": "array",
-              "items": { "type": "string" }
+            "error_class": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Category from .claude/data/failure-taxonomy.json (e.g. 'DNA_BUILD', 'APP_BUILD', 'INFRASTRUCTURE'). Closed enum — never a free-form description."
+            },
+            "source_artifact": {
+              "type": "string",
+              "description": "URL or MCP tool name where the details live. Caller dispatches ci-investigator with this pointer to extract specifics. Examples: 'mcp__jenkins__searchBuildLog jobFullName=elohim-edge/dev buildNumber=42 pattern=error[E', 'https://jenkins.ethosengine.com/job/elohim-genesis/job/dev/966/artifact/genesis/a2o/reports/sprint-report.md'."
             }
           }
         }
@@ -60,21 +68,52 @@
 
     "observed_anti_patterns": {
       "type": "array",
+      "description": "Anti-pattern IDs from genesis/agentic/data/anti-patterns.json that matched. Closed taxonomy — Haiku never invents new patterns or describes what they look like; that's already in the catalog.",
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["pattern", "evidence"],
+        "required": ["pattern_id"],
         "properties": {
-          "pattern": { "type": "string", "minLength": 1 },
-          "evidence": { "type": "string", "minLength": 1 }
+          "pattern_id": {
+            "type": "string",
+            "pattern": "^AP-\\d{3}$",
+            "description": "ID from anti-patterns.json (e.g. 'AP-007')."
+          }
         }
       }
     },
 
-    "confidence": { "enum": ["low", "medium", "high"] },
+    "artifacts_pulled": {
+      "type": "array",
+      "description": "Records of which artifacts ci-observer pulled while observing. Lets the caller dispatch ci-investigator at exactly the right URL without re-discovery. Pure factual record of tool calls — not analysis.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["kind", "ref", "status"],
+        "properties": {
+          "kind": {
+            "enum": ["mcp_query", "webfetch_artifact"],
+            "description": "What kind of fetch this was."
+          },
+          "ref": {
+            "type": "string",
+            "description": "MCP tool call (e.g. 'getBuild jobFullName=elohim-edge/dev buildNumber=42') or full URL."
+          },
+          "status": {
+            "enum": ["ok", "not_found", "empty", "error"],
+            "description": "Outcome of the fetch. 'empty' = fetched successfully but the artifact had no content (e.g. sprint-report with 0 scenarios)."
+          }
+        }
+      }
+    },
+
+    "confidence": {
+      "enum": ["low", "medium", "high"],
+      "description": "Confidence that diagnostic-quality data was found, NOT confidence in any analysis. high = artifacts found, status fields all populated, taxonomy match clean. low = artifacts missing, empty, or status unclear (caller should escalate to ci-investigator)."
+    },
 
     "dispatch_drift": {
-      "description": "Populated only by ci-observer in validate mode. Compares the orchestrator's actual pipeline dispatch against a predicted set (typically from graph-walker.mjs run on the diff before push).",
+      "description": "Populated only by ci-observer in validate mode. Compares the orchestrator's actual pipeline dispatch against a predicted set (typically from graph-walker.mjs run on the diff before push). All fields are factual API responses — predicted comes from the caller, actual comes from the orchestrator's own dispatch list.",
       "oneOf": [
         { "type": "null" },
         {
@@ -84,7 +123,7 @@
           "properties": {
             "verdict": {
               "enum": ["expected", "over_built", "under_built", "mixed", "recovery_fallback"],
-              "description": "expected = predicted == actual; over_built = actual ⊃ predicted; under_built = actual ⊊ predicted; mixed = both extras and missing; recovery_fallback = orchestrator fell into a generic 'build all' or 'baselines stale' mode without a real reason."
+              "description": "expected = predicted == actual; over_built = actual ⊃ predicted; under_built = actual ⊊ predicted; mixed = both extras and missing; recovery_fallback = orchestrator fell into a generic 'build all' or 'baselines stale' mode."
             },
             "predicted": { "type": "array", "items": { "type": "string" } },
             "actual": { "type": "array", "items": { "type": "string" } },
@@ -97,10 +136,6 @@
               "type": "array",
               "items": { "type": "string" },
               "description": "Pipelines predicted but not built."
-            },
-            "evidence": {
-              "type": "string",
-              "description": "Brief excerpt from the orchestrator's Determine Build Plan output supporting the verdict."
             }
           }
         }
