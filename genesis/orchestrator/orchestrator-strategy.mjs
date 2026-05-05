@@ -155,8 +155,13 @@ export function analyzePipelineRequirements(changedFiles) {
       }
 
       for (const pattern of config.changePatterns) {
+        // Normalise glob patterns: 'some/dir/**' → directory prefix 'some/dir/'
+        // so that startsWith matching works uniformly.
+        const normalised = pattern.endsWith('/**')
+          ? pattern.slice(0, -2) // strip '**', keep trailing '/'
+          : pattern;
         // Match files inside directory OR bare submodule pointer
-        if (file.startsWith(pattern) || file === pattern.replace(/\/$/, '')) {
+        if (file.startsWith(normalised) || file === normalised.replace(/\/$/, '')) {
           if (!matchedPatterns.includes(pattern)) {
             matchedPatterns.push(pattern);
           }

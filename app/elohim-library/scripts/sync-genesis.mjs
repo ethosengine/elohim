@@ -61,6 +61,9 @@ export const MAPPINGS = [
   { fromGlob: 'a2o/features/auth/*.feature',
     toDir: 'domains/identity/stories/',
     titleFn: (name) => `III. Domains / Identity (Imagodei) / Stories / ${name}` },
+  { fromGlob: 'a2o/features/auth/recovery/*.feature',
+    toDir: 'domains/identity/stories/',
+    titleFn: (name) => `III. Domains / Identity (Imagodei) / Stories / Recovery / ${name}` },
   { fromGlob: 'a2o/features/lamad/*.feature',
     toDir: 'domains/learning/stories/',
     titleFn: (name) => `III. Domains / Learning (Lamad) / Stories / ${name}` },
@@ -80,17 +83,23 @@ export const MAPPINGS = [
     toDir: 'domains/doorway/stories/',
     titleFn: (name) => `III. Domains / Doorway / Stories / ${name}` },
   // IV. Reference — globs
+  // wrapperDir is explicit to prevent the auto-derive from collapsing all four
+  // reference subcategories into the same reference/__docs__/_generated/ dir.
   { fromGlob: 'a2o/features/federation/*.feature',
     toDir: 'reference/federation/',
+    wrapperDir: 'reference/federation/__docs__/_generated/',
     titleFn: (name) => `IV. Reference / Federation / ${name}` },
   { fromGlob: 'a2o/features/resilience/*.feature',
     toDir: 'reference/resilience/',
+    wrapperDir: 'reference/resilience/__docs__/_generated/',
     titleFn: (name) => `IV. Reference / Resilience / ${name}` },
   { fromGlob: 'a2o/features/deployment/*.feature',
     toDir: 'reference/deployment/',
+    wrapperDir: 'reference/deployment/__docs__/_generated/',
     titleFn: (name) => `IV. Reference / Deployment / ${name}` },
   { fromGlob: 'a2o/features/elohim/*.feature',
     toDir: 'reference/cross-cutting/',
+    wrapperDir: 'reference/cross-cutting/__docs__/_generated/',
     titleFn: (name) => `IV. Reference / Cross-cutting Stories / ${name}` },
 ];
 
@@ -177,7 +186,11 @@ export function runSyncWithGlobs(mappings, genesisDir, outDir, wrappersBase) {
       // 2. Write the generated MDX wrapper.
       // Wrapper lives under wrappersBase/<sectionPath>/<slug>.mdx
       // toDir example: 'domains/identity/stories/' → 'domains/identity/__docs__/_generated/'
-      const sectionPath = m.toDir.replace(/\/[^/]+\/?$/, '/__docs__/_generated/');
+      // wrapperDir overrides the auto-derive for reference subcategories that
+      // would otherwise all collapse to 'reference/__docs__/_generated/'.
+      const sectionPath = m.wrapperDir
+        ? m.wrapperDir
+        : m.toDir.replace(/\/[^/]+\/?$/, '/__docs__/_generated/');
       const mdxDest = join(wrappersBase, sectionPath, `${slug}.mdx`);
       mkdirSync(dirname(mdxDest), { recursive: true });
       const title = m.titleFn(niceName);

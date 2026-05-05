@@ -99,3 +99,29 @@ test('runSyncWithGlobs writes both an imported .md AND a generated .mdx wrapper 
   assert.match(mdxContent, /<Markdown>\{content\}<\/Markdown>/);
   rmSync(root, { recursive: true, force: true });
 });
+
+test('runSyncWithGlobs uses wrapperDir override for reference subcategory mappings', () => {
+  const { root, genesis, out } = setupFixtureRepo();
+  mkdirSync(join(genesis, 'a2o/features/federation'), { recursive: true });
+  writeFileSync(join(genesis, 'a2o/features/federation/peer-discovery.feature'), 'Feature: Peer Discovery\n  Scenario: x\n');
+  const wrappersDir = join(out, '..', 'graphos-wrappers');
+  mkdirSync(wrappersDir, { recursive: true });
+  const mappings = [
+    { fromGlob: 'a2o/features/federation/*.feature',
+      toDir: 'reference/federation/',
+      wrapperDir: 'reference/federation/__docs__/_generated/',
+      titleFn: (name) => `IV. Reference / Federation / ${name}` },
+  ];
+  runSyncWithGlobs(mappings, genesis, out, wrappersDir);
+  // Wrapper must land in per-category dir, NOT the collapsed reference/__docs__/_generated/
+  const correctMdx = join(wrappersDir, 'reference/federation/__docs__/_generated/peer-discovery.mdx');
+  const collapsedMdx = join(wrappersDir, 'reference/__docs__/_generated/peer-discovery.mdx');
+  assert.equal(existsSync(correctMdx), true, 'wrapper should exist in per-category wrapperDir');
+  assert.equal(existsSync(collapsedMdx), false, 'wrapper must NOT exist in collapsed reference/__docs__/_generated/');
+  rmSync(root, { recursive: true, force: true });
+});
+
+test('gherkinToMarkdown falls back to fileName when no Feature: line', () => {
+  const md = gherkinToMarkdown('# some comment\nScenario: x\n', 'orphan.feature');
+  assert.match(md, /# orphan\.feature/);
+});

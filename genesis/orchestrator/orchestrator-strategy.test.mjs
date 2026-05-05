@@ -159,6 +159,32 @@ describe('changeset routing', () => {
     });
     assert.equal(pipelines.length, 0);
   });
+
+  it('genesis content edit triggers elohim-storybook', () => {
+    const { pipelines } = simulate({
+      changedFiles: ['genesis/docs/content/elohim-protocol/manifesto.md'],
+    });
+    assert.ok(pipelines.includes('elohim-storybook'),
+      'genesis/docs/content/elohim-protocol/** should trigger elohim-storybook');
+  });
+
+  it('genesis a2o feature edit triggers elohim-storybook AND elohim-genesis', () => {
+    const { pipelines } = simulate({
+      changedFiles: ['genesis/a2o/features/auth/auth-lifecycle.feature'],
+    });
+    assert.ok(pipelines.includes('elohim-storybook'),
+      'genesis/a2o/features/** should trigger elohim-storybook');
+    assert.ok(pipelines.includes('elohim-genesis'),
+      'genesis/a2o/features/** should also trigger elohim-genesis (genesis/ pattern)');
+  });
+
+  it('genesis/graphos/** edit triggers elohim-storybook', () => {
+    const { pipelines } = simulate({
+      changedFiles: ['genesis/graphos/vocabulary.md'],
+    });
+    assert.ok(pipelines.includes('elohim-storybook'),
+      'genesis/graphos/** should trigger elohim-storybook');
+  });
 });
 
 // ── Cascade / Dependency Propagation ────────────────────────────
