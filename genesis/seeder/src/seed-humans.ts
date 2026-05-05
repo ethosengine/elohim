@@ -103,7 +103,7 @@ async function registerHuman(
     bio: human.bio,
     affinities: human.affinities ?? [],
     profileReach: human.profileReach,
-    agencyPhase: human.agencyPhase ?? 'visitor',
+    agencyPhase: human.agencyPhase ?? 'hosted',
   };
 
   if (isAdmin && adminBootstrapKey) {
@@ -205,9 +205,12 @@ async function main(): Promise<void> {
   }
   const humansJson: HumansJson = JSON.parse(readFileSync(jsonPath, 'utf-8'));
 
-  // Filter to active humans (those with a non-visitor agencyPhase)
+  // Filter to active humans (everyone except the visitor-category persona).
+  // Humans with no explicit agencyPhase default to "hosted" at registration —
+  // they get a doorway-managed account without a dedicated infra archetype.
+  // Only the Traveler persona (category=visitor) is intentionally unseeded.
   const active = humansJson.humans.filter(
-    h => h.agencyPhase && h.agencyPhase !== 'visitor'
+    h => h.category !== 'visitor' && h.agencyPhase !== 'visitor'
   );
 
   console.log('=== Seed Humans ===\n');
@@ -237,7 +240,7 @@ async function main(): Promise<void> {
 
     const icon =
       result.result === 'registered' ? '+' : result.result === 'exists' ? '=' : 'X';
-    const phase = human.agencyPhase ?? 'visitor';
+    const phase = human.agencyPhase ?? 'hosted';
     const suffix = result.error ? ` (${result.error})` : '';
     console.log(
       `  [${icon}] ${result.displayName.padEnd(16)} ${result.identifier.padEnd(40)} ${phase}${suffix}`
