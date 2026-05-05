@@ -1,5 +1,24 @@
 import type { SprintReport, Finding } from './aggregate.js';
 
+function renderVisualValidation(report: SprintReport): string[] {
+  const v = report.summary.visualValidation;
+  if (!v) return [];
+  const lines: string[] = [];
+  lines.push(`## Visual Validation`);
+  lines.push('');
+  lines.push(`|  | passed | failed |`);
+  lines.push(`|---|---|---|`);
+  lines.push(`| has \`@elohim-visually-validated\` | ${v.validatedPassing} | **${v.validatedRegressed}** |`);
+  lines.push(`| no tag (pending review) | ${v.pendingPassing} | ${v.pendingFailing} |`);
+  lines.push('');
+  lines.push(`- **${v.validatedPassing}** validatedPassing — confirmed delivering as designed`);
+  lines.push(`- **${v.validatedRegressed}** validatedRegressed — see \`visual-regression\` findings below`);
+  lines.push(`- **${v.pendingPassing}** pendingPassing — candidates for review`);
+  lines.push(`- **${v.pendingFailing}** pendingFailing — see \`scenario-failure\` findings below`);
+  lines.push('');
+  return lines;
+}
+
 export function renderMarkdown(report: SprintReport): string {
   const lines: string[] = [];
   lines.push(`# A2O Sprint Report`);
@@ -22,6 +41,8 @@ export function renderMarkdown(report: SprintReport): string {
   );
   lines.push('');
 
+  lines.push(...renderVisualValidation(report));
+
   const byPillar = new Map<string, Finding[]>();
   for (const f of report.findings) {
     const arr = byPillar.get(f.pillar) ?? [];
@@ -38,6 +59,7 @@ export function renderMarkdown(report: SprintReport): string {
       lines.push(`> ${f.message}`);
       lines.push('');
       if (f.firstSeenUrl) lines.push(`- URL: ${f.firstSeenUrl}`);
+      if (f.screenshotPath) lines.push(`- **Screenshot**: \`${f.screenshotPath}\``);
       lines.push(`- **Objective**: ${f.suggestedObjective}`);
       lines.push('');
       lines.push(`<details><summary>Scenarios (${f.scenarios.length})</summary>`);

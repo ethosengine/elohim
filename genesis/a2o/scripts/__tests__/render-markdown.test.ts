@@ -67,4 +67,58 @@ void describe('renderMarkdown', () => {
     assert.match(md, /timothy/);
     assert.match(md, /mary/);
   });
+
+  void it('renders the Visual Validation section when summary.visualValidation is present', () => {
+    const reportWithVisual: SprintReport = {
+      ...report,
+      profile: 'browser',
+      summary: {
+        ...report.summary,
+        visualValidation: {
+          validatedPassing: 12,
+          validatedRegressed: 3,
+          pendingPassing: 47,
+          pendingFailing: 18,
+        },
+      },
+    };
+    const md = renderMarkdown(reportWithVisual);
+    assert.match(md, /## Visual Validation/);
+    assert.match(md, /validatedPassing.*12|12.*validated/i);
+    assert.match(md, /validatedRegressed.*3|3.*regressed/i);
+    assert.match(md, /pendingPassing.*47|47.*pending/i);
+    assert.match(md, /pendingFailing.*18|18.*failing/i);
+  });
+
+  void it('omits the Visual Validation section when summary.visualValidation is absent', () => {
+    const md = renderMarkdown(report);
+    assert.doesNotMatch(md, /## Visual Validation/);
+  });
+
+  void it('renders screenshotPath as a Screenshot bullet on findings that have one', () => {
+    const reportWithRegression: SprintReport = {
+      ...report,
+      findings: [
+        {
+          fingerprint: 'reg123',
+          source: 'visual-regression',
+          pillar: 'lamad',
+          severity: 'error',
+          message: 'Validated visual regressed: Starting a Journey',
+          screenshotPath: 'reports/screenshots/lamad-learning-journey/starting-a-journey--Matthew.png',
+          occurrences: 1,
+          scenarios: [
+            {
+              name: 'Starting a Journey',
+              feature: 'features/lamad/learning-journey.feature',
+              human: 'Matthew',
+            },
+          ],
+          suggestedObjective: 'Restore visual delivery of: Starting a Journey',
+        },
+      ],
+    };
+    const md = renderMarkdown(reportWithRegression);
+    assert.match(md, /Screenshot.*lamad-learning-journey\/starting-a-journey--Matthew\.png/);
+  });
 });
