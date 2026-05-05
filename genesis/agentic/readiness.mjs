@@ -6,13 +6,19 @@ const execFileP = promisify(execFile);
 
 /**
  * Run `git status --porcelain`; empty output means clean.
+ *
+ * Submodule-internal working-tree changes are ignored (--ignore-submodules=all).
+ * The parent's recorded submodule pointer is still tracked normally — only
+ * intra-submodule diff is filtered, since e.g. brit's gitoxide working tree
+ * is not the parent shift's concern.
  */
 export async function checkGitClean({ cwd }) {
   try {
-    const { stdout } = await execFileP('git', ['status', '--porcelain'], {
-      cwd,
-      env: process.env,
-    });
+    const { stdout } = await execFileP(
+      'git',
+      ['status', '--porcelain', '--ignore-submodules=all'],
+      { cwd, env: process.env },
+    );
     if (stdout.trim().length > 0) {
       return {
         ok: false,
