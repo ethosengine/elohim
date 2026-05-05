@@ -33,15 +33,13 @@ Feature: Compute commitments are bounded and breach without contagion
     Then matthew's storage returns the work attributed to adam
     And adam's authorship is preserved in citation graphs
     And the love-map between adam and eve remains queryable
-    And no flow that recognizes adam's prior contribution is gated on adam's
-      compute being online
+    And no flow that recognizes adam's prior contribution is gated on adam's compute being online
 
   Scenario: Catastrophic compute loss is recorded as compute-class breach only
     When the operator marks adam, pete, frank as suspended in deployments.json
     Then their compute-allocation commitments enter breach state
     And each breach event records cause "catastrophic-loss"
-    And each breach event records witness "counterparty" or "collective"
-      because the breached agent cannot self-attest
+    And each breach event records witness "counterparty" or "collective" because the breached agent cannot self-attest
     But their attribution-class flows continue unaffected:
       | flow                                                | status     |
       | matthew citing adam's contribution                  | continues  |
