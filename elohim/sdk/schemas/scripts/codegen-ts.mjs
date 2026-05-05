@@ -126,6 +126,8 @@ async function loadRefMap(baseDir) {
     const schema = JSON.parse(await readFile(join(viewDir, file), 'utf8'));
     // Same-directory ref from views/: just the filename
     refMap.set(file, schema);
+    // Same-directory ref with explicit "./" prefix (epr-list-view, epr-view)
+    refMap.set(`./${file}`, schema);
     // Cross-dir ref from other directories
     refMap.set(`../views/${file}`, schema);
     // URI-style $id ref (e.g. "epr:schema:view:human") — resolves $ref in
