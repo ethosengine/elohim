@@ -46,6 +46,18 @@
               "additionalProperties": { "type": "integer", "minimum": 0 }
             }
           }
+        },
+        "visualValidation": {
+          "type": "object",
+          "description": "Present only when the run was in Playwright/browser mode. Counts the four buckets formed by { has @elohim-visually-validated tag } x { passed | failed }.",
+          "required": ["validatedPassing", "validatedRegressed", "pendingPassing", "pendingFailing"],
+          "additionalProperties": false,
+          "properties": {
+            "validatedPassing": { "type": "integer", "minimum": 0 },
+            "validatedRegressed": { "type": "integer", "minimum": 0 },
+            "pendingPassing": { "type": "integer", "minimum": 0 },
+            "pendingFailing": { "type": "integer", "minimum": 0 }
+          }
         }
       }
     },
@@ -72,7 +84,8 @@
             "failed-request",
             "scenario-failure",
             "pending-step",
-            "coverage-gap"
+            "coverage-gap",
+            "visual-regression"
           ]
         },
         "pillar": {
@@ -86,6 +99,10 @@
         "severity": { "type": "string", "enum": ["error", "warning", "info"], "default": "error" },
         "message": { "type": "string" },
         "firstSeenUrl": { "type": "string", "format": "uri" },
+        "screenshotPath": {
+          "type": "string",
+          "description": "Relative path to the captured screenshot (e.g., reports/screenshots/lamad-learning-journey/starting-a-journey--Matthew.png). Populated for visual-regression and for scenario-failure when an image was captured."
+        },
         "occurrences": { "type": "integer", "minimum": 1 },
         "scenarios": {
           "type": "array",
