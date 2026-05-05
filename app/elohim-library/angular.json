@@ -162,7 +162,16 @@
           "builder": "@angular-devkit/build-angular:ng-packagr",
           "options": {
             "project": "projects/graphos/ng-package.json"
-          }
+          },
+          "configurations": {
+            "production": {
+              "tsConfig": "projects/graphos/tsconfig.lib.prod.json"
+            },
+            "development": {
+              "tsConfig": "projects/graphos/tsconfig.lib.json"
+            }
+          },
+          "defaultConfiguration": "production"
         },
         "test": {
           "builder": "@analogjs/vitest-angular:test"
