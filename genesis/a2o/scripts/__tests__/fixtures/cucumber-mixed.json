@@ -46,10 +46,7 @@
       {
         "name": "Stub step not implemented",
         "type": "scenario",
-        "tags": [
-          { "name": "@e2e" },
-          { "name": "@auth" }
-        ],
+        "tags": [{ "name": "@e2e" }, { "name": "@auth" }],
         "steps": [
           { "name": "a new human wanders in", "result": { "status": "pending", "duration": 0 } }
         ]

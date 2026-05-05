@@ -110,10 +110,7 @@ function suggestObjective(source: FindingSource, message: string): string {
   }
 }
 
-function buildScenarioRaws(
-  scenarios: ScenarioResult[],
-  emitVisual: boolean
-): RawFinding[] {
+function buildScenarioRaws(scenarios: ScenarioResult[], emitVisual: boolean): RawFinding[] {
   const raws: RawFinding[] = [];
   for (const s of scenarios) {
     const validated = s.tags.includes(VISUAL_VALIDATION_TAG);

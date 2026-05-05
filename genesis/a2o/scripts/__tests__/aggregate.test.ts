@@ -70,6 +70,9 @@ function input() {
   return { scenarios, console, gaps };
 }
 
+const SCENARIO_FAILURE = 'scenario-failure' as const;
+const VISUAL_REGRESSION = 'visual-regression' as const;
+
 void describe('aggregate', () => {
   void it('counts scenarios in summary', () => {
     const { scenarios, console, gaps } = input();
@@ -112,7 +115,7 @@ void describe('aggregate', () => {
       runId: 'r1',
       profile: 'alpha',
     });
-    const failure = r.findings.find(f => f.source === 'scenario-failure')!;
+    const failure = r.findings.find(f => f.source === SCENARIO_FAILURE)!;
     assert.ok(failure);
     assert.match(failure.message, /AssertionError/);
     assert.equal(failure.pillar, 'lamad');
@@ -218,10 +221,10 @@ void describe('aggregate', () => {
       profile: 'browser',
     });
     assert.ok(r.summary.visualValidation, 'visualValidation should be present');
-    assert.equal(r.summary.visualValidation!.validatedPassing, 1);
-    assert.equal(r.summary.visualValidation!.validatedRegressed, 1);
-    assert.equal(r.summary.visualValidation!.pendingPassing, 1);
-    assert.equal(r.summary.visualValidation!.pendingFailing, 1);
+    assert.equal(r.summary.visualValidation.validatedPassing, 1);
+    assert.equal(r.summary.visualValidation.validatedRegressed, 1);
+    assert.equal(r.summary.visualValidation.pendingPassing, 1);
+    assert.equal(r.summary.visualValidation.pendingFailing, 1);
   });
 
   void it('emits summary.visualValidation when profile is delivery-browser', () => {
@@ -265,7 +268,7 @@ void describe('aggregate', () => {
       runId: 'r1',
       profile: 'browser',
     });
-    const regression = r.findings.find(f => f.source === 'visual-regression');
+    const regression = r.findings.find(f => f.source === VISUAL_REGRESSION);
     assert.ok(regression, 'expected a visual-regression finding');
     assert.equal(regression.scenarios.length, 1);
     assert.equal(regression.scenarios[0].name, 'Validated but failed');
@@ -282,7 +285,7 @@ void describe('aggregate', () => {
       runId: 'r1',
       profile: 'alpha',
     });
-    const regression = r.findings.find(f => f.source === 'visual-regression');
+    const regression = r.findings.find(f => f.source === VISUAL_REGRESSION);
     assert.equal(regression, undefined);
   });
 
@@ -294,10 +297,10 @@ void describe('aggregate', () => {
       runId: 'r1',
       profile: 'browser',
     });
-    const regression = r.findings.find(f => f.source === 'visual-regression')!;
+    const regression = r.findings.find(f => f.source === VISUAL_REGRESSION)!;
     assert.ok(regression.screenshotPath);
-    assert.match(regression.screenshotPath!, /^reports\/screenshots\/lamad-b\//);
-    assert.match(regression.screenshotPath!, /\.png$/);
+    assert.match(regression.screenshotPath, /^reports\/screenshots\/lamad-b\//);
+    assert.match(regression.screenshotPath, /\.png$/);
   });
 
   void it('populates screenshotPath on scenario-failure findings in playwright mode', () => {
@@ -309,11 +312,11 @@ void describe('aggregate', () => {
       profile: 'browser',
     });
     const failure = r.findings.find(
-      f => f.source === 'scenario-failure' && f.message.includes('nope')
+      f => f.source === SCENARIO_FAILURE && f.message.includes('nope')
     );
     assert.ok(failure);
     assert.ok(failure.screenshotPath);
-    assert.match(failure.screenshotPath!, /^reports\/screenshots\/lamad-d\//);
+    assert.match(failure.screenshotPath, /^reports\/screenshots\/lamad-d\//);
   });
 
   void it('omits screenshotPath on scenario-failure findings outside playwright mode', () => {
@@ -324,7 +327,7 @@ void describe('aggregate', () => {
       runId: 'r1',
       profile: 'alpha',
     });
-    const failure = r.findings.find(f => f.source === 'scenario-failure')!;
+    const failure = r.findings.find(f => f.source === SCENARIO_FAILURE)!;
     assert.equal(failure.screenshotPath, undefined);
   });
 });

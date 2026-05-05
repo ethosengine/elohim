@@ -1,5 +1,27 @@
 import type { SprintReport, Finding } from './aggregate.js';
 
+function renderFinding(f: Finding): string[] {
+  const lines: string[] = [];
+  lines.push(`### [${f.source}] \`${f.fingerprint}\` (occurrences: ${f.occurrences})`);
+  lines.push('');
+  lines.push(`> ${f.message}`);
+  lines.push('');
+  if (f.firstSeenUrl) lines.push(`- URL: ${f.firstSeenUrl}`);
+  if (f.screenshotPath) lines.push(`- **Screenshot**: \`${f.screenshotPath}\``);
+  lines.push(`- **Objective**: ${f.suggestedObjective}`);
+  lines.push('');
+  lines.push(`<details><summary>Scenarios (${f.scenarios.length})</summary>`);
+  lines.push('');
+  for (const s of f.scenarios) {
+    const who = s.human ? ` — ${s.human}` : '';
+    lines.push(`- \`${s.feature}\` · ${s.name}${who}`);
+  }
+  lines.push('');
+  lines.push(`</details>`);
+  lines.push('');
+  return lines;
+}
+
 function renderVisualValidation(report: SprintReport): string[] {
   const v = report.summary.visualValidation;
   if (!v) return [];
@@ -8,11 +30,15 @@ function renderVisualValidation(report: SprintReport): string[] {
   lines.push('');
   lines.push(`|  | passed | failed |`);
   lines.push(`|---|---|---|`);
-  lines.push(`| has \`@elohim-visually-validated\` | ${v.validatedPassing} | **${v.validatedRegressed}** |`);
+  lines.push(
+    `| has \`@elohim-visually-validated\` | ${v.validatedPassing} | **${v.validatedRegressed}** |`
+  );
   lines.push(`| no tag (pending review) | ${v.pendingPassing} | ${v.pendingFailing} |`);
   lines.push('');
   lines.push(`- **${v.validatedPassing}** validatedPassing — confirmed delivering as designed`);
-  lines.push(`- **${v.validatedRegressed}** validatedRegressed — see \`visual-regression\` findings below`);
+  lines.push(
+    `- **${v.validatedRegressed}** validatedRegressed — see \`visual-regression\` findings below`
+  );
   lines.push(`- **${v.pendingPassing}** pendingPassing — candidates for review`);
   lines.push(`- **${v.pendingFailing}** pendingFailing — see \`scenario-failure\` findings below`);
   lines.push('');
@@ -54,23 +80,7 @@ export function renderMarkdown(report: SprintReport): string {
     lines.push(`## ${pillar}`);
     lines.push('');
     for (const f of findings) {
-      lines.push(`### [${f.source}] \`${f.fingerprint}\` (occurrences: ${f.occurrences})`);
-      lines.push('');
-      lines.push(`> ${f.message}`);
-      lines.push('');
-      if (f.firstSeenUrl) lines.push(`- URL: ${f.firstSeenUrl}`);
-      if (f.screenshotPath) lines.push(`- **Screenshot**: \`${f.screenshotPath}\``);
-      lines.push(`- **Objective**: ${f.suggestedObjective}`);
-      lines.push('');
-      lines.push(`<details><summary>Scenarios (${f.scenarios.length})</summary>`);
-      lines.push('');
-      for (const s of f.scenarios) {
-        const who = s.human ? ` — ${s.human}` : '';
-        lines.push(`- \`${s.feature}\` · ${s.name}${who}`);
-      }
-      lines.push('');
-      lines.push(`</details>`);
-      lines.push('');
+      lines.push(...renderFinding(f));
     }
   }
 

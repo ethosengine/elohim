@@ -48,7 +48,12 @@ void describe('loadCucumber', () => {
     const results = loadCucumber(fixture);
     const timothy = results.find(r => r.name === 'Timothy completes path')!;
     assert.ok(timothy);
-    assert.deepEqual(timothy.tags, ['@e2e', '@lamad', '@browser-only', '@elohim-visually-validated']);
+    assert.deepEqual(timothy.tags, [
+      '@e2e',
+      '@lamad',
+      '@browser-only',
+      '@elohim-visually-validated',
+    ]);
   });
 
   void it('returns empty tags array when scenario has no tags', () => {

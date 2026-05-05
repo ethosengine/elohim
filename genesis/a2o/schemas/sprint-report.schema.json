@@ -50,7 +50,12 @@
         "visualValidation": {
           "type": "object",
           "description": "Present only when the run was in Playwright/browser mode. Counts the four buckets formed by { has @elohim-visually-validated tag } x { passed | failed }.",
-          "required": ["validatedPassing", "validatedRegressed", "pendingPassing", "pendingFailing"],
+          "required": [
+            "validatedPassing",
+            "validatedRegressed",
+            "pendingPassing",
+            "pendingFailing"
+          ],
           "additionalProperties": false,
           "properties": {
             "validatedPassing": { "type": "integer", "minimum": 0 },

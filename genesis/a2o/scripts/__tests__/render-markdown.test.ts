@@ -84,10 +84,10 @@ void describe('renderMarkdown', () => {
     };
     const md = renderMarkdown(reportWithVisual);
     assert.match(md, /## Visual Validation/);
-    assert.match(md, /validatedPassing.*12|12.*validated/i);
-    assert.match(md, /validatedRegressed.*3|3.*regressed/i);
-    assert.match(md, /pendingPassing.*47|47.*pending/i);
-    assert.match(md, /pendingFailing.*18|18.*failing/i);
+    assert.match(md, /\*\*12\*\* validatedPassing/);
+    assert.match(md, /\*\*3\*\* validatedRegressed/);
+    assert.match(md, /\*\*47\*\* pendingPassing/);
+    assert.match(md, /\*\*18\*\* pendingFailing/);
   });
 
   void it('omits the Visual Validation section when summary.visualValidation is absent', () => {
@@ -105,7 +105,8 @@ void describe('renderMarkdown', () => {
           pillar: 'lamad',
           severity: 'error',
           message: 'Validated visual regressed: Starting a Journey',
-          screenshotPath: 'reports/screenshots/lamad-learning-journey/starting-a-journey--Matthew.png',
+          screenshotPath:
+            'reports/screenshots/lamad-learning-journey/starting-a-journey--Matthew.png',
           occurrences: 1,
           scenarios: [
             {
