@@ -36,6 +36,13 @@
       "edgenodeCpuLimit": "3000m"
     },
     {
+      "$comment": "TEMPORARY BUMP (2026-05-05): jessica's edgenode OOM-flapping at 1536Mi limit (7 restarts in 26h, last OOMKilled 2026-05-05T18:43Z while serving content + handling app-WS authentication during a2o sweep). Cluster is also in scaled-down mode with shem decommissioned, so jessica picks up extra registration load via the hosted conductor pool (matthew/jessica/timothy is the only path for the 25 humans newly seeded by the iter-3 agencyPhase fix). Bumping 1536Mi → 3Gi to give ~2× headroom over observed RSS — same pattern as Timothy's 2026-04-21 chromebook bump (see Timothy's $comment block for the restoration chain). Restoration: when shem returns and the hosted-pool load drops back to baseline, restore to the device-recycled-laptop archetype floor at 512Mi/1536Mi.",
+      "$recycledLaptopFloor": {
+        "edgenodeMemoryRequest": "512Mi",
+        "edgenodeMemoryLimit": "1536Mi",
+        "edgenodeCpuRequest": "250m",
+        "edgenodeCpuLimit": "1000m"
+      },
       "name": "jessica",
       "role": "spouse",
       "humanLabel": "jessica-spouse",
@@ -45,8 +52,8 @@
       "deviceArchetype": "device-recycled-laptop",
       "affinityComment": "Jessica: typical device steward — operations or edge, never remote/performance",
       "nodeTypes": ["operations", "edge"],
-      "edgenodeMemoryRequest": "512Mi",
-      "edgenodeMemoryLimit": "1536Mi",
+      "edgenodeMemoryRequest": "768Mi",
+      "edgenodeMemoryLimit": "3Gi",
       "edgenodeCpuRequest": "250m",
       "edgenodeCpuLimit": "1000m"
     },
