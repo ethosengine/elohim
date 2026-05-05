@@ -9,8 +9,8 @@
 //
 // Glob mappings and gherkin transforms land in later tasks.
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
+import { basename, dirname, extname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -85,7 +85,83 @@ export function runSync(mappings, genesisDir, outDir) {
   }
 }
 
+export function gherkinToMarkdown(featureContent, fileName) {
+  // Wrap the raw .feature in a fenced code block with `gherkin` language.
+  // Storybook's Markdown block handles syntax highlighting via prismjs.
+  const titleMatch = featureContent.match(/^Feature:\s*(.+)$/m);
+  const heading = titleMatch ? `# ${titleMatch[1].trim()}` : `# ${fileName}`;
+  return `${heading}\n\n_Source: \`${fileName}\`_\n\n\`\`\`gherkin\n${featureContent.trimEnd()}\n\`\`\`\n`;
+}
+
+export function expandGlob(pattern, baseDir) {
+  // Minimal glob: supports `<segments>/*.<ext>` only — no `**`, no character classes.
+  // Add complexity only if a future mapping requires it.
+  const parts = pattern.split('/');
+  const fileGlob = parts.pop();
+  const dir = join(baseDir, parts.join('/'));
+  if (!existsSync(dir) || !statSync(dir).isDirectory()) return [];
+  const ext = fileGlob.replace(/^\*/, '');
+  return readdirSync(dir)
+    .filter(name => name.endsWith(ext) && !name.startsWith('.'))
+    .map(name => join(dir, name));
+}
+
+function toTitleCase(slug) {
+  return slug
+    .replace(/[-_]/g, ' ')
+    .replace(/\b\w/g, c => c.toUpperCase());
+}
+
+function relativeFromTo(fromDir, toDir, slug) {
+  // Both are relative to the same root (graphos/src). Compute the relative
+  // path between them, then append the file.
+  const fromParts = fromDir.split('/').filter(Boolean);
+  // Go up from fromParts to graphos/src root, then descend into imported/<toDir>/<slug>.md
+  const upDirs = fromParts.length;
+  const ups = '../'.repeat(upDirs);
+  const toParts = toDir.split('/').filter(Boolean);
+  return `${ups}imported/${toParts.join('/')}/${slug}.md`;
+}
+
+export function runSyncWithGlobs(mappings, genesisDir, outDir, wrappersBase) {
+  for (const m of mappings) {
+    if (!m.fromGlob) continue;
+    const matches = expandGlob(m.fromGlob, genesisDir);
+    for (const sourcePath of matches) {
+      const fileName = basename(sourcePath);
+      const slug = fileName.replace(/\.feature$/, '');
+      const niceName = toTitleCase(slug);
+      const featureContent = readFileSync(sourcePath, 'utf-8');
+      const md = gherkinToMarkdown(featureContent, fileName);
+
+      // 1. Write the imported markdown content
+      const mdDest = join(outDir, m.toDir, `${slug}.md`);
+      mkdirSync(dirname(mdDest), { recursive: true });
+      writeFileSync(mdDest, md);
+
+      // 2. Write the generated MDX wrapper.
+      // Wrapper lives under wrappersBase/<sectionPath>/<slug>.mdx
+      // toDir example: 'domains/identity/stories/' → 'domains/identity/__docs__/_generated/'
+      const sectionPath = m.toDir.replace(/\/[^/]+\/?$/, '/__docs__/_generated/');
+      const mdxDest = join(wrappersBase, sectionPath, `${slug}.mdx`);
+      mkdirSync(dirname(mdxDest), { recursive: true });
+      const title = m.titleFn(niceName);
+      const importRelPath = relativeFromTo(sectionPath, m.toDir, slug);
+      const mdxContent = `import { Meta, Markdown } from '@storybook/addon-docs/blocks';
+import content from '${importRelPath}?raw';
+
+<Meta title="${title}" />
+
+<Markdown>{content}</Markdown>
+`;
+      writeFileSync(mdxDest, mdxContent);
+    }
+  }
+}
+
 // CLI entrypoint
+const WRAPPERS_BASE = resolve(__dirname, '..', 'projects', 'graphos', 'src');
+
 if (import.meta.url === `file://${process.argv[1]}`) {
   const missing = validateMappings(MAPPINGS, GENESIS_DIR);
   if (missing.length > 0) {
@@ -96,5 +172,6 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     process.exit(1);
   }
   runSync(MAPPINGS, GENESIS_DIR, OUT_DIR);
+  runSyncWithGlobs(MAPPINGS, GENESIS_DIR, OUT_DIR, WRAPPERS_BASE);
   // Silent on success per spec.
 }

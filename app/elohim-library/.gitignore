@@ -40,3 +40,6 @@ testem.log
 # System files
 .DS_Store
 Thumbs.db
+
+# Generated Graphos MDX wrappers (written by sync-genesis at build time)
+projects/*/src/**/__docs__/_generated/
