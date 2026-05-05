@@ -13,13 +13,26 @@ function isPlaywrightProfile(profile: string): boolean {
   return PLAYWRIGHT_PROFILES.has(profile);
 }
 
+function screenshotPathFor(scenario: ScenarioResult): string {
+  const featureSlug = scenario.feature
+    .replace(/^.*features\//, '')
+    .replace(/\.feature$/, '')
+    .replace(/\//g, '-');
+  const scenarioSlug = scenario.name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
+  return `reports/screenshots/${featureSlug}/${scenarioSlug}.png`;
+}
+
 export type FindingSource =
   | 'console-error'
   | 'page-error'
   | 'failed-request'
   | 'scenario-failure'
   | 'pending-step'
-  | 'coverage-gap';
+  | 'coverage-gap'
+  | 'visual-regression';
 
 export interface FindingScenario {
   name: string;
@@ -34,6 +47,7 @@ export interface Finding {
   severity: 'error' | 'warning' | 'info';
   message: string;
   firstSeenUrl?: string;
+  screenshotPath?: string;
   occurrences: number;
   scenarios: FindingScenario[];
   suggestedObjective: string;
@@ -72,6 +86,7 @@ interface RawFinding {
   severity: 'error' | 'warning' | 'info';
   rawMessage: string;
   url?: string;
+  screenshotPath?: string;
   scenario: FindingScenario;
 }
 
@@ -90,20 +105,37 @@ function suggestObjective(source: FindingSource, message: string): string {
       return `Implement pending step definition: ${head}`;
     case 'coverage-gap':
       return `Author missing scenario: ${head}`;
+    case 'visual-regression':
+      return `Restore visual delivery of: ${head}`;
   }
 }
 
-function buildScenarioRaws(scenarios: ScenarioResult[]): RawFinding[] {
+function buildScenarioRaws(
+  scenarios: ScenarioResult[],
+  emitVisual: boolean
+): RawFinding[] {
   const raws: RawFinding[] = [];
   for (const s of scenarios) {
+    const validated = s.tags.includes(VISUAL_VALIDATION_TAG);
     if (s.status === 'failed' && s.failureMessage) {
       raws.push({
         source: 'scenario-failure',
         pillar: pillarFromFeature(s.feature),
         severity: 'error',
         rawMessage: s.failureMessage.split('\n')[0],
+        screenshotPath: emitVisual ? screenshotPathFor(s) : undefined,
         scenario: { name: s.name, feature: s.feature },
       });
+      if (emitVisual && validated) {
+        raws.push({
+          source: 'visual-regression',
+          pillar: pillarFromFeature(s.feature),
+          severity: 'error',
+          rawMessage: `Validated visual regressed: ${s.name}`,
+          screenshotPath: screenshotPathFor(s),
+          scenario: { name: s.name, feature: s.feature },
+        });
+      }
     } else if (s.status === 'pending') {
       raws.push({
         source: 'pending-step',
@@ -166,6 +198,10 @@ function groupIntoFindings(raws: RawFinding[]): Finding[] {
       if (!existing.scenarios.some(s => scenarioKey(s) === scenarioKey(r.scenario))) {
         existing.scenarios.push(r.scenario);
       }
+      // First non-empty screenshotPath wins; downstream renderers link to one image per finding.
+      if (!existing.screenshotPath && r.screenshotPath) {
+        existing.screenshotPath = r.screenshotPath;
+      }
     } else {
       const message = normalizeMessage(r.rawMessage);
       groups.set(key, {
@@ -175,6 +211,7 @@ function groupIntoFindings(raws: RawFinding[]): Finding[] {
         severity: r.severity,
         message,
         firstSeenUrl: r.url,
+        screenshotPath: r.screenshotPath,
         occurrences: 1,
         scenarios: [r.scenario],
         suggestedObjective: suggestObjective(r.source, message),
@@ -228,8 +265,9 @@ function computeVisualValidation(
 }
 
 export function aggregate(input: AggregateInput): SprintReport {
+  const emitVisual = isPlaywrightProfile(input.profile);
   const raws = [
-    ...buildScenarioRaws(input.scenarios),
+    ...buildScenarioRaws(input.scenarios, emitVisual),
     ...buildConsoleRaws(input.consoleArtifacts),
     ...buildGapRaws(input.gaps),
   ];
@@ -237,7 +275,7 @@ export function aggregate(input: AggregateInput): SprintReport {
   const findings = groupIntoFindings(raws);
   const summary = computeSummary(input.scenarios, findings);
 
-  if (isPlaywrightProfile(input.profile)) {
+  if (emitVisual) {
     summary.visualValidation = computeVisualValidation(input.scenarios);
   }
 

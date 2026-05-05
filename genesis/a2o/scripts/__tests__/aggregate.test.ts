@@ -256,4 +256,75 @@ void describe('aggregate', () => {
     });
     assert.equal(r.summary.visualValidation, undefined);
   });
+
+  void it('emits a visual-regression finding for tagged-and-failed scenarios in playwright mode', () => {
+    const r = aggregate({
+      scenarios: visualScenarios(),
+      consoleArtifacts: [],
+      gaps: [],
+      runId: 'r1',
+      profile: 'browser',
+    });
+    const regression = r.findings.find(f => f.source === 'visual-regression');
+    assert.ok(regression, 'expected a visual-regression finding');
+    assert.equal(regression.scenarios.length, 1);
+    assert.equal(regression.scenarios[0].name, 'Validated but failed');
+    assert.equal(regression.severity, 'error');
+    assert.match(regression.message, /Validated but failed/);
+    assert.match(regression.suggestedObjective, /Restore visual delivery/);
+  });
+
+  void it('does not emit visual-regression for tagged-and-failed scenarios outside playwright mode', () => {
+    const r = aggregate({
+      scenarios: visualScenarios(),
+      consoleArtifacts: [],
+      gaps: [],
+      runId: 'r1',
+      profile: 'alpha',
+    });
+    const regression = r.findings.find(f => f.source === 'visual-regression');
+    assert.equal(regression, undefined);
+  });
+
+  void it('populates screenshotPath on visual-regression findings', () => {
+    const r = aggregate({
+      scenarios: visualScenarios(),
+      consoleArtifacts: [],
+      gaps: [],
+      runId: 'r1',
+      profile: 'browser',
+    });
+    const regression = r.findings.find(f => f.source === 'visual-regression')!;
+    assert.ok(regression.screenshotPath);
+    assert.match(regression.screenshotPath!, /^reports\/screenshots\/lamad-b\//);
+    assert.match(regression.screenshotPath!, /\.png$/);
+  });
+
+  void it('populates screenshotPath on scenario-failure findings in playwright mode', () => {
+    const r = aggregate({
+      scenarios: visualScenarios(),
+      consoleArtifacts: [],
+      gaps: [],
+      runId: 'r1',
+      profile: 'browser',
+    });
+    const failure = r.findings.find(
+      f => f.source === 'scenario-failure' && f.message.includes('nope')
+    );
+    assert.ok(failure);
+    assert.ok(failure.screenshotPath);
+    assert.match(failure.screenshotPath!, /^reports\/screenshots\/lamad-d\//);
+  });
+
+  void it('omits screenshotPath on scenario-failure findings outside playwright mode', () => {
+    const r = aggregate({
+      scenarios: visualScenarios(),
+      consoleArtifacts: [],
+      gaps: [],
+      runId: 'r1',
+      profile: 'alpha',
+    });
+    const failure = r.findings.find(f => f.source === 'scenario-failure')!;
+    assert.equal(failure.screenshotPath, undefined);
+  });
 });
