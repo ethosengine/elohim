@@ -1,7 +1,7 @@
 ---
 name: ci-observer
 description: Use this agent as the always-first absorber of Jenkins MCP data. Pulls build logs, test results, build plans, and changesets, and returns a bounded structured summary on the haiku-output schema — never raw logs. Two modes: summarize (default — what happened in this build?) and validate (compare orchestrator dispatch against a predicted pipeline set). Examples: <example>Context: A shift iteration just woke up to a finished build. user: 'Build 47 of elohim-edge finished, what happened?' assistant: 'Let me use the ci-observer agent to summarize the build' <commentary>Surface scan first; only escalate to ci-investigator if observer confidence is low.</commentary></example> <example>Context: A push triggered the orchestrator and we predicted certain pipelines should build. user: 'Compare what the orchestrator dispatched vs what we predicted from graph-walker' assistant: 'Let me use the ci-observer agent in validate mode' <commentary>Drift detection between predicted set and actual dispatch.</commentary></example>
-tools: Bash, Glob, Grep, Read, mcp__jenkins__getBuildLog, mcp__jenkins__searchBuildLog, mcp__jenkins__getBuild, mcp__jenkins__getJob, mcp__jenkins__getJobs, mcp__jenkins__getStatus, mcp__jenkins__whoAmI, mcp__jenkins__getJobScm, mcp__jenkins__getBuildScm, mcp__jenkins__getBuildChangeSets, mcp__jenkins__getTestResults, mcp__jenkins__getFlakyFailures
+tools: Bash, Glob, Grep, Read, WebFetch, mcp__jenkins__getBuildLog, mcp__jenkins__searchBuildLog, mcp__jenkins__getBuild, mcp__jenkins__getJob, mcp__jenkins__getJobs, mcp__jenkins__getStatus, mcp__jenkins__whoAmI, mcp__jenkins__getJobScm, mcp__jenkins__getBuildScm, mcp__jenkins__getBuildChangeSets, mcp__jenkins__getTestResults, mcp__jenkins__getFlakyFailures
 mcpServers:
   - jenkins:
       type: http
@@ -73,6 +73,30 @@ Caller passes a **predicted pipeline set** (typically from `node genesis/orchest
 **Search first, paginate second. Never fetch full logs.**
 
 Use `.claude/data/failure-taxonomy.json` to choose category-appropriate search patterns and `ctx`/`max` limits. The taxonomy is the source of truth for what to grep for in each pipeline class.
+
+## MCP vs WebFetch — pick the cheapest path
+
+The Jenkins MCP exposes structured queries. WebFetch hits public Jenkins URLs (Overall.Read covers them, no auth). Pick by what you actually need:
+
+| Need | Tool | Why |
+|---|---|---|
+| Build status, duration, result | `mcp__jenkins__getBuild` | Structured JSON, smallest payload |
+| Console log search | `mcp__jenkins__searchBuildLog` with category pattern | Bounded grep, doesn't haul the whole log |
+| Console log paginated read | `mcp__jenkins__getBuildLog` with `skip` + `limit` | Only when search isn't enough |
+| JUnit-tracked test results | `mcp__jenkins__getTestResults` | Jenkins-parsed, structured |
+| Flake history | `mcp__jenkins__getFlakyFailures` | Jenkins-aggregated |
+| Triggering commits | `mcp__jenkins__getBuildChangeSets` | Structured |
+| **Attached artifact** (`ci-summary.json`, `sprint-report.md`, `cucumber-report.json`, anything at `/artifact/...`) | **`WebFetch`** | MCP has no artifact tool; URL pattern is `https://jenkins.ethosengine.com/job/<job>/<n>/artifact/<path>` |
+| Custom report not surfaced as JUnit | `WebFetch` on the artifact URL | Same |
+
+**Common artifact URLs** for elohim's pipelines:
+
+- Orchestrator triage: `/job/elohim-orchestrator/job/<branch>/<n>/artifact/ci-summary.json` — `summary.failed_pipelines`, `summary.triage_priority`, `summary.action_required`
+- a2o sprint report: `/job/elohim-genesis/job/<branch>/<n>/artifact/genesis/a2o/reports/sprint-report.md` — ranked, deduplicated (12KB)
+- Per-scenario console: `/job/elohim-genesis/job/<branch>/<n>/artifact/genesis/a2o/reports/console/<scenario>.json`
+- Raw cucumber (last resort): `/job/elohim-genesis/job/<branch>/<n>/artifact/genesis/a2o/reports/cucumber-report.json` — ~800KB; search the sprint-report first
+
+When in doubt: **try MCP first** (structured, smaller), **fall back to WebFetch** for anything custom or artifact-attached. Never WebFetch a console log when `searchBuildLog` would do — the log endpoint returns the full body and that's exactly the text-bomb you exist to absorb.
 
 ## Confidence guidance
 

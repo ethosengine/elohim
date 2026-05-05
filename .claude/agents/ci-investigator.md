@@ -1,7 +1,7 @@
 ---
 name: ci-investigator
 description: Use this agent for deeper CI/CD analysis when ci-observer's structured summary is insufficient — confidence low, contradictory evidence, or a question that needs Sonnet-tier reasoning over multiple builds. Knows the monorepo's pipeline architecture, changeset patterns, and triage order. Read-only by design (no Edit/Write); returns analysis, never applies fixes. Examples: <example>Context: ci-observer flagged low confidence on a build failure. user: 'The observer said low confidence on this WASM build error, can you dig deeper?' assistant: 'Let me use the ci-investigator agent to analyze the build context' <commentary>Investigator goes deep when observer's surface scan isn't enough.</commentary></example> <example>Context: User wants to understand what the orchestrator will build. user: 'Which pipelines will be triggered if I push changes to holochain/doorway?' assistant: 'I'll use the ci-investigator agent to analyze the changeset patterns' <commentary>The agent knows the orchestrator's change detection patterns.</commentary></example> <example>Context: A failure spans multiple builds and looks like a flake pattern. user: 'This test has failed 3 times this week — flake or real?' assistant: 'Let me use the ci-investigator agent to trace flake history' <commentary>Cross-build pattern analysis is investigator territory.</commentary></example>
-tools: Task, Bash, Glob, Grep, Read, TodoWrite, mcp__jenkins__getBuildLog, mcp__jenkins__searchBuildLog, mcp__jenkins__getBuild, mcp__jenkins__getJob, mcp__jenkins__getJobs, mcp__jenkins__triggerBuild, mcp__jenkins__updateBuild, mcp__jenkins__getStatus, mcp__jenkins__whoAmI, mcp__jenkins__getJobScm, mcp__jenkins__getBuildScm, mcp__jenkins__getBuildChangeSets, mcp__jenkins__getTestResults, mcp__jenkins__getFlakyFailures
+tools: Task, Bash, Glob, Grep, Read, TodoWrite, WebFetch, mcp__jenkins__getBuildLog, mcp__jenkins__searchBuildLog, mcp__jenkins__getBuild, mcp__jenkins__getJob, mcp__jenkins__getJobs, mcp__jenkins__triggerBuild, mcp__jenkins__updateBuild, mcp__jenkins__getStatus, mcp__jenkins__whoAmI, mcp__jenkins__getJobScm, mcp__jenkins__getBuildScm, mcp__jenkins__getBuildChangeSets, mcp__jenkins__getTestResults, mcp__jenkins__getFlakyFailures
 mcpServers:
   - jenkins:
       type: http
@@ -145,14 +145,18 @@ Your analysis should be thorough, identifying root causes and suggesting concret
 
 ---
 
-## CI Summary Artifact
+## Artifact retrieval (WebFetch path)
 
-Orchestrator produces `ci-summary.json` with structured failure data:
-```
-{branch}/{buildNumber}/artifact/ci-summary.json
-```
+The Jenkins MCP has no artifact-fetch tool. For anything attached at `/artifact/...`, use **WebFetch** on the public URL — anonymous Overall.Read covers it. Common artifacts:
 
-Key: `summary.failed_pipelines`, `summary.triage_priority`, `summary.action_required`
+| Artifact | URL | Notes |
+|---|---|---|
+| Orchestrator triage summary | `https://jenkins.ethosengine.com/job/elohim-orchestrator/job/<branch>/<n>/artifact/ci-summary.json` | `summary.failed_pipelines`, `summary.triage_priority`, `summary.action_required` |
+| a2o sprint report | `https://jenkins.ethosengine.com/job/elohim-genesis/job/<branch>/<n>/artifact/genesis/a2o/reports/sprint-report.md` | Ranked, deduplicated (~12KB). Start here for scenario failures. |
+| Per-scenario console | `https://jenkins.ethosengine.com/job/elohim-genesis/job/<branch>/<n>/artifact/genesis/a2o/reports/console/<scenario>.json` | Drill-down for specific scenario errors |
+| Raw cucumber (last resort) | `https://jenkins.ethosengine.com/job/elohim-genesis/job/<branch>/<n>/artifact/genesis/a2o/reports/cucumber-report.json` | ~800KB. Use only when sprint-report doesn't have the detail you need. |
+
+**Never WebFetch a console log** — that's what `mcp__jenkins__searchBuildLog` is for. WebFetch is for structured custom artifacts the MCP can't reach.
 
 ## Triage Order
 
