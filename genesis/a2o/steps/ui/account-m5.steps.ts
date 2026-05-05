@@ -195,12 +195,12 @@ Given(
   }
 );
 
-Given('the portal host responds to /healthz with 200', function (this: E2EWorld) {
+Given('the portal host responds to \\/healthz with 200', function (this: E2EWorld) {
   // Precondition: test environment has a reachable portal host stub.
   // This is verified by the redirect scenario assertion.
 });
 
-Given('my portal host does not respond to /healthz', function (this: E2EWorld) {
+Given('my portal host does not respond to \\/healthz', function (this: E2EWorld) {
   // Precondition: portal host is unreachable — doorway falls through to hosted view.
   this.contentIds.set('portalHostUnreachable', 'true');
 });
@@ -227,14 +227,14 @@ Given(
 // Navigation steps
 // ─────────────────────────────────────────────────────────────────────────────
 
-When('I navigate to /account/security', async function (this: E2EWorld) {
+When('I navigate to \\/account\\/security', async function (this: E2EWorld) {
   const device = requirePlaywright(this);
   if (!device) return 'pending';
   await device.navigate('/account/security');
   await device.page.waitForLoadState('networkidle');
 });
 
-When('I navigate to doorway/account', async function (this: E2EWorld) {
+When('I navigate to doorway\\/account', async function (this: E2EWorld) {
   const device = requirePlaywright(this);
   if (!device) return 'pending';
   // doorway/account is served from the doorway-app, not elohim-app
@@ -530,7 +530,7 @@ Then('the pending recovery card disappears from my view', async function (this: 
 // lost-key-entry — routes to /identity/recover
 // ─────────────────────────────────────────────────────────────────────────────
 
-Then('I am redirected to /identity/recover', async function (this: E2EWorld) {
+Then('I am redirected to \\/identity\\/recover', async function (this: E2EWorld) {
   const device = requirePlaywright(this);
   if (!device) return 'pending';
 
@@ -599,7 +599,7 @@ Then("elohim-app's account-guard consumes the session_token", async function (th
 });
 
 Then(
-  'I land on /account/security authenticated as the same identity',
+  'I land on \\/account\\/security authenticated as the same identity',
   async function (this: E2EWorld) {
     const device = requirePlaywright(this);
     if (!device) return 'pending';
@@ -667,7 +667,7 @@ Then('I see the existing hosted account view', function (this: E2EWorld) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 When(
-  'I POST {string} to /api/v1/account/portal-hosts',
+  'I POST {string} to \\/api\\/v1\\/account\\/portal-hosts',
   async function (this: E2EWorld, jsonPayload: string) {
     const doorwayUrl = requireDoorwayUrl(this);
     const token = getFirstAuthToken(this);
@@ -690,7 +690,7 @@ Then('the response is 200 with the new PortalHostView', function (this: E2EWorld
   assert.ok(view['addedAt'], 'PortalHostView missing addedAt field');
 });
 
-Then('/api/v1/account/portal-hosts returns the host in the list', async function (this: E2EWorld) {
+Then('\\/api\\/v1\\/account\\/portal-hosts returns the host in the list', async function (this: E2EWorld) {
   const doorwayUrl = requireDoorwayUrl(this);
   const token = getFirstAuthToken(this);
   const headers: Record<string, string> = {};
