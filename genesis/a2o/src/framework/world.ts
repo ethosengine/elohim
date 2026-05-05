@@ -38,6 +38,12 @@ export class E2EWorld extends World {
   /** Named humans participating in the scenario */
   humans = new Map<string, Human>();
 
+  /** Slug of the current scenario's feature file, set by the Before hook (e.g. "lamad-learning-journey") */
+  featureSlug?: string;
+
+  /** Slug of the current scenario's name, set by the Before hook (e.g. "starting-a-journey") */
+  scenarioSlug?: string;
+
   /** Content IDs created during the scenario, keyed by alias */
   contentIds = new Map<string, string>();
 
