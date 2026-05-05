@@ -5,6 +5,7 @@ export interface ScenarioResult {
   feature: string;
   status: ScenarioStatus;
   failureMessage?: string;
+  tags: string[];
 }
 
 interface CucumberStep {
@@ -12,10 +13,15 @@ interface CucumberStep {
   result?: { status: string; duration?: number; error_message?: string };
 }
 
+interface CucumberTag {
+  name: string;
+}
+
 interface CucumberElement {
   name: string;
   type: string;
   steps?: CucumberStep[];
+  tags?: CucumberTag[];
 }
 
 interface CucumberFeature {
@@ -42,11 +48,13 @@ export function loadCucumber(json: string): ScenarioResult[] {
       const steps = el.steps ?? [];
       const status = aggregateStatus(steps);
       const failed = steps.find(s => s.result?.status === 'failed');
+      const tags = (el.tags ?? []).map(t => t.name);
       results.push({
         name: el.name,
         feature: feature.uri,
         status,
         failureMessage: failed?.result?.error_message,
+        tags,
       });
     }
   }

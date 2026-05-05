@@ -43,4 +43,29 @@ void describe('loadCucumber', () => {
   void it('throws on malformed input', () => {
     assert.throws(() => loadCucumber('not-json'), /JSON/);
   });
+
+  void it('extracts scenario tags', () => {
+    const results = loadCucumber(fixture);
+    const timothy = results.find(r => r.name === 'Timothy completes path')!;
+    assert.ok(timothy);
+    assert.deepEqual(timothy.tags, ['@e2e', '@lamad', '@browser-only', '@elohim-visually-validated']);
+  });
+
+  void it('returns empty tags array when scenario has no tags', () => {
+    const noTagsJson = JSON.stringify([
+      {
+        uri: 'features/x.feature',
+        name: 'X',
+        elements: [
+          {
+            name: 'untagged scenario',
+            type: 'scenario',
+            steps: [{ name: 's', result: { status: 'passed' } }],
+          },
+        ],
+      },
+    ]);
+    const [scenario] = loadCucumber(noTagsJson);
+    assert.deepEqual(scenario.tags, []);
+  });
 });

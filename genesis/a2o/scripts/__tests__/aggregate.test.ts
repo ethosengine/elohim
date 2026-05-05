@@ -13,17 +13,20 @@ function input() {
       name: 'Timothy completes path',
       feature: 'features/lamad/learning-journey.feature',
       status: 'passed',
+      tags: [],
     },
     {
       name: 'Mary fails on assessment',
       feature: 'features/lamad/learning-journey.feature',
       status: 'failed',
       failureMessage: 'AssertionError: expected 500 to be 200',
+      tags: [],
     },
     {
       name: 'Stub not implemented',
       feature: 'features/auth/fixture-humans.feature',
       status: 'pending',
+      tags: [],
     },
   ];
   const console: ConsoleArtifact[] = [

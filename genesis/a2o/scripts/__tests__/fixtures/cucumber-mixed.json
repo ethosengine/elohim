@@ -6,6 +6,12 @@
       {
         "name": "Timothy completes path",
         "type": "scenario",
+        "tags": [
+          { "name": "@e2e" },
+          { "name": "@lamad" },
+          { "name": "@browser-only" },
+          { "name": "@elohim-visually-validated" }
+        ],
         "steps": [
           { "name": "doorway is reachable", "result": { "status": "passed", "duration": 100 } }
         ]
@@ -13,6 +19,12 @@
       {
         "name": "Mary fails on assessment",
         "type": "scenario",
+        "tags": [
+          { "name": "@e2e" },
+          { "name": "@lamad" },
+          { "name": "@browser-only" },
+          { "name": "@elohim-visually-validated" }
+        ],
         "steps": [
           { "name": "doorway is reachable", "result": { "status": "passed", "duration": 50 } },
           {
@@ -34,6 +46,10 @@
       {
         "name": "Stub step not implemented",
         "type": "scenario",
+        "tags": [
+          { "name": "@e2e" },
+          { "name": "@auth" }
+        ],
         "steps": [
           { "name": "a new human wanders in", "result": { "status": "pending", "duration": 0 } }
         ]
