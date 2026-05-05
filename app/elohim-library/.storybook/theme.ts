@@ -3,7 +3,7 @@ import { create } from 'storybook/theming';
 export default create({
   base: 'dark',
 
-  brandTitle: 'Lamad UI',
+  brandTitle: 'graphos',
   brandUrl: '/',
 
   colorPrimary: '#c9a961',
