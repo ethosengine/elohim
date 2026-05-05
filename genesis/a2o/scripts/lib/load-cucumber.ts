@@ -33,6 +33,7 @@ function aggregateStatus(steps: CucumberStep[]): ScenarioStatus {
 }
 
 export function loadCucumber(json: string): ScenarioResult[] {
+  if (json.trim().length === 0) return [];
   const features = JSON.parse(json) as CucumberFeature[];
   const results: ScenarioResult[] = [];
   for (const feature of features) {
