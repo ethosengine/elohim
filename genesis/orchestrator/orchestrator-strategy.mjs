@@ -83,12 +83,18 @@ export const PIPELINES = {
     changePatterns: [
       'app/elohim-library/projects/**',
       'app/elohim-library/.storybook/**',
+      'app/elohim-library/scripts/**',
       'app/elohim-library/package.json',
       'app/elohim-library/tsconfig.storybook.json',
       'app/elohim-library/angular.json',
       'app/elohim-library/Jenkinsfile',
       'app/elohim-library/images/**',
+      'app/elohim-library/build-manifest.json',
       'genesis/orchestrator/manifests/elohim-storybook/**',
+      // graphos source content (per design-surface-narrative-scaffold spec)
+      'genesis/docs/content/elohim-protocol/**',
+      'genesis/graphos/**',
+      'genesis/a2o/features/**',
     ],
     dependsOn: [],
     cascades: false,

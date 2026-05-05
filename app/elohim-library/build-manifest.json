@@ -9,10 +9,17 @@
         "sources": [
           "app/elohim-library/projects/**",
           "app/elohim-library/.storybook/**",
+          "app/elohim-library/scripts/**",
+          "app/elohim-library/build-manifest.json",
+          "app/elohim-library/Jenkinsfile",
           "app/elohim-library/package.json",
           "app/elohim-library/tsconfig.json",
           "app/elohim-library/tsconfig.storybook.json",
-          "app/elohim-library/angular.json"
+          "app/elohim-library/angular.json",
+          "genesis/docs/content/elohim-protocol/**",
+          "genesis/graphos/**",
+          "genesis/a2o/features/**",
+          "genesis/orchestrator/manifests/elohim-storybook/**"
         ],
         "buildProcess": ["app/elohim-library/Jenkinsfile"]
       },
@@ -30,8 +37,7 @@
       "description": "Package Storybook static bundle into nginx:alpine container image",
       "inputs": {
         "sources": [
-          "app/elohim-library/images/Dockerfile",
-          "app/elohim-library/images/nginx.conf"
+          "app/elohim-library/images/**"
         ],
         "buildProcess": ["app/elohim-library/Jenkinsfile"]
       },
