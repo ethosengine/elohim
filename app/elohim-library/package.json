@@ -8,9 +8,13 @@
     "watch": "ng build --watch --configuration development",
     "test": "vitest run --config vite.config.ts --passWithNoTests",
     "test:service": "cd projects/elohim-service && pnpm exec jest",
+    "test:sync-genesis": "node --test scripts/sync-genesis.test.mjs",
     "lint": "eslint projects/elohim-service/src projects/lamad-ui/src projects/html5-app-plugin/src",
     "lint:fix": "eslint projects/elohim-service/src projects/lamad-ui/src projects/html5-app-plugin/src --fix",
+    "sync-genesis": "node scripts/sync-genesis.mjs",
+    "prestorybook": "pnpm run sync-genesis",
     "storybook": "ng run elohim-ui-playground:storybook",
+    "prebuild-storybook": "pnpm run sync-genesis",
     "build-storybook": "ng run elohim-ui-playground:build-storybook"
   },
   "private": true,
