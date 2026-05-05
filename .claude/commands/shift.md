@@ -13,21 +13,19 @@ Invokes the `agentic-developer` skill to run an agentic developer shift.
 
 ## What it does
 
-1. Runs the `generalize-permissions` skill on the current allowlist
-   (bulk-collapse proposals).
-2. Interviews the user for the Objective (name, measure command,
+1. Interviews the user for the Objective (name, measure command,
    baseline, scope, budget).
-3. Composes a shift id, writes Objective YAML to
+2. Composes a shift id, writes Objective YAML to
    `.claude/shifts/<shift-id>.objective.yaml`, writes initial journal
    to `.claude/shifts/<shift-id>.journal.md`.
-4. Pattern-matches the predicted command palette against current
+3. Pattern-matches the predicted command palette against current
    allowlists; proposes shift-scoped additions to
    `.claude/settings.local.json` for user approval.
-5. Runs `pnpm run agentic:readiness -- --objective <path>`. Aborts
+4. Runs `pnpm run agentic:readiness -- --objective <path>`. Aborts
    on any readiness failure with a report.
-6. Enters the iteration loop, using `ScheduleWakeup` to pace between
+5. Enters the iteration loop, using `ScheduleWakeup` to pace between
    iterations until done, bail, or budget exhaustion.
-7. On terminal state, writes a sprint result markdown at
+6. On terminal state, writes a sprint result markdown at
    `.claude/shifts/<shift-id>.journal.md` and prints its path.
 
 ## See also

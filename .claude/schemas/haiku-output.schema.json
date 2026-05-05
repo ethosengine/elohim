@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://elohim.protocol/schemas/agentic/haiku-output.schema.json",
   "title": "Haiku Observation Output",
-  "description": "Bounded structured summary that Haiku returns to Opus per iteration.",
+  "description": "Bounded structured summary returned by Haiku-tier observation (the shift loop's step 2 dispatch and the ci-observer agent). The optional dispatch_drift field is populated only by ci-observer when invoked in validate mode against a predicted pipeline set.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -71,6 +71,40 @@
       }
     },
 
-    "confidence": { "enum": ["low", "medium", "high"] }
+    "confidence": { "enum": ["low", "medium", "high"] },
+
+    "dispatch_drift": {
+      "description": "Populated only by ci-observer in validate mode. Compares the orchestrator's actual pipeline dispatch against a predicted set (typically from graph-walker.mjs run on the diff before push).",
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["verdict", "predicted", "actual"],
+          "properties": {
+            "verdict": {
+              "enum": ["expected", "over_built", "under_built", "mixed", "recovery_fallback"],
+              "description": "expected = predicted == actual; over_built = actual ⊃ predicted; under_built = actual ⊊ predicted; mixed = both extras and missing; recovery_fallback = orchestrator fell into a generic 'build all' or 'baselines stale' mode without a real reason."
+            },
+            "predicted": { "type": "array", "items": { "type": "string" } },
+            "actual": { "type": "array", "items": { "type": "string" } },
+            "extras": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "Pipelines built that were not predicted."
+            },
+            "missing": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "Pipelines predicted but not built."
+            },
+            "evidence": {
+              "type": "string",
+              "description": "Brief excerpt from the orchestrator's Determine Build Plan output supporting the verdict."
+            }
+          }
+        }
+      ]
+    }
   }
 }

@@ -1,6 +1,6 @@
 ---
 name: generalize-permissions
-description: Cluster near-duplicate entries in .claude/settings.json + settings.local.json allow list into broader patterns under a safety taxonomy. Propose bulk collapses (10 entries → 1 pattern), user approves per-cluster. Invoked as first step of every agentic-developer shift kickoff AND standalone when the allowlist is getting bloated.
+description: Cluster near-duplicate entries in .claude/settings.json + settings.local.json allow list into broader patterns under a safety taxonomy. Propose bulk collapses (10 entries → 1 pattern), user approves per-cluster. Run standalone when the allowlist is getting bloated.
 ---
 
 # Generalize Permissions
@@ -11,11 +11,8 @@ the taxonomy in `genesis/agentic/data/safety-taxonomy.json`.
 
 ## When to invoke
 
-- **Automatically:** as the first step of every `/shift` kickoff, before
-  Opus starts iteration 1. If novel commands the shift will need are not
-  yet in the palette, this is where the gap closes.
-- **Standalone:** any time the allowlist is large or the user has been
-  approving near-duplicate entries frequently. Run `/generalize-permissions`.
+Run `/generalize-permissions` when the allowlist is large or you've
+been approving near-duplicate entries frequently.
 
 ## Procedure
 

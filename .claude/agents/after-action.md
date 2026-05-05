@@ -2,6 +2,10 @@
 name: after-action
 description: Use this agent to analyze incidents, bugs, and outages to extract lessons and prevent recurrence. Examples: <example>Context: Production incident just resolved. user: 'The seeder crashed in production yesterday, can you do a post-mortem?' assistant: 'Let me use the after-action agent to analyze the incident and extract lessons' <commentary>Post-incident analysis to prevent recurrence.</commentary></example> <example>Context: Bug was fixed but user wants to understand root cause. user: 'We fixed the auth bug but I want to understand how it got there' assistant: 'I'll use the after-action agent to trace the bug origin and find process gaps' <commentary>Root cause analysis beyond the immediate fix.</commentary></example> <example>Context: Pattern of similar issues emerging. user: 'This is the third time we have had a caching issue, what are we missing?' assistant: 'Let me use the after-action agent to analyze recurring caching problems' <commentary>Pattern analysis across multiple incidents.</commentary></example>
 tools: Task, Bash, Glob, Grep, Read, TodoWrite, mcp__jenkins__getBuildLog, mcp__jenkins__searchBuildLog, mcp__jenkins__getBuild, mcp__jenkins__getTestResults
+mcpServers:
+  - jenkins:
+      type: http
+      url: https://jenkins.ethosengine.com/mcp-server/mcp
 model: sonnet
 color: gold
 ---

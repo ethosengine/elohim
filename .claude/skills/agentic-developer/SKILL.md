@@ -21,10 +21,18 @@ closes with done or a clean bail.
 3. **Judgment governs loop length.** Bail when stuck with an explicit
    question. Budget is the safety net, not the primary exit.
 4. **Done is stable.** Two consecutive passing measurements, at least one
-   from a **fresh trigger** — a new Jenkins build invoked this shift via
-   `mcp__jenkins__triggerBuild` or a fresh `git push`, *not* a poll or
+   from a **fresh trigger** — a new Jenkins build dispatched by the
+   orchestrator from a `git push` you made this shift, *not* a poll or
    replay of a prior build id. A single green is a *done-candidate* (one
    pass, awaiting fresh-trigger confirmation), not *done*.
+
+   Note on triggers: the Jenkins MCP runs as anonymous and cannot call
+   `mcp__jenkins__triggerBuild`. Fresh triggers come from `git push` —
+   either a real change, or an empty commit
+   (`git commit --allow-empty -m "ci: retrigger [build:<pipeline>]"`)
+   when you need to re-run without a code change. The orchestrator's
+   webhook receiver + changeset analysis is the canonical dispatch path;
+   `[build:<pipeline>]` commit tags override its analysis when needed.
 
    The stability counter lives in the journal's **Stability Tracker**
    header. Increment on pass, reset to 0 on fail, evaluate at end of
@@ -61,11 +69,7 @@ closes with done or a clean bail.
 
 When `/shift` invokes this skill:
 
-1. **Run the `/generalize-permissions` skill first.** This bulk-collapses
-   near-duplicate palette entries before the shift starts. Present user
-   with proposals; wait for approval.
-
-2. **Interview the user for the Objective.** Ask short, pointed questions:
+1. **Interview the user for the Objective.** Ask short, pointed questions:
 
    - *"What's the outcome you're aiming at? (one sentence)"*
    - *"How do we measure it? (a command that returns a number)"*
@@ -79,14 +83,15 @@ When `/shift` invokes this skill:
    parses JSON in v1 (YAML support deferred). Show it to the user.
    Wait for explicit *"yes, kick off"* before proceeding.
 
-3. **Predict the command palette for this shift.** Based on the Objective
+2. **Predict the command palette for this shift.** Based on the Objective
    (paths, measure command, likely actions), list the bash/MCP commands
    you expect to need. Pattern-match against existing palette. Any gap
    becomes a proposed shift-scoped addition — present to user, wait for
    approval, write approved additions to `.claude/settings.local.json`
-   under a `// shift:<id>` comment.
+   under a `// shift:<id>` comment. This is best-effort: anything missed
+   surfaces as a wishlist entry in the sprint result.
 
-4. **Run pre-shift readiness check.**
+3. **Run pre-shift readiness check.**
 
    ```bash
    pnpm run agentic:readiness -- --objective .claude/shifts/<shift-id>.objective.json
@@ -95,10 +100,10 @@ When `/shift` invokes this skill:
    If `ready: false` in output, ABORT. Write a readiness report to
    `.claude/shifts/<shift-id>.readiness-report.md` explaining what failed,
    commit nothing, and remove any shift-scoped `// shift:<id>` entries
-   that step 3 added to `.claude/settings.local.json` before exiting.
+   that step 2 added to `.claude/settings.local.json` before exiting.
    User fixes in the morning.
 
-5. **Initialize the journal.** The **shift id** is
+4. **Initialize the journal.** The **shift id** is
    `<ISO-timestamp-no-colons>-<objective-slug>` (e.g.
    `2026-04-16T22-30-lift-edge-pipeline-to-green`). Create
    `.claude/shifts/<shift-id>.journal.md` from
@@ -124,35 +129,43 @@ palette union. Decide iteration type:
 
 ### 2. Observe (Haiku dispatch)
 
-Use the `Task` tool with a Haiku model to fetch and summarize current
-state. Your prompt to Haiku must specify:
+Dispatch the `ci-observer` agent (Haiku) for any Jenkins data — build
+logs, test results, orchestrator output, changesets. **You never read
+raw Jenkins logs directly.** The observer absorbs the text bomb and
+returns a structured summary on `.claude/schemas/haiku-output.schema.json`.
 
-- Source artifacts (log paths, Jenkins build id, command outputs, etc.)
-- The Haiku-output schema at `.claude/schemas/haiku-output.schema.json`
-- A hint to flag anti-patterns from
-  `genesis/agentic/data/anti-patterns.json`
+Two modes:
 
-Example Haiku dispatch:
+- **Summarize** (default) — pass `iteration`, `build_id`, prior
+  measurement context. Observer returns failure summary, anti-patterns,
+  confidence.
+- **Validate** — pass a predicted pipeline set (from step 4's
+  graph-walker pre-flight) plus the orchestrator's `build_id`. Observer
+  returns the same summary plus a `dispatch_drift` verdict (`expected`,
+  `over_built`, `under_built`, `mixed`, or `recovery_fallback`).
 
-> *"Reduce the following Jenkins build output into the structured
-> summary defined by `.claude/schemas/haiku-output.schema.json`.
-> Return ALL required fields: `iteration`, `measurement` (value, delta,
-> baseline, target), `context` (build_id, status, first_failing_stage),
-> `primary_failure` (error_class, evidence, files_mentioned) or null,
-> `observed_anti_patterns[]`, and `confidence`. Iteration is 4. Previous
-> measurement was 0.15. Flag any anti-patterns per
-> `genesis/agentic/data/anti-patterns.json` with IDs and evidence. Be
-> bounded: 5-10 lines max for evidence fields."*
+For non-Jenkins observation (filesystem state, command output that's
+not from CI), an inline Haiku `Task` dispatch is fine. Always pin the
+output schema in the prompt.
+
+If `confidence: low` comes back from the observer, escalate to step 3.
 
 ### 3. Verify (Sonnet dispatch, optional)
 
-If Haiku's `confidence` is `low`, OR you suspect the summary:
+If the observer's `confidence` is `low`, OR you suspect the summary:
 
 - contradicts prior iteration findings
 - is suspiciously clean given the change surface
 - is missing critical detail (line numbers, file paths, timing)
+- needs cross-build correlation (flake history, deploy chain)
 
-Dispatch Sonnet via `Task` tool with a specific directive AND the
+For CI/CD-shaped questions, dispatch the `ci-investigator` agent
+(Sonnet, read-only). It already knows pipeline architecture, changeset
+patterns, and triage order — no need to re-brief. Return analysis,
+not directives.
+
+For non-CI verification (project-domain code analysis, test logic),
+dispatch Sonnet via `Task` tool with a specific directive AND the
 current palette. Sonnet must:
 
 - Pattern-match its intended commands against the palette before running
@@ -168,7 +181,27 @@ Pick ONE action:
   not in the high-risk denylist AND not a measurement-oracle file.
 - **Commit + push.** Use palette-approved `git add` and `git commit`
   commands. Never force-push, amend, rebase, or branch delete.
-- **Retrigger build.** Via `mcp__jenkins__triggerBuild`.
+
+  **Pre-flight pipeline prediction (before push).** Run graph-walker
+  on the staged diff to predict which pipelines the orchestrator should
+  dispatch:
+
+  ```bash
+  git diff --name-only --cached | node genesis/orchestrator/graph-walker.mjs
+  ```
+
+  Journal the predicted pipeline set in this iteration's stanza. The
+  next iteration's step 2 will pass this set to `ci-observer` in
+  validate mode for drift detection — this is how CI dispatch
+  correctness gets continuously verified (principle 7).
+
+- **Retrigger build.** Push an empty commit:
+  `git commit --allow-empty -m "ci: retrigger [build:<pipeline>]" && git push`.
+  Do NOT call `mcp__jenkins__triggerBuild` — the MCP is anonymous and
+  lacks Job.Build. The orchestrator's webhook + commit-tag dispatch is
+  the trigger surface. The `[build:<pipeline>]` tag overrides
+  changeset analysis, so for retriggers the predicted set is exactly
+  what the tag names.
 - **Nothing.** You're waiting on a prior action; next iteration is
   `observe-only`.
 

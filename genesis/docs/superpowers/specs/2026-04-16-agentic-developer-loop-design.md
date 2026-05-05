@@ -67,7 +67,7 @@ Eight artifacts constitute the v1 surface.
 |---|---|---|---|
 | `/shift` slash command | `.claude/commands/shift.md` | committed | Entry point. Invokes the skill. |
 | `agentic-developer` skill | `.claude/skills/agentic-developer/SKILL.md` | committed | Orchestration playbook: kickoff → iterate → close. |
-| `/generalize-permissions` skill | `.claude/skills/generalize-permissions/SKILL.md` | committed | Deterministic allowlist clustering with safety taxonomy. Invoked as first step of shift + standalone. |
+| `/generalize-permissions` skill | `.claude/skills/generalize-permissions/SKILL.md` | committed | Deterministic allowlist clustering with safety taxonomy. Run standalone when the allowlist gets bloated. |
 | Objective YAML | `.claude/shifts/<shift-id>.objective.yaml` | gitignored | Authored interactively at kickoff. Read each iteration. |
 | Shift journal / sprint result | `.claude/shifts/<shift-id>.journal.md` | gitignored | Appended each iteration; becomes sprint result on close. |
 | Durable palette | `.claude/settings.json` | committed | Patterns graduated from past shifts' wishlists. |
@@ -281,7 +281,7 @@ Patterns follow the taxonomy:
 - **Subcommand-scoped:** `git` (add/commit/diff/status/log/show/fetch/pull — safe; push/reset --hard/branch -D/checkout --/--force — prompt or deny). `kubectl` (get/describe — safe; apply/delete/rollout — prompt).
 - **Never wildcard:** `rm`, `sudo`, `curl`, `ssh`, `aws`, `gcloud`, `gh delete`, `npm publish`, `cargo publish`
 
-`/generalize-permissions` skill encodes this taxonomy. Its proposals are bulk (10 literal entries collapse to 1 pattern) and never applied silently — always user-approved.
+`/generalize-permissions` skill encodes this taxonomy. Its proposals are bulk (10 literal entries collapse to 1 pattern) and never applied silently — always user-approved. Run it standalone when the allowlist gets bloated.
 
 ### Wishlist tiers
 

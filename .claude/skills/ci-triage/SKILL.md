@@ -15,6 +15,10 @@ description: Quick CI/CD failure diagnosis. Use when builds fail.
 
 **ci-summary.json URL**: `https://jenkins.ethosengine.com/job/elohim-orchestrator/job/{branch}/{buildNumber}/artifact/ci-summary.json`
 
+## Auth model
+
+MCP runs as anonymous against this Jenkins (OIDC realm — explicit auth would redirect-loop). Read tools work freely; `triggerBuild` and `updateBuild` will fail. To re-run a build, push an empty commit with a `[build:<pipeline>]` tag — see pipeline-diagnostics for the full list.
+
 ## Search Strategy
 
 **Rule: Search first, paginate second. Never fetch full logs.**
@@ -52,4 +56,5 @@ curl -s https://alpha.elohim.host -o /dev/null -w '%{http_code}'
 ## See Also
 
 - `.claude/data/failure-taxonomy.json` - Full category definitions
-- ci-pipeline agent - Deep investigation with test results
+- `ci-observer` agent (Haiku) - Always-first absorber of Jenkins MCP data; returns structured summary
+- `ci-investigator` agent (Sonnet) - Deep investigation when observer confidence is low or cross-build correlation is needed

@@ -284,7 +284,7 @@ The point is to delete decision logic, not Jenkins itself.
 - **Rakia harvest (executor + manifest schema):** `elohim/rakia/docs/specs/2026-04-27-rakia-as-brit-attestation-executor-design.md`
 - **Brit-graph + rakia MVP:** `docs/superpowers/specs/2026-04-19-brit-graph-rakia-mvp-design.md`
 - **Originating incident:** orchestrator-build #727/#728 over-build (storageClass commit `edfe5c57`)
-- **Diagnostic report:** ci-pipeline agent dispatched 2026-04-27
+- **Diagnostic report:** ci-investigator agent dispatched 2026-04-27
 
 ## 10. Done criteria
 
