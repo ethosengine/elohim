@@ -40,6 +40,44 @@ interface HumansJson {
   humans: HumansJsonHuman[];
 }
 
+interface DeploymentRecord {
+  name: string;
+  suspended?: boolean;
+}
+
+interface DeploymentsJson {
+  humans?: DeploymentRecord[];
+}
+
+/**
+ * Load suspended-human names from deployments.json. Mirrors the a2o
+ * framework's loadDeployments() (genesis/a2o/src/framework/fixtures/humans.ts).
+ *
+ * Suspended humans (e.g. shem-pinned adam/pete/frank when shem is offline)
+ * have dead conductor pods — registration via doorway's node/device branches
+ * fails 502/503/WebSocket-closed because the per-human conductor isn't
+ * scheduled. Skip them at the seeder boundary so the suspension flag in
+ * deployments.json governs both deploy *and* seed.
+ *
+ * Fail-open on read errors: if deployments.json is unreadable, treat
+ * everyone as deployable (preserves prior behavior).
+ */
+function loadSuspendedNames(): Set<string> {
+  try {
+    const __dirname = dirname(fileURLToPath(import.meta.url));
+    const jsonPath = resolve(__dirname, '../../orchestrator/data/deployments.json');
+    const raw = readFileSync(jsonPath, 'utf-8');
+    const data = JSON.parse(raw) as DeploymentsJson;
+    const suspended = new Set<string>();
+    for (const h of data.humans ?? []) {
+      if (h.suspended) suspended.add(h.name.toLowerCase());
+    }
+    return suspended;
+  } catch {
+    return new Set();
+  }
+}
+
 // =============================================================================
 // Credential derivation — MUST stay in sync with a2o fixtures/humans.ts
 // =============================================================================
@@ -205,17 +243,32 @@ async function main(): Promise<void> {
   }
   const humansJson: HumansJson = JSON.parse(readFileSync(jsonPath, 'utf-8'));
 
-  // Filter to active humans (everyone except the visitor-category persona).
-  // Humans with no explicit agencyPhase default to "hosted" at registration —
-  // they get a doorway-managed account without a dedicated infra archetype.
-  // Only the Traveler persona (category=visitor) is intentionally unseeded.
-  const active = humansJson.humans.filter(
-    h => h.category !== 'visitor' && h.agencyPhase !== 'visitor'
+  // Filter to active humans:
+  //  - Skip the visitor-category persona (Traveler — intentionally unseeded).
+  //  - Skip humans suspended in deployments.json (shem-pinned adam/pete/frank
+  //    while shem is decommissioned — their dedicated conductor pods are
+  //    Pending and registration via doorway's node/device branches would
+  //    fail 502/503/WebSocket-closed).
+  //  - Humans with no explicit agencyPhase default to "hosted" at
+  //    registration — doorway-managed account, no dedicated infra archetype.
+  const suspendedNames = loadSuspendedNames();
+  const active = humansJson.humans.filter(h => {
+    if (h.category === 'visitor' || h.agencyPhase === 'visitor') return false;
+    if (suspendedNames.has(h.displayName.toLowerCase())) return false;
+    return true;
+  });
+  const skippedSuspended = humansJson.humans.filter(h =>
+    suspendedNames.has(h.displayName.toLowerCase())
   );
 
   console.log('=== Seed Humans ===\n');
   console.log(`Doorway:  ${doorwayUrl}`);
   console.log(`Humans:   ${active.length} active of ${humansJson.humans.length} total`);
+  if (skippedSuspended.length > 0) {
+    console.log(
+      `Skipping: ${skippedSuspended.length} suspended (${skippedSuspended.map(h => h.displayName).join(', ')}) — see deployments.json`
+    );
+  }
   console.log(`Admin key: ${adminBootstrapKey ? 'provided' : 'not set'}`);
   console.log('');
 
