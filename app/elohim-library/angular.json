@@ -151,6 +151,23 @@
           "builder": "@analogjs/vitest-angular:test"
         }
       }
+    },
+    "graphos": {
+      "projectType": "library",
+      "root": "projects/graphos",
+      "sourceRoot": "projects/graphos/src",
+      "prefix": "graphos",
+      "architect": {
+        "build": {
+          "builder": "@angular-devkit/build-angular:ng-packagr",
+          "options": {
+            "project": "projects/graphos/ng-package.json"
+          }
+        },
+        "test": {
+          "builder": "@analogjs/vitest-angular:test"
+        }
+      }
     }
   }
 }
