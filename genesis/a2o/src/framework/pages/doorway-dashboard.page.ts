@@ -16,7 +16,8 @@ type DashboardTab =
   | 'resources'
   | 'federation'
   | 'pipeline'
-  | 'graduation';
+  | 'graduation'
+  | 'topology';
 
 const TAB_MAP: Record<DashboardTab, string> = {
   overview: DOORWAY_DASHBOARD.TAB_OVERVIEW,
@@ -26,6 +27,7 @@ const TAB_MAP: Record<DashboardTab, string> = {
   federation: DOORWAY_DASHBOARD.TAB_FEDERATION,
   pipeline: DOORWAY_DASHBOARD.TAB_PIPELINE,
   graduation: DOORWAY_DASHBOARD.TAB_GRADUATION,
+  topology: DOORWAY_DASHBOARD.TAB_TOPOLOGY,
 };
 
 export class DoorwayDashboardPage extends BasePage {

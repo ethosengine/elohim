@@ -50,6 +50,13 @@ export const DOORWAY_DASHBOARD = {
   TAB_FEDERATION: 'dashboard-tab-federation',
   TAB_PIPELINE: 'dashboard-tab-pipeline',
   TAB_GRADUATION: 'dashboard-tab-graduation',
+  TAB_TOPOLOGY: 'dashboard-tab-topology',
+  TOPOLOGY_PANEL: 'operator-topology',
+  TOPOLOGY_HOSTNAME: 'topology-hostname',
+  TOPOLOGY_STEWARDS_COUNT: 'topology-stewards-count',
+  TOPOLOGY_FEDERATION_COUNT: 'topology-federation-count',
+  TOPOLOGY_DETAILS_TOGGLE: 'topology-details-toggle',
+  TOPOLOGY_RETRY: 'topology-retry',
   NODES_STATUS_FILTER: 'nodes-status-filter',
   NODES_SORT_ID: 'nodes-sort-id',
   NODES_SORT_STATUS: 'nodes-sort-status',
@@ -487,4 +494,42 @@ export const ELOHIM_PRESENCE = {
 // Banner notification (elohim-app: banner-notification.component.ts)
 export const BANNER = {
   NOTIFICATION: 'banner-notification',
+} as const;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Elohim App — Shefa Topology Surfaces (light-up-the-topology sprint)
+// ─────────────────────────────────────────────────────────────────────────────
+
+// /shefa/cluster — federated multi-device view (my-cluster.component.html)
+export const SHEFA_CLUSTER = {
+  PAGE: 'my-cluster-page',
+  LOADING: 'my-cluster-loading',
+  SUMMARY: 'my-cluster-summary',
+  TOTALS: 'my-cluster-totals',
+  STATUS: 'my-cluster-status',
+  SHOW_DETAILS_TOGGLE: 'my-cluster-show-details-toggle',
+  DETAIL_JSON: 'my-cluster-detail-json',
+  ERROR: 'my-cluster-error',
+  DEVICE_TILE: 'device-tile',
+} as const;
+
+// /shefa/peers — per-household reciprocation topology (peer-topology.component.ts)
+export const SHEFA_PEERS = {
+  PAGE: 'peer-topology-page',
+  SUMMARY: 'peer-topology-summary',
+  CLIFF: 'peer-topology-cliff',
+  SHOW_DETAILS_TOGGLE: 'peer-topology-show-details-toggle',
+  DETAIL_JSON: 'peer-topology-detail-json',
+  HOUSEHOLD_CARD: 'peer-household-card',
+} as const;
+
+// /shefa/reciprocity — inflow/outflow ledger (reciprocity-ledger.component.ts)
+export const SHEFA_RECIPROCITY = {
+  PAGE: 'reciprocity-page',
+  INFLOW_ROW: 'reciprocity-inflow-row',
+  INFLOW_EMPTY: 'reciprocity-inflow-empty',
+  OUTFLOW_ROW: 'reciprocity-outflow-row',
+  OUTFLOW_EMPTY: 'reciprocity-outflow-empty',
+  NET: 'reciprocity-net',
+  CAPACITY: 'reciprocity-capacity',
 } as const;

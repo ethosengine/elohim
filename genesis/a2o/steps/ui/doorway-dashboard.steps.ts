@@ -59,6 +59,7 @@ When(
         | 'federation'
         | 'pipeline'
         | 'graduation'
+        | 'topology'
     );
   }
 );
