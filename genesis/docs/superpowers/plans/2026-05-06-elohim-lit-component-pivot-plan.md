@@ -561,9 +561,11 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 
 Use Write to create:
 
+> **Side-effect contract:** This file does NOT use Lit's `@customElement` decorator. The decorator calls `customElements.define()` at module evaluation time, which would make `index.ts`'s "side-effect-free" contract a lie and create a tree-shaking trap (a bundler dropping an unused `import { ElohimButton } from 'elohim-core'` would also drop the registration). Registration lives exclusively in `src/register.ts`, which is the only file marked `sideEffects` in `package.json`. This matches the sophia-element pattern in this repo.
+
 ```typescript
 import { LitElement, css, html, type PropertyValues } from 'lit';
-import { customElement, property } from 'lit/decorators.js';
+import { property } from 'lit/decorators.js';
 
 export type ElohimButtonVariant = 'primary' | 'secondary' | 'ghost';
 
@@ -588,7 +590,6 @@ export type ElohimButtonVariant = 'primary' | 'secondary' | 'ghost';
  *
  * @csspart button - The internal native <button> element
  */
-@customElement('elohim-button')
 export class ElohimButton extends LitElement {
   static override styles = css`
     :host {
