@@ -1,0 +1,223 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://elohim.protocol/schemas/agentic/feature-promise.schema.json",
+  "title": "FeaturePromise",
+  "description": "Bound artifact for /deliver invocations. Composed during kickoff via exhaustive plan-anchored search. Tier-3 stewardship verdicts judge the rendered screenshot against this promise.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["name", "handle", "promise", "verification", "scope", "budget", "search_trail"],
+  "properties": {
+    "name": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{2,60}$",
+      "description": "Slug-case identifier; used in shift id."
+    },
+    "handle": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The argument passed to /deliver — plan name, manifesto reference, or natural-language gap description."
+    },
+    "description": {
+      "type": "string",
+      "minLength": 10,
+      "maxLength": 1000
+    },
+    "promise": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["vision_quotes", "plan_deliverables"],
+      "properties": {
+        "vision_quotes": {
+          "type": "array",
+          "minItems": 0,
+          "description": "Verbatim quotes from manifesto/epic narrative anchoring the WHY of the feature.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["source", "text"],
+            "properties": {
+              "source": {
+                "type": "string",
+                "description": "Path or path:line reference, e.g. 'genesis/docs/content/elohim-protocol/manifesto.md:42'"
+              },
+              "text": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        },
+        "plan_deliverables": {
+          "type": "array",
+          "minItems": 1,
+          "description": "Verbatim list from the plan(s) of what was supposed to land.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["plan_path", "deliverable", "user_visible"],
+            "properties": {
+              "plan_path": {
+                "type": "string",
+                "description": "Path to the plan file."
+              },
+              "deliverable": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Verbatim deliverable text from the plan."
+              },
+              "user_visible": {
+                "type": "boolean",
+                "description": "True if this deliverable should produce something the user can see in the app. Tier-3 judgment focuses on user_visible deliverables."
+              }
+            }
+          }
+        },
+        "manifesto_anchors": {
+          "type": "array",
+          "description": "Optional. Additional manifesto/epic references that ground the deliverables.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["source", "text"],
+            "properties": {
+              "source": { "type": "string" },
+              "text": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "verification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scenarios_existing", "scenarios_missing", "screenshot_targets"],
+      "properties": {
+        "scenarios_existing": {
+          "type": "array",
+          "description": "Gherkin scenarios already authored that assert this delivery. Format: 'features/path/file.feature: scenario name'.",
+          "items": { "type": "string" }
+        },
+        "scenarios_missing": {
+          "type": "array",
+          "description": "Gaps where scenarios should exist but don't. Drives /generate-scenarios dispatches during the iteration loop.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["intent", "proposed_location"],
+            "properties": {
+              "intent": {
+                "type": "string",
+                "minLength": 1,
+                "description": "What this scenario should assert about the delivered experience."
+              },
+              "proposed_location": {
+                "type": "string",
+                "description": "Suggested feature file path, e.g. 'features/lamad/topology-discovery.feature'"
+              }
+            }
+          }
+        },
+        "screenshot_targets": {
+          "type": "array",
+          "minItems": 1,
+          "description": "Per-scenario expected visual proof. Tier-3 judges the rendered screenshot against what_should_be_visible.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["feature_slug", "what_should_be_visible"],
+            "properties": {
+              "feature_slug": {
+                "type": "string",
+                "description": "Pillar-prefixed feature slug, e.g. 'lamad-learning-journey', 'elohim-presence'."
+              },
+              "scenario_name": {
+                "type": "string",
+                "description": "Optional. Name of the specific scenario the screenshot proves."
+              },
+              "what_should_be_visible": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Structural description of what the screenshot must show for tier-3 to verdict 'delivered'. NO transcribed text — describe structure (e.g. 'topology graph rendered with peer nodes; legend visible; loading state cleared'), not exact strings ('says \"3 peers connected\"')."
+              }
+            }
+          }
+        }
+      }
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["philosophy"],
+      "properties": {
+        "philosophy": {
+          "const": "unbounded; agent commits to whatever delivers",
+          "description": "Hard-coded constant. /deliver does not negotiate scope at kickoff like /shift does — scope is unbounded by design."
+        },
+        "consent_required_paths": {
+          "type": "array",
+          "description": "Globs requiring explicit user consent before edit. Destructive/irreversible paths still need user OK. Defaults: production configs, .github/workflows/, DNA-notarized validators when changing the LAW, crypto/identity files.",
+          "items": { "type": "string" },
+          "default": [
+            "**/*.production.*",
+            ".github/workflows/**"
+          ]
+        }
+      }
+    },
+    "budget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["iterations", "wall_clock_min"],
+      "properties": {
+        "iterations": {
+          "type": "integer",
+          "minimum": 5,
+          "maximum": 50,
+          "default": 20,
+          "description": "Soft signal. /deliver does not bail on iteration count alone — only on design-uncharted or consent-required."
+        },
+        "wall_clock_min": {
+          "type": "integer",
+          "minimum": 30,
+          "maximum": 1440,
+          "default": 480
+        },
+        "search_calls": {
+          "type": "integer",
+          "minimum": 10,
+          "maximum": 200,
+          "default": 50,
+          "description": "Soft cap on grep/read calls in any single search-first phase. After this, agent must propose action with what it has."
+        }
+      }
+    },
+    "search_trail": {
+      "type": "array",
+      "minItems": 0,
+      "description": "Audit log of every search location visited during kickoff and any mid-iteration ambiguity-resolution searches. Bail-with-proposal requires this to have ≥7 unique entries with non-empty result fields.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["location", "result"],
+        "properties": {
+          "location": {
+            "type": "string",
+            "description": "Path, glob, or grep pattern searched."
+          },
+          "result": {
+            "enum": ["hit_relevant", "hit_partial", "miss"],
+            "description": "Outcome of the search."
+          },
+          "iteration": {
+            "type": ["integer", "null"],
+            "description": "Iteration number when this search was performed; null for kickoff searches."
+          },
+          "notes": {
+            "type": "string",
+            "description": "Optional. Brief observation about what was found at this location."
+          }
+        }
+      }
+    }
+  }
+}
