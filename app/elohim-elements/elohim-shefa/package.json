@@ -1,0 +1,14 @@
+{
+  "name": "elohim-shefa",
+  "version": "0.0.0",
+  "private": true,
+  "sideEffects": false,
+  "description": "Economy pillar styles — stewardship, banking, resource flows, signals, storage distribution, compute needs.",
+  "style": "./index.scss",
+  "sass": "./index.scss",
+  "files": [
+    "*.scss",
+    "**/*.scss",
+    "README.md"
+  ]
+}

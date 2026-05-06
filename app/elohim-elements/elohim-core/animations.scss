@@ -1,0 +1,39 @@
+// elohim-core / animations
+//
+// Global keyframes available to every consumer. Components use them via
+// `animation: <name> <duration> ...` without re-declaring the keyframe.
+//
+// Harvested from app/elohim-app/src/styles.css.
+
+/* Twinkle — used by the elohim-shell starry-sky background overlay. */
+@keyframes twinkle {
+  0%,
+  100% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 0.85;
+  }
+}
+
+/* Float — used by the hero component's idle motion. */
+@keyframes float {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    transform: translate3d(0, -10px, 0);
+  }
+}
+
+/* Bounce — used by the hero component's scroll indicator. */
+@keyframes bounce {
+  0%,
+  100% {
+    transform: translate3d(-50%, 0, 0);
+  }
+  50% {
+    transform: translate3d(-50%, 10px, 0);
+  }
+}

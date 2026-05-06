@@ -1,0 +1,14 @@
+{
+  "name": "elohim-imagodei",
+  "version": "0.0.0",
+  "private": true,
+  "sideEffects": false,
+  "description": "Identity pillar styles — login, register, recovery, profile, presence, account, agency, stewardship.",
+  "style": "./index.scss",
+  "sass": "./index.scss",
+  "files": [
+    "*.scss",
+    "**/*.scss",
+    "README.md"
+  ]
+}

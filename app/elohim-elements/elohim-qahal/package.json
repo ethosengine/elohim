@@ -1,0 +1,14 @@
+{
+  "name": "elohim-qahal",
+  "version": "0.0.0",
+  "private": true,
+  "sideEffects": false,
+  "description": "Community pillar styles — governance, affinity, consent.",
+  "style": "./index.scss",
+  "sass": "./index.scss",
+  "files": [
+    "*.scss",
+    "**/*.scss",
+    "README.md"
+  ]
+}

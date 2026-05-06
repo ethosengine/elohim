@@ -1,0 +1,14 @@
+{
+  "name": "elohim-core",
+  "version": "0.0.0",
+  "private": true,
+  "sideEffects": false,
+  "description": "Protocol substrate styles — tokens, breakpoints, base, mixins. The single source of truth that every other elohim-styles module @uses.",
+  "style": "./index.scss",
+  "sass": "./index.scss",
+  "files": [
+    "*.scss",
+    "**/*.scss",
+    "README.md"
+  ]
+}

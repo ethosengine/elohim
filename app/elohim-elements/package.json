@@ -1,0 +1,9 @@
+{
+  "name": "elohim-styles",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Constellation of single-concern style modules for the elohim protocol. See ./README.md and the elohim-{core,shell,<pillar>}/ subdirectories.",
+  "files": [
+    "README.md"
+  ]
+}

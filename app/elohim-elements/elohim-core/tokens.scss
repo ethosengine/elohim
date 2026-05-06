@@ -1,0 +1,207 @@
+// elohim-core / tokens
+//
+// CSS custom properties form the protocol's runtime design substrate.
+// The dark theme is the default; `prefers-color-scheme: light` overrides at
+// the OS level; `body[data-theme='light'|'dark']` provides a manual override
+// for theme-toggle UX.
+//
+// Harvested verbatim from app/elohim-app/src/styles.css (lines 12-118, 537-665).
+
+:root {
+  /* Space theme colors - Dark Mode (Default) */
+  --space-black: #000000;
+  --atmosphere-dark: #0a0a0a;
+  --atmosphere-mid: #1a1a2e;
+  --atmosphere-light: #16213e;
+  --text-light: #f3f4f6;
+
+  /* Accent colors for interactive elements */
+  --primary: #6b46c1;
+  --secondary: #ec4899;
+  --accent: #10b981;
+
+  /* Footer earthy theme colors */
+  --forest-dark: rgb(26, 35, 31);
+  --forest-light: rgb(36, 49, 41);
+  --leaf-light: rgb(201, 212, 197);
+  --tech-glow: rgb(127, 203, 238);
+  --tech-accent: rgba(127, 203, 238, 0.15);
+  --tech-bright: rgba(127, 203, 238, 0.8);
+  --earthy-orange: rgb(217, 124, 43);
+  --earthy-orange-light: rgba(217, 124, 43, 0.8);
+
+  /* Lamad Learning Platform - Clean Professional Theme (Dark Mode Default) */
+  --lamad-bg-primary: #0f172a;
+  --lamad-bg-secondary: #1e293b;
+  --lamad-bg-tertiary: #334155;
+  --lamad-surface: rgba(30, 41, 59, 0.8);
+  --lamad-surface-hover: rgba(51, 65, 85, 0.9);
+
+  --lamad-text-primary: #f1f5f9;
+  --lamad-text-secondary: #cbd5e1;
+  --lamad-text-tertiary: #94a3b8;
+  --lamad-text-muted: #64748b;
+
+  --lamad-border: rgba(148, 163, 184, 0.2);
+  --lamad-border-hover: rgba(148, 163, 184, 0.4);
+
+  --lamad-accent-primary: #6366f1;
+  --lamad-accent-secondary: #8b5cf6;
+  --lamad-accent-gradient: linear-gradient(135deg, #6366f1, #8b5cf6);
+
+  --lamad-success: #10b981;
+  --lamad-warning: #f59e0b;
+  --lamad-info: #3b82f6;
+
+  /* ============================================================================
+     Responsive Breakpoints
+     ============================================================================
+     Standard breakpoints for consistent responsive design across components.
+     Usage: @media (max-width: 768px) or use these values as reference.
+     ============================================================================ */
+  --bp-sm: 480px; /* Small mobile */
+  --bp-md: 768px; /* Tablet / Large mobile */
+  --bp-lg: 1024px; /* Desktop */
+  --bp-xl: 1280px; /* Large desktop */
+}
+
+/* Light Theme - Activates based on device preference */
+@media (prefers-color-scheme: light) {
+  :root {
+    /* Sky theme colors - Light Mode */
+    --space-black: #e3f2fd;
+    --atmosphere-dark: #bbdefb;
+    --atmosphere-mid: #90caf9;
+    --atmosphere-light: #64b5f6;
+    --text-light: #1a1a1a;
+
+    /* Accent colors for interactive elements - nature-inspired for beautiful day */
+    --primary: #1976d2;
+    --secondary: #f57c00;
+    --accent: #00897b;
+
+    /* Footer soft meadow theme colors - desaturated for beautiful day aesthetic */
+    --forest-dark: rgb(195, 205, 180);
+    --forest-light: rgb(235, 240, 225);
+    --leaf-light: rgb(40, 55, 30);
+    --tech-glow: rgb(15, 85, 150);
+    --tech-accent: rgba(15, 85, 150, 0.15);
+    --tech-bright: rgba(15, 85, 150, 0.95);
+    --earthy-orange: rgb(175, 85, 30);
+    --earthy-orange-light: rgba(175, 85, 30, 0.8);
+
+    /* Lamad Learning Platform - Clean Professional Theme (Light Mode) */
+    --lamad-bg-primary: #ffffff;
+    --lamad-bg-secondary: #f8fafc;
+    --lamad-bg-tertiary: #f1f5f9;
+    --lamad-surface: rgba(255, 255, 255, 0.95);
+    --lamad-surface-hover: rgba(248, 250, 252, 1);
+
+    --lamad-text-primary: #0f172a;
+    --lamad-text-secondary: #334155;
+    --lamad-text-tertiary: #475569;
+    --lamad-text-muted: #525252;
+
+    --lamad-border: rgba(15, 23, 42, 0.15);
+    --lamad-border-hover: rgba(15, 23, 42, 0.3);
+
+    --lamad-accent-primary: #4f46e5;
+    --lamad-accent-secondary: #7c3aed;
+    --lamad-accent-gradient: linear-gradient(135deg, #4f46e5, #7c3aed);
+
+    --lamad-success: #059669;
+    --lamad-warning: #d97706;
+    --lamad-info: #2563eb;
+  }
+}
+
+/* Manual Theme Overrides - These take precedence over media queries.
+   Applied by the theme-toggle component setting body[data-theme]. */
+
+/* Light Theme Override - Applied when user manually selects light theme */
+body[data-theme='light'] {
+  --space-black: #e3f2fd;
+  --atmosphere-dark: #bbdefb;
+  --atmosphere-mid: #90caf9;
+  --atmosphere-light: #64b5f6;
+  --text-light: #1a1a1a;
+  --primary: #5e35b1;
+  --secondary: #d81b60;
+  --accent: #00897b;
+  --forest-dark: rgb(46, 125, 50);
+  --forest-light: rgb(102, 187, 106);
+  --leaf-light: rgb(27, 94, 32);
+  --tech-glow: rgb(1, 87, 155);
+  --tech-accent: rgba(1, 87, 155, 0.15);
+  --tech-bright: rgba(1, 87, 155, 0.9);
+  --earthy-orange: rgb(230, 81, 0);
+  --earthy-orange-light: rgba(230, 81, 0, 0.8);
+
+  /* Lamad Learning Platform - Clean Professional Theme (Light Mode) */
+  --lamad-bg-primary: #ffffff;
+  --lamad-bg-secondary: #f8fafc;
+  --lamad-bg-tertiary: #f1f5f9;
+  --lamad-surface: rgba(255, 255, 255, 0.95);
+  --lamad-surface-hover: rgba(248, 250, 252, 1);
+
+  --lamad-text-primary: #0f172a;
+  --lamad-text-secondary: #334155;
+  --lamad-text-tertiary: #475569;
+  --lamad-text-muted: #525252;
+
+  --lamad-border: rgba(15, 23, 42, 0.15);
+  --lamad-border-hover: rgba(15, 23, 42, 0.3);
+
+  --lamad-accent-primary: #4f46e5;
+  --lamad-accent-secondary: #7c3aed;
+  --lamad-accent-gradient: linear-gradient(135deg, #4f46e5, #7c3aed);
+
+  --lamad-success: #059669;
+  --lamad-warning: #d97706;
+  --lamad-info: #2563eb;
+}
+
+/* Dark Theme Override - Applied when user manually selects dark theme.
+   Dark is already the default; this re-asserts it so the manual choice
+   sticks even if the OS preference flips to light. */
+body[data-theme='dark'] {
+  --space-black: #000000;
+  --atmosphere-dark: #0a0a0a;
+  --atmosphere-mid: #1a1a2e;
+  --atmosphere-light: #16213e;
+  --text-light: #f3f4f6;
+  --primary: #6b46c1;
+  --secondary: #ec4899;
+  --accent: #10b981;
+  --forest-dark: rgb(26, 35, 31);
+  --forest-light: rgb(36, 49, 41);
+  --leaf-light: rgb(201, 212, 197);
+  --tech-glow: rgb(127, 203, 238);
+  --tech-accent: rgba(127, 203, 238, 0.15);
+  --tech-bright: rgba(127, 203, 238, 0.8);
+  --earthy-orange: rgb(217, 124, 43);
+  --earthy-orange-light: rgba(217, 124, 43, 0.8);
+
+  /* Lamad Learning Platform - Clean Professional Theme (Dark Mode) */
+  --lamad-bg-primary: #0f172a;
+  --lamad-bg-secondary: #1e293b;
+  --lamad-bg-tertiary: #334155;
+  --lamad-surface: rgba(30, 41, 59, 0.8);
+  --lamad-surface-hover: rgba(51, 65, 85, 0.9);
+
+  --lamad-text-primary: #f1f5f9;
+  --lamad-text-secondary: #cbd5e1;
+  --lamad-text-tertiary: #94a3b8;
+  --lamad-text-muted: #64748b;
+
+  --lamad-border: rgba(148, 163, 184, 0.2);
+  --lamad-border-hover: rgba(148, 163, 184, 0.4);
+
+  --lamad-accent-primary: #6366f1;
+  --lamad-accent-secondary: #8b5cf6;
+  --lamad-accent-gradient: linear-gradient(135deg, #6366f1, #8b5cf6);
+
+  --lamad-success: #10b981;
+  --lamad-warning: #f59e0b;
+  --lamad-info: #3b82f6;
+}

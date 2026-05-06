@@ -3,6 +3,14 @@ packages:
   - doorway/doorway-app
   - app/elohim-library
   - app/elohim-library/projects/elohim-service
+  - app/elohim-elements/elohim-core
+  - app/elohim-elements/elohim-shell
+  - app/elohim-elements/elohim-imagodei
+  - app/elohim-elements/elohim-lamad
+  - app/elohim-elements/elohim-shefa
+  - app/elohim-elements/elohim-qahal
+  - app/elohim-elements/elohim-doorway
+  - app/elohim-elements/elohim-avodah
   - steward/device
   - genesis/seeder
   - genesis/a2o

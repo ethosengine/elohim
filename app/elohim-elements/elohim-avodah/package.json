@@ -1,0 +1,14 @@
+{
+  "name": "elohim-avodah",
+  "version": "0.0.0",
+  "private": true,
+  "sideEffects": false,
+  "description": "Avodah meta-pillar styles — protocol-as-process reference implementation views.",
+  "style": "./index.scss",
+  "sass": "./index.scss",
+  "files": [
+    "*.scss",
+    "**/*.scss",
+    "README.md"
+  ]
+}

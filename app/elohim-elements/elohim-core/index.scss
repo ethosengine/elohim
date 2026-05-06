@@ -1,0 +1,18 @@
+// elohim-core — protocol substrate styles
+//
+// Single source of truth for the design substrate every other elohim-styles
+// module composes from. Forwards three partials:
+//
+//   tokens     — CSS custom properties (colors, type, spacing, breakpoints)
+//                plus dark/light variants and manual theme-toggle overrides.
+//   base       — universal reset, html-element rules, and protocol-wide
+//                accessibility utilities (focus-visible, skip-link, sr-only,
+//                touch-target, table-scroll, reduced-motion, focused-view).
+//   animations — global keyframes (twinkle, float, bounce).
+//
+// Consumers import this single entry point. Sibling modules (elohim-shell,
+// elohim-imagodei, …) `@use 'elohim-core'` to get the substrate.
+
+@forward 'tokens';
+@forward 'base';
+@forward 'animations';

@@ -1,0 +1,242 @@
+// elohim-core / base
+//
+// Resets, global element rules, and protocol-wide accessibility utilities.
+// Everything here is substrate — present in every consuming app — and never
+// pillar-specific.
+//
+// Harvested from app/elohim-app/src/styles.css (universal reset, smooth-scroll,
+// focus-visible, skip-link, scrollbar, sr-only, touch-target, table-scroll,
+// reduced-motion, focused-view).
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
+/* ============================================================================
+   Accessibility: Focus Visibility
+   ============================================================================
+   Provides visible focus indicators for keyboard navigation while hiding
+   them for mouse users. This is critical for WCAG 2.1 compliance.
+   ============================================================================ */
+
+:focus-visible {
+  outline: 2px solid var(--lamad-accent-primary, #6366f1);
+  outline-offset: 2px;
+}
+
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* ============================================================================
+   Accessibility: Skip Navigation Link
+   ============================================================================
+   Allows keyboard users to skip repetitive navigation and jump directly
+   to main content. Hidden until focused.
+   ============================================================================ */
+
+.skip-link {
+  position: absolute;
+  left: -10000px;
+  top: auto;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  z-index: 10000;
+}
+
+.skip-link:focus {
+  position: fixed;
+  left: 1rem;
+  top: 1rem;
+  width: auto;
+  height: auto;
+  padding: 0.75rem 1.5rem;
+  background: var(--lamad-accent-primary, #6366f1);
+  color: white;
+  font-weight: 600;
+  border-radius: 0.5rem;
+  text-decoration: none;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, var(--primary), var(--secondary));
+  border-radius: 4px;
+}
+
+/* Light mode scrollbar */
+@media (prefers-color-scheme: light) {
+  ::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.05);
+  }
+}
+
+/* Manual theme-toggle scrollbar overrides */
+body[data-theme='light'] ::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+body[data-theme='dark'] ::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+/* ============================================================================
+   Accessibility Utilities
+   ============================================================================
+   Global utility classes for accessibility improvements.
+   ============================================================================ */
+
+/* Screen reader only - visually hidden but accessible to screen readers */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* ============================================================================
+   Touch Target Utilities
+   ============================================================================
+   Global utility classes for ensuring touch-friendly tap targets.
+   iOS Human Interface Guidelines and WCAG 2.2 recommend minimum 44x44px.
+   ============================================================================ */
+
+/* Apply to buttons, links, and other tappable elements */
+.touch-target {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+/* Larger touch target for primary actions */
+.touch-target-lg {
+  min-height: 48px;
+  min-width: 48px;
+}
+
+/* Inline touch targets (for link text that shouldn't be too wide) */
+.touch-target-inline {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+}
+
+/* On touch devices, ensure interactive elements meet minimums */
+@media (pointer: coarse) {
+  /* Buttons should be touch-friendly */
+  button:not([class*='touch']),
+  [role='button']:not([class*='touch']) {
+    min-height: 44px;
+  }
+
+  /* Links in navigation or action areas */
+  nav a,
+  .nav-link,
+  .action-link {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+  }
+}
+
+/* ============================================================================
+   Table Scroll Wrapper Utility
+   ============================================================================
+   Use .table-scroll-wrapper around tables to enable horizontal scrolling
+   on mobile devices while maintaining readable table content.
+   ============================================================================ */
+
+.table-scroll-wrapper {
+  display: block;
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin-bottom: 1rem;
+}
+
+.table-scroll-wrapper table {
+  margin-bottom: 0;
+}
+
+/* ============================================================================
+   Accessibility: Reduced Motion
+   ============================================================================
+   Respects user preference for reduced motion. Users who have enabled
+   "reduce motion" in their OS settings will see minimal or no animations.
+   This is critical for users with vestibular disorders or motion sensitivity.
+   ============================================================================ */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ============================================================================
+   Focused View Mode (Immersive Content Display)
+   ============================================================================
+   CSS-based fullscreen mode for distraction-free content viewing.
+   Activated via .focused-view-active class on container elements.
+   Uses fixed positioning to fill viewport while hiding app navigation.
+   ============================================================================ */
+
+.focused-view-container {
+  position: relative;
+}
+
+.focused-view-active {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  z-index: 1000;
+  background: var(--lamad-bg-primary, #ffffff);
+  overflow: auto;
+  transition: all 0.3s ease;
+}
+
+/* Lock body scroll when focused view is active */
+body.focused-view-mode {
+  overflow: hidden;
+}
+
+/* Hide app navigation elements in focused view.
+   NOTE: cross-pillar selectors (.elohim-navigator, .lamad-nav, app-header,
+   .site-header, .app-navigation) are referenced here pragmatically — the
+   utility is core, the targets are pillar nav classes the utility must hide. */
+body.focused-view-mode .elohim-navigator,
+body.focused-view-mode .app-navigation,
+body.focused-view-mode .lamad-nav,
+body.focused-view-mode app-header,
+body.focused-view-mode .site-header {
+  display: none !important;
+}

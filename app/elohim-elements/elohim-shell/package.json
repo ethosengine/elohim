@@ -1,0 +1,14 @@
+{
+  "name": "elohim-shell",
+  "version": "0.0.0",
+  "private": true,
+  "sideEffects": false,
+  "description": "Landing and host chrome — hero, footer, theme-toggle, vision, debug-bar. The non-pillar app shell.",
+  "style": "./index.scss",
+  "sass": "./index.scss",
+  "files": [
+    "*.scss",
+    "**/*.scss",
+    "README.md"
+  ]
+}
