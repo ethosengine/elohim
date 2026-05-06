@@ -1127,6 +1127,24 @@ spec:
                             // run as pre-push gates, not as Jenkins builds.
                             graphPipelines.removeAll { !PIPELINES.containsKey(it) }
 
+                            // Apply [build:*] commit-message overrides to graph result.
+                            // The build-graph algorithm correctly says "no sources changed
+                            // → no rebuild needed" — but a human pushing [build:app] is
+                            // intentionally overriding that decision (e.g., to redeploy after
+                            // a manifest-only change that elohim still needs to reconcile).
+                            // The legacy analyzer at line ~1050 already does this; mirror
+                            // here so graph-walker (authoritative since 2026-04) honors the
+                            // override too. Without this, every developer's manual retrigger
+                            // workflow is silently broken.
+                            if (env.FORCE_BUILD_PIPELINES) {
+                                env.FORCE_BUILD_PIPELINES.split(',').each { name ->
+                                    if (!graphPipelines.contains(name) && PIPELINES[name]) {
+                                        graphPipelines.add(name)
+                                        echo "🔧 [build:*] force-include applied to graph result: ${name}"
+                                    }
+                                }
+                            }
+
                             // Genesis auto-include: if any triggering pipeline is in the graph result
                             if (!graphPipelines.contains('elohim-genesis') && !params.SKIP_GENESIS) {
                                 def isDevBranch = env.BRANCH_NAME == 'dev' || env.BRANCH_NAME ==~ /dev-.+|feat-.+|claude\/.+/
