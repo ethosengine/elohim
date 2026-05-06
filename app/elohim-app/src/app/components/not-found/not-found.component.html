@@ -17,15 +17,15 @@
 
     <!-- Navigation Options -->
     <div class="actions">
-      <elohim-button variant="primary" (click)="goHome()">
+      <elohim-button variant="primary" data-testid="not-found-go-home" (click)="goHome()">
         <i class="fa-solid fa-house"></i>
         Go Home
       </elohim-button>
-      <elohim-button variant="secondary" (click)="goToLamad()">
+      <elohim-button variant="secondary" data-testid="not-found-go-lamad" (click)="goToLamad()">
         <i class="fa-solid fa-graduation-cap"></i>
         Explore Lamad
       </elohim-button>
-      <elohim-button variant="ghost" (click)="goBack()">
+      <elohim-button variant="ghost" data-testid="not-found-go-back" (click)="goBack()">
         <i class="fa-solid fa-arrow-left"></i>
         Go Back
       </elohim-button>
