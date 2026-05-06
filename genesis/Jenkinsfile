@@ -984,6 +984,58 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                             }
                         }
 
+                        // Browser-mode tests (Playwright). Probe-gated: if the builder
+                        // image can't run chromium, skip gracefully. Proper Playwright
+                        // container is a follow-up.
+                        env.PLAYWRIGHT_AVAILABLE = 'false'
+                        catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
+                            dir('genesis/a2o') {
+                                def probeRc = sh(returnStatus: true, script: '''#!/bin/bash
+                                    set +e
+
+                                    echo "═══════════════════════════════════════════════════════════"
+                                    echo "🔎 PLAYWRIGHT PROBE"
+                                    echo "═══════════════════════════════════════════════════════════"
+
+                                    npx playwright install chromium 2>&1 | tail -5
+                                    INSTALL_RC=$?
+                                    if [ $INSTALL_RC -ne 0 ]; then
+                                        echo "⚠️  npx playwright install chromium failed (rc=$INSTALL_RC)"
+                                        exit 1
+                                    fi
+
+                                    node -e "require('playwright').chromium.launch().then(b => b.close()).then(() => process.exit(0)).catch(e => { console.error('chromium.launch failed:', e.message); process.exit(1); })"
+                                ''')
+
+                                if (probeRc == 0) {
+                                    env.PLAYWRIGHT_AVAILABLE = 'true'
+                                    echo "✅ Playwright chromium can launch — running browser scenarios"
+
+                                    sh """#!/bin/bash
+                                        set -euo pipefail
+
+                                        echo "═══════════════════════════════════════════════════════════"
+                                        echo "🧪 E2E VERIFICATION (BROWSER)"
+                                        echo "═══════════════════════════════════════════════════════════"
+                                        echo "Doorway: ${doorwayHost}"
+                                        echo ""
+
+                                        E2E_DEVICE_MODE=playwright \\
+                                        E2E_DOORWAY_ALPHA="${doorwayHost}" \\
+                                            npx cucumber-js --tags '@e2e and @browser-only and not @wip' \\
+                                            --format progress-bar \\
+                                            --format json:reports/cucumber-report-browser.json \\
+                                            --format html:reports/cucumber-report-browser.html
+
+                                        echo "✅ Browser E2E tests passed"
+                                    """
+                                } else {
+                                    echo "⚠️  Playwright chromium not available in this image — skipping browser scenarios"
+                                    echo "    (Follow-up: build a ci-builder-playwright variant or run this stage in mcr.microsoft.com/playwright)"
+                                }
+                            }
+                        }
+
                         // Run BDD coverage gap scan (advisory)
                         catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
                             dir('genesis/a2o') {
@@ -997,7 +1049,7 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                             }
                         }
 
-                        // --- Sprint-report aggregator ---
+                        // --- Sprint-report aggregator (API run) ---
                         // Always runs (pass or fail). Non-blocking: report is informational, not a gate.
                         sh """
                           cd genesis/a2o
@@ -1005,14 +1057,49 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                             --run-id \"${env.BUILD_TAG}\" \\
                             --profile \"\${CUCUMBER_PROFILE:-alpha}\" \\
                             --doorway \"\${E2E_DOORWAY_ALPHA:-}\" \\
-                            || echo 'Sprint-report aggregator failed (non-blocking)'
+                            || echo 'Sprint-report aggregator (API) failed (non-blocking)'
                         """
 
-                        // Archive reports
+                        // --- Sprint-report aggregator (Browser run) ---
+                        // Only emits when the browser stage actually ran. Profile=browser
+                        // unlocks the Visual Validation 2x2 buckets and visual-regression
+                        // findings in the markdown.
+                        if (env.PLAYWRIGHT_AVAILABLE == 'true') {
+                            sh """
+                              cd genesis/a2o
+                              pnpm run build:sprint-report -- \\
+                                --run-id \"${env.BUILD_TAG}\" \\
+                                --profile browser \\
+                                --doorway \"\${E2E_DOORWAY_ALPHA:-}\" \\
+                                --cucumber reports/cucumber-report-browser.json \\
+                                --out-json reports/sprint-report-browser.json \\
+                                --out-md reports/sprint-report-browser.md \\
+                                || echo 'Sprint-report aggregator (Browser) failed (non-blocking)'
+                            """
+                        }
+
+                        // Archive reports — includes per-feature screenshot subdirs
+                        // when the browser stage produced any.
                         archiveArtifacts(
                             artifacts: 'genesis/a2o/reports/**',
                             allowEmptyArchive: true
                         )
+
+                        // Publish cucumber reports through the Jenkins plugin so the
+                        // build sidebar gets the "Cucumber Reports" link. Glob covers
+                        // both the API report (cucumber-report.json) and the browser
+                        // report (cucumber-report-browser.json) when present.
+                        if (fileExists('genesis/a2o/reports/cucumber-report.json') ||
+                            fileExists('genesis/a2o/reports/cucumber-report-browser.json')) {
+                            cucumber([
+                                reportTitle: 'A2O E2E Reports',
+                                fileIncludePattern: 'cucumber-report*.json',
+                                jsonReportDirectory: 'genesis/a2o/reports',
+                                buildStatus: 'UNSTABLE',
+                                sortingMethod: 'ALPHABETICAL',
+                                trendsLimit: 10
+                            ])
+                        }
                     }
                 }
             }
