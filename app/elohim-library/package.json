@@ -13,12 +13,13 @@
     "lint:fix": "eslint projects/elohim-service/src projects/lamad-ui/src projects/html5-app-plugin/src --fix",
     "sync-genesis": "node scripts/sync-genesis.mjs",
     "prestorybook": "pnpm run sync-genesis",
-    "storybook": "ng run elohim-ui-playground:storybook",
+    "storybook": "storybook dev -p 6006 --config-dir .storybook",
     "prebuild-storybook": "pnpm run sync-genesis",
-    "build-storybook": "ng run elohim-ui-playground:build-storybook"
+    "build-storybook": "storybook build --config-dir .storybook"
   },
   "private": true,
   "dependencies": {
+    "elohim-core": "workspace:*",
     "@angular/common": "^19.2.0",
     "@angular/compiler": "^19.2.0",
     "@angular/core": "^19.2.0",
@@ -44,7 +45,9 @@
     "@storybook/addon-a11y": "^10.3.6",
     "@storybook/addon-docs": "^10.3.6",
     "@storybook/addon-links": "^10.3.6",
-    "@storybook/angular": "^10.3.6",
+    "@storybook/web-components": "^10.3.6",
+    "@storybook/web-components-vite": "^10.3.6",
+    "lit": "^3.2.1",
     "@vitest/coverage-v8": "^4.0.18",
     "eslint": "^9.39.2",
     "eslint-config-prettier": "^10.1.8",
