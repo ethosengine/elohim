@@ -613,6 +613,30 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
             steps { container('builder') { script { buildSophiaPlugin() } } }
         }
 
+        stage('Build Elohim Core') {
+            when {
+                allOf {
+                    expression { env.PIPELINE_SKIPPED != 'true' }
+                    expression { shouldRunStep('build-angular') }
+                }
+            }
+            steps {
+                container('builder') {
+                    sh '''#!/bin/bash
+                        set -euo pipefail
+                        echo "Building elohim-core (vite library + custom-elements-manifest)..."
+                        pnpm --filter elohim-core run build
+
+                        if [ ! -f app/elohim-elements/elohim-core/dist/register.js ]; then
+                            echo "ERROR: elohim-core/dist/register.js missing after build"
+                            exit 1
+                        fi
+                        echo "elohim-core build OK"
+                    '''
+                }
+            }
+        }
+
         stage('Build App') {
             when {
                 allOf {
