@@ -1399,8 +1399,9 @@ Inside the `case "$PROJECT_NAME" in` block (the one with `schema-validate)`, add
 
 ```bash
       elements-codegen)
-        echo "[$PROJECT_NAME] Verifying elohim-elements custom-elements-manifest freshness..."
-        pnpm run elements:codegen:verify 2>&1
+        echo "[$PROJECT_NAME] Verifying elohim-elements manifest freshness + running unit tests..."
+        pnpm run elements:codegen:verify 2>&1 && \
+        pnpm --filter elohim-core test 2>&1
         rc=$?
         ;;
 ```
