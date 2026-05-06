@@ -19,6 +19,7 @@ import { Injectable, Injector, inject } from '@angular/core';
 
 import { firstValueFrom } from 'rxjs';
 
+import { environment } from '../../../environments/environment';
 import { ContentBlob } from '../models/content-node.model';
 
 import { WasmCacheService, ReachLevel } from './wasm-cache.service';
@@ -299,7 +300,7 @@ export class BlobCacheTiersService {
     try {
       await this.wasmCache.initialize({
         maxSizePerReach: BigInt(128 * 1024 * 1024),
-        preferWasm: true,
+        preferWasm: environment.cache?.preferWasm ?? true,
       });
       this.wasmCacheInitialized = true;
     } catch {

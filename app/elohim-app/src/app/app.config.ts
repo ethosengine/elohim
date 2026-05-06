@@ -1,4 +1,4 @@
-import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { ApplicationConfig, provideZoneChangeDetection, importProvidersFrom } from '@angular/core';
 import { provideRouter } from '@angular/router';
 
@@ -7,6 +7,7 @@ import { provideRouter } from '@angular/router';
 import { environment } from '../environments/environment';
 
 import { routes } from './app.routes';
+import { apiBaseUrlInterceptor } from './elohim/interceptors/api-base-url.interceptor';
 import { CONTENT_ATTESTATION } from './elohim/interfaces/content-attestation.interface';
 import { GOVERNANCE } from './elohim/interfaces/governance.interface';
 import { provideElohimClient, detectClientMode } from './elohim/providers/elohim-client.provider';
@@ -22,7 +23,7 @@ export const appConfig: ApplicationConfig = {
   providers: [
     provideZoneChangeDetection({ eventCoalescing: true }),
     provideRouter(routes),
-    provideHttpClient(),
+    provideHttpClient(withInterceptors([apiBaseUrlInterceptor])),
     // ElohimClient - mode-aware content client (browser via doorway, tauri via local storage)
     ...provideElohimClient({
       mode: detectClientMode({

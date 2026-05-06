@@ -26,4 +26,10 @@ export const environment: Environment = {
     holochainHAppId: 'elohim',
     holochainConductorUrl: DOORWAY_ALPHA_WSS,
   },
+  cache: {
+    // WASM bundle is fetched per-build from Harbor at ${happVersion}; when the
+    // DNA pipeline hasn't yet published a matching artifact for the app's
+    // commit, the asset 404s. TypeScript fallback is functionally complete.
+    preferWasm: false,
+  },
 };

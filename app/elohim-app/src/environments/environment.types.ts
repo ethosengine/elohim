@@ -72,6 +72,18 @@ export interface ClientEnvironmentConfig {
 }
 
 /**
+ * Cache configuration (WASM gating + reach-aware cache toggles).
+ *
+ * `preferWasm` defaults true; alpha/prod set false until the DNA pipeline
+ * reliably publishes a matching wasm artifact upstream of the elohim-app build.
+ * The TypeScript fallback is functionally complete — gating only suppresses
+ * the 404 console noise that otherwise obscures real errors.
+ */
+export interface CacheEnvironmentConfig {
+  preferWasm?: boolean;
+}
+
+/**
  * Environment configuration interface
  */
 export interface Environment {
@@ -88,4 +100,6 @@ export interface Environment {
   doorwayUrl?: string;
   /** ElohimClient configuration */
   client?: ClientEnvironmentConfig;
+  /** Cache layer configuration (WASM gating, reach-aware toggles) */
+  cache?: CacheEnvironmentConfig;
 }

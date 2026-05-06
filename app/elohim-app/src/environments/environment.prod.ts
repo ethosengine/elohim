@@ -26,4 +26,9 @@ export const environment: Environment = {
     holochainHAppId: 'elohim',
     holochainConductorUrl: DOORWAY_PROD_WSS,
   },
+  cache: {
+    // See environment.alpha.ts — flip to true once the DNA→app upstream
+    // publish dependency is reliable in the build graph.
+    preferWasm: false,
+  },
 };

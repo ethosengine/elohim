@@ -39,6 +39,8 @@ import {
   TsChunkCache,
 } from '@elohim/service/cache/reach-aware-cache';
 
+import { environment } from '../../../environments/environment';
+
 import type {
   IReachAwareCache,
   IBlobCache,
@@ -134,7 +136,7 @@ export class WasmCacheService implements OnDestroy {
         maxSizePerReach: BigInt(128 * 1024 * 1024), // 128MB per reach level (1GB total)
         maxSizeBytes: BigInt(1024 * 1024 * 1024), // 1GB for blob cache
         ttlMillis: BigInt(7 * 24 * 60 * 60 * 1000), // 7 days for chunk cache
-        preferWasm: true,
+        preferWasm: environment.cache?.preferWasm ?? true,
         ...config,
       };
 
