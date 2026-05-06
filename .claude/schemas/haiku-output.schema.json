@@ -92,8 +92,8 @@
         "required": ["kind", "ref", "status"],
         "properties": {
           "kind": {
-            "enum": ["mcp_query", "webfetch_artifact"],
-            "description": "What kind of fetch this was."
+            "enum": ["mcp_query", "webfetch_artifact", "local_read"],
+            "description": "What kind of fetch this was. local_read = direct Read of a file path (e.g. a screenshot already on disk in visual-triage mode, or a tmp file from a prior WebFetch)."
           },
           "ref": {
             "type": "string",
@@ -110,6 +110,38 @@
     "confidence": {
       "enum": ["low", "medium", "high"],
       "description": "Confidence that diagnostic-quality data was found, NOT confidence in any analysis. high = artifacts found, status fields all populated, taxonomy match clean. low = artifacts missing, empty, or status unclear (caller should escalate to ci-investigator)."
+    },
+
+    "visual_triage": {
+      "description": "Populated only by ci-observer in visual-triage mode (tier-1 of the visual judgment escalation: Haiku categorical → Sonnet completeness → Opus stewardship). The caller passes a screenshot artifact ref + scenario name + feature label; Haiku opens the image (WebFetch → tmp → Read) and returns a closed-taxonomy classification. All fields stay disciplined: closed enum, boolean, bounded one-line observation. NO design judgment, NO completeness assessment, NO UI element enumeration — those are tier-2 (ci-investigator) and tier-3 (Opus). See genesis/docs/superpowers/specs/2026-05-06-haiku-visual-triage-design.md.",
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["image_state", "feature_identifiable", "evidence_one_line", "screenshot_artifact_ref"],
+          "properties": {
+            "image_state": {
+              "enum": ["blank", "loading", "error_overlay", "partial_render", "feature_visible", "unreadable"],
+              "description": "Closed taxonomy. blank = empty canvas, no chrome. loading = spinner/skeleton dominates. error_overlay = error dialog/HTTP error/Content-Not-Found dominates the viewport. partial_render = app shell visible but main content empty/broken (app loaded; feature didn't). feature_visible = app shell + main content rendered with apparent feature content. unreadable = image cannot be loaded or is corrupted (pair with confidence: low)."
+            },
+            "feature_identifiable": {
+              "type": "boolean",
+              "description": "Is the scenario's feature visually identifiable in the screenshot? True ONLY when image_state is feature_visible AND the rendered content matches the feature_label the caller passed. False if image_state is feature_visible but content belongs to a different feature (routing failure)."
+            },
+            "evidence_one_line": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "description": "Single-clause observation, ≤160 chars. Strictly observational — no judgment language ('looks broken'), no UX claims ('user can't proceed'), no inferred causes ('probably a routing bug')."
+            },
+            "screenshot_artifact_ref": {
+              "type": "string",
+              "description": "URL or local path that was opened. Echo back what the caller passed."
+            }
+          }
+        }
+      ]
     },
 
     "dispatch_drift": {
