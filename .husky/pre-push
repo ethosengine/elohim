@@ -214,6 +214,9 @@ if [ "$USE_MANIFEST" = false ]; then
   if echo "$CHANGED" | grep -q "^elohim/sdk/schemas/"; then
     PROJECTS="$PROJECTS schema-codegen"
   fi
+  if echo "$CHANGED" | grep -qE "^app/elohim-elements/[^/]+/src/.*\.ts$|^app/elohim-elements/[^/]+/custom-elements-manifest\.config\.mjs$"; then
+    PROJECTS="$PROJECTS elements-codegen"
+  fi
   if echo "$CHANGED" | grep -qE "^elohim/rakia/schemas/|^elohim/rakia/rakia-core/src/(generated_types|manifest)\.rs$"; then
     PROJECTS="$PROJECTS rakia-codegen"
   fi
@@ -255,7 +258,7 @@ run_gate() {
   cd "$PROJECT_DIR" || return 1
 
   # Schema checks run pnpm scripts directly — no justfile needed
-  if [ "$PROJECT_NAME" = "schema-validate" ] || [ "$PROJECT_NAME" = "schema-dna" ] || [ "$PROJECT_NAME" = "schema-codegen" ] || [ "$PROJECT_NAME" = "constants-sync" ] || [ "$PROJECT_NAME" = "domain-types" ] || [ "$PROJECT_NAME" = "rakia-codegen" ] || [ "$PROJECT_NAME" = "rakia-validate" ] || [ "$PROJECT_NAME" = "manifest-hygiene" ] || [ "$PROJECT_NAME" = "sweettest-check" ]; then
+  if [ "$PROJECT_NAME" = "schema-validate" ] || [ "$PROJECT_NAME" = "schema-dna" ] || [ "$PROJECT_NAME" = "schema-codegen" ] || [ "$PROJECT_NAME" = "constants-sync" ] || [ "$PROJECT_NAME" = "domain-types" ] || [ "$PROJECT_NAME" = "rakia-codegen" ] || [ "$PROJECT_NAME" = "rakia-validate" ] || [ "$PROJECT_NAME" = "manifest-hygiene" ] || [ "$PROJECT_NAME" = "sweettest-check" ] || [ "$PROJECT_NAME" = "elements-codegen" ]; then
     case "$PROJECT_NAME" in
       schema-validate)
         echo "[$PROJECT_NAME] Validating seed data against protocol schemas..."
@@ -318,6 +321,12 @@ run_gate() {
         BINDGEN_EXTRA_CLANG_ARGS="${BINDGEN_EXTRA_CLANG_ARGS:--I/usr/lib/clang/20/include}" \
         RUSTFLAGS="" \
           cargo check --manifest-path elohim/holochain/tests/sweettest/Cargo.toml --tests 2>&1
+        rc=$?
+        ;;
+      elements-codegen)
+        echo "[$PROJECT_NAME] Verifying elohim-elements manifest freshness + running unit tests..."
+        pnpm run elements:codegen:verify 2>&1 && \
+        pnpm --filter elohim-core test 2>&1
         rc=$?
         ;;
     esac
@@ -580,6 +589,7 @@ for PROJECT in $PROJECTS; do
       rakia-validate)   PROJECT_DIR="." ;;
       manifest-hygiene) PROJECT_DIR="." ;;
       sweettest-check) PROJECT_DIR="." ;;
+      elements-codegen) PROJECT_DIR="." ;;
       *)                PROJECT_DIR="$PROJECT" ;;
     esac
   fi
