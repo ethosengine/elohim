@@ -41,6 +41,15 @@ def deployAppToEnvironment(String environment, String namespace, String deployme
 
     // Deploy and rollout
     sh "kubectl apply -f ${outputFile}"
+
+    // Apply per-env sibling manifests (ingress, configmap, service, etc.) if the
+    // matching env subdirectory exists alongside the Deployment manifest.
+    // For example: deploying ./manifests/elohim-app/alpha.yaml also reconciles
+    // ./manifests/elohim-app/alpha/{ingress,service,configmap}.yaml — keeping
+    // ingress routes (e.g. /api/v1 → doorway) in sync with the source of truth.
+    def envSubdir = manifestPath.replace('.yaml', "/")
+    sh "if [ -d '${envSubdir}' ]; then echo 'Applying sibling manifests in ${envSubdir}'; kubectl apply -f ${envSubdir}; else echo 'No sibling-manifest dir at ${envSubdir} (ok)'; fi"
+
     sh "kubectl rollout restart deployment/${deploymentName} -n ${namespace}"
     sh "kubectl rollout status deployment/${deploymentName} -n ${namespace} --timeout=300s"
 

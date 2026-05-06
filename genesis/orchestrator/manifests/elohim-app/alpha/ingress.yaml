@@ -31,6 +31,16 @@ spec:
               number: 8080
         path: /blob
         pathType: Prefix
+      # Topology + domain APIs (cluster, peer-topology, reciprocity, etc.)
+      # land at /api/v1/* — same-origin proxy via ingress avoids CORS.
+      # Mirrors /apps and /blob: alpha.elohim.host/api/v1/X → elohim-doorway-alpha:8080.
+      - backend:
+          service:
+            name: elohim-doorway-alpha
+            port:
+              number: 8080
+        path: /api/v1
+        pathType: Prefix
       - backend:
           service:
             name: elohim-site-alpha-service
