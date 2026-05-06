@@ -363,6 +363,69 @@ The 8-step skeleton is the same, but four steps adapt:
 
 Stability still requires two consecutive passing measurements, but in integration mode the predicate is per-candidate. The shift is "done" when the per-candidate measurements all stabilize OR the 5-loop budget is exhausted — whichever first. Bail if you've exhausted the candidate set without progress on any.
 
+## Visual validation as an integration candidate dimension
+
+When the genesis pipeline runs the browser stage (Playwright probe passes), it emits a second sprint-report at `genesis/a2o/reports/sprint-report-browser.{json,md}` in addition to the API one. The browser report carries:
+
+- `summary.visualValidation` — a 2×2 buckets object: `{ validatedPassing, validatedRegressed, pendingPassing, pendingFailing }`. Buckets are formed by joining the `@elohim-visually-validated` Gherkin tag with the scenario's pass/fail status.
+- A new `visual-regression` finding source — emitted whenever a tagged scenario fails this run (a previously-confirmed user-facing experience broke).
+- `Finding.screenshotPath` — a glob (`reports/screenshots/{featureSlug}/{scenarioSlug}--*.png`) populated on `visual-regression` and on `scenario-failure` findings when the run was Playwright-mode. The actual files are archived under the same path.
+
+The bucket meanings:
+
+| | passed | failed |
+|---|---|---|
+| has `@elohim-visually-validated` | `validatedPassing` — confirmed delivering | **`validatedRegressed`** — TOP-PRIORITY |
+| no tag | `pendingPassing` — review backlog | `pendingFailing` — see scenario-failure |
+
+Each step of the integration iteration loop adapts as follows:
+
+**Step 2 (Observe) — visual-regression is a first-class candidate.** When dispatching `ci-observer` against an integration-mode build, pass it `genesis/a2o/reports/sprint-report-browser.json` (in addition to the API one) if the file exists. Ask the observer to count the `visualValidation` buckets and to flag every `visual-regression` finding as a candidate.
+
+- `validatedRegressed > 0` is the highest-priority signal in the build. Each `visual-regression` finding goes to the front of the candidate set, ahead of generic scenario-failure candidates, even when its occurrence count is lower.
+- `pendingFailing` is already covered by the scenario-failure candidate path — no separate handling.
+- `pendingPassing` is the **backlog burndown surface**, not a failure. Do NOT dispatch on it during integration iteration unless the user's Objective explicitly named it (e.g. *"review the pending-passing list in lamad"*).
+- `validatedPassing` is informational. A drop here between iterations is a regression too — flag it.
+
+**Step 3 (Verify) — open the actual screenshot.** For any `visual-regression` candidate, the investigator's specific question MUST be: *"open the artifact at `finding.screenshotPath` (resolve the `--*.png` glob to the first matching file in the artifact directory), describe what you see, and tell me whether the visual delivery matches the pillar's manifesto excerpt at `genesis/docs/content/elohim-protocol/<pillar>/`."*
+
+If the investigator's model can't read images, it returns the resolved path plus the cucumber failure message and you handle the visual judgment yourself. **Never silently judge a `visual-regression` by log content alone** — the whole point of the source is that the log doesn't tell you whether the user can see what they should see.
+
+For a passing scenario where you're considering proposing the `@elohim-visually-validated` tag, the investigator's job is the same: read the image, compare to manifesto, return one of: **tag** / **don't tag — drift, here's why** / **uncertain**.
+
+**Step 4 (Act) — tag changes are scope-gated.** Adding or removing `@elohim-visually-validated` is an edit; it must fall under `objective.scope.paths`. By default, integration-mode shifts driving down failures DO NOT have `genesis/a2o/features/**` in scope. If they're out of scope:
+
+- Tag additions for `pendingPassing` scenarios → surface as a follow-up Objective candidate in the sprint result; don't edit.
+- Tag removals for genuine intentional redesigns → surface to the user; never auto-remove tags inside a shift.
+
+When the cause of a `validatedRegressed` finding is a real bug (not an intentional redesign), fix the implementation code so the scenario passes again. The existing tag stays valid. This is the normal path and lives within typical integration-mode scopes.
+
+**Step 7 (Journal) — visual snapshot in every iteration stanza.** Append a one-line visual-validation snapshot after the standard measurement line:
+
+```
+visual: 12vP / 3vR / 47pP / 18pF  (validatedPassing / validatedRegressed / pendingPassing / pendingFailing)
+```
+
+A drop in `validatedRegressed` or a rise in `validatedPassing` across iterations is forward progress toward stable user-facing delivery — not just test-green. Trajectory summary should name which `validatedRegressed` scenario was cleared in iterations where the count moved.
+
+**Close — surface the visual surface.** Sprint-result outcome section MUST report:
+
+- Final `visualValidation` counts (from the last `sprint-report-browser.json`).
+- Per-pillar list of `validatedRegressed` scenarios still failing — these are the next shift's load-bearing top-priority candidates, named.
+- A flag when `pendingPassing > 0` and no review happened — surface as a follow-up Objective candidate (*"review pending-passing in pillar X against manifesto, propose tag additions"*).
+
+If the browser stage did not run (probe failed, no Playwright in the image), say so explicitly: *"Visual validation: not measured — genesis pipeline browser stage skipped (Playwright probe failed). Follow-up: graduate to mcr.microsoft.com/playwright sidecar."* Don't omit the section.
+
+**Rationalization counter:**
+
+| Excuse | Reality |
+|---|---|
+| "The cucumber pass/fail covers it" | A scenario can pass logically while the visible delivery is broken, hidden, or off-vision. `validatedRegressed` is the signal that distinguishes "logged green" from "delivered green". |
+| "Screenshots are nice-to-have" | They're the perceptual layer — the only way to confirm the user can actually use the feature. Treat them with the same weight as a failing assertion. |
+| "Pending-passing scenarios are passing — they're done" | They've passed logic. They haven't been confirmed to deliver the experience. Until a human reviews the screenshot and tags, they're a known-unknown. |
+| "I don't have a vision-capable model in this dispatch" | Return the screenshot path + cucumber failure message; surface for human review. Never silently judge a `visual-regression` by log content alone. |
+| "The browser stage was skipped, so visual is N/A" | Skipping is a finding too. Document it and surface the follow-up to graduate the Playwright environment. |
+
 ## Sonnet delegation patterns
 
 Common directives (pick whichever matches; always include the palette):
