@@ -160,45 +160,33 @@ pub async fn handle_hc_connect(
         }
     } else if let Some(entry) = registry.get_conductor_for_agent(&claims.agent_pub_key) {
         // Agent already registered in conductor registry
-        let info = match registry.get_conductor_info(&entry.conductor_id) {
-            Some(i) => i,
-            None => {
-                return json_error(StatusCode::BAD_GATEWAY, "Conductor info not found");
+        if let Some(info) = registry.get_conductor_info(&entry.conductor_id) {
+            (entry.conductor_id, info.admin_url, entry.app_id)
+        } else {
+            // Stale registry entry — the conductor_id stored in MongoDB no
+            // longer exists in the current in-memory conductor pool (e.g.,
+            // CONDUCTOR_URLS reordered, count changed, or hosts renamed
+            // across deploys). The persisted agent map outlives the
+            // ephemeral conductor map. Fall through to auto-provision:
+            // the provisioner is idempotent — it searches every current
+            // conductor for an existing app installation for this user
+            // and re-binds the mapping. Self-healing, no operator step.
+            warn!(
+                agent = %claims.agent_pub_key,
+                stale_conductor = %entry.conductor_id,
+                "Stale agent→conductor mapping; re-provisioning to current pool"
+            );
+            registry.unregister_agent(&claims.agent_pub_key);
+            match auto_provision(&state, &registry, &claims).await {
+                Ok(triple) => triple,
+                Err(resp) => return resp,
             }
-        };
-        (entry.conductor_id, info.admin_url, entry.app_id)
+        }
     } else {
         // Auto-provision (idempotent — handles logout→re-login)
-        let provisioner = AgentProvisioner::new(Arc::clone(&registry))
-            .with_app_id(state.args.installed_app_id.clone())
-            .with_bundle_path(state.args.happ_bundle_path.clone());
-        match provisioner.provision_agent(&claims.identifier).await {
-            Ok(p) => {
-                let info = match registry.get_conductor_info(&p.conductor_id) {
-                    Some(i) => i,
-                    None => {
-                        return json_error(
-                            StatusCode::BAD_GATEWAY,
-                            "Provisioned conductor info not found",
-                        );
-                    }
-                };
-
-                // Also register the JWT's agent_pub_key so Path 2 works on future connects
-                // (the provisioner registers the conductor-generated key, but the JWT
-                // carries the auth-system key — both need to resolve to the same conductor)
-                if claims.agent_pub_key != p.agent_pub_key {
-                    let _ = registry
-                        .register_agent(&claims.agent_pub_key, &p.conductor_id, &p.installed_app_id)
-                        .await;
-                }
-
-                (p.conductor_id, info.admin_url, p.installed_app_id)
-            }
-            Err(e) => {
-                error!("Chaperone auto-provision failed: {}", e);
-                return sanitize_client_error(StatusCode::SERVICE_UNAVAILABLE, "Auto-provision");
-            }
+        match auto_provision(&state, &registry, &claims).await {
+            Ok(triple) => triple,
+            Err(resp) => return resp,
         }
     };
 
@@ -518,6 +506,69 @@ pub async fn handle_hc_connect(
 // Helpers
 // =============================================================================
 
+/// Resolve a conductor for the user via the idempotent provisioner.
+///
+/// Returns `(conductor_id, admin_url, installed_app_id)` on success, or a
+/// pre-built error response on failure. Used from two paths in
+/// `handle_hc_connect`:
+/// 1. The unknown-agent path (agent never seen by this doorway before)
+/// 2. The stale-mapping path (agent in MongoDB references a conductor_id
+///    that is no longer in the current pool)
+///
+/// The provisioner walks every current conductor looking for an existing
+/// app for this user (deterministic app_id) before installing a new one,
+/// so calling this for a stale mapping naturally re-binds the agent.
+async fn auto_provision(
+    state: &Arc<AppState>,
+    registry: &Arc<crate::conductor::ConductorRegistry>,
+    claims: &crate::auth::jwt::Claims,
+) -> Result<(String, String, String), Response<Full<Bytes>>> {
+    let provisioner = AgentProvisioner::new(Arc::clone(registry))
+        .with_app_id(state.args.installed_app_id.clone())
+        .with_bundle_path(state.args.happ_bundle_path.clone());
+
+    let provisioned = match provisioner.provision_agent(&claims.identifier).await {
+        Ok(p) => p,
+        Err(e) => {
+            error!("Chaperone auto-provision failed: {}", e);
+            return Err(sanitize_client_error(
+                StatusCode::SERVICE_UNAVAILABLE,
+                "Auto-provision",
+            ));
+        }
+    };
+
+    let info = match registry.get_conductor_info(&provisioned.conductor_id) {
+        Some(i) => i,
+        None => {
+            return Err(json_error(
+                StatusCode::BAD_GATEWAY,
+                "Provisioned conductor info not found",
+            ));
+        }
+    };
+
+    // Also register the JWT's agent_pub_key so Path 2 succeeds on future
+    // connects without re-walking every conductor. The provisioner registers
+    // the conductor-generated key; the JWT carries the auth-system key —
+    // both need to resolve to the same conductor.
+    if claims.agent_pub_key != provisioned.agent_pub_key {
+        let _ = registry
+            .register_agent(
+                &claims.agent_pub_key,
+                &provisioned.conductor_id,
+                &provisioned.installed_app_id,
+            )
+            .await;
+    }
+
+    Ok((
+        provisioned.conductor_id,
+        info.admin_url,
+        provisioned.installed_app_id,
+    ))
+}
+
 /// Sanitize internal error details for client-facing responses.
 /// Full errors are already logged server-side via `error!()` / `warn!()`.
 fn sanitize_client_error(status: StatusCode, operation: &str) -> Response<Full<Bytes>> {
@@ -546,4 +597,74 @@ fn json_success<T: Serialize>(status: StatusCode, data: &T) -> Response<Full<Byt
         .header("Content-Type", "application/json")
         .body(Full::new(Bytes::from(body)))
         .unwrap()
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::conductor::registry::{ConductorInfo, ConductorRegistry};
+
+    /// Captures the stale-agent-mapping bug class that previously surfaced
+    /// as `502 {"error":"Conductor info not found"}` from `/hc/connect`.
+    ///
+    /// The agent→conductor map persists across doorway restarts (MongoDB
+    /// `conductor_registry`), but the conductor map is in-memory only and
+    /// is rebuilt from `CONDUCTOR_URLS` each boot. When pool composition
+    /// changes (reorder, count change, host rename), persisted rows can
+    /// reference conductor_ids that no longer exist in the pool.
+    ///
+    /// `handle_hc_connect` detects this (Path 2 `get_conductor_info`
+    /// returns `None`), unregisters the stale local entry, then calls
+    /// `auto_provision`. The provisioner is idempotent — it walks every
+    /// current conductor for an existing app for this user and re-binds.
+    /// This test exercises the registry-level shape of that recovery.
+    #[tokio::test]
+    async fn stale_agent_mapping_recovers_via_unregister_and_re_register() {
+        let registry = ConductorRegistry::new(None).await;
+
+        // Boot 1 (simulated): pool had a conductor-3; user was assigned to it.
+        registry
+            .register_agent("uhCAk_user_a", "conductor-3", "elohim-conductor-3-abc123")
+            .await
+            .unwrap();
+
+        // Boot 2: pool now has only conductor-0; conductor-3 is gone.
+        registry.register_conductor(ConductorInfo {
+            conductor_id: "conductor-0".to_string(),
+            conductor_url: "ws://c0:4445".to_string(),
+            admin_url: "ws://c0:4444".to_string(),
+            capacity_used: 0,
+            capacity_max: 50,
+        });
+
+        // Bug shape: agent lookup succeeds but conductor lookup fails.
+        let entry = registry.get_conductor_for_agent("uhCAk_user_a").unwrap();
+        assert_eq!(entry.conductor_id, "conductor-3");
+        assert!(
+            registry.get_conductor_info(&entry.conductor_id).is_none(),
+            "stale conductor_id should not resolve in current pool"
+        );
+
+        // Recovery shape that handle_hc_connect now performs on this case.
+        registry.unregister_agent("uhCAk_user_a");
+        assert!(
+            registry.get_conductor_for_agent("uhCAk_user_a").is_none(),
+            "stale entry must be cleared before re-provision"
+        );
+
+        // auto_provision (mocked here at the registry layer) picks a current
+        // conductor and re-registers the JWT's agent_pub_key.
+        registry
+            .register_agent("uhCAk_user_a", "conductor-0", "elohim-conductor-0-xyz789")
+            .await
+            .unwrap();
+
+        let recovered = registry.get_conductor_for_agent("uhCAk_user_a").unwrap();
+        assert_eq!(recovered.conductor_id, "conductor-0");
+        assert!(
+            registry
+                .get_conductor_info(&recovered.conductor_id)
+                .is_some(),
+            "recovered mapping must reach a current conductor"
+        );
+    }
 }
