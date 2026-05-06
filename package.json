@@ -38,6 +38,8 @@
     "app:lint": "pnpm --filter elohim-app lint",
     "doorway-app:dev": "pnpm --filter doorway-app start",
     "doorway-app:build": "pnpm --filter doorway-app build",
+    "elements:codegen": "node tools/check-cem-fresh.mjs",
+    "elements:codegen:verify": "node tools/check-cem-fresh.mjs --verify",
     "lib:test": "pnpm --filter elohim-library test",
     "storage-client:build": "pnpm --filter @elohim/storage-client build",
     "seed": "pnpm --filter holochain-seeder seed",
