@@ -7,18 +7,18 @@
       "description": "Build Storybook 10 static bundle (pnpm --filter elohim-library run build-storybook)",
       "inputs": {
         "sources": [
-          "app/elohim-library/projects/**",
+          "app/elohim-elements/**",
           "app/elohim-library/.storybook/**",
-          "app/elohim-library/scripts/**",
-          "app/elohim-library/build-manifest.json",
           "app/elohim-library/Jenkinsfile",
-          "app/elohim-library/package.json",
-          "app/elohim-library/tsconfig.json",
-          "app/elohim-library/tsconfig.storybook.json",
           "app/elohim-library/angular.json",
+          "app/elohim-library/build-manifest.json",
+          "app/elohim-library/package.json",
+          "app/elohim-library/projects/**",
+          "app/elohim-library/scripts/**",
+          "app/elohim-library/tsconfig.json",
+          "genesis/a2o/features/**",
           "genesis/docs/content/elohim-protocol/**",
           "genesis/graphos/**",
-          "genesis/a2o/features/**",
           "genesis/orchestrator/manifests/elohim-storybook/**"
         ],
         "buildProcess": ["app/elohim-library/Jenkinsfile"]
