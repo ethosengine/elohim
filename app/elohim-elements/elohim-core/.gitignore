@@ -1,0 +1,4 @@
+!dist/
+dist/*
+!dist/custom-elements.json
+node_modules/
