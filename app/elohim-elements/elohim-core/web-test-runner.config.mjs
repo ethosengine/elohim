@@ -28,7 +28,6 @@ if (!window.axe) {
 }
 const axe = window.axe;
 export default axe;
-export { axe };
 `,
           type: 'js',
         };
