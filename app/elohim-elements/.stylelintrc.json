@@ -7,7 +7,17 @@
     },
     {
       "files": ["**/*.scss"],
-      "customSyntax": "postcss-scss"
+      "customSyntax": "postcss-scss",
+      "rules": {
+        "alpha-value-notation": null,
+        "color-function-alias-notation": null,
+        "color-function-notation": null,
+        "color-hex-length": null,
+        "rule-empty-line-before": null,
+        "property-no-deprecated": null,
+        "declaration-block-no-redundant-longhand-properties": null,
+        "scss/comment-no-empty": null
+      }
     }
   ],
   "rules": {
@@ -16,14 +26,6 @@
     "selector-class-pattern": null,
     "scss/dollar-variable-pattern": null,
     "custom-property-pattern": null,
-    "custom-property-empty-line-before": null,
-    "alpha-value-notation": null,
-    "color-function-alias-notation": null,
-    "color-function-notation": null,
-    "color-hex-length": null,
-    "rule-empty-line-before": null,
-    "property-no-deprecated": null,
-    "declaration-block-no-redundant-longhand-properties": null,
-    "scss/comment-no-empty": null
+    "custom-property-empty-line-before": null
   }
 }
