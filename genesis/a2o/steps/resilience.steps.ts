@@ -79,7 +79,10 @@ function loadResponse(world: E2EWorld): Record<string, unknown> {
  */
 Given('elohim-storage is reachable at {string}', async function (this: E2EWorld, urlOrEnv: string) {
   const url = process.env[urlOrEnv] ?? urlOrEnv;
-  const { statusCode } = await request(`${url}/api/v1/health`);
+  // elohim-storage exposes /health (see elohim/elohim-storage/src/http.rs:555).
+  // The route is not under /api/v1/* — that prefix is reserved for storage
+  // domain endpoints like /api/v1/cluster, /api/v1/peers, etc.
+  const { statusCode } = await request(`${url}/health`);
   assert.ok(statusCode === 200, `elohim-storage not reachable at ${url} (status ${statusCode})`);
 });
 
