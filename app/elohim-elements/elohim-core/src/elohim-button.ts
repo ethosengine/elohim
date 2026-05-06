@@ -25,6 +25,7 @@ export type ElohimButtonVariant = 'primary' | 'secondary' | 'ghost';
  * @csspart button - The internal native <button> element
  */
 export class ElohimButton extends LitElement {
+  /** @ignore */
   static override readonly shadowRootOptions: ShadowRootInit = {
     ...LitElement.shadowRootOptions,
     delegatesFocus: true,
