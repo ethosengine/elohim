@@ -317,6 +317,393 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 
 ---
 
+## Task 2b: Linting, formatting, and style setup
+
+**Why this task exists:** Pull `elohim-app`'s linting/formatting standards into the elohim-elements packages **before** code starts flowing. elohim-app's flat ESLint config (sonarjs, unicorn, import, prettier, naming conventions, complexity limits) is the polished baseline; doorway-app is a lighter variant. We adopt the elohim-app rigor here, plus Lit/WC-specific plugins (`eslint-plugin-lit`, `eslint-plugin-wc`, `eslint-plugin-lit-a11y`) for the Custom Elements context, and Stylelint with `postcss-lit` for the `static styles = css\`…\`` template-literal blocks.
+
+**Scope:** Configs at the `app/elohim-elements/` umbrella so all 8 packages inherit one source of truth. Each package then has thin `lint`, `lint:fix`, `format`, `format:check`, `lint:css` scripts. Builds the rails the rest of the sprint runs on.
+
+**Files:**
+- Create: `app/elohim-elements/eslint.config.js`
+- Create: `app/elohim-elements/.prettierrc.js`
+- Create: `app/elohim-elements/.prettierignore`
+- Create: `app/elohim-elements/.stylelintrc.json`
+- Create: `app/elohim-elements/.stylelintignore`
+- Modify: `app/elohim-elements/elohim-core/package.json` — add lint/format/style devDeps and scripts
+
+- [ ] **Step 1: Write `app/elohim-elements/eslint.config.js`**
+
+Use Write to create the shared flat config — adapted from elohim-app's `eslint.config.js` (the polished baseline) but tuned for a Lit/Web-Components library context (no Angular plugins, plus `lit`/`wc`/`lit-a11y`):
+
+```javascript
+// @ts-check
+const eslint = require('@eslint/js');
+const tseslint = require('typescript-eslint');
+const importPlugin = require('eslint-plugin-import');
+const prettierPlugin = require('eslint-plugin-prettier');
+const prettierConfig = require('eslint-config-prettier');
+const sonarjs = require('eslint-plugin-sonarjs');
+const unicorn = require('eslint-plugin-unicorn').default;
+const lit = require('eslint-plugin-lit');
+const wc = require('eslint-plugin-wc');
+const litA11y = require('eslint-plugin-lit-a11y');
+
+module.exports = tseslint.config(
+  {
+    // Global ignores — apply to every config object below
+    ignores: [
+      '**/dist/**',
+      '**/node_modules/**',
+      '**/coverage/**',
+      '**/*.scss', // SCSS handled by Stylelint
+    ],
+  },
+  {
+    // TypeScript source files
+    files: ['**/*.ts'],
+    extends: [
+      eslint.configs.recommended,
+      ...tseslint.configs.recommended,
+      ...tseslint.configs.stylistic,
+      sonarjs.configs.recommended,
+      lit.configs['flat/recommended'],
+      wc.configs['flat/recommended'],
+      litA11y.configs['flat/recommended'],
+    ],
+    plugins: {
+      import: importPlugin,
+      prettier: prettierPlugin,
+      unicorn: unicorn,
+    },
+    languageOptions: {
+      parserOptions: {
+        // projectService auto-discovers tsconfigs per package — no manual list needed
+        projectService: true,
+        tsconfigRootDir: __dirname,
+      },
+    },
+    settings: {
+      'import/resolver': {
+        typescript: { project: '*/tsconfig.json' },
+      },
+    },
+    rules: {
+      // ============================================================
+      // TYPESCRIPT-ESLINT — SonarQube parity (matches elohim-app)
+      // ============================================================
+      '@typescript-eslint/no-explicit-any': 'error',
+      '@typescript-eslint/no-unsafe-assignment': 'warn',
+      '@typescript-eslint/no-unsafe-member-access': 'warn',
+      '@typescript-eslint/no-unsafe-call': 'warn',
+      '@typescript-eslint/no-unsafe-return': 'warn',
+      '@typescript-eslint/no-unsafe-argument': 'warn',
+      '@typescript-eslint/no-unused-vars': ['error', {
+        argsIgnorePattern: '^_',
+        varsIgnorePattern: '^_',
+        caughtErrorsIgnorePattern: '^_',
+      }],
+      '@typescript-eslint/no-empty-function': 'warn',
+      '@typescript-eslint/consistent-type-definitions': ['error', 'interface'],
+      '@typescript-eslint/prefer-nullish-coalescing': 'error',
+      '@typescript-eslint/prefer-optional-chain': 'error',
+      '@typescript-eslint/prefer-readonly': 'error',
+      '@typescript-eslint/prefer-for-of': 'error',
+      '@typescript-eslint/prefer-includes': 'error',
+      '@typescript-eslint/prefer-string-starts-ends-with': 'error',
+      '@typescript-eslint/no-misused-promises': 'error',
+      '@typescript-eslint/no-floating-promises': 'error',
+      '@typescript-eslint/promise-function-async': 'warn',
+      '@typescript-eslint/require-await': 'error',
+      '@typescript-eslint/no-unnecessary-type-assertion': 'error',
+      '@typescript-eslint/await-thenable': 'error',
+      '@typescript-eslint/max-params': ['error', { max: 7 }],
+      '@typescript-eslint/no-deprecated': 'warn',
+      '@typescript-eslint/naming-convention': [
+        'error',
+        { selector: 'interface', format: ['PascalCase'] },
+        { selector: 'class', format: ['PascalCase'] },
+        { selector: 'typeAlias', format: ['PascalCase'] },
+      ],
+
+      // ============================================================
+      // IMPORTS
+      // ============================================================
+      'import/order': ['error', {
+        groups: ['builtin', 'external', 'internal', 'parent', 'sibling', 'index', 'type'],
+        pathGroups: [
+          { pattern: 'lit', group: 'external', position: 'before' },
+          { pattern: 'lit/**', group: 'external', position: 'before' },
+        ],
+        'newlines-between': 'always',
+        alphabetize: { order: 'asc', caseInsensitive: true },
+      }],
+      'import/no-duplicates': 'error',
+      'import/no-useless-path-segments': 'error',
+
+      // ============================================================
+      // GENERAL BEST PRACTICES (mirrors elohim-app)
+      // ============================================================
+      'no-console': ['error', { allow: ['warn', 'error'] }],
+      'prefer-const': 'error',
+      'no-var': 'error',
+      eqeqeq: ['error', 'always'],
+      'no-eval': 'error',
+      'no-implied-eval': 'error',
+      'no-new-func': 'error',
+      'no-throw-literal': 'error',
+
+      // ============================================================
+      // SONARJS
+      // ============================================================
+      'sonarjs/cognitive-complexity': ['error', 15],
+      'sonarjs/no-duplicate-string': ['error', { threshold: 3 }],
+      'sonarjs/no-identical-functions': 'error',
+      'sonarjs/no-collapsible-if': 'error',
+      'sonarjs/no-redundant-jump': 'error',
+      'sonarjs/prefer-immediate-return': 'error',
+      'sonarjs/no-inverted-boolean-check': 'error',
+      'sonarjs/no-nested-conditional': 'error',
+      'sonarjs/no-gratuitous-expressions': 'error',
+      'sonarjs/prefer-single-boolean-return': 'error',
+      'sonarjs/no-ignored-exceptions': 'error',
+      'sonarjs/no-nested-functions': 'off', // arrow fns in event handlers are idiomatic for Lit
+
+      // ============================================================
+      // UNICORN — SonarQube parity
+      // ============================================================
+      'unicorn/prefer-set-has': 'error',
+      'unicorn/no-zero-fractions': 'error',
+      'unicorn/prefer-number-properties': 'error',
+      'unicorn/prefer-array-index-of': 'error',
+      'unicorn/no-typeof-undefined': 'error',
+      'unicorn/prefer-export-from': 'error',
+      'unicorn/prefer-global-this': 'error',
+      'unicorn/no-array-push-push': 'error',
+      'unicorn/prefer-dom-node-remove': 'error',
+      'unicorn/prefer-array-some': 'error',
+      'unicorn/prefer-negative-index': 'error',
+      'unicorn/prefer-at': 'error',
+      'unicorn/prefer-structured-clone': 'error',
+      'unicorn/prefer-top-level-await': 'off', // libraries shouldn't ship TLA
+
+      // ============================================================
+      // LIT / WC SPECIFIC
+      // ============================================================
+      // wc/no-self-class: prevents `class extends ThisClass` mistakes
+      'wc/no-self-class': 'error',
+      // wc/guard-super-call: ensures super.connectedCallback() etc. when overriding
+      'wc/guard-super-call': 'error',
+      // wc/no-closed-shadow-root: closed shadow roots break dev tools and a11y
+      'wc/no-closed-shadow-root': 'error',
+      // lit/no-classfield-shadowing: Lit @property fields shadow inherited accessors
+      'lit/no-classfield-shadowing': 'error',
+      // lit/no-legacy-template-syntax: enforce modern Lit 2/3 syntax
+      'lit/no-legacy-template-syntax': 'error',
+      // lit/no-template-bind: don't bind `this` in templates
+      'lit/no-template-bind': 'error',
+      // lit/no-useless-template-literals: catch `html\`${''}\`` etc.
+      'lit/no-useless-template-literals': 'error',
+      // lit-a11y rules ship as 'flat/recommended' above — accepts defaults
+
+      // ============================================================
+      // PRETTIER
+      // ============================================================
+      'prettier/prettier': [process.env.CI === 'true' ? 'off' : 'error'],
+      ...prettierConfig.rules,
+    },
+  },
+  {
+    // Test files — relax some rules
+    files: ['**/*.spec.ts'],
+    rules: {
+      '@typescript-eslint/no-non-null-assertion': 'off', // tests assert presence
+      'sonarjs/no-duplicate-string': 'off', // tests have repeated literals
+      '@typescript-eslint/no-explicit-any': 'off', // tests sometimes need any
+    },
+  },
+  {
+    // Build/config files — disable type-aware rules that need projectService
+    files: ['**/*.config.{ts,mjs,js}', '**/*.config.*.{ts,mjs,js}'],
+    languageOptions: {
+      parserOptions: { projectService: false, project: null },
+    },
+    rules: {
+      '@typescript-eslint/no-floating-promises': 'off',
+      '@typescript-eslint/no-misused-promises': 'off',
+      '@typescript-eslint/await-thenable': 'off',
+      '@typescript-eslint/require-await': 'off',
+      '@typescript-eslint/no-unsafe-assignment': 'off',
+      '@typescript-eslint/no-unsafe-member-access': 'off',
+      '@typescript-eslint/no-unsafe-call': 'off',
+    },
+  },
+);
+```
+
+- [ ] **Step 2: Write `app/elohim-elements/.prettierrc.js`**
+
+Use Write — verbatim copy from `app/elohim-app/.prettierrc.js` (so formatting is consistent across the monorepo):
+
+```javascript
+module.exports = {
+  printWidth: 100,
+  tabWidth: 2,
+  semi: true,
+  singleQuote: true,
+  trailingComma: 'es5',
+  bracketSpacing: true,
+  arrowParens: 'avoid',
+  htmlWhitespaceSensitivity: 'ignore',
+};
+```
+
+- [ ] **Step 3: Write `app/elohim-elements/.prettierignore`**
+
+Use Write:
+
+```
+**/dist/**
+**/node_modules/**
+**/coverage/**
+**/*.min.*
+**/custom-elements.json
+```
+
+- [ ] **Step 4: Write `app/elohim-elements/.stylelintrc.json`**
+
+Use Write — Stylelint with the standard SCSS config plus `postcss-lit` for `css\`…\`` template literals inside `.ts` files:
+
+```json
+{
+  "extends": ["stylelint-config-standard", "stylelint-config-standard-scss"],
+  "overrides": [
+    {
+      "files": ["**/*.ts"],
+      "customSyntax": "postcss-lit"
+    },
+    {
+      "files": ["**/*.scss"],
+      "customSyntax": "postcss-scss"
+    }
+  ],
+  "rules": {
+    "declaration-empty-line-before": null,
+    "no-descending-specificity": null,
+    "selector-class-pattern": null,
+    "scss/dollar-variable-pattern": null,
+    "custom-property-pattern": null
+  }
+}
+```
+
+- [ ] **Step 5: Write `app/elohim-elements/.stylelintignore`**
+
+Use Write:
+
+```
+**/dist/**
+**/node_modules/**
+**/coverage/**
+```
+
+- [ ] **Step 6: Update `app/elohim-elements/elohim-core/package.json` — add lint deps + scripts**
+
+Use Edit to add the following to `devDependencies` (alphabetically sorted alongside existing entries):
+
+```json
+    "@eslint/js": "^9.39.2",
+    "eslint": "^9.39.2",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-import-resolver-typescript": "^4.4.4",
+    "eslint-plugin-import": "^2.32.0",
+    "eslint-plugin-lit": "^2.1.1",
+    "eslint-plugin-lit-a11y": "^4.1.4",
+    "eslint-plugin-prettier": "^5.5.5",
+    "eslint-plugin-sonarjs": "^3.0.5",
+    "eslint-plugin-unicorn": "^62.0.0",
+    "eslint-plugin-wc": "^3.0.1",
+    "postcss-lit": "^1.2.0",
+    "postcss-scss": "^4.0.9",
+    "prettier": "^3.8.1",
+    "stylelint": "^16.10.0",
+    "stylelint-config-standard": "^36.0.1",
+    "stylelint-config-standard-scss": "^14.0.0",
+    "typescript-eslint": "^8.16.0",
+```
+
+> Versions chosen to match the rest of the monorepo where possible (eslint, prettier, typescript-eslint, sonarjs, unicorn, import, prettier-eslint plugins). The lit/wc/lit-a11y/postcss-lit/stylelint set is net-new for this package.
+
+Also update the `scripts` block to add the four new scripts (alphabetically near existing `analyze`, `build`, `dev`, `test`, `typecheck`):
+
+```json
+    "lint": "eslint --config ../eslint.config.js src",
+    "lint:fix": "eslint --config ../eslint.config.js src --fix",
+    "lint:css": "stylelint --config ../.stylelintrc.json --ignore-path ../.stylelintignore \"src/**/*.{ts,scss}\" \"*.scss\"",
+    "format": "prettier --config ../.prettierrc.js --ignore-path ../.prettierignore --write \"src/**/*.ts\" \"*.scss\"",
+    "format:check": "prettier --config ../.prettierrc.js --ignore-path ../.prettierignore --check \"src/**/*.ts\" \"*.scss\""
+```
+
+(Each script references the umbrella config at `../<file>`.)
+
+- [ ] **Step 7: Run `pnpm install` from repo root**
+
+Run: `pnpm install`
+Expected: succeeds; resolves all new lint/format/style deps. Some pre-existing peer-dep warnings are unrelated.
+
+- [ ] **Step 8: Smoke-test each script**
+
+Run, in order, from repo root:
+
+```bash
+pnpm --filter elohim-core run lint
+```
+
+Expected: passes (only `src/index.ts` and `src/register.ts` exist; both should be clean by construction). If any rule complains about the existing files, **adjust the config**, not the source — these files are spec-prescribed and represent the canonical pattern. Common likely tweak: a Lit-specific rule complaining about `register.ts` because it doesn't extend LitElement. If so, add `register.ts` to a per-file rule override in the config.
+
+```bash
+pnpm --filter elohim-core run format:check
+```
+
+Expected: passes (or run `pnpm --filter elohim-core run format` to auto-format the existing files; commit any formatting changes alongside the lint setup).
+
+```bash
+pnpm --filter elohim-core run lint:css
+```
+
+Expected: passes — no `.ts` files with `css\`\`` templates yet, but the SCSS files in elohim-core (`tokens.scss`, `base.scss`, `animations.scss`, `index.scss`) get scanned. If any rule fails on the existing SCSS, **add a rule override** in the stylelint config (the existing tokens.scss was harvested verbatim from the original styles.css and shouldn't be hand-fixed for cosmetic lint).
+
+- [ ] **Step 9: Commit**
+
+```bash
+git add app/elohim-elements/eslint.config.js \
+        app/elohim-elements/.prettierrc.js \
+        app/elohim-elements/.prettierignore \
+        app/elohim-elements/.stylelintrc.json \
+        app/elohim-elements/.stylelintignore \
+        app/elohim-elements/elohim-core/package.json \
+        pnpm-lock.yaml
+git commit -m "feat(elohim-elements): linting + formatting + style configs
+
+Adapts elohim-app's flat ESLint config (sonarjs, unicorn, import,
+prettier, naming conventions, complexity limits) for the Lit/WC
+context — drops Angular plugins, adds eslint-plugin-lit,
+eslint-plugin-wc, and eslint-plugin-lit-a11y. Stylelint covers SCSS
+files plus css\`\` template literals via postcss-lit. Prettier config
+is verbatim from elohim-app for cross-monorepo consistency.
+
+Configs live at the app/elohim-elements/ umbrella so all 8 packages
+inherit. Each package has thin lint/lint:fix/format/format:check/lint:css
+scripts that reference the umbrella configs.
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
+```
+
+> **Forward note for Tasks 4–12:** Each subsequent task that touches TS source must run `pnpm --filter elohim-core run lint` and `pnpm --filter elohim-core run format:check` (or `format`, then commit) before the task's commit step. The pre-push hook gate (Task 8) will eventually enforce this; until then, it's the implementer's responsibility.
+
+> **Forward note for Task 4:** Before the test step (`pnpm --filter elohim-core test`), run `pnpm exec playwright install chromium` (in repo root). The web-test-runner config uses `playwrightLauncher({ product: 'chromium' })` and Playwright's chromium binary is not pre-installed in this environment.
+
+---
+
 ## Task 3: Vite library config + minimal entry points
 
 **Files:**
