@@ -139,6 +139,18 @@ spec:
       limits:
         ephemeral-storage: "5Gi"
         memory: "4Gi"
+  - name: playwright
+    image: harbor.ethosengine.com/ethosengine/ci-playwright:latest
+    command:
+    - cat
+    tty: true
+    resources:
+      requests:
+        ephemeral-storage: "2Gi"
+        memory: "2Gi"
+      limits:
+        ephemeral-storage: "5Gi"
+        memory: "4Gi"
 '''
         }
     }
@@ -984,33 +996,14 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                             }
                         }
 
-                        // Browser-mode tests (Playwright). Probe-gated: if the builder
-                        // image can't run chromium, skip gracefully. Proper Playwright
-                        // container is a follow-up.
-                        env.PLAYWRIGHT_AVAILABLE = 'false'
+                        // Browser-mode tests (Playwright). Runs in the dedicated
+                        // ci-playwright sidecar, which bundles chromium and the
+                        // Playwright runtime. node_modules from the builder's
+                        // pnpm install above are visible via the shared workspace.
+                        env.PLAYWRIGHT_AVAILABLE = 'true'
                         catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
-                            dir('genesis/a2o') {
-                                def probeRc = sh(returnStatus: true, script: '''#!/bin/bash
-                                    set +e
-
-                                    echo "═══════════════════════════════════════════════════════════"
-                                    echo "🔎 PLAYWRIGHT PROBE"
-                                    echo "═══════════════════════════════════════════════════════════"
-
-                                    npx playwright install chromium 2>&1 | tail -5
-                                    INSTALL_RC=$?
-                                    if [ $INSTALL_RC -ne 0 ]; then
-                                        echo "⚠️  npx playwright install chromium failed (rc=$INSTALL_RC)"
-                                        exit 1
-                                    fi
-
-                                    node -e "require('playwright').chromium.launch().then(b => b.close()).then(() => process.exit(0)).catch(e => { console.error('chromium.launch failed:', e.message); process.exit(1); })"
-                                ''')
-
-                                if (probeRc == 0) {
-                                    env.PLAYWRIGHT_AVAILABLE = 'true'
-                                    echo "✅ Playwright chromium can launch — running browser scenarios"
-
+                            container('playwright') {
+                                dir('genesis/a2o') {
                                     sh """#!/bin/bash
                                         set -euo pipefail
 
@@ -1030,9 +1023,6 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
 
                                         echo "✅ Browser E2E tests passed"
                                     """
-                                } else {
-                                    echo "⚠️  Playwright chromium not available in this image — skipping browser scenarios"
-                                    echo "    (Follow-up: build a ci-builder-playwright variant or run this stage in mcr.microsoft.com/playwright)"
                                 }
                             }
                         }
