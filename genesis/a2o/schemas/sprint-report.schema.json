@@ -106,7 +106,7 @@
         "firstSeenUrl": { "type": "string", "format": "uri" },
         "screenshotPath": {
           "type": "string",
-          "description": "Relative path to the captured screenshot (e.g., reports/screenshots/lamad-learning-journey/starting-a-journey--Matthew.png). Populated for visual-regression and for scenario-failure when an image was captured."
+          "description": "Relative path or glob to the captured screenshot(s). For multi-human scenarios the glob '--*.png' matches all per-human images under the feature directory. Populated for visual-regression and for scenario-failure when in Playwright mode."
         },
         "occurrences": { "type": "integer", "minimum": 1 },
         "scenarios": {

@@ -13,7 +13,7 @@ function isPlaywrightProfile(profile: string): boolean {
   return PLAYWRIGHT_PROFILES.has(profile);
 }
 
-function screenshotPathFor(scenario: ScenarioResult): string {
+function screenshotPathFor(scenario: ScenarioResult, human?: string): string {
   const featureSlug = scenario.feature
     .replace(/^.*features\//, '')
     .replace(/\.feature$/, '')
@@ -22,7 +22,8 @@ function screenshotPathFor(scenario: ScenarioResult): string {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-|-$/g, '');
-  return `reports/screenshots/${featureSlug}/${scenarioSlug}.png`;
+  const suffix = human ? `--${human}` : '--*';
+  return `reports/screenshots/${featureSlug}/${scenarioSlug}${suffix}.png`;
 }
 
 export type FindingSource =
@@ -128,7 +129,7 @@ function buildScenarioRaws(scenarios: ScenarioResult[], emitVisual: boolean): Ra
           source: 'visual-regression',
           pillar: pillarFromFeature(s.feature),
           severity: 'error',
-          rawMessage: `Validated visual regressed: ${s.name}`,
+          rawMessage: `Visually-validated scenario regressed: ${s.name}`,
           screenshotPath: screenshotPathFor(s),
           scenario: { name: s.name, feature: s.feature },
         });

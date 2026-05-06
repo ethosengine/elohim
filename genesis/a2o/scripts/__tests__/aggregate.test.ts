@@ -273,7 +273,7 @@ void describe('aggregate', () => {
     assert.equal(regression.scenarios.length, 1);
     assert.equal(regression.scenarios[0].name, 'Validated but failed');
     assert.equal(regression.severity, 'error');
-    assert.match(regression.message, /Validated but failed/);
+    assert.match(regression.message, /^Visually-validated scenario regressed:/);
     assert.match(regression.suggestedObjective, /Restore visual delivery/);
   });
 
@@ -301,6 +301,7 @@ void describe('aggregate', () => {
     assert.ok(regression.screenshotPath);
     assert.match(regression.screenshotPath, /^reports\/screenshots\/lamad-b\//);
     assert.match(regression.screenshotPath, /\.png$/);
+    assert.match(regression.screenshotPath, /--\*\.png$/);
   });
 
   void it('populates screenshotPath on scenario-failure findings in playwright mode', () => {
@@ -317,6 +318,7 @@ void describe('aggregate', () => {
     assert.ok(failure);
     assert.ok(failure.screenshotPath);
     assert.match(failure.screenshotPath, /^reports\/screenshots\/lamad-d\//);
+    assert.match(failure.screenshotPath, /--\*\.png$/);
   });
 
   void it('omits screenshotPath on scenario-failure findings outside playwright mode', () => {
