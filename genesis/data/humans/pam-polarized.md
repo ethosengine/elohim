@@ -2,7 +2,7 @@
 id: "human-pam-polarized"
 displayName: "Pam"
 category: "community"
-profileReach: "familiar"
+profileReach: "community"
 bio: "Passionate about truth. Tired of being manipulated by media. Looking for authentic community and honest conversation."
 location: {"layer":"neighborhood","name":"Tech Valley"}
 communities: ["community-local-church"]

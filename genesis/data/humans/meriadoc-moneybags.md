@@ -2,7 +2,7 @@
 id: "human-meriadoc-moneybags"
 displayName: "Meriadoc"
 category: "affinity"
-profileReach: "familiar"
+profileReach: "community"
 bio: "Community investor and philanthropist. Interested in funding projects that build genuine community wealth."
 location: {"layer":"county_regional","name":"Valley Region"}
 organizations: [{"id":"org-community-foundation","name":"Valley Community Foundation","role":"board-member"}]

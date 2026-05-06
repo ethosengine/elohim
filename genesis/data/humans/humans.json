@@ -254,7 +254,7 @@
       "householdId": "household-gertrude",
       "displayName": "Gertrude",
       "category": "core-family",
-      "profileReach": "familiar",
+      "profileReach": "community",
       "bio": "Grandmother, gardener, keeper of family stories. Learning to navigate this digital world with help from family.",
       "location": {
         "layer": "neighborhood",
@@ -303,7 +303,7 @@
       "householdId": "household-matthew",
       "displayName": "James",
       "category": "core-family",
-      "profileReach": "familiar",
+      "profileReach": "community",
       "bio": "Learning about the world. Interested in games, building things, and asking questions.",
       "ageCategory": "minor",
       "communities": [
@@ -324,7 +324,7 @@
       "id": "human-janice-janitor",
       "displayName": "Janice",
       "category": "edge-case",
-      "profileReach": "familiar",
+      "profileReach": "community",
       "bio": "Working hard, keeping things clean. Don't have much time for this stuff but trying to stay connected.",
       "location": {
         "layer": "municipality",
@@ -357,7 +357,7 @@
       "displayName": "Jessica",
       "agencyPhase": "device",
       "category": "core-family",
-      "profileReach": "familiar",
+      "profileReach": "community",
       "bio": "Partner in life and learning. Focused on family flourishing, community connection, and meaningful work.",
       "location": {
         "layer": "neighborhood",
@@ -416,7 +416,7 @@
       "id": "human-levi-contributor",
       "displayName": "Levi",
       "category": "community",
-      "profileReach": "familiar",
+      "profileReach": "community",
       "bio": "Moderate-trust contributor. Building reputation through consistent, quality contributions.",
       "location": {
         "layer": "city",
@@ -465,7 +465,7 @@
       "id": "human-mary-migrant",
       "displayName": "Maria",
       "category": "newcomer",
-      "profileReach": "familiar",
+      "profileReach": "community",
       "bio": "Came here for a better life. Working hard, learning the language, trying to build a future for my family.",
       "location": {
         "layer": "neighborhood",
@@ -563,7 +563,7 @@
       "id": "human-meriadoc-moneybags",
       "displayName": "Meriadoc",
       "category": "affinity",
-      "profileReach": "familiar",
+      "profileReach": "community",
       "bio": "Community investor and philanthropist. Interested in funding projects that build genuine community wealth.",
       "location": {
         "layer": "county_regional",
@@ -633,7 +633,7 @@
       "id": "human-pam-polarized",
       "displayName": "Pam",
       "category": "community",
-      "profileReach": "familiar",
+      "profileReach": "community",
       "bio": "Passionate about truth. Tired of being manipulated by media. Looking for authentic community and honest conversation.",
       "location": {
         "layer": "neighborhood",
@@ -776,7 +776,7 @@
       "householdId": "household-matthew",
       "displayName": "Susan",
       "category": "core-family",
-      "profileReach": "familiar",
+      "profileReach": "community",
       "bio": "Matthew's sister. Household member exploring how families can steward digital resources together.",
       "location": {
         "layer": "neighborhood",
@@ -797,7 +797,7 @@
       "id": "human-tiffany-teen",
       "displayName": "Tiffany",
       "category": "red-team",
-      "profileReach": "familiar",
+      "profileReach": "community",
       "bio": "Just vibing. Follow for follow?",
       "location": {
         "layer": "neighborhood",
@@ -899,7 +899,7 @@
       "id": "human-traveler",
       "displayName": "Traveler",
       "category": "visitor",
-      "profileReach": "hidden",
+      "profileReach": "private",
       "bio": "Anonymous explorer. Just passing through, learning about this place.",
       "isPseudonymous": true,
       "acceptingConnections": false,

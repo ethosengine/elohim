@@ -2,7 +2,7 @@
 id: "human-janice-janitor"
 displayName: "Janice"
 category: "edge-case"
-profileReach: "familiar"
+profileReach: "community"
 bio: "Working hard, keeping things clean. Don't have much time for this stuff but trying to stay connected."
 location: {"layer":"municipality","name":"Valley Town"}
 organizations: [{"id":"org-valley-school-district","name":"Valley School District","role":"custodian"}]

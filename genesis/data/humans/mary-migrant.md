@@ -2,7 +2,7 @@
 id: "human-mary-migrant"
 displayName: "Maria"
 category: "newcomer"
-profileReach: "familiar"
+profileReach: "community"
 bio: "Came here for a better life. Working hard, learning the language, trying to build a future for my family."
 location: {"layer":"neighborhood","name":"Tech Valley"}
 communities: ["community-immigrant-support","community-local-church","community-esl-program"]

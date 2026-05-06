@@ -2,7 +2,7 @@
 id: "human-tiffany-teen"
 displayName: "Tiffany"
 category: "red-team"
-profileReach: "familiar"
+profileReach: "community"
 bio: "Just vibing. Follow for follow?"
 location: {"layer":"neighborhood","name":"Tech Valley"}
 ageCategory: "minor"

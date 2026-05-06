@@ -3,7 +3,7 @@ id: "human-james-son"
 householdId: "household-matthew"
 displayName: "James"
 category: "core-family"
-profileReach: "familiar"
+profileReach: "community"
 bio: "Learning about the world. Interested in games, building things, and asking questions."
 ageCategory: "minor"
 communities: ["community-homeschool-coop"]

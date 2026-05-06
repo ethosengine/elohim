@@ -2,7 +2,7 @@
 id: "human-traveler"
 displayName: "Traveler"
 category: "visitor"
-profileReach: "hidden"
+profileReach: "private"
 bio: "Anonymous explorer. Just passing through, learning about this place."
 isPseudonymous: true
 acceptingConnections: false
