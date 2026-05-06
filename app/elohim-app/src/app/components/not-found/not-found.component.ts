@@ -1,6 +1,8 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, CUSTOM_ELEMENTS_SCHEMA, OnInit, inject } from '@angular/core';
 import { Router, RouterModule } from '@angular/router';
+
+import 'elohim-core/register';
 
 // @coverage: 100.0% (2026-02-24)
 
@@ -21,6 +23,7 @@ import { SeoService } from '../../services/seo.service';
   imports: [CommonModule, RouterModule],
   templateUrl: './not-found.component.html',
   styleUrl: './not-found.component.css',
+  schemas: [CUSTOM_ELEMENTS_SCHEMA],
 })
 export class NotFoundComponent implements OnInit {
   private readonly seoService = inject(SeoService);

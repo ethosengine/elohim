@@ -84,6 +84,7 @@
     "classnames": "^2.5.1",
     "d3": "^7.9.0",
     "elohim-cache-core": "file:../../elohim/elohim-cache-core/pkg",
+    "elohim-core": "workspace:*",
     "highlight.js": "^11.11.1",
     "jszip": "^3.10.1",
     "maplibre-gl": "^5.20.2",

@@ -92,6 +92,9 @@ importers:
       elohim-cache-core:
         specifier: file:../../elohim/elohim-cache-core/pkg
         version: file:elohim/elohim-cache-core/pkg
+      elohim-core:
+        specifier: workspace:*
+        version: link:../elohim-elements/elohim-core
       highlight.js:
         specifier: ^11.11.1
         version: 11.11.1

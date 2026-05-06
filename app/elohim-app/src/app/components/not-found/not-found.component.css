@@ -101,54 +101,6 @@ h1 {
   margin-bottom: 3rem;
 }
 
-.btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.75rem 1.5rem;
-  border-radius: 8px;
-  font-size: 1rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  border: none;
-}
-
-.btn i {
-  font-size: 0.875rem;
-}
-
-.btn-primary {
-  background: var(--lamad-accent-gradient);
-  color: white;
-}
-
-.btn-primary:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgb(99 102 241 / 40%);
-}
-
-.btn-secondary {
-  background: var(--lamad-bg-secondary);
-  color: var(--lamad-text-primary);
-  border: 1px solid var(--lamad-border);
-}
-
-.btn-secondary:hover {
-  background: var(--lamad-bg-tertiary);
-  border-color: var(--lamad-border-hover);
-}
-
-.btn-ghost {
-  background: transparent;
-  color: var(--lamad-text-secondary);
-}
-
-.btn-ghost:hover {
-  color: var(--lamad-text-primary);
-  background: var(--lamad-bg-secondary);
-}
-
 /* Helpful Links */
 .helpful-links {
   text-align: left;
@@ -209,10 +161,5 @@ h1 {
 
   .actions {
     flex-direction: column;
-  }
-
-  .btn {
-    width: 100%;
-    justify-content: center;
   }
 }
