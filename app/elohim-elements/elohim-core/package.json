@@ -29,7 +29,7 @@
   "scripts": {
     "build": "vite build && cem analyze --config custom-elements-manifest.config.mjs",
     "dev": "vite build --watch",
-    "test": "wtr \"src/**/*.spec.ts\" --node-resolve",
+    "test": "wtr",
     "analyze": "cem analyze --config custom-elements-manifest.config.mjs",
     "typecheck": "tsc --noEmit"
   },
