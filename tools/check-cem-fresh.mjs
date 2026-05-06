@@ -69,7 +69,7 @@ for (const dir of dirs) {
       // outdir on the command line so we don't clobber the committed file.
       execSync(
         `pnpm --filter ${name} exec cem analyze --config custom-elements-manifest.config.mjs --outdir ${tmpRel}`,
-        { cwd: REPO_ROOT, stdio: 'pipe' },
+        { cwd: REPO_ROOT, stdio: ['pipe', 'pipe', 'inherit'] },
       );
       const fresh = join(tmp, 'custom-elements.json');
       if (!existsSync(fresh)) {
