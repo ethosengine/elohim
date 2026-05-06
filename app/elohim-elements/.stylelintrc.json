@@ -1,0 +1,29 @@
+{
+  "extends": ["stylelint-config-standard", "stylelint-config-standard-scss"],
+  "overrides": [
+    {
+      "files": ["**/*.ts"],
+      "customSyntax": "postcss-lit"
+    },
+    {
+      "files": ["**/*.scss"],
+      "customSyntax": "postcss-scss"
+    }
+  ],
+  "rules": {
+    "declaration-empty-line-before": null,
+    "no-descending-specificity": null,
+    "selector-class-pattern": null,
+    "scss/dollar-variable-pattern": null,
+    "custom-property-pattern": null,
+    "custom-property-empty-line-before": null,
+    "alpha-value-notation": null,
+    "color-function-alias-notation": null,
+    "color-function-notation": null,
+    "color-hex-length": null,
+    "rule-empty-line-before": null,
+    "property-no-deprecated": null,
+    "declaration-block-no-redundant-longhand-properties": null,
+    "scss/comment-no-empty": null
+  }
+}
