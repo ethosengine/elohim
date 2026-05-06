@@ -1,0 +1,164 @@
+{
+  "schemaVersion": "1.0.0",
+  "readme": "",
+  "modules": [
+    {
+      "kind": "javascript-module",
+      "path": "src/elohim-button.ts",
+      "declarations": [
+        {
+          "kind": "class",
+          "description": "The elohim button atom — substrate primitive for action affordances.\n\nToken-driven; respects light/dark theme via the global tokens cascade.",
+          "name": "ElohimButton",
+          "cssProperties": [
+            {
+              "description": "Override background color",
+              "name": "--elohim-button-bg"
+            },
+            {
+              "description": "Override foreground (label) color",
+              "name": "--elohim-button-fg"
+            },
+            {
+              "description": "Override border style",
+              "name": "--elohim-button-border"
+            },
+            {
+              "description": "Override border-radius",
+              "name": "--elohim-button-radius"
+            }
+          ],
+          "cssParts": [
+            {
+              "description": "The internal native <button> element",
+              "name": "button"
+            }
+          ],
+          "slots": [
+            {
+              "description": "Default slot for label content (text or icon+text)",
+              "name": ""
+            }
+          ],
+          "members": [
+            {
+              "kind": "field",
+              "name": "shadowRootOptions",
+              "type": {
+                "text": "ShadowRootInit"
+              },
+              "static": true,
+              "readonly": true,
+              "default": "{ ...LitElement.shadowRootOptions, delegatesFocus: true, }"
+            },
+            {
+              "kind": "field",
+              "name": "variant",
+              "type": {
+                "text": "ElohimButtonVariant"
+              },
+              "default": "'primary'",
+              "description": "Visual variant: primary | secondary | ghost",
+              "attribute": "variant",
+              "reflects": true
+            },
+            {
+              "kind": "field",
+              "name": "disabled",
+              "type": {
+                "text": "boolean"
+              },
+              "default": "false",
+              "description": "Disabled state. Suppresses click and applies aria-disabled.",
+              "attribute": "disabled",
+              "reflects": true
+            }
+          ],
+          "events": [
+            {
+              "type": {
+                "text": "MouseEvent"
+              },
+              "description": "Fired on activation (mouse or keyboard via native button). Native bubbling click from the inner <button>.",
+              "name": "click"
+            }
+          ],
+          "attributes": [
+            {
+              "name": "variant",
+              "type": {
+                "text": "ElohimButtonVariant"
+              },
+              "default": "'primary'",
+              "description": "Visual variant: primary | secondary | ghost",
+              "fieldName": "variant"
+            },
+            {
+              "name": "disabled",
+              "type": {
+                "text": "boolean"
+              },
+              "default": "false",
+              "description": "Disabled state. Suppresses click and applies aria-disabled.",
+              "fieldName": "disabled"
+            }
+          ],
+          "superclass": {
+            "name": "LitElement",
+            "package": "lit"
+          },
+          "tagName": "elohim-button",
+          "customElement": true
+        }
+      ],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "ElohimButton",
+          "declaration": {
+            "name": "ElohimButton",
+            "module": "src/elohim-button.ts"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/index.ts",
+      "declarations": [],
+      "exports": [
+        {
+          "kind": "js",
+          "name": "ElohimButton",
+          "declaration": {
+            "name": "ElohimButton",
+            "module": "./elohim-button.js"
+          }
+        },
+        {
+          "kind": "js",
+          "name": "ElohimButtonVariant",
+          "declaration": {
+            "name": "ElohimButtonVariant",
+            "module": "./elohim-button.js"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "javascript-module",
+      "path": "src/register.ts",
+      "declarations": [],
+      "exports": [
+        {
+          "kind": "custom-element-definition",
+          "name": "elohim-button",
+          "declaration": {
+            "name": "ElohimButton",
+            "module": "/src/elohim-button.js"
+          }
+        }
+      ]
+    }
+  ]
+}
