@@ -978,6 +978,11 @@ export type ElohimButtonVariant = 'primary' | 'secondary' | 'ghost';
  * @csspart button - The internal native <button> element
  */
 export class ElohimButton extends LitElement {
+  static override shadowRootOptions: ShadowRootInit = {
+    ...LitElement.shadowRootOptions,
+    delegatesFocus: true,
+  };
+
   static override styles = css`
     :host {
       display: inline-block;
