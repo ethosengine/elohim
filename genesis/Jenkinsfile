@@ -1022,6 +1022,7 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
 
                                         E2E_DEVICE_MODE=playwright \\
                                         E2E_DOORWAY_ALPHA="${doorwayHost}" \\
+                                        E2E_STORAGE_URL="${env.INTERNAL_STORAGE_URL}" \\
                                             npx cucumber-js --tags '@e2e and @browser-only and not @wip' \\
                                             --format progress-bar \\
                                             --format json:reports/cucumber-report-browser.json \\
