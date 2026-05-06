@@ -89,7 +89,11 @@ Each iteration:
 
 1. **Refresh on vision-goal.** Re-read the relevant slice of plan/manifesto. Cheap (often cached). Mandatory — don't skip. Drift-prevention.
 
-2. **Render the experience.** Playwright run, screenshot. Or pull the latest CI screenshot when fresh enough. Capture console/network errors as side artifacts.
+2. **Render the experience.** Two pathways depending on iteration context (see "CI artifact mechanics" section for the specific tool calls):
+   - **CI fresh-render** — pull the latest genesis pipeline build's screenshot artifact for the relevant feature slug. Use this when CI just ran and is the source of truth.
+   - **Local fresh-render** — Playwright run against the local dev server (`pnpm hc:start` + a2o run). Use this when CI is stale, when iterating fast, or when CI hasn't seen the latest fix yet.
+
+   Either way, capture: the screenshot, the cucumber-report-browser.json (per-scenario state), and the per-scenario `errors-{device}.json` console/network artifacts. All three feed tier-3 judgment.
 
 3. **Tier-3 stewardship judgment.** Opus orchestrator (the skill itself) compares screenshot against the FeaturePromise's plan_deliverables + vision_quotes. Verdict:
    - **delivered** — matches the promise, can identify the feature, no error overlays, scenarios pass
@@ -311,6 +315,102 @@ The orchestrator (the skill itself, running as Opus) does:
 - Cross-pillar change boundary tracking
 - Sprint-result composition at close
 
+## CI artifact mechanics — how `/deliver` reaches the signals it needs
+
+`/deliver` does not invent CI plumbing. It inherits the artifact-pulling, subagent-dispatch, and pipeline-trigger patterns that `/shift` and `agentic-developer` already use. The runtime skill text MUST point at these explicitly so the agent doesn't re-derive them per invocation.
+
+### Reference: pipeline-diagnostics skill
+
+`/deliver` runs the `pipeline-diagnostics` skill (`.claude/skills/pipeline-diagnostics/SKILL.md`) when it needs Jenkins data. That skill is the canonical reference for:
+
+- Jenkins MCP tool inventory (`mcp__jenkins__getBuild`, `getBuildLog`, `searchBuildLog`, `getTestResults`, `getFlakyFailures`, etc.)
+- Public-Jenkins URL patterns + WebFetch fallback when MCP isn't loaded in the session (a real constraint — e.g. some subagent contexts don't get MCP)
+- The `JENKINS_URL` env var + curl pattern for measure scripts
+- Authenticated parameterized rebuild via `JENKINS_TOKEN` (rare; gated)
+
+The runtime skill text should say: *"Read the pipeline-diagnostics skill before any Jenkins fetch. If MCP tools aren't in your tool list, fall back to WebFetch on the public URL pattern documented there."*
+
+### Artifact map — what to pull from where
+
+For genesis pipeline (`elohim-genesis/dev`):
+
+| Signal needed | Artifact | URL pattern (relative to `${JENKINS_URL}/job/elohim-genesis/job/dev/<build>/`) | Tool |
+|---|---|---|---|
+| Pass/fail summary | `sprint-report.md` | `artifact/genesis/a2o/reports/sprint-report.md` | WebFetch |
+| Pass/fail summary (machine) | `sprint-report.json` | `artifact/genesis/a2o/reports/sprint-report.json` | WebFetch |
+| Per-scenario error data | `cucumber-report-browser.json` | `artifact/genesis/a2o/reports/cucumber-report-browser.json` | WebFetch |
+| Visual proof | screenshot PNG | `artifact/genesis/a2o/reports/screenshots/<feature-slug>/<scenario-slug>--<human>.png` | WebFetch (saves binary to tmp) → Read (renders multimodally) |
+| Console/page/network errors | `errors-<device>.json` | `artifact/genesis/a2o/reports/screenshots/<feature-slug>/errors-<device>.json` | WebFetch |
+| Build log (full) | `consoleText` | `consoleText` | WebFetch (paginate via `mcp__jenkins__getBuildLog` `skip`/`limit` when MCP loaded) |
+| Seed-phase output | embedded in console | grep within `consoleText` for `[+]` / `[X]` / `[=]` markers | WebFetch + grep |
+
+For a feature slug, the convention is `<pillar>-<feature-name>` (e.g. `lamad-learning-journey`, `elohim-presence`, `deployment-staging-validation`).
+
+For the screenshot binary pathway:
+1. WebFetch on the PNG URL — the harness detects binary content-type and saves it to a tmp path (e.g. `/projects/.claude-config/.../tool-results/webfetch-<id>.bin`)
+2. Read the tmp path — multimodal rendering produces an image the agent can describe
+3. Inline tier-3 judgment OR pass-through to ci-observer (tier-1) / ci-investigator (tier-2) for the bounded categorical / completeness check before tier-3
+
+### Subagent dispatch — which agent for which signal
+
+| Signal needed | Agent | Tier | Cost |
+|---|---|---:|---:|
+| Categorical visual state — blank? loading? error_overlay? feature_visible? | `ci-observer` (visual-triage mode, just landed) | 1 | $ |
+| Pipeline build summary, dispatch drift, anti-pattern catalog match | `ci-observer` (summarize/validate mode — existing) | 1 | $ |
+| UI element completeness against page-model selectors | `ci-investigator` (with explicit tier-2 directive) | 2 | $$ |
+| Specific quoted errors from cucumber/console | `ci-investigator` (existing pattern) | 2 | $$ |
+| Cross-build correlation (flake history, regression bisection) | `ci-investigator` (existing pattern) | 2 | $$ |
+| Stewardship verdict — does screenshot match plan/manifesto? | Opus orchestrator (the skill itself) | 3 | $$$ |
+| Plan-vs-delivery match summary | Opus orchestrator | 3 | $$$ |
+
+**Tier flow** for any screenshot the orchestrator wants to evaluate:
+1. Tier-1 first — Haiku categorical triage. Cheap, fast, parallelizable across N screenshots.
+2. If `image_state ∈ {feature_visible}` AND `feature_identifiable: true` — escalate to tier-2.
+3. Tier-2 — Sonnet completeness check against page-model selectors / FeaturePromise.screenshot_targets.
+4. If tier-2 returns `complete` — tier-3 (orchestrator) does final stewardship verdict.
+5. Negative results at any tier short-circuit upward to orchestrator for diagnose-and-fix.
+
+### Pipeline trigger mechanics — for forcing fresh CI renders
+
+When `/deliver` needs a fresh CI render (because the agent just landed a fix and wants to see it through real CI):
+
+**Anonymous path (default):** empty commit with build tag, push:
+```bash
+git commit --allow-empty -m "ci: deliver retrigger [build:elohim-genesis]"
+git push
+```
+
+The orchestrator's webhook + commit-tag dispatch picks this up. Reuses `/shift`'s pattern.
+
+**Authenticated path (rare, gated by orchestrator-state-verification):** parameterized rebuild via `curl -u "$JENKINS_USERNAME:$JENKINS_TOKEN" .../buildWithParameters?...`. Used only when a parameter must be set that the Jenkinsfile default doesn't carry (canonical case: `RESET_STORAGE=true` for elohim-genesis schema-drift recovery). Same guardrails as `/shift`'s parameterized-rebuild path — read `pipeline-diagnostics` skill before invoking. Token never logged.
+
+**Local Playwright path (faster iteration):** when CI is too slow or the fix is purely app-side and doesn't need full pipeline rebuild, run Playwright locally against `pnpm hc:start` + a2o:
+```bash
+cd /projects/elohim
+pnpm hc:start                         # background, conductor + storage + doorway
+cd genesis/a2o
+pnpm test:browser -- --tags @browser-only --feature <slug>
+```
+
+Screenshots land in `genesis/a2o/reports/screenshots/<feature-slug>/`. Read directly via Read tool (already local).
+
+### Pre-flight pipeline prediction
+
+Before any push that triggers CI, run graph-walker on the staged diff to predict which pipelines the orchestrator should dispatch:
+
+```bash
+git diff --name-only --cached | node genesis/orchestrator/graph-walker.mjs
+```
+
+Journal the predicted set in the iteration stanza. Next iteration's tier-1 ci-observer dispatch (in validate mode) compares predicted vs actual — if drift, surface as a principle-7 finding (CI dispatch correctness is part of deliverability).
+
+### Measure script reuse
+
+`/deliver` does NOT have a single measure script (no numerical Objective). But it inherits `/shift`'s patterns for safe artifact reading:
+
+- `genesis/agentic/scripts/jenkins-measure-genesis-findings.sh` — reads `failed` count from `sprint-report.md`. `/deliver` may run this to track regression-elsewhere as part of done criterion check #3 ("no regression elsewhere").
+- Custom one-off scripts for plan-deliverable verification (e.g. "did topology load by querying `<topology-component>`?") may be drafted ad-hoc by the agent; not gated on a pre-existing script library.
+
 ## Failure modes
 
 | Failure mode | Why it happens | Mitigation |
@@ -335,8 +435,19 @@ The orchestrator (the skill itself, running as Opus) does:
 5. **Journal template** at `genesis/docs/shifts/DELIVER-JOURNAL-TEMPLATE.md`
 6. **Readiness check** at `genesis/agentic/deliver-readiness.mjs` — ensure prereqs (Playwright runnable, target app reachable, git clean enough)
 7. **Search-trail validator** wired into the close phase — refuses to write sprint-result with insufficient search trail when status=bail
+8. **Runtime skill text MUST point at `pipeline-diagnostics` skill explicitly** — that's where the Jenkins URL/MCP/auth patterns live. `/deliver` should read it before any Jenkins fetch, NOT re-derive the patterns. Same applies for `agentic-developer` cross-references (e.g. ci-observer/ci-investigator dispatch shapes).
 
 The skill text should be roughly the same shape as `agentic-developer/SKILL.md` — principles, kickoff routine, iteration loop steps, close routine, invariants. Length-wise, expect parity with `agentic-developer/SKILL.md`.
+
+### Subagent prerequisites
+
+`/deliver` requires these existing agent definitions to be present and functional. The implementation plan must verify each:
+
+- `.claude/agents/ci-observer.md` — including the **Visual triage mode** section landed in commit `0eac5fdd`. If a future change strips it, `/deliver`'s tier-1 dispatch breaks.
+- `.claude/agents/ci-investigator.md` — for tier-2 completeness checks. The agent definition should accept an explicit "tier-2 completeness check" directive shape; if not, that's an implementation-blocking gap to fix first.
+- The schema at `.claude/schemas/haiku-output.schema.json` with the `visual_triage` field — same dependency surface.
+
+If any of these is missing or stale, `/deliver` kickoff readiness check FAILS the same way `/shift`'s readiness check does.
 
 ## Validation criteria
 
