@@ -192,11 +192,14 @@ module.exports = tseslint.config(
     },
   },
   {
+    // Spec files: tsconfig.json excludes src/**/*.spec.ts, and WTR uses
+    // esbuild for TypeScript transpilation independently of tsconfig — no
+    // separate test tsconfig is needed. Type-aware lint rules are disabled
+    // here because there is no project reference for spec files. Chai BDD
+    // assertions parse as bare property accesses, so no-unused-expressions
+    // is also disabled.
     files: ['**/*.spec.ts'],
     languageOptions: {
-      // Spec files are excluded from the package tsconfig (Task 4 will wire a
-      // dedicated test tsconfig). Disable projectService here so they parse
-      // without typed-info; type-aware rules below stay functional via overrides.
       parserOptions: { projectService: false, project: null },
     },
     rules: {
