@@ -122,8 +122,25 @@ impl JsRuntime {
     /// `toString()` is returned. This is necessary for `fetch(...)` and other
     /// async ops registered via extensions.
     ///
-    /// Wraps execution in a try/catch so that JS exceptions surface their
-    /// actual error message instead of being swallowed.
+    /// Drives the V8 event loop via `with_event_loop_promise` so that
+    /// async expressions (Promises, awaited fetches) resolve before
+    /// returning. Sync values pass through with a no-op event-loop spin.
+    ///
+    /// # Error mapping
+    ///
+    /// Both compile-time syntax errors and runtime JS exceptions
+    /// (`throw new Error(...)`) map to `RenderError::ModuleLoad` with
+    /// the exception message preserved via deno_core's TryCatch handling.
+    /// Operators looking for the actual cause should read the
+    /// `RenderError::ModuleLoad(msg)` payload, not just the variant.
+    ///
+    /// `RenderError::Panic` is reserved for failures driving the
+    /// event loop (op panics, unhandled promise rejections from the
+    /// runtime layer) and for `to_string()` failures on the resolved value.
+    ///
+    /// Semantic differentiation between syntax errors and thrown exceptions
+    /// (via stack-frame inspection on `JsError`) is deferred to a future
+    /// refinement — the current mapping is intentional and documented here.
     pub async fn eval_string(&mut self, source: &str) -> Result<String> {
         // execute_script returns a Global<Value>. For a Promise result (e.g.
         // an async IIFE), we must drive the event loop before reading the value.
@@ -155,6 +172,18 @@ impl JsRuntime {
     /// Load an ESM module from `module_path`, call its `render(url)` export,
     /// and return the resulting HTML string.
     ///
+    /// # Module contract
+    ///
+    /// The file at `module_path` must be an ESM module that exports a function
+    /// named `render` with the signature `(url: string) -> string`. Any other
+    /// shape (missing export, non-function, wrong arity) produces a
+    /// `RenderError::ModuleLoad` with a descriptive message.
+    ///
+    /// Module loading caches per-runtime: re-calling with the same path on
+    /// the same `JsRuntime` instance returns the cached module (or errors if
+    /// deno_core's loader doesn't deduplicate — verify behavior in tests if
+    /// re-loading is exercised).
+    ///
     /// # Errors
     ///
     /// Returns `RenderError::ModuleLoad("runtime constructed without FS loader...")` if
@@ -162,7 +191,10 @@ impl JsRuntime {
     /// `JsRuntime::with_fs_loader()`.
     ///
     /// Returns `RenderError::ModuleLoad` for any failure during load, module
-    /// evaluation, or JS exception thrown by `render()`.
+    /// evaluation, or JS exception thrown by `render()`. This includes the case
+    /// where the module exists but does not export a `render` function (missing
+    /// export), which is distinguished from "export exists but is not a function"
+    /// by separate guard branches.
     pub async fn render_via_module(&mut self, module_path: &Path, url: &str) -> Result<String> {
         if !self.has_fs_loader {
             return Err(RenderError::ModuleLoad(
@@ -218,6 +250,15 @@ impl JsRuntime {
                 .unwrap_or_else(|| "namespace.get('render') returned None".into());
             RenderError::ModuleLoad(msg)
         })?;
+
+        // Guard: distinguish "export missing" from "export exists but wrong type".
+        // Angular bundles may ship with a different entry-point name; both cases
+        // deserve a clear message rather than a confusing type-cast error.
+        if render_val.is_undefined() {
+            return Err(RenderError::ModuleLoad(
+                "module does not export a 'render' function".into(),
+            ));
+        }
 
         // Cast to v8::Function.
         let render_fn = v8::Local::<v8::Function>::try_from(render_val)

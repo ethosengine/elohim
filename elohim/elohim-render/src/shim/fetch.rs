@@ -7,7 +7,7 @@ use std::sync::Arc;
 use crate::{DataFetcher, FetchRequest, FetchResponse};
 
 /// Wraps an `Arc<dyn DataFetcher>` for storage in deno_core's `OpState`.
-pub struct FetcherHandle(pub Arc<dyn DataFetcher>);
+pub struct FetcherHandle(pub(crate) Arc<dyn DataFetcher>);
 
 #[op2(async)]
 #[serde]

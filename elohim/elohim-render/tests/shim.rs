@@ -48,3 +48,49 @@ async fn text_encoder_round_trips() {
         .unwrap();
     assert_eq!(v, "hi");
 }
+
+#[tokio::test]
+async fn url_searchparams_basic_ops() {
+    let mut rt = JsRuntime::with_shims();
+    let v = rt
+        .eval_string(
+            r#"
+            const u = new URL('https://example.com/?a=1&b=2');
+            const p = u.searchParams;
+            `${p.get('a')}|${p.get('b')}|${p.has('c')}`
+            "#,
+        )
+        .await
+        .unwrap();
+    assert_eq!(v, "1|2|false");
+}
+
+#[tokio::test]
+async fn url_ipv6_hostname_port() {
+    let mut rt = JsRuntime::with_shims();
+    let v = rt
+        .eval_string(
+            r#"
+            const u = new URL('http://[::1]:8080/path');
+            `${u.hostname}|${u.port}`
+            "#,
+        )
+        .await
+        .unwrap();
+    assert_eq!(v, "[::1]|8080");
+}
+
+#[tokio::test]
+async fn url_default_port_elided() {
+    let mut rt = JsRuntime::with_shims();
+    let v = rt
+        .eval_string(
+            r#"
+            const u = new URL('https://example.com:443/');
+            `${u.host}|${u.origin}`
+            "#,
+        )
+        .await
+        .unwrap();
+    assert_eq!(v, "example.com|https://example.com");
+}
