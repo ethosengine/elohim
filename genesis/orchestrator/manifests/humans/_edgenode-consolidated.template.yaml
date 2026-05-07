@@ -256,6 +256,12 @@ spec:
               value: "NODE_ROLE_PLACEHOLDER"
             - name: REGION
               value: "REGION_PLACEHOLDER"
+            # Display name for cluster_view topology UI
+            - name: ELOHIM_DISPLAY_NAME
+              value: "HUMAN_LABEL_PLACEHOLDER"
+            # Blob storage path for filesystem capacity calculations
+            - name: ELOHIM_BLOB_PATH
+              value: "/data/blobs"
           ports:
             # Conductor admin WS — exposed via elohim-storage forwarder on
             # 8444 (bridges to 127.0.0.1:4444). See top-of-file Architecture
