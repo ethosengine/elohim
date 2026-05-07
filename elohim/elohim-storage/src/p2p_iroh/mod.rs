@@ -17,5 +17,7 @@
 //! schemas.
 
 mod config;
+mod identity;
 
 pub use config::IrohConfig;
+pub use identity::load_or_generate as load_or_generate_secret_key;

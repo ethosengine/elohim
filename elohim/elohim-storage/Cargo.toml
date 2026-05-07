@@ -188,6 +188,10 @@ futures = { version = "0.3", optional = true }
 iroh = { version = "=0.92", optional = true }
 iroh-blobs = { version = "=0.94", optional = true }
 
+# Direct dep on `rand` for iroh SecretKey generation (OsRng).
+# Already in the transitive tree; declare direct so call sites can use it.
+rand = { version = "0.8", optional = true }
+
 # Optional: Compression for blobs
 lz4_flex = { version = "0.11", optional = true }
 
@@ -195,7 +199,7 @@ lz4_flex = { version = "0.11", optional = true }
 default = ["p2p"]
 compression = ["lz4_flex"]
 p2p = ["libp2p", "futures"]
-p2p-iroh = ["iroh", "iroh-blobs", "futures"]
+p2p-iroh = ["iroh", "iroh-blobs", "rand", "futures"]
 ssr = ["dep:elohim-render"]
 
 [dev-dependencies]
