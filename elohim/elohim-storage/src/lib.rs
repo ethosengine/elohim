@@ -103,6 +103,10 @@ pub mod identity;
 #[cfg(feature = "p2p")]
 pub mod p2p;
 
+// SSR endpoint handlers (require ssr feature — opt-in, V8 is expensive)
+#[cfg(feature = "ssr")]
+pub mod ssr;
+
 // CRDT sync module (always available, P2P transport requires p2p feature)
 pub mod sync;
 

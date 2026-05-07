@@ -183,6 +183,10 @@ pub struct HttpServer {
     /// project_signal + back_prop_one_hop + flood_feedback end-to-end.
     /// When absent (no P2P swarm, test fixtures), fan-out steps are skipped gracefully.
     fan_out_ctx: Option<Arc<crate::api::epr::EprFanOutCtx>>,
+    /// SSR renderer (ssr feature only). Constructed once at startup from SSR_BUNDLE_PATH.
+    /// None when the feature is off or the bundle failed to load — handlers return 503.
+    #[cfg(feature = "ssr")]
+    ssr_state: Option<crate::ssr::SsrState>,
     /// T17: CID of this peer's steward. Populated from `Config::self_cid` at startup.
     /// Used as the `receiver` field in `serve-blob` REA events emitted on a
     /// successful GET-time race-fetch.  Empty string when not configured.
@@ -271,6 +275,8 @@ impl HttpServer {
             write_through_state: None,
             hc_registry: None,
             fan_out_ctx: None,
+            #[cfg(feature = "ssr")]
+            ssr_state: None,
             self_cid: String::new(),
             fetch_blob_timeout_seconds: 5,
             fetch_blob_parallelism: 3,
@@ -353,6 +359,17 @@ impl HttpServer {
     /// require missing dependencies are skipped gracefully.
     pub fn with_fan_out_ctx(mut self, ctx: Arc<crate::api::epr::EprFanOutCtx>) -> Self {
         self.fan_out_ctx = Some(ctx);
+        self
+    }
+
+    /// Wire the SSR renderer (ssr feature only).
+    ///
+    /// Call with `crate::ssr::SsrState::from_env()` at startup. When absent
+    /// (feature off, or bundle failed to load), `GET /spa/*` and `POST /render`
+    /// return 503. Peers that cannot sustain V8 simply omit this call.
+    #[cfg(feature = "ssr")]
+    pub fn with_ssr_state(mut self, state: crate::ssr::SsrState) -> Self {
+        self.ssr_state = Some(state);
         self
     }
 
@@ -1013,6 +1030,99 @@ impl HttpServer {
                 crate::api::write_through_admin::handle(req, method, &state).await
             }
 
+            // SSR: direct-peer rendering (ssr feature only)
+            //
+            // GET /spa/* — peer-to-peer libp2p-routed direct rendering.
+            //   The leading "/spa/" prefix is stripped and the remainder is
+            //   treated as an Angular route, e.g. /spa/lamad/concept/foo →
+            //   renders /lamad/concept/foo.
+            //
+            // POST /render — internal endpoint for doorway co-location.
+            //   Body: JSON { "url": "/lamad/concept/foo" }
+            //   Response: rendered HTML (text/html).
+            //
+            // Both return 503 when the renderer is absent (feature compiled in
+            // but SSR_BUNDLE_PATH unset or bundle load failed).
+            #[cfg(feature = "ssr")]
+            (Method::GET, p) if p.starts_with("/spa/") => {
+                let inner_path = format!("/{}", &p[5..]); // strip "/spa/"
+                match self.ssr_state.as_ref() {
+                    Some(state) => {
+                        match crate::ssr::render_url(state, inner_path).await {
+                            Ok(html) => Ok(Self::html_response(html)),
+                            Err(e) => {
+                                tracing::warn!(
+                                    target: "elohim_storage::ssr",
+                                    error = %e,
+                                    path = %p,
+                                    "SSR render error"
+                                );
+                                Ok(Response::builder()
+                                    .status(StatusCode::SERVICE_UNAVAILABLE)
+                                    .header(header::CONTENT_TYPE, "application/json")
+                                    .body(Full::new(Bytes::from(
+                                        r#"{"error":"render failed"}"#,
+                                    )))
+                                    .unwrap())
+                            }
+                        }
+                    }
+                    None => Ok(Response::builder()
+                        .status(StatusCode::SERVICE_UNAVAILABLE)
+                        .header(header::CONTENT_TYPE, "application/json")
+                        .body(Full::new(Bytes::from(
+                            r#"{"error":"SSR not available — SSR_BUNDLE_PATH not set or bundle failed to load"}"#,
+                        )))
+                        .unwrap()),
+                }
+            }
+
+            #[cfg(feature = "ssr")]
+            (Method::POST, "/render") => {
+                match self.ssr_state.as_ref() {
+                    Some(state) => {
+                        // Parse body: { "url": "..." }. On body-read failure, return 400.
+                        let url = match req.collect().await {
+                            Ok(collected) => {
+                                let body_bytes = collected.to_bytes();
+                                let parsed: serde_json::Value =
+                                    serde_json::from_slice(&body_bytes).unwrap_or_default();
+                                parsed
+                                    .get("url")
+                                    .and_then(|v| v.as_str())
+                                    .unwrap_or("/")
+                                    .to_string()
+                            }
+                            Err(_) => "/".to_string(),
+                        };
+                        match crate::ssr::render_url(state, url).await {
+                            Ok(html) => Ok(Self::html_response(html)),
+                            Err(e) => {
+                                tracing::warn!(
+                                    target: "elohim_storage::ssr",
+                                    error = %e,
+                                    "SSR /render error"
+                                );
+                                Ok(Response::builder()
+                                    .status(StatusCode::SERVICE_UNAVAILABLE)
+                                    .header(header::CONTENT_TYPE, "application/json")
+                                    .body(Full::new(Bytes::from(format!(
+                                        r#"{{"error":"render failed: {e}"}}"#
+                                    ))))
+                                    .unwrap())
+                            }
+                        }
+                    }
+                    None => Ok(Response::builder()
+                        .status(StatusCode::SERVICE_UNAVAILABLE)
+                        .header(header::CONTENT_TYPE, "application/json")
+                        .body(Full::new(Bytes::from(
+                            r#"{"error":"SSR not available — SSR_BUNDLE_PATH not set or bundle failed to load"}"#,
+                        )))
+                        .unwrap()),
+                }
+            }
+
             // Not found
             _ => Ok(Response::builder()
                 .status(StatusCode::NOT_FOUND)
@@ -1478,6 +1588,16 @@ impl HttpServer {
         builder
             .header("Access-Control-Allow-Origin", "*")
             .header("Cross-Origin-Resource-Policy", "cross-origin")
+    }
+
+    /// Build a `text/html` response (used by SSR handlers, ssr feature only).
+    #[cfg(feature = "ssr")]
+    fn html_response(html: String) -> Response<Full<Bytes>> {
+        Response::builder()
+            .status(StatusCode::OK)
+            .header(header::CONTENT_TYPE, "text/html; charset=utf-8")
+            .body(Full::new(Bytes::from(html)))
+            .unwrap()
     }
 
     /// GET /blob/{hash} - Reassemble blob from shards
