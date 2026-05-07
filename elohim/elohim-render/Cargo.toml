@@ -1,0 +1,20 @@
+[package]
+name = "elohim-render"
+version = "0.1.0"
+edition = "2021"
+description = "JS execution runtime for server-side rendering at the Elohim peer boundary"
+license = "Apache-2.0"
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "1.0"
+tracing = "0.1"
+async-trait = "0.1"
+tokio = { version = "1.43", features = ["sync", "rt", "macros"] }
+
+[dev-dependencies]
+tokio = { version = "1.43", features = ["full", "macros"] }
+
+[features]
+default = []

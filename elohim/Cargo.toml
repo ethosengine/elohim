@@ -9,6 +9,7 @@ members = [
     "elohim-agent/specialists/defender",
     "eae",
     "elohim-compute",
+    "elohim-render",
     "elohim-token",
     "epr",
 ]
