@@ -1,13 +1,13 @@
 :host {
   display: block;
   width: 100%;
-  height: 100%;
+  height: 100dvh;
 }
 
 .map-wrapper {
   position: relative;
   width: 100%;
-  height: 100%;
+  height: 100dvh;
   min-height: 400px;
 }
 
