@@ -1,37 +1,61 @@
-//! `IrohNode` — Phase 1 stub.
+//! `IrohNode` — Phase 2: blob plane via iroh-blobs.
 //!
-//! Phase 1 holds only the endpoint; just enough to verify the boot path and
-//! prove the persisted secret key resolves to a stable [`iroh::NodeId`].
-//! Phase 2 expands this to mount iroh-blobs on the endpoint via the
-//! `iroh::protocol::Router` integration; later phases register custom-ALPN
-//! handlers alongside iroh-blobs.
+//! Aggregates the iroh `Endpoint`, an [`IrohBlobStore`] (wrapping
+//! `iroh-blobs`' filesystem store), and an `iroh::protocol::Router` with
+//! `BlobsProtocol` mounted under [`iroh_blobs::ALPN`]. This is the
+//! production shape for the iroh transport's blob plane.
+//!
+//! Custom-ALPN handlers (Phase 5+) will register on the same Router
+//! alongside iroh-blobs.
 
-use iroh::{Endpoint, NodeId};
+use anyhow::Result;
+use bytes::Bytes;
+use iroh::{
+    protocol::{Router, RouterBuilder},
+    Endpoint, NodeAddr, NodeId, Watcher,
+};
+use iroh_blobs::{BlobsProtocol, Hash};
 use tracing::info;
 
-use super::{config::IrohConfig, endpoint::BuildEndpointError};
+use super::{blob_store::IrohBlobStore, config::IrohConfig, endpoint::BuildEndpointError};
 
-/// Iroh-side P2P node. Phase 1 holds only the endpoint.
+/// Iroh-side P2P node — Phase 2 holds endpoint + store + router. The
+/// Router has `BlobsProtocol` mounted under `iroh_blobs::ALPN`. Phase 3+
+/// will call [`IrohNode::router_builder`]-style hooks (added then) so
+/// custom-ALPN handlers can register without churning this aggregate.
 #[derive(Debug)]
 pub struct IrohNode {
     endpoint: Endpoint,
+    router: Router,
+    store: IrohBlobStore,
 }
 
 impl IrohNode {
-    /// Build the endpoint and announce ourselves. Caller is responsible for
-    /// shutting down via [`IrohNode::shutdown`] on graceful exit.
-    pub async fn start(config: IrohConfig) -> Result<Self, BuildEndpointError> {
+    /// Build endpoint + store, mount `BlobsProtocol` under `iroh_blobs::ALPN`,
+    /// and spawn the accept loop. Caller is responsible for shutting down
+    /// via [`IrohNode::shutdown`] on graceful exit.
+    pub async fn start(config: IrohConfig) -> Result<Self, IrohNodeError> {
         let endpoint = super::endpoint::build_endpoint(&config).await?;
+        let store = IrohBlobStore::load(&config.blobs_dir).await?;
+
+        let blobs_protocol = BlobsProtocol::new(store.inner(), endpoint.clone(), None);
+        let router: Router = RouterBuilder::new(endpoint.clone())
+            .accept(iroh_blobs::ALPN, blobs_protocol)
+            .spawn();
 
         info!(
             target: "elohim_storage::p2p_iroh",
             node_id = %endpoint.node_id(),
             relays = config.use_n0_relays,
             blobs_dir = %config.blobs_dir.display(),
-            "iroh node started (Phase 1 stub: blob plane not yet mounted)"
+            "iroh node started (blob plane mounted; iroh_blobs ALPN registered)"
         );
 
-        Ok(Self { endpoint })
+        Ok(Self {
+            endpoint,
+            router,
+            store,
+        })
     }
 
     /// This node's [`iroh::NodeId`] (derived from the persisted secret key).
@@ -39,21 +63,81 @@ impl IrohNode {
         self.endpoint.node_id()
     }
 
-    /// Borrow the endpoint. Phase 2 promotes this surface to richer
-    /// blob-plane methods.
+    /// Wait for the endpoint's `NodeAddr` to be initialized and return it.
+    /// On loopback (relays disabled) this is essentially immediate; with
+    /// relays it waits for the relay home address to resolve.
+    pub async fn node_addr(&self) -> Result<NodeAddr> {
+        let addr = self.endpoint.node_addr().initialized().await;
+        Ok(addr)
+    }
+
+    /// Borrow the underlying `Endpoint` for advanced uses (Phase 3+ ALPN
+    /// handlers, NAT-traversal probes, metrics).
     pub fn endpoint(&self) -> &Endpoint {
         &self.endpoint
     }
 
-    /// Shut down the endpoint gracefully.
-    pub async fn shutdown(self) {
+    /// Borrow the local `IrohBlobStore`.
+    pub fn store(&self) -> &IrohBlobStore {
+        &self.store
+    }
+
+    /// Add bytes to the local store. Returns the BLAKE3 hash.
+    pub async fn add_bytes(&self, data: Vec<u8>) -> Result<Hash> {
+        self.store.add_bytes(data).await
+    }
+
+    /// Read bytes from the local store.
+    pub async fn get_bytes(&self, hash: Hash) -> Result<Bytes> {
+        self.store.get_bytes(hash).await
+    }
+
+    /// Whether this node currently holds the given hash locally.
+    pub async fn has(&self, hash: Hash) -> Result<bool> {
+        self.store.has(hash).await
+    }
+
+    /// Fetch a blob from a specific peer by `NodeAddr` + `Hash`. Opens a
+    /// QUIC connection on `iroh_blobs::ALPN` and uses `Store::remote().fetch`
+    /// to drive chunked verified streaming into the local store. After this
+    /// returns, [`IrohNode::get_bytes`] will succeed.
+    ///
+    /// Pattern matches iroh-blobs' own two-node test (`tests.rs:230` in
+    /// upstream): connect with the full `NodeAddr`, then `remote().fetch(conn,
+    /// hash)`. We deliberately do not route through `Downloader` here: the
+    /// pool's `endpoint.connect(node_id, alpn)` path strips direct addresses
+    /// and falls back to discovery, which is unavailable when relays are
+    /// disabled (CI/loopback case).
+    pub async fn fetch_blob_from(&self, peer: NodeAddr, hash: Hash) -> Result<Bytes> {
+        let conn = self.endpoint.connect(peer, iroh_blobs::ALPN).await?;
+        self.store.inner().remote().fetch(conn, hash).await?;
+        self.store.get_bytes(hash).await
+    }
+
+    /// Shut down router (closes accept loop + endpoint) gracefully.
+    pub async fn shutdown(self) -> Result<()> {
         info!(
             target: "elohim_storage::p2p_iroh",
             node_id = %self.endpoint.node_id(),
             "iroh node shutting down"
         );
-        self.endpoint.close().await;
+        self.router
+            .shutdown()
+            .await
+            .map_err(|e| anyhow::anyhow!("router shutdown failed: {e}"))?;
+        Ok(())
     }
+}
+
+/// Errors from `IrohNode::start`. Bind/identity failures, store load
+/// failures, and protocol-mount failures all funnel here.
+#[derive(Debug, thiserror::Error)]
+pub enum IrohNodeError {
+    #[error("endpoint build failed: {0}")]
+    Endpoint(#[from] BuildEndpointError),
+
+    #[error("blob store load failed: {0}")]
+    Store(#[from] anyhow::Error),
 }
 
 #[cfg(test)]
@@ -61,17 +145,36 @@ mod tests {
     use super::*;
     use tempfile::tempdir;
 
+    fn loopback_config(dir: &std::path::Path) -> IrohConfig {
+        IrohConfig {
+            blobs_dir: dir.join("blobs_iroh"),
+            secret_key_path: dir.join("iroh.key"),
+            use_n0_relays: false,
+        }
+    }
+
+    /// Smoke test — start the node, get its NodeId, shut down cleanly.
     #[tokio::test]
     async fn start_then_shutdown() {
         let dir = tempdir().unwrap();
-        let cfg = IrohConfig {
-            blobs_dir: dir.path().join("blobs_iroh"),
-            secret_key_path: dir.path().join("iroh.key"),
-            use_n0_relays: false,
-        };
-
-        let node = IrohNode::start(cfg).await.unwrap();
+        let node = IrohNode::start(loopback_config(dir.path())).await.unwrap();
         let _id = node.node_id();
-        node.shutdown().await;
+        node.shutdown().await.unwrap();
+    }
+
+    /// Adding bytes via the node API delegates to the local store.
+    #[tokio::test]
+    async fn add_then_get_local() {
+        let dir = tempdir().unwrap();
+        let node = IrohNode::start(loopback_config(dir.path())).await.unwrap();
+
+        let payload = b"phase 2 hello".to_vec();
+        let hash = node.add_bytes(payload.clone()).await.unwrap();
+        assert!(node.has(hash).await.unwrap());
+
+        let got = node.get_bytes(hash).await.unwrap();
+        assert_eq!(&got[..], &payload[..]);
+
+        node.shutdown().await.unwrap();
     }
 }
