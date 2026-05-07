@@ -38,11 +38,11 @@
  *   1 — at least one human failed
  */
 
-import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { AdminWebsocket, AppWebsocket } from '@holochain/client';
+import { deterministicPeerId, type Archetype } from './peer-id.js';
 
 // =============================================================================
 // Types — match seed-conductor-identities.ts (no shared types module exists)
@@ -61,8 +61,6 @@ interface HumansJsonHuman {
 interface HumansJson {
   humans: HumansJsonHuman[];
 }
-
-type Archetype = 'node' | 'desktop' | 'mobile' | 'steward';
 
 interface CreateAgentPeerBindingInput {
   peer_id: string;
@@ -104,27 +102,6 @@ function plansForHuman(human: HumansJsonHuman): Archetype[] {
     default:
       return ['desktop'];
   }
-}
-
-/**
- * Deterministic test-only peer_id. Not a valid libp2p PeerId (suffix is
- * hex, not base58btc) — opaque string at Stage 1; replace with
- * keypair-derived IDs in Stage 2 that round-trip through `PeerId::from_str`.
- *
- * Same (humanId, archetype) → same peer_id across re-runs. The
- * `12D3KooW` prefix mimics libp2p shape for ergonomic logs only; the
- * hex suffix is deterministic, alphanumeric, and clearly not a real
- * libp2p PeerId.
- */
-function deterministicPeerId(humanId: string, archetype: Archetype): string {
-  const digest = createHash('sha256')
-    .update(`${humanId}:${archetype}`, 'utf8')
-    .digest();
-  // Lowercase hex suffix — deterministic, alphanumeric, and clearly not a
-  // real libp2p PeerId. Stage 1 stores peer_id as an opaque string; Stage 2
-  // will generate keypair-derived IDs that round-trip through PeerId::from_str.
-  // Sliced to 38 chars to keep total length stable (12D3KooW + 38 = 46 chars).
-  return `12D3KooW${digest.toString('hex').slice(0, 38)}`;
 }
 
 // =============================================================================
