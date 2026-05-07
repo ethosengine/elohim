@@ -246,8 +246,7 @@ pub async fn build_local_slice(pool: &DbPool) -> serde_json::Value {
     use crate::services::system_metrics;
 
     let display_name = std::env::var("ELOHIM_DISPLAY_NAME").unwrap_or_default();
-    let blob_path = std::env::var("ELOHIM_BLOB_PATH")
-        .unwrap_or_else(|_| "/data/blobs".to_string());
+    let blob_path = std::env::var("ELOHIM_BLOB_PATH").unwrap_or_else(|_| "/data/blobs".to_string());
 
     let blob_path_buf = std::path::PathBuf::from(&blob_path);
     let storage_used_bytes = system_metrics::directory_size(&blob_path_buf).unwrap_or(0);
@@ -354,10 +353,7 @@ mod tests {
         env::set_var("ELOHIM_DISPLAY_NAME", "test");
         let pool = test_pool();
         let slice = build_local_slice(&pool).await;
-        assert_eq!(
-            slice.get("hosting_count").and_then(|v| v.as_u64()),
-            Some(0)
-        );
+        assert_eq!(slice.get("hosting_count").and_then(|v| v.as_u64()), Some(0));
         env::remove_var("ELOHIM_DISPLAY_NAME");
     }
 
