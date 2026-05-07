@@ -50,14 +50,19 @@ pub struct AngularRenderer {
     /// `SyncSender` is `Send + Sync`, satisfying the `Renderer: Send + Sync` bound
     /// even though the `JsRuntime` on the other end is `!Send`.
     tx: mpsc::SyncSender<StringWorkItem>,
+    /// Handle to the background OS thread. Stored so we can join on drop and
+    /// surface any worker panic rather than silently losing it.
+    worker: Option<std::thread::JoinHandle<()>>,
 }
 
 impl AngularRenderer {
-    /// Create a new renderer backed by `bundle`.
-    ///
-    /// Validates that the bundle path exists, then spawns the background thread
-    /// and initialises the V8 isolate with all stdlib shims (console, URL,
-    /// TextEncoder, fetch).
+    /// Creates a new `AngularRenderer`. Spawns a dedicated OS thread that
+    /// owns a V8 isolate. The isolate is initialized with the standard
+    /// runtime shims: `console`, `URL` (with `URLSearchParams`),
+    /// `TextEncoder`/`TextDecoder`, and the `fs` module loader. The fetch
+    /// shim is NOT yet wired (see `Task 14+` for per-request DataFetcher
+    /// swapping); rendering content that depends on fetched data will hit
+    /// `ReferenceError: fetch is not defined` until that lands.
     ///
     /// # Errors
     ///
@@ -75,8 +80,8 @@ impl AngularRenderer {
         let (tx, rx) = mpsc::sync_channel::<StringWorkItem>(1);
 
         // Spawn the background thread that owns the JsRuntime.
-        std::thread::Builder::new()
-            .name("angular-render-worker".into())
+        let worker = std::thread::Builder::new()
+            .name("angular-renderer".into())
             .spawn(move || {
                 // Each worker thread runs its own single-threaded Tokio runtime.
                 // This is required because JsRuntime::eval_string is async and must
@@ -88,11 +93,14 @@ impl AngularRenderer {
 
                 local_rt.block_on(async move {
                     // JsRuntime is created here — it stays on this thread forever.
-                    // with_fs_loader gives us dynamic import() support. The fetch
-                    // shim is not connected here (MVP); if Angular tries to call
-                    // fetch() during SSR it will hit a missing-global error that
-                    // surfaces as RenderError::Panic.
-                    let mut runtime = crate::runtime::JsRuntime::with_fs_loader();
+                    // with_shims() wires console, URL, and TextEncoder/TextDecoder
+                    // shims alongside FsModuleLoader.
+                    //
+                    // TODO(post-task-9): wire DataFetcher per request via swappable
+                    // OpState so that Angular SSR bundles can call `fetch()`. Until
+                    // then, any `fetch()` call inside the bundle will surface as
+                    // `RenderError::ModuleLoad("ReferenceError: fetch is not defined")`.
+                    let mut runtime = crate::runtime::JsRuntime::with_shims();
 
                     for StringWorkItem { script, reply } in rx {
                         let result = runtime.eval_string(&script).await;
@@ -102,14 +110,30 @@ impl AngularRenderer {
                     }
                 });
             })
-            .map_err(|e| RenderError::Panic(format!("angular render worker: spawn failed: {e}")))?;
+            .map_err(|e| RenderError::ModuleLoad(format!("spawn worker thread: {e}")))?;
 
-        Ok(Self { bundle, tx })
+        Ok(Self {
+            bundle,
+            tx,
+            worker: Some(worker),
+        })
     }
 }
 
 #[async_trait]
 impl Renderer for AngularRenderer {
+    /// Renders `ctx.url` via Angular SSR and returns the full HTML document.
+    ///
+    /// # Timeout
+    ///
+    /// The caller-side timeout is `ctx.limits.wall_time_ms`. If the worker does
+    /// not reply within this window, `RenderError::Timeout` is returned and the
+    /// caller resumes immediately. The worker continues executing in its V8
+    /// isolate until the in-flight JS resolves or the isolate OOMs —
+    /// V8-level termination (interrupt + `TerminateExecution`) is deferred to
+    /// a future task. The next work item sent to the worker will block until
+    /// the current render completes, so sustained timeout storms will exhaust the
+    /// channel queue. Mitigation (isolate interrupt) is tracked as Task 14+.
     async fn render(&self, ctx: RenderContext) -> Result<RenderOutput> {
         // Build a file:// URL for the bundle so dynamic import() can locate it.
         let bundle_url = url::Url::from_file_path(&self.bundle).map_err(|_| {
@@ -134,20 +158,35 @@ impl Renderer for AngularRenderer {
             }})()"#
         );
 
-        // Send the driver to the background thread and await the response.
+        // Send the work item to the background thread.
+        // SyncSender::send is a blocking call and must not run on a tokio worker
+        // thread directly — wrap it in spawn_blocking so tokio can schedule other
+        // tasks while we wait for channel capacity.
         let (reply_tx, reply_rx) = tokio::sync::oneshot::channel();
+        let tx = self.tx.clone();
+        let work_item = StringWorkItem {
+            script: driver,
+            reply: reply_tx,
+        };
+        tokio::task::spawn_blocking(move || {
+            tx.send(work_item)
+                .map_err(|_| RenderError::Panic("angular render worker: channel closed".into()))
+        })
+        .await
+        .map_err(|_| RenderError::Panic("spawn_blocking join failed".into()))??;
 
-        self.tx
-            .send(StringWorkItem {
-                script: driver,
-                reply: reply_tx,
-            })
-            .map_err(|_| RenderError::Panic("angular render worker: channel closed".into()))?;
+        // Await the result from the background thread, subject to wall-time limit.
+        let result = tokio::time::timeout(
+            std::time::Duration::from_millis(ctx.limits.wall_time_ms),
+            reply_rx,
+        )
+        .await
+        .map_err(|_| RenderError::Timeout {
+            limit_ms: ctx.limits.wall_time_ms,
+        })?
+        .map_err(|_| RenderError::Panic("angular render worker: reply channel dropped".into()))??;
 
-        // Await the result from the background thread.
-        let html = reply_rx.await.map_err(|_| {
-            RenderError::Panic("angular render worker: reply channel dropped".into())
-        })??;
+        let html = result;
 
         if html.len() > ctx.limits.max_output_bytes {
             return Err(RenderError::OutputTooLarge {
@@ -162,5 +201,36 @@ impl Renderer for AngularRenderer {
             headers: vec![("content-type".into(), "text/html; charset=utf-8".into())],
             fetched_inputs: vec![],
         })
+    }
+}
+
+impl Drop for AngularRenderer {
+    fn drop(&mut self) {
+        // Close our send half by replacing it with a freshly-closed sender,
+        // then dropping the original. This signals the worker's rx iterator to
+        // exit (it returns `Err(RecvError)` once all senders are gone), which
+        // lets the worker's `for item in rx` loop terminate cleanly.
+        let (closed_tx, _closed_rx) = mpsc::sync_channel(0);
+        // _closed_rx drops here, so closed_tx is already disconnected on the
+        // receive side — but that doesn't matter. What matters is that we
+        // drop the *original* tx so the worker's rx sees the disconnect.
+        let original_tx = std::mem::replace(&mut self.tx, closed_tx);
+        drop(original_tx);
+
+        // Wait for the worker to finish its current render and tear down V8.
+        // Joining here surfaces any worker panic so it isn't silently lost.
+        if let Some(handle) = self.worker.take() {
+            if let Err(panic) = handle.join() {
+                let msg = panic
+                    .downcast_ref::<&'static str>()
+                    .map(|s| (*s).to_string())
+                    .or_else(|| panic.downcast_ref::<String>().cloned())
+                    .unwrap_or_else(|| "<unknown panic>".into());
+                tracing::error!(
+                    target: "elohim_render::angular",
+                    "AngularRenderer worker panicked: {msg}"
+                );
+            }
+        }
     }
 }
