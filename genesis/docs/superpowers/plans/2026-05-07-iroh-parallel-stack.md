@@ -1,111 +1,143 @@
-# iroh Parallel P2P Stack — Phase 1 (Blob Plane, iroh-standalone)
+# iroh Parallel P2P Stack — Staged Cutover from libp2p
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Stand up a parallel iroh-based P2P module inside `elohim-storage` that can serve and fetch content-addressed blobs end-to-end via iroh's QUIC transport (custom ALPN, our own protocol handler, BLAKE3-keyed minimal file store). Existing libp2p stack remains the default; iroh becomes selectable via feature flag + runtime config. First cutover target: blob distribution. Other protocols (sync, shard, epr, trust, identity) stay on libp2p and graduate in subsequent sprints.
+**Goal:** Stand up a parallel iroh-based P2P module inside `elohim-storage` that, by the end of the plan, can serve every existing libp2p protocol over iroh's QUIC transport and become the default. Existing libp2p stack remains the runtime default until the cutover gate clears. The migration is staged protocol-by-protocol so each plane can be exercised, parity-tested against libp2p, and graduated independently.
 
-**Architecture:** A new `src/p2p_iroh/` module sits alongside `src/p2p/`, gated by `p2p-iroh` Cargo feature. Both backends compile additively; runtime config (`TransportBackend::Libp2p` | `TransportBackend::Iroh`) picks one at startup. In `Iroh` mode, blobs are stored in a new BLAKE3-keyed minimal file store at `<storage_dir>/blobs_iroh/` (operational, parallel to the existing SHA256-keyed `BlobStore`). Wire transport is iroh QUIC streams under a custom ALPN (`/elohim/blob/1.0.0`) carrying length-prefixed MessagePack `BlobFetchRequest` / `BlobFetchResponse` frames — same wire format as the existing libp2p blob protocol, just on QUIC instead of yamux. We deliberately **do not** use iroh-blobs in Phase 1: as of 2026-05-07, iroh-blobs 0.100 has hard incompatibilities with this codebase's `multihash-codetable` (sha2 pre-release exact pin). We revisit iroh-blobs adoption when n0 publishes a release aligned with iroh 1.0.
+**Architecture:** A new `src/p2p_iroh/` module sits alongside `src/p2p/`, gated by `p2p-iroh` Cargo feature. Both backends compile additively; runtime config (`TransportBackend::Libp2p` | `TransportBackend::Iroh`) selects one at startup. Wire formats (MessagePack frames defined in `crate::p2p::wire`) are *shared* across stacks so the cutover doesn't fork message schemas — only the transport. Where iroh has a native protocol (blobs via `iroh-blobs`, gossip via `iroh-gossip`), we adopt it; where we have bespoke protocols (sync, shard, EPR, view federation, identity handshake, trust, reach), we register custom ALPNs on iroh's `Router` and reuse our existing wire types.
 
-**Tech Stack:** `iroh = "1.0.0-rc.0"` (core endpoint + router + protocol handler API), `blake3 = "1"` (already a dep, used for content addressing on the iroh path), tokio, rmp-serde (existing for the wire format). **No iroh-blobs.**
+**Tech Stack:**
+- `iroh = "=0.96"` (pulled transitively by iroh-blobs/iroh-gossip; pinned for stability)
+- `iroh-blobs = "=0.98"` (BLAKE3-keyed content-addressed blob protocol — Phase 2)
+- `iroh-gossip = "=0.96"` (gossip overlay — Phase 4)
+- `tokio`, `rmp-serde`, `bytes` (existing)
 
-**Phasing:** Phase 0 is a prerequisite holochain stack bump (`holochain_client 0.9.0-dev.5 → =0.9.0-dev.23`, `holochain_types 0.7.0-dev.5 → =0.7.0-dev.22`) that unblocks iroh's serde requirement. Phase 1 is the iroh module itself.
+**Pinning rationale (post-probe, 2026-05-07):**
 
-**Version pinning rationale (post-probe, 2026-05-07):**
-- iroh 1.0.0-rc.0 was published 2026-05-07. We pin exactly because it has had no soak time.
-- iroh 1.0.0-rc.0 requires `serde ^1.0.228`. Our existing `holochain_serialized_bytes 0.0.56` (transitive via `holochain_types 0.7.0-dev.5`) pins `serde =1.0.219`. The serde pin is exact on the holochain side, so a `[patch]` cannot thread it.
-- `holochain_serialized_bytes 0.0.57` (April 2026) pins `serde =1.0.228` — exactly what iroh wants. `holochain_types 0.7.0-dev.22` is the first dev release pulling HSB 0.0.57. Bumping to dev.22 (or paired dev.23) unblocks the conflict.
-- `iroh-blobs 0.100` requires `iroh ^0.98` (it has not yet caught up to iroh 1.0). iroh 0.98 + iroh-blobs 0.100 is itself viable in clean projects, but it transitively pulls `sha2 =0.11.0-rc.5` (an exact pre-release pin via iroh-base), which is incompatible with our existing `multihash-codetable 0.2`'s `sha2 ^0.11` (stable only). No `[patch]` threads this — both are exact constraints on different versions.
-- The path that resolves: **iroh 1.0.0-rc.0 standalone, no iroh-blobs, holochain bumped to dev.22+.** Verified by `cargo metadata` probe on 2026-05-07; resolution succeeds with serde 1.0.228, ed25519-dalek 3.0.0-pre.7, and sha2 0.10.9 + 0.11.0 coexisting at different majors.
+The first iteration of this plan pinned `iroh = "1.0.0-rc.0"` standalone (no iroh-blobs, custom QUIC protocol from scratch) because iroh-blobs 0.100 has a hard transitive conflict with our `multihash-codetable` (sha2 pre-release pin via iroh-base 0.98 → ed25519-dalek 3.0.0-pre.6). That premise turns out to be over-narrow.
+
+`cargo metadata` probes against the *actual* elohim-storage workspace constraints walked the iroh-blobs version range:
+
+| iroh-blobs | Resolves with current stack? | Notes |
+|---|---|---|
+| 0.100 | ❌ sha2 rc.5 conflict via iroh-base 0.98 | Plan blocker — but only at this version |
+| 0.99 | ❌ same | |
+| 0.98 (Jan 2026) | ✅ **clean** — pulls iroh 0.96, sha2 0.10.9 + 0.11.0 coexist | **Selected** |
+| 0.97, 0.96 | ❌ crypto-common conflict | |
+| 0.94–0.90 | ✅ also clean (older) | |
+
+iroh-blobs 0.98 with iroh 0.96 is a real released crate (~3 months soak), not a release candidate. It resolves alongside our current `holochain_client 0.9.0-dev.5` — no holochain bump required. Picking this pinned pair eliminates Phase 0 entirely and lets Phase 2 use iroh-blobs' production blob protocol instead of building a custom QUIC ALPN handler from scratch.
+
+When n0 publishes iroh-blobs aligned with iroh 1.0 stable, we revisit. By then we'll already be running on iroh-blobs natively, so the upgrade is a version bump rather than a protocol rewrite.
+
+**Phasing (high level):**
+
+| Phase | Scope | Surface area | Status |
+|---|---|---|---|
+| ~~0~~ | ~~holochain dev.5 → dev.22 bump~~ | — | **eliminated** (no longer needed under iroh-blobs 0.98) |
+| 1 | Foundation: deps, feature flag, IrohNode skeleton, config wiring | ~5 files | Detailed below |
+| 2 | Blob plane via iroh-blobs (replaces `p2p::blob_protocol` + `p2p::blob_fetch`) | ~5 files | Detailed below |
+| 3 | Custom-ALPN harness: shared `Router` mounting, codec helpers, parity-test scaffold | ~3 files | Sketched |
+| 4 | Gossip plane via iroh-gossip (replaces inventory_gossip + identity_binding_gossip + attention_tending + feedback_signal + recovery_*) | ~6 files | Sketched |
+| 5 | Sync plane (custom ALPN: `/elohim/sync/2.0.0`) | ~2 files | Sketched |
+| 6 | EPR plane (`/elohim/epr/2.0.0`, `/elohim/epr-atom/2.0.0`) | ~3 files | Sketched |
+| 7 | Shard plane (`/elohim/shard/2.0.0`) | ~2 files | Sketched |
+| 8 | View federation (`/elohim/view-federation/2.0.0`) | ~2 files | Sketched |
+| 9 | Identity / handshake / trust / reach planes | ~5 files | Sketched |
+| 10 | Discovery + topology (iroh built-in DNS/pkarr/mdns replaces kad+mdns) | ~3 files | Sketched |
+| 11 | Cutover gate: parity verification, default flip, libp2p deprecation | docs + Cargo | Cutover playbook |
+
+Each phase from 3 onward gets its own design gate when picked up — that's not a deferral excuse, it's the rule (entity classification depends on what's being moved). This plan's executable detail is Phases 1 and 2; Phases 3–11 are the **cutover roadmap** with enough shape that the parallel scaffolding decisions (shared wire types, parity-test harness, hybrid-mode behavior) made in Phase 1–2 don't paint the later phases into corners.
 
 ---
 
-## P2P Design Gate: iroh parallel stack — Phase 1
+## P2P Design Gate: iroh parallel stack — Phase 1 + 2 entities
 
-This plan introduces two new persistent on-disk artifacts. Classifying each before any code is written, per `.claude/skills/p2p-design-gate/SKILL.md`.
+This plan introduces persistent on-disk artifacts. Classifying each before any code is written, per `.claude/skills/p2p-design-gate/SKILL.md`.
 
-### Entity: iroh blob store directory (`<storage_dir>/blobs_iroh/`)
+### Entity: iroh-blobs store directory (`<storage_dir>/blobs_iroh/`)
 
-- **Classification**: **Operational (Category C)** — parallel to the existing SHA256-keyed `crate::blob_store::BlobStore`. A minimal BLAKE3-keyed file store; Phase 1 mode-exclusive with the libp2p path so the two stores never both serve at once.
-- **Justification**: Bytes are content-addressed (BLAKE3). Loss on a single node = re-fetch from peers, not loss of source of truth. The collective peer inventory is the broader source of truth; any single node's store is an operational projection of what it currently holds.
-- **Content Address Strategy**: **Content-Derived (BLAKE3 hex)** — the hash IS the identity. Distinct from the libp2p path's SHA256/CIDv1 addressing; in Phase 1 each path is canonical within its mode, runtime config selects exactly one mode.
-- **Address Justification**: Content-derived because bytes are immutable. BLAKE3 (not SHA256) chosen on the iroh path to be forward-compatible with eventual iroh-blobs adoption (iroh-blobs uses BLAKE3 natively). Storing as raw 64-char hex (the BLAKE3 fingerprint), not wrapped in CIDv1 — minimal viable shape.
-- **Source of Truth**: **Local filesystem (operational)**. Reconstruction strategy: any blob can be re-fetched from peers via its BLAKE3 hash. No SQLite projection in Phase 1; `peer_blob_inventory` table changes are deferred to Phase 2.
+- **Classification**: **Operational (Category C)** — parallel to the existing SHA256-keyed `crate::blob_store::BlobStore`. Phase 2 mode-exclusive with the libp2p path so the two stores never both serve at once.
+- **Justification**: Bytes are content-addressed (BLAKE3, via iroh-blobs). Loss on a single node = re-fetch from peers, not loss of source of truth. The collective peer inventory is the broader source of truth; any single node's store is an operational projection of what it currently holds.
+- **Content Address Strategy**: **Content-Derived (BLAKE3)** — iroh-blobs handles the hash IS the identity invariant natively. Distinct from the libp2p path's SHA256/CIDv1 addressing; in Phase 2 each path is canonical within its mode, runtime config selects exactly one mode.
+- **Address Justification**: Content-derived because bytes are immutable. BLAKE3 is iroh-blobs' native addressing — chunked verified streaming, GC, dedup, partial fetches all key on it. We adopt iroh-blobs' format directly rather than re-wrapping in a CID for the iroh path.
+- **Source of Truth**: **Local filesystem (operational)**. Reconstruction strategy: any blob can be re-fetched from peers via its BLAKE3 hash. The iroh-blobs store internally uses redb for metadata + filesystem for blob data; `<storage_dir>/blobs_iroh/` is the iroh-blobs `Store` root.
 - **Coordinator Zome**: N/A — sidecar storage layer below the API boundary.
-- **Storage Projection**: filesystem at `<storage_dir>/blobs_iroh/<first-2-blake3-hex>/<remaining-62>`. No SQL, no redb. Phase 1 does not project into any inventory table.
-- **HTTP Route**: None in Phase 1. Phase 2 graduates HTTP routes (separate plan, separate gate).
+- **Storage Projection**: iroh-blobs internal layout. `peer_blob_inventory` table changes are deferred to Phase 4 (gossip plane), where BLAKE3 hashes get a parallel inventory column.
+- **HTTP Route**: None in Phase 2. HTTP route graduation is deferred until parity is proven and the cutover playbook executes (Phase 11).
 - **Anti-Pattern Check**: ✓ Source of truth declared (operational, reconstructable). ✓ Address format declared (BLAKE3, scoped to iroh mode). ✓ No new DHT entry type. ✓ Disjoint from existing SHA256 blob store directory (no aliasing).
 
 ### Entity: iroh secret key file (`<storage_dir>/iroh.key`)
 
 - **Classification**: **Agent-Scoped (Category B)** — peer to the existing libp2p node keypair. Private to this node; identifies it on the iroh transport.
 - **Justification**: ed25519 secret material; private credential. No other peer should ever see it. Loss = identity rotation.
-- **Content Address Strategy**: N/A (not content; identity material). Public derivation (EndpointId) is the addressable form.
+- **Content Address Strategy**: N/A (not content; identity material). Public derivation (`NodeId`) is the addressable form.
 - **Source of Truth**: **Private local filesystem** — never gossipped, file-mode 0600 on Unix.
 - **Coordinator Zome**: N/A — not a Holochain entity.
 - **HTTP Route**: None.
-- **Anti-Pattern Check**: ✓ Not in a shared table. ✓ File-mode tightening on creation. ✓ Distinct from libp2p identity by design (Phase 1 keeps stacks identity-disjoint).
+- **Anti-Pattern Check**: ✓ Not in a shared table. ✓ File-mode tightening on creation. ✓ Distinct from libp2p identity by design.
 
 ### Design Constraints Discovered
 
-- **Two canonical address formats coexist during Phase 1.** SHA256/CIDv1 on the libp2p path, BLAKE3 on the iroh path. Each canonical within its mode; runtime config selects exactly one. Documented in `p2p_iroh/README.md` (Task 11). Temporary state — the cutover playbook converges on one format once libp2p is retired.
-- **`peer_blob_inventory` is not modified.** Phase 2 graduates the inventory layer with its own design gate.
-- **Genesis seeder is not modified.** Continues to write SHA256-keyed blobs to the legacy `BlobStore`. Phase 2 graduates the seeder.
-- **No new HTTP route surface.** All HTTP routes continue to read from the legacy `BlobStore`.
-- **No iroh-blobs surface.** Phase 1 deliberately avoids iroh-blobs because it's currently incompatible with our codebase. Phase 2 (or later) will reconsider once n0 ships a 1.0-aligned release.
+- **Two canonical address formats coexist during the cutover.** SHA256/CIDv1 on the libp2p path, BLAKE3 on the iroh path. Each canonical within its mode; runtime config selects exactly one. Documented in `p2p_iroh/README.md`. Convergence on BLAKE3 happens after the cutover gate (Phase 11).
+- **`peer_blob_inventory` adds a parallel column for BLAKE3** in Phase 4 (gossip plane), not Phase 2. Phase 2 keeps the existing libp2p path unchanged.
+- **Genesis seeder is not modified in Phase 2.** Continues to write SHA256-keyed blobs to the legacy `BlobStore`. Seeder graduates as part of Phase 11 cutover.
+- **No HTTP route changes in Phases 1–2.** All HTTP routes continue to read from the legacy `BlobStore`.
+- **Wire types are shared, not forked.** `crate::p2p::wire` is exposed publicly (or re-homed to `crate::wire`) so the iroh-side codecs reuse the same `BlobFetchRequest`/`BlobFetchResponse`/`SyncRequest`/etc. Cutover removes one transport, never two divergent message schemas.
+- **`iroh-blobs` makes its own protocol surface.** Phase 2 does NOT define a custom blob ALPN — iroh-blobs is the blob protocol. The custom-ALPN harness (Phase 3) is for protocols that have no iroh equivalent.
+
+### Entities deferred to later-phase design gates
+
+These will be classified when their phase is picked up — not pre-decided here:
+
+- iroh-gossip topic state (Phase 4) — operational; tied to existing gossipsub topic-name mapping
+- BLAKE3 column on `peer_blob_inventory` (Phase 4) — operational projection, parallel to existing SHA256 column
+- Cross-stack peer ID mapping (Phase 10) — agent-scoped operational; bridge during transition
 
 ---
 
 ## File Structure
 
-### New files (Phase 1)
+### Phase 1 + 2 new files
 
-| File | Responsibility |
-|------|----------------|
-| `elohim/elohim-storage/src/p2p_iroh/mod.rs` | Module root; re-exports public API. Feature-gated as a whole. |
-| `elohim/elohim-storage/src/p2p_iroh/config.rs` | `IrohConfig` struct (blobs_dir, secret_key_path, listen_addrs, relay mode, ALPN list). |
-| `elohim/elohim-storage/src/p2p_iroh/identity.rs` | Load-or-generate `iroh::SecretKey`; persist as 32 raw bytes at `<storage_dir>/iroh.key`. |
-| `elohim/elohim-storage/src/p2p_iroh/endpoint.rs` | `build_endpoint(&IrohConfig)` returns a configured `iroh::Endpoint` with our custom ALPN registered. |
-| `elohim/elohim-storage/src/p2p_iroh/blake3_store.rs` | `Blake3Store` — minimal BLAKE3-keyed filesystem store. `add_bytes(&[u8]) -> Hash`, `get_bytes(Hash) -> Vec<u8>`, `has(Hash) -> bool`. |
-| `elohim/elohim-storage/src/p2p_iroh/blob_protocol.rs` | Custom protocol primitives: `BLOB_ALPN`, `BlobFetchRequest`, `BlobFetchResponse`, length-prefixed MessagePack codec helpers (`read_request_frame`, `write_response_frame`, etc.) for QUIC streams. |
-| `elohim/elohim-storage/src/p2p_iroh/blob_handler.rs` | `BlobProtocolHandler` — implements `iroh::protocol::ProtocolHandler`. Accepts inbound bidi streams, parses BlobFetchRequest, looks up via Blake3Store, writes BlobFetchResponse. |
-| `elohim/elohim-storage/src/p2p_iroh/router.rs` | `build_router(endpoint, handler)` — assembles `iroh::protocol::Router` registering BLOB_ALPN → BlobProtocolHandler. |
-| `elohim/elohim-storage/src/p2p_iroh/fetch.rs` | `fetch_blob(endpoint, peer_addr, hash) -> Result<Vec<u8>>` — connects to peer over QUIC, opens bidi stream, sends BlobFetchRequest, awaits BlobFetchResponse, verifies BLAKE3 hash. |
-| `elohim/elohim-storage/src/p2p_iroh/node.rs` | `IrohNode` aggregate — owns endpoint, router, store. Public surface: `start`, `node_id`, `node_addr`, `add_bytes`, `fetch_blob_from`, `get_bytes`, `has`, `shutdown`. |
-| `elohim/elohim-storage/src/p2p_iroh/README.md` | Status, what works, graduation gates, cutover playbook. |
-| `elohim/elohim-storage/tests/iroh_blob_roundtrip.rs` | Two-node integration test: provider adds blob → fetcher pulls by hash + provider's address → bytes match. |
-| `elohim/elohim-storage/tests/iroh_node_lifecycle.rs` | Single-node smoke test: build, listen, shutdown cleanly. |
+| File | Phase | Responsibility |
+|------|-------|----------------|
+| `elohim/elohim-storage/src/p2p_iroh/mod.rs` | 1 | Module root; re-exports public API. Feature-gated as a whole. |
+| `elohim/elohim-storage/src/p2p_iroh/config.rs` | 1 | `IrohConfig` struct (blobs_dir, secret_key_path, listen_addrs, relay mode, future ALPN list for Phase 3+). |
+| `elohim/elohim-storage/src/p2p_iroh/identity.rs` | 1 | Load-or-generate `iroh::SecretKey`; persist as 32 raw bytes at `<storage_dir>/iroh.key`. |
+| `elohim/elohim-storage/src/p2p_iroh/endpoint.rs` | 1 | `build_endpoint(&IrohConfig)` returns a configured `iroh::Endpoint`. |
+| `elohim/elohim-storage/src/p2p_iroh/blob_store.rs` | 2 | Thin wrapper over `iroh_blobs::store::fs::Store` rooted at `<storage_dir>/blobs_iroh/`. Public surface: `add_bytes`, `get_bytes`, `has`, `gc`. |
+| `elohim/elohim-storage/src/p2p_iroh/node.rs` | 2 | `IrohNode` aggregate — owns endpoint, iroh-blobs Router/Service, store. Public surface: `start`, `node_id`, `node_addr`, `add_bytes`, `fetch_blob_from`, `get_bytes`, `has`, `shutdown`. |
+| `elohim/elohim-storage/src/p2p_iroh/README.md` | 2 | Status, what works, graduation gates, cutover playbook. |
+| `elohim/elohim-storage/tests/iroh_blob_roundtrip.rs` | 2 | Two-node integration test: provider adds blob → fetcher pulls by hash + provider's `NodeAddr` → bytes match. |
+| `elohim/elohim-storage/tests/iroh_node_lifecycle.rs` | 2 | Single-node smoke test: build, listen, shutdown cleanly. |
 
-### Modified files
+### Phase 1 + 2 modified files
 
 | File | Change |
 |------|--------|
-| `elohim/elohim-storage/Cargo.toml` | Phase 0: `=` pins on holochain_client/_types. Phase 1: optional `iroh` dep; `p2p-iroh` feature. |
+| `elohim/elohim-storage/Cargo.toml` | Phase 1: add optional `iroh`, `iroh-blobs`, `iroh-gossip` (gossip pinned now, used in Phase 4); add `p2p-iroh` feature. |
 | `elohim/elohim-storage/justfile` | Add `build-iroh`, `test-iroh` recipes. |
-| `elohim/elohim-storage/src/lib.rs` | Mount `p2p_iroh` module behind `#[cfg(feature = "p2p-iroh")]`. |
-| `elohim/elohim-storage/src/config.rs` | `TransportBackend` enum (`Libp2p` | `Iroh`); `transport_backend` field on `Config`; loads from TOML/env (`ELOHIM_TRANSPORT_BACKEND`). |
+| `elohim/elohim-storage/src/lib.rs` | Mount `p2p_iroh` module behind `#[cfg(feature = "p2p-iroh")]`; expose `crate::p2p::wire` (or relocate wire types to `crate::wire`) so iroh-side custom-ALPN handlers can reuse them in Phase 5+. |
+| `elohim/elohim-storage/src/config.rs` | `TransportBackend` enum (`Libp2p` \| `Iroh`); `transport_backend` field on `Config`; loads from TOML/env (`ELOHIM_TRANSPORT_BACKEND`). |
 | `elohim/elohim-storage/src/main.rs` | Branch on `config.transport_backend` at boot: spawn either `P2PNode` or `IrohNode`. |
-| **(Phase 0 only)** various `*.rs` files in `elohim-storage` | Absorb holochain dev.5 → dev.22 API drift (e.g., `kitsune2_api::url::Url` → `kitsune2_api::Url`, removed `AdminRequest::GraftRecords`, etc.). Discovered during `cargo build`. |
 
-### Out of scope (Phase 1)
+### Out of scope (this plan)
 
-- Other libp2p protocols' migration (sync/shard/epr/trust/identity).
-- HTTP route surface graduation.
-- Genesis seeder rewrite.
-- `peer_blob_inventory` projection schema migration to BLAKE3.
+- Other libp2p protocols' migration — sketched in Phases 3–10 below as cutover roadmap; each phase gets its own executable plan when picked up.
+- HTTP route surface graduation (Phase 11 cutover only).
+- Genesis seeder rewrite (Phase 11 cutover only).
 - Self-hosted iroh-relay.
-- Cross-stack identity unification (separate iroh `EndpointId` and libp2p `PeerId`).
-- iroh-blobs adoption (deferred until n0 ships a 1.0-aligned release).
-
-Each runs its own design gate when graduated.
+- Cross-stack identity unification — Phase 10 introduces a mapping table during transition; full unification is post-cutover.
 
 ---
 
 ## Pre-flight: Read these before starting
 
 1. **`elohim/elohim-storage/CLAUDE.md`** — API boundary architecture; iroh module sits below it, no view-type changes.
-2. **`elohim/elohim-storage/src/p2p/blob_protocol.rs`** — current libp2p blob protocol; we reuse the wire format (`BlobFetchRequest`, `BlobFetchResponse`) on the iroh path. Read but do not modify.
-3. **`elohim/elohim-storage/src/blob_store.rs`** — current SHA256-keyed BlobStore; reference for `Blake3Store`'s on-disk layout pattern.
-4. **iroh docs at task time** — iroh 1.0.0-rc.0 was published 2026-05-07. Verify API signatures against `https://docs.rs/iroh/1.0.0-rc.0/iroh/` before each task that touches iroh API. The code in this plan reflects the README/docs as of plan-write; if a method has been renamed, follow the docs and update the plan.
+2. **`elohim/elohim-storage/src/p2p/blob_protocol.rs`** — current libp2p blob protocol; we will reuse the wire format on the iroh path in Phase 5+ (sync, shard, EPR), but Phase 2 uses iroh-blobs' native protocol instead. Read but do not modify.
+3. **`elohim/elohim-storage/src/blob_store.rs`** — current SHA256-keyed BlobStore; reference for the parallel-store-disjointness pattern.
+4. **iroh-blobs 0.98 docs at task time** — `https://docs.rs/iroh-blobs/0.98.0/`. Verify the `Store::add_bytes`, `Store::get_bytes`, and `iroh_blobs::net_protocol::Blobs` (or whatever the integration shape is at this version) before each task that touches iroh-blobs API. The code in this plan reflects 0.98 docs as of plan-write; if a method has been renamed at task time, follow the docs and update the plan.
 
 **Build incantation:**
 ```bash
@@ -118,139 +150,51 @@ Bare `cargo build` will fail without the `RUSTFLAGS='--cfg getrandom_backend="cu
 
 ---
 
-## Phase 0: Bump holochain stack to dev.22+
+## Phase 0: ELIMINATED
 
-Phase 0 is a single discovery-driven task. The holochain bump is necessary to unblock iroh's serde requirement; it is NOT optional. The cost is bounded but not pre-knowable — we know `AdminRequest::GraftRecords` was removed and `kitsune2_api::url::Url` was renamed; other API drift may surface during `cargo build`. Phase 0 is "make the bump compile and tests pass; commit; move to Phase 1."
+The original iteration of this plan required a holochain stack bump (`holochain_client 0.9.0-dev.5 → =0.9.0-dev.23`) to satisfy iroh 1.0-rc.0's serde 1.0.228 requirement. With iroh 0.96 pulled by iroh-blobs 0.98, that requirement disappears: the existing holochain_serialized_bytes 0.0.56 (transitive at dev.5) is fine.
 
-### Phase 0, Task A: Bump holochain stack
-
-**Files:**
-- Modify: `elohim/elohim-storage/Cargo.toml`
-- Modify: any `*.rs` files using removed/renamed holochain APIs (discovered during build)
-
-- [ ] **Step 1: Pin holochain to dev.22+**
-
-Edit `elohim/elohim-storage/Cargo.toml`. Find lines 48-49:
-
-```toml
-holochain_client = { version = "0.9.0-dev.5", default-features = false, features = ["lair_signing"] }
-holochain_types = { version = "0.7.0-dev.5", default-features = false }
-```
-
-Change to:
-
-```toml
-# Pinned to dev.23/dev.22 to align with serde 1.0.228 (required by iroh 1.0).
-# holochain_serialized_bytes 0.0.57 (transitive via holochain_types 0.7.0-dev.22)
-# bumps the pin from serde =1.0.219 to =1.0.228.
-holochain_client = { version = "=0.9.0-dev.23", default-features = false, features = ["lair_signing"] }
-holochain_types = { version = "=0.7.0-dev.22", default-features = false }
-```
-
-- [ ] **Step 2: Try to build**
-
-```bash
-cd /projects/elohim/.claude/worktrees/iroh-parallel-stack/elohim/elohim-storage
-just build
-```
-
-Expect compilation errors. Capture them:
-```bash
-just build 2>&1 | tee /tmp/holochain-bump-errors.txt
-```
-
-- [ ] **Step 3: Fix the API drift**
-
-Common issues likely to appear (verified from earlier probe):
-
-| Issue | Likely fix |
-|-------|------------|
-| `error[E0599]: no variant named 'GraftRecords' found for enum 'AdminRequest'` | Remove or replace usage. `GraftRecords` was a debug surface; the production path likely uses `RegisterDna` + `AddDhtOps` or similar. Check `holochain_client 0.9.0-dev.23` docs; find the equivalent. |
-| `error[E0308]: mismatched types ... expected 'kitsune2_api::url::Url', found 'kitsune2_api::Url'` | Update the import: `use kitsune2_api::url::Url` → `use kitsune2_api::Url`. Both names referenced the same type; the namespacing changed. |
-| `error[E0432]: unresolved import 'holochain_client::AdminWebsocket'` (or similar) | The module path may have changed. `cargo doc --open` on holochain_client 0.9.0-dev.23 shows the current surface. |
-
-For each error: read the error line, find the calling file, look up the new API in `holochain_client 0.9.0-dev.23` docs (`https://docs.rs/holochain_client/0.9.0-dev.23`), update the call site. Do NOT introduce stubs or `todo!()` — every replacement must be a real fix.
-
-If you encounter a removed feature with no clear replacement (rare), leave a clear `// TODO(holochain-bump): GraftRecords removed in dev.X; replacement is ...` comment, only if you've confirmed via docs no equivalent exists.
-
-- [ ] **Step 4: Iterate until clean build**
-
-Run `just build` after each batch of fixes. Stop iterating only when the build is green.
-
-- [ ] **Step 5: Run tests; absorb test-only API drift**
-
-```bash
-just test
-```
-
-Tests may also use removed APIs. Same fix process: read error, find call site, update. Pre-push hook also runs `just gate` (fmt + clippy + test); make sure clippy is clean too.
-
-- [ ] **Step 6: Commit**
-
-Commit Phase 0 as a separate, focused commit before any Phase 1 work:
-
-```bash
-git add elohim/elohim-storage/Cargo.toml elohim/elohim-storage/Cargo.lock <any-rs-files-modified>
-git commit -m "chore(storage): bump holochain to dev.23/dev.22 (unblocks iroh serde)
-
-Required to land Phase 1 of the iroh parallel stack. holochain_client and
-holochain_types pinned exactly to prevent unintended further drift. Absorbed
-API drift: <list the things you fixed>.
-
-See genesis/docs/superpowers/plans/2026-05-07-iroh-parallel-stack.md
-"
-```
-
-- [ ] **Step 7: Verify**
-
-```bash
-just gate    # fmt + clippy + test
-```
-Expected: all green.
-
-If you hit unexpected scope (the API drift turns out to be larger than 1-3 days of work), STOP and report BLOCKED. Do not continue into Phase 1 with a half-bumped holochain. The cost of an incomplete bump is much higher than the cost of pausing.
+The holochain bump is still worth doing on its own merits at some point — but it's no longer a precondition for iroh adoption, and doing it as part of an iroh sprint coupled two unrelated risks. We track it as a separate concern.
 
 ---
 
-## Phase 1: iroh parallel module
+## Phase 1: Foundation
 
-The 11 tasks below land on top of the Phase 0 commit. Each task is bite-sized TDD: write failing test → run failing → implement → run passing → commit.
+Phase 1 stands up the iroh module skeleton without touching any actual P2P logic. After Phase 1, `cargo build --features "p2p p2p-iroh"` succeeds and a no-op `IrohNode` can be constructed and shut down.
 
-## Task 1: Add iroh dependency and feature flag
+### Task 1.1: Add iroh + iroh-blobs + iroh-gossip dependencies and feature flag
 
 **Files:**
 - Modify: `elohim/elohim-storage/Cargo.toml`
 - Modify: `elohim/elohim-storage/justfile`
 
-- [ ] **Step 1: Add the iroh dependency**
+- [ ] **Step 1: Add the iroh dependencies**
 
-Edit `elohim/elohim-storage/Cargo.toml`. After the libp2p block (around line 171), before the `futures` dep (around line 174), add:
+Edit `elohim/elohim-storage/Cargo.toml`. After the libp2p block, before the `futures` dep, add:
 
 ```toml
-# iroh — QUIC-based P2P transport (parallel stack, Phase 1, standalone).
-# Pinned to 1.0.0-rc.0 published 2026-05-07; bump explicitly when 1.0 stable
-# ships and we're ready to absorb API changes. iroh-blobs is intentionally
-# NOT a dep here — see plan version-pinning rationale.
-iroh = { version = "=1.0.0-rc.0", optional = true }
+# iroh — QUIC-based P2P transport (parallel stack; staged cutover from libp2p).
+# Pinned to iroh-blobs 0.98 + iroh-gossip 0.96, which both pull iroh 0.96.
+# This pin coexists with current holochain dev.5 — see plan version-pinning rationale.
+# The iroh dep is pulled transitively; declare it explicitly so re-exports are stable.
+iroh = { version = "=0.96", optional = true }
+iroh-blobs = { version = "=0.98", optional = true }
+iroh-gossip = { version = "=0.96", optional = true, features = ["net"] }
 ```
 
 - [ ] **Step 2: Add p2p-iroh feature**
-
-In `[features]` (around line 179):
 
 ```toml
 [features]
 default = ["p2p"]
 compression = ["lz4_flex"]
 p2p = ["libp2p", "futures"]
-p2p-iroh = ["iroh", "futures"]
+p2p-iroh = ["iroh", "iroh-blobs", "iroh-gossip", "futures"]
 ```
 
 `p2p-iroh` is **not** in `default`. Both features are additive (the parity test harness uses both compiled in).
 
 - [ ] **Step 3: Add justfile recipes**
-
-Edit `elohim/elohim-storage/justfile`. After the existing `build` and `test` recipes:
 
 ```makefile
 # Build with iroh parallel stack enabled (libp2p still default)
@@ -268,20 +212,18 @@ test-iroh:
 cd /projects/elohim/.claude/worktrees/iroh-parallel-stack/elohim/elohim-storage
 just build-iroh
 ```
-Expected: builds successfully (downloads iroh + transitives from crates.io). First compile is slow — allow up to 10 minutes.
+Expected: builds successfully (downloads iroh + iroh-blobs + iroh-gossip + transitives). First compile is slow — allow up to 10 minutes.
 
-If resolution fails, the Phase 0 holochain bump probably didn't land. Verify HEAD includes the holochain bump commit before continuing.
+If resolution fails: STOP. Do not change versions. The probe at plan-write proved this combo resolves; if it doesn't at task time, something in the workspace shifted. Surface BLOCKED, do NOT pick a different iroh-blobs version to "make it build" (per `feedback_subagent_dep_conflict_supervision.md`).
 
 - [ ] **Step 5: Commit**
 
 ```bash
 git add elohim/elohim-storage/Cargo.toml elohim/elohim-storage/justfile
-git commit -m "feat(storage): add p2p-iroh feature flag (deps only, no code yet)"
+git commit -m "feat(storage): add p2p-iroh feature + iroh-blobs/gossip deps (no code yet)"
 ```
 
----
-
-## Task 2: Scaffold p2p_iroh module
+### Task 1.2: Scaffold p2p_iroh module + relocate shared wire types
 
 **Files:**
 - Create: `elohim/elohim-storage/src/p2p_iroh/mod.rs`
@@ -289,72 +231,64 @@ git commit -m "feat(storage): add p2p-iroh feature flag (deps only, no code yet)
 
 - [ ] **Step 1: Create module root**
 
-Create `elohim/elohim-storage/src/p2p_iroh/mod.rs`:
-
 ```rust
-//! Parallel iroh-based P2P stack (Phase 1 — blob plane only, iroh-standalone).
+//! Parallel iroh-based P2P stack — staged cutover from libp2p.
 //!
-//! Sibling to [`crate::p2p`]; gated by the `p2p-iroh` Cargo feature. In iroh
-//! mode the blob store is a minimal BLAKE3-keyed filesystem store at
-//! `<storage_dir>/blobs_iroh/`, parallel to the SHA256-keyed
-//! [`crate::blob_store::BlobStore`]. The two stacks are mutually exclusive at
-//! runtime — selected by [`crate::config::TransportBackend`] at startup —
-//! but compile additively so the parity test harness can exercise them in
-//! one binary.
+//! Sibling to [`crate::p2p`]; gated by the `p2p-iroh` Cargo feature. The two
+//! stacks are mutually exclusive at runtime — selected by
+//! [`crate::config::TransportBackend`] at startup — but compile additively so
+//! the parity test harness can exercise them in one binary.
 //!
-//! Phase 1 deliberately does NOT use iroh-blobs; see
-//! `genesis/docs/superpowers/plans/2026-05-07-iroh-parallel-stack.md`.
+//! Phase 2 (current): blob plane via iroh-blobs.
+//! Phases 3+: gossip, sync, shard, EPR, view federation, identity, discovery.
+//! See genesis/docs/superpowers/plans/2026-05-07-iroh-parallel-stack.md.
 
 // Submodules added in subsequent tasks.
 ```
 
 - [ ] **Step 2: Mount in lib.rs**
 
-Edit `elohim/elohim-storage/src/lib.rs`. After the existing `#[cfg(feature = "p2p")] pub mod p2p;` block, add:
-
 ```rust
 #[cfg(feature = "p2p-iroh")]
 pub mod p2p_iroh;
 ```
 
-- [ ] **Step 3: Verify build**
+- [ ] **Step 3: Expose shared wire types**
+
+Phase 5+ custom-ALPN handlers will reuse the existing libp2p-side wire types (`BlobFetchRequest`/`BlobFetchResponse`/`SyncRequest`/etc.). To avoid creating a parallel set, expose `crate::p2p::wire` publicly (or relocate the type definitions to a top-level `crate::wire` module if they're scattered across protocol files).
+
+For Phase 1 the minimum is to confirm the wire types are accessible from outside `crate::p2p`. If they're currently buried in `crate::p2p::blob_protocol::BlobFetchRequest` (private to `p2p`), promote them now — it's cheap to do at module-scaffold time, expensive once Phase 5 imports them.
+
+Decision deferred to Task 1.2 inspection: if the wire types are already `pub`, leave them. If not, relocate. Document the choice in the commit message.
+
+- [ ] **Step 4: Verify build**
 
 ```bash
 just build-iroh
 ```
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 5: Commit**
 
 ```bash
-git add elohim/elohim-storage/src/p2p_iroh/mod.rs elohim/elohim-storage/src/lib.rs
+git add elohim/elohim-storage/src/p2p_iroh/mod.rs elohim/elohim-storage/src/lib.rs <any-relocated-files>
 git commit -m "feat(storage): scaffold p2p_iroh module behind p2p-iroh feature"
 ```
 
----
-
-## Task 3: IrohConfig struct
+### Task 1.3: IrohConfig struct
 
 **Files:**
 - Create: `elohim/elohim-storage/src/p2p_iroh/config.rs`
 - Modify: `elohim/elohim-storage/src/p2p_iroh/mod.rs`
-
-- [ ] **Step 1: Write the failing test**
-
-Create `elohim/elohim-storage/src/p2p_iroh/config.rs`:
 
 ```rust
 //! Iroh-side P2P configuration.
 
 use std::path::PathBuf;
 
-/// ALPN identifier for our custom blob fetch protocol on QUIC.
-/// Distinct from any iroh-blobs ALPN — we are not using iroh-blobs in Phase 1.
-pub const BLOB_ALPN: &[u8] = b"/elohim/blob/1.0.0";
-
 /// Configuration for the iroh-based P2P node.
 #[derive(Debug, Clone)]
 pub struct IrohConfig {
-    /// Directory holding the BLAKE3-keyed blob files.
+    /// Directory holding the iroh-blobs store.
     /// Defaults to `<storage_dir>/blobs_iroh/` to keep disjoint from the
     /// SHA256-keyed legacy `<storage_dir>/blobs/`.
     pub blobs_dir: PathBuf,
@@ -362,1389 +296,367 @@ pub struct IrohConfig {
     /// Path to the persisted iroh secret key. Generated on first run.
     pub secret_key_path: PathBuf,
 
-    /// Whether to use n0's hosted relay infrastructure. `true` matches
-    /// `RelayMode::Default`; `false` matches `RelayMode::Disabled` (only
-    /// useful when both sides have routable addresses, e.g. household LAN
-    /// or loopback in tests).
+    /// Whether to use n0's hosted relay infrastructure.
     pub use_n0_relays: bool,
-
-    /// ALPN identifiers this endpoint will accept. Phase 1 only registers
-    /// BLOB_ALPN; later phases extend as protocols graduate from libp2p.
-    pub alpns: Vec<Vec<u8>>,
 }
 
 impl IrohConfig {
-    /// Construct a default config rooted at `storage_dir`.
     pub fn from_storage_dir(storage_dir: &std::path::Path) -> Self {
         Self {
             blobs_dir: storage_dir.join("blobs_iroh"),
             secret_key_path: storage_dir.join("iroh.key"),
             use_n0_relays: true,
-            alpns: vec![BLOB_ALPN.to_vec()],
         }
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::path::Path;
-
-    #[test]
-    fn from_storage_dir_uses_disjoint_blob_dir() {
-        let cfg = IrohConfig::from_storage_dir(Path::new("/var/elohim"));
-        assert_eq!(cfg.blobs_dir, Path::new("/var/elohim/blobs_iroh"));
-        assert_eq!(cfg.secret_key_path, Path::new("/var/elohim/iroh.key"));
-        assert!(cfg.use_n0_relays);
-        assert_eq!(cfg.alpns.len(), 1);
-        assert_eq!(cfg.alpns[0], BLOB_ALPN);
-    }
-
-    #[test]
-    fn alpns_does_not_collide_with_legacy_blob_dir() {
-        let cfg = IrohConfig::from_storage_dir(Path::new("/x"));
-        assert_ne!(cfg.blobs_dir.file_name().unwrap(), "blobs");
-    }
-
-    #[test]
-    fn blob_alpn_is_canonical() {
-        assert_eq!(BLOB_ALPN, b"/elohim/blob/1.0.0");
-    }
-}
 ```
 
-- [ ] **Step 2: Mount in mod.rs**
+Tests: `from_storage_dir_uses_disjoint_blob_dir`, `secret_key_path_distinct_from_libp2p`.
 
-```rust
-mod config;
+Commit: `feat(storage): IrohConfig with disjoint blobs_iroh dir`
 
-pub use config::{BLOB_ALPN, IrohConfig};
-```
-
-- [ ] **Step 3: Run tests**
-
-```bash
-just test-iroh -- p2p_iroh::config
-```
-Expected: 3 tests pass.
-
-- [ ] **Step 4: Commit**
-
-```bash
-git add elohim/elohim-storage/src/p2p_iroh/
-git commit -m "feat(storage): IrohConfig with disjoint blobs_iroh dir + BLOB_ALPN"
-```
-
----
-
-## Task 4: Persisted iroh secret key
+### Task 1.4: Persisted iroh secret key
 
 **Files:**
 - Create: `elohim/elohim-storage/src/p2p_iroh/identity.rs`
 - Modify: `elohim/elohim-storage/src/p2p_iroh/mod.rs`
 
-- [ ] **Step 1: Write the failing test**
+`load_or_generate(path) -> io::Result<iroh::SecretKey>`: read 32 raw bytes if file exists, else generate via `SecretKey::generate(&mut OsRng)` and persist with mode 0600.
 
-Create `elohim/elohim-storage/src/p2p_iroh/identity.rs`:
+**API drift to verify against iroh 0.96 docs at task time:** `SecretKey::from_bytes` signature, `SecretKey::generate` signature, key serialization (`to_bytes()` returns `[u8; 32]` historically).
 
-```rust
-//! Persisted iroh secret key. Load if present, generate-and-write if not.
-//!
-//! Stored as 32 raw bytes (the ed25519 secret) at the configured path.
-//! Distinct from any libp2p keypair file; the two stacks have separate
-//! identities in Phase 1.
+Tests: `generates_when_missing`, `round_trips_existing_key`, `rejects_wrong_length_file`.
 
-use std::path::Path;
-use std::{fs, io};
+Commit: `feat(storage): persist iroh SecretKey at <storage_dir>/iroh.key`
 
-use iroh::SecretKey;
-
-/// Load a secret key from `path`, or generate a fresh one and persist it
-/// if the file does not exist.
-pub fn load_or_generate(path: &Path) -> io::Result<SecretKey> {
-    match fs::read(path) {
-        Ok(bytes) => {
-            let arr: [u8; 32] = bytes.as_slice().try_into().map_err(|_| {
-                io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    format!(
-                        "iroh key file {} has wrong length: expected 32, got {}",
-                        path.display(),
-                        bytes.len()
-                    ),
-                )
-            })?;
-            Ok(SecretKey::from_bytes(&arr))
-        }
-        Err(e) if e.kind() == io::ErrorKind::NotFound => {
-            let key = SecretKey::generate(&mut rand::rngs::OsRng);
-            if let Some(parent) = path.parent() {
-                fs::create_dir_all(parent)?;
-            }
-            fs::write(path, key.to_bytes())?;
-            #[cfg(unix)]
-            {
-                use std::os::unix::fs::PermissionsExt;
-                let _ = fs::set_permissions(path, fs::Permissions::from_mode(0o600));
-            }
-            Ok(key)
-        }
-        Err(e) => Err(e),
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use tempfile::tempdir;
-
-    #[test]
-    fn generates_when_missing() {
-        let dir = tempdir().unwrap();
-        let path = dir.path().join("iroh.key");
-        let key = load_or_generate(&path).unwrap();
-        assert!(path.exists());
-        assert_eq!(fs::read(&path).unwrap().len(), 32);
-        let _ = key.public();
-    }
-
-    #[test]
-    fn round_trips_existing_key() {
-        let dir = tempdir().unwrap();
-        let path = dir.path().join("iroh.key");
-        let k1 = load_or_generate(&path).unwrap();
-        let k2 = load_or_generate(&path).unwrap();
-        assert_eq!(k1.to_bytes(), k2.to_bytes());
-    }
-
-    #[test]
-    fn rejects_wrong_length_file() {
-        let dir = tempdir().unwrap();
-        let path = dir.path().join("iroh.key");
-        fs::write(&path, b"too short").unwrap();
-        let err = load_or_generate(&path).unwrap_err();
-        assert_eq!(err.kind(), io::ErrorKind::InvalidData);
-    }
-}
-```
-
-- [ ] **Step 2: Add `rand` dep**
-
-Verify whether `rand` is already a transitive: `cargo tree --features "p2p p2p-iroh" -e normal | grep '^rand '`. If not direct, add to `Cargo.toml`:
-
-```toml
-rand = { version = "0.8", optional = true }
-```
-
-And update the feature:
-```toml
-p2p-iroh = ["iroh", "futures", "rand"]
-```
-
-If iroh 1.0.0-rc.0 has migrated to `rand` 0.9, match that version. Verify with `cargo tree`.
-
-- [ ] **Step 3: Mount in mod.rs**
-
-```rust
-mod config;
-mod identity;
-
-pub use config::{BLOB_ALPN, IrohConfig};
-pub use identity::load_or_generate as load_or_generate_secret_key;
-```
-
-- [ ] **Step 4: Run tests**
-
-```bash
-just test-iroh -- p2p_iroh::identity
-```
-Expected: 3 tests pass.
-
-If `SecretKey::from_bytes` has a different signature in 1.0.0-rc.0 (e.g., returns `Result`), follow the docs and adjust.
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add elohim/elohim-storage/Cargo.toml elohim/elohim-storage/src/p2p_iroh/
-git commit -m "feat(storage): persist iroh SecretKey at <storage_dir>/iroh.key"
-```
-
----
-
-## Task 5: Build the iroh Endpoint
+### Task 1.5: Build the iroh Endpoint
 
 **Files:**
 - Create: `elohim/elohim-storage/src/p2p_iroh/endpoint.rs`
-- Modify: `elohim/elohim-storage/src/p2p_iroh/mod.rs`
-
-- [ ] **Step 1: Write the failing test**
-
-Create `elohim/elohim-storage/src/p2p_iroh/endpoint.rs`:
 
 ```rust
-//! Iroh `Endpoint` construction. ALPN registration happens here; protocol
-//! handlers are registered separately on the `Router`.
-
-use anyhow::Result;
-use iroh::Endpoint;
-
-use super::{config::IrohConfig, identity};
-
-/// Build an iroh `Endpoint` from config. Caller is responsible for shutting
-/// it down on graceful exit.
-pub async fn build_endpoint(config: &IrohConfig) -> Result<Endpoint> {
+pub async fn build_endpoint(config: &IrohConfig) -> Result<iroh::Endpoint> {
     let secret = identity::load_or_generate(&config.secret_key_path)?;
-
     let relay_mode = if config.use_n0_relays {
         iroh::RelayMode::Default
     } else {
         iroh::RelayMode::Disabled
     };
-
-    let endpoint = Endpoint::builder()
+    Endpoint::builder()
         .secret_key(secret)
-        .alpns(config.alpns.clone())
         .relay_mode(relay_mode)
         .bind()
-        .await?;
-
-    Ok(endpoint)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use tempfile::tempdir;
-    use crate::p2p_iroh::config::BLOB_ALPN;
-
-    #[tokio::test]
-    async fn builds_endpoint_with_relays_disabled() {
-        let dir = tempdir().unwrap();
-        let cfg = IrohConfig {
-            blobs_dir: dir.path().join("blobs_iroh"),
-            secret_key_path: dir.path().join("iroh.key"),
-            use_n0_relays: false,
-            alpns: vec![BLOB_ALPN.to_vec()],
-        };
-
-        let ep = build_endpoint(&cfg).await.expect("endpoint builds");
-        let _id = ep.node_id();
-        ep.close().await;
-    }
-}
-```
-
-- [ ] **Step 2: Mount in mod.rs**
-
-```rust
-mod config;
-mod endpoint;
-mod identity;
-
-pub use config::{BLOB_ALPN, IrohConfig};
-pub use endpoint::build_endpoint;
-pub use identity::load_or_generate as load_or_generate_secret_key;
-```
-
-- [ ] **Step 3: Run test**
-
-```bash
-just test-iroh -- p2p_iroh::endpoint
-```
-Expected: 1 test passes.
-
-**API drift to verify:** `Endpoint::builder()` may require a preset arg in 1.0.0-rc.0 (e.g., `Endpoint::builder(presets::N0)`). Check `https://docs.rs/iroh/1.0.0-rc.0/iroh/struct.Endpoint.html`. Also verify `node_id()` vs renamed `endpoint_id()`. Update both production code and test once confirmed.
-
-- [ ] **Step 4: Commit**
-
-```bash
-git add elohim/elohim-storage/src/p2p_iroh/
-git commit -m "feat(storage): build_endpoint constructs iroh Endpoint with custom ALPN"
-```
-
----
-
-## Task 6: Blake3Store — minimal BLAKE3-keyed file store
-
-**Files:**
-- Create: `elohim/elohim-storage/src/p2p_iroh/blake3_store.rs`
-- Modify: `elohim/elohim-storage/src/p2p_iroh/mod.rs`
-
-- [ ] **Step 1: Write the failing test**
-
-Create `elohim/elohim-storage/src/p2p_iroh/blake3_store.rs`:
-
-```rust
-//! Minimal BLAKE3-keyed filesystem blob store.
-//!
-//! On the iroh path, blobs are content-addressed with BLAKE3 (not SHA256).
-//! Storage layout: `<root>/<first-2-hex>/<remaining-62-hex>`. No SQL, no
-//! redb — just files. Mirrors the layout pattern from
-//! [`crate::blob_store::BlobStore`] but with BLAKE3.
-
-use std::path::{Path, PathBuf};
-use std::{fs, io};
-
-/// 32-byte BLAKE3 fingerprint, displayed as 64 lowercase hex chars.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct Hash(pub [u8; 32]);
-
-impl Hash {
-    pub fn to_hex(&self) -> String {
-        hex::encode(self.0)
-    }
-
-    pub fn from_hex(s: &str) -> io::Result<Self> {
-        let bytes = hex::decode(s)
-            .map_err(|e| io::Error::new(io::ErrorKind::InvalidInput, e))?;
-        let arr: [u8; 32] = bytes.as_slice().try_into().map_err(|_| {
-            io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!("expected 32-byte hash, got {} bytes", bytes.len()),
-            )
-        })?;
-        Ok(Self(arr))
-    }
-}
-
-/// BLAKE3-keyed filesystem store.
-pub struct Blake3Store {
-    root: PathBuf,
-}
-
-impl Blake3Store {
-    pub fn open(root: &Path) -> io::Result<Self> {
-        fs::create_dir_all(root)?;
-        Ok(Self { root: root.to_path_buf() })
-    }
-
-    /// Hash and persist `bytes`. Idempotent.
-    pub fn add_bytes(&self, bytes: &[u8]) -> io::Result<Hash> {
-        let hash = Hash(blake3::hash(bytes).into());
-        let path = self.path_for(&hash);
-        if path.exists() {
-            return Ok(hash);
-        }
-        if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent)?;
-        }
-        // Write to a temp file in the same dir, then atomic-rename.
-        let tmp = path.with_extension("tmp");
-        fs::write(&tmp, bytes)?;
-        fs::rename(&tmp, &path)?;
-        Ok(hash)
-    }
-
-    pub fn get_bytes(&self, hash: Hash) -> io::Result<Vec<u8>> {
-        fs::read(self.path_for(&hash))
-    }
-
-    pub fn has(&self, hash: Hash) -> bool {
-        self.path_for(&hash).exists()
-    }
-
-    fn path_for(&self, hash: &Hash) -> PathBuf {
-        let hex = hash.to_hex();
-        let (prefix, rest) = hex.split_at(2);
-        self.root.join(prefix).join(rest)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use tempfile::tempdir;
-
-    #[test]
-    fn add_then_get_round_trips() {
-        let dir = tempdir().unwrap();
-        let store = Blake3Store::open(dir.path()).unwrap();
-        let h = store.add_bytes(b"hello iroh").unwrap();
-        let back = store.get_bytes(h).unwrap();
-        assert_eq!(back, b"hello iroh");
-    }
-
-    #[test]
-    fn add_is_idempotent() {
-        let dir = tempdir().unwrap();
-        let store = Blake3Store::open(dir.path()).unwrap();
-        let h1 = store.add_bytes(b"same").unwrap();
-        let h2 = store.add_bytes(b"same").unwrap();
-        assert_eq!(h1, h2);
-    }
-
-    #[test]
-    fn has_reports_correctly() {
-        let dir = tempdir().unwrap();
-        let store = Blake3Store::open(dir.path()).unwrap();
-        let h = store.add_bytes(b"present").unwrap();
-        assert!(store.has(h));
-        let absent = Hash([0u8; 32]);
-        assert!(!store.has(absent));
-    }
-
-    #[test]
-    fn hash_hex_round_trips() {
-        let h = Hash([0xab; 32]);
-        let s = h.to_hex();
-        assert_eq!(s.len(), 64);
-        let back = Hash::from_hex(&s).unwrap();
-        assert_eq!(back, h);
-    }
-
-    #[test]
-    fn path_layout_is_two_char_prefix() {
-        let dir = tempdir().unwrap();
-        let store = Blake3Store::open(dir.path()).unwrap();
-        let h = store.add_bytes(b"test").unwrap();
-        let hex = h.to_hex();
-        let expected = dir.path().join(&hex[..2]).join(&hex[2..]);
-        assert!(expected.exists());
-    }
-}
-```
-
-- [ ] **Step 2: Mount in mod.rs**
-
-```rust
-mod blake3_store;
-mod config;
-mod endpoint;
-mod identity;
-
-pub use blake3_store::{Blake3Store, Hash};
-pub use config::{BLOB_ALPN, IrohConfig};
-pub use endpoint::build_endpoint;
-pub use identity::load_or_generate as load_or_generate_secret_key;
-```
-
-- [ ] **Step 3: Run tests**
-
-```bash
-just test-iroh -- p2p_iroh::blake3_store
-```
-Expected: 5 tests pass.
-
-- [ ] **Step 4: Commit**
-
-```bash
-git add elohim/elohim-storage/src/p2p_iroh/
-git commit -m "feat(storage): Blake3Store — BLAKE3-keyed filesystem blob store"
-```
-
----
-
-## Task 7: Blob protocol primitives + handler
-
-**Files:**
-- Create: `elohim/elohim-storage/src/p2p_iroh/blob_protocol.rs`
-- Create: `elohim/elohim-storage/src/p2p_iroh/blob_handler.rs`
-- Modify: `elohim/elohim-storage/src/p2p_iroh/mod.rs`
-
-- [ ] **Step 1: Write blob_protocol.rs**
-
-Create `elohim/elohim-storage/src/p2p_iroh/blob_protocol.rs`:
-
-```rust
-//! Wire format for the custom blob protocol on iroh QUIC streams.
-//!
-//! Length-prefixed (4-byte big-endian u32) MessagePack frames carrying
-//! [`BlobFetchRequest`] / [`BlobFetchResponse`]. Same wire shape as the
-//! libp2p `request_response` codec in [`crate::p2p::blob_protocol`], just
-//! moved off libp2p's codec trait onto raw QUIC `tokio::io` streams.
-
-use serde::{Deserialize, Serialize};
-use std::io;
-use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
-
-pub const MAX_REQUEST_SIZE: usize = 4 * 1024;
-pub const DEFAULT_MAX_RESPONSE_SIZE: usize = 16 * 1024 * 1024;
-pub const HARD_MAX_RESPONSE_SIZE: usize = 64 * 1024 * 1024;
-
-/// Request: peer asks for a blob by 64-char BLAKE3 hex.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct BlobFetchRequest {
-    pub blake3_hex: String,
-}
-
-/// Response from the targeted peer.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum BlobFetchResponse {
-    Found(Vec<u8>),
-    NotFound,
-    Error(String),
-}
-
-pub async fn write_request<W: AsyncWrite + Unpin>(
-    w: &mut W,
-    req: &BlobFetchRequest,
-) -> io::Result<()> {
-    let data = rmp_serde::to_vec(req)
-        .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
-    let len: u32 = data.len().try_into().map_err(|_| {
-        io::Error::new(io::ErrorKind::InvalidData, "request too large for u32 length prefix")
-    })?;
-    w.write_all(&len.to_be_bytes()).await?;
-    w.write_all(&data).await?;
-    w.flush().await
-}
-
-pub async fn read_request<R: AsyncRead + Unpin>(r: &mut R) -> io::Result<BlobFetchRequest> {
-    let mut len_buf = [0u8; 4];
-    r.read_exact(&mut len_buf).await?;
-    let len = u32::from_be_bytes(len_buf) as usize;
-    if len > MAX_REQUEST_SIZE {
-        return Err(io::Error::new(
-            io::ErrorKind::InvalidData,
-            format!("request too large: {} > {}", len, MAX_REQUEST_SIZE),
-        ));
-    }
-    let mut buf = vec![0u8; len];
-    r.read_exact(&mut buf).await?;
-    rmp_serde::from_slice(&buf).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))
-}
-
-pub async fn write_response<W: AsyncWrite + Unpin>(
-    w: &mut W,
-    resp: &BlobFetchResponse,
-) -> io::Result<()> {
-    let data = rmp_serde::to_vec(resp)
-        .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
-    let len: u32 = data.len().try_into().map_err(|_| {
-        io::Error::new(io::ErrorKind::InvalidData, "response too large for u32 length prefix")
-    })?;
-    w.write_all(&len.to_be_bytes()).await?;
-    w.write_all(&data).await?;
-    w.flush().await
-}
-
-pub async fn read_response<R: AsyncRead + Unpin>(
-    r: &mut R,
-    max_response_size: usize,
-) -> io::Result<BlobFetchResponse> {
-    let cap = max_response_size.min(HARD_MAX_RESPONSE_SIZE);
-    let mut len_buf = [0u8; 4];
-    r.read_exact(&mut len_buf).await?;
-    let len = u32::from_be_bytes(len_buf) as usize;
-    if len > cap {
-        return Err(io::Error::new(
-            io::ErrorKind::InvalidData,
-            format!("response too large: {} > {}", len, cap),
-        ));
-    }
-    let mut buf = vec![0u8; len];
-    r.read_exact(&mut buf).await?;
-    rmp_serde::from_slice(&buf).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use tokio::io::{duplex, AsyncWriteExt};
-
-    #[tokio::test]
-    async fn request_round_trips_through_stream() {
-        let (mut a, mut b) = duplex(8192);
-        let req = BlobFetchRequest { blake3_hex: "ab".repeat(32) };
-        let req_clone = req.clone();
-        let writer = tokio::spawn(async move {
-            write_request(&mut a, &req_clone).await.unwrap();
-            a.shutdown().await.unwrap();
-        });
-        let got = read_request(&mut b).await.unwrap();
-        writer.await.unwrap();
-        assert_eq!(got, req);
-    }
-
-    #[tokio::test]
-    async fn response_found_round_trips() {
-        let (mut a, mut b) = duplex(2 * 1024 * 1024);
-        let payload = vec![0x42_u8; 1_000_000];
-        let resp = BlobFetchResponse::Found(payload.clone());
-        let writer = tokio::spawn(async move {
-            write_response(&mut a, &resp).await.unwrap();
-            a.shutdown().await.unwrap();
-        });
-        let got = read_response(&mut b, DEFAULT_MAX_RESPONSE_SIZE).await.unwrap();
-        writer.await.unwrap();
-        match got {
-            BlobFetchResponse::Found(b) => assert_eq!(b, payload),
-            other => panic!("expected Found, got {other:?}"),
-        }
-    }
-
-    #[tokio::test]
-    async fn read_response_rejects_oversized_frame() {
-        let (mut a, mut b) = duplex(32);
-        // Write a length prefix claiming 100 MiB (above hard cap).
-        let len: u32 = (HARD_MAX_RESPONSE_SIZE as u32) + 1;
-        a.write_all(&len.to_be_bytes()).await.unwrap();
-        a.shutdown().await.unwrap();
-        let err = read_response(&mut b, DEFAULT_MAX_RESPONSE_SIZE).await.unwrap_err();
-        assert_eq!(err.kind(), io::ErrorKind::InvalidData);
-    }
-}
-```
-
-- [ ] **Step 2: Write blob_handler.rs**
-
-Create `elohim/elohim-storage/src/p2p_iroh/blob_handler.rs`:
-
-```rust
-//! Inbound blob protocol handler. Implements `iroh::protocol::ProtocolHandler`
-//! to accept incoming connections on BLOB_ALPN, parse fetch requests, and
-//! serve from the BLAKE3 store.
-
-use std::sync::Arc;
-
-use iroh::endpoint::Connection;
-use iroh::protocol::{AcceptError, ProtocolHandler};
-
-use super::blake3_store::{Blake3Store, Hash};
-use super::blob_protocol::{
-    read_request, write_response, BlobFetchResponse, MAX_REQUEST_SIZE,
-};
-
-#[derive(Debug, Clone)]
-pub struct BlobProtocolHandler {
-    store: Arc<Blake3Store>,
-}
-
-impl BlobProtocolHandler {
-    pub fn new(store: Arc<Blake3Store>) -> Self {
-        Self { store }
-    }
-}
-
-impl ProtocolHandler for BlobProtocolHandler {
-    async fn accept(&self, connection: Connection) -> Result<(), AcceptError> {
-        loop {
-            let (mut send, mut recv) = match connection.accept_bi().await {
-                Ok(streams) => streams,
-                Err(_) => return Ok(()), // Peer closed; clean exit.
-            };
-
-            // Limit reads on the request side to MAX_REQUEST_SIZE worth of bytes.
-            let req = match read_request(&mut recv).await {
-                Ok(r) => r,
-                Err(e) => {
-                    let _ = write_response(
-                        &mut send,
-                        &BlobFetchResponse::Error(format!("bad request: {e}")),
-                    )
-                    .await;
-                    let _ = send.finish();
-                    continue;
-                }
-            };
-
-            let resp = match Hash::from_hex(&req.blake3_hex) {
-                Err(e) => BlobFetchResponse::Error(format!("invalid hash: {e}")),
-                Ok(h) => match self.store.get_bytes(h) {
-                    Ok(bytes) => BlobFetchResponse::Found(bytes),
-                    Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-                        BlobFetchResponse::NotFound
-                    }
-                    Err(e) => BlobFetchResponse::Error(format!("store error: {e}")),
-                },
-            };
-
-            let _ = write_response(&mut send, &resp).await;
-            let _ = send.finish();
-
-            // Suppress unused-import warning when MAX_REQUEST_SIZE is only
-            // used in blob_protocol's read path; touch it here for symmetry.
-            let _ = MAX_REQUEST_SIZE;
-        }
-    }
-}
-```
-
-- [ ] **Step 3: Mount in mod.rs**
-
-```rust
-mod blake3_store;
-mod blob_handler;
-mod blob_protocol;
-mod config;
-mod endpoint;
-mod identity;
-
-pub use blake3_store::{Blake3Store, Hash};
-pub use blob_handler::BlobProtocolHandler;
-pub use blob_protocol::{BlobFetchRequest, BlobFetchResponse};
-pub use config::{BLOB_ALPN, IrohConfig};
-pub use endpoint::build_endpoint;
-pub use identity::load_or_generate as load_or_generate_secret_key;
-```
-
-- [ ] **Step 4: Run tests**
-
-```bash
-just test-iroh -- p2p_iroh::blob_protocol
-```
-Expected: 3 tests pass. No tests for `blob_handler` yet — covered by Task 9 round-trip.
-
-**API drift to verify:** `iroh::protocol::ProtocolHandler` trait signature, `iroh::endpoint::Connection::accept_bi()` return shape. Adjust if renamed.
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add elohim/elohim-storage/src/p2p_iroh/
-git commit -m "feat(storage): blob protocol primitives + inbound ProtocolHandler"
-```
-
----
-
-## Task 8: Router with custom ALPN registration
-
-**Files:**
-- Create: `elohim/elohim-storage/src/p2p_iroh/router.rs`
-- Modify: `elohim/elohim-storage/src/p2p_iroh/mod.rs`
-
-- [ ] **Step 1: Write the failing test**
-
-Create `elohim/elohim-storage/src/p2p_iroh/router.rs`:
-
-```rust
-//! Assemble the iroh `Router` with our custom blob protocol handler.
-
-use iroh::Endpoint;
-use iroh::protocol::Router;
-
-use super::blob_handler::BlobProtocolHandler;
-use super::config::BLOB_ALPN;
-
-/// Build a `Router` that accepts BLOB_ALPN, dispatching to the supplied
-/// handler. The `Router` owns its accept loop; drop it (or call `shutdown`)
-/// to stop accepting new connections.
-pub fn build_router(endpoint: Endpoint, handler: BlobProtocolHandler) -> Router {
-    Router::builder(endpoint)
-        .accept(BLOB_ALPN, handler)
-        .spawn()
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::p2p_iroh::{
-        blake3_store::Blake3Store, build_endpoint, BlobProtocolHandler, IrohConfig,
-    };
-    use std::sync::Arc;
-    use tempfile::tempdir;
-
-    #[tokio::test]
-    async fn router_spawns_and_shuts_down() {
-        let dir = tempdir().unwrap();
-        let cfg = IrohConfig {
-            blobs_dir: dir.path().join("blobs_iroh"),
-            secret_key_path: dir.path().join("iroh.key"),
-            use_n0_relays: false,
-            alpns: vec![BLOB_ALPN.to_vec()],
-        };
-        let endpoint = build_endpoint(&cfg).await.unwrap();
-        let store = Arc::new(Blake3Store::open(&cfg.blobs_dir).unwrap());
-        let handler = BlobProtocolHandler::new(store);
-
-        let router = build_router(endpoint, handler);
-        router.shutdown().await.expect("clean shutdown");
-    }
-}
-```
-
-- [ ] **Step 2: Mount in mod.rs**
-
-```rust
-mod blake3_store;
-mod blob_handler;
-mod blob_protocol;
-mod config;
-mod endpoint;
-mod identity;
-mod router;
-
-pub use blake3_store::{Blake3Store, Hash};
-pub use blob_handler::BlobProtocolHandler;
-pub use blob_protocol::{BlobFetchRequest, BlobFetchResponse};
-pub use config::{BLOB_ALPN, IrohConfig};
-pub use endpoint::build_endpoint;
-pub use identity::load_or_generate as load_or_generate_secret_key;
-pub use router::build_router;
-```
-
-- [ ] **Step 3: Run test**
-
-```bash
-just test-iroh -- p2p_iroh::router
-```
-Expected: 1 test passes.
-
-**API drift to verify:** `Router::builder().accept(alpn, handler).spawn()` shape; `router.shutdown().await` return type.
-
-- [ ] **Step 4: Commit**
-
-```bash
-git add elohim/elohim-storage/src/p2p_iroh/
-git commit -m "feat(storage): Router with custom BLOB_ALPN registered"
-```
-
----
-
-## Task 9: Outbound fetch helper + IrohNode + round-trip integration test
-
-**Files:**
-- Create: `elohim/elohim-storage/src/p2p_iroh/fetch.rs`
-- Create: `elohim/elohim-storage/src/p2p_iroh/node.rs`
-- Create: `elohim/elohim-storage/tests/iroh_blob_roundtrip.rs`
-- Modify: `elohim/elohim-storage/src/p2p_iroh/mod.rs`
-
-This is the milestone task: the first proof that two iroh nodes can move bytes.
-
-- [ ] **Step 1: Write fetch.rs**
-
-Create `elohim/elohim-storage/src/p2p_iroh/fetch.rs`:
-
-```rust
-//! Outbound blob fetch over iroh QUIC.
-
-use anyhow::{anyhow, Context, Result};
-use iroh::{Endpoint, EndpointAddr};
-
-use super::blake3_store::Hash;
-use super::blob_protocol::{
-    read_response, write_request, BlobFetchRequest, BlobFetchResponse, DEFAULT_MAX_RESPONSE_SIZE,
-};
-use super::config::BLOB_ALPN;
-
-/// Fetch a blob from `peer_addr` by its BLAKE3 hash. Verifies the returned
-/// bytes hash to the requested hash before returning.
-pub async fn fetch_blob(
-    endpoint: &Endpoint,
-    peer_addr: EndpointAddr,
-    hash: Hash,
-) -> Result<Vec<u8>> {
-    let conn = endpoint
-        .connect(peer_addr, BLOB_ALPN)
         .await
-        .context("iroh: connect to peer")?;
-
-    let (mut send, mut recv) = conn
-        .open_bi()
-        .await
-        .context("iroh: open bidi stream")?;
-
-    let req = BlobFetchRequest { blake3_hex: hash.to_hex() };
-    write_request(&mut send, &req).await.context("write request")?;
-    send.finish().context("finish send side")?;
-
-    let resp = read_response(&mut recv, DEFAULT_MAX_RESPONSE_SIZE)
-        .await
-        .context("read response")?;
-
-    let bytes = match resp {
-        BlobFetchResponse::Found(b) => b,
-        BlobFetchResponse::NotFound => {
-            return Err(anyhow!("peer reported NotFound for {}", hash.to_hex()))
-        }
-        BlobFetchResponse::Error(msg) => {
-            return Err(anyhow!("peer error: {}", msg))
-        }
-    };
-
-    // Verify hash before returning — the peer is untrusted.
-    let actual = Hash(blake3::hash(&bytes).into());
-    if actual != hash {
-        return Err(anyhow!(
-            "hash mismatch: requested {} got {}",
-            hash.to_hex(),
-            actual.to_hex()
-        ));
-    }
-    Ok(bytes)
 }
 ```
 
-- [ ] **Step 2: Write node.rs**
+**API drift to verify against iroh 0.96 docs:** `Endpoint::builder()` signature, `bind()` vs deprecated names, `RelayMode` enum variants. Phase 2 will register iroh-blobs ALPNs via the iroh-blobs `Router` integration, NOT manually via `.alpns(...)` — so the endpoint here is just a base.
 
-Create `elohim/elohim-storage/src/p2p_iroh/node.rs`:
+Tests: `builds_endpoint_with_relays_disabled` (single-node, then close).
 
-```rust
-//! Long-lived iroh P2P node aggregate.
+Commit: `feat(storage): build_endpoint constructs iroh Endpoint`
 
-use std::sync::Arc;
-
-use anyhow::Result;
-use iroh::protocol::Router;
-use iroh::{Endpoint, EndpointAddr, NodeId};
-
-use super::{
-    blake3_store::{Blake3Store, Hash},
-    blob_handler::BlobProtocolHandler,
-    build_endpoint, build_router,
-    config::IrohConfig,
-    fetch::fetch_blob,
-};
-
-pub struct IrohNode {
-    endpoint: Endpoint,
-    router: Router,
-    store: Arc<Blake3Store>,
-}
-
-impl IrohNode {
-    pub async fn start(config: &IrohConfig) -> Result<Self> {
-        let endpoint = build_endpoint(config).await?;
-        let store = Arc::new(Blake3Store::open(&config.blobs_dir)?);
-        let handler = BlobProtocolHandler::new(store.clone());
-        let router = build_router(endpoint.clone(), handler);
-        Ok(Self { endpoint, router, store })
-    }
-
-    pub fn node_id(&self) -> NodeId {
-        self.endpoint.node_id()
-    }
-
-    pub async fn node_addr(&self) -> Result<EndpointAddr> {
-        Ok(self.endpoint.node_addr().await?)
-    }
-
-    pub fn add_bytes(&self, bytes: &[u8]) -> Result<Hash> {
-        Ok(self.store.add_bytes(bytes)?)
-    }
-
-    pub fn get_bytes(&self, hash: Hash) -> Result<Vec<u8>> {
-        Ok(self.store.get_bytes(hash)?)
-    }
-
-    pub fn has(&self, hash: Hash) -> bool {
-        self.store.has(hash)
-    }
-
-    pub async fn fetch_blob_from(
-        &self,
-        peer_addr: EndpointAddr,
-        hash: Hash,
-    ) -> Result<Vec<u8>> {
-        if self.store.has(hash) {
-            return Ok(self.store.get_bytes(hash)?);
-        }
-        let bytes = fetch_blob(&self.endpoint, peer_addr, hash).await?;
-        // Persist locally so subsequent fetches are no-ops.
-        self.store.add_bytes(&bytes)?;
-        Ok(bytes)
-    }
-
-    pub async fn shutdown(self) -> Result<()> {
-        self.router.shutdown().await?;
-        self.endpoint.close().await;
-        Ok(())
-    }
-}
-```
-
-- [ ] **Step 3: Mount in mod.rs**
-
-```rust
-mod blake3_store;
-mod blob_handler;
-mod blob_protocol;
-mod config;
-mod endpoint;
-mod fetch;
-mod identity;
-mod node;
-mod router;
-
-pub use blake3_store::{Blake3Store, Hash};
-pub use blob_handler::BlobProtocolHandler;
-pub use blob_protocol::{BlobFetchRequest, BlobFetchResponse};
-pub use config::{BLOB_ALPN, IrohConfig};
-pub use endpoint::build_endpoint;
-pub use fetch::fetch_blob;
-pub use identity::load_or_generate as load_or_generate_secret_key;
-pub use node::IrohNode;
-pub use router::build_router;
-```
-
-- [ ] **Step 4: Write the round-trip integration test**
-
-Create `elohim/elohim-storage/tests/iroh_blob_roundtrip.rs`:
-
-```rust
-//! Two-node iroh blob round-trip — the milestone for Phase 1.
-
-#![cfg(feature = "p2p-iroh")]
-
-use elohim_storage::p2p_iroh::{IrohConfig, IrohNode, BLOB_ALPN};
-use tempfile::tempdir;
-
-#[tokio::test]
-async fn two_nodes_can_round_trip_a_blob() {
-    let provider_dir = tempdir().unwrap();
-    let provider_cfg = IrohConfig {
-        blobs_dir: provider_dir.path().join("blobs_iroh"),
-        secret_key_path: provider_dir.path().join("iroh.key"),
-        use_n0_relays: false,
-        alpns: vec![BLOB_ALPN.to_vec()],
-    };
-    let provider = IrohNode::start(&provider_cfg).await.expect("provider starts");
-
-    let fetcher_dir = tempdir().unwrap();
-    let fetcher_cfg = IrohConfig {
-        blobs_dir: fetcher_dir.path().join("blobs_iroh"),
-        secret_key_path: fetcher_dir.path().join("iroh.key"),
-        use_n0_relays: false,
-        alpns: vec![BLOB_ALPN.to_vec()],
-    };
-    let fetcher = IrohNode::start(&fetcher_cfg).await.expect("fetcher starts");
-
-    // Provider adds a blob.
-    let payload = b"two-node iroh round trip works on loopback".to_vec();
-    let hash = provider.add_bytes(&payload).expect("add bytes");
-
-    // Get provider's address (with direct addrs / relay) for the fetcher.
-    let provider_addr = provider.node_addr().await.expect("provider addr");
-
-    // Fetcher pulls.
-    let fetched = fetcher
-        .fetch_blob_from(provider_addr.clone(), hash)
-        .await
-        .expect("fetch blob");
-    assert_eq!(fetched, payload);
-
-    // Idempotent: second fetch returns from local store.
-    let fetched_again = fetcher
-        .fetch_blob_from(provider_addr, hash)
-        .await
-        .expect("idempotent fetch");
-    assert_eq!(fetched_again, payload);
-
-    fetcher.shutdown().await.expect("fetcher shutdown");
-    provider.shutdown().await.expect("provider shutdown");
-}
-```
-
-- [ ] **Step 5: Run the integration test**
-
-```bash
-just test-iroh --test iroh_blob_roundtrip
-```
-Expected: 1 test passes. May take 10-30s for QUIC handshake + transfer.
-
-**If it hangs:** with `use_n0_relays: false`, both nodes need direct UDP reachability. On loopback this should work; if blocked, set `use_n0_relays: true` and accept the n0 relay dependency for CI. Not acceptable for production but fine for the round-trip test.
-
-If `node_addr()` returns before any addresses are discovered (race), insert `tokio::time::sleep(Duration::from_millis(200)).await` before calling it. Refactor to a deterministic ready-signal in a follow-up.
-
-- [ ] **Step 6: Commit**
-
-```bash
-git add elohim/elohim-storage/src/p2p_iroh/fetch.rs \
-        elohim/elohim-storage/src/p2p_iroh/node.rs \
-        elohim/elohim-storage/src/p2p_iroh/mod.rs \
-        elohim/elohim-storage/tests/iroh_blob_roundtrip.rs
-git commit -m "feat(storage): two-node iroh blob round-trip via custom QUIC protocol"
-```
-
----
-
-## Task 10: TransportBackend config + main.rs branch + lifecycle smoke
+### Task 1.6: TransportBackend config + main.rs branch
 
 **Files:**
 - Modify: `elohim/elohim-storage/src/config.rs`
 - Modify: `elohim/elohim-storage/src/main.rs`
-- Create: `elohim/elohim-storage/tests/iroh_node_lifecycle.rs`
 
-- [ ] **Step 1: Add the enum and field; write config tests**
+Add `TransportBackend` enum (`Libp2p` default, `Iroh`). Loads from TOML key `transport_backend` and env `ELOHIM_TRANSPORT_BACKEND`. In `main.rs`, branch at startup: spawn either the existing `P2PNode` (Libp2p) or a placeholder `IrohNode` (which Phase 2 fills in).
 
-In `elohim/elohim-storage/src/config.rs`, near the top (after imports), add:
+Phase 1 acceptance: `ELOHIM_TRANSPORT_BACKEND=iroh just run` boots a no-op IrohNode that:
+- Builds endpoint
+- Logs `node_id` + listen addrs
+- Waits on shutdown signal
+- Shuts cleanly
 
-```rust
-/// Which P2P transport backend the daemon should use at startup.
-///
-/// In Phase 1 only `Libp2p` is fully featured; `Iroh` enables the parallel
-/// stack covering blob distribution only. See
-/// `genesis/docs/superpowers/plans/2026-05-07-iroh-parallel-stack.md`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
-#[serde(rename_all = "lowercase")]
-pub enum TransportBackend {
-    #[default]
-    Libp2p,
-    Iroh,
-}
-```
+No actual P2P work yet; that's Phase 2.
 
-In the `Config` struct, append:
+Commit: `feat(storage): TransportBackend selector + main.rs branch (no-op iroh path)`
 
-```rust
-    /// Which P2P backend to start. Default `Libp2p`. Override via TOML
-    /// (`transport_backend = "iroh"`) or env var `ELOHIM_TRANSPORT_BACKEND`.
-    #[serde(default)]
-    pub transport_backend: TransportBackend,
-```
+### Phase 1 acceptance criteria
 
-Update the `Default` impl (or rely on the derive if `Config` derives Default with all fields defaulting). Default value: `TransportBackend::Libp2p`.
-
-In the existing `#[cfg(test)] mod tests` block (or add one), append:
-
-```rust
-#[test]
-fn transport_backend_defaults_to_libp2p() {
-    let cfg = Config::default();
-    assert_eq!(cfg.transport_backend, TransportBackend::Libp2p);
-}
-
-#[test]
-fn transport_backend_round_trips_through_toml() {
-    let cfg = Config {
-        transport_backend: TransportBackend::Iroh,
-        ..Config::default()
-    };
-    let s = toml::to_string(&cfg).unwrap();
-    let back: Config = toml::from_str(&s).unwrap();
-    assert_eq!(back.transport_backend, TransportBackend::Iroh);
-}
-```
-
-- [ ] **Step 2: Run config tests**
-
-```bash
-just test-iroh -- config::tests::transport_backend
-```
-Expected: 2 tests pass.
-
-- [ ] **Step 3: Branch in main.rs**
-
-Edit `elohim/elohim-storage/src/main.rs`. Find the existing P2P startup block (search for `P2PNode::new` or `P2PConfig`). Wrap with the backend match.
-
-```rust
-use elohim_storage::config::TransportBackend;
-
-// ... in the runtime startup function ...
-match config.transport_backend {
-    TransportBackend::Libp2p => {
-        #[cfg(feature = "p2p")]
-        {
-            // ... existing libp2p P2PNode startup, indented one level ...
-        }
-        #[cfg(not(feature = "p2p"))]
-        {
-            anyhow::bail!("config.transport_backend = libp2p but the `p2p` feature is not compiled in");
-        }
-    }
-    TransportBackend::Iroh => {
-        #[cfg(feature = "p2p-iroh")]
-        {
-            use elohim_storage::p2p_iroh::{IrohConfig, IrohNode};
-            let iroh_cfg = IrohConfig::from_storage_dir(&config.storage_dir);
-            let _iroh_node = IrohNode::start(&iroh_cfg).await?;
-            tracing::info!(
-                node_id = %_iroh_node.node_id(),
-                "iroh node started (Phase 1 — blob plane only; libp2p protocols disabled)"
-            );
-            // Phase 1: hold the node alive until shutdown; HTTP/inventory
-            // wiring graduates in Phase 2.
-        }
-        #[cfg(not(feature = "p2p-iroh"))]
-        {
-            anyhow::bail!("config.transport_backend = iroh but the `p2p-iroh` feature is not compiled in");
-        }
-    }
-}
-```
-
-- [ ] **Step 4: Single-node smoke test**
-
-Create `elohim/elohim-storage/tests/iroh_node_lifecycle.rs`:
-
-```rust
-#![cfg(feature = "p2p-iroh")]
-
-use elohim_storage::p2p_iroh::{IrohConfig, IrohNode, BLOB_ALPN};
-use tempfile::tempdir;
-
-#[tokio::test]
-async fn node_starts_and_stops_clean() {
-    let dir = tempdir().unwrap();
-    let cfg = IrohConfig {
-        blobs_dir: dir.path().join("blobs_iroh"),
-        secret_key_path: dir.path().join("iroh.key"),
-        use_n0_relays: false,
-        alpns: vec![BLOB_ALPN.to_vec()],
-    };
-    let node = IrohNode::start(&cfg).await.expect("starts");
-    let _id = node.node_id();
-    node.shutdown().await.expect("clean shutdown");
-}
-```
-
-- [ ] **Step 5: Run the smoke test**
-
-```bash
-just test-iroh --test iroh_node_lifecycle
-```
-Expected: 1 test passes in <2s.
-
-- [ ] **Step 6: Verify daemon starts in iroh mode**
-
-```bash
-just build-iroh
-ELOHIM_TRANSPORT_BACKEND=iroh \
-RUST_LOG=elohim_storage=info \
-./target/debug/elohim-storage --storage-dir /tmp/iroh-smoke
-```
-
-Expected log line: `iroh node started (Phase 1 — blob plane only; libp2p protocols disabled)`. Ctrl-C; clean shutdown.
-
-If the daemon errors on missing libp2p side effects (HTTP routes that need P2PHandle, etc.), document them as TODO comments near the iroh branch. Phase 2 graduates them.
-
-- [ ] **Step 7: Commit**
-
-```bash
-git add elohim/elohim-storage/src/config.rs \
-        elohim/elohim-storage/src/main.rs \
-        elohim/elohim-storage/tests/iroh_node_lifecycle.rs
-git commit -m "feat(storage): TransportBackend config + iroh boot path"
-```
+- [ ] `just build-iroh` succeeds
+- [ ] `just test-iroh -- p2p_iroh` passes (config, identity, endpoint tests)
+- [ ] `ELOHIM_TRANSPORT_BACKEND=iroh just run` boots and shuts down cleanly
+- [ ] `just gate` (fmt + clippy + test) clean for both feature flags
+- [ ] No changes to existing libp2p code paths
 
 ---
 
-## Task 11: Graduation gates README + final gate run
+## Phase 2: Blob plane via iroh-blobs
+
+Phase 2 mounts iroh-blobs as the blob protocol on the iroh path. **No custom ALPN. No custom protocol handler. No hand-written codec.** iroh-blobs IS the blob plane.
+
+The libp2p path is unchanged.
+
+### Task 2.1: BlobStore wrapper over iroh-blobs
+
+**Files:**
+- Create: `elohim/elohim-storage/src/p2p_iroh/blob_store.rs`
+
+A thin wrapper around `iroh_blobs::store::fs::Store::load(path)`. Public surface:
+
+```rust
+pub struct IrohBlobStore { inner: iroh_blobs::store::fs::Store }
+
+impl IrohBlobStore {
+    pub async fn load(blobs_dir: &Path) -> Result<Self>;
+    pub async fn add_bytes(&self, data: Vec<u8>) -> Result<iroh_blobs::Hash>;
+    pub async fn get_bytes(&self, hash: iroh_blobs::Hash) -> Result<Bytes>;
+    pub async fn has(&self, hash: iroh_blobs::Hash) -> bool;
+}
+```
+
+The wrapper exists to (a) anchor a stable Phase 2 surface so Phase 11 cutover code can replace the legacy BlobStore call sites uniformly, and (b) hide iroh-blobs API drift behind one type.
+
+**API drift to verify against iroh-blobs 0.98 docs:** `iroh_blobs::store::fs` module exists; `Store::load` / `Store::create` / `Store::persistent` (name varies by version); `Store::add_bytes` async signature; `Store::get_bytes` returns `Bytes` or stream.
+
+Tests: `add_then_get_round_trips`, `has_returns_false_for_unknown`, `same_bytes_dedupe_to_same_hash`.
+
+Commit: `feat(storage): IrohBlobStore wraps iroh-blobs fs Store`
+
+### Task 2.2: Mount iroh-blobs on the Endpoint via Router
+
+**Files:**
+- Create: `elohim/elohim-storage/src/p2p_iroh/node.rs`
+
+`IrohNode` aggregates endpoint + iroh-blobs Router + store. iroh-blobs registers its own ALPN(s) via `iroh_blobs::net_protocol::Blobs::builder(store).build(endpoint)` (exact API per 0.98 docs at task time — likely `Blobs::new(store, endpoint)` returning a `Blobs` that can be inserted into a `Router`).
+
+```rust
+pub struct IrohNode {
+    endpoint: iroh::Endpoint,
+    router: iroh::protocol::Router,
+    store: IrohBlobStore,
+    blobs: iroh_blobs::net_protocol::Blobs,
+}
+
+impl IrohNode {
+    pub async fn start(config: IrohConfig) -> Result<Self>;
+    pub fn node_id(&self) -> iroh::NodeId;
+    pub async fn node_addr(&self) -> Result<iroh::NodeAddr>;
+    pub async fn add_bytes(&self, data: Vec<u8>) -> Result<iroh_blobs::Hash>;
+    pub async fn fetch_blob_from(&self, peer: iroh::NodeAddr, hash: iroh_blobs::Hash) -> Result<Bytes>;
+    pub async fn get_bytes(&self, hash: iroh_blobs::Hash) -> Result<Bytes>;
+    pub async fn has(&self, hash: iroh_blobs::Hash) -> bool;
+    pub async fn shutdown(self) -> Result<()>;
+}
+```
+
+`fetch_blob_from` uses iroh-blobs' download API (`blobs_client.download(hash, peer).await?` or similar — verify at task time). It does NOT use a custom `BlobFetchRequest` — that's the libp2p path.
+
+Tests: lifecycle (`start_then_shutdown`).
+
+Commit: `feat(storage): IrohNode mounts iroh-blobs on shared Router`
+
+### Task 2.3: Two-node round-trip integration test
+
+**Files:**
+- Create: `elohim/elohim-storage/tests/iroh_blob_roundtrip.rs`
+- Create: `elohim/elohim-storage/tests/iroh_node_lifecycle.rs`
+
+```rust
+#[tokio::test]
+async fn two_node_blob_round_trip() {
+    let provider = IrohNode::start(IrohConfig {
+        use_n0_relays: false, // loopback only for CI
+        ..test_config()
+    }).await.unwrap();
+    let fetcher = IrohNode::start(IrohConfig {
+        use_n0_relays: false,
+        ..test_config()
+    }).await.unwrap();
+
+    let payload = b"hello iroh world".to_vec();
+    let hash = provider.add_bytes(payload.clone()).await.unwrap();
+    let provider_addr = provider.node_addr().await.unwrap();
+
+    let received = fetcher.fetch_blob_from(provider_addr, hash).await.unwrap();
+    assert_eq!(received, payload);
+
+    provider.shutdown().await.unwrap();
+    fetcher.shutdown().await.unwrap();
+}
+```
+
+**CI risk:** UDP loopback in Jenkins containers can behave oddly. The original plan flagged this. Mitigation: if `use_n0_relays: false` doesn't work in CI, fall back to `RelayMode::Default` for the test (n0 relay is public infra; CI environments typically have outbound). Document the choice.
+
+Commit: `test(storage): two-node iroh blob round-trip`
+
+### Task 2.4: README + graduation gates
 
 **Files:**
 - Create: `elohim/elohim-storage/src/p2p_iroh/README.md`
 
-- [ ] **Step 1: Write the README**
+Contents:
+- Status (what works, what's stubbed)
+- How to run (env var + commands)
+- Graduation gates for the next phase
+- Cutover playbook reference
+- Address format note (BLAKE3 on iroh path; SHA256/CIDv1 on libp2p path; mode-exclusive)
 
-Create `elohim/elohim-storage/src/p2p_iroh/README.md`:
+Commit: `docs(storage): p2p_iroh README + graduation gates`
 
-```markdown
-# p2p_iroh — Phase 1: Blob plane (iroh-standalone)
+### Phase 2 acceptance criteria
 
-Parallel iroh-based P2P module sitting alongside `crate::p2p`. Selectable at
-runtime via `Config::transport_backend = TransportBackend::Iroh`.
-
-## Status
-
-**Preview.** Uses iroh 1.0.0-rc.0, the first 1.0 release candidate (2026-05-07).
-Custom QUIC blob protocol with BLAKE3 hashing in our own code; iroh-blobs is
-intentionally not used because it has hard incompatibilities with our existing
-`multihash-codetable` dep. Keep `Libp2p` as default until graduation.
-
-## What works
-
-- Two-node blob round-trip via direct EndpointAddr fetch (LAN/loopback)
-- BLAKE3 content addressing on the iroh path
-- BLAKE3-keyed minimal filesystem store at `<storage_dir>/blobs_iroh/`
-- Persisted iroh `SecretKey` at `<storage_dir>/iroh.key`
-- Graceful startup and shutdown
-
-## What does not work yet (Phase 2+)
-
-- HTTP `/api/v1/blob/{hash}` route does NOT serve from `Blake3Store` — the
-  route still reads from the legacy SHA256 `BlobStore`.
-- Genesis seeder writes to the legacy `BlobStore`, not `Blake3Store`.
-- The existing `peer_blob_inventory` projection records SHA256 hashes; no
-  BLAKE3-mode integration exists.
-- Other libp2p protocols (sync, shard, epr, trust, identity, gossip, kad,
-  mdns, dcutr, autonat) have no iroh equivalents.
-- iroh-blobs is not used. When n0 publishes a release aligned with iroh 1.0
-  (estimated 4-12 weeks based on cadence), revisit to swap our minimal
-  Blake3Store + custom protocol for iroh-blobs's FsStore + BlobsProtocol.
-
-## Graduation gates (must clear all before flipping default)
-
-1. iroh 1.0 stable shipped (or our `=1.0.0-rc.X` pin proven stable for ≥1
-   month with no regressions).
-2. HTTP `/api/v1/blob/{hash}` reads from `Blake3Store` when iroh-mode is
-   active; route accepts BLAKE3 hashes (or both, with prefix discriminator).
-3. Genesis seeder graduated to write through `Blake3Store`.
-4. Inventory tables migrated to BLAKE3 keys (or — pre-launch — formal
-   wipe-and-reseed runbook documented).
-5. Sync, shard, EPR, and identity protocols graduate to iroh ALPNs (or
-   the daemon refuses to start in iroh mode if any required protocol is
-   missing, with a clear error).
-6. Round-trip + lifecycle tests run in CI on every PR.
-7. At least one alpha-cluster household runs in iroh mode for a full week
-   without regression.
-8. Reconsider iroh-blobs adoption: if n0 has shipped a 1.0-aligned release
-   and the multihash-codetable conflict resolves, plan the swap.
-
-## Cutover playbook (for the day we flip the default)
-
-1. Confirm all graduation gates green.
-2. Branch: `git checkout -b feat/iroh-default-backend`.
-3. Edit `Cargo.toml`: `default = ["p2p", "p2p-iroh"]`.
-4. Edit `src/config.rs`: `TransportBackend::default() = Iroh`.
-5. Run full test suite under both `--features p2p` and
-   `--features "p2p p2p-iroh"`.
-6. Alpha cluster e2e: wipe `<storage_dir>` on every node, run seeder,
-   confirm content distributes via iroh.
-7. Update `CLAUDE.md` and `genesis/graphos/vocabulary.md` if any vocabulary
-   changes (BLAKE3 hash format clarification on `/blob/{hash}`).
-8. Open a PR; tag the alpha-cluster operators.
-
-## Code map
-
-| File | Purpose |
-|------|---------|
-| `mod.rs` | Module root + re-exports |
-| `config.rs` | `IrohConfig`, `BLOB_ALPN` |
-| `identity.rs` | Persisted `SecretKey` |
-| `endpoint.rs` | `Endpoint` builder |
-| `blake3_store.rs` | BLAKE3-keyed file store |
-| `blob_protocol.rs` | Wire format + framing |
-| `blob_handler.rs` | Inbound `ProtocolHandler` |
-| `router.rs` | `Router` with custom ALPN |
-| `fetch.rs` | Outbound fetch helper |
-| `node.rs` | `IrohNode` aggregate |
-
-Tests: `tests/iroh_blob_roundtrip.rs`, `tests/iroh_node_lifecycle.rs`.
-```
-
-- [ ] **Step 2: Commit**
-
-```bash
-git add elohim/elohim-storage/src/p2p_iroh/README.md
-git commit -m "docs(storage): p2p_iroh README — status, graduation gates, cutover playbook"
-```
-
-- [ ] **Step 3: Run the full feature build + tests**
-
-```bash
-just build-iroh
-just test-iroh
-```
-Expected: builds clean, all tests pass (libp2p tests + new iroh tests).
-
-- [ ] **Step 4: Run pre-push gate**
-
-```bash
-just gate
-```
-Expected: `cargo fmt --check`, `cargo clippy -- -D warnings`, `cargo test` all green.
+- [ ] `cargo test --features "p2p p2p-iroh" iroh_blob_roundtrip` passes
+- [ ] `cargo test --features "p2p p2p-iroh" iroh_node_lifecycle` passes
+- [ ] `ELOHIM_TRANSPORT_BACKEND=iroh just run` boots, accepts blob inserts via `IrohNode::add_bytes`, can be queried for `node_addr` via debug API
+- [ ] `just gate` clean
+- [ ] README updated; cutover playbook references this phase
 
 ---
 
-## Self-Review Notes
+## Phase 3: Custom-ALPN harness (sketched)
 
-**Spec coverage:**
-- Phase 0: holochain bump (single discovery-driven task).
-- Phase 1: parallel module — Tasks 1-2.
-- BLAKE3 content addressing on iroh path — Task 6.
-- Custom blob protocol on QUIC — Tasks 7-8.
-- Two-node round-trip — Task 9.
-- Runtime config toggle — Task 10.
-- Graduation gates + cutover playbook — Task 11.
+**Goal:** Land the shared infrastructure that Phases 5–9 will depend on. After Phase 3, registering a new custom protocol (sync, shard, EPR, etc.) is a copy-paste exercise.
 
-**Out of scope (intentional):** Each runs its own design gate when graduated.
-- Other libp2p protocols' migration (sync/shard/epr/trust/identity)
-- HTTP route surface graduation
-- Genesis seeder rewrite
-- Inventory projection migration to BLAKE3
-- Self-hosted iroh-relay
-- Cross-stack identity unification
-- iroh-blobs adoption (deferred until n0 ships a 1.0-aligned release)
+**Surface:**
+- `src/p2p_iroh/router_extras.rs` — extension points for adding ALPNs alongside iroh-blobs on the same `Router`
+- `src/p2p_iroh/codec.rs` — generic length-prefixed MessagePack codec helpers (`read_frame<T>`, `write_frame<T>`) reusable by every custom protocol
+- `src/p2p_iroh/parity_harness.rs` — test infrastructure that runs the same wire-level test against both libp2p and iroh nodes; used in Phase 5+
 
-**Known API uncertainty:** iroh 1.0.0-rc.0 was published 2026-05-07. Each task that touches iroh API surface flags specific calls to verify against current docs.rs. API drift is contained per-task.
+**Design gate runs at Phase 3 pickup.** Likely entities: ALPN registry (operational, in-memory), parity-test fixtures (test-only, no classification needed).
 
-**Phase 0 risk:** holochain dev.5 → dev.22 is 17 dev releases of API drift. Known: `AdminRequest::GraftRecords` removed, `kitsune2_api::url::Url` namespacing changed. Phase 0 explicitly time-boxes — if scope balloons beyond 1-3 days of work, STOP and report BLOCKED rather than continuing into Phase 1 with a half-bumped holochain.
+**No Phase 3 dependencies on later phases — but later phases all depend on Phase 3 codec helpers.** Ordering is strict.
+
+---
+
+## Phase 4: Gossip plane via iroh-gossip (sketched)
+
+**Goal:** Replace libp2p gossipsub with iroh-gossip as the substrate for inventory, identity-binding, attention-tending, feedback-signal, and recovery topics.
+
+**Topics being migrated (verified by grep at plan-write):**
+- `INVENTORY_TOPIC` (peer_blob_inventory broadcasts)
+- `IDENTITY_BINDING_TOPIC` / `INTEGRITY_REVOCATION_TOPIC`
+- `RECOVERY_INVITATION_TOPIC` / `RECOVERY_REVOCATION_TOPIC`
+- attention-tending heartbeat topic
+- feedback-signal topic
+
+**iroh-gossip mapping:** Each gossipsub topic maps to an iroh-gossip `TopicId` (32 bytes; we hash the existing topic-name string for determinism).
+
+**`peer_blob_inventory` adds BLAKE3 column** in this phase. Migration: add `blake3_hash TEXT NULL` alongside `blob_hash`. Both populated during transition. After cutover (Phase 11), drop the SHA256 column.
+
+**Hybrid mode:** Phase 4 can run with libp2p gossip primary + iroh-gossip secondary (or vice versa) for parity validation. The parity harness from Phase 3 verifies both stacks see the same set of topic messages within bounded time.
+
+**Design gate runs at Phase 4 pickup.** Entities: iroh-gossip topic membership state (operational), `blake3_hash` column (operational projection, parallel to existing).
+
+---
+
+## Phase 5: Sync plane (sketched)
+
+Custom ALPN: `/elohim/sync/2.0.0`. Reuse `crate::p2p::wire::SyncRequest`/`SyncResponse` (or whatever they're currently called) on iroh streams.
+
+Parity test (via Phase 3 harness): same sync request issued to both stacks returns same wire bytes.
+
+---
+
+## Phase 6: EPR plane (sketched)
+
+Two ALPNs: `/elohim/epr/2.0.0` and `/elohim/epr-atom/2.0.0`. Reuse existing wire types from `crate::p2p::epr_protocol` and `crate::p2p::epr_atom_protocol`.
+
+EPR codec is transport-agnostic by design (per `project_epr_substrate_vs_vf_graphql.md`) — this phase is mostly plumbing.
+
+---
+
+## Phase 7: Shard plane (sketched)
+
+Custom ALPN: `/elohim/shard/2.0.0`. Reuse `crate::p2p::wire::ShardRequest`/etc.
+
+Reed-Solomon coding logic stays in pure Rust (transport-agnostic). Only the request/response framing migrates.
+
+---
+
+## Phase 8: View federation (sketched)
+
+Custom ALPN: `/elohim/view-federation/2.0.0`. Reuse existing wire types.
+
+256 KiB cap on responses (matches existing libp2p path). Document any iroh stream-flow-control implications discovered at task time.
+
+---
+
+## Phase 9: Identity / handshake / trust / reach (sketched)
+
+Five ALPNs for the auth and trust planes:
+- `/elohim/identity-handshake/2.0.0`
+- `/elohim/identity-map/2.0.0`
+- `/elohim/trust/2.0.0`
+- `/elohim/reach-authorization/2.0.0`
+- (kad-store needs special design — see Phase 10)
+
+These are sensitive flows. Phase 9 design gate must verify:
+- Identity material remains agent-scoped (no leakage via QUIC stream metadata)
+- Reach-authorization gate semantics preserved on iroh path
+- Cross-stack peer ID mapping correctly bridges identity claims during transition
+
+---
+
+## Phase 10: Discovery + topology (sketched)
+
+iroh has built-in discovery (DNS, pkarr, mDNS) that replaces libp2p kad+mdns. The libp2p path uses `kad_store` for peer record persistence; the iroh path doesn't need a parallel — iroh's pkarr-DHT integration handles record publication.
+
+**Cross-stack peer ID mapping** is required during the transition: a peer running on libp2p has a `PeerId`, on iroh a `NodeId`. The mapping table (`cross_stack_peer_map`) records both for the same logical peer during hybrid operation. Post-cutover, the table is dropped.
+
+**kad_store migration plan:** Records currently in kad get re-published via pkarr-DHT after cutover. During Phase 10 hybrid, both record stores are populated.
+
+---
+
+## Phase 11: Cutover gate
+
+Cutover criteria (must ALL hold before flipping default):
+
+- [ ] All Phases 1–10 acceptance criteria green
+- [ ] Parity-test harness runs every Phase 5–9 ALPN against both stacks for a week of nightly CI; zero divergences
+- [ ] Inventory delta convergence proven on a 6-peer alpha cluster (`project_alpha_topology_bootstrap_pair.md`) within target time
+- [ ] Production-shape stress test: 10k blob round-trips between two nodes via iroh, latency p99 ≤ libp2p baseline
+- [ ] Recovery flow (`project_socially_derived_security.md`) end-to-end on iroh path passes
+- [ ] Genesis seeder rewritten to write to BLAKE3 store (Phase 11 task — not earlier)
+- [ ] HTTP routes graduated to BLAKE3 addressing (Phase 11 task — not earlier)
+- [ ] Rollback playbook tested: flip default back to libp2p, run smoke test, flip forward again
+- [ ] `peer_blob_inventory` SHA256 column drop migration written, tested, gated behind a follow-up release
+
+**Cutover execution:**
+1. Flip `TransportBackend` default to `Iroh` in code
+2. Run `just gate` + smoke + alpha-cluster test
+3. Tag release; deploy
+4. Soak two weeks
+5. Run column-drop migration + remove libp2p deps in a follow-up release
+6. Delete `src/p2p/` module
+
+**Rollback:** Until step 5, `ELOHIM_TRANSPORT_BACKEND=libp2p` reverts to legacy. After step 5, rollback requires reverting the deletion commit + redeploy.
+
+---
+
+## Risks & mitigations
+
+| Risk | Mitigation |
+|---|---|
+| iroh 0.96 → iroh 1.0 API drift later | We absorb it as a version bump when iroh-blobs ships 1.0-aligned; the Phase 2 wrapper (`IrohBlobStore`) hides drift |
+| iroh-blobs internal store format incompatibility across upgrades | Pin `=0.98`; bump deliberately; document migration path in commit message |
+| CI UDP loopback flake | Document fallback to n0 hosted relay for CI; alpha-cluster test is the real validation |
+| `peer_blob_inventory` BLAKE3 column drift across phases | Add column in Phase 4; populate from both stacks in hybrid; drop SHA256 only after cutover stable |
+| Subagent picks alternate iroh-blobs version when conflict surfaces (per `feedback_subagent_dep_conflict_supervision.md`) | Dispatch prompts in this plan explicitly forbid version changes; report BLOCKED instead |
+| Parity-test divergence found mid-migration | Each phase is independently roll-back-able; isolate the divergent ALPN, fix or revert that phase only |
+| Cross-stack identity confusion during hybrid | Phase 10 mapping table is the bridge; never assume a `PeerId` is the same identity as a `NodeId` without consulting the map |
+| Phases 3–10 each hit unforeseen design gate work | That's by design — each phase gets its own gate at pickup; budget accordingly, don't promise dates ahead of gate runs |
+
+---
+
+## What this plan deliberately does NOT do
+
+- Bump holochain stack — that's now decoupled and tracked separately
+- Adopt iroh 1.0-rc.0 — pinning to soaked iroh 0.96 via iroh-blobs 0.98
+- Build a custom QUIC blob protocol — iroh-blobs is the protocol
+- Modify HTTP routes in Phases 1–2 — cutover concern (Phase 11)
+- Modify the genesis seeder in Phases 1–2 — cutover concern (Phase 11)
+- Pre-classify Phase 3+ entities — each phase's design gate runs at pickup
+
+---
+
+## Status
+
+**Plan rewritten:** 2026-05-07 after second-opinion probe revealed iroh-blobs 0.98 resolves cleanly with current workspace, eliminating the need for a holochain bump and a custom QUIC blob protocol.
+
+**Previous iteration superseded by this rewrite.** Git history preserves the standalone-iroh approach if needed for reference. The current `worktree-iroh-parallel-stack` branch retains the prior plan-amend commits as historical context — no code from those commits is on disk.
+
+**Next session:** start at Phase 1 Task 1.1.
