@@ -22,6 +22,15 @@ build-dev:
 test:
     cargo test
 
+# Build with iroh parallel stack enabled (libp2p still default)
+# See genesis/docs/superpowers/plans/2026-05-07-iroh-parallel-stack.md
+build-iroh:
+    cargo build --features "p2p p2p-iroh"
+
+# Test with both stacks compiled in
+test-iroh:
+    cargo test --features "p2p p2p-iroh"
+
 # Export TypeScript type bindings
 export-bindings:
     cargo test export_bindings
