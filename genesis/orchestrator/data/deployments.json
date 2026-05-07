@@ -75,7 +75,7 @@
       "edgenodeCpuLimit": "1000m"
     },
     {
-      "$comment": "SECOND TEMPORARY BUMP (2026-04-21). History: Chromebook floor 384Mi/768Mi + 150m/500m → bumped 2026-04-17 to Jessica/Frank/Pete 'typical steward' tier (512Mi/1536Mi + 250m/1000m) to survive seed burst. That held for seeding but the 1536Mi limit OOMed during sustained content-serving: pod observed at ~1.5GB RSS while serving 3498-item inventory to 5 peers + handling Holochain app-WS authentication backlog (3 OOMKilled restarts within 19min, container-level exit 137). Bumped again to 1Gi/3Gi + 250m/1000m — doubles the limit, gives ~2× headroom over observed RSS. Restoration chain: to prove the device-chromebook-edu archetype we eventually tune all the way back to the floor below. Full design in genesis/plans/2026-04-13-device-archetypes-design.md.",
+      "$comment": "THIRD TEMPORARY BUMP (2026-05-07). History: Chromebook floor 384Mi/768Mi + 150m/500m → bumped 2026-04-17 to Jessica/Frank/Pete 'typical steward' tier (512Mi/1536Mi + 250m/1000m) to survive seed burst. → 2026-04-21 bumped to 1Gi/3Gi + 250m/1000m after sustained content-serving OOMs. → 2026-05-07 bumped again to 2Gi/6Gi + 500m/2000m + added 'performance' nodeType: M1 topology-substrate-completion build #994 saw timothy's Holochain conductor admin port (:4444 socat sidecar) ETIMEDOUT during seed-conductor-identities + seed-agent-bindings stages; storage port :8090 was reachable so the pod itself was alive but the conductor + admin socat were under compute pressure. With shem decommissioned and matthew/jessica/timothy carrying the full hosted-conductor pool plus M1's three new seed stages writing to admin WS, the chromebook-tier 3Gi limit and 1000m CPU were insufficient. 'performance' nodeType added so the scheduler can land timothy on ethosengine performance hardware when available (mirrors jessica's 2026-05-05 bump). Restoration: when shem returns and the hosted-pool load drops, restore to 1Gi/3Gi or further to chromebook floor. Full design in genesis/plans/2026-04-13-device-archetypes-design.md.",
       "$chromebookFloor": {
         "edgenodeMemoryRequest": "384Mi",
         "edgenodeMemoryLimit": "768Mi",
@@ -89,12 +89,12 @@
       "pattern": "consolidated",
       "template": "genesis/orchestrator/manifests/humans/_edgenode-consolidated.template.yaml",
       "deviceArchetype": "device-chromebook-edu",
-      "affinityComment": "Timothy: Chromebook-class stewarded child — edge only, bumped twice for seeding + sync-load (see $comment)",
-      "nodeTypes": ["edge"],
-      "edgenodeMemoryRequest": "1Gi",
-      "edgenodeMemoryLimit": "3Gi",
-      "edgenodeCpuRequest": "250m",
-      "edgenodeCpuLimit": "1000m"
+      "affinityComment": "Timothy: Chromebook-class stewarded child — bumped three times for seeding + sync-load + M1 conductor admin WS load (see $comment); performance node affinity added 2026-05-07",
+      "nodeTypes": ["edge", "performance"],
+      "edgenodeMemoryRequest": "2Gi",
+      "edgenodeMemoryLimit": "6Gi",
+      "edgenodeCpuRequest": "500m",
+      "edgenodeCpuLimit": "2000m"
     },
     {
       "name": "frank",
