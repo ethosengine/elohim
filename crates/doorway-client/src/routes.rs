@@ -184,6 +184,13 @@ pub struct Route {
     /// Description for documentation
     #[serde(default)]
     pub description: Option<String>,
+
+    /// Render spec for SSR-eligible routes (e.g. "angular-ssr").
+    /// `None` (omitted from JSON) means the route is NOT SSR-eligible —
+    /// doorway forwards as a normal proxy. `Some("angular-ssr")` means
+    /// doorway dispatches the route to its in-process Renderer (Task 13).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub render: Option<String>,
 }
 
 impl Route {
@@ -257,6 +264,7 @@ impl RouteBuilder {
                 public_if_reach: None,
                 rate_limit_rpm: 0,
                 description: None,
+                render: None,
             },
         }
     }
@@ -306,6 +314,15 @@ impl RouteBuilder {
     /// Add description
     pub fn description(mut self, desc: &str) -> Self {
         self.route.description = Some(desc.to_string());
+        self
+    }
+
+    /// Mark this route as SSR-eligible with the given render spec.
+    /// Currently the only supported value is `"angular-ssr"`. Other values
+    /// will be rejected by doorway's renderer dispatch (Task 13) but are
+    /// not validated at builder time.
+    pub fn render(mut self, spec: &str) -> Self {
+        self.route.render = Some(spec.to_string());
         self
     }
 
@@ -592,14 +609,18 @@ mod tests {
     #[test]
     fn test_doorway_routes_builder() {
         let routes = DoorwayRoutesBuilder::new()
-            .route(Route::get("/api/content/{id}")
-                .handler("get_content")
-                .cache_ttl(3600)
-                .build())
-            .route(Route::post("/api/content")
-                .handler("create_content")
-                .auth_required()
-                .build())
+            .route(
+                Route::get("/api/content/{id}")
+                    .handler("get_content")
+                    .cache_ttl(3600)
+                    .build(),
+            )
+            .route(
+                Route::post("/api/content")
+                    .handler("create_content")
+                    .auth_required()
+                    .build(),
+            )
             .with_blobs()
             .build();
 

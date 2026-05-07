@@ -49,34 +49,16 @@ pub mod routes;
 
 // Re-export publishing types at crate root
 pub use publish::{
+    ContentServer, ContentServerCapability, DoorwayPublishSignal, FindPublishersInput,
+    FindPublishersOutput, Html5AppBundle, Html5AppManifest, PublishSignal, PublishSignalType,
     Publishable,
-    ContentServer,
-    ContentServerCapability,
-    PublishSignal,
-    PublishSignalType,
-    DoorwayPublishSignal,
-    Html5AppBundle,
-    Html5AppManifest,
-    FindPublishersInput,
-    FindPublishersOutput,
 };
 
 // Re-export routes types at crate root
 pub use routes::{
-    ROUTES_FN,
-    ROUTES_PROTOCOL_VERSION,
-    DoorwayRoutes,
-    DoorwayRoutesBuilder,
-    Route,
-    RouteBuilder,
-    HttpMethod,
-    ReachCondition,
-    BlobProxyConfig,
-    StreamProxyConfig,
-    StreamFormat,
-    AgentRegistration,
-    AgentRegistrationResponse,
-    AgentCapability,
+    AgentCapability, AgentRegistration, AgentRegistrationResponse, BlobProxyConfig, DoorwayRoutes,
+    DoorwayRoutesBuilder, HttpMethod, ReachCondition, Route, RouteBuilder, StreamFormat,
+    StreamProxyConfig, ROUTES_FN, ROUTES_PROTOCOL_VERSION,
 };
 
 // =============================================================================
@@ -240,7 +222,8 @@ mod hdk_integration {
     #[inline]
     pub fn emit_cache_signal(signal: CacheSignal) -> Result<(), String> {
         let doorway_signal = DoorwaySignal::new(signal);
-        let bytes = doorway_signal.to_bytes()
+        let bytes = doorway_signal
+            .to_bytes()
             .map_err(|e| format!("Failed to serialize cache signal: {}", e))?;
 
         // Note: In actual HDK usage, this would call hdk::prelude::emit_signal
