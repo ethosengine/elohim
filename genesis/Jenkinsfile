@@ -110,6 +110,38 @@ def getHumanStorageUrls(String ignored) {
     }
 }
 
+/**
+ * Build comma-separated CONDUCTOR_URLS for non-suspended humans whose
+ * agencyPhase is node, doorway, or device. Each URL points at the conductor's
+ * app WebSocket port; the seeder derives admin port (= app port - 1) per the
+ * existing socat convention in K8s.
+ */
+def getConductorAppUrls() {
+    def topoPath = "genesis/orchestrator/environments/topology.json"
+    def humans = []
+    if (fileExists(topoPath)) {
+        try {
+            def topo = new groovy.json.JsonSlurper().parseText(readFile(topoPath))
+            humans = topo.humans ?: []
+        } catch (e) {
+            echo "WARN: topology.json parse failed for conductor URLs: ${e.message}"
+        }
+    }
+    if (humans.isEmpty()) {
+        // Fallback: alpha-concentration default (mirrors getHumanStorageUrls).
+        humans = [
+            [name: 'matthew', service: 'elohim-matthew-alpha', namespace: 'elohim-alpha', agencyPhase: 'doorway'],
+            [name: 'jessica', service: 'elohim-jessica-alpha', namespace: 'elohim-alpha', agencyPhase: 'device'],
+            [name: 'timothy', service: 'elohim-timothy-alpha', namespace: 'elohim-alpha', agencyPhase: 'device'],
+        ]
+    }
+    def urls = humans
+        .findAll { ['node', 'doorway', 'device'].contains(it.agencyPhase) }
+        .findAll { !it.suspended }
+        .collect { "ws://${it.service}.${it.namespace}.svc.cluster.local:4445" }
+    return urls.join(',')
+}
+
 def shouldRunStep(String stepName) {
     def steps = (params.STEPS ?: 'all').split(',').collect { it.trim() }
     return steps.contains('all') || steps.contains(stepName)
@@ -916,6 +948,104 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                                     DOORWAY_URL="${doorwayHost}" \\
                                     SEEDER_TARGET_PEERS="${targetPeers}" \\
                                       npx tsx src/seed-accounts.ts
+                                """
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Seed Conductor Identities') {
+            when { allOf {
+                expression { env.PIPELINE_SKIPPED != 'true' }
+                expression { params.SEED_DATA }
+            }}
+            steps {
+                container('builder') {
+                    script {
+                        def conductorUrls = getConductorAppUrls()
+                        if (!conductorUrls) {
+                            echo "WARN: no conductor URLs resolved — skipping seed-conductor-identities"
+                            return
+                        }
+                        catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
+                            dir('genesis/seeder') {
+                                sh """#!/bin/bash
+                                    set -euo pipefail
+                                    echo "═══════════════════════════════════════════════════════════"
+                                    echo "SEED CONDUCTOR IDENTITIES"
+                                    echo "═══════════════════════════════════════════════════════════"
+                                    echo "Conductors: ${conductorUrls}"
+                                    echo ""
+                                    CONDUCTOR_URLS="${conductorUrls}" \\
+                                      npx tsx src/seed-conductor-identities.ts
+                                """
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Seed Agent Peer Bindings') {
+            when { allOf {
+                expression { env.PIPELINE_SKIPPED != 'true' }
+                expression { params.SEED_DATA }
+            }}
+            steps {
+                container('builder') {
+                    script {
+                        def conductorUrls = getConductorAppUrls()
+                        if (!conductorUrls) {
+                            echo "WARN: no conductor URLs resolved — skipping seed-agent-bindings"
+                            return
+                        }
+                        catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
+                            dir('genesis/seeder') {
+                                sh """#!/bin/bash
+                                    set -euo pipefail
+                                    echo "═══════════════════════════════════════════════════════════"
+                                    echo "SEED AGENT PEER BINDINGS"
+                                    echo "═══════════════════════════════════════════════════════════"
+                                    echo "Conductors: ${conductorUrls}"
+                                    echo ""
+                                    CONDUCTOR_URLS="${conductorUrls}" \\
+                                      npx tsx src/seed-agent-bindings.ts
+                                """
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Seed Custody Commitments') {
+            when { allOf {
+                expression { env.PIPELINE_SKIPPED != 'true' }
+                expression { params.SEED_DATA }
+                expression { env.M1_BLOB_HASH != null && env.M1_BLOB_HASH != '' }
+            }}
+            steps {
+                container('builder') {
+                    script {
+                        def doorwayHost = env.RESOLVED_DOORWAY_HOST
+                        def blobHash = env.M1_BLOB_HASH
+                        def blobSize = env.M1_BLOB_SIZE_BYTES ?: '0'
+                        catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
+                            dir('genesis/seeder') {
+                                sh """#!/bin/bash
+                                    set -euo pipefail
+                                    echo "═══════════════════════════════════════════════════════════"
+                                    echo "SEED CUSTODY COMMITMENTS (M1 matthew↔timothy pair)"
+                                    echo "═══════════════════════════════════════════════════════════"
+                                    echo "Doorway: ${doorwayHost}"
+                                    echo "Blob:    ${blobHash} (${blobSize} bytes)"
+                                    echo ""
+                                    DOORWAY_URL="${doorwayHost}" \\
+                                    M1_BLOB_HASH="${blobHash}" \\
+                                    M1_BLOB_SIZE_BYTES="${blobSize}" \\
+                                      npx tsx src/seed-commitments.ts
                                 """
                             }
                         }
