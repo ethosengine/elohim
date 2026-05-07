@@ -9,6 +9,8 @@ use std::rc::Rc;
 
 use deno_core::{v8, FsModuleLoader, JsRuntime as DenoJsRuntime, ModuleSpecifier, PollEventLoopOptions, RuntimeOptions};
 
+use crate::shim::{console::console_ext, text::text_ext, url::url_ext};
+
 use crate::{RenderError, Result};
 
 /// A V8 isolate managed by deno_core.
@@ -180,6 +182,31 @@ impl JsRuntime {
             .to_string(tc)
             .ok_or_else(|| RenderError::Panic("render() result to_string failed".into()))?;
         Ok(result_str.to_rust_string_lossy(tc))
+    }
+}
+
+impl JsRuntime {
+    /// Boot a new V8 isolate with console, URL, and TextEncoder/TextDecoder shims.
+    ///
+    /// `console.*` calls dispatch into Rust's `tracing` system at the
+    /// appropriate level (info/warn/error). `URL` is a minimal WHATWG-compatible
+    /// JS implementation. `TextEncoder`/`TextDecoder` are implemented on top of
+    /// deno_core's `op_encode`/`op_decode` builtins. None of these are available
+    /// in a bare deno_core runtime without a snapshot; the extensions inject them.
+    ///
+    /// Includes `FsModuleLoader` so that `render_via_module` works from the
+    /// same runtime instance.
+    pub fn with_shims() -> Self {
+        let inner = DenoJsRuntime::new(RuntimeOptions {
+            module_loader: Some(Rc::new(FsModuleLoader)),
+            extensions: vec![
+                console_ext::init_ops_and_esm(),
+                url_ext::init_ops_and_esm(),
+                text_ext::init_ops_and_esm(),
+            ],
+            ..Default::default()
+        });
+        Self { inner, has_fs_loader: true }
     }
 }
 
