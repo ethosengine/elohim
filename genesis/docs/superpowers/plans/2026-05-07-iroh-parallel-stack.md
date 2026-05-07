@@ -7,28 +7,34 @@
 **Architecture:** A new `src/p2p_iroh/` module sits alongside `src/p2p/`, gated by `p2p-iroh` Cargo feature. Both backends compile additively; runtime config (`TransportBackend::Libp2p` | `TransportBackend::Iroh`) selects one at startup. Wire formats (MessagePack frames defined in `crate::p2p::wire`) are *shared* across stacks so the cutover doesn't fork message schemas — only the transport. Where iroh has a native protocol (blobs via `iroh-blobs`, gossip via `iroh-gossip`), we adopt it; where we have bespoke protocols (sync, shard, EPR, view federation, identity handshake, trust, reach), we register custom ALPNs on iroh's `Router` and reuse our existing wire types.
 
 **Tech Stack:**
-- `iroh = "=0.96"` (pulled transitively by iroh-blobs/iroh-gossip; pinned for stability)
-- `iroh-blobs = "=0.98"` (BLAKE3-keyed content-addressed blob protocol — Phase 2)
-- `iroh-gossip = "=0.96"` (gossip overlay — Phase 4)
+- `iroh = "=0.92"` (pulled transitively by iroh-blobs 0.94; pinned for stability)
+- `iroh-blobs = "=0.94"` (BLAKE3-keyed content-addressed blob protocol — Phase 2)
 - `tokio`, `rmp-serde`, `bytes` (existing)
+- `iroh-gossip` — deferred to Phase 4 (see version-pinning notes below)
 
-**Pinning rationale (post-probe, 2026-05-07):**
+**Pinning rationale (post-probe + post-compile, 2026-05-07):**
 
-The first iteration of this plan pinned `iroh = "1.0.0-rc.0"` standalone (no iroh-blobs, custom QUIC protocol from scratch) because iroh-blobs 0.100 has a hard transitive conflict with our `multihash-codetable` (sha2 pre-release pin via iroh-base 0.98 → ed25519-dalek 3.0.0-pre.6). That premise turns out to be over-narrow.
+Two iterations of this plan landed in the wrong place by probing only resolution, not compilation:
 
-`cargo metadata` probes against the *actual* elohim-storage workspace constraints walked the iroh-blobs version range:
+1. First iteration pinned `iroh = "1.0.0-rc.0"` standalone (no iroh-blobs, custom QUIC protocol) because iroh-blobs 0.100 has a sha2 pre-release pin conflict with `multihash-codetable`. Over-narrow.
+2. Second iteration walked the iroh-blobs version range and picked 0.98 + iroh 0.96 + iroh-gossip 0.96 — all RESOLVED cleanly. But on `cargo build`, iroh-blobs 0.95+ pulls `ed25519-dalek 3.0.0-pre.1` → `curve25519-dalek 5.0.0-pre.1`, and the *published source* of curve25519-dalek 5.0.0-pre.1 has a stale import (`digest::crypto_common::BlockSizeUser`) that no longer exists in current `digest`. iroh-base pins these pre-releases exactly, so no resolver-level escape.
 
-| iroh-blobs | Resolves with current stack? | Notes |
-|---|---|---|
-| 0.100 | ❌ sha2 rc.5 conflict via iroh-base 0.98 | Plan blocker — but only at this version |
-| 0.99 | ❌ same | |
-| 0.98 (Jan 2026) | ✅ **clean** — pulls iroh 0.96, sha2 0.10.9 + 0.11.0 coexist | **Selected** |
-| 0.97, 0.96 | ❌ crypto-common conflict | |
-| 0.94–0.90 | ✅ also clean (older) | |
+**Third pin (this iteration), tested with `cargo build`:**
 
-iroh-blobs 0.98 with iroh 0.96 is a real released crate (~3 months soak), not a release candidate. It resolves alongside our current `holochain_client 0.9.0-dev.5` — no holochain bump required. Picking this pinned pair eliminates Phase 0 entirely and lets Phase 2 use iroh-blobs' production blob protocol instead of building a custom QUIC ALPN handler from scratch.
+| iroh-blobs | Resolves? | Compiles? | Crypto path |
+|---|---|---|---|
+| 0.100 / 0.99 | ❌ sha2 rc.5 conflict | n/a | ed25519-dalek 3.0.0-pre.6 path |
+| 0.98 / 0.96 / 0.95 | ✅ | ❌ source bug in curve25519-dalek 5.0.0-pre.1 | ed25519-dalek 3.0.0-pre.1 path |
+| **0.94 (Sep 2025)** | ✅ | ✅ **clean** | **stable ed25519-dalek 2.2 + curve25519-dalek 4.1** |
+| 0.93 / 0.91 / 0.90 | ✅ | ✅ (also stable crypto path) | older alternatives |
 
-When n0 publishes iroh-blobs aligned with iroh 1.0 stable, we revisit. By then we'll already be running on iroh-blobs natively, so the upgrade is a version bump rather than a protocol rewrite.
+iroh-blobs 0.94 (Sep 2025) is the highest version using fully soaked ed25519-dalek 2.2 + curve25519-dalek 4.1. It pulls `iroh 0.92` transitively. ~7 months soak as of plan-write. Coexists with current `holochain_client 0.9.0-dev.5` — Phase 0 (holochain bump) remains eliminated.
+
+**iroh-gossip deferred to Phase 4.** In Phase 1 probes, iroh-gossip 0.94 conflicted with `multihash-codetable`'s `crypto-common` at a different major. Phase 4 picks up the gossip plane with its own design gate and version probe; until then we don't add iroh-gossip as a dep.
+
+**API drift risk:** writing against iroh-blobs 0.94 / iroh 0.92 means absorbing API drift later when n0 ships an iroh-blobs aligned with iroh 1.0 stable. The Phase 2 wrapper (`IrohBlobStore`) is the single chokepoint for that drift — that's its primary purpose.
+
+**Subagent-conflict guardrail (per `feedback_subagent_dep_conflict_supervision.md`):** if `just build-iroh` fails after a future workspace change, do NOT pick a different iroh-blobs version. Surface BLOCKED and probe inline.
 
 **Phasing (high level):**
 
@@ -168,60 +174,32 @@ Phase 1 stands up the iroh module skeleton without touching any actual P2P logic
 - Modify: `elohim/elohim-storage/Cargo.toml`
 - Modify: `elohim/elohim-storage/justfile`
 
-- [ ] **Step 1: Add the iroh dependencies**
-
-Edit `elohim/elohim-storage/Cargo.toml`. After the libp2p block, before the `futures` dep, add:
+- [x] **Step 1: Add the iroh dependencies** (committed 2bea677c)
 
 ```toml
-# iroh — QUIC-based P2P transport (parallel stack; staged cutover from libp2p).
-# Pinned to iroh-blobs 0.98 + iroh-gossip 0.96, which both pull iroh 0.96.
-# This pin coexists with current holochain dev.5 — see plan version-pinning rationale.
-# The iroh dep is pulled transitively; declare it explicitly so re-exports are stable.
-iroh = { version = "=0.96", optional = true }
-iroh-blobs = { version = "=0.98", optional = true }
-iroh-gossip = { version = "=0.96", optional = true, features = ["net"] }
+iroh = { version = "=0.92", optional = true }
+iroh-blobs = { version = "=0.94", optional = true }
 ```
 
-- [ ] **Step 2: Add p2p-iroh feature**
+- [x] **Step 2: Add p2p-iroh feature** (committed 2bea677c)
 
 ```toml
 [features]
 default = ["p2p"]
 compression = ["lz4_flex"]
 p2p = ["libp2p", "futures"]
-p2p-iroh = ["iroh", "iroh-blobs", "iroh-gossip", "futures"]
+p2p-iroh = ["iroh", "iroh-blobs", "futures"]
 ```
 
 `p2p-iroh` is **not** in `default`. Both features are additive (the parity test harness uses both compiled in).
 
-- [ ] **Step 3: Add justfile recipes**
+- [x] **Step 3: Add justfile recipes** (committed 2bea677c)
 
-```makefile
-# Build with iroh parallel stack enabled (libp2p still default)
-build-iroh:
-    cargo build --features "p2p p2p-iroh"
+- [x] **Step 4: Verify build** — clean fresh compile, 9m 16s, zero errors
 
-# Test with both stacks compiled in
-test-iroh:
-    cargo test --features "p2p p2p-iroh"
-```
+- [x] **Step 5: Commit** — `feat(storage): add p2p-iroh feature + iroh-blobs/iroh deps (no code yet)` (2bea677c)
 
-- [ ] **Step 4: Verify build**
-
-```bash
-cd /projects/elohim/.claude/worktrees/iroh-parallel-stack/elohim/elohim-storage
-just build-iroh
-```
-Expected: builds successfully (downloads iroh + iroh-blobs + iroh-gossip + transitives). First compile is slow — allow up to 10 minutes.
-
-If resolution fails: STOP. Do not change versions. The probe at plan-write proved this combo resolves; if it doesn't at task time, something in the workspace shifted. Surface BLOCKED, do NOT pick a different iroh-blobs version to "make it build" (per `feedback_subagent_dep_conflict_supervision.md`).
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add elohim/elohim-storage/Cargo.toml elohim/elohim-storage/justfile
-git commit -m "feat(storage): add p2p-iroh feature + iroh-blobs/gossip deps (no code yet)"
-```
+**Discovery during Task 1.1:** Plan-time probe was resolution-only; compile-time surfaced the curve25519-dalek 5.0.0-pre.1 source bug. Pin landed on iroh-blobs 0.94 + iroh 0.92 (versus the planned 0.98 + 0.96 with iroh-gossip). Plan version-pinning rationale section updated to record the third pin shift. Pattern: probe resolution AND compile before pinning.
 
 ### Task 1.2: Scaffold p2p_iroh module + relocate shared wire types
 
