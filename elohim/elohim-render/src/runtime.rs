@@ -27,22 +27,42 @@ impl JsRuntime {
 
     /// Evaluate a JS expression and return its `toString()`.
     ///
-    /// Uses a raw `HandleScope` so there is no async overhead for simple
-    /// expressions. Subsequent tasks will add module-loading paths that
-    /// require async.
+    /// Requires `&mut self` because `handle_scope` requires exclusive access
+    /// to the V8 isolate.
+    ///
+    /// Wraps compile + run in a `v8::TryCatch` scope so that JS exceptions
+    /// surface their actual error message instead of being swallowed.
+    ///
+    /// The function is intentionally `async` to keep the contract stable for
+    /// future tasks that require event-loop turning (module loading, fetch
+    /// dispatch). The allow attribute silences `clippy::unused_async` without
+    /// removing the forward-compatible signature.
+    #[allow(clippy::unused_async)]
     pub async fn eval_string(&mut self, source: &str) -> Result<String> {
         let scope = &mut self.inner.handle_scope();
-        let code = v8::String::new(scope, source)
+        let tc = &mut v8::TryCatch::new(scope);
+        let code = v8::String::new(tc, source)
             .ok_or_else(|| RenderError::ModuleLoad("v8 string alloc failed".into()))?;
-        let script = v8::Script::compile(scope, code, None)
-            .ok_or_else(|| RenderError::ModuleLoad("compile failed".into()))?;
-        let result = script
-            .run(scope)
-            .ok_or_else(|| RenderError::Panic("run returned None".into()))?;
+        let script = v8::Script::compile(tc, code, None).ok_or_else(|| {
+            let msg = tc
+                .exception()
+                .and_then(|e| e.to_string(tc))
+                .map(|s| s.to_rust_string_lossy(tc))
+                .unwrap_or_else(|| "compile failed".into());
+            RenderError::ModuleLoad(msg)
+        })?;
+        let result = script.run(tc).ok_or_else(|| {
+            let msg = tc
+                .exception()
+                .and_then(|e| e.to_string(tc))
+                .map(|s| s.to_rust_string_lossy(tc))
+                .unwrap_or_else(|| "run returned None".into());
+            RenderError::Panic(msg)
+        })?;
         let s = result
-            .to_string(scope)
+            .to_string(tc)
             .ok_or_else(|| RenderError::Panic("to_string failed".into()))?;
-        Ok(s.to_rust_string_lossy(scope))
+        Ok(s.to_rust_string_lossy(tc))
     }
 }
 

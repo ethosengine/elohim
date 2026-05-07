@@ -70,6 +70,7 @@ ts-rs = "10.0"
 
 # Concurrent data structures
 dashmap = "6.1"
+deno_core = "0.339.0"
 
 # Internal crate dependencies
 constitution = { path = "constitution" }
