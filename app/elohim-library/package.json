@@ -15,7 +15,7 @@
     "prestorybook": "pnpm run sync-genesis",
     "storybook": "storybook dev -p 6006 --config-dir .storybook",
     "prebuild-storybook": "pnpm run sync-genesis",
-    "build-storybook": "storybook build --config-dir .storybook"
+    "build-storybook": "storybook build --config-dir .storybook --output-dir dist/storybook"
   },
   "private": true,
   "dependencies": {
