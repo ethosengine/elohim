@@ -1579,6 +1579,12 @@ async fn handle_request(
         // ====================================================================
         // SSR smoke-test route — proves doorway → elohim-render end-to-end.
         //
+        // TEMPORARY: Replaced by manifest-driven SSR dispatch in Task 13
+        //   (genesis/docs/superpowers/plans/2026-05-07-doorway-ssr-runtime.md).
+        // The hardcoded /render-test/* arm exists only as the smallest first
+        // slice that proves the architecture; once the storage manifest gains
+        // a `render` field and the registry honours it, this arm is removed.
+        //
         // GET /render-test/{url} — delegates to the Angular SSR renderer when
         // SSR_BUNDLE_PATH is set at startup.  Falls back to a static SPA shell
         // when the renderer is absent (SSR_BUNDLE_PATH unset) or returns an
@@ -1999,6 +2005,10 @@ fn bad_request_response(message: &str) -> Response<Full<Bytes>> {
 // ─── SSR helpers ──────────────────────────────────────────────────────────────
 
 /// `DataFetcher` that returns 404 for every fetch.
+///
+/// TEMPORARY: Replaced in Task 13 by `ResolverFetcher`, which dispatches
+/// fetches through `DoorwayResolver` so SSR data calls hit the projection
+/// cache.  This stub exists only for the `/render-test/*` smoke route.
 ///
 /// Used by the `/render-test/*` route so Angular SSR can call the renderer
 /// without a real elohim-storage sidecar.  Any `fetch()` inside the bundle
