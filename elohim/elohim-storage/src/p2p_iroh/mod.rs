@@ -19,7 +19,9 @@
 mod config;
 mod endpoint;
 mod identity;
+mod node;
 
 pub use config::IrohConfig;
 pub use endpoint::{build_endpoint, BuildEndpointError};
 pub use identity::load_or_generate as load_or_generate_secret_key;
+pub use node::IrohNode;

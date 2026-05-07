@@ -3,6 +3,45 @@
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
+/// Selects the P2P transport stack used at runtime.
+///
+/// `Libp2p` (default) keeps the existing libp2p path. `Iroh` selects the
+/// parallel iroh-based stack — see `crate::p2p_iroh` and the staged-cutover
+/// plan at `genesis/docs/superpowers/plans/2026-05-07-iroh-parallel-stack.md`.
+///
+/// The two stacks are mutually exclusive at runtime; runtime config picks
+/// exactly one. Both compile in if both feature flags are enabled.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum TransportBackend {
+    #[default]
+    Libp2p,
+    Iroh,
+}
+
+impl std::str::FromStr for TransportBackend {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_ascii_lowercase().as_str() {
+            "libp2p" => Ok(Self::Libp2p),
+            "iroh" => Ok(Self::Iroh),
+            other => Err(format!(
+                "invalid transport backend '{other}' (expected 'libp2p' or 'iroh')"
+            )),
+        }
+    }
+}
+
+impl std::fmt::Display for TransportBackend {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Libp2p => f.write_str("libp2p"),
+            Self::Iroh => f.write_str("iroh"),
+        }
+    }
+}
+
 /// Default storage directory
 pub fn default_storage_dir() -> PathBuf {
     dirs::data_local_dir()
@@ -137,6 +176,12 @@ pub struct Config {
     /// GET-time race-fetch. Loaded from env `SELF_CID` at boot.
     #[serde(default)]
     pub self_cid: Option<String>,
+
+    /// Selects the P2P transport stack at runtime — see [`TransportBackend`].
+    /// Loaded from `ELOHIM_TRANSPORT_BACKEND` env or `transport_backend` TOML
+    /// key. Defaults to `Libp2p` so existing deployments are unaffected.
+    #[serde(default)]
+    pub transport_backend: TransportBackend,
 }
 
 fn default_peer_policy_path() -> PathBuf {
@@ -238,6 +283,7 @@ impl Default for Config {
             fetch_blob_timeout_seconds: default_fetch_blob_timeout_seconds(),
             fetch_blob_parallelism: default_fetch_blob_parallelism(),
             self_cid: None,
+            transport_backend: TransportBackend::default(),
         }
     }
 }
@@ -304,6 +350,53 @@ impl Config {
             self.storage_dir.join("cache").join("extractions")
         } else {
             self.extraction_cache.cache_dir.clone()
+        }
+    }
+}
+
+#[cfg(test)]
+mod transport_backend_tests {
+    use super::TransportBackend;
+    use std::str::FromStr;
+
+    #[test]
+    fn defaults_to_libp2p() {
+        let cfg = super::Config::default();
+        assert_eq!(cfg.transport_backend, TransportBackend::Libp2p);
+    }
+
+    #[test]
+    fn parses_known_values_case_insensitive() {
+        assert_eq!(
+            TransportBackend::from_str("libp2p").unwrap(),
+            TransportBackend::Libp2p
+        );
+        assert_eq!(
+            TransportBackend::from_str("LIBP2P").unwrap(),
+            TransportBackend::Libp2p
+        );
+        assert_eq!(
+            TransportBackend::from_str("iroh").unwrap(),
+            TransportBackend::Iroh
+        );
+        assert_eq!(
+            TransportBackend::from_str("Iroh").unwrap(),
+            TransportBackend::Iroh
+        );
+    }
+
+    #[test]
+    fn rejects_unknown() {
+        let err = TransportBackend::from_str("quic").unwrap_err();
+        assert!(err.contains("invalid transport backend"));
+    }
+
+    #[test]
+    fn round_trips_through_display() {
+        for backend in [TransportBackend::Libp2p, TransportBackend::Iroh] {
+            let s = backend.to_string();
+            let parsed = TransportBackend::from_str(&s).unwrap();
+            assert_eq!(parsed, backend);
         }
     }
 }
