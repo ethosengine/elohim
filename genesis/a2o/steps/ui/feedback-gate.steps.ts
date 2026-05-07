@@ -41,7 +41,12 @@ async function ensureOnContentPage(device: PlaywrightDevice): Promise<void> {
   await device.page.goto(`${appUrl}/lamad/resource/${DEFAULT_CONTENT_ID}`, {
     waitUntil: 'networkidle',
   });
-  await device.page.locator('.markdown-content').waitFor({ state: 'visible', timeout: 15_000 });
+  // Wait for the content-viewer header to render — that's where our trigger lives.
+  // We don't need the markdown body fully loaded; the trigger sits in `.content-actions`
+  // alongside Edit/Download which render as soon as the node fetches.
+  await device.page
+    .locator(`[data-testid="${VIEWER.FEEDBACK_TRIGGER}"]`)
+    .waitFor({ state: 'visible', timeout: 30_000 });
 }
 
 // ---------------------------------------------------------------------------
