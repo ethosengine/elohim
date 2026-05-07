@@ -10,7 +10,16 @@
  * handles mechanism selection, loading state, and routing to the correct renderer.
  */
 
-import { Component, computed, effect, inject, input, signal } from '@angular/core';
+import {
+  Component,
+  ElementRef,
+  computed,
+  effect,
+  inject,
+  input,
+  signal,
+  viewChild,
+} from '@angular/core';
 import { Router } from '@angular/router';
 
 import { GovernanceApiService } from '@app/elohim/services/governance-api.service';
@@ -48,7 +57,14 @@ import type { ChallengeView, GovernanceStateView, ProposalView } from '@elohim/s
   ],
   template: `
     @if (showChallengeForm()) {
-      <div class="challenge-overlay">
+      <dialog
+        #challengeDialog
+        class="challenge-dialog"
+        aria-label="File a challenge"
+        data-testid="challenge-overlay"
+        (click)="onChallengeDialogClick($event)"
+        (close)="closeChallengeForm()"
+      >
         <div class="challenge-panel">
           <button
             class="challenge-close"
@@ -65,7 +81,7 @@ import type { ChallengeView, GovernanceStateView, ProposalView } from '@elohim/s
             (challengeFiled)="onChallengeFiled($event)"
           />
         </div>
-      </div>
+      </dialog>
     }
 
     @if (selection(); as sel) {
@@ -138,20 +154,29 @@ import type { ChallengeView, GovernanceStateView, ProposalView } from '@elohim/s
       color: var(--text-secondary, #999);
     }
 
-    .challenge-overlay {
-      position: fixed;
-      inset: 0;
-      z-index: 1000;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+    /*
+     * Native <dialog> + showModal() — top-layer rendering escapes any
+     * ancestor stacking/clipping (lesson-view overflow:hidden, transformed
+     * sidebars, focused-view containers, etc.).
+     */
+    .challenge-dialog {
+      border: none;
+      padding: 0;
+      margin: auto;
+      background: transparent;
+      width: 90%;
+      max-width: 560px;
+      max-height: 90vh;
+      overflow: visible;
+      color: inherit;
+    }
+
+    .challenge-dialog::backdrop {
       background: rgba(0, 0, 0, 0.5);
     }
 
     .challenge-panel {
       position: relative;
-      width: 90%;
-      max-width: 560px;
       max-height: 90vh;
       overflow-y: auto;
       background: var(--surface, #fff);
@@ -261,6 +286,9 @@ export class FeedbackMechanismGatewayComponent {
   private readonly mechanismSelection = inject(MechanismSelectionService);
   private readonly signalAccumulation = inject(SignalAccumulationService);
 
+  /** Reference to the native <dialog> element when the challenge form is open. */
+  readonly challengeDialog = viewChild<ElementRef<HTMLDialogElement>>('challengeDialog');
+
   /** Whether the inline challenge form is currently shown. */
   readonly showChallengeForm = signal(false);
 
@@ -293,6 +321,33 @@ export class FeedbackMechanismGatewayComponent {
       const id = this.entityId();
       this.loadGovernanceData(type, id);
     });
+
+    // When the challenge dialog mounts, open it modally so it renders in
+    // the browser's top layer (above all stacking contexts and unaffected
+    // by ancestor transforms / overflow:hidden).
+    effect(() => {
+      if (!this.showChallengeForm()) return;
+      const ref = this.challengeDialog();
+      if (!ref) return;
+      const dialog = ref.nativeElement;
+      if (dialog.open) return;
+      if (typeof dialog.showModal === 'function') {
+        dialog.showModal();
+      } else {
+        dialog.setAttribute('open', '');
+      }
+    });
+  }
+
+  /**
+   * Native click on the dialog. When the backdrop is clicked the click target
+   * is the dialog element itself (not a descendant); use that to dismiss.
+   */
+  onChallengeDialogClick(event: MouseEvent): void {
+    const ref = this.challengeDialog();
+    if (ref && event.target === ref.nativeElement) {
+      this.closeChallengeForm();
+    }
   }
 
   /**

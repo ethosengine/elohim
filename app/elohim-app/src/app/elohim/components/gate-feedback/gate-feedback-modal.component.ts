@@ -1,9 +1,10 @@
 import {
+  AfterViewInit,
   Component,
   ChangeDetectionStrategy,
   DestroyRef,
+  ElementRef,
   EventEmitter,
-  HostListener,
   Output,
   computed,
   effect,
@@ -46,21 +47,17 @@ const PLACEHOLDER_MAP: Record<string, string> = {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [GateArtifactCardComponent],
   template: `
-    <div
-      class="modal-backdrop"
-      role="button"
-      tabindex="-1"
-      aria-label="Dismiss feedback dialog"
+    <dialog
+      #dialogEl
+      class="feedback-dialog"
+      aria-labelledby="feedback-modal-heading"
       data-testid="feedback-modal-backdrop"
-      (click)="closed.emit()"
+      (click)="onDialogClick($event)"
+      (close)="onDialogClose()"
     >
       <div
         class="modal-panel"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="feedback-modal-heading"
         data-testid="feedback-modal-panel"
-        (click)="$event.stopPropagation()"
       >
         <div class="modal-header">
           <h3 id="feedback-modal-heading" data-testid="feedback-modal-title">{{ title() }}</h3>
@@ -82,31 +79,39 @@ const PLACEHOLDER_MAP: Record<string, string> = {
           (settled)="settled.emit($event)"
         />
       </div>
-    </div>
+    </dialog>
   `,
   styles: [
     `
-      .modal-backdrop {
-        position: fixed;
-        inset: 0;
+      /*
+       * Native <dialog> + showModal() renders into the browser's top layer —
+       * above all stacking contexts and unaffected by ancestor transforms,
+       * overflow:hidden, or z-index. This is the canonical fix for the
+       * "feedback pane slides behind / off the page" symptom.
+       */
+      .feedback-dialog {
+        border: none;
+        padding: 0;
+        margin: auto;
+        background: transparent;
+        max-width: min(600px, calc(100vw - 2rem));
+        width: 100%;
+        max-height: 90vh;
+        overflow: visible;
+        color: inherit;
+      }
+
+      .feedback-dialog::backdrop {
         background: rgba(0, 0, 0, 0.5);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        /* must clear markdown-renderer .toc-sidebar (1100) and any pillar overlays */
-        z-index: 2000;
       }
 
       .modal-panel {
-        position: relative;
-        z-index: 1;
         background: var(--surface-elevated, #fff);
         border-radius: var(--radius-lg, 12px);
         padding: 1.5rem;
-        width: 100%;
-        max-width: 600px;
         max-height: 90vh;
         overflow-y: auto;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
       }
 
       .modal-header {
@@ -142,7 +147,7 @@ const PLACEHOLDER_MAP: Record<string, string> = {
     `,
   ],
 })
-export class GateFeedbackModalComponent {
+export class GateFeedbackModalComponent implements AfterViewInit {
   private readonly destroyRef = inject(DestroyRef);
   private readonly storageApi = inject(StorageApiService);
   private readonly diagnosticCollector = inject(DiagnosticCollectorService);
@@ -159,12 +164,30 @@ export class GateFeedbackModalComponent {
   }>();
   @Output() readonly closed = new EventEmitter<void>();
 
-  @HostListener('document:keydown.escape')
-  onEscapeKey(): void {
-    this.closed.emit();
+  readonly dialogEl = viewChild.required<ElementRef<HTMLDialogElement>>('dialogEl');
+  readonly artifactCard = viewChild.required(GateArtifactCardComponent);
+
+  ngAfterViewInit(): void {
+    const dialog = this.dialogEl().nativeElement;
+    if (typeof dialog.showModal === 'function') {
+      dialog.showModal();
+    } else {
+      // jsdom / older browser fallback — open attribute is enough for query-based tests
+      dialog.setAttribute('open', '');
+    }
   }
 
-  readonly artifactCard = viewChild.required(GateArtifactCardComponent);
+  /** Native click on the dialog. Backdrop click has target === dialog itself. */
+  onDialogClick(event: MouseEvent): void {
+    if (event.target === this.dialogEl().nativeElement) {
+      this.closed.emit();
+    }
+  }
+
+  /** Native close event (Escape key, or programmatic dialog.close()). */
+  onDialogClose(): void {
+    this.closed.emit();
+  }
 
   readonly title = computed(() => TITLE_MAP[this.feedbackType()] ?? 'Share Feedback');
   readonly placeholder = computed(

@@ -23,6 +23,7 @@ import { takeUntil } from 'rxjs/operators';
 import { Subject, Subscription } from 'rxjs';
 
 import { EprRelationshipsPanelComponent } from '@app/elohim/components/epr-relationships-panel/epr-relationships-panel.component';
+import { GateFeedbackTriggerComponent } from '@app/elohim/components/gate-feedback';
 import { EprResolverService } from '@app/elohim/services/epr-resolver.service';
 import { FeedbackMechanismGatewayComponent } from '@app/qahal';
 
@@ -81,6 +82,7 @@ interface InlineQuizCompletionEvent {
     RelatedConceptsPanelComponent,
     MiniGraphComponent,
     FeedbackMechanismGatewayComponent,
+    GateFeedbackTriggerComponent,
     EprRelationshipsPanelComponent,
     // TODO: InlineQuizComponent - requires Perseus/React dependencies
   ],
@@ -118,6 +120,11 @@ interface InlineQuizCompletionEvent {
                 }
               </div>
             }
+            <app-gate-feedback-trigger
+              class="lesson-feedback-trigger"
+              [contentId]="content.id"
+              data-testid="lesson-feedback-trigger"
+            />
           </div>
           <h1 class="lesson-title">
             {{ content.title || content.id }}
@@ -290,6 +297,11 @@ interface InlineQuizCompletionEvent {
         align-items: center;
         gap: 0.75rem;
         margin-bottom: 0.5rem;
+      }
+
+      /* Push the feedback trigger to the right edge of the header row. */
+      .lesson-feedback-trigger {
+        margin-left: auto;
       }
 
       .content-type-badge {
