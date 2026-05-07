@@ -1013,6 +1013,14 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                                         echo "Doorway: ${doorwayHost}"
                                         echo ""
 
+                                        # Ensure the chromium build matches the workspace's
+                                        # pnpm-resolved Playwright version. The sidecar image
+                                        # bundles browsers, but a Playwright minor bump in the
+                                        # workspace expects a different chromium build (see
+                                        # 'chromium_headless_shell-XXXX' suffix). Idempotent.
+                                        echo "🎭 ensuring matching chromium browser..."
+                                        npx playwright install chromium 2>&1 | tail -5
+
                                         E2E_DEVICE_MODE=playwright \\
                                         E2E_DOORWAY_ALPHA="${doorwayHost}" \\
                                         E2E_STORAGE_URL="http://${env.INTERNAL_STORAGE_URL}" \\
