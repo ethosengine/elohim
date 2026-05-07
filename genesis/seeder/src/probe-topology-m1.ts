@@ -18,7 +18,7 @@ import { chromium, type Page } from 'playwright';
 import { mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-const BASE = process.env.ALPHA_BASE_URL || 'https://app.elohim.host';
+const BASE = process.env.ALPHA_BASE_URL || 'https://alpha.elohim.host';
 const USER = process.env.MATTHEW_USERNAME || 'matthew.dowell@alpha.elohim.host';
 const PASS = process.env.MATTHEW_PASSWORD || 'TestAdmin2026!';
 const BLOB = process.env.M1_BLOB_HASH || '';
@@ -34,11 +34,16 @@ interface Check {
 const results: Check[] = [];
 
 async function login(page: Page): Promise<void> {
-  await page.goto(`${BASE}/login`);
-  await page.fill('input[type=email], input[name=email]', USER);
-  await page.fill('input[type=password], input[name=password]', PASS);
-  await page.click('button[type=submit]');
-  await page.waitForURL(/\/(home|dashboard|shefa|lamad|imagodei)/, { timeout: 30000 });
+  // Two-step login: federated identity → credentials.
+  // Selectors come from app/elohim-app/src/app/imagodei/components/login/login.component.html
+  await page.goto(`${BASE}/identity/login`);
+  // Step 1: enter federated identity (e.g., matthew.dowell@alpha.elohim.host)
+  await page.locator('[data-testid=login-federated-id]').fill(USER);
+  await page.locator('[data-testid=login-federated-submit]').click();
+  // Step 2: enter password on the credentials card (identifier may auto-fill)
+  await page.locator('[data-testid=login-password]').fill(PASS);
+  await page.locator('[data-testid=login-submit]').click();
+  await page.waitForURL(/\/(home|dashboard|shefa|lamad|imagodei|resource)/, { timeout: 30000 });
 }
 
 async function checkClusterPage(page: Page): Promise<void> {
