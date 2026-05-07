@@ -217,7 +217,10 @@ pub async fn aggregate_peer_topology_view(
 /// computed from `peer_blob_inventory`. The "authored-by-me" set is currently
 /// inferred as "blobs present locally" — M3 will tighten this to a real
 /// authoring-peer field.
-pub async fn build_local_slice(pool: &DbPool, connected_peers: &[libp2p::PeerId]) -> serde_json::Value {
+pub async fn build_local_slice(
+    pool: &DbPool,
+    connected_peers: &[libp2p::PeerId],
+) -> serde_json::Value {
     use crate::db::diesel_schema::{humans, peer_blob_inventory, peer_identity_bindings};
     use diesel::prelude::*;
 
@@ -231,6 +234,15 @@ pub async fn build_local_slice(pool: &DbPool, connected_peers: &[libp2p::PeerId]
     };
 
     let local_peer_id = std::env::var("ELOHIM_LOCAL_PEER_ID").unwrap_or_default();
+
+    // Hoisted above the loop — loop-invariant heuristic until M3 introduces
+    // a per-peer authoring-peer field on peer_blob_inventory.
+    // TODO(M3): replace with per-peer authored-CID count once authoring-peer is tracked.
+    let local_blob_count_heuristic: i64 = peer_blob_inventory::table
+        .filter(peer_blob_inventory::peer_id.eq(&local_peer_id))
+        .count()
+        .get_result(&mut conn)
+        .unwrap_or(0);
 
     let mut entries: Vec<serde_json::Value> = Vec::new();
 
@@ -266,6 +278,15 @@ pub async fn build_local_slice(pool: &DbPool, connected_peers: &[libp2p::PeerId]
             .select((humans::household_id, humans::display_name))
             .first::<(Option<String>, String)>(&mut conn)
             .optional()
+            .map_err(|e| {
+                tracing::warn!(
+                    target: "peer_topology_view",
+                    agent_cid = %agent_cid,
+                    err = %e,
+                    "humans query failed — falling back to agent_cid as household_id"
+                );
+                e
+            })
             .ok()
             .flatten();
 
@@ -276,13 +297,9 @@ pub async fn build_local_slice(pool: &DbPool, connected_peers: &[libp2p::PeerId]
         };
 
         // Step 3: CID counts from peer_blob_inventory.
-        // their_cids_hosted_by_me: count of blobs local peer_id holds (heuristic until M3).
-        let their_cids_hosted_by_me: i64 = peer_blob_inventory::table
-            .filter(peer_blob_inventory::peer_id.eq(&local_peer_id))
-            .count()
-            .get_result(&mut conn)
-            .unwrap_or(0);
-
+        // their_cids_hosted_by_me uses the loop-invariant heuristic computed above;
+        // my_cids_hosted_by_them is per-peer.
+        // TODO(M3): batch counts into a single GROUP BY query once N > cluster_size
         let my_cids_hosted_by_them: i64 = peer_blob_inventory::table
             .filter(peer_blob_inventory::peer_id.eq(&peer_str))
             .count()
@@ -293,9 +310,9 @@ pub async fn build_local_slice(pool: &DbPool, connected_peers: &[libp2p::PeerId]
             "household_id": household_id,
             "display_name": display_name,
             "online": true,
-            "last_sync_sec": 0u64,
+            "last_sync_sec": 0u64, // TODO(M3): derive from last fetch-success timestamp in peer_blob_inventory
             "my_cids_hosted_by_them": my_cids_hosted_by_them as u32,
-            "their_cids_hosted_by_me": their_cids_hosted_by_me as u32,
+            "their_cids_hosted_by_me": local_blob_count_heuristic as u32,
         }));
     }
 
@@ -312,7 +329,9 @@ mod tests {
     async fn build_local_slice_returns_empty_array_when_no_peers_connected() {
         let pool = test_pool();
         let slice = build_local_slice(&pool, &[]).await;
-        let arr = slice.get("connected_peer_households").and_then(|v| v.as_array());
+        let arr = slice
+            .get("connected_peer_households")
+            .and_then(|v| v.as_array());
         assert!(arr.is_some(), "expected connected_peer_households array");
         assert_eq!(arr.unwrap().len(), 0);
     }
