@@ -13,6 +13,7 @@ tracing.workspace = true
 async-trait.workspace = true
 tokio = { workspace = true }
 deno_core.workspace = true
+deno_error.workspace = true
 
 [dev-dependencies]
 tokio = { workspace = true }

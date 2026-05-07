@@ -84,44 +84,72 @@ impl JsRuntime {
         }
     }
 
+    /// Boot a new V8 isolate with all shims plus a `fetch` global backed by
+    /// the provided [`DataFetcher`].
+    ///
+    /// The `fetch(url, init?)` global dispatches to `fetcher.fetch(...)` via
+    /// an async deno_core op. The runtime drives the event loop when
+    /// `eval_string` receives a Promise result, so callers can `await fetch()`
+    /// inside an async IIFE evaluated through `eval_string`.
+    ///
+    /// Includes `FsModuleLoader` so that `render_via_module` works from the
+    /// same runtime instance.
+    pub fn with_full_shims(fetcher: std::sync::Arc<dyn crate::DataFetcher>) -> Self {
+        use crate::shim::fetch::{fetch_ext, FetcherHandle};
+        let inner = DenoJsRuntime::new(RuntimeOptions {
+            module_loader: Some(Rc::new(FsModuleLoader)),
+            extensions: vec![
+                console_ext::init_ops_and_esm(),
+                url_ext::init_ops_and_esm(),
+                text_ext::init_ops_and_esm(),
+                fetch_ext::init_ops_and_esm(FetcherHandle(fetcher)),
+            ],
+            ..Default::default()
+        });
+        Self {
+            inner,
+            has_fs_loader: true,
+        }
+    }
+
     /// Evaluate a JS expression and return its `toString()`.
     ///
-    /// Requires `&mut self` because `handle_scope` requires exclusive access
-    /// to the V8 isolate.
+    /// Requires `&mut self` because V8 operations require exclusive access
+    /// to the isolate.
     ///
-    /// Wraps compile + run in a `v8::TryCatch` scope so that JS exceptions
-    /// surface their actual error message instead of being swallowed.
+    /// If the expression evaluates to a `Promise` (e.g. an async IIFE), the
+    /// event loop is driven until the promise settles, and the resolved value's
+    /// `toString()` is returned. This is necessary for `fetch(...)` and other
+    /// async ops registered via extensions.
     ///
-    /// The function is intentionally `async` to keep the contract stable for
-    /// future tasks that require event-loop turning (module loading, fetch
-    /// dispatch). The allow attribute silences `clippy::unused_async` without
-    /// removing the forward-compatible signature.
-    #[allow(clippy::unused_async)]
+    /// Wraps execution in a try/catch so that JS exceptions surface their
+    /// actual error message instead of being swallowed.
     pub async fn eval_string(&mut self, source: &str) -> Result<String> {
+        // execute_script returns a Global<Value>. For a Promise result (e.g.
+        // an async IIFE), we must drive the event loop before reading the value.
+        let global_val = self
+            .inner
+            .execute_script("<eval>", source.to_string())
+            .map_err(|e| RenderError::ModuleLoad(e.to_string()))?;
+
+        // resolve() creates an RcPromiseFuture. For non-Promise values it
+        // resolves immediately; for Promises it registers a V8 callback and
+        // resolves when the promise settles. with_event_loop_promise drives the
+        // event loop concurrently so async ops (fetch, timers) can complete.
+        let resolve_fut = self.inner.resolve(global_val);
+        let resolved = self
+            .inner
+            .with_event_loop_promise(resolve_fut, PollEventLoopOptions::default())
+            .await
+            .map_err(|e| RenderError::Panic(e.to_string()))?;
+
+        // Convert the final value to a Rust String.
         let scope = &mut self.inner.handle_scope();
-        let tc = &mut v8::TryCatch::new(scope);
-        let code = v8::String::new(tc, source)
-            .ok_or_else(|| RenderError::ModuleLoad("v8 string alloc failed".into()))?;
-        let script = v8::Script::compile(tc, code, None).ok_or_else(|| {
-            let msg = tc
-                .exception()
-                .and_then(|e| e.to_string(tc))
-                .map(|s| s.to_rust_string_lossy(tc))
-                .unwrap_or_else(|| "compile failed".into());
-            RenderError::ModuleLoad(msg)
-        })?;
-        let result = script.run(tc).ok_or_else(|| {
-            let msg = tc
-                .exception()
-                .and_then(|e| e.to_string(tc))
-                .map(|s| s.to_rust_string_lossy(tc))
-                .unwrap_or_else(|| "run returned None".into());
-            RenderError::Panic(msg)
-        })?;
-        let s = result
-            .to_string(tc)
+        let local = v8::Local::new(scope, &resolved);
+        let s = local
+            .to_string(scope)
             .ok_or_else(|| RenderError::Panic("to_string failed".into()))?;
-        Ok(s.to_rust_string_lossy(tc))
+        Ok(s.to_rust_string_lossy(scope))
     }
 
     /// Load an ESM module from `module_path`, call its `render(url)` export,

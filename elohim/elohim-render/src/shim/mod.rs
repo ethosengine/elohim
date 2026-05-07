@@ -1,4 +1,4 @@
-//! deno_core extension shims (console, URL, TextEncoder/TextDecoder).
+//! deno_core extension shims (console, URL, TextEncoder/TextDecoder, fetch).
 //!
 //! WARNING: All `.js` files in this directory must be pure ASCII. The
 //! deno_core `js = [dir "...", "..."]` macro uses `ascii_str_include!`
@@ -9,5 +9,6 @@
 //! curly quotes.
 
 pub(crate) mod console;
+pub(crate) mod fetch;
 pub(crate) mod text;
 pub(crate) mod url;
