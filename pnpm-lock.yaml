@@ -808,7 +808,7 @@ importers:
         specifier: ^4.0.18
         version: 4.0.18(vitest@4.0.18(@types/node@22.19.13)(jiti@1.21.7)(jsdom@28.1.0(@noble/hashes@2.0.1))(less@4.5.1)(sass@1.97.3)(terser@5.46.1)(tsx@4.21.0)(yaml@2.8.3))
       playwright:
-        specifier: ^1.59.0
+        specifier: 1.59.1
         version: 1.59.1
       tsx:
         specifier: ^4.0.0
