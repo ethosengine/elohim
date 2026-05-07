@@ -20,8 +20,8 @@ pub enum RenderError {
     #[error("unsupported render spec: {0}")]
     UnsupportedSpec(String),
 
-    #[error("render output exceeded {limit_bytes} bytes")]
-    OutputTooLarge { limit_bytes: usize },
+    #[error("render output exceeded limit of {limit_bytes} bytes (actual: {actual_bytes} bytes)")]
+    OutputTooLarge { limit_bytes: usize, actual_bytes: usize },
 
     #[error("io error: {0}")]
     Io(#[from] std::io::Error),

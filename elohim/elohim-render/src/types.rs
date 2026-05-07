@@ -52,10 +52,21 @@ pub struct RenderContext {
     pub limits: RenderLimits,
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct RenderOutput {
     pub html: String,
     pub status: u16,
     pub headers: Vec<(String, String)>,
     pub fetched_inputs: Vec<ContentRef>,
+}
+
+impl Default for RenderOutput {
+    fn default() -> Self {
+        Self {
+            html: String::new(),
+            status: 200,
+            headers: Vec::new(),
+            fetched_inputs: Vec::new(),
+        }
+    }
 }
