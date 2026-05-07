@@ -194,6 +194,31 @@ pub struct AppState {
     /// Observable warmup retry state — populated when spawn_stream_task starts.
     /// Read by /health/startup to expose attempt count and completion status.
     pub warmup_state: Option<Arc<crate::projection::warm_stream::WarmupState>>,
+    /// Angular SSR renderer — present when SSR_BUNDLE_PATH env var is set at startup.
+    /// Used by the /render-test/* hardcoded route to prove the architecture end-to-end.
+    /// None in all other constructors (renderer: None is the safe default).
+    pub renderer: Option<Arc<dyn elohim_render::Renderer>>,
+}
+
+/// Initialize the SSR renderer from the `SSR_BUNDLE_PATH` environment variable.
+///
+/// Returns `Some(renderer)` if the env var is set and the bundle path exists.
+/// Returns `None` silently if the var is unset.
+/// Logs a warning and returns `None` if the path is set but the bundle fails to load.
+fn init_renderer() -> Option<Arc<dyn elohim_render::Renderer>> {
+    match std::env::var("SSR_BUNDLE_PATH") {
+        Ok(path) => match elohim_render::AngularRenderer::new(std::path::PathBuf::from(path)) {
+            Ok(r) => {
+                tracing::info!(target: "doorway::ssr", "SSR renderer ready");
+                Some(Arc::new(r) as Arc<dyn elohim_render::Renderer>)
+            }
+            Err(e) => {
+                tracing::warn!(target: "doorway::ssr", "SSR disabled: {}", e);
+                None
+            }
+        },
+        Err(_) => None,
+    }
 }
 
 impl AppState {
@@ -276,6 +301,7 @@ impl AppState {
             app_file_cache: None,
             cache_enabled: Arc::new(std::sync::atomic::AtomicBool::new(true)),
             warmup_state: None,
+            renderer: init_renderer(),
         }
     }
 
@@ -362,6 +388,7 @@ impl AppState {
             app_file_cache: None,
             cache_enabled: Arc::new(std::sync::atomic::AtomicBool::new(true)),
             warmup_state: None,
+            renderer: init_renderer(),
         }
     }
 
@@ -463,6 +490,7 @@ impl AppState {
             app_file_cache: None,
             cache_enabled: Arc::new(std::sync::atomic::AtomicBool::new(true)),
             warmup_state: None,
+            renderer: init_renderer(),
         }
     }
 
@@ -567,6 +595,7 @@ impl AppState {
             app_file_cache,
             cache_enabled: Arc::new(std::sync::atomic::AtomicBool::new(true)),
             warmup_state: None,
+            renderer: init_renderer(),
         })
     }
 
@@ -1548,6 +1577,41 @@ async fn handle_request(
         }
 
         // ====================================================================
+        // SSR smoke-test route — proves doorway → elohim-render end-to-end.
+        //
+        // GET /render-test/{url} — delegates to the Angular SSR renderer when
+        // SSR_BUNDLE_PATH is set at startup.  Falls back to a static SPA shell
+        // when the renderer is absent (SSR_BUNDLE_PATH unset) or returns an
+        // error.  This arm is intentionally hardcoded (not manifest-driven)
+        // because SSR is a doorway-specific concern: the renderer lives in
+        // doorway's process, not in elohim-storage.
+        // ====================================================================
+        (Method::GET, p) if p.starts_with("/render-test/") => {
+            if let Some(renderer) = state.renderer.as_ref() {
+                let stripped = p.strip_prefix("/render-test/").unwrap_or("");
+                let url = format!("/{}", stripped);
+                let ctx = elohim_render::RenderContext {
+                    spec: elohim_render::RenderSpec::AngularSsr,
+                    url: url.clone(),
+                    data_fetcher: Arc::new(NoopFetcher),
+                    limits: Default::default(),
+                };
+                match renderer.render(ctx).await {
+                    Ok(out) => {
+                        tracing::debug!(target: "doorway::ssr", url = %url, "SSR render ok");
+                        return Ok(to_boxed(ssr_html_response(out.html)));
+                    }
+                    Err(e) => {
+                        tracing::warn!(target: "doorway::ssr", url = %url, error = %e, "SSR render error — falling back to SPA shell");
+                        return Ok(to_boxed(ssr_spa_shell_fallback()));
+                    }
+                }
+            }
+            // No renderer configured — return SPA shell so CSR can hydrate.
+            to_boxed(ssr_spa_shell_fallback())
+        }
+
+        // ====================================================================
         // Dynamic Route Registry + SPA fallback — all remaining requests.
         //
         // The registry is consulted on every otherwise-unmatched request.
@@ -1929,6 +1993,59 @@ fn bad_request_response(message: &str) -> Response<Full<Bytes>> {
         .status(StatusCode::BAD_REQUEST)
         .header("Content-Type", "application/json")
         .body(Full::new(Bytes::from(body.to_string())))
+        .unwrap()
+}
+
+// ─── SSR helpers ──────────────────────────────────────────────────────────────
+
+/// `DataFetcher` that returns 404 for every fetch.
+///
+/// Used by the `/render-test/*` route so Angular SSR can call the renderer
+/// without a real elohim-storage sidecar.  Any `fetch()` inside the bundle
+/// will receive a 404 body rather than crashing the render worker.
+struct NoopFetcher;
+
+#[async_trait::async_trait]
+impl elohim_render::DataFetcher for NoopFetcher {
+    async fn fetch(
+        &self,
+        _request: elohim_render::FetchRequest,
+    ) -> elohim_render::Result<elohim_render::FetchResponse> {
+        Ok(elohim_render::FetchResponse {
+            status: 404,
+            headers: Default::default(),
+            body: b"not found".to_vec(),
+            content_hash: None,
+        })
+    }
+}
+
+/// Build a `text/html` response from SSR-rendered HTML.
+fn ssr_html_response(html: String) -> Response<Full<Bytes>> {
+    Response::builder()
+        .status(StatusCode::OK)
+        .header("Content-Type", "text/html; charset=utf-8")
+        .header("Cache-Control", "no-store")
+        .body(Full::new(Bytes::from(html)))
+        .unwrap()
+}
+
+/// Minimal SPA shell returned when SSR is unavailable or the renderer errors.
+///
+/// The shell contains an `<app-root>` placeholder so the Angular CSR bundle
+/// can hydrate the page without a full server-rendered document.
+fn ssr_spa_shell_fallback() -> Response<Full<Bytes>> {
+    const SHELL: &str = concat!(
+        "<!doctype html><html><body>",
+        "<app-root></app-root>",
+        "<script>console.log('SSR fallback \u{2014} CSR will hydrate')</script>",
+        "</body></html>",
+    );
+    Response::builder()
+        .status(StatusCode::OK)
+        .header("Content-Type", "text/html; charset=utf-8")
+        .header("Cache-Control", "no-store")
+        .body(Full::new(Bytes::from(SHELL)))
         .unwrap()
 }
 

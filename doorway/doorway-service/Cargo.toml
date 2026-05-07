@@ -125,6 +125,9 @@ infrastructure-types = { path = "../../elohim/sdk/domains/infrastructure/types" 
 # Shared compute reporting types
 elohim-compute = { path = "../../elohim/elohim-compute" }
 
+# SSR rendering engine (V8/deno_core — loads Angular SSR bundles)
+elohim-render = { path = "../../elohim/elohim-render" }
+
 # Wisdom-as-system-auth gate: fires on every state-changing write path.
 # default-features = false excludes ts-rs and the testing shims.
 gate-client = { path = "../../elohim/elohim-agent/gate-client", default-features = false }

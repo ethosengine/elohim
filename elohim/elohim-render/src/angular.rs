@@ -68,7 +68,7 @@ impl AngularRenderer {
     ///
     /// Returns `RenderError::ModuleLoad` if the bundle path does not exist or the
     /// background thread cannot be spawned.
-    pub async fn new(bundle: PathBuf) -> Result<Self> {
+    pub fn new(bundle: PathBuf) -> Result<Self> {
         if !bundle.exists() {
             return Err(RenderError::ModuleLoad(format!(
                 "bundle not found: {}",
