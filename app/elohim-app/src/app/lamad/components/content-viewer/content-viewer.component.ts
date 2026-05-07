@@ -20,6 +20,7 @@ import { BehaviorSubject, Observable, Subject, Subscription, forkJoin, of } from
 
 import { ContentAnalyticsComponent } from '@app/elohim/components/content-analytics/content-analytics.component';
 import { EprRelationshipsPanelComponent } from '@app/elohim/components/epr-relationships-panel/epr-relationships-panel.component';
+import { GateFeedbackTriggerComponent } from '@app/elohim/components/gate-feedback';
 import {
   ProtocolOmnibarComponent,
   OmnibarSteward,
@@ -105,6 +106,7 @@ import type { ContentStewardshipView } from '@elohim/storage-client/generated';
     EprRelationshipsPanelComponent,
     ResilienceSnapshotComponent,
     DistributionBadgeComponent,
+    GateFeedbackTriggerComponent,
   ],
   templateUrl: './content-viewer.component.html',
   styleUrls: ['./content-viewer.component.css'],

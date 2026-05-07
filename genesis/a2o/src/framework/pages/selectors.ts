@@ -261,6 +261,23 @@ export const VIEWER = {
   AFFINITY_PRACTICING: 'viewer-affinity-practicing',
   FILE_CHALLENGE: 'viewer-file-challenge',
   START_DISCUSSION: 'viewer-start-discussion',
+  FEEDBACK_TRIGGER: 'viewer-feedback-trigger',
+} as const;
+
+// Gate feedback (elohim-app: gate-feedback-trigger + gate-feedback-modal)
+export const FEEDBACK_GATE = {
+  TRIGGER_BTN: 'feedback-trigger-btn',
+  TRIGGER_MENU: 'feedback-trigger-menu',
+  MENU_ITEM_FLAG: 'feedback-menu-item-flag',
+  MENU_ITEM_CHALLENGE: 'feedback-menu-item-challenge',
+  MENU_ITEM_FEEDBACK: 'feedback-menu-item-feedback',
+  MENU_ITEM_REPORT: 'feedback-menu-item-report',
+  MODAL_BACKDROP: 'feedback-modal-backdrop',
+  MODAL_PANEL: 'feedback-modal-panel',
+  MODAL_TITLE: 'feedback-modal-title',
+  MODAL_CLOSE: 'feedback-modal-close',
+  ARTIFACT_TEXTAREA: 'artifact-textarea',
+  ARTIFACT_SUBMIT: 'artifact-submit',
 } as const;
 
 // Lesson view (elohim-app: lesson-view.component.ts)

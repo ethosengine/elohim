@@ -48,14 +48,17 @@ const PLACEHOLDER_MAP: Record<string, string> = {
   template: `
     <div
       class="modal-backdrop"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="feedback-modal-heading"
+      role="button"
+      tabindex="-1"
+      aria-label="Dismiss feedback dialog"
       data-testid="feedback-modal-backdrop"
       (click)="closed.emit()"
     >
       <div
         class="modal-panel"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="feedback-modal-heading"
         data-testid="feedback-modal-panel"
         (click)="$event.stopPropagation()"
       >
@@ -90,10 +93,13 @@ const PLACEHOLDER_MAP: Record<string, string> = {
         display: flex;
         align-items: center;
         justify-content: center;
-        z-index: 1000; /* modal overlay — above all pillar content */
+        /* must clear markdown-renderer .toc-sidebar (1100) and any pillar overlays */
+        z-index: 2000;
       }
 
       .modal-panel {
+        position: relative;
+        z-index: 1;
         background: var(--surface-elevated, #fff);
         border-radius: var(--radius-lg, 12px);
         padding: 1.5rem;
