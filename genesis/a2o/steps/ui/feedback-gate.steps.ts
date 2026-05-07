@@ -48,37 +48,38 @@ async function ensureOnContentPage(device: PlaywrightDevice): Promise<void> {
 // Navigation
 // ---------------------------------------------------------------------------
 
-When('{word} navigates to a markdown content page', async function (
-  this: E2EWorld,
-  humanName: string,
-) {
-  const device = requirePlaywright(this, humanName);
-  if (!device) return 'pending';
-  await ensureOnContentPage(device);
-});
+When(
+  '{word} navigates to a markdown content page',
+  async function (this: E2EWorld, humanName: string) {
+    const device = requirePlaywright(this, humanName);
+    if (!device) return 'pending';
+    await ensureOnContentPage(device);
+  }
+);
 
-Given('{word} is viewing a markdown content page', async function (
-  this: E2EWorld,
-  humanName: string,
-) {
-  const device = requirePlaywright(this, humanName);
-  if (!device) return 'pending';
-  await ensureOnContentPage(device);
-});
+Given(
+  '{word} is viewing a markdown content page',
+  async function (this: E2EWorld, humanName: string) {
+    const device = requirePlaywright(this, humanName);
+    if (!device) return 'pending';
+    await ensureOnContentPage(device);
+  }
+);
 
 // ---------------------------------------------------------------------------
 // Trigger visibility
 // ---------------------------------------------------------------------------
 
-Then('the feedback trigger should be visible in the content actions', async function (
-  this: E2EWorld,
-) {
-  const device = requirePlaywright(this);
-  if (!device) return 'pending';
+Then(
+  'the feedback trigger should be visible in the content actions',
+  async function (this: E2EWorld) {
+    const device = requirePlaywright(this);
+    if (!device) return 'pending';
 
-  const trigger = device.page.locator(`[data-testid="${VIEWER.FEEDBACK_TRIGGER}"]`);
-  await trigger.waitFor({ state: 'visible', timeout: 10_000 });
-});
+    const trigger = device.page.locator(`[data-testid="${VIEWER.FEEDBACK_TRIGGER}"]`);
+    await trigger.waitFor({ state: 'visible', timeout: 10_000 });
+  }
+);
 
 Then('the feedback trigger should have an accessible label', async function (this: E2EWorld) {
   const device = requirePlaywright(this);
@@ -105,18 +106,18 @@ When('{word} opens the feedback trigger menu', async function (this: E2EWorld, h
   await menu.waitFor({ state: 'visible', timeout: 5_000 });
 });
 
-Given('{word} has opened the feedback trigger menu', async function (
-  this: E2EWorld,
-  humanName: string,
-) {
-  const device = requirePlaywright(this, humanName);
-  if (!device) return 'pending';
+Given(
+  '{word} has opened the feedback trigger menu',
+  async function (this: E2EWorld, humanName: string) {
+    const device = requirePlaywright(this, humanName);
+    if (!device) return 'pending';
 
-  const triggerBtn = device.page.locator(`[data-testid="${FEEDBACK_GATE.TRIGGER_BTN}"]`);
-  await triggerBtn.click();
-  const menu = device.page.locator(`[data-testid="${FEEDBACK_GATE.TRIGGER_MENU}"]`);
-  await menu.waitFor({ state: 'visible', timeout: 5_000 });
-});
+    const triggerBtn = device.page.locator(`[data-testid="${FEEDBACK_GATE.TRIGGER_BTN}"]`);
+    await triggerBtn.click();
+    const menu = device.page.locator(`[data-testid="${FEEDBACK_GATE.TRIGGER_MENU}"]`);
+    await menu.waitFor({ state: 'visible', timeout: 5_000 });
+  }
+);
 
 Then('the feedback menu should list {string}', async function (this: E2EWorld, label: string) {
   const device = requirePlaywright(this);
@@ -127,20 +128,19 @@ Then('the feedback menu should list {string}', async function (this: E2EWorld, l
   await item.waitFor({ state: 'visible', timeout: 5_000 });
 });
 
-When('{word} selects {string} from the menu', async function (
-  this: E2EWorld,
-  humanName: string,
-  label: string,
-) {
-  const device = requirePlaywright(this, humanName);
-  if (!device) return 'pending';
+When(
+  '{word} selects {string} from the menu',
+  async function (this: E2EWorld, humanName: string, label: string) {
+    const device = requirePlaywright(this, humanName);
+    if (!device) return 'pending';
 
-  const menu = device.page.locator(`[data-testid="${FEEDBACK_GATE.TRIGGER_MENU}"]`);
-  await menu.getByText(label, { exact: true }).click();
+    const menu = device.page.locator(`[data-testid="${FEEDBACK_GATE.TRIGGER_MENU}"]`);
+    await menu.getByText(label, { exact: true }).click();
 
-  const panel = device.page.locator(`[data-testid="${FEEDBACK_GATE.MODAL_PANEL}"]`);
-  await panel.waitFor({ state: 'visible', timeout: 5_000 });
-});
+    const panel = device.page.locator(`[data-testid="${FEEDBACK_GATE.MODAL_PANEL}"]`);
+    await panel.waitFor({ state: 'visible', timeout: 5_000 });
+  }
+);
 
 // ---------------------------------------------------------------------------
 // Modal visibility & stacking
@@ -168,30 +168,38 @@ Then(
     const device = requirePlaywright(this);
     if (!device) return 'pending';
 
-    const backdropZ = await device.page
-      .locator(`[data-testid="${FEEDBACK_GATE.MODAL_BACKDROP}"]`)
-      .evaluate(el => parseInt(window.getComputedStyle(el).zIndex || '0', 10));
+    const panel = device.page.locator(`[data-testid="${FEEDBACK_GATE.MODAL_PANEL}"]`);
+    await panel.waitFor({ state: 'visible' });
+
+    const backdropSel = `[data-testid="${FEEDBACK_GATE.MODAL_BACKDROP}"]`;
+    const panelSel = `[data-testid="${FEEDBACK_GATE.MODAL_PANEL}"]`;
+
+    const backdropZ = (await device.page.evaluate((sel: string) => {
+      const el = document.querySelector(sel);
+      if (!el) return 0;
+      return Number.parseInt(globalThis.getComputedStyle(el).zIndex ?? '0', 10);
+    }, backdropSel)) as number;
 
     // The TOC sidebar's known stacking ceiling is 1100 (markdown-renderer.component.css).
     assert.ok(
       backdropZ > 1100,
-      `feedback backdrop z-index ${backdropZ} must exceed TOC sidebar (1100)`,
+      `feedback backdrop z-index ${backdropZ} must exceed TOC sidebar (1100)`
     );
-
-    const panel = device.page.locator(`[data-testid="${FEEDBACK_GATE.MODAL_PANEL}"]`);
-    await panel.waitFor({ state: 'visible' });
 
     // Hit-testing: the click target at the panel center should be the panel
     // (or one of its descendants), not a chrome element above it.
-    const panelOnTop = await panel.evaluate(el => {
+    const panelOnTop = (await device.page.evaluate((sel: string) => {
+      const el = document.querySelector(sel);
+      if (!el) return false;
       const rect = el.getBoundingClientRect();
       const x = rect.left + rect.width / 2;
       const y = rect.top + rect.height / 2;
       const hit = document.elementFromPoint(x, y);
-      return hit ? el.contains(hit) || el === hit : false;
-    });
+      return hit ? el === hit || el.contains(hit) : false;
+    }, panelSel)) as boolean;
+
     assert.ok(panelOnTop, 'feedback dialogue panel center must be hit-testable (nothing above it)');
-  },
+  }
 );
 
 Then('the artifact textarea should be selectable and focusable', async function (this: E2EWorld) {
@@ -201,63 +209,62 @@ Then('the artifact textarea should be selectable and focusable', async function 
   const textarea = device.page.locator(`[data-testid="${FEEDBACK_GATE.ARTIFACT_TEXTAREA}"]`);
   await textarea.waitFor({ state: 'visible', timeout: 5_000 });
   await textarea.click();
-  const isFocused = await textarea.evaluate(el => el === document.activeElement);
+  const isFocused = (await device.page.evaluate((sel: string) => {
+    const el = document.querySelector(sel);
+    return el === document.activeElement;
+  }, `[data-testid="${FEEDBACK_GATE.ARTIFACT_TEXTAREA}"]`)) as boolean;
   assert.ok(isFocused, 'artifact textarea did not receive focus on click');
 });
 
-Then('the artifact textarea placeholder should be {string}', async function (
-  this: E2EWorld,
-  expected: string,
-) {
-  const device = requirePlaywright(this);
-  if (!device) return 'pending';
+Then(
+  'the artifact textarea placeholder should be {string}',
+  async function (this: E2EWorld, expected: string) {
+    const device = requirePlaywright(this);
+    if (!device) return 'pending';
 
-  const textarea = device.page.locator(`[data-testid="${FEEDBACK_GATE.ARTIFACT_TEXTAREA}"]`);
-  await textarea.waitFor({ state: 'visible', timeout: 5_000 });
-  const placeholder = await textarea.getAttribute('placeholder');
-  assert.equal(placeholder, expected, `expected placeholder "${expected}", got "${placeholder}"`);
-});
+    const textarea = device.page.locator(`[data-testid="${FEEDBACK_GATE.ARTIFACT_TEXTAREA}"]`);
+    await textarea.waitFor({ state: 'visible', timeout: 5_000 });
+    const placeholder = await textarea.getAttribute('placeholder');
+    assert.equal(placeholder, expected, `expected placeholder "${expected}", got "${placeholder}"`);
+  }
+);
 
-Then('the feedback dialogue panel title should read {string}', async function (
-  this: E2EWorld,
-  expected: string,
-) {
-  const device = requirePlaywright(this);
-  if (!device) return 'pending';
+Then(
+  'the feedback dialogue panel title should read {string}',
+  async function (this: E2EWorld, expected: string) {
+    const device = requirePlaywright(this);
+    if (!device) return 'pending';
 
-  const title = device.page.locator(`[data-testid="${FEEDBACK_GATE.MODAL_TITLE}"]`);
-  await title.waitFor({ state: 'visible', timeout: 5_000 });
-  const text = (await title.textContent())?.trim();
-  assert.equal(text, expected, `expected title "${expected}", got "${text}"`);
-});
+    const title = device.page.locator(`[data-testid="${FEEDBACK_GATE.MODAL_TITLE}"]`);
+    await title.waitFor({ state: 'visible', timeout: 5_000 });
+    const text = (await title.textContent())?.trim();
+    assert.equal(text, expected, `expected title "${expected}", got "${text}"`);
+  }
+);
 
 // ---------------------------------------------------------------------------
 // Dismissal
 // ---------------------------------------------------------------------------
 
-Given('{word} has the feedback dialogue panel open with {string} selected', async function (
-  this: E2EWorld,
-  humanName: string,
-  label: string,
-) {
-  const device = requirePlaywright(this, humanName);
-  if (!device) return 'pending';
+Given(
+  '{word} has the feedback dialogue panel open with {string} selected',
+  async function (this: E2EWorld, humanName: string, label: string) {
+    const device = requirePlaywright(this, humanName);
+    if (!device) return 'pending';
 
-  await ensureOnContentPage(device);
-  await device.page.locator(`[data-testid="${FEEDBACK_GATE.TRIGGER_BTN}"]`).click();
-  await device.page
-    .locator(`[data-testid="${FEEDBACK_GATE.TRIGGER_MENU}"]`)
-    .getByText(label, { exact: true })
-    .click();
-  await device.page
-    .locator(`[data-testid="${FEEDBACK_GATE.MODAL_PANEL}"]`)
-    .waitFor({ state: 'visible', timeout: 5_000 });
-});
+    await ensureOnContentPage(device);
+    await device.page.locator(`[data-testid="${FEEDBACK_GATE.TRIGGER_BTN}"]`).click();
+    await device.page
+      .locator(`[data-testid="${FEEDBACK_GATE.TRIGGER_MENU}"]`)
+      .getByText(label, { exact: true })
+      .click();
+    await device.page
+      .locator(`[data-testid="${FEEDBACK_GATE.MODAL_PANEL}"]`)
+      .waitFor({ state: 'visible', timeout: 5_000 });
+  }
+);
 
-When('{word} clicks the dialogue close button', async function (
-  this: E2EWorld,
-  humanName: string,
-) {
+When('{word} clicks the dialogue close button', async function (this: E2EWorld, humanName: string) {
   const device = requirePlaywright(this, humanName);
   if (!device) return 'pending';
 
@@ -279,5 +286,12 @@ When('{word} presses the Escape key', async function (this: E2EWorld, humanName:
   const device = requirePlaywright(this, humanName);
   if (!device) return 'pending';
 
-  await device.page.keyboard.press('Escape');
+  // PWPage stub doesn't expose `keyboard`, so dispatch a KeyboardEvent in the
+  // page context. The modal subscribes to document:keydown.escape via Angular
+  // HostListener, which reads from a real KeyboardEvent.
+  await device.page.evaluate(() => {
+    document.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
+    );
+  });
 });
