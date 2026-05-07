@@ -89,6 +89,10 @@ pub struct CompiledRoute {
     pub cache_ttl_secs: u64,
     /// Rate limit (0 = no limit)
     pub rate_limit_rpm: u32,
+    /// SSR render spec declared by the manifest (e.g. `"angular-ssr"`).
+    /// `None` means normal proxy dispatch; `Some` means the route is
+    /// eligible for in-process rendering by doorway's Renderer.
+    pub render_spec: Option<String>,
 }
 
 /// Source of a route (for debugging/auditing)
@@ -197,6 +201,38 @@ impl RouteRegistry {
     /// Create with default configuration
     pub fn with_defaults() -> Self {
         Self::new(RouteRegistryConfig::default())
+    }
+
+    /// Create a registry pre-populated with routes from a `DoorwayRoutes` manifest.
+    ///
+    /// All routes are compiled as `StorageProxy` targets pointing at `storage_url`.
+    /// This is a synchronous constructor intended for tests and boot-time use when
+    /// an async manifest fetch is not required.
+    pub fn with_routes(storage_url: &str, manifest: DoorwayRoutes) -> Self {
+        let registry = Self::new(RouteRegistryConfig::default());
+        let mut compiled = Vec::new();
+        for route in &manifest.routes {
+            compiled.push(CompiledRoute {
+                method: route.method,
+                path: normalize_path_params(&route.path),
+                source: RouteSource::StewardPeer {
+                    storage_url: storage_url.to_string(),
+                },
+                target: RouteTarget::StorageProxy {
+                    endpoint: storage_url.trim_end_matches('/').to_string(),
+                },
+                auth_required: route.auth_required,
+                cache_ttl_secs: route.cache_ttl_secs,
+                rate_limit_rpm: route.rate_limit_rpm,
+                render_spec: route.render.clone(),
+            });
+        }
+        // Populate the compiled_routes synchronously using try_write (always succeeds
+        // on a freshly-created registry — no other holders yet).
+        if let Ok(mut lock) = registry.compiled_routes.try_write() {
+            *lock = compiled;
+        }
+        registry
     }
 
     // =========================================================================
@@ -424,7 +460,7 @@ impl RouteRegistry {
         for route in &entry.routes.routes {
             compiled.push(CompiledRoute {
                 method: route.method,
-                path: route.path.clone(),
+                path: normalize_path_params(&route.path),
                 source: RouteSource::Dna {
                     dna_hash: entry.dna_hash.clone(),
                     role_name: entry.role_name.clone(),
@@ -437,10 +473,11 @@ impl RouteRegistry {
                 auth_required: route.auth_required,
                 cache_ttl_secs: route.cache_ttl_secs,
                 rate_limit_rpm: route.rate_limit_rpm,
+                render_spec: route.render.clone(),
             });
         }
 
-        // Compile blob proxy if enabled
+        // Compile blob proxy if enabled — blob routes are never SSR-eligible
         if let Some(ref blob_config) = entry.routes.blob_proxy {
             if blob_config.enabled {
                 compiled.push(CompiledRoute {
@@ -456,11 +493,12 @@ impl RouteRegistry {
                     auth_required: false,
                     cache_ttl_secs: blob_config.cache_ttl_secs,
                     rate_limit_rpm: 0,
+                    render_spec: None,
                 });
             }
         }
 
-        // Compile stream proxy if enabled
+        // Compile stream proxy if enabled — stream routes are never SSR-eligible
         if let Some(ref stream_config) = entry.routes.stream_proxy {
             if stream_config.enabled {
                 compiled.push(CompiledRoute {
@@ -476,6 +514,7 @@ impl RouteRegistry {
                     auth_required: false,
                     cache_ttl_secs: 300, // 5 min for stream manifests
                     rate_limit_rpm: 0,
+                    render_spec: None,
                 });
             }
         }
@@ -496,7 +535,7 @@ impl RouteRegistry {
             for route in &routes.routes {
                 compiled.push(CompiledRoute {
                     method: route.method,
-                    path: format!("{}{}", base_path, route.path),
+                    path: normalize_path_params(&format!("{}{}", base_path, route.path)),
                     source: RouteSource::ExternalAgent {
                         agent_pubkey: entry.registration.agent_pubkey.clone(),
                         registration_id: entry.registration_id.clone(),
@@ -509,6 +548,7 @@ impl RouteRegistry {
                     auth_required: route.auth_required,
                     cache_ttl_secs: route.cache_ttl_secs,
                     rate_limit_rpm: route.rate_limit_rpm,
+                    render_spec: None,
                 });
             }
         } else {
@@ -532,6 +572,7 @@ impl RouteRegistry {
                             auth_required: true,
                             cache_ttl_secs: 300,
                             rate_limit_rpm: 100,
+                            render_spec: None,
                         });
                     }
                     AgentCapability::Blobs => {
@@ -550,6 +591,7 @@ impl RouteRegistry {
                             auth_required: false,
                             cache_ttl_secs: 86400,
                             rate_limit_rpm: 0,
+                            render_spec: None,
                         });
                     }
                     AgentCapability::Streaming => {
@@ -568,6 +610,7 @@ impl RouteRegistry {
                             auth_required: false,
                             cache_ttl_secs: 300,
                             rate_limit_rpm: 0,
+                            render_spec: None,
                         });
                     }
                     AgentCapability::Import => {
@@ -586,6 +629,7 @@ impl RouteRegistry {
                             auth_required: true,
                             cache_ttl_secs: 0,
                             rate_limit_rpm: 10,
+                            render_spec: None,
                         });
                     }
                     AgentCapability::Custom(name) => {
@@ -604,6 +648,7 @@ impl RouteRegistry {
                             auth_required: true,
                             cache_ttl_secs: 300,
                             rate_limit_rpm: 100,
+                            render_spec: None,
                         });
                     }
                 }
@@ -655,7 +700,7 @@ impl RouteRegistry {
         for route in &manifest.routes {
             new_routes.push(CompiledRoute {
                 method: route.method,
-                path: route.path.clone(),
+                path: normalize_path_params(&route.path),
                 source: RouteSource::StewardPeer {
                     storage_url: storage_url.to_string(),
                 },
@@ -665,6 +710,7 @@ impl RouteRegistry {
                 auth_required: route.auth_required,
                 cache_ttl_secs: route.cache_ttl_secs,
                 rate_limit_rpm: route.rate_limit_rpm,
+                render_spec: route.render.clone(),
             });
         }
 
@@ -682,6 +728,7 @@ impl RouteRegistry {
                     auth_required: false,
                     cache_ttl_secs: blob_config.cache_ttl_secs,
                     rate_limit_rpm: 0,
+                    render_spec: None,
                 });
             }
         }
@@ -802,6 +849,32 @@ fn generate_registration_id(agent_pubkey: &str) -> String {
     agent_pubkey.hash(&mut hasher);
     Instant::now().hash(&mut hasher);
     format!("reg-{:016x}", hasher.finish())
+}
+
+/// Normalize a route path from `{param}` to `:param` notation.
+///
+/// The doorway-client manifest builder uses `{id}` (curly-brace) path
+/// parameters (matching Angular/OpenAPI convention). The internal
+/// `path_matches` matcher uses `:param` (Express/axum convention). This
+/// function normalizes on the way in so both notations are accepted.
+fn normalize_path_params(path: &str) -> String {
+    // Replace {word} with :word — handles all param segments in one pass.
+    let mut result = String::with_capacity(path.len());
+    let mut chars = path.chars().peekable();
+    while let Some(ch) = chars.next() {
+        if ch == '{' {
+            result.push(':');
+            for inner in chars.by_ref() {
+                if inner == '}' {
+                    break;
+                }
+                result.push(inner);
+            }
+        } else {
+            result.push(ch);
+        }
+    }
+    result
 }
 
 /// Simple path pattern matching (supports :param and *wildcard)
@@ -957,6 +1030,7 @@ mod tests {
                 auth_required: false,
                 cache_ttl_secs: 300,
                 rate_limit_rpm: 0,
+                render_spec: None,
             },
             CompiledRoute {
                 method: HttpMethod::Post,
@@ -970,6 +1044,7 @@ mod tests {
                 auth_required: true,
                 cache_ttl_secs: 0,
                 rate_limit_rpm: 0,
+                render_spec: None,
             },
         ];
 

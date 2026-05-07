@@ -49,6 +49,10 @@ type BoxBody = http_body_util::combinators::BoxBody<Bytes, hyper::Error>;
 enum Disposition {
     /// Registry matched a `StorageProxy` route — caller forwards to `endpoint`.
     StorageProxy { endpoint: String },
+    /// Registry matched a `StorageProxy` route that carries a render spec
+    /// (manifest `render` field set). Caller dispatches through the in-process
+    /// Renderer; falls back to `StorageProxy` if the renderer is absent.
+    SsrRoute { spec: String, endpoint: String },
     /// Registry matched but the target type is not yet handled by dispatch
     /// (BlobProxy, StreamProxy, ZomeCall, AgentProxy). Caller returns 404.
     RegistryUnhandled,
@@ -89,6 +93,15 @@ async fn classify_dispatch(
     let matches = registry.match_request(http_method, path).await;
     if let Some(route) = matches.first() {
         if let Some(endpoint) = route.storage_endpoint() {
+            // SSR-eligible routes (manifest `render` field set) get their own
+            // disposition so the caller can dispatch through the in-process
+            // Renderer.  Non-SSR StorageProxy routes use the normal forwarder.
+            if let Some(spec) = route.render_spec.as_deref() {
+                return Disposition::SsrRoute {
+                    spec: spec.to_string(),
+                    endpoint: endpoint.to_string(),
+                };
+            }
             return Disposition::StorageProxy {
                 endpoint: endpoint.to_string(),
             };
@@ -195,8 +208,10 @@ pub struct AppState {
     /// Read by /health/startup to expose attempt count and completion status.
     pub warmup_state: Option<Arc<crate::projection::warm_stream::WarmupState>>,
     /// Angular SSR renderer — present when SSR_BUNDLE_PATH env var is set at startup.
-    /// Used by the /render-test/* hardcoded route to prove the architecture end-to-end.
-    /// None in all other constructors (renderer: None is the safe default).
+    /// Used by manifest-driven SSR dispatch (Task 13): routes declared with
+    /// `render = "angular-ssr"` in elohim-storage's manifest are dispatched
+    /// through this renderer when it is `Some`. `None` is the safe default —
+    /// SSR-eligible routes fall back to the normal storage proxy.
     pub renderer: Option<Arc<dyn elohim_render::Renderer>>,
 }
 
@@ -1577,58 +1592,21 @@ async fn handle_request(
         }
 
         // ====================================================================
-        // SSR smoke-test route — proves doorway → elohim-render end-to-end.
+        // Dynamic Route Registry + Manifest-driven SSR + SPA fallback.
         //
-        // TEMPORARY: Replaced by manifest-driven SSR dispatch in Task 13
-        //   (genesis/docs/superpowers/plans/2026-05-07-doorway-ssr-runtime.md).
-        // The hardcoded /render-test/* arm exists only as the smallest first
-        // slice that proves the architecture; once the storage manifest gains
-        // a `render` field and the registry honours it, this arm is removed.
+        // Task 13: manifest-driven SSR dispatch replaces the temporary
+        // /render-test/* hardcoded arm. Any route declared in elohim-storage's
+        // manifest with `render = "angular-ssr"` is dispatched through the
+        // in-process Renderer when SSR_BUNDLE_PATH is configured at startup.
+        // Routes without a render spec, and all other registry-matched routes,
+        // fall through to the existing StorageProxy forwarder.
         //
-        // GET /render-test/{url} — delegates to the Angular SSR renderer when
-        // SSR_BUNDLE_PATH is set at startup.  Falls back to a static SPA shell
-        // when the renderer is absent (SSR_BUNDLE_PATH unset) or returns an
-        // error.  This arm is intentionally hardcoded (not manifest-driven)
-        // because SSR is a doorway-specific concern: the renderer lives in
-        // doorway's process, not in elohim-storage.
-        // ====================================================================
-        (Method::GET, p) if p.starts_with("/render-test/") => {
-            if let Some(renderer) = state.renderer.as_ref() {
-                let stripped = p.strip_prefix("/render-test/").unwrap_or("");
-                let url = format!("/{}", stripped);
-                let ctx = elohim_render::RenderContext {
-                    spec: elohim_render::RenderSpec::AngularSsr,
-                    url: url.clone(),
-                    data_fetcher: Arc::new(NoopFetcher),
-                    limits: Default::default(),
-                };
-                match renderer.render(ctx).await {
-                    Ok(out) => {
-                        tracing::debug!(target: "doorway::ssr", url = %url, "SSR render ok");
-                        return Ok(to_boxed(ssr_html_response(out.html)));
-                    }
-                    Err(e) => {
-                        tracing::warn!(target: "doorway::ssr", url = %url, error = %e, "SSR render error — falling back to SPA shell");
-                        return Ok(to_boxed(ssr_spa_shell_fallback()));
-                    }
-                }
-            }
-            // No renderer configured — return SPA shell so CSR can hydrate.
-            to_boxed(ssr_spa_shell_fallback())
-        }
-
-        // ====================================================================
-        // Dynamic Route Registry + SPA fallback — all remaining requests.
-        //
-        // The registry is consulted on every otherwise-unmatched request.
-        // Any path elohim-storage declared in its manifest (routes,
-        // blob_proxy, stream_proxy, …) is dispatched without doorway-side
-        // path-prefix changes — this is the contract written in
-        // doorway/CLAUDE.md ("Adding a new endpoint to elohim-storage
-        // automatically makes it routable through doorway").
-        //
-        // Registry miss + GET + slug configured → SPA bootstrap (Angular
-        // client-side routing). Anything else → 404.
+        // Dispatch priority:
+        //   1. Registry match + render_spec set + renderer available → SSR render
+        //   2. Registry match + render_spec set + no renderer → StorageProxy fallback
+        //   3. Registry match + no render_spec → StorageProxy
+        //   4. Registry miss + GET + slug configured → SPA bootstrap
+        //   5. Registry miss otherwise → 404
         // ====================================================================
         (_, p) => {
             let dispo = classify_dispatch(
@@ -1640,6 +1618,83 @@ async fn handle_request(
             .await;
 
             match dispo {
+                Disposition::SsrRoute { spec, endpoint } => {
+                    // Manifest-driven SSR dispatch (Task 13).
+                    if let Some(renderer) = state.renderer.as_ref() {
+                        let render_spec = match elohim_render::RenderSpec::parse(&spec) {
+                            Ok(s) => s,
+                            Err(e) => {
+                                tracing::warn!(
+                                    target: "doorway::ssr",
+                                    path = %p,
+                                    spec = %spec,
+                                    error = %e,
+                                    "Unknown render spec — falling back to storage proxy"
+                                );
+                                let agent_cid_owned =
+                                    resolve_agent_cid_from_request(&state, &req);
+                                let ctx = routes::ForwardCtx {
+                                    agent_cid: agent_cid_owned.as_deref(),
+                                };
+                                return Ok(to_boxed(
+                                    routes::forward_to_storage(req, &endpoint, p, ctx).await,
+                                ));
+                            }
+                        };
+
+                        let storage_base = endpoint.clone();
+                        let fetcher: Arc<dyn elohim_render::DataFetcher> =
+                            Arc::new(crate::ssr::ResolverFetcher::new(storage_base));
+                        let url = format!(
+                            "{}{}",
+                            p,
+                            req.uri()
+                                .query()
+                                .map(|q| format!("?{q}"))
+                                .unwrap_or_default()
+                        );
+                        let ctx = elohim_render::RenderContext {
+                            spec: render_spec,
+                            url: url.clone(),
+                            data_fetcher: fetcher,
+                            limits: Default::default(),
+                        };
+                        return Ok(to_boxed(match renderer.render(ctx).await {
+                            Ok(out) => {
+                                tracing::debug!(
+                                    target: "doorway::ssr",
+                                    path = %p,
+                                    "SSR render ok"
+                                );
+                                ssr_html_response(out.html)
+                            }
+                            Err(e) => {
+                                tracing::warn!(
+                                    target: "doorway::ssr",
+                                    path = %p,
+                                    error = %e,
+                                    "SSR render error — falling back to SPA shell"
+                                );
+                                ssr_spa_shell_fallback()
+                            }
+                        }));
+                    }
+                    // Renderer absent (SSR_BUNDLE_PATH not set) — forward to storage
+                    // so the Angular CSR bundle can hydrate on the client side.
+                    tracing::debug!(
+                        target: "doorway::ssr",
+                        path = %p,
+                        "SSR-eligible route but no renderer — falling back to storage proxy"
+                    );
+                    let agent_cid_owned = resolve_agent_cid_from_request(&state, &req);
+                    let ctx = routes::ForwardCtx {
+                        agent_cid: agent_cid_owned.as_deref(),
+                    };
+                    return Ok(to_boxed(
+                        routes::forward_to_storage(req, &endpoint, p, ctx).await,
+                    ));
+                }
+
                 Disposition::StorageProxy { endpoint } => {
                     debug!(path = %p, %endpoint, "Registry-routed to storage proxy");
                     // Resolve agent_cid from the bearer's claims (alpha-substrate:
@@ -2004,32 +2059,6 @@ fn bad_request_response(message: &str) -> Response<Full<Bytes>> {
 
 // ─── SSR helpers ──────────────────────────────────────────────────────────────
 
-/// `DataFetcher` that returns 404 for every fetch.
-///
-/// TEMPORARY: Replaced in Task 13 by `ResolverFetcher`, which dispatches
-/// fetches through `DoorwayResolver` so SSR data calls hit the projection
-/// cache.  This stub exists only for the `/render-test/*` smoke route.
-///
-/// Used by the `/render-test/*` route so Angular SSR can call the renderer
-/// without a real elohim-storage sidecar.  Any `fetch()` inside the bundle
-/// will receive a 404 body rather than crashing the render worker.
-struct NoopFetcher;
-
-#[async_trait::async_trait]
-impl elohim_render::DataFetcher for NoopFetcher {
-    async fn fetch(
-        &self,
-        _request: elohim_render::FetchRequest,
-    ) -> elohim_render::Result<elohim_render::FetchResponse> {
-        Ok(elohim_render::FetchResponse {
-            status: 404,
-            headers: Default::default(),
-            body: b"not found".to_vec(),
-            content_hash: None,
-        })
-    }
-}
-
 /// Build a `text/html` response from SSR-rendered HTML.
 fn ssr_html_response(html: String) -> Response<Full<Bytes>> {
     Response::builder()
@@ -2293,6 +2322,7 @@ mod dispatch_classification_tests {
             auth_required: false,
             cache_ttl_secs: 0,
             rate_limit_rpm: 0,
+            render_spec: None,
         };
         let mut compiled = registry.compiled_routes.write().await;
         compiled.push(route);
