@@ -9337,6 +9337,54 @@ pub fn build_manifest() -> doorway_client::DoorwayRoutes {
                 .rate_limit(20)
                 .build(),
         )
+        // =====================================================================
+        // /lamad/* — SSR-eligible routes (Task 12)
+        //
+        // These paths are declared with `render: "angular-ssr"`. Doorway
+        // dispatches them to its in-process renderer (Task 13) instead of
+        // proxying directly to the JSON handler. The handler name is still
+        // required so the SSR DataFetcher can call back through the doorway
+        // resolver to hydrate the Angular component tree.
+        //
+        // Handler mapping rationale (none of the view-specific handler names
+        // exist yet; we map to the nearest data-equivalent handler):
+        //   /lamad/concept/{id}        → get_content    (content node by id)
+        //   /lamad/path/{slug}         → list_content   (path = filtered content set)
+        //   /lamad/path/{slug}/step/{n}→ get_content    (a step is a content node)
+        //   /                          → list_content   (landing aggregates content)
+        // =====================================================================
+        .route(
+            Route::get("/lamad/concept/{id}")
+                .handler("get_content")
+                .cache_ttl(60)
+                .public_if_reach("commons")
+                .render("angular-ssr")
+                .build(),
+        )
+        .route(
+            Route::get("/lamad/path/{slug}")
+                .handler("list_content")
+                .cache_ttl(60)
+                .public_if_reach("commons")
+                .render("angular-ssr")
+                .build(),
+        )
+        .route(
+            Route::get("/lamad/path/{slug}/step/{n}")
+                .handler("get_content")
+                .cache_ttl(60)
+                .public_if_reach("commons")
+                .render("angular-ssr")
+                .build(),
+        )
+        .route(
+            Route::get("/")
+                .handler("list_content")
+                .cache_ttl(60)
+                .public_if_reach("commons")
+                .render("angular-ssr")
+                .build(),
+        )
         // Blob proxy: doorway caches blobs from /blob/{hash}
         .with_blobs_at("/blob")
         .build()
@@ -9424,6 +9472,53 @@ mod tests {
         assert!(
             paths.contains(&"/api/v1/reciprocity"),
             "missing /api/v1/reciprocity (T32)"
+        );
+        // SSR-eligible lamad routes (Task 12) — verify paths and render field
+        let lamad_routes: std::collections::HashMap<&str, _> = manifest
+            .routes
+            .iter()
+            .filter(|r| {
+                matches!(
+                    r.path.as_str(),
+                    "/lamad/concept/{id}"
+                        | "/lamad/path/{slug}"
+                        | "/lamad/path/{slug}/step/{n}"
+                        | "/"
+                )
+            })
+            .map(|r| (r.path.as_str(), r))
+            .collect();
+        let concept = lamad_routes
+            .get("/lamad/concept/{id}")
+            .expect("missing /lamad/concept/{id} (Task 12)");
+        assert_eq!(
+            concept.render.as_deref(),
+            Some("angular-ssr"),
+            "/lamad/concept/{{id}} must declare render=angular-ssr"
+        );
+        let path_view = lamad_routes
+            .get("/lamad/path/{slug}")
+            .expect("missing /lamad/path/{slug} (Task 12)");
+        assert_eq!(
+            path_view.render.as_deref(),
+            Some("angular-ssr"),
+            "/lamad/path/{{slug}} must declare render=angular-ssr"
+        );
+        let step_view = lamad_routes
+            .get("/lamad/path/{slug}/step/{n}")
+            .expect("missing /lamad/path/{slug}/step/{n} (Task 12)");
+        assert_eq!(
+            step_view.render.as_deref(),
+            Some("angular-ssr"),
+            "/lamad/path/{{slug}}/step/{{n}} must declare render=angular-ssr"
+        );
+        let landing = lamad_routes
+            .get("/")
+            .expect("missing / (landing route — Task 12)");
+        assert_eq!(
+            landing.render.as_deref(),
+            Some("angular-ssr"),
+            "/ must declare render=angular-ssr"
         );
         // Ensure infrastructure routes are NOT in the manifest
         assert!(
