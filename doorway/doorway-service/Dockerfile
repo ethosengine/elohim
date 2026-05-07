@@ -33,6 +33,10 @@ COPY elohim/elohim-agent/gate-types ./elohim/elohim-agent/gate-types
 # resolves the path even from the agent-service dependency edge — must be
 # copied or the build fails with `failed to read .../specialists/defender/Cargo.toml`.
 COPY elohim/elohim-agent/specialists/defender ./elohim/elohim-agent/specialists/defender
+# elohim-render is a non-optional path-dep of doorway-service (Cargo.toml line ~129)
+# and a workspace member of elohim/Cargo.toml. Without this COPY, cargo aborts at
+# resolve time: "failed to read /elohim/elohim-render/Cargo.toml: No such file".
+COPY elohim/elohim-render ./elohim/elohim-render
 
 # Prune workspace members that aren't copied into the build context.
 # Keeps: constitution, elohim-agent-service, gate-client, gate-types,
@@ -52,7 +56,8 @@ RUN sed -i 's|path = "../../crates/doorway-client"|path = "crates/doorway-client
     sed -i 's|path = "../../elohim/elohim-cache-core"|path = "elohim/elohim-cache-core"|' Cargo.toml && \
     sed -i 's|path = "../../elohim/sdk/domains/imagodei/types"|path = "elohim/sdk/domains/imagodei/types"|' Cargo.toml && \
     sed -i 's|path = "../../elohim/sdk/domains/infrastructure/types"|path = "elohim/sdk/domains/infrastructure/types"|' Cargo.toml && \
-    sed -i 's|path = "../../elohim/elohim-agent/gate-client"|path = "elohim/elohim-agent/gate-client"|' Cargo.toml
+    sed -i 's|path = "../../elohim/elohim-agent/gate-client"|path = "elohim/elohim-agent/gate-client"|' Cargo.toml && \
+    sed -i 's|path = "../../elohim/elohim-render"|path = "elohim/elohim-render"|' Cargo.toml
 
 # Build dependencies (this layer gets cached)
 RUN cargo build --release
