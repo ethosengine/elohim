@@ -234,31 +234,65 @@ fn compose_totals(
 /// Build the per-peer slice payload that this node returns when asked for its
 /// own cluster slice via the F-T20 responder.
 ///
-/// Returns a `serde_json::Value` shaped like:
-/// ```json
-/// {
-///   "display_name": "Matthew's Desktop",
-///   "storage_used_bytes": 0,
-///   "storage_total_bytes": 0,
-///   "hosting_count": 0,
-///   "projecting_count": 0,
-///   "beacon_age_ms": 0
-/// }
-/// ```
-///
-/// Real values for storage / hosting / projecting are stubbed in T25 (TODOs)
-/// and replaced as those substrate sources land. T26 wires the F-T20 responder
-/// to call this function (today the responder still returns the F-T20 stub).
-pub async fn build_local_slice(_pool: &DbPool) -> serde_json::Value {
-    // TODO(Phase 4 follow-up): wire real values from system metrics + db counts.
+/// All metrics are read from real system state via `services::system_metrics`:
+/// - `display_name` from `ELOHIM_DISPLAY_NAME` env var
+/// - `storage_used_bytes` from filesystem walk of `ELOHIM_BLOB_PATH`
+/// - `storage_total_bytes` from `fs4::total_space` on the same path
+/// - `memory_used_bytes` / `memory_total_bytes` from POSIX getrusage/sysinfo
+/// - `hosting_count` from `peer_blob_inventory` count where `peer_id = ELOHIM_LOCAL_PEER_ID`
+/// - `projecting_count` is 0 until M3 (no `source_peer_id` field on content yet)
+/// - `beacon_age_ms` is 0 until M3 (needs Swarm beacon timestamp threading)
+pub async fn build_local_slice(pool: &DbPool) -> serde_json::Value {
+    use crate::services::system_metrics;
+
+    let display_name = std::env::var("ELOHIM_DISPLAY_NAME").unwrap_or_default();
+    let blob_path = std::env::var("ELOHIM_BLOB_PATH")
+        .unwrap_or_else(|_| "/data/blobs".to_string());
+
+    let blob_path_buf = std::path::PathBuf::from(&blob_path);
+    let storage_used_bytes = system_metrics::directory_size(&blob_path_buf).unwrap_or(0);
+    let storage_total_bytes =
+        system_metrics::filesystem_capacity_bytes(&blob_path_buf).unwrap_or(0);
+    let memory_used_bytes = system_metrics::process_memory_bytes().unwrap_or(0);
+    let memory_total_bytes = system_metrics::total_memory_bytes().unwrap_or(0);
+
+    let hosting_count = count_local_hosting(pool).await.unwrap_or(0);
+
     serde_json::json!({
-        "display_name": std::env::var("ELOHIM_DISPLAY_NAME").unwrap_or_default(),
-        "storage_used_bytes": 0u64,
-        "storage_total_bytes": 0u64,
-        "hosting_count": 0u32,
+        "display_name": display_name,
+        "storage_used_bytes": storage_used_bytes,
+        "storage_total_bytes": storage_total_bytes,
+        "memory_used_bytes": memory_used_bytes,
+        "memory_total_bytes": memory_total_bytes,
+        "hosting_count": hosting_count,
         "projecting_count": 0u32,
         "beacon_age_ms": 0u64,
     })
+}
+
+/// Count rows in `peer_blob_inventory` where `peer_id` is the local peer.
+///
+/// The local peer_id comes from `ELOHIM_LOCAL_PEER_ID` env var (set by the
+/// runtime at swarm start). Returns 0 if the env var is missing or the query
+/// fails — observability is best-effort, not load-bearing.
+async fn count_local_hosting(pool: &DbPool) -> Result<u32, ClusterViewError> {
+    use crate::db::diesel_schema::peer_blob_inventory::dsl as pbi;
+
+    let local_peer_id = match std::env::var("ELOHIM_LOCAL_PEER_ID") {
+        Ok(s) => s,
+        Err(_) => return Ok(0),
+    };
+
+    let mut conn = pool
+        .get()
+        .map_err(|e| ClusterViewError::Pool(e.to_string()))?;
+
+    let count: i64 = pbi::peer_blob_inventory
+        .filter(pbi::peer_id.eq(&local_peer_id))
+        .count()
+        .get_result(&mut conn)?;
+
+    Ok(count as u32)
 }
 
 #[cfg(test)]
@@ -277,5 +311,74 @@ mod tests {
     fn parse_archetype_unknown_defaults_to_node() {
         assert_eq!(parse_archetype("server"), DeviceArchetype::Node);
         assert_eq!(parse_archetype(""), DeviceArchetype::Node);
+    }
+
+    use crate::test_util::test_pool;
+    use std::env;
+    use std::sync::Mutex;
+
+    static ENV_LOCK: Mutex<()> = Mutex::new(());
+
+    #[tokio::test]
+    async fn build_local_slice_includes_display_name_from_env() {
+        let _guard = ENV_LOCK.lock().unwrap();
+        env::set_var("ELOHIM_DISPLAY_NAME", "Matthew's Desktop");
+        env::remove_var("ELOHIM_BLOB_PATH");
+        let pool = test_pool();
+        let slice = build_local_slice(&pool).await;
+        assert_eq!(
+            slice.get("display_name").and_then(|v| v.as_str()),
+            Some("Matthew's Desktop")
+        );
+        env::remove_var("ELOHIM_DISPLAY_NAME");
+    }
+
+    #[tokio::test]
+    async fn build_local_slice_returns_zero_storage_when_path_missing() {
+        let _guard = ENV_LOCK.lock().unwrap();
+        env::set_var("ELOHIM_BLOB_PATH", "/this/path/does/not/exist");
+        env::set_var("ELOHIM_DISPLAY_NAME", "test");
+        let pool = test_pool();
+        let slice = build_local_slice(&pool).await;
+        assert_eq!(
+            slice.get("storage_used_bytes").and_then(|v| v.as_u64()),
+            Some(0)
+        );
+        env::remove_var("ELOHIM_BLOB_PATH");
+        env::remove_var("ELOHIM_DISPLAY_NAME");
+    }
+
+    #[tokio::test]
+    async fn build_local_slice_returns_hosting_count_zero_for_empty_inventory() {
+        let _guard = ENV_LOCK.lock().unwrap();
+        env::set_var("ELOHIM_DISPLAY_NAME", "test");
+        let pool = test_pool();
+        let slice = build_local_slice(&pool).await;
+        assert_eq!(
+            slice.get("hosting_count").and_then(|v| v.as_u64()),
+            Some(0)
+        );
+        env::remove_var("ELOHIM_DISPLAY_NAME");
+    }
+
+    #[tokio::test]
+    async fn build_local_slice_includes_all_required_fields() {
+        let _guard = ENV_LOCK.lock().unwrap();
+        env::set_var("ELOHIM_DISPLAY_NAME", "test");
+        let pool = test_pool();
+        let slice = build_local_slice(&pool).await;
+        for field in &[
+            "display_name",
+            "storage_used_bytes",
+            "storage_total_bytes",
+            "memory_used_bytes",
+            "memory_total_bytes",
+            "hosting_count",
+            "projecting_count",
+            "beacon_age_ms",
+        ] {
+            assert!(slice.get(*field).is_some(), "missing field: {}", field);
+        }
+        env::remove_var("ELOHIM_DISPLAY_NAME");
     }
 }
