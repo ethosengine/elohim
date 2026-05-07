@@ -1424,6 +1424,7 @@ dependencies = [
  "hyper-util",
  "ipld-core",
  "jsonschema",
+ "libc",
  "libp2p",
  "lru 0.12.5",
  "lz4_flex",

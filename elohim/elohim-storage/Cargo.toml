@@ -114,6 +114,11 @@ dashmap = "5"
 # LRU cache for per-agent pubkey timeline hot path (Task A.6)
 lru = "0.12"
 
+# Compute-reporting foundation — POSIX sysinfo/getrusage/sysconf primitives
+# used by services/system_metrics.rs (memory probes, future CPU/page-size).
+# Filesystem-capacity stays on fs4 (heartbeat::measure_free_pct convention).
+libc = "0.2"
+
 # Error handling
 thiserror = "1"
 anyhow = "1"
