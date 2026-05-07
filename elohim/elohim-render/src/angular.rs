@@ -150,8 +150,24 @@ impl Renderer for AngularRenderer {
         // The `await import(...)` is required because eval_string executes in a
         // *script* context (not a module context). Dynamic import() is the bridge
         // from script to ESM module space.
+        //
+        // Unhandled promise rejection suppression: deno_core tracks unhandled
+        // rejections in EventLoopPendingState.has_pending_promise_events. If the
+        // handler returns false (default), op_dispatch_exception is called, which
+        // causes poll_event_loop to return an error. By registering a handler that
+        // returns true (handled), rejections are consumed without throwing. This is
+        // needed because Angular services make HTTP calls during SSR (ConfigService,
+        // etc.) which hit our stub fetch and produce rejected Promises that propagate
+        // up the RxJS chain without a subscriber-level error handler.
         let driver = format!(
             r#"(async () => {{
+                // Suppress unhandled promise rejections — SSR fetch failures are
+                // expected (our fetch shim rejects) and must not block the event loop.
+                // Without this, op_dispatch_exception is called on each unhandled
+                // rejection, which causes RenderError::Panic instead of rendering.
+                if (typeof Deno !== 'undefined' && Deno.core && Deno.core.setUnhandledPromiseRejectionHandler) {{
+                    Deno.core.setUnhandledPromiseRejectionHandler(() => true);
+                }}
                 const mod = await import({bundle_lit});
                 const html = await mod.renderApplication(mod.default, {{ url: {url_lit} }});
                 return html;

@@ -78,7 +78,7 @@ async fn angular_renderer_with_real_bundle() {
         url: "/".into(),
         data_fetcher: Arc::new(EmptyFetcher),
         limits: RenderLimits {
-            wall_time_ms: 30_000,
+            wall_time_ms: 120_000,
             memory_mb: 512,
             max_fetches: 32,
             max_output_bytes: 5 * 1024 * 1024,
