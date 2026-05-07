@@ -213,6 +213,22 @@ pub struct AppState {
     /// through this renderer when it is `Some`. `None` is the safe default —
     /// SSR-eligible routes fall back to the normal storage proxy.
     pub renderer: Option<Arc<dyn elohim_render::Renderer>>,
+    /// Shared HTTP client for SSR data-fetching (Task 14 carry-forward).
+    ///
+    /// A single client is allocated at boot and shared via `Arc::clone` by
+    /// every `ResolverFetcher` created during an SSR render. This avoids
+    /// creating a new connection pool per request.
+    pub ssr_http_client: Arc<reqwest::Client>,
+}
+
+/// Build the shared HTTP client used by SSR `ResolverFetcher` instances.
+fn init_ssr_http_client() -> Arc<reqwest::Client> {
+    Arc::new(
+        reqwest::Client::builder()
+            .timeout(std::time::Duration::from_secs(10))
+            .build()
+            .unwrap_or_default(),
+    )
 }
 
 /// Initialize the SSR renderer from the `SSR_BUNDLE_PATH` environment variable.
@@ -317,6 +333,7 @@ impl AppState {
             cache_enabled: Arc::new(std::sync::atomic::AtomicBool::new(true)),
             warmup_state: None,
             renderer: init_renderer(),
+            ssr_http_client: init_ssr_http_client(),
         }
     }
 
@@ -404,6 +421,7 @@ impl AppState {
             cache_enabled: Arc::new(std::sync::atomic::AtomicBool::new(true)),
             warmup_state: None,
             renderer: init_renderer(),
+            ssr_http_client: init_ssr_http_client(),
         }
     }
 
@@ -506,6 +524,7 @@ impl AppState {
             cache_enabled: Arc::new(std::sync::atomic::AtomicBool::new(true)),
             warmup_state: None,
             renderer: init_renderer(),
+            ssr_http_client: init_ssr_http_client(),
         }
     }
 
@@ -611,6 +630,7 @@ impl AppState {
             cache_enabled: Arc::new(std::sync::atomic::AtomicBool::new(true)),
             warmup_state: None,
             renderer: init_renderer(),
+            ssr_http_client: init_ssr_http_client(),
         })
     }
 
@@ -1642,9 +1662,6 @@ async fn handle_request(
                             }
                         };
 
-                        let storage_base = endpoint.clone();
-                        let fetcher: Arc<dyn elohim_render::DataFetcher> =
-                            Arc::new(crate::ssr::ResolverFetcher::new(storage_base));
                         let url = format!(
                             "{}{}",
                             p,
@@ -1653,6 +1670,30 @@ async fn handle_request(
                                 .map(|q| format!("?{q}"))
                                 .unwrap_or_default()
                         );
+
+                        // MVP cache key: (url, spec_version). Invalidation is TTL-based
+                        // (5-minute default). `fetched_inputs` is captured in the audit
+                        // trail (RenderOutput) but not in the lookup key. Hash-aware
+                        // invalidation lands when a DHT signal subscriber drives evictions
+                        // (Task 14+).
+                        let cache_key = crate::ssr::render_cache_key(&url, &[], "v1");
+                        if let Some(cached_html) = state.cache.get_rendered(&cache_key) {
+                            tracing::debug!(
+                                target: "doorway::ssr",
+                                path = %p,
+                                "SSR cache HIT"
+                            );
+                            return Ok(to_boxed(ssr_html_response_with_cache_status(
+                                cached_html,
+                                "HIT",
+                            )));
+                        }
+
+                        let fetcher: Arc<dyn elohim_render::DataFetcher> =
+                            Arc::new(crate::ssr::ResolverFetcher::new(
+                                Arc::clone(&state.ssr_http_client),
+                                endpoint.clone(),
+                            ));
                         let ctx = elohim_render::RenderContext {
                             spec: render_spec,
                             url: url.clone(),
@@ -1664,9 +1705,14 @@ async fn handle_request(
                                 tracing::debug!(
                                     target: "doorway::ssr",
                                     path = %p,
-                                    "SSR render ok"
+                                    "SSR render ok — caching result"
                                 );
-                                ssr_html_response(out.html)
+                                state.cache.put_rendered(
+                                    &cache_key,
+                                    out.html.clone(),
+                                    std::time::Duration::from_secs(5 * 60),
+                                );
+                                ssr_html_response_with_cache_status(out.html, "MISS")
                             }
                             Err(e) => {
                                 tracing::warn!(
@@ -2059,12 +2105,17 @@ fn bad_request_response(message: &str) -> Response<Full<Bytes>> {
 
 // ─── SSR helpers ──────────────────────────────────────────────────────────────
 
-/// Build a `text/html` response from SSR-rendered HTML.
-fn ssr_html_response(html: String) -> Response<Full<Bytes>> {
+/// Build a `text/html` SSR response with an `x-render-cache` header.
+///
+/// `cache_status` is either `"HIT"` (served from render-result cache) or
+/// `"MISS"` (freshly rendered by the in-process renderer). The header lets
+/// callers verify cache behaviour without inspecting response bodies.
+fn ssr_html_response_with_cache_status(html: String, cache_status: &str) -> Response<Full<Bytes>> {
     Response::builder()
         .status(StatusCode::OK)
-        .header("Content-Type", "text/html; charset=utf-8")
-        .header("Cache-Control", "no-store")
+        .header("content-type", "text/html; charset=utf-8")
+        .header("cache-control", "no-store")
+        .header("x-render-cache", cache_status)
         .body(Full::new(Bytes::from(html)))
         .unwrap()
 }
@@ -2400,5 +2451,48 @@ mod dispatch_classification_tests {
             Disposition::NotFound,
             "Unregistered non-GET must 404, never SPA"
         );
+    }
+
+    /// Helper: inject a `StorageProxy` route with a render_spec into a fresh registry.
+    async fn registry_with_ssr_route(method: HttpMethod, path: &str, spec: &str) -> RouteRegistry {
+        use crate::services::route_registry::{CompiledRoute, RouteSource, RouteTarget};
+        let registry = RouteRegistry::with_defaults();
+        let route = CompiledRoute {
+            method,
+            path: path.to_string(),
+            source: RouteSource::StewardPeer {
+                storage_url: "http://storage:8090".to_string(),
+            },
+            target: RouteTarget::StorageProxy {
+                endpoint: "http://storage:8090".to_string(),
+            },
+            auth_required: false,
+            cache_ttl_secs: 0,
+            rate_limit_rpm: 0,
+            render_spec: Some(spec.to_string()),
+        };
+        let mut compiled = registry.compiled_routes.write().await;
+        compiled.push(route);
+        drop(compiled);
+        registry
+    }
+
+    #[tokio::test]
+    async fn classify_dispatch_returns_ssr_route_when_render_spec_set() {
+        // Regression contract: routes with render_spec must classify as SsrRoute,
+        // not StorageProxy, so the caller can dispatch through the in-process renderer.
+        let registry =
+            registry_with_ssr_route(HttpMethod::Get, "/lamad/concept/:id", "angular-ssr").await;
+        let dispo =
+            classify_dispatch(&registry, Some("lamad"), &Method::GET, "/lamad/concept/abc").await;
+        match dispo {
+            Disposition::SsrRoute { spec, .. } => {
+                assert_eq!(
+                    spec, "angular-ssr",
+                    "render_spec must propagate to SsrRoute"
+                )
+            }
+            other => panic!("expected SsrRoute, got {other:?}"),
+        }
     }
 }

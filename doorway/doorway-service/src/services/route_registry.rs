@@ -1009,6 +1009,36 @@ mod tests {
         assert!(!path_matches("/api/content", "/api/content/extra"));
     }
 
+    #[test]
+    fn normalize_path_params_converts_curly_to_colon() {
+        // Plain path — no params to convert
+        assert_eq!(normalize_path_params("/api/v1/foo"), "/api/v1/foo");
+
+        // Single curly-brace param
+        assert_eq!(
+            normalize_path_params("/api/v1/users/{id}"),
+            "/api/v1/users/:id"
+        );
+
+        // Multiple params
+        assert_eq!(
+            normalize_path_params("/api/v1/users/{user_id}/posts/{post_id}"),
+            "/api/v1/users/:user_id/posts/:post_id"
+        );
+
+        // Mixed — already-colon params are left unchanged (idempotent on colon style)
+        assert_eq!(
+            normalize_path_params("/api/v1/:legacy/{new}"),
+            "/api/v1/:legacy/:new"
+        );
+
+        // Param at start of path
+        assert_eq!(normalize_path_params("{id}/posts"), ":id/posts");
+
+        // Root path — no params
+        assert_eq!(normalize_path_params("/"), "/");
+    }
+
     /// Verifies that routes manually inserted as StewardPeer/StorageProxy are
     /// compiled correctly — without making a real HTTP call to a manifest.
     #[tokio::test]

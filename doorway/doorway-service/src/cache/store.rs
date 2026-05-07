@@ -510,6 +510,26 @@ impl ContentCache {
         Some((Box::pin(stream), total_size, etag, content_type))
     }
 
+    // =========================================================================
+    // SSR render-result cache
+    // =========================================================================
+
+    /// Look up a cached SSR render result by key.
+    ///
+    /// Returns `Some(html)` on a cache hit (unexpired), `None` on a miss.
+    /// The key is produced by `crate::ssr::render_cache_key`.
+    pub fn get_rendered(&self, key: &str) -> Option<String> {
+        let entry = self.get(key)?;
+        String::from_utf8(entry.data).ok()
+    }
+
+    /// Store an SSR render result under `key` with an explicit TTL.
+    ///
+    /// The value is stored as UTF-8 bytes under content-type `text/html`.
+    pub fn put_rendered(&self, key: &str, html: String, ttl: std::time::Duration) {
+        self.set(key, html.into_bytes(), "text/html; charset=utf-8", ttl);
+    }
+
     /// Store a blob with explicit size tracking for large content.
     /// This method is optimized for media files.
     pub fn set_blob(
