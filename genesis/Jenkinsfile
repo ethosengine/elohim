@@ -1103,6 +1103,39 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
             }
         }
 
+        stage('Trigger M1 Cross-Pod Fetch') {
+            when { allOf {
+                expression { env.PIPELINE_SKIPPED != 'true' }
+                expression { params.SEED_DATA }
+                expression { env.M1_BLOB_HASH != null && env.M1_BLOB_HASH != '' }
+            }}
+            steps {
+                container('builder') {
+                    script {
+                        def blobHash = env.M1_BLOB_HASH
+                        def timothyUrl = 'http://elohim-timothy-alpha.elohim-alpha.svc.cluster.local:8090'
+                        catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
+                            sh """#!/bin/bash
+                                set -euo pipefail
+                                echo "═══════════════════════════════════════════════════════════"
+                                echo "M1 CROSS-POD FETCH — timothy fetches blob ${blobHash} from matthew"
+                                echo "═══════════════════════════════════════════════════════════"
+                                # GET (not HEAD per memory feedback_head_vs_get_blob_asymmetry)
+                                STATUS=\$(curl -s -o /dev/null -w '%{http_code}' \\
+                                  "${timothyUrl}/blob/${blobHash}")
+                                echo "Fetch status: \$STATUS"
+                                if [ "\$STATUS" != "200" ]; then
+                                  echo "Fetch failed — substrate did not propagate the blob"
+                                  exit 1
+                                fi
+                                echo "Fetch successful — serve-blob EconomicEvent should be emitted"
+                            """
+                        }
+                    }
+                }
+            }
+        }
+
         stage('Warm Projection Cache') {
             when { allOf {
                 expression { env.PIPELINE_SKIPPED != 'true' }
