@@ -182,6 +182,25 @@ impl request_response::Codec for ViewFederationCodec {
     }
 }
 
+/// Context for [`build_response_slice`] — bundles identity + transport fields
+/// to keep the function signature within clippy's argument-count limit.
+pub struct SliceContext<'a> {
+    /// CID of the requesting agent (from the inbound request).
+    pub agent_cid: String,
+    /// Request correlation ID (echoed into the response).
+    pub request_id: String,
+    /// This node's agent CID — used to decide ownership.
+    pub local_agent_cid: &'a str,
+    /// This node's peer ID string — embedded in the returned slice.
+    pub local_peer_id: String,
+    /// Snapshot of connected peers at request receipt time.
+    pub connected_peers: &'a [libp2p::PeerId],
+    /// Signing keypair for the slice signature.
+    pub keypair: &'a libp2p::identity::Keypair,
+    /// DB pool for local-slice queries, or `None` in test contexts.
+    pub pool: Option<&'a crate::db::DbPool>,
+}
+
 /// Build a signed [`ViewFederationResponse`] for an inbound request.
 ///
 /// T26 wires real per-view-kind slice sources: when `agent_cid` matches the
@@ -204,20 +223,16 @@ impl request_response::Codec for ViewFederationCodec {
 /// a public-key-only handle without a private key).
 pub async fn build_response_slice(
     view_kind: ViewKind,
-    agent_cid: String,
-    request_id: String,
-    local_agent_cid: &str,
-    local_peer_id: String,
-    keypair: &libp2p::identity::Keypair,
-    pool: Option<&crate::db::DbPool>,
+    ctx: SliceContext<'_>,
 ) -> Result<ViewFederationResponse, libp2p::identity::SigningError> {
-    let owns_agent = agent_cid == local_agent_cid;
+    let owns_agent = ctx.agent_cid == ctx.local_agent_cid;
     let payload = if owns_agent {
-        match pool {
+        match ctx.pool {
             Some(p) => match view_kind {
                 ViewKind::Cluster => crate::services::cluster_view::build_local_slice(p).await,
                 ViewKind::PeerTopology => {
-                    crate::services::peer_topology_view::build_local_slice(p).await
+                    crate::services::peer_topology_view::build_local_slice(p, ctx.connected_peers)
+                        .await
                 }
             },
             None => serde_json::json!({}),
@@ -231,7 +246,7 @@ pub async fn build_response_slice(
         FreshnessState::Offline
     };
     let mut slice = ViewSlice {
-        peer_id: local_peer_id,
+        peer_id: ctx.local_peer_id,
         view_kind: view_kind.clone(),
         freshness: Freshness {
             state: freshness_state,
@@ -241,12 +256,12 @@ pub async fn build_response_slice(
         signature: String::new(),
     };
     let canonical = slice.canonical_bytes_for_signing();
-    let sig_bytes = keypair.sign(&canonical)?;
+    let sig_bytes = ctx.keypair.sign(&canonical)?;
     slice.signature = base64::engine::general_purpose::STANDARD.encode(&sig_bytes);
     Ok(ViewFederationResponse {
         view_kind,
-        agent_cid,
-        request_id,
+        agent_cid: ctx.agent_cid,
+        request_id: ctx.request_id,
         slice,
     })
 }

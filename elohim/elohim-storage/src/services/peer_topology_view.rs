@@ -204,20 +204,130 @@ pub async fn aggregate_peer_topology_view(
 }
 
 /// Build the per-peer slice payload that this node returns when asked for its
-/// own peer topology slice via the F-T20 responder.
+/// own peer-topology slice via the F-T20 responder.
 ///
-/// Returns a `serde_json::Value` with an empty `connected_peer_households` array.
+/// Walks `connected_peers` (snapshot from `swarm.connected_peers()` at request
+/// time), resolves each peer_id to an `agent_cid` via `peer_identity_bindings`,
+/// then resolves each agent_cid to a `household_id` via the `humans` table.
+/// Peers with no binding are skipped silently (logged at WARN). Peers with a
+/// binding but no human row are emitted with `display_name: None` and
+/// `household_id` falling back to the agent_cid.
 ///
-/// TODO(Phase 4 follow-up): populate from libp2p's connected-peer set joined
-/// with each peer's binding's `household_id`. Real CID counts come from the
-/// quilt distribution layer once it surfaces per-peer hosted-CID sets.
-pub async fn build_local_slice(_pool: &DbPool) -> serde_json::Value {
-    serde_json::json!({ "connected_peer_households": [] })
+/// CID counts (`my_cids_hosted_by_them`, `their_cids_hosted_by_me`) are
+/// computed from `peer_blob_inventory`. The "authored-by-me" set is currently
+/// inferred as "blobs present locally" — M3 will tighten this to a real
+/// authoring-peer field.
+pub async fn build_local_slice(pool: &DbPool, connected_peers: &[libp2p::PeerId]) -> serde_json::Value {
+    use crate::db::diesel_schema::{humans, peer_blob_inventory, peer_identity_bindings};
+    use diesel::prelude::*;
+
+    if connected_peers.is_empty() {
+        return serde_json::json!({ "connected_peer_households": [] });
+    }
+
+    let mut conn = match pool.get() {
+        Ok(c) => c,
+        Err(_) => return serde_json::json!({ "connected_peer_households": [] }),
+    };
+
+    let local_peer_id = std::env::var("ELOHIM_LOCAL_PEER_ID").unwrap_or_default();
+
+    let mut entries: Vec<serde_json::Value> = Vec::new();
+
+    for peer in connected_peers {
+        let peer_str = peer.to_string();
+
+        // Step 1: peer_id → agent_cid via peer_identity_bindings (most recent valid_from).
+        // valid_from is ISO-8601 TEXT — lexicographic descending gives most recent first.
+        let binding_row: Option<String> = peer_identity_bindings::table
+            .filter(peer_identity_bindings::peer_id.eq(&peer_str))
+            .order(peer_identity_bindings::valid_from.desc())
+            .select(peer_identity_bindings::agent_cid)
+            .first::<String>(&mut conn)
+            .optional()
+            .ok()
+            .flatten();
+
+        let agent_cid = match binding_row {
+            Some(cid) => cid,
+            None => {
+                tracing::warn!(
+                    target: "peer_topology_view",
+                    peer = %peer_str,
+                    "peer_id has no binding — skipping edge"
+                );
+                continue;
+            }
+        };
+
+        // Step 2: agent_cid → household_id, display_name via humans table.
+        let human_row: Option<(Option<String>, String)> = humans::table
+            .filter(humans::id.eq(&agent_cid))
+            .select((humans::household_id, humans::display_name))
+            .first::<(Option<String>, String)>(&mut conn)
+            .optional()
+            .ok()
+            .flatten();
+
+        let (household_id, display_name) = match human_row {
+            Some((Some(hid), name)) => (hid, Some(name)),
+            Some((None, name)) => (agent_cid.clone(), Some(name)),
+            None => (agent_cid.clone(), None),
+        };
+
+        // Step 3: CID counts from peer_blob_inventory.
+        // their_cids_hosted_by_me: count of blobs local peer_id holds (heuristic until M3).
+        let their_cids_hosted_by_me: i64 = peer_blob_inventory::table
+            .filter(peer_blob_inventory::peer_id.eq(&local_peer_id))
+            .count()
+            .get_result(&mut conn)
+            .unwrap_or(0);
+
+        let my_cids_hosted_by_them: i64 = peer_blob_inventory::table
+            .filter(peer_blob_inventory::peer_id.eq(&peer_str))
+            .count()
+            .get_result(&mut conn)
+            .unwrap_or(0);
+
+        entries.push(serde_json::json!({
+            "household_id": household_id,
+            "display_name": display_name,
+            "online": true,
+            "last_sync_sec": 0u64,
+            "my_cids_hosted_by_them": my_cids_hosted_by_them as u32,
+            "their_cids_hosted_by_me": their_cids_hosted_by_me as u32,
+        }));
+    }
+
+    serde_json::json!({ "connected_peer_households": entries })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_util::test_pool;
+    use libp2p::PeerId;
+
+    #[tokio::test]
+    async fn build_local_slice_returns_empty_array_when_no_peers_connected() {
+        let pool = test_pool();
+        let slice = build_local_slice(&pool, &[]).await;
+        let arr = slice.get("connected_peer_households").and_then(|v| v.as_array());
+        assert!(arr.is_some(), "expected connected_peer_households array");
+        assert_eq!(arr.unwrap().len(), 0);
+    }
+
+    #[tokio::test]
+    async fn build_local_slice_skips_peers_without_bindings() {
+        let pool = test_pool();
+        let unknown = PeerId::random();
+        let slice = build_local_slice(&pool, &[unknown]).await;
+        let arr = slice
+            .get("connected_peer_households")
+            .and_then(|v| v.as_array())
+            .unwrap();
+        assert_eq!(arr.len(), 0, "unbound peer should be skipped silently");
+    }
 
     #[test]
     fn net_diff_computed_correctly() {

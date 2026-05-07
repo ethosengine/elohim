@@ -4177,14 +4177,21 @@ impl P2PNode {
                     let local_peer_id = self.identity.peer_id_string();
                     let keypair = self.identity.keypair();
                     let pool_ref = self.db_pool.as_ref();
+                    let connected_peers: Vec<libp2p::PeerId> = {
+                        let swarm = self.swarm.read().await;
+                        swarm.connected_peers().cloned().collect()
+                    };
                     match build_response_slice(
                         request.view_kind,
-                        request.agent_cid,
-                        request.request_id,
-                        &local_agent_cid,
-                        local_peer_id,
-                        keypair,
-                        pool_ref,
+                        crate::p2p::view_federation::SliceContext {
+                            agent_cid: request.agent_cid,
+                            request_id: request.request_id,
+                            local_agent_cid: &local_agent_cid,
+                            local_peer_id,
+                            connected_peers: &connected_peers,
+                            keypair,
+                            pool: pool_ref,
+                        },
                     )
                     .await
                     {
