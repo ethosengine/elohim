@@ -466,7 +466,10 @@ mod tests {
 
         assert_eq!(server.content_hash, "sha256-abc123");
         assert_eq!(server.capability, ContentServerCapability::Html5App);
-        assert_eq!(server.serve_url, Some("https://doorway.example.com".to_string()));
+        assert_eq!(
+            server.serve_url,
+            Some("https://doorway.example.com".to_string())
+        );
         assert_eq!(server.region, Some("us-west".to_string()));
         assert_eq!(server.bandwidth_mbps, Some(100));
         assert_eq!(server.priority, 75);

@@ -183,6 +183,10 @@ pub struct HttpServer {
     /// project_signal + back_prop_one_hop + flood_feedback end-to-end.
     /// When absent (no P2P swarm, test fixtures), fan-out steps are skipped gracefully.
     fan_out_ctx: Option<Arc<crate::api::epr::EprFanOutCtx>>,
+    /// SSR renderer (ssr feature only). Constructed once at startup from SSR_BUNDLE_PATH.
+    /// None when the feature is off or the bundle failed to load — handlers return 503.
+    #[cfg(feature = "ssr")]
+    ssr_state: Option<crate::ssr::SsrState>,
     /// T17: CID of this peer's steward. Populated from `Config::self_cid` at startup.
     /// Used as the `receiver` field in `serve-blob` REA events emitted on a
     /// successful GET-time race-fetch.  Empty string when not configured.
@@ -271,6 +275,8 @@ impl HttpServer {
             write_through_state: None,
             hc_registry: None,
             fan_out_ctx: None,
+            #[cfg(feature = "ssr")]
+            ssr_state: None,
             self_cid: String::new(),
             fetch_blob_timeout_seconds: 5,
             fetch_blob_parallelism: 3,
@@ -353,6 +359,17 @@ impl HttpServer {
     /// require missing dependencies are skipped gracefully.
     pub fn with_fan_out_ctx(mut self, ctx: Arc<crate::api::epr::EprFanOutCtx>) -> Self {
         self.fan_out_ctx = Some(ctx);
+        self
+    }
+
+    /// Wire the SSR renderer (ssr feature only).
+    ///
+    /// Call with `crate::ssr::SsrState::from_env()` at startup. When absent
+    /// (feature off, or bundle failed to load), `GET /spa/*` and `POST /render`
+    /// return 503. Peers that cannot sustain V8 simply omit this call.
+    #[cfg(feature = "ssr")]
+    pub fn with_ssr_state(mut self, state: crate::ssr::SsrState) -> Self {
+        self.ssr_state = Some(state);
         self
     }
 
@@ -1013,6 +1030,99 @@ impl HttpServer {
                 crate::api::write_through_admin::handle(req, method, &state).await
             }
 
+            // SSR: direct-peer rendering (ssr feature only)
+            //
+            // GET /spa/* — peer-to-peer libp2p-routed direct rendering.
+            //   The leading "/spa/" prefix is stripped and the remainder is
+            //   treated as an Angular route, e.g. /spa/lamad/concept/foo →
+            //   renders /lamad/concept/foo.
+            //
+            // POST /render — internal endpoint for doorway co-location.
+            //   Body: JSON { "url": "/lamad/concept/foo" }
+            //   Response: rendered HTML (text/html).
+            //
+            // Both return 503 when the renderer is absent (feature compiled in
+            // but SSR_BUNDLE_PATH unset or bundle load failed).
+            #[cfg(feature = "ssr")]
+            (Method::GET, p) if p.starts_with("/spa/") => {
+                let inner_path = format!("/{}", &p[5..]); // strip "/spa/"
+                match self.ssr_state.as_ref() {
+                    Some(state) => {
+                        match crate::ssr::render_url(state, inner_path).await {
+                            Ok(html) => Ok(Self::html_response(html)),
+                            Err(e) => {
+                                tracing::warn!(
+                                    target: "elohim_storage::ssr",
+                                    error = %e,
+                                    path = %p,
+                                    "SSR render error"
+                                );
+                                Ok(Response::builder()
+                                    .status(StatusCode::SERVICE_UNAVAILABLE)
+                                    .header(header::CONTENT_TYPE, "application/json")
+                                    .body(Full::new(Bytes::from(
+                                        r#"{"error":"render failed"}"#,
+                                    )))
+                                    .unwrap())
+                            }
+                        }
+                    }
+                    None => Ok(Response::builder()
+                        .status(StatusCode::SERVICE_UNAVAILABLE)
+                        .header(header::CONTENT_TYPE, "application/json")
+                        .body(Full::new(Bytes::from(
+                            r#"{"error":"SSR not available — SSR_BUNDLE_PATH not set or bundle failed to load"}"#,
+                        )))
+                        .unwrap()),
+                }
+            }
+
+            #[cfg(feature = "ssr")]
+            (Method::POST, "/render") => {
+                match self.ssr_state.as_ref() {
+                    Some(state) => {
+                        // Parse body: { "url": "..." }. On body-read failure, return 400.
+                        let url = match req.collect().await {
+                            Ok(collected) => {
+                                let body_bytes = collected.to_bytes();
+                                let parsed: serde_json::Value =
+                                    serde_json::from_slice(&body_bytes).unwrap_or_default();
+                                parsed
+                                    .get("url")
+                                    .and_then(|v| v.as_str())
+                                    .unwrap_or("/")
+                                    .to_string()
+                            }
+                            Err(_) => "/".to_string(),
+                        };
+                        match crate::ssr::render_url(state, url).await {
+                            Ok(html) => Ok(Self::html_response(html)),
+                            Err(e) => {
+                                tracing::warn!(
+                                    target: "elohim_storage::ssr",
+                                    error = %e,
+                                    "SSR /render error"
+                                );
+                                Ok(Response::builder()
+                                    .status(StatusCode::SERVICE_UNAVAILABLE)
+                                    .header(header::CONTENT_TYPE, "application/json")
+                                    .body(Full::new(Bytes::from(format!(
+                                        r#"{{"error":"render failed: {e}"}}"#
+                                    ))))
+                                    .unwrap())
+                            }
+                        }
+                    }
+                    None => Ok(Response::builder()
+                        .status(StatusCode::SERVICE_UNAVAILABLE)
+                        .header(header::CONTENT_TYPE, "application/json")
+                        .body(Full::new(Bytes::from(
+                            r#"{"error":"SSR not available — SSR_BUNDLE_PATH not set or bundle failed to load"}"#,
+                        )))
+                        .unwrap()),
+                }
+            }
+
             // Not found
             _ => Ok(Response::builder()
                 .status(StatusCode::NOT_FOUND)
@@ -1478,6 +1588,16 @@ impl HttpServer {
         builder
             .header("Access-Control-Allow-Origin", "*")
             .header("Cross-Origin-Resource-Policy", "cross-origin")
+    }
+
+    /// Build a `text/html` response (used by SSR handlers, ssr feature only).
+    #[cfg(feature = "ssr")]
+    fn html_response(html: String) -> Response<Full<Bytes>> {
+        Response::builder()
+            .status(StatusCode::OK)
+            .header(header::CONTENT_TYPE, "text/html; charset=utf-8")
+            .body(Full::new(Bytes::from(html)))
+            .unwrap()
     }
 
     /// GET /blob/{hash} - Reassemble blob from shards
@@ -9337,6 +9457,54 @@ pub fn build_manifest() -> doorway_client::DoorwayRoutes {
                 .rate_limit(20)
                 .build(),
         )
+        // =====================================================================
+        // /lamad/* — SSR-eligible routes (Task 12)
+        //
+        // These paths are declared with `render: "angular-ssr"`. Doorway
+        // dispatches them to its in-process renderer (Task 13) instead of
+        // proxying directly to the JSON handler. The handler name is still
+        // required so the SSR DataFetcher can call back through the doorway
+        // resolver to hydrate the Angular component tree.
+        //
+        // Handler mapping rationale (none of the view-specific handler names
+        // exist yet; we map to the nearest data-equivalent handler):
+        //   /lamad/concept/{id}        → get_content    (content node by id)
+        //   /lamad/path/{slug}         → list_content   (path = filtered content set)
+        //   /lamad/path/{slug}/step/{n}→ get_content    (a step is a content node)
+        //   /                          → list_content   (landing aggregates content)
+        // =====================================================================
+        .route(
+            Route::get("/lamad/concept/{id}")
+                .handler("get_content")
+                .cache_ttl(60)
+                .public_if_reach("commons")
+                .render("angular-ssr")
+                .build(),
+        )
+        .route(
+            Route::get("/lamad/path/{slug}")
+                .handler("list_content")
+                .cache_ttl(60)
+                .public_if_reach("commons")
+                .render("angular-ssr")
+                .build(),
+        )
+        .route(
+            Route::get("/lamad/path/{slug}/step/{n}")
+                .handler("get_content")
+                .cache_ttl(60)
+                .public_if_reach("commons")
+                .render("angular-ssr")
+                .build(),
+        )
+        .route(
+            Route::get("/")
+                .handler("list_content")
+                .cache_ttl(60)
+                .public_if_reach("commons")
+                .render("angular-ssr")
+                .build(),
+        )
         // Blob proxy: doorway caches blobs from /blob/{hash}
         .with_blobs_at("/blob")
         .build()
@@ -9424,6 +9592,53 @@ mod tests {
         assert!(
             paths.contains(&"/api/v1/reciprocity"),
             "missing /api/v1/reciprocity (T32)"
+        );
+        // SSR-eligible lamad routes (Task 12) — verify paths and render field
+        let lamad_routes: std::collections::HashMap<&str, _> = manifest
+            .routes
+            .iter()
+            .filter(|r| {
+                matches!(
+                    r.path.as_str(),
+                    "/lamad/concept/{id}"
+                        | "/lamad/path/{slug}"
+                        | "/lamad/path/{slug}/step/{n}"
+                        | "/"
+                )
+            })
+            .map(|r| (r.path.as_str(), r))
+            .collect();
+        let concept = lamad_routes
+            .get("/lamad/concept/{id}")
+            .expect("missing /lamad/concept/{id} (Task 12)");
+        assert_eq!(
+            concept.render.as_deref(),
+            Some("angular-ssr"),
+            "/lamad/concept/{{id}} must declare render=angular-ssr"
+        );
+        let path_view = lamad_routes
+            .get("/lamad/path/{slug}")
+            .expect("missing /lamad/path/{slug} (Task 12)");
+        assert_eq!(
+            path_view.render.as_deref(),
+            Some("angular-ssr"),
+            "/lamad/path/{{slug}} must declare render=angular-ssr"
+        );
+        let step_view = lamad_routes
+            .get("/lamad/path/{slug}/step/{n}")
+            .expect("missing /lamad/path/{slug}/step/{n} (Task 12)");
+        assert_eq!(
+            step_view.render.as_deref(),
+            Some("angular-ssr"),
+            "/lamad/path/{{slug}}/step/{{n}} must declare render=angular-ssr"
+        );
+        let landing = lamad_routes
+            .get("/")
+            .expect("missing / (landing route — Task 12)");
+        assert_eq!(
+            landing.render.as_deref(),
+            Some("angular-ssr"),
+            "/ must declare render=angular-ssr"
         );
         // Ensure infrastructure routes are NOT in the manifest
         assert!(
