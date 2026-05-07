@@ -160,7 +160,7 @@ async fn view_federate_swarm_gone_when_channel_closed() {
 async fn responder_signs_slice_with_agent_key_when_agent_matches() {
     use base64::Engine as _;
     use elohim_storage::{
-        p2p::view_federation::build_response_slice,
+        p2p::view_federation::{build_response_slice, SliceContext},
         views::{FreshnessState, ViewKind},
     };
 
@@ -170,12 +170,15 @@ async fn responder_signs_slice_with_agent_key_when_agent_matches() {
 
     let response = build_response_slice(
         ViewKind::Cluster,
-        local_agent_cid.to_string(), // agent_cid == local_agent_cid
-        "req-live-001".to_string(),
-        local_agent_cid,
-        local_peer_id,
-        &keypair,
-        None, // pool=None → stub json!({}) payload
+        SliceContext {
+            agent_cid: local_agent_cid.to_string(), // agent_cid == local_agent_cid
+            request_id: "req-live-001".to_string(),
+            local_agent_cid,
+            local_peer_id,
+            connected_peers: &[],
+            keypair: &keypair,
+            pool: None, // pool=None → stub json!({}) payload
+        },
     )
     .await
     .expect("build_response_slice should not fail for a valid keypair");
@@ -215,7 +218,7 @@ async fn responder_signs_slice_with_agent_key_when_agent_matches() {
 async fn responder_returns_offline_for_unknown_agent_cid() {
     use base64::Engine as _;
     use elohim_storage::{
-        p2p::view_federation::build_response_slice,
+        p2p::view_federation::{build_response_slice, SliceContext},
         views::{FreshnessState, ViewKind},
     };
 
@@ -226,12 +229,15 @@ async fn responder_returns_offline_for_unknown_agent_cid() {
 
     let response = build_response_slice(
         ViewKind::PeerTopology,
-        other_agent_cid.to_string(), // agent_cid != local_agent_cid
-        "req-offline-001".to_string(),
-        local_agent_cid,
-        local_peer_id,
-        &keypair,
-        None, // pool=None; non-matching agent always returns Null regardless
+        SliceContext {
+            agent_cid: other_agent_cid.to_string(), // agent_cid != local_agent_cid
+            request_id: "req-offline-001".to_string(),
+            local_agent_cid,
+            local_peer_id,
+            connected_peers: &[],
+            keypair: &keypair,
+            pool: None, // pool=None; non-matching agent always returns Null regardless
+        },
     )
     .await
     .expect("build_response_slice should not fail for a valid keypair");
@@ -265,7 +271,10 @@ async fn responder_returns_offline_for_unknown_agent_cid() {
 /// `agent_cid`, and `request_id` exactly as supplied — required by the F-T21 dedup map.
 #[tokio::test]
 async fn responder_echoes_view_kind_and_request_id() {
-    use elohim_storage::{p2p::view_federation::build_response_slice, views::ViewKind};
+    use elohim_storage::{
+        p2p::view_federation::{build_response_slice, SliceContext},
+        views::ViewKind,
+    };
 
     let keypair = libp2p::identity::Keypair::generate_ed25519();
     let agent_cid = "echo_agent_cid_test";
@@ -274,12 +283,15 @@ async fn responder_echoes_view_kind_and_request_id() {
 
     let response = build_response_slice(
         ViewKind::PeerTopology,
-        agent_cid.to_string(),
-        request_id.to_string(),
-        "different_local_agent",
-        local_peer_id,
-        &keypair,
-        None, // pool=None
+        SliceContext {
+            agent_cid: agent_cid.to_string(),
+            request_id: request_id.to_string(),
+            local_agent_cid: "different_local_agent",
+            local_peer_id,
+            connected_peers: &[],
+            keypair: &keypair,
+            pool: None, // pool=None
+        },
     )
     .await
     .expect("build_response_slice should not fail");

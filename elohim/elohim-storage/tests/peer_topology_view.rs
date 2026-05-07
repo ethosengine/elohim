@@ -114,7 +114,7 @@ async fn peer_topology_reciprocation_count_zero_when_no_live_edges() {
 #[tokio::test]
 async fn build_local_slice_returns_connected_peer_households_key() {
     let pool = test_pool();
-    let v = build_local_slice(&pool).await;
+    let v = build_local_slice(&pool, &[]).await;
 
     assert!(
         v.get("connected_peer_households").is_some(),
