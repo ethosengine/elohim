@@ -16,4 +16,6 @@
 //! required. Cutover removes one transport, never two divergent message
 //! schemas.
 
-// Submodules added in subsequent tasks.
+mod config;
+
+pub use config::IrohConfig;
