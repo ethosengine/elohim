@@ -1020,6 +1020,55 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
             }
         }
 
+        stage('Upload M1 Blob-Backed Content') {
+            when { allOf {
+                expression { env.PIPELINE_SKIPPED != 'true' }
+                expression { params.SEED_DATA }
+            }}
+            steps {
+                container('builder') {
+                    script {
+                        def manifestoPath = 'genesis/docs/content/elohim-protocol/manifesto.md'
+                        def internalDoorwayUrl = env.INTERNAL_DOORWAY_URL
+                        catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
+                            sh """#!/bin/bash
+                                set -euo pipefail
+                                if [ ! -f "${manifestoPath}" ]; then
+                                  echo "ERROR: ${manifestoPath} missing"; exit 1
+                                fi
+                                BLOB_SIZE=\$(wc -c < "${manifestoPath}")
+                                BLOB_HASH=sha256-\$(sha256sum "${manifestoPath}" | awk '{print \$1}')
+                                echo "═══════════════════════════════════════════════════════════"
+                                echo "UPLOAD M1 BLOB-BACKED CONTENT"
+                                echo "═══════════════════════════════════════════════════════════"
+                                echo "File:   ${manifestoPath}"
+                                echo "Size:   \$BLOB_SIZE bytes"
+                                echo "Hash:   \$BLOB_HASH"
+                                echo "Target: http://${internalDoorwayUrl}/admin/seed/blob"
+                                echo ""
+                                STATUS=\$(curl -s -o /tmp/upload.out -w '%{http_code}' \\
+                                  -X PUT "http://${internalDoorwayUrl}/admin/seed/blob" \\
+                                  -H "X-Blob-Hash: \$BLOB_HASH" \\
+                                  -H 'Content-Type: application/octet-stream' \\
+                                  --data-binary @"${manifestoPath}")
+                                if [ "\$STATUS" != "200" ] && [ "\$STATUS" != "201" ] && [ "\$STATUS" != "409" ]; then
+                                  echo "Upload failed: HTTP \$STATUS"
+                                  cat /tmp/upload.out
+                                  exit 1
+                                fi
+                                echo "Upload status: \$STATUS"
+                                echo "\$BLOB_HASH" > /tmp/m1_blob_hash
+                                echo "\$BLOB_SIZE" > /tmp/m1_blob_size
+                            """
+                            env.M1_BLOB_HASH = sh(script: 'cat /tmp/m1_blob_hash', returnStdout: true).trim()
+                            env.M1_BLOB_SIZE_BYTES = sh(script: 'cat /tmp/m1_blob_size', returnStdout: true).trim()
+                            echo "Exported: M1_BLOB_HASH=${env.M1_BLOB_HASH}, M1_BLOB_SIZE_BYTES=${env.M1_BLOB_SIZE_BYTES}"
+                        }
+                    }
+                }
+            }
+        }
+
         stage('Seed Custody Commitments') {
             when { allOf {
                 expression { env.PIPELINE_SKIPPED != 'true' }
