@@ -14,11 +14,12 @@
  *   npx tsx src/probe-topology-m1.ts
  */
 
-import { chromium, type Page } from 'playwright';
+import { chromium, type BrowserContext, type Page } from 'playwright';
 import { mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 const BASE = process.env.ALPHA_BASE_URL || 'https://alpha.elohim.host';
+const DOORWAY = process.env.ALPHA_DOORWAY_URL || 'https://doorway-alpha.elohim.host';
 const USER = process.env.MATTHEW_USERNAME || 'matthew.dowell@alpha.elohim.host';
 const PASS = process.env.MATTHEW_PASSWORD || 'TestAdmin2026!';
 const BLOB = process.env.M1_BLOB_HASH || '';
@@ -33,17 +34,43 @@ interface Check {
 }
 const results: Check[] = [];
 
-async function login(page: Page): Promise<void> {
-  // Two-step login: federated identity → credentials.
-  // Selectors come from app/elohim-app/src/app/imagodei/components/login/login.component.html
-  await page.goto(`${BASE}/identity/login`);
-  // Step 1: enter federated identity (e.g., matthew.dowell@alpha.elohim.host)
-  await page.locator('[data-testid=login-federated-id]').fill(USER);
-  await page.locator('[data-testid=login-federated-submit]').click();
-  // Step 2: enter password on the credentials card (identifier may auto-fill)
-  await page.locator('[data-testid=login-password]').fill(PASS);
-  await page.locator('[data-testid=login-submit]').click();
-  await page.waitForURL(/\/(home|dashboard|shefa|lamad|imagodei|resource)/, { timeout: 30000 });
+/**
+ * JWT-injection auth — mirrors genesis/a2o/steps/fixture-humans.steps.ts.
+ * Hits doorway /auth/login directly to get a token, then bakes it into:
+ *  - extraHTTPHeaders (Authorization: Bearer ...) for every network request
+ *  - localStorage doorway_auth_token (for the Angular auth interceptor)
+ *
+ * Avoids the OAuth UI flow entirely (alpha redirects to doorway-alpha's
+ * /threshold/login which requires browser-side OAuth handshake).
+ */
+async function authenticate(): Promise<{ token: string; agentPubKey: string; humanId: string }> {
+  const resp = await fetch(`${DOORWAY}/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ identifier: USER.toLowerCase(), password: PASS }),
+  });
+  if (!resp.ok) {
+    throw new Error(`login failed: ${resp.status} ${await resp.text()}`);
+  }
+  const json = (await resp.json()) as { token: string; agentPubKey?: string; humanId?: string };
+  return {
+    token: json.token,
+    agentPubKey: json.agentPubKey ?? '',
+    humanId: json.humanId ?? '',
+  };
+}
+
+async function injectToken(ctx: BrowserContext, token: string): Promise<void> {
+  // Pre-load localStorage on every page in the context so the Angular auth
+  // interceptor reads the token before it issues any data fetch.
+  await ctx.addInitScript(t => {
+    try {
+      localStorage.setItem('doorway_auth_token', t);
+    } catch {
+      /* localStorage may be unavailable in some contexts; header injection
+         covers that path. */
+    }
+  }, token);
 }
 
 async function checkClusterPage(page: Page): Promise<void> {
@@ -106,12 +133,27 @@ async function checkContentViewer(page: Page): Promise<void> {
 }
 
 async function main(): Promise<void> {
+  // Authenticate against doorway, get a JWT, then run the browser session
+  // with that token injected at the network + localStorage layers.
+  const auth = await authenticate();
+  console.log(`Authenticated as ${auth.humanId} (agentPubKey ${auth.agentPubKey.slice(0, 16)}...).`);
+
   const browser = await chromium.launch({ headless: true });
-  const ctx = await browser.newContext();
+  const ctx = await browser.newContext({
+    extraHTTPHeaders: { Authorization: `Bearer ${auth.token}` },
+  });
+  await injectToken(ctx, auth.token);
   const page = await ctx.newPage();
 
+  // Surface anything the SPA logs to the console so empty-state vs crash is
+  // distinguishable in the local report.
+  page.on('console', msg => {
+    if (msg.type() === 'error' || msg.type() === 'warning') {
+      console.log(`  [browser ${msg.type()}] ${msg.text().slice(0, 200)}`);
+    }
+  });
+
   try {
-    await login(page);
     await checkClusterPage(page);
     await checkPeerTopology(page);
     await checkReciprocity(page);
