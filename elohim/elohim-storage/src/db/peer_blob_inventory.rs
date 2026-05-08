@@ -41,6 +41,7 @@ pub fn apply_snapshot(
                 last_seen_at: snapshot_at.to_string(),
                 source: "gossip-snapshot".to_string(),
                 sequence,
+                blake3_hash: None,
             })
             .collect();
 
@@ -98,6 +99,7 @@ pub fn apply_delta(
                         last_seen_at: emitted_at.to_string(),
                         source: "gossip-delta".to_string(),
                         sequence,
+                        blake3_hash: None,
                     };
                     diesel::replace_into(peer_blob_inventory::table)
                         .values(&row)
@@ -142,6 +144,7 @@ pub fn record_fetch_success(
             last_seen_at: observed_at.to_string(),
             source: "fetch-success".to_string(),
             sequence: existing_seq.unwrap_or(0),
+            blake3_hash: None,
         };
         diesel::replace_into(peer_blob_inventory::table)
             .values(&row)

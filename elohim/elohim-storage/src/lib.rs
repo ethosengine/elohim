@@ -107,6 +107,11 @@ pub mod p2p;
 #[cfg(feature = "ssr")]
 pub mod ssr;
 
+// Parallel iroh-based P2P stack (staged cutover; see plan
+// genesis/docs/superpowers/plans/2026-05-07-iroh-parallel-stack.md).
+#[cfg(feature = "p2p-iroh")]
+pub mod p2p_iroh;
+
 // CRDT sync module (always available, P2P transport requires p2p feature)
 pub mod sync;
 

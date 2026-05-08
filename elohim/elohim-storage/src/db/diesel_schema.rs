@@ -1200,6 +1200,7 @@ diesel::table! {
         last_seen_at -> Text,
         source       -> Text,
         sequence     -> BigInt,
+        blake3_hash  -> Nullable<Text>,
     }
 }
 
@@ -1405,6 +1406,17 @@ diesel::joinable!(content_tags -> content (content_id));
 diesel::joinable!(node_stewardship -> stewarded_nodes (node_id));
 diesel::joinable!(node_stewardship -> humans (human_id));
 
+// Phase 10 of iroh parallel stack — cross-stack peer identity bridge.
+diesel::table! {
+    cross_stack_peer_map (agent_cid) {
+        agent_cid     -> Text,
+        peer_id       -> Nullable<Text>,
+        node_id       -> Nullable<Text>,
+        first_seen_at -> Text,
+        last_seen_at  -> Text,
+    }
+}
+
 diesel::allow_tables_to_appear_in_same_query!(
     access_grants,
     agreements,
@@ -1458,6 +1470,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     proposal_options,
     projector_cursor,
     proposals,
+    cross_stack_peer_map,
     ranked_votes,
     key_revocations,
     key_rotations,

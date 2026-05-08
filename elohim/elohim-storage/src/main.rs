@@ -354,6 +354,17 @@ async fn async_main(
         }
     }
 
+    // Iroh parallel-stack toggle (see plan
+    // genesis/docs/superpowers/plans/2026-05-07-iroh-parallel-stack.md).
+    // Default `Libp2p` — existing deployments unaffected. `iroh` selects
+    // the parallel iroh-blobs path; mutually exclusive at runtime.
+    if let Ok(v) = std::env::var("ELOHIM_TRANSPORT_BACKEND") {
+        match v.parse::<elohim_storage::config::TransportBackend>() {
+            Ok(backend) => config.transport_backend = backend,
+            Err(e) => warn!("ignoring ELOHIM_TRANSPORT_BACKEND: {}", e),
+        }
+    }
+
     info!(
         storage_dir = %config.storage_dir.display(),
         http_port = config.http_port,
@@ -655,9 +666,14 @@ async fn async_main(
     let progress_hub = Arc::new(ProgressHub::new(ProgressHubConfig::default()));
     info!("Progress hub initialized for WebSocket streaming");
 
-    // Initialize P2P node if enabled
+    // Initialize P2P node if enabled.
+    // Gated on `transport_backend == Libp2p` so the iroh path can take over
+    // the P2P slot when selected (the two stacks are mutually exclusive at
+    // runtime — see plan).
     #[cfg(feature = "p2p")]
-    let mut p2p_node = if args.enable_p2p {
+    let mut p2p_node = if args.enable_p2p
+        && config.transport_backend == elohim_storage::config::TransportBackend::Libp2p
+    {
         let agent_pubkey = args.agent_pubkey.clone().unwrap_or_else(|| {
             // Generate a placeholder agent key if none provided
             format!(
@@ -778,6 +794,11 @@ async fn async_main(
         info!("  Protocols: /elohim/shard/1.0.0, /elohim/storage-sync/1.0.0, /elohim/epr/1.0.0, /elohim/id/1.0.0");
 
         Some(p2p_node)
+    } else if args.enable_p2p
+        && config.transport_backend == elohim_storage::config::TransportBackend::Iroh
+    {
+        info!("P2P transport_backend=iroh — libp2p path skipped (iroh init below)");
+        None
     } else {
         info!("P2P networking disabled (use --enable-p2p or ENABLE_P2P=true)");
         None
@@ -785,6 +806,34 @@ async fn async_main(
 
     #[cfg(not(feature = "p2p"))]
     let p2p_node: Option<()> = None;
+
+    // Phase 1 iroh parallel-stack init (no-op holder — see plan
+    // genesis/docs/superpowers/plans/2026-05-07-iroh-parallel-stack.md).
+    // Phase 2 promotes this to mount iroh-blobs and integrate with the
+    // tokio::select shutdown loop. For now: build endpoint, log node_id,
+    // hold the handle so the secret-key file gets persisted on first run.
+    #[cfg(feature = "p2p-iroh")]
+    let _iroh_node = if args.enable_p2p
+        && config.transport_backend == elohim_storage::config::TransportBackend::Iroh
+    {
+        let iroh_cfg = elohim_storage::p2p_iroh::IrohConfig::from_storage_dir(&config.storage_dir);
+        match elohim_storage::p2p_iroh::IrohNode::start(iroh_cfg).await {
+            Ok(node) => {
+                info!("Iroh parallel-stack node started (Phase 1 stub)");
+                info!("  Node ID: {}", node.node_id());
+                Some(node)
+            }
+            Err(e) => {
+                error!(error = %e, "Failed to start iroh node");
+                return Err(Box::new(e));
+            }
+        }
+    } else {
+        None
+    };
+
+    #[cfg(not(feature = "p2p-iroh"))]
+    let _iroh_node: Option<()> = None;
 
     // Initialize extraction cache if enabled
     let extraction_cache = if config.extraction_cache.enabled {

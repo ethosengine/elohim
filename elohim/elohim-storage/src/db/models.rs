@@ -3145,6 +3145,9 @@ pub struct PeerBlobInventoryRow {
     /// 'gossip-snapshot' | 'gossip-delta' | 'fetch-success'
     pub source: String,
     pub sequence: i64,
+    /// iroh-side BLAKE3 hash (Phase 4). NULL during transition; cutover
+    /// (Phase 11) drops blob_hash and makes this required.
+    pub blake3_hash: Option<String>,
 }
 
 #[derive(Debug, Clone, Insertable)]
@@ -3155,6 +3158,7 @@ pub struct NewPeerBlobInventoryRow {
     pub last_seen_at: String,
     pub source: String,
     pub sequence: i64,
+    pub blake3_hash: Option<String>,
 }
 
 // ============================================================================

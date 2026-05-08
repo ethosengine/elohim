@@ -176,6 +176,23 @@ libp2p = { version = "0.54", features = [
 # Futures for async traits (used by libp2p request-response)
 futures = { version = "0.3", optional = true }
 
+# iroh — QUIC-based P2P transport (parallel stack; staged cutover from libp2p).
+# Pinned to iroh-blobs 0.94 (Sep 2025) which pulls iroh 0.92. Both use stable
+# ed25519-dalek 2.2 + curve25519-dalek 4.1 — versus iroh-blobs 0.95+ which
+# moves to a pre-release crypto path (curve25519-dalek 5.0.0-pre.1) that has
+# a published-source bug (digest::crypto_common path mismatch). Coexists with
+# current holochain dev.5 + multihash-codetable 0.2 — see plan version-pinning
+# rationale in genesis/docs/superpowers/plans/2026-05-07-iroh-parallel-stack.md.
+# iroh-gossip 0.92 aligns with iroh 0.92's iroh-base; pulled in at Phase 4
+# pickup. Verified in isolation 2026-05-08; in-workspace probe pending.
+iroh = { version = "=0.92", optional = true }
+iroh-blobs = { version = "=0.94", optional = true }
+iroh-gossip = { version = "=0.92", optional = true }
+
+# Direct dep on `rand` for iroh SecretKey generation (OsRng).
+# Already in the transitive tree; declare direct so call sites can use it.
+rand = { version = "0.8", optional = true }
+
 # Optional: Compression for blobs
 lz4_flex = { version = "0.11", optional = true }
 
@@ -183,6 +200,7 @@ lz4_flex = { version = "0.11", optional = true }
 default = ["p2p"]
 compression = ["lz4_flex"]
 p2p = ["libp2p", "futures"]
+p2p-iroh = ["iroh", "iroh-blobs", "iroh-gossip", "rand", "futures"]
 ssr = ["dep:elohim-render"]
 
 [dev-dependencies]

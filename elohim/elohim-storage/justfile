@@ -22,6 +22,27 @@ build-dev:
 test:
     cargo test
 
+# Build with iroh parallel stack enabled (libp2p still default)
+# See genesis/docs/superpowers/plans/2026-05-07-iroh-parallel-stack.md
+build-iroh:
+    cargo build --features "p2p p2p-iroh"
+
+# Test with both stacks compiled in.
+# Iroh integration tests (the iroh_* tests in tests/) run serialized via
+# --test-threads=1 because multiple in-process QUIC endpoints on loopback
+# race for UDP port allocation and the iroh-gossip overlay needs more
+# than the default test thread share to converge under contention. Unit
+# tests (--lib) are unaffected and can run parallel.
+test-iroh:
+    cargo test --features "p2p p2p-iroh" --lib
+    cargo test --features "p2p p2p-iroh" --test 'iroh_*' -- --test-threads=1
+
+# Head-to-head blob plane perf bench: iroh vs libp2p on loopback.
+# Release-mode + ignored-test pattern keeps the bench out of `just test-iroh`
+# but makes it explicit-to-invoke.
+bench-blob:
+    cargo test --release --features "p2p p2p-iroh" --test bench_blob_perf -- --ignored --nocapture
+
 # Export TypeScript type bindings
 export-bindings:
     cargo test export_bindings
