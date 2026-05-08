@@ -1,0 +1,21 @@
+{
+  "$id": "epr:schema:enum:renderer-kind",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "RendererKind",
+  "description": "Kind of server-side renderer a doorway carries. Reserved values are valid claim values; only `angular-ssr` is implemented in elohim-render today. Source of truth: doorway runtime (Category C operational). Not a DHT entry type.",
+  "_sourceOfTruth": {
+    "category": "C",
+    "layer": "view",
+    "owner": "doorway runtime",
+    "notarized": false,
+    "rationale": "Renderer kind is a runtime-derived label tied to bundle shape; it's part of the operator's compute-shape claim, not a notarized protocol primitive"
+  },
+  "type": "string",
+  "enum": ["angular-ssr", "react-rsc", "vue-ssr", "svelte-ssr", "lit-ssr", "static-html"],
+  "_tiers": {
+    "core": {
+      "values": ["angular-ssr"],
+      "rationale": "angular-ssr is the only renderer the protocol ships today; others are reserved for future framework adapters"
+    }
+  }
+}
