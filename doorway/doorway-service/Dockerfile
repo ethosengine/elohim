@@ -147,6 +147,15 @@ COPY genesis/a2o ./genesis/a2o
 COPY genesis/orchestrator ./genesis/orchestrator
 COPY genesis/landing ./genesis/landing
 
+# elohim-app declares `"elohim-cache-core": "file:../../elohim/elohim-cache-core/pkg"`
+# (a wasm-pack output dir whose .wasm/.js files are gitignored — only
+# package.json is tracked). pnpm install --frozen-lockfile aborts with
+# "ENOENT: scandir '/workspace/elohim/elohim-cache-core/pkg'" without it.
+# The wasm is browser-loaded at runtime via dynamic import; the SSR server
+# bundle never references it, so copying just the tracked package.json is
+# enough to satisfy the lockfile + the angular.json assets entry.
+COPY elohim/elohim-cache-core/pkg ./elohim/elohim-cache-core/pkg
+
 # Install only elohim-app + its transitive workspace deps.
 RUN pnpm install --filter "elohim-app..." --frozen-lockfile
 
