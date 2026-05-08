@@ -22,7 +22,7 @@
 
 use async_trait::async_trait;
 use std::path::PathBuf;
-use std::sync::mpsc;
+use std::sync::{mpsc, Arc};
 
 use crate::{RenderContext, RenderError, RenderOutput, Renderer, Result};
 
@@ -59,16 +59,21 @@ impl AngularRenderer {
     /// Creates a new `AngularRenderer`. Spawns a dedicated OS thread that
     /// owns a V8 isolate. The isolate is initialized with the standard
     /// runtime shims: `console`, `URL` (with `URLSearchParams`),
-    /// `TextEncoder`/`TextDecoder`, and the `fs` module loader. The fetch
-    /// shim is NOT yet wired (see `Task 14+` for per-request DataFetcher
-    /// swapping); rendering content that depends on fetched data will hit
-    /// `ReferenceError: fetch is not defined` until that lands.
+    /// `TextEncoder`/`TextDecoder`, the `fs` module loader, and a `fetch`
+    /// global backed by the supplied `DataFetcher`.
+    ///
+    /// The fetcher is fixed at construction time. Per-request `RenderContext.
+    /// data_fetcher` is currently ignored by this renderer — the constructor's
+    /// fetcher is used for every render. This matches the doorway use case
+    /// where one renderer instance always forwards to a single elohim-storage
+    /// endpoint. Per-request DataFetcher swapping via OpState is a future
+    /// enhancement (Task 14+).
     ///
     /// # Errors
     ///
     /// Returns `RenderError::ModuleLoad` if the bundle path does not exist or the
     /// background thread cannot be spawned.
-    pub fn new(bundle: PathBuf) -> Result<Self> {
+    pub fn new(bundle: PathBuf, fetcher: Arc<dyn crate::DataFetcher>) -> Result<Self> {
         if !bundle.exists() {
             return Err(RenderError::ModuleLoad(format!(
                 "bundle not found: {}",
@@ -93,14 +98,12 @@ impl AngularRenderer {
 
                 local_rt.block_on(async move {
                     // JsRuntime is created here — it stays on this thread forever.
-                    // with_shims() wires console, URL, and TextEncoder/TextDecoder
-                    // shims alongside FsModuleLoader.
-                    //
-                    // TODO(post-task-9): wire DataFetcher per request via swappable
-                    // OpState so that Angular SSR bundles can call `fetch()`. Until
-                    // then, any `fetch()` call inside the bundle will surface as
-                    // `RenderError::ModuleLoad("ReferenceError: fetch is not defined")`.
-                    let mut runtime = crate::runtime::JsRuntime::with_shims();
+                    // with_full_shims() wires console, URL, TextEncoder/TextDecoder,
+                    // FsModuleLoader, AND a `fetch` global that dispatches into the
+                    // supplied DataFetcher. Without fetch, Angular SSR bootstrap
+                    // hangs forever waiting on HttpClient calls (services like
+                    // ConfigService, AuthService, ContentService).
+                    let mut runtime = crate::runtime::JsRuntime::with_full_shims(fetcher);
 
                     for StringWorkItem { script, reply } in rx {
                         let result = runtime.eval_string(&script).await;

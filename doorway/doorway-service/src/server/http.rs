@@ -236,19 +236,34 @@ fn init_ssr_http_client() -> Arc<reqwest::Client> {
 /// Returns `Some(renderer)` if the env var is set and the bundle path exists.
 /// Returns `None` silently if the var is unset.
 /// Logs a warning and returns `None` if the path is set but the bundle fails to load.
+///
+/// The renderer is constructed with a `ResolverFetcher` pointing at
+/// `SSR_STORAGE_URL` (defaults to `http://localhost:8090`). Without a real
+/// fetcher, Angular SSR bootstrap hangs indefinitely waiting on HttpClient
+/// calls — that produced `x-ssr-error: render timed out` on every cold render.
 fn init_renderer() -> Option<Arc<dyn elohim_render::Renderer>> {
-    match std::env::var("SSR_BUNDLE_PATH") {
-        Ok(path) => match elohim_render::AngularRenderer::new(std::path::PathBuf::from(path)) {
-            Ok(r) => {
-                tracing::info!(target: "doorway::ssr", "SSR renderer ready");
-                Some(Arc::new(r) as Arc<dyn elohim_render::Renderer>)
-            }
-            Err(e) => {
-                tracing::warn!(target: "doorway::ssr", "SSR disabled: {}", e);
-                None
-            }
-        },
-        Err(_) => None,
+    let bundle_path = std::env::var("SSR_BUNDLE_PATH").ok()?;
+    let storage_url = std::env::var("SSR_STORAGE_URL")
+        .or_else(|_| std::env::var("STORAGE_URL"))
+        .unwrap_or_else(|_| "http://localhost:8090".to_string());
+    let fetcher: Arc<dyn elohim_render::DataFetcher> = Arc::new(crate::ssr::ResolverFetcher::new(
+        Arc::new(reqwest::Client::new()),
+        storage_url.clone(),
+    ));
+    match elohim_render::AngularRenderer::new(std::path::PathBuf::from(&bundle_path), fetcher) {
+        Ok(r) => {
+            tracing::info!(
+                target: "doorway::ssr",
+                bundle = %bundle_path,
+                storage = %storage_url,
+                "SSR renderer ready"
+            );
+            Some(Arc::new(r) as Arc<dyn elohim_render::Renderer>)
+        }
+        Err(e) => {
+            tracing::warn!(target: "doorway::ssr", "SSR disabled: {}", e);
+            None
+        }
     }
 }
 
@@ -1695,19 +1710,19 @@ async fn handle_request(
                                 endpoint.clone(),
                             ));
                         // Default RenderLimits.wall_time_ms is 2_000ms — too tight
-                        // for the cold-start path where V8 has to parse + interpret
-                        // a 51MB bundle (171 .mjs files, main.server.mjs ~484KB)
-                        // and walk Angular's bootstrap. Production saw
-                        // x-ssr-error="render timed out after 2000ms" on every
-                        // first request after a pod rollout. 15s is generous for
-                        // cold-start; warm renders complete in tens of ms once
-                        // deno_core's module loader has cached the imports.
+                        // for cold-start where V8 parses + interprets a 51MB bundle
+                        // (171 .mjs files, main.server.mjs ~484KB), walks Angular's
+                        // bootstrap (which makes HTTP fetches), and renders. 15s
+                        // wasn't enough either when fetch was wired (Angular awaits
+                        // ConfigService etc. on first call). 60s is generous for
+                        // cold start; warm renders are tens of ms once deno_core's
+                        // module loader caches imports + V8 JIT settles.
                         let ctx = elohim_render::RenderContext {
                             spec: render_spec,
                             url: url.clone(),
                             data_fetcher: fetcher,
                             limits: elohim_render::RenderLimits {
-                                wall_time_ms: 15_000,
+                                wall_time_ms: 60_000,
                                 ..Default::default()
                             },
                         };
