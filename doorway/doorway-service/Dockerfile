@@ -123,6 +123,12 @@ RUN npm install -g pnpm@9
 # package.json to exist for --frozen-lockfile to pass.
 COPY pnpm-workspace.yaml pnpm-lock.yaml package.json ./
 
+# pnpm patchedDependencies — root package.json declares
+# `"@angular/build@19.2.22": "patches/@angular__build@19.2.22.patch"`.
+# Without this dir, `pnpm install --frozen-lockfile` aborts with
+# "ENOENT: no such file or directory, open '/workspace/patches/...'".
+COPY patches ./patches
+
 # Copy workspace package directories. Source files for elohim-app's
 # transitive workspace deps (elohim-core, storage-client-ts) are pulled in
 # here; other dirs are copied for their package.json metadata only —
