@@ -46,6 +46,41 @@ clarifications for the design-gate audit:
   the `peer_blob_inventory` precedent (`db/peer_blob_inventory.rs`
   comment: "Category C operational").
 
+### Aligned with spec `2026-05-08-iroh-libp2p-complementarity.md`
+
+The architecture spec landed after this doc was written. The spec's
+plane-by-plane verdict (§"Plane-by-plane verdict and decision rule")
+governs Phase 11 backend wiring; this doc's catalogs and dispatch
+sketches stand, but several framings that originally treated cutover as
+a transition need re-reading as **structurally permanent dual-stack**:
+
+- **Most planes are dual-stack permanent** (Gossip, Sync, EPR, EPR-atom,
+  Shard, View-fed, Discovery). Both transports run forever; the
+  cross-stack peer-map governs per-call selection. The "transition aid"
+  framing in §§2-3 of this doc is wrong on the time horizon — what I
+  called "during the cutover window" is actually **the steady state**.
+- **Blob plane is iroh-canonical with libp2p fallback.** §3 Strategy C
+  (dual-read fallback) is the permanent shape, not transition.
+- **Identity-handshake / Trust / Reach-authorization are
+  libp2p-canonical with iroh-receive.** The auth path stays libp2p — no
+  n0 in security-sensitive flows. §5.6/§5.7 dispatch sketches need
+  inverting: libp2p-side is the canonical send path, iroh-side
+  registers the ALPN but is receive-only for hub-to-hub convenience.
+- **Cross-stack peer-map graduates to `peer_transport_manifest`** —
+  richer schema (capability_level, discovery_methods_json,
+  supports_json per transport). The §3.5 `blob_address_index` proposal
+  is consistent with this (Category C operational) but the manifest
+  itself is the source-of-truth schema for Phase 11 selection. See
+  spec §"Cross-stack peer-map as permanent structural schema."
+- **The decision rule for backend wiring lives in the spec, not here.**
+  When wiring a Phase 11 backend, look up the plane's verdict in the
+  spec, not this doc. The catalog stays useful as the call-site index.
+
+Three downstream sections of this doc carry inline alignment notes
+(§6.2, §7, §8). The catalog sections (§§2-5) keep their call-site
+coverage; readers should bring the spec's verdict table when
+interpreting the dispatch sketches.
+
 ## Status — what's already done vs what this doc covers
 
 | Phase 11 prereq | Status going in | This doc |
@@ -614,29 +649,67 @@ This is implementation work, not in scope here.
 
 ### 6.2 `peer_blob_inventory.blob_hash` drop migration (prereq #10)
 
+> **⚠ ALIGNED WITH SPEC — section obsolete.**
+>
+> The spec's revised cutover gate #12 says: *"`peer_blob_inventory.blob_hash`
+> (SHA256) **stays** for libp2p-fallback peers. The column is NOT dropped
+> post-cutover; both BLAKE3 and SHA256 remain populated for consumer-grade
+> peers that fetch via libp2p-blob-protocol."*
+>
+> Both columns are permanent. Both stacks publish to the inventory topic
+> permanently (gossip plane is dual-stack). The drop migration is not
+> a Phase 11 deliverable — it is **never executed** under the current
+> spec. The same applies to `blob_address_index` (§3.5): a permanent
+> Category C tendril of `peer_transport_manifest`, not transient.
+>
+> Original sketch retained below for historical reference only.
+
 Already added: `2026-05-08-033248_peer_blob_inventory_blake3_hash`
 (adds `blake3_hash` as NULL).
 
-Post-cutover migration (sketch):
+~~Post-cutover migration (sketch):~~
 
 ```sql
--- migrations/YYYY-MM-DD-HHMMSS_drop_peer_blob_inventory_blob_hash/up.sql
--- Run only after all peers have been writing blake3_hash for ≥1 week
--- and the blob_address_index has been populated for ≥1 week.
+-- ~~migrations/YYYY-MM-DD-HHMMSS_drop_peer_blob_inventory_blob_hash/up.sql~~
+-- ~~Run only after all peers have been writing blake3_hash for ≥1 week~~
+-- ~~and the blob_address_index has been populated for ≥1 week.~~
 
-ALTER TABLE peer_blob_inventory DROP COLUMN blob_hash;
-DROP TABLE blob_address_index;
+-- ~~ALTER TABLE peer_blob_inventory DROP COLUMN blob_hash;~~
+-- ~~DROP TABLE blob_address_index;~~
 ```
 
-Down migration: re-add the columns NULL. Code paths that reference
-`blob_hash` must be removed before this migration is applied.
+~~Down migration: re-add the columns NULL. Code paths that reference
+`blob_hash` must be removed before this migration is applied.~~
 
 ---
 
 ## §7 Rollback drill playbook (prereq #9)
 
-The cutover is reversible by env-var flip. This section is the
-operator-facing playbook.
+> **ALIGNED WITH SPEC — reframing.**
+>
+> The spec keeps both stacks running forever (Track 2 dual-stack
+> permanent). "Rollback" therefore is **not** turning iroh off — it is
+> **flipping the canonical-path verdict for one or more planes** within
+> the permanent dual-stack. For example: blob plane is normally
+> iroh-canonical, libp2p-fallback; if iroh-blobs has a regression on a
+> production peer profile, the blob plane's canonical path flips to
+> libp2p, with iroh becoming the fallback. The libp2p stack keeps
+> running on every plane it always did; only the *preference order in
+> the cross-stack peer-map's selection algorithm* changes.
+>
+> The env-var flip described below is still useful as a **node-local
+> kill-switch**: it forces a single node to behave as libp2p-only for
+> all planes (treating itself as if its `peer_transport_manifest` had
+> `iroh: None`). That's the "emergency, my iroh subsystem is broken on
+> my hardware" exit. It does NOT cut the substrate's iroh participation
+> globally — the rest of the federation keeps running dual-stack and
+> just routes to this node via libp2p.
+>
+> Sub-sections below are revised in place: §7.1 still describes
+> per-plane regression triggers (which now flip the verdict, not
+> disable the stack); §7.2 keeps the env-flip as the per-node kill-
+> switch with one extra step (publish a transport-profile-update gossip
+> so peers know to route via libp2p only).
 
 ### 7.1 Pre-conditions for rollback
 
@@ -733,25 +806,78 @@ addition stays).
 
 ## §8 Open questions awaiting architecture spec
 
-These resolve when `genesis/docs/superpowers/specs/2026-05-08-iroh-libp2p-complementarity.md`
-lands.
+> **ALIGNED WITH SPEC — most questions answered.** Status updates inline.
 
-1. **Plane scope** — which planes go iroh-only, which stay libp2p-only,
-   which go dual-stack? Affects every dispatch sketch in §§2-5.
-2. **Browser/edge transport** — does the substrate have any role for
-   browser-edge peers, or are those exclusively doorway-projected?
-   Affects whether `BlobBridge` (§3.6) needs a third arm.
-3. **Discovery seam** — `discovery_n0()` vs Kademlia vs both? Affects
-   bootstrap-resolution in §2.8.
-4. **Hub-vs-edge split** — household-hub and collective-hub may be
+The spec at `genesis/docs/superpowers/specs/2026-05-08-iroh-libp2p-complementarity.md`
+landed. Status of each original question:
+
+1. ~~**Plane scope** — which planes go iroh-only, which stay libp2p-only,
+   which go dual-stack?~~ **ANSWERED.** See spec §"Plane-by-plane verdict
+   and decision rule": Blob is iroh-canonical-libp2p-fallback; Gossip,
+   Sync, EPR, EPR-atom, Shard, View-fed, Discovery are dual-stack
+   permanent; Identity-handshake, Trust, Reach-auth are libp2p-canonical-
+   iroh-receive. Phase 11 backend wiring follows the verdict table.
+2. ~~**Browser/edge transport** — does the substrate have any role for
+   browser-edge peers, or are those exclusively doorway-projected?~~
+   **PARTIALLY ANSWERED.** Spec §"Three substrate transport tracks" splits
+   this: browser-direct-WebRTC P2P substrate participation is on Track 2
+   (libp2p WebRTC); doorway-projected web2 access is Track 4. Most
+   browsers will use Track 4. The "user-facing surface for advanced
+   browser users wanting direct substrate" is explicitly listed as out-
+   of-scope for the spec — a separate epic.
+3. ~~**Discovery seam** — `discovery_n0()` vs Kademlia vs both?~~
+   **ANSWERED.** Both, plus pkarr-self-hosted via doorways. See spec
+   §"n0 centralization seam — full mitigation plan" — five-step plan
+   that demotes n0 to one-of-many defaults, requires self-hostable
+   pkarr resolver in production, and lets each peer's transport-profile
+   manifest declare which resolvers it trusts.
+4. ~~**Hub-vs-edge split** — household-hub and collective-hub may be
    substrate-iroh while peers around them are doorway-libp2p. Is the
-   intra-substrate gossip fully iroh, or does it bridge?
-5. **Doorway role** — does doorway speak iroh too (becoming a substrate
-   participant) or stay libp2p-only as the federation projection?
-6. **Cutover timeline** — gradual (one plane per release) or atomic
-   (one cutover release)?
+   intra-substrate gossip fully iroh, or does it bridge?~~ **ANSWERED.**
+   Spec §"Hub graduation gradient" + matrix: hubs are a *role*, not a
+   hardware tier. Tier-3 hubs are iroh-primary; consumer-grade and
+   Tier-1 hubs are libp2p-primary; **all gossip is dual-stack
+   permanent** (§Plane-by-plane verdict). The bridge is structural, not
+   transitional.
+5. ~~**Doorway role** — does doorway speak iroh too (becoming a substrate
+   participant) or stay libp2p-only as the federation projection?~~
+   **ANSWERED.** Spec §"Track 4 — Doorway web2 projection": doorway
+   does NOT swarm libp2p or iroh. Doorway speaks HTTP, presents identity
+   via OAuth-RP, routes via manifest. The substrate's transport choice
+   doesn't apply to doorway because doorway is not a substrate
+   participant. Doorway's *co-located storage pod* runs Track 2 (and
+   speaks both stacks).
+6. ~~**Cutover timeline** — gradual (one plane per release) or atomic?~~
+   **ANSWERED.** Spec implies gradual: each backend wiring lands per
+   plane verdict; planes are independent. Cutover-gate criteria
+   (§"Cutover gate (revised)") are pass/fail per gate, not bundled.
+   Consumer-grade soak (gate #9) is per-device-class — if iroh fails
+   on a real phone over cellular, the affected plane stays libp2p-
+   canonical for that device class permanently.
 
-§§2-5 are written so the answers slot in without rewriting catalogs.
+### Remaining open questions
+
+These were *not* settled by the spec and remain genuine unknowns for the
+implementation work that follows §§2-5:
+
+- **Generic `send_typed_request<P: Plane>` signature.** §5.10 proposed
+  the helper. Spec confirms peer-by-peer selection via cross-stack peer-
+  map. The helper signature needs a `peer_profile:
+  &PeerTransportManifest` parameter; concrete trait definition is
+  Phase-11 implementation work.
+- **Bootstrap-resolution algorithm for new gossip topics.** §2.8
+  proposed reading from `cross_stack_peer_map`. Spec graduates that to
+  `peer_transport_manifest` with richer schema. Concrete algorithm —
+  prefer hub-tier-3+ peers as bootstrap, or any peer with `iroh_node_id`
+  populated, or capability-level-aware? — is implementation detail.
+- **Failure-mode framework for the cross-stack peer-map.** What if a
+  peer's manifest goes stale (e.g., NodeId rotated after hardware
+  upgrade)? Implicit in spec §"Hub graduation gradient — graduation
+  preserves identity" but operational details (TTL, refresh cadence,
+  tombstoning) need a follow-up.
+- **Dual-publish failure semantics.** When a gossip publish to one
+  stack succeeds and the other fails, does the call return success or
+  partial-success? Implementation choice; not in spec scope.
 
 ---
 
