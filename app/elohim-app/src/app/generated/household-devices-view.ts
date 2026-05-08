@@ -82,6 +82,26 @@ export type ElohimStrength =
   | 'fast-resolution'
   | 'cross-context-consistency'
   | 'escalation-accuracy';
+/**
+ * Kind of server-side renderer a doorway carries. Reserved values are valid claim values; only `angular-ssr` is implemented in elohim-render today. Source of truth: doorway runtime (Category C operational). Not a DHT entry type.
+ */
+export type RendererKind =
+  | 'angular-ssr'
+  | 'react-rsc'
+  | 'vue-ssr'
+  | 'svelte-ssr'
+  | 'lit-ssr'
+  | 'static-html';
+/**
+ * Kind of server-side renderer a doorway carries. Reserved values are valid claim values; only `angular-ssr` is implemented in elohim-render today. Source of truth: doorway runtime (Category C operational). Not a DHT entry type.
+ */
+export type RendererKind1 =
+  | 'angular-ssr'
+  | 'react-rsc'
+  | 'vue-ssr'
+  | 'svelte-ssr'
+  | 'lit-ssr'
+  | 'static-html';
 
 /**
  * Devices (nodes) belonging to a household with live peer vitals. Source of truth: computed projection from stewarded_nodes (projects NodeRegistration DHT entry) LEFT JOIN peer_statuses (projects PeerStatus DHT entry). Operational Category C — no persistence, no new entry type.
@@ -163,6 +183,14 @@ export interface PeerStatusView {
    * If this peer runs an elohim-agent, this block advertises its model-level capabilities. Null or absent means no elohim runs here (e.g., pure storage/relay node). Operator-configured in Phase 9; auto-detected in Phase 10+
    */
   elohimCapability?: ElohimCapabilityProfile | null;
+  /**
+   * If this peer runs a doorway that can server-render, advertises its render-capability profile. Null or absent = no SSR (storage-only peer, or operator opted out). Layered post-construction by build_peer_status_view (Category C operational, NOT a DHT entry).
+   */
+  renderCapability?: RenderCapabilityProfile | null;
+  /**
+   * Tier-2 extension capabilities. Apps register kebab-case capability names; each entry has a schemaRef + structured profile. Layered post-construction by build_peer_status_view (Category C operational, NOT a DHT entry).
+   */
+  extensions?: CapabilityExtensions | null;
 }
 /**
  * Source of truth: operator-configured at elohim-storage startup (Operational, Category C). Not auto-detected — the operator declares the model running here. Phase 10+ may derive this automatically from a live elohim-agent-service.
@@ -212,4 +240,86 @@ export interface ElohimCapabilityProfile {
    * Reach of this specific elohim instance. Distinct from the peer node's overall reach — an elohim running at a well-connected node may still have limited reach for certain gate decisions. Null until reach attestations accrue
    */
   reachLevel?: string | null;
+}
+/**
+ * Source of truth: auto-derived at doorway startup from on-disk bundles intersected with elohim-storage's manifest of SSR-eligible routes (Operational, Category C). doorway-config.toml may reduce the claim but never inflate it. Layered into PeerStatusView via build_peer_status_view, mirroring the elohimCapability pattern. NOT a DHT entry.
+ */
+export interface RenderCapabilityProfile {
+  /**
+   * @minItems 1
+   */
+  bundles: [
+    {
+      /**
+       * Bundle name (e.g. lamad-app, qahal-app)
+       */
+      name: string;
+      /**
+       * Semver bundle version
+       */
+      version: string;
+      renderer: RendererKind;
+      /**
+       * Optional sha256 hash of the bundle file
+       */
+      digest?: string | null;
+    },
+    ...{
+      /**
+       * Bundle name (e.g. lamad-app, qahal-app)
+       */
+      name: string;
+      /**
+       * Semver bundle version
+       */
+      version: string;
+      renderer: RendererKind;
+      /**
+       * Optional sha256 hash of the bundle file
+       */
+      digest?: string | null;
+    }[],
+  ];
+  /**
+   * Distinct renderer kinds (deduplicated bundles[].renderer). Cheap-to-query summary.
+   *
+   * @minItems 1
+   */
+  renderers: [RendererKind1, ...RendererKind1[]];
+  /**
+   * Auth modes this doorway honors for SSR. 'anonymous' must always be present.
+   *
+   * @minItems 1
+   */
+  authModes: [
+    'anonymous' | 'doorway-hosted' | 'steward-presence',
+    ...('anonymous' | 'doorway-hosted' | 'steward-presence')[],
+  ];
+  /**
+   * Operator-declared concurrency budget. CSR fallback fires when reached.
+   */
+  maxConcurrentRenders: number;
+  /**
+   * Operator-declared memory ceiling for the renderer (informational; null = cgroup-managed)
+   */
+  memoryBudgetMib?: number | null;
+}
+/**
+ * Tier-2 capability claims map. Source of truth: each capability's owner declares it via runtime registration (Category C operational). Each key is a kebab-case capability name registered in the protocol's capability registry. Each value carries a schemaRef pointer (so consumers can resolve the profile schema) and an opaque structured profile. The validator checks structural well-formedness only — claim CONTENTS are interpreted by consumers who recognize the capability name. When a Tier-2 capability proves load-bearing, it graduates to Tier 1 with a typed sibling field on peer-status. NOT a DHT entry.
+ */
+export interface CapabilityExtensions {
+  /**
+   * This interface was referenced by `CapabilityExtensions`'s JSON-Schema definition
+   * via the `patternProperty` "^[a-z][a-z0-9-]{2,30}$".
+   */
+  [k: string]: {
+    /**
+     * Schema URI for this capability's profile (e.g., 'epr:schema:view:transcode-capability-profile')
+     */
+    schemaRef: string;
+    /**
+     * Capability-specific claim. Shape defined by schemaRef. Validator checks 'is an object'; consumers do deep validation.
+     */
+    profile: Record<string, unknown>;
+  };
 }
