@@ -51,7 +51,7 @@ These three seams are intertwined. The auth pattern shapes what the capability c
 | Capability-claim shape | Per-bundle + per-auth-mode + per-concurrency-budget |
 | Capability-claim origin | Auto-derived at startup from disk + storage manifest; operator override may only reduce |
 | Capability-claim role | Informational — CSR fallback is the floor; substrate routing is a later sprint |
-| Capability-claim notarization | DHT-notarized via extension to existing peer-status entry |
+| Capability-claim publication | View-layer projection populated from doorway, mirroring the existing `elohimCapability` Category C pattern (operator-supplied operational state, layered into `PeerStatusView` post-construction). DHT entry shape is unchanged — no DNA migration. Future Stage-3 elohim-defender enforcement is the path that would graduate the claim to DHT-attested. |
 | Capability-tier strategy | Ship Tier 1 (`renderCapability`) **and** Tier 2 (`extensions` map) together; Tier 3 (libp2p gossip) for runtime state |
 | Doorway identity in SSR | SSR always renders as the user (or anonymous); doorway never elevates privilege |
 
@@ -88,9 +88,11 @@ The V8 fetch shim itself is mode-agnostic — it just attaches an opaque `UserCr
        │                   │                       │
        │                   ▼                       │
        │  ┌──────────────────────────────────┐    │
-       │  │ peer-status entry (DHT)          │────┼──► DHT (notarized)
-       │  │   .renderCapability  (Tier 1)    │    │
-       │  │   .extensions[…]     (Tier 2)    │    │
+       │  │ GET /admin/capability            │◄───┼─── elohim-storage pulls
+       │  │   (returns derived profile JSON) │    │    at startup (env var
+       │  │                                  │    │    DOORWAY_CAPABILITY_URL),
+       │  │                                  │    │    layers into
+       │  │                                  │    │    PeerStatusView
        │  └──────────────────────────────────┘    │
        │                                           │
        │  ┌──────────────────────────────────┐    │
@@ -112,13 +114,15 @@ Three changes layered onto the existing substrate:
 
 1. **Capability derivation** — at doorway startup, scan `/bundles/*.bundle.mjs`, read each bundle's manifest header, intersect with storage's `build_manifest()` SSR-route declarations. The result is a structured claim: `{ bundles, authModes, maxConcurrentRenders, renderers }`. An optional `doorway-config.toml` may *reduce* the claim but never inflate it.
 
-2. **Capability publication** — the derived claim populates a new `renderCapability` field on the existing peer-status DHT entry, sibling to `elohimCapability`. The same entry gains an `extensions` map for Tier-2 capabilities.
+2. **Capability publication** — doorway exposes its derived claim at `/admin/capability` (HTTP). Elohim-storage pulls from this URL at startup (configured via `DOORWAY_CAPABILITY_URL` env var, defaulting to the local doorway), holds the result in `AppContext`, and layers it into `PeerStatusView` post-construction in `build_peer_status_view()`. **Mirrors the existing `elohimCapability` precedent exactly**: that field is loaded from `ELOHIM_CAPABILITY_CONFIG_FILE` and layered the same way (`elohim-storage/src/views.rs:6386-6400`). The DHT `PeerStatus` entry shape is unchanged — no DNA migration, no integrity-validator updates. Same applies to the `extensions` Tier-2 map, layered identically.
 
 3. **Auth normalization** — doorway's session layer (already polymorphic over JWT and steward attestation) hands the V8 fetch shim an opaque user-credential blob per render. The shim attaches it as `Authorization` / `Cookie` to outbound storage fetches. Storage validates as if the user called direct.
 
 What does *not* change:
 
-- DHT entry-type count (no new entry types — `renderCapability` is a field on existing peer-status)
+- DHT entry-type count (no new entry types)
+- DHT `PeerStatus` entry shape — `infrastructure_integrity` zome untouched
+- Integrity validators — no new structural rules, no DNA build
 - Storage's peer-selection / matchmaking logic (claim is informational this sprint)
 - CSR fallback path (still the floor)
 - Render cache, dispatch logic, manifest declarations, ingress rules
@@ -288,14 +292,16 @@ Per `elohim/sdk/schemas/CLAUDE.md`, both new files added to `INTERFACE_FILES` in
 
 Rust side: ts-rs structs in `elohim-storage/src/views.rs` mirror these for the wire format. Schema contract test in `elohim/elohim-storage/tests/schema_contract.rs` catches drift.
 
-### DHT integrity-validator scope (Stage 1, structural only)
+### Validation surface (view-layer, not DHT)
 
-Per `project_bootstrap_to_elohim_security_gradient` and `project_hdi_no_get_links_in_validators`, the integrity zome validator can only do *deterministic structural checks*:
+Because `renderCapability` and `extensions` are view-layer projections (Category C operational state), validation lives at the **schema/serde layer**, not in integrity-zome validators:
 
-- Shape compliance (already enforced by serde + ts-rs).
-- "If `renderCapability` is non-null, `bundles` is non-empty and `authModes` includes `anonymous`."
-- "If present, `maxConcurrentRenders` is a non-negative integer."
-- *Cannot* enforce "the doorway actually has these bundles on disk" — that's Stage 3 (elohim defender observation), out of scope for this sprint.
+- JSON-Schema enforces shape (required fields, enum membership, minItems).
+- The Rust `RenderCapabilityProfile` struct's `From`/`TryFrom` constructors enforce semantic constraints (`authModes` must include `anonymous`; `bundles` must be non-empty when not null).
+- `tests/schema_contract.rs` round-trips serde to catch drift.
+- No DNA changes, no integrity-validator changes. The infrastructure-integrity zome's `PeerStatus` entry shape is untouched.
+
+Future Stage-3 enforcement (elohim-defender observing claim-vs-behavior consistency) is what would graduate the claim to DHT-attested integrity, but that's deferred.
 
 ## Doorway runtime
 
@@ -323,25 +329,43 @@ Runs once at startup. Three inputs, one output.
 
 **Why "intersection with manifest" matters:** an operator who installed `qahal-app.bundle.mjs` but storage's manifest doesn't declare any qahal SSR routes shouldn't advertise qahal-SSR capability — they have the bundle but the substrate has nothing for them to render. Honest by construction.
 
-### Capability publisher (extension to existing peer-status publisher)
+### Capability publication (HTTP exposure on doorway, pull on storage)
 
-Doorway already publishes peer-status to its local conductor (which DHT-notarizes). The publisher gains one extra step:
+Doorway does NOT publish to the DHT directly. The flow mirrors the existing `elohimCapability` pattern:
 
-```rust
-let render_cap = capability::derive(bundles_dir, manifest, override_path)?;
-let extensions = capability::derive_extensions(plugin_dir)?;
+**On the doorway side** — new HTTP endpoint:
 
-let peer_status = PeerStatus {
-    // existing fields...
-    elohim_capability: existing_elohim_cap,
-    render_capability: render_cap,
-    extensions,
-};
-
-conductor.publish_peer_status(peer_status).await?;
+```
+GET /admin/capability  →  RenderCapabilityProfile JSON
 ```
 
-**Republish on change:** capability derivation runs once at startup. If bundles change at runtime (typically a redeploy) doorway re-derives and republishes. Storage manifest changes also trigger re-derive — storage's manifest version is exposed via a header; doorway watches and re-runs the deriver on bump. (Initial sprint may ship startup-only derivation; runtime watching is a follow-up if churn proves frequent.)
+The handler returns the deriver's cached output. Endpoint is internal-only (binds to admin port, not public-facing) and is the source of truth for "what does this doorway claim it can render?"
+
+**On the storage side** — at startup, mirror the `load_elohim_capability_from_env()` pattern (`elohim-storage/src/views.rs:6402`):
+
+```rust
+pub async fn load_render_capability_from_env() -> Option<RenderCapabilityProfile> {
+    let url = std::env::var("DOORWAY_CAPABILITY_URL").ok()?;
+    let resp = reqwest::get(&url).await.ok()?;
+    if !resp.status().is_success() { return None; }
+    serde_json::from_slice(&resp.bytes().await.ok()?).ok()
+}
+```
+
+Storage's `main.rs` calls this alongside `load_elohim_capability_from_env()`, holds the result in `AppContext.render_capability`, and `build_peer_status_view()` gains a third optional argument layered post-construction (same pattern as elohim_capability):
+
+```rust
+pub fn build_peer_status_view(
+    row: PeerStatusRow,
+    elohim_capability: Option<&ElohimCapabilityProfile>,
+    render_capability: Option<&RenderCapabilityProfile>,
+    extensions: Option<&CapabilityExtensions>,
+) -> PeerStatusView { ... }
+```
+
+**Republish on change (deferred):** initial sprint ships startup-only loading. Storage re-pulls on a configurable interval (default: every peer-status query, with a 60s in-memory TTL) — this is sufficient for static deployments. Runtime watching of bundle directory changes is the follow-up listed in the deferred table.
+
+**Multi-doorway households:** `DOORWAY_CAPABILITY_URL` is single-target in this sprint (storage maps to one doorway). Aggregating multiple doorways into a unified household claim is a future sprint that pairs with substrate routing.
 
 ### Concurrency limiter — extends existing `SsrRoute` dispatch
 
@@ -430,8 +454,9 @@ These headers are the immediate substrate-debugging surface. The pre-push hook f
 | Unit | capability deriver: bundle scan + manifest intersection + override layering, table-driven fixtures | `doorway-service/src/render/capability.rs` `#[cfg(test)]` |
 | Unit | session layer → user-credential normalization (JWT path, steward-presence path, anonymous path) | `doorway-service/src/session/mod.rs` |
 | Unit | `ResolverFetcher` attaches `user_credential` header when present, omits when `None` | `doorway-service/tests/render_fetcher.rs` |
-| Schema contract | `peer-status-view` round-trip with new fields; `render-capability-profile` serde via ts-rs | `elohim-storage/tests/schema_contract.rs` |
-| Integration | doorway boots, derives capability, publishes to local conductor; `/admin/capability` returns the published profile | new `doorway-service/tests/capability_publish.rs` |
+| Schema contract | `peer-status-view` round-trip with new fields; `render-capability-profile` and `capability-extensions` serde via ts-rs | `elohim-storage/tests/schema_contract.rs` |
+| Integration | doorway boots, derives capability, exposes at `/admin/capability`; storage pulls and surfaces it in `PeerStatusView` | new `doorway-service/tests/capability_publish.rs` + extend storage's view-construction tests |
+| Integration | storage with `DOORWAY_CAPABILITY_URL` unset returns `renderCapability: null` in `PeerStatusView` (honest degradation) | new test in `elohim-storage/tests/` |
 | Integration | SsrRoute with auth-mode mismatch returns CSR fallback + `x-ssr-skipped: auth-mode-not-supported` | extend `doorway-service/tests/registry_render.rs` |
 | Integration | concurrency limit: spawn `max_concurrent + 2` renders; assert two return `x-ssr-skipped: overflow` | new test |
 | a2o | "When a doorway operator restricts SSR to anonymous-only, an authenticated user requesting an SSR-eligible route gets CSR fallback (not anonymous render of their authenticated content)" | new `genesis/a2o/features/content/ssr_capability.feature` |
