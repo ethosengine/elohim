@@ -16,6 +16,7 @@
 //! required. Cutover removes one transport, never two divergent message
 //! schemas.
 
+pub mod auth;
 mod blob_store;
 pub mod codec;
 mod config;
@@ -25,9 +26,15 @@ mod gossip;
 mod identity;
 mod node;
 pub mod parity_harness;
+pub mod peer_map;
 pub mod shard;
 pub mod sync;
+pub mod view_fed;
 
+pub use auth::{
+    IdentityHandshakeBackend, IrohIdentityHandshakeClient, IrohIdentityHandshakeProtocol,
+    IrohTrustClient, IrohTrustProtocol, TrustBackend, IDENTITY_HANDSHAKE_ALPN, TRUST_ALPN,
+};
 pub use blob_store::IrohBlobStore;
 pub use config::IrohConfig;
 pub use endpoint::{build_endpoint, BuildEndpointError};
@@ -40,6 +47,9 @@ pub use identity::load_or_generate as load_or_generate_secret_key;
 pub use node::{AlpnRegistration, IrohNode};
 pub use shard::{IrohShardClient, IrohShardProtocol, ShardBackend, SHARD_ALPN};
 pub use sync::{IrohSyncClient, IrohSyncProtocol, SyncBackend, SYNC_ALPN};
+pub use view_fed::{
+    IrohViewFederationClient, IrohViewFederationProtocol, ViewFederationBackend, VIEW_FED_ALPN,
+};
 
 // Re-export the iroh-blobs Hash type so callers don't have to depend on
 // iroh-blobs directly when they live behind this module's API.

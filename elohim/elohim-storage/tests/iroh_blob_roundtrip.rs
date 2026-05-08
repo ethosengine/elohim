@@ -17,6 +17,7 @@ fn loopback_config(dir: &std::path::Path) -> IrohConfig {
         blobs_dir: dir.join("blobs_iroh"),
         secret_key_path: dir.join("iroh.key"),
         use_n0_relays: false,
+        use_n0_discovery: false,
     }
 }
 

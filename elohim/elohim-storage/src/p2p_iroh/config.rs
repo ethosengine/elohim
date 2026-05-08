@@ -23,6 +23,12 @@ pub struct IrohConfig {
     /// Whether to use n0's hosted relay infrastructure for NAT traversal.
     /// `false` in tests where both endpoints are loopback.
     pub use_n0_relays: bool,
+
+    /// Whether to enable n0's hosted DNS-based peer discovery (Phase 10).
+    /// `true` for production peers — replaces libp2p Kademlia for record
+    /// publication. `false` in tests where peer addresses are exchanged
+    /// out-of-band via [`iroh::Endpoint::add_node_addr`].
+    pub use_n0_discovery: bool,
 }
 
 impl IrohConfig {
@@ -34,6 +40,7 @@ impl IrohConfig {
             blobs_dir: storage_dir.join("blobs_iroh"),
             secret_key_path: storage_dir.join("iroh.key"),
             use_n0_relays: true,
+            use_n0_discovery: true,
         }
     }
 }

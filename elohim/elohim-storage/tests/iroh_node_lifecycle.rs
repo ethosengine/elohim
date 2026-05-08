@@ -16,6 +16,7 @@ async fn single_node_starts_and_shuts_down() {
         blobs_dir: dir.path().join("blobs_iroh"),
         secret_key_path: dir.path().join("iroh.key"),
         use_n0_relays: false,
+        use_n0_discovery: false,
     };
 
     let node = IrohNode::start(cfg).await.expect("node starts");
@@ -30,6 +31,7 @@ async fn iroh_key_persisted_to_disk() {
         blobs_dir: dir.path().join("blobs_iroh"),
         secret_key_path: dir.path().join("iroh.key"),
         use_n0_relays: false,
+        use_n0_discovery: false,
     };
 
     {

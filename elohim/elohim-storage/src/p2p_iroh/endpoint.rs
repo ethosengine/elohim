@@ -24,6 +24,12 @@ pub enum BuildEndpointError {
 
 /// Build an iroh `Endpoint` from config. Caller is responsible for shutting
 /// it down on graceful exit (`endpoint.close().await`).
+///
+/// Phase 10: when `config.use_n0_discovery` is `true`, n0's DNS-based
+/// peer discovery is enabled. This replaces libp2p's Kademlia for record
+/// publication during cutover and post-cutover. Tests with relays
+/// disabled typically also disable discovery and exchange `NodeAddr`
+/// directly via `endpoint.add_node_addr`.
 pub async fn build_endpoint(config: &IrohConfig) -> Result<Endpoint, BuildEndpointError> {
     let secret = identity::load_or_generate(&config.secret_key_path)?;
 
@@ -33,11 +39,15 @@ pub async fn build_endpoint(config: &IrohConfig) -> Result<Endpoint, BuildEndpoi
         RelayMode::Disabled
     };
 
-    let endpoint = Endpoint::builder()
+    let mut builder = Endpoint::builder()
         .secret_key(secret)
-        .relay_mode(relay_mode)
-        .bind()
-        .await?;
+        .relay_mode(relay_mode);
+
+    if config.use_n0_discovery {
+        builder = builder.discovery_n0();
+    }
+
+    let endpoint = builder.bind().await?;
 
     Ok(endpoint)
 }
@@ -57,6 +67,7 @@ mod tests {
             blobs_dir: dir.path().join("blobs_iroh"),
             secret_key_path: dir.path().join("iroh.key"),
             use_n0_relays: false,
+            use_n0_discovery: false,
         };
 
         let ep = build_endpoint(&cfg).await.expect("endpoint binds");
@@ -74,6 +85,7 @@ mod tests {
             blobs_dir: dir.path().join("blobs_iroh"),
             secret_key_path: dir.path().join("iroh.key"),
             use_n0_relays: false,
+            use_n0_discovery: false,
         };
 
         let ep1 = build_endpoint(&cfg).await.unwrap();
