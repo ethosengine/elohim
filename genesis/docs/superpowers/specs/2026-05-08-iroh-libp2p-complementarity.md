@@ -37,6 +37,9 @@ memory_anchors:
   - project_trust_as_efficiency_signal
   - project_signal_kind_extensible_protocol_class
   - project_substrate_floor_elohim_ceiling
+  - project_household_fabric
+  - project_elohim_subagent_specialists
+  - project_elohim_as_counsel
   - project_first_class_graph_pattern
   - project_intelligence_revolution_scales_to_humans
   - project_redeploy_the_substrate
@@ -188,6 +191,28 @@ The substrate's Tier-3 federation paradigm (`project_substrate_scale_ceiling`) i
 **Graduation preserves identity.** Per `hardware-spec.md` migration-preserves-everything: when a steward graduates from a consumer-grade hub to a Tier-3 hub, the agent identity moves with them. The substrate sees a transport-profile change (libp2p-primary → iroh-primary), not an identity change. The stewardship contracts the hub carries are reassigned to the new hardware via DHT-notarized REA events witnessed by the household's stewards. Spokes don't notice the upgrade beyond their hub's `node_addr` rotating.
 
 **Track 2 transport implication:** the dual-stack posture is what makes consumer-grade hubs viable. If we went iroh-only, a consumer-grade hub on intermittent residential networking with carrier-grade NAT and battery-aware idle disconnect would struggle to participate. libp2p's TCP+yamux fallback + Circuit Relay v2 + WebRTC keeps consumer-grade hubs first-class. **Forfeiting consumer-grade hub viability to the simplification of one transport would forfeit the protocol's onboarding funnel for hubs themselves.**
+
+### The hub's elohim-operator — runtime composition + capacity negotiation
+
+Every hub runs an **elohim-operator** — a context-bound specialist agent (`project_elohim_subagent_specialists`, `project_household_fabric`) that fills the role a household's devops/IT person would fill if they had one. The operator treats the hub's hardware as a **cluster** (whether the cluster is one recycled laptop, three NUCs, five blades, or a Tier-3 family-node-extended with hot-swap modules) and continuously negotiates:
+
+- **Internal cluster operations** — hot/cold blade migration, leader election, replica placement, PVC movement, blob tiering across NVMe/bulk/encrypted-shard storage. Kubernetes-class concerns absorbed *inside* the hub so household stewards don't have to think about them.
+- **Stewardship-vs-capacity tradeoffs** — how much compute / bandwidth / storage / AI inference budget each Track 3 spoke commitment, each Track 2 federation contract, and each internal household need consumes. When to defer, when to spend, when to renegotiate.
+- **External federation participation** — peer-hub gossip, sponsored compute contracts (sending and receiving), AbusePattern signal emission, defense-reach earning, federation-manifest declaration of which peer hubs are reachable.
+- **Track 3 mediation** — when a wearable streams sensor data, the operator decides which signals get notarized; when a phone-as-spoke requests inference, the operator applies reach-earning; when a stewardship contract is renegotiated, the operator drafts the renegotiation for steward witness/sign.
+
+The operator is bound by the **substrate-floor / elohim-ceiling pattern** (`project_substrate_floor_elohim_ceiling`):
+
+- **Substrate floor** — deterministic gates from Track 1 stewardship contracts + Track 2 reach-earning rules. What the hub MUST / MUST NOT do.
+- **Elohim ceiling** — the operator's discernment within the floor's permission. What the hub CHOOSES to do given context. **Discernment is signed, witnessable, reversible** by the household's stewards. The operator never overrides the floor; it adds context-aware judgment on top.
+
+**The operator graduates with the hub.** A consumer-grade hub runs a smaller operator (modest context window, defers most heavy discernment to peer hubs); a Tier-1 lightweight hub runs a more capable operator (small CPU-bound inference, more local discernment); a Tier-3 full hub runs the canonical operator (full 70B-class local inference, federation-scale discernment, sponsors compute for smaller peer hubs). When a steward upgrades hardware, the operator's identity and decision history migrate intact via DHT-notarized REA events; the substrate sees a capability-grant evolution, not a re-installation. **This is what makes the consumer-grade-hub onboarding funnel real** — a household can start with a recycled laptop running a humble operator and grow into a Tier-3 family-node with a full operator without losing context.
+
+**Serving the home AND the broader social resilient compute simultaneously.** The operator's job is two-way: it stewards the hub's capacity for the household's internal needs (family inference requests, photo backups, custodial keys, learning paths) AND for the household's outward federation commitments (sponsored compute for peer hubs, defense-reach earning, AbusePattern emission, content distribution). Both are first-class; the operator's discernment is what continuously balances them. **This is the household-fabric-manager role, concretely** — the entity that holds in tension "serve my family" and "serve the social fabric my family is part of."
+
+**Stewardship is two-way:** the operator stewards the hub's capacity for the household's needs; the household stewards the operator's discernment shape via manifest configuration and witness-and-reverse mechanisms. Per `project_elohim_as_counsel`, the operator has standing to act in the household's defense even against the household's current-moment preferences when stewardship is at stake — but always within the substrate floor and always reversibly.
+
+The operator's specific role-manifest, witness-UX, and renegotiation-flow are out of scope for this spec — they're seeded as stub epics in `2026-05-08-doorway-hub-edge-design.md` (Stub-epic seeds #2, #3, #6, #9). What this spec settles is **the operator is the entity that orchestrates the hub's use of Tracks 1, 2, and 3**, and the dual-stack Track 2 posture is what gives operators on consumer-grade hardware a first-class role from day one.
 
 ### Track 3 — Hub-spoke bridge (wearables, IoT, phone-as-spoke; no full storage)
 
@@ -483,7 +508,7 @@ A reference to this spec is added to the module README's "What works / What's ne
 
 ## Decision rule summary (the one-liner)
 
-> **iroh wins where it wins (hub-to-hub federation, BLAKE3-native blob); libp2p stays where consumer-grade-first-class agency lives (intermittent, UDP-restricted, browser-direct, no-n0-in-the-auth-path); both selected at call-site by transport-profile manifest. Wearables and IoT bridge through dwelling hubs via HTTP/WS (Track 3), not substrate transport. Hub is a role, not a hardware tier — consumer-grade hardware (recycled laptops, gaming desktops, composed thin-client batches) acts as a hub when it's the only option available, with a graduation path to Tier-1-lightweight (Pi 4, NUC) and Tier-3 DwellingHub (full local AI inference) that preserves identity continuity. Hubs federate horizontally; the protocol structurally prevents hub-as-datacenter via DHT-notarized stewardship contracts, federation reach-earning cost asymmetry, hardware-bounded consumer-grade-hub ceilings, and three independent paths for consumer-grade peers (Track 2 direct, Track 3 spoke, Track 4 doorway-projected). The protocol subsumes Cloudflare and FANG via federation density, not via a single hub at scale.**
+> **iroh wins where it wins (hub-to-hub federation, BLAKE3-native blob); libp2p stays where consumer-grade-first-class agency lives (intermittent, UDP-restricted, browser-direct, no-n0-in-the-auth-path); both selected at call-site by transport-profile manifest. Wearables and IoT bridge through dwelling hubs via HTTP/WS (Track 3), not substrate transport. Hub is a role, not a hardware tier — consumer-grade hardware (recycled laptops, gaming desktops, composed thin-client batches) acts as a hub when it's the only option available, with a graduation path to Tier-1-lightweight (Pi 4, NUC) and Tier-3 DwellingHub (full local AI inference) that preserves identity continuity. Every hub is orchestrated by an **elohim-operator** — a context-bound specialist agent that fills the household's devops/IT role, treating the hub's hardware as a cluster (whether that cluster is one recycled laptop or a Tier-3 family-node-extended) and continuously negotiating stewardship-vs-capacity tradeoffs across internal household needs and external federation commitments, bound by the substrate-floor / elohim-ceiling pattern and signed/witnessable/reversible by the household's stewards. Hubs federate horizontally; the protocol structurally prevents hub-as-datacenter via DHT-notarized stewardship contracts, federation reach-earning cost asymmetry, hardware-bounded consumer-grade-hub ceilings, and three independent paths for consumer-grade peers (Track 2 direct, Track 3 spoke, Track 4 doorway-projected). The protocol subsumes Cloudflare and FANG via federation density, not via a single hub at scale.**
 
 ## Memory anchors that load this spec
 
