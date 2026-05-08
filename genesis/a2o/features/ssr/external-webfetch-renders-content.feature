@@ -21,14 +21,14 @@ Feature: External WebFetch renders concept HTML readable without JS
 
   Background:
     Given doorway is running with SSR enabled
-    And elohim-storage is seeded with concept "elohim-protocol-overview"
+    And elohim-storage is seeded with concept "fct-bible-micah-6-8"
 
   @requires:ssr-bundle
   Scenario: HTTP client without a JS engine fetches a concept page
     # An HTTP GET with no JS execution — same wire bytes a search crawler or
     # AI design tool would receive. The SSR contract guarantees readable HTML
     # before any client-side script runs.
-    When an HTTP client without a JavaScript engine fetches "/lamad/concept/elohim-protocol-overview"
+    When an HTTP client without a JavaScript engine fetches "/lamad/concept/fct-bible-micah-6-8"
     Then the response has status 200
     And the response body contains the concept title in <title>
     And the response body contains the concept body in <article>

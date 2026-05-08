@@ -41,6 +41,36 @@ spec:
               number: 8080
         path: /api/v1
         pathType: Prefix
+      # SSR-eligible routes — keep in sync with storage's build_manifest()
+      # in elohim/elohim-storage/src/http.rs (search for `render("angular-ssr")`).
+      # These paths are routes that storage declares with render="angular-ssr".
+      # They must reach doorway, not the static SPA pod, so doorway's in-process
+      # elohim-render engine can produce a full HTML document for non-JS clients
+      # (search crawlers, AI design tools, social-card crawlers, accessibility
+      # without JS, AI agents observing the live system). The SPA pod (catch-all
+      # below) still serves the SPA bundle and the client-side hydration takes
+      # over after first paint.
+      #
+      # Storage manifest as of 2026-05-07 declares four SSR-eligible groups:
+      #   /lamad/concept/{id}         — covered by /lamad/concept Prefix
+      #   /lamad/path/{slug}          — covered by /lamad/path Prefix
+      #   /lamad/path/{slug}/step/{n} — covered by /lamad/path Prefix
+      #   /                           — left on the catch-all for now (SPA shell);
+      #                                 graduating root-route SSR is a follow-up.
+      - backend:
+          service:
+            name: elohim-doorway-alpha
+            port:
+              number: 8080
+        path: /lamad/concept
+        pathType: Prefix
+      - backend:
+          service:
+            name: elohim-doorway-alpha
+            port:
+              number: 8080
+        path: /lamad/path
+        pathType: Prefix
       - backend:
           service:
             name: elohim-site-alpha-service

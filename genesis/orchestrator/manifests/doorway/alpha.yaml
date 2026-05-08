@@ -152,6 +152,17 @@ spec:
               value: "elohim"
             - name: HAPP_BUNDLE_PATH
               value: "/opt/holochain/elohim.happ"
+            # Server-side rendering — points to the elohim-app server bundle
+            # baked into the doorway image at build time (see the Dockerfile's
+            # ssr-bundle stage). Set safely even if the bundle hasn't shipped
+            # yet: doorway's `init_renderer` (server/http.rs:239) silently
+            # returns None when the file fails to load, so the pod stays
+            # healthy and SSR routes fall through to the storage proxy.
+            #
+            # Spec § Smallest first slice (line 396-422) — line 411 graduates
+            # SSR to real content routes once the engine is wired.
+            - name: SSR_BUNDLE_PATH
+              value: "/opt/elohim-render/main.server.mjs"
             - name: FEDERATION_PEERS
               value: "https://doorway-staging.elohim.host,https://doorway.elohim.host"
             - name: API_KEY_AUTHENTICATED

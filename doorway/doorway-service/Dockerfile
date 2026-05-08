@@ -99,6 +99,66 @@ RUN GIT_COMMIT_SHORT=${GIT_COMMIT_SHORT} \
     BUILD_TIMESTAMP=${BUILD_TIMESTAMP} \
     touch src/main.rs src/lib.rs && cargo build --release
 
+# SSR bundle stage — builds elohim-app's Angular server bundle for in-process SSR.
+# Independent of the Rust stages above; BuildKit parallelizes them.
+# Bundle is ~50MB. Reference: genesis/docs/superpowers/specs/2026-05-07-doorway-ssr-runtime-design.md
+# §Build-side change to elohim-app (line 229-242).
+#
+# This stage exists in the doorway Dockerfile (rather than as a separate
+# Harbor artifact + initContainer) to avoid cross-pipeline tag coordination
+# between elohim-app and elohim-edge. Tradeoff: ~5-10 minutes added to
+# doorway image build on a cold cache, plus pnpm/Node toolchain in the
+# build phase. The followup project_doorway_full_facilitator_sprint memory
+# entry covers retiring this redundancy by absorbing the SPA host into
+# doorway entirely.
+FROM node:22-alpine AS ssr-bundle
+WORKDIR /workspace
+
+# Tooling: native-dep build (some npm packages have C++ bindings) + bash for
+# any prebuild scripts ng build's pipeline reaches for.
+RUN apk add --no-cache python3 make g++ git bash curl
+RUN npm install -g pnpm@9
+
+# Workspace metadata — pnpm-lock.yaml requires every workspace member's
+# package.json to exist for --frozen-lockfile to pass.
+COPY pnpm-workspace.yaml pnpm-lock.yaml package.json ./
+
+# Copy workspace package directories. Source files for elohim-app's
+# transitive workspace deps (elohim-core, storage-client-ts) are pulled in
+# here; other dirs are copied for their package.json metadata only —
+# pnpm install with --filter scopes won't traverse their src.
+COPY app ./app
+COPY elohim/sdk ./elohim/sdk
+COPY elohim/elohim-agent ./elohim/elohim-agent
+COPY doorway/doorway-app ./doorway/doorway-app
+COPY steward/device ./steward/device
+COPY genesis/seeder ./genesis/seeder
+COPY genesis/a2o ./genesis/a2o
+COPY genesis/orchestrator ./genesis/orchestrator
+COPY genesis/landing ./genesis/landing
+
+# Install only elohim-app + its transitive workspace deps.
+RUN pnpm install --filter "elohim-app..." --frozen-lockfile
+
+# Stub prebuild outputs so ng build doesn't fail on missing browser-only
+# artifacts (service worker, wasm cache core, fonts). The server bundle
+# never references these — they're browser-side performance enhancements.
+RUN mkdir -p app/elohim-app/src/assets/fonts && \
+    : > app/elohim-app/src/assets/apps-sw.js
+
+# Build the server bundle. We invoke ng directly to bypass the `prebuild`
+# hook (which would otherwise try to fetch fonts, build wasm-pack, and
+# verify the sophia submodule — none needed for SSR). The `postbuild` hook
+# (the Node-shim script) is run explicitly afterward.
+WORKDIR /workspace/app/elohim-app
+RUN pnpm exec ng build --configuration=alpha
+RUN node scripts/ssr-shim-node.mjs
+
+# Result lives at /workspace/app/elohim-app/dist/elohim-app/server/.
+# Contains: main.server.mjs (entry), chunk-*.mjs (code-split bundles),
+# assets-chunks/, node-shims/ (the 22 Node built-in shims the postbuild
+# script writes), polyfills.server.mjs.
+
 # Runtime stage
 FROM debian:bookworm-slim
 
@@ -117,11 +177,18 @@ RUN useradd -m -u 1000 doorway
 # Copy binary from builder
 COPY --from=builder /app/target/release/doorway /usr/local/bin/doorway
 
+# SSR bundle — read at startup by elohim-render::AngularRenderer when
+# SSR_BUNDLE_PATH=/opt/elohim-render/main.server.mjs is set on the pod.
+# init_renderer in server/http.rs:239 silently returns None if the bundle
+# fails to load, so the pod boots cleanly even if this stage produced an
+# unusable bundle (e.g., a future Angular/SSR API mismatch).
+COPY --from=ssr-bundle /workspace/app/elohim-app/dist/elohim-app/server /opt/elohim-render
+
 # Copy default config
 COPY doorway/doorway-service/.env.example /app/.env.example
 
 # Set ownership
-RUN chown -R doorway:doorway /app
+RUN chown -R doorway:doorway /app /opt/elohim-render
 
 USER doorway
 

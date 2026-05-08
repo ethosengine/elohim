@@ -25,12 +25,12 @@ Feature: Browser hydrates SSR'd content without a re-render flash
     # elohim-storage's manifest. Doorway dispatches it to elohim-render when
     # SSR_BUNDLE_PATH is set. The rendered HTML contains ngh="..." hydration
     # markers that Angular's client runtime uses to reuse the existing nodes.
-    When the raw HTTP response for "/lamad/concept/elohim-protocol-overview" is captured
+    When the raw HTTP response for "/lamad/concept/fct-bible-micah-6-8" is captured
     Then the raw HTTP response status is 200
     And the raw HTTP response header "x-render-cache" is present
     And the raw HTTP response body contains Angular hydration markers
     And the raw HTTP response body contains a non-empty html title element
-    When Matthew navigates to "/lamad/concept/elohim-protocol-overview" in the browser
+    When Matthew navigates to "/lamad/concept/fct-bible-micah-6-8" in the browser
     Then the concept page content is visible
     And there should be no console errors
     And no uncaught JavaScript errors occurred
