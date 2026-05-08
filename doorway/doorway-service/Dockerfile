@@ -5,11 +5,18 @@ FROM rust:1.93-slim-bookworm AS deps
 
 WORKDIR /app
 
-# Install build dependencies
+# Install build dependencies.
+# curl + ca-certificates are needed by the v8 crate's build.rs (pulled in via
+# elohim-render → deno_core), which downloads a ~190MB prebuilt librusty_v8
+# from github.com/denoland/rusty_v8/releases. The build script falls back to
+# curl when its Python downloader fails; the slim image has neither, so v8
+# build.rs panics with `Result::unwrap()` on a NotFound IO error.
 RUN apt-get update && apt-get install -y \
     pkg-config \
     libssl-dev \
     make \
+    curl \
+    ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 # Install rustfmt and clippy (not included in slim image)
