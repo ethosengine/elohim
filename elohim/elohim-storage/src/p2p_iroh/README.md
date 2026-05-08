@@ -20,8 +20,8 @@ decision rule for Phase 11 backend wiring. Summary:
 | Plane | Verdict |
 |---|---|
 | Blob | iroh-canonical, libp2p-fallback (BLAKE3 chunked verified streaming is the protocol) |
-| Gossip / Sync / EPR / EPR-atom / Shard / View-fed | dual-stack permanent (selected by transport-profile manifest) |
-| Identity-handshake / Trust / Reach-authorization | libp2p-canonical, iroh-receive (no n0 in the auth path) |
+| Gossip / Sync / EPR / EPR-atom / Shard / View-fed / Identity-handshake / Trust | dual-stack permanent (selected by transport-profile manifest; integrity from Track 1 DHT-notarized contracts + signed wire frames, not transport) |
+| Reach-authorization | n/a — internal service, not a wire plane (feature canonical to the protocol; wire-composition design in-progress) |
 | Discovery | dual-stack: pkarr-DHT (iroh side) + Kademlia (libp2p side); n0 demoted to one-of-many defaults |
 
 **Why dual-stack permanent and not full-iroh:** consumer-grade devices
