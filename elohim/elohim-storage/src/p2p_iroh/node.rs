@@ -11,13 +11,19 @@
 use anyhow::Result;
 use bytes::Bytes;
 use iroh::{
-    protocol::{Router, RouterBuilder},
+    protocol::{DynProtocolHandler, Router, RouterBuilder},
     Endpoint, NodeAddr, NodeId, Watcher,
 };
 use iroh_blobs::{BlobsProtocol, Hash};
 use tracing::info;
 
 use super::{blob_store::IrohBlobStore, config::IrohConfig, endpoint::BuildEndpointError};
+
+/// An ALPN bound to a protocol handler — the unit of registration on the
+/// shared iroh `Router`. Used by [`IrohNode::start_with_protocols`] so
+/// later phases can mount custom-ALPN handlers (sync, EPR, etc.) alongside
+/// the iroh-blobs blob plane without churning this aggregate's API.
+pub type AlpnRegistration = (Vec<u8>, Box<dyn DynProtocolHandler>);
 
 /// Iroh-side P2P node — Phase 2 holds endpoint + store + router. The
 /// Router has `BlobsProtocol` mounted under `iroh_blobs::ALPN`. Phase 3+
@@ -35,20 +41,38 @@ impl IrohNode {
     /// and spawn the accept loop. Caller is responsible for shutting down
     /// via [`IrohNode::shutdown`] on graceful exit.
     pub async fn start(config: IrohConfig) -> Result<Self, IrohNodeError> {
+        Self::start_with_protocols(config, Vec::new()).await
+    }
+
+    /// Like [`IrohNode::start`] but additionally registers each custom-ALPN
+    /// handler in `extra_protocols` on the shared `Router`. Phase 3+ uses
+    /// this to layer sync / EPR / shard / view-fed / identity protocols
+    /// alongside iroh-blobs without forking this aggregate.
+    pub async fn start_with_protocols(
+        config: IrohConfig,
+        extra_protocols: Vec<AlpnRegistration>,
+    ) -> Result<Self, IrohNodeError> {
         let endpoint = super::endpoint::build_endpoint(&config).await?;
         let store = IrohBlobStore::load(&config.blobs_dir).await?;
 
         let blobs_protocol = BlobsProtocol::new(store.inner(), endpoint.clone(), None);
-        let router: Router = RouterBuilder::new(endpoint.clone())
-            .accept(iroh_blobs::ALPN, blobs_protocol)
-            .spawn();
+        let mut builder: RouterBuilder = RouterBuilder::new(endpoint.clone())
+            .accept(iroh_blobs::ALPN, blobs_protocol);
+
+        let extra_count = extra_protocols.len();
+        for (alpn, handler) in extra_protocols {
+            builder = builder.accept(alpn, handler);
+        }
+
+        let router: Router = builder.spawn();
 
         info!(
             target: "elohim_storage::p2p_iroh",
             node_id = %endpoint.node_id(),
             relays = config.use_n0_relays,
             blobs_dir = %config.blobs_dir.display(),
-            "iroh node started (blob plane mounted; iroh_blobs ALPN registered)"
+            extra_alpns = extra_count,
+            "iroh node started (blob plane + extra ALPNs registered)"
         );
 
         Ok(Self {
