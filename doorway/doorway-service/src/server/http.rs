@@ -1694,11 +1694,22 @@ async fn handle_request(
                                 Arc::clone(&state.ssr_http_client),
                                 endpoint.clone(),
                             ));
+                        // Default RenderLimits.wall_time_ms is 2_000ms — too tight
+                        // for the cold-start path where V8 has to parse + interpret
+                        // a 51MB bundle (171 .mjs files, main.server.mjs ~484KB)
+                        // and walk Angular's bootstrap. Production saw
+                        // x-ssr-error="render timed out after 2000ms" on every
+                        // first request after a pod rollout. 15s is generous for
+                        // cold-start; warm renders complete in tens of ms once
+                        // deno_core's module loader has cached the imports.
                         let ctx = elohim_render::RenderContext {
                             spec: render_spec,
                             url: url.clone(),
                             data_fetcher: fetcher,
-                            limits: Default::default(),
+                            limits: elohim_render::RenderLimits {
+                                wall_time_ms: 15_000,
+                                ..Default::default()
+                            },
                         };
                         return Ok(to_boxed(match renderer.render(ctx).await {
                             Ok(out) => {
