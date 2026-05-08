@@ -50,10 +50,7 @@ impl EprBackend for FixedEprBackend {
 
 fn epr_protocols() -> Vec<AlpnRegistration> {
     let backend: Arc<dyn EprBackend> = Arc::new(FixedEprBackend);
-    vec![(
-        EPR_ALPN.to_vec(),
-        Box::new(IrohEprProtocol::new(backend)),
-    )]
+    vec![(EPR_ALPN.to_vec(), Box::new(IrohEprProtocol::new(backend)))]
 }
 
 #[tokio::test]
@@ -120,12 +117,8 @@ async fn epr_atom_request_round_trips_over_iroh_quic() -> Result<()> {
     let provider_dir = tempdir().unwrap();
     let fetcher_dir = tempdir().unwrap();
 
-    let fixture = TwoNodeFixture::new(
-        provider_dir.path(),
-        fetcher_dir.path(),
-        epr_atom_protocols,
-    )
-    .await?;
+    let fixture =
+        TwoNodeFixture::new(provider_dir.path(), fetcher_dir.path(), epr_atom_protocols).await?;
 
     let req = EprAtomRequest::Fetch {
         cid: "bafyreigh3...example".into(),

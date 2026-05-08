@@ -18,8 +18,8 @@ use elohim_storage::p2p::identity_handshake::{
 use elohim_storage::p2p::trust_protocol::{TrustHandshake, TrustResponse};
 use elohim_storage::p2p_iroh::{
     parity_harness::TwoNodeFixture, AlpnRegistration, IdentityHandshakeBackend,
-    IrohIdentityHandshakeClient, IrohIdentityHandshakeProtocol, IrohTrustClient,
-    IrohTrustProtocol, TrustBackend, IDENTITY_HANDSHAKE_ALPN, TRUST_ALPN,
+    IrohIdentityHandshakeClient, IrohIdentityHandshakeProtocol, IrohTrustClient, IrohTrustProtocol,
+    TrustBackend, IDENTITY_HANDSHAKE_ALPN, TRUST_ALPN,
 };
 use tempfile::tempdir;
 

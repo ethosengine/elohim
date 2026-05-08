@@ -23,9 +23,7 @@ struct FixedShardBackend;
 impl ShardBackend for FixedShardBackend {
     async fn handle(&self, req: ShardRequest) -> ShardResponse {
         match req {
-            ShardRequest::Get { hash: _ } => {
-                ShardResponse::Data(b"shard-bytes-phase7".to_vec())
-            }
+            ShardRequest::Get { hash: _ } => ShardResponse::Data(b"shard-bytes-phase7".to_vec()),
             ShardRequest::Have { hash: _ } => ShardResponse::Have(true),
             ShardRequest::Push { hash: _, data: _ } => ShardResponse::PushAck,
             ShardRequest::ListContent { .. } => ShardResponse::ContentList {

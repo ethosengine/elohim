@@ -18,8 +18,7 @@ use iroh_blobs::{BlobsProtocol, Hash};
 use tracing::info;
 
 use super::{
-    blob_store::IrohBlobStore, config::IrohConfig, endpoint::BuildEndpointError,
-    gossip::IrohGossip,
+    blob_store::IrohBlobStore, config::IrohConfig, endpoint::BuildEndpointError, gossip::IrohGossip,
 };
 
 /// An ALPN bound to a protocol handler — the unit of registration on the
@@ -186,7 +185,7 @@ mod tests {
             blobs_dir: dir.join("blobs_iroh"),
             secret_key_path: dir.join("iroh.key"),
             use_n0_relays: false,
-        use_n0_discovery: false,
+            use_n0_discovery: false,
         }
     }
 

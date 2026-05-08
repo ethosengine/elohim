@@ -50,11 +50,9 @@ impl TwoNodeFixture {
         fetcher_dir: &Path,
         protocol_factory: impl Fn() -> Vec<AlpnRegistration>,
     ) -> anyhow::Result<Self> {
-        let provider = IrohNode::start_with_protocols(
-            loopback_config(provider_dir),
-            (protocol_factory)(),
-        )
-        .await?;
+        let provider =
+            IrohNode::start_with_protocols(loopback_config(provider_dir), (protocol_factory)())
+                .await?;
         let fetcher =
             IrohNode::start_with_protocols(loopback_config(fetcher_dir), (protocol_factory)())
                 .await?;
@@ -80,8 +78,7 @@ impl TwoNodeFixture {
             IrohNode::start_with_protocols(loopback_config(provider_dir), provider_protocols)
                 .await?;
         let fetcher =
-            IrohNode::start_with_protocols(loopback_config(fetcher_dir), fetcher_protocols)
-                .await?;
+            IrohNode::start_with_protocols(loopback_config(fetcher_dir), fetcher_protocols).await?;
 
         let provider_addr = provider.node_addr().await?;
 

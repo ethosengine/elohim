@@ -103,7 +103,10 @@ mod tests {
         let payload = b"identical content".to_vec();
         let h1 = store.add_bytes(payload.clone()).await.unwrap();
         let h2 = store.add_bytes(payload.clone()).await.unwrap();
-        assert_eq!(h1, h2, "BLAKE3 is content-addressed; same bytes => same hash");
+        assert_eq!(
+            h1, h2,
+            "BLAKE3 is content-addressed; same bytes => same hash"
+        );
     }
 
     #[tokio::test]

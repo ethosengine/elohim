@@ -47,8 +47,7 @@ async fn inventory_delta_round_trips_via_iroh_gossip() -> Result<()> {
     let provider_dir = tempdir().unwrap();
     let fetcher_dir = tempdir().unwrap();
 
-    let fixture =
-        TwoNodeFixture::new(provider_dir.path(), fetcher_dir.path(), Vec::new).await?;
+    let fixture = TwoNodeFixture::new(provider_dir.path(), fetcher_dir.path(), Vec::new).await?;
 
     // The fetcher's endpoint must know the provider's NodeAddr before it
     // can dial it for the gossip overlay — relays are disabled in this

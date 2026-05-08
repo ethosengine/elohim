@@ -55,12 +55,8 @@ async fn view_fed_request_round_trips_over_iroh_quic() -> Result<()> {
     let provider_dir = tempdir().unwrap();
     let fetcher_dir = tempdir().unwrap();
 
-    let fixture = TwoNodeFixture::new(
-        provider_dir.path(),
-        fetcher_dir.path(),
-        view_fed_protocols,
-    )
-    .await?;
+    let fixture =
+        TwoNodeFixture::new(provider_dir.path(), fetcher_dir.path(), view_fed_protocols).await?;
 
     let req = ViewFederationRequest {
         view_kind: ViewKind::Cluster,

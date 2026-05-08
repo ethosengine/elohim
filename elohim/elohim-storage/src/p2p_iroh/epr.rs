@@ -33,9 +33,7 @@ use iroh::{
     Endpoint, NodeAddr,
 };
 
-use super::codec::{
-    read_frame_cbor_default, read_frame_default, write_frame, write_frame_cbor,
-};
+use super::codec::{read_frame_cbor_default, read_frame_default, write_frame, write_frame_cbor};
 use crate::p2p::epr_atom_protocol::{EprAtomRequest, EprAtomResponse};
 use crate::p2p::epr_protocol::{EprRequest, EprResponse};
 
@@ -131,7 +129,8 @@ impl IrohEprAtomProtocol {
 
 impl std::fmt::Debug for IrohEprAtomProtocol {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("IrohEprAtomProtocol").finish_non_exhaustive()
+        f.debug_struct("IrohEprAtomProtocol")
+            .finish_non_exhaustive()
     }
 }
 
@@ -162,11 +161,7 @@ impl<'a> IrohEprAtomClient<'a> {
         Self { endpoint }
     }
 
-    pub async fn request(
-        &self,
-        peer: NodeAddr,
-        req: &EprAtomRequest,
-    ) -> Result<EprAtomResponse> {
+    pub async fn request(&self, peer: NodeAddr, req: &EprAtomRequest) -> Result<EprAtomResponse> {
         let conn = self.endpoint.connect(peer, EPR_ATOM_ALPN).await?;
         let (mut send, mut recv) = conn.open_bi().await?;
         write_frame_cbor(&mut send, req).await?;

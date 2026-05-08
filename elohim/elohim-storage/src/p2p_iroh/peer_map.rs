@@ -50,10 +50,7 @@ pub fn record_libp2p(
         match existing {
             Some(_) => {
                 diesel::update(t::table.filter(t::agent_cid.eq(agent_cid)))
-                    .set((
-                        t::peer_id.eq(peer_id),
-                        t::last_seen_at.eq(observed_at),
-                    ))
+                    .set((t::peer_id.eq(peer_id), t::last_seen_at.eq(observed_at)))
                     .execute(conn)?;
             }
             None => {
@@ -90,10 +87,7 @@ pub fn record_iroh(
         match existing {
             Some(_) => {
                 diesel::update(t::table.filter(t::agent_cid.eq(agent_cid)))
-                    .set((
-                        t::node_id.eq(node_id),
-                        t::last_seen_at.eq(observed_at),
-                    ))
+                    .set((t::node_id.eq(node_id), t::last_seen_at.eq(observed_at)))
                     .execute(conn)?;
             }
             None => {
