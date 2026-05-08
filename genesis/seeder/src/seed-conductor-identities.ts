@@ -8,9 +8,12 @@
  * Runs BEFORE seed-humans.ts (which registers with doorway).
  *
  * Environment variables:
- *   CONDUCTOR_URLS    Comma-separated conductor app WebSocket URLs
- *                     e.g. ws://elohim-adam-alpha:4445,ws://elohim-eve-alpha:4445
- *   INSTALLED_APP_ID  Holochain app ID prefix (default: elohim)
+ *   CONDUCTOR_URLS               Comma-separated conductor app WebSocket URLs
+ *                                e.g. ws://elohim-adam-alpha:4445,ws://elohim-eve-alpha:4445
+ *   INSTALLED_APP_ID             Holochain app ID prefix (default: elohim)
+ *   CONDUCTOR_CONNECT_TIMEOUT_MS Per-connect timeout (default: 10000) — fail fast on
+ *                                unreachable conductors so the stage's catchError can
+ *                                soft-land before the pipeline's global timeout fires
  *
  * Output:
  *   [+] Created — Human profile was just created on the conductor
@@ -73,6 +76,30 @@ interface ConductorResult {
 // Holochain helpers
 // =============================================================================
 
+const CONNECT_TIMEOUT_MS = parseInt(
+  process.env.CONDUCTOR_CONNECT_TIMEOUT_MS ?? '10000',
+  10
+);
+
+async function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  label: string
+): Promise<T> {
+  let timer: NodeJS.Timeout | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(
+      () => reject(new Error(`${label} timed out after ${timeoutMs}ms`)),
+      timeoutMs
+    );
+  });
+  try {
+    return await Promise.race([promise, timeout]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 /**
  * Derive admin WebSocket URL from app WebSocket URL.
  *
@@ -107,10 +134,14 @@ async function connectToConductor(
 
   let adminWs: AdminWebsocket;
   try {
-    adminWs = await AdminWebsocket.connect({
-      url: new URL(adminUrl),
-      wsClientOptions: { origin: 'http://localhost' },
-    });
+    adminWs = await withTimeout(
+      AdminWebsocket.connect({
+        url: new URL(adminUrl),
+        wsClientOptions: { origin: 'http://localhost' },
+      }),
+      CONNECT_TIMEOUT_MS,
+      `Admin connect ${adminUrl}`
+    );
   } catch (err) {
     throw new Error(
       `Admin connect failed (${adminUrl}): ${err instanceof Error ? err.message : err}`
@@ -168,11 +199,15 @@ async function connectToConductor(
     await adminWs.client.close();
 
     // Connect to app interface
-    const appWs = await AppWebsocket.connect({
-      url: new URL(appUrl),
-      token: tokenResult.token,
-      wsClientOptions: { origin: 'http://localhost' },
-    });
+    const appWs = await withTimeout(
+      AppWebsocket.connect({
+        url: new URL(appUrl),
+        token: tokenResult.token,
+        wsClientOptions: { origin: 'http://localhost' },
+      }),
+      CONNECT_TIMEOUT_MS,
+      `App connect ${appUrl}`
+    );
 
     return { appWs, cellId, appInfo: matchingApp };
   } catch (err) {

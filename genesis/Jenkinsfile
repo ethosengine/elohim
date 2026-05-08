@@ -223,7 +223,7 @@ spec:
 
     options {
         skipDefaultCheckout(true)
-        timeout(time: 15, unit: 'MINUTES')  // SQLite seeding is fast (~5 seconds)
+        timeout(time: 60, unit: 'MINUTES')  // M1 topology seeds + E2E (~25-35 min); 60 absorbs pod-flap archival waits
         buildDiscarder(logRotator(numToKeepStr: '20'))
         overrideIndexTriggers(false)  // Only orchestrator or manual triggers - no webhook/branch indexing
     }
