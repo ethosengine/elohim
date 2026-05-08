@@ -36,6 +36,19 @@ RUN sed -i 's|path = "../../crates/doorway-client"|path = "crates/doorway-client
     sed -i 's|path = "../elohim-compute"|path = "elohim-compute"|' Cargo.toml && \
     sed -i 's|path = "../epr"|path = "epr"|' Cargo.toml
 
+# Strip the optional `elohim-render` path-dep + the `ssr` feature that
+# selects it. elohim-render is the V8/deno_core SSR runtime — it lives
+# in the doorway image, not here. The `ssr` feature is opt-in and not
+# enabled in this build, but cargo still resolves the path at metadata
+# time (and `dep:elohim-render` in the feature list would also error if
+# the optional dep is missing). Storage source code uses
+# `#[cfg(feature = "ssr")]` to gate ssr-only paths — those just stay
+# inactive in this image, which is the intended deployment shape.
+RUN sed -i \
+    -e '/^elohim-render = .*optional = true.*$/d' \
+    -e '/^ssr = \["dep:elohim-render"\]$/d' \
+    Cargo.toml
+
 # Constitution crate uses workspace inheritance — inline the values since
 # the workspace root (elohim/Cargo.toml) isn't copied into the build context
 RUN sed -i \
