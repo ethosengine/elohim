@@ -20,6 +20,7 @@ mod blob_store;
 pub mod codec;
 mod config;
 mod endpoint;
+pub mod epr;
 mod gossip;
 mod identity;
 mod node;
@@ -29,6 +30,10 @@ pub mod sync;
 pub use blob_store::IrohBlobStore;
 pub use config::IrohConfig;
 pub use endpoint::{build_endpoint, BuildEndpointError};
+pub use epr::{
+    EprAtomBackend, EprBackend, IrohEprAtomClient, IrohEprAtomProtocol, IrohEprClient,
+    IrohEprProtocol, EPR_ALPN, EPR_ATOM_ALPN,
+};
 pub use gossip::{GossipEvent, IrohGossip};
 pub use identity::load_or_generate as load_or_generate_secret_key;
 pub use node::{AlpnRegistration, IrohNode};

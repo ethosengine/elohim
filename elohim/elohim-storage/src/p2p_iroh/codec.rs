@@ -80,6 +80,59 @@ where
     Ok(())
 }
 
+/// CBOR-bodied variant of [`read_frame`]. Same wire shape (4-byte BE len
+/// + body), different encoding. Used by the EPR-atom plane, which is
+/// CBOR-encoded for parity with the existing libp2p `EprAtomCodec`.
+pub async fn read_frame_cbor<T, R>(stream: &mut R, max_size: usize) -> io::Result<T>
+where
+    T: DeserializeOwned,
+    R: AsyncRead + Unpin,
+{
+    let max = max_size.min(HARD_MAX_FRAME_SIZE);
+
+    let mut len_buf = [0u8; 4];
+    stream.read_exact(&mut len_buf).await?;
+    let len = u32::from_be_bytes(len_buf) as usize;
+
+    if len > max {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            format!("frame too large: {len} > {max}"),
+        ));
+    }
+
+    let mut buf = vec![0u8; len];
+    stream.read_exact(&mut buf).await?;
+    ciborium::de::from_reader(&buf[..])
+        .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, format!("cbor decode: {e}")))
+}
+
+/// CBOR-bodied [`read_frame_default`].
+pub async fn read_frame_cbor_default<T, R>(stream: &mut R) -> io::Result<T>
+where
+    T: DeserializeOwned,
+    R: AsyncRead + Unpin,
+{
+    read_frame_cbor(stream, DEFAULT_MAX_FRAME_SIZE).await
+}
+
+/// CBOR-bodied [`write_frame`].
+pub async fn write_frame_cbor<T, W>(stream: &mut W, value: &T) -> io::Result<()>
+where
+    T: Serialize,
+    W: AsyncWrite + Unpin,
+{
+    let mut body = Vec::new();
+    ciborium::ser::into_writer(value, &mut body)
+        .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, format!("cbor encode: {e}")))?;
+    let len = u32::try_from(body.len())
+        .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "frame body exceeds u32::MAX"))?;
+    stream.write_all(&len.to_be_bytes()).await?;
+    stream.write_all(&body).await?;
+    stream.flush().await?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
