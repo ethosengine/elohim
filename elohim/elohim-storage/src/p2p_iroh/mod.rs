@@ -25,6 +25,7 @@ mod gossip;
 mod identity;
 mod node;
 pub mod parity_harness;
+pub mod shard;
 pub mod sync;
 
 pub use blob_store::IrohBlobStore;
@@ -37,6 +38,7 @@ pub use epr::{
 pub use gossip::{GossipEvent, IrohGossip};
 pub use identity::load_or_generate as load_or_generate_secret_key;
 pub use node::{AlpnRegistration, IrohNode};
+pub use shard::{IrohShardClient, IrohShardProtocol, ShardBackend, SHARD_ALPN};
 pub use sync::{IrohSyncClient, IrohSyncProtocol, SyncBackend, SYNC_ALPN};
 
 // Re-export the iroh-blobs Hash type so callers don't have to depend on

@@ -8,32 +8,61 @@ The two stacks are **mutually exclusive at runtime** but compile additively
 when both feature flags are set, so a single binary can host the parity-test
 harness used during cutover.
 
-## What works (Phase 1 + 2 complete)
+## What works (Phases 1–7 complete)
 
 - `IrohConfig` with disjoint paths (`iroh.key`, `blobs_iroh/`)
 - `iroh::SecretKey` persisted at `<storage_dir>/iroh.key` (mode 0600 on Unix)
 - `iroh::Endpoint` built with persisted identity + relay-mode toggle
 - `IrohBlobStore` wrapping `iroh-blobs` filesystem store
-- `IrohNode` aggregates endpoint + Router + store, with `BlobsProtocol`
-  mounted under [`iroh_blobs::ALPN`]
+- `IrohNode` aggregates endpoint + Router + store + gossip, with
+  `BlobsProtocol` mounted under [`iroh_blobs::ALPN`] and `iroh-gossip`
+  mounted under [`iroh_gossip::ALPN`]
 - `add_bytes` / `get_bytes` / `has` (local) and `fetch_blob_from`
   (peer-to-peer via QUIC + verified BLAKE3 streaming)
 - `ELOHIM_TRANSPORT_BACKEND=iroh` boot path lights up the iroh node and
   skips libp2p init (mutually exclusive)
-- Two-node loopback integration test (`tests/iroh_blob_roundtrip.rs`)
+- Custom-ALPN harness (Phase 3): `codec.rs` length-prefixed
+  MessagePack/CBOR helpers; `parity_harness.rs` `TwoNodeFixture` for
+  symmetric/asymmetric two-node tests; worked example in
+  `tests/iroh_custom_alpn_echo.rs`
+- iroh-gossip plane (Phase 4): `IrohGossip` wrapper with
+  `topic_id_for(name)` deterministic mapping (BLAKE3(name)[..32]);
+  `peer_blob_inventory.blake3_hash` column added (NULL during
+  transition); two-node gossip parity test
+- Sync ALPN `/elohim/sync/2.0.0` (Phase 5): `IrohSyncProtocol` +
+  `IrohSyncClient`, MessagePack, dispatches to `SyncBackend` trait
+- EPR ALPNs (Phase 6): `/elohim/epr/2.0.0` (MessagePack) +
+  `/elohim/epr-atom/2.0.0` (CBOR), `IrohEprProtocol` /
+  `IrohEprAtomProtocol`, dispatches to backends
+- Shard ALPN `/elohim/shard/2.0.0` (Phase 7): `IrohShardProtocol` +
+  `IrohShardClient`, MessagePack, dispatches to `ShardBackend`
+- Two-node loopback integration tests for every plane:
+  `iroh_blob_roundtrip`, `iroh_node_lifecycle`, `iroh_custom_alpn_echo`,
+  `iroh_gossip_parity`, `iroh_sync_parity`, `iroh_epr_parity`,
+  `iroh_shard_parity` (12 integration tests total + 26 unit tests)
 
 ## What is stubbed / deferred
 
 - HTTP routes still read from the legacy SHA256-keyed
   [`crate::blob_store::BlobStore`]. Cutover (Phase 11) graduates them.
 - Genesis seeder still writes to the legacy store.
-- `peer_blob_inventory` table has no BLAKE3 column yet (Phase 4).
-- No gossip / sync / shard / EPR / view-fed / identity protocols on the
-  iroh path yet — those are Phases 3–9 in the plan.
+- Phase 5–7 backends (`SyncBackend`, `EprBackend`, `EprAtomBackend`,
+  `ShardBackend`) are trait objects supplied by the daemon; the iroh
+  ALPNs accept connections and round-trip wire bytes correctly, but no
+  production daemon code yet supplies real backends. Test fixtures use
+  fixed-response stubs. Phase 11 cutover wires the real services.
+- Phase 4 gossip topic broadcasters (inventory snapshot/delta publish,
+  identity-binding, integrity-revocation, recovery-invitation,
+  recovery-revocation, attention, feedback) are not yet wired into the
+  daemon's existing libp2p-side broadcast call sites. Topic mapping
+  (`IrohGossip::topic_id_for`) is the only piece needed; the per-topic
+  publish wiring graduates per protocol at cutover.
+- View-federation (Phase 8), identity/handshake/trust/reach (Phase 9),
+  and discovery/topology (Phase 10) ALPNs are not yet stood up.
 - `IrohNode` is held in `main.rs` for lifetime but not yet driven through
   the `tokio::select` shutdown loop. Drop-on-exit is fine for now; Phase
-  3+ will integrate explicit `IrohNode::shutdown` for parity with libp2p
-  graceful shutdown.
+  10–11 will integrate explicit `IrohNode::shutdown` for parity with
+  libp2p graceful shutdown.
 
 ## How to run
 
@@ -65,11 +94,11 @@ within a single mode.
 
 ## Pinning
 
-`iroh = "=0.92"` + `iroh-blobs = "=0.94"` (both pulled with stable
-ed25519-dalek 2.2 + curve25519-dalek 4.1; iroh-blobs 0.95+ moves to a
-broken pre-release crypto path). Coexists with current
-`holochain_client 0.9.0-dev.5` — no holochain bump required. See plan
-for the version-walk rationale.
+`iroh = "=0.92"` + `iroh-blobs = "=0.94"` + `iroh-gossip = "=0.92"`
+(all pulled with stable ed25519-dalek 2.2 + curve25519-dalek 4.1;
+iroh-blobs 0.95+ moves to a broken pre-release crypto path). Coexists
+with current `holochain_client 0.9.0-dev.5` — no holochain bump
+required. See plan for the version-walk rationale.
 
 ## Why explicit Connection in `fetch_blob_from`
 
@@ -100,17 +129,26 @@ connection is the right shape.
 
 Each gate must be green before the next phase picks up.
 
-### Phase 2 → Phase 3 (custom-ALPN harness)
+### Phases 2 → 7 graduation (custom-ALPN harness + gossip + sync + EPR + shard)
 
 - [x] `just build-iroh` clean
-- [x] `just test-iroh -- p2p_iroh` green (13/13 unit)
-- [x] `tests/iroh_blob_roundtrip.rs` green (2/2 integration)
-- [x] `tests/iroh_node_lifecycle.rs` green (2/2 integration)
+- [x] `just test-iroh` green (26/26 unit + 12/12 integration when
+      serialized via `--test-threads=1`)
+- [x] All seven plane parity tests pass:
+      `iroh_blob_roundtrip`, `iroh_node_lifecycle`, `iroh_custom_alpn_echo`,
+      `iroh_gossip_parity`, `iroh_sync_parity`, `iroh_epr_parity`,
+      `iroh_shard_parity`
 - [x] `cargo check` (default features, libp2p-only) clean
-- [x] `cargo clippy --features "p2p p2p-iroh" --lib -- -D warnings` clean
-      for new code (pre-existing `constitution` + `ts-rs` noise unaffected)
+- [x] `peer_blob_inventory.blake3_hash` migration applies + reverses
 - [ ] CI runs both feature combos at least once on the worktree branch
       (verified locally; CI verification on next push)
+
+### Phases 8–10 (view federation, identity/handshake/trust/reach, discovery)
+
+- [ ] view-federation ALPN `/elohim/view-federation/2.0.0`
+- [ ] identity/handshake/trust/reach ALPNs (5 total)
+- [ ] cross-stack peer-id mapping table (`PeerId` ↔ `NodeId`)
+- [ ] iroh discovery (DNS / pkarr / mDNS) wired
 
 ### Phase 11 cutover gate
 

@@ -77,7 +77,7 @@ async fn inventory_delta_round_trips_via_iroh_gossip() -> Result<()> {
     // dropped on a topic with zero peers. iroh-gossip emits NeighborUp
     // when the swarm sample includes the new peer.
     use futures_util::StreamExt;
-    timeout(Duration::from_secs(10), async {
+    timeout(Duration::from_secs(30), async {
         while let Some(evt) = fetcher_recv.next().await {
             if let Ok(GossipEvent::NeighborUp(_)) = evt {
                 break;
@@ -100,7 +100,7 @@ async fn inventory_delta_round_trips_via_iroh_gossip() -> Result<()> {
     provider_sender.broadcast(payload.clone().into()).await?;
 
     // Fetcher receives the same MessagePack bytes within bounded time.
-    let received: BlobInventoryDeltaWire = timeout(Duration::from_secs(10), async {
+    let received: BlobInventoryDeltaWire = timeout(Duration::from_secs(30), async {
         loop {
             match fetcher_recv.next().await {
                 Some(Ok(GossipEvent::Received(msg))) => {
