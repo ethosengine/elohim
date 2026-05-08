@@ -1715,13 +1715,14 @@ async fn handle_request(
                                 ssr_html_response_with_cache_status(out.html, "MISS")
                             }
                             Err(e) => {
+                                let err_str = format!("{e}");
                                 tracing::warn!(
                                     target: "doorway::ssr",
                                     path = %p,
-                                    error = %e,
+                                    error = %err_str,
                                     "SSR render error — falling back to SPA shell"
                                 );
-                                ssr_spa_shell_fallback()
+                                ssr_spa_shell_fallback_with_error(&err_str)
                             }
                         }));
                     }
@@ -2125,18 +2126,40 @@ fn ssr_html_response_with_cache_status(html: String, cache_status: &str) -> Resp
 /// The shell contains an `<app-root>` placeholder so the Angular CSR bundle
 /// can hydrate the page without a full server-rendered document.
 fn ssr_spa_shell_fallback() -> Response<Full<Bytes>> {
+    ssr_spa_shell_fallback_with_error("")
+}
+
+/// SPA shell fallback that surfaces the render error in an `x-ssr-error`
+/// header for ops/debug visibility. Empty `err` omits the header.
+///
+/// Header values must be ASCII-printable; we sanitize CR/LF/non-ASCII to `?`
+/// so a panic message containing newlines doesn't trip hyper's validation.
+fn ssr_spa_shell_fallback_with_error(err: &str) -> Response<Full<Bytes>> {
     const SHELL: &str = concat!(
         "<!doctype html><html><body>",
         "<app-root></app-root>",
         "<script>console.log('SSR fallback \u{2014} CSR will hydrate')</script>",
         "</body></html>",
     );
-    Response::builder()
+    let mut builder = Response::builder()
         .status(StatusCode::OK)
         .header("Content-Type", "text/html; charset=utf-8")
-        .header("Cache-Control", "no-store")
-        .body(Full::new(Bytes::from(SHELL)))
-        .unwrap()
+        .header("Cache-Control", "no-store");
+    if !err.is_empty() {
+        let sanitized: String = err
+            .chars()
+            .map(|c| {
+                if (0x20..=0x7e).contains(&(c as u32)) {
+                    c
+                } else {
+                    '?'
+                }
+            })
+            .take(512)
+            .collect();
+        builder = builder.header("x-ssr-error", sanitized);
+    }
+    builder.body(Full::new(Bytes::from(SHELL))).unwrap()
 }
 
 // ─── Gate layer tests ─────────────────────────────────────────────────────────
