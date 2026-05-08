@@ -117,7 +117,11 @@ WORKDIR /workspace
 # Tooling: native-dep build (some npm packages have C++ bindings) + bash for
 # any prebuild scripts ng build's pipeline reaches for.
 RUN apk add --no-cache python3 make g++ git bash curl
-RUN npm install -g pnpm@9
+# Pin pnpm to the version declared in root package.json's `packageManager`
+# field. Mismatched pnpm versions hash patches/@angular__build@19.2.22.patch
+# differently, tripping ERR_PNPM_LOCKFILE_CONFIG_MISMATCH on
+# --frozen-lockfile. Keep this in sync with package.json.
+RUN npm install -g pnpm@10.30.3
 
 # Workspace metadata — pnpm-lock.yaml requires every workspace member's
 # package.json to exist for --frozen-lockfile to pass.
