@@ -49,6 +49,8 @@ const INTERFACE_FILES = [
   { src: 'inputs/wisdom-invocation-input.ts', dest: 'wisdom-invocation-input.ts' },
   { src: 'views/wisdom-invocation-response.ts', dest: 'wisdom-invocation-response.ts' },
   { src: 'views/elohim-capability-profile.ts', dest: 'elohim-capability-profile.ts' },
+  { src: 'views/render-capability-profile.ts', dest: 'render-capability-profile.ts' },
+  { src: 'views/capability-extensions.ts', dest: 'capability-extensions.ts' },
   { src: 'views/peer-status-view.ts', dest: 'peer-status-view.ts' },
   { src: 'views/elohim-reputation-profile-view.ts', dest: 'elohim-reputation-profile-view.ts' },
   { src: 'views/node-shape-view.ts', dest: 'node-shape-view.ts' },
