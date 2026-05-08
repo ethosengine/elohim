@@ -156,8 +156,15 @@ COPY genesis/landing ./genesis/landing
 # enough to satisfy the lockfile + the angular.json assets entry.
 COPY elohim/elohim-cache-core/pkg ./elohim/elohim-cache-core/pkg
 
-# Install only elohim-app + its transitive workspace deps.
-RUN pnpm install --filter "elohim-app..." --frozen-lockfile
+# Install elohim-app + its transitive workspace deps. We also need
+# `@elohim/service` (elohim-library/projects/elohim-service) — it's NOT
+# a package.json workspace dep of elohim-app (no `"@elohim/service":
+# "workspace:*"` entry); it's pulled in via tsconfig path aliases
+# (`"@elohim/service": ["../elohim-library/projects/elohim-service/src/
+# index.ts"]`). When ng build resolves those path-aliased imports, the
+# library's own peerDeps (@angular/core, rxjs, tslib...) need to be
+# installed under app/elohim-library/projects/elohim-service/node_modules.
+RUN pnpm install --filter "elohim-app..." --filter "@elohim/service..." --frozen-lockfile
 
 # Stub prebuild outputs so ng build doesn't fail on missing browser-only
 # artifacts (service worker, wasm cache core, fonts). The server bundle
