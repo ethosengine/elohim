@@ -165,10 +165,18 @@ RUN pnpm install --filter "elohim-app..." --frozen-lockfile
 RUN mkdir -p app/elohim-app/src/assets/fonts && \
     : > app/elohim-app/src/assets/apps-sw.js
 
+# Build the workspace TypeScript deps that elohim-app's ng build resolves
+# at compile time. Their dist/ directories are gitignored, and we bypass
+# the elohim-app `prebuild` hook (which fetches fonts, builds wasm, and
+# verifies the sophia submodule — none needed for the server bundle), so
+# we have to build these explicitly. Mirrors the elohim-app pipeline's
+# build order in the root Jenkinsfile (storage-client first, then core).
+RUN pnpm --filter @elohim/storage-client run build && \
+    pnpm --filter elohim-core run build
+
 # Build the server bundle. We invoke ng directly to bypass the `prebuild`
-# hook (which would otherwise try to fetch fonts, build wasm-pack, and
-# verify the sophia submodule — none needed for SSR). The `postbuild` hook
-# (the Node-shim script) is run explicitly afterward.
+# hook. The `postbuild` hook (the Node-shim script) is run explicitly
+# afterward.
 WORKDIR /workspace/app/elohim-app
 RUN pnpm exec ng build --configuration=alpha
 RUN node scripts/ssr-shim-node.mjs
