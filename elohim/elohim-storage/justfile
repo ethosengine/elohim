@@ -27,9 +27,15 @@ test:
 build-iroh:
     cargo build --features "p2p p2p-iroh"
 
-# Test with both stacks compiled in
+# Test with both stacks compiled in.
+# Iroh integration tests (the iroh_* tests in tests/) run serialized via
+# --test-threads=1 because multiple in-process QUIC endpoints on loopback
+# race for UDP port allocation and the iroh-gossip overlay needs more
+# than the default test thread share to converge under contention. Unit
+# tests (--lib) are unaffected and can run parallel.
 test-iroh:
-    cargo test --features "p2p p2p-iroh"
+    cargo test --features "p2p p2p-iroh" --lib
+    cargo test --features "p2p p2p-iroh" --test 'iroh_*' -- --test-threads=1
 
 # Export TypeScript type bindings
 export-bindings:

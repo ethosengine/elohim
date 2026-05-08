@@ -17,7 +17,10 @@ use iroh::{
 use iroh_blobs::{BlobsProtocol, Hash};
 use tracing::info;
 
-use super::{blob_store::IrohBlobStore, config::IrohConfig, endpoint::BuildEndpointError};
+use super::{
+    blob_store::IrohBlobStore, config::IrohConfig, endpoint::BuildEndpointError,
+    gossip::IrohGossip,
+};
 
 /// An ALPN bound to a protocol handler — the unit of registration on the
 /// shared iroh `Router`. Used by [`IrohNode::start_with_protocols`] so
@@ -34,6 +37,7 @@ pub struct IrohNode {
     endpoint: Endpoint,
     router: Router,
     store: IrohBlobStore,
+    gossip: IrohGossip,
 }
 
 impl IrohNode {
@@ -54,10 +58,12 @@ impl IrohNode {
     ) -> Result<Self, IrohNodeError> {
         let endpoint = super::endpoint::build_endpoint(&config).await?;
         let store = IrohBlobStore::load(&config.blobs_dir).await?;
+        let gossip = IrohGossip::new(endpoint.clone());
 
         let blobs_protocol = BlobsProtocol::new(store.inner(), endpoint.clone(), None);
         let mut builder: RouterBuilder = RouterBuilder::new(endpoint.clone())
-            .accept(iroh_blobs::ALPN, blobs_protocol);
+            .accept(iroh_blobs::ALPN, blobs_protocol)
+            .accept(iroh_gossip::ALPN, gossip.inner().clone());
 
         let extra_count = extra_protocols.len();
         for (alpn, handler) in extra_protocols {
@@ -72,13 +78,14 @@ impl IrohNode {
             relays = config.use_n0_relays,
             blobs_dir = %config.blobs_dir.display(),
             extra_alpns = extra_count,
-            "iroh node started (blob plane + extra ALPNs registered)"
+            "iroh node started (blob plane + gossip + extra ALPNs registered)"
         );
 
         Ok(Self {
             endpoint,
             router,
             store,
+            gossip,
         })
     }
 
@@ -104,6 +111,11 @@ impl IrohNode {
     /// Borrow the local `IrohBlobStore`.
     pub fn store(&self) -> &IrohBlobStore {
         &self.store
+    }
+
+    /// Borrow the gossip handle for subscribe/broadcast on a topic by name.
+    pub fn gossip(&self) -> &IrohGossip {
+        &self.gossip
     }
 
     /// Add bytes to the local store. Returns the BLAKE3 hash.

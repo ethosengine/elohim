@@ -64,6 +64,7 @@ fn seed_inventory(conn: &mut SqliteConnection, peer_id: &str, blob_hash: &str) {
             last_seen_at: "2026-04-30T12:00:00Z".to_string(),
             source: "gossip-snapshot".to_string(),
             sequence: 1,
+            blake3_hash: None,
         })
         .execute(conn)
         .expect("seed inventory");

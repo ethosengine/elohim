@@ -183,10 +183,11 @@ futures = { version = "0.3", optional = true }
 # a published-source bug (digest::crypto_common path mismatch). Coexists with
 # current holochain dev.5 + multihash-codetable 0.2 — see plan version-pinning
 # rationale in genesis/docs/superpowers/plans/2026-05-07-iroh-parallel-stack.md.
-# iroh-gossip is deferred to Phase 4 (its Phase 1 inclusion conflicted with
-# multihash-codetable's crypto-common at a different major).
+# iroh-gossip 0.92 aligns with iroh 0.92's iroh-base; pulled in at Phase 4
+# pickup. Verified in isolation 2026-05-08; in-workspace probe pending.
 iroh = { version = "=0.92", optional = true }
 iroh-blobs = { version = "=0.94", optional = true }
+iroh-gossip = { version = "=0.92", optional = true }
 
 # Direct dep on `rand` for iroh SecretKey generation (OsRng).
 # Already in the transitive tree; declare direct so call sites can use it.
@@ -199,7 +200,7 @@ lz4_flex = { version = "0.11", optional = true }
 default = ["p2p"]
 compression = ["lz4_flex"]
 p2p = ["libp2p", "futures"]
-p2p-iroh = ["iroh", "iroh-blobs", "rand", "futures"]
+p2p-iroh = ["iroh", "iroh-blobs", "iroh-gossip", "rand", "futures"]
 ssr = ["dep:elohim-render"]
 
 [dev-dependencies]

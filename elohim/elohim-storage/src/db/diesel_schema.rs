@@ -1200,6 +1200,7 @@ diesel::table! {
         last_seen_at -> Text,
         source       -> Text,
         sequence     -> BigInt,
+        blake3_hash  -> Nullable<Text>,
     }
 }
 

@@ -20,6 +20,7 @@ mod blob_store;
 pub mod codec;
 mod config;
 mod endpoint;
+mod gossip;
 mod identity;
 mod node;
 pub mod parity_harness;
@@ -27,6 +28,7 @@ pub mod parity_harness;
 pub use blob_store::IrohBlobStore;
 pub use config::IrohConfig;
 pub use endpoint::{build_endpoint, BuildEndpointError};
+pub use gossip::{GossipEvent, IrohGossip};
 pub use identity::load_or_generate as load_or_generate_secret_key;
 pub use node::{AlpnRegistration, IrohNode};
 
