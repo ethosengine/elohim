@@ -37,6 +37,12 @@ test-iroh:
     cargo test --features "p2p p2p-iroh" --lib
     cargo test --features "p2p p2p-iroh" --test 'iroh_*' -- --test-threads=1
 
+# Head-to-head blob plane perf bench: iroh vs libp2p on loopback.
+# Release-mode + ignored-test pattern keeps the bench out of `just test-iroh`
+# but makes it explicit-to-invoke.
+bench-blob:
+    cargo test --release --features "p2p p2p-iroh" --test bench_blob_perf -- --ignored --nocapture
+
 # Export TypeScript type bindings
 export-bindings:
     cargo test export_bindings
