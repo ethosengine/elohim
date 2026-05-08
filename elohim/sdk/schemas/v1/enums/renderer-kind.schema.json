@@ -3,7 +3,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "RendererKind",
   "description": "Kind of server-side renderer a doorway carries. Reserved values are valid claim values; only `angular-ssr` is implemented in elohim-render today. Source of truth: doorway runtime (Category C operational). Not a DHT entry type.",
-  "_sourceOfTruth": {
+  "_source": {
     "category": "C",
     "layer": "view",
     "owner": "doorway runtime",
