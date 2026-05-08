@@ -8,6 +8,39 @@ The two stacks are **mutually exclusive at runtime** but compile additively
 when both feature flags are set, so a single binary can host the parity-test
 harness used during cutover.
 
+## Architecture decision: cutover posture
+
+**Phase 11 backend wiring is gated by the architecture spec at**
+[`genesis/docs/superpowers/specs/2026-05-08-iroh-libp2p-complementarity.md`](../../../../genesis/docs/superpowers/specs/2026-05-08-iroh-libp2p-complementarity.md).
+
+The spec lands the cutover posture as **partial replacement, dual-stack
+permanent for most planes**, with a per-plane verdict table and a
+decision rule for Phase 11 backend wiring. Summary:
+
+| Plane | Verdict |
+|---|---|
+| Blob | iroh-canonical, libp2p-fallback (BLAKE3 chunked verified streaming is the protocol) |
+| Gossip / Sync / EPR / EPR-atom / Shard / View-fed | dual-stack permanent (selected by transport-profile manifest) |
+| Identity-handshake / Trust / Reach-authorization | libp2p-canonical, iroh-receive (no n0 in the auth path) |
+| Discovery | dual-stack: pkarr-DHT (iroh side) + Kademlia (libp2p side); n0 demoted to one-of-many defaults |
+
+**Why dual-stack permanent and not full-iroh:** consumer-grade devices
+(intermittent laptops, browsers wanting direct WebRTC, UDP-restricted
+networks) stay first-class substrate citizens via libp2p; iroh handles
+hub-to-hub federation where its bench wins are real. The cross-stack
+peer-map (Phase 10's `cross_stack_peer_map` migration) graduates from
+transition-bridge to permanent structural schema. See the spec for the
+anti-capture, anti-datacenter, and FANG-subsumption-via-federation
+mechanisms this preserves.
+
+When wiring a backend in Phase 11, the rule is:
+
+1. Look up the plane's verdict in the spec.
+2. If iroh-canonical: implement iroh primary + libp2p fallback.
+3. If dual-stack permanent: implement both; selection via cross-stack peer-map.
+4. If libp2p-canonical: libp2p primary + iroh ALPN registered for hub-to-hub.
+5. NEVER hard-code transport choice or bypass the peer-map.
+
 ## What works (Phases 1–10 complete — cutover-ready transport)
 
 All wire-protocol planes for the iroh transport are stood up. Backend
