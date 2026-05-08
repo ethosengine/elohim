@@ -13,13 +13,17 @@ default:
 install:
     pnpm install
 
-# Lint all Jenkinsfiles in the repo
+# Lint all Jenkinsfiles via Jenkins's pipeline-model-converter (fast, ~5s).
 lint:
-    pnpm exec npm-groovy-lint --path '../..' --files '**/*Jenkinsfile*' --ignorepattern '**/node_modules/**' --failon error
+    bash scripts/lint-jenkinsfiles-fast.sh
 
-# Lint with auto-fix
+# CodeNarc style/best-practice pass (slow, advisory). Use when you want the style report.
+lint-style:
+    pnpm exec npm-groovy-lint --path '../..' --files '**/*Jenkinsfile*' --ignorepattern '**/node_modules/**'
+
+# CodeNarc with auto-fix.
 lint-fix:
     pnpm exec npm-groovy-lint --path '../..' --files '**/*Jenkinsfile*' --ignorepattern '**/node_modules/**' --fix
 
-# Quality gate: lint Jenkinsfiles
+# Quality gate: validate Jenkinsfiles against Jenkins itself.
 gate: lint

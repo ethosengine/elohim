@@ -414,7 +414,7 @@ run_gate() {
         rc=$?
         ;;
       orchestrator)
-        pnpm exec npm-groovy-lint --path '..' --files '**/*Jenkinsfile*' --ignorepattern '**/node_modules/**' --failon error 2>&1 && \
+        bash scripts/lint-jenkinsfiles-fast.sh 2>&1 && \
         node --test orchestrator-strategy.test.mjs graph-walker.test.mjs 2>&1
         rc=$?
         ;;
