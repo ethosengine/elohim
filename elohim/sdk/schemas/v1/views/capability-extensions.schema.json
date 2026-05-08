@@ -1,0 +1,33 @@
+{
+  "$id": "epr:schema:view:capability-extensions",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CapabilityExtensions",
+  "description": "Tier-2 capability claims map. Source of truth: each capability's owner declares it via runtime registration (Category C operational). Each key is a kebab-case capability name registered in the protocol's capability registry. Each value carries a schemaRef pointer (so consumers can resolve the profile schema) and an opaque structured profile. The validator checks structural well-formedness only — claim CONTENTS are interpreted by consumers who recognize the capability name. When a Tier-2 capability proves load-bearing, it graduates to Tier 1 with a typed sibling field on peer-status. NOT a DHT entry.",
+  "_source": {
+    "category": "C",
+    "layer": "view",
+    "owner": "per-capability runtime owners (each capability declares its own profile)",
+    "notarized": false,
+    "rationale": "Generic extension hatch for Tier-2 capabilities. Inherits the parent peer-status-view's view-layer projection model. Promotion to Tier 1 (typed sibling field) requires substrate-wide load-bearing use."
+  },
+  "type": "object",
+  "patternProperties": {
+    "^[a-z][a-z0-9-]{2,30}$": {
+      "type": "object",
+      "required": ["schemaRef", "profile"],
+      "properties": {
+        "schemaRef": {
+          "type": "string",
+          "pattern": "^epr:schema:",
+          "description": "Schema URI for this capability's profile (e.g., 'epr:schema:view:transcode-capability-profile')"
+        },
+        "profile": {
+          "type": "object",
+          "description": "Capability-specific claim. Shape defined by schemaRef. Validator checks 'is an object'; consumers do deep validation."
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}
