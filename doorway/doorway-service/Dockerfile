@@ -127,6 +127,16 @@ RUN npm install -g pnpm@10.30.3
 # package.json to exist for --frozen-lockfile to pass.
 COPY pnpm-workspace.yaml pnpm-lock.yaml package.json ./
 
+# Hoist all deps to the workspace root so ng build can find tslib (and
+# every other transitively-resolved package) regardless of which workspace
+# package owns the import. Mirrors the repo-root .npmrc — that file isn't
+# COPY'd because it carries the Nexus registry URL and an `${NPM_TOKEN}`
+# auth placeholder that wouldn't expand inside the docker build context.
+# We only need the hoist + peer-deps behavior here; default public npm is
+# fine because pnpm install --frozen-lockfile pulls from the URLs already
+# resolved in pnpm-lock.yaml.
+RUN printf 'shamefully-hoist=true\nlegacy-peer-deps=true\nstrict-peer-dependencies=false\n' > .npmrc
+
 # pnpm patchedDependencies — root package.json declares
 # `"@angular/build@19.2.22": "patches/@angular__build@19.2.22.patch"`.
 # Without this dir, `pnpm install --frozen-lockfile` aborts with
