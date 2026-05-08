@@ -161,6 +161,34 @@ struct Libp2pTransportProfile {
 
 The protocol negotiates per-call: a laptop with `{libp2p: full, iroh: None}` and a Tier-3 hub with `{iroh: full, libp2p: receive-only}` connect over libp2p. Two Tier-3 hubs connect over iroh. **Users don't see the choice.**
 
+### Hub graduation gradient — hubs are a role, not a hardware tier
+
+A hub is defined by **role**, not by hardware tier:
+
+> A peer is acting as a hub when it (a) accepts Track 3 spoke connections under DHT-notarized stewardship contracts and serves them via HTTP/WS, AND (b) federates horizontally on Track 2 with peer hubs under continuously-negotiated REA contracts.
+
+Both conditions can be satisfied on consumer-grade hardware. **The hub role is graduated, not gated.**
+
+| Tier | Hardware | Examples | Track 2 transport posture | Track 3 spoke capacity | AI inference role |
+|---|---|---|---|---|---|
+| **Consumer-grade hub** | Repurposed laptop, gaming desktop intermittent, old NAS, composed thin-client-batch via coordinator | `recycled-laptop`, `gaming-desktop`, `thin-client-batch` (composed) | **libp2p primary** (intermittent, TCP fallback through residential NAT) + iroh receive when peer is iroh-only | small (a few household members + extended family custodial keys) | none → relay-to-peer-hub |
+| **Tier-1 lightweight hub** | Always-on Pi 4, NUC, intentional mid-tier steward | `raspberry-pi-4`, `home-nuc` | **iroh primary** + libp2p receive for consumer-grade peers | medium (household + neighborhood spokes) | small CPU-bound models |
+| **Tier-3 full hub (DwellingHub canonical)** | Family-node base/extended, dedicated server | `family-node-base`, `family-node-extended`, `dedicated-server` | **iroh primary** + libp2p receive | full (extended family + community + custodial-keyed relatives) | full local inference (70B-class) |
+
+**Why this matters — the onboarding funnel for hubs:**
+
+The substrate's Tier-3 federation paradigm (`project_substrate_scale_ceiling`) is a **target**, not a precondition. Consumer-grade hubs are how households reach the target:
+
+1. **Meets people where they are.** Someone with an old laptop and a desire to host their family's photos can run a consumer-grade hub today, without a $3,000 Tier-3 investment. Someone with a gaming desktop already volunteers burst compute when not gaming. Someone with a closet Pi 4 already runs a 24/7 always-on hub. The protocol counts all of these as first-class hub stewards.
+2. **Repurposes hardware that would otherwise be e-waste.** Recycled-laptop, NAS upgrades, lab thin-client batches, hand-me-down desktops — the protocol's substrate makes them meaningful again. Inclusion + circularity.
+3. **Onboarding into full-capability DwellingHubs.** Consumer-grade hub is the entry point; Tier-1 lightweight is the intermediate; Tier-3 full is the destination. Each tier is first-class **within its capabilities**, with a clear graduation path. AI inferencing graduation lands at Tier-1+ (small models) and Tier-3 (full local 70B-class).
+4. **Reaches edge capabilities earlier.** A neighborhood with three consumer-grade hubs federating is already FANG-equivalent at neighborhood scale long before any of those households upgrades to Tier-3. Federation density wins before hardware density.
+5. **Constitutionally distinct from datacenters.** A consumer-grade hub on a recycled laptop is structurally bounded — it can't grow into a datacenter because the hardware doesn't support it, the steward count is small, and the stewardship contracts cap acceptance. **The graduation path goes through DwellingHub, never through datacenter.** Tier-3 is the ceiling for substrate-native hub composition; further scaling is via federation density (more hubs), never vertical hub scaling.
+
+**Graduation preserves identity.** Per `hardware-spec.md` migration-preserves-everything: when a steward graduates from a consumer-grade hub to a Tier-3 hub, the agent identity moves with them. The substrate sees a transport-profile change (libp2p-primary → iroh-primary), not an identity change. The stewardship contracts the hub carries are reassigned to the new hardware via DHT-notarized REA events witnessed by the household's stewards. Spokes don't notice the upgrade beyond their hub's `node_addr` rotating.
+
+**Track 2 transport implication:** the dual-stack posture is what makes consumer-grade hubs viable. If we went iroh-only, a consumer-grade hub on intermittent residential networking with carrier-grade NAT and battery-aware idle disconnect would struggle to participate. libp2p's TCP+yamux fallback + Circuit Relay v2 + WebRTC keeps consumer-grade hubs first-class. **Forfeiting consumer-grade hub viability to the simplification of one transport would forfeit the protocol's onboarding funnel for hubs themselves.**
+
 ### Track 3 — Hub-spoke bridge (wearables, IoT, phone-as-spoke; no full storage)
 
 | Concern | Choice |
@@ -188,25 +216,25 @@ For each archetype in `genesis/data/devices/devices.json`, which tracks does it 
 |---|---|---|---|---|---|
 | `2019-android-phone` | 2 | tx5/WebRTC | libp2p (if direct, rare) | HTTP/WS via dwelling hub (default) | optional client |
 | `chromebook-edu` | 2 | tx5/WebRTC | libp2p (if direct, optional) | HTTP/WS via dwelling hub (default) | optional client |
-| `recycled-laptop` | 3 | tx5/WebRTC | **libp2p primary** (intermittent, TCP fallback) | optional Track 3 | optional client |
-| `gaming-desktop` | 4 | tx5/WebRTC | **libp2p primary** when on (variable availability) | n/a | optional client |
-| `raspberry-pi-4` | 3 | tx5/WebRTC | **iroh primary** (always-on, can also accept libp2p) | n/a | n/a |
-| `home-nuc` | 4 | tx5/WebRTC | **iroh primary** (always-on; libp2p receive-only) | n/a (potentially Track 4 host) | optional host |
-| `family-node-base` | 5 | tx5/WebRTC | **iroh primary; libp2p receive for consumer-grade peers** | hub host | hub host (if doorway-enabled) |
-| `family-node-extended` | 5 | tx5/WebRTC | **iroh primary; libp2p receive** | hub host | hub host |
-| `dedicated-server` | 5 | tx5/WebRTC | **iroh primary; libp2p receive** | hub host (collective) | hub host |
+| `recycled-laptop` | 3 | tx5/WebRTC | **libp2p primary** (intermittent, TCP fallback) | optional Track 3 spoke; **Track 3 host as consumer-grade hub when plugged in** | optional client |
+| `gaming-desktop` | 4 | tx5/WebRTC | **libp2p primary** when on (variable availability) | **optional Track 3 host (burst consumer-grade hub when not gaming)** | optional client |
+| `raspberry-pi-4` | 3 | tx5/WebRTC | **iroh primary** (always-on, can also accept libp2p) | **Track 3 host (Tier-1 lightweight hub)** | n/a |
+| `home-nuc` | 4 | tx5/WebRTC | **iroh primary** (always-on; libp2p receive-only) | **Track 3 host (Tier-1 lightweight hub)**; potentially Track 4 host | optional host |
+| `family-node-base` | 5 | tx5/WebRTC | **iroh primary; libp2p receive for consumer-grade peers** | **Track 3 host (Tier-3 DwellingHub canonical)** | hub host (if doorway-enabled) |
+| `family-node-extended` | 5 | tx5/WebRTC | **iroh primary; libp2p receive** | **Track 3 host (Tier-3 DwellingHub extended)** | hub host |
+| `dedicated-server` | 5 | tx5/WebRTC | **iroh primary; libp2p receive** | **Track 3 host (CollectiveHub)** | hub host |
 | `k8s-pod-256mb` | 5 | tx5/WebRTC | **iroh primary** (deployment convenience; not a real archetype) | n/a | hub host |
 | `observer-mic-array` | 1 | tx5/WebRTC | n/a | **HTTP/WS to dwelling hub** | n/a |
 | `observer-camera` | 1 | tx5/WebRTC | n/a | **HTTP/WS to dwelling hub** | n/a |
 | `environmental-sensor` | 1 | tx5/WebRTC (via gateway) | n/a | **LoRaWAN → gateway → HTTP/WS to dwelling hub** | n/a |
 | `biometric-fob` | 0 | tx5/WebRTC (paired) | n/a | **streams to paired device, hub-internal** | n/a |
-| `thin-client-batch` | 1 | tx5/WebRTC | n/a | **HTTP/WS to dwelling hub** | n/a |
+| `thin-client-batch` | 1 individually / **3 composed** | tx5/WebRTC | n/a individually; **libp2p primary as composed hub via coordinator** | **HTTP/WS to dwelling hub** individually; **Track 3 host as composed consumer-grade hub** | n/a |
 
 **Reading the matrix:**
 
 - Every device class has Track 1 (DHT) participation. Identity is universal.
-- Track 2 is **bifurcated by always-on-ness**: always-on Tier-3+ → iroh; intermittent / consumer-grade-direct → libp2p. Always-on Tier-3+ also accepts libp2p inbound for consumer-grade peers that want to connect directly.
-- Track 3 is the **convenience path** for L0–L2 devices (wearable / sensor / spoke) — they don't run elohim-storage, they bridge through their dwelling hub.
+- Track 2 transport posture is **graduated by always-on-ness and hub role**: Tier-3+ always-on hubs → iroh primary with libp2p receive; Tier-1 lightweight always-on hubs (Pi 4, NUC) → iroh primary; consumer-grade hubs and consumer-grade direct peers (recycled laptop, gaming desktop, intermittent) → libp2p primary with iroh receive when peer is iroh-only. **Hub-capable status is a property of the role, not the hardware tier.**
+- Track 3 (HTTP/WS spoke bridge) has two participant types: **spoke participants** (L0–L2 devices that don't run elohim-storage and bridge through a hub — wearables, IoT, phone-as-spoke), and **hub hosts** (any L3+ archetype acting as a hub, plus L1 thin-client-batch when composed via coordinator). The consumer-grade-hub onboarding funnel runs through this column.
 - Track 4 is **opt-in projection** for any device class that wants HTTP-shaped access.
 
 ## Plane-by-plane verdict and decision rule
@@ -455,7 +483,7 @@ A reference to this spec is added to the module README's "What works / What's ne
 
 ## Decision rule summary (the one-liner)
 
-> **iroh wins where it wins (hub-to-hub federation, BLAKE3-native blob); libp2p stays where consumer-grade-first-class agency lives (intermittent, UDP-restricted, browser-direct, no-n0-in-the-auth-path); both selected at call-site by transport-profile manifest. Wearables and IoT bridge through dwelling hubs via HTTP/WS (Track 3), not substrate transport. Hubs federate horizontally; the protocol structurally prevents hub-as-datacenter via DHT-notarized stewardship contracts, federation reach-earning cost asymmetry, and three independent paths for consumer-grade peers (Track 2 direct, Track 3 spoke, Track 4 doorway-projected). The protocol subsumes Cloudflare and FANG via federation density, not via a single hub at scale.**
+> **iroh wins where it wins (hub-to-hub federation, BLAKE3-native blob); libp2p stays where consumer-grade-first-class agency lives (intermittent, UDP-restricted, browser-direct, no-n0-in-the-auth-path); both selected at call-site by transport-profile manifest. Wearables and IoT bridge through dwelling hubs via HTTP/WS (Track 3), not substrate transport. Hub is a role, not a hardware tier — consumer-grade hardware (recycled laptops, gaming desktops, composed thin-client batches) acts as a hub when it's the only option available, with a graduation path to Tier-1-lightweight (Pi 4, NUC) and Tier-3 DwellingHub (full local AI inference) that preserves identity continuity. Hubs federate horizontally; the protocol structurally prevents hub-as-datacenter via DHT-notarized stewardship contracts, federation reach-earning cost asymmetry, hardware-bounded consumer-grade-hub ceilings, and three independent paths for consumer-grade peers (Track 2 direct, Track 3 spoke, Track 4 doorway-projected). The protocol subsumes Cloudflare and FANG via federation density, not via a single hub at scale.**
 
 ## Memory anchors that load this spec
 

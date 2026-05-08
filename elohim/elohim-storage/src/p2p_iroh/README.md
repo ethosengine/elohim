@@ -33,6 +33,15 @@ transition-bridge to permanent structural schema. See the spec for the
 anti-capture, anti-datacenter, and FANG-subsumption-via-federation
 mechanisms this preserves.
 
+**Hub is a role, not a hardware tier.** The dual-stack posture is also
+what enables the hub graduation gradient — recycled laptops, gaming
+desktops, composed thin-client batches, and other consumer-grade
+hardware can act as hubs when that's the only option available, with
+a graduation path through Tier-1-lightweight (Pi 4, NUC) and Tier-3
+full DwellingHub (with local AI inference). Forfeiting consumer-grade
+hub viability to one-transport simplification would forfeit the
+protocol's onboarding funnel for hubs themselves.
+
 When wiring a backend in Phase 11, the rule is:
 
 1. Look up the plane's verdict in the spec.
