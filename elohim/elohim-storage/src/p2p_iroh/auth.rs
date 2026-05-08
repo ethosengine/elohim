@@ -66,17 +66,20 @@ impl std::fmt::Debug for IrohIdentityHandshakeProtocol {
 
 impl ProtocolHandler for IrohIdentityHandshakeProtocol {
     async fn accept(&self, connection: Connection) -> Result<(), AcceptError> {
-        let (mut send, mut recv) = connection.accept_bi().await?;
-        let req: IdentityHandshakeRequest = read_frame(&mut recv, IDENTITY_HANDSHAKE_REQ_MAX)
-            .await
-            .map_err(io_to_accept)?;
-        let res = self.backend.handle(req).await;
-        write_frame(&mut send, &res).await.map_err(io_to_accept)?;
-        send.finish().map_err(|e| {
-            AcceptError::from_err(io::Error::new(io::ErrorKind::Other, e.to_string()))
-        })?;
-        connection.closed().await;
-        Ok(())
+        loop {
+            let (mut send, mut recv) = match connection.accept_bi().await {
+                Ok(streams) => streams,
+                Err(_) => return Ok(()),
+            };
+            let req: IdentityHandshakeRequest = read_frame(&mut recv, IDENTITY_HANDSHAKE_REQ_MAX)
+                .await
+                .map_err(io_to_accept)?;
+            let res = self.backend.handle(req).await;
+            write_frame(&mut send, &res).await.map_err(io_to_accept)?;
+            send.finish().map_err(|e| {
+                AcceptError::from_err(io::Error::new(io::ErrorKind::Other, e.to_string()))
+            })?;
+        }
     }
 }
 
@@ -138,17 +141,20 @@ impl std::fmt::Debug for IrohTrustProtocol {
 
 impl ProtocolHandler for IrohTrustProtocol {
     async fn accept(&self, connection: Connection) -> Result<(), AcceptError> {
-        let (mut send, mut recv) = connection.accept_bi().await?;
-        let req: TrustHandshake = read_frame(&mut recv, TRUST_REQ_MAX)
-            .await
-            .map_err(io_to_accept)?;
-        let res = self.backend.handle(req).await;
-        write_frame(&mut send, &res).await.map_err(io_to_accept)?;
-        send.finish().map_err(|e| {
-            AcceptError::from_err(io::Error::new(io::ErrorKind::Other, e.to_string()))
-        })?;
-        connection.closed().await;
-        Ok(())
+        loop {
+            let (mut send, mut recv) = match connection.accept_bi().await {
+                Ok(streams) => streams,
+                Err(_) => return Ok(()),
+            };
+            let req: TrustHandshake = read_frame(&mut recv, TRUST_REQ_MAX)
+                .await
+                .map_err(io_to_accept)?;
+            let res = self.backend.handle(req).await;
+            write_frame(&mut send, &res).await.map_err(io_to_accept)?;
+            send.finish().map_err(|e| {
+                AcceptError::from_err(io::Error::new(io::ErrorKind::Other, e.to_string()))
+            })?;
+        }
     }
 }
 

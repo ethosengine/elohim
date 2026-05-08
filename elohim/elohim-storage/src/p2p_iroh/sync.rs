@@ -16,15 +16,21 @@
 //! ## Server side
 //!
 //! [`IrohSyncProtocol`] implements [`iroh::protocol::ProtocolHandler`].
-//! On each bidi stream:
+//! For each accepted connection it loops over `accept_bi`, handling
+//! streams sequentially. On each bidi stream:
 //! 1. read a [`SyncRequest`] via `read_frame_default`
 //! 2. dispatch to the configured [`SyncBackend`]
 //! 3. write a [`SyncResponse`] via `write_frame`
-//! 4. close the send side; let the client close the connection
+//! 4. close the send side
+//!
+//! Loop exits when the peer closes the connection (`accept_bi` errors).
+//! This supports both fresh-conn-per-request callers (Phase 5
+//! [`IrohSyncClient::request`]) and stream-reuse callers (perf benches;
+//! Phase 11 connection pools).
 //!
 //! ## Client side
 //!
-//! [`IrohSyncClient::request`] opens a fresh bidi stream on
+//! [`IrohSyncClient::request`] opens a fresh QUIC connection on
 //! [`SYNC_ALPN`], writes the request, reads exactly one response, and
 //! returns it. Connections are not pooled in Phase 5; that's a Phase 11
 //! optimization.
@@ -81,15 +87,20 @@ impl std::fmt::Debug for IrohSyncProtocol {
 
 impl ProtocolHandler for IrohSyncProtocol {
     async fn accept(&self, connection: Connection) -> Result<(), AcceptError> {
-        let (mut send, mut recv) = connection.accept_bi().await?;
-        let req: SyncRequest = read_frame_default(&mut recv).await.map_err(io_to_accept)?;
-        let res = self.backend.handle(req).await;
-        write_frame(&mut send, &res).await.map_err(io_to_accept)?;
-        send.finish().map_err(|e| {
-            AcceptError::from_err(io::Error::new(io::ErrorKind::Other, e.to_string()))
-        })?;
-        connection.closed().await;
-        Ok(())
+        loop {
+            let (mut send, mut recv) = match connection.accept_bi().await {
+                Ok(streams) => streams,
+                // Peer closed the connection — clean exit.
+                Err(_) => return Ok(()),
+            };
+            let req: SyncRequest =
+                read_frame_default(&mut recv).await.map_err(io_to_accept)?;
+            let res = self.backend.handle(req).await;
+            write_frame(&mut send, &res).await.map_err(io_to_accept)?;
+            send.finish().map_err(|e| {
+                AcceptError::from_err(io::Error::new(io::ErrorKind::Other, e.to_string()))
+            })?;
+        }
     }
 }
 

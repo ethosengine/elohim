@@ -76,15 +76,19 @@ impl std::fmt::Debug for IrohEprProtocol {
 
 impl ProtocolHandler for IrohEprProtocol {
     async fn accept(&self, connection: Connection) -> Result<(), AcceptError> {
-        let (mut send, mut recv) = connection.accept_bi().await?;
-        let req: EprRequest = read_frame_default(&mut recv).await.map_err(io_to_accept)?;
-        let res = self.backend.handle(req).await;
-        write_frame(&mut send, &res).await.map_err(io_to_accept)?;
-        send.finish().map_err(|e| {
-            AcceptError::from_err(io::Error::new(io::ErrorKind::Other, e.to_string()))
-        })?;
-        connection.closed().await;
-        Ok(())
+        loop {
+            let (mut send, mut recv) = match connection.accept_bi().await {
+                Ok(streams) => streams,
+                Err(_) => return Ok(()),
+            };
+            let req: EprRequest =
+                read_frame_default(&mut recv).await.map_err(io_to_accept)?;
+            let res = self.backend.handle(req).await;
+            write_frame(&mut send, &res).await.map_err(io_to_accept)?;
+            send.finish().map_err(|e| {
+                AcceptError::from_err(io::Error::new(io::ErrorKind::Other, e.to_string()))
+            })?;
+        }
     }
 }
 
@@ -136,19 +140,22 @@ impl std::fmt::Debug for IrohEprAtomProtocol {
 
 impl ProtocolHandler for IrohEprAtomProtocol {
     async fn accept(&self, connection: Connection) -> Result<(), AcceptError> {
-        let (mut send, mut recv) = connection.accept_bi().await?;
-        let req: EprAtomRequest = read_frame_cbor_default(&mut recv)
-            .await
-            .map_err(io_to_accept)?;
-        let res = self.backend.handle(req).await;
-        write_frame_cbor(&mut send, &res)
-            .await
-            .map_err(io_to_accept)?;
-        send.finish().map_err(|e| {
-            AcceptError::from_err(io::Error::new(io::ErrorKind::Other, e.to_string()))
-        })?;
-        connection.closed().await;
-        Ok(())
+        loop {
+            let (mut send, mut recv) = match connection.accept_bi().await {
+                Ok(streams) => streams,
+                Err(_) => return Ok(()),
+            };
+            let req: EprAtomRequest = read_frame_cbor_default(&mut recv)
+                .await
+                .map_err(io_to_accept)?;
+            let res = self.backend.handle(req).await;
+            write_frame_cbor(&mut send, &res)
+                .await
+                .map_err(io_to_accept)?;
+            send.finish().map_err(|e| {
+                AcceptError::from_err(io::Error::new(io::ErrorKind::Other, e.to_string()))
+            })?;
+        }
     }
 }
 

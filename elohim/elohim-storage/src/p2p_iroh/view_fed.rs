@@ -61,17 +61,20 @@ impl std::fmt::Debug for IrohViewFederationProtocol {
 
 impl ProtocolHandler for IrohViewFederationProtocol {
     async fn accept(&self, connection: Connection) -> Result<(), AcceptError> {
-        let (mut send, mut recv) = connection.accept_bi().await?;
-        let req: ViewFederationRequest = read_frame(&mut recv, MAX_PAYLOAD)
-            .await
-            .map_err(io_to_accept)?;
-        let res = self.backend.handle(req).await;
-        write_frame(&mut send, &res).await.map_err(io_to_accept)?;
-        send.finish().map_err(|e| {
-            AcceptError::from_err(io::Error::new(io::ErrorKind::Other, e.to_string()))
-        })?;
-        connection.closed().await;
-        Ok(())
+        loop {
+            let (mut send, mut recv) = match connection.accept_bi().await {
+                Ok(streams) => streams,
+                Err(_) => return Ok(()),
+            };
+            let req: ViewFederationRequest = read_frame(&mut recv, MAX_PAYLOAD)
+                .await
+                .map_err(io_to_accept)?;
+            let res = self.backend.handle(req).await;
+            write_frame(&mut send, &res).await.map_err(io_to_accept)?;
+            send.finish().map_err(|e| {
+                AcceptError::from_err(io::Error::new(io::ErrorKind::Other, e.to_string()))
+            })?;
+        }
     }
 }
 
