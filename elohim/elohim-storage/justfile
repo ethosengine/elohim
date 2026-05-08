@@ -43,6 +43,43 @@ test-iroh:
 bench-blob:
     cargo test --release --features "p2p p2p-iroh" --test bench_blob_perf -- --ignored --nocapture
 
+# Head-to-head sync plane perf bench: iroh /elohim/sync/2.0.0 vs libp2p
+# /elohim/storage-sync/1.0.0 — request/response with reused connections.
+bench-sync:
+    cargo test --release --features "p2p p2p-iroh" --test bench_sync_perf -- --ignored --nocapture
+
+# Head-to-head EPR plane perf bench: iroh /elohim/epr/2.0.0 vs libp2p
+# /elohim/epr/1.0.0 — Resolve→Head round-trip on MessagePack codec.
+bench-epr:
+    cargo test --release --features "p2p p2p-iroh" --test bench_epr_perf -- --ignored --nocapture
+
+# Head-to-head EPR-atom plane perf bench: iroh /elohim/epr-atom/2.0.0 vs libp2p
+# /elohim/epr-atom/1.0.0 — Fetch→Atom round-trip on CBOR codec.
+bench-epr-atom:
+    cargo test --release --features "p2p p2p-iroh" --test bench_epr_atom_perf -- --ignored --nocapture
+
+# Head-to-head shard plane perf bench: iroh /elohim/shard/2.0.0 vs libp2p
+# /elohim/shard/1.0.0 — Get→Data round-trip; sweeps RS-shard sizes.
+bench-shard:
+    cargo test --release --features "p2p p2p-iroh" --test bench_shard_perf -- --ignored --nocapture
+
+# Head-to-head view-federation plane perf bench: iroh
+# /elohim/view-federation/2.0.0 vs libp2p /elohim/view-federation/1.0.0 —
+# ViewFederationRequest/Response with topology-edge payloads (256 KiB cap).
+bench-view-fed:
+    cargo test --release --features "p2p p2p-iroh" --test bench_view_fed_perf -- --ignored --nocapture
+
+# Head-to-head gossip plane perf bench: iroh-gossip vs libp2p-gossipsub —
+# inventory delta publish→receive latency.
+bench-gossip:
+    cargo test --release --features "p2p p2p-iroh" --test bench_gossip_perf -- --ignored --nocapture
+
+# Run every bench in sequence and print a combined summary report.
+# Each plane runs independently; the umbrella target streams output as it goes.
+bench-all: bench-blob bench-sync bench-epr bench-epr-atom bench-shard bench-view-fed bench-gossip
+    @echo ""
+    @echo "All bench-* recipes completed. See per-plane markdown tables above."
+
 # Export TypeScript type bindings
 export-bindings:
     cargo test export_bindings
