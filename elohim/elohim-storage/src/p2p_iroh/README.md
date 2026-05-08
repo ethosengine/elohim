@@ -8,60 +8,99 @@ The two stacks are **mutually exclusive at runtime** but compile additively
 when both feature flags are set, so a single binary can host the parity-test
 harness used during cutover.
 
-## What works (Phases 1–7 complete)
+## What works (Phases 1–10 complete — cutover-ready transport)
 
-- `IrohConfig` with disjoint paths (`iroh.key`, `blobs_iroh/`)
+All wire-protocol planes for the iroh transport are stood up. Backend
+dispatch is supplied via trait objects; production daemon code wires
+them at Phase 11 cutover.
+
+**Foundation (Phases 1–2):**
+- `IrohConfig` with disjoint paths (`iroh.key`, `blobs_iroh/`) + relay
+  toggle (`use_n0_relays`) + discovery toggle (`use_n0_discovery`)
 - `iroh::SecretKey` persisted at `<storage_dir>/iroh.key` (mode 0600 on Unix)
-- `iroh::Endpoint` built with persisted identity + relay-mode toggle
+- `iroh::Endpoint` built with persisted identity, relay mode, and
+  optional `discovery_n0()` (Phase 10)
 - `IrohBlobStore` wrapping `iroh-blobs` filesystem store
-- `IrohNode` aggregates endpoint + Router + store + gossip, with
-  `BlobsProtocol` mounted under [`iroh_blobs::ALPN`] and `iroh-gossip`
-  mounted under [`iroh_gossip::ALPN`]
+- `IrohNode` aggregates endpoint + Router + store + gossip; mounts
+  `BlobsProtocol` under [`iroh_blobs::ALPN`], iroh-gossip under
+  [`iroh_gossip::ALPN`], plus arbitrary custom-ALPN extras supplied via
+  `start_with_protocols`
 - `add_bytes` / `get_bytes` / `has` (local) and `fetch_blob_from`
   (peer-to-peer via QUIC + verified BLAKE3 streaming)
 - `ELOHIM_TRANSPORT_BACKEND=iroh` boot path lights up the iroh node and
   skips libp2p init (mutually exclusive)
-- Custom-ALPN harness (Phase 3): `codec.rs` length-prefixed
-  MessagePack/CBOR helpers; `parity_harness.rs` `TwoNodeFixture` for
-  symmetric/asymmetric two-node tests; worked example in
-  `tests/iroh_custom_alpn_echo.rs`
-- iroh-gossip plane (Phase 4): `IrohGossip` wrapper with
-  `topic_id_for(name)` deterministic mapping (BLAKE3(name)[..32]);
-  `peer_blob_inventory.blake3_hash` column added (NULL during
-  transition); two-node gossip parity test
-- Sync ALPN `/elohim/sync/2.0.0` (Phase 5): `IrohSyncProtocol` +
-  `IrohSyncClient`, MessagePack, dispatches to `SyncBackend` trait
-- EPR ALPNs (Phase 6): `/elohim/epr/2.0.0` (MessagePack) +
-  `/elohim/epr-atom/2.0.0` (CBOR), `IrohEprProtocol` /
-  `IrohEprAtomProtocol`, dispatches to backends
-- Shard ALPN `/elohim/shard/2.0.0` (Phase 7): `IrohShardProtocol` +
-  `IrohShardClient`, MessagePack, dispatches to `ShardBackend`
-- Two-node loopback integration tests for every plane:
-  `iroh_blob_roundtrip`, `iroh_node_lifecycle`, `iroh_custom_alpn_echo`,
-  `iroh_gossip_parity`, `iroh_sync_parity`, `iroh_epr_parity`,
-  `iroh_shard_parity` (12 integration tests total + 26 unit tests)
 
-## What is stubbed / deferred
+**Custom-ALPN harness (Phase 3):**
+- `codec.rs` length-prefixed MessagePack helpers (`read_frame` /
+  `write_frame` / `read_frame_default`) + CBOR variants
+  (`read_frame_cbor` / `write_frame_cbor` / `read_frame_cbor_default`)
+- `parity_harness.rs` `TwoNodeFixture` (symmetric + asymmetric) for
+  protocol parity tests
+- Worked example: `tests/iroh_custom_alpn_echo.rs`
+
+**Gossip plane (Phase 4):**
+- `IrohGossip` wrapper with `topic_id_for(name)` deterministic
+  BLAKE3(name)[..32] mapping
+- `peer_blob_inventory.blake3_hash` Diesel migration (NULL during
+  transition; Phase 11 drops the SHA256 `blob_hash`)
+- `iroh_gossip_parity` two-node MessagePack inventory-delta round-trip
+
+**Request/response ALPNs (Phases 5–9):**
+
+| Phase | ALPN | Encoding | Backend trait | Wire types |
+|---|---|---|---|---|
+| 5 | `/elohim/sync/2.0.0` | MessagePack | `SyncBackend` | `crate::p2p::sync_protocol` |
+| 6 | `/elohim/epr/2.0.0` | MessagePack | `EprBackend` | `crate::p2p::epr_protocol` |
+| 6 | `/elohim/epr-atom/2.0.0` | CBOR | `EprAtomBackend` | `crate::p2p::epr_atom_protocol` |
+| 7 | `/elohim/shard/2.0.0` | MessagePack | `ShardBackend` | `crate::p2p::shard_protocol` |
+| 8 | `/elohim/view-federation/2.0.0` | MessagePack | `ViewFederationBackend` | `crate::views` |
+| 9 | `/elohim/identity-handshake/2.0.0` | MessagePack | `IdentityHandshakeBackend` | `crate::p2p::identity_handshake` |
+| 9 | `/elohim/trust/2.0.0` | MessagePack | `TrustBackend` | `crate::p2p::trust_protocol` |
+
+Each is a `<plane>.rs` module with `Iroh<Plane>Protocol` (server) +
+`Iroh<Plane>Client` (client) + `<Plane>Backend` trait. Wire types reused
+unchanged from libp2p side — cutover removes one transport, never two
+divergent message schemas.
+
+**Discovery + cross-stack peer mapping (Phase 10):**
+- `IrohConfig.use_n0_discovery` + `Endpoint::builder().discovery_n0()`
+  replace libp2p Kademlia for peer record publication
+- `cross_stack_peer_map` table (Diesel migration 2026-05-08-045024)
+  bridges libp2p `PeerId` ↔ iroh `NodeId` for the same `agent_cid`
+  during the hybrid window. `peer_map::{record_libp2p, record_iroh,
+  iroh_for_libp2p, libp2p_for_iroh}` upsert + resolve helpers.
+
+**Test coverage:** 26 unit + 19 integration tests (parity tests for every
+plane + 4 peer-map tests). Run via `cargo test --features "p2p p2p-iroh"
+--test 'iroh_*' -- --test-threads=1` (or `just test-iroh` which enforces
+serialization for the integration binaries).
+
+## What is stubbed / deferred (Phase 11 cutover work)
 
 - HTTP routes still read from the legacy SHA256-keyed
-  [`crate::blob_store::BlobStore`]. Cutover (Phase 11) graduates them.
-- Genesis seeder still writes to the legacy store.
-- Phase 5–7 backends (`SyncBackend`, `EprBackend`, `EprAtomBackend`,
-  `ShardBackend`) are trait objects supplied by the daemon; the iroh
-  ALPNs accept connections and round-trip wire bytes correctly, but no
-  production daemon code yet supplies real backends. Test fixtures use
-  fixed-response stubs. Phase 11 cutover wires the real services.
+  [`crate::blob_store::BlobStore`]. Cutover graduates `/api/v1/blob/{hash}`
+  to read from `IrohBlobStore` when in iroh mode.
+- Genesis seeder still writes to the legacy store. Phase 11 rewrites it
+  to write through `IrohBlobStore`.
+- Phase 5–9 backends (`SyncBackend`, `EprBackend`, `EprAtomBackend`,
+  `ShardBackend`, `ViewFederationBackend`, `IdentityHandshakeBackend`,
+  `TrustBackend`) are trait objects supplied by the daemon. The iroh
+  ALPNs accept connections and round-trip wire bytes correctly under
+  test stubs, but no production daemon code yet supplies real backends.
+  Cutover wires each one to its existing libp2p-side service.
 - Phase 4 gossip topic broadcasters (inventory snapshot/delta publish,
   identity-binding, integrity-revocation, recovery-invitation,
   recovery-revocation, attention, feedback) are not yet wired into the
   daemon's existing libp2p-side broadcast call sites. Topic mapping
   (`IrohGossip::topic_id_for`) is the only piece needed; the per-topic
   publish wiring graduates per protocol at cutover.
-- View-federation (Phase 8), identity/handshake/trust/reach (Phase 9),
-  and discovery/topology (Phase 10) ALPNs are not yet stood up.
+- Identity-map (`crate::p2p::identity_map`) and reach-authorization
+  (`crate::p2p::reach_authorization`) are internal services, not wire
+  protocols — they consume identity context from the handshake plane.
+  No separate ALPNs.
 - `IrohNode` is held in `main.rs` for lifetime but not yet driven through
-  the `tokio::select` shutdown loop. Drop-on-exit is fine for now; Phase
-  10–11 will integrate explicit `IrohNode::shutdown` for parity with
+  the `tokio::select` shutdown loop. Drop-on-exit is fine for now;
+  cutover will integrate explicit `IrohNode::shutdown` for parity with
   libp2p graceful shutdown.
 
 ## How to run
@@ -100,6 +139,35 @@ iroh-blobs 0.95+ moves to a broken pre-release crypto path). Coexists
 with current `holochain_client 0.9.0-dev.5` — no holochain bump
 required. See plan for the version-walk rationale.
 
+## Phase 11 cutover prerequisites
+
+Wire transport for every plane is in place. Remaining work for the
+cutover gate is application-layer wiring + soak validation:
+
+1. **Backend wiring** — replace stub backends in production code paths
+   so daemon services (sync engine, EPR resolver, atom store, shard
+   service, view-fed dispatcher, identity verifier, trust verifier)
+   route through the iroh ALPNs when `transport_backend = Iroh`.
+2. **HTTP route graduation** — `/api/v1/blob/{hash}` reads from
+   `IrohBlobStore` in iroh mode; format-discriminated path or BLAKE3-
+   accepting variant.
+3. **Genesis seeder rewrite** — write to `IrohBlobStore` instead of
+   legacy `BlobStore`.
+4. **Gossip topic broadcast wiring** — per-topic publish call sites
+   route through `IrohGossip::subscribe`/broadcast in iroh mode.
+5. **Recovery e2e** — full social-recovery flow runs over iroh ALPNs
+   end-to-end.
+6. **CI parity soak** — nightly run of every parity test for a week
+   with zero divergences.
+7. **Alpha-cluster soak** — 6-peer cluster runs in iroh mode for one
+   week without regression; inventory delta convergence within target.
+8. **Latency stress test** — 10k blob round-trips between two nodes,
+   p99 ≤ libp2p baseline.
+9. **Rollback drill** — flip default to `Iroh`, run, flip back to
+   `Libp2p` via env override, smoke pass; document playbook.
+10. **Column-drop migration** — `peer_blob_inventory.blob_hash` drop
+    written, tested, gated behind a post-cutover follow-up release.
+
 ## Why explicit Connection in `fetch_blob_from`
 
 `IrohNode::fetch_blob_from` does NOT use `iroh_blobs::api::downloader::Downloader`.
@@ -127,34 +195,54 @@ connection is the right shape.
 
 ## Graduation gates
 
-Each gate must be green before the next phase picks up.
-
-### Phases 2 → 7 graduation (custom-ALPN harness + gossip + sync + EPR + shard)
+### Phases 2 → 10 (transport scaffolding) — GREEN
 
 - [x] `just build-iroh` clean
-- [x] `just test-iroh` green (26/26 unit + 12/12 integration when
+- [x] `just test-iroh` green (26/26 unit + 19/19 integration when
       serialized via `--test-threads=1`)
-- [x] All seven plane parity tests pass:
+- [x] All ten plane parity tests pass:
       `iroh_blob_roundtrip`, `iroh_node_lifecycle`, `iroh_custom_alpn_echo`,
       `iroh_gossip_parity`, `iroh_sync_parity`, `iroh_epr_parity`,
-      `iroh_shard_parity`
+      `iroh_shard_parity`, `iroh_view_fed_parity`, `iroh_auth_parity`,
+      `iroh_peer_map`
 - [x] `cargo check` (default features, libp2p-only) clean
 - [x] `peer_blob_inventory.blake3_hash` migration applies + reverses
+- [x] `cross_stack_peer_map` migration applies + reverses
 - [ ] CI runs both feature combos at least once on the worktree branch
       (verified locally; CI verification on next push)
 
-### Phases 8–10 (view federation, identity/handshake/trust/reach, discovery)
+### Phase 11 cutover gate (NEXT)
 
-- [ ] view-federation ALPN `/elohim/view-federation/2.0.0`
-- [ ] identity/handshake/trust/reach ALPNs (5 total)
-- [ ] cross-stack peer-id mapping table (`PeerId` ↔ `NodeId`)
-- [ ] iroh discovery (DNS / pkarr / mDNS) wired
+See plan section "Phase 11: Cutover gate" for the full criteria list and
+"Phase 11 cutover prerequisites" above for what's still required: backend
+wiring, HTTP route graduation, seeder rewrite, gossip publish wiring,
+recovery e2e, CI parity soak, alpha-cluster soak, latency stress test,
+rollback drill, column-drop migration.
 
-### Phase 11 cutover gate
+## Code map
 
-See plan section "Phase 11: Cutover gate" for the full criteria list (parity
-soak, alpha-cluster validation, latency parity, recovery e2e, seeder
-graduation, HTTP route graduation, rollback drill, column-drop migration).
+| File | Purpose |
+|---|---|
+| `mod.rs` | Module root + re-exports |
+| `config.rs` | `IrohConfig` (paths, relay/discovery toggles) |
+| `identity.rs` | Persisted `SecretKey` (file-mode 0600) |
+| `endpoint.rs` | `Endpoint` builder (relay + discovery wiring) |
+| `blob_store.rs` | `IrohBlobStore` over iroh-blobs `FsStore` |
+| `node.rs` | `IrohNode` aggregate (Endpoint + Router + store + gossip) |
+| `codec.rs` | Length-prefixed MessagePack + CBOR frame helpers |
+| `parity_harness.rs` | `TwoNodeFixture` for parity tests |
+| `gossip.rs` | `IrohGossip` wrapper + topic-id mapping (Phase 4) |
+| `sync.rs` | Sync ALPN handler + client (Phase 5) |
+| `epr.rs` | EPR + EPR-atom ALPN handlers + clients (Phase 6) |
+| `shard.rs` | Shard ALPN handler + client (Phase 7) |
+| `view_fed.rs` | View-federation ALPN handler + client (Phase 8) |
+| `auth.rs` | Identity-handshake + trust ALPN handlers + clients (Phase 9) |
+| `peer_map.rs` | Cross-stack `PeerId` ↔ `NodeId` bridge (Phase 10) |
+
+Tests under `tests/`: `iroh_blob_roundtrip`, `iroh_node_lifecycle`,
+`iroh_custom_alpn_echo`, `iroh_gossip_parity`, `iroh_sync_parity`,
+`iroh_epr_parity`, `iroh_shard_parity`, `iroh_view_fed_parity`,
+`iroh_auth_parity`, `iroh_peer_map`.
 
 ## See also
 
