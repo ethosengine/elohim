@@ -117,6 +117,41 @@ plane + 4 peer-map tests). Run via `cargo test --features "p2p p2p-iroh"
 --test 'iroh_*' -- --test-threads=1` (or `just test-iroh` which enforces
 serialization for the integration binaries).
 
+**Bench coverage:** 9 head-to-head perf benches (loopback, release; iroh
+ALPN vs libp2p `/elohim/<plane>/1.0.0`). Each runs both REUSE
+(handshake-amortized engine ceiling) and FRESH (handshake per request)
+scenarios; prints two markdown tables; asserts the perf-bump on REUSE.
+Run via `just bench-<plane>` or `just bench-all`. Headline p50 ratios
+(iroh wins / libp2p p50) on a chatty plane sweep — full per-payload
+tables are in each plane's commit body:
+
+| Plane | REUSE p50 win | FRESH p50 win | Commit | Notes |
+|---|---|---|---|---|
+| Blob | 4×–290× | n/a (different bench shape) | `bd0a2f75` | iroh-blobs vs libp2p `BlobProtocol` |
+| Gossip | publish→receive latency parity | n/a | `278c10c5` | iroh-gossip vs libp2p-gossipsub on inventory deltas |
+| Sync | 45×–541× | 19×–50× | `7db8def2a` | small-frame `GetHeads` request/response |
+| EPR | 25×–249× | 19×–34× | `996038198` | MessagePack `Resolve`/`Head` |
+| EPR-atom | 25×–266× | 18×–25× | `1dadb8d01` | CBOR `Fetch`/`Atom` |
+| Shard | 1.2×–128× | 1.3×–25× | `261a7ece7` | Reed-Solomon shard fetch; wins narrow on large payloads |
+| View-fed | 59×–290× | 18×–58× | `3aacceec5` | edge-graph `GetEdges`/`Edges` |
+| Identity-handshake | 207×–300× | 28×–52× | `ac58b6cf2` | binding presentation w/ signature payload sweep |
+| Trust | 73×–306× | 31×–57× | `b9b579c45` | attestation list w/ CID-count sweep |
+
+Pattern: iroh's small-frame multiplex wins by 100×+ on chatty protocols
+in REUSE and stays 20–50× ahead in FRESH (handshake per request, the
+shape `IrohSyncClient::request` ships today). Wins narrow as raw payload
+climbs past ~1 MiB — at that point per-frame overhead stops dominating
+and the comparison becomes throughput-bound.
+
+A coincident structural finding from the bench expansion: every Phase
+5–10 ALPN handler was originally one-stream-per-connection by design.
+Production unaffected (clients always open fresh QUIC connections), but
+the bench's stream-reuse pattern would silently hang. All 6 affected
+handlers (sync, epr, epr-atom, shard, view-fed, identity-handshake,
+trust) now loop on `accept_bi`, breaking on connection-closed error.
+Existing parity tests still green; bench reuse + future Phase 11
+connection pool both work.
+
 ## What is stubbed / deferred (Phase 11 cutover work)
 
 - HTTP routes still read from the legacy SHA256-keyed
