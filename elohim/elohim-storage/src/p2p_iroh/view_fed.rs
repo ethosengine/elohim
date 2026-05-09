@@ -71,9 +71,8 @@ impl ProtocolHandler for IrohViewFederationProtocol {
                 .map_err(io_to_accept)?;
             let res = self.backend.handle(req).await;
             write_frame(&mut send, &res).await.map_err(io_to_accept)?;
-            send.finish().map_err(|e| {
-                AcceptError::from_err(io::Error::new(io::ErrorKind::Other, e.to_string()))
-            })?;
+            send.finish()
+                .map_err(|e| AcceptError::from_err(io::Error::other(e.to_string())))?;
         }
     }
 }

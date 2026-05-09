@@ -82,7 +82,7 @@ where
 
 /// CBOR-bodied variant of [`read_frame`]. Same wire shape (4-byte BE len
 /// + body), different encoding. Used by the EPR-atom plane, which is
-/// CBOR-encoded for parity with the existing libp2p `EprAtomCodec`.
+///   CBOR-encoded for parity with the existing libp2p `EprAtomCodec`.
 pub async fn read_frame_cbor<T, R>(stream: &mut R, max_size: usize) -> io::Result<T>
 where
     T: DeserializeOwned,

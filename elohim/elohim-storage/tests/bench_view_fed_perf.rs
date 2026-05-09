@@ -260,10 +260,12 @@ mod iroh_bench {
         )];
         let fetcher_protocols: Vec<AlpnRegistration> = vec![];
 
-        let provider =
-            IrohNode::start_with_protocols(loopback_config(provider_dir.path()), provider_protocols)
-                .await
-                .expect("provider starts");
+        let provider = IrohNode::start_with_protocols(
+            loopback_config(provider_dir.path()),
+            provider_protocols,
+        )
+        .await
+        .expect("provider starts");
         let fetcher =
             IrohNode::start_with_protocols(loopback_config(fetcher_dir.path()), fetcher_protocols)
                 .await
@@ -338,10 +340,12 @@ mod iroh_bench {
         )];
         let fetcher_protocols: Vec<AlpnRegistration> = vec![];
 
-        let provider =
-            IrohNode::start_with_protocols(loopback_config(provider_dir.path()), provider_protocols)
-                .await
-                .expect("provider starts");
+        let provider = IrohNode::start_with_protocols(
+            loopback_config(provider_dir.path()),
+            provider_protocols,
+        )
+        .await
+        .expect("provider starts");
         let fetcher =
             IrohNode::start_with_protocols(loopback_config(fetcher_dir.path()), fetcher_protocols)
                 .await
@@ -567,7 +571,11 @@ mod libp2p_bench {
             }
         });
 
-        Node { peer_id: local_peer_id, addr: listen_addr, cmd_tx }
+        Node {
+            peer_id: local_peer_id,
+            addr: listen_addr,
+            cmd_tx,
+        }
     }
 
     async fn dial(node: &Node, addr: Multiaddr) {
@@ -736,20 +744,15 @@ async fn compare_view_fed_perf() {
         let request_ids = build_request_ids(total_iters);
 
         // Reuse scenario — engine ceiling.
-        all_results.push(
-            iroh_bench::run_reuse_conn(request_ids.clone(), edges, warmup, measured).await,
-        );
-        all_results.push(
-            libp2p_bench::run_reuse_conn(request_ids.clone(), edges, warmup, measured).await,
-        );
+        all_results
+            .push(iroh_bench::run_reuse_conn(request_ids.clone(), edges, warmup, measured).await);
+        all_results
+            .push(libp2p_bench::run_reuse_conn(request_ids.clone(), edges, warmup, measured).await);
 
         // Fresh scenario — handshake-per-request.
-        all_results.push(
-            iroh_bench::run_fresh_conn(request_ids.clone(), edges, warmup, measured).await,
-        );
-        all_results.push(
-            libp2p_bench::run_fresh_conn(request_ids, edges, warmup, measured).await,
-        );
+        all_results
+            .push(iroh_bench::run_fresh_conn(request_ids.clone(), edges, warmup, measured).await);
+        all_results.push(libp2p_bench::run_fresh_conn(request_ids, edges, warmup, measured).await);
     }
 
     // ----- Print a table per scenario -----

@@ -165,11 +165,7 @@ mod iroh_bench {
     use futures_util::StreamExt;
     use tokio::time::timeout;
 
-    pub async fn run(
-        adds_per_delta: usize,
-        warmup: usize,
-        measured: usize,
-    ) -> BenchResult {
+    pub async fn run(adds_per_delta: usize, warmup: usize, measured: usize) -> BenchResult {
         let provider_dir = tempdir().expect("provider tempdir");
         let fetcher_dir = tempdir().expect("fetcher tempdir");
 
@@ -289,9 +285,7 @@ mod libp2p_bench {
         msg_rx: Option<mpsc::Receiver<Vec<u8>>>,
     }
 
-    fn build_swarm(
-        keypair: identity::Keypair,
-    ) -> libp2p::Swarm<gossipsub::Behaviour> {
+    fn build_swarm(keypair: identity::Keypair) -> libp2p::Swarm<gossipsub::Behaviour> {
         let local_peer_id = PeerId::from(keypair.public());
         let _ = local_peer_id; // silence unused
         let gossipsub_config = gossipsub::ConfigBuilder::default()
@@ -310,11 +304,8 @@ mod libp2p_bench {
             )
             .expect("tcp transport")
             .with_behaviour(|kp| {
-                gossipsub::Behaviour::new(
-                    MessageAuthenticity::Signed(kp.clone()),
-                    gossipsub_config,
-                )
-                .expect("gossipsub behaviour")
+                gossipsub::Behaviour::new(MessageAuthenticity::Signed(kp.clone()), gossipsub_config)
+                    .expect("gossipsub behaviour")
             })
             .expect("behaviour build")
             .with_swarm_config(|c| c.with_idle_connection_timeout(Duration::from_secs(120)))
@@ -328,10 +319,7 @@ mod libp2p_bench {
 
         // Subscribe to topic on this node.
         let topic = IdentTopic::new(TOPIC_NAME);
-        swarm
-            .behaviour_mut()
-            .subscribe(&topic)
-            .expect("subscribe");
+        swarm.behaviour_mut().subscribe(&topic).expect("subscribe");
 
         swarm
             .listen_on("/ip4/127.0.0.1/tcp/0".parse().unwrap())
@@ -419,10 +407,7 @@ mod libp2p_bench {
 
     async fn wait_subscribers(node: &Node) {
         let (tx, rx) = oneshot::channel();
-        node.cmd_tx
-            .send(Cmd::WaitSubscribers(tx))
-            .await
-            .unwrap();
+        node.cmd_tx.send(Cmd::WaitSubscribers(tx)).await.unwrap();
         let _ = tokio::time::timeout(Duration::from_secs(30), rx)
             .await
             .expect("wait_subscribers timed out");

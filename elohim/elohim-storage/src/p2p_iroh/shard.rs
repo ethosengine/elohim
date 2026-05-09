@@ -66,13 +66,11 @@ impl ProtocolHandler for IrohShardProtocol {
                 Ok(streams) => streams,
                 Err(_) => return Ok(()),
             };
-            let req: ShardRequest =
-                read_frame_default(&mut recv).await.map_err(io_to_accept)?;
+            let req: ShardRequest = read_frame_default(&mut recv).await.map_err(io_to_accept)?;
             let res = self.backend.handle(req).await;
             write_frame(&mut send, &res).await.map_err(io_to_accept)?;
-            send.finish().map_err(|e| {
-                AcceptError::from_err(io::Error::new(io::ErrorKind::Other, e.to_string()))
-            })?;
+            send.finish()
+                .map_err(|e| AcceptError::from_err(io::Error::other(e.to_string())))?;
         }
     }
 }

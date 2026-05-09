@@ -318,7 +318,11 @@ mod tests {
 
     static ENV_LOCK: Mutex<()> = Mutex::new(());
 
+    // Env-var serialization mutex held across .await is intentional — the
+    // whole test must own the env-var slot from set through assertion.
+    // See feedback_env_var_test_flakiness memory note.
     #[tokio::test]
+    #[allow(clippy::await_holding_lock)]
     async fn build_local_slice_includes_display_name_from_env() {
         let _guard = ENV_LOCK.lock().unwrap();
         env::set_var("ELOHIM_DISPLAY_NAME", "Matthew's Desktop");
@@ -333,6 +337,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[allow(clippy::await_holding_lock)]
     async fn build_local_slice_returns_zero_storage_when_path_missing() {
         let _guard = ENV_LOCK.lock().unwrap();
         env::set_var("ELOHIM_BLOB_PATH", "/this/path/does/not/exist");
@@ -348,6 +353,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[allow(clippy::await_holding_lock)]
     async fn build_local_slice_returns_hosting_count_zero_for_empty_inventory() {
         let _guard = ENV_LOCK.lock().unwrap();
         env::set_var("ELOHIM_DISPLAY_NAME", "test");
@@ -358,6 +364,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[allow(clippy::await_holding_lock)]
     async fn build_local_slice_includes_all_required_fields() {
         let _guard = ENV_LOCK.lock().unwrap();
         env::set_var("ELOHIM_DISPLAY_NAME", "test");

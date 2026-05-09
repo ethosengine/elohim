@@ -205,10 +205,7 @@ mod iroh_bench {
     /// Drive a single GetHeads request over an existing QUIC connection.
     /// Used by both scenarios — reuse opens the conn once and calls this
     /// in a hot loop, fresh opens a new conn before each call.
-    async fn send_one(
-        conn: &iroh::endpoint::Connection,
-        req: &SyncRequest,
-    ) -> SyncResponse {
+    async fn send_one(conn: &iroh::endpoint::Connection, req: &SyncRequest) -> SyncResponse {
         let (mut send, mut recv) = conn.open_bi().await.expect("open_bi");
         elohim_storage::p2p_iroh::codec::write_frame(&mut send, req)
             .await
@@ -241,7 +238,7 @@ mod iroh_bench {
         let provider_dir = tempdir().expect("provider tempdir");
         let fetcher_dir = tempdir().expect("fetcher tempdir");
 
-        let heads = build_heads(heads_per_response, 0xC0FF_EE);
+        let heads = build_heads(heads_per_response, 0x00C0_FFEE);
         let backend: Arc<dyn SyncBackend> = Arc::new(FixedHeadsBackend { heads });
 
         let provider_protocols: Vec<AlpnRegistration> = vec![(
@@ -250,10 +247,12 @@ mod iroh_bench {
         )];
         let fetcher_protocols: Vec<AlpnRegistration> = vec![];
 
-        let provider =
-            IrohNode::start_with_protocols(loopback_config(provider_dir.path()), provider_protocols)
-                .await
-                .expect("provider starts");
+        let provider = IrohNode::start_with_protocols(
+            loopback_config(provider_dir.path()),
+            provider_protocols,
+        )
+        .await
+        .expect("provider starts");
         let fetcher =
             IrohNode::start_with_protocols(loopback_config(fetcher_dir.path()), fetcher_protocols)
                 .await
@@ -329,7 +328,7 @@ mod iroh_bench {
         let provider_dir = tempdir().expect("provider tempdir");
         let fetcher_dir = tempdir().expect("fetcher tempdir");
 
-        let heads = build_heads(heads_per_response, 0xC0FF_EE);
+        let heads = build_heads(heads_per_response, 0x00C0_FFEE);
         let backend: Arc<dyn SyncBackend> = Arc::new(FixedHeadsBackend { heads });
 
         let provider_protocols: Vec<AlpnRegistration> = vec![(
@@ -338,10 +337,12 @@ mod iroh_bench {
         )];
         let fetcher_protocols: Vec<AlpnRegistration> = vec![];
 
-        let provider =
-            IrohNode::start_with_protocols(loopback_config(provider_dir.path()), provider_protocols)
-                .await
-                .expect("provider starts");
+        let provider = IrohNode::start_with_protocols(
+            loopback_config(provider_dir.path()),
+            provider_protocols,
+        )
+        .await
+        .expect("provider starts");
         let fetcher =
             IrohNode::start_with_protocols(loopback_config(fetcher_dir.path()), fetcher_protocols)
                 .await
@@ -626,7 +627,7 @@ mod libp2p_bench {
             doc_ids.len()
         );
 
-        let heads = build_heads(heads_per_response, 0xC0FF_EE);
+        let heads = build_heads(heads_per_response, 0x00C0_FFEE);
 
         let provider = spawn_node(heads.clone()).await;
         let fetcher = spawn_node(Vec::new()).await;
@@ -688,7 +689,7 @@ mod libp2p_bench {
             doc_ids.len()
         );
 
-        let heads = build_heads(heads_per_response, 0xC0FF_EE);
+        let heads = build_heads(heads_per_response, 0x00C0_FFEE);
 
         let provider = spawn_node(heads.clone()).await;
 

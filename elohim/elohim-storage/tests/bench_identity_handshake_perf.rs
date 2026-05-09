@@ -160,7 +160,7 @@ fn build_signature_b64(raw_len: usize) -> String {
 
 fn base64_encode(input: &[u8]) -> String {
     const TABLE: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-    let mut out = String::with_capacity((input.len() + 2) / 3 * 4);
+    let mut out = String::with_capacity(input.len().div_ceil(3) * 4);
     for chunk in input.chunks(3) {
         let b0 = chunk[0] as u32;
         let b1 = if chunk.len() > 1 { chunk[1] as u32 } else { 0 };
@@ -189,7 +189,9 @@ fn base64_encode(input: &[u8]) -> String {
 fn build_request(
     payload_size: usize,
 ) -> elohim_storage::p2p::identity_handshake::IdentityHandshakeRequest {
-    use elohim_storage::p2p::identity_handshake::{HandshakeBindingPayload, IdentityHandshakeRequest};
+    use elohim_storage::p2p::identity_handshake::{
+        HandshakeBindingPayload, IdentityHandshakeRequest,
+    };
     IdentityHandshakeRequest {
         binding: HandshakeBindingPayload {
             peer_id: "12D3KooWBenchPeerIdentityHandshake".to_string(),
@@ -258,8 +260,7 @@ mod iroh_bench {
         tokio::time::timeout(
             READ_TIMEOUT,
             elohim_storage::p2p_iroh::codec::read_frame::<IdentityHandshakeResponse, _>(
-                &mut recv,
-                REQ_MAX,
+                &mut recv, REQ_MAX,
             ),
         )
         .await
@@ -439,7 +440,7 @@ mod libp2p_bench {
 
     enum Cmd {
         Dial(Multiaddr, oneshot::Sender<Result<(), String>>),
-        Request(PeerId, IdentityHandshakeRequest, RequestTx),
+        Request(PeerId, Box<IdentityHandshakeRequest>, RequestTx),
         WaitConnected(PeerId, oneshot::Sender<()>),
     }
 
@@ -506,7 +507,7 @@ mod libp2p_bench {
                             Cmd::Request(peer, req, reply) => {
                                 let req_id = swarm
                                     .behaviour_mut()
-                                    .send_request(&peer, req);
+                                    .send_request(&peer, *req);
                                 pending.insert(req_id, reply);
                             }
                             Cmd::WaitConnected(peer, reply) => {
@@ -609,7 +610,7 @@ mod libp2p_bench {
     ) -> IdentityHandshakeResponse {
         let (tx, rx) = oneshot::channel();
         node.cmd_tx
-            .send(Cmd::Request(peer, req, tx))
+            .send(Cmd::Request(peer, Box::new(req), tx))
             .await
             .unwrap();
         tokio::time::timeout(READ_TIMEOUT, rx)

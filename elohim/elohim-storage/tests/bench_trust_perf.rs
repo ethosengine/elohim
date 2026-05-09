@@ -144,7 +144,9 @@ fn build_attestation_cids(n: usize) -> Vec<String> {
 
 /// Build a `TrustHandshake` with `attestation_count` attestation CIDs and
 /// a fixed set of membership/relationship/stewardship CIDs (1 each).
-fn build_handshake(attestation_count: usize) -> elohim_storage::p2p::trust_protocol::TrustHandshake {
+fn build_handshake(
+    attestation_count: usize,
+) -> elohim_storage::p2p::trust_protocol::TrustHandshake {
     use elohim_storage::p2p::trust_protocol::TrustHandshake;
     TrustHandshake {
         agent_pubkey: "Ed25519:bench-pubkey-trust-perf".to_string(),
@@ -196,10 +198,7 @@ mod iroh_bench {
     /// Drive a single trust request over an existing QUIC connection.
     /// Used by both scenarios — reuse opens the conn once and calls this
     /// in a hot loop, fresh opens a new conn before each call.
-    async fn send_one(
-        conn: &iroh::endpoint::Connection,
-        req: &TrustHandshake,
-    ) -> TrustResponse {
+    async fn send_one(conn: &iroh::endpoint::Connection, req: &TrustHandshake) -> TrustResponse {
         let (mut send, mut recv) = conn.open_bi().await.expect("open_bi");
         elohim_storage::p2p_iroh::codec::write_frame(&mut send, req)
             .await
@@ -235,10 +234,12 @@ mod iroh_bench {
         )];
         let fetcher_protocols: Vec<AlpnRegistration> = vec![];
 
-        let provider =
-            IrohNode::start_with_protocols(loopback_config(provider_dir.path()), provider_protocols)
-                .await
-                .expect("provider starts");
+        let provider = IrohNode::start_with_protocols(
+            loopback_config(provider_dir.path()),
+            provider_protocols,
+        )
+        .await
+        .expect("provider starts");
         let fetcher =
             IrohNode::start_with_protocols(loopback_config(fetcher_dir.path()), fetcher_protocols)
                 .await
@@ -302,10 +303,12 @@ mod iroh_bench {
         )];
         let fetcher_protocols: Vec<AlpnRegistration> = vec![];
 
-        let provider =
-            IrohNode::start_with_protocols(loopback_config(provider_dir.path()), provider_protocols)
-                .await
-                .expect("provider starts");
+        let provider = IrohNode::start_with_protocols(
+            loopback_config(provider_dir.path()),
+            provider_protocols,
+        )
+        .await
+        .expect("provider starts");
         let fetcher =
             IrohNode::start_with_protocols(loopback_config(fetcher_dir.path()), fetcher_protocols)
                 .await
@@ -552,10 +555,7 @@ mod libp2p_bench {
 
     async fn request(node: &Node, peer: PeerId, req: TrustHandshake) -> TrustResponse {
         let (tx, rx) = oneshot::channel();
-        node.cmd_tx
-            .send(Cmd::Request(peer, req, tx))
-            .await
-            .unwrap();
+        node.cmd_tx.send(Cmd::Request(peer, req, tx)).await.unwrap();
         tokio::time::timeout(READ_TIMEOUT, rx)
             .await
             .expect("libp2p request timed out — peer may be wedged")
@@ -673,16 +673,12 @@ async fn compare_trust_perf() {
 
     for &attestation_count in attestation_counts {
         // Reuse scenario — engine ceiling.
-        all_results
-            .push(iroh_bench::run_reuse_conn(attestation_count, warmup, measured).await);
-        all_results
-            .push(libp2p_bench::run_reuse_conn(attestation_count, warmup, measured).await);
+        all_results.push(iroh_bench::run_reuse_conn(attestation_count, warmup, measured).await);
+        all_results.push(libp2p_bench::run_reuse_conn(attestation_count, warmup, measured).await);
 
         // Fresh scenario — handshake-per-request.
-        all_results
-            .push(iroh_bench::run_fresh_conn(attestation_count, warmup, measured).await);
-        all_results
-            .push(libp2p_bench::run_fresh_conn(attestation_count, warmup, measured).await);
+        all_results.push(iroh_bench::run_fresh_conn(attestation_count, warmup, measured).await);
+        all_results.push(libp2p_bench::run_fresh_conn(attestation_count, warmup, measured).await);
     }
 
     // ----- Print a table per scenario -----
@@ -819,9 +815,7 @@ fn group_by_class<'a>(
         (Option<&'a BenchResult>, Option<&'a BenchResult>),
     > = std::collections::BTreeMap::new();
     for r in all_results.iter().filter(|r| r.scenario == scenario) {
-        let entry = by_class
-            .entry(r.attestation_count)
-            .or_insert((None, None));
+        let entry = by_class.entry(r.attestation_count).or_insert((None, None));
         match r.transport {
             "iroh" => entry.0 = Some(r),
             "libp2p" => entry.1 = Some(r),
