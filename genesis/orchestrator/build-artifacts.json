@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "1",
+  "description": "Canonical filenames for build pipeline artifacts. Cross-language references — Groovy (Jenkinsfiles), TypeScript (seeder), JavaScript (reconciler) — all read from this manifest. Renaming an artifact means updating ONE entry here. Drift detection lives in build-artifacts.test.mjs which asserts every documented key resolves and every consuming reference matches.",
+  "orchestrator": {
+    "predictedBuildGraph": "predicted-build-graph.json",
+    "actualBuildGraph": "actual-build-graph.json",
+    "buildGraphReconciliation": "build-graph-reconciliation.json"
+  },
+  "genesis": {
+    "conductorReadiness": "conductor-readiness.json",
+    "seedResultsConductorIdentities": "seed-results-conductor-identities.json",
+    "seedResultsAgentBindings": "seed-results-agent-bindings.json"
+  }
+}

@@ -866,6 +866,21 @@ spec:
                         env.GIT_COMMIT_SHORT = getGitCommitHash()
                         env.GIT_COMMIT_FULL = getGitCommitHashFull()
 
+                        // Load canonical artifact filenames from the manifest
+                        // and stash in env vars. Downstream `when` blocks +
+                        // steps reference env.PREDICTED_BUILD_GRAPH_FILE etc.
+                        // so a rename in build-artifacts.json propagates
+                        // automatically. Fail loud if the manifest is missing
+                        // or malformed — the rest of the orchestrator's
+                        // reconciliation surface depends on it.
+                        if (!fileExists('genesis/orchestrator/build-artifacts.json')) {
+                            error 'genesis/orchestrator/build-artifacts.json missing — cannot bootstrap artifact names'
+                        }
+                        def artifactNames = readJSON(file: 'genesis/orchestrator/build-artifacts.json')
+                        env.PREDICTED_BUILD_GRAPH_FILE = artifactNames.orchestrator.predictedBuildGraph
+                        env.ACTUAL_BUILD_GRAPH_FILE = artifactNames.orchestrator.actualBuildGraph
+                        env.BUILD_GRAPH_RECONCILIATION_FILE = artifactNames.orchestrator.buildGraphReconciliation
+
                         // Detect build trigger type. "Push event to branch X" is the
                         // shortDescription Jenkins emits for git-push webhook causes from
                         // some plugin configurations (alongside the GitHub/SCM/webhook
@@ -1210,7 +1225,7 @@ spec:
                             genesisAfterLevels: hasGenesis,
                             analysis: analysis,
                         ]
-                        writeJSON(file: 'predicted-build-graph.json', json: predictedGraph, pretty: 2)
+                        writeJSON(file: env.PREDICTED_BUILD_GRAPH_FILE, json: predictedGraph, pretty: 2)
 
                         // Set build description
                         if (graphPipelines.isEmpty() && mode == 'auto') {
@@ -1246,11 +1261,11 @@ spec:
                         // watchers (the Ralph Wiggum loop) can grab the artifact
                         // immediately after this stage completes — they do NOT
                         // have to wait for any build to finish.
-                        if (!fileExists('predicted-build-graph.json')) {
-                            error 'predicted-build-graph.json missing — Determine Build Plan should have written it'
+                        if (!fileExists(env.PREDICTED_BUILD_GRAPH_FILE)) {
+                            error "${env.PREDICTED_BUILD_GRAPH_FILE} missing — Determine Build Plan should have written it"
                         }
-                        def predicted = readJSON(file: 'predicted-build-graph.json')
-                        archiveArtifacts(artifacts: 'predicted-build-graph.json', fingerprint: true)
+                        def predicted = readJSON(file: env.PREDICTED_BUILD_GRAPH_FILE)
+                        archiveArtifacts(artifacts: env.PREDICTED_BUILD_GRAPH_FILE, fingerprint: true)
 
                         def levelDesc = (predicted.levels ?: []).collect { lvl ->
                             lvl.size() > 1 ? "[${lvl.join(' + ')}]" : lvl[0]
@@ -1265,7 +1280,7 @@ spec:
   Mode:      ${predicted.mode}
   Pipelines: ${predicted.pipelines.size() > 0 ? predicted.pipelines.join(', ') : '(none)'}
   Plan:      ${levelDesc ?: '(no builds)'}
-  Artifact:  ${env.BUILD_URL}artifact/predicted-build-graph.json
+  Artifact:  ${env.BUILD_URL}artifact/${env.PREDICTED_BUILD_GRAPH_FILE}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 """
                     }
@@ -1482,7 +1497,7 @@ spec:
                             results: enrichedResults,
                             abortedBeforeStart: abortedBeforeStart,
                         ]
-                        writeJSON(file: 'actual-build-graph.json', json: actualGraph, pretty: 2)
+                        writeJSON(file: env.ACTUAL_BUILD_GRAPH_FILE, json: actualGraph, pretty: 2)
                         // Archive happens in the dedicated Post Actual Build Graph
                         // stage below — keeps Execute Builds focused on dispatch.
 
@@ -1511,7 +1526,7 @@ spec:
                     // Skip when nothing dispatched (Execute Builds didn't run, no
                     // file exists). The post.always backstop handles cascade-aborted
                     // runs where Execute Builds threw before its writeJSON call.
-                    fileExists('actual-build-graph.json')
+                    fileExists(env.ACTUAL_BUILD_GRAPH_FILE ?: 'actual-build-graph.json')
                 }
             }
             steps {
@@ -1522,8 +1537,8 @@ spec:
                         // to verify it, archive it, and print a summary that
                         // mirrors Post Predicted Build Graph. Symmetric stages
                         // give external watchers two clean artifacts to diff.
-                        def actual = readJSON(file: 'actual-build-graph.json')
-                        archiveArtifacts(artifacts: 'actual-build-graph.json', fingerprint: true)
+                        def actual = readJSON(file: env.ACTUAL_BUILD_GRAPH_FILE)
+                        archiveArtifacts(artifacts: env.ACTUAL_BUILD_GRAPH_FILE, fingerprint: true)
 
                         def resultLine = (actual.executionOrder ?: []).collect { name ->
                             def r = actual.results[name]
@@ -1537,7 +1552,7 @@ spec:
   Commit:           ${(actual.commitSha ?: '').take(8)}
   Results:          ${resultLine ?: '(no builds dispatched)'}
   Aborted-pre-start: ${(actual.abortedBeforeStart ?: []).join(', ') ?: '(none)'}
-  Artifact:         ${env.BUILD_URL}artifact/actual-build-graph.json
+  Artifact:         ${env.BUILD_URL}artifact/${env.ACTUAL_BUILD_GRAPH_FILE}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 """
                     }
@@ -1552,7 +1567,7 @@ spec:
                     // runs that never reached Post Actual Build Graph are picked
                     // up by the post.always backstop, which synthesizes the actual
                     // artifact from env.BUILD_RESULTS and runs the reconciler then.
-                    fileExists('predicted-build-graph.json') && fileExists('actual-build-graph.json')
+                    fileExists(env.PREDICTED_BUILD_GRAPH_FILE ?: 'predicted-build-graph.json') && fileExists(env.ACTUAL_BUILD_GRAPH_FILE ?: 'actual-build-graph.json')
                 }
             }
             steps {
@@ -1569,15 +1584,13 @@ spec:
                         // the orchestrator UNSTABLE on any disconnect without
                         // aborting the rest of the pipeline.
                         def reconcileExit = sh(
-                            script: 'node genesis/orchestrator/reconcile-build-graph.mjs ' +
-                                'predicted-build-graph.json actual-build-graph.json ' +
-                                'build-graph-reconciliation.json',
+                            script: "node genesis/orchestrator/reconcile-build-graph.mjs ${env.PREDICTED_BUILD_GRAPH_FILE} ${env.ACTUAL_BUILD_GRAPH_FILE} ${env.BUILD_GRAPH_RECONCILIATION_FILE}",
                             returnStatus: true,
                         )
-                        archiveArtifacts(artifacts: 'build-graph-reconciliation.json', fingerprint: true)
+                        archiveArtifacts(artifacts: env.BUILD_GRAPH_RECONCILIATION_FILE, fingerprint: true)
 
                         if (reconcileExit != 0) {
-                            unstable('Build graph drift detected — see build-graph-reconciliation.json')
+                            unstable("Build graph drift detected — see ${env.BUILD_GRAPH_RECONCILIATION_FILE}")
                         } else {
                             echo '✅ Build graph reconciled cleanly (predicted == actual)'
                         }
@@ -1870,9 +1883,16 @@ ${healthyCount < postflight.size() ? '  ⚠️  ATTENTION: Some services unhealt
                 //
                 // Pure Groovy + Jenkins workflow primitives only — sh is
                 // unavailable on the controller agent in many K8s setups.
-                if (fileExists('predicted-build-graph.json')) {
-                    if (!fileExists('actual-build-graph.json')) {
-                        def predicted = readJSON(file: 'predicted-build-graph.json')
+                // env vars set by Checkout stage from build-artifacts.json.
+                // Fall back to literal filenames if env vars are missing
+                // (e.g. Checkout never reached this run).
+                def predictedFile = env.PREDICTED_BUILD_GRAPH_FILE ?: 'predicted-build-graph.json'
+                def actualFile = env.ACTUAL_BUILD_GRAPH_FILE ?: 'actual-build-graph.json'
+                def reconciliationFile = env.BUILD_GRAPH_RECONCILIATION_FILE ?: 'build-graph-reconciliation.json'
+
+                if (fileExists(predictedFile)) {
+                    if (!fileExists(actualFile)) {
+                        def predicted = readJSON(file: predictedFile)
                         def predictedPipelines = predicted.pipelines ?: []
 
                         // env.BUILD_RESULTS is updated inside Execute Builds
@@ -1895,22 +1915,22 @@ ${healthyCount < postflight.size() ? '  ⚠️  ATTENTION: Some services unhealt
                             abortedBeforeStart: abortedBeforeStart,
                             synthesizedByBackstop: true
                         ]
-                        writeJSON file: 'actual-build-graph.json', json: synthesized, pretty: 2
-                        archiveArtifacts artifacts: 'actual-build-graph.json', allowEmptyArchive: true
-                        echo "[backstop] Synthesized actual-build-graph.json from env.BUILD_RESULTS — ${buildResults.size()} pipelines completed, ${abortedBeforeStart.size()} aborted before start"
+                        writeJSON file: actualFile, json: synthesized, pretty: 2
+                        archiveArtifacts artifacts: actualFile, allowEmptyArchive: true
+                        echo "[backstop] Synthesized ${actualFile} from env.BUILD_RESULTS — ${buildResults.size()} pipelines completed, ${abortedBeforeStart.size()} aborted before start"
                     }
 
-                    if (!fileExists('build-graph-reconciliation.json')) {
+                    if (!fileExists(reconciliationFile)) {
                         echo '[backstop] No reconciliation artifact yet — Reconcile Build Graph stage was skipped (cascade abort path).'
                         echo '[backstop] Both predicted and actual artifacts are archived. To reconcile externally:'
-                        echo '[backstop]   curl -O ${BUILD_URL}artifact/predicted-build-graph.json'
-                        echo '[backstop]   curl -O ${BUILD_URL}artifact/actual-build-graph.json'
-                        echo '[backstop]   node genesis/orchestrator/reconcile-build-graph.mjs predicted-build-graph.json actual-build-graph.json out.json'
+                        echo "[backstop]   curl -O \${BUILD_URL}artifact/${predictedFile}"
+                        echo "[backstop]   curl -O \${BUILD_URL}artifact/${actualFile}"
+                        echo "[backstop]   node genesis/orchestrator/reconcile-build-graph.mjs ${predictedFile} ${actualFile} out.json"
                     } else {
                         echo '[backstop] Reconciliation artifact already exists — happy-path Reconcile Build Graph stage ran.'
                     }
                 } else {
-                    echo '[backstop] No predicted-build-graph.json — Determine Build Plan did not complete; skipping reconciliation backstop'
+                    echo "[backstop] No ${predictedFile} — Determine Build Plan did not complete; skipping reconciliation backstop"
                 }
 
                 // Checkpoint 3 (last word): archive the baseline one final time.

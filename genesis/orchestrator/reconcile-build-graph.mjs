@@ -13,6 +13,8 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
+import { ORCHESTRATOR } from './build-artifacts.mjs';
+
 // ── Reconciliation primitives ──────────────────────────────────────
 
 const SUCCESSFUL_RESULTS = new Set(['SUCCESS', 'UNSTABLE']);
@@ -179,9 +181,15 @@ const isMain = import.meta.url === `file://${process.argv[1]}` ||
                import.meta.url === `file://${resolve(process.argv[1])}`;
 
 if (isMain) {
-  const [predictedPath, actualPath, outPath] = process.argv.slice(2);
+  // Default to canonical filenames from build-artifacts.json so the CLI
+  // works as `node reconcile-build-graph.mjs` from a workspace where
+  // those artifacts already exist. Args still override for explicit use.
+  const [predictedArg, actualArg, outArg] = process.argv.slice(2);
+  const predictedPath = predictedArg || ORCHESTRATOR.predictedBuildGraph;
+  const actualPath = actualArg || ORCHESTRATOR.actualBuildGraph;
+  const outPath = outArg || ORCHESTRATOR.buildGraphReconciliation;
   if (!predictedPath || !actualPath || !outPath) {
-    console.error('usage: node reconcile-build-graph.mjs <predicted.json> <actual.json> <out.json>');
+    console.error('usage: node reconcile-build-graph.mjs [<predicted.json> <actual.json> <out.json>]');
     process.exit(2);
   }
 

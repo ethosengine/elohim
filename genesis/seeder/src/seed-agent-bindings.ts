@@ -52,6 +52,16 @@ import { fileURLToPath } from 'node:url';
 import { AdminWebsocket, AppWebsocket } from '@holochain/client';
 import { deterministicPeerId, type Archetype } from './peer-id.js';
 
+// Canonical artifact filename from build-artifacts.json — single source of
+// truth across Groovy + TypeScript + JS. See seed-conductor-identities.ts
+// for the same pattern; both seeders resolve through the manifest.
+const ARTIFACTS_MANIFEST_PATH = resolve(
+  dirname(fileURLToPath(import.meta.url)),
+  '..', '..', 'orchestrator', 'build-artifacts.json',
+);
+const ARTIFACTS = JSON.parse(readFileSync(ARTIFACTS_MANIFEST_PATH, 'utf8'));
+const SEED_RESULTS_FILE: string = ARTIFACTS.genesis.seedResultsAgentBindings;
+
 // =============================================================================
 // Types — match seed-conductor-identities.ts (no shared types module exists)
 // =============================================================================
@@ -451,9 +461,9 @@ export async function main(): Promise<void> {
     })),
   };
   try {
-    writeFileSync('seed-results-agent-bindings.json', JSON.stringify(report, null, 2));
+    writeFileSync(SEED_RESULTS_FILE, JSON.stringify(report, null, 2));
   } catch (e) {
-    console.error('WARN: could not write seed-results-agent-bindings.json:', e);
+    console.error(`WARN: could not write ${SEED_RESULTS_FILE}:`, e);
   }
 
   if (failed > 0) {

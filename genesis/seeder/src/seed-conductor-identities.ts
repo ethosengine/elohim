@@ -37,6 +37,16 @@ import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { AdminWebsocket, AppWebsocket, type AppInfo } from '@holochain/client';
 
+// Canonical artifact filename from build-artifacts.json — single source of
+// truth across Groovy + TypeScript + JS. Resolved once at module load so
+// the writeFileSync below cannot drift from what genesis/Jenkinsfile reads.
+const ARTIFACTS_MANIFEST_PATH = resolve(
+  dirname(fileURLToPath(import.meta.url)),
+  '..', '..', 'orchestrator', 'build-artifacts.json',
+);
+const ARTIFACTS = JSON.parse(readFileSync(ARTIFACTS_MANIFEST_PATH, 'utf8'));
+const SEED_RESULTS_FILE: string = ARTIFACTS.genesis.seedResultsConductorIdentities;
+
 // =============================================================================
 // Types
 // =============================================================================
@@ -438,9 +448,9 @@ async function main(): Promise<void> {
     })),
   };
   try {
-    writeFileSync('seed-results-conductor-identities.json', JSON.stringify(report, null, 2));
+    writeFileSync(SEED_RESULTS_FILE, JSON.stringify(report, null, 2));
   } catch (e) {
-    console.error('WARN: could not write seed-results-conductor-identities.json:', e);
+    console.error(`WARN: could not write ${SEED_RESULTS_FILE}:`, e);
   }
 
   if (failed > 0) {

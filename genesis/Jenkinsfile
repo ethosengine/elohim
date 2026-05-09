@@ -227,8 +227,13 @@ def probeConductorReadiness(String urlsString, String stageLabel) {
         ready: readyDetails,
         unready: unreadyDetails,
     ]
-    writeJSON(file: 'conductor-readiness.json', json: report, pretty: 2)
-    archiveArtifacts(artifacts: 'conductor-readiness.json', allowEmptyArchive: true, fingerprint: true)
+    // Filename comes from build-artifacts.json via env var set in Checkout.
+    // Elvis fallback handles edge cases where Checkout's bootstrap was skipped
+    // (e.g. helper invoked from a probe-only mode). Drift detection lives in
+    // genesis/orchestrator/build-artifacts.test.mjs.
+    def conductorReadinessFile = env.CONDUCTOR_READINESS_FILE ?: 'conductor-readiness.json'
+    writeJSON(file: conductorReadinessFile, json: report, pretty: 2)
+    archiveArtifacts(artifacts: conductorReadinessFile, allowEmptyArchive: true, fingerprint: true)
 
     return [
         ready: readyDetails.collect { it.url },
@@ -379,6 +384,20 @@ Seed Data: ${params.SEED_DATA}
 Seed IDs: ${params.SEED_IDS ?: '(all)'}
 ═══════════════════════════════════════════════════════════
                         """
+
+                        // Bootstrap canonical artifact filenames from the
+                        // shared manifest (single source of truth across
+                        // Groovy + TypeScript + JS). Downstream stages and
+                        // the seeder TS scripts both read from the same
+                        // build-artifacts.json so a rename propagates to
+                        // every consumer automatically.
+                        if (!fileExists('genesis/orchestrator/build-artifacts.json')) {
+                            error 'genesis/orchestrator/build-artifacts.json missing — cannot bootstrap artifact names'
+                        }
+                        def artifactNames = readJSON(file: 'genesis/orchestrator/build-artifacts.json')
+                        env.CONDUCTOR_READINESS_FILE = artifactNames.genesis.conductorReadiness
+                        env.SEED_RESULTS_CONDUCTOR_IDENTITIES_FILE = artifactNames.genesis.seedResultsConductorIdentities
+                        env.SEED_RESULTS_AGENT_BINDINGS_FILE = artifactNames.genesis.seedResultsAgentBindings
                     }
                 }
             }
@@ -1113,18 +1132,20 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                         // by the seeder regardless of exit code (the script
                         // writes it before exiting). Read it to enrich the
                         // unstable() message with concrete counts.
-                        if (fileExists('genesis/seeder/seed-results-conductor-identities.json')) {
+                        def seedResultsName = env.SEED_RESULTS_CONDUCTOR_IDENTITIES_FILE ?: 'seed-results-conductor-identities.json'
+                        def seedResultsPath = "genesis/seeder/${seedResultsName}"
+                        if (fileExists(seedResultsPath)) {
                             archiveArtifacts(
-                                artifacts: 'genesis/seeder/seed-results-conductor-identities.json',
+                                artifacts: seedResultsPath,
                                 fingerprint: true,
                                 allowEmptyArchive: true,
                             )
-                            def seedReport = readJSON(file: 'genesis/seeder/seed-results-conductor-identities.json')
+                            def seedReport = readJSON(file: seedResultsPath)
                             def c = seedReport.counts ?: [:]
                             if (seedExit == 2) {
-                                unstable("Seed Conductor Identities partial: ${c.succeeded ?: 0} succeeded (${c.created ?: 0} created + ${c.exists ?: 0} exists), ${c.failed ?: 0} failed (see seed-results-conductor-identities.json)")
+                                unstable("Seed Conductor Identities partial: ${c.succeeded ?: 0} succeeded (${c.created ?: 0} created + ${c.exists ?: 0} exists), ${c.failed ?: 0} failed (see ${seedResultsName})")
                             } else if (seedExit == 1) {
-                                unstable("Seed Conductor Identities total failure: 0 of ${c.total ?: 0} humans seeded (see seed-results-conductor-identities.json)")
+                                unstable("Seed Conductor Identities total failure: 0 of ${c.total ?: 0} humans seeded (see ${seedResultsName})")
                             } else if (seedExit != 0) {
                                 unstable("Seed Conductor Identities exited ${seedExit} (unexpected — see console)")
                             }
@@ -1189,18 +1210,20 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                             )
                         }
 
-                        if (fileExists('genesis/seeder/seed-results-agent-bindings.json')) {
+                        def seedResultsName = env.SEED_RESULTS_AGENT_BINDINGS_FILE ?: 'seed-results-agent-bindings.json'
+                        def seedResultsPath = "genesis/seeder/${seedResultsName}"
+                        if (fileExists(seedResultsPath)) {
                             archiveArtifacts(
-                                artifacts: 'genesis/seeder/seed-results-agent-bindings.json',
+                                artifacts: seedResultsPath,
                                 fingerprint: true,
                                 allowEmptyArchive: true,
                             )
-                            def seedReport = readJSON(file: 'genesis/seeder/seed-results-agent-bindings.json')
+                            def seedReport = readJSON(file: seedResultsPath)
                             def c = seedReport.counts ?: [:]
                             if (seedExit == 2) {
-                                unstable("Seed Agent Peer Bindings partial: ${c.succeeded ?: 0} humans succeeded (${c.totalCreated ?: 0} bindings written), ${c.failed ?: 0} failed (see seed-results-agent-bindings.json)")
+                                unstable("Seed Agent Peer Bindings partial: ${c.succeeded ?: 0} humans succeeded (${c.totalCreated ?: 0} bindings written), ${c.failed ?: 0} failed (see ${seedResultsName})")
                             } else if (seedExit == 1) {
-                                unstable("Seed Agent Peer Bindings total failure: 0 of ${c.total ?: 0} humans seeded (see seed-results-agent-bindings.json)")
+                                unstable("Seed Agent Peer Bindings total failure: 0 of ${c.total ?: 0} humans seeded (see ${seedResultsName})")
                             } else if (seedExit != 0) {
                                 unstable("Seed Agent Peer Bindings exited ${seedExit} (unexpected — see console)")
                             }
