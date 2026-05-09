@@ -165,6 +165,12 @@ pub struct HttpServer {
     /// Operator-configured elohim capability profile (Category C — operational, not DHT-derived).
     /// Loaded once at startup from ELOHIM_CAPABILITY_CONFIG_FILE. None for storage/relay-only nodes.
     elohim_capability: Option<crate::views::ElohimCapabilityProfile>,
+    /// SSR render capability profile fetched from DOORWAY_CAPABILITY_URL at startup.
+    /// None when env var is unset or the fetch failed — peer-status shows null render_capability.
+    render_capability: Option<crate::views::RenderCapabilityProfile>,
+    /// Registered capability extensions (Tier-2 advertised capabilities beyond elohim + render).
+    /// None until the capability registry is populated at startup (Task 9).
+    extensions: Option<crate::views::CapabilityExtensions>,
     /// Manifest registry for projector status endpoint.
     /// Wired at startup via `with_manifest_registry`. None = endpoint returns empty cursors.
     manifest_registry: Option<Arc<crate::projector::ManifestRegistry>>,
@@ -270,6 +276,8 @@ impl HttpServer {
             request_semaphore: Arc::new(Semaphore::new(MAX_CONCURRENT_REQUESTS)),
             embedded_conductor: false,
             elohim_capability: None,
+            render_capability: None,
+            extensions: None,
             manifest_registry: None,
             signing_client: None,
             write_through_state: None,
@@ -292,6 +300,29 @@ impl HttpServer {
         capability: Option<crate::views::ElohimCapabilityProfile>,
     ) -> Self {
         self.elohim_capability = capability;
+        self
+    }
+
+    /// Set the SSR render capability profile fetched from DOORWAY_CAPABILITY_URL.
+    ///
+    /// Call with the result of `load_render_capability_from_url().await` at startup.
+    /// None means this node has no render capability advertised (fetch failed or env var unset).
+    pub fn with_render_capability(
+        mut self,
+        capability: Option<crate::views::RenderCapabilityProfile>,
+    ) -> Self {
+        self.render_capability = capability;
+        self
+    }
+
+    /// Set the Tier-2 capability extensions map.
+    ///
+    /// None until the capability registry is populated (Task 9).
+    pub fn with_extensions(
+        mut self,
+        extensions: Option<crate::views::CapabilityExtensions>,
+    ) -> Self {
+        self.extensions = extensions;
         self
     }
 
@@ -867,6 +898,9 @@ impl HttpServer {
                         local_peer_id,
                         self.fan_out_ctx.clone(),
                         p2p_handle,
+                        self.elohim_capability.clone(),
+                        self.render_capability.clone(),
+                        self.extensions.clone(),
                     )
                     .await
                 } else {

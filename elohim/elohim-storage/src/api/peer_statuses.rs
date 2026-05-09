@@ -12,7 +12,10 @@ use hyper::{body::Incoming, Method, Request, Response};
 use crate::db::{peer_statuses as db, AppContext, DbPool};
 use crate::error::StorageError;
 use crate::services::response;
-use crate::views::PeerStatusView;
+use crate::views::{
+    build_peer_status_view, CapabilityExtensions, ElohimCapabilityProfile, PeerStatusView,
+    RenderCapabilityProfile,
+};
 
 use super::get_conn;
 
@@ -23,12 +26,17 @@ pub async fn handle(
     resource_path: &str,
     pool: &DbPool,
     _ctx: &AppContext,
+    elohim_capability: Option<&ElohimCapabilityProfile>,
+    render_capability: Option<&RenderCapabilityProfile>,
+    extensions: Option<&CapabilityExtensions>,
 ) -> Result<Response<Full<Bytes>>, StorageError> {
     let path = resource_path.trim_start_matches('/');
 
     Ok(match (&method, path) {
         // GET /api/v1/peer-statuses  (path is "" after stripping the prefix)
-        (&Method::GET, "") => handle_list(req, pool).await,
+        (&Method::GET, "") => {
+            handle_list(req, pool, elohim_capability, render_capability, extensions).await
+        }
         _ => response::not_found(&format!(
             "Unknown peer-statuses route: {} /api/v1/peer-statuses/{}",
             method, path
@@ -36,7 +44,13 @@ pub async fn handle(
     })
 }
 
-async fn handle_list(req: Request<Incoming>, pool: &DbPool) -> Response<Full<Bytes>> {
+async fn handle_list(
+    req: Request<Incoming>,
+    pool: &DbPool,
+    elohim_capability: Option<&ElohimCapabilityProfile>,
+    render_capability: Option<&RenderCapabilityProfile>,
+    extensions: Option<&CapabilityExtensions>,
+) -> Response<Full<Bytes>> {
     // Parse optional ?householdId= query param
     let household = req.uri().query().and_then(|q| {
         url::form_urlencoded::parse(q.as_bytes())
@@ -56,7 +70,12 @@ async fn handle_list(req: Request<Incoming>, pool: &DbPool) -> Response<Full<Byt
 
     match rows {
         Ok(rs) => {
-            let views: Vec<PeerStatusView> = rs.into_iter().map(Into::into).collect();
+            let views: Vec<PeerStatusView> = rs
+                .into_iter()
+                .map(|row| {
+                    build_peer_status_view(row, elohim_capability, render_capability, extensions)
+                })
+                .collect();
             response::ok(&views)
         }
         Err(e) => response::internal_error(&format!("{e}")),
