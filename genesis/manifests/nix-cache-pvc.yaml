@@ -51,3 +51,38 @@ spec:
   resources:
     requests:
       storage: 20Gi
+---
+# Sweettest target/ persistence for DNA Integration tests
+#
+# Without this PVC, every elohim-holochain build recompiles the sweettest
+# crate from scratch — observed as 47m 48s of "Compiling …" output in
+# elohim-holochain/dev/1210. The sweettest target tree (compiled native
+# rust artifacts, not wasm32) lives outside cargo-cache because cargo-cache
+# only persists the registry index + downloaded source tarballs.
+#
+# Setting CARGO_TARGET_DIR=/cargo-target in the Jenkinsfile environment
+# block routes both DNA WASM builds AND the native sweettest build into
+# this volume; cargo manages the per-target subdirectory layout.
+#
+# Storage class: openebs-jiva-csi-default (same pattern as nix-cache + cargo-cache)
+#   - Backing data on hp-micro10 storage node
+#   - Network-mounted into builder pods on operations / edge nodes
+#
+# Size: 20Gi
+#   - Sweettest target/release: ~2-4GB
+#   - Multiple Cargo.lock states across active branches: ~10-15GB buffer
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: sweettest-target-cache-holochain
+  namespace: ethosengine
+  labels:
+    app: holochain-build
+    purpose: sweettest-target-cache
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: openebs-jiva-csi-default
+  resources:
+    requests:
+      storage: 20Gi

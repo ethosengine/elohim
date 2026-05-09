@@ -87,6 +87,9 @@ spec:
     - name: cargo-cache
       persistentVolumeClaim:
         claimName: cargo-cache-holochain
+    - name: sweettest-target-cache
+      persistentVolumeClaim:
+        claimName: sweettest-target-cache-holochain
   containers:
     - name: builder
       image: harbor.ethosengine.com/ethosengine/ci-builder-nix:latest
@@ -104,6 +107,19 @@ spec:
       volumeMounts:
         - name: cargo-cache
           mountPath: /root/.cargo
+        # Mount the nix-store PVC so the holochain toolchain (rustc, cargo,
+        # holochain, lair-keystore, etc.) persists across builds instead of
+        # being re-downloaded from cachix every run. The PVC was previously
+        # declared in volumes but never mounted into the builder container.
+        - name: nix-store
+          mountPath: /nix/store
+        # Persist the cargo target/ tree across builds. Without this mount,
+        # the sweettest crate recompiles from scratch every run (47m 48s
+        # observed in elohim-holochain/dev/1210). CARGO_TARGET_DIR below
+        # routes both DNA WASM builds and the native sweettest build into
+        # this volume; cargo handles the per-target subdirectory layout.
+        - name: sweettest-target-cache
+          mountPath: /cargo-target
 '''
         }
     }
@@ -111,6 +127,12 @@ spec:
     environment {
         BRANCH_NAME = "${env.BRANCH_NAME ?: 'main'}"
         PATH = "/nix/var/nix/profiles/default/bin:${env.PATH}"
+        // Route compiled cargo artefacts (both DNA WASM and the native
+        // sweettest crate) into the sweettest-target-cache PVC mounted at
+        // /cargo-target. Cargo manages target subdirs per profile/triple,
+        // so a single CARGO_TARGET_DIR is correct for both build kinds.
+        // Eliminates the 47m+ cold compile observed in build #1210.
+        CARGO_TARGET_DIR = "/cargo-target"
     }
 
     parameters {
