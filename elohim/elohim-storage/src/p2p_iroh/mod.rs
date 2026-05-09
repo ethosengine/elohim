@@ -17,6 +17,7 @@
 //! schemas.
 
 pub mod auth;
+pub mod auth_backends;
 mod blob_store;
 pub mod codec;
 mod config;
@@ -52,6 +53,7 @@ pub use identity::load_or_generate as load_or_generate_secret_key;
 pub use node::{AlpnRegistration, IrohNode};
 pub use shard::{IrohShardClient, IrohShardProtocol, ShardBackend, SHARD_ALPN};
 pub use sync::{IrohSyncClient, IrohSyncProtocol, SyncBackend, SYNC_ALPN};
+pub use auth_backends::{IdentityHandshakeServiceBackend, TrustServiceBackend};
 pub use epr_atom_backend::EprAtomServiceBackend;
 pub use epr_backend::EprServiceBackend;
 pub use shard_backend::ShardServiceBackend;

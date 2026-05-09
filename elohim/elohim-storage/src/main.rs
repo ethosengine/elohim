@@ -856,16 +856,20 @@ async fn async_main(
     {
         use elohim_storage::epr_atom_service::EprAtomService;
         use elohim_storage::epr_service::EprService;
+        use elohim_storage::identity_handshake_service::IdentityHandshakeService;
         use elohim_storage::p2p::dedup::DedupLru;
         use elohim_storage::p2p::trust_cache::PeerTrustCache;
         use elohim_storage::p2p_iroh::{
-            AlpnRegistration, EprAtomServiceBackend, EprServiceBackend, IrohConfig,
-            IrohEprAtomProtocol, IrohEprProtocol, IrohNode, IrohShardProtocol, IrohSyncProtocol,
-            IrohViewFederationProtocol, ShardServiceBackend, SyncManagerBackend,
-            ViewFedServiceBackend, EPR_ALPN, EPR_ATOM_ALPN, SHARD_ALPN, SYNC_ALPN, VIEW_FED_ALPN,
+            AlpnRegistration, EprAtomServiceBackend, EprServiceBackend,
+            IdentityHandshakeServiceBackend, IrohConfig, IrohEprAtomProtocol, IrohEprProtocol,
+            IrohIdentityHandshakeProtocol, IrohNode, IrohShardProtocol, IrohSyncProtocol,
+            IrohTrustProtocol, IrohViewFederationProtocol, ShardServiceBackend, SyncManagerBackend,
+            TrustServiceBackend, ViewFedServiceBackend, EPR_ALPN, EPR_ATOM_ALPN,
+            IDENTITY_HANDSHAKE_ALPN, SHARD_ALPN, SYNC_ALPN, TRUST_ALPN, VIEW_FED_ALPN,
         };
         use elohim_storage::shard_service::ShardService;
         use elohim_storage::sync::{DocStore, StreamTracker, SyncManager};
+        use elohim_storage::trust_service::TrustService;
         use elohim_storage::view_fed_service::{libp2p_keypair_from_ed25519_bytes, ViewFedService};
 
         let iroh_cfg = IrohConfig::from_storage_dir(&config.storage_dir);
@@ -995,9 +999,39 @@ async fn async_main(
         let view_fed_backend: Arc<dyn elohim_storage::p2p_iroh::ViewFederationBackend> =
             Arc::new(ViewFedServiceBackend::new(
                 view_fed_service,
-                iroh_node_id_str,
+                iroh_node_id_str.clone(),
             ));
         let view_fed_handler = IrohViewFederationProtocol::new(view_fed_backend);
+
+        // Identity-handshake backend — transport-neutral service
+        // sharing the libp2p path's verify+persist sequence. Per spec
+        // dual-stack permanent; integrity via DHT-anchored signed
+        // wire frames (Track 1), not transport-level security.
+        let identity_handshake_service = Arc::new(IdentityHandshakeService::new(
+            if args.enable_content_db {
+                db_pool.clone()
+            } else {
+                None
+            },
+        ));
+        let identity_handshake_backend: Arc<
+            dyn elohim_storage::p2p_iroh::IdentityHandshakeBackend,
+        > = Arc::new(IdentityHandshakeServiceBackend::new(
+            identity_handshake_service,
+            iroh_node_id_str.clone(),
+        ));
+        let identity_handshake_handler =
+            IrohIdentityHandshakeProtocol::new(identity_handshake_backend);
+
+        // Trust backend — transport-neutral response builder. Cache
+        // insertion (libp2p-keyed peer_trust_cache) is intentionally
+        // skipped in iroh mode pending Phase 12 cross-stack peer-map
+        // graduation; iroh-mode reach-auth fast path falls through to
+        // slow-path DB lookups (correct, just not ambient-cached).
+        let trust_service = Arc::new(TrustService::new());
+        let trust_backend: Arc<dyn elohim_storage::p2p_iroh::TrustBackend> =
+            Arc::new(TrustServiceBackend::new(trust_service));
+        let trust_handler = IrohTrustProtocol::new(trust_backend);
 
         let extras: Vec<AlpnRegistration> = vec![
             (SYNC_ALPN.to_vec(), Box::new(sync_handler)),
@@ -1005,19 +1039,25 @@ async fn async_main(
             (EPR_ATOM_ALPN.to_vec(), Box::new(epr_atom_handler)),
             (SHARD_ALPN.to_vec(), Box::new(shard_handler)),
             (VIEW_FED_ALPN.to_vec(), Box::new(view_fed_handler)),
+            (
+                IDENTITY_HANDSHAKE_ALPN.to_vec(),
+                Box::new(identity_handshake_handler),
+            ),
+            (TRUST_ALPN.to_vec(), Box::new(trust_handler)),
         ];
 
         match IrohNode::start_with_protocols(iroh_cfg, extras).await {
             Ok(node) => {
                 info!(
                     "Iroh parallel-stack node started (Phase 11 — sync + EPR + EPR-atom \
-                     + shard + view-fed backends wired)"
+                     + shard + view-fed + identity-handshake + trust backends wired)"
                 );
                 info!("  Node ID: {}", node.node_id());
                 info!(
                     "  ALPNs: iroh-blobs, iroh-gossip, /elohim/sync/2.0.0, \
                      /elohim/epr/2.0.0, /elohim/epr-atom/2.0.0, /elohim/shard/2.0.0, \
-                     /elohim/view-federation/2.0.0"
+                     /elohim/view-federation/2.0.0, /elohim/identity-handshake/2.0.0, \
+                     /elohim/trust/2.0.0"
                 );
                 Some(node)
             }
