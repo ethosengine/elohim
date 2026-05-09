@@ -648,6 +648,168 @@ def triggerPipeline(String name, String branch, boolean wait = true) {
 }
 
 /**
+ * Auto-mode analyzer — load baselines, analyze changesets, apply
+ * commit-tag overrides, propagate dependencies, auto-include genesis.
+ * Extracted from Determine Build Plan to keep its script {} body
+ * under the 64KB CPS method size limit.
+ *
+ * Side effects: sets env.PIPELINE_BASELINES, env.CHANGED_FILES_COUNT,
+ * env.ANALYSIS_JSON; logs decision matrix output.
+ *
+ * @return Map [pipelines, analysis, changedFiles]
+ */
+def autoModeAnalyze() {
+    def pipelineBaselines = [:]
+    if (!(params.FORCE_COMMIT?.trim())) {
+        pipelineBaselines = loadPipelineBaselines()
+    }
+
+    echo "🔍 Analyzing changesets since last build..."
+    def changedFiles = analyzeChangeset(pipelineBaselines['__global__'])
+
+    if (!pipelineBaselines && changedFiles.size() > 50) {
+        echo "⚠️ Large changeset (${changedFiles.size()} files) with no per-pipeline baselines"
+        echo "   Building all matching pipelines (baselines will be saved after this run)"
+    }
+
+    def analysis = analyzePipelineRequirements(changedFiles, pipelineBaselines)
+    env.PIPELINE_BASELINES = writeJSON(returnText: true, json: pipelineBaselines)
+    env.CHANGED_FILES_COUNT = changedFiles.size().toString()
+    env.ANALYSIS_JSON = writeJSON(returnText: true, json: analysis)
+
+    // Group changed files by top-level area for the decision-matrix log.
+    def filesByArea = [:]
+    changedFiles.each { file ->
+        def area = file.split('/')[0]
+        if (!filesByArea[area]) filesByArea[area] = []
+        filesByArea[area].add(file)
+    }
+    echo "📁 Changed Files (${changedFiles.size()} total):"
+    filesByArea.each { area, files ->
+        echo "   ${area}/ (${files.size()} files)"
+        files.take(3).each { echo "      └─ ${it}" }
+        if (files.size() > 3) echo "      └─ ... and ${files.size() - 3} more"
+    }
+
+    def pipelines = analysis.findAll { name, info -> info.shouldRun }.keySet().toList()
+
+    // [build:*] commit-tag overrides
+    if (env.FORCE_BUILD_PIPELINES) {
+        env.FORCE_BUILD_PIPELINES.split(',').each { name ->
+            if (!pipelines.contains(name) && PIPELINES[name]) {
+                pipelines.add(name)
+                analysis[name].shouldRun = true
+                analysis[name].matchedPatterns.add('commit-tag:[build:*]')
+            }
+        }
+    }
+
+    pipelines = propagateDependencies(pipelines, analysis)
+
+    // Genesis auto-include for dev branches when any triggering pipeline builds
+    if (!pipelines.contains('elohim-genesis') && !params.SKIP_GENESIS) {
+        def isDevBranch = env.BRANCH_NAME == 'dev' || env.BRANCH_NAME ==~ /dev-.+|feat-.+|claude\/.+/
+        def triggeringPipeline = pipelines.find { PIPELINES[it]?.triggersGenesis }
+        if (triggeringPipeline && isDevBranch) {
+            pipelines.add('elohim-genesis')
+            analysis['elohim-genesis'].shouldRun = true
+            analysis['elohim-genesis'].matchedPatterns.add("triggered-by:${triggeringPipeline}")
+        }
+    }
+
+    return [pipelines: pipelines, analysis: analysis, changedFiles: changedFiles]
+}
+
+/**
+ * Manual-mode analyzer — emit fixed pipeline lists for explicit operator
+ * mode params, plus a synthetic analysis Map for the decision matrix
+ * display. Extracted from Determine Build Plan to keep script {} body
+ * under the 64KB CPS limit.
+ *
+ * @return Map [pipelines, analysis]
+ */
+def manualModeAnalyze(String mode) {
+    echo "📋 Using manual build mode: ${mode}"
+    def pipelines = []
+
+    switch (mode) {
+        case 'rebuild-all':
+            pipelines = ['elohim-holochain', 'elohim-edge', 'elohim']
+            if (!params.SKIP_GENESIS) pipelines.add('elohim-genesis')
+            break
+        case 'rebuild-edge':
+            pipelines = ['elohim-edge']
+            if (!params.SKIP_GENESIS) pipelines.add('elohim-genesis')
+            break
+        case 'rebuild-app':
+            pipelines = ['elohim']
+            if (!params.SKIP_GENESIS) pipelines.add('elohim-genesis')
+            break
+        case 'genesis-only':
+            pipelines = ['elohim-genesis']
+            break
+    }
+
+    def analysis = [:]
+    PIPELINES.each { name, config ->
+        analysis[name] = [
+            shouldRun: pipelines.contains(name),
+            manualOnly: config.manualOnly ?: false,
+            matchedPatterns: pipelines.contains(name) ? ['manual-mode'] : [],
+            matchedFileCount: 0,
+            sampleFiles: [],
+            dependsOn: config.dependsOn ?: [],
+            triggersGenesis: config.triggersGenesis ?: false,
+            baselineUsed: 'global'
+        ]
+    }
+    env.ANALYSIS_JSON = writeJSON(returnText: true, json: analysis)
+
+    return [pipelines: pipelines, analysis: analysis]
+}
+
+/**
+ * Apply build-graph routing on top of legacy analysis. For auto/status
+ * mode, runs runBuildGraph then applies [build:*] tag overrides + genesis
+ * auto-include. For manual mode, passes through the explicit pipeline list.
+ * Extracted from Determine Build Plan to keep script {} body under 64KB.
+ */
+def applyBuildGraphRouting(String mode, changedFiles, analysis, fallbackPipelines) {
+    def graphPipelines
+    if (mode in ['auto', 'status']) {
+        echo '\n=== Build Graph (Primary) ==='
+        def graphResult = runBuildGraph(changedFiles, analysis)
+        graphPipelines = graphResult.pipelineSteps.keySet().toList()
+
+        // Filter to pipelines that have Jenkins jobs in the PIPELINES map.
+        graphPipelines.removeAll { !PIPELINES.containsKey(it) }
+
+        // Apply [build:*] commit-message overrides — graph-walker (auth
+        // since 2026-04) needs to honor manual retrigger workflow.
+        if (env.FORCE_BUILD_PIPELINES) {
+            env.FORCE_BUILD_PIPELINES.split(',').each { name ->
+                if (!graphPipelines.contains(name) && PIPELINES[name]) {
+                    graphPipelines.add(name)
+                    echo "🔧 [build:*] force-include applied to graph result: ${name}"
+                }
+            }
+        }
+
+        // Genesis auto-include for dev branches
+        if (!graphPipelines.contains('elohim-genesis') && !params.SKIP_GENESIS) {
+            def isDevBranch = env.BRANCH_NAME == 'dev' || env.BRANCH_NAME ==~ /dev-.+|feat-.+|claude\/.+/
+            def triggeringPipeline = graphPipelines.find { PIPELINES[it]?.triggersGenesis }
+            if (triggeringPipeline && isDevBranch) {
+                graphPipelines.add('elohim-genesis')
+            }
+        }
+    } else {
+        graphPipelines = fallbackPipelines
+    }
+    return graphPipelines
+}
+
+/**
  * Build the predicted-build-graph artifact map. Extracted from
  * Determine Build Plan to keep the inline CPS-compiled method under
  * the 64KB JVM limit.
@@ -1275,11 +1437,13 @@ spec:
             steps {
                 container('builder') {
                     script {
+                        // Stage logic extracted to autoModeAnalyze /
+                        // manualModeAnalyze / applyBuildGraphRouting /
+                        // buildPredictedGraph helpers (above pipeline {}) to
+                        // keep this script body under the 64KB CPS method
+                        // size limit. Failure mode in build #923 was
+                        // ___cps___74 too large from this stage's inline body.
                         def mode = params.MODE ?: 'auto'
-                        def pipelines = []
-                        def analysis = [:]
-                        def changedFiles = []
-
                         echo """
 ┌──────────────────────────────────────────────────────────────────────────────┐
 │                              BUILD PLAN ANALYSIS                              │
@@ -1288,188 +1452,40 @@ spec:
 │  Trigger: ${env.BUILD_TRIGGER}
 └──────────────────────────────────────────────────────────────────────────────┘"""
 
+                        def pipelines, analysis, changedFiles
                         if (mode in ['auto', 'status']) {
-                            // Load per-pipeline baselines for accurate change detection
-                            def pipelineBaselines = [:]
-                            if (!(params.FORCE_COMMIT?.trim())) {
-                                pipelineBaselines = loadPipelineBaselines()
-                            }
-
-                            // Automatic changeset analysis (uses stored global baseline if available)
-                            echo "🔍 Analyzing changesets since last build..."
-                            changedFiles = analyzeChangeset(pipelineBaselines['__global__'])
-
-                            // Log advisory when baseline appears stale (no per-pipeline
-                            // baselines and large diff). We still use the full changeset —
-                            // those are real accumulated changes that need building. The
-                            // one-time full rebuild after baseline loss is correct; the
-                            // previous HEAD~1 fallback silently discarded real changes.
-                            if (!pipelineBaselines && changedFiles.size() > 50) {
-                                echo "⚠️ Large changeset (${changedFiles.size()} files) with no per-pipeline baselines"
-                                echo "   Building all matching pipelines (baselines will be saved after this run)"
-                            }
-
-                            analysis = analyzePipelineRequirements(changedFiles, pipelineBaselines)
-                            env.PIPELINE_BASELINES = writeJSON(returnText: true, json: pipelineBaselines)
-
-                            env.CHANGED_FILES_COUNT = changedFiles.size().toString()
-                            env.ANALYSIS_JSON = writeJSON(returnText: true, json: analysis)
-
-                            // Show changed files grouped by area
-                            def filesByArea = [:]
-                            changedFiles.each { file ->
-                                def area = file.split('/')[0]
-                                if (!filesByArea[area]) filesByArea[area] = []
-                                filesByArea[area].add(file)
-                            }
-
-                            echo "📁 Changed Files (${changedFiles.size()} total):"
-                            filesByArea.each { area, files ->
-                                echo "   ${area}/ (${files.size()} files)"
-                                files.take(3).each { echo "      └─ ${it}" }
-                                if (files.size() > 3) echo "      └─ ... and ${files.size() - 3} more"
-                            }
-
-                            pipelines = analysis.findAll { name, info -> info.shouldRun }.keySet().toList()
-
-                            // Inject [build:*] commit message overrides into the pipeline set
-                            if (env.FORCE_BUILD_PIPELINES) {
-                                env.FORCE_BUILD_PIPELINES.split(',').each { name ->
-                                    if (!pipelines.contains(name) && PIPELINES[name]) {
-                                        pipelines.add(name)
-                                        analysis[name].shouldRun = true
-                                        analysis[name].matchedPatterns.add('commit-tag:[build:*]')
-                                    }
-                                }
-                            }
-
-                            // Propagate: if a dependency is building, auto-include its dependents
-                            pipelines = propagateDependencies(pipelines, analysis)
-
-                            // Safety net: auto-include genesis if any triggering pipeline builds (dev branches only)
-                            if (!pipelines.contains('elohim-genesis') && !params.SKIP_GENESIS) {
-                                def isDevBranch = env.BRANCH_NAME == 'dev' || env.BRANCH_NAME ==~ /dev-.+|feat-.+|claude\/.+/
-                                def triggeringPipeline = pipelines.find { PIPELINES[it]?.triggersGenesis }
-                                if (triggeringPipeline && isDevBranch) {
-                                    pipelines.add('elohim-genesis')
-                                    analysis['elohim-genesis'].shouldRun = true
-                                    analysis['elohim-genesis'].matchedPatterns.add("triggered-by:${triggeringPipeline}")
-                                }
-                            }
-
+                            def r = autoModeAnalyze()
+                            pipelines = r.pipelines
+                            analysis = r.analysis
+                            changedFiles = r.changedFiles
                         } else {
-                            // Manual forced builds
-                            echo "📋 Using manual build mode: ${mode}"
-
-                            switch (mode) {
-                                case 'rebuild-all':
-                                    pipelines = ['elohim-holochain', 'elohim-edge', 'elohim']
-                                    if (!params.SKIP_GENESIS) pipelines.add('elohim-genesis')
-                                    break
-                                case 'rebuild-edge':
-                                    pipelines = ['elohim-edge']
-                                    if (!params.SKIP_GENESIS) pipelines.add('elohim-genesis')
-                                    break
-                                case 'rebuild-app':
-                                    pipelines = ['elohim']
-                                    if (!params.SKIP_GENESIS) pipelines.add('elohim-genesis')
-                                    break
-                                case 'genesis-only':
-                                    pipelines = ['elohim-genesis']
-                                    break
-                            }
-
-                            // Create analysis for display (even for manual mode)
-                            PIPELINES.each { name, config ->
-                                analysis[name] = [
-                                    shouldRun: pipelines.contains(name),
-                                    manualOnly: config.manualOnly ?: false,
-                                    matchedPatterns: pipelines.contains(name) ? ['manual-mode'] : [],
-                                    matchedFileCount: 0,
-                                    sampleFiles: [],
-                                    dependsOn: config.dependsOn ?: [],
-                                    triggersGenesis: config.triggersGenesis ?: false,
-                                    baselineUsed: 'global'
-                                ]
-                            }
-                            env.ANALYSIS_JSON = writeJSON(returnText: true, json: analysis)
+                            def r = manualModeAnalyze(mode)
+                            pipelines = r.pipelines
+                            analysis = r.analysis
+                            changedFiles = []
                         }
 
-                        // Legacy ordering (advisory only — feeds comparison matrix)
+                        // Legacy advisory ordering for the comparison matrix.
                         def legacyOrdered = orderByDependencies(pipelines)
-
-                        // ALWAYS show the legacy decision matrix (advisory)
                         printDecisionMatrix(analysis, legacyOrdered)
 
-                        def graphPipelines
-                        if (mode in ['auto', 'status']) {
-                            // Build graph is PRIMARY for auto mode
-                            echo '\n=== Build Graph (Primary) ==='
-                            def graphResult = runBuildGraph(changedFiles, analysis)
-                            graphPipelines = graphResult.pipelineSteps.keySet().toList()
+                        def graphPipelines = applyBuildGraphRouting(mode, changedFiles, analysis, pipelines)
 
-                            // Filter to pipelines that have Jenkins jobs (in PIPELINES map).
-                            // Graph-only pipelines (elohim-compute, elohim-doorway-app, etc.)
-                            // run as pre-push gates, not as Jenkins builds.
-                            graphPipelines.removeAll { !PIPELINES.containsKey(it) }
-
-                            // Apply [build:*] commit-message overrides to graph result.
-                            // The build-graph algorithm correctly says "no sources changed
-                            // → no rebuild needed" — but a human pushing [build:app] is
-                            // intentionally overriding that decision (e.g., to redeploy after
-                            // a manifest-only change that elohim still needs to reconcile).
-                            // The legacy analyzer at line ~1050 already does this; mirror
-                            // here so graph-walker (authoritative since 2026-04) honors the
-                            // override too. Without this, every developer's manual retrigger
-                            // workflow is silently broken.
-                            if (env.FORCE_BUILD_PIPELINES) {
-                                env.FORCE_BUILD_PIPELINES.split(',').each { name ->
-                                    if (!graphPipelines.contains(name) && PIPELINES[name]) {
-                                        graphPipelines.add(name)
-                                        echo "🔧 [build:*] force-include applied to graph result: ${name}"
-                                    }
-                                }
-                            }
-
-                            // Genesis auto-include: if any triggering pipeline is in the graph result
-                            if (!graphPipelines.contains('elohim-genesis') && !params.SKIP_GENESIS) {
-                                def isDevBranch = env.BRANCH_NAME == 'dev' || env.BRANCH_NAME ==~ /dev-.+|feat-.+|claude\/.+/
-                                def triggeringPipeline = graphPipelines.find { PIPELINES[it]?.triggersGenesis }
-                                if (triggeringPipeline && isDevBranch) {
-                                    graphPipelines.add('elohim-genesis')
-                                }
-                            }
-                        } else {
-                            // Manual mode: use the explicitly requested pipelines
-                            graphPipelines = pipelines
-                        }
-
-                        // DEPLOY_ONLY override: bypass changeset analysis and dispatch
-                        // only the deploy-bearing pipelines. Operator uses this after
-                        // manifest/RBAC/storageClass-only changes when existing Harbor
-                        // tags are valid and the build matrix would just burn ~75min.
-                        // Edge pipeline self-skips its build stages on DEPLOY_ONLY=true
-                        // and runs only Deploy Edge Node - <Env>. Genesis runs unless
-                        // operator sets SKIP_GENESIS=true.
-                        //
-                        // Two activation paths: explicit operator param (params.DEPLOY_ONLY)
-                        // or [deploy-only] commit-message tag on the webhook push (env.DEPLOY_ONLY_FROM_TAG).
+                        // DEPLOY_ONLY override (operator param OR [deploy-only]
+                        // commit tag): bypass changeset analysis and dispatch
+                        // only deploy-bearing pipelines. Edge self-skips its
+                        // build stages, runs only Deploy Edge Node - <Env>.
                         def deployOnly = params.DEPLOY_ONLY || env.DEPLOY_ONLY_FROM_TAG == 'true'
                         if (deployOnly) {
                             graphPipelines = ['elohim-edge']
-                            if (!params.SKIP_GENESIS) {
-                                graphPipelines.add('elohim-genesis')
-                            }
+                            if (!params.SKIP_GENESIS) graphPipelines.add('elohim-genesis')
                             def src = params.DEPLOY_ONLY ? 'param' : 'commit tag'
                             echo "🚀 DEPLOY_ONLY=true (via ${src}): bypassing changeset analysis; dispatching ${graphPipelines.join(', ')}"
                         }
 
                         env.PIPELINES_TO_RUN = graphPipelines.join(',')
 
-                        // Predicted Build Graph: orchestrator's promise of what
-                        // it will dispatch. Construction extracted to
-                        // buildPredictedGraph helper to keep this stage's
-                        // inline method under the 64KB CPS limit.
+                        // Build + write the predicted-build-graph artifact.
                         def predictedLevels = groupByDependencyLevel(graphPipelines)
                         def hasGenesis = graphPipelines.contains('elohim-genesis')
                         def predictedGraph = buildPredictedGraph(graphPipelines, analysis, mode, deployOnly, changedFiles, predictedLevels, hasGenesis)
@@ -1485,11 +1501,9 @@ spec:
                             currentBuild.description = "${mode}: ${graphPipelines.join(', ')}"
                         }
 
-                        // Checkpoint 1: archive baseline now so that if Execute
-                        // Builds or post.always gets interrupted (pod eviction,
-                        // abort-on-milestone, OOM), the next orchestrator run
-                        // still has a __global__ = HEAD resume point. See
-                        // archivePipelineBaselines() docstring for rationale.
+                        // Checkpoint 1: archive baseline so an interruption
+                        // (pod eviction, abort-on-milestone, OOM) still leaves
+                        // the next run with a __global__ = HEAD resume point.
                         archivePipelineBaselines('plan')
                     }
                 }
