@@ -488,6 +488,13 @@ async fn main() -> anyhow::Result<()> {
             tracing::debug!("SSR_BUNDLES_DIR unset — render_capability will be None");
             None
         };
+        // Concurrency semaphore: sized to render_capability.max_concurrent_renders.
+        // None when render_capability is None (no SSR claim, no limiter needed).
+        state.render_semaphore = render_capability.as_ref().map(|c| {
+            std::sync::Arc::new(tokio::sync::Semaphore::new(
+                c.max_concurrent_renders as usize,
+            ))
+        });
         state.render_capability = render_capability;
     }
 

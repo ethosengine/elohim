@@ -228,6 +228,15 @@ pub struct AppState {
     /// returned `None` (e.g. `SSR_BUNDLES_DIR` unset, storage manifest
     /// unreachable, or the bundles directory is empty).
     pub render_capability: Option<crate::render::types::RenderCapabilityProfile>,
+
+    /// Concurrency limiter for SSR rendering. Sized to
+    /// `render_capability.max_concurrent_renders` at startup. The dispatch
+    /// arm calls `try_acquire_owned()`; on failure (limit reached) the
+    /// request returns a CSR-shell fallback with `x-ssr-skipped: overflow`
+    /// rather than queueing — fallback is always faster than waiting.
+    ///
+    /// `None` means no SSR claim was published, so no limiter needed.
+    pub render_semaphore: Option<Arc<tokio::sync::Semaphore>>,
 }
 
 /// Build the shared HTTP client used by SSR `ResolverFetcher` instances.
@@ -359,6 +368,7 @@ impl AppState {
             renderer: init_renderer(),
             ssr_http_client: init_ssr_http_client(),
             render_capability: None,
+            render_semaphore: None,
         }
     }
 
@@ -448,6 +458,7 @@ impl AppState {
             renderer: init_renderer(),
             ssr_http_client: init_ssr_http_client(),
             render_capability: None,
+            render_semaphore: None,
         }
     }
 
@@ -552,6 +563,7 @@ impl AppState {
             renderer: init_renderer(),
             ssr_http_client: init_ssr_http_client(),
             render_capability: None,
+            render_semaphore: None,
         }
     }
 
@@ -659,6 +671,7 @@ impl AppState {
             renderer: init_renderer(),
             ssr_http_client: init_ssr_http_client(),
             render_capability: None,
+            render_semaphore: None,
         })
     }
 
@@ -1774,6 +1787,31 @@ async fn handle_request(
                             )));
                         }
                     }
+
+                    // Concurrency limiter (Task 19): bound the number of
+                    // simultaneous V8 renders by render_capability.max_
+                    // concurrent_renders. Overflow returns CSR shell with
+                    // x-ssr-skipped: overflow. No queueing — fallback is
+                    // always faster than waiting.
+                    let _render_permit = match state.render_semaphore.as_ref() {
+                        Some(sem) => match Arc::clone(sem).try_acquire_owned() {
+                            Ok(p) => Some(p),
+                            Err(_) => {
+                                tracing::info!(
+                                    target: "doorway::ssr",
+                                    path = %p,
+                                    available = sem.available_permits(),
+                                    "render semaphore at limit — falling back to CSR shell"
+                                );
+                                return Ok(to_boxed(
+                                    ssr_spa_shell_fallback_with_skip_reason(Some("overflow")),
+                                ));
+                            }
+                        },
+                        // No claim → no limiter; renderer absence is handled
+                        // by the inner `if let Some(renderer)` branch below.
+                        None => None,
+                    };
 
                     if let Some(renderer) = state.renderer.as_ref() {
                         let render_spec = match elohim_render::RenderSpec::parse(&spec) {
