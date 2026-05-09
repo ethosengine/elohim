@@ -95,22 +95,24 @@ spec:
       image: harbor.ethosengine.com/ethosengine/ci-builder-nix:latest
       command: [cat]
       tty: true
-      # NOTE: sccache wiring (envFrom: secretRef sccache-credentials +
-      # RUSTC_WRAPPER=sccache) was added in commit 6d563f989 and reverted
-      # in this commit because build #1214 failed with
-      #   error: could not execute process `sccache rustc -vV` (never
-      #   executed) / No such file or directory (os error 2)
-      # The ci-builder-nix:latest image used by this pipeline does not yet
-      # contain the sccache binary at /usr/local/bin/sccache. The
-      # rust-nix-dev workspace image was rebuilt with the layer, but the
-      # ci-builder Dockerfile in ethosengine/che-devworkspaces either
-      # didn't get the same edit or hasn't been rebuilt+pushed to Harbor.
-      # Re-enable this block after the operator confirms the binary is
-      # present in the published image:
-      #   docker run --rm harbor.ethosengine.com/ethosengine/ci-builder-nix:latest which sccache
-      # The Garage S3 substrate (sccache-elohim bucket, secret in jenkins ns)
-      # is already validated end-to-end from the workspace image — only the
-      # CI image is missing the binary.
+      # sccache config injected via the sccache-credentials Secret in the
+      # jenkins ns (auto-mounted via labelled secret pattern). Provides:
+      # AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, SCCACHE_BUCKET,
+      # SCCACHE_ENDPOINT, SCCACHE_S3_USE_SSL, SCCACHE_REGION. Backing store
+      # is Garage at garage.ethosengine.svc.cluster.local:3900 (S3-compatible).
+      # ci-builder-nix:latest carries /usr/local/bin/sccache 0.15.0 (added
+      # in che-devworkspaces commit 2026-05-09; verified Dockerfile layer).
+      # Earlier wiring attempt in commit 6d563f989 failed (build #1214) when
+      # the image hadn't been rebuilt yet — re-applied here after operator
+      # confirmed the rebuild landed.
+      envFrom:
+        - secretRef:
+            name: sccache-credentials
+      env:
+        - name: RUSTC_WRAPPER
+          value: sccache
+        - name: SCCACHE_LOG
+          value: warn
       resources:
         requests:
           memory: "4Gi"
