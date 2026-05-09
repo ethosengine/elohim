@@ -29,6 +29,7 @@ pub mod parity_harness;
 pub mod peer_map;
 pub mod shard;
 pub mod sync;
+pub mod sync_backend;
 pub mod view_fed;
 
 pub use auth::{
@@ -47,6 +48,7 @@ pub use identity::load_or_generate as load_or_generate_secret_key;
 pub use node::{AlpnRegistration, IrohNode};
 pub use shard::{IrohShardClient, IrohShardProtocol, ShardBackend, SHARD_ALPN};
 pub use sync::{IrohSyncClient, IrohSyncProtocol, SyncBackend, SYNC_ALPN};
+pub use sync_backend::SyncManagerBackend;
 pub use view_fed::{
     IrohViewFederationClient, IrohViewFederationProtocol, ViewFederationBackend, VIEW_FED_ALPN,
 };

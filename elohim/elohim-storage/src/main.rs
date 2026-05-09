@@ -807,20 +807,48 @@ async fn async_main(
     #[cfg(not(feature = "p2p"))]
     let p2p_node: Option<()> = None;
 
-    // Phase 1 iroh parallel-stack init (no-op holder — see plan
-    // genesis/docs/superpowers/plans/2026-05-07-iroh-parallel-stack.md).
-    // Phase 2 promotes this to mount iroh-blobs and integrate with the
-    // tokio::select shutdown loop. For now: build endpoint, log node_id,
-    // hold the handle so the secret-key file gets persisted on first run.
+    // Phase 11 iroh parallel-stack init — production backends wired in.
+    // Per plan genesis/docs/superpowers/plans/2026-05-07-iroh-parallel-stack.md
+    // and spec genesis/docs/superpowers/specs/2026-05-08-iroh-libp2p-complementarity.md:
+    // each plane's backend dispatches into the same daemon services as the
+    // libp2p side. Modes are mutually exclusive at runtime, so the iroh
+    // branch constructs its own SyncManager pointing at the same on-disk
+    // sled DB the libp2p path would use; only one branch ever opens it.
     #[cfg(feature = "p2p-iroh")]
     let _iroh_node = if args.enable_p2p
         && config.transport_backend == elohim_storage::config::TransportBackend::Iroh
     {
-        let iroh_cfg = elohim_storage::p2p_iroh::IrohConfig::from_storage_dir(&config.storage_dir);
-        match elohim_storage::p2p_iroh::IrohNode::start(iroh_cfg).await {
+        use elohim_storage::p2p_iroh::{
+            AlpnRegistration, IrohConfig, IrohNode, IrohSyncProtocol, SyncManagerBackend, SYNC_ALPN,
+        };
+        use elohim_storage::sync::{DocStore, StreamTracker, SyncManager};
+
+        let iroh_cfg = IrohConfig::from_storage_dir(&config.storage_dir);
+
+        // Sync backend — opens the same `sync.sled` directory the libp2p
+        // path uses (mirrors src/p2p/mod.rs:1472). Mode-exclusive at
+        // runtime so the two paths never contend for the lock.
+        let sync_sled_path = config.storage_dir.join("sync.sled");
+        let doc_store = match DocStore::at_path(&sync_sled_path).await {
+            Ok(store) => Arc::new(store),
+            Err(e) => {
+                error!(error = %e, path = %sync_sled_path.display(), "iroh: failed to open sync DocStore");
+                return Err(Box::new(e));
+            }
+        };
+        let stream_tracker = Arc::new(StreamTracker::new());
+        let sync_manager = Arc::new(SyncManager::new(doc_store, stream_tracker));
+        let sync_backend: Arc<dyn elohim_storage::p2p_iroh::SyncBackend> =
+            Arc::new(SyncManagerBackend::new(sync_manager));
+        let sync_handler = IrohSyncProtocol::new(sync_backend);
+
+        let extras: Vec<AlpnRegistration> = vec![(SYNC_ALPN.to_vec(), Box::new(sync_handler))];
+
+        match IrohNode::start_with_protocols(iroh_cfg, extras).await {
             Ok(node) => {
-                info!("Iroh parallel-stack node started (Phase 1 stub)");
+                info!("Iroh parallel-stack node started (Phase 11 — sync backend wired)");
                 info!("  Node ID: {}", node.node_id());
+                info!("  ALPNs: iroh-blobs, iroh-gossip, /elohim/sync/2.0.0");
                 Some(node)
             }
             Err(e) => {
