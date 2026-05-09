@@ -861,10 +861,12 @@ async fn async_main(
         use elohim_storage::p2p_iroh::{
             AlpnRegistration, EprAtomServiceBackend, EprServiceBackend, IrohConfig,
             IrohEprAtomProtocol, IrohEprProtocol, IrohNode, IrohShardProtocol, IrohSyncProtocol,
-            ShardServiceBackend, SyncManagerBackend, EPR_ALPN, EPR_ATOM_ALPN, SHARD_ALPN, SYNC_ALPN,
+            IrohViewFederationProtocol, ShardServiceBackend, SyncManagerBackend,
+            ViewFedServiceBackend, EPR_ALPN, EPR_ATOM_ALPN, SHARD_ALPN, SYNC_ALPN, VIEW_FED_ALPN,
         };
         use elohim_storage::shard_service::ShardService;
         use elohim_storage::sync::{DocStore, StreamTracker, SyncManager};
+        use elohim_storage::view_fed_service::{libp2p_keypair_from_ed25519_bytes, ViewFedService};
 
         let iroh_cfg = IrohConfig::from_storage_dir(&config.storage_dir);
 
@@ -953,23 +955,69 @@ async fn async_main(
             Arc::new(ShardServiceBackend::new(shard_service));
         let shard_handler = IrohShardProtocol::new(shard_backend);
 
+        // View-federation backend — transport-neutral service that
+        // bundles this node's identity, keypair, and DB pool. The
+        // signing keypair is derived from the iroh SecretKey's
+        // ed25519 bytes and rebuilt as a libp2p::identity::Keypair so
+        // the same `build_response_slice` path runs identically (the
+        // service still expects a libp2p Keypair pending signer-trait
+        // refactor; both wrap the same ed25519 crypto so signatures
+        // are byte-identical).
+        let iroh_secret =
+            elohim_storage::p2p_iroh::load_or_generate_secret_key(&iroh_cfg.secret_key_path)
+                .map_err(|e| {
+                    error!(error = %e, path = %iroh_cfg.secret_key_path.display(),
+                           "iroh: failed to load secret key for view-fed signer");
+                    e
+                })?;
+        let mut iroh_secret_bytes = iroh_secret.to_bytes();
+        let view_fed_signer = libp2p_keypair_from_ed25519_bytes(&mut iroh_secret_bytes)
+            .map_err(|e| {
+                error!(error = %e, "iroh: failed to derive libp2p keypair from iroh secret");
+                std::io::Error::other(format!("iroh keypair derivation: {e}"))
+            })?;
+        let iroh_node_id_str = iroh_secret.public().to_string();
+        // Local agent CID in iroh mode mirrors the iroh NodeId until
+        // the cross-stack peer-map graduates DHT-anchored identity
+        // into a unified handle. View-fed responses are verifiable by
+        // the receiver against the agent CID's public key (which is
+        // the same ed25519 key in both transport modes).
+        let view_fed_service = Arc::new(ViewFedService::new(
+            iroh_node_id_str.clone(),
+            iroh_node_id_str.clone(),
+            view_fed_signer,
+            if args.enable_content_db {
+                db_pool.clone()
+            } else {
+                None
+            },
+        ));
+        let view_fed_backend: Arc<dyn elohim_storage::p2p_iroh::ViewFederationBackend> =
+            Arc::new(ViewFedServiceBackend::new(
+                view_fed_service,
+                iroh_node_id_str,
+            ));
+        let view_fed_handler = IrohViewFederationProtocol::new(view_fed_backend);
+
         let extras: Vec<AlpnRegistration> = vec![
             (SYNC_ALPN.to_vec(), Box::new(sync_handler)),
             (EPR_ALPN.to_vec(), Box::new(epr_handler)),
             (EPR_ATOM_ALPN.to_vec(), Box::new(epr_atom_handler)),
             (SHARD_ALPN.to_vec(), Box::new(shard_handler)),
+            (VIEW_FED_ALPN.to_vec(), Box::new(view_fed_handler)),
         ];
 
         match IrohNode::start_with_protocols(iroh_cfg, extras).await {
             Ok(node) => {
                 info!(
                     "Iroh parallel-stack node started (Phase 11 — sync + EPR + EPR-atom \
-                     + shard backends wired)"
+                     + shard + view-fed backends wired)"
                 );
                 info!("  Node ID: {}", node.node_id());
                 info!(
                     "  ALPNs: iroh-blobs, iroh-gossip, /elohim/sync/2.0.0, \
-                     /elohim/epr/2.0.0, /elohim/epr-atom/2.0.0, /elohim/shard/2.0.0"
+                     /elohim/epr/2.0.0, /elohim/epr-atom/2.0.0, /elohim/shard/2.0.0, \
+                     /elohim/view-federation/2.0.0"
                 );
                 Some(node)
             }

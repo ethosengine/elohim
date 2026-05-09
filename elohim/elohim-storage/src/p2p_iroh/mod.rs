@@ -34,6 +34,7 @@ pub mod shard_backend;
 pub mod sync;
 pub mod sync_backend;
 pub mod view_fed;
+pub mod view_fed_backend;
 
 pub use auth::{
     IdentityHandshakeBackend, IrohIdentityHandshakeClient, IrohIdentityHandshakeProtocol,
@@ -55,6 +56,7 @@ pub use epr_atom_backend::EprAtomServiceBackend;
 pub use epr_backend::EprServiceBackend;
 pub use shard_backend::ShardServiceBackend;
 pub use sync_backend::SyncManagerBackend;
+pub use view_fed_backend::ViewFedServiceBackend;
 pub use view_fed::{
     IrohViewFederationClient, IrohViewFederationProtocol, ViewFederationBackend, VIEW_FED_ALPN,
 };
