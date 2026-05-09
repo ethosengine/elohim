@@ -50,6 +50,7 @@ pub mod conductor_client; // Legacy: kept for backward compatibility during migr
 pub mod config;
 pub mod dag_store;
 pub mod db; // SQLite content storage
+pub mod epr_atom_service;
 pub mod epr_codec;
 pub mod epr_head;
 pub mod epr_service;

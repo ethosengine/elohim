@@ -854,11 +854,14 @@ async fn async_main(
     let _iroh_node = if args.enable_p2p
         && config.transport_backend == elohim_storage::config::TransportBackend::Iroh
     {
+        use elohim_storage::epr_atom_service::EprAtomService;
         use elohim_storage::epr_service::EprService;
+        use elohim_storage::p2p::dedup::DedupLru;
         use elohim_storage::p2p::trust_cache::PeerTrustCache;
         use elohim_storage::p2p_iroh::{
-            AlpnRegistration, EprServiceBackend, IrohConfig, IrohEprProtocol, IrohNode,
-            IrohSyncProtocol, SyncManagerBackend, EPR_ALPN, SYNC_ALPN,
+            AlpnRegistration, EprAtomServiceBackend, EprServiceBackend, IrohConfig,
+            IrohEprAtomProtocol, IrohEprProtocol, IrohNode, IrohSyncProtocol, SyncManagerBackend,
+            EPR_ALPN, EPR_ATOM_ALPN, SYNC_ALPN,
         };
         use elohim_storage::sync::{DocStore, StreamTracker, SyncManager};
 
@@ -910,17 +913,41 @@ async fn async_main(
             Arc::new(EprServiceBackend::new(epr_service));
         let epr_handler = IrohEprProtocol::new(epr_backend);
 
+        // EPR-atom backend — transport-neutral service shared with the
+        // libp2p path. Caller identity defaults to Anonymous in iroh
+        // mode pending the cross-stack peer-map graduation; serves
+        // Commons/Public atoms correctly and falls through to NotFound
+        // for tighter reach tiers (leak-free, matches libp2p semantics
+        // for unauthenticated callers).
+        let dedup = Arc::new(DedupLru::new());
+        let epr_atom_service = Arc::new(EprAtomService::new(
+            if args.enable_content_db {
+                db_pool.clone()
+            } else {
+                None
+            },
+            dedup,
+        ));
+        let epr_atom_backend: Arc<dyn elohim_storage::p2p_iroh::EprAtomBackend> =
+            Arc::new(EprAtomServiceBackend::new(epr_atom_service));
+        let epr_atom_handler = IrohEprAtomProtocol::new(epr_atom_backend);
+
         let extras: Vec<AlpnRegistration> = vec![
             (SYNC_ALPN.to_vec(), Box::new(sync_handler)),
             (EPR_ALPN.to_vec(), Box::new(epr_handler)),
+            (EPR_ATOM_ALPN.to_vec(), Box::new(epr_atom_handler)),
         ];
 
         match IrohNode::start_with_protocols(iroh_cfg, extras).await {
             Ok(node) => {
-                info!("Iroh parallel-stack node started (Phase 11 — sync + EPR backends wired)");
+                info!(
+                    "Iroh parallel-stack node started (Phase 11 — sync + EPR + EPR-atom \
+                     backends wired)"
+                );
                 info!("  Node ID: {}", node.node_id());
                 info!(
-                    "  ALPNs: iroh-blobs, iroh-gossip, /elohim/sync/2.0.0, /elohim/epr/2.0.0"
+                    "  ALPNs: iroh-blobs, iroh-gossip, /elohim/sync/2.0.0, \
+                     /elohim/epr/2.0.0, /elohim/epr-atom/2.0.0"
                 );
                 Some(node)
             }

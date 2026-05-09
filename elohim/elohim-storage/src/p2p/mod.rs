@@ -5330,329 +5330,35 @@ impl P2PNode {
         )
     }
 
+    /// Snapshot the EPR-atom-relevant deps into a transport-neutral
+    /// [`crate::epr_atom_service::EprAtomService`]. Cheap (clones an
+    /// `Option<DbPool>` and an `Arc<DedupLru>`); construct per-request
+    /// rather than keeping a stale field. Used by
+    /// [`Self::handle_epr_atom_request`] to delegate and by the iroh-mode
+    /// adapter to share fetch/announce/dedup logic.
+    pub(crate) fn epr_atom_service(&self) -> crate::epr_atom_service::EprAtomService {
+        crate::epr_atom_service::EprAtomService::new(self.db_pool.clone(), self.dedup.clone())
+    }
+
     /// Handle an incoming EPR atom federation request from a peer.
     ///
-    /// Batch C (Tasks 11–14) replaces these stubs with real fetch/announce
-    /// logic that reads/writes the `epr_atoms` projection and enforces the
-    /// reach gate. During Batch B, the protocol is wired end-to-end but
-    /// returns shape-correct placeholders.
+    /// Delegates to the transport-neutral
+    /// [`crate::epr_atom_service::EprAtomService`] so the iroh-side
+    /// [`crate::p2p_iroh::EprAtomBackend`] can produce wire-byte-identical
+    /// responses. The libp2p-specific work (resolving the caller from
+    /// libp2p `PeerId` via the `PeerIdentityMap`, formatting the peer
+    /// label for tracing) happens here; the service handles the
+    /// rest.
     async fn handle_epr_atom_request(
         &self,
         peer: libp2p::PeerId,
         request: EprAtomRequest,
     ) -> EprAtomResponse {
         let caller = self.identity_map.lookup(&peer);
-
-        match request {
-            EprAtomRequest::Fetch { cid } => {
-                let Some(pool) = self.db_pool.as_ref() else {
-                    warn!(cid = %cid, "EPR atom fetch: db pool unavailable");
-                    return EprAtomResponse::Error {
-                        message: "storage unavailable".to_string(),
-                    };
-                };
-                let mut conn = match pool.get() {
-                    Ok(c) => c,
-                    Err(e) => {
-                        warn!(cid = %cid, error = %e, "EPR atom fetch: db pool exhausted");
-                        return EprAtomResponse::Error {
-                            message: "storage busy".to_string(),
-                        };
-                    }
-                };
-
-                match crate::services::epr_service::fetch_wire_bytes_by_cid(&mut conn, &cid) {
-                    Ok(Some(fetched)) => {
-                        // Reach gate: Phase 2c — public atoms served to all; authors
-                        // may fetch their own private atoms.
-                        if reach_gate_allows(&fetched.reach, &caller, Some(&fetched.signer_cid)) {
-                            debug!(
-                                cid = %cid,
-                                reach = %fetched.reach,
-                                bytes = fetched.wire_bytes.len(),
-                                "EPR atom fetch served"
-                            );
-                            EprAtomResponse::Atom {
-                                envelope_bytes: fetched.wire_bytes,
-                            }
-                        } else {
-                            // Leak-free: caller cannot distinguish missing from unauthorized.
-                            debug!(
-                                cid = %cid,
-                                reach = %fetched.reach,
-                                "EPR atom fetch denied by reach gate"
-                            );
-                            EprAtomResponse::NotFound
-                        }
-                    }
-                    Ok(None) => EprAtomResponse::NotFound,
-                    Err(e) => {
-                        warn!(cid = %cid, error = ?e, "EPR atom fetch error");
-                        EprAtomResponse::Error {
-                            message: "internal error".to_string(),
-                        }
-                    }
-                }
-            }
-            EprAtomRequest::Announce { envelope_bytes } => {
-                // D.6: decode the envelope first (CBOR only — no DB I/O) to
-                // extract the CID string cheaply, then dedup-check before
-                // committing the pool connection or running ingest.
-                let epr: elohim_epr::Epr =
-                    match ciborium::de::from_reader(envelope_bytes.as_slice()) {
-                        Ok(e) => e,
-                        Err(err) => {
-                            debug!(
-                                bytes = envelope_bytes.len(),
-                                reason = %err,
-                                "EPR atom announce: cbor decode failed"
-                            );
-                            return EprAtomResponse::Announced {
-                                accepted: false,
-                                reason: Some(format!("cbor decode: {err}")),
-                            };
-                        }
-                    };
-                let cid_str = epr.envelope.cid.to_string();
-
-                // D.6 wire point A: dedup on CID before DB connection + ingest.
-                if !self.dedup.insert(&cid_str) {
-                    debug!(
-                        target: "elohim_storage::dedup",
-                        from = %peer,
-                        cid = %cid_str,
-                        "duplicate Announce — dropped (no-op)"
-                    );
-                    // D.6: dedup hit. Respond accepted=false so the sender doesn't treat this
-                    // as a fresh acceptance, but include reason so they don't retry. The atom
-                    // is already persisted from the original delivery (LocalEprStore::put is
-                    // idempotent), so accepted=false here means "no NEW ingestion happened."
-                    return EprAtomResponse::Announced {
-                        accepted: false,
-                        reason: Some("duplicate (already seen)".to_string()),
-                    };
-                }
-
-                let Some(pool) = self.db_pool.as_ref() else {
-                    warn!(
-                        bytes = envelope_bytes.len(),
-                        "EPR atom announce: db pool unavailable"
-                    );
-                    return EprAtomResponse::Announced {
-                        accepted: false,
-                        reason: Some("storage unavailable".to_string()),
-                    };
-                };
-                let mut conn = match pool.get() {
-                    Ok(c) => c,
-                    Err(e) => {
-                        warn!(error = %e, "EPR atom announce: db pool exhausted");
-                        return EprAtomResponse::Announced {
-                            accepted: false,
-                            reason: Some("storage busy".to_string()),
-                        };
-                    }
-                };
-
-                // Call ingest() directly with the already-decoded Epr — avoids
-                // a second CBOR decode that ingest_from_wire_bytes would do.
-                match crate::services::epr_service::ingest(&mut conn, epr) {
-                    Ok(ingested) => {
-                        debug!(
-                            cid = %ingested.cid,
-                            bytes = envelope_bytes.len(),
-                            "EPR atom announce accepted"
-                        );
-                        // TODO(T22-followup): call record_predecessor here so the
-                        // libp2p ingest path records the sender for back-prop.
-                        //
-                        // The sender PeerId is available as `peer.to_string()`.
-                        // Wiring requires P2PNode to hold an Arc<SealingKeyPair>
-                        // (added via a `with_sealing_keys` builder method, mirroring
-                        // the existing `with_db_pool` / `with_policy_enforcement`
-                        // pattern). Example call site (once sealing_keys field added):
-                        //
-                        //   if let Some(keys) = &self.sealing_keys {
-                        //       let pub_keys = SealingPubKeys {
-                        //           mishpat_pk: &keys.mishpat_pk,
-                        //           imagodei_pk: &keys.imagodei_pk,
-                        //       };
-                        //       if let Err(e) = crate::services::back_prop::record_predecessor(
-                        //           &mut conn, &ingested.cid, &peer.to_string(), &pub_keys,
-                        //       ) {
-                        //           warn!(?e, cid = %ingested.cid, "record_predecessor failed (non-fatal)");
-                        //       }
-                        //   }
-                        //
-                        // Without this, back_prop_one_hop finds no predecessors and
-                        // returns Ok(vec![]) — correct, just not yet forward-propagating.
-                        EprAtomResponse::Announced {
-                            accepted: true,
-                            reason: None,
-                        }
-                    }
-                    Err(crate::error::StorageError::InvalidInput(msg)) => {
-                        debug!(bytes = envelope_bytes.len(), reason = %msg, "EPR atom announce rejected (invalid)");
-                        EprAtomResponse::Announced {
-                            accepted: false,
-                            reason: Some(format!("verification failed: {msg}")),
-                        }
-                    }
-                    Err(e) => {
-                        warn!(bytes = envelope_bytes.len(), error = ?e, "EPR atom announce: persistence error");
-                        EprAtomResponse::Announced {
-                            accepted: false,
-                            reason: Some("persistence error".to_string()),
-                        }
-                    }
-                }
-            }
-            EprAtomRequest::FetchBatch { cids } => {
-                use crate::p2p::MAX_BATCH_CIDS;
-                if cids.len() > MAX_BATCH_CIDS {
-                    debug!(
-                        count = cids.len(),
-                        max = MAX_BATCH_CIDS,
-                        "EPR atom fetch batch rejected — oversized"
-                    );
-                    return EprAtomResponse::Error {
-                        message: format!(
-                            "batch too large: {} cids (max {})",
-                            cids.len(),
-                            MAX_BATCH_CIDS
-                        ),
-                    };
-                }
-
-                let Some(pool) = self.db_pool.as_ref() else {
-                    warn!(
-                        count = cids.len(),
-                        "EPR atom fetch batch: db pool unavailable"
-                    );
-                    return EprAtomResponse::Error {
-                        message: "storage unavailable".to_string(),
-                    };
-                };
-                let mut conn = match pool.get() {
-                    Ok(c) => c,
-                    Err(e) => {
-                        warn!(count = cids.len(), error = %e, "EPR atom fetch batch: db pool exhausted");
-                        return EprAtomResponse::Error {
-                            message: "storage busy".to_string(),
-                        };
-                    }
-                };
-
-                let mut atoms: Vec<Option<Vec<u8>>> = Vec::with_capacity(cids.len());
-                let mut served = 0usize;
-                for cid in &cids {
-                    let slot =
-                        match crate::services::epr_service::fetch_wire_bytes_by_cid(&mut conn, cid)
-                        {
-                            Ok(Some(fetched))
-                                if reach_gate_allows(
-                                    &fetched.reach,
-                                    &caller,
-                                    Some(&fetched.signer_cid),
-                                ) =>
-                            {
-                                served += 1;
-                                Some(fetched.wire_bytes)
-                            }
-                            Ok(_) => None,
-                            Err(e) => {
-                                warn!(cid = %cid, error = ?e, "EPR atom fetch batch: row error");
-                                None
-                            }
-                        };
-                    atoms.push(slot);
-                }
-                debug!(
-                    total = cids.len(),
-                    served = served,
-                    "EPR atom fetch batch completed"
-                );
-                EprAtomResponse::AtomBatch { atoms }
-            }
-            // D.5: direct-notify of an integrity event from a peer.
-            // Stage 1: only KeyRevocation is handled; other kinds are accepted
-            // but logged as not-yet-handled. Receivers decode by kind and route
-            // to the same handler the gossipsub receive path uses.
-            EprAtomRequest::IntegrityNotify {
-                kind,
-                payload_bytes,
-            } => {
-                match kind.as_str() {
-                    "KeyRevocation" => {
-                        match crate::p2p::recovery_revocation::RecoveryRevocationMessage::from_bytes(
-                            &payload_bytes,
-                        ) {
-                            Ok(msg) => {
-                                // D.6 wire point C: dedup on synthetic KeyRevocation:<id>
-                                // key. Same revocation arriving via direct-notify + gossipsub
-                                // will not double-process after the first delivery.
-                                // See first KeyRevocation: dedup site (wire B) for namespace rationale.
-                                let dedup_key = format!("KeyRevocation:{}", msg.revocation_id);
-                                if !self.dedup.insert(&dedup_key) {
-                                    debug!(
-                                        target: "elohim_storage::dedup",
-                                        from = %peer,
-                                        revocation_id = %msg.revocation_id,
-                                        "duplicate KeyRevocation direct-notify — dropped"
-                                    );
-                                    return EprAtomResponse::IntegrityAck {
-                                        received: true,
-                                        reason: Some("duplicate".to_string()),
-                                    };
-                                }
-                                info!(
-                                    target: "elohim_storage::recovery",
-                                    from = %peer,
-                                    revocation_id = %msg.revocation_id,
-                                    human_id = %msg.human_id,
-                                    status = %msg.status,
-                                    "D.5: Received KeyRevocation via direct-notify"
-                                );
-                                // The gossipsub receive path for RECOVERY_REVOCATION_TOPIC
-                                // currently logs only. When that path adds projection logic,
-                                // factor it into a shared helper and call it from both
-                                // direct-notify + gossipsub paths. For now, structural
-                                // receive + log is sufficient.
-                                EprAtomResponse::IntegrityAck {
-                                    received: true,
-                                    reason: None,
-                                }
-                            }
-                            Err(e) => {
-                                warn!(
-                                    target: "elohim_storage::recovery",
-                                    from = %peer,
-                                    error = %e,
-                                    "D.5: Failed to decode RecoveryRevocationMessage from direct-notify"
-                                );
-                                EprAtomResponse::IntegrityAck {
-                                    received: false,
-                                    reason: Some(format!("decode failed: {e}")),
-                                }
-                            }
-                        }
-                    }
-                    _ => {
-                        warn!(
-                            target: "elohim_storage::integrity",
-                            from = %peer,
-                            kind = %kind,
-                            "D.5: Received IntegrityNotify with unhandled kind — Stage 2/3 will add handlers"
-                        );
-                        EprAtomResponse::IntegrityAck {
-                            received: false,
-                            reason: Some(format!("unhandled integrity kind: {kind}")),
-                        }
-                    }
-                }
-            }
-        }
+        self.epr_atom_service()
+            .handle(&peer.to_string(), caller, request)
     }
+
 
     /// Handle an incoming EPR atom response to one of our outbound requests.
     async fn handle_epr_atom_response(
