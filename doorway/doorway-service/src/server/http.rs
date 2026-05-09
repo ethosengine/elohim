@@ -715,6 +715,50 @@ impl AppState {
 /// enforcement lands, doorway will resolve `human_id → agent_cid` once at user
 /// creation, persist on UserDoc, and source from there. The wire shape
 /// (`X-Agent-Cid` header) does not change.
+/// Auth posture of an incoming request — what kind of session backs it
+/// (or `Anonymous` if unauthenticated). Mirrors the protocol's `authModes`
+/// enum exactly so the auth-mode check is a direct membership test against
+/// `RenderCapabilityProfile.auth_modes`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AuthPosture {
+    Anonymous,
+    DoorwayHosted,
+    StewardPresence,
+}
+
+impl AuthPosture {
+    /// Wire-shape string matching the protocol enum.
+    pub fn as_claim_str(&self) -> &'static str {
+        match self {
+            AuthPosture::Anonymous => "anonymous",
+            AuthPosture::DoorwayHosted => "doorway-hosted",
+            AuthPosture::StewardPresence => "steward-presence",
+        }
+    }
+}
+
+/// Determine an incoming request's auth posture from its headers.
+/// Authorization (Bearer / API key) → `DoorwayHosted` (the protocol JWT
+/// flow today). Cookie containing `steward_attestation=` → `StewardPresence`
+/// (forward-compat for M5 auth-portal-convergence). Cookie containing
+/// `doorway_session=` → `DoorwayHosted`. Anything else → `Anonymous`.
+pub fn determine_auth_posture<B>(req: &Request<B>) -> AuthPosture {
+    if req.headers().get(hyper::header::AUTHORIZATION).is_some() {
+        return AuthPosture::DoorwayHosted;
+    }
+    if let Some(cookie) = req.headers().get(hyper::header::COOKIE) {
+        if let Ok(s) = cookie.to_str() {
+            if s.contains("steward_attestation=") {
+                return AuthPosture::StewardPresence;
+            }
+            if s.contains("doorway_session=") {
+                return AuthPosture::DoorwayHosted;
+            }
+        }
+    }
+    AuthPosture::Anonymous
+}
+
 /// Build a `UserCredential` for the V8 SSR fetch shim from the originating
 /// HTTP request's headers. Returns None for anonymous requests.
 ///
@@ -1704,6 +1748,33 @@ async fn handle_request(
             match dispo {
                 Disposition::SsrRoute { spec, endpoint } => {
                     // Manifest-driven SSR dispatch (Task 13).
+                    //
+                    // Auth-mode enforcement: if the doorway publishes a
+                    // render_capability claim and the request's posture isn't
+                    // in the claim's auth_modes, fall back to the CSR shell
+                    // with x-ssr-skipped: auth-mode-not-supported. Eliminates
+                    // the audit's anonymous-render-of-authenticated-content
+                    // failure mode at the dispatch boundary.
+                    if let Some(claim) = state.render_capability.as_ref() {
+                        let posture = determine_auth_posture(&req);
+                        if !claim
+                            .auth_modes
+                            .iter()
+                            .any(|m| m == posture.as_claim_str())
+                        {
+                            tracing::info!(
+                                target: "doorway::ssr",
+                                path = %p,
+                                posture = %posture.as_claim_str(),
+                                claim_modes = ?claim.auth_modes,
+                                "auth mode not in claim — falling back to CSR shell"
+                            );
+                            return Ok(to_boxed(ssr_spa_shell_fallback_with_skip_reason(
+                                Some("auth-mode-not-supported"),
+                            )));
+                        }
+                    }
+
                     if let Some(renderer) = state.renderer.as_ref() {
                         let render_spec = match elohim_render::RenderSpec::parse(&spec) {
                             Ok(s) => s,
@@ -2221,16 +2292,7 @@ fn ssr_spa_shell_fallback() -> Response<Full<Bytes>> {
 /// Header values must be ASCII-printable; we sanitize CR/LF/non-ASCII to `?`
 /// so a panic message containing newlines doesn't trip hyper's validation.
 fn ssr_spa_shell_fallback_with_error(err: &str) -> Response<Full<Bytes>> {
-    const SHELL: &str = concat!(
-        "<!doctype html><html><body>",
-        "<app-root></app-root>",
-        "<script>console.log('SSR fallback \u{2014} CSR will hydrate')</script>",
-        "</body></html>",
-    );
-    let mut builder = Response::builder()
-        .status(StatusCode::OK)
-        .header("Content-Type", "text/html; charset=utf-8")
-        .header("Cache-Control", "no-store");
+    let mut resp = ssr_spa_shell_fallback_with_skip_reason(None);
     if !err.is_empty() {
         let sanitized: String = err
             .chars()
@@ -2243,7 +2305,35 @@ fn ssr_spa_shell_fallback_with_error(err: &str) -> Response<Full<Bytes>> {
             })
             .take(512)
             .collect();
-        builder = builder.header("x-ssr-error", sanitized);
+        if let Ok(value) = hyper::header::HeaderValue::from_str(&sanitized) {
+            resp.headers_mut().insert("x-ssr-error", value);
+        }
+    }
+    resp
+}
+
+/// SPA shell fallback that records WHY SSR was skipped. Returned when:
+/// - SSR-eligible route but the doorway's auth_modes don't include the
+///   request's posture (`auth-mode-not-supported`)
+/// - Concurrency limit reached (`overflow`)
+/// - Renderer absent for a route that requires SSR (`bundle-not-loaded`)
+///
+/// `skip_reason: None` is the generic fallback (no `x-ssr-skipped` header,
+/// just the SPA shell + `x-ssr-rendered: 0`).
+fn ssr_spa_shell_fallback_with_skip_reason(skip_reason: Option<&str>) -> Response<Full<Bytes>> {
+    const SHELL: &str = concat!(
+        "<!doctype html><html><body>",
+        "<app-root></app-root>",
+        "<script>console.log('SSR fallback \u{2014} CSR will hydrate')</script>",
+        "</body></html>",
+    );
+    let mut builder = Response::builder()
+        .status(StatusCode::OK)
+        .header("Content-Type", "text/html; charset=utf-8")
+        .header("Cache-Control", "no-store")
+        .header("x-ssr-rendered", "0");
+    if let Some(reason) = skip_reason {
+        builder = builder.header("x-ssr-skipped", reason);
     }
     builder.body(Full::new(Bytes::from(SHELL))).unwrap()
 }
