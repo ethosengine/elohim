@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "version": "1.0.0",
+  "description": "Registry of capability claims that may appear on PeerStatusView. Tier-1 capabilities have typed sibling fields on peer-status-view; Tier-2 capabilities live in the extensions map. Promotion criteria (Tier 2 → Tier 1) require two-or-more of: substrate-wide matchmaking branches on the claim, validators enforce structural constraints on the claim, multi-app consumption (3+ apps), or cross-pillar accountability flows. Documented in genesis/docs/superpowers/specs/2026-05-08-ssr-capability-design.md.",
+  "_source": {
+    "category": "C",
+    "layer": "view",
+    "owner": "protocol — registry curation lives in this repo via PR",
+    "notarized": false,
+    "rationale": "Documentation + collision-avoidance for capability namespaces. Validators do not consult this at runtime; it gates schema design at PR review time."
+  },
+  "capabilities": [
+    {
+      "name": "elohim",
+      "tier": 1,
+      "schemaRef": "epr:schema:view:elohim-capability-profile",
+      "addedAt": "2026-01-01T00:00:00Z",
+      "description": "Model-level claims about an elohim-agent running at this peer (model name, family, context window, specialties, skills, strengths)."
+    },
+    {
+      "name": "render",
+      "tier": 1,
+      "schemaRef": "epr:schema:view:render-capability-profile",
+      "addedAt": "2026-05-08T00:00:00Z",
+      "description": "Server-side rendering capability of a doorway co-located with this peer (bundles, auth modes, concurrency budget, memory budget)."
+    }
+  ]
+}
