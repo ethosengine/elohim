@@ -93,6 +93,13 @@ spec:
   containers:
     - name: builder
       image: harbor.ethosengine.com/ethosengine/ci-builder-nix:latest
+      # imagePullPolicy: Always — the :latest tag is moving (sccache 0.15.0
+      # was added 2026-05-09 21:40Z). Without explicit Always, k8s nodes
+      # with cached pre-sccache layers can serve stale pods; build #1218
+      # presumed sccache present (per shellHook's `[ -x ... ]` check) but
+      # tried to exec a non-existent /usr/local/bin/sccache. Forcing pull
+      # rules out the cache-staleness branch.
+      imagePullPolicy: Always
       command: [cat]
       tty: true
       # sccache S3 (Garage) config — auto-mounted Secret in jenkins ns.

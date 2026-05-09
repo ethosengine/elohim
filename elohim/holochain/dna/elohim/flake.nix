@@ -42,11 +42,33 @@
           # in the consuming pod's namespace via the sccache-credentials Secret;
           # we don't need to declare them here.
           shellHook = ''
-            if [ -x /usr/local/bin/sccache ]; then
-              export PATH=/usr/local/bin:$PATH
-              export RUSTC_WRAPPER=sccache
-              export SCCACHE_LOG=''${SCCACHE_LOG:-warn}
-            fi
+            # Diagnostic — surface sccache state on EVERY nix develop entry so
+            # build logs answer "is sccache visible here?" without us having
+            # to spelunk. Pipe to stderr so it doesn't pollute stdout-consuming
+            # commands.
+            {
+              echo "[flake-shellHook] sccache probe:"
+              if [ -x /usr/local/bin/sccache ]; then
+                echo "  /usr/local/bin/sccache: present ($(/usr/local/bin/sccache --version 2>&1 | head -1))"
+                export PATH=/usr/local/bin:$PATH
+                export RUSTC_WRAPPER=sccache
+                export SCCACHE_LOG=''${SCCACHE_LOG:-warn}
+                echo "  RUSTC_WRAPPER=$RUSTC_WRAPPER"
+                echo "  SCCACHE_BUCKET=''${SCCACHE_BUCKET:-<unset>}"
+                echo "  SCCACHE_ENDPOINT=''${SCCACHE_ENDPOINT:-<unset>}"
+                echo "  PATH=$PATH"
+              else
+                echo "  /usr/local/bin/sccache: ABSENT — RUSTC_WRAPPER not set, cargo will not wrap"
+                echo "  ls /usr/local/bin/sccache: $(ls -la /usr/local/bin/sccache 2>&1)"
+                # Defensive: if RUSTC_WRAPPER is set in the inherited env but the
+                # binary is missing, unset it to avoid the os-error-2 trap that
+                # blew up #1216 / #1218.
+                if [ -n "''${RUSTC_WRAPPER:-}" ]; then
+                  echo "  RUSTC_WRAPPER was inherited as=$RUSTC_WRAPPER — UNSETTING to avoid exec failure"
+                  unset RUSTC_WRAPPER
+                fi
+              fi
+            } >&2
           '';
         };
       };
