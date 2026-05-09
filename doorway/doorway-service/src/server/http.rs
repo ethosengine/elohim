@@ -1856,9 +1856,10 @@ async fn handle_request(
                                 path = %p,
                                 "SSR cache HIT"
                             );
-                            return Ok(to_boxed(ssr_html_response_with_cache_status(
+                            return Ok(to_boxed(ssr_html_response_with_observability(
                                 cached_html,
                                 "HIT",
+                                state.render_capability.as_ref(),
                             )));
                         }
 
@@ -1907,7 +1908,11 @@ async fn handle_request(
                                     out.html.clone(),
                                     std::time::Duration::from_secs(5 * 60),
                                 );
-                                ssr_html_response_with_cache_status(out.html, "MISS")
+                                ssr_html_response_with_observability(
+                                    out.html,
+                                    "MISS",
+                                    state.render_capability.as_ref(),
+                                )
                             }
                             Err(e) => {
                                 let err_str = format!("{e}");
@@ -2307,13 +2312,50 @@ fn bad_request_response(message: &str) -> Response<Full<Bytes>> {
 /// `"MISS"` (freshly rendered by the in-process renderer). The header lets
 /// callers verify cache behaviour without inspecting response bodies.
 fn ssr_html_response_with_cache_status(html: String, cache_status: &str) -> Response<Full<Bytes>> {
-    Response::builder()
+    ssr_html_response_with_observability(html, cache_status, None)
+}
+
+/// SSR success response with the observability header contract:
+/// - x-render-cache: MISS / HIT (existing)
+/// - x-ssr-rendered: 1 (always on success)
+/// - x-ssr-renderer: e.g. "angular-ssr" (when capability is present)
+/// - x-ssr-bundle-version: e.g. "lamad-app@1.0.3" (when capability is present)
+///
+/// `capability` is the doorway's published RenderCapabilityProfile (None
+/// when the doorway hasn't derived one — typical for ssr-without-claim
+/// deployments). When None, only x-render-cache and x-ssr-rendered are
+/// emitted; bundle/renderer headers are omitted rather than guessed.
+fn ssr_html_response_with_observability(
+    html: String,
+    cache_status: &str,
+    capability: Option<&crate::render::types::RenderCapabilityProfile>,
+) -> Response<Full<Bytes>> {
+    let mut builder = Response::builder()
         .status(StatusCode::OK)
         .header("content-type", "text/html; charset=utf-8")
         .header("cache-control", "no-store")
         .header("x-render-cache", cache_status)
-        .body(Full::new(Bytes::from(html)))
-        .unwrap()
+        .header("x-ssr-rendered", "1");
+    if let Some(claim) = capability {
+        if let Some(bundle) = claim.bundles.first() {
+            builder = builder.header(
+                "x-ssr-bundle-version",
+                format!("{}@{}", bundle.name, bundle.version),
+            );
+            // The renderer's serialized wire-shape is the kebab-case enum
+            // value, the same string that appears in storage's manifest.
+            let renderer_str = match bundle.renderer {
+                crate::render::types::RendererKind::AngularSsr => "angular-ssr",
+                crate::render::types::RendererKind::ReactRsc => "react-rsc",
+                crate::render::types::RendererKind::VueSsr => "vue-ssr",
+                crate::render::types::RendererKind::SvelteSsr => "svelte-ssr",
+                crate::render::types::RendererKind::LitSsr => "lit-ssr",
+                crate::render::types::RendererKind::StaticHtml => "static-html",
+            };
+            builder = builder.header("x-ssr-renderer", renderer_str);
+        }
+    }
+    builder.body(Full::new(Bytes::from(html))).unwrap()
 }
 
 /// Minimal SPA shell returned when SSR is unavailable or the renderer errors.
