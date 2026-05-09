@@ -1529,18 +1529,23 @@ spec:
                         def predicted = readJSON(file: env.PREDICTED_BUILD_GRAPH_FILE)
                         archiveArtifacts(artifacts: env.PREDICTED_BUILD_GRAPH_FILE, fingerprint: true)
 
+                        // Coerce JSON-derived containers to Groovy List
+                        // before .join() — readJSON returns net.sf.json.JSONArray
+                        // and Jenkins Script Security blocks .join() on it.
+                        // .collect{it} materializes a plain ArrayList.
                         def levelDesc = (predicted.levels ?: []).collect { lvl ->
-                            lvl.size() > 1 ? "[${lvl.join(' + ')}]" : lvl[0]
+                            lvl.size() > 1 ? "[${lvl.collect{it}.join(' + ')}]" : lvl[0]
                         }.join(' → ')
                         if (predicted.genesisAfterLevels) levelDesc += ' → genesis'
 
+                        def pipelinesList = (predicted.pipelines ?: []).collect { it }
                         echo """
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 📤 PREDICTED BUILD GRAPH posted
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   Commit:    ${(predicted.commitSha ?: '').take(8)}
   Mode:      ${predicted.mode}
-  Pipelines: ${predicted.pipelines.size() > 0 ? predicted.pipelines.join(', ') : '(none)'}
+  Pipelines: ${pipelinesList.size() > 0 ? pipelinesList.join(', ') : '(none)'}
   Plan:      ${levelDesc ?: '(no builds)'}
   Artifact:  ${env.BUILD_URL}artifact/${env.PREDICTED_BUILD_GRAPH_FILE}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -1794,7 +1799,7 @@ spec:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   Commit:           ${(actual.commitSha ?: '').take(8)}
   Results:          ${resultLine ?: '(no builds dispatched)'}
-  Aborted-pre-start: ${(actual.abortedBeforeStart ?: []).join(', ') ?: '(none)'}
+  Aborted-pre-start: ${(actual.abortedBeforeStart ?: []).collect { it }.join(', ') ?: '(none)'}
   Artifact:         ${env.BUILD_URL}artifact/${env.ACTUAL_BUILD_GRAPH_FILE}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 """
