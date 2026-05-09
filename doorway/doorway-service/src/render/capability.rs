@@ -146,6 +146,150 @@ pub async fn fetch_manifest_renderers(
     Ok(out)
 }
 
+#[derive(Debug, Clone, Default, serde::Deserialize)]
+#[serde(default)]
+pub struct RenderOverride {
+    pub bundles_hidden: Vec<String>,
+    pub max_concurrent: Option<u32>,
+    pub auth_modes: Option<Vec<String>>,
+    pub memory_budget_mib: Option<u32>,
+}
+
+#[derive(serde::Deserialize)]
+struct OverrideRoot {
+    #[serde(default)]
+    render: RenderOverride,
+}
+
+/// Parse override TOML text. Returns `RenderOverride::default()` on empty input.
+pub fn parse_override(text: &str) -> Result<RenderOverride, CapabilityDeriverError> {
+    if text.trim().is_empty() {
+        return Ok(RenderOverride::default());
+    }
+    let root: OverrideRoot = toml::from_str(text)
+        .map_err(|e| CapabilityDeriverError::OverrideMalformed(e.to_string()))?;
+    Ok(root.render)
+}
+
+/// Load override from a path. Missing file or malformed contents → default
+/// (honest degradation: no override applied; warning logged).
+pub async fn load_override(path: Option<&std::path::Path>) -> RenderOverride {
+    let Some(path) = path else {
+        return RenderOverride::default();
+    };
+    let contents = match tokio::fs::read_to_string(path).await {
+        Ok(c) => c,
+        Err(_) => {
+            tracing::debug!(
+                path = %path.display(),
+                "override file not present — using defaults"
+            );
+            return RenderOverride::default();
+        }
+    };
+    match parse_override(&contents) {
+        Ok(o) => o,
+        Err(e) => {
+            tracing::warn!(
+                path = %path.display(),
+                error = %e,
+                "override file malformed — ignoring (using derived claim verbatim)"
+            );
+            RenderOverride::default()
+        }
+    }
+}
+
+#[cfg(test)]
+mod override_tests {
+    use super::*;
+    use std::fs;
+    use tempfile::TempDir;
+
+    #[test]
+    fn parses_full_override() {
+        let toml_str = r#"
+[render]
+bundles_hidden = ["qahal-app"]
+max_concurrent = 2
+auth_modes = ["anonymous"]
+memory_budget_mib = 512
+"#;
+        let parsed = parse_override(toml_str).expect("parses");
+        assert_eq!(parsed.bundles_hidden, vec!["qahal-app".to_string()]);
+        assert_eq!(parsed.max_concurrent, Some(2));
+        assert_eq!(parsed.auth_modes, Some(vec!["anonymous".to_string()]));
+        assert_eq!(parsed.memory_budget_mib, Some(512));
+    }
+
+    #[test]
+    fn empty_override_returns_default() {
+        let parsed = parse_override("").expect("parses");
+        assert!(parsed.bundles_hidden.is_empty());
+        assert!(parsed.max_concurrent.is_none());
+        assert!(parsed.auth_modes.is_none());
+        assert!(parsed.memory_budget_mib.is_none());
+    }
+
+    #[test]
+    fn whitespace_only_returns_default() {
+        let parsed = parse_override("   \n\t\n  ").expect("parses");
+        assert!(parsed.bundles_hidden.is_empty());
+    }
+
+    #[test]
+    fn missing_render_section_returns_default() {
+        // Valid TOML but no [render] section
+        let parsed = parse_override("[other]\nfoo = 1\n").expect("parses");
+        assert!(parsed.bundles_hidden.is_empty());
+    }
+
+    #[test]
+    fn malformed_toml_returns_error() {
+        let result = parse_override("[render\nbroken");
+        assert!(result.is_err());
+        assert!(matches!(
+            result.unwrap_err(),
+            CapabilityDeriverError::OverrideMalformed(_)
+        ));
+    }
+
+    #[tokio::test]
+    async fn missing_file_returns_default() {
+        let result = load_override(Some(std::path::Path::new(
+            "/nonexistent/path/override.toml",
+        )))
+        .await;
+        assert!(result.bundles_hidden.is_empty());
+        assert!(result.max_concurrent.is_none());
+    }
+
+    #[tokio::test]
+    async fn none_path_returns_default() {
+        let result = load_override(None).await;
+        assert!(result.bundles_hidden.is_empty());
+    }
+
+    #[tokio::test]
+    async fn loads_valid_file() {
+        let tmp = TempDir::new().unwrap();
+        let path = tmp.path().join("override.toml");
+        fs::write(&path, "[render]\nmax_concurrent = 4\n").unwrap();
+        let result = load_override(Some(path.as_path())).await;
+        assert_eq!(result.max_concurrent, Some(4));
+    }
+
+    #[tokio::test]
+    async fn malformed_file_falls_back_to_default() {
+        let tmp = TempDir::new().unwrap();
+        let path = tmp.path().join("broken.toml");
+        fs::write(&path, "[render\nthis is broken").unwrap();
+        // Honest degradation: no panic, no error — just defaults
+        let result = load_override(Some(path.as_path())).await;
+        assert!(result.bundles_hidden.is_empty());
+    }
+}
+
 #[cfg(test)]
 mod scan_tests {
     use super::*;
