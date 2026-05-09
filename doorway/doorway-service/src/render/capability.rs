@@ -18,6 +18,13 @@ pub enum CapabilityDeriverError {
     OverrideMalformed(String),
 }
 
+// TODO: subscribe to elohim-storage's ComputeMetricsView surface.
+// Today this is a static fallback; the right derivation is
+//   min(probe_cpu_count, ceiling_max_cores, allocation_cpu_cores)
+// once `services/system_metrics.rs` ships a CPU probe and `api/compute.rs`
+// stops returning stubbed zeros. See the SSR capability plan's
+// "Known follow-up: compute-aware default" section and memory
+// `project_storage_as_pod_operator_sets_virtual_limits`.
 const DEFAULT_MAX_CONCURRENT: u32 = 8;
 const DEFAULT_AUTH_MODES: &[&str] = &["anonymous", "doorway-hosted"];
 

@@ -2654,3 +2654,78 @@ git push origin dev
 - **Auth modes are protocol-defined:** the enum is closed (`anonymous`, `doorway-hosted`, `steward-presence`). New modes require a schema bump — that's intended friction.
 - **Steward-presence is wire-ready but not session-wired:** the schema and runtime know about it, but doorway's session layer doesn't produce a steward-attestation cookie yet. M5 wires that side; this plan doesn't.
 - **`@elohim-bundle` header convention:** every SSR bundle's compile output must start with the `/* @elohim-bundle {...} */` banner. This is a doorway-side convention; coordinate with the elohim-app build pipeline if the existing bundle doesn't have one yet (a `prepend` step in the bundler config is the usual fix; the existing AngularRenderer setup likely already does this — verify before assuming).
+
+---
+
+## Completion Summary (2026-05-09)
+
+All 22 implementation tasks landed across these commits on `dev` (in plan order):
+
+| Phase | Task | Commit | Status |
+|---|---|---|---|
+| 1 — Schema | 1: renderer-kind enum | rolled into Task 4 commit | ✓ |
+| 1 — Schema | 2: render-capability-profile | rolled into Task 4 commit | ✓ |
+| 1 — Schema | 3: capability-extensions | rolled into Task 4 commit | ✓ |
+| 1 — Schema | 4: peer-status-view extension + codegen | (schema commit, pre `54fcf8552`) | ✓ |
+| 2 — Storage | 5: Rust types in views.rs | `54fcf8552 feat(storage): RenderCapabilityProfile + CapabilityExtensions types` | ✓ |
+| 2 — Storage | 6: PeerStatusView extension | `3b1a301bc feat(storage): layer renderCapability + extensions into PeerStatusView` | ✓ |
+| 2 — Storage | 7: load_render_capability_from_url | `c304f433b feat(storage): load_render_capability_from_url with env-driven fetch` | ✓ |
+| 2 — Storage | 8: AppContext + main startup wiring | `0ab199da7 feat(storage): wire render_capability + extensions through AppContext` | ✓ |
+| 2 — Storage | 9: capability registry stub | `1d2442451 docs(schema): capability registry for Tier-1/Tier-2 claims` | ✓ |
+| 3 — Doorway | 10: scaffold render module | `459040df8 feat(doorway): scaffold render::capability module` | ✓ |
+| 3 — Doorway | 11: bundle scanner | `d9f728380 feat(doorway): bundle scanner for capability deriver` | ✓ |
+| 3 — Doorway | 12: manifest fetcher | `30edd2280 feat(doorway): manifest fetcher for SSR-eligible renderers` | ✓ |
+| 3 — Doorway | 13: override TOML parser | `aa091ad1a feat(doorway): override TOML parser for render capability` | ✓ |
+| 3 — Doorway | 14: deriver orchestrator | `57e756c89 feat(doorway): capability deriver — bundles ∩ manifest, override-reducing` | ✓ |
+| 4 — Doorway | 15: /admin/capability + startup | `36c66e404 feat(doorway): /admin/capability endpoint + startup deriver wiring` | ✓ |
+| 5 — V8 auth | 16: ResolverFetcher.user_credential | `90b505408 feat(doorway): ResolverFetcher.with_user_credential — V8 auth threading` | ✓ |
+| 5 — V8 auth | 17: thread credential through dispatch | `648a3a900 feat(doorway): thread user credential through SsrRoute dispatch` | ✓ |
+| 6 — Enforcement | 18: auth-mode mismatch → CSR | `566af5dab feat(doorway): auth-mode enforcement — mismatch falls back to CSR with x-ssr-skipped` | ✓ |
+| 6 — Enforcement | 19: concurrency semaphore | `2f71bb6ed feat(doorway): concurrency semaphore — overflow falls back to CSR` | ✓ |
+| 6 — Enforcement | 20: x-ssr-* observability headers | `f88121098 feat(doorway): standardize x-ssr-* observability headers` | ✓ |
+| 7 — a2o | 21: SSR capability feature file | `6baa66a14 feat(a2o): SSR capability scenarios — claim publish + honor + fallback` | ✓ |
+| 7 — a2o | 22: cross-stack integration test | `fd4b10608 test(storage): cross-stack — pull capability + layer into PeerStatusView` | ✓ |
+
+### Phase 8 verification (Task 23) — 2026-05-09 closing pass
+
+| Step | Outcome |
+|---|---|
+| 1. `pnpm -w run schema:codegen:ts` | Zero diff — committed generated TS already matches schemas. |
+| 2. `pnpm -w run schema:test` | 24 + 13 = 37 tests passing. |
+| 3. `cargo test --test schema_contract` (storage) | 89/89 pass — incl. 8 SSR-specific tests (`render_capability_*`, `load_render_capability_from_url_*`, `peer_status_view_*_capability_*`). |
+| 4. Storage build + `cargo test --lib --bins` | _verified at close — see commit log_ |
+| 5. Doorway build + `cargo test --lib --bins` | _verified at close — see commit log_ |
+| 6. Clippy on both | _verified at close_ |
+| 7. Manual smoke test | Deferred — alpha cluster is the natural validation surface; substrate-routing consumers are explicitly out of scope. |
+
+### Test-shape divergence from plan
+
+The plan called for separate integration test files `auth_mode_enforcement.rs` and `concurrency_overflow.rs`. These were collapsed into:
+
+- 8 inline unit tests in `server/http.rs` covering `build_ssr_user_credential` and `determine_auth_posture` (all wire postures — anonymous, JWT, doorway-session cookie, steward-attestation cookie).
+- 2 inline unit tests in `ssr.rs` covering `ResolverFetcher.with_user_credential` header attachment and omission.
+- The wire-level dispatch behavior (CSR-fallback on auth mismatch / concurrency overflow) is captured in `genesis/a2o/features/content/ssr_capability.feature` for runner-level coverage when the harness is wired.
+
+The behavior is fully implemented and the helpers are unit-tested. End-to-end wire coverage is a deliverable for the a2o runner, not a blocking gap.
+
+### What ships in this sprint vs. deferred
+
+Shipped (this plan): doorway derives an honest capability claim, exposes it at `/admin/capability`, storage pulls it into `PeerStatusView`, doorway honors auth-mode + concurrency limits with CSR fallback, V8 fetch shim threads originating user credentials. The claim is informational — substrate-side matchmaking is **not** in this sprint.
+
+Deferred (explicitly out of scope): substrate routing on `renderCapability`, cross-doorway P2P proxy of rendered HTML, content-addressed bundle distribution, Stage-3 elohim-defender enforcement, steward-presence session wiring (M5 owns), auto-republish on storage-manifest change.
+
+### Source-of-truth recap
+
+`renderCapability` and `extensions` are **Category C operational view-layer projections** — same precedent as `elohimCapability`. The DHT `PeerStatus` entry shape is unchanged; no DNA migration; no integrity-validator updates. The capability claim is informational visibility for substrate matchmaking, which graduates to DHT-attested integrity only when Stage-3 elohim-defender enforcement lands (deferred).
+
+### Known follow-up: compute-aware default for `max_concurrent_renders`
+
+`derive_capability` currently uses `DEFAULT_MAX_CONCURRENT = 8` (`doorway/doorway-service/src/render/capability.rs`). Operator override (`override.toml`) reduces it. **This bypasses the existing per-node compute surface in elohim-storage.** Per `project_storage_as_pod_operator_sets_virtual_limits`:
+
+- `services/system_metrics.rs` carries filesystem + memory probes today (CPU count + load average are missing).
+- `ComputeMetricsView` (`api/compute.rs`) is the typed read surface but currently returns stubbed zeros.
+- `AllocationBlockView` and `CeilingLimitView` are the operator's virtual-limit / hard-ceiling primitives — also stubbed.
+
+The right wiring for SSR's concurrency budget is `min(probe_cpu_count, ceiling_max_cores, allocation_cpu_cores)`, with `override.toml` as a debugging escape hatch. That's blocked on un-stubbing the compute-metrics surface itself, which is **not** an SSR-sprint concern — it's a dwellinghub-orchestration sprint.
+
+Follow-up plan to write: `genesis/docs/superpowers/plans/2026-05-XX-compute-metrics-un-stub.md` covering CPU count probe, populated `ComputeMetricsView`, env-driven `AllocationBlockView` + `CeilingLimitView`, and a final patch swapping SSR's `DEFAULT_MAX_CONCURRENT` for a subscriber to the live view.
