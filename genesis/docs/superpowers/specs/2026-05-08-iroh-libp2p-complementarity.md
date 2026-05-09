@@ -286,6 +286,33 @@ For each wire plane in elohim-storage, the verdict is one of:
 | **Reach-authorization** | **n/a — internal service, not a wire plane** | Per `p2p_iroh/README.md`, reach-authorization is an internal service that consumes identity context from the handshake plane and reads DHT-notarized stewardship contracts to make reach-gate decisions. **The feature itself is canonical to the protocol.** Its wire participation is via the planes that carry the data being authorized (sync, EPR, shard, etc.) — those planes' verdicts apply. How reach-authorization's full wire-composition is shaped while preserving DHT-derived integrity is a subject of in-progress feature design — see §What this spec deliberately does NOT settle. |
 | **Discovery** | **dual-stack permanent: pkarr (iroh) + Kademlia (libp2p)** | Multi-bootstrap. n0 demoted to one-of-many defaults; operators self-host pkarr resolvers. Kademlia stays for cross-collective discovery on consumer-grade peers. mDNS available for local fabric. |
 
+### Empirical perf data (loopback, release, 2026-05-09)
+
+Per-plane head-to-head benches now run two scenarios on each transport:
+
+- **Reuse** — open one connection, fresh stream/request per iteration. Engine-ceiling number for stream multiplexing.
+- **Fresh** — open a new connection per iteration. iroh side matches `IrohSyncClient::request` as shipped today (Phase 5 — pre-pool). Libp2p side spawns a fresh fetcher swarm per iter (full TCP+Noise+Yamux handshake on every iteration).
+
+Iroh wins decisively on every chatty (small-frame) plane in **both** scenarios. Wins narrow as payload grows past ~1 MiB — the shard plane (4 MiB Reed-Solomon shards) shows iroh winning only ~1.2–1.4× because per-frame overhead stops dominating once raw bytes do.
+
+| Plane | REUSE p50 ratio (iroh wins) | FRESH p50 ratio (iroh wins) | Source |
+|---|---|---|---|
+| Sync | 45×–541× | 19×–50× | `bench_sync_perf` (`7db8def2a`) |
+| EPR | 25×–249× | 19×–34× | `bench_epr_perf` (`996038198`) |
+| EPR-atom | 25×–266× | 18×–25× | `bench_epr_atom_perf` (`1dadb8d01`) |
+| Shard | 1.2×–128× | 1.3×–25× | `bench_shard_perf` (`261a7ece7`) |
+| View-fed | 59×–290× | 18×–58× | `bench_view_fed_perf` (`3aacceec5`) |
+
+(Range reflects payload-size sweep within each plane — small-frame win is always largest.)
+
+A coincident finding from the bench expansion: every Phase 5–10 ALPN
+ProtocolHandler::accept was originally one-stream-per-connection by
+design (single `accept_bi` then `connection.closed().await`). Production
+is unaffected because clients always open a fresh QUIC connection per
+request — but reuse-mode benches and any future Phase 11 connection pool
+would hang. Handlers now loop on `accept_bi`, breaking on connection-
+closed error. See `7db8def2a` for the patch and the discovery trace.
+
 ### Decision rule (Phase 11 backend wiring)
 
 When wiring a backend in Phase 11 (replacing a stub backend so the daemon routes through iroh ALPNs in iroh mode), the rule is:
