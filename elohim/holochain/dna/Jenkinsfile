@@ -95,24 +95,24 @@ spec:
       image: harbor.ethosengine.com/ethosengine/ci-builder-nix:latest
       command: [cat]
       tty: true
-      # sccache config injected via the sccache-credentials Secret in the
-      # jenkins ns (auto-mounted via labelled secret pattern). Provides:
-      # AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, SCCACHE_BUCKET,
-      # SCCACHE_ENDPOINT, SCCACHE_S3_USE_SSL, SCCACHE_REGION. Backing store
-      # is Garage at garage.ethosengine.svc.cluster.local:3900 (S3-compatible).
-      # ci-builder-nix:latest carries /usr/local/bin/sccache 0.15.0 (added
-      # in che-devworkspaces commit 2026-05-09; verified Dockerfile layer).
-      # Earlier wiring attempt in commit 6d563f989 failed (build #1214) when
-      # the image hadn't been rebuilt yet — re-applied here after operator
-      # confirmed the rebuild landed.
-      envFrom:
-        - secretRef:
-            name: sccache-credentials
-      env:
-        - name: RUSTC_WRAPPER
-          value: sccache
-        - name: SCCACHE_LOG
-          value: warn
+      # NOTE: sccache wiring reverted (second time) after build #1216 also
+      # failed with `No such file or directory (os error 2)` invoking
+      # /usr/local/bin/sccache. The che-devworkspaces Dockerfile in the
+      # main branch has the sccache install layer (verified), but the
+      # published harbor.ethosengine.com/ethosengine/ci-builder-nix:latest
+      # image still lacks the binary at runtime. The image-build pipeline
+      # in che-devworkspaces evidently hasn't pushed a layer-current :latest.
+      # Worth noting: Nix-managed stages (Manifest Hygiene, Build WASM Cache
+      # Core, Build DNA) IGNORE RUSTC_WRAPPER because Nix env isolation
+      # strips it — sccache only kicks in at the sweettest compile (first
+      # bare cargo invocation), which is why #1216 failed at DNA Integration
+      # 19min in instead of at Manifest Hygiene seconds in. Even when the
+      # image lands, sccache benefit on this pipeline is narrow: only the
+      # sweettest cold-compile (the dominant cost — ~30-47min historically)
+      # gets the speedup; the WASM stages will continue to be Nix-driven.
+      # Re-enable after operator verifies:
+      #   docker run --rm harbor.ethosengine.com/ethosengine/ci-builder-nix:latest \
+      #       which sccache && /usr/local/bin/sccache --version
       resources:
         requests:
           memory: "4Gi"
