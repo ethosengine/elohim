@@ -142,6 +142,102 @@ def getConductorAppUrls() {
     return urls.join(',')
 }
 
+/**
+ * Probe each conductor's admin WebSocket port for reachability before
+ * invoking the seeder. Returns [ready: [...urls], unready: [...urls]]
+ * and writes a structured conductor-readiness.json artifact.
+ *
+ * Aligns with the "seed whoever is ready" principle: partial-cluster
+ * operation is the steady state, not an exception. If timothy's admin
+ * WS is down, we want to seed adam/jessica/matthew and report timothy
+ * as unready — not waste 150s of WebSocket-timeout-loop trying to seed
+ * 5 humans against a dead conductor.
+ *
+ * The probe is a 2-second TCP connect to the admin port (= app port - 1
+ * per the socat convention; see seed-conductor-identities.ts:106-115).
+ * TCP success is necessary but not sufficient for WS handshake; if the
+ * conductor TCP-accepts but rejects the WS upgrade, the seeder will
+ * still surface that as a per-peer failure. The probe just eliminates
+ * the obvious "pod is dead" case fast.
+ *
+ * @param urlsString  comma-separated app URLs from getConductorAppUrls()
+ * @param stageLabel  human-readable stage name (for the artifact)
+ * @return            [ready: [...urls], unready: [...urls],
+ *                     readyDetails: [...{url, host, adminPort}],
+ *                     unreadyDetails: [...{url, host, adminPort, reason}]]
+ */
+def probeConductorReadiness(String urlsString, String stageLabel) {
+    def readyDetails = []
+    def unreadyDetails = []
+
+    def urls = (urlsString ?: '').split(',').collect { it.trim() }.findAll { it }
+    urls.each { String appUrl ->
+        // Strip ws:// then split host:port. Defensive against malformed
+        // entries from topology.json — we don't want a typo to throw and
+        // cascade-fail the whole seed stage.
+        def stripped = appUrl.replaceFirst(/^wss?:\/\//, '')
+        def parts = stripped.split(':')
+        if (parts.size() < 2 || !parts[1].isInteger()) {
+            echo "[probe] ⚠️  Malformed URL — skipping: ${appUrl}"
+            unreadyDetails.add([url: appUrl, reason: 'malformed-url'])
+            return
+        }
+        def host = parts[0]
+        def appPort = parts[1].toInteger()
+        def adminPort = appPort - 1
+
+        // Sanity check on host shape — K8s DNS uses [a-z0-9.-]+ only.
+        // Anything else likely came from a broken topology entry; treat
+        // as unready rather than risk shell interpolation surprises.
+        if (!(host ==~ /[a-z0-9.\-]+/)) {
+            echo "[probe] ⚠️  Suspicious host shape — skipping: ${host}"
+            unreadyDetails.add([url: appUrl, host: host, reason: 'suspicious-host'])
+            return
+        }
+
+        // 2-second TCP probe via /dev/tcp (no nc dependency required).
+        // returnStatus: 0 on connect, non-zero on timeout / refused / DNS fail.
+        def probeExit = sh(
+            script: "timeout 2 bash -c 'echo > /dev/tcp/${host}/${adminPort}' 2>/dev/null",
+            returnStatus: true
+        )
+
+        if (probeExit == 0) {
+            readyDetails.add([url: appUrl, host: host, adminPort: adminPort])
+            echo "[probe] ✅ ${host}:${adminPort} reachable"
+        } else {
+            unreadyDetails.add([url: appUrl, host: host, adminPort: adminPort, reason: 'tcp-timeout-or-refused'])
+            echo "[probe] ❌ ${host}:${adminPort} unreachable (admin WS not accepting TCP)"
+        }
+    }
+
+    // Emit structured artifact. Schema is intentionally compatible with
+    // future stageAnnotations work that would feed conductor-readiness
+    // into actual-build-graph.json's per-pipeline result map.
+    def report = [
+        schemaVersion: '1',
+        probedAt: new Date().format("yyyy-MM-dd'T'HH:mm:ss'Z'", TimeZone.getTimeZone('UTC')),
+        stage: stageLabel,
+        commitSha: env.GIT_COMMIT_FULL ?: env.GIT_COMMIT ?: '',
+        readyCount: readyDetails.size(),
+        unreadyCount: unreadyDetails.size(),
+        partial: readyDetails.size() > 0 && unreadyDetails.size() > 0,
+        allReady: unreadyDetails.isEmpty(),
+        allUnready: readyDetails.isEmpty(),
+        ready: readyDetails,
+        unready: unreadyDetails,
+    ]
+    writeJSON(file: 'conductor-readiness.json', json: report, pretty: 2)
+    archiveArtifacts(artifacts: 'conductor-readiness.json', allowEmptyArchive: true, fingerprint: true)
+
+    return [
+        ready: readyDetails.collect { it.url },
+        unready: unreadyDetails.collect { it.url },
+        readyDetails: readyDetails,
+        unreadyDetails: unreadyDetails,
+    ]
+}
+
 def shouldRunStep(String stepName) {
     def steps = (params.STEPS ?: 'all').split(',').collect { it.trim() }
     return steps.contains('all') || steps.contains(stepName)
@@ -969,6 +1065,29 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                             echo "WARN: no conductor URLs resolved — skipping seed-conductor-identities"
                             return
                         }
+
+                        // Per-peer pre-flight probe. Skips dead peers entirely
+                        // rather than letting the seeder waste ~150s on the
+                        // 10s-WS-timeout × N-humans loop. Emits
+                        // conductor-readiness.json for downstream investigation.
+                        def probe = probeConductorReadiness(conductorUrls, 'Seed Conductor Identities')
+
+                        if (probe.ready.isEmpty()) {
+                            // All conductors unreachable — nothing to seed.
+                            // Still mark UNSTABLE (not FAILED) per the
+                            // partial-cluster-is-steady-state principle:
+                            // a household with no peers ready today is
+                            // recoverable, not a hard failure.
+                            unstable("All ${probe.unready.size()} conductors unreachable — skipping seed (see conductor-readiness.json)")
+                            return
+                        }
+
+                        if (!probe.unready.isEmpty()) {
+                            unstable("${probe.unready.size()} of ${probe.ready.size() + probe.unready.size()} conductors unready — seeding ${probe.ready.size()} reachable peers (see conductor-readiness.json)")
+                        }
+
+                        def readyUrls = probe.ready.join(',')
+
                         catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
                             dir('genesis/seeder') {
                                 sh """#!/bin/bash
@@ -976,9 +1095,9 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                                     echo "═══════════════════════════════════════════════════════════"
                                     echo "SEED CONDUCTOR IDENTITIES"
                                     echo "═══════════════════════════════════════════════════════════"
-                                    echo "Conductors: ${conductorUrls}"
+                                    echo "Conductors (ready): ${readyUrls}"
                                     echo ""
-                                    CONDUCTOR_URLS="${conductorUrls}" \\
+                                    CONDUCTOR_URLS="${readyUrls}" \\
                                       npx tsx src/seed-conductor-identities.ts
                                 """
                             }
@@ -1001,6 +1120,25 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                             echo "WARN: no conductor URLs resolved — skipping seed-agent-bindings"
                             return
                         }
+
+                        // Probe again — a peer may have recovered or gone
+                        // down between Seed Conductor Identities and now.
+                        // The latest probe overwrites conductor-readiness.json
+                        // (single-file, latest-wins) — sufficient for
+                        // iteration 1; preserve-history is a follow-up.
+                        def probe = probeConductorReadiness(conductorUrls, 'Seed Agent Peer Bindings')
+
+                        if (probe.ready.isEmpty()) {
+                            unstable("All ${probe.unready.size()} conductors unreachable — skipping seed (see conductor-readiness.json)")
+                            return
+                        }
+
+                        if (!probe.unready.isEmpty()) {
+                            unstable("${probe.unready.size()} of ${probe.ready.size() + probe.unready.size()} conductors unready — seeding ${probe.ready.size()} reachable peers (see conductor-readiness.json)")
+                        }
+
+                        def readyUrls = probe.ready.join(',')
+
                         catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
                             dir('genesis/seeder') {
                                 sh """#!/bin/bash
@@ -1008,9 +1146,9 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                                     echo "═══════════════════════════════════════════════════════════"
                                     echo "SEED AGENT PEER BINDINGS"
                                     echo "═══════════════════════════════════════════════════════════"
-                                    echo "Conductors: ${conductorUrls}"
+                                    echo "Conductors (ready): ${readyUrls}"
                                     echo ""
-                                    CONDUCTOR_URLS="${conductorUrls}" \\
+                                    CONDUCTOR_URLS="${readyUrls}" \\
                                       npx tsx src/seed-agent-bindings.ts
                                 """
                             }
