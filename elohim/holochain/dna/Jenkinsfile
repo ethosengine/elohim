@@ -109,18 +109,18 @@ spec:
           mountPath: /root/.cargo
         # NOTE: nix-store PVC mount intentionally absent. Mounting an empty
         # PVC at /nix/store on first run wipes out the ci-builder-nix image's
-        # bundled nix binary (lives at /nix/store/<hash>-nix/bin/nix), which
-        # made build #1211 fail with "nix: command not found". Re-enabling
-        # this needs an init-container that primes the PVC from the image's
-        # /nix/store on first run. Tracked as followup. The volume is still
-        # declared above so the manifest stays valid; just unused.
-        # Persist the cargo target/ tree across builds. Without this mount,
-        # the sweettest crate recompiles from scratch every run (47m 48s
-        # observed in elohim-holochain/dev/1210). CARGO_TARGET_DIR below
-        # routes both DNA WASM builds and the native sweettest build into
-        # this volume; cargo handles the per-target subdirectory layout.
-        - name: sweettest-target-cache
-          mountPath: /cargo-target
+        # bundled nix binary. Tracked as followup; sccache via Garage S3 is
+        # the planned replacement for cargo build caching once sccache lands
+        # in ci-builder-nix:latest (in flight separately).
+        # NOTE: sweettest-target-cache /cargo-target mount also temporarily
+        # absent. Pairing CARGO_TARGET_DIR=/cargo-target with this mount
+        # broke the DNA pack stage in build #1212: post-build steps (hc dna
+        # pack, hApp manifest resolution) look for content_store.wasm at the
+        # default ./target path, which CARGO_TARGET_DIR overrides. Failure:
+        # "Failed to canonicalize resource path: content_store.wasm: No
+        # such file or directory". Reverting to default ./target until we
+        # can either rewire the post-build paths to honor CARGO_TARGET_DIR,
+        # or move to sccache-based caching once that infra lands.
 '''
         }
     }
@@ -128,12 +128,11 @@ spec:
     environment {
         BRANCH_NAME = "${env.BRANCH_NAME ?: 'main'}"
         PATH = "/nix/var/nix/profiles/default/bin:${env.PATH}"
-        // Route compiled cargo artefacts (both DNA WASM and the native
-        // sweettest crate) into the sweettest-target-cache PVC mounted at
-        // /cargo-target. Cargo manages target subdirs per profile/triple,
-        // so a single CARGO_TARGET_DIR is correct for both build kinds.
-        // Eliminates the 47m+ cold compile observed in build #1210.
-        CARGO_TARGET_DIR = "/cargo-target"
+        // CARGO_TARGET_DIR temporarily unset — see volumeMounts NOTE above.
+        // Default ./target restores the path post-build steps (hc dna pack,
+        // hApp manifest resolution) expect. Caching for the sweettest cold
+        // compile will return via sccache once ci-builder-nix:latest carries
+        // the sccache binary (in-flight infra change).
     }
 
     parameters {
