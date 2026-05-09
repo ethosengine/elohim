@@ -556,10 +556,23 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                 # Flake-ref is explicit — tests/sweettest/ has no flake.nix
                                 # so nix would otherwise search parents and bail.
                                 # --impure preserves SCCACHE_* env vars from pod
-                                # envFrom; this is the dominant cache-benefit
-                                # stage (sweettest cold compile, ~30-47min).
+                                # envFrom (used by other stages). sccache itself
+                                # is DISABLED for sweettest (see unset below).
                                 nix develop --impure --accept-flake-config "$WORKSPACE/elohim/holochain/dna/elohim" --command bash -c "
                                     set -uo pipefail
+                                    # Disable sccache for the sweettest compile only.
+                                    # Build #1219 hit the known sccache+cargo build-script
+                                    # caching bug: sccache served a 'cache hit' for
+                                    # lair_keystore_api's build-script compilation but
+                                    # didn't materialize target/release/build/<crate>/
+                                    # build-script-build, causing 'never executed (os
+                                    # error 2)' when cargo invoked it. This bug only
+                                    # affects native cargo builds with build scripts;
+                                    # the WASM stages (Build WASM Cache Core, Build DNA)
+                                    # use wasm32 target without native build scripts and
+                                    # cache cleanly. Sweettest stays at the prior ~71min
+                                    # cold-compile baseline; other stages keep sccache.
+                                    unset RUSTC_WRAPPER
                                     export CARGO_BUILD_JOBS=2
                                     # The flake exports RUSTFLAGS='--cfg getrandom_backend=\"custom\"'
                                     # for WASM zome builds (Holochain provides the host RNG fn).
