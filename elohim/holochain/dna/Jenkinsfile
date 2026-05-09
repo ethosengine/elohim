@@ -107,12 +107,13 @@ spec:
       volumeMounts:
         - name: cargo-cache
           mountPath: /root/.cargo
-        # Mount the nix-store PVC so the holochain toolchain (rustc, cargo,
-        # holochain, lair-keystore, etc.) persists across builds instead of
-        # being re-downloaded from cachix every run. The PVC was previously
-        # declared in volumes but never mounted into the builder container.
-        - name: nix-store
-          mountPath: /nix/store
+        # NOTE: nix-store PVC mount intentionally absent. Mounting an empty
+        # PVC at /nix/store on first run wipes out the ci-builder-nix image's
+        # bundled nix binary (lives at /nix/store/<hash>-nix/bin/nix), which
+        # made build #1211 fail with "nix: command not found". Re-enabling
+        # this needs an init-container that primes the PVC from the image's
+        # /nix/store on first run. Tracked as followup. The volume is still
+        # declared above so the manifest stays valid; just unused.
         # Persist the cargo target/ tree across builds. Without this mount,
         # the sweettest crate recompiles from scratch every run (47m 48s
         # observed in elohim-holochain/dev/1210). CARGO_TARGET_DIR below
