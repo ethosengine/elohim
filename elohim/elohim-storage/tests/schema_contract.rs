@@ -446,6 +446,8 @@ fn peer_status_view_no_elohim_capability_matches_schema() {
         dht_anchor_hash: "uhCkkSMOKEHASH001".to_string(),
         updated_at: "1700000000100000".to_string(),
         elohim_capability: None,
+        render_capability: None,
+        extensions: None,
     };
 
     let json = serde_json::to_value(&view).unwrap();
@@ -488,6 +490,8 @@ fn peer_status_view_full_elohim_capability_matches_schema() {
             active_since: "2026-04-18T00:00:00Z".to_string(),
             reach_level: Some("community".to_string()),
         }),
+        render_capability: None,
+        extensions: None,
     };
 
     let json = serde_json::to_value(&view).unwrap();
@@ -521,6 +525,8 @@ fn peer_status_view_minimal_elohim_capability_matches_schema() {
             active_since: "2026-01-01T00:00:00Z".to_string(),
             reach_level: None,
         }),
+        render_capability: None,
+        extensions: None,
     };
 
     let json = serde_json::to_value(&view).unwrap();
@@ -2271,4 +2277,55 @@ fn render_capability_serializes_with_camel_case() {
     // Optional fields with None should be skipped (per #[serde(skip_serializing_if = "Option::is_none")])
     assert!(json_value.get("memoryBudgetMib").is_none());
     assert!(json_value["bundles"][0].get("digest").is_none());
+}
+
+#[test]
+fn peer_status_view_carries_render_capability_when_layered() {
+    use elohim_storage::{
+        build_peer_status_view, BundleEntry, RenderCapabilityProfile, RendererKind,
+    };
+    let row = elohim_storage::db::peer_statuses::PeerStatusRow {
+        peer_id: "peer-x".into(),
+        status: "online".into(),
+        general_pool_member: 1,
+        accepting_stewardship_reserves: 0,
+        archetype_class: Some("home-nuc".into()),
+        timestamp: 1_700_000_000_000_000,
+        dht_anchor_hash: "anchor-1".into(),
+        updated_at: 1_700_000_000_000_000,
+    };
+    let render_cap = RenderCapabilityProfile {
+        bundles: vec![BundleEntry {
+            name: "lamad-app".into(),
+            version: "1.0.3".into(),
+            renderer: RendererKind::AngularSsr,
+            digest: None,
+        }],
+        renderers: vec![RendererKind::AngularSsr],
+        auth_modes: vec!["anonymous".into()],
+        max_concurrent_renders: 4,
+        memory_budget_mib: None,
+    };
+    let view = build_peer_status_view(row, None, Some(&render_cap), None);
+    assert!(view.render_capability.is_some());
+    assert_eq!(view.render_capability.unwrap().bundles[0].name, "lamad-app");
+    assert!(view.extensions.is_none());
+}
+
+#[test]
+fn peer_status_view_renders_null_capability_when_unlayered() {
+    use elohim_storage::build_peer_status_view;
+    let row = elohim_storage::db::peer_statuses::PeerStatusRow {
+        peer_id: "peer-y".into(),
+        status: "online".into(),
+        general_pool_member: 1,
+        accepting_stewardship_reserves: 0,
+        archetype_class: None,
+        timestamp: 1_700_000_000_000_000,
+        dht_anchor_hash: "anchor-2".into(),
+        updated_at: 1_700_000_000_000_000,
+    };
+    let view = build_peer_status_view(row, None, None, None);
+    assert!(view.render_capability.is_none());
+    assert!(view.extensions.is_none());
 }

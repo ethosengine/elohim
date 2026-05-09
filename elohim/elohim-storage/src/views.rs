@@ -6417,6 +6417,13 @@ pub struct PeerStatusView {
     /// Model-level capabilities if an elohim-agent runs at this peer. None for pure storage/relay nodes.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub elohim_capability: Option<ElohimCapabilityProfile>,
+    /// Render capability profile if a doorway co-located with this peer can SSR.
+    /// Layered post-construction via build_peer_status_view; NOT in DHT entry.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub render_capability: Option<RenderCapabilityProfile>,
+    /// Tier-2 extension capabilities. Layered post-construction.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub extensions: Option<CapabilityExtensions>,
 }
 
 impl From<PeerStatusRow> for PeerStatusView {
@@ -6431,6 +6438,8 @@ impl From<PeerStatusRow> for PeerStatusView {
             dht_anchor_hash: row.dht_anchor_hash,
             updated_at: row.updated_at.to_string(),
             elohim_capability: None, // Layered post-construction via build_peer_status_view()
+            render_capability: None, // Layered post-construction via build_peer_status_view()
+            extensions: None,        // Layered post-construction via build_peer_status_view()
         }
     }
 }
@@ -6444,10 +6453,14 @@ impl From<PeerStatusRow> for PeerStatusView {
 /// Use this instead of `PeerStatusView::from(row)` in handlers and tests.
 pub fn build_peer_status_view(
     row: PeerStatusRow,
-    capability: Option<&ElohimCapabilityProfile>,
+    elohim_capability: Option<&ElohimCapabilityProfile>,
+    render_capability: Option<&RenderCapabilityProfile>,
+    extensions: Option<&CapabilityExtensions>,
 ) -> PeerStatusView {
     let mut view = PeerStatusView::from(row);
-    view.elohim_capability = capability.cloned();
+    view.elohim_capability = elohim_capability.cloned();
+    view.render_capability = render_capability.cloned();
+    view.extensions = extensions.cloned();
     view
 }
 
