@@ -94,6 +94,58 @@ fn parse_bundle_header(contents: &str) -> Option<BundleEntry> {
     })
 }
 
+#[derive(serde::Deserialize)]
+struct ManifestResponse {
+    routes: Vec<ManifestRoute>,
+}
+
+#[derive(serde::Deserialize)]
+struct ManifestRoute {
+    #[serde(default)]
+    render: Option<String>,
+}
+
+/// Fetch elohim-storage's manifest and extract the unique set of renderers
+/// declared by SSR-eligible routes. Errors propagate so the caller can
+/// publish `renderCapability: null` and retry.
+pub async fn fetch_manifest_renderers(
+    storage_manifest_url: &str,
+) -> Result<Vec<RendererKind>, CapabilityDeriverError> {
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(5))
+        .build()
+        .map_err(|e| CapabilityDeriverError::ManifestFetch(e.to_string()))?;
+    let resp = client
+        .get(storage_manifest_url)
+        .send()
+        .await
+        .map_err(|e| CapabilityDeriverError::ManifestFetch(e.to_string()))?;
+    if !resp.status().is_success() {
+        return Err(CapabilityDeriverError::ManifestFetch(format!(
+            "HTTP {}",
+            resp.status()
+        )));
+    }
+    let manifest: ManifestResponse = resp
+        .json()
+        .await
+        .map_err(|e| CapabilityDeriverError::ManifestFetch(e.to_string()))?;
+    let mut seen = std::collections::HashSet::new();
+    let mut out = Vec::new();
+    for route in manifest.routes {
+        if let Some(rstr) = route.render {
+            if let Ok(kind) =
+                serde_json::from_value::<RendererKind>(serde_json::Value::String(rstr))
+            {
+                if seen.insert(kind.clone()) {
+                    out.push(kind);
+                }
+            }
+        }
+    }
+    Ok(out)
+}
+
 #[cfg(test)]
 mod scan_tests {
     use super::*;
@@ -191,5 +243,100 @@ mod scan_tests {
         );
         let bundles = scan_bundles(tmp.path()).await.expect("scan succeeds");
         assert!(bundles.is_empty());
+    }
+}
+
+#[cfg(test)]
+mod manifest_tests {
+    use super::*;
+    use crate::render::types::RendererKind;
+    use wiremock::{matchers, Mock, MockServer, ResponseTemplate};
+
+    #[tokio::test]
+    async fn fetches_ssr_eligible_renderers_from_manifest() {
+        let server = MockServer::start().await;
+        let manifest = serde_json::json!({
+            "routes": [
+                { "path": "/lamad/concept/{id}", "render": "angular-ssr" },
+                { "path": "/lamad/path/{slug}", "render": "angular-ssr" },
+                { "path": "/api/content/{id}" }
+            ]
+        });
+        Mock::given(matchers::method("GET"))
+            .and(matchers::path("/admin/manifest"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(manifest))
+            .mount(&server)
+            .await;
+        let url = format!("{}/admin/manifest", server.uri());
+        let renderers = fetch_manifest_renderers(&url).await.expect("fetch ok");
+        assert!(renderers.contains(&RendererKind::AngularSsr));
+        assert_eq!(renderers.len(), 1, "deduped angular-ssr appears once");
+    }
+
+    #[tokio::test]
+    async fn dedupes_multiple_renderer_kinds() {
+        let server = MockServer::start().await;
+        let manifest = serde_json::json!({
+            "routes": [
+                { "path": "/a", "render": "angular-ssr" },
+                { "path": "/b", "render": "react-rsc" },
+                { "path": "/c", "render": "angular-ssr" },
+                { "path": "/d" }
+            ]
+        });
+        Mock::given(matchers::method("GET"))
+            .and(matchers::path("/admin/manifest"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(manifest))
+            .mount(&server)
+            .await;
+        let url = format!("{}/admin/manifest", server.uri());
+        let renderers = fetch_manifest_renderers(&url).await.expect("fetch ok");
+        assert_eq!(renderers.len(), 2);
+        assert!(renderers.contains(&RendererKind::AngularSsr));
+        assert!(renderers.contains(&RendererKind::ReactRsc));
+    }
+
+    #[tokio::test]
+    async fn manifest_unreachable_returns_error() {
+        let result = fetch_manifest_renderers("http://127.0.0.1:1/never").await;
+        assert!(result.is_err());
+        assert!(matches!(
+            result.unwrap_err(),
+            CapabilityDeriverError::ManifestFetch(_)
+        ));
+    }
+
+    #[tokio::test]
+    async fn manifest_5xx_returns_error() {
+        let server = MockServer::start().await;
+        Mock::given(matchers::method("GET"))
+            .and(matchers::path("/admin/manifest"))
+            .respond_with(ResponseTemplate::new(503))
+            .mount(&server)
+            .await;
+        let url = format!("{}/admin/manifest", server.uri());
+        let result = fetch_manifest_renderers(&url).await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn skips_unknown_renderer_kinds_silently() {
+        let server = MockServer::start().await;
+        let manifest = serde_json::json!({
+            "routes": [
+                { "path": "/a", "render": "angular-ssr" },
+                { "path": "/b", "render": "future-renderer-kind" }
+            ]
+        });
+        Mock::given(matchers::method("GET"))
+            .and(matchers::path("/admin/manifest"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(manifest))
+            .mount(&server)
+            .await;
+        let url = format!("{}/admin/manifest", server.uri());
+        let renderers = fetch_manifest_renderers(&url).await.expect("fetch ok");
+        // Only the known one is included; unknowns drop silently.
+        assert_eq!(renderers.len(), 1);
+        assert!(renderers.contains(&RendererKind::AngularSsr));
     }
 }
