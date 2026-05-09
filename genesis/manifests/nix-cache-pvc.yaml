@@ -23,7 +23,7 @@ apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: nix-cache-holochain
-  namespace: ethosengine
+  namespace: jenkins
   labels:
     app: holochain-build
     purpose: nix-store-cache
@@ -40,7 +40,7 @@ apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: cargo-cache-holochain
-  namespace: ethosengine
+  namespace: jenkins
   labels:
     app: holochain-build
     purpose: cargo-cache
@@ -75,7 +75,7 @@ apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: sweettest-target-cache-holochain
-  namespace: ethosengine
+  namespace: jenkins
   labels:
     app: holochain-build
     purpose: sweettest-target-cache

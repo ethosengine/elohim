@@ -1,7 +1,7 @@
 # Runbook — DNA caching PVC apply (2026-05-09)
 
 **Target cluster:** the K8s cluster that hosts `elohim-holochain` Jenkins builds (operations + edge nodes for compute, hp-micro10 for storage).
-**Namespace:** `ethosengine`
+**Namespace:** `jenkins`
 **Owning pipeline:** `elohim-holochain/dev`
 **Risk:** None to running services. This adds a new PVC consumed only by the elohim-holochain build pod, which is created on demand for each build.
 
