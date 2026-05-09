@@ -13,17 +13,24 @@ The two existing PVCs in the same manifest (`nix-cache-holochain`, `cargo-cache-
 
 ## Apply
 
+The Che workspace image does NOT have `kubectl` installed. The manifest
+lives in this workspace; the apply runs from the operator's host (or any
+shell with cluster credentials). The pattern that worked on 2026-05-09:
+
+```bash
+# From the operator's host (with kubeconfig pointing at the cluster):
+kubectl exec -n <workspace-ns> <workspace-pod> -c tools -- \
+    cat /projects/elohim/genesis/manifests/nix-cache-pvc.yaml | \
+    kubectl apply -f -
+```
+
+Or, if the operator pulls a fresh checkout of `dev` to their own host:
+
 ```bash
 kubectl apply -f genesis/manifests/nix-cache-pvc.yaml
 ```
 
-Run this command from the workspace root (`/projects/elohim`), or pass the absolute path:
-
-```bash
-kubectl apply -f /projects/elohim/genesis/manifests/nix-cache-pvc.yaml
-```
-
-Expected output:
+Expected output (verbatim — observed on 2026-05-09):
 
 ```
 persistentvolumeclaim/nix-cache-holochain unchanged
@@ -36,7 +43,7 @@ persistentvolumeclaim/sweettest-target-cache-holochain created
 Confirm all three PVCs are present and Bound to backing volumes:
 
 ```bash
-kubectl get pvc -n ethosengine -l app=holochain-build
+kubectl get pvc -n jenkins -l app=holochain-build
 ```
 
 Expected output (all three should show STATUS=Bound):
@@ -52,7 +59,7 @@ If `sweettest-target-cache-holochain` shows STATUS=Pending for more than ~30 sec
 
 ```bash
 kubectl logs -n openebs-system -l openebs.io/component-name=openebs-jiva-csi-controller --tail=100
-kubectl describe pvc sweettest-target-cache-holochain -n ethosengine
+kubectl describe pvc sweettest-target-cache-holochain -n jenkins
 ```
 
 ## Storage placement note
@@ -79,7 +86,7 @@ The first build after apply will still cold-compile (cache is empty). The second
 This PVC is consumed only by the elohim-holochain build pod, which is created fresh per build. To remove:
 
 ```bash
-kubectl delete pvc sweettest-target-cache-holochain -n ethosengine
+kubectl delete pvc sweettest-target-cache-holochain -n jenkins
 ```
 
 Then revert commit `ff648597f` on the `dev` branch (the Jenkinsfile changes that mount the PVC). Without the revert, the next build will fail to schedule with the missing PVC.
