@@ -2693,9 +2693,9 @@ All 22 implementation tasks landed across these commits on `dev` (in plan order)
 | 1. `pnpm -w run schema:codegen:ts` | Zero diff — committed generated TS already matches schemas. |
 | 2. `pnpm -w run schema:test` | 24 + 13 = 37 tests passing. |
 | 3. `cargo test --test schema_contract` (storage) | 89/89 pass — incl. 8 SSR-specific tests (`render_capability_*`, `load_render_capability_from_url_*`, `peer_status_view_*_capability_*`). |
-| 4. Storage build + `cargo test --lib --bins` | _verified at close — see commit log_ |
-| 5. Doorway build + `cargo test --lib --bins` | _verified at close — see commit log_ |
-| 6. Clippy on both | _verified at close_ |
+| 4. Storage `cargo build --release` + `cargo test --lib --bins` | release build clean; 1257/1257 lib tests pass (1 ignored) — verified 2026-05-09. |
+| 5. Doorway `cargo build --release` + `cargo test --lib --bins` | release build clean; 476/476 lib tests pass — verified 2026-05-09. |
+| 6. Clippy on both with `-D warnings` | Doorway clean after deleting two orphaned helpers (`ssr_html_response_with_cache_status`, `ssr_spa_shell_fallback`) left over from the Task 18 / Task 20 refactors. Storage clean after `#[allow(clippy::too_many_arguments)]` on `peer_statuses::handle` (8 args after the 3 new capability params; matches existing convention at `api/mod.rs:75`, `import_handler.rs:992`, etc.). Pre-existing ts-rs "failed to parse serde attribute" warnings on `skip_serializing_if` are macro-side notes, not rustc lints — they do not escalate. |
 | 7. Manual smoke test | Deferred — alpha cluster is the natural validation surface; substrate-routing consumers are explicitly out of scope. |
 
 ### Test-shape divergence from plan

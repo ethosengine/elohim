@@ -2306,15 +2306,6 @@ fn bad_request_response(message: &str) -> Response<Full<Bytes>> {
 
 // ─── SSR helpers ──────────────────────────────────────────────────────────────
 
-/// Build a `text/html` SSR response with an `x-render-cache` header.
-///
-/// `cache_status` is either `"HIT"` (served from render-result cache) or
-/// `"MISS"` (freshly rendered by the in-process renderer). The header lets
-/// callers verify cache behaviour without inspecting response bodies.
-fn ssr_html_response_with_cache_status(html: String, cache_status: &str) -> Response<Full<Bytes>> {
-    ssr_html_response_with_observability(html, cache_status, None)
-}
-
 /// SSR success response with the observability header contract:
 /// - x-render-cache: MISS / HIT (existing)
 /// - x-ssr-rendered: 1 (always on success)
@@ -2356,14 +2347,6 @@ fn ssr_html_response_with_observability(
         }
     }
     builder.body(Full::new(Bytes::from(html))).unwrap()
-}
-
-/// Minimal SPA shell returned when SSR is unavailable or the renderer errors.
-///
-/// The shell contains an `<app-root>` placeholder so the Angular CSR bundle
-/// can hydrate the page without a full server-rendered document.
-fn ssr_spa_shell_fallback() -> Response<Full<Bytes>> {
-    ssr_spa_shell_fallback_with_error("")
 }
 
 /// SPA shell fallback that surfaces the render error in an `x-ssr-error`
