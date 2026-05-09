@@ -807,63 +807,10 @@ async fn async_main(
     #[cfg(not(feature = "p2p"))]
     let p2p_node: Option<()> = None;
 
-    // Phase 11 iroh parallel-stack init — production backends wired in.
-    // Per plan genesis/docs/superpowers/plans/2026-05-07-iroh-parallel-stack.md
-    // and spec genesis/docs/superpowers/specs/2026-05-08-iroh-libp2p-complementarity.md:
-    // each plane's backend dispatches into the same daemon services as the
-    // libp2p side. Modes are mutually exclusive at runtime, so the iroh
-    // branch constructs its own SyncManager pointing at the same on-disk
-    // sled DB the libp2p path would use; only one branch ever opens it.
-    #[cfg(feature = "p2p-iroh")]
-    let _iroh_node = if args.enable_p2p
-        && config.transport_backend == elohim_storage::config::TransportBackend::Iroh
-    {
-        use elohim_storage::p2p_iroh::{
-            AlpnRegistration, IrohConfig, IrohNode, IrohSyncProtocol, SyncManagerBackend, SYNC_ALPN,
-        };
-        use elohim_storage::sync::{DocStore, StreamTracker, SyncManager};
-
-        let iroh_cfg = IrohConfig::from_storage_dir(&config.storage_dir);
-
-        // Sync backend — opens the same `sync.sled` directory the libp2p
-        // path uses (mirrors src/p2p/mod.rs:1472). Mode-exclusive at
-        // runtime so the two paths never contend for the lock.
-        let sync_sled_path = config.storage_dir.join("sync.sled");
-        let doc_store = match DocStore::at_path(&sync_sled_path).await {
-            Ok(store) => Arc::new(store),
-            Err(e) => {
-                error!(error = %e, path = %sync_sled_path.display(), "iroh: failed to open sync DocStore");
-                return Err(Box::new(e));
-            }
-        };
-        let stream_tracker = Arc::new(StreamTracker::new());
-        let sync_manager = Arc::new(SyncManager::new(doc_store, stream_tracker));
-        let sync_backend: Arc<dyn elohim_storage::p2p_iroh::SyncBackend> =
-            Arc::new(SyncManagerBackend::new(sync_manager));
-        let sync_handler = IrohSyncProtocol::new(sync_backend);
-
-        let extras: Vec<AlpnRegistration> = vec![(SYNC_ALPN.to_vec(), Box::new(sync_handler))];
-
-        match IrohNode::start_with_protocols(iroh_cfg, extras).await {
-            Ok(node) => {
-                info!("Iroh parallel-stack node started (Phase 11 — sync backend wired)");
-                info!("  Node ID: {}", node.node_id());
-                info!("  ALPNs: iroh-blobs, iroh-gossip, /elohim/sync/2.0.0");
-                Some(node)
-            }
-            Err(e) => {
-                error!(error = %e, "Failed to start iroh node");
-                return Err(Box::new(e));
-            }
-        }
-    } else {
-        None
-    };
-
-    #[cfg(not(feature = "p2p-iroh"))]
-    let _iroh_node: Option<()> = None;
-
-    // Initialize extraction cache if enabled
+    // Initialize extraction cache if enabled. Built before the iroh
+    // branch so the iroh-mode `EprServiceBackend` can register it for
+    // QueryDelivery cache-tier reporting; the libp2p path picks it up
+    // post-hoc via `P2PNode::set_extraction_cache` lower down.
     let extraction_cache = if config.extraction_cache.enabled {
         let cache_dir = config.extraction_cache_dir();
         tokio::fs::create_dir_all(&cache_dir).await?;
@@ -895,6 +842,99 @@ async fn async_main(
         info!("Extraction cache disabled");
         None
     };
+
+    // Phase 11 iroh parallel-stack init — production backends wired in.
+    // Per plan genesis/docs/superpowers/plans/2026-05-07-iroh-parallel-stack.md
+    // and spec genesis/docs/superpowers/specs/2026-05-08-iroh-libp2p-complementarity.md:
+    // each plane's backend dispatches into the same daemon services as the
+    // libp2p side. Modes are mutually exclusive at runtime, so the iroh
+    // branch constructs its own SyncManager pointing at the same on-disk
+    // sled DB the libp2p path would use; only one branch ever opens it.
+    #[cfg(feature = "p2p-iroh")]
+    let _iroh_node = if args.enable_p2p
+        && config.transport_backend == elohim_storage::config::TransportBackend::Iroh
+    {
+        use elohim_storage::epr_service::EprService;
+        use elohim_storage::p2p::trust_cache::PeerTrustCache;
+        use elohim_storage::p2p_iroh::{
+            AlpnRegistration, EprServiceBackend, IrohConfig, IrohEprProtocol, IrohNode,
+            IrohSyncProtocol, SyncManagerBackend, EPR_ALPN, SYNC_ALPN,
+        };
+        use elohim_storage::sync::{DocStore, StreamTracker, SyncManager};
+
+        let iroh_cfg = IrohConfig::from_storage_dir(&config.storage_dir);
+
+        // Sync backend — opens the same `sync.sled` directory the libp2p
+        // path uses (mirrors src/p2p/mod.rs:1472). Mode-exclusive at
+        // runtime so the two paths never contend for the lock.
+        let sync_sled_path = config.storage_dir.join("sync.sled");
+        let doc_store = match DocStore::at_path(&sync_sled_path).await {
+            Ok(store) => Arc::new(store),
+            Err(e) => {
+                error!(error = %e, path = %sync_sled_path.display(), "iroh: failed to open sync DocStore");
+                return Err(Box::new(e));
+            }
+        };
+        let stream_tracker = Arc::new(StreamTracker::new());
+        let sync_manager = Arc::new(SyncManager::new(doc_store, stream_tracker));
+        let sync_backend: Arc<dyn elohim_storage::p2p_iroh::SyncBackend> =
+            Arc::new(SyncManagerBackend::new(sync_manager));
+        let sync_handler = IrohSyncProtocol::new(sync_backend);
+
+        // EPR backend — transport-neutral service shared with the libp2p
+        // path. Read-side only in iroh mode for now: Announce (Kademlia
+        // put_record on libp2p) is stubbed pending pkarr / iroh-gossip
+        // identity-binding per the complementarity spec n0 mitigation
+        // roadmap. PeerTrustCache starts empty in iroh mode (trust
+        // handshake is libp2p-canonical per the spec); the slow-path
+        // reach-auth still runs correctly via DB lookups.
+        let epr_db_pool = if args.enable_content_db {
+            db_pool.clone()
+        } else {
+            None
+        };
+        let epr_policy = epr_db_pool.as_ref().map(|pool| {
+            let policy_cache =
+                elohim_storage::db::policy_cache::PolicyCache::new(pool.clone());
+            Arc::new(elohim_storage::db::policy_cache::PolicyEnforcement::new(
+                policy_cache,
+            ))
+        });
+        let epr_service = Arc::new(EprService::new(
+            epr_db_pool,
+            epr_policy,
+            extraction_cache.clone(),
+            PeerTrustCache::new(),
+        ));
+        let epr_backend: Arc<dyn elohim_storage::p2p_iroh::EprBackend> =
+            Arc::new(EprServiceBackend::new(epr_service));
+        let epr_handler = IrohEprProtocol::new(epr_backend);
+
+        let extras: Vec<AlpnRegistration> = vec![
+            (SYNC_ALPN.to_vec(), Box::new(sync_handler)),
+            (EPR_ALPN.to_vec(), Box::new(epr_handler)),
+        ];
+
+        match IrohNode::start_with_protocols(iroh_cfg, extras).await {
+            Ok(node) => {
+                info!("Iroh parallel-stack node started (Phase 11 — sync + EPR backends wired)");
+                info!("  Node ID: {}", node.node_id());
+                info!(
+                    "  ALPNs: iroh-blobs, iroh-gossip, /elohim/sync/2.0.0, /elohim/epr/2.0.0"
+                );
+                Some(node)
+            }
+            Err(e) => {
+                error!(error = %e, "Failed to start iroh node");
+                return Err(Box::new(e));
+            }
+        }
+    } else {
+        None
+    };
+
+    #[cfg(not(feature = "p2p-iroh"))]
+    let _iroh_node: Option<()> = None;
 
     // Start HTTP server for shard API
     let http_addr: SocketAddr = format!("0.0.0.0:{}", config.http_port).parse()?;

@@ -52,6 +52,7 @@ pub mod dag_store;
 pub mod db; // SQLite content storage
 pub mod epr_codec;
 pub mod epr_head;
+pub mod epr_service;
 pub mod error;
 pub mod happ_manager;
 pub mod hc_client;
