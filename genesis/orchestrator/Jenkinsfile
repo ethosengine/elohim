@@ -648,6 +648,200 @@ def triggerPipeline(String name, String branch, boolean wait = true) {
 }
 
 /**
+ * Build the predicted-build-graph artifact map. Extracted from
+ * Determine Build Plan to keep the inline CPS-compiled method under
+ * the 64KB JVM limit.
+ */
+def buildPredictedGraph(graphPipelines, analysis, mode, deployOnly, changedFiles, predictedLevels, hasGenesis) {
+    return [
+        schemaVersion: '1',
+        predictedAt: new Date().format("yyyy-MM-dd'T'HH:mm:ss'Z'", TimeZone.getTimeZone('UTC')),
+        commitSha: env.GIT_COMMIT_FULL ?: env.GIT_COMMIT ?: '',
+        branch: env.BRANCH_NAME ?: '',
+        mode: mode,
+        buildTrigger: env.BUILD_TRIGGER ?: '',
+        buildNumber: env.BUILD_NUMBER ?: '',
+        changedFileCount: changedFiles.size(),
+        // Cap at 50 — the decision matrix is the authoritative view; this
+        // is for forensic spot-checks only.
+        changedFilesSample: changedFiles.take(50),
+        skipCi: env.SKIP_CI == 'true',
+        forceBuildPipelines: (env.FORCE_BUILD_PIPELINES ?: '').split(',').findAll { it },
+        deployOnly: deployOnly,
+        pipelines: graphPipelines,
+        levels: predictedLevels,
+        genesisAfterLevels: hasGenesis,
+        analysis: analysis,
+    ]
+}
+
+/**
+ * Build the actual-build-graph artifact map. Extracted from Execute
+ * Builds to keep the inline CPS-compiled method under the 64KB JVM limit.
+ */
+def buildActualGraph(pipelines, results, levels) {
+    def levelMap = [:]
+    levels.eachWithIndex { lvl, idx ->
+        lvl.each { name -> levelMap[name] = idx }
+    }
+    if (pipelines.contains('elohim-genesis')) {
+        levelMap['elohim-genesis'] = 'genesis-trailer'
+    }
+
+    def abortedBeforeStart = pipelines.findAll { name -> !results.containsKey(name) }
+
+    def enrichedResults = [:]
+    results.each { name, info ->
+        def enriched = [:] + info
+        enriched.level = levelMap.containsKey(name) ? levelMap[name] : null
+        enrichedResults[name] = enriched
+    }
+
+    return [
+        schemaVersion: '1',
+        executedAt: new Date().format("yyyy-MM-dd'T'HH:mm:ss'Z'", TimeZone.getTimeZone('UTC')),
+        commitSha: env.GIT_COMMIT_FULL ?: env.GIT_COMMIT ?: '',
+        branch: env.BRANCH_NAME ?: '',
+        buildNumber: env.BUILD_NUMBER ?: '',
+        executionOrder: pipelines,
+        results: enrichedResults,
+        abortedBeforeStart: abortedBeforeStart,
+    ]
+}
+
+/**
+ * Build the machine-readable CI summary map. Extracted from post.always
+ * to keep the inline pipeline { } block under the JVM CPS 64KB method
+ * size limit. See CLAUDE.md note: "Never add inline logic to stages."
+ */
+def buildCiSummary(results, preflight, postflight, verification, successCount, unstableCount, failCount, healthyCount, unhealthyCount) {
+    return [
+        schema_version: '1.0.0',
+        timestamp: new Date().format("yyyy-MM-dd'T'HH:mm:ss'Z'", TimeZone.getTimeZone('UTC')),
+        orchestration: [
+            build_number: env.BUILD_NUMBER,
+            build_url: env.BUILD_URL,
+            branch: env.BRANCH_NAME,
+            commit: env.GIT_COMMIT_SHORT ?: 'unknown',
+            mode: params.MODE,
+            duration_seconds: (System.currentTimeMillis() - currentBuild.startTimeInMillis) / 1000
+        ],
+        pipelines: results.collect { name, r ->
+            [
+                name: name,
+                status: r?.unstable ? 'UNSTABLE' : (r?.success ? 'SUCCESS' : (r?.result ?: 'FAILURE')),
+                url: r?.url,
+                duration_ms: r?.duration,
+                category: r?.success ? null : categorizeFailure(name),
+                remediation_hint: r?.success ? null : getRemediationHint(name)
+            ]
+        },
+        health: [
+            preflight: preflight,
+            postflight: postflight,
+            degraded_services: postflight.findAll { k, v -> !v?.healthy }.keySet().toList()
+        ],
+        deployment: [
+            verified: verification.every { k, v -> v?.match },
+            verification_results: verification,
+            mismatches: verification.findAll { k, v -> !v?.match }.keySet().toList()
+        ],
+        summary: [
+            overall_status: failCount > 0 ? 'FAILURE' : (unstableCount > 0 || unhealthyCount > 0 ? 'UNSTABLE' : 'SUCCESS'),
+            builds_succeeded: successCount,
+            builds_unstable: unstableCount,
+            builds_failed: failCount,
+            services_healthy: healthyCount,
+            services_total: postflight.size(),
+            failed_pipelines: results.findAll { k, v -> !v?.success }.keySet().toList(),
+            triage_priority: calculateTriagePriority(failCount, unhealthyCount),
+            action_required: failCount > 0 ? results.findAll { k, v -> !v?.success }.collect { name, r ->
+                "${name}: ${getRemediationHint(name)}"
+            } : []
+        ]
+    ]
+}
+
+/**
+ * Reconciliation backstop — runs in post.always when the happy-path
+ * Reconcile Build Graph stage was skipped (cascade abort). Synthesizes
+ * actual-build-graph.json from env.BUILD_RESULTS so external Ralph
+ * Wiggum tooling can still reconcile against the predicted artifact.
+ *
+ * Pure Groovy + Jenkins workflow primitives only — runs inside
+ * node('built-in') where sh / node may be unavailable.
+ */
+def runReconciliationBackstop() {
+    def predictedFile = env.PREDICTED_BUILD_GRAPH_FILE ?: 'predicted-build-graph.json'
+    def actualFile = env.ACTUAL_BUILD_GRAPH_FILE ?: 'actual-build-graph.json'
+    def reconciliationFile = env.BUILD_GRAPH_RECONCILIATION_FILE ?: 'build-graph-reconciliation.json'
+
+    if (!fileExists(predictedFile)) {
+        echo "[backstop] No ${predictedFile} — Determine Build Plan did not complete; skipping reconciliation backstop"
+        return
+    }
+
+    if (!fileExists(actualFile)) {
+        def predicted = readJSON(file: predictedFile)
+        def predictedPipelines = predicted.pipelines ?: []
+        def buildResults = readJSON(text: env.BUILD_RESULTS ?: '{}')
+        def abortedBeforeStart = predictedPipelines.findAll { name -> !buildResults.containsKey(name) }
+        def synthesized = [
+            schemaVersion: '1',
+            executedAt: new Date().format("yyyy-MM-dd'T'HH:mm:ss'Z'", TimeZone.getTimeZone('UTC')),
+            commitSha: env.GIT_COMMIT_FULL ?: env.GIT_COMMIT ?: '',
+            branch: env.BRANCH_NAME ?: '',
+            buildNumber: env.BUILD_NUMBER ?: '',
+            executionOrder: predictedPipelines,
+            results: buildResults,
+            abortedBeforeStart: abortedBeforeStart,
+            synthesizedByBackstop: true
+        ]
+        writeJSON file: actualFile, json: synthesized, pretty: 2
+        archiveArtifacts artifacts: actualFile, allowEmptyArchive: true
+        echo "[backstop] Synthesized ${actualFile} from env.BUILD_RESULTS — ${buildResults.size()} pipelines completed, ${abortedBeforeStart.size()} aborted before start"
+    }
+
+    if (!fileExists(reconciliationFile)) {
+        echo '[backstop] No reconciliation artifact yet — Reconcile Build Graph stage was skipped (cascade abort path).'
+        echo '[backstop] Both predicted and actual artifacts are archived. To reconcile externally:'
+        echo "[backstop]   curl -O \${BUILD_URL}artifact/${predictedFile}"
+        echo "[backstop]   curl -O \${BUILD_URL}artifact/${actualFile}"
+        echo "[backstop]   node genesis/orchestrator/reconcile-build-graph.mjs ${predictedFile} ${actualFile} out.json"
+    } else {
+        echo '[backstop] Reconciliation artifact already exists — happy-path Reconcile Build Graph stage ran.'
+    }
+}
+
+/**
+ * Continuity guard for build-state.json. If this run was interrupted
+ * before saveBuildState ran (superseded push, pod eviction, SCM checkout
+ * abort), copy-forward the most recent good build-state.json so the next
+ * orchestrator build doesn't cold-start every pipeline.
+ */
+def maintainBuildStateContinuity() {
+    if (!fileExists('build-state.json')) {
+        try {
+            copyArtifacts(
+                projectName: env.JOB_NAME,
+                selector: lastSuccessful(),
+                filter: 'build-state.json',
+                optional: true,
+                fingerprintArtifacts: false
+            )
+        } catch (Exception e) {
+            echo "[baseline:post] could not copy-forward build-state.json: ${e.message}"
+        }
+    }
+    if (fileExists('build-state.json')) {
+        archiveArtifacts artifacts: 'build-state.json', fingerprint: true
+        echo "[baseline:post] build-state.json archived (continuity)"
+    } else {
+        echo "[baseline:post] no prior build-state.json found — genuine first run"
+    }
+}
+
+/**
  * Hydrate stageAnnotations for a downstream pipeline by copying its
  * structured artifacts into the orchestrator workspace and parsing them.
  *
@@ -1272,39 +1466,13 @@ spec:
 
                         env.PIPELINES_TO_RUN = graphPipelines.join(',')
 
-                        // Compute dependency-level grouping for the predicted
-                        // artifact (used by Post Predicted Build Graph stage below).
+                        // Predicted Build Graph: orchestrator's promise of what
+                        // it will dispatch. Construction extracted to
+                        // buildPredictedGraph helper to keep this stage's
+                        // inline method under the 64KB CPS limit.
                         def predictedLevels = groupByDependencyLevel(graphPipelines)
                         def hasGenesis = graphPipelines.contains('elohim-genesis')
-
-                        // Predicted Build Graph: the orchestrator's promise of
-                        // what it will dispatch. Computed here because
-                        // Determine Build Plan owns the dispatch decision; emitted
-                        // to a file by the dedicated Post Predicted Build Graph
-                        // stage so the artifact has a visible deliverable column
-                        // in Blue Ocean and any external watcher can grab a
-                        // standalone file before Execute Builds even starts.
-                        def predictedGraph = [
-                            schemaVersion: '1',
-                            predictedAt: new Date().format("yyyy-MM-dd'T'HH:mm:ss'Z'", TimeZone.getTimeZone('UTC')),
-                            commitSha: env.GIT_COMMIT_FULL ?: env.GIT_COMMIT ?: '',
-                            branch: env.BRANCH_NAME ?: '',
-                            mode: mode,
-                            buildTrigger: env.BUILD_TRIGGER ?: '',
-                            buildNumber: env.BUILD_NUMBER ?: '',
-                            changedFileCount: changedFiles.size(),
-                            // Cap the changedFiles list to keep the artifact reasonable.
-                            // The decision matrix is the authoritative view; this is
-                            // for forensic spot-checks only.
-                            changedFilesSample: changedFiles.take(50),
-                            skipCi: env.SKIP_CI == 'true',
-                            forceBuildPipelines: (env.FORCE_BUILD_PIPELINES ?: '').split(',').findAll { it },
-                            deployOnly: deployOnly,
-                            pipelines: graphPipelines,
-                            levels: predictedLevels,
-                            genesisAfterLevels: hasGenesis,
-                            analysis: analysis,
-                        ]
+                        def predictedGraph = buildPredictedGraph(graphPipelines, analysis, mode, deployOnly, changedFiles, predictedLevels, hasGenesis)
                         writeJSON(file: env.PREDICTED_BUILD_GRAPH_FILE, json: predictedGraph, pretty: 2)
 
                         // Set build description
@@ -1552,46 +1720,12 @@ spec:
                         }
 
                         // Actual Build Graph artifact — what Execute Builds
-                        // actually dispatched and how each downstream pipeline
-                        // finished. Compared against predicted-build-graph.json
-                        // by the Reconcile Build Graph stage below.
-                        // Note: this happy-path emit only fires when Execute
-                        // Builds completes. Cascade-aborted runs (a level
-                        // throwing the level-failed error) are caught by the
-                        // post.always backstop so reconciliation still runs.
-                        def levelMap = [:]
-                        levels.eachWithIndex { lvl, idx ->
-                            lvl.each { name -> levelMap[name] = idx }
-                        }
-                        if (pipelines.contains('elohim-genesis')) {
-                            levelMap['elohim-genesis'] = 'genesis-trailer'
-                        }
-
-                        // Mark predicted pipelines that never ran (genesis aborted
-                        // before start, or a level failed before reaching them).
-                        def abortedBeforeStart = pipelines.findAll { name ->
-                            !results.containsKey(name)
-                        }
-
-                        // Enrich results with level annotation so reconciliation
-                        // pointers can group by dependency level.
-                        def enrichedResults = [:]
-                        results.each { name, info ->
-                            def enriched = [:] + info
-                            enriched.level = levelMap.containsKey(name) ? levelMap[name] : null
-                            enrichedResults[name] = enriched
-                        }
-
-                        def actualGraph = [
-                            schemaVersion: '1',
-                            executedAt: new Date().format("yyyy-MM-dd'T'HH:mm:ss'Z'", TimeZone.getTimeZone('UTC')),
-                            commitSha: env.GIT_COMMIT_FULL ?: env.GIT_COMMIT ?: '',
-                            branch: env.BRANCH_NAME ?: '',
-                            buildNumber: env.BUILD_NUMBER ?: '',
-                            executionOrder: pipelines,
-                            results: enrichedResults,
-                            abortedBeforeStart: abortedBeforeStart,
-                        ]
+                        // dispatched and how each downstream pipeline finished.
+                        // Construction extracted to buildActualGraph helper to
+                        // keep this stage's inline method under 64KB CPS limit.
+                        // Cascade-aborted runs (level-failed throw) are picked
+                        // up by the post.always backstop instead.
+                        def actualGraph = buildActualGraph(pipelines, results, levels)
                         writeJSON(file: env.ACTUAL_BUILD_GRAPH_FILE, json: actualGraph, pretty: 2)
                         // Archive happens in the dedicated Post Actual Build Graph
                         // stage below — keeps Execute Builds focused on dispatch.
@@ -1899,173 +2033,21 @@ ${healthyCount < postflight.size() ? '  ⚠️  ATTENTION: Some services unhealt
                     currentBuild.result = 'UNSTABLE'
                 }
 
-                // Generate machine-readable CI summary for Claude consumption
+                // CI summary + reconciliation backstop + build-state continuity
+                // are extracted to def helpers above the pipeline block to keep
+                // the inline CPS-compiled method under the 64KB JVM limit.
+                // See CLAUDE.md: "Never add inline logic to stages."
                 def unhealthyCount = postflight.count { k, v -> !v?.healthy }
-                def ciSummary = [
-                    schema_version: '1.0.0',
-                    timestamp: new Date().format("yyyy-MM-dd'T'HH:mm:ss'Z'", TimeZone.getTimeZone('UTC')),
-                    orchestration: [
-                        build_number: env.BUILD_NUMBER,
-                        build_url: env.BUILD_URL,
-                        branch: env.BRANCH_NAME,
-                        commit: env.GIT_COMMIT_SHORT ?: 'unknown',
-                        mode: params.MODE,
-                        duration_seconds: (System.currentTimeMillis() - currentBuild.startTimeInMillis) / 1000
-                    ],
-                    pipelines: results.collect { name, r ->
-                        [
-                            name: name,
-                            status: r?.unstable ? 'UNSTABLE' : (r?.success ? 'SUCCESS' : (r?.result ?: 'FAILURE')),
-                            url: r?.url,
-                            duration_ms: r?.duration,
-                            category: r?.success ? null : categorizeFailure(name),
-                            remediation_hint: r?.success ? null : getRemediationHint(name)
-                        ]
-                    },
-                    health: [
-                        preflight: preflight,
-                        postflight: postflight,
-                        degraded_services: postflight.findAll { k, v -> !v?.healthy }.keySet().toList()
-                    ],
-                    deployment: [
-                        verified: verification.every { k, v -> v?.match },
-                        verification_results: verification,
-                        mismatches: verification.findAll { k, v -> !v?.match }.keySet().toList()
-                    ],
-                    summary: [
-                        overall_status: failCount > 0 ? 'FAILURE' : (unstableCount > 0 || unhealthyCount > 0 ? 'UNSTABLE' : 'SUCCESS'),
-                        builds_succeeded: successCount,
-                        builds_unstable: unstableCount,
-                        builds_failed: failCount,
-                        services_healthy: healthyCount,
-                        services_total: postflight.size(),
-                        failed_pipelines: results.findAll { k, v -> !v?.success }.keySet().toList(),
-                        triage_priority: calculateTriagePriority(failCount, unhealthyCount),
-                        action_required: failCount > 0 ? results.findAll { k, v -> !v?.success }.collect { name, r ->
-                            "${name}: ${getRemediationHint(name)}"
-                        } : []
-                    ]
-                ]
-
+                def ciSummary = buildCiSummary(results, preflight, postflight, verification, successCount, unstableCount, failCount, healthyCount, unhealthyCount)
                 writeJSON file: 'ci-summary.json', json: ciSummary, pretty: 2
-
-                // CI summary is informational — allowEmptyArchive is fine here.
-                // If an earlier stage bailed before writeJSON ran, we don't want
-                // the post-block to fail on a missing optional artifact.
                 archiveArtifacts artifacts: 'ci-summary.json', allowEmptyArchive: true
                 echo "📋 CI Summary archived: ${env.BUILD_URL}artifact/ci-summary.json"
 
-                // ── Build Graph Reconciliation Backstop ──────────────────────
-                // The happy path: Post Predicted, Post Actual, and Reconcile
-                // Build Graph stages run inside the stages{} block and produce
-                // three artifacts. The backstop here covers cascade-aborted
-                // runs where Execute Builds threw before its writeJSON call —
-                // those skip the Post Actual + Reconcile stages, so without
-                // this backstop investigators have no actual-build-graph or
-                // reconciliation artifact to compare against the predicted.
-                //
-                // Strategy:
-                //   1. If predicted-build-graph.json is missing entirely,
-                //      Determine Build Plan never ran — nothing to reconcile.
-                //   2. If actual-build-graph.json is missing, synthesize one
-                //      from env.BUILD_RESULTS (which Execute Builds updates
-                //      after each level, even on the failure path) and tag it
-                //      `synthesizedByBackstop: true` so consumers know.
-                //   3. If build-graph-reconciliation.json is missing, archive
-                //      the artifacts but do NOT try to run node here —
-                //      node('built-in') typically lacks Node.js. External
-                //      Ralph Wiggum tooling can reconcile from the artifacts.
-                //
-                // Pure Groovy + Jenkins workflow primitives only — sh is
-                // unavailable on the controller agent in many K8s setups.
-                // env vars set by Checkout stage from build-artifacts.json.
-                // Fall back to literal filenames if env vars are missing
-                // (e.g. Checkout never reached this run).
-                def predictedFile = env.PREDICTED_BUILD_GRAPH_FILE ?: 'predicted-build-graph.json'
-                def actualFile = env.ACTUAL_BUILD_GRAPH_FILE ?: 'actual-build-graph.json'
-                def reconciliationFile = env.BUILD_GRAPH_RECONCILIATION_FILE ?: 'build-graph-reconciliation.json'
+                runReconciliationBackstop()
 
-                if (fileExists(predictedFile)) {
-                    if (!fileExists(actualFile)) {
-                        def predicted = readJSON(file: predictedFile)
-                        def predictedPipelines = predicted.pipelines ?: []
-
-                        // env.BUILD_RESULTS is updated inside Execute Builds
-                        // after every level and after the genesis trigger,
-                        // so even a cascade-aborted run leaves partial results.
-                        def buildResults = readJSON(text: env.BUILD_RESULTS ?: '{}')
-
-                        def abortedBeforeStart = predictedPipelines.findAll { name ->
-                            !buildResults.containsKey(name)
-                        }
-
-                        def synthesized = [
-                            schemaVersion: '1',
-                            executedAt: new Date().format("yyyy-MM-dd'T'HH:mm:ss'Z'", TimeZone.getTimeZone('UTC')),
-                            commitSha: env.GIT_COMMIT_FULL ?: env.GIT_COMMIT ?: '',
-                            branch: env.BRANCH_NAME ?: '',
-                            buildNumber: env.BUILD_NUMBER ?: '',
-                            executionOrder: predictedPipelines,
-                            results: buildResults,
-                            abortedBeforeStart: abortedBeforeStart,
-                            synthesizedByBackstop: true
-                        ]
-                        writeJSON file: actualFile, json: synthesized, pretty: 2
-                        archiveArtifacts artifacts: actualFile, allowEmptyArchive: true
-                        echo "[backstop] Synthesized ${actualFile} from env.BUILD_RESULTS — ${buildResults.size()} pipelines completed, ${abortedBeforeStart.size()} aborted before start"
-                    }
-
-                    if (!fileExists(reconciliationFile)) {
-                        echo '[backstop] No reconciliation artifact yet — Reconcile Build Graph stage was skipped (cascade abort path).'
-                        echo '[backstop] Both predicted and actual artifacts are archived. To reconcile externally:'
-                        echo "[backstop]   curl -O \${BUILD_URL}artifact/${predictedFile}"
-                        echo "[backstop]   curl -O \${BUILD_URL}artifact/${actualFile}"
-                        echo "[backstop]   node genesis/orchestrator/reconcile-build-graph.mjs ${predictedFile} ${actualFile} out.json"
-                    } else {
-                        echo '[backstop] Reconciliation artifact already exists — happy-path Reconcile Build Graph stage ran.'
-                    }
-                } else {
-                    echo "[backstop] No ${predictedFile} — Determine Build Plan did not complete; skipping reconciliation backstop"
-                }
-
-                // Checkpoint 3 (last word): archive the baseline one final time.
-                // The helper asserts the file exists and archives without
-                // allowEmptyArchive — any failure surfaces loudly on the next
-                // build via the BASELINE CASCADE WARNING in loadPipelineBaselines.
                 archivePipelineBaselines('post')
 
-                // Continuity guard for build-state.json.
-                // When this run was interrupted before saveBuildState() ran
-                // (e.g. superseded by a newer push, pod evicted, SCM checkout
-                // aborted → NOT_BUILT), no build-state.json was archived this
-                // run. The next orchestrator build's copyArtifacts(lastCompleted())
-                // would return 0 files for 'build-state.json' and trigger a
-                // cold-start cascade — every pipeline rebuilds despite most
-                // being unchanged. Observed as an oscillating pattern: every
-                // other build cold-starts when rapid pushes supersede each other.
-                //
-                // Fix: if we don't have a local build-state.json, copy forward
-                // the most recent good one and re-archive. That way every
-                // completed build leaves at least *a* baseline for the next run.
-                if (!fileExists('build-state.json')) {
-                    try {
-                        copyArtifacts(
-                            projectName: env.JOB_NAME,
-                            selector: lastSuccessful(),
-                            filter: 'build-state.json',
-                            optional: true,
-                            fingerprintArtifacts: false
-                        )
-                    } catch (Exception e) {
-                        echo "[baseline:post] could not copy-forward build-state.json: ${e.message}"
-                    }
-                }
-                if (fileExists('build-state.json')) {
-                    archiveArtifacts artifacts: 'build-state.json', fingerprint: true
-                    echo "[baseline:post] build-state.json archived (continuity)"
-                } else {
-                    echo "[baseline:post] no prior build-state.json found — genuine first run"
-                }
+                maintainBuildStateContinuity()
             }
             } // node('built-in')
         }

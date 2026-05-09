@@ -243,6 +243,81 @@ def probeConductorReadiness(String urlsString, String stageLabel) {
     ]
 }
 
+/**
+ * Run a probe-then-seed stage: TCP-probe each conductor's admin WS,
+ * pass only ready URLs to the named seeder script, parse the structured
+ * seed-results-*.json artifact, archive it. Returns a Map describing
+ * the run so the caller can format stage-specific UNSTABLE messages.
+ *
+ * Extracted from the two seed stages (Seed Conductor Identities + Seed
+ * Agent Peer Bindings) which had ~80 lines of near-identical inline
+ * logic. Keeps the pipeline { } CPS method under the 64KB JVM limit.
+ *
+ * @param stageLabel       human-readable stage name (for probe + console)
+ * @param scriptName       seeder script under genesis/seeder/src/
+ * @param seedResultsName  basename of the seed-results-*.json artifact
+ * @return Map [skipped, exitCode, seedReport, seedResultsName]
+ */
+def runProbedSeeder(String stageLabel, String scriptName, String seedResultsName) {
+    def conductorUrls = getConductorAppUrls()
+    if (!conductorUrls) {
+        echo "WARN: no conductor URLs resolved — skipping ${stageLabel}"
+        return [skipped: true]
+    }
+
+    def probe = probeConductorReadiness(conductorUrls, stageLabel)
+
+    if (probe.ready.isEmpty()) {
+        // All conductors unreachable — partial-cluster principle:
+        // mark UNSTABLE not FAILED, household is recoverable.
+        unstable("All ${probe.unready.size()} conductors unreachable — skipping seed (see conductor-readiness.json)")
+        return [skipped: true, allUnready: true]
+    }
+
+    if (!probe.unready.isEmpty()) {
+        unstable("${probe.unready.size()} of ${probe.ready.size() + probe.unready.size()} conductors unready — seeding ${probe.ready.size()} reachable peers (see conductor-readiness.json)")
+    }
+
+    def readyUrls = probe.ready.join(',')
+
+    // Run the seeder; capture exit code so we can interpret the
+    // partial-vs-total split (0=clean, 2=partial, 1=total).
+    def seedExit = -1
+    dir('genesis/seeder') {
+        seedExit = sh(
+            script: """#!/bin/bash
+                set -uo pipefail
+                echo "═══════════════════════════════════════════════════════════"
+                echo "${stageLabel.toUpperCase()}"
+                echo "═══════════════════════════════════════════════════════════"
+                echo "Conductors (ready): ${readyUrls}"
+                echo ""
+                CONDUCTOR_URLS="${readyUrls}" \\
+                  npx tsx src/${scriptName}
+            """,
+            returnStatus: true,
+        )
+    }
+
+    def seedResultsPath = "genesis/seeder/${seedResultsName}"
+    def seedReport = null
+    if (fileExists(seedResultsPath)) {
+        archiveArtifacts(
+            artifacts: seedResultsPath,
+            fingerprint: true,
+            allowEmptyArchive: true,
+        )
+        seedReport = readJSON(file: seedResultsPath)
+    }
+
+    return [
+        skipped: false,
+        exitCode: seedExit,
+        seedReport: seedReport,
+        seedResultsName: seedResultsName,
+    ]
+}
+
 def shouldRunStep(String stepName) {
     def steps = (params.STEPS ?: 'all').split(',').collect { it.trim() }
     return steps.contains('all') || steps.contains(stepName)
@@ -1079,80 +1154,19 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
             steps {
                 container('builder') {
                     script {
-                        def conductorUrls = getConductorAppUrls()
-                        if (!conductorUrls) {
-                            echo "WARN: no conductor URLs resolved — skipping seed-conductor-identities"
-                            return
-                        }
-
-                        // Per-peer pre-flight probe. Skips dead peers entirely
-                        // rather than letting the seeder waste ~150s on the
-                        // 10s-WS-timeout × N-humans loop. Emits
-                        // conductor-readiness.json for downstream investigation.
-                        def probe = probeConductorReadiness(conductorUrls, 'Seed Conductor Identities')
-
-                        if (probe.ready.isEmpty()) {
-                            // All conductors unreachable — nothing to seed.
-                            // Still mark UNSTABLE (not FAILED) per the
-                            // partial-cluster-is-steady-state principle:
-                            // a household with no peers ready today is
-                            // recoverable, not a hard failure.
-                            unstable("All ${probe.unready.size()} conductors unreachable — skipping seed (see conductor-readiness.json)")
-                            return
-                        }
-
-                        if (!probe.unready.isEmpty()) {
-                            unstable("${probe.unready.size()} of ${probe.ready.size() + probe.unready.size()} conductors unready — seeding ${probe.ready.size()} reachable peers (see conductor-readiness.json)")
-                        }
-
-                        def readyUrls = probe.ready.join(',')
-
-                        // Run the seeder; capture exit code via returnStatus
-                        // so we can interpret the partial-vs-total exit code
-                        // split (0=clean, 2=partial, 1=total) without
-                        // letting catchError swallow the distinction.
-                        def seedExit = -1
-                        dir('genesis/seeder') {
-                            seedExit = sh(
-                                script: """#!/bin/bash
-                                    set -uo pipefail
-                                    echo "═══════════════════════════════════════════════════════════"
-                                    echo "SEED CONDUCTOR IDENTITIES"
-                                    echo "═══════════════════════════════════════════════════════════"
-                                    echo "Conductors (ready): ${readyUrls}"
-                                    echo ""
-                                    CONDUCTOR_URLS="${readyUrls}" \\
-                                      npx tsx src/seed-conductor-identities.ts
-                                """,
-                                returnStatus: true,
-                            )
-                        }
-
-                        // Archive the structured per-human artifact emitted
-                        // by the seeder regardless of exit code (the script
-                        // writes it before exiting). Read it to enrich the
-                        // unstable() message with concrete counts.
-                        def seedResultsName = env.SEED_RESULTS_CONDUCTOR_IDENTITIES_FILE ?: 'seed-results-conductor-identities.json'
-                        def seedResultsPath = "genesis/seeder/${seedResultsName}"
-                        if (fileExists(seedResultsPath)) {
-                            archiveArtifacts(
-                                artifacts: seedResultsPath,
-                                fingerprint: true,
-                                allowEmptyArchive: true,
-                            )
-                            def seedReport = readJSON(file: seedResultsPath)
-                            def c = seedReport.counts ?: [:]
-                            if (seedExit == 2) {
-                                unstable("Seed Conductor Identities partial: ${c.succeeded ?: 0} succeeded (${c.created ?: 0} created + ${c.exists ?: 0} exists), ${c.failed ?: 0} failed (see ${seedResultsName})")
-                            } else if (seedExit == 1) {
-                                unstable("Seed Conductor Identities total failure: 0 of ${c.total ?: 0} humans seeded (see ${seedResultsName})")
-                            } else if (seedExit != 0) {
-                                unstable("Seed Conductor Identities exited ${seedExit} (unexpected — see console)")
-                            }
-                        } else if (seedExit != 0) {
-                            // Script didn't even reach the writeFile call.
-                            // Existing UNSTABLE behaviour preserved.
-                            unstable("Seed Conductor Identities failed before writing seed-results — exit ${seedExit}")
+                        def res = runProbedSeeder(
+                            'Seed Conductor Identities',
+                            'seed-conductor-identities.ts',
+                            env.SEED_RESULTS_CONDUCTOR_IDENTITIES_FILE ?: 'seed-results-conductor-identities.json',
+                        )
+                        if (res.skipped) return
+                        def c = res.seedReport?.counts ?: [:]
+                        if (res.exitCode == 2) {
+                            unstable("Seed Conductor Identities partial: ${c.succeeded ?: 0} succeeded (${c.created ?: 0} created + ${c.exists ?: 0} exists), ${c.failed ?: 0} failed (see ${res.seedResultsName})")
+                        } else if (res.exitCode == 1) {
+                            unstable("Seed Conductor Identities total failure: 0 of ${c.total ?: 0} humans seeded (see ${res.seedResultsName})")
+                        } else if (res.exitCode != 0) {
+                            unstable("Seed Conductor Identities exited ${res.exitCode} (unexpected — see console)")
                         }
                     }
                 }
@@ -1167,68 +1181,19 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
             steps {
                 container('builder') {
                     script {
-                        def conductorUrls = getConductorAppUrls()
-                        if (!conductorUrls) {
-                            echo "WARN: no conductor URLs resolved — skipping seed-agent-bindings"
-                            return
-                        }
-
-                        // Probe again — a peer may have recovered or gone
-                        // down between Seed Conductor Identities and now.
-                        // The latest probe overwrites conductor-readiness.json
-                        // (single-file, latest-wins) — sufficient for
-                        // iteration 1; preserve-history is a follow-up.
-                        def probe = probeConductorReadiness(conductorUrls, 'Seed Agent Peer Bindings')
-
-                        if (probe.ready.isEmpty()) {
-                            unstable("All ${probe.unready.size()} conductors unreachable — skipping seed (see conductor-readiness.json)")
-                            return
-                        }
-
-                        if (!probe.unready.isEmpty()) {
-                            unstable("${probe.unready.size()} of ${probe.ready.size() + probe.unready.size()} conductors unready — seeding ${probe.ready.size()} reachable peers (see conductor-readiness.json)")
-                        }
-
-                        def readyUrls = probe.ready.join(',')
-
-                        // Same partial-vs-total exit-code interpretation
-                        // pattern as Seed Conductor Identities above.
-                        def seedExit = -1
-                        dir('genesis/seeder') {
-                            seedExit = sh(
-                                script: """#!/bin/bash
-                                    set -uo pipefail
-                                    echo "═══════════════════════════════════════════════════════════"
-                                    echo "SEED AGENT PEER BINDINGS"
-                                    echo "═══════════════════════════════════════════════════════════"
-                                    echo "Conductors (ready): ${readyUrls}"
-                                    echo ""
-                                    CONDUCTOR_URLS="${readyUrls}" \\
-                                      npx tsx src/seed-agent-bindings.ts
-                                """,
-                                returnStatus: true,
-                            )
-                        }
-
-                        def seedResultsName = env.SEED_RESULTS_AGENT_BINDINGS_FILE ?: 'seed-results-agent-bindings.json'
-                        def seedResultsPath = "genesis/seeder/${seedResultsName}"
-                        if (fileExists(seedResultsPath)) {
-                            archiveArtifacts(
-                                artifacts: seedResultsPath,
-                                fingerprint: true,
-                                allowEmptyArchive: true,
-                            )
-                            def seedReport = readJSON(file: seedResultsPath)
-                            def c = seedReport.counts ?: [:]
-                            if (seedExit == 2) {
-                                unstable("Seed Agent Peer Bindings partial: ${c.succeeded ?: 0} humans succeeded (${c.totalCreated ?: 0} bindings written), ${c.failed ?: 0} failed (see ${seedResultsName})")
-                            } else if (seedExit == 1) {
-                                unstable("Seed Agent Peer Bindings total failure: 0 of ${c.total ?: 0} humans seeded (see ${seedResultsName})")
-                            } else if (seedExit != 0) {
-                                unstable("Seed Agent Peer Bindings exited ${seedExit} (unexpected — see console)")
-                            }
-                        } else if (seedExit != 0) {
-                            unstable("Seed Agent Peer Bindings failed before writing seed-results — exit ${seedExit}")
+                        def res = runProbedSeeder(
+                            'Seed Agent Peer Bindings',
+                            'seed-agent-bindings.ts',
+                            env.SEED_RESULTS_AGENT_BINDINGS_FILE ?: 'seed-results-agent-bindings.json',
+                        )
+                        if (res.skipped) return
+                        def c = res.seedReport?.counts ?: [:]
+                        if (res.exitCode == 2) {
+                            unstable("Seed Agent Peer Bindings partial: ${c.succeeded ?: 0} humans succeeded (${c.totalCreated ?: 0} bindings written), ${c.failed ?: 0} failed (see ${res.seedResultsName})")
+                        } else if (res.exitCode == 1) {
+                            unstable("Seed Agent Peer Bindings total failure: 0 of ${c.total ?: 0} humans seeded (see ${res.seedResultsName})")
+                        } else if (res.exitCode != 0) {
+                            unstable("Seed Agent Peer Bindings exited ${res.exitCode} (unexpected — see console)")
                         }
                     }
                 }
