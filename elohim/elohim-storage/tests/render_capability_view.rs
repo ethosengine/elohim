@@ -125,7 +125,10 @@ async fn storage_returns_null_capability_when_doorway_returns_garbage() {
     let cap = load_render_capability_from_url().await;
     std::env::remove_var("DOORWAY_CAPABILITY_URL");
     drop(_g);
-    assert!(cap.is_none(), "unparseable body must produce null capability");
+    assert!(
+        cap.is_none(),
+        "unparseable body must produce null capability"
+    );
 }
 
 #[tokio::test]

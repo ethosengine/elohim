@@ -2343,7 +2343,9 @@ static DOORWAY_CAP_ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 #[test]
 fn load_render_capability_from_url_returns_none_when_unset() {
-    let _g = DOORWAY_CAP_ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    let _g = DOORWAY_CAP_ENV_LOCK
+        .lock()
+        .unwrap_or_else(|e| e.into_inner());
     std::env::remove_var("DOORWAY_CAPABILITY_URL");
     let result = elohim_storage::load_render_capability_from_url_blocking();
     assert!(result.is_none());
@@ -2364,8 +2366,13 @@ async fn load_render_capability_from_url_parses_valid_response() {
         .respond_with(ResponseTemplate::new(200).set_body_json(body))
         .mount(&server)
         .await;
-    let _g = DOORWAY_CAP_ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
-    std::env::set_var("DOORWAY_CAPABILITY_URL", format!("{}/admin/capability", server.uri()));
+    let _g = DOORWAY_CAP_ENV_LOCK
+        .lock()
+        .unwrap_or_else(|e| e.into_inner());
+    std::env::set_var(
+        "DOORWAY_CAPABILITY_URL",
+        format!("{}/admin/capability", server.uri()),
+    );
     let result = elohim_storage::load_render_capability_from_url().await;
     std::env::remove_var("DOORWAY_CAPABILITY_URL");
     drop(_g);
@@ -2385,8 +2392,13 @@ async fn load_render_capability_from_url_returns_none_on_5xx() {
         .respond_with(ResponseTemplate::new(503))
         .mount(&server)
         .await;
-    let _g = DOORWAY_CAP_ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
-    std::env::set_var("DOORWAY_CAPABILITY_URL", format!("{}/admin/capability", server.uri()));
+    let _g = DOORWAY_CAP_ENV_LOCK
+        .lock()
+        .unwrap_or_else(|e| e.into_inner());
+    std::env::set_var(
+        "DOORWAY_CAPABILITY_URL",
+        format!("{}/admin/capability", server.uri()),
+    );
     let result = elohim_storage::load_render_capability_from_url().await;
     std::env::remove_var("DOORWAY_CAPABILITY_URL");
     drop(_g);
@@ -2402,8 +2414,13 @@ async fn load_render_capability_from_url_returns_none_on_unparseable_body() {
         .respond_with(ResponseTemplate::new(200).set_body_string("not json at all"))
         .mount(&server)
         .await;
-    let _g = DOORWAY_CAP_ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
-    std::env::set_var("DOORWAY_CAPABILITY_URL", format!("{}/admin/capability", server.uri()));
+    let _g = DOORWAY_CAP_ENV_LOCK
+        .lock()
+        .unwrap_or_else(|e| e.into_inner());
+    std::env::set_var(
+        "DOORWAY_CAPABILITY_URL",
+        format!("{}/admin/capability", server.uri()),
+    );
     let result = elohim_storage::load_render_capability_from_url().await;
     std::env::remove_var("DOORWAY_CAPABILITY_URL");
     drop(_g);
