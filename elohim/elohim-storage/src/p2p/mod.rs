@@ -84,7 +84,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::{broadcast, mpsc, oneshot, RwLock};
-use tracing::{debug, error, info, warn};
+use tracing::{debug, info, warn};
 use ts_rs::TS;
 
 use crate::db::DbPool;
@@ -4792,147 +4792,21 @@ impl P2PNode {
     }
 
     /// Handle an incoming shard request
+    /// Snapshot the shard-relevant deps into a transport-neutral
+    /// [`crate::shard_service::ShardService`]. Cheap (clones an
+    /// `Arc<BlobStore>` and an `Option<DbPool>`); construct per-request.
+    pub(crate) fn shard_service(&self) -> crate::shard_service::ShardService {
+        crate::shard_service::ShardService::new(self.blob_store.clone(), self.db_pool.clone())
+    }
+
+    /// Handle an incoming shard request from a peer.
+    ///
+    /// Delegates to the transport-neutral
+    /// [`crate::shard_service::ShardService`] so the iroh-side
+    /// [`crate::p2p_iroh::ShardBackend`] can produce wire-byte-identical
+    /// responses.
     async fn handle_shard_request(&self, request: ShardRequest) -> ShardResponse {
-        match request {
-            ShardRequest::Get { hash } => {
-                debug!(hash = %hash, "Handling shard Get request");
-                match self.blob_store.get(&hash).await {
-                    Ok(data) => {
-                        info!(hash = %hash, size = data.len(), "Serving shard");
-                        ShardResponse::Data(data)
-                    }
-                    Err(_) => {
-                        debug!(hash = %hash, "Shard not found");
-                        ShardResponse::NotFound
-                    }
-                }
-            }
-            ShardRequest::Have { hash } => {
-                debug!(hash = %hash, "Handling shard Have request");
-                let exists = self.blob_store.exists(&hash).await;
-                ShardResponse::Have(exists)
-            }
-            ShardRequest::Push { hash, data } => {
-                debug!(hash = %hash, size = data.len(), "Handling shard Push request");
-                match self.blob_store.store(&data).await {
-                    Ok(result) => {
-                        if result.hash == hash {
-                            info!(hash = %hash, "Shard stored via P2P push");
-                            ShardResponse::PushAck
-                        } else {
-                            warn!(expected = %hash, actual = %result.hash, "Shard hash mismatch");
-                            ShardResponse::Error("Hash mismatch".to_string())
-                        }
-                    }
-                    Err(e) => {
-                        error!(hash = %hash, error = %e, "Failed to store shard");
-                        ShardResponse::Error(format!("Storage error: {}", e))
-                    }
-                }
-            }
-            ShardRequest::ListContent {
-                reach_filter,
-                offset,
-                limit,
-            } => {
-                // Validate reach_filter against schema-generated constants so
-                // unknown strings don't silently return empty results.
-                if let Some(ref r) = reach_filter {
-                    if !crate::generated_enums::CORE_REACH_LEVELS.contains(&r.as_str()) {
-                        return ShardResponse::Error(format!(
-                            "Unknown reach level {:?}. Valid values: {:?}",
-                            r,
-                            crate::generated_enums::CORE_REACH_LEVELS
-                        ));
-                    }
-                }
-                let pool = match self.db_pool.as_ref() {
-                    Some(p) => p,
-                    None => return ShardResponse::Error("No database pool".to_string()),
-                };
-                let mut conn = match pool.get() {
-                    Ok(c) => c,
-                    Err(e) => return ShardResponse::Error(format!("DB connection failed: {}", e)),
-                };
-                let app_ctx = crate::db::AppContext::default_lamad();
-                let query = crate::db::content_diesel::ContentQuery {
-                    reach: reach_filter,
-                    limit: limit as i64,
-                    offset: offset as i64,
-                    ..Default::default()
-                };
-                // P2P shard inventory — internal peer-to-peer protocol, not
-                // web2 HTTP. Peers must see all local rows so replication can
-                // cover pre-drain content.
-                match crate::db::content_diesel::list_content(&mut conn, &app_ctx, &query, false) {
-                    Ok(items) => {
-                        let total = crate::db::content_diesel::count_content(
-                            &mut conn, &app_ctx, &query, false,
-                        )
-                        .unwrap_or(items.len() as i64) as u64;
-                        let inventory: Vec<shard_protocol::ContentInventoryItem> = items
-                            .iter()
-                            .map(|cwt| shard_protocol::ContentInventoryItem {
-                                id: cwt.content.id.clone(),
-                                title: cwt.content.title.clone(),
-                                content_type: cwt.content.content_type.clone(),
-                                content_format: cwt.content.content_format.clone(),
-                                reach: cwt.content.reach.clone(),
-                                blob_cid: cwt.content.blob_cid.clone(),
-                                updated_at: cwt.content.updated_at.clone(),
-                            })
-                            .collect();
-                        let has_more = (offset as u64 + inventory.len() as u64) < total;
-                        info!(
-                            count = inventory.len(),
-                            total = total,
-                            "Serving content inventory"
-                        );
-                        ShardResponse::ContentList {
-                            items: inventory,
-                            total,
-                            has_more,
-                        }
-                    }
-                    Err(e) => ShardResponse::Error(format!("Content query failed: {}", e)),
-                }
-            }
-            ShardRequest::GetContent { id } => {
-                let pool = match self.db_pool.as_ref() {
-                    Some(p) => p,
-                    None => return ShardResponse::Error("No database pool".to_string()),
-                };
-                let mut conn = match pool.get() {
-                    Ok(c) => c,
-                    Err(e) => return ShardResponse::Error(format!("DB connection failed: {}", e)),
-                };
-                let app_ctx = crate::db::AppContext::default_lamad();
-                match crate::db::content_diesel::get_content_with_tags(
-                    &mut conn, &app_ctx, &id, false,
-                ) {
-                    Ok(Some(cwt)) => {
-                        debug!(id = %id, "Serving content record to peer");
-                        ShardResponse::Content(Box::new(shard_protocol::ContentRecord {
-                            id: cwt.content.id,
-                            title: cwt.content.title,
-                            description: cwt.content.description,
-                            content_type: cwt.content.content_type,
-                            content_format: cwt.content.content_format,
-                            blob_hash: cwt.content.blob_hash,
-                            blob_cid: cwt.content.blob_cid,
-                            content_size_bytes: cwt.content.content_size_bytes,
-                            metadata_json: cwt.content.metadata_json,
-                            reach: cwt.content.reach,
-                            created_by: cwt.content.created_by,
-                            tags: cwt.tags,
-                            content_body: cwt.content.content_body,
-                        }))
-                    }
-                    Ok(None) => ShardResponse::ContentNotFound,
-                    Err(e) => ShardResponse::Error(format!("Content fetch failed: {}", e)),
-                }
-            }
-        }
+        self.shard_service().handle(request).await
     }
 
     /// Verify that peers still hold their announced shards.

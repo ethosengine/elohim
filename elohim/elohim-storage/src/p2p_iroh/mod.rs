@@ -30,6 +30,7 @@ mod node;
 pub mod parity_harness;
 pub mod peer_map;
 pub mod shard;
+pub mod shard_backend;
 pub mod sync;
 pub mod sync_backend;
 pub mod view_fed;
@@ -52,6 +53,7 @@ pub use shard::{IrohShardClient, IrohShardProtocol, ShardBackend, SHARD_ALPN};
 pub use sync::{IrohSyncClient, IrohSyncProtocol, SyncBackend, SYNC_ALPN};
 pub use epr_atom_backend::EprAtomServiceBackend;
 pub use epr_backend::EprServiceBackend;
+pub use shard_backend::ShardServiceBackend;
 pub use sync_backend::SyncManagerBackend;
 pub use view_fed::{
     IrohViewFederationClient, IrohViewFederationProtocol, ViewFederationBackend, VIEW_FED_ALPN,

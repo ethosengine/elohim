@@ -860,9 +860,10 @@ async fn async_main(
         use elohim_storage::p2p::trust_cache::PeerTrustCache;
         use elohim_storage::p2p_iroh::{
             AlpnRegistration, EprAtomServiceBackend, EprServiceBackend, IrohConfig,
-            IrohEprAtomProtocol, IrohEprProtocol, IrohNode, IrohSyncProtocol, SyncManagerBackend,
-            EPR_ALPN, EPR_ATOM_ALPN, SYNC_ALPN,
+            IrohEprAtomProtocol, IrohEprProtocol, IrohNode, IrohShardProtocol, IrohSyncProtocol,
+            ShardServiceBackend, SyncManagerBackend, EPR_ALPN, EPR_ATOM_ALPN, SHARD_ALPN, SYNC_ALPN,
         };
+        use elohim_storage::shard_service::ShardService;
         use elohim_storage::sync::{DocStore, StreamTracker, SyncManager};
 
         let iroh_cfg = IrohConfig::from_storage_dir(&config.storage_dir);
@@ -932,22 +933,43 @@ async fn async_main(
             Arc::new(EprAtomServiceBackend::new(epr_atom_service));
         let epr_atom_handler = IrohEprAtomProtocol::new(epr_atom_backend);
 
+        // Shard backend — transport-neutral service shared with the
+        // libp2p path. Wraps the same BlobStore the libp2p path uses;
+        // mode-exclusive at runtime so no contention. Note: this is the
+        // legacy SHA-256 sharded fetch plane, NOT the iroh-blobs
+        // BLAKE3-streamed plane (the latter mounts on the Router
+        // automatically under iroh_blobs::ALPN). Per spec, the shard
+        // ALPN exists for libp2p-fallback peers that can't use
+        // iroh-blobs.
+        let shard_service = Arc::new(ShardService::new(
+            blob_store.clone(),
+            if args.enable_content_db {
+                db_pool.clone()
+            } else {
+                None
+            },
+        ));
+        let shard_backend: Arc<dyn elohim_storage::p2p_iroh::ShardBackend> =
+            Arc::new(ShardServiceBackend::new(shard_service));
+        let shard_handler = IrohShardProtocol::new(shard_backend);
+
         let extras: Vec<AlpnRegistration> = vec![
             (SYNC_ALPN.to_vec(), Box::new(sync_handler)),
             (EPR_ALPN.to_vec(), Box::new(epr_handler)),
             (EPR_ATOM_ALPN.to_vec(), Box::new(epr_atom_handler)),
+            (SHARD_ALPN.to_vec(), Box::new(shard_handler)),
         ];
 
         match IrohNode::start_with_protocols(iroh_cfg, extras).await {
             Ok(node) => {
                 info!(
                     "Iroh parallel-stack node started (Phase 11 — sync + EPR + EPR-atom \
-                     backends wired)"
+                     + shard backends wired)"
                 );
                 info!("  Node ID: {}", node.node_id());
                 info!(
                     "  ALPNs: iroh-blobs, iroh-gossip, /elohim/sync/2.0.0, \
-                     /elohim/epr/2.0.0, /elohim/epr-atom/2.0.0"
+                     /elohim/epr/2.0.0, /elohim/epr-atom/2.0.0, /elohim/shard/2.0.0"
                 );
                 Some(node)
             }

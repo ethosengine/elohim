@@ -54,6 +54,7 @@ pub mod epr_atom_service;
 pub mod epr_codec;
 pub mod epr_head;
 pub mod epr_service;
+pub mod shard_service;
 pub mod error;
 pub mod happ_manager;
 pub mod hc_client;
