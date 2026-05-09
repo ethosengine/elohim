@@ -1264,82 +1264,105 @@ spec:
 │  Plan: ${levelDesc}
 └──────────────────────────────────────────────────────────────────────────────┘"""
 
-                        // Execute in dependency-level order (parallel within each level)
+                        // Execute in dependency-level order (parallel within each level).
+                        // Each level is wrapped in a nested stage() so Blue Ocean
+                        // surfaces the dependency-graph structure with per-level
+                        // and per-pipeline timing — what `groupByDependencyLevel`
+                        // computes is what the UI now shows.
+                        // Behaviour-preserving: the level-failed guard, baseline
+                        // updates, and parallel-wait semantics are unchanged.
                         levels.eachWithIndex { level, idx ->
-                            echo ''
-                            echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
-                            echo "📦 Level ${idx}: ${level.join(' + ')}"
-                            echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
+                            def levelLabel = level.size() > 1
+                                ? "Level ${idx}: ${level.join(' + ')}"
+                                : "Level ${idx}: ${level[0]}"
 
-                            if (level.size() == 1) {
-                                def name = level[0]
-                                echo "🔨 Building: ${name}"
-                                def result = triggerPipeline(name, env.BRANCH_NAME, true)
-                                results[name] = result
-                                if (result.success) {
-                                    if (result.unstable) {
-                                        echo "⚠️ ${name}: UNSTABLE (${result.duration / 1000}s)"
-                                    } else {
-                                        echo "✅ ${name}: SUCCESS (${result.duration / 1000}s)"
-                                    }
-                                    pipelineBaselines[name] = env.GIT_COMMIT_FULL
-                                } else {
-                                    echo "❌ ${name}: ${result.result}"
-                                    if (result.error) echo "   Error: ${result.error}"
-                                }
-                            } else {
-                                def parallelBuilds = [:]
-                                level.each { name ->
-                                    parallelBuilds[name] = {
-                                        echo "🔨 Building: ${name}"
-                                        def result = triggerPipeline(name, env.BRANCH_NAME, true)
-                                        results[name] = result
-                                        if (result.success) {
-                                            if (result.unstable) {
-                                                echo "⚠️ ${name}: UNSTABLE (${result.duration / 1000}s)"
-                                            } else {
-                                                echo "✅ ${name}: SUCCESS (${result.duration / 1000}s)"
-                                            }
-                                            pipelineBaselines[name] = env.GIT_COMMIT_FULL
+                            stage(levelLabel) {
+                                echo ''
+                                echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
+                                echo "📦 Level ${idx}: ${level.join(' + ')}"
+                                echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
+
+                                if (level.size() == 1) {
+                                    def name = level[0]
+                                    echo "🔨 Building: ${name}"
+                                    def result = triggerPipeline(name, env.BRANCH_NAME, true)
+                                    results[name] = result
+                                    if (result.success) {
+                                        if (result.unstable) {
+                                            echo "⚠️ ${name}: UNSTABLE (${result.duration / 1000}s)"
                                         } else {
-                                            echo "❌ ${name}: ${result.result}"
-                                            if (result.error) echo "   Error: ${result.error}"
+                                            echo "✅ ${name}: SUCCESS (${result.duration / 1000}s)"
+                                        }
+                                        pipelineBaselines[name] = env.GIT_COMMIT_FULL
+                                    } else {
+                                        echo "❌ ${name}: ${result.result}"
+                                        if (result.error) echo "   Error: ${result.error}"
+                                    }
+                                } else {
+                                    def parallelBuilds = [:]
+                                    level.each { name ->
+                                        parallelBuilds[name] = {
+                                            // Nested stage gives Blue Ocean a named
+                                            // parallel branch with its own timing.
+                                            stage(name) {
+                                                echo "🔨 Building: ${name}"
+                                                def result = triggerPipeline(name, env.BRANCH_NAME, true)
+                                                results[name] = result
+                                                if (result.success) {
+                                                    if (result.unstable) {
+                                                        echo "⚠️ ${name}: UNSTABLE (${result.duration / 1000}s)"
+                                                    } else {
+                                                        echo "✅ ${name}: SUCCESS (${result.duration / 1000}s)"
+                                                    }
+                                                    pipelineBaselines[name] = env.GIT_COMMIT_FULL
+                                                } else {
+                                                    echo "❌ ${name}: ${result.result}"
+                                                    if (result.error) echo "   Error: ${result.error}"
+                                                }
+                                            }
                                         }
                                     }
+                                    parallel parallelBuilds
                                 }
-                                parallel parallelBuilds
-                            }
 
-                            // Fail fast: abort if any pipeline in this level failed
-                            def levelFailed = level.findAll { !results[it]?.success }
-                            if (levelFailed) {
-                                error "Build(s) failed: ${levelFailed.join(', ')} - Aborting"
+                                // Fail fast: abort if any pipeline in this level failed.
+                                // Inside the level stage so the failure marks THIS level
+                                // red in Blue Ocean, not the outer Execute Builds stage.
+                                def levelFailed = level.findAll { !results[it]?.success }
+                                if (levelFailed) {
+                                    error "Build(s) failed: ${levelFailed.join(', ')} - Aborting"
+                                }
                             }
                         }
 
                         env.BUILD_RESULTS = writeJSON(returnText: true, json: results)
                         env.PIPELINE_BASELINES = writeJSON(returnText: true, json: pipelineBaselines)
 
-                        // Run genesis if requested
+                        // Run genesis if requested. Wrapped in its own stage so
+                        // Blue Ocean shows the trailing genesis dispatch as a
+                        // distinct column (it's NOT a level — runs after all
+                        // build levels succeed, per the dependency contract).
                         if (pipelines.contains('elohim-genesis')) {
-                            echo ''
-                            echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
-                            echo '🌱 Running Genesis (seed + test)'
-                            echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
+                            stage('elohim-genesis') {
+                                echo ''
+                                echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
+                                echo '🌱 Running Genesis (seed + test)'
+                                echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
 
-                            def genesisResult = triggerPipeline('elohim-genesis', env.BRANCH_NAME, true)
-                            results['elohim-genesis'] = genesisResult
+                                def genesisResult = triggerPipeline('elohim-genesis', env.BRANCH_NAME, true)
+                                results['elohim-genesis'] = genesisResult
 
-                            if (genesisResult.success) {
-                                echo '✅ elohim-genesis: SUCCESS'
-                                pipelineBaselines['elohim-genesis'] = env.GIT_COMMIT_FULL
-                            } else {
-                                echo "❌ elohim-genesis: ${genesisResult.result}"
-                                unstable('Genesis failed - seeding or tests may have issues')
+                                if (genesisResult.success) {
+                                    echo '✅ elohim-genesis: SUCCESS'
+                                    pipelineBaselines['elohim-genesis'] = env.GIT_COMMIT_FULL
+                                } else {
+                                    echo "❌ elohim-genesis: ${genesisResult.result}"
+                                    unstable('Genesis failed - seeding or tests may have issues')
+                                }
+
+                                env.BUILD_RESULTS = writeJSON(returnText: true, json: results)
+                                env.PIPELINE_BASELINES = writeJSON(returnText: true, json: pipelineBaselines)
                             }
-
-                            env.BUILD_RESULTS = writeJSON(returnText: true, json: results)
-                            env.PIPELINE_BASELINES = writeJSON(returnText: true, json: pipelineBaselines)
                         }
 
                         // Now that builds succeeded, advance the build graph's
