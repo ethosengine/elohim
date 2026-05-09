@@ -2210,3 +2210,65 @@ fn attention_tending_with_negative_tended_at_rejected_by_schema() {
         "schema should reject tendedAt: [-1] (items minimum: 0 violated)"
     );
 }
+
+#[test]
+fn render_capability_profile_round_trips_against_schema() {
+    use elohim_storage::{BundleEntry, RenderCapabilityProfile, RendererKind};
+    let profile = RenderCapabilityProfile {
+        bundles: vec![BundleEntry {
+            name: "lamad-app".into(),
+            version: "1.0.3".into(),
+            renderer: RendererKind::AngularSsr,
+            digest: Some("sha256:abc123".into()),
+        }],
+        renderers: vec![RendererKind::AngularSsr],
+        auth_modes: vec!["anonymous".into(), "doorway-hosted".into()],
+        max_concurrent_renders: 8,
+        memory_budget_mib: Some(1024),
+    };
+    let json = serde_json::to_string(&profile).expect("serialize");
+    let back: RenderCapabilityProfile = serde_json::from_str(&json).expect("deserialize");
+    assert_eq!(back.bundles[0].name, "lamad-app");
+    assert_eq!(back.bundles[0].renderer, RendererKind::AngularSsr);
+    assert!(back.auth_modes.contains(&"anonymous".to_string()));
+}
+
+#[test]
+fn capability_extensions_round_trips() {
+    use elohim_storage::CapabilityExtensions;
+    use serde_json::json;
+    let ext_json = json!({
+        "transcode": {
+            "schemaRef": "epr:schema:view:transcode-capability-profile",
+            "profile": { "codecs": ["h264", "av1"] }
+        }
+    });
+    let ext: CapabilityExtensions = serde_json::from_value(ext_json.clone()).expect("deserialize");
+    let back = serde_json::to_value(&ext).expect("serialize");
+    assert_eq!(back, ext_json);
+}
+
+#[test]
+fn render_capability_serializes_with_camel_case() {
+    use elohim_storage::{BundleEntry, RenderCapabilityProfile, RendererKind};
+    let profile = RenderCapabilityProfile {
+        bundles: vec![BundleEntry {
+            name: "lamad-app".into(),
+            version: "1.0.3".into(),
+            renderer: RendererKind::AngularSsr,
+            digest: None,
+        }],
+        renderers: vec![RendererKind::AngularSsr],
+        auth_modes: vec!["anonymous".into()],
+        max_concurrent_renders: 4,
+        memory_budget_mib: None,
+    };
+    let json_value: serde_json::Value = serde_json::to_value(&profile).unwrap();
+    // Camel case keys, kebab-case enum values
+    assert!(json_value.get("authModes").is_some());
+    assert!(json_value.get("maxConcurrentRenders").is_some());
+    assert!(json_value["bundles"][0].get("renderer").unwrap() == "angular-ssr");
+    // Optional fields with None should be skipped (per #[serde(skip_serializing_if = "Option::is_none")])
+    assert!(json_value.get("memoryBudgetMib").is_none());
+    assert!(json_value["bundles"][0].get("digest").is_none());
+}

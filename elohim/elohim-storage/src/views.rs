@@ -6301,6 +6301,58 @@ impl ElohimReputationProfileView {
 
 use crate::db::peer_statuses::PeerStatusRow;
 
+/// Renderer kind a bundle targets. Mirrors `enums/renderer-kind.schema.json`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "kebab-case")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub enum RendererKind {
+    AngularSsr,
+    ReactRsc,
+    VueSsr,
+    SvelteSsr,
+    LitSsr,
+    StaticHtml,
+}
+
+/// One bundle a doorway carries (mirrors `bundles[]` items in the profile schema).
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct BundleEntry {
+    pub name: String,
+    pub version: String,
+    pub renderer: RendererKind,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub digest: Option<String>,
+}
+
+/// Tier-1 render capability profile. View-layer Category C operational state,
+/// layered into PeerStatusView post-construction. NOT a DHT entry.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct RenderCapabilityProfile {
+    pub bundles: Vec<BundleEntry>,
+    pub renderers: Vec<RendererKind>,
+    pub auth_modes: Vec<String>,
+    pub max_concurrent_renders: u32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub memory_budget_mib: Option<u32>,
+}
+
+/// Tier-2 extension capability claim (one entry in the extensions map).
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct CapabilityExtensionEntry {
+    pub schema_ref: String,
+    pub profile: JsonVal,
+}
+
+/// Tier-2 extensions map. Keys are kebab-case capability names registered in
+/// the capability registry. Validation checks shape only; consumers interpret content.
+pub type CapabilityExtensions = std::collections::BTreeMap<String, CapabilityExtensionEntry>;
+
 /// Advertised model-level capabilities of an elohim-agent running at this peer.
 ///
 /// Wire format: `elohim/sdk/schemas/v1/views/elohim-capability-profile.schema.json`

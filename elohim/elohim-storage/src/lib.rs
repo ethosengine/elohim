@@ -181,9 +181,10 @@ pub use views::ElohimReputationProfileView;
 pub use views::GateDecisionAttestationView;
 pub use views::GateDecisionChallengeView;
 pub use views::{
-    build_peer_status_view, load_elohim_capability_from_env, CommittedResources, DeviceEntryView,
-    ElohimCapabilityProfile, HouseholdDevicesView, HouseholdResilienceDetails,
-    HouseholdResilienceView, NetworkPostureView, NodeShapeView, PeerStatusView,
+    build_peer_status_view, load_elohim_capability_from_env, BundleEntry, CapabilityExtensionEntry,
+    CapabilityExtensions, CommittedResources, DeviceEntryView, ElohimCapabilityProfile,
+    HouseholdDevicesView, HouseholdResilienceDetails, HouseholdResilienceView, NetworkPostureView,
+    NodeShapeView, PeerStatusView, RenderCapabilityProfile, RendererKind,
 };
 pub use views::{
     EprCouplingView, EprEnvelopeView, EprListView, EprProvidersView, EprPublishInput,
