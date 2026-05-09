@@ -74,9 +74,22 @@ bench-view-fed:
 bench-gossip:
     cargo test --release --features "p2p p2p-iroh" --test bench_gossip_perf -- --ignored --nocapture
 
+# Head-to-head identity-handshake plane perf bench: iroh /elohim/identity-handshake/2.0.0
+# vs libp2p /elohim/identity/handshake/1.0.0 — IdentityHandshakeRequest/Response with
+# signature payload size sweep (64 B – 2048 B raw; ~2730 B base64 + binding
+# overhead stays under the 4 KiB IDENTITY_HANDSHAKE_REQ_MAX cap).
+bench-identity-handshake:
+    cargo test --release --features "p2p p2p-iroh" --test bench_identity_handshake_perf -- --ignored --nocapture
+
+# Head-to-head trust plane perf bench: iroh /elohim/trust/2.0.0
+# vs libp2p /elohim/trust/1.0.0 — TrustHandshake/Response with attestation CID count sweep
+# (1–768 CIDs, under the 64 KiB request cap).
+bench-trust:
+    cargo test --release --features "p2p p2p-iroh" --test bench_trust_perf -- --ignored --nocapture
+
 # Run every bench in sequence and print a combined summary report.
 # Each plane runs independently; the umbrella target streams output as it goes.
-bench-all: bench-blob bench-sync bench-epr bench-epr-atom bench-shard bench-view-fed bench-gossip
+bench-all: bench-blob bench-sync bench-epr bench-epr-atom bench-shard bench-view-fed bench-gossip bench-identity-handshake bench-trust
     @echo ""
     @echo "All bench-* recipes completed. See per-plane markdown tables above."
 
