@@ -648,6 +648,86 @@ def triggerPipeline(String name, String branch, boolean wait = true) {
 }
 
 /**
+ * Hydrate stageAnnotations for a downstream pipeline by copying its
+ * structured artifacts into the orchestrator workspace and parsing them.
+ *
+ * The actual-build-graph.json's results map gets a `stageAnnotations` field
+ * per pipeline that ran one of these emit-aware stages. This lets the
+ * reconciler surface peer-level / human-level findings as investigation
+ * pointers without requiring downstream tooling to fetch each downstream
+ * build's artifacts separately.
+ *
+ * Best-effort by design: a missing artifact (build aborted before emit,
+ * old pipeline version, archive expired) yields a smaller annotation map.
+ * The reconciler tolerates absent annotations.
+ *
+ * @param pipelineName  e.g. 'elohim-genesis'
+ * @param buildNumber   the downstream build's number (from triggerPipeline result)
+ * @param branch        e.g. env.BRANCH_NAME
+ * @return              Map of annotation key → parsed JSON
+ */
+def hydrateStageAnnotations(String pipelineName, def buildNumber, String branch) {
+    def annotations = [:]
+    if (!buildNumber) return annotations
+
+    // Each pipeline declares which artifacts to slurp. Genesis is the
+    // only pipeline today; future pipelines (edge, app) can register here
+    // when they emit their own stage-level partial-readiness signals.
+    def manifest = readJSON(file: 'genesis/orchestrator/build-artifacts.json')
+    def genesisArtifacts = manifest.genesis ?: [:]
+    def perPipelineArtifacts = [
+        'elohim-genesis': [
+            conductorReadiness:                genesisArtifacts.conductorReadiness,
+            seedResultsConductorIdentities:    genesisArtifacts.seedResultsConductorIdentities,
+            seedResultsAgentBindings:          genesisArtifacts.seedResultsAgentBindings,
+        ],
+    ]
+    def wanted = perPipelineArtifacts[pipelineName]
+    if (!wanted) return annotations
+
+    // Copy into a per-build dir so successive trigger calls don't clobber
+    // each other's artifacts. The dir is local to the orchestrator workspace
+    // and not archived — only the parsed values land in stageAnnotations.
+    def downstreamDir = "downstream-artifacts/${pipelineName}-${buildNumber}"
+    sh "mkdir -p '${downstreamDir}'"
+
+    // Build an Ant glob that catches all wanted basenames, regardless of
+    // where they were archived inside the downstream build. The seeders
+    // archive at genesis/seeder/<name>; conductor-readiness archives at root.
+    def basenames = wanted.values().findAll { it } as Set
+    def filter = basenames.collect { "**/${it}" }.join(',')
+
+    try {
+        copyArtifacts(
+            projectName: "${pipelineName}/${branch}",
+            selector: specific(buildNumber.toString()),
+            filter: filter,
+            target: downstreamDir,
+            optional: true,
+            flatten: true,
+            fingerprintArtifacts: false,
+        )
+    } catch (Exception e) {
+        echo "[stageAnnotations] copyArtifacts failed for ${pipelineName} #${buildNumber}: ${e.message}"
+        return annotations
+    }
+
+    wanted.each { String key, String fname ->
+        if (!fname) return
+        def path = "${downstreamDir}/${fname}"
+        if (fileExists(path)) {
+            try {
+                annotations[key] = readJSON(file: path)
+            } catch (Exception e) {
+                echo "[stageAnnotations] could not parse ${path}: ${e.message}"
+            }
+        }
+    }
+
+    return annotations
+}
+
+/**
  * Print a decision matrix showing what will be built and why
  */
 def printDecisionMatrix(analysis, pipelines) {
@@ -1441,6 +1521,21 @@ spec:
                                 echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
 
                                 def genesisResult = triggerPipeline('elohim-genesis', env.BRANCH_NAME, true)
+
+                                // Hydrate stageAnnotations from genesis's
+                                // conductor-readiness + seed-results artifacts.
+                                // Best-effort — empty map on copy failure.
+                                // Embedded into actual-build-graph.json so the
+                                // reconciler can surface peer-level findings
+                                // as investigation pointers (Path C).
+                                def genesisAnnotations = hydrateStageAnnotations('elohim-genesis', genesisResult.buildNumber, env.BRANCH_NAME)
+                                if (genesisAnnotations) {
+                                    genesisResult.stageAnnotations = genesisAnnotations
+                                    def keys = genesisAnnotations.keySet().toList()
+                                    if (keys) {
+                                        echo "[stageAnnotations] elohim-genesis hydrated: ${keys.join(', ')}"
+                                    }
+                                }
                                 results['elohim-genesis'] = genesisResult
 
                                 if (genesisResult.success) {

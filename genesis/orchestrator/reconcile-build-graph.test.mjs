@@ -279,3 +279,122 @@ describe('reconcile — summary text', () => {
     assert.match(r.summary, /1 unstable/i);
   });
 });
+
+describe('reconcile — stageAnnotations pointers', () => {
+  it('surfaces conductor-readiness unready peers as pointers', () => {
+    const predicted = predictedFixture();
+    const actual = actualFixture({
+      results: {
+        'elohim-holochain': { result: 'SUCCESS', durationMs: 4080000, level: 0 },
+        'elohim-edge': { result: 'SUCCESS', durationMs: 1980000, level: 1 },
+        elohim: { result: 'SUCCESS', durationMs: 1140000, level: 1 },
+        'elohim-genesis': {
+          result: 'UNSTABLE',
+          durationMs: 600000,
+          level: 'genesis-trailer',
+          stageAnnotations: {
+            conductorReadiness: {
+              schemaVersion: '1',
+              stage: 'Seed Agent Peer Bindings',
+              readyCount: 2,
+              unreadyCount: 1,
+              partial: true,
+              allReady: false,
+              allUnready: false,
+              ready: [],
+              unready: [
+                { url: 'ws://elohim-timothy-alpha:4445', host: 'elohim-timothy-alpha', adminPort: 4444, reason: 'tcp-timeout-or-refused' },
+              ],
+            },
+          },
+        },
+      },
+    });
+
+    const r = reconcile({ predicted, actual });
+
+    assert.ok(
+      r.investigationPointers.some(p => p.includes('conductor-readiness') && p.includes('elohim-timothy-alpha')),
+      `expected conductor-readiness pointer naming timothy; got ${JSON.stringify(r.investigationPointers)}`,
+    );
+  });
+
+  it('surfaces seed-results partial humans as pointers', () => {
+    const predicted = predictedFixture();
+    const actual = actualFixture({
+      results: {
+        'elohim-holochain': { result: 'SUCCESS', durationMs: 4080000, level: 0 },
+        'elohim-edge': { result: 'SUCCESS', durationMs: 1980000, level: 1 },
+        elohim: { result: 'SUCCESS', durationMs: 1140000, level: 1 },
+        'elohim-genesis': {
+          result: 'UNSTABLE',
+          durationMs: 600000,
+          level: 'genesis-trailer',
+          stageAnnotations: {
+            seedResultsConductorIdentities: {
+              schemaVersion: '1',
+              counts: { created: 2, exists: 0, failed: 1, succeeded: 2, total: 3 },
+              partial: true,
+              allSucceeded: false,
+              allFailed: false,
+              results: [
+                { humanId: 'human-matthew-manager', result: 'created' },
+                { humanId: 'human-jessica-spouse', result: 'created' },
+                { humanId: 'human-timothy-tutor', result: 'failed', error: 'admin WS timeout' },
+              ],
+            },
+          },
+        },
+      },
+    });
+
+    const r = reconcile({ predicted, actual });
+
+    assert.ok(
+      r.investigationPointers.some(p => p.includes('seed-conductor-identities') && p.includes('partial') && p.includes('human-timothy-tutor')),
+      `expected seed-conductor-identities partial pointer naming timothy; got ${JSON.stringify(r.investigationPointers)}`,
+    );
+  });
+
+  it('omits stageAnnotations pointers when annotations are clean (allReady + allSucceeded)', () => {
+    const predicted = predictedFixture();
+    const actual = actualFixture({
+      results: {
+        'elohim-holochain': { result: 'SUCCESS', durationMs: 4080000, level: 0 },
+        'elohim-edge': { result: 'SUCCESS', durationMs: 1980000, level: 1 },
+        elohim: { result: 'SUCCESS', durationMs: 1140000, level: 1 },
+        'elohim-genesis': {
+          result: 'SUCCESS',
+          durationMs: 600000,
+          level: 'genesis-trailer',
+          stageAnnotations: {
+            conductorReadiness: { partial: false, allReady: true, allUnready: false, ready: [], unready: [] },
+            seedResultsConductorIdentities: {
+              counts: { created: 3, exists: 0, failed: 0, succeeded: 3, total: 3 },
+              partial: false,
+              allSucceeded: true,
+              allFailed: false,
+              results: [],
+            },
+          },
+        },
+      },
+    });
+
+    const r = reconcile({ predicted, actual });
+
+    assert.ok(
+      !r.investigationPointers.some(p => p.includes('conductor-readiness') || p.includes('seed-conductor-identities')),
+      `expected no stageAnnotations pointers on clean genesis; got ${JSON.stringify(r.investigationPointers)}`,
+    );
+  });
+
+  it('handles missing stageAnnotations gracefully (older builds)', () => {
+    const predicted = predictedFixture();
+    const actual = actualFixture(); // genesis has no stageAnnotations field
+
+    // Should not throw; reconciler returns valid output.
+    const r = reconcile({ predicted, actual });
+    assert.ok(Array.isArray(r.investigationPointers));
+  });
+});

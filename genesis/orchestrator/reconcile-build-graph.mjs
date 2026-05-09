@@ -143,6 +143,52 @@ export function reconcile({ predicted, actual }) {
     );
   }
 
+  // Stage annotations refine existing findings with peer/human-level detail.
+  // The downstream pipeline emit a structured artifact (e.g. genesis emits
+  // conductor-readiness.json + seed-results-*.json); the orchestrator
+  // hydrateStageAnnotations call slurps them into actual-build-graph.json's
+  // results map. Surface the partial-readiness specifics as additional
+  // investigation pointers so a reader doesn't need to drill into per-build
+  // artifacts to know which peers / humans were involved.
+  for (const name of [...actualSet]) {
+    const annotations = actualResults[name]?.stageAnnotations;
+    if (!annotations || typeof annotations !== 'object') continue;
+
+    const cr = annotations.conductorReadiness;
+    if (cr && Array.isArray(cr.unready) && cr.unready.length > 0) {
+      const unreadyHosts = cr.unready
+        .map(u => u.host || u.url)
+        .filter(Boolean);
+      investigationPointers.push(
+        `${name} conductor-readiness: ${cr.unreadyCount ?? unreadyHosts.length} unready (${unreadyHosts.join(', ')})`,
+      );
+    }
+
+    const sci = annotations.seedResultsConductorIdentities;
+    if (sci && sci.counts && (sci.partial || sci.allFailed)) {
+      const failed = (sci.results || [])
+        .filter(r => r?.result === 'failed')
+        .map(r => r.humanId || r.displayName)
+        .filter(Boolean);
+      const verdict = sci.allFailed ? 'total failure' : 'partial';
+      investigationPointers.push(
+        `${name} seed-conductor-identities ${verdict}: ${sci.counts.succeeded ?? 0}/${sci.counts.total ?? '?'} succeeded; failed: ${failed.join(', ') || '(none listed)'}`,
+      );
+    }
+
+    const sab = annotations.seedResultsAgentBindings;
+    if (sab && sab.counts && (sab.partial || sab.allFailed)) {
+      const failed = (sab.results || [])
+        .filter(r => r?.result === 'failed')
+        .map(r => r.humanId || r.displayName)
+        .filter(Boolean);
+      const verdict = sab.allFailed ? 'total failure' : 'partial';
+      investigationPointers.push(
+        `${name} seed-agent-bindings ${verdict}: ${sab.counts.succeeded ?? 0}/${sab.counts.total ?? '?'} succeeded; failed: ${failed.join(', ') || '(none listed)'}`,
+      );
+    }
+  }
+
   // Human-readable summary.
   const parts = [];
   if (commitShaDrift) parts.push('commit sha drift');
