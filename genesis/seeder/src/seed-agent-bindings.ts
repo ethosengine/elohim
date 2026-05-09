@@ -33,12 +33,20 @@
  *   [=] exists  — (reserved for future dedup; unused at Stage 1)
  *   [X] failed  — connection or zome error
  *
- * Exit codes:
- *   0 — every targeted human's bindings written
- *   1 — at least one human failed
+ *   seed-results-agent-bindings.json — structured per-human results,
+ *     written next to the script. Same shape as
+ *     seed-results-conductor-identities.json. The Jenkinsfile reads this
+ *     to emit a partial-vs-total UNSTABLE message and to archive the
+ *     artifact for orchestrator-level reconciliation (Path C).
+ *
+ * Exit codes (partial-readiness aware — aligns with the "seed whoever is
+ * ready" architecture: partial-cluster operation is the steady state):
+ *   0 — all targeted humans' bindings written
+ *   2 — partial: at least one human's bindings written, at least one failed
+ *   1 — total failure: ZERO humans seeded (or pre-flight error)
  */
 
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { AdminWebsocket, AppWebsocket } from '@holochain/client';
@@ -416,12 +424,48 @@ export async function main(): Promise<void> {
     `=== Results: ${totalCreated} bindings written, ${succeeded} humans succeeded, ${failed} humans failed ===`,
   );
 
+  // Structured artifact for Jenkinsfile + orchestrator-level reconciliation.
+  // Schema mirrors seed-conductor-identities so consumers can branch by
+  // `script` field rather than reparse two slightly-different shapes.
+  const report = {
+    schemaVersion: '1',
+    seededAt: new Date().toISOString(),
+    script: 'seed-agent-bindings',
+    counts: {
+      totalCreated,
+      succeeded,
+      failed,
+      total: results.length,
+    },
+    partial: succeeded > 0 && failed > 0,
+    allSucceeded: failed === 0,
+    allFailed: succeeded === 0 && results.length > 0,
+    results: results.map(r => ({
+      humanId: r.humanId,
+      displayName: r.displayName,
+      result: r.result,
+      conductorUrl: r.conductorUrl,
+      plans: r.plans,
+      created: r.created,
+      errors: r.errors,
+    })),
+  };
+  try {
+    writeFileSync('seed-results-agent-bindings.json', JSON.stringify(report, null, 2));
+  } catch (e) {
+    console.error('WARN: could not write seed-results-agent-bindings.json:', e);
+  }
+
   if (failed > 0) {
     console.error('\nFailed humans:');
     for (const r of results.filter(rr => rr.result === 'failed')) {
       console.error(`  ${r.displayName} (${r.humanId}): ${r.errors.join('; ')}`);
     }
-    process.exit(1);
+    // Partial-readiness aware: exit 2 if at least one succeeded, exit 1
+    // only on total failure. The Jenkinsfile maps both to UNSTABLE today
+    // but the distinction lets external tooling route partial vs total
+    // to different remediations.
+    process.exit(succeeded > 0 ? 2 : 1);
   }
 
   process.exit(0);

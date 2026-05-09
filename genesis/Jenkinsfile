@@ -1088,10 +1088,15 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
 
                         def readyUrls = probe.ready.join(',')
 
-                        catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
-                            dir('genesis/seeder') {
-                                sh """#!/bin/bash
-                                    set -euo pipefail
+                        // Run the seeder; capture exit code via returnStatus
+                        // so we can interpret the partial-vs-total exit code
+                        // split (0=clean, 2=partial, 1=total) without
+                        // letting catchError swallow the distinction.
+                        def seedExit = -1
+                        dir('genesis/seeder') {
+                            seedExit = sh(
+                                script: """#!/bin/bash
+                                    set -uo pipefail
                                     echo "═══════════════════════════════════════════════════════════"
                                     echo "SEED CONDUCTOR IDENTITIES"
                                     echo "═══════════════════════════════════════════════════════════"
@@ -1099,8 +1104,34 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                                     echo ""
                                     CONDUCTOR_URLS="${readyUrls}" \\
                                       npx tsx src/seed-conductor-identities.ts
-                                """
+                                """,
+                                returnStatus: true,
+                            )
+                        }
+
+                        // Archive the structured per-human artifact emitted
+                        // by the seeder regardless of exit code (the script
+                        // writes it before exiting). Read it to enrich the
+                        // unstable() message with concrete counts.
+                        if (fileExists('genesis/seeder/seed-results-conductor-identities.json')) {
+                            archiveArtifacts(
+                                artifacts: 'genesis/seeder/seed-results-conductor-identities.json',
+                                fingerprint: true,
+                                allowEmptyArchive: true,
+                            )
+                            def seedReport = readJSON(file: 'genesis/seeder/seed-results-conductor-identities.json')
+                            def c = seedReport.counts ?: [:]
+                            if (seedExit == 2) {
+                                unstable("Seed Conductor Identities partial: ${c.succeeded ?: 0} succeeded (${c.created ?: 0} created + ${c.exists ?: 0} exists), ${c.failed ?: 0} failed (see seed-results-conductor-identities.json)")
+                            } else if (seedExit == 1) {
+                                unstable("Seed Conductor Identities total failure: 0 of ${c.total ?: 0} humans seeded (see seed-results-conductor-identities.json)")
+                            } else if (seedExit != 0) {
+                                unstable("Seed Conductor Identities exited ${seedExit} (unexpected — see console)")
                             }
+                        } else if (seedExit != 0) {
+                            // Script didn't even reach the writeFile call.
+                            // Existing UNSTABLE behaviour preserved.
+                            unstable("Seed Conductor Identities failed before writing seed-results — exit ${seedExit}")
                         }
                     }
                 }
@@ -1139,10 +1170,13 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
 
                         def readyUrls = probe.ready.join(',')
 
-                        catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
-                            dir('genesis/seeder') {
-                                sh """#!/bin/bash
-                                    set -euo pipefail
+                        // Same partial-vs-total exit-code interpretation
+                        // pattern as Seed Conductor Identities above.
+                        def seedExit = -1
+                        dir('genesis/seeder') {
+                            seedExit = sh(
+                                script: """#!/bin/bash
+                                    set -uo pipefail
                                     echo "═══════════════════════════════════════════════════════════"
                                     echo "SEED AGENT PEER BINDINGS"
                                     echo "═══════════════════════════════════════════════════════════"
@@ -1150,8 +1184,28 @@ Seed IDs: ${params.SEED_IDS ?: '(all)'}
                                     echo ""
                                     CONDUCTOR_URLS="${readyUrls}" \\
                                       npx tsx src/seed-agent-bindings.ts
-                                """
+                                """,
+                                returnStatus: true,
+                            )
+                        }
+
+                        if (fileExists('genesis/seeder/seed-results-agent-bindings.json')) {
+                            archiveArtifacts(
+                                artifacts: 'genesis/seeder/seed-results-agent-bindings.json',
+                                fingerprint: true,
+                                allowEmptyArchive: true,
+                            )
+                            def seedReport = readJSON(file: 'genesis/seeder/seed-results-agent-bindings.json')
+                            def c = seedReport.counts ?: [:]
+                            if (seedExit == 2) {
+                                unstable("Seed Agent Peer Bindings partial: ${c.succeeded ?: 0} humans succeeded (${c.totalCreated ?: 0} bindings written), ${c.failed ?: 0} failed (see seed-results-agent-bindings.json)")
+                            } else if (seedExit == 1) {
+                                unstable("Seed Agent Peer Bindings total failure: 0 of ${c.total ?: 0} humans seeded (see seed-results-agent-bindings.json)")
+                            } else if (seedExit != 0) {
+                                unstable("Seed Agent Peer Bindings exited ${seedExit} (unexpected — see console)")
                             }
+                        } else if (seedExit != 0) {
+                            unstable("Seed Agent Peer Bindings failed before writing seed-results — exit ${seedExit}")
                         }
                     }
                 }

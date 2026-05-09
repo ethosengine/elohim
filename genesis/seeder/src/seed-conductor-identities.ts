@@ -20,12 +20,19 @@
  *   [=] Exists  — Human profile already present (idempotent)
  *   [X] Failed  — Could not connect or create (see error)
  *
- * Exit codes:
- *   0 — all node/device humans created or already exist
- *   1 — one or more humans failed
+ *   seed-results-conductor-identities.json — structured per-human results,
+ *     written next to the script. The Jenkinsfile reads this to emit a
+ *     partial-vs-total UNSTABLE message and to archive the artifact for
+ *     orchestrator-level reconciliation (Path C).
+ *
+ * Exit codes (partial-readiness aware — aligns with the "seed whoever is
+ * ready" architecture: partial-cluster operation is the steady state):
+ *   0 — all targeted humans created or already exist
+ *   2 — partial: at least one human seeded, at least one failed
+ *   1 — total failure: ZERO humans seeded (or pre-flight error)
  */
 
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, writeFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { AdminWebsocket, AppWebsocket, type AppInfo } from '@holochain/client';
@@ -406,16 +413,46 @@ async function main(): Promise<void> {
   const created = results.filter(r => r.result === 'created').length;
   const exists = results.filter(r => r.result === 'exists').length;
   const failed = results.filter(r => r.result === 'failed').length;
+  const succeeded = created + exists;
 
   console.log('');
   console.log(`=== Results: ${created} created, ${exists} existing, ${failed} failed ===`);
+
+  // Structured artifact for Jenkinsfile + orchestrator-level reconciliation.
+  // Schema kept stable so Path C (stageAnnotations in actual-build-graph.json)
+  // can consume this without re-parsing console output.
+  const report = {
+    schemaVersion: '1',
+    seededAt: new Date().toISOString(),
+    script: 'seed-conductor-identities',
+    counts: { created, exists, failed, succeeded, total: results.length },
+    partial: succeeded > 0 && failed > 0,
+    allSucceeded: failed === 0,
+    allFailed: succeeded === 0 && results.length > 0,
+    results: results.map(r => ({
+      humanId: r.humanId,
+      displayName: r.displayName,
+      result: r.result,
+      conductorUrl: r.conductorUrl,
+      error: r.error ?? null,
+    })),
+  };
+  try {
+    writeFileSync('seed-results-conductor-identities.json', JSON.stringify(report, null, 2));
+  } catch (e) {
+    console.error('WARN: could not write seed-results-conductor-identities.json:', e);
+  }
 
   if (failed > 0) {
     console.error('\nFailed humans:');
     for (const r of results.filter(r => r.result === 'failed')) {
       console.error(`  ${r.displayName} (${r.humanId}): ${r.error}`);
     }
-    process.exit(1);
+    // Partial-readiness aware: exit 2 if at least one succeeded, exit 1
+    // only on total failure. The Jenkinsfile maps both to UNSTABLE today
+    // but the distinction lets a future operator (or external Ralph
+    // Wiggum loop) route partial vs total to different remediations.
+    process.exit(succeeded > 0 ? 2 : 1);
   }
 
   process.exit(0);
