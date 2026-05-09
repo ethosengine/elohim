@@ -94,8 +94,15 @@ components:
         # garage.ethosengine.svc.cluster.local:3900 (S3-compatible). Provides:
         #   AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY,
         #   SCCACHE_BUCKET, SCCACHE_ENDPOINT, SCCACHE_S3_USE_SSL, SCCACHE_REGION
-        # Wiring `RUSTC_WRAPPER=sccache` in the dev image is a separate follow-up
-        # in ethosengine/che-devworkspaces (rust-nix-dev image).
+        # sccache binary is baked into rust-nix-dev image at /usr/local/bin/sccache
+        # (added 2026-05-09 in ethosengine/che-devworkspaces). Flipping the
+        # wrapper here means every cargo invocation in the workspace consults
+        # Garage; cache hits are ~ms, misses fall through to local compile
+        # and populate the cache for the next workspace.
+        - name: RUSTC_WRAPPER
+          value: sccache
+        - name: SCCACHE_LOG
+          value: warn
         # PATH: Ensure holochain binaries, rust toolchain, and helper scripts are available
         # (not just interactive shells that source .bashrc)
         - name: PATH

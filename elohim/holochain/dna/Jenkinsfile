@@ -95,6 +95,22 @@ spec:
       image: harbor.ethosengine.com/ethosengine/ci-builder-nix:latest
       command: [cat]
       tty: true
+      # sccache config injected via the sccache-credentials Secret in the
+      # jenkins ns (auto-mounted via labelled secret pattern). Provides:
+      # AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, SCCACHE_BUCKET,
+      # SCCACHE_ENDPOINT, SCCACHE_S3_USE_SSL, SCCACHE_REGION. Backing store
+      # is Garage at garage.ethosengine.svc.cluster.local:3900 (S3-compatible).
+      envFrom:
+        - secretRef:
+            name: sccache-credentials
+      env:
+        # sccache binary baked into ci-builder-nix:latest at /usr/local/bin/sccache
+        # (added 2026-05-09). Wraps every cargo invocation; cache hits pull
+        # from Garage in ms, misses fall through to local compile and populate.
+        - name: RUSTC_WRAPPER
+          value: sccache
+        - name: SCCACHE_LOG
+          value: warn
       resources:
         requests:
           memory: "4Gi"
