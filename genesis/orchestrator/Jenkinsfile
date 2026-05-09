@@ -814,7 +814,7 @@ spec:
     }
 
     options {
-        timeout(time: 120, unit: 'MINUTES')
+        timeout(time: 240, unit: 'MINUTES')  // upstream parallel builds + genesis (60min) + a2o gap analysis
         disableConcurrentBuilds(abortPrevious: true)  // Abort older builds when new one starts
         buildDiscarder(logRotator(numToKeepStr: '100'))
         // Skip implicit Declarative: Checkout SCM — its 10-min default per-attempt
