@@ -949,6 +949,33 @@ pub async fn handle_admin_dashboard_topology(state: Arc<AppState>) -> Response<F
     }
 }
 
+/// Handle `GET /admin/capability`
+///
+/// Returns the render-capability profile derived at doorway startup, or JSON
+/// `null` when no SSR runtime is configured (`SSR_BUNDLES_DIR` unset or empty).
+///
+/// ## Auth
+///
+/// No authentication required.  Storage peers poll this endpoint from inside
+/// the cluster; requiring a token would force every storage instance to hold a
+/// doorway API key.
+///
+/// ## Wire format
+///
+/// `application/json` body matching
+/// `elohim/sdk/schemas/v1/views/render-capability-profile.schema.json`.
+/// When `render_capability` is `None` the body is the literal JSON `null`.
+pub async fn handle_admin_capability(state: Arc<AppState>) -> Response<Full<Bytes>> {
+    match &state.render_capability {
+        Some(profile) => json_response(StatusCode::OK, profile),
+        None => Response::builder()
+            .status(StatusCode::OK)
+            .header("Content-Type", "application/json")
+            .body(Full::new(Bytes::from("null")))
+            .unwrap(),
+    }
+}
+
 fn json_response<T: Serialize>(status: StatusCode, body: T) -> Response<Full<Bytes>> {
     match serde_json::to_string_pretty(&body) {
         Ok(json) => Response::builder()

@@ -219,6 +219,15 @@ pub struct AppState {
     /// every `ResolverFetcher` created during an SSR render. This avoids
     /// creating a new connection pool per request.
     pub ssr_http_client: Arc<reqwest::Client>,
+    /// Cached render-capability claim derived at startup.
+    ///
+    /// Served by `GET /admin/capability` so elohim-storage can pull the profile
+    /// when polling doorway peers (Task 7: `load_render_capability_from_url`).
+    ///
+    /// `None` means doorway has no SSR runtime configured or the deriver
+    /// returned `None` (e.g. `SSR_BUNDLES_DIR` unset, storage manifest
+    /// unreachable, or the bundles directory is empty).
+    pub render_capability: Option<crate::render::types::RenderCapabilityProfile>,
 }
 
 /// Build the shared HTTP client used by SSR `ResolverFetcher` instances.
@@ -349,6 +358,7 @@ impl AppState {
             warmup_state: None,
             renderer: init_renderer(),
             ssr_http_client: init_ssr_http_client(),
+            render_capability: None,
         }
     }
 
@@ -437,6 +447,7 @@ impl AppState {
             warmup_state: None,
             renderer: init_renderer(),
             ssr_http_client: init_ssr_http_client(),
+            render_capability: None,
         }
     }
 
@@ -540,6 +551,7 @@ impl AppState {
             warmup_state: None,
             renderer: init_renderer(),
             ssr_http_client: init_ssr_http_client(),
+            render_capability: None,
         }
     }
 
@@ -646,6 +658,7 @@ impl AppState {
             warmup_state: None,
             renderer: init_renderer(),
             ssr_http_client: init_ssr_http_client(),
+            render_capability: None,
         })
     }
 
@@ -1208,6 +1221,12 @@ async fn handle_request(
         // No auth required: clients use this for upfront capability discovery
         (Method::GET, "/admin/capabilities") => {
             to_boxed(routes::handle_capabilities(Arc::clone(&state)).await)
+        }
+
+        // Render capability profile — SSR bundle inventory + renderer kinds derived at startup.
+        // No auth required: storage peers pull this to discover SSR availability.
+        (Method::GET, "/admin/capability") => {
+            to_boxed(routes::handle_admin_capability(Arc::clone(&state)).await)
         }
 
         // Conductor pool visibility (available on ALL instances)
