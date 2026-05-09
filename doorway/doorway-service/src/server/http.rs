@@ -715,6 +715,36 @@ impl AppState {
 /// enforcement lands, doorway will resolve `human_id → agent_cid` once at user
 /// creation, persist on UserDoc, and source from there. The wire shape
 /// (`X-Agent-Cid` header) does not change.
+/// Build a `UserCredential` for the V8 SSR fetch shim from the originating
+/// HTTP request's headers. Returns None for anonymous requests.
+///
+/// Order: Authorization header (Bearer / API key) wins; falls back to a
+/// Cookie header containing a known doorway-session marker.
+/// `steward_attestation=` is also recognised as a forward-compat hook for
+/// the M5 auth-portal-convergence sprint; today the session layer doesn't
+/// produce that cookie shape but the shim is wire-ready.
+fn build_ssr_user_credential<B>(req: &Request<B>) -> Option<crate::ssr::UserCredential> {
+    if let Some(auth) = req.headers().get(hyper::header::AUTHORIZATION) {
+        if let Ok(value) = auth.to_str() {
+            return Some(crate::ssr::UserCredential {
+                header_name: "Authorization".into(),
+                header_value: value.into(),
+            });
+        }
+    }
+    if let Some(cookie) = req.headers().get(hyper::header::COOKIE) {
+        if let Ok(value) = cookie.to_str() {
+            if value.contains("doorway_session=") || value.contains("steward_attestation=") {
+                return Some(crate::ssr::UserCredential {
+                    header_name: "Cookie".into(),
+                    header_value: value.into(),
+                });
+            }
+        }
+    }
+    None
+}
+
 fn resolve_agent_cid_from_request<B>(state: &AppState, req: &Request<B>) -> Option<String> {
     let auth_header = req
         .headers()
@@ -1723,11 +1753,22 @@ async fn handle_request(
                             )));
                         }
 
-                        let fetcher: Arc<dyn elohim_render::DataFetcher> =
-                            Arc::new(crate::ssr::ResolverFetcher::new(
+                        // Build the originating user's credential for the V8
+                        // fetch shim (anonymous → None, no header forwarded).
+                        // Anonymous-render-of-authenticated-content is the
+                        // failure mode flagged in the SSR audit; this thread
+                        // forwards the user's session header to outbound
+                        // storage fetches so reach-aware content renders for
+                        // logged-in users instead of falling back to public.
+                        let user_credential = build_ssr_user_credential(&req);
+
+                        let fetcher: Arc<dyn elohim_render::DataFetcher> = Arc::new(
+                            crate::ssr::ResolverFetcher::new(
                                 Arc::clone(&state.ssr_http_client),
                                 endpoint.clone(),
-                            ));
+                            )
+                            .maybe_with_user_credential(user_credential),
+                        );
                         // Default RenderLimits.wall_time_ms is 2_000ms — too tight
                         // for cold-start where V8 parses + interprets a 51MB bundle
                         // (171 .mjs files, main.server.mjs ~484KB), walks Angular's
@@ -2208,6 +2249,85 @@ fn ssr_spa_shell_fallback_with_error(err: &str) -> Response<Full<Bytes>> {
 }
 
 // ─── Gate layer tests ─────────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod ssr_session_tests {
+    use super::*;
+    use hyper::header::{HeaderValue, AUTHORIZATION, COOKIE};
+
+    fn req_with_headers(headers: &[(&str, &str)]) -> Request<Bytes> {
+        let mut builder = Request::builder().uri("/lamad/concept/abc");
+        for (k, v) in headers {
+            builder = builder.header(*k, *v);
+        }
+        builder.body(Bytes::new()).unwrap()
+    }
+
+    #[test]
+    fn anonymous_request_returns_none() {
+        let req = req_with_headers(&[]);
+        assert!(build_ssr_user_credential(&req).is_none());
+    }
+
+    #[test]
+    fn authorization_bearer_is_forwarded() {
+        let req = req_with_headers(&[("authorization", "Bearer token-xyz")]);
+        let cred = build_ssr_user_credential(&req).expect("some");
+        assert_eq!(cred.header_name, "Authorization");
+        assert_eq!(cred.header_value, "Bearer token-xyz");
+    }
+
+    #[test]
+    fn doorway_session_cookie_is_forwarded() {
+        let req = req_with_headers(&[("cookie", "doorway_session=abc; theme=dark")]);
+        let cred = build_ssr_user_credential(&req).expect("some");
+        assert_eq!(cred.header_name, "Cookie");
+        assert!(cred.header_value.contains("doorway_session=abc"));
+    }
+
+    #[test]
+    fn steward_attestation_cookie_is_forwarded() {
+        let req = req_with_headers(&[("cookie", "steward_attestation=xyz; locale=en")]);
+        let cred = build_ssr_user_credential(&req).expect("some");
+        assert_eq!(cred.header_name, "Cookie");
+        assert!(cred.header_value.contains("steward_attestation=xyz"));
+    }
+
+    #[test]
+    fn unknown_cookies_are_not_forwarded() {
+        let req = req_with_headers(&[("cookie", "theme=dark; locale=en")]);
+        assert!(build_ssr_user_credential(&req).is_none());
+    }
+
+    #[test]
+    fn authorization_takes_precedence_over_cookie() {
+        let req = req_with_headers(&[
+            ("authorization", "Bearer t"),
+            ("cookie", "doorway_session=abc"),
+        ]);
+        let cred = build_ssr_user_credential(&req).expect("some");
+        assert_eq!(cred.header_name, "Authorization");
+    }
+
+    #[test]
+    fn non_utf8_authorization_falls_through() {
+        // Bytes that don't form valid UTF-8 — to_str() returns Err
+        let mut req = req_with_headers(&[]);
+        req.headers_mut().insert(
+            AUTHORIZATION,
+            HeaderValue::from_bytes(&[0xFF, 0xFE, 0xFD]).unwrap(),
+        );
+        assert!(build_ssr_user_credential(&req).is_none());
+    }
+
+    #[test]
+    fn non_utf8_cookie_falls_through() {
+        let mut req = req_with_headers(&[]);
+        req.headers_mut()
+            .insert(COOKIE, HeaderValue::from_bytes(&[0xFF, 0xFE]).unwrap());
+        assert!(build_ssr_user_credential(&req).is_none());
+    }
+}
 
 #[cfg(test)]
 mod gate_layer_tests {
