@@ -635,7 +635,8 @@ def triggerPipeline(String name, String branch, boolean wait = true) {
             unstable: result.result == 'UNSTABLE',
             result: result.result,
             duration: result.duration,
-            url: result.absoluteUrl
+            url: result.absoluteUrl,
+            buildNumber: result.number
         ]
     } catch (Exception e) {
         return [
@@ -1176,6 +1177,41 @@ spec:
 
                         env.PIPELINES_TO_RUN = graphPipelines.join(',')
 
+                        // Compute dependency-level grouping for the predicted
+                        // artifact below — same algorithm used by Execute Builds.
+                        def predictedLevels = groupByDependencyLevel(graphPipelines)
+                        def hasGenesis = graphPipelines.contains('elohim-genesis')
+
+                        // Predicted Build Graph artifact — what the orchestrator
+                        // PROMISED to dispatch. Compared against the actual artifact
+                        // emitted by Execute Builds via reconcile-build-graph.mjs.
+                        // Drift between predicted and actual is the highest-value
+                        // pipeline-quality signal: every disconnect is a candidate
+                        // for investigation.
+                        def predictedGraph = [
+                            schemaVersion: '1',
+                            predictedAt: new Date().format("yyyy-MM-dd'T'HH:mm:ss'Z'", TimeZone.getTimeZone('UTC')),
+                            commitSha: env.GIT_COMMIT_FULL ?: env.GIT_COMMIT ?: '',
+                            branch: env.BRANCH_NAME ?: '',
+                            mode: mode,
+                            buildTrigger: env.BUILD_TRIGGER ?: '',
+                            buildNumber: env.BUILD_NUMBER ?: '',
+                            changedFileCount: changedFiles.size(),
+                            // Cap the changedFiles list to keep the artifact reasonable.
+                            // The decision matrix is the authoritative view; this is
+                            // for forensic spot-checks only.
+                            changedFilesSample: changedFiles.take(50),
+                            skipCi: env.SKIP_CI == 'true',
+                            forceBuildPipelines: (env.FORCE_BUILD_PIPELINES ?: '').split(',').findAll { it },
+                            deployOnly: deployOnly,
+                            pipelines: graphPipelines,
+                            levels: predictedLevels,
+                            genesisAfterLevels: hasGenesis,
+                            analysis: analysis,
+                        ]
+                        writeJSON(file: 'predicted-build-graph.json', json: predictedGraph, pretty: 2)
+                        archiveArtifacts(artifacts: 'predicted-build-graph.json', fingerprint: true)
+
                         // Set build description
                         if (graphPipelines.isEmpty() && mode == 'auto') {
                             echo 'ℹ️  No pipelines need to run for these changes'
@@ -1365,6 +1401,50 @@ spec:
                             }
                         }
 
+                        // Actual Build Graph artifact — what Execute Builds
+                        // actually dispatched and how each downstream pipeline
+                        // finished. Compared against predicted-build-graph.json
+                        // by the Reconcile Build Graph stage below.
+                        // Note: this happy-path emit only fires when Execute
+                        // Builds completes. Cascade-aborted runs (a level
+                        // throwing the level-failed error) are caught by the
+                        // post.always backstop so reconciliation still runs.
+                        def levelMap = [:]
+                        levels.eachWithIndex { lvl, idx ->
+                            lvl.each { name -> levelMap[name] = idx }
+                        }
+                        if (pipelines.contains('elohim-genesis')) {
+                            levelMap['elohim-genesis'] = 'genesis-trailer'
+                        }
+
+                        // Mark predicted pipelines that never ran (genesis aborted
+                        // before start, or a level failed before reaching them).
+                        def abortedBeforeStart = pipelines.findAll { name ->
+                            !results.containsKey(name)
+                        }
+
+                        // Enrich results with level annotation so reconciliation
+                        // pointers can group by dependency level.
+                        def enrichedResults = [:]
+                        results.each { name, info ->
+                            def enriched = [:] + info
+                            enriched.level = levelMap.containsKey(name) ? levelMap[name] : null
+                            enrichedResults[name] = enriched
+                        }
+
+                        def actualGraph = [
+                            schemaVersion: '1',
+                            executedAt: new Date().format("yyyy-MM-dd'T'HH:mm:ss'Z'", TimeZone.getTimeZone('UTC')),
+                            commitSha: env.GIT_COMMIT_FULL ?: env.GIT_COMMIT ?: '',
+                            branch: env.BRANCH_NAME ?: '',
+                            buildNumber: env.BUILD_NUMBER ?: '',
+                            executionOrder: pipelines,
+                            results: enrichedResults,
+                            abortedBeforeStart: abortedBeforeStart,
+                        ]
+                        writeJSON(file: 'actual-build-graph.json', json: actualGraph, pretty: 2)
+                        archiveArtifacts(artifacts: 'actual-build-graph.json', fingerprint: true)
+
                         // Now that builds succeeded, advance the build graph's
                         // lastSuccessfulCommit. During planning we deliberately
                         // kept the previous commit to avoid baseline leapfrog
@@ -1379,6 +1459,48 @@ spec:
                         // Checkpoint 2: archive per-pipeline baselines captured
                         // during this Execute Builds run.
                         archivePipelineBaselines('execute')
+                    }
+                }
+            }
+        }
+
+        stage('Reconcile Build Graph') {
+            when {
+                expression {
+                    // Run whenever both artifacts exist. The predicted artifact
+                    // is emitted at the end of Determine Build Plan; the actual
+                    // artifact at the end of Execute Builds. If either is missing
+                    // the build was aborted before its emit point — the post.always
+                    // backstop covers that case (future iteration).
+                    fileExists('predicted-build-graph.json') && fileExists('actual-build-graph.json')
+                }
+            }
+            steps {
+                container('builder') {
+                    script {
+                        // Compare what the orchestrator PROMISED with what
+                        // actually happened. Drift between predicted and actual
+                        // is the highest-value pipeline-quality signal — every
+                        // disconnect is a candidate for investigation.
+                        //
+                        // The reconcile-build-graph.mjs script is pure JS and
+                        // unit-tested at genesis/orchestrator/reconcile-build-graph.test.mjs.
+                        // It exits 0 on match, 1 on drift; we use that to mark
+                        // the orchestrator UNSTABLE on any disconnect without
+                        // aborting the rest of the pipeline.
+                        def reconcileExit = sh(
+                            script: 'node genesis/orchestrator/reconcile-build-graph.mjs ' +
+                                'predicted-build-graph.json actual-build-graph.json ' +
+                                'build-graph-reconciliation.json',
+                            returnStatus: true,
+                        )
+                        archiveArtifacts(artifacts: 'build-graph-reconciliation.json', fingerprint: true)
+
+                        if (reconcileExit != 0) {
+                            unstable('Build graph drift detected — see build-graph-reconciliation.json')
+                        } else {
+                            echo '✅ Build graph reconciled cleanly (predicted == actual)'
+                        }
                     }
                 }
             }
