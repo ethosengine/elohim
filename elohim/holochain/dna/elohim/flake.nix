@@ -33,6 +33,21 @@
           # Required for getrandom 0.3.x on wasm32-unknown-unknown
           # Holochain provides a custom random implementation via host functions
           RUSTFLAGS = "--cfg getrandom_backend=\"custom\"";
+          # Pick up sccache from /usr/local/bin when present (Jenkins CI image
+          # ci-builder-nix and devspace rust-nix-dev both ship sccache 0.15.0
+          # there, outside the Nix store on purpose so it survives `nix develop`
+          # PATH stripping). The conditional keeps this safe on dev machines
+          # without sccache — they get the un-wrapped cargo path. SCCACHE_*
+          # env vars (SCCACHE_BUCKET, SCCACHE_ENDPOINT, AWS_*) are auto-mounted
+          # in the consuming pod's namespace via the sccache-credentials Secret;
+          # we don't need to declare them here.
+          shellHook = ''
+            if [ -x /usr/local/bin/sccache ]; then
+              export PATH=/usr/local/bin:$PATH
+              export RUSTC_WRAPPER=sccache
+              export SCCACHE_LOG=''${SCCACHE_LOG:-warn}
+            fi
+          '';
         };
       };
     };

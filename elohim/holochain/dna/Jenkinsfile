@@ -95,24 +95,17 @@ spec:
       image: harbor.ethosengine.com/ethosengine/ci-builder-nix:latest
       command: [cat]
       tty: true
-      # NOTE: sccache wiring reverted (second time) after build #1216 also
-      # failed with `No such file or directory (os error 2)` invoking
-      # /usr/local/bin/sccache. The che-devworkspaces Dockerfile in the
-      # main branch has the sccache install layer (verified), but the
-      # published harbor.ethosengine.com/ethosengine/ci-builder-nix:latest
-      # image still lacks the binary at runtime. The image-build pipeline
-      # in che-devworkspaces evidently hasn't pushed a layer-current :latest.
-      # Worth noting: Nix-managed stages (Manifest Hygiene, Build WASM Cache
-      # Core, Build DNA) IGNORE RUSTC_WRAPPER because Nix env isolation
-      # strips it — sccache only kicks in at the sweettest compile (first
-      # bare cargo invocation), which is why #1216 failed at DNA Integration
-      # 19min in instead of at Manifest Hygiene seconds in. Even when the
-      # image lands, sccache benefit on this pipeline is narrow: only the
-      # sweettest cold-compile (the dominant cost — ~30-47min historically)
-      # gets the speedup; the WASM stages will continue to be Nix-driven.
-      # Re-enable after operator verifies:
-      #   docker run --rm harbor.ethosengine.com/ethosengine/ci-builder-nix:latest \
-      #       which sccache && /usr/local/bin/sccache --version
+      # sccache S3 (Garage) config — auto-mounted Secret in jenkins ns.
+      # Provides AWS_ACCESS_KEY_ID/SECRET, SCCACHE_BUCKET, SCCACHE_ENDPOINT,
+      # SCCACHE_S3_USE_SSL, SCCACHE_REGION. The flake.nix devShell's
+      # shellHook surfaces /usr/local/bin/sccache and sets RUSTC_WRAPPER
+      # when entering `nix develop` (the binary lives outside the nix
+      # store on purpose so it survives nix's PATH stripping). Combined
+      # with `nix develop --impure` on the build invocations below,
+      # SCCACHE_* env vars flow through to cargo's wrapper exec.
+      envFrom:
+        - secretRef:
+            name: sccache-credentials
       resources:
         requests:
           memory: "4Gi"
@@ -318,7 +311,11 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                             # to pick up the toolchain. RUSTFLAGS="" overrides
                             # the flake's wasm32 setting for this native test.
                             cd "$WORKSPACE/elohim/holochain/tests/manifest-hygiene"
-                            nix develop --accept-flake-config \
+                            # --impure preserves outer env (SCCACHE_BUCKET,
+                            # SCCACHE_ENDPOINT, AWS_* from envFrom) so sccache
+                            # can talk to Garage. flake.nix shellHook handles
+                            # RUSTC_WRAPPER + PATH for sccache binary.
+                            nix develop --impure --accept-flake-config \
                                 "$WORKSPACE/elohim/holochain/dna/elohim" \
                                 --command bash -c 'RUSTFLAGS="" cargo test'
                         '''
@@ -367,7 +364,10 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
 
                                 echo "=== Entering Nix development shell for WASM build ==="
 
-                                nix develop --accept-flake-config --command bash -c '
+                                # --impure preserves SCCACHE_* env vars from
+                                # the pod's envFrom Secret mount; flake.nix
+                                # shellHook activates sccache wrapper.
+                                nix develop --impure --accept-flake-config --command bash -c '
                                     set -euo pipefail
 
                                     echo "=== Rust toolchain ready ==="
@@ -420,7 +420,9 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                 echo "=== Entering Nix development shell ==="
                                 echo "This will download/build Holochain toolchain from Cachix..."
 
-                                nix develop --accept-flake-config --command bash -c '
+                                # --impure preserves SCCACHE_* env vars; sccache
+                                # speeds up cargo invocations the build script makes.
+                                nix develop --impure --accept-flake-config --command bash -c '
                                     set -euo pipefail
 
                                     echo "=== Holochain toolchain ready ==="
@@ -546,7 +548,10 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                 # stage comment in tests/sweettest/README.md for the trade-off.
                                 # Flake-ref is explicit — tests/sweettest/ has no flake.nix
                                 # so nix would otherwise search parents and bail.
-                                nix develop --accept-flake-config "$WORKSPACE/elohim/holochain/dna/elohim" --command bash -c "
+                                # --impure preserves SCCACHE_* env vars from pod
+                                # envFrom; this is the dominant cache-benefit
+                                # stage (sweettest cold compile, ~30-47min).
+                                nix develop --impure --accept-flake-config "$WORKSPACE/elohim/holochain/dna/elohim" --command bash -c "
                                     set -uo pipefail
                                     export CARGO_BUILD_JOBS=2
                                     # The flake exports RUSTFLAGS='--cfg getrandom_backend=\"custom\"'
