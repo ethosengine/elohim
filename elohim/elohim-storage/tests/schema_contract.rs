@@ -2329,3 +2329,83 @@ fn peer_status_view_renders_null_capability_when_unlayered() {
     assert!(view.render_capability.is_none());
     assert!(view.extensions.is_none());
 }
+
+// ---------------------------------------------------------------------------
+// Task 7: load_render_capability_from_url loader tests
+// ---------------------------------------------------------------------------
+//
+// These tests mutate `DOORWAY_CAPABILITY_URL`. cargo test runs tests in
+// parallel, so an unguarded set_var in one test can leak into env::var reads
+// in another (memory: feedback_env_var_test_flakiness). Serialize via a
+// single static Mutex around the env-var section of each test.
+
+static DOORWAY_CAP_ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+#[test]
+fn load_render_capability_from_url_returns_none_when_unset() {
+    let _g = DOORWAY_CAP_ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    std::env::remove_var("DOORWAY_CAPABILITY_URL");
+    let result = elohim_storage::load_render_capability_from_url_blocking();
+    assert!(result.is_none());
+}
+
+#[tokio::test]
+async fn load_render_capability_from_url_parses_valid_response() {
+    use wiremock::{matchers, Mock, MockServer, ResponseTemplate};
+    let server = MockServer::start().await;
+    let body = serde_json::json!({
+        "bundles": [{ "name": "lamad-app", "version": "1.0.3", "renderer": "angular-ssr" }],
+        "renderers": ["angular-ssr"],
+        "authModes": ["anonymous"],
+        "maxConcurrentRenders": 4
+    });
+    Mock::given(matchers::method("GET"))
+        .and(matchers::path("/admin/capability"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(body))
+        .mount(&server)
+        .await;
+    let _g = DOORWAY_CAP_ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    std::env::set_var("DOORWAY_CAPABILITY_URL", format!("{}/admin/capability", server.uri()));
+    let result = elohim_storage::load_render_capability_from_url().await;
+    std::env::remove_var("DOORWAY_CAPABILITY_URL");
+    drop(_g);
+    assert!(result.is_some());
+    let profile = result.unwrap();
+    assert_eq!(profile.bundles.len(), 1);
+    assert_eq!(profile.bundles[0].name, "lamad-app");
+    assert!(profile.auth_modes.contains(&"anonymous".to_string()));
+}
+
+#[tokio::test]
+async fn load_render_capability_from_url_returns_none_on_5xx() {
+    use wiremock::{matchers, Mock, MockServer, ResponseTemplate};
+    let server = MockServer::start().await;
+    Mock::given(matchers::method("GET"))
+        .and(matchers::path("/admin/capability"))
+        .respond_with(ResponseTemplate::new(503))
+        .mount(&server)
+        .await;
+    let _g = DOORWAY_CAP_ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    std::env::set_var("DOORWAY_CAPABILITY_URL", format!("{}/admin/capability", server.uri()));
+    let result = elohim_storage::load_render_capability_from_url().await;
+    std::env::remove_var("DOORWAY_CAPABILITY_URL");
+    drop(_g);
+    assert!(result.is_none());
+}
+
+#[tokio::test]
+async fn load_render_capability_from_url_returns_none_on_unparseable_body() {
+    use wiremock::{matchers, Mock, MockServer, ResponseTemplate};
+    let server = MockServer::start().await;
+    Mock::given(matchers::method("GET"))
+        .and(matchers::path("/admin/capability"))
+        .respond_with(ResponseTemplate::new(200).set_body_string("not json at all"))
+        .mount(&server)
+        .await;
+    let _g = DOORWAY_CAP_ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    std::env::set_var("DOORWAY_CAPABILITY_URL", format!("{}/admin/capability", server.uri()));
+    let result = elohim_storage::load_render_capability_from_url().await;
+    std::env::remove_var("DOORWAY_CAPABILITY_URL");
+    drop(_g);
+    assert!(result.is_none());
+}

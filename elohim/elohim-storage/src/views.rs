@@ -6500,6 +6500,67 @@ pub fn load_elohim_capability_from_env() -> Option<ElohimCapabilityProfile> {
     }
 }
 
+/// Load the render capability profile from a doorway's `/admin/capability` HTTP endpoint.
+///
+/// Uses the URL in `DOORWAY_CAPABILITY_URL`. Returns `None` (honest degradation) when:
+/// - The env var is unset
+/// - The URL is unreachable
+/// - The response is non-2xx
+/// - The body fails to parse as `RenderCapabilityProfile`
+pub async fn load_render_capability_from_url() -> Option<RenderCapabilityProfile> {
+    let url = std::env::var("DOORWAY_CAPABILITY_URL").ok()?;
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(5))
+        .build()
+        .ok()?;
+    let resp = match client.get(&url).send().await {
+        Ok(r) => r,
+        Err(e) => {
+            tracing::warn!(
+                url = %url,
+                error = %e,
+                "DOORWAY_CAPABILITY_URL unreachable — render_capability will be None"
+            );
+            return None;
+        }
+    };
+    if !resp.status().is_success() {
+        tracing::warn!(
+            url = %url,
+            status = %resp.status(),
+            "DOORWAY_CAPABILITY_URL returned non-success — render_capability will be None"
+        );
+        return None;
+    }
+    let bytes = resp.bytes().await.ok()?;
+    match serde_json::from_slice::<RenderCapabilityProfile>(&bytes) {
+        Ok(profile) => Some(profile),
+        Err(e) => {
+            tracing::warn!(
+                url = %url,
+                error = %e,
+                "DOORWAY_CAPABILITY_URL response did not parse as RenderCapabilityProfile"
+            );
+            None
+        }
+    }
+}
+
+/// Synchronous wrapper for tests / non-async startup paths.
+///
+/// Returns `None` immediately if `DOORWAY_CAPABILITY_URL` is unset (avoiding
+/// runtime startup overhead).
+pub fn load_render_capability_from_url_blocking() -> Option<RenderCapabilityProfile> {
+    if std::env::var("DOORWAY_CAPABILITY_URL").is_err() {
+        return None;
+    }
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .ok()?;
+    rt.block_on(load_render_capability_from_url())
+}
+
 /// Committed hardware resources declared by a node in its NodeRegistration DHT entry.
 ///
 /// Wire format: embedded in `NodeShapeView`.
