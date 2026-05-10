@@ -1072,7 +1072,7 @@ async fn async_main(
     };
 
     #[cfg(not(feature = "p2p-iroh"))]
-    let (_iroh_node, iroh_blob_store_for_http): (Option<()>, Option<()>) = (None, None);
+    let (_iroh_node, _iroh_blob_store_for_http): (Option<()>, Option<()>) = (None, None);
 
     // Plan 4: Wire DualGossipPublisher into the libp2p P2PNode so inventory snapshots
     // are published to both transports. Must happen after iroh node creation, before
