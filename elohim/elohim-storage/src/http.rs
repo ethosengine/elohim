@@ -1574,7 +1574,7 @@ impl HttpServer {
 
         // Create shard encoder and generate manifest
         let encoder = ShardEncoder::new(crate::sharding::ShardConfig::default());
-        let manifest = match encoder.create_manifest(&data, &mime_type, "commons") {
+        let manifest = match encoder.create_manifest(&data, mime_type, "commons") {
             Ok(m) => m,
             Err(e) => {
                 return Ok(Response::builder()
