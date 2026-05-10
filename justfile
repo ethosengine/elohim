@@ -241,3 +241,23 @@ app-build:
 # Preview what the orchestrator will decide for current changes
 ci-preview base="origin/dev":
     @node {{genesis_dir}}/orchestrator/preview.mjs {{base}}
+
+# ─────────────────────────────────────────────────────────────────────
+# Gate #8 — iroh latency stress (10,000 round-trips per transport)
+# ─────────────────────────────────────────────────────────────────────
+
+# Run the Gate #8 iroh blob stress bench (10k round-trips, p99 acceptance).
+# Requires --release for representative numbers; debug adds 5-10x overhead.
+bench-stress:
+    #!/usr/bin/env bash
+    set -e
+    echo "=== Gate #8: iroh blob latency stress (10,000 round-trips per transport) ==="
+    echo "This takes several minutes. Use --nocapture output to see progress."
+    echo ""
+    cd {{elohim_dir}}/elohim-storage
+    RUSTFLAGS='--cfg getrandom_backend="custom"' \
+    cargo test \
+        --release \
+        --features "p2p p2p-iroh" \
+        --test bench_blob_stress_10k \
+        -- --ignored --nocapture
