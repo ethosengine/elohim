@@ -95,6 +95,8 @@ const INTERFACE_FILES = [
   { src: 'views/view-slice.ts', dest: 'view-slice.ts' },
   // Phase 12: peer transport manifest — Category C operational projection
   { src: 'views/peer-transport-manifest.ts', dest: 'peer-transport-manifest.ts' },
+  // Cutover gate #3: dual-write blob upload response — Category C operational
+  { src: 'views/put-blob-response.ts', dest: 'put-blob-response.ts' },
 ];
 
 /**

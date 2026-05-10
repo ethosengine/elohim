@@ -1,0 +1,38 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "epr:schema:view:put-blob-response",
+  "title": "PutBlobResponse",
+  "description": "Source of truth: BlobStore filesystem (SHA256-keyed, Category C operational) and IrohBlobStore filesystem (BLAKE3-keyed, Category C operational). Response from PUT /blob/{hash}. Returns the SHA256-keyed shard manifest (legacy wire-compat) and, when the iroh blob store is configured server-side, the BLAKE3 hash the bytes were also written under.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "blobHash",
+    "totalSize",
+    "mimeType",
+    "encoding",
+    "dataShards",
+    "totalShards",
+    "shardSize",
+    "shardHashes",
+    "reach",
+    "createdAt"
+  ],
+  "properties": {
+    "blobHash":    { "type": "string", "description": "SHA256-keyed legacy address: 'sha256-{64hex}'" },
+    "totalSize":   { "type": "integer", "minimum": 0 },
+    "mimeType":    { "type": "string" },
+    "encoding":    { "type": "string", "enum": ["none", "chunked", "rs-4-7", "rs-8-12", "reed-solomon"] },
+    "dataShards":  { "type": "integer", "minimum": 1 },
+    "totalShards": { "type": "integer", "minimum": 1 },
+    "shardSize":   { "type": "integer", "minimum": 0 },
+    "shardHashes": { "type": "array", "items": { "type": "string" } },
+    "reach":       { "type": "string" },
+    "authorId":    { "type": ["string", "null"] },
+    "createdAt":   { "type": "string" },
+    "verifiedAt":  { "type": ["string", "null"] },
+    "blake3Hash": {
+      "type": ["string", "null"],
+      "description": "BLAKE3 hash the same bytes were written to in IrohBlobStore. Null when iroh side is not configured or the iroh write failed (legacy SHA256 write still succeeded in that case)."
+    }
+  }
+}
