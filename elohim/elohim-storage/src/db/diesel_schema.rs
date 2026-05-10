@@ -1406,14 +1406,22 @@ diesel::joinable!(content_tags -> content (content_id));
 diesel::joinable!(node_stewardship -> stewarded_nodes (node_id));
 diesel::joinable!(node_stewardship -> humans (human_id));
 
-// Phase 10 of iroh parallel stack — cross-stack peer identity bridge.
+// Phase 12 of iroh parallel stack — permanent peer transport manifest schema.
+// Graduated from Phase 10 cross_stack_peer_map (transition-bridge) to permanent structural
+// schema per genesis/docs/superpowers/specs/2026-05-08-iroh-libp2p-complementarity.md
+// lines 440-505.
 diesel::table! {
-    cross_stack_peer_map (agent_cid) {
-        agent_cid     -> Text,
-        peer_id       -> Nullable<Text>,
-        node_id       -> Nullable<Text>,
-        first_seen_at -> Text,
-        last_seen_at  -> Text,
+    peer_transport_manifest (agent_cid) {
+        agent_cid              -> Text,
+        libp2p_peer_id         -> Nullable<Text>,
+        iroh_node_id           -> Nullable<Text>,
+        libp2p_addrs_json      -> Nullable<Text>,
+        iroh_relays_json       -> Nullable<Text>,
+        libp2p_supports_json   -> Nullable<Text>,
+        iroh_supports_json     -> Nullable<Text>,
+        discovery_methods_json -> Text,
+        capability_level       -> Integer,
+        last_observed          -> BigInt,
     }
 }
 
@@ -1470,7 +1478,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     proposal_options,
     projector_cursor,
     proposals,
-    cross_stack_peer_map,
+    peer_transport_manifest,
     ranked_votes,
     key_revocations,
     key_rotations,

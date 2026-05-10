@@ -93,6 +93,8 @@ const INTERFACE_FILES = [
   { src: 'views/projection-coverage.ts', dest: 'projection-coverage.ts' },
   { src: 'views/public-surface-state.ts', dest: 'public-surface-state.ts' },
   { src: 'views/view-slice.ts', dest: 'view-slice.ts' },
+  // Phase 12: peer transport manifest — Category C operational projection
+  { src: 'views/peer-transport-manifest.ts', dest: 'peer-transport-manifest.ts' },
 ];
 
 /**

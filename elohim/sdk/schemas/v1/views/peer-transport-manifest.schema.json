@@ -1,0 +1,88 @@
+{
+  "$id": "epr:schema:view:peer-transport-manifest",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PeerTransportManifestView",
+  "description": "Source of truth: libp2p Swarm + iroh Endpoint observations (Operational, Category C). Persisted via peer_transport_manifest SQLite table for hybrid-window transport selection. Rebuildable from observed handshake arrivals on either transport. Per spec 2026-05-08-iroh-libp2p-complementarity §peer-transport-manifest.",
+  "type": "object",
+  "required": ["agentCid", "discovery", "capabilityLevel", "lastObserved"],
+  "properties": {
+    "agentCid": {
+      "type": "string",
+      "description": "Canonical DHT-anchored agent identity (imagodei). Stable across transports."
+    },
+    "libp2p": {
+      "oneOf": [
+        { "$ref": "#/$defs/Libp2pTransportProfileView" },
+        { "type": "null" }
+      ],
+      "description": "libp2p transport profile if peer speaks libp2p. Null when only iroh-observed."
+    },
+    "iroh": {
+      "oneOf": [
+        { "$ref": "#/$defs/IrohTransportProfileView" },
+        { "type": "null" }
+      ],
+      "description": "iroh transport profile if peer speaks iroh. Null when only libp2p-observed."
+    },
+    "discovery": {
+      "type": "array",
+      "items": { "type": "string", "enum": ["pkarr", "kademlia", "mdns", "doorway-introduction"] },
+      "description": "Discovery methods that surfaced this peer."
+    },
+    "capabilityLevel": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 5,
+      "description": "Device-archetype capability tier: 0=unknown, 1=wearable, 2=phone, 3=laptop, 4=always-on full node, 5=hub default."
+    },
+    "lastObserved": {
+      "type": "integer",
+      "description": "Unix epoch seconds of the last observation."
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "Libp2pTransportProfileView": {
+      "type": "object",
+      "required": ["peerId", "addrs", "supports"],
+      "properties": {
+        "peerId": { "type": "string", "description": "libp2p PeerId (multihash, multibase encoded)." },
+        "addrs": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Listen multiaddrs."
+        },
+        "supports": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["blob", "gossip", "sync", "epr", "epr-atom", "shard", "view-fed", "identity-handshake", "trust"]
+          },
+          "description": "Planes this peer supports over libp2p."
+        }
+      },
+      "additionalProperties": false
+    },
+    "IrohTransportProfileView": {
+      "type": "object",
+      "required": ["nodeId", "relays", "supports"],
+      "properties": {
+        "nodeId": { "type": "string", "description": "iroh NodeId (32-byte ed25519 pubkey, base32 encoded)." },
+        "relays": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Relay URLs the peer is reachable through."
+        },
+        "supports": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["blob", "gossip", "sync", "epr", "epr-atom", "shard", "view-fed", "identity-handshake", "trust"]
+          },
+          "description": "Planes this peer supports over iroh."
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

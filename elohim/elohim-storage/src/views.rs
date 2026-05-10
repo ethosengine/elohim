@@ -7778,3 +7778,40 @@ mod federation_canonical_tests {
         );
     }
 }
+
+// ============================================================================
+// Peer Transport Manifest View (Phase 12)
+// ============================================================================
+//
+// Source-of-truth pairing: peer_transport_manifest SQLite table,
+// populated by p2p_iroh::peer_map record_* fns.
+
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct Libp2pTransportProfileView {
+    pub peer_id: String,
+    pub addrs: Vec<String>,
+    pub supports: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct IrohTransportProfileView {
+    pub node_id: String,
+    pub relays: Vec<String>,
+    pub supports: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct PeerTransportManifestView {
+    pub agent_cid: String,
+    pub libp2p: Option<Libp2pTransportProfileView>,
+    pub iroh: Option<IrohTransportProfileView>,
+    pub discovery: Vec<String>,
+    pub capability_level: u8,
+    pub last_observed: i64,
+}

@@ -2434,3 +2434,74 @@ async fn load_render_capability_from_url_returns_none_on_unparseable_body() {
     drop(_g);
     assert!(result.is_none());
 }
+
+// ── Peer Transport Manifest (Phase 12) ──────────────────────────
+
+#[test]
+fn peer_transport_manifest_view_matches_schema() {
+    use elohim_storage::{
+        IrohTransportProfileView, Libp2pTransportProfileView, PeerTransportManifestView,
+    };
+
+    let manifest = PeerTransportManifestView {
+        agent_cid: "bafyrei...agent-1".to_string(),
+        libp2p: Some(Libp2pTransportProfileView {
+            peer_id: "12D3KooWPeer1".to_string(),
+            addrs: vec!["/ip4/127.0.0.1/tcp/4001".to_string()],
+            supports: vec!["blob".to_string(), "gossip".to_string()],
+        }),
+        iroh: Some(IrohTransportProfileView {
+            node_id: "abcd...node-1".to_string(),
+            relays: vec!["https://relay.iroh.network".to_string()],
+            supports: vec!["blob".to_string(), "epr".to_string()],
+        }),
+        discovery: vec!["pkarr".to_string(), "kademlia".to_string()],
+        capability_level: 5,
+        last_observed: 1746878400,
+    };
+
+    let json = serde_json::to_value(&manifest).unwrap();
+    validate_against_schema("views/peer-transport-manifest.schema.json", &json);
+}
+
+#[test]
+fn peer_transport_manifest_view_libp2p_only() {
+    use elohim_storage::{Libp2pTransportProfileView, PeerTransportManifestView};
+
+    let manifest = PeerTransportManifestView {
+        agent_cid: "bafyrei...agent-2".to_string(),
+        libp2p: Some(Libp2pTransportProfileView {
+            peer_id: "12D3KooWPeer2".to_string(),
+            addrs: vec![],
+            supports: vec!["blob".to_string()],
+        }),
+        iroh: None,
+        discovery: vec!["kademlia".to_string()],
+        capability_level: 3,
+        last_observed: 1746878500,
+    };
+
+    let json = serde_json::to_value(&manifest).unwrap();
+    validate_against_schema("views/peer-transport-manifest.schema.json", &json);
+}
+
+#[test]
+fn peer_transport_manifest_view_iroh_only() {
+    use elohim_storage::{IrohTransportProfileView, PeerTransportManifestView};
+
+    let manifest = PeerTransportManifestView {
+        agent_cid: "bafyrei...agent-3".to_string(),
+        libp2p: None,
+        iroh: Some(IrohTransportProfileView {
+            node_id: "wxyz...node-3".to_string(),
+            relays: vec![],
+            supports: vec!["sync".to_string(), "view-fed".to_string()],
+        }),
+        discovery: vec!["pkarr".to_string()],
+        capability_level: 5,
+        last_observed: 1746878600,
+    };
+
+    let json = serde_json::to_value(&manifest).unwrap();
+    validate_against_schema("views/peer-transport-manifest.schema.json", &json);
+}
