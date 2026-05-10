@@ -111,6 +111,24 @@ divergent message schemas.
   bridged libp2p `PeerId` ↔ iroh `NodeId` — **graduated to permanent schema
   in Phase 12** (see below).
 
+**Gossip dual-publish (Phase 12 cutover gate #4):**
+- `src/p2p_iroh/dual_publish/` — `DualGossipPublisher`, `IrohGossipPublisher`,
+  `TopicTransports` verdict table, and `classify_topic` routing function.
+- All publish call sites (inventory snapshot, identity-binding, recovery-invitation,
+  recovery-revocation, feedback-signal, EPR-atom-announce) route through
+  `DualGossipPublisher` which fans out byte-identical MessagePack payloads to both
+  `LibP2PGossipPublisher` and `IrohGossipPublisher` per the per-topic verdict table.
+- `IrohGossipPublisher::spawn` background task handles subscribe-on-demand so the
+  sync `GossipPublisher` trait contract is preserved.
+- `EprServiceBackend::handle(EprRequest::Announce)` now returns `accepted: true`
+  — the n0-mitigation gap is closed. Identity-binding gossip on the dual-publish
+  path provides the peer discovery semantics formerly blocked by the missing iroh
+  Kademlia `put_record` equivalent.
+- Topic-id derivation: `BLAKE3(topic_name)[..32]` via `IrohGossip::topic_id_for`.
+  Wire payloads unchanged — gossipsub and iroh-gossip differ only on transport and
+  topic-id encoding.
+- See `src/p2p_iroh/dual_publish/CATALOG.md` for the complete publisher catalog.
+
 **Peer transport manifest (Phase 12):**
 - `peer_transport_manifest` table (Diesel migration 2026-05-10-120000)
   is the permanent structural replacement for the Phase 10 bridge table.
@@ -189,12 +207,16 @@ connection pool both work.
   ALPNs accept connections and round-trip wire bytes correctly under
   test stubs, but no production daemon code yet supplies real backends.
   Cutover wires each one to its existing libp2p-side service.
-- Phase 4 gossip topic broadcasters (inventory snapshot/delta publish,
-  identity-binding, integrity-revocation, recovery-invitation,
-  recovery-revocation, attention, feedback) are not yet wired into the
-  daemon's existing libp2p-side broadcast call sites. Topic mapping
-  (`IrohGossip::topic_id_for`) is the only piece needed; the per-topic
-  publish wiring graduates per protocol at cutover.
+- Phase 4 gossip receive-side: iroh-side subscribers for inventory, identity-binding,
+  recovery-invitation, recovery-revocation, feedback-signal, and integrity-revocation
+  are not yet wired into the daemon's receive handlers
+  (`src/p2p/mod.rs:4396-4607`). The `IrohGossipPublisher` background task subscribes
+  on first publish per topic — the ALPN and transport are ready; routing received
+  bytes into the existing libp2p-shaped handlers is a follow-up task (out-of-scope
+  for Plan 4 / cutover gate #4, which requires publish parity only).
+- `integrity-revocation` producer: no publisher exists yet (Recovery M4 follow-on).
+  When wired, it uses `self.gossip_publisher.publish(TOPIC_INTEGRITY_REVOCATION, ...)`
+  — no further plan work needed, the dual-publish path handles it automatically.
 - Identity-map (`crate::p2p::identity_map`) and reach-authorization
   (`crate::p2p::reach_authorization`) are internal services, not wire
   protocols — they consume identity context from the handshake plane.
