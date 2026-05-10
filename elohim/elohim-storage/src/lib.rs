@@ -118,6 +118,11 @@ pub mod ssr;
 #[cfg(feature = "p2p-iroh")]
 pub mod p2p_iroh;
 
+// Blob backend router — selects iroh vs libp2p per GET /blob/{hash} request.
+// Pure selection function; no I/O. Gated on p2p-iroh since it uses peer_map types.
+#[cfg(feature = "p2p-iroh")]
+pub mod http_blob_router;
+
 // CRDT sync module (always available, P2P transport requires p2p feature)
 pub mod sync;
 

@@ -538,6 +538,54 @@ pub fn libp2p_for_iroh(
 }
 
 // ────────────────────────────────────────────────────────────────
+// Test constructors (Plan 2 cutover gate #2 helpers)
+// ────────────────────────────────────────────────────────────────
+
+impl PeerTransportManifest {
+    /// Build an iroh-capable test manifest that advertises Blob on both
+    /// transports (so `select_transport` returns `Iroh` for `Plane::Blob`).
+    /// Only compiled for tests — never used in production code.
+    #[cfg(test)]
+    pub fn iroh_capable_for_test() -> Self {
+        PeerTransportManifest {
+            agent_cid: "test-iroh-capable".to_string(),
+            libp2p: Some(Libp2pTransportProfile {
+                peer_id: "12D3KooWIrohTest".to_string(),
+                addrs: vec![],
+                supports: vec!["blob".to_string()],
+            }),
+            iroh: Some(IrohTransportProfile {
+                node_id: "iroh-test-node".to_string(),
+                relays: vec![],
+                supports: vec!["blob".to_string()],
+            }),
+            discovery: vec![],
+            capability_level: 5,
+            last_observed: 1746878400,
+        }
+    }
+
+    /// Build a libp2p-only test manifest that has no iroh profile
+    /// (so `select_transport` returns `Libp2p` for `Plane::Blob`).
+    /// Only compiled for tests — never used in production code.
+    #[cfg(test)]
+    pub fn libp2p_only_for_test() -> Self {
+        PeerTransportManifest {
+            agent_cid: "test-libp2p-only".to_string(),
+            libp2p: Some(Libp2pTransportProfile {
+                peer_id: "12D3KooWLibp2pTest".to_string(),
+                addrs: vec![],
+                supports: vec!["blob".to_string()],
+            }),
+            iroh: None,
+            discovery: vec![],
+            capability_level: 5,
+            last_observed: 1746878400,
+        }
+    }
+}
+
+// ────────────────────────────────────────────────────────────────
 // Unit tests
 // ────────────────────────────────────────────────────────────────
 
