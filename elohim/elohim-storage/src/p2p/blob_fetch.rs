@@ -128,6 +128,21 @@ pub async fn race_fetch(
         while let Some(joined) = in_flight.next().await {
             if let Ok((peer, Ok(bytes))) = joined {
                 if verify_blob_hash(&bytes, blob_hash) {
+                    // Gate #5 cross-stack transport observability.
+                    // `race_fetch` is the libp2p fetch path; transport = "libp2p".
+                    // The iroh blob path (IrohBlobStore) emits its own receipt
+                    // when that path is wired in Phase 11 backend graduation.
+                    // Structured field `transport` feeds the parity-soak (gate #6)
+                    // so reviewers can confirm cross-stack delivery happened.
+                    // PII check: `peer` is the libp2p PeerId string (already public
+                    // per the peer-map); `blob_hash` is content-addressed.
+                    tracing::debug!(
+                        target: "recovery::transport",
+                        blob_hash = %blob_hash,
+                        source_peer = %peer,
+                        transport = "libp2p",
+                        "share-blob received"
+                    );
                     // Returning here drops `in_flight`, which stops awaiting
                     // the remaining JoinHandles. The detached tokio tasks
                     // continue running to completion (bounded by

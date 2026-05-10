@@ -28,6 +28,7 @@ pub mod epr_atom_backend;
 pub mod epr_backend;
 mod gossip;
 mod identity;
+pub mod multi_stack_fixture;
 mod node;
 pub mod parity_harness;
 pub mod peer_map;
