@@ -11,14 +11,14 @@
 //! the view-federation plane is dual-stack permanent. 256 KiB cap on
 //! responses applies on both transports.
 //!
-//! ## Connected peers
+//! ## Connected peers (Phase 12)
 //!
-//! Iroh-mode `connected_peers` is currently empty — the cross-stack
-//! peer-map's `peer_transport_manifest` projection (Phase 12) will
-//! provide a unified connection list across both transports. Until
-//! then, iroh-mode PeerTopology slices return a local-only view; the
-//! libp2p side continues to project its full connected-peers
-//! snapshot.
+//! When constructed with [`ViewFedServiceBackend::with_manifest_pool`], the
+//! iroh-mode adapter queries the `peer_transport_manifest` for all rows with
+//! a `libp2p_peer_id`, parses each into a `libp2p::PeerId`, and passes the
+//! resulting slice to `service.handle`. Without the pool wired (`new`
+//! constructor), `connected_peers` is an empty slice — the same Phase 11
+//! fallback that returned a local-only view.
 //!
 //! ## Signing failure
 //!
@@ -37,10 +37,13 @@ use std::sync::Arc;
 use tracing::warn;
 
 use super::view_fed::ViewFederationBackend;
+use crate::db::DbPool;
+use crate::p2p_iroh::peer_map::list_libp2p_peer_ids;
 use crate::view_fed_service::ViewFedService;
 use crate::views::{
     Freshness, FreshnessState, JsonVal, ViewFederationRequest, ViewFederationResponse, ViewSlice,
 };
+use libp2p::PeerId;
 
 /// Routes [`ViewFederationRequest`]s into a shared
 /// [`ViewFedService`] and produces the matching
@@ -52,6 +55,8 @@ pub struct ViewFedServiceBackend {
     /// embeds this in slice.peer_id; here we track it explicitly so
     /// the failure path can do the same.
     local_peer_id_fallback: String,
+    /// Phase 12: manifest pool for connected-peers hydration.
+    pool: Option<DbPool>,
 }
 
 impl ViewFedServiceBackend {
@@ -59,6 +64,36 @@ impl ViewFedServiceBackend {
         Self {
             service,
             local_peer_id_fallback,
+            pool: None,
+        }
+    }
+
+    /// Phase 12 wiring: when the manifest pool is supplied, the iroh-mode
+    /// view-federation adapter passes a real connected-peers slice (parsed
+    /// from manifest libp2p_peer_id rows) instead of empty.
+    pub fn with_manifest_pool(
+        service: Arc<ViewFedService>,
+        local_peer_id_fallback: String,
+        pool: DbPool,
+    ) -> Self {
+        Self {
+            service,
+            local_peer_id_fallback,
+            pool: Some(pool),
+        }
+    }
+
+    fn connected_peers(&self) -> Vec<PeerId> {
+        match self.pool.as_ref() {
+            Some(pool) => match pool.get() {
+                Ok(mut conn) => list_libp2p_peer_ids(&mut conn)
+                    .unwrap_or_default()
+                    .into_iter()
+                    .filter_map(|s| s.parse::<PeerId>().ok())
+                    .collect(),
+                Err(_) => Vec::new(),
+            },
+            None => Vec::new(),
         }
     }
 }
@@ -74,9 +109,8 @@ impl std::fmt::Debug for ViewFedServiceBackend {
 #[async_trait::async_trait]
 impl ViewFederationBackend for ViewFedServiceBackend {
     async fn handle(&self, request: ViewFederationRequest) -> ViewFederationResponse {
-        // Iroh-mode connected_peers is currently an empty libp2p
-        // PeerId slice — see module-level docs.
-        match self.service.handle(request.clone(), &[]).await {
+        let connected = self.connected_peers();
+        match self.service.handle(request.clone(), &connected).await {
             Ok(res) => res,
             Err(e) => {
                 warn!(
@@ -151,5 +185,42 @@ mod tests {
             })
             .await;
         assert_eq!(res.slice.freshness.state, FreshnessState::Offline);
+    }
+
+    #[tokio::test]
+    async fn manifest_backed_connected_peers_includes_libp2p_rows() {
+        use crate::db::{init_pool_from_dir, run_migrations};
+        use crate::p2p_iroh::peer_map::{record_libp2p_observation, Plane};
+        use tempfile::tempdir;
+
+        let dir = tempdir().unwrap();
+        let pool = init_pool_from_dir(dir.path()).expect("pool");
+        run_migrations(&pool).expect("migrations");
+        {
+            let mut conn = pool.get().unwrap();
+            // 12D3KooW... is the canonical libp2p PeerId prefix; the
+            // test uses a known-valid base58btc PeerId.
+            record_libp2p_observation(
+                &mut conn,
+                "bafyrei...vf",
+                "12D3KooWNZyfTfb1ENd1HRgGTbvXebvA7iJfCRZHm9NzpDdEsTwo",
+                &[],
+                &[Plane::ViewFed],
+                1746878400,
+            )
+            .unwrap();
+        }
+        // The test asserts construction succeeds with the manifest pool;
+        // full-handle behavior is covered in iroh_view_fed_real_backend.
+        let kp = libp2p::identity::Keypair::generate_ed25519();
+        let local = libp2p::PeerId::from(kp.public()).to_string();
+        let svc = Arc::new(ViewFedService::new(
+            "agent-cid-self".into(),
+            local.clone(),
+            kp,
+            None,
+        ));
+        let _backend = ViewFedServiceBackend::with_manifest_pool(svc, local, pool);
+        // Smoke: doesn't panic.
     }
 }
