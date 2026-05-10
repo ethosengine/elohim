@@ -1,0 +1,23 @@
+# Critical: don't let local build artifacts clobber the freshly-installed
+# /app/node_modules from `pnpm install` in stage 1 of the Dockerfile.
+# Without this, `COPY . .` would overwrite node_modules with whatever is
+# in the build host's local copy — which is often empty in CI checkouts
+# and was the cause of "Cannot find module @angular/cli/bin/ng.js" errors.
+node_modules
+dist
+.angular
+
+# Local dev artifacts not needed in image
+*.log
+.DS_Store
+coverage
+.vscode
+.idea
+.git
+.gitignore
+README.md
+CLAUDE.md
+
+# Test output not part of the prod build
+src/**/*.spec.ts
+src/test-setup.ts
