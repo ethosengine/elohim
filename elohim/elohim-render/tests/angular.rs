@@ -30,7 +30,7 @@ async fn angular_renderer_returns_rendered_html() {
     ]
     .iter()
     .collect();
-    let renderer = AngularRenderer::new(bundle).expect("renderer init");
+    let renderer = AngularRenderer::new(bundle, Arc::new(EmptyFetcher)).expect("renderer init");
     let ctx = RenderContext {
         spec: RenderSpec::AngularSsr,
         url: "/lamad/concept/test".into(),
@@ -72,7 +72,7 @@ async fn angular_renderer_with_real_bundle() {
         return;
     }
 
-    let renderer = AngularRenderer::new(bundle).expect("renderer init");
+    let renderer = AngularRenderer::new(bundle, Arc::new(EmptyFetcher)).expect("renderer init");
     let ctx = RenderContext {
         spec: RenderSpec::AngularSsr,
         url: "/".into(),

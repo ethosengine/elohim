@@ -1086,6 +1086,17 @@ async fn async_main(
         info!("No elohim capability profile — node operates as storage/relay only (set ELOHIM_CAPABILITY_CONFIG_FILE to enable)");
     }
 
+    let render_capability = elohim_storage::load_render_capability_from_url().await;
+    if render_capability.is_some() {
+        tracing::info!("render_capability loaded from DOORWAY_CAPABILITY_URL");
+    } else if std::env::var("DOORWAY_CAPABILITY_URL").is_ok() {
+        tracing::warn!("DOORWAY_CAPABILITY_URL set but capability could not be loaded — peer-status will show null");
+    }
+
+    // Tier-2 extensions are not yet populated by any source; leave None for now.
+    // (Future: registered capability owners populate this map at startup.)
+    let extensions: Option<elohim_storage::CapabilityExtensions> = None;
+
     // EPR Phase 2B Task C.6 — compose the 4-layer write-through state.
     //
     // Layer 1 (manifest defaults) — TODO: Phase 4 manifest registry will load
@@ -1131,6 +1142,8 @@ async fn async_main(
     let mut http_server = HttpServer::new(blob_store.clone(), http_addr)
         .with_progress_hub(Arc::clone(&progress_hub))
         .with_elohim_capability(elohim_capability)
+        .with_render_capability(render_capability)
+        .with_extensions(extensions)
         .with_write_through_state(write_through_state.clone())
         // T17: race-fetch parameters (timeout, parallelism, self-CID).
         .with_fetch_config(&config);

@@ -87,11 +87,32 @@ spec:
     - name: cargo-cache
       persistentVolumeClaim:
         claimName: cargo-cache-holochain
+    - name: sweettest-target-cache
+      persistentVolumeClaim:
+        claimName: sweettest-target-cache-holochain
   containers:
     - name: builder
       image: harbor.ethosengine.com/ethosengine/ci-builder-nix:latest
+      # imagePullPolicy: Always — the :latest tag is moving (sccache 0.15.0
+      # was added 2026-05-09 21:40Z). Without explicit Always, k8s nodes
+      # with cached pre-sccache layers can serve stale pods; build #1218
+      # presumed sccache present (per shellHook's `[ -x ... ]` check) but
+      # tried to exec a non-existent /usr/local/bin/sccache. Forcing pull
+      # rules out the cache-staleness branch.
+      imagePullPolicy: Always
       command: [cat]
       tty: true
+      # sccache S3 (Garage) config — auto-mounted Secret in jenkins ns.
+      # Provides AWS_ACCESS_KEY_ID/SECRET, SCCACHE_BUCKET, SCCACHE_ENDPOINT,
+      # SCCACHE_S3_USE_SSL, SCCACHE_REGION. The flake.nix devShell's
+      # shellHook surfaces /usr/local/bin/sccache and sets RUSTC_WRAPPER
+      # when entering `nix develop` (the binary lives outside the nix
+      # store on purpose so it survives nix's PATH stripping). Combined
+      # with `nix develop --impure` on the build invocations below,
+      # SCCACHE_* env vars flow through to cargo's wrapper exec.
+      envFrom:
+        - secretRef:
+            name: sccache-credentials
       resources:
         requests:
           memory: "4Gi"
@@ -104,6 +125,20 @@ spec:
       volumeMounts:
         - name: cargo-cache
           mountPath: /root/.cargo
+        # NOTE: nix-store PVC mount intentionally absent. Mounting an empty
+        # PVC at /nix/store on first run wipes out the ci-builder-nix image's
+        # bundled nix binary. Tracked as followup; sccache via Garage S3 is
+        # the planned replacement for cargo build caching once sccache lands
+        # in ci-builder-nix:latest (in flight separately).
+        # NOTE: sweettest-target-cache /cargo-target mount also temporarily
+        # absent. Pairing CARGO_TARGET_DIR=/cargo-target with this mount
+        # broke the DNA pack stage in build #1212: post-build steps (hc dna
+        # pack, hApp manifest resolution) look for content_store.wasm at the
+        # default ./target path, which CARGO_TARGET_DIR overrides. Failure:
+        # "Failed to canonicalize resource path: content_store.wasm: No
+        # such file or directory". Reverting to default ./target until we
+        # can either rewire the post-build paths to honor CARGO_TARGET_DIR,
+        # or move to sccache-based caching once that infra lands.
 '''
         }
     }
@@ -111,6 +146,11 @@ spec:
     environment {
         BRANCH_NAME = "${env.BRANCH_NAME ?: 'main'}"
         PATH = "/nix/var/nix/profiles/default/bin:${env.PATH}"
+        // CARGO_TARGET_DIR temporarily unset — see volumeMounts NOTE above.
+        // Default ./target restores the path post-build steps (hc dna pack,
+        // hApp manifest resolution) expect. Caching for the sweettest cold
+        // compile will return via sccache once ci-builder-nix:latest carries
+        // the sccache binary (in-flight infra change).
     }
 
     parameters {
@@ -278,7 +318,11 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                             # to pick up the toolchain. RUSTFLAGS="" overrides
                             # the flake's wasm32 setting for this native test.
                             cd "$WORKSPACE/elohim/holochain/tests/manifest-hygiene"
-                            nix develop --accept-flake-config \
+                            # --impure preserves outer env (SCCACHE_BUCKET,
+                            # SCCACHE_ENDPOINT, AWS_* from envFrom) so sccache
+                            # can talk to Garage. flake.nix shellHook handles
+                            # RUSTC_WRAPPER + PATH for sccache binary.
+                            nix develop --impure --accept-flake-config \
                                 "$WORKSPACE/elohim/holochain/dna/elohim" \
                                 --command bash -c 'RUSTFLAGS="" cargo test'
                         '''
@@ -327,7 +371,10 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
 
                                 echo "=== Entering Nix development shell for WASM build ==="
 
-                                nix develop --accept-flake-config --command bash -c '
+                                # --impure preserves SCCACHE_* env vars from
+                                # the pod's envFrom Secret mount; flake.nix
+                                # shellHook activates sccache wrapper.
+                                nix develop --impure --accept-flake-config --command bash -c '
                                     set -euo pipefail
 
                                     echo "=== Rust toolchain ready ==="
@@ -380,7 +427,9 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                 echo "=== Entering Nix development shell ==="
                                 echo "This will download/build Holochain toolchain from Cachix..."
 
-                                nix develop --accept-flake-config --command bash -c '
+                                # --impure preserves SCCACHE_* env vars; sccache
+                                # speeds up cargo invocations the build script makes.
+                                nix develop --impure --accept-flake-config --command bash -c '
                                     set -euo pipefail
 
                                     echo "=== Holochain toolchain ready ==="
@@ -506,8 +555,24 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                 # stage comment in tests/sweettest/README.md for the trade-off.
                                 # Flake-ref is explicit — tests/sweettest/ has no flake.nix
                                 # so nix would otherwise search parents and bail.
-                                nix develop --accept-flake-config "$WORKSPACE/elohim/holochain/dna/elohim" --command bash -c "
+                                # --impure preserves SCCACHE_* env vars from pod
+                                # envFrom (used by other stages). sccache itself
+                                # is DISABLED for sweettest (see unset below).
+                                nix develop --impure --accept-flake-config "$WORKSPACE/elohim/holochain/dna/elohim" --command bash -c "
                                     set -uo pipefail
+                                    # Disable sccache for the sweettest compile only.
+                                    # Build #1219 hit the known sccache+cargo build-script
+                                    # caching bug: sccache served a 'cache hit' for
+                                    # lair_keystore_api's build-script compilation but
+                                    # didn't materialize target/release/build/<crate>/
+                                    # build-script-build, causing 'never executed (os
+                                    # error 2)' when cargo invoked it. This bug only
+                                    # affects native cargo builds with build scripts;
+                                    # the WASM stages (Build WASM Cache Core, Build DNA)
+                                    # use wasm32 target without native build scripts and
+                                    # cache cleanly. Sweettest stays at the prior ~71min
+                                    # cold-compile baseline; other stages keep sccache.
+                                    unset RUSTC_WRAPPER
                                     export CARGO_BUILD_JOBS=2
                                     # The flake exports RUSTFLAGS='--cfg getrandom_backend=\"custom\"'
                                     # for WASM zome builds (Holochain provides the host RNG fn).

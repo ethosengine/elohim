@@ -448,6 +448,56 @@ async fn main() -> anyhow::Result<()> {
         tracing::info!(registered, failed, "Steward peer registration complete");
     }
 
+    // Derive render-capability profile from SSR bundles directory (Task 15).
+    //
+    // Reads `SSR_BUNDLES_DIR` (directory of pre-built SSR bundles) and fetches
+    // the storage manifest from `STORAGE_URL` to determine supported renderers.
+    // The result is cached on AppState and served at GET /admin/capability.
+    //
+    // Non-fatal: if the env var is unset or the deriver fails, render_capability
+    // stays None and the endpoint returns JSON null. The existing SSR renderer
+    // (`renderer` field, driven by `SSR_BUNDLE_PATH`) is unaffected.
+    {
+        let render_capability = if let Ok(bundles_dir) = std::env::var("SSR_BUNDLES_DIR") {
+            let manifest_url = std::env::var("STORAGE_URL")
+                .map(|u| format!("{}/admin/manifest", u.trim_end_matches('/')))
+                .unwrap_or_else(|_| "http://localhost:8090/admin/manifest".into());
+            let override_path = std::env::var("DOORWAY_RENDER_OVERRIDE")
+                .ok()
+                .map(std::path::PathBuf::from);
+            match doorway::render::derive_capability(
+                std::path::Path::new(&bundles_dir),
+                &manifest_url,
+                override_path.as_deref(),
+            )
+            .await
+            {
+                Ok(c) => {
+                    tracing::info!(
+                        capability = ?c,
+                        "render capability derived"
+                    );
+                    c
+                }
+                Err(e) => {
+                    tracing::error!(error = %e, "deriver failed — render_capability=null");
+                    None
+                }
+            }
+        } else {
+            tracing::debug!("SSR_BUNDLES_DIR unset — render_capability will be None");
+            None
+        };
+        // Concurrency semaphore: sized to render_capability.max_concurrent_renders.
+        // None when render_capability is None (no SSR claim, no limiter needed).
+        state.render_semaphore = render_capability.as_ref().map(|c| {
+            std::sync::Arc::new(tokio::sync::Semaphore::new(
+                c.max_concurrent_renders as usize,
+            ))
+        });
+        state.render_capability = render_capability;
+    }
+
     // Create WarmupState before Arc::new(state) so it can be stored in AppState
     // and also passed to spawn_stream_task later.
     if args.projection_writer && !peer_urls.is_empty() && state.projection.is_some() {

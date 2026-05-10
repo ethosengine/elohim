@@ -62,6 +62,17 @@ pub fn render_cache_key(url: &str, fetched_hashes: &[String], spec_version: &str
 // ResolverFetcher
 // =============================================================================
 
+/// Opaque user credential the V8 fetch shim attaches to outbound storage
+/// fetches. Constructed by doorway's session layer; the shim doesn't decode
+/// or interpret it. Allows framework-agnostic auth threading: any V8-based
+/// renderer can pass through whatever credential shape doorway's session
+/// produced (JWT, steward attestation, opaque session cookie, etc.).
+#[derive(Debug, Clone)]
+pub struct UserCredential {
+    pub header_name: String,
+    pub header_value: String,
+}
+
 /// Forwards Angular SSR `fetch()` calls to the local elohim-storage sidecar.
 ///
 /// Constructed with a shared `reqwest::Client` (from `AppState::ssr_http_client`)
@@ -72,9 +83,14 @@ pub fn render_cache_key(url: &str, fetched_hashes: &[String], spec_version: &str
 ///
 /// The client is injected rather than built per-request so the connection pool is
 /// shared across all SSR renders on this doorway instance.
+///
+/// When `user_credential` is `Some`, the shim attaches it as an HTTP header
+/// to every outbound storage fetch, so authenticated SSR renders see the
+/// originating user's auth context (commons + reach-aware content).
 pub struct ResolverFetcher {
     storage_base: String,
     client: Arc<reqwest::Client>,
+    user_credential: Option<UserCredential>,
 }
 
 impl ResolverFetcher {
@@ -87,6 +103,22 @@ impl ResolverFetcher {
         Self {
             storage_base: storage_base_url.trim_end_matches('/').to_string(),
             client,
+            user_credential: None,
+        }
+    }
+
+    /// Builder: attach a per-render user credential. The shim will add this
+    /// as a header on every outbound storage fetch.
+    pub fn with_user_credential(mut self, credential: UserCredential) -> Self {
+        self.user_credential = Some(credential);
+        self
+    }
+
+    /// Convenience: apply credential only if `Some`.
+    pub fn maybe_with_user_credential(self, cred: Option<UserCredential>) -> Self {
+        match cred {
+            Some(c) => self.with_user_credential(c),
+            None => self,
         }
     }
 }
@@ -110,6 +142,13 @@ impl DataFetcher for ResolverFetcher {
         let mut req_builder = req_builder;
         for (k, v) in &request.headers {
             req_builder = req_builder.header(k.as_str(), v.as_str());
+        }
+
+        // Attach the originating user's credential if the shim was given one.
+        // The header value is opaque to the shim — doorway's session layer
+        // constructed it from the live request's auth context.
+        if let Some(cred) = &self.user_credential {
+            req_builder = req_builder.header(&cred.header_name, &cred.header_value);
         }
 
         // Forward body if present
@@ -180,6 +219,70 @@ mod tests {
             strip_to_path("https://example.com/api/v1/foo?bar=1"),
             "/api/v1/foo?bar=1"
         );
+    }
+
+    // ── ResolverFetcher user_credential threading ───────────────────────────
+
+    #[tokio::test]
+    async fn fetcher_forwards_user_credential_header() {
+        use wiremock::{matchers, Mock, MockServer, ResponseTemplate};
+        let server = MockServer::start().await;
+        Mock::given(matchers::method("GET"))
+            .and(matchers::header("authorization", "Bearer user-token"))
+            .respond_with(ResponseTemplate::new(200).set_body_string("ok"))
+            .mount(&server)
+            .await;
+        let client = Arc::new(reqwest::Client::new());
+        let fetcher =
+            ResolverFetcher::new(client, server.uri()).with_user_credential(UserCredential {
+                header_name: "Authorization".into(),
+                header_value: "Bearer user-token".into(),
+            });
+        let req = FetchRequest {
+            url: "/api/private".into(),
+            method: "GET".into(),
+            headers: HashMap::new(),
+            body: None,
+        };
+        let resp = fetcher.fetch(req).await.expect("fetch ok");
+        assert_eq!(resp.status, 200);
+    }
+
+    #[tokio::test]
+    async fn fetcher_omits_credential_when_none() {
+        use wiremock::{matchers, Mock, MockServer, ResponseTemplate};
+        let server = MockServer::start().await;
+        Mock::given(matchers::method("GET"))
+            .and(matchers::path("/api/public"))
+            .respond_with(ResponseTemplate::new(200).set_body_string("public"))
+            .mount(&server)
+            .await;
+        let client = Arc::new(reqwest::Client::new());
+        let fetcher = ResolverFetcher::new(client, server.uri());
+        let req = FetchRequest {
+            url: "/api/public".into(),
+            method: "GET".into(),
+            headers: HashMap::new(),
+            body: None,
+        };
+        let resp = fetcher.fetch(req).await.expect("fetch ok");
+        assert_eq!(resp.status, 200);
+        let received = server.received_requests().await.unwrap();
+        let auth_header = received[0].headers.get("authorization");
+        assert!(
+            auth_header.is_none(),
+            "no credential → no Authorization header on outbound fetch"
+        );
+    }
+
+    #[tokio::test]
+    async fn fetcher_maybe_with_user_credential_none_is_noop() {
+        let client = Arc::new(reqwest::Client::new());
+        let fetcher = ResolverFetcher::new(client, "http://localhost:8090".to_string())
+            .maybe_with_user_credential(None);
+        // Just verify it compiles and doesn't panic.
+        // Behavioral coverage is in fetcher_omits_credential_when_none.
+        assert_eq!(fetcher.storage_base, "http://localhost:8090");
     }
 
     #[test]

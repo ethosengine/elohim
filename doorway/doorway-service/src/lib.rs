@@ -30,6 +30,7 @@ pub mod nats;
 pub mod orchestrator;
 pub mod projection;
 pub mod proxy;
+pub mod render;
 pub mod routes;
 pub mod server;
 pub mod services;

@@ -74,6 +74,7 @@ dotenvy = "0.15"
 # Logging
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+toml = "0.8"
 
 # Utilities
 uuid = { version = "1.16", features = ["v4", "serde"] }
@@ -134,6 +135,8 @@ gate-client = { path = "../../elohim/elohim-agent/gate-client", default-features
 
 [dev-dependencies]
 tokio-test = "0.4"
+tempfile = "3"
+wiremock = "0.6"
 # Enable gate-client testing shims (mock_decline, __test_set_decision_override)
 # in test builds only.  Production builds use default-features = false above.
 gate-client = { path = "../../elohim/elohim-agent/gate-client", features = ["testing"] }

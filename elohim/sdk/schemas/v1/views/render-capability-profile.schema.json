@@ -1,0 +1,59 @@
+{
+  "$id": "epr:schema:view:render-capability-profile",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "RenderCapabilityProfile",
+  "description": "Source of truth: auto-derived at doorway startup from on-disk bundles intersected with elohim-storage's manifest of SSR-eligible routes (Operational, Category C). doorway-config.toml may reduce the claim but never inflate it. Layered into PeerStatusView via build_peer_status_view, mirroring the elohimCapability pattern. NOT a DHT entry.",
+  "_source": {
+    "category": "C",
+    "layer": "view",
+    "owner": "doorway runtime (derived from disk + storage manifest)",
+    "notarized": false,
+    "consumed_by": "elohim-storage build_peer_status_view (layered post-construction)",
+    "rationale": "Compute-shape claim about doorway-local SSR capability; informational visibility for substrate matchmaking. Stage-3 elohim-defender enforcement is the deferred path that would graduate the claim to DHT-attested."
+  },
+  "type": "object",
+  "required": ["bundles", "authModes", "maxConcurrentRenders", "renderers"],
+  "properties": {
+    "bundles": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["name", "version", "renderer"],
+        "properties": {
+          "name":     { "type": "string", "description": "Bundle name (e.g. lamad-app, qahal-app)" },
+          "version":  { "type": "string", "description": "Semver bundle version" },
+          "renderer": { "$ref": "../enums/renderer-kind.schema.json" },
+          "digest":   { "type": ["string", "null"], "description": "Optional sha256 hash of the bundle file" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "renderers": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "../enums/renderer-kind.schema.json" },
+      "description": "Distinct renderer kinds (deduplicated bundles[].renderer). Cheap-to-query summary."
+    },
+    "authModes": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "enum": ["anonymous", "doorway-hosted", "steward-presence"]
+      },
+      "description": "Auth modes this doorway honors for SSR. 'anonymous' must always be present."
+    },
+    "maxConcurrentRenders": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Operator-declared concurrency budget. CSR fallback fires when reached."
+    },
+    "memoryBudgetMib": {
+      "type": ["integer", "null"],
+      "minimum": 0,
+      "description": "Operator-declared memory ceiling for the renderer (informational; null = cgroup-managed)"
+    }
+  },
+  "additionalProperties": false
+}

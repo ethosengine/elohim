@@ -55,6 +55,20 @@
         { "type": "null" }
       ],
       "description": "If this peer runs an elohim-agent, this block advertises its model-level capabilities. Null or absent means no elohim runs here (e.g., pure storage/relay node). Operator-configured in Phase 9; auto-detected in Phase 10+"
+    },
+    "renderCapability": {
+      "oneOf": [
+        { "$ref": "render-capability-profile.schema.json" },
+        { "type": "null" }
+      ],
+      "description": "If this peer runs a doorway that can server-render, advertises its render-capability profile. Null or absent = no SSR (storage-only peer, or operator opted out). Layered post-construction by build_peer_status_view (Category C operational, NOT a DHT entry)."
+    },
+    "extensions": {
+      "oneOf": [
+        { "$ref": "capability-extensions.schema.json" },
+        { "type": "null" }
+      ],
+      "description": "Tier-2 extension capabilities. Apps register kebab-case capability names; each entry has a schemaRef + structured profile. Layered post-construction by build_peer_status_view (Category C operational, NOT a DHT entry)."
     }
   },
   "additionalProperties": false

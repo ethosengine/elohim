@@ -446,6 +446,8 @@ fn peer_status_view_no_elohim_capability_matches_schema() {
         dht_anchor_hash: "uhCkkSMOKEHASH001".to_string(),
         updated_at: "1700000000100000".to_string(),
         elohim_capability: None,
+        render_capability: None,
+        extensions: None,
     };
 
     let json = serde_json::to_value(&view).unwrap();
@@ -488,6 +490,8 @@ fn peer_status_view_full_elohim_capability_matches_schema() {
             active_since: "2026-04-18T00:00:00Z".to_string(),
             reach_level: Some("community".to_string()),
         }),
+        render_capability: None,
+        extensions: None,
     };
 
     let json = serde_json::to_value(&view).unwrap();
@@ -521,6 +525,8 @@ fn peer_status_view_minimal_elohim_capability_matches_schema() {
             active_since: "2026-01-01T00:00:00Z".to_string(),
             reach_level: None,
         }),
+        render_capability: None,
+        extensions: None,
     };
 
     let json = serde_json::to_value(&view).unwrap();
@@ -2209,4 +2215,214 @@ fn attention_tending_with_negative_tended_at_rejected_by_schema() {
         has_errors,
         "schema should reject tendedAt: [-1] (items minimum: 0 violated)"
     );
+}
+
+#[test]
+fn render_capability_profile_round_trips_against_schema() {
+    use elohim_storage::{BundleEntry, RenderCapabilityProfile, RendererKind};
+    let profile = RenderCapabilityProfile {
+        bundles: vec![BundleEntry {
+            name: "lamad-app".into(),
+            version: "1.0.3".into(),
+            renderer: RendererKind::AngularSsr,
+            digest: Some("sha256:abc123".into()),
+        }],
+        renderers: vec![RendererKind::AngularSsr],
+        auth_modes: vec!["anonymous".into(), "doorway-hosted".into()],
+        max_concurrent_renders: 8,
+        memory_budget_mib: Some(1024),
+    };
+    let json = serde_json::to_string(&profile).expect("serialize");
+    let back: RenderCapabilityProfile = serde_json::from_str(&json).expect("deserialize");
+    assert_eq!(back.bundles[0].name, "lamad-app");
+    assert_eq!(back.bundles[0].renderer, RendererKind::AngularSsr);
+    assert!(back.auth_modes.contains(&"anonymous".to_string()));
+}
+
+#[test]
+fn capability_extensions_round_trips() {
+    use elohim_storage::CapabilityExtensions;
+    use serde_json::json;
+    let ext_json = json!({
+        "transcode": {
+            "schemaRef": "epr:schema:view:transcode-capability-profile",
+            "profile": { "codecs": ["h264", "av1"] }
+        }
+    });
+    let ext: CapabilityExtensions = serde_json::from_value(ext_json.clone()).expect("deserialize");
+    let back = serde_json::to_value(&ext).expect("serialize");
+    assert_eq!(back, ext_json);
+}
+
+#[test]
+fn render_capability_serializes_with_camel_case() {
+    use elohim_storage::{BundleEntry, RenderCapabilityProfile, RendererKind};
+    let profile = RenderCapabilityProfile {
+        bundles: vec![BundleEntry {
+            name: "lamad-app".into(),
+            version: "1.0.3".into(),
+            renderer: RendererKind::AngularSsr,
+            digest: None,
+        }],
+        renderers: vec![RendererKind::AngularSsr],
+        auth_modes: vec!["anonymous".into()],
+        max_concurrent_renders: 4,
+        memory_budget_mib: None,
+    };
+    let json_value: serde_json::Value = serde_json::to_value(&profile).unwrap();
+    // Camel case keys, kebab-case enum values
+    assert!(json_value.get("authModes").is_some());
+    assert!(json_value.get("maxConcurrentRenders").is_some());
+    assert!(json_value["bundles"][0].get("renderer").unwrap() == "angular-ssr");
+    // Optional fields with None should be skipped (per #[serde(skip_serializing_if = "Option::is_none")])
+    assert!(json_value.get("memoryBudgetMib").is_none());
+    assert!(json_value["bundles"][0].get("digest").is_none());
+}
+
+#[test]
+fn peer_status_view_carries_render_capability_when_layered() {
+    use elohim_storage::{
+        build_peer_status_view, BundleEntry, RenderCapabilityProfile, RendererKind,
+    };
+    let row = elohim_storage::db::peer_statuses::PeerStatusRow {
+        peer_id: "peer-x".into(),
+        status: "online".into(),
+        general_pool_member: 1,
+        accepting_stewardship_reserves: 0,
+        archetype_class: Some("home-nuc".into()),
+        timestamp: 1_700_000_000_000_000,
+        dht_anchor_hash: "anchor-1".into(),
+        updated_at: 1_700_000_000_000_000,
+    };
+    let render_cap = RenderCapabilityProfile {
+        bundles: vec![BundleEntry {
+            name: "lamad-app".into(),
+            version: "1.0.3".into(),
+            renderer: RendererKind::AngularSsr,
+            digest: None,
+        }],
+        renderers: vec![RendererKind::AngularSsr],
+        auth_modes: vec!["anonymous".into()],
+        max_concurrent_renders: 4,
+        memory_budget_mib: None,
+    };
+    let view = build_peer_status_view(row, None, Some(&render_cap), None);
+    assert!(view.render_capability.is_some());
+    assert_eq!(view.render_capability.unwrap().bundles[0].name, "lamad-app");
+    assert!(view.extensions.is_none());
+}
+
+#[test]
+fn peer_status_view_renders_null_capability_when_unlayered() {
+    use elohim_storage::build_peer_status_view;
+    let row = elohim_storage::db::peer_statuses::PeerStatusRow {
+        peer_id: "peer-y".into(),
+        status: "online".into(),
+        general_pool_member: 1,
+        accepting_stewardship_reserves: 0,
+        archetype_class: None,
+        timestamp: 1_700_000_000_000_000,
+        dht_anchor_hash: "anchor-2".into(),
+        updated_at: 1_700_000_000_000_000,
+    };
+    let view = build_peer_status_view(row, None, None, None);
+    assert!(view.render_capability.is_none());
+    assert!(view.extensions.is_none());
+}
+
+// ---------------------------------------------------------------------------
+// Task 7: load_render_capability_from_url loader tests
+// ---------------------------------------------------------------------------
+//
+// These tests mutate `DOORWAY_CAPABILITY_URL`. cargo test runs tests in
+// parallel, so an unguarded set_var in one test can leak into env::var reads
+// in another (memory: feedback_env_var_test_flakiness). Serialize via a
+// single static Mutex around the env-var section of each test.
+
+static DOORWAY_CAP_ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+#[test]
+fn load_render_capability_from_url_returns_none_when_unset() {
+    let _g = DOORWAY_CAP_ENV_LOCK
+        .lock()
+        .unwrap_or_else(|e| e.into_inner());
+    std::env::remove_var("DOORWAY_CAPABILITY_URL");
+    let result = elohim_storage::load_render_capability_from_url_blocking();
+    assert!(result.is_none());
+}
+
+#[tokio::test]
+async fn load_render_capability_from_url_parses_valid_response() {
+    use wiremock::{matchers, Mock, MockServer, ResponseTemplate};
+    let server = MockServer::start().await;
+    let body = serde_json::json!({
+        "bundles": [{ "name": "lamad-app", "version": "1.0.3", "renderer": "angular-ssr" }],
+        "renderers": ["angular-ssr"],
+        "authModes": ["anonymous"],
+        "maxConcurrentRenders": 4
+    });
+    Mock::given(matchers::method("GET"))
+        .and(matchers::path("/admin/capability"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(body))
+        .mount(&server)
+        .await;
+    let _g = DOORWAY_CAP_ENV_LOCK
+        .lock()
+        .unwrap_or_else(|e| e.into_inner());
+    std::env::set_var(
+        "DOORWAY_CAPABILITY_URL",
+        format!("{}/admin/capability", server.uri()),
+    );
+    let result = elohim_storage::load_render_capability_from_url().await;
+    std::env::remove_var("DOORWAY_CAPABILITY_URL");
+    drop(_g);
+    assert!(result.is_some());
+    let profile = result.unwrap();
+    assert_eq!(profile.bundles.len(), 1);
+    assert_eq!(profile.bundles[0].name, "lamad-app");
+    assert!(profile.auth_modes.contains(&"anonymous".to_string()));
+}
+
+#[tokio::test]
+async fn load_render_capability_from_url_returns_none_on_5xx() {
+    use wiremock::{matchers, Mock, MockServer, ResponseTemplate};
+    let server = MockServer::start().await;
+    Mock::given(matchers::method("GET"))
+        .and(matchers::path("/admin/capability"))
+        .respond_with(ResponseTemplate::new(503))
+        .mount(&server)
+        .await;
+    let _g = DOORWAY_CAP_ENV_LOCK
+        .lock()
+        .unwrap_or_else(|e| e.into_inner());
+    std::env::set_var(
+        "DOORWAY_CAPABILITY_URL",
+        format!("{}/admin/capability", server.uri()),
+    );
+    let result = elohim_storage::load_render_capability_from_url().await;
+    std::env::remove_var("DOORWAY_CAPABILITY_URL");
+    drop(_g);
+    assert!(result.is_none());
+}
+
+#[tokio::test]
+async fn load_render_capability_from_url_returns_none_on_unparseable_body() {
+    use wiremock::{matchers, Mock, MockServer, ResponseTemplate};
+    let server = MockServer::start().await;
+    Mock::given(matchers::method("GET"))
+        .and(matchers::path("/admin/capability"))
+        .respond_with(ResponseTemplate::new(200).set_body_string("not json at all"))
+        .mount(&server)
+        .await;
+    let _g = DOORWAY_CAP_ENV_LOCK
+        .lock()
+        .unwrap_or_else(|e| e.into_inner());
+    std::env::set_var(
+        "DOORWAY_CAPABILITY_URL",
+        format!("{}/admin/capability", server.uri()),
+    );
+    let result = elohim_storage::load_render_capability_from_url().await;
+    std::env::remove_var("DOORWAY_CAPABILITY_URL");
+    drop(_g);
+    assert!(result.is_none());
 }

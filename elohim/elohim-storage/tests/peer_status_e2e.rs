@@ -211,7 +211,7 @@ fn sample_capability() -> ElohimCapabilityProfile {
 #[test]
 fn build_peer_status_view_with_capability() {
     let cap = sample_capability();
-    let view = build_peer_status_view(smoke_row(), Some(&cap));
+    let view = build_peer_status_view(smoke_row(), Some(&cap), None, None);
 
     assert_eq!(view.peer_id, "uhCAkSMOKE");
     assert_eq!(view.status, "online");
@@ -224,7 +224,7 @@ fn build_peer_status_view_with_capability() {
 /// `build_peer_status_view` with None leaves elohim_capability as None.
 #[test]
 fn build_peer_status_view_without_capability() {
-    let view = build_peer_status_view(smoke_row(), None);
+    let view = build_peer_status_view(smoke_row(), None, None, None);
     assert!(
         view.elohim_capability.is_none(),
         "no capability for storage/relay nodes"
@@ -301,7 +301,7 @@ fn capability_hydration_mirrors_app_state() {
 
     // AppState-with-capability path
     let state_capability: Option<ElohimCapabilityProfile> = Some(cap.clone());
-    let view_with = build_peer_status_view(smoke_row(), state_capability.as_ref());
+    let view_with = build_peer_status_view(smoke_row(), state_capability.as_ref(), None, None);
     assert!(view_with.elohim_capability.is_some());
     assert_eq!(
         view_with.elohim_capability.as_ref().unwrap().model_name,
@@ -310,6 +310,6 @@ fn capability_hydration_mirrors_app_state() {
 
     // AppState-without-capability path
     let state_none: Option<ElohimCapabilityProfile> = None;
-    let view_without = build_peer_status_view(smoke_row(), state_none.as_ref());
+    let view_without = build_peer_status_view(smoke_row(), state_none.as_ref(), None, None);
     assert!(view_without.elohim_capability.is_none());
 }

@@ -84,6 +84,9 @@ pub async fn handle_api_request(
     local_peer_id: Option<String>,
     fan_out_ctx: Option<Arc<crate::api::epr::EprFanOutCtx>>,
     p2p_handle: Option<crate::p2p::P2PHandle>,
+    elohim_capability: Option<crate::views::ElohimCapabilityProfile>,
+    render_capability: Option<crate::views::RenderCapabilityProfile>,
+    extensions: Option<crate::views::CapabilityExtensions>,
 ) -> Result<Response<Full<Bytes>>, StorageError> {
     // Strip /api/v1/ prefix
     let sub_path = path.strip_prefix("/api/v1/").unwrap_or("");
@@ -225,7 +228,17 @@ pub async fn handle_api_request(
         steward::handle(req, method, resource_path, &pool, &app_ctx).await
     } else if sub_path.starts_with("peer-statuses") {
         let resource_path = sub_path.strip_prefix("peer-statuses").unwrap_or("");
-        peer_statuses::handle(req, method, resource_path, &pool, &app_ctx).await
+        peer_statuses::handle(
+            req,
+            method,
+            resource_path,
+            &pool,
+            &app_ctx,
+            elohim_capability.as_ref(),
+            render_capability.as_ref(),
+            extensions.as_ref(),
+        )
+        .await
     } else if sub_path.starts_with("nodes") {
         let resource_path = sub_path.strip_prefix("nodes").unwrap_or("");
         node_shape::handle_nodes(req, method, resource_path, &pool, &app_ctx).await

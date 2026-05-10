@@ -219,6 +219,24 @@ pub struct AppState {
     /// every `ResolverFetcher` created during an SSR render. This avoids
     /// creating a new connection pool per request.
     pub ssr_http_client: Arc<reqwest::Client>,
+    /// Cached render-capability claim derived at startup.
+    ///
+    /// Served by `GET /admin/capability` so elohim-storage can pull the profile
+    /// when polling doorway peers (Task 7: `load_render_capability_from_url`).
+    ///
+    /// `None` means doorway has no SSR runtime configured or the deriver
+    /// returned `None` (e.g. `SSR_BUNDLES_DIR` unset, storage manifest
+    /// unreachable, or the bundles directory is empty).
+    pub render_capability: Option<crate::render::types::RenderCapabilityProfile>,
+
+    /// Concurrency limiter for SSR rendering. Sized to
+    /// `render_capability.max_concurrent_renders` at startup. The dispatch
+    /// arm calls `try_acquire_owned()`; on failure (limit reached) the
+    /// request returns a CSR-shell fallback with `x-ssr-skipped: overflow`
+    /// rather than queueing — fallback is always faster than waiting.
+    ///
+    /// `None` means no SSR claim was published, so no limiter needed.
+    pub render_semaphore: Option<Arc<tokio::sync::Semaphore>>,
 }
 
 /// Build the shared HTTP client used by SSR `ResolverFetcher` instances.
@@ -236,19 +254,34 @@ fn init_ssr_http_client() -> Arc<reqwest::Client> {
 /// Returns `Some(renderer)` if the env var is set and the bundle path exists.
 /// Returns `None` silently if the var is unset.
 /// Logs a warning and returns `None` if the path is set but the bundle fails to load.
+///
+/// The renderer is constructed with a `ResolverFetcher` pointing at
+/// `SSR_STORAGE_URL` (defaults to `http://localhost:8090`). Without a real
+/// fetcher, Angular SSR bootstrap hangs indefinitely waiting on HttpClient
+/// calls — that produced `x-ssr-error: render timed out` on every cold render.
 fn init_renderer() -> Option<Arc<dyn elohim_render::Renderer>> {
-    match std::env::var("SSR_BUNDLE_PATH") {
-        Ok(path) => match elohim_render::AngularRenderer::new(std::path::PathBuf::from(path)) {
-            Ok(r) => {
-                tracing::info!(target: "doorway::ssr", "SSR renderer ready");
-                Some(Arc::new(r) as Arc<dyn elohim_render::Renderer>)
-            }
-            Err(e) => {
-                tracing::warn!(target: "doorway::ssr", "SSR disabled: {}", e);
-                None
-            }
-        },
-        Err(_) => None,
+    let bundle_path = std::env::var("SSR_BUNDLE_PATH").ok()?;
+    let storage_url = std::env::var("SSR_STORAGE_URL")
+        .or_else(|_| std::env::var("STORAGE_URL"))
+        .unwrap_or_else(|_| "http://localhost:8090".to_string());
+    let fetcher: Arc<dyn elohim_render::DataFetcher> = Arc::new(crate::ssr::ResolverFetcher::new(
+        Arc::new(reqwest::Client::new()),
+        storage_url.clone(),
+    ));
+    match elohim_render::AngularRenderer::new(std::path::PathBuf::from(&bundle_path), fetcher) {
+        Ok(r) => {
+            tracing::info!(
+                target: "doorway::ssr",
+                bundle = %bundle_path,
+                storage = %storage_url,
+                "SSR renderer ready"
+            );
+            Some(Arc::new(r) as Arc<dyn elohim_render::Renderer>)
+        }
+        Err(e) => {
+            tracing::warn!(target: "doorway::ssr", "SSR disabled: {}", e);
+            None
+        }
     }
 }
 
@@ -334,6 +367,8 @@ impl AppState {
             warmup_state: None,
             renderer: init_renderer(),
             ssr_http_client: init_ssr_http_client(),
+            render_capability: None,
+            render_semaphore: None,
         }
     }
 
@@ -422,6 +457,8 @@ impl AppState {
             warmup_state: None,
             renderer: init_renderer(),
             ssr_http_client: init_ssr_http_client(),
+            render_capability: None,
+            render_semaphore: None,
         }
     }
 
@@ -525,6 +562,8 @@ impl AppState {
             warmup_state: None,
             renderer: init_renderer(),
             ssr_http_client: init_ssr_http_client(),
+            render_capability: None,
+            render_semaphore: None,
         }
     }
 
@@ -631,6 +670,8 @@ impl AppState {
             warmup_state: None,
             renderer: init_renderer(),
             ssr_http_client: init_ssr_http_client(),
+            render_capability: None,
+            render_semaphore: None,
         })
     }
 
@@ -687,6 +728,80 @@ impl AppState {
 /// enforcement lands, doorway will resolve `human_id → agent_cid` once at user
 /// creation, persist on UserDoc, and source from there. The wire shape
 /// (`X-Agent-Cid` header) does not change.
+/// Auth posture of an incoming request — what kind of session backs it
+/// (or `Anonymous` if unauthenticated). Mirrors the protocol's `authModes`
+/// enum exactly so the auth-mode check is a direct membership test against
+/// `RenderCapabilityProfile.auth_modes`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AuthPosture {
+    Anonymous,
+    DoorwayHosted,
+    StewardPresence,
+}
+
+impl AuthPosture {
+    /// Wire-shape string matching the protocol enum.
+    pub fn as_claim_str(&self) -> &'static str {
+        match self {
+            AuthPosture::Anonymous => "anonymous",
+            AuthPosture::DoorwayHosted => "doorway-hosted",
+            AuthPosture::StewardPresence => "steward-presence",
+        }
+    }
+}
+
+/// Determine an incoming request's auth posture from its headers.
+/// Authorization (Bearer / API key) → `DoorwayHosted` (the protocol JWT
+/// flow today). Cookie containing `steward_attestation=` → `StewardPresence`
+/// (forward-compat for M5 auth-portal-convergence). Cookie containing
+/// `doorway_session=` → `DoorwayHosted`. Anything else → `Anonymous`.
+pub fn determine_auth_posture<B>(req: &Request<B>) -> AuthPosture {
+    if req.headers().get(hyper::header::AUTHORIZATION).is_some() {
+        return AuthPosture::DoorwayHosted;
+    }
+    if let Some(cookie) = req.headers().get(hyper::header::COOKIE) {
+        if let Ok(s) = cookie.to_str() {
+            if s.contains("steward_attestation=") {
+                return AuthPosture::StewardPresence;
+            }
+            if s.contains("doorway_session=") {
+                return AuthPosture::DoorwayHosted;
+            }
+        }
+    }
+    AuthPosture::Anonymous
+}
+
+/// Build a `UserCredential` for the V8 SSR fetch shim from the originating
+/// HTTP request's headers. Returns None for anonymous requests.
+///
+/// Order: Authorization header (Bearer / API key) wins; falls back to a
+/// Cookie header containing a known doorway-session marker.
+/// `steward_attestation=` is also recognised as a forward-compat hook for
+/// the M5 auth-portal-convergence sprint; today the session layer doesn't
+/// produce that cookie shape but the shim is wire-ready.
+fn build_ssr_user_credential<B>(req: &Request<B>) -> Option<crate::ssr::UserCredential> {
+    if let Some(auth) = req.headers().get(hyper::header::AUTHORIZATION) {
+        if let Ok(value) = auth.to_str() {
+            return Some(crate::ssr::UserCredential {
+                header_name: "Authorization".into(),
+                header_value: value.into(),
+            });
+        }
+    }
+    if let Some(cookie) = req.headers().get(hyper::header::COOKIE) {
+        if let Ok(value) = cookie.to_str() {
+            if value.contains("doorway_session=") || value.contains("steward_attestation=") {
+                return Some(crate::ssr::UserCredential {
+                    header_name: "Cookie".into(),
+                    header_value: value.into(),
+                });
+            }
+        }
+    }
+    None
+}
+
 fn resolve_agent_cid_from_request<B>(state: &AppState, req: &Request<B>) -> Option<String> {
     let auth_header = req
         .headers()
@@ -1195,6 +1310,12 @@ async fn handle_request(
             to_boxed(routes::handle_capabilities(Arc::clone(&state)).await)
         }
 
+        // Render capability profile — SSR bundle inventory + renderer kinds derived at startup.
+        // No auth required: storage peers pull this to discover SSR availability.
+        (Method::GET, "/admin/capability") => {
+            to_boxed(routes::handle_admin_capability(Arc::clone(&state)).await)
+        }
+
         // Conductor pool visibility (available on ALL instances)
         (Method::GET, "/admin/conductors") => {
             to_boxed(routes::handle_list_conductors(Arc::clone(&state)).await)
@@ -1640,6 +1761,58 @@ async fn handle_request(
             match dispo {
                 Disposition::SsrRoute { spec, endpoint } => {
                     // Manifest-driven SSR dispatch (Task 13).
+                    //
+                    // Auth-mode enforcement: if the doorway publishes a
+                    // render_capability claim and the request's posture isn't
+                    // in the claim's auth_modes, fall back to the CSR shell
+                    // with x-ssr-skipped: auth-mode-not-supported. Eliminates
+                    // the audit's anonymous-render-of-authenticated-content
+                    // failure mode at the dispatch boundary.
+                    if let Some(claim) = state.render_capability.as_ref() {
+                        let posture = determine_auth_posture(&req);
+                        if !claim
+                            .auth_modes
+                            .iter()
+                            .any(|m| m == posture.as_claim_str())
+                        {
+                            tracing::info!(
+                                target: "doorway::ssr",
+                                path = %p,
+                                posture = %posture.as_claim_str(),
+                                claim_modes = ?claim.auth_modes,
+                                "auth mode not in claim — falling back to CSR shell"
+                            );
+                            return Ok(to_boxed(ssr_spa_shell_fallback_with_skip_reason(
+                                Some("auth-mode-not-supported"),
+                            )));
+                        }
+                    }
+
+                    // Concurrency limiter (Task 19): bound the number of
+                    // simultaneous V8 renders by render_capability.max_
+                    // concurrent_renders. Overflow returns CSR shell with
+                    // x-ssr-skipped: overflow. No queueing — fallback is
+                    // always faster than waiting.
+                    let _render_permit = match state.render_semaphore.as_ref() {
+                        Some(sem) => match Arc::clone(sem).try_acquire_owned() {
+                            Ok(p) => Some(p),
+                            Err(_) => {
+                                tracing::info!(
+                                    target: "doorway::ssr",
+                                    path = %p,
+                                    available = sem.available_permits(),
+                                    "render semaphore at limit — falling back to CSR shell"
+                                );
+                                return Ok(to_boxed(
+                                    ssr_spa_shell_fallback_with_skip_reason(Some("overflow")),
+                                ));
+                            }
+                        },
+                        // No claim → no limiter; renderer absence is handled
+                        // by the inner `if let Some(renderer)` branch below.
+                        None => None,
+                    };
+
                     if let Some(renderer) = state.renderer.as_ref() {
                         let render_spec = match elohim_render::RenderSpec::parse(&spec) {
                             Ok(s) => s,
@@ -1683,31 +1856,43 @@ async fn handle_request(
                                 path = %p,
                                 "SSR cache HIT"
                             );
-                            return Ok(to_boxed(ssr_html_response_with_cache_status(
+                            return Ok(to_boxed(ssr_html_response_with_observability(
                                 cached_html,
                                 "HIT",
+                                state.render_capability.as_ref(),
                             )));
                         }
 
-                        let fetcher: Arc<dyn elohim_render::DataFetcher> =
-                            Arc::new(crate::ssr::ResolverFetcher::new(
+                        // Build the originating user's credential for the V8
+                        // fetch shim (anonymous → None, no header forwarded).
+                        // Anonymous-render-of-authenticated-content is the
+                        // failure mode flagged in the SSR audit; this thread
+                        // forwards the user's session header to outbound
+                        // storage fetches so reach-aware content renders for
+                        // logged-in users instead of falling back to public.
+                        let user_credential = build_ssr_user_credential(&req);
+
+                        let fetcher: Arc<dyn elohim_render::DataFetcher> = Arc::new(
+                            crate::ssr::ResolverFetcher::new(
                                 Arc::clone(&state.ssr_http_client),
                                 endpoint.clone(),
-                            ));
+                            )
+                            .maybe_with_user_credential(user_credential),
+                        );
                         // Default RenderLimits.wall_time_ms is 2_000ms — too tight
-                        // for the cold-start path where V8 has to parse + interpret
-                        // a 51MB bundle (171 .mjs files, main.server.mjs ~484KB)
-                        // and walk Angular's bootstrap. Production saw
-                        // x-ssr-error="render timed out after 2000ms" on every
-                        // first request after a pod rollout. 15s is generous for
-                        // cold-start; warm renders complete in tens of ms once
-                        // deno_core's module loader has cached the imports.
+                        // for cold-start where V8 parses + interprets a 51MB bundle
+                        // (171 .mjs files, main.server.mjs ~484KB), walks Angular's
+                        // bootstrap (which makes HTTP fetches), and renders. 15s
+                        // wasn't enough either when fetch was wired (Angular awaits
+                        // ConfigService etc. on first call). 60s is generous for
+                        // cold start; warm renders are tens of ms once deno_core's
+                        // module loader caches imports + V8 JIT settles.
                         let ctx = elohim_render::RenderContext {
                             spec: render_spec,
                             url: url.clone(),
                             data_fetcher: fetcher,
                             limits: elohim_render::RenderLimits {
-                                wall_time_ms: 15_000,
+                                wall_time_ms: 60_000,
                                 ..Default::default()
                             },
                         };
@@ -1723,7 +1908,11 @@ async fn handle_request(
                                     out.html.clone(),
                                     std::time::Duration::from_secs(5 * 60),
                                 );
-                                ssr_html_response_with_cache_status(out.html, "MISS")
+                                ssr_html_response_with_observability(
+                                    out.html,
+                                    "MISS",
+                                    state.render_capability.as_ref(),
+                                )
                             }
                             Err(e) => {
                                 let err_str = format!("{e}");
@@ -2117,27 +2306,47 @@ fn bad_request_response(message: &str) -> Response<Full<Bytes>> {
 
 // ─── SSR helpers ──────────────────────────────────────────────────────────────
 
-/// Build a `text/html` SSR response with an `x-render-cache` header.
+/// SSR success response with the observability header contract:
+/// - x-render-cache: MISS / HIT (existing)
+/// - x-ssr-rendered: 1 (always on success)
+/// - x-ssr-renderer: e.g. "angular-ssr" (when capability is present)
+/// - x-ssr-bundle-version: e.g. "lamad-app@1.0.3" (when capability is present)
 ///
-/// `cache_status` is either `"HIT"` (served from render-result cache) or
-/// `"MISS"` (freshly rendered by the in-process renderer). The header lets
-/// callers verify cache behaviour without inspecting response bodies.
-fn ssr_html_response_with_cache_status(html: String, cache_status: &str) -> Response<Full<Bytes>> {
-    Response::builder()
+/// `capability` is the doorway's published RenderCapabilityProfile (None
+/// when the doorway hasn't derived one — typical for ssr-without-claim
+/// deployments). When None, only x-render-cache and x-ssr-rendered are
+/// emitted; bundle/renderer headers are omitted rather than guessed.
+fn ssr_html_response_with_observability(
+    html: String,
+    cache_status: &str,
+    capability: Option<&crate::render::types::RenderCapabilityProfile>,
+) -> Response<Full<Bytes>> {
+    let mut builder = Response::builder()
         .status(StatusCode::OK)
         .header("content-type", "text/html; charset=utf-8")
         .header("cache-control", "no-store")
         .header("x-render-cache", cache_status)
-        .body(Full::new(Bytes::from(html)))
-        .unwrap()
-}
-
-/// Minimal SPA shell returned when SSR is unavailable or the renderer errors.
-///
-/// The shell contains an `<app-root>` placeholder so the Angular CSR bundle
-/// can hydrate the page without a full server-rendered document.
-fn ssr_spa_shell_fallback() -> Response<Full<Bytes>> {
-    ssr_spa_shell_fallback_with_error("")
+        .header("x-ssr-rendered", "1");
+    if let Some(claim) = capability {
+        if let Some(bundle) = claim.bundles.first() {
+            builder = builder.header(
+                "x-ssr-bundle-version",
+                format!("{}@{}", bundle.name, bundle.version),
+            );
+            // The renderer's serialized wire-shape is the kebab-case enum
+            // value, the same string that appears in storage's manifest.
+            let renderer_str = match bundle.renderer {
+                crate::render::types::RendererKind::AngularSsr => "angular-ssr",
+                crate::render::types::RendererKind::ReactRsc => "react-rsc",
+                crate::render::types::RendererKind::VueSsr => "vue-ssr",
+                crate::render::types::RendererKind::SvelteSsr => "svelte-ssr",
+                crate::render::types::RendererKind::LitSsr => "lit-ssr",
+                crate::render::types::RendererKind::StaticHtml => "static-html",
+            };
+            builder = builder.header("x-ssr-renderer", renderer_str);
+        }
+    }
+    builder.body(Full::new(Bytes::from(html))).unwrap()
 }
 
 /// SPA shell fallback that surfaces the render error in an `x-ssr-error`
@@ -2146,16 +2355,7 @@ fn ssr_spa_shell_fallback() -> Response<Full<Bytes>> {
 /// Header values must be ASCII-printable; we sanitize CR/LF/non-ASCII to `?`
 /// so a panic message containing newlines doesn't trip hyper's validation.
 fn ssr_spa_shell_fallback_with_error(err: &str) -> Response<Full<Bytes>> {
-    const SHELL: &str = concat!(
-        "<!doctype html><html><body>",
-        "<app-root></app-root>",
-        "<script>console.log('SSR fallback \u{2014} CSR will hydrate')</script>",
-        "</body></html>",
-    );
-    let mut builder = Response::builder()
-        .status(StatusCode::OK)
-        .header("Content-Type", "text/html; charset=utf-8")
-        .header("Cache-Control", "no-store");
+    let mut resp = ssr_spa_shell_fallback_with_skip_reason(None);
     if !err.is_empty() {
         let sanitized: String = err
             .chars()
@@ -2168,12 +2368,119 @@ fn ssr_spa_shell_fallback_with_error(err: &str) -> Response<Full<Bytes>> {
             })
             .take(512)
             .collect();
-        builder = builder.header("x-ssr-error", sanitized);
+        if let Ok(value) = hyper::header::HeaderValue::from_str(&sanitized) {
+            resp.headers_mut().insert("x-ssr-error", value);
+        }
+    }
+    resp
+}
+
+/// SPA shell fallback that records WHY SSR was skipped. Returned when:
+/// - SSR-eligible route but the doorway's auth_modes don't include the
+///   request's posture (`auth-mode-not-supported`)
+/// - Concurrency limit reached (`overflow`)
+/// - Renderer absent for a route that requires SSR (`bundle-not-loaded`)
+///
+/// `skip_reason: None` is the generic fallback (no `x-ssr-skipped` header,
+/// just the SPA shell + `x-ssr-rendered: 0`).
+fn ssr_spa_shell_fallback_with_skip_reason(skip_reason: Option<&str>) -> Response<Full<Bytes>> {
+    const SHELL: &str = concat!(
+        "<!doctype html><html><body>",
+        "<app-root></app-root>",
+        "<script>console.log('SSR fallback \u{2014} CSR will hydrate')</script>",
+        "</body></html>",
+    );
+    let mut builder = Response::builder()
+        .status(StatusCode::OK)
+        .header("Content-Type", "text/html; charset=utf-8")
+        .header("Cache-Control", "no-store")
+        .header("x-ssr-rendered", "0");
+    if let Some(reason) = skip_reason {
+        builder = builder.header("x-ssr-skipped", reason);
     }
     builder.body(Full::new(Bytes::from(SHELL))).unwrap()
 }
 
 // ─── Gate layer tests ─────────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod ssr_session_tests {
+    use super::*;
+    use hyper::header::{HeaderValue, AUTHORIZATION, COOKIE};
+
+    fn req_with_headers(headers: &[(&str, &str)]) -> Request<Bytes> {
+        let mut builder = Request::builder().uri("/lamad/concept/abc");
+        for (k, v) in headers {
+            builder = builder.header(*k, *v);
+        }
+        builder.body(Bytes::new()).unwrap()
+    }
+
+    #[test]
+    fn anonymous_request_returns_none() {
+        let req = req_with_headers(&[]);
+        assert!(build_ssr_user_credential(&req).is_none());
+    }
+
+    #[test]
+    fn authorization_bearer_is_forwarded() {
+        let req = req_with_headers(&[("authorization", "Bearer token-xyz")]);
+        let cred = build_ssr_user_credential(&req).expect("some");
+        assert_eq!(cred.header_name, "Authorization");
+        assert_eq!(cred.header_value, "Bearer token-xyz");
+    }
+
+    #[test]
+    fn doorway_session_cookie_is_forwarded() {
+        let req = req_with_headers(&[("cookie", "doorway_session=abc; theme=dark")]);
+        let cred = build_ssr_user_credential(&req).expect("some");
+        assert_eq!(cred.header_name, "Cookie");
+        assert!(cred.header_value.contains("doorway_session=abc"));
+    }
+
+    #[test]
+    fn steward_attestation_cookie_is_forwarded() {
+        let req = req_with_headers(&[("cookie", "steward_attestation=xyz; locale=en")]);
+        let cred = build_ssr_user_credential(&req).expect("some");
+        assert_eq!(cred.header_name, "Cookie");
+        assert!(cred.header_value.contains("steward_attestation=xyz"));
+    }
+
+    #[test]
+    fn unknown_cookies_are_not_forwarded() {
+        let req = req_with_headers(&[("cookie", "theme=dark; locale=en")]);
+        assert!(build_ssr_user_credential(&req).is_none());
+    }
+
+    #[test]
+    fn authorization_takes_precedence_over_cookie() {
+        let req = req_with_headers(&[
+            ("authorization", "Bearer t"),
+            ("cookie", "doorway_session=abc"),
+        ]);
+        let cred = build_ssr_user_credential(&req).expect("some");
+        assert_eq!(cred.header_name, "Authorization");
+    }
+
+    #[test]
+    fn non_utf8_authorization_falls_through() {
+        // Bytes that don't form valid UTF-8 — to_str() returns Err
+        let mut req = req_with_headers(&[]);
+        req.headers_mut().insert(
+            AUTHORIZATION,
+            HeaderValue::from_bytes(&[0xFF, 0xFE, 0xFD]).unwrap(),
+        );
+        assert!(build_ssr_user_credential(&req).is_none());
+    }
+
+    #[test]
+    fn non_utf8_cookie_falls_through() {
+        let mut req = req_with_headers(&[]);
+        req.headers_mut()
+            .insert(COOKIE, HeaderValue::from_bytes(&[0xFF, 0xFE]).unwrap());
+        assert!(build_ssr_user_credential(&req).is_none());
+    }
+}
 
 #[cfg(test)]
 mod gate_layer_tests {

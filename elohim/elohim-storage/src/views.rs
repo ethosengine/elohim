@@ -6301,6 +6301,58 @@ impl ElohimReputationProfileView {
 
 use crate::db::peer_statuses::PeerStatusRow;
 
+/// Renderer kind a bundle targets. Mirrors `enums/renderer-kind.schema.json`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "kebab-case")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub enum RendererKind {
+    AngularSsr,
+    ReactRsc,
+    VueSsr,
+    SvelteSsr,
+    LitSsr,
+    StaticHtml,
+}
+
+/// One bundle a doorway carries (mirrors `bundles[]` items in the profile schema).
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct BundleEntry {
+    pub name: String,
+    pub version: String,
+    pub renderer: RendererKind,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub digest: Option<String>,
+}
+
+/// Tier-1 render capability profile. View-layer Category C operational state,
+/// layered into PeerStatusView post-construction. NOT a DHT entry.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct RenderCapabilityProfile {
+    pub bundles: Vec<BundleEntry>,
+    pub renderers: Vec<RendererKind>,
+    pub auth_modes: Vec<String>,
+    pub max_concurrent_renders: u32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub memory_budget_mib: Option<u32>,
+}
+
+/// Tier-2 extension capability claim (one entry in the extensions map).
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct CapabilityExtensionEntry {
+    pub schema_ref: String,
+    pub profile: JsonVal,
+}
+
+/// Tier-2 extensions map. Keys are kebab-case capability names registered in
+/// the capability registry. Validation checks shape only; consumers interpret content.
+pub type CapabilityExtensions = std::collections::BTreeMap<String, CapabilityExtensionEntry>;
+
 /// Advertised model-level capabilities of an elohim-agent running at this peer.
 ///
 /// Wire format: `elohim/sdk/schemas/v1/views/elohim-capability-profile.schema.json`
@@ -6365,6 +6417,13 @@ pub struct PeerStatusView {
     /// Model-level capabilities if an elohim-agent runs at this peer. None for pure storage/relay nodes.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub elohim_capability: Option<ElohimCapabilityProfile>,
+    /// Render capability profile if a doorway co-located with this peer can SSR.
+    /// Layered post-construction via build_peer_status_view; NOT in DHT entry.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub render_capability: Option<RenderCapabilityProfile>,
+    /// Tier-2 extension capabilities. Layered post-construction.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub extensions: Option<CapabilityExtensions>,
 }
 
 impl From<PeerStatusRow> for PeerStatusView {
@@ -6379,6 +6438,8 @@ impl From<PeerStatusRow> for PeerStatusView {
             dht_anchor_hash: row.dht_anchor_hash,
             updated_at: row.updated_at.to_string(),
             elohim_capability: None, // Layered post-construction via build_peer_status_view()
+            render_capability: None, // Layered post-construction via build_peer_status_view()
+            extensions: None,        // Layered post-construction via build_peer_status_view()
         }
     }
 }
@@ -6392,10 +6453,14 @@ impl From<PeerStatusRow> for PeerStatusView {
 /// Use this instead of `PeerStatusView::from(row)` in handlers and tests.
 pub fn build_peer_status_view(
     row: PeerStatusRow,
-    capability: Option<&ElohimCapabilityProfile>,
+    elohim_capability: Option<&ElohimCapabilityProfile>,
+    render_capability: Option<&RenderCapabilityProfile>,
+    extensions: Option<&CapabilityExtensions>,
 ) -> PeerStatusView {
     let mut view = PeerStatusView::from(row);
-    view.elohim_capability = capability.cloned();
+    view.elohim_capability = elohim_capability.cloned();
+    view.render_capability = render_capability.cloned();
+    view.extensions = extensions.cloned();
     view
 }
 
@@ -6433,6 +6498,67 @@ pub fn load_elohim_capability_from_env() -> Option<ElohimCapabilityProfile> {
             None
         }
     }
+}
+
+/// Load the render capability profile from a doorway's `/admin/capability` HTTP endpoint.
+///
+/// Uses the URL in `DOORWAY_CAPABILITY_URL`. Returns `None` (honest degradation) when:
+/// - The env var is unset
+/// - The URL is unreachable
+/// - The response is non-2xx
+/// - The body fails to parse as `RenderCapabilityProfile`
+pub async fn load_render_capability_from_url() -> Option<RenderCapabilityProfile> {
+    let url = std::env::var("DOORWAY_CAPABILITY_URL").ok()?;
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(5))
+        .build()
+        .ok()?;
+    let resp = match client.get(&url).send().await {
+        Ok(r) => r,
+        Err(e) => {
+            tracing::warn!(
+                url = %url,
+                error = %e,
+                "DOORWAY_CAPABILITY_URL unreachable — render_capability will be None"
+            );
+            return None;
+        }
+    };
+    if !resp.status().is_success() {
+        tracing::warn!(
+            url = %url,
+            status = %resp.status(),
+            "DOORWAY_CAPABILITY_URL returned non-success — render_capability will be None"
+        );
+        return None;
+    }
+    let bytes = resp.bytes().await.ok()?;
+    match serde_json::from_slice::<RenderCapabilityProfile>(&bytes) {
+        Ok(profile) => Some(profile),
+        Err(e) => {
+            tracing::warn!(
+                url = %url,
+                error = %e,
+                "DOORWAY_CAPABILITY_URL response did not parse as RenderCapabilityProfile"
+            );
+            None
+        }
+    }
+}
+
+/// Synchronous wrapper for tests / non-async startup paths.
+///
+/// Returns `None` immediately if `DOORWAY_CAPABILITY_URL` is unset (avoiding
+/// runtime startup overhead).
+pub fn load_render_capability_from_url_blocking() -> Option<RenderCapabilityProfile> {
+    if std::env::var("DOORWAY_CAPABILITY_URL").is_err() {
+        return None;
+    }
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .ok()?;
+    rt.block_on(load_render_capability_from_url())
 }
 
 /// Committed hardware resources declared by a node in its NodeRegistration DHT entry.

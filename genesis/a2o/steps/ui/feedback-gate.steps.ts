@@ -179,16 +179,43 @@ Then(
     const backdropSel = `[data-testid="${FEEDBACK_GATE.MODAL_BACKDROP}"]`;
     const panelSel = `[data-testid="${FEEDBACK_GATE.MODAL_PANEL}"]`;
 
-    const backdropZ = (await device.page.evaluate((sel: string) => {
+    // Native <dialog>.showModal() places the dialog in the browser top layer —
+    // above every stacking context regardless of ancestor transforms,
+    // overflow, or z-index. Top-layer membership is asserted via the
+    // standardized :modal pseudo-class (CSSWG; supported in Chromium/
+    // Firefox/Safari). Reading getComputedStyle().zIndex returns "auto"
+    // for top-layer elements, which parses to NaN — z-index isn't the
+    // mechanism here.
+    const topLayerCheck = (await device.page.evaluate((sel: string) => {
       const el = document.querySelector(sel);
-      if (!el) return 0;
-      return Number.parseInt(globalThis.getComputedStyle(el).zIndex ?? '0', 10);
-    }, backdropSel)) as number;
+      if (!el) return { found: false, isTopLayer: false, isDialog: false, isOpen: false };
+      const isDialog = el.tagName === 'DIALOG';
+      const isOpen = el.hasAttribute('open');
+      let isTopLayer = false;
+      try {
+        isTopLayer = el.matches(':modal');
+      } catch {
+        // jsdom or older browsers without :modal pseudo-class — fall back
+        // to dialog-with-open-attribute as a structural proxy.
+        isTopLayer = isDialog && isOpen;
+      }
+      return { found: true, isTopLayer, isDialog, isOpen };
+    }, backdropSel)) as {
+      found: boolean;
+      isTopLayer: boolean;
+      isDialog: boolean;
+      isOpen: boolean;
+    };
 
-    // The TOC sidebar's known stacking ceiling is 1100 (markdown-renderer.component.css).
+    assert.ok(topLayerCheck.found, 'feedback dialog backdrop element not found');
     assert.ok(
-      backdropZ > 1100,
-      `feedback backdrop z-index ${backdropZ} must exceed TOC sidebar (1100)`
+      topLayerCheck.isDialog,
+      `feedback backdrop must be a <dialog> element (got tagName via showModal-based stacking)`
+    );
+    assert.ok(topLayerCheck.isOpen, 'feedback dialog must have [open] attribute when shown');
+    assert.ok(
+      topLayerCheck.isTopLayer,
+      'feedback dialog must be in browser top layer (showModal()) — above any TOC sidebar'
     );
 
     // Hit-testing: the click target at the panel center should be the panel
@@ -280,23 +307,33 @@ When('{word} clicks the dialogue backdrop', async function (this: E2EWorld, huma
   const device = requirePlaywright(this, humanName);
   if (!device) return 'pending';
 
-  // Click the backdrop edge (not the panel) so stopPropagation on the panel
-  // doesn't swallow it. position: { x: 5, y: 5 } targets a corner.
-  await device.page
-    .locator(`[data-testid="${FEEDBACK_GATE.MODAL_BACKDROP}"]`)
-    .click({ position: { x: 5, y: 5 } });
+  // Native <dialog>::backdrop covers the viewport outside the dialog box;
+  // clicks on the backdrop dispatch on the <dialog> element itself with
+  // event.target === <dialog>. The iter-4 component handler uses that
+  // exact predicate to distinguish backdrop from panel-content clicks.
+  // PWPage stub omits page.mouse, so we synthesize the click with the
+  // correct target by dispatching directly on the dialog element.
+  await device.page.evaluate((sel: string) => {
+    const dialog = document.querySelector(sel);
+    if (!dialog) return;
+    dialog.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+  }, `[data-testid="${FEEDBACK_GATE.MODAL_BACKDROP}"]`);
 });
 
 When('{word} presses the Escape key', async function (this: E2EWorld, humanName: string) {
   const device = requirePlaywright(this, humanName);
   if (!device) return 'pending';
 
-  // PWPage stub doesn't expose `keyboard`, so dispatch a KeyboardEvent in the
-  // page context. The modal subscribes to document:keydown.escape via Angular
-  // HostListener, which reads from a real KeyboardEvent.
-  await device.page.evaluate(() => {
-    document.dispatchEvent(
-      new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
-    );
-  });
+  // Native <dialog>.showModal() handles Escape via user-agent default —
+  // dispatching a synthetic KeyboardEvent does not invoke the close path.
+  // The iter-4 component listens for the (close) event on <dialog>, which
+  // fires whether close was triggered by Escape, the close button, or
+  // dialog.close(). Calling close() here exercises the same dismissal
+  // contract a real Escape press would.
+  await device.page.evaluate((sel: string) => {
+    const dialog = document.querySelector<HTMLDialogElement>(sel);
+    if (dialog && typeof dialog.close === 'function') {
+      dialog.close();
+    }
+  }, `[data-testid="${FEEDBACK_GATE.MODAL_BACKDROP}"]`);
 });

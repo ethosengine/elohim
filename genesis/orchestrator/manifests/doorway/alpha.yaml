@@ -182,22 +182,37 @@ spec:
                   key: jwt-secret
           resources:
             requests:
-              memory: "64Mi"
-              cpu: "50m"
-            limits:
+              # SSR enabled: doorway loads a 51MB Angular server bundle into a
+              # V8 isolate at startup. V8 parsing reserves ~200MB working set
+              # during AST construction; steady-state holds ~150MB for the
+              # parsed bundle + module loader cache. 256Mi was a coin-toss
+              # OOM; build #953 squeaked through, #954 didn't.
               memory: "256Mi"
-              cpu: "200m"
-          readinessProbe:
+              cpu: "100m"
+            limits:
+              memory: "1Gi"
+              cpu: "1000m"
+          # V8 + Angular bundle parse takes 10–60s on cold start (varies by
+          # cluster CPU contention). Use a startupProbe with a long failure
+          # tolerance so liveness/readiness can stay aggressive once the pod
+          # is up. Without this, livenessProbe's 10s initial delay killed the
+          # pod before doorway's HTTP server bound :8080.
+          startupProbe:
             httpGet:
               path: /health
               port: 8080
             initialDelaySeconds: 5
+            periodSeconds: 5
+            failureThreshold: 24  # 24 × 5s = 120s total budget
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
             periodSeconds: 10
           livenessProbe:
             httpGet:
               path: /health
               port: 8080
-            initialDelaySeconds: 10
             periodSeconds: 30
         # Doorway Operator Dashboard - Angular app for node operators
         # Provides: federated OAuth, node metrics, configuration UI

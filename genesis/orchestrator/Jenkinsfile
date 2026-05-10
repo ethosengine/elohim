@@ -635,7 +635,8 @@ def triggerPipeline(String name, String branch, boolean wait = true) {
             unstable: result.result == 'UNSTABLE',
             result: result.result,
             duration: result.duration,
-            url: result.absoluteUrl
+            url: result.absoluteUrl,
+            buildNumber: result.number
         ]
     } catch (Exception e) {
         return [
@@ -644,6 +645,442 @@ def triggerPipeline(String name, String branch, boolean wait = true) {
             error: e.message
         ]
     }
+}
+
+/**
+ * Auto-mode analyzer — load baselines, analyze changesets, apply
+ * commit-tag overrides, propagate dependencies, auto-include genesis.
+ * Extracted from Determine Build Plan to keep its script {} body
+ * under the 64KB CPS method size limit.
+ *
+ * Side effects: sets env.PIPELINE_BASELINES, env.CHANGED_FILES_COUNT,
+ * env.ANALYSIS_JSON; logs decision matrix output.
+ *
+ * @return Map [pipelines, analysis, changedFiles]
+ */
+def autoModeAnalyze() {
+    def pipelineBaselines = [:]
+    if (!(params.FORCE_COMMIT?.trim())) {
+        pipelineBaselines = loadPipelineBaselines()
+    }
+
+    echo "🔍 Analyzing changesets since last build..."
+    def changedFiles = analyzeChangeset(pipelineBaselines['__global__'])
+
+    if (!pipelineBaselines && changedFiles.size() > 50) {
+        echo "⚠️ Large changeset (${changedFiles.size()} files) with no per-pipeline baselines"
+        echo "   Building all matching pipelines (baselines will be saved after this run)"
+    }
+
+    def analysis = analyzePipelineRequirements(changedFiles, pipelineBaselines)
+    env.PIPELINE_BASELINES = writeJSON(returnText: true, json: pipelineBaselines)
+    env.CHANGED_FILES_COUNT = changedFiles.size().toString()
+    env.ANALYSIS_JSON = writeJSON(returnText: true, json: analysis)
+
+    // Group changed files by top-level area for the decision-matrix log.
+    def filesByArea = [:]
+    changedFiles.each { file ->
+        def area = file.split('/')[0]
+        if (!filesByArea[area]) filesByArea[area] = []
+        filesByArea[area].add(file)
+    }
+    echo "📁 Changed Files (${changedFiles.size()} total):"
+    filesByArea.each { area, files ->
+        echo "   ${area}/ (${files.size()} files)"
+        files.take(3).each { echo "      └─ ${it}" }
+        if (files.size() > 3) echo "      └─ ... and ${files.size() - 3} more"
+    }
+
+    def pipelines = analysis.findAll { name, info -> info.shouldRun }.keySet().toList()
+
+    // [build:*] commit-tag overrides
+    if (env.FORCE_BUILD_PIPELINES) {
+        env.FORCE_BUILD_PIPELINES.split(',').each { name ->
+            if (!pipelines.contains(name) && PIPELINES[name]) {
+                pipelines.add(name)
+                analysis[name].shouldRun = true
+                analysis[name].matchedPatterns.add('commit-tag:[build:*]')
+            }
+        }
+    }
+
+    pipelines = propagateDependencies(pipelines, analysis)
+
+    // Genesis auto-include for dev branches when any triggering pipeline builds
+    if (!pipelines.contains('elohim-genesis') && !params.SKIP_GENESIS) {
+        def isDevBranch = env.BRANCH_NAME == 'dev' || env.BRANCH_NAME ==~ /dev-.+|feat-.+|claude\/.+/
+        def triggeringPipeline = pipelines.find { PIPELINES[it]?.triggersGenesis }
+        if (triggeringPipeline && isDevBranch) {
+            pipelines.add('elohim-genesis')
+            analysis['elohim-genesis'].shouldRun = true
+            analysis['elohim-genesis'].matchedPatterns.add("triggered-by:${triggeringPipeline}")
+        }
+    }
+
+    return [pipelines: pipelines, analysis: analysis, changedFiles: changedFiles]
+}
+
+/**
+ * Manual-mode analyzer — emit fixed pipeline lists for explicit operator
+ * mode params, plus a synthetic analysis Map for the decision matrix
+ * display. Extracted from Determine Build Plan to keep script {} body
+ * under the 64KB CPS limit.
+ *
+ * @return Map [pipelines, analysis]
+ */
+def manualModeAnalyze(String mode) {
+    echo "📋 Using manual build mode: ${mode}"
+    def pipelines = []
+
+    switch (mode) {
+        case 'rebuild-all':
+            pipelines = ['elohim-holochain', 'elohim-edge', 'elohim']
+            if (!params.SKIP_GENESIS) pipelines.add('elohim-genesis')
+            break
+        case 'rebuild-edge':
+            pipelines = ['elohim-edge']
+            if (!params.SKIP_GENESIS) pipelines.add('elohim-genesis')
+            break
+        case 'rebuild-app':
+            pipelines = ['elohim']
+            if (!params.SKIP_GENESIS) pipelines.add('elohim-genesis')
+            break
+        case 'genesis-only':
+            pipelines = ['elohim-genesis']
+            break
+    }
+
+    def analysis = [:]
+    PIPELINES.each { name, config ->
+        analysis[name] = [
+            shouldRun: pipelines.contains(name),
+            manualOnly: config.manualOnly ?: false,
+            matchedPatterns: pipelines.contains(name) ? ['manual-mode'] : [],
+            matchedFileCount: 0,
+            sampleFiles: [],
+            dependsOn: config.dependsOn ?: [],
+            triggersGenesis: config.triggersGenesis ?: false,
+            baselineUsed: 'global'
+        ]
+    }
+    env.ANALYSIS_JSON = writeJSON(returnText: true, json: analysis)
+
+    return [pipelines: pipelines, analysis: analysis]
+}
+
+/**
+ * Apply build-graph routing on top of legacy analysis. For auto/status
+ * mode, runs runBuildGraph then applies [build:*] tag overrides + genesis
+ * auto-include. For manual mode, passes through the explicit pipeline list.
+ * Extracted from Determine Build Plan to keep script {} body under 64KB.
+ */
+def applyBuildGraphRouting(String mode, changedFiles, analysis, fallbackPipelines) {
+    def graphPipelines
+    if (mode in ['auto', 'status']) {
+        echo '\n=== Build Graph (Primary) ==='
+        def graphResult = runBuildGraph(changedFiles, analysis)
+        graphPipelines = graphResult.pipelineSteps.keySet().toList()
+
+        // Filter to pipelines that have Jenkins jobs in the PIPELINES map.
+        graphPipelines.removeAll { !PIPELINES.containsKey(it) }
+
+        // Apply [build:*] commit-message overrides — graph-walker (auth
+        // since 2026-04) needs to honor manual retrigger workflow.
+        if (env.FORCE_BUILD_PIPELINES) {
+            env.FORCE_BUILD_PIPELINES.split(',').each { name ->
+                if (!graphPipelines.contains(name) && PIPELINES[name]) {
+                    graphPipelines.add(name)
+                    echo "🔧 [build:*] force-include applied to graph result: ${name}"
+                }
+            }
+        }
+
+        // Genesis auto-include for dev branches
+        if (!graphPipelines.contains('elohim-genesis') && !params.SKIP_GENESIS) {
+            def isDevBranch = env.BRANCH_NAME == 'dev' || env.BRANCH_NAME ==~ /dev-.+|feat-.+|claude\/.+/
+            def triggeringPipeline = graphPipelines.find { PIPELINES[it]?.triggersGenesis }
+            if (triggeringPipeline && isDevBranch) {
+                graphPipelines.add('elohim-genesis')
+            }
+        }
+    } else {
+        graphPipelines = fallbackPipelines
+    }
+    return graphPipelines
+}
+
+/**
+ * Build the predicted-build-graph artifact map. Extracted from
+ * Determine Build Plan to keep the inline CPS-compiled method under
+ * the 64KB JVM limit.
+ */
+def buildPredictedGraph(graphPipelines, analysis, mode, deployOnly, changedFiles, predictedLevels, hasGenesis) {
+    return [
+        schemaVersion: '1',
+        predictedAt: new Date().format("yyyy-MM-dd'T'HH:mm:ss'Z'", TimeZone.getTimeZone('UTC')),
+        commitSha: env.GIT_COMMIT_FULL ?: env.GIT_COMMIT ?: '',
+        branch: env.BRANCH_NAME ?: '',
+        mode: mode,
+        buildTrigger: env.BUILD_TRIGGER ?: '',
+        buildNumber: env.BUILD_NUMBER ?: '',
+        changedFileCount: changedFiles.size(),
+        // Cap at 50 — the decision matrix is the authoritative view; this
+        // is for forensic spot-checks only.
+        changedFilesSample: changedFiles.take(50),
+        skipCi: env.SKIP_CI == 'true',
+        forceBuildPipelines: (env.FORCE_BUILD_PIPELINES ?: '').split(',').findAll { it },
+        deployOnly: deployOnly,
+        pipelines: graphPipelines,
+        levels: predictedLevels,
+        genesisAfterLevels: hasGenesis,
+        analysis: analysis,
+    ]
+}
+
+/**
+ * Build the actual-build-graph artifact map. Extracted from Execute
+ * Builds to keep the inline CPS-compiled method under the 64KB JVM limit.
+ */
+def buildActualGraph(pipelines, results, levels) {
+    def levelMap = [:]
+    levels.eachWithIndex { lvl, idx ->
+        lvl.each { name -> levelMap[name] = idx }
+    }
+    if (pipelines.contains('elohim-genesis')) {
+        levelMap['elohim-genesis'] = 'genesis-trailer'
+    }
+
+    def abortedBeforeStart = pipelines.findAll { name -> !results.containsKey(name) }
+
+    def enrichedResults = [:]
+    results.each { name, info ->
+        def enriched = [:] + info
+        enriched.level = levelMap.containsKey(name) ? levelMap[name] : null
+        enrichedResults[name] = enriched
+    }
+
+    return [
+        schemaVersion: '1',
+        executedAt: new Date().format("yyyy-MM-dd'T'HH:mm:ss'Z'", TimeZone.getTimeZone('UTC')),
+        commitSha: env.GIT_COMMIT_FULL ?: env.GIT_COMMIT ?: '',
+        branch: env.BRANCH_NAME ?: '',
+        buildNumber: env.BUILD_NUMBER ?: '',
+        executionOrder: pipelines,
+        results: enrichedResults,
+        abortedBeforeStart: abortedBeforeStart,
+    ]
+}
+
+/**
+ * Build the machine-readable CI summary map. Extracted from post.always
+ * to keep the inline pipeline { } block under the JVM CPS 64KB method
+ * size limit. See CLAUDE.md note: "Never add inline logic to stages."
+ */
+def buildCiSummary(results, preflight, postflight, verification, successCount, unstableCount, failCount, healthyCount, unhealthyCount) {
+    return [
+        schema_version: '1.0.0',
+        timestamp: new Date().format("yyyy-MM-dd'T'HH:mm:ss'Z'", TimeZone.getTimeZone('UTC')),
+        orchestration: [
+            build_number: env.BUILD_NUMBER,
+            build_url: env.BUILD_URL,
+            branch: env.BRANCH_NAME,
+            commit: env.GIT_COMMIT_SHORT ?: 'unknown',
+            mode: params.MODE,
+            duration_seconds: (System.currentTimeMillis() - currentBuild.startTimeInMillis) / 1000
+        ],
+        pipelines: results.collect { name, r ->
+            [
+                name: name,
+                status: r?.unstable ? 'UNSTABLE' : (r?.success ? 'SUCCESS' : (r?.result ?: 'FAILURE')),
+                url: r?.url,
+                duration_ms: r?.duration,
+                category: r?.success ? null : categorizeFailure(name),
+                remediation_hint: r?.success ? null : getRemediationHint(name)
+            ]
+        },
+        health: [
+            preflight: preflight,
+            postflight: postflight,
+            degraded_services: postflight.findAll { k, v -> !v?.healthy }.keySet().toList()
+        ],
+        deployment: [
+            verified: verification.every { k, v -> v?.match },
+            verification_results: verification,
+            mismatches: verification.findAll { k, v -> !v?.match }.keySet().toList()
+        ],
+        summary: [
+            overall_status: failCount > 0 ? 'FAILURE' : (unstableCount > 0 || unhealthyCount > 0 ? 'UNSTABLE' : 'SUCCESS'),
+            builds_succeeded: successCount,
+            builds_unstable: unstableCount,
+            builds_failed: failCount,
+            services_healthy: healthyCount,
+            services_total: postflight.size(),
+            failed_pipelines: results.findAll { k, v -> !v?.success }.keySet().toList(),
+            triage_priority: calculateTriagePriority(failCount, unhealthyCount),
+            action_required: failCount > 0 ? results.findAll { k, v -> !v?.success }.collect { name, r ->
+                "${name}: ${getRemediationHint(name)}"
+            } : []
+        ]
+    ]
+}
+
+/**
+ * Reconciliation backstop — runs in post.always when the happy-path
+ * Reconcile Build Graph stage was skipped (cascade abort). Synthesizes
+ * actual-build-graph.json from env.BUILD_RESULTS so external Ralph
+ * Wiggum tooling can still reconcile against the predicted artifact.
+ *
+ * Pure Groovy + Jenkins workflow primitives only — runs inside
+ * node('built-in') where sh / node may be unavailable.
+ */
+def runReconciliationBackstop() {
+    def predictedFile = env.PREDICTED_BUILD_GRAPH_FILE ?: 'predicted-build-graph.json'
+    def actualFile = env.ACTUAL_BUILD_GRAPH_FILE ?: 'actual-build-graph.json'
+    def reconciliationFile = env.BUILD_GRAPH_RECONCILIATION_FILE ?: 'build-graph-reconciliation.json'
+
+    if (!fileExists(predictedFile)) {
+        echo "[backstop] No ${predictedFile} — Determine Build Plan did not complete; skipping reconciliation backstop"
+        return
+    }
+
+    if (!fileExists(actualFile)) {
+        def predicted = readJSON(file: predictedFile)
+        def predictedPipelines = predicted.pipelines ?: []
+        def buildResults = readJSON(text: env.BUILD_RESULTS ?: '{}')
+        def abortedBeforeStart = predictedPipelines.findAll { name -> !buildResults.containsKey(name) }
+        def synthesized = [
+            schemaVersion: '1',
+            executedAt: new Date().format("yyyy-MM-dd'T'HH:mm:ss'Z'", TimeZone.getTimeZone('UTC')),
+            commitSha: env.GIT_COMMIT_FULL ?: env.GIT_COMMIT ?: '',
+            branch: env.BRANCH_NAME ?: '',
+            buildNumber: env.BUILD_NUMBER ?: '',
+            executionOrder: predictedPipelines,
+            results: buildResults,
+            abortedBeforeStart: abortedBeforeStart,
+            synthesizedByBackstop: true
+        ]
+        writeJSON file: actualFile, json: synthesized, pretty: 2
+        archiveArtifacts artifacts: actualFile, allowEmptyArchive: true
+        echo "[backstop] Synthesized ${actualFile} from env.BUILD_RESULTS — ${buildResults.size()} pipelines completed, ${abortedBeforeStart.size()} aborted before start"
+    }
+
+    if (!fileExists(reconciliationFile)) {
+        echo '[backstop] No reconciliation artifact yet — Reconcile Build Graph stage was skipped (cascade abort path).'
+        echo '[backstop] Both predicted and actual artifacts are archived. To reconcile externally:'
+        echo "[backstop]   curl -O \${BUILD_URL}artifact/${predictedFile}"
+        echo "[backstop]   curl -O \${BUILD_URL}artifact/${actualFile}"
+        echo "[backstop]   node genesis/orchestrator/reconcile-build-graph.mjs ${predictedFile} ${actualFile} out.json"
+    } else {
+        echo '[backstop] Reconciliation artifact already exists — happy-path Reconcile Build Graph stage ran.'
+    }
+}
+
+/**
+ * Continuity guard for build-state.json. If this run was interrupted
+ * before saveBuildState ran (superseded push, pod eviction, SCM checkout
+ * abort), copy-forward the most recent good build-state.json so the next
+ * orchestrator build doesn't cold-start every pipeline.
+ */
+def maintainBuildStateContinuity() {
+    if (!fileExists('build-state.json')) {
+        try {
+            copyArtifacts(
+                projectName: env.JOB_NAME,
+                selector: lastSuccessful(),
+                filter: 'build-state.json',
+                optional: true,
+                fingerprintArtifacts: false
+            )
+        } catch (Exception e) {
+            echo "[baseline:post] could not copy-forward build-state.json: ${e.message}"
+        }
+    }
+    if (fileExists('build-state.json')) {
+        archiveArtifacts artifacts: 'build-state.json', fingerprint: true
+        echo "[baseline:post] build-state.json archived (continuity)"
+    } else {
+        echo "[baseline:post] no prior build-state.json found — genuine first run"
+    }
+}
+
+/**
+ * Hydrate stageAnnotations for a downstream pipeline by copying its
+ * structured artifacts into the orchestrator workspace and parsing them.
+ *
+ * The actual-build-graph.json's results map gets a `stageAnnotations` field
+ * per pipeline that ran one of these emit-aware stages. This lets the
+ * reconciler surface peer-level / human-level findings as investigation
+ * pointers without requiring downstream tooling to fetch each downstream
+ * build's artifacts separately.
+ *
+ * Best-effort by design: a missing artifact (build aborted before emit,
+ * old pipeline version, archive expired) yields a smaller annotation map.
+ * The reconciler tolerates absent annotations.
+ *
+ * @param pipelineName  e.g. 'elohim-genesis'
+ * @param buildNumber   the downstream build's number (from triggerPipeline result)
+ * @param branch        e.g. env.BRANCH_NAME
+ * @return              Map of annotation key → parsed JSON
+ */
+def hydrateStageAnnotations(String pipelineName, def buildNumber, String branch) {
+    def annotations = [:]
+    if (!buildNumber) return annotations
+
+    // Each pipeline declares which artifacts to slurp. Genesis is the
+    // only pipeline today; future pipelines (edge, app) can register here
+    // when they emit their own stage-level partial-readiness signals.
+    def manifest = readJSON(file: 'genesis/orchestrator/build-artifacts.json')
+    def genesisArtifacts = manifest.genesis ?: [:]
+    def perPipelineArtifacts = [
+        'elohim-genesis': [
+            conductorReadiness:                genesisArtifacts.conductorReadiness,
+            seedResultsConductorIdentities:    genesisArtifacts.seedResultsConductorIdentities,
+            seedResultsAgentBindings:          genesisArtifacts.seedResultsAgentBindings,
+        ],
+    ]
+    def wanted = perPipelineArtifacts[pipelineName]
+    if (!wanted) return annotations
+
+    // Copy into a per-build dir so successive trigger calls don't clobber
+    // each other's artifacts. The dir is local to the orchestrator workspace
+    // and not archived — only the parsed values land in stageAnnotations.
+    def downstreamDir = "downstream-artifacts/${pipelineName}-${buildNumber}"
+    sh "mkdir -p '${downstreamDir}'"
+
+    // Build an Ant glob that catches all wanted basenames, regardless of
+    // where they were archived inside the downstream build. The seeders
+    // archive at genesis/seeder/<name>; conductor-readiness archives at root.
+    def basenames = wanted.values().findAll { it } as Set
+    def filter = basenames.collect { "**/${it}" }.join(',')
+
+    try {
+        copyArtifacts(
+            projectName: "${pipelineName}/${branch}",
+            selector: specific(buildNumber.toString()),
+            filter: filter,
+            target: downstreamDir,
+            optional: true,
+            flatten: true,
+            fingerprintArtifacts: false,
+        )
+    } catch (Exception e) {
+        echo "[stageAnnotations] copyArtifacts failed for ${pipelineName} #${buildNumber}: ${e.message}"
+        return annotations
+    }
+
+    wanted.each { String key, String fname ->
+        if (!fname) return
+        def path = "${downstreamDir}/${fname}"
+        if (fileExists(path)) {
+            try {
+                annotations[key] = readJSON(file: path)
+            } catch (Exception e) {
+                echo "[stageAnnotations] could not parse ${path}: ${e.message}"
+            }
+        }
+    }
+
+    return annotations
 }
 
 /**
@@ -814,7 +1251,7 @@ spec:
     }
 
     options {
-        timeout(time: 120, unit: 'MINUTES')
+        timeout(time: 240, unit: 'MINUTES')  // upstream parallel builds + genesis (60min) + a2o gap analysis
         disableConcurrentBuilds(abortPrevious: true)  // Abort older builds when new one starts
         buildDiscarder(logRotator(numToKeepStr: '100'))
         // Skip implicit Declarative: Checkout SCM — its 10-min default per-attempt
@@ -864,6 +1301,21 @@ spec:
 
                         env.GIT_COMMIT_SHORT = getGitCommitHash()
                         env.GIT_COMMIT_FULL = getGitCommitHashFull()
+
+                        // Load canonical artifact filenames from the manifest
+                        // and stash in env vars. Downstream `when` blocks +
+                        // steps reference env.PREDICTED_BUILD_GRAPH_FILE etc.
+                        // so a rename in build-artifacts.json propagates
+                        // automatically. Fail loud if the manifest is missing
+                        // or malformed — the rest of the orchestrator's
+                        // reconciliation surface depends on it.
+                        if (!fileExists('genesis/orchestrator/build-artifacts.json')) {
+                            error 'genesis/orchestrator/build-artifacts.json missing — cannot bootstrap artifact names'
+                        }
+                        def artifactNames = readJSON(file: 'genesis/orchestrator/build-artifacts.json')
+                        env.PREDICTED_BUILD_GRAPH_FILE = artifactNames.orchestrator.predictedBuildGraph
+                        env.ACTUAL_BUILD_GRAPH_FILE = artifactNames.orchestrator.actualBuildGraph
+                        env.BUILD_GRAPH_RECONCILIATION_FILE = artifactNames.orchestrator.buildGraphReconciliation
 
                         // Detect build trigger type. "Push event to branch X" is the
                         // shortDescription Jenkins emits for git-push webhook causes from
@@ -985,11 +1437,13 @@ spec:
             steps {
                 container('builder') {
                     script {
+                        // Stage logic extracted to autoModeAnalyze /
+                        // manualModeAnalyze / applyBuildGraphRouting /
+                        // buildPredictedGraph helpers (above pipeline {}) to
+                        // keep this script body under the 64KB CPS method
+                        // size limit. Failure mode in build #923 was
+                        // ___cps___74 too large from this stage's inline body.
                         def mode = params.MODE ?: 'auto'
-                        def pipelines = []
-                        def analysis = [:]
-                        def changedFiles = []
-
                         echo """
 ┌──────────────────────────────────────────────────────────────────────────────┐
 │                              BUILD PLAN ANALYSIS                              │
@@ -998,183 +1452,44 @@ spec:
 │  Trigger: ${env.BUILD_TRIGGER}
 └──────────────────────────────────────────────────────────────────────────────┘"""
 
+                        def pipelines, analysis, changedFiles
                         if (mode in ['auto', 'status']) {
-                            // Load per-pipeline baselines for accurate change detection
-                            def pipelineBaselines = [:]
-                            if (!(params.FORCE_COMMIT?.trim())) {
-                                pipelineBaselines = loadPipelineBaselines()
-                            }
-
-                            // Automatic changeset analysis (uses stored global baseline if available)
-                            echo "🔍 Analyzing changesets since last build..."
-                            changedFiles = analyzeChangeset(pipelineBaselines['__global__'])
-
-                            // Log advisory when baseline appears stale (no per-pipeline
-                            // baselines and large diff). We still use the full changeset —
-                            // those are real accumulated changes that need building. The
-                            // one-time full rebuild after baseline loss is correct; the
-                            // previous HEAD~1 fallback silently discarded real changes.
-                            if (!pipelineBaselines && changedFiles.size() > 50) {
-                                echo "⚠️ Large changeset (${changedFiles.size()} files) with no per-pipeline baselines"
-                                echo "   Building all matching pipelines (baselines will be saved after this run)"
-                            }
-
-                            analysis = analyzePipelineRequirements(changedFiles, pipelineBaselines)
-                            env.PIPELINE_BASELINES = writeJSON(returnText: true, json: pipelineBaselines)
-
-                            env.CHANGED_FILES_COUNT = changedFiles.size().toString()
-                            env.ANALYSIS_JSON = writeJSON(returnText: true, json: analysis)
-
-                            // Show changed files grouped by area
-                            def filesByArea = [:]
-                            changedFiles.each { file ->
-                                def area = file.split('/')[0]
-                                if (!filesByArea[area]) filesByArea[area] = []
-                                filesByArea[area].add(file)
-                            }
-
-                            echo "📁 Changed Files (${changedFiles.size()} total):"
-                            filesByArea.each { area, files ->
-                                echo "   ${area}/ (${files.size()} files)"
-                                files.take(3).each { echo "      └─ ${it}" }
-                                if (files.size() > 3) echo "      └─ ... and ${files.size() - 3} more"
-                            }
-
-                            pipelines = analysis.findAll { name, info -> info.shouldRun }.keySet().toList()
-
-                            // Inject [build:*] commit message overrides into the pipeline set
-                            if (env.FORCE_BUILD_PIPELINES) {
-                                env.FORCE_BUILD_PIPELINES.split(',').each { name ->
-                                    if (!pipelines.contains(name) && PIPELINES[name]) {
-                                        pipelines.add(name)
-                                        analysis[name].shouldRun = true
-                                        analysis[name].matchedPatterns.add('commit-tag:[build:*]')
-                                    }
-                                }
-                            }
-
-                            // Propagate: if a dependency is building, auto-include its dependents
-                            pipelines = propagateDependencies(pipelines, analysis)
-
-                            // Safety net: auto-include genesis if any triggering pipeline builds (dev branches only)
-                            if (!pipelines.contains('elohim-genesis') && !params.SKIP_GENESIS) {
-                                def isDevBranch = env.BRANCH_NAME == 'dev' || env.BRANCH_NAME ==~ /dev-.+|feat-.+|claude\/.+/
-                                def triggeringPipeline = pipelines.find { PIPELINES[it]?.triggersGenesis }
-                                if (triggeringPipeline && isDevBranch) {
-                                    pipelines.add('elohim-genesis')
-                                    analysis['elohim-genesis'].shouldRun = true
-                                    analysis['elohim-genesis'].matchedPatterns.add("triggered-by:${triggeringPipeline}")
-                                }
-                            }
-
+                            def r = autoModeAnalyze()
+                            pipelines = r.pipelines
+                            analysis = r.analysis
+                            changedFiles = r.changedFiles
                         } else {
-                            // Manual forced builds
-                            echo "📋 Using manual build mode: ${mode}"
-
-                            switch (mode) {
-                                case 'rebuild-all':
-                                    pipelines = ['elohim-holochain', 'elohim-edge', 'elohim']
-                                    if (!params.SKIP_GENESIS) pipelines.add('elohim-genesis')
-                                    break
-                                case 'rebuild-edge':
-                                    pipelines = ['elohim-edge']
-                                    if (!params.SKIP_GENESIS) pipelines.add('elohim-genesis')
-                                    break
-                                case 'rebuild-app':
-                                    pipelines = ['elohim']
-                                    if (!params.SKIP_GENESIS) pipelines.add('elohim-genesis')
-                                    break
-                                case 'genesis-only':
-                                    pipelines = ['elohim-genesis']
-                                    break
-                            }
-
-                            // Create analysis for display (even for manual mode)
-                            PIPELINES.each { name, config ->
-                                analysis[name] = [
-                                    shouldRun: pipelines.contains(name),
-                                    manualOnly: config.manualOnly ?: false,
-                                    matchedPatterns: pipelines.contains(name) ? ['manual-mode'] : [],
-                                    matchedFileCount: 0,
-                                    sampleFiles: [],
-                                    dependsOn: config.dependsOn ?: [],
-                                    triggersGenesis: config.triggersGenesis ?: false,
-                                    baselineUsed: 'global'
-                                ]
-                            }
-                            env.ANALYSIS_JSON = writeJSON(returnText: true, json: analysis)
+                            def r = manualModeAnalyze(mode)
+                            pipelines = r.pipelines
+                            analysis = r.analysis
+                            changedFiles = []
                         }
 
-                        // Legacy ordering (advisory only — feeds comparison matrix)
+                        // Legacy advisory ordering for the comparison matrix.
                         def legacyOrdered = orderByDependencies(pipelines)
-
-                        // ALWAYS show the legacy decision matrix (advisory)
                         printDecisionMatrix(analysis, legacyOrdered)
 
-                        def graphPipelines
-                        if (mode in ['auto', 'status']) {
-                            // Build graph is PRIMARY for auto mode
-                            echo '\n=== Build Graph (Primary) ==='
-                            def graphResult = runBuildGraph(changedFiles, analysis)
-                            graphPipelines = graphResult.pipelineSteps.keySet().toList()
+                        def graphPipelines = applyBuildGraphRouting(mode, changedFiles, analysis, pipelines)
 
-                            // Filter to pipelines that have Jenkins jobs (in PIPELINES map).
-                            // Graph-only pipelines (elohim-compute, elohim-doorway-app, etc.)
-                            // run as pre-push gates, not as Jenkins builds.
-                            graphPipelines.removeAll { !PIPELINES.containsKey(it) }
-
-                            // Apply [build:*] commit-message overrides to graph result.
-                            // The build-graph algorithm correctly says "no sources changed
-                            // → no rebuild needed" — but a human pushing [build:app] is
-                            // intentionally overriding that decision (e.g., to redeploy after
-                            // a manifest-only change that elohim still needs to reconcile).
-                            // The legacy analyzer at line ~1050 already does this; mirror
-                            // here so graph-walker (authoritative since 2026-04) honors the
-                            // override too. Without this, every developer's manual retrigger
-                            // workflow is silently broken.
-                            if (env.FORCE_BUILD_PIPELINES) {
-                                env.FORCE_BUILD_PIPELINES.split(',').each { name ->
-                                    if (!graphPipelines.contains(name) && PIPELINES[name]) {
-                                        graphPipelines.add(name)
-                                        echo "🔧 [build:*] force-include applied to graph result: ${name}"
-                                    }
-                                }
-                            }
-
-                            // Genesis auto-include: if any triggering pipeline is in the graph result
-                            if (!graphPipelines.contains('elohim-genesis') && !params.SKIP_GENESIS) {
-                                def isDevBranch = env.BRANCH_NAME == 'dev' || env.BRANCH_NAME ==~ /dev-.+|feat-.+|claude\/.+/
-                                def triggeringPipeline = graphPipelines.find { PIPELINES[it]?.triggersGenesis }
-                                if (triggeringPipeline && isDevBranch) {
-                                    graphPipelines.add('elohim-genesis')
-                                }
-                            }
-                        } else {
-                            // Manual mode: use the explicitly requested pipelines
-                            graphPipelines = pipelines
-                        }
-
-                        // DEPLOY_ONLY override: bypass changeset analysis and dispatch
-                        // only the deploy-bearing pipelines. Operator uses this after
-                        // manifest/RBAC/storageClass-only changes when existing Harbor
-                        // tags are valid and the build matrix would just burn ~75min.
-                        // Edge pipeline self-skips its build stages on DEPLOY_ONLY=true
-                        // and runs only Deploy Edge Node - <Env>. Genesis runs unless
-                        // operator sets SKIP_GENESIS=true.
-                        //
-                        // Two activation paths: explicit operator param (params.DEPLOY_ONLY)
-                        // or [deploy-only] commit-message tag on the webhook push (env.DEPLOY_ONLY_FROM_TAG).
+                        // DEPLOY_ONLY override (operator param OR [deploy-only]
+                        // commit tag): bypass changeset analysis and dispatch
+                        // only deploy-bearing pipelines. Edge self-skips its
+                        // build stages, runs only Deploy Edge Node - <Env>.
                         def deployOnly = params.DEPLOY_ONLY || env.DEPLOY_ONLY_FROM_TAG == 'true'
                         if (deployOnly) {
                             graphPipelines = ['elohim-edge']
-                            if (!params.SKIP_GENESIS) {
-                                graphPipelines.add('elohim-genesis')
-                            }
+                            if (!params.SKIP_GENESIS) graphPipelines.add('elohim-genesis')
                             def src = params.DEPLOY_ONLY ? 'param' : 'commit tag'
                             echo "🚀 DEPLOY_ONLY=true (via ${src}): bypassing changeset analysis; dispatching ${graphPipelines.join(', ')}"
                         }
 
                         env.PIPELINES_TO_RUN = graphPipelines.join(',')
+
+                        // Build + write the predicted-build-graph artifact.
+                        def predictedLevels = groupByDependencyLevel(graphPipelines)
+                        def hasGenesis = graphPipelines.contains('elohim-genesis')
+                        def predictedGraph = buildPredictedGraph(graphPipelines, analysis, mode, deployOnly, changedFiles, predictedLevels, hasGenesis)
+                        writeJSON(file: env.PREDICTED_BUILD_GRAPH_FILE, json: predictedGraph, pretty: 2)
 
                         // Set build description
                         if (graphPipelines.isEmpty() && mode == 'auto') {
@@ -1186,12 +1501,55 @@ spec:
                             currentBuild.description = "${mode}: ${graphPipelines.join(', ')}"
                         }
 
-                        // Checkpoint 1: archive baseline now so that if Execute
-                        // Builds or post.always gets interrupted (pod eviction,
-                        // abort-on-milestone, OOM), the next orchestrator run
-                        // still has a __global__ = HEAD resume point. See
-                        // archivePipelineBaselines() docstring for rationale.
+                        // Checkpoint 1: archive baseline so an interruption
+                        // (pod eviction, abort-on-milestone, OOM) still leaves
+                        // the next run with a __global__ = HEAD resume point.
                         archivePipelineBaselines('plan')
+                    }
+                }
+            }
+        }
+
+        stage('Post Predicted Build Graph') {
+            when { expression { env.SKIP_CI != 'true' } }
+            steps {
+                container('builder') {
+                    script {
+                        // Standalone deliverable: predicted-build-graph.json was
+                        // written by Determine Build Plan. This stage's only job
+                        // is to verify it exists, archive it as an artifact, and
+                        // print a one-line summary. Failing here is loud: a red
+                        // stage in Blue Ocean before Execute Builds runs. External
+                        // watchers (the Ralph Wiggum loop) can grab the artifact
+                        // immediately after this stage completes — they do NOT
+                        // have to wait for any build to finish.
+                        if (!fileExists(env.PREDICTED_BUILD_GRAPH_FILE)) {
+                            error "${env.PREDICTED_BUILD_GRAPH_FILE} missing — Determine Build Plan should have written it"
+                        }
+                        def predicted = readJSON(file: env.PREDICTED_BUILD_GRAPH_FILE)
+                        archiveArtifacts(artifacts: env.PREDICTED_BUILD_GRAPH_FILE, fingerprint: true)
+
+                        // Coerce JSON-derived containers to Groovy List
+                        // before .join() — readJSON returns net.sf.json.JSONArray
+                        // and Jenkins Script Security blocks .join() on it.
+                        // .collect{it} materializes a plain ArrayList.
+                        def levelDesc = (predicted.levels ?: []).collect { lvl ->
+                            lvl.size() > 1 ? "[${lvl.collect{it}.join(' + ')}]" : lvl[0]
+                        }.join(' → ')
+                        if (predicted.genesisAfterLevels) levelDesc += ' → genesis'
+
+                        def pipelinesList = (predicted.pipelines ?: []).collect { it }
+                        echo """
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📤 PREDICTED BUILD GRAPH posted
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Commit:    ${(predicted.commitSha ?: '').take(8)}
+  Mode:      ${predicted.mode}
+  Pipelines: ${pipelinesList.size() > 0 ? pipelinesList.join(', ') : '(none)'}
+  Plan:      ${levelDesc ?: '(no builds)'}
+  Artifact:  ${env.BUILD_URL}artifact/${env.PREDICTED_BUILD_GRAPH_FILE}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+"""
                     }
                 }
             }
@@ -1264,83 +1622,132 @@ spec:
 │  Plan: ${levelDesc}
 └──────────────────────────────────────────────────────────────────────────────┘"""
 
-                        // Execute in dependency-level order (parallel within each level)
+                        // Execute in dependency-level order (parallel within each level).
+                        // Each level is wrapped in a nested stage() so Blue Ocean
+                        // surfaces the dependency-graph structure with per-level
+                        // and per-pipeline timing — what `groupByDependencyLevel`
+                        // computes is what the UI now shows.
+                        // Behaviour-preserving: the level-failed guard, baseline
+                        // updates, and parallel-wait semantics are unchanged.
                         levels.eachWithIndex { level, idx ->
-                            echo ''
-                            echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
-                            echo "📦 Level ${idx}: ${level.join(' + ')}"
-                            echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
+                            def levelLabel = level.size() > 1
+                                ? "Level ${idx}: ${level.join(' + ')}"
+                                : "Level ${idx}: ${level[0]}"
 
-                            if (level.size() == 1) {
-                                def name = level[0]
-                                echo "🔨 Building: ${name}"
-                                def result = triggerPipeline(name, env.BRANCH_NAME, true)
-                                results[name] = result
-                                if (result.success) {
-                                    if (result.unstable) {
-                                        echo "⚠️ ${name}: UNSTABLE (${result.duration / 1000}s)"
-                                    } else {
-                                        echo "✅ ${name}: SUCCESS (${result.duration / 1000}s)"
-                                    }
-                                    pipelineBaselines[name] = env.GIT_COMMIT_FULL
-                                } else {
-                                    echo "❌ ${name}: ${result.result}"
-                                    if (result.error) echo "   Error: ${result.error}"
-                                }
-                            } else {
-                                def parallelBuilds = [:]
-                                level.each { name ->
-                                    parallelBuilds[name] = {
-                                        echo "🔨 Building: ${name}"
-                                        def result = triggerPipeline(name, env.BRANCH_NAME, true)
-                                        results[name] = result
-                                        if (result.success) {
-                                            if (result.unstable) {
-                                                echo "⚠️ ${name}: UNSTABLE (${result.duration / 1000}s)"
-                                            } else {
-                                                echo "✅ ${name}: SUCCESS (${result.duration / 1000}s)"
-                                            }
-                                            pipelineBaselines[name] = env.GIT_COMMIT_FULL
+                            stage(levelLabel) {
+                                echo ''
+                                echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
+                                echo "📦 Level ${idx}: ${level.join(' + ')}"
+                                echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
+
+                                if (level.size() == 1) {
+                                    def name = level[0]
+                                    echo "🔨 Building: ${name}"
+                                    def result = triggerPipeline(name, env.BRANCH_NAME, true)
+                                    results[name] = result
+                                    if (result.success) {
+                                        if (result.unstable) {
+                                            echo "⚠️ ${name}: UNSTABLE (${result.duration / 1000}s)"
                                         } else {
-                                            echo "❌ ${name}: ${result.result}"
-                                            if (result.error) echo "   Error: ${result.error}"
+                                            echo "✅ ${name}: SUCCESS (${result.duration / 1000}s)"
+                                        }
+                                        pipelineBaselines[name] = env.GIT_COMMIT_FULL
+                                    } else {
+                                        echo "❌ ${name}: ${result.result}"
+                                        if (result.error) echo "   Error: ${result.error}"
+                                    }
+                                } else {
+                                    def parallelBuilds = [:]
+                                    level.each { name ->
+                                        parallelBuilds[name] = {
+                                            // Nested stage gives Blue Ocean a named
+                                            // parallel branch with its own timing.
+                                            stage(name) {
+                                                echo "🔨 Building: ${name}"
+                                                def result = triggerPipeline(name, env.BRANCH_NAME, true)
+                                                results[name] = result
+                                                if (result.success) {
+                                                    if (result.unstable) {
+                                                        echo "⚠️ ${name}: UNSTABLE (${result.duration / 1000}s)"
+                                                    } else {
+                                                        echo "✅ ${name}: SUCCESS (${result.duration / 1000}s)"
+                                                    }
+                                                    pipelineBaselines[name] = env.GIT_COMMIT_FULL
+                                                } else {
+                                                    echo "❌ ${name}: ${result.result}"
+                                                    if (result.error) echo "   Error: ${result.error}"
+                                                }
+                                            }
                                         }
                                     }
+                                    parallel parallelBuilds
                                 }
-                                parallel parallelBuilds
-                            }
 
-                            // Fail fast: abort if any pipeline in this level failed
-                            def levelFailed = level.findAll { !results[it]?.success }
-                            if (levelFailed) {
-                                error "Build(s) failed: ${levelFailed.join(', ')} - Aborting"
+                                // Fail fast: abort if any pipeline in this level failed.
+                                // Inside the level stage so the failure marks THIS level
+                                // red in Blue Ocean, not the outer Execute Builds stage.
+                                def levelFailed = level.findAll { !results[it]?.success }
+                                if (levelFailed) {
+                                    error "Build(s) failed: ${levelFailed.join(', ')} - Aborting"
+                                }
                             }
                         }
 
                         env.BUILD_RESULTS = writeJSON(returnText: true, json: results)
                         env.PIPELINE_BASELINES = writeJSON(returnText: true, json: pipelineBaselines)
 
-                        // Run genesis if requested
+                        // Run genesis if requested. Wrapped in its own stage so
+                        // Blue Ocean shows the trailing genesis dispatch as a
+                        // distinct column (it's NOT a level — runs after all
+                        // build levels succeed, per the dependency contract).
                         if (pipelines.contains('elohim-genesis')) {
-                            echo ''
-                            echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
-                            echo '🌱 Running Genesis (seed + test)'
-                            echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
+                            stage('elohim-genesis') {
+                                echo ''
+                                echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
+                                echo '🌱 Running Genesis (seed + test)'
+                                echo '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
 
-                            def genesisResult = triggerPipeline('elohim-genesis', env.BRANCH_NAME, true)
-                            results['elohim-genesis'] = genesisResult
+                                def genesisResult = triggerPipeline('elohim-genesis', env.BRANCH_NAME, true)
 
-                            if (genesisResult.success) {
-                                echo '✅ elohim-genesis: SUCCESS'
-                                pipelineBaselines['elohim-genesis'] = env.GIT_COMMIT_FULL
-                            } else {
-                                echo "❌ elohim-genesis: ${genesisResult.result}"
-                                unstable('Genesis failed - seeding or tests may have issues')
+                                // Hydrate stageAnnotations from genesis's
+                                // conductor-readiness + seed-results artifacts.
+                                // Best-effort — empty map on copy failure.
+                                // Embedded into actual-build-graph.json so the
+                                // reconciler can surface peer-level findings
+                                // as investigation pointers (Path C).
+                                def genesisAnnotations = hydrateStageAnnotations('elohim-genesis', genesisResult.buildNumber, env.BRANCH_NAME)
+                                if (genesisAnnotations) {
+                                    genesisResult.stageAnnotations = genesisAnnotations
+                                    def keys = genesisAnnotations.keySet().toList()
+                                    if (keys) {
+                                        echo "[stageAnnotations] elohim-genesis hydrated: ${keys.join(', ')}"
+                                    }
+                                }
+                                results['elohim-genesis'] = genesisResult
+
+                                if (genesisResult.success) {
+                                    echo '✅ elohim-genesis: SUCCESS'
+                                    pipelineBaselines['elohim-genesis'] = env.GIT_COMMIT_FULL
+                                } else {
+                                    echo "❌ elohim-genesis: ${genesisResult.result}"
+                                    unstable('Genesis failed - seeding or tests may have issues')
+                                }
+
+                                env.BUILD_RESULTS = writeJSON(returnText: true, json: results)
+                                env.PIPELINE_BASELINES = writeJSON(returnText: true, json: pipelineBaselines)
                             }
-
-                            env.BUILD_RESULTS = writeJSON(returnText: true, json: results)
-                            env.PIPELINE_BASELINES = writeJSON(returnText: true, json: pipelineBaselines)
                         }
+
+                        // Actual Build Graph artifact — what Execute Builds
+                        // dispatched and how each downstream pipeline finished.
+                        // Construction extracted to buildActualGraph helper to
+                        // keep this stage's inline method under 64KB CPS limit.
+                        // Cascade-aborted runs (level-failed throw) are picked
+                        // up by the post.always backstop instead.
+                        def actualGraph = buildActualGraph(pipelines, results, levels)
+                        writeJSON(file: env.ACTUAL_BUILD_GRAPH_FILE, json: actualGraph, pretty: 2)
+                        // Archive happens in the dedicated Post Actual Build Graph
+                        // stage below — keeps Execute Builds focused on dispatch.
 
                         // Now that builds succeeded, advance the build graph's
                         // lastSuccessfulCommit. During planning we deliberately
@@ -1356,6 +1763,85 @@ spec:
                         // Checkpoint 2: archive per-pipeline baselines captured
                         // during this Execute Builds run.
                         archivePipelineBaselines('execute')
+                    }
+                }
+            }
+        }
+
+        stage('Post Actual Build Graph') {
+            when {
+                expression {
+                    // Skip when nothing dispatched (Execute Builds didn't run, no
+                    // file exists). The post.always backstop handles cascade-aborted
+                    // runs where Execute Builds threw before its writeJSON call.
+                    fileExists(env.ACTUAL_BUILD_GRAPH_FILE ?: 'actual-build-graph.json')
+                }
+            }
+            steps {
+                container('builder') {
+                    script {
+                        // Standalone deliverable: actual-build-graph.json was
+                        // written by Execute Builds. This stage's only job is
+                        // to verify it, archive it, and print a summary that
+                        // mirrors Post Predicted Build Graph. Symmetric stages
+                        // give external watchers two clean artifacts to diff.
+                        def actual = readJSON(file: env.ACTUAL_BUILD_GRAPH_FILE)
+                        archiveArtifacts(artifacts: env.ACTUAL_BUILD_GRAPH_FILE, fingerprint: true)
+
+                        def resultLine = (actual.executionOrder ?: []).collect { name ->
+                            def r = actual.results[name]
+                            "${name}=${r?.result ?: 'NOT_RUN'}"
+                        }.join(', ')
+
+                        echo """
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📥 ACTUAL BUILD GRAPH posted
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  Commit:           ${(actual.commitSha ?: '').take(8)}
+  Results:          ${resultLine ?: '(no builds dispatched)'}
+  Aborted-pre-start: ${(actual.abortedBeforeStart ?: []).collect { it }.join(', ') ?: '(none)'}
+  Artifact:         ${env.BUILD_URL}artifact/${env.ACTUAL_BUILD_GRAPH_FILE}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+"""
+                    }
+                }
+            }
+        }
+
+        stage('Reconcile Build Graph') {
+            when {
+                expression {
+                    // Run when both artifacts exist (happy path). Cascade-aborted
+                    // runs that never reached Post Actual Build Graph are picked
+                    // up by the post.always backstop, which synthesizes the actual
+                    // artifact from env.BUILD_RESULTS and runs the reconciler then.
+                    fileExists(env.PREDICTED_BUILD_GRAPH_FILE ?: 'predicted-build-graph.json') && fileExists(env.ACTUAL_BUILD_GRAPH_FILE ?: 'actual-build-graph.json')
+                }
+            }
+            steps {
+                container('builder') {
+                    script {
+                        // Compare what the orchestrator PROMISED with what
+                        // actually happened. Drift between predicted and actual
+                        // is the highest-value pipeline-quality signal — every
+                        // disconnect is a candidate for investigation.
+                        //
+                        // The reconcile-build-graph.mjs script is pure JS and
+                        // unit-tested at genesis/orchestrator/reconcile-build-graph.test.mjs.
+                        // It exits 0 on match, 1 on drift; we use that to mark
+                        // the orchestrator UNSTABLE on any disconnect without
+                        // aborting the rest of the pipeline.
+                        def reconcileExit = sh(
+                            script: "node genesis/orchestrator/reconcile-build-graph.mjs ${env.PREDICTED_BUILD_GRAPH_FILE} ${env.ACTUAL_BUILD_GRAPH_FILE} ${env.BUILD_GRAPH_RECONCILIATION_FILE}",
+                            returnStatus: true,
+                        )
+                        archiveArtifacts(artifacts: env.BUILD_GRAPH_RECONCILIATION_FILE, fingerprint: true)
+
+                        if (reconcileExit != 0) {
+                            unstable("Build graph drift detected — see ${env.BUILD_GRAPH_RECONCILIATION_FILE}")
+                        } else {
+                            echo '✅ Build graph reconciled cleanly (predicted == actual)'
+                        }
                     }
                 }
             }
@@ -1566,100 +2052,21 @@ ${healthyCount < postflight.size() ? '  ⚠️  ATTENTION: Some services unhealt
                     currentBuild.result = 'UNSTABLE'
                 }
 
-                // Generate machine-readable CI summary for Claude consumption
+                // CI summary + reconciliation backstop + build-state continuity
+                // are extracted to def helpers above the pipeline block to keep
+                // the inline CPS-compiled method under the 64KB JVM limit.
+                // See CLAUDE.md: "Never add inline logic to stages."
                 def unhealthyCount = postflight.count { k, v -> !v?.healthy }
-                def ciSummary = [
-                    schema_version: '1.0.0',
-                    timestamp: new Date().format("yyyy-MM-dd'T'HH:mm:ss'Z'", TimeZone.getTimeZone('UTC')),
-                    orchestration: [
-                        build_number: env.BUILD_NUMBER,
-                        build_url: env.BUILD_URL,
-                        branch: env.BRANCH_NAME,
-                        commit: env.GIT_COMMIT_SHORT ?: 'unknown',
-                        mode: params.MODE,
-                        duration_seconds: (System.currentTimeMillis() - currentBuild.startTimeInMillis) / 1000
-                    ],
-                    pipelines: results.collect { name, r ->
-                        [
-                            name: name,
-                            status: r?.unstable ? 'UNSTABLE' : (r?.success ? 'SUCCESS' : (r?.result ?: 'FAILURE')),
-                            url: r?.url,
-                            duration_ms: r?.duration,
-                            category: r?.success ? null : categorizeFailure(name),
-                            remediation_hint: r?.success ? null : getRemediationHint(name)
-                        ]
-                    },
-                    health: [
-                        preflight: preflight,
-                        postflight: postflight,
-                        degraded_services: postflight.findAll { k, v -> !v?.healthy }.keySet().toList()
-                    ],
-                    deployment: [
-                        verified: verification.every { k, v -> v?.match },
-                        verification_results: verification,
-                        mismatches: verification.findAll { k, v -> !v?.match }.keySet().toList()
-                    ],
-                    summary: [
-                        overall_status: failCount > 0 ? 'FAILURE' : (unstableCount > 0 || unhealthyCount > 0 ? 'UNSTABLE' : 'SUCCESS'),
-                        builds_succeeded: successCount,
-                        builds_unstable: unstableCount,
-                        builds_failed: failCount,
-                        services_healthy: healthyCount,
-                        services_total: postflight.size(),
-                        failed_pipelines: results.findAll { k, v -> !v?.success }.keySet().toList(),
-                        triage_priority: calculateTriagePriority(failCount, unhealthyCount),
-                        action_required: failCount > 0 ? results.findAll { k, v -> !v?.success }.collect { name, r ->
-                            "${name}: ${getRemediationHint(name)}"
-                        } : []
-                    ]
-                ]
-
+                def ciSummary = buildCiSummary(results, preflight, postflight, verification, successCount, unstableCount, failCount, healthyCount, unhealthyCount)
                 writeJSON file: 'ci-summary.json', json: ciSummary, pretty: 2
-
-                // CI summary is informational — allowEmptyArchive is fine here.
-                // If an earlier stage bailed before writeJSON ran, we don't want
-                // the post-block to fail on a missing optional artifact.
                 archiveArtifacts artifacts: 'ci-summary.json', allowEmptyArchive: true
                 echo "📋 CI Summary archived: ${env.BUILD_URL}artifact/ci-summary.json"
 
-                // Checkpoint 3 (last word): archive the baseline one final time.
-                // The helper asserts the file exists and archives without
-                // allowEmptyArchive — any failure surfaces loudly on the next
-                // build via the BASELINE CASCADE WARNING in loadPipelineBaselines.
+                runReconciliationBackstop()
+
                 archivePipelineBaselines('post')
 
-                // Continuity guard for build-state.json.
-                // When this run was interrupted before saveBuildState() ran
-                // (e.g. superseded by a newer push, pod evicted, SCM checkout
-                // aborted → NOT_BUILT), no build-state.json was archived this
-                // run. The next orchestrator build's copyArtifacts(lastCompleted())
-                // would return 0 files for 'build-state.json' and trigger a
-                // cold-start cascade — every pipeline rebuilds despite most
-                // being unchanged. Observed as an oscillating pattern: every
-                // other build cold-starts when rapid pushes supersede each other.
-                //
-                // Fix: if we don't have a local build-state.json, copy forward
-                // the most recent good one and re-archive. That way every
-                // completed build leaves at least *a* baseline for the next run.
-                if (!fileExists('build-state.json')) {
-                    try {
-                        copyArtifacts(
-                            projectName: env.JOB_NAME,
-                            selector: lastSuccessful(),
-                            filter: 'build-state.json',
-                            optional: true,
-                            fingerprintArtifacts: false
-                        )
-                    } catch (Exception e) {
-                        echo "[baseline:post] could not copy-forward build-state.json: ${e.message}"
-                    }
-                }
-                if (fileExists('build-state.json')) {
-                    archiveArtifacts artifacts: 'build-state.json', fingerprint: true
-                    echo "[baseline:post] build-state.json archived (continuity)"
-                } else {
-                    echo "[baseline:post] no prior build-state.json found — genuine first run"
-                }
+                maintainBuildStateContinuity()
             }
             } // node('built-in')
         }

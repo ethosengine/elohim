@@ -87,6 +87,22 @@ components:
         # CC for native compilation (some crates need explicit gcc)
         - name: CC
           value: gcc
+        # sccache config injected via K8s secret auto-mount annotations
+        # (sccache-credentials Secret in the Che user namespace, labeled
+        # controller.devfile.io/mount-to-devworkspace=true and annotated
+        # mount-as=env). Backing store is Garage at
+        # garage.ethosengine.svc.cluster.local:3900 (S3-compatible). Provides:
+        #   AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY,
+        #   SCCACHE_BUCKET, SCCACHE_ENDPOINT, SCCACHE_S3_USE_SSL, SCCACHE_REGION
+        # sccache binary is baked into rust-nix-dev image at /usr/local/bin/sccache
+        # (added 2026-05-09 in ethosengine/che-devworkspaces). Flipping the
+        # wrapper here means every cargo invocation in the workspace consults
+        # Garage; cache hits are ~ms, misses fall through to local compile
+        # and populate the cache for the next workspace.
+        - name: RUSTC_WRAPPER
+          value: sccache
+        - name: SCCACHE_LOG
+          value: warn
         # PATH: Ensure holochain binaries, rust toolchain, and helper scripts are available
         # (not just interactive shells that source .bashrc)
         - name: PATH

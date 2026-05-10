@@ -48,7 +48,8 @@ impl SsrState {
     pub fn from_env() -> Option<Self> {
         let path = std::env::var("SSR_BUNDLE_PATH").ok()?;
         let bundle = PathBuf::from(path);
-        match AngularRenderer::new(bundle) {
+        let fetcher: Arc<dyn DataFetcher> = Arc::new(LocalFetcher);
+        match AngularRenderer::new(bundle, fetcher) {
             Ok(r) => Some(Self {
                 renderer: Arc::new(r),
             }),

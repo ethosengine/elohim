@@ -8,24 +8,44 @@
  * Runs BEFORE seed-humans.ts (which registers with doorway).
  *
  * Environment variables:
- *   CONDUCTOR_URLS    Comma-separated conductor app WebSocket URLs
- *                     e.g. ws://elohim-adam-alpha:4445,ws://elohim-eve-alpha:4445
- *   INSTALLED_APP_ID  Holochain app ID prefix (default: elohim)
+ *   CONDUCTOR_URLS               Comma-separated conductor app WebSocket URLs
+ *                                e.g. ws://elohim-adam-alpha:4445,ws://elohim-eve-alpha:4445
+ *   INSTALLED_APP_ID             Holochain app ID prefix (default: elohim)
+ *   CONDUCTOR_CONNECT_TIMEOUT_MS Per-connect timeout (default: 10000) — fail fast on
+ *                                unreachable conductors so the stage's catchError can
+ *                                soft-land before the pipeline's global timeout fires
  *
  * Output:
  *   [+] Created — Human profile was just created on the conductor
  *   [=] Exists  — Human profile already present (idempotent)
  *   [X] Failed  — Could not connect or create (see error)
  *
- * Exit codes:
- *   0 — all node/device humans created or already exist
- *   1 — one or more humans failed
+ *   seed-results-conductor-identities.json — structured per-human results,
+ *     written next to the script. The Jenkinsfile reads this to emit a
+ *     partial-vs-total UNSTABLE message and to archive the artifact for
+ *     orchestrator-level reconciliation (Path C).
+ *
+ * Exit codes (partial-readiness aware — aligns with the "seed whoever is
+ * ready" architecture: partial-cluster operation is the steady state):
+ *   0 — all targeted humans created or already exist
+ *   2 — partial: at least one human seeded, at least one failed
+ *   1 — total failure: ZERO humans seeded (or pre-flight error)
  */
 
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, writeFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { AdminWebsocket, AppWebsocket, type AppInfo } from '@holochain/client';
+
+// Canonical artifact filename from build-artifacts.json — single source of
+// truth across Groovy + TypeScript + JS. Resolved once at module load so
+// the writeFileSync below cannot drift from what genesis/Jenkinsfile reads.
+const ARTIFACTS_MANIFEST_PATH = resolve(
+  dirname(fileURLToPath(import.meta.url)),
+  '..', '..', 'orchestrator', 'build-artifacts.json',
+);
+const ARTIFACTS = JSON.parse(readFileSync(ARTIFACTS_MANIFEST_PATH, 'utf8'));
+const SEED_RESULTS_FILE: string = ARTIFACTS.genesis.seedResultsConductorIdentities;
 
 // =============================================================================
 // Types
@@ -73,6 +93,30 @@ interface ConductorResult {
 // Holochain helpers
 // =============================================================================
 
+const CONNECT_TIMEOUT_MS = parseInt(
+  process.env.CONDUCTOR_CONNECT_TIMEOUT_MS ?? '10000',
+  10
+);
+
+async function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  label: string
+): Promise<T> {
+  let timer: NodeJS.Timeout | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(
+      () => reject(new Error(`${label} timed out after ${timeoutMs}ms`)),
+      timeoutMs
+    );
+  });
+  try {
+    return await Promise.race([promise, timeout]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 /**
  * Derive admin WebSocket URL from app WebSocket URL.
  *
@@ -107,10 +151,14 @@ async function connectToConductor(
 
   let adminWs: AdminWebsocket;
   try {
-    adminWs = await AdminWebsocket.connect({
-      url: new URL(adminUrl),
-      wsClientOptions: { origin: 'http://localhost' },
-    });
+    adminWs = await withTimeout(
+      AdminWebsocket.connect({
+        url: new URL(adminUrl),
+        wsClientOptions: { origin: 'http://localhost' },
+      }),
+      CONNECT_TIMEOUT_MS,
+      `Admin connect ${adminUrl}`
+    );
   } catch (err) {
     throw new Error(
       `Admin connect failed (${adminUrl}): ${err instanceof Error ? err.message : err}`
@@ -168,11 +216,15 @@ async function connectToConductor(
     await adminWs.client.close();
 
     // Connect to app interface
-    const appWs = await AppWebsocket.connect({
-      url: new URL(appUrl),
-      token: tokenResult.token,
-      wsClientOptions: { origin: 'http://localhost' },
-    });
+    const appWs = await withTimeout(
+      AppWebsocket.connect({
+        url: new URL(appUrl),
+        token: tokenResult.token,
+        wsClientOptions: { origin: 'http://localhost' },
+      }),
+      CONNECT_TIMEOUT_MS,
+      `App connect ${appUrl}`
+    );
 
     return { appWs, cellId, appInfo: matchingApp };
   } catch (err) {
@@ -371,16 +423,46 @@ async function main(): Promise<void> {
   const created = results.filter(r => r.result === 'created').length;
   const exists = results.filter(r => r.result === 'exists').length;
   const failed = results.filter(r => r.result === 'failed').length;
+  const succeeded = created + exists;
 
   console.log('');
   console.log(`=== Results: ${created} created, ${exists} existing, ${failed} failed ===`);
+
+  // Structured artifact for Jenkinsfile + orchestrator-level reconciliation.
+  // Schema kept stable so Path C (stageAnnotations in actual-build-graph.json)
+  // can consume this without re-parsing console output.
+  const report = {
+    schemaVersion: '1',
+    seededAt: new Date().toISOString(),
+    script: 'seed-conductor-identities',
+    counts: { created, exists, failed, succeeded, total: results.length },
+    partial: succeeded > 0 && failed > 0,
+    allSucceeded: failed === 0,
+    allFailed: succeeded === 0 && results.length > 0,
+    results: results.map(r => ({
+      humanId: r.humanId,
+      displayName: r.displayName,
+      result: r.result,
+      conductorUrl: r.conductorUrl,
+      error: r.error ?? null,
+    })),
+  };
+  try {
+    writeFileSync(SEED_RESULTS_FILE, JSON.stringify(report, null, 2));
+  } catch (e) {
+    console.error(`WARN: could not write ${SEED_RESULTS_FILE}:`, e);
+  }
 
   if (failed > 0) {
     console.error('\nFailed humans:');
     for (const r of results.filter(r => r.result === 'failed')) {
       console.error(`  ${r.displayName} (${r.humanId}): ${r.error}`);
     }
-    process.exit(1);
+    // Partial-readiness aware: exit 2 if at least one succeeded, exit 1
+    // only on total failure. The Jenkinsfile maps both to UNSTABLE today
+    // but the distinction lets a future operator (or external Ralph
+    // Wiggum loop) route partial vs total to different remediations.
+    process.exit(succeeded > 0 ? 2 : 1);
   }
 
   process.exit(0);
