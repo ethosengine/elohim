@@ -31,6 +31,12 @@ import * as crypto from 'crypto';
 export interface BlobMetadata {
   /** SHA256 hash of the blob content */
   hash: string;
+  /**
+   * BLAKE3 hash populated post-upload when the server dual-wrote to IrohBlobStore.
+   * Undefined until the seeder records the value from the PUT /blob/{hash} response.
+   * Undefined in libp2p-only deployments where iroh is not configured.
+   */
+  blake3Hash?: string;
   /** Size in bytes */
   sizeBytes: number;
   /** MIME type */

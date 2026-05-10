@@ -341,7 +341,8 @@ async function seedProduction(config: SeedConfig): Promise<SeedResults> {
           manifestsToRegister.push({ manifest: result.manifest, reach });
 
           if (config.verbose) {
-            console.log(`  ✓ ${blob.hash} → ${result.manifest.total_shards} shards`);
+            const blake3Note = result.blake3Hash ? ` blake3=${result.blake3Hash.slice(0, 12)}…` : ' (sha256-only)';
+            console.log(`  ✓ ${blob.hash} → ${result.manifest.total_shards} shards${blake3Note}`);
           }
         } else {
           results.shardErrors++;

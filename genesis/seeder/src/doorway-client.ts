@@ -145,6 +145,8 @@ export interface PushResult {
   /** SHA256 hash - legacy format for backward compatibility */
   hash: string;
   cached: boolean;
+  /** BLAKE3 hash from server-side iroh dual-write. Undefined when iroh not configured (libp2p-only). */
+  blake3Hash?: string;
   error?: string;
 }
 
@@ -487,7 +489,18 @@ export class DoorwayClient {
         };
       }
 
-      return { success: true, cid, hash, cached: false };
+      // Read response JSON to extract blake3Hash from server-side dual-write.
+      // Best-effort: if JSON parse fails (e.g. unexpected response shape), we
+      // still report success — the bytes were accepted.
+      let blake3Hash: string | undefined;
+      try {
+        const body = await response.json();
+        blake3Hash = (body as any)?.blake3Hash || undefined;
+      } catch {
+        // Doorway may return an empty body or non-JSON response; ignore.
+      }
+
+      return { success: true, cid, hash, cached: false, blake3Hash };
     } catch (error) {
       return {
         success: false,

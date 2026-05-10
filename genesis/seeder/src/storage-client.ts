@@ -47,6 +47,8 @@ export interface ShardManifest {
   author_id?: string;
   created_at: string;
   verified_at?: string;
+  /** BLAKE3 hash populated by server-side dual-write (iroh). Null when iroh is not configured. */
+  blake3Hash?: string | null;
 }
 
 export interface StorageHealthStatus {
@@ -60,6 +62,8 @@ export interface StorageHealthStatus {
 export interface PushBlobResult {
   success: boolean;
   manifest?: ShardManifest;
+  /** BLAKE3 hash from server-side dual-write (iroh). Undefined when iroh not configured (libp2p-only). */
+  blake3Hash?: string;
   error?: string;
 }
 
@@ -241,12 +245,17 @@ export class StorageClient {
       }
 
       const manifest = await response.json();
+      // Extract blake3Hash from the server response (present when iroh dual-write succeeded).
+      // The server returns camelCase JSON; we surface it at PushBlobResult level so callers
+      // don't have to cast through ShardManifest's snake_case fields.
+      const blake3Hash: string | undefined = (manifest as any).blake3Hash || undefined;
       return {
         success: true,
         manifest: {
           ...manifest,
           reach, // Storage doesn't know about reach, we set it
         },
+        blake3Hash,
       };
     } catch (error) {
       return {

@@ -212,6 +212,12 @@ pub struct HttpServer {
     /// [`HttpServer::with_self_transport_manifest`].
     #[cfg(feature = "p2p-iroh")]
     self_transport_manifest: Option<Arc<crate::p2p_iroh::peer_map::PeerTransportManifest>>,
+    /// This node's libp2p peer ID string (e.g. "12D3KooW...").
+    /// Used by `handle_put_blob` to stamp `peer_blob_inventory` with
+    /// `source='self-custody'` on dual-write. Wired at startup via
+    /// [`HttpServer::with_self_peer_id`]. Falls back to "unknown-peer"
+    /// when not configured (legacy deployments without P2P).
+    self_peer_id: String,
     /// Counter — number of `GET /blob` requests served from iroh.
     /// Read by parity-soak diagnostics; never reset at runtime.
     blob_iroh_served_count: Arc<std::sync::atomic::AtomicU64>,
@@ -308,6 +314,7 @@ impl HttpServer {
             iroh_blob_store: None,
             #[cfg(feature = "p2p-iroh")]
             self_transport_manifest: None,
+            self_peer_id: "unknown-peer".to_string(),
             blob_iroh_served_count: Arc::new(std::sync::atomic::AtomicU64::new(0)),
             blob_libp2p_served_count: Arc::new(std::sync::atomic::AtomicU64::new(0)),
         }
@@ -433,6 +440,16 @@ impl HttpServer {
         manifest: Arc<crate::p2p_iroh::peer_map::PeerTransportManifest>,
     ) -> Self {
         self.self_transport_manifest = Some(manifest);
+        self
+    }
+
+    /// Set this node's libp2p peer ID string for `peer_blob_inventory`
+    /// self-custody stamps. Typically sourced from `self_transport_manifest`
+    /// (Plan 1) or the libp2p swarm identity. When absent the inventory row
+    /// is stamped with `"unknown-peer"` (correct but unroutable for reverse
+    /// lookup by other peers).
+    pub fn with_self_peer_id(mut self, peer_id: String) -> Self {
+        self.self_peer_id = peer_id;
         self
     }
 
@@ -1522,6 +1539,19 @@ impl HttpServer {
             .map_err(|e| StorageError::Internal(format!("Failed to read body: {}", e)))?;
         let data = body.to_bytes().to_vec();
 
+        self.put_blob_bytes(data, expected_hash, &mime_type, &agent_id)
+            .await
+    }
+
+    /// Inner implementation of blob PUT — decoupled from `Request<Incoming>` so
+    /// integration tests can call it directly without a live HTTP connection.
+    async fn put_blob_bytes(
+        &self,
+        data: Vec<u8>,
+        expected_hash: &str,
+        mime_type: &str,
+        agent_id: &str,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
         // Verify hash if provided - normalize both to hex for comparison
         // URL may contain raw hex, sha256-prefixed, or CID format
         let computed_hash = BlobStore::compute_hash(&data);
@@ -1588,7 +1618,7 @@ impl HttpServer {
                     content_hash: expected_hex.to_string(), // The full content hash
                     // Ideally, use the actual agent ID (e.g. from X-Agent-Id header) if provided;
                     // fallback to a generic placeholder or the configured connection's role for now.
-                    custodian_did: agent_id.clone(),
+                    custodian_did: agent_id.to_string(),
                     shard_index: i as u32,
                     strategy: crate::node_registry_api::ShardingStrategy::Geographic,
                     status: crate::node_registry_api::ShardStatus::Active,
@@ -1626,8 +1656,75 @@ impl HttpServer {
             "Stored blob with manifest"
         );
 
+        // ── Cutover gate #3: dual-write to IrohBlobStore when wired ──────────
+        // Best-effort: if the iroh side fails, the SHA256 write already
+        // succeeded — return 201 with blake3_hash: null per the pre-flight
+        // invariant in the plan ("partial readiness is OK").
+        #[cfg(feature = "p2p-iroh")]
+        let blake3_hash_str: Option<String> = match self.iroh_blob_store.as_ref() {
+            Some(iroh) => match iroh.add_bytes(data.clone()).await {
+                Ok(hash) => {
+                    tracing::debug!(
+                        sha256 = %manifest.blob_hash,
+                        blake3 = %hash,
+                        "Dual-wrote blob bytes to IrohBlobStore"
+                    );
+                    // Store with the canonical "blake3-{hex}" prefix so the
+                    // GET handler and peer_blob_inventory queries can strip it
+                    // consistently (see handle_get_blob line that strips the prefix).
+                    Some(format!("blake3-{hash}"))
+                }
+                Err(e) => {
+                    tracing::warn!(
+                        sha256 = %manifest.blob_hash,
+                        error = %e,
+                        "IrohBlobStore dual-write failed; SHA256 store still succeeded"
+                    );
+                    None
+                }
+            },
+            None => None,
+        };
+        #[cfg(not(feature = "p2p-iroh"))]
+        let blake3_hash_str: Option<String> = None;
+
+        // Stamp self-custody inventory row — best-effort; log on failure.
+        if let Some(pool) = self.db_pool.as_ref() {
+            let now = chrono::Utc::now().to_rfc3339();
+            let sha = manifest.blob_hash.clone();
+            let blake3_for_row = blake3_hash_str.clone();
+            let peer_id = self.self_peer_id.clone();
+            let pool_clone = pool.clone();
+            tokio::task::spawn_blocking(move || {
+                let mut conn = match pool_clone.get() {
+                    Ok(c) => c,
+                    Err(e) => {
+                        tracing::warn!(
+                            error = %e,
+                            "self-custody: db pool checkout failed"
+                        );
+                        return;
+                    }
+                };
+                if let Err(e) = crate::db::peer_blob_inventory::record_self_custody(
+                    &mut conn,
+                    &peer_id,
+                    &sha,
+                    blake3_for_row.as_deref(),
+                    &now,
+                ) {
+                    tracing::warn!(
+                        error = %e,
+                        sha256 = %sha,
+                        "self-custody: inventory stamp failed"
+                    );
+                }
+            });
+        }
+
+        let view = crate::views::PutBlobResponseView::from_manifest(manifest, blake3_hash_str);
         let body =
-            serde_json::to_string(&manifest).map_err(|e| StorageError::Internal(e.to_string()))?;
+            serde_json::to_string(&view).map_err(|e| StorageError::Internal(e.to_string()))?;
 
         Ok(Response::builder()
             .status(StatusCode::CREATED)
@@ -7786,6 +7883,65 @@ impl HttpServer {
         self.blob_libp2p_served_count
             .store(n, std::sync::atomic::Ordering::Relaxed);
     }
+
+    // ── Test helpers for integration tests (put_blob_dual_write, seed_e2e_dual_address) ──
+    // Named `test_*` to signal test-only intent; NOT guarded by `#[cfg(test)]`
+    // because integration test binaries in `tests/` compile the library without
+    // `cfg(test)` set — only the binary itself carries that flag.
+
+    /// Drive `put_blob_bytes` directly without an HTTP server bind.
+    /// Used by integration tests in `tests/put_blob_dual_write.rs` and
+    /// `tests/seed_e2e_dual_address.rs`.
+    pub async fn test_put_blob(
+        &self,
+        sha256: &str,
+        payload: &[u8],
+        mime_type: &str,
+    ) -> HttpTestResponse {
+        let data = payload.to_vec();
+        match self
+            .put_blob_bytes(data, sha256, mime_type, "did:elohim:test")
+            .await
+        {
+            Ok(resp) => {
+                let status = resp.status().as_u16();
+                let body = http_body_util::BodyExt::collect(resp.into_body())
+                    .await
+                    .unwrap()
+                    .to_bytes();
+                HttpTestResponse { status, body }
+            }
+            Err(e) => HttpTestResponse {
+                status: 500,
+                body: bytes::Bytes::from(format!("error: {e}")),
+            },
+        }
+    }
+
+    /// Drive `handle_get_blob` directly without an HTTP server bind.
+    pub async fn test_get_blob(&self, hash: &str) -> HttpTestResponse {
+        match self.handle_get_blob(hash, None).await {
+            Ok(resp) => {
+                let status = resp.status().as_u16();
+                let body = http_body_util::BodyExt::collect(resp.into_body())
+                    .await
+                    .unwrap()
+                    .to_bytes();
+                HttpTestResponse { status, body }
+            }
+            Err(e) => HttpTestResponse {
+                status: 500,
+                body: bytes::Bytes::from(format!("error: {e}")),
+            },
+        }
+    }
+
+    /// Expose the db pool for integration test assertions on
+    /// `peer_blob_inventory` rows written by dual-write.
+    /// Not guarded by `#[cfg(test)]` — see note above.
+    pub fn db_pool(&self) -> Option<crate::db::DbPool> {
+        self.db_pool.clone()
+    }
 }
 
 /// Correlate observation entries into actionable issues.
@@ -9748,6 +9904,16 @@ pub fn build_manifest() -> doorway_client::DoorwayRoutes {
         // Blob proxy: doorway caches blobs from /blob/{hash}
         .with_blobs_at("/blob")
         .build()
+}
+
+/// Simple response container for integration test assertions.
+///
+/// Defined at module level WITHOUT `#[cfg(test)]` so it is visible to
+/// `tests/` integration test binaries — those compile the library crate
+/// without `cfg(test)`, so anything guarded by that flag is invisible to them.
+pub struct HttpTestResponse {
+    pub status: u16,
+    pub body: bytes::Bytes,
 }
 
 #[cfg(test)]

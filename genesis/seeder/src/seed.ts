@@ -1176,7 +1176,8 @@ async function seedViaDoorway(): Promise<SeedResult> {
               entryPoint,
             });
 
-            console.log(`   ✅ ${concept.id}: ${uploadResult.cached ? 'already cached' : 'uploaded'} (slug: ${slug})`);
+            const blake3Note = uploadResult.blake3Hash ? ` blake3=${uploadResult.blake3Hash.slice(0, 12)}…` : ' (sha256-only)';
+            console.log(`   ✅ ${concept.id}: ${uploadResult.cached ? 'already cached' : 'uploaded'} (slug: ${slug})${blake3Note}`);
           } else {
             console.error(`   ❌ ${concept.id}: upload failed - ${uploadResult.error}`);
           }
@@ -1478,7 +1479,8 @@ async function seedViaDoorway(): Promise<SeedResult> {
 
         if (uploadResult.success) {
           pathThumbnailHashes.set(pathData.id, hash);
-          console.log(`   ✅ ${pathData.id}: ${uploadResult.cached ? 'already cached' : 'uploaded'}`);
+          const blake3Note = uploadResult.blake3Hash ? ` blake3=${uploadResult.blake3Hash.slice(0, 12)}…` : ' (sha256-only)';
+          console.log(`   ✅ ${pathData.id}: ${uploadResult.cached ? 'already cached' : 'uploaded'}${blake3Note}`);
         } else {
           console.error(`   ❌ ${pathData.id}: upload failed - ${uploadResult.error}`);
         }

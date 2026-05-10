@@ -342,6 +342,56 @@ describe('StorageClient', () => {
 
       expect(result.manifest?.reach).toBe('commons');
     });
+
+    it('returns blake3Hash from server response when present', async () => {
+      const mockManifest = {
+        blobHash: 'sha256-aa',
+        totalSize: 4,
+        mimeType: 'text/plain',
+        encoding: 'none',
+        dataShards: 1,
+        totalShards: 1,
+        shardSize: 4,
+        shardHashes: ['sha256-aa'],
+        reach: 'commons',
+        createdAt: new Date().toISOString(),
+        blake3Hash: 'b'.repeat(64),
+      };
+      (global.fetch as any).mockResolvedValueOnce({
+        ok: true,
+        status: 201,
+        json: async () => mockManifest,
+      });
+
+      const result = await client.pushBlob(Buffer.from('test'), 'text/plain');
+      expect(result.success).toBe(true);
+      expect(result.blake3Hash).toBe('b'.repeat(64));
+    });
+
+    it('handles libp2p-only response with null blake3Hash', async () => {
+      const mockManifest = {
+        blobHash: 'sha256-aa',
+        totalSize: 4,
+        mimeType: 'text/plain',
+        encoding: 'none',
+        dataShards: 1,
+        totalShards: 1,
+        shardSize: 4,
+        shardHashes: ['sha256-aa'],
+        reach: 'commons',
+        createdAt: new Date().toISOString(),
+        blake3Hash: null,
+      };
+      (global.fetch as any).mockResolvedValueOnce({
+        ok: true,
+        status: 201,
+        json: async () => mockManifest,
+      });
+
+      const result = await client.pushBlob(Buffer.from('test'), 'text/plain');
+      expect(result.success).toBe(true);
+      expect(result.blake3Hash).toBeUndefined();
+    });
   });
 
   describe('getShard()', () => {
