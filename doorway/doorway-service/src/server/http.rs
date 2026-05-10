@@ -681,6 +681,7 @@ impl AppState {
             ssr_http_client: init_ssr_http_client(),
             render_capability: None,
             render_semaphore: None,
+            pkarr_resolver: None,
         })
     }
 
@@ -1744,7 +1745,7 @@ async fn handle_request(
         // pkarr resolver endpoint — cutover gate #10 (n0 mitigation step 2).
         // Doorway-specific because the bytes terminate inside doorway's LRU
         // cache; not a storage-proxy concern.
-        (_, p) if p.starts_with("/pkarr/") => {
+        (m, p) if p.starts_with("/pkarr/") => {
             let key = &p["/pkarr/".len()..];
             let svc = match state.pkarr_resolver.as_ref() {
                 Some(s) => Arc::clone(s),
@@ -1760,7 +1761,7 @@ async fn handle_request(
                     ));
                 }
             };
-            match method {
+            match m {
                 Method::GET => {
                     let ims = req
                         .headers()
