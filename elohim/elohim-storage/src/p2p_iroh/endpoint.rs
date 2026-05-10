@@ -7,7 +7,10 @@
 
 use std::io;
 
-use iroh::{Endpoint, RelayMode};
+use iroh::{
+    discovery::pkarr::{PkarrPublisher, PkarrResolver},
+    Endpoint, RelayMode,
+};
 
 use super::{config::IrohConfig, identity};
 
@@ -25,11 +28,12 @@ pub enum BuildEndpointError {
 /// Build an iroh `Endpoint` from config. Caller is responsible for shutting
 /// it down on graceful exit (`endpoint.close().await`).
 ///
-/// Phase 10: when `config.use_n0_discovery` is `true`, n0's DNS-based
-/// peer discovery is enabled. This replaces libp2p's Kademlia for record
-/// publication during cutover and post-cutover. Tests with relays
-/// disabled typically also disable discovery and exchange `NodeAddr`
-/// directly via `endpoint.add_node_addr`.
+/// Cutover gate #10: each entry in `config.discovery_resolvers` is registered
+/// as a `(PkarrPublisher, PkarrResolver)` pair via `add_discovery`. iroh wraps
+/// them in `ConcurrentDiscovery` for parallel querying. n0's hosted resolver
+/// is no longer hardcoded — it is one entry among many that operators choose.
+/// An empty list means "no discovery" (peer addresses must be exchanged
+/// out-of-band via `Endpoint::add_node_addr` — this is what tests do).
 pub async fn build_endpoint(config: &IrohConfig) -> Result<Endpoint, BuildEndpointError> {
     let secret = identity::load_or_generate(&config.secret_key_path)?;
 
@@ -43,8 +47,13 @@ pub async fn build_endpoint(config: &IrohConfig) -> Result<Endpoint, BuildEndpoi
         .secret_key(secret)
         .relay_mode(relay_mode);
 
-    if config.use_n0_discovery {
-        builder = builder.discovery_n0();
+    for resolver in &config.discovery_resolvers {
+        builder = builder.add_discovery(PkarrPublisher::builder(resolver.url.clone()));
+        builder = builder.add_discovery(PkarrResolver::builder(resolver.url.clone()));
+        tracing::info!(
+            url = %resolver.url, kind = ?resolver.kind,
+            "iroh: registered pkarr discovery resolver"
+        );
     }
 
     let endpoint = builder.bind().await?;
@@ -68,6 +77,7 @@ mod tests {
             secret_key_path: dir.path().join("iroh.key"),
             use_n0_relays: false,
             use_n0_discovery: false,
+            discovery_resolvers: vec![],
         };
 
         let ep = build_endpoint(&cfg).await.expect("endpoint binds");
@@ -86,6 +96,7 @@ mod tests {
             secret_key_path: dir.path().join("iroh.key"),
             use_n0_relays: false,
             use_n0_discovery: false,
+            discovery_resolvers: vec![],
         };
 
         let ep1 = build_endpoint(&cfg).await.unwrap();

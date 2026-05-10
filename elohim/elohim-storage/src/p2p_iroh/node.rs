@@ -186,6 +186,7 @@ mod tests {
             secret_key_path: dir.join("iroh.key"),
             use_n0_relays: false,
             use_n0_discovery: false,
+            discovery_resolvers: vec![],
         }
     }
 
