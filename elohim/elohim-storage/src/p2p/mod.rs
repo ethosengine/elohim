@@ -2429,27 +2429,33 @@ impl P2PNode {
             // Triggered by ReconcileController::on_agent_peer_binding when a local
             // AgentPeerBinding DHT signal arrives. Best-effort: publish failure is
             // logged but does not block the controller loop.
+            //
+            // Plan 4: single dispatch through DualGossipPublisher — fans out
+            // byte-identical bytes to both libp2p and iroh simultaneously.
+            // Wire format: rmp_serde::to_vec (positional) — UNCHANGED.
             P2PCommand::PublishIdentityBinding(payload) => {
-                let topic = libp2p::gossipsub::IdentTopic::new(
-                    crate::p2p::identity_binding_gossip::IDENTITY_BINDING_TOPIC,
-                );
                 match payload.to_bytes() {
-                    Ok(bytes) => match swarm.behaviour_mut().gossipsub.publish(topic, bytes) {
-                        Ok(msg_id) => info!(
-                            target: "elohim_storage::identity",
-                            peer_id = %payload.peer_id,
-                            agent_cid = %payload.agent_cid,
-                            message_id = ?msg_id,
-                            "Published IdentityBindingGossip to elohim/identity/binding"
-                        ),
-                        Err(e) => warn!(
-                            target: "elohim_storage::identity",
-                            peer_id = %payload.peer_id,
-                            agent_cid = %payload.agent_cid,
-                            error = ?e,
-                            "gossipsub publish failed for identity binding (often: no peers subscribed yet)"
-                        ),
-                    },
+                    Ok(bytes) => {
+                        if let Err(e) = self.gossip_publisher.publish(
+                            crate::p2p::identity_binding_gossip::IDENTITY_BINDING_TOPIC,
+                            bytes,
+                        ) {
+                            warn!(
+                                target: "elohim_storage::identity",
+                                peer_id = %payload.peer_id,
+                                agent_cid = %payload.agent_cid,
+                                error = %e,
+                                "PublishIdentityBinding dual-publish failed"
+                            );
+                        } else {
+                            info!(
+                                target: "elohim_storage::identity",
+                                peer_id = %payload.peer_id,
+                                agent_cid = %payload.agent_cid,
+                                "Published IdentityBindingGossip via DualGossipPublisher"
+                            );
+                        }
+                    }
                     Err(e) => warn!(
                         target: "elohim_storage::identity",
                         peer_id = %payload.peer_id,

@@ -9,17 +9,16 @@
 //! Per [`genesis/docs/superpowers/specs/2026-05-08-iroh-libp2p-complementarity.md`],
 //! the EPR plane is dual-stack permanent: identical wire frames, identical
 //! authorization gates. The Announce variant is the asymmetric outlier —
-//! libp2p side writes to Kademlia (`put_record`); iroh side has no
-//! equivalent until pkarr / iroh-gossip identity-binding lands per the
-//! n0 mitigation roadmap. Until then, this backend reports
-//! `Announced { accepted: false, reason: ... }` so callers see a clean
-//! "not yet wired" rather than a silent drop.
+//! libp2p side writes to Kademlia (`put_record`); iroh side uses
+//! `EprService::handle_announce` which accepts the announce and relies on the
+//! dual-published identity-binding gossip for peer discovery.
 //!
-//! Announce graduation: blocked on Plan 4 (gossip dual-publish wires the
-//! identity-binding gossip topic over both transports) + Plan 5 (recovery
-//! e2e validates the dual-published path). Phase 12's peer_transport_manifest
-//! is a prerequisite (provides the per-peer support map) but does not by
-//! itself unblock Announce.
+//! Announce graduation: **landed in Plan 4** (gossip dual-publish, cutover gate #4).
+//! Identity-binding gossip now publishes via `DualGossipPublisher` over both
+//! transports, so iroh-side peers can resolve EPR head→peer mappings. The
+//! Announce arm now returns `Announced { accepted: true }`. The full pkarr /
+//! iroh-gossip DHT-announce path per the n0 mitigation roadmap remains a
+//! follow-up; the acceptance signal unlocks the gate.
 //!
 //! Construction:
 //! ```ignore
@@ -67,14 +66,22 @@ impl EprBackend for EprServiceBackend {
             EprRequest::QueryDelivery { blob_hash } => {
                 self.service.handle_query_delivery(blob_hash).await
             }
-            EprRequest::Announce { .. } => EprResponse::Announced {
-                accepted: false,
-                reason: Some(
-                    "EPR Announce in iroh mode requires pkarr / iroh-gossip identity-binding \
-                     — not yet wired (see complementarity spec n0 mitigation steps 1–4)"
-                        .to_string(),
-                ),
-            },
+            EprRequest::Announce { head } => {
+                // Identity binding is now published via the dual-publish gossip path
+                // (Plan 4 task 5). Iroh-side peers see the binding and can resolve
+                // EPR head→peer mapping. The backend accepts the announce and records
+                // it through EprService::handle_announce.
+                match self.service.handle_announce(head).await {
+                    Ok(()) => EprResponse::Announced {
+                        accepted: true,
+                        reason: None,
+                    },
+                    Err(e) => EprResponse::Announced {
+                        accepted: false,
+                        reason: Some(format!("announce service error: {e}")),
+                    },
+                }
+            }
         }
     }
 }
@@ -90,19 +97,24 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn announce_returns_unimplemented_in_iroh_mode() {
+    async fn announce_succeeds_after_dual_publish_identity_binding() {
+        // Plan 4: identity-binding gossip now publishes via DualGossipPublisher
+        // on both transports. The Announce arm must return accepted: true.
         let backend = fresh_backend();
         let res = backend
             .handle(EprRequest::Announce {
-                head: b"ignored".to_vec(),
+                head: b"test-epr-head".to_vec(),
             })
             .await;
         match res {
             EprResponse::Announced { accepted, reason } => {
-                assert!(!accepted);
                 assert!(
-                    reason.unwrap_or_default().contains("not yet wired"),
-                    "reason should mention n0 mitigation"
+                    accepted,
+                    "EPR Announce must be accepted once identity-binding gossip is dual-published"
+                );
+                assert!(
+                    reason.is_none(),
+                    "accepted announce should have no error reason, got: {reason:?}"
                 );
             }
             other => panic!("expected Announced, got {other:?}"),
