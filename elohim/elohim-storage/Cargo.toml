@@ -207,6 +207,10 @@ ssr = ["dep:elohim-render"]
 tempfile = "3"
 jsonschema = "0.28"
 wiremock = "0.6"
+# pkarr resolver e2e (gate #10): minimal in-process pkarr relay using axum,
+# n0-future for stream consumption.
+axum = "0.8"
+n0-future = "0.1"
 
 [[bin]]
 name = "elohim-storage"
