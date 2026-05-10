@@ -285,7 +285,7 @@ async function main() {
     const refMap = await loadRefMap(SCHEMA_DIR);
 
     const allGenerated = [];
-    for (const subdir of ['enums', 'inputs', 'views', 'p2p']) {
+    for (const subdir of ['enums', 'inputs', 'views', 'p2p', 'manifests']) {
       const results = await generateFromDir(subdir, refMap);
       allGenerated.push(...results);
     }

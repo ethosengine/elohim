@@ -17,6 +17,11 @@
       "type": "integer",
       "minimum": 0,
       "description": "Count of CIDs both doorways project."
+    },
+    "discovery_resolvers": {
+      "type": "array",
+      "items": { "$ref": "../manifests/discovery-resolvers.schema.json#/definitions/DiscoveryResolver" },
+      "description": "Resolvers this peer publishes as trusted. Empty/omitted means 'inherits federation defaults'. A peer that explicitly publishes [{kind: 'operator-self-hosted', url: 'https://<their-doorway>/pkarr'}] (and no n0-default entry) is opting out of n0 — gate #10 + Step 3 of the n0-mitigation spec."
     }
   }
 }

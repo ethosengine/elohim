@@ -1,0 +1,47 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://elohim.host/schemas/v1/manifests/discovery-resolvers.schema.json",
+  "title": "DiscoveryResolversManifest",
+  "description": "A peer's declared list of pkarr discovery resolvers. Trusted resolvers a peer queries (and publishes to) for iroh NodeId → NodeAddr lookups. Per spec 2026-05-08-iroh-libp2p-complementarity.md, Step 3: a hub that distrusts n0 publishes its manifest with self-hosted resolvers only.",
+  "type": "object",
+  "required": ["resolvers"],
+  "additionalProperties": false,
+  "properties": {
+    "resolvers": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/definitions/DiscoveryResolver" },
+      "description": "Ordered list. iroh queries them in parallel via ConcurrentDiscovery; first success wins. Order is operator-meaningful (preference signal) but not protocol-meaningful."
+    }
+  },
+  "definitions": {
+    "DiscoveryResolver": {
+      "type": "object",
+      "required": ["url", "kind"],
+      "additionalProperties": false,
+      "properties": {
+        "url": {
+          "type": "string",
+          "format": "uri",
+          "pattern": "^https://",
+          "description": "Base HTTPS URL of the pkarr relay endpoint. The pkarr wire protocol appends /<z32-public-key> to this base. Example: https://doorway.elohim.host/pkarr"
+        },
+        "kind": {
+          "type": "string",
+          "enum": ["n0-default", "operator-self-hosted", "federated-peer", "third-party"],
+          "description": "Provenance of this resolver. Audit + UI hint; not consulted by the wire protocol."
+        },
+        "operator_doorway_id": {
+          "type": "string",
+          "description": "If kind is 'operator-self-hosted' or 'federated-peer', the doorway_id that runs this resolver. Cross-referenced against federation.doorways.",
+          "examples": ["adam-elohim-host", "alpha-elohim-host"]
+        },
+        "label": {
+          "type": "string",
+          "maxLength": 64,
+          "description": "Human-readable label for operator dashboards."
+        }
+      }
+    }
+  }
+}
