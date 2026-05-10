@@ -25,6 +25,7 @@ pub mod federation;
 pub mod import_client;
 pub mod import_config;
 pub mod import_orchestrator;
+pub mod pkarr_resolver;
 pub mod recording;
 pub mod route_registry;
 pub mod shard_resolver;
