@@ -1280,7 +1280,11 @@ impl HttpServer {
         // info level (default): basic operational data
         if detail >= elohim_compute::DetailLevel::Info {
             let stats = self.blob_store.stats().await?;
-            body["blobs"] = serde_json::json!(stats.total_blobs);
+            body["blobs"] = serde_json::json!({
+                "total": stats.total_blobs,
+                "iroh_served": self.blob_iroh_served_count.load(std::sync::atomic::Ordering::Relaxed),
+                "libp2p_served": self.blob_libp2p_served_count.load(std::sync::atomic::Ordering::Relaxed),
+            });
             body["bytes"] = serde_json::json!(stats.total_bytes);
             body["importEnabled"] = serde_json::json!(self.import_api.is_some());
             body["conductor"] = serde_json::json!({
@@ -7766,6 +7770,30 @@ impl HttpServer {
     ) -> Result<Response<Full<Bytes>>, StorageError> {
         self.handle_get_blob(hash, agent_cid).await
     }
+
+    /// Test entry point: invoke the /health endpoint with default detail level.
+    /// Returns the full health JSON body. Used to verify blob backend counters
+    /// surface correctly in the health response.
+    #[cfg(test)]
+    pub async fn handle_status_for_test(
+        &self,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        self.handle_health("").await
+    }
+
+    /// Set the iroh-served counter to an arbitrary value for unit tests.
+    #[cfg(test)]
+    pub fn set_iroh_served_count_for_test(&self, n: u64) {
+        self.blob_iroh_served_count
+            .store(n, std::sync::atomic::Ordering::Relaxed);
+    }
+
+    /// Set the libp2p-served counter to an arbitrary value for unit tests.
+    #[cfg(test)]
+    pub fn set_libp2p_served_count_for_test(&self, n: u64) {
+        self.blob_libp2p_served_count
+            .store(n, std::sync::atomic::Ordering::Relaxed);
+    }
 }
 
 /// Correlate observation entries into actionable issues.
@@ -9931,5 +9959,36 @@ mod blob_backend_wiring_tests {
         let server = HttpServer::new(blob_store, "127.0.0.1:0".parse().unwrap())
             .with_self_transport_manifest(manifest);
         assert!(server.self_transport_manifest.is_some());
+    }
+
+    #[tokio::test]
+    async fn status_response_includes_blob_backend_counters() {
+        let blob_store = Arc::new(
+            BlobStore::new(tempfile::tempdir().unwrap().path().to_path_buf())
+                .await
+                .unwrap(),
+        );
+        let server = HttpServer::new(blob_store, "127.0.0.1:0".parse().unwrap());
+        // Simulate 7 iroh-served and 13 libp2p-served blobs.
+        // We call handle_blob_get_for_test in a way that won't actually serve
+        // (empty hash → BAD_REQUEST), but we want to test the counter wiring.
+        // Instead, directly increment by atomically storing after construction.
+        // Access the counters via the Arc handles stored in the server struct
+        // through the snapshot helper (which reads them without mutation).
+        // We need to drive the counters up — use the Arc clones we can access
+        // via the server's public counter snapshot methods for verification.
+        //
+        // To mutate, we need to reach the Arc — expose a test helper:
+        server.set_iroh_served_count_for_test(7);
+        server.set_libp2p_served_count_for_test(13);
+
+        let resp = server.handle_status_for_test().await.unwrap();
+        let body = http_body_util::BodyExt::collect(resp.into_body())
+            .await
+            .unwrap()
+            .to_bytes();
+        let v: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(v["blobs"]["iroh_served"].as_u64(), Some(7));
+        assert_eq!(v["blobs"]["libp2p_served"].as_u64(), Some(13));
     }
 }
