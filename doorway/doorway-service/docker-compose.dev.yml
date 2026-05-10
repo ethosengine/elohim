@@ -41,6 +41,30 @@ services:
     profiles:
       - debug
 
+  # Doorway service with pkarr resolver enabled (cutover gate #10).
+  # Opt-in via `docker-compose --profile full up -d`.
+  doorway:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: doorway-service
+    ports:
+      - "8888:8888"
+    environment:
+      DOORWAY_PKARR_RESOLVER_ENABLED: "true"
+      DOORWAY_PKARR_CACHE_CAPACITY: "1000"
+      DOORWAY_PKARR_CACHE_DIR: "/var/lib/doorway/pkarr"
+      STORAGE_URL: "http://host.docker.internal:8090"
+    volumes:
+      - doorway_pkarr_cache:/var/lib/doorway/pkarr
+    depends_on:
+      - nats
+      - mongodb
+    profiles:
+      - full
+
 volumes:
   doorway_mongo_data:
     name: doorway_mongo_data
+  doorway_pkarr_cache:
+    name: doorway_pkarr_cache

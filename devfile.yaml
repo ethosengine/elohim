@@ -115,6 +115,12 @@ components:
         # and genesis/agentic/bin (cargo-pool, pool-*.sh) are available.
         - name: PATH
           value: '/projects/elohim/genesis/agentic/bin:/nix/xdg/cache/pnpm:/opt/rust/cargo/bin:/opt/holochain/bin:/home/user/bin:/home/user/.nix-profile/bin:/home/user/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'
+        # Cutover gate #10 — auto-enable the pkarr resolver in Che workspaces
+        # so dev-time iroh can use the workspace doorway as its resolver.
+        - name: DOORWAY_PKARR_RESOLVER_ENABLED
+          value: "true"
+        - name: DOORWAY_PKARR_CACHE_DIR
+          value: "/projects/elohim/.doorway/pkarr-cache"
       endpoints:
         - name: angular-dev
           targetPort: 4200

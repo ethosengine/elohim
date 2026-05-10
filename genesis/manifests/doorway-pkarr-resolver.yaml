@@ -1,0 +1,42 @@
+# Cutover gate #10 — pkarr resolver enablement for doorway.
+#
+# Apply via:
+#   kubectl patch deployment doorway -n <ns> --patch-file genesis/manifests/doorway-pkarr-resolver.yaml
+#
+# Per memory project_ci_storage_topology: openebs-jiva-csi-default is the
+# verified storage class for this cluster. Per spec
+# genesis/docs/superpowers/specs/2026-05-08-iroh-libp2p-complementarity.md,
+# this enables the self-hostable pkarr relay endpoint at /pkarr/{key}.
+spec:
+  template:
+    spec:
+      containers:
+        - name: doorway
+          env:
+            - name: DOORWAY_PKARR_RESOLVER_ENABLED
+              value: "true"
+            - name: DOORWAY_PKARR_CACHE_CAPACITY
+              value: "10000"
+            - name: DOORWAY_PKARR_CACHE_DIR
+              value: "/var/lib/doorway/pkarr"
+          volumeMounts:
+            - name: doorway-pkarr-cache
+              mountPath: /var/lib/doorway/pkarr
+      volumes:
+        - name: doorway-pkarr-cache
+          persistentVolumeClaim:
+            claimName: doorway-pkarr-cache
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: doorway-pkarr-cache
+  labels:
+    app: doorway
+    component: pkarr-resolver
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: openebs-jiva-csi-default
