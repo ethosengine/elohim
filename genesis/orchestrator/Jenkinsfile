@@ -1250,6 +1250,15 @@ spec:
         )
     }
 
+    triggers {
+        // Gate #6 iroh parity soak: nightly at midnight UTC.
+        // The stage itself guards with `when { anyOf { triggeredBy 'TimerTrigger'; changeset ... } }`
+        // so on push-triggered runs the nightly stage only fires when transport code changed.
+        // The cron trigger here fires the full orchestrator at midnight regardless of changes,
+        // which then runs the iroh parity stage unconditionally (TimerTrigger path).
+        cron('0 0 * * *')
+    }
+
     options {
         timeout(time: 240, unit: 'MINUTES')  // upstream parallel builds + genesis (60min) + a2o gap analysis
         disableConcurrentBuilds(abortPrevious: true)  // Abort older builds when new one starts
@@ -1983,6 +1992,59 @@ spec:
             post {
                 always {
                     archiveArtifacts artifacts: 'genesis/a2o/reports/coverage-gap-report.json',
+                                     allowEmptyArchive: true
+                }
+            }
+        }
+
+        // ── Gate #6: iroh parity nightly soak ─────────────────────────────────
+        // Runs every night at midnight UTC and on any push that touches the iroh
+        // or libp2p transport code paths. Advisory: marks UNSTABLE, never FAILURE,
+        // so it cannot block a legitimate elohim-edge build.
+        //
+        // Soak window opened: 2026-05-10. Closure criterion: 7 consecutive nightly
+        // runs with zero iroh_* test divergences. See RUNBOOK below.
+        stage('Iroh Parity Nightly (Gate #6 Soak)') {
+            when {
+                anyOf {
+                    // Nightly cron trigger
+                    triggeredBy 'TimerTrigger'
+                    // On any push that touches iroh or libp2p transport code
+                    changeset pattern: 'elohim/elohim-storage/src/p2p/**', comparator: 'ANT'
+                    changeset pattern: 'elohim/elohim-storage/src/p2p_iroh/**', comparator: 'ANT'
+                }
+            }
+            steps {
+                catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
+                    container('builder') {
+                        script {
+                            echo '''
++-------------------------------------------------------------------+
+| IROH PARITY NIGHTLY SOAK — Gate #6                                |
+| Divergence = iroh_*_real_backend or iroh_*_parity fails where     |
+| the matching libp2p path is green. 2 hits in 7 days = escalate.  |
++-------------------------------------------------------------------+'''
+                        }
+                        dir('elohim/elohim-storage') {
+                            sh '''
+                                export CARGO_TARGET_DIR=/projects/.cargo-target-pool/family/iroh/elohim__elohim-storage/dev
+                                RUSTFLAGS=\'--cfg getrandom_backend="custom"\' \
+                                cargo test \
+                                    --release \
+                                    --features "p2p p2p-iroh" \
+                                    --test \'iroh_*\' \
+                                    -- --test-threads=1 \
+                                    2>&1 | tee iroh-parity-nightly.log
+                            '''
+                        }
+                        archiveArtifacts artifacts: 'elohim/elohim-storage/iroh-parity-nightly.log',
+                                         allowEmptyArchive: true
+                    }
+                }
+            }
+            post {
+                always {
+                    archiveArtifacts artifacts: 'elohim/elohim-storage/iroh-parity-nightly.log',
                                      allowEmptyArchive: true
                 }
             }
