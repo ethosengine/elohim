@@ -54,9 +54,7 @@ struct RelayMetrics {
 const PKARR_CONTENT_TYPE: &str = "application/pkarr.org-relays+octet-stream";
 
 async fn run_test_relay(metrics: Arc<RelayMetrics>) -> SocketAddr {
-    let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0))
-        .await
-        .unwrap();
+    let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).await.unwrap();
     let addr = listener.local_addr().unwrap();
     tokio::spawn(async move {
         loop {
@@ -68,10 +66,7 @@ async fn run_test_relay(metrics: Arc<RelayMetrics>) -> SocketAddr {
             tokio::spawn(async move {
                 let io = TokioIo::new(stream);
                 let _ = http1::Builder::new()
-                    .serve_connection(
-                        io,
-                        service_fn(move |req| handle(req, metrics.clone())),
-                    )
+                    .serve_connection(io, service_fn(move |req| handle(req, metrics.clone())))
                     .await;
             });
         }
@@ -189,7 +184,9 @@ async fn iroh_resolves_via_self_hosted_pkarr_only() {
     // B resolves A's NodeId via the configured discovery surface.
     let node_id_a = ep_a.node_id();
     let resolved = ep_b.discovery().expect("discovery configured");
-    let mut stream = resolved.resolve(node_id_a).expect("resolver returns stream");
+    let mut stream = resolved
+        .resolve(node_id_a)
+        .expect("resolver returns stream");
     use n0_future::StreamExt;
     let item = tokio::time::timeout(Duration::from_secs(10), stream.next())
         .await
