@@ -851,7 +851,10 @@ async fn async_main(
     // branch constructs its own SyncManager pointing at the same on-disk
     // sled DB the libp2p path would use; only one branch ever opens it.
     #[cfg(feature = "p2p-iroh")]
-    let _iroh_node = if args.enable_p2p
+    let (_iroh_node, iroh_blob_store_for_http): (
+        Option<elohim_storage::p2p_iroh::IrohNode>,
+        Option<Arc<elohim_storage::p2p_iroh::IrohBlobStore>>,
+    ) = if args.enable_p2p
         && config.transport_backend == elohim_storage::config::TransportBackend::Iroh
     {
         use elohim_storage::epr_atom_service::EprAtomService;
@@ -1055,7 +1058,10 @@ async fn async_main(
                      /elohim/view-federation/2.0.0, /elohim/identity-handshake/2.0.0, \
                      /elohim/trust/2.0.0"
                 );
-                Some(node)
+                // Cutover gate #2 (Plan 2): clone blob store for HTTP server wiring.
+                let iroh_blob_store_for_http =
+                    Arc::new(node.store().clone());
+                (Some(node), Some(iroh_blob_store_for_http))
             }
             Err(e) => {
                 error!(error = %e, "Failed to start iroh node");
@@ -1063,11 +1069,11 @@ async fn async_main(
             }
         }
     } else {
-        None
+        (None, None)
     };
 
     #[cfg(not(feature = "p2p-iroh"))]
-    let _iroh_node: Option<()> = None;
+    let (_iroh_node, iroh_blob_store_for_http): (Option<()>, Option<()>) = (None, None);
 
     // Start HTTP server for shard API
     let http_addr: SocketAddr = format!("0.0.0.0:{}", config.http_port).parse()?;
@@ -1146,6 +1152,18 @@ async fn async_main(
 
     if args.embedded_conductor {
         http_server = http_server.with_embedded_conductor();
+    }
+
+    // Cutover gate #2 (Plan 2 Task 3): wire iroh blob store into HTTP server.
+    // When the iroh node started successfully, thread its blob store so that
+    // GET /blob/{hash} can serve BLAKE3-addressed blobs from iroh for
+    // iroh-capable callers. Absent store → every request degrades to legacy SHA256 path.
+    #[cfg(feature = "p2p-iroh")]
+    if let Some(iroh_blobs) = iroh_blob_store_for_http.clone() {
+        http_server = http_server.with_iroh_blob_store(iroh_blobs);
+        info!(
+            "Iroh blob store wired into HTTP server (cutover gate #2 — iroh-first for BLAKE3-capable callers)"
+        );
     }
 
     if let Some(ref cache) = extraction_cache {

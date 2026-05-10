@@ -201,6 +201,22 @@ pub struct HttpServer {
     fetch_blob_timeout_seconds: u64,
     /// T17: max parallel peer attempts per race-fetch batch. From `Config::fetch_blob_parallelism`.
     fetch_blob_parallelism: usize,
+    /// Iroh-side blob backend (BLAKE3-keyed). Wired at startup via
+    /// [`HttpServer::with_iroh_blob_store`] when the iroh node is
+    /// active. None means iroh is disabled or not yet wired — every
+    /// `/blob/{hash}` request degrades to the legacy SHA256 path.
+    #[cfg(feature = "p2p-iroh")]
+    iroh_blob_store: Option<Arc<crate::p2p_iroh::IrohBlobStore>>,
+    /// This node's transport-profile manifest (Plan 1). Used by the
+    /// blob handler's backend selector. Wired at startup via
+    /// [`HttpServer::with_self_transport_manifest`].
+    #[cfg(feature = "p2p-iroh")]
+    self_transport_manifest: Option<Arc<crate::p2p_iroh::peer_map::PeerTransportManifest>>,
+    /// Counter — number of `GET /blob` requests served from iroh.
+    /// Read by parity-soak diagnostics; never reset at runtime.
+    blob_iroh_served_count: Arc<std::sync::atomic::AtomicU64>,
+    /// Counter — number of `GET /blob` requests served from libp2p.
+    blob_libp2p_served_count: Arc<std::sync::atomic::AtomicU64>,
 }
 
 /// Extract X-Schema-Version header from request and validate it.
@@ -288,6 +304,12 @@ impl HttpServer {
             self_cid: String::new(),
             fetch_blob_timeout_seconds: 5,
             fetch_blob_parallelism: 3,
+            #[cfg(feature = "p2p-iroh")]
+            iroh_blob_store: None,
+            #[cfg(feature = "p2p-iroh")]
+            self_transport_manifest: None,
+            blob_iroh_served_count: Arc::new(std::sync::atomic::AtomicU64::new(0)),
+            blob_libp2p_served_count: Arc::new(std::sync::atomic::AtomicU64::new(0)),
         }
     }
 
@@ -390,6 +412,30 @@ impl HttpServer {
     /// require missing dependencies are skipped gracefully.
     pub fn with_fan_out_ctx(mut self, ctx: Arc<crate::api::epr::EprFanOutCtx>) -> Self {
         self.fan_out_ctx = Some(ctx);
+        self
+    }
+
+    /// Wire the iroh-side blob store. When set, `GET /blob/{hash}` may
+    /// serve from BLAKE3-keyed iroh storage for iroh-capable callers
+    /// before falling through to the legacy SHA256 path.
+    #[cfg(feature = "p2p-iroh")]
+    pub fn with_iroh_blob_store(
+        mut self,
+        store: Arc<crate::p2p_iroh::IrohBlobStore>,
+    ) -> Self {
+        self.iroh_blob_store = Some(store);
+        self
+    }
+
+    /// Wire this node's transport-profile manifest (Plan 1). Required
+    /// for the blob backend selector to ever return Iroh; absent
+    /// manifest forces libp2p-only.
+    #[cfg(feature = "p2p-iroh")]
+    pub fn with_self_transport_manifest(
+        mut self,
+        manifest: Arc<crate::p2p_iroh::peer_map::PeerTransportManifest>,
+    ) -> Self {
+        self.self_transport_manifest = Some(manifest);
         self
     }
 
@@ -7580,6 +7626,20 @@ impl HttpServer {
             None,
         );
     }
+
+    /// Snapshot of the iroh-served counter. Test-visibility helper.
+    #[cfg(test)]
+    pub fn blob_iroh_served_count_snapshot(&self) -> u64 {
+        self.blob_iroh_served_count
+            .load(std::sync::atomic::Ordering::Relaxed)
+    }
+
+    /// Snapshot of the libp2p-served counter. Test-visibility helper.
+    #[cfg(test)]
+    pub fn blob_libp2p_served_count_snapshot(&self) -> u64 {
+        self.blob_libp2p_served_count
+            .load(std::sync::atomic::Ordering::Relaxed)
+    }
 }
 
 /// Correlate observation entries into actionable issues.
@@ -9689,5 +9749,61 @@ mod tests {
         );
         // Verify blob proxy points to /blob
         assert_eq!(manifest.blob_proxy.unwrap().base_path, "/blob");
+    }
+}
+
+/// Tests for the iroh blob backend wiring (Plan 2 Task 3).
+///
+/// These tests verify that `HttpServer` correctly exposes and initializes
+/// the four new fields added for cutover gate #2.
+#[cfg(all(test, feature = "p2p-iroh"))]
+mod blob_backend_wiring_tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn http_server_defaults_iroh_blob_store_to_none() {
+        let blob_store = Arc::new(
+            BlobStore::new(tempfile::tempdir().unwrap().path().to_path_buf())
+                .await
+                .unwrap(),
+        );
+        let server = HttpServer::new(blob_store, "127.0.0.1:0".parse().unwrap());
+        assert!(server.iroh_blob_store.is_none());
+        assert!(server.self_transport_manifest.is_none());
+        assert_eq!(server.blob_iroh_served_count_snapshot(), 0);
+        assert_eq!(server.blob_libp2p_served_count_snapshot(), 0);
+    }
+
+    #[tokio::test]
+    async fn with_iroh_blob_store_sets_field() {
+        let blob_store = Arc::new(
+            BlobStore::new(tempfile::tempdir().unwrap().path().to_path_buf())
+                .await
+                .unwrap(),
+        );
+        let iroh_dir = tempfile::tempdir().unwrap();
+        let iroh = Arc::new(
+            crate::p2p_iroh::IrohBlobStore::load(&iroh_dir.path().join("blobs_iroh"))
+                .await
+                .unwrap(),
+        );
+        let server = HttpServer::new(blob_store, "127.0.0.1:0".parse().unwrap())
+            .with_iroh_blob_store(iroh.clone());
+        assert!(server.iroh_blob_store.is_some());
+    }
+
+    #[tokio::test]
+    async fn with_self_transport_manifest_sets_field() {
+        let blob_store = Arc::new(
+            BlobStore::new(tempfile::tempdir().unwrap().path().to_path_buf())
+                .await
+                .unwrap(),
+        );
+        let manifest = Arc::new(
+            crate::p2p_iroh::peer_map::PeerTransportManifest::iroh_capable_for_test(),
+        );
+        let server = HttpServer::new(blob_store, "127.0.0.1:0".parse().unwrap())
+            .with_self_transport_manifest(manifest);
+        assert!(server.self_transport_manifest.is_some());
     }
 }
