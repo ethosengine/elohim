@@ -74,8 +74,14 @@ fn recovery_invitation_dual_publish_byte_parity() {
     assert_eq!(lp_calls.len(), 1, "libp2p sub must receive one payload");
     assert_eq!(iroh_calls.len(), 1, "iroh sub must receive one payload");
 
-    assert_eq!(lp_calls[0].0, RECOVERY_INVITATION_TOPIC, "topic mismatch libp2p");
-    assert_eq!(iroh_calls[0].0, RECOVERY_INVITATION_TOPIC, "topic mismatch iroh");
+    assert_eq!(
+        lp_calls[0].0, RECOVERY_INVITATION_TOPIC,
+        "topic mismatch libp2p"
+    );
+    assert_eq!(
+        iroh_calls[0].0, RECOVERY_INVITATION_TOPIC,
+        "topic mismatch iroh"
+    );
 
     assert_eq!(
         lp_calls[0].1, iroh_calls[0].1,
@@ -124,8 +130,14 @@ fn recovery_revocation_dual_publish_byte_parity() {
     assert_eq!(lp_calls.len(), 1, "libp2p sub must receive one payload");
     assert_eq!(iroh_calls.len(), 1, "iroh sub must receive one payload");
 
-    assert_eq!(lp_calls[0].0, RECOVERY_REVOCATION_TOPIC, "topic mismatch libp2p");
-    assert_eq!(iroh_calls[0].0, RECOVERY_REVOCATION_TOPIC, "topic mismatch iroh");
+    assert_eq!(
+        lp_calls[0].0, RECOVERY_REVOCATION_TOPIC,
+        "topic mismatch libp2p"
+    );
+    assert_eq!(
+        iroh_calls[0].0, RECOVERY_REVOCATION_TOPIC,
+        "topic mismatch iroh"
+    );
 
     assert_eq!(
         lp_calls[0].1, iroh_calls[0].1,

@@ -10,11 +10,11 @@
 
 use std::sync::Arc;
 
+use elohim_storage::epr_service::EprService;
 use elohim_storage::p2p::epr_protocol::{EprRequest, EprResponse};
 use elohim_storage::p2p::trust_cache::PeerTrustCache;
 use elohim_storage::p2p_iroh::epr_backend::EprServiceBackend;
 use elohim_storage::p2p_iroh::EprBackend;
-use elohim_storage::epr_service::EprService;
 
 fn fresh_backend() -> EprServiceBackend {
     let service = Arc::new(EprService::new(None, None, None, PeerTrustCache::new()));

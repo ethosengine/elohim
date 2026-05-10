@@ -38,7 +38,6 @@ pub mod sync_backend;
 pub mod view_fed;
 pub mod view_fed_backend;
 
-pub use dual_publish::{classify_topic, DualGossipPublisher, IrohGossipPublisher, TopicTransports};
 pub use auth::{
     IdentityHandshakeBackend, IrohIdentityHandshakeClient, IrohIdentityHandshakeProtocol,
     IrohTrustClient, IrohTrustProtocol, TrustBackend, IDENTITY_HANDSHAKE_ALPN, TRUST_ALPN,
@@ -46,6 +45,7 @@ pub use auth::{
 pub use auth_backends::{IdentityHandshakeServiceBackend, TrustServiceBackend};
 pub use blob_store::IrohBlobStore;
 pub use config::{DiscoveryResolverConfig, DiscoveryResolverKind, IrohConfig};
+pub use dual_publish::{classify_topic, DualGossipPublisher, IrohGossipPublisher, TopicTransports};
 pub use endpoint::{build_endpoint, BuildEndpointError};
 pub use epr::{
     EprAtomBackend, EprBackend, IrohEprAtomClient, IrohEprAtomProtocol, IrohEprClient,

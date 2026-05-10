@@ -11,13 +11,13 @@
 use std::sync::Arc;
 
 use crate::p2p::feedback_signal::{FeedbackSignal, SignalKind, StandingImpact};
-use crate::p2p::inventory_gossip::BlobInventorySnapshot;
 use crate::p2p::identity_binding_gossip::IdentityBindingGossip;
+use crate::p2p::inventory_gossip::BlobInventorySnapshot;
 use crate::p2p::recovery_invitation::RecoveryInvitation;
 use crate::p2p::recovery_revocation::RecoveryRevocationMessage;
 use crate::services::gossip_flood::{GossipPublisher, PublishError};
 
-use super::{DualGossipPublisher, TopicTransports, classify_topic};
+use super::{classify_topic, DualGossipPublisher, TopicTransports};
 
 // ---------------------------------------------------------------------------
 // Shared mock
@@ -80,7 +80,8 @@ fn flood_feedback_dual_publish_byte_identical() {
     };
 
     let topic = "/elohim/feedback-signal/bafyrei_test_target_001";
-    flood_feedback(&signal, "cid-signal-x", topic, &publisher).expect("flood_feedback should succeed");
+    flood_feedback(&signal, "cid-signal-x", topic, &publisher)
+        .expect("flood_feedback should succeed");
 
     let lp_calls = libp2p.recorded_calls();
     let iroh_calls = iroh.recorded_calls();
@@ -184,29 +185,21 @@ fn all_wire_types_byte_parity_across_transports() {
     };
     let sig_bytes = rmp_serde::to_vec_named(&signal).expect("signal encode");
     publisher
-        .publish("/elohim/feedback-signal/bafyrei_target_002", sig_bytes.clone())
+        .publish(
+            "/elohim/feedback-signal/bafyrei_target_002",
+            sig_bytes.clone(),
+        )
         .expect("publish feedback signal");
 
     // Verify: for each call index, libp2p and iroh received byte-identical payload.
     let lp_calls = libp2p.recorded_calls();
     let iroh_calls = iroh.recorded_calls();
 
-    assert_eq!(
-        lp_calls.len(),
-        5,
-        "libp2p should have received 5 publishes"
-    );
-    assert_eq!(
-        iroh_calls.len(),
-        5,
-        "iroh should have received 5 publishes"
-    );
+    assert_eq!(lp_calls.len(), 5, "libp2p should have received 5 publishes");
+    assert_eq!(iroh_calls.len(), 5, "iroh should have received 5 publishes");
 
     for (i, (lp, ir)) in lp_calls.iter().zip(iroh_calls.iter()).enumerate() {
-        assert_eq!(
-            lp.0, ir.0,
-            "call {i}: topic must match across transports"
-        );
+        assert_eq!(lp.0, ir.0, "call {i}: topic must match across transports");
         assert_eq!(
             lp.1, ir.1,
             "call {i}: payload bytes must be identical across transports"

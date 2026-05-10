@@ -1081,19 +1081,24 @@ async fn async_main(
     #[cfg(all(feature = "p2p", feature = "p2p-iroh"))]
     if let (Some(libp2p_n), Some(iroh_n)) = (p2p_node.as_mut(), _iroh_node.as_ref()) {
         let libp2p_tx = libp2p_n.handle().command_sender();
-        let libp2p_pub: Arc<dyn elohim_storage::services::gossip_flood::GossipPublisher> =
-            Arc::new(elohim_storage::p2p::adapters::LibP2PGossipPublisher::new(libp2p_tx));
-        let iroh_pub: Arc<dyn elohim_storage::services::gossip_flood::GossipPublisher> =
-            Arc::new(elohim_storage::p2p_iroh::dual_publish::IrohGossipPublisher::spawn(
+        let libp2p_pub: Arc<dyn elohim_storage::services::gossip_flood::GossipPublisher> = Arc::new(
+            elohim_storage::p2p::adapters::LibP2PGossipPublisher::new(libp2p_tx),
+        );
+        let iroh_pub: Arc<dyn elohim_storage::services::gossip_flood::GossipPublisher> = Arc::new(
+            elohim_storage::p2p_iroh::dual_publish::IrohGossipPublisher::spawn(
                 iroh_n.gossip().clone(),
-            ));
-        let dual: Arc<dyn elohim_storage::services::gossip_flood::GossipPublisher> =
-            Arc::new(elohim_storage::p2p_iroh::dual_publish::DualGossipPublisher::new(
+            ),
+        );
+        let dual: Arc<dyn elohim_storage::services::gossip_flood::GossipPublisher> = Arc::new(
+            elohim_storage::p2p_iroh::dual_publish::DualGossipPublisher::new(
                 Some(libp2p_pub),
                 Some(iroh_pub),
-            ));
+            ),
+        );
         libp2p_n.set_gossip_publisher(dual);
-        info!("Plan 4: DualGossipPublisher wired into P2PNode — inventory snapshots now dual-stack");
+        info!(
+            "Plan 4: DualGossipPublisher wired into P2PNode — inventory snapshots now dual-stack"
+        );
     }
 
     // Start HTTP server for shard API
@@ -1425,22 +1430,30 @@ async fn async_main(
                 elohim_storage::p2p::adapters::LibP2POutboundSink::new(tx.clone()),
             );
             let libp2p_publisher: Arc<dyn elohim_storage::services::gossip_flood::GossipPublisher> =
-                Arc::new(elohim_storage::p2p::adapters::LibP2PGossipPublisher::new(tx));
+                Arc::new(elohim_storage::p2p::adapters::LibP2PGossipPublisher::new(
+                    tx,
+                ));
 
             // Plan 4: wrap in DualGossipPublisher — fans out to iroh when the iroh
             // node is running, degrades to libp2p-only when it is absent (None).
-            let iroh_publisher_opt: Option<Arc<dyn elohim_storage::services::gossip_flood::GossipPublisher>> =
-                _iroh_node.as_ref().map(|iroh| {
-                    Arc::new(elohim_storage::p2p_iroh::dual_publish::IrohGossipPublisher::spawn(
+            let iroh_publisher_opt: Option<
+                Arc<dyn elohim_storage::services::gossip_flood::GossipPublisher>,
+            > = _iroh_node.as_ref().map(|iroh| {
+                Arc::new(
+                    elohim_storage::p2p_iroh::dual_publish::IrohGossipPublisher::spawn(
                         iroh.gossip().clone(),
-                    )) as Arc<dyn elohim_storage::services::gossip_flood::GossipPublisher>
-                });
+                    ),
+                )
+                    as Arc<dyn elohim_storage::services::gossip_flood::GossipPublisher>
+            });
 
             let publisher: Arc<dyn elohim_storage::services::gossip_flood::GossipPublisher> =
-                Arc::new(elohim_storage::p2p_iroh::dual_publish::DualGossipPublisher::new(
-                    Some(libp2p_publisher),
-                    iroh_publisher_opt,
-                ));
+                Arc::new(
+                    elohim_storage::p2p_iroh::dual_publish::DualGossipPublisher::new(
+                        Some(libp2p_publisher),
+                        iroh_publisher_opt,
+                    ),
+                );
 
             let peer_id = node.handle().local_peer_id();
             (Some(sink), Some(publisher), Some(peer_id))
@@ -1457,7 +1470,9 @@ async fn async_main(
                 elohim_storage::p2p::adapters::LibP2POutboundSink::new(tx.clone()),
             );
             let publisher: Arc<dyn elohim_storage::services::gossip_flood::GossipPublisher> =
-                Arc::new(elohim_storage::p2p::adapters::LibP2PGossipPublisher::new(tx));
+                Arc::new(elohim_storage::p2p::adapters::LibP2PGossipPublisher::new(
+                    tx,
+                ));
             let peer_id = node.handle().local_peer_id();
             (Some(sink), Some(publisher), Some(peer_id))
         } else {

@@ -98,8 +98,6 @@ impl GossipPublisher for IrohGossipPublisher {
                 topic: topic.to_string(),
                 payload,
             })
-            .map_err(|e| {
-                PublishError::Backend(format!("iroh gossip command channel: {e}"))
-            })
+            .map_err(|e| PublishError::Backend(format!("iroh gossip command channel: {e}")))
     }
 }

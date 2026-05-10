@@ -29,7 +29,7 @@ use elohim_storage::p2p::identity_binding_gossip::{IdentityBindingGossip, IDENTI
 use elohim_storage::p2p::inventory_gossip::{BlobInventorySnapshot, INVENTORY_TOPIC};
 use elohim_storage::p2p::recovery_invitation::{RecoveryInvitation, RECOVERY_INVITATION_TOPIC};
 use elohim_storage::p2p::recovery_revocation::RecoveryRevocationMessage;
-use elohim_storage::p2p::{RECOVERY_REVOCATION_TOPIC};
+use elohim_storage::p2p::RECOVERY_REVOCATION_TOPIC;
 use elohim_storage::p2p_iroh::dual_publish::DualGossipPublisher;
 use elohim_storage::services::gossip_flood::{GossipPublisher, PublishError};
 
@@ -192,7 +192,10 @@ fn provider_dual_publishes_all_wire_types_to_both_subscribers() {
     let decoded_bind = IdentityBindingGossip::from_bytes(&received)
         .expect("round-trip decode IdentityBindingGossip");
     assert_eq!(decoded_bind.agent_cid, binding.agent_cid);
-    assert_eq!(decoded_bind.binding_action_hash, binding.binding_action_hash);
+    assert_eq!(
+        decoded_bind.binding_action_hash,
+        binding.binding_action_hash
+    );
 
     // -----------------------------------------------------------------------
     // Round 3: RecoveryInvitation
@@ -215,8 +218,8 @@ fn provider_dual_publishes_all_wire_types_to_both_subscribers() {
         &invitation_bytes,
         "RecoveryInvitation",
     );
-    let decoded_inv = RecoveryInvitation::from_bytes(&received)
-        .expect("round-trip decode RecoveryInvitation");
+    let decoded_inv =
+        RecoveryInvitation::from_bytes(&received).expect("round-trip decode RecoveryInvitation");
     assert_eq!(decoded_inv.human_id, invitation.human_id);
     assert_eq!(decoded_inv.request_hash, invitation.request_hash);
 

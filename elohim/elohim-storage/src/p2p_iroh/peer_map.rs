@@ -328,9 +328,8 @@ pub fn record_discovery(
     methods: &[&str],
 ) -> Result<(), StorageError> {
     use peer_transport_manifest as t;
-    let json = serialize_string_array(
-        &methods.iter().map(|s| (*s).to_string()).collect::<Vec<_>>(),
-    );
+    let json =
+        serialize_string_array(&methods.iter().map(|s| (*s).to_string()).collect::<Vec<_>>());
     let updated = diesel::update(t::table.filter(t::agent_cid.eq(agent_cid)))
         .set(t::discovery_methods_json.eq(json))
         .execute(conn)
@@ -395,9 +394,7 @@ pub fn lookup_by_iroh_node_id(
 
 /// Returns all libp2p PeerIds in the manifest. Used by view-fed
 /// adapter to populate connected_peers.
-pub fn list_libp2p_peer_ids(
-    conn: &mut SqliteConnection,
-) -> Result<Vec<String>, StorageError> {
+pub fn list_libp2p_peer_ids(conn: &mut SqliteConnection) -> Result<Vec<String>, StorageError> {
     use peer_transport_manifest as t;
     t::table
         .filter(t::libp2p_peer_id.is_not_null())
@@ -417,7 +414,11 @@ pub fn list_libp2p_to_agent(
         .filter(t::libp2p_peer_id.is_not_null())
         .select((t::libp2p_peer_id, t::agent_cid))
         .load::<(Option<String>, String)>(conn)
-        .map(|rows| rows.into_iter().filter_map(|(pid, cid)| pid.map(|p| (p, cid))).collect())
+        .map(|rows| {
+            rows.into_iter()
+                .filter_map(|(pid, cid)| pid.map(|p| (p, cid)))
+                .collect()
+        })
         .map_err(|e| StorageError::Database(format!("list_libp2p_to_agent: {e}")))
 }
 
@@ -597,9 +598,7 @@ mod tests {
 
     fn setup_conn() -> (
         tempfile::TempDir,
-        diesel::r2d2::PooledConnection<
-            diesel::r2d2::ConnectionManager<diesel::SqliteConnection>,
-        >,
+        diesel::r2d2::PooledConnection<diesel::r2d2::ConnectionManager<diesel::SqliteConnection>>,
     ) {
         let dir = tempdir().unwrap();
         let pool = init_pool_from_dir(dir.path()).expect("pool");
@@ -636,8 +635,7 @@ mod tests {
     fn record_iroh_observation_upserts_existing_libp2p_row() {
         let (_dir, mut conn) = setup_conn();
         let agent = "bafyrei...agent-2";
-        record_libp2p_observation(&mut conn, agent, "12D3KooWPeer2", &[], &[], 1746878400)
-            .unwrap();
+        record_libp2p_observation(&mut conn, agent, "12D3KooWPeer2", &[], &[], 1746878400).unwrap();
         record_iroh_observation(
             &mut conn,
             agent,
@@ -658,8 +656,7 @@ mod tests {
     fn record_capability_overwrites_default() {
         let (_dir, mut conn) = setup_conn();
         let agent = "bafyrei...agent-3";
-        record_libp2p_observation(&mut conn, agent, "12D3KooWPeer3", &[], &[], 1746878400)
-            .unwrap();
+        record_libp2p_observation(&mut conn, agent, "12D3KooWPeer3", &[], &[], 1746878400).unwrap();
         record_capability(&mut conn, agent, 3).unwrap();
         let m = lookup_by_agent_cid(&mut conn, agent).unwrap().expect("row");
         assert_eq!(m.capability_level, 3);
@@ -669,8 +666,7 @@ mod tests {
     fn record_discovery_replaces_methods() {
         let (_dir, mut conn) = setup_conn();
         let agent = "bafyrei...agent-4";
-        record_libp2p_observation(&mut conn, agent, "12D3KooWPeer4", &[], &[], 1746878400)
-            .unwrap();
+        record_libp2p_observation(&mut conn, agent, "12D3KooWPeer4", &[], &[], 1746878400).unwrap();
         record_discovery(&mut conn, agent, &["pkarr", "mdns"]).unwrap();
         let m = lookup_by_agent_cid(&mut conn, agent).unwrap().expect("row");
         assert_eq!(m.discovery, vec!["pkarr".to_string(), "mdns".to_string()]);
@@ -709,8 +705,7 @@ mod tests {
     fn lookup_by_libp2p_peer_id_finds_row() {
         let (_dir, mut conn) = setup_conn();
         let agent = "bafyrei...agent-6";
-        record_libp2p_observation(&mut conn, agent, "12D3KooWPeer6", &[], &[], 1746878400)
-            .unwrap();
+        record_libp2p_observation(&mut conn, agent, "12D3KooWPeer6", &[], &[], 1746878400).unwrap();
         let m = lookup_by_libp2p_peer_id(&mut conn, "12D3KooWPeer6")
             .unwrap()
             .expect("row");
@@ -731,25 +726,45 @@ mod tests {
     #[test]
     fn lookup_returns_none_for_unknown() {
         let (_dir, mut conn) = setup_conn();
-        assert!(lookup_by_agent_cid(&mut conn, "bafyrei...nope").unwrap().is_none());
-        assert!(lookup_by_libp2p_peer_id(&mut conn, "12D3KooWNope").unwrap().is_none());
-        assert!(lookup_by_iroh_node_id(&mut conn, "node-nope").unwrap().is_none());
+        assert!(lookup_by_agent_cid(&mut conn, "bafyrei...nope")
+            .unwrap()
+            .is_none());
+        assert!(lookup_by_libp2p_peer_id(&mut conn, "12D3KooWNope")
+            .unwrap()
+            .is_none());
+        assert!(lookup_by_iroh_node_id(&mut conn, "node-nope")
+            .unwrap()
+            .is_none());
     }
 
     #[test]
     fn back_compat_record_libp2p_writes_row() {
         let (_dir, mut conn) = setup_conn();
-        record_libp2p(&mut conn, "bafyrei...compat-1", "12D3KooWC1", "2026-05-10T12:00:00Z")
-            .unwrap();
-        assert!(lookup_by_libp2p_peer_id(&mut conn, "12D3KooWC1").unwrap().is_some());
+        record_libp2p(
+            &mut conn,
+            "bafyrei...compat-1",
+            "12D3KooWC1",
+            "2026-05-10T12:00:00Z",
+        )
+        .unwrap();
+        assert!(lookup_by_libp2p_peer_id(&mut conn, "12D3KooWC1")
+            .unwrap()
+            .is_some());
     }
 
     #[test]
     fn back_compat_record_iroh_writes_row() {
         let (_dir, mut conn) = setup_conn();
-        record_iroh(&mut conn, "bafyrei...compat-2", "node-compat-2", "2026-05-10T12:00:00Z")
-            .unwrap();
-        assert!(lookup_by_iroh_node_id(&mut conn, "node-compat-2").unwrap().is_some());
+        record_iroh(
+            &mut conn,
+            "bafyrei...compat-2",
+            "node-compat-2",
+            "2026-05-10T12:00:00Z",
+        )
+        .unwrap();
+        assert!(lookup_by_iroh_node_id(&mut conn, "node-compat-2")
+            .unwrap()
+            .is_some());
     }
 
     #[test]
@@ -786,7 +801,10 @@ mod tests {
             Some(Libp2pTransportProfile {
                 peer_id: format!("12D3KooW{agent_cid}"),
                 addrs: vec![],
-                supports: libp2p_supports.iter().map(|p| p.as_str().to_string()).collect(),
+                supports: libp2p_supports
+                    .iter()
+                    .map(|p| p.as_str().to_string())
+                    .collect(),
             })
         };
         let iroh = if iroh_supports.is_empty() {
@@ -795,7 +813,10 @@ mod tests {
             Some(IrohTransportProfile {
                 node_id: format!("node-{agent_cid}"),
                 relays: vec![],
-                supports: iroh_supports.iter().map(|p| p.as_str().to_string()).collect(),
+                supports: iroh_supports
+                    .iter()
+                    .map(|p| p.as_str().to_string())
+                    .collect(),
             })
         };
         PeerTransportManifest {

@@ -67,18 +67,12 @@ mod tests {
 
     #[test]
     fn recovery_invitation_is_dual() {
-        assert_eq!(
-            classify_topic("recovery.invitation"),
-            TopicTransports::Dual
-        );
+        assert_eq!(classify_topic("recovery.invitation"), TopicTransports::Dual);
     }
 
     #[test]
     fn recovery_revocation_is_dual() {
-        assert_eq!(
-            classify_topic("recovery.revocation"),
-            TopicTransports::Dual
-        );
+        assert_eq!(classify_topic("recovery.revocation"), TopicTransports::Dual);
     }
 
     #[test]
@@ -100,10 +94,7 @@ mod tests {
     #[test]
     fn reach_scoped_epr_topic_is_dual() {
         // D.3 reach-scoped EPR announce topics
-        assert_eq!(
-            classify_topic("elohim/lamad/public"),
-            TopicTransports::Dual
-        );
+        assert_eq!(classify_topic("elohim/lamad/public"), TopicTransports::Dual);
         assert_eq!(
             classify_topic("elohim/shefa/trusted/coll-42"),
             TopicTransports::Dual
@@ -113,9 +104,6 @@ mod tests {
     #[test]
     fn unknown_topic_defaults_to_dual() {
         // Conservative default: unknown topics get dual coverage.
-        assert_eq!(
-            classify_topic("some.unknown.topic"),
-            TopicTransports::Dual
-        );
+        assert_eq!(classify_topic("some.unknown.topic"), TopicTransports::Dual);
     }
 }

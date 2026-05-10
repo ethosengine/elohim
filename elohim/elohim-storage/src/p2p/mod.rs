@@ -2400,36 +2400,34 @@ impl P2PNode {
                 let _ = reply.send(peers);
             }
             // Plan 4: route through DualGossipPublisher for dual-stack publish.
-            P2PCommand::PublishRecoveryInvitation(inv) => {
-                match inv.to_bytes() {
-                    Ok(bytes) => {
-                        if let Err(e) = self
-                            .gossip_publisher
-                            .publish(RECOVERY_INVITATION_TOPIC, bytes)
-                        {
-                            warn!(
-                                target: "elohim_storage::recovery",
-                                request_hash = %inv.request_hash,
-                                error = %e,
-                                "PublishRecoveryInvitation dual-publish failed"
-                            );
-                        } else {
-                            info!(
-                                target: "elohim_storage::recovery",
-                                request_hash = %inv.request_hash,
-                                human_id = %inv.human_id,
-                                "Published RecoveryInvitation via DualGossipPublisher"
-                            );
-                        }
+            P2PCommand::PublishRecoveryInvitation(inv) => match inv.to_bytes() {
+                Ok(bytes) => {
+                    if let Err(e) = self
+                        .gossip_publisher
+                        .publish(RECOVERY_INVITATION_TOPIC, bytes)
+                    {
+                        warn!(
+                            target: "elohim_storage::recovery",
+                            request_hash = %inv.request_hash,
+                            error = %e,
+                            "PublishRecoveryInvitation dual-publish failed"
+                        );
+                    } else {
+                        info!(
+                            target: "elohim_storage::recovery",
+                            request_hash = %inv.request_hash,
+                            human_id = %inv.human_id,
+                            "Published RecoveryInvitation via DualGossipPublisher"
+                        );
                     }
-                    Err(e) => warn!(
-                        target: "elohim_storage::recovery",
-                        request_hash = %inv.request_hash,
-                        error = ?e,
-                        "Failed to encode RecoveryInvitation"
-                    ),
                 }
-            }
+                Err(e) => warn!(
+                    target: "elohim_storage::recovery",
+                    request_hash = %inv.request_hash,
+                    error = ?e,
+                    "Failed to encode RecoveryInvitation"
+                ),
+            },
             // A.10: publish identity binding to elohim/identity/binding topic.
             // Triggered by ReconcileController::on_agent_peer_binding when a local
             // AgentPeerBinding DHT signal arrives. Best-effort: publish failure is
@@ -2438,69 +2436,65 @@ impl P2PNode {
             // Plan 4: single dispatch through DualGossipPublisher — fans out
             // byte-identical bytes to both libp2p and iroh simultaneously.
             // Wire format: rmp_serde::to_vec (positional) — UNCHANGED.
-            P2PCommand::PublishIdentityBinding(payload) => {
-                match payload.to_bytes() {
-                    Ok(bytes) => {
-                        if let Err(e) = self.gossip_publisher.publish(
-                            crate::p2p::identity_binding_gossip::IDENTITY_BINDING_TOPIC,
-                            bytes,
-                        ) {
-                            warn!(
-                                target: "elohim_storage::identity",
-                                peer_id = %payload.peer_id,
-                                agent_cid = %payload.agent_cid,
-                                error = %e,
-                                "PublishIdentityBinding dual-publish failed"
-                            );
-                        } else {
-                            info!(
-                                target: "elohim_storage::identity",
-                                peer_id = %payload.peer_id,
-                                agent_cid = %payload.agent_cid,
-                                "Published IdentityBindingGossip via DualGossipPublisher"
-                            );
-                        }
+            P2PCommand::PublishIdentityBinding(payload) => match payload.to_bytes() {
+                Ok(bytes) => {
+                    if let Err(e) = self.gossip_publisher.publish(
+                        crate::p2p::identity_binding_gossip::IDENTITY_BINDING_TOPIC,
+                        bytes,
+                    ) {
+                        warn!(
+                            target: "elohim_storage::identity",
+                            peer_id = %payload.peer_id,
+                            agent_cid = %payload.agent_cid,
+                            error = %e,
+                            "PublishIdentityBinding dual-publish failed"
+                        );
+                    } else {
+                        info!(
+                            target: "elohim_storage::identity",
+                            peer_id = %payload.peer_id,
+                            agent_cid = %payload.agent_cid,
+                            "Published IdentityBindingGossip via DualGossipPublisher"
+                        );
                     }
-                    Err(e) => warn!(
-                        target: "elohim_storage::identity",
-                        peer_id = %payload.peer_id,
-                        error = ?e,
-                        "Failed to encode IdentityBindingGossip"
-                    ),
                 }
-            }
+                Err(e) => warn!(
+                    target: "elohim_storage::identity",
+                    peer_id = %payload.peer_id,
+                    error = ?e,
+                    "Failed to encode IdentityBindingGossip"
+                ),
+            },
             // Plan 4: route through DualGossipPublisher for dual-stack publish.
-            P2PCommand::PublishRecoveryRevocation(msg) => {
-                match msg.to_bytes() {
-                    Ok(bytes) => {
-                        if let Err(e) = self
-                            .gossip_publisher
-                            .publish(RECOVERY_REVOCATION_TOPIC, bytes)
-                        {
-                            warn!(
-                                target: "elohim_storage::recovery",
-                                revocation_id = %msg.revocation_id,
-                                error = %e,
-                                "PublishRecoveryRevocation dual-publish failed"
-                            );
-                        } else {
-                            info!(
-                                target: "elohim_storage::recovery",
-                                revocation_id = %msg.revocation_id,
-                                human_id = %msg.human_id,
-                                status = %msg.status,
-                                "Published RecoveryRevocationMessage via DualGossipPublisher"
-                            );
-                        }
+            P2PCommand::PublishRecoveryRevocation(msg) => match msg.to_bytes() {
+                Ok(bytes) => {
+                    if let Err(e) = self
+                        .gossip_publisher
+                        .publish(RECOVERY_REVOCATION_TOPIC, bytes)
+                    {
+                        warn!(
+                            target: "elohim_storage::recovery",
+                            revocation_id = %msg.revocation_id,
+                            error = %e,
+                            "PublishRecoveryRevocation dual-publish failed"
+                        );
+                    } else {
+                        info!(
+                            target: "elohim_storage::recovery",
+                            revocation_id = %msg.revocation_id,
+                            human_id = %msg.human_id,
+                            status = %msg.status,
+                            "Published RecoveryRevocationMessage via DualGossipPublisher"
+                        );
                     }
-                    Err(e) => warn!(
-                        target: "elohim_storage::recovery",
-                        revocation_id = %msg.revocation_id,
-                        error = ?e,
-                        "Failed to encode RecoveryRevocationMessage"
-                    ),
                 }
-            }
+                Err(e) => warn!(
+                    target: "elohim_storage::recovery",
+                    revocation_id = %msg.revocation_id,
+                    error = ?e,
+                    "Failed to encode RecoveryRevocationMessage"
+                ),
+            },
             // D.2: announce atom provider record to Kademlia DHT.
             // Key: EPR_ATOM_KAD_KEY_PREFIX + ":" + cid — distinct from `epr:{id}` (EPR Head put_record).
             P2PCommand::KadStartProviding { cid } => {

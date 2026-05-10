@@ -69,8 +69,16 @@ fn assert_parity(
     let lp = libp2p.take_calls();
     let ir = iroh.take_calls();
 
-    assert_eq!(lp.len(), 1, "{label}: libp2p mock must receive exactly one call");
-    assert_eq!(ir.len(), 1, "{label}: iroh mock must receive exactly one call");
+    assert_eq!(
+        lp.len(),
+        1,
+        "{label}: libp2p mock must receive exactly one call"
+    );
+    assert_eq!(
+        ir.len(),
+        1,
+        "{label}: iroh mock must receive exactly one call"
+    );
 
     assert_eq!(lp[0].0, expected_topic, "{label}: libp2p topic mismatch");
     assert_eq!(ir[0].0, expected_topic, "{label}: iroh topic mismatch");
@@ -111,8 +119,16 @@ fn inventory_snapshot_byte_parity() {
     };
     let bytes = snapshot.to_bytes().expect("encode");
 
-    publisher.publish(INVENTORY_TOPIC, bytes.clone()).expect("publish");
-    assert_parity(&libp2p, &iroh, INVENTORY_TOPIC, &bytes, "BlobInventorySnapshot");
+    publisher
+        .publish(INVENTORY_TOPIC, bytes.clone())
+        .expect("publish");
+    assert_parity(
+        &libp2p,
+        &iroh,
+        INVENTORY_TOPIC,
+        &bytes,
+        "BlobInventorySnapshot",
+    );
 
     // Round-trip decode sanity.
     let decoded = BlobInventorySnapshot::from_bytes(&bytes).expect("decode");
@@ -145,8 +161,16 @@ fn identity_binding_byte_parity() {
     };
     let bytes = binding.to_bytes().expect("encode");
 
-    publisher.publish(IDENTITY_BINDING_TOPIC, bytes.clone()).expect("publish");
-    assert_parity(&libp2p, &iroh, IDENTITY_BINDING_TOPIC, &bytes, "IdentityBindingGossip");
+    publisher
+        .publish(IDENTITY_BINDING_TOPIC, bytes.clone())
+        .expect("publish");
+    assert_parity(
+        &libp2p,
+        &iroh,
+        IDENTITY_BINDING_TOPIC,
+        &bytes,
+        "IdentityBindingGossip",
+    );
 
     let decoded = IdentityBindingGossip::from_bytes(&bytes).expect("decode");
     assert_eq!(decoded.agent_cid, binding.agent_cid);
@@ -172,8 +196,16 @@ fn recovery_invitation_byte_parity() {
     };
     let bytes = invitation.to_bytes().expect("encode");
 
-    publisher.publish(RECOVERY_INVITATION_TOPIC, bytes.clone()).expect("publish");
-    assert_parity(&libp2p, &iroh, RECOVERY_INVITATION_TOPIC, &bytes, "RecoveryInvitation");
+    publisher
+        .publish(RECOVERY_INVITATION_TOPIC, bytes.clone())
+        .expect("publish");
+    assert_parity(
+        &libp2p,
+        &iroh,
+        RECOVERY_INVITATION_TOPIC,
+        &bytes,
+        "RecoveryInvitation",
+    );
 
     let decoded = RecoveryInvitation::from_bytes(&bytes).expect("decode");
     assert_eq!(decoded.human_id, invitation.human_id);
@@ -204,8 +236,16 @@ fn recovery_revocation_byte_parity() {
     };
     let bytes = revocation.to_bytes().expect("encode");
 
-    publisher.publish(RECOVERY_REVOCATION_TOPIC, bytes.clone()).expect("publish");
-    assert_parity(&libp2p, &iroh, RECOVERY_REVOCATION_TOPIC, &bytes, "RecoveryRevocationMessage");
+    publisher
+        .publish(RECOVERY_REVOCATION_TOPIC, bytes.clone())
+        .expect("publish");
+    assert_parity(
+        &libp2p,
+        &iroh,
+        RECOVERY_REVOCATION_TOPIC,
+        &bytes,
+        "RecoveryRevocationMessage",
+    );
 
     let decoded = RecoveryRevocationMessage::from_bytes(&bytes).expect("decode");
     assert_eq!(decoded.revocation_id, revocation.revocation_id);

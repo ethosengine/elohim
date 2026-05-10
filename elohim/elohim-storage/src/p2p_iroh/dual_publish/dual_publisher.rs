@@ -147,8 +147,14 @@ mod tests {
 
         assert_eq!(lp_calls.len(), 1, "libp2p should receive exactly one call");
         assert_eq!(iroh_calls.len(), 1, "iroh should receive exactly one call");
-        assert_eq!(lp_calls[0].1, payload, "libp2p payload must be byte-identical");
-        assert_eq!(iroh_calls[0].1, payload, "iroh payload must be byte-identical");
+        assert_eq!(
+            lp_calls[0].1, payload,
+            "libp2p payload must be byte-identical"
+        );
+        assert_eq!(
+            iroh_calls[0].1, payload,
+            "iroh payload must be byte-identical"
+        );
         assert_eq!(lp_calls[0].0, "elohim/identity/binding");
         assert_eq!(iroh_calls[0].0, "elohim/identity/binding");
     }
@@ -193,7 +199,11 @@ mod tests {
             .unwrap();
 
         assert_eq!(libp2p.recorded_calls().len(), 1, "libp2p must receive");
-        assert_eq!(iroh.recorded_calls().len(), 0, "iroh must NOT receive for libp2p-only");
+        assert_eq!(
+            iroh.recorded_calls().len(),
+            0,
+            "iroh must NOT receive for libp2p-only"
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -231,7 +241,10 @@ mod tests {
         );
 
         let result = publisher.publish("elohim/identity/binding", vec![1, 2, 3]);
-        assert!(result.is_err(), "error must surface when both transports fail");
+        assert!(
+            result.is_err(),
+            "error must surface when both transports fail"
+        );
     }
 
     // -----------------------------------------------------------------------

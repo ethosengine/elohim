@@ -66,17 +66,15 @@ fn dual_publisher_routes_inventory_snapshot_to_both_transports() {
     // Build a realistic inventory snapshot.
     let snapshot = BlobInventorySnapshot {
         peer_id: "12D3KooWTestPeer".to_string(),
-        hashes: vec![
-            "a".repeat(64),
-            "b".repeat(64),
-            "c".repeat(64),
-        ],
+        hashes: vec!["a".repeat(64), "b".repeat(64), "c".repeat(64)],
         sequence: 42,
         snapshot_at: 1_700_000_000_000_000,
         signature: vec![0u8; 32],
     };
 
-    let bytes = snapshot.to_bytes().expect("BlobInventorySnapshot should encode");
+    let bytes = snapshot
+        .to_bytes()
+        .expect("BlobInventorySnapshot should encode");
 
     publisher
         .publish(INVENTORY_TOPIC, bytes.clone())
@@ -86,8 +84,16 @@ fn dual_publisher_routes_inventory_snapshot_to_both_transports() {
     let lp_calls = libp2p_mock.recorded_calls();
     let iroh_calls = iroh_mock.recorded_calls();
 
-    assert_eq!(lp_calls.len(), 1, "libp2p mock must receive exactly one publish");
-    assert_eq!(iroh_calls.len(), 1, "iroh mock must receive exactly one publish");
+    assert_eq!(
+        lp_calls.len(),
+        1,
+        "libp2p mock must receive exactly one publish"
+    );
+    assert_eq!(
+        iroh_calls.len(),
+        1,
+        "iroh mock must receive exactly one publish"
+    );
 
     assert_eq!(
         lp_calls[0].0, INVENTORY_TOPIC,
@@ -142,7 +148,9 @@ fn inventory_snapshot_reaches_libp2p_when_iroh_absent() {
     };
 
     let bytes = snapshot.to_bytes().expect("encode");
-    publisher.publish(INVENTORY_TOPIC, bytes.clone()).expect("publish");
+    publisher
+        .publish(INVENTORY_TOPIC, bytes.clone())
+        .expect("publish");
 
     let calls = libp2p_mock.recorded_calls();
     assert_eq!(calls.len(), 1);

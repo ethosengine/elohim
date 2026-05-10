@@ -93,10 +93,9 @@ impl EprAtomServiceBackend {
             }
         };
         match lookup_by_iroh_node_id(&mut conn, &node_id) {
-            Ok(Some(PeerTransportManifest { agent_cid, .. })) => (
-                format!("iroh:{node_id}"),
-                CallerIdentity::Agent(agent_cid),
-            ),
+            Ok(Some(PeerTransportManifest { agent_cid, .. })) => {
+                (format!("iroh:{node_id}"), CallerIdentity::Agent(agent_cid))
+            }
             Ok(None) => (format!("iroh:{node_id}"), CallerIdentity::Anonymous),
             Err(e) => {
                 tracing::warn!(target: "elohim_storage::epr_atom",
