@@ -544,8 +544,8 @@ pub fn libp2p_for_iroh(
 impl PeerTransportManifest {
     /// Build an iroh-capable test manifest that advertises Blob on both
     /// transports (so `select_transport` returns `Iroh` for `Plane::Blob`).
-    /// Only compiled for tests — never used in production code.
-    #[cfg(test)]
+    /// Named `_for_test` to signal test-only intent. Available to
+    /// integration test binaries (not guarded by `#[cfg(test)]`).
     pub fn iroh_capable_for_test() -> Self {
         PeerTransportManifest {
             agent_cid: "test-iroh-capable".to_string(),
@@ -567,8 +567,8 @@ impl PeerTransportManifest {
 
     /// Build a libp2p-only test manifest that has no iroh profile
     /// (so `select_transport` returns `Libp2p` for `Plane::Blob`).
-    /// Only compiled for tests — never used in production code.
-    #[cfg(test)]
+    /// Named `_for_test` to signal test-only intent. Available to
+    /// integration test binaries (not guarded by `#[cfg(test)]`).
     pub fn libp2p_only_for_test() -> Self {
         PeerTransportManifest {
             agent_cid: "test-libp2p-only".to_string(),

@@ -1694,6 +1694,110 @@ impl HttpServer {
                 .unwrap());
         }
 
+        // Cutover gate #2 (Phase 11, Plan 2): try iroh-side blob backend first
+        // when the caller is iroh-capable AND the blob has a known BLAKE3 alias.
+        // Falls through to the legacy SHA256 path on miss, libp2p-only caller,
+        // or no IrohBlobStore wired.
+        #[cfg(feature = "p2p-iroh")]
+        if let Some(ref iroh) = self.iroh_blob_store {
+            // Normalize to the router's expected form: sha256-{hex} or blake3-{hex}.
+            let normalized_for_router: String = if hash.starts_with("blake3-") {
+                hash.to_string()
+            } else {
+                match crate::blob_store::BlobStore::parse_content_address(hash) {
+                    Ok(h) => format!("sha256-{}", h),
+                    Err(_) => String::new(), // fall through to legacy parser below
+                }
+            };
+
+            if !normalized_for_router.is_empty() {
+                let mut conn_opt = self.db_pool.as_ref().and_then(|p| p.get().ok());
+                let blake3_alias = if !normalized_for_router.starts_with("blake3-") {
+                    conn_opt.as_mut().and_then(|c| {
+                        crate::db::peer_blob_inventory::lookup_blake3_for_sha256(
+                            c,
+                            &normalized_for_router,
+                        )
+                        .ok()
+                        .flatten()
+                    })
+                } else {
+                    None
+                };
+                let sha256_alias = if normalized_for_router.starts_with("blake3-") {
+                    conn_opt.as_mut().and_then(|c| {
+                        crate::db::peer_blob_inventory::lookup_sha256_for_blake3(
+                            c,
+                            &normalized_for_router,
+                        )
+                        .ok()
+                        .flatten()
+                    })
+                } else {
+                    None
+                };
+
+                let caller_manifest = match (agent_id, conn_opt.as_mut()) {
+                    (Some(cid), Some(c)) => {
+                        crate::p2p_iroh::peer_map::lookup_by_agent_cid(c, cid)
+                            .ok()
+                            .flatten()
+                    }
+                    _ => None,
+                };
+
+                let choice = crate::http_blob_router::choose_backend(
+                    crate::http_blob_router::ChooseInputs {
+                        normalized_hash: &normalized_for_router,
+                        blake3_alias_for_sha256: blake3_alias,
+                        sha256_alias_for_blake3: sha256_alias,
+                        self_manifest: self.self_transport_manifest.as_deref(),
+                        caller_manifest: caller_manifest.as_ref(),
+                    },
+                );
+
+                if let crate::http_blob_router::BlobBackendChoice::IrohThenLibp2p {
+                    blake3_hash,
+                    ..
+                } = choice
+                {
+                    let blake3_hex =
+                        blake3_hash.strip_prefix("blake3-").unwrap_or(&blake3_hash);
+                    if let Ok(iroh_hash) = blake3_hex.parse::<iroh_blobs::Hash>() {
+                        match iroh.get_bytes(iroh_hash).await {
+                            Ok(data) => {
+                                self.blob_iroh_served_count
+                                    .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                                debug!(
+                                    hash = %hash,
+                                    backend = "iroh",
+                                    size = data.len(),
+                                    "blob served from iroh backend (cutover gate #2)"
+                                );
+                                return Ok(Self::with_cors_headers(Response::builder())
+                                    .status(StatusCode::OK)
+                                    .header(header::CONTENT_TYPE, "application/octet-stream")
+                                    .header(header::CONTENT_LENGTH, data.len())
+                                    .header(
+                                        header::CACHE_CONTROL,
+                                        "public, max-age=31536000, immutable",
+                                    )
+                                    .body(Full::new(Bytes::from(data.to_vec())))
+                                    .unwrap());
+                            }
+                            Err(e) => {
+                                debug!(
+                                    hash = %hash,
+                                    error = %e,
+                                    "iroh-side miss; falling through to legacy backend"
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         // Parse content address (accepts CID, sha256-prefixed hash, or raw hex)
         let normalized_hash = match crate::blob_store::BlobStore::parse_content_address(hash) {
             Ok(h) => format!("sha256-{}", h),
@@ -1764,6 +1868,9 @@ impl HttpServer {
                 // Try direct blob lookup (for non-sharded blobs)
                 match self.blob_store.get(hash).await {
                     Ok(data) => {
+                        self.blob_libp2p_served_count
+                            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                        debug!(hash = %hash, backend = "libp2p", "blob served from legacy backend (direct)");
                         return Ok(Self::with_cors_headers(Response::builder())
                             .status(StatusCode::OK)
                             .header(header::CONTENT_TYPE, "application/octet-stream")
@@ -1898,6 +2005,9 @@ impl HttpServer {
                                             size = bytes_len,
                                             "T20: race-fetch hit — blob persisted and recorded"
                                         );
+                                        self.blob_libp2p_served_count
+                                            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                                        debug!(hash = %hash, backend = "libp2p", "blob served from legacy backend (race-fetch)");
                                         return Ok(Self::with_cors_headers(Response::builder())
                                             .status(StatusCode::OK)
                                             .header(
@@ -1947,6 +2057,9 @@ impl HttpServer {
             "Serving reassembled blob"
         );
 
+        self.blob_libp2p_served_count
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        debug!(hash = %hash, backend = "libp2p", "blob served from legacy backend (reassembled)");
         Ok(Self::with_cors_headers(Response::builder())
             .status(StatusCode::OK)
             .header(header::CONTENT_TYPE, &manifest.mime_type)
@@ -7627,18 +7740,31 @@ impl HttpServer {
         );
     }
 
-    /// Snapshot of the iroh-served counter. Test-visibility helper.
-    #[cfg(test)]
+    /// Snapshot of the iroh-served counter.
+    /// Exposed for integration-test and parity-soak diagnostics.
     pub fn blob_iroh_served_count_snapshot(&self) -> u64 {
         self.blob_iroh_served_count
             .load(std::sync::atomic::Ordering::Relaxed)
     }
 
-    /// Snapshot of the libp2p-served counter. Test-visibility helper.
-    #[cfg(test)]
+    /// Snapshot of the libp2p-served counter.
+    /// Exposed for integration-test and parity-soak diagnostics.
     pub fn blob_libp2p_served_count_snapshot(&self) -> u64 {
         self.blob_libp2p_served_count
             .load(std::sync::atomic::Ordering::Relaxed)
+    }
+
+    /// Test entry point: invoke the GET /blob/{hash} dispatcher with an
+    /// explicit hash and optional caller agent CID. Wraps `handle_get_blob`
+    /// with the same parameters the real router extracts from the request.
+    /// Named `_for_test` to signal test-only intent; not guarded by
+    /// `#[cfg(test)]` so integration test binaries can call it.
+    pub async fn handle_blob_get_for_test(
+        &self,
+        hash: &str,
+        agent_cid: Option<&str>,
+    ) -> Result<Response<Full<Bytes>>, StorageError> {
+        self.handle_get_blob(hash, agent_cid).await
     }
 }
 
