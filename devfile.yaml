@@ -30,10 +30,10 @@ components:
   - name: tools
     container:
       image: harbor.ethosengine.com/devspaces/rust-nix-dev:latest
-      memoryLimit: 18Gi
-      memoryRequest: 6Gi
-      cpuLimit: '6'
-      cpuRequest: '2'
+      memoryLimit: 20Gi
+      memoryRequest: 8Gi
+      cpuLimit: '10'
+      cpuRequest: '6'
       mountSources: true
       sourceMapping: /projects
       env:
@@ -197,10 +197,13 @@ commands:
         # here, so the parent context doesn't load Jenkins tool schemas.
 
         # Configure GitHub CLI authentication
-        if [ -n "$GH_TOKEN" ]; then
-          echo "$GH_TOKEN" | gh auth login --with-token
-          gh auth status
-        fi
+        # Commented out 2026-05-10: `gh` is not installed in rust-nix-dev image,
+        # so this block exit-127s and aborts postStart. Re-enable after gh is
+        # baked into the image (ethosengine/che-devworkspaces).
+        # if [ -n "$GH_TOKEN" ]; then
+        #   echo "$GH_TOKEN" | gh auth login --with-token
+        #   gh auth status
+        # fi
   - id: start-doorway
     exec:
       component: tools
