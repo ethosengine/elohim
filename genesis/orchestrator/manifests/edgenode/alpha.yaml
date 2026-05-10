@@ -263,6 +263,11 @@ spec:
             # K8s pods act as relay servers for desktop stewards behind NAT
             - name: RELAY_MODE
               value: "server"
+            # Gate #7 — iroh alpha-cluster soak (opened 2026-05-10).
+            # Flip to "libp2p" to roll back. "iroh" enables iroh-only (not yet
+            # available; use dual-stack during soak). See RUNBOOK below.
+            - name: TRANSPORT_BACKEND
+              value: "dual-stack"
           ports:
             - name: storage-http
               containerPort: 8090
