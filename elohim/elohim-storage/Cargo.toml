@@ -207,9 +207,10 @@ ssr = ["dep:elohim-render"]
 tempfile = "3"
 jsonschema = "0.28"
 wiremock = "0.6"
-# pkarr resolver e2e (gate #10): minimal in-process pkarr relay using axum,
-# n0-future for stream consumption.
-axum = "0.8"
+# pkarr resolver e2e (gate #10): minimal in-process pkarr relay using
+# raw hyper (already a regular dep). Avoids dragging axum's serde >=1.0.220
+# transitive constraint, which conflicts with holochain_serialized_bytes
+# 0.0.56's exact pin to serde =1.0.219.
 n0-future = "0.1"
 
 [[bin]]
