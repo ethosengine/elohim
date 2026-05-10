@@ -14,6 +14,23 @@
             "timeout": 300,
             "statusMessage": "Checking disk usage...",
             "async": true
+          },
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/genesis/agentic/bin/pool-preflight.sh\"",
+            "timeout": 15000,
+            "statusMessage": "Cargo target pool stewardship..."
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/genesis/agentic/bin/pool-postflight.sh\"",
+            "timeout": 15000
           }
         ]
       }

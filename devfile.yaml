@@ -103,10 +103,18 @@ components:
           value: sccache
         - name: SCCACHE_LOG
           value: warn
-        # PATH: Ensure holochain binaries, rust toolchain, and helper scripts are available
-        # (not just interactive shells that source .bashrc)
+        # Cargo target pool — family-shared target dirs to keep parallel
+        # worktree builds from each materializing their own ~18GB target/.
+        # Hooks at SessionStart/Stop run worktree stewardship; agents read
+        # the slot path from the hook's context block and set
+        # CARGO_TARGET_DIR explicitly for native builds.
+        # Design: genesis/docs/plans/cargo-target-pool-design.md
+        - name: CARGO_TARGET_POOL_ROOT
+          value: /projects/.cargo-target-pool
+        # PATH: Ensure holochain binaries, rust toolchain, helper scripts,
+        # and genesis/agentic/bin (cargo-pool, pool-*.sh) are available.
         - name: PATH
-          value: '/nix/xdg/cache/pnpm:/opt/rust/cargo/bin:/opt/holochain/bin:/home/user/bin:/home/user/.nix-profile/bin:/home/user/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'
+          value: '/projects/elohim/genesis/agentic/bin:/nix/xdg/cache/pnpm:/opt/rust/cargo/bin:/opt/holochain/bin:/home/user/bin:/home/user/.nix-profile/bin:/home/user/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'
       endpoints:
         - name: angular-dev
           targetPort: 4200

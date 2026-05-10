@@ -143,6 +143,18 @@ When `/shift` invokes this skill:
    under a `// shift:<id>` comment. This is best-effort: anything missed
    surfaces as a wishlist entry in the sprint result.
 
+   **Cargo target pool.** For native cargo invocations (elohim-storage,
+   doorway, steward/node, sweettest), use `CARGO_TARGET_DIR=<slot>` from
+   the **ELOHIM CARGO TARGET POOL** context block emitted by the
+   SessionStart preflight hook. This shares the family's `target/`
+   across parallel worktrees and avoids the ~18GB-per-worktree disk
+   blowup that happened on 2026-05-10. WASM/DNA workspaces (the
+   `holochain/dna/*` tree) use plain `cargo` — do NOT redirect their
+   target dir or `hc dna pack` will break. Palette additions:
+   `Bash(CARGO_TARGET_DIR=/projects/.cargo-target-pool/* cargo *)`,
+   `Bash(cargo-pool *)`. Design:
+   `genesis/docs/plans/cargo-target-pool-design.md`.
+
 3. **Run pre-shift readiness check.**
 
    ```bash

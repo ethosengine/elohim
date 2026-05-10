@@ -1,0 +1,203 @@
+#!/usr/bin/env bash
+# cargo-pool — operator CLI for the cargo target pool.
+#
+# Subcommands:
+#   status                    Tabular family overview (disk + last touched).
+#   steward [--dry-run]       Run stewardship pass against worktrees.
+#   key                       Print the slot path that the current PWD
+#                             would use for native cargo builds.
+#   prune family <name> [-y]  Wipe a family's slot tree.
+#   prune --older-than DUR    Wipe slot subdirs whose .last-build is older
+#                             than DUR (e.g. '7d', '36h'). Requires --yes
+#                             non-interactively.
+#   log [-n N]                Tail the event log (steward.log).
+#   orphans                   Print orphan-worktrees.tsv.
+#   key                       Slot path for current PWD.
+#
+# Design: genesis/docs/plans/cargo-target-pool-design.md
+set -uo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/pool-lib.sh"
+
+cmd="${1:-help}"
+[ "$#" -gt 0 ] && shift || true
+
+usage() {
+  cat <<'EOF'
+cargo-pool — cargo target pool operator CLI
+
+Usage:
+  cargo-pool status
+  cargo-pool steward [--dry-run]
+  cargo-pool key
+  cargo-pool prune family <name> [--yes]
+  cargo-pool prune --older-than <duration> [--yes]
+  cargo-pool log [-n N]
+  cargo-pool orphans
+
+Env:
+  CARGO_TARGET_POOL_ROOT       (default /projects/.cargo-target-pool)
+  POOL_PARENT_REPO             (default $CLAUDE_PROJECT_DIR or /projects/elohim)
+  CARGO_TARGET_POOL_FAMILY     override family detection in `key`
+
+Design: genesis/docs/plans/cargo-target-pool-design.md
+EOF
+}
+
+confirm() {
+  # confirm "Prompt: " — returns 0 on yes, 1 on no/non-tty
+  if ! [ -t 0 ]; then return 1; fi
+  read -r -p "$1" ans
+  case "$ans" in y|Y|yes|YES) return 0 ;; *) return 1 ;; esac
+}
+
+cmd_status() {
+  pool_init
+  echo "Pool root:    $POOL_ROOT"
+  echo "Pool size:    $(human_bytes "$(pool_disk_bytes)")"
+  local pdf
+  pdf="$(df -h "$POOL_PARENT_REPO" 2>/dev/null | awk 'NR==2 {print $5 " of " $2 " used"}')"
+  echo "Volume:       $pdf"
+  echo
+  printf '%-20s %-10s %-10s %s\n' FAMILY DISK SLOTS LAST_TOUCHED
+  local fam fd disk slots last
+  for fam in $(list_families); do
+    fd="$POOL_ROOT/family/$fam"
+    disk="$(human_bytes "$(dir_disk_bytes "$fd")")"
+    slots="$(list_slots_for_family "$fam" | wc -l | tr -d ' ')"
+    last="$(find "$fd" -name '.last-build' -printf '%T@ %p\n' 2>/dev/null \
+      | sort -nr | head -1 | awk '{print $1}')"
+    if [ -n "$last" ]; then
+      last="$(date -u -d "@${last%.*}" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || echo "$last")"
+    else
+      last="-"
+    fi
+    printf '%-20s %-10s %-10s %s\n' "$fam" "$disk" "$slots" "$last"
+  done
+}
+
+cmd_steward() {
+  pool_init
+  local dry=0
+  case "${1:-}" in --dry-run) dry=1 ;; esac
+  echo "stewardship: walking $POOL_WORKTREES_DIR (dry=$dry)"
+  steward_all_worktrees "$dry" \
+    | awk -F'\t' '{printf "  %-14s %-14s %s [%s]\n", $1, $2, $3, $4}'
+}
+
+cmd_key() {
+  local wt
+  if ! wt="$(find_worktree_root "$PWD")"; then
+    echo "cargo-pool key: $PWD is not inside a git worktree" >&2; return 1
+  fi
+  local family ws_rel slot
+  family="$(detect_family "$wt")"
+  # Walk up to find the workspace's Cargo.toml, then express path relative
+  # to worktree root. For a given native cargo build, the workspace dir is
+  # whatever has Cargo.toml + [workspace], or the nearest Cargo.toml.
+  local d="$PWD" first=""
+  while [ "$d" != "/" ] && [ -n "$d" ]; do
+    if [ -f "$d/Cargo.toml" ]; then
+      if grep -q '^\[workspace\]' "$d/Cargo.toml"; then ws_rel="${d#$wt/}"; break; fi
+      [ -z "$first" ] && first="${d#$wt/}"
+    fi
+    d="$(dirname "$d")"
+  done
+  ws_rel="${ws_rel:-$first}"
+  if [ -z "${ws_rel:-}" ]; then
+    echo "cargo-pool key: no Cargo.toml found from $PWD" >&2; return 1
+  fi
+  slot="$(slot_path "$family" "$ws_rel" dev)"
+  echo "family=$family"
+  echo "workspace=$ws_rel"
+  echo "slot_dev=$slot"
+  echo "slot_release=$(slot_path "$family" "$ws_rel" release)"
+  echo
+  echo "# Use:"
+  echo "#   export CARGO_TARGET_DIR=\"$slot\""
+  echo "#   cargo build"
+}
+
+cmd_prune() {
+  case "${1:-}" in
+    family)
+      shift
+      local fam="${1:?usage: cargo-pool prune family <name>}"
+      shift || true
+      local fd="$POOL_ROOT/family/$fam"
+      if ! [ -d "$fd" ]; then
+        echo "no such family: $fam" >&2; return 1
+      fi
+      local sz; sz="$(human_bytes "$(dir_disk_bytes "$fd")")"
+      local yes=0
+      [ "${1:-}" = "--yes" ] || [ "${1:-}" = "-y" ] && yes=1
+      if [ "$yes" != 1 ]; then
+        confirm "Wipe family '$fam' ($sz)? [y/N] " || { echo aborted; return 1; }
+      fi
+      rm -rf "$fd"
+      echo "wiped: $fd ($sz)"
+      ;;
+    --older-than)
+      shift
+      local dur="${1:?usage: cargo-pool prune --older-than <duration> [--yes]}"
+      shift || true
+      local yes=0
+      [ "${1:-}" = "--yes" ] || [ "${1:-}" = "-y" ] && yes=1
+      # Convert duration to find -mtime arg. Accept '7d', '36h', or bare days.
+      local mtime_arg
+      case "$dur" in
+        *d) mtime_arg="+${dur%d}" ;;
+        *h) mtime_arg="+$(awk -v h="${dur%h}" 'BEGIN{print h/24}')" ;;
+        *)  mtime_arg="+$dur" ;;
+      esac
+      if [ "$yes" != 1 ]; then
+        echo "Would prune slot dirs whose .last-build is older than $dur"
+        find "$POOL_ROOT/family" -mindepth 4 -maxdepth 4 -type f \
+          -name '.last-build' -mtime "$mtime_arg" -print 2>/dev/null \
+          | sed 's|/.last-build$||'
+        confirm "Apply? [y/N] " || { echo aborted; return 1; }
+      fi
+      while IFS= read -r -d '' lb; do
+        local slot; slot="$(dirname "$lb")"
+        echo "removing $slot"
+        rm -rf "$slot"
+      done < <(find "$POOL_ROOT/family" -mindepth 4 -maxdepth 4 -type f \
+        -name '.last-build' -mtime "$mtime_arg" -print0 2>/dev/null)
+      ;;
+    *)
+      echo "usage: cargo-pool prune family <name> [--yes]" >&2
+      echo "       cargo-pool prune --older-than <duration> [--yes]" >&2
+      return 2
+      ;;
+  esac
+}
+
+cmd_log() {
+  local n=20
+  case "${1:-}" in -n) n="${2:-20}" ;; esac
+  pool_init
+  tail -n "$n" "$(pool_steward_log)" 2>/dev/null
+}
+
+cmd_orphans() {
+  pool_init
+  if [ -s "$(pool_orphan_log)" ]; then
+    echo "orphan worktrees (timestamp / path / branch / classification):"
+    cat "$(pool_orphan_log)"
+  else
+    echo "(no orphans logged)"
+  fi
+}
+
+case "$cmd" in
+  status)   cmd_status "$@" ;;
+  steward)  cmd_steward "$@" ;;
+  key)      cmd_key "$@" ;;
+  prune)    cmd_prune "$@" ;;
+  log)      cmd_log "$@" ;;
+  orphans)  cmd_orphans "$@" ;;
+  help|-h|--help) usage ;;
+  *) usage; exit 2 ;;
+esac
