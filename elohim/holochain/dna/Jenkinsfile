@@ -556,23 +556,34 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                 # Flake-ref is explicit — tests/sweettest/ has no flake.nix
                                 # so nix would otherwise search parents and bail.
                                 # --impure preserves SCCACHE_* env vars from pod
-                                # envFrom (used by other stages). sccache itself
-                                # is DISABLED for sweettest (see unset below).
+                                # envFrom; flake shellHook activates sccache wrapper.
+                                # Sweettest re-enabled with full daemon log capture
+                                # (see SCCACHE_LOG_FILE below) so if the build-script
+                                # bug recurs we have ground truth in dna-integration-
+                                # sccache-daemon.log instead of guessing.
                                 nix develop --impure --accept-flake-config "$WORKSPACE/elohim/holochain/dna/elohim" --command bash -c "
                                     set -uo pipefail
-                                    # Disable sccache for the sweettest compile only.
-                                    # Build #1219 hit the known sccache+cargo build-script
-                                    # caching bug: sccache served a 'cache hit' for
-                                    # lair_keystore_api's build-script compilation but
-                                    # didn't materialize target/release/build/<crate>/
-                                    # build-script-build, causing 'never executed (os
-                                    # error 2)' when cargo invoked it. This bug only
-                                    # affects native cargo builds with build scripts;
-                                    # the WASM stages (Build WASM Cache Core, Build DNA)
-                                    # use wasm32 target without native build scripts and
-                                    # cache cleanly. Sweettest stays at the prior ~71min
-                                    # cold-compile baseline; other stages keep sccache.
-                                    unset RUSTC_WRAPPER
+                                    # sccache daemon log capture — written by sccache
+                                    # daemon itself, not by cargo. SCCACHE_LOG=info
+                                    # (escalated from warn) gives request-level detail.
+                                    # The file is archived as a Jenkins artifact in
+                                    # post.always so we can analyze cache hit/miss
+                                    # patterns and surface any S3 write errors that
+                                    # sccache silently swallows.
+                                    export SCCACHE_LOG=info
+                                    export SCCACHE_LOG_FILE=\"\$WORKSPACE/elohim/holochain/tests/sweettest/dna-integration-sccache-daemon.log\"
+                                    : > \"\$SCCACHE_LOG_FILE\"
+                                    # Defensive: explicitly disable cargo's incremental
+                                    # compilation (release profile already does this,
+                                    # but explicit prevents any incremental/sccache
+                                    # interaction surprise). Build-script caching is
+                                    # the known sccache failure mode — see #1219 RCA.
+                                    export CARGO_INCREMENTAL=0
+                                    # Force a fresh sccache daemon so SCCACHE_LOG_FILE
+                                    # takes effect (env vars are read at daemon start).
+                                    sccache --stop-server >/dev/null 2>&1 || true
+                                    sccache --start-server
+                                    sccache --zero-stats
                                     export CARGO_BUILD_JOBS=2
                                     # The flake exports RUSTFLAGS='--cfg getrandom_backend=\"custom\"'
                                     # for WASM zome builds (Holochain provides the host RNG fn).
@@ -618,6 +629,16 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                         --skip refresh_ttl_appends_timestamp \\
                                         --skip cross_agent_get_returns_none \\
                                         2>&1 | tee \\"$LOG\\"
+                                    CARGO_RC=\\${PIPESTATUS[0]}
+                                    # Capture sccache hit/miss/write stats to the
+                                    # build log (visible immediately) and a sidecar
+                                    # file (archived). Stop the daemon so its log
+                                    # gets fully flushed before archive.
+                                    echo ''
+                                    echo '=== sccache stats (sweettest stage) ==='
+                                    sccache --show-stats 2>&1 | tee \\"\$WORKSPACE/elohim/holochain/tests/sweettest/dna-integration-sccache-stats.txt\\"
+                                    sccache --stop-server >/dev/null 2>&1 || true
+                                    exit \\$CARGO_RC
                                 "
                                 RC=${PIPESTATUS[0]}
 
@@ -648,7 +669,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
             post {
                 always {
                     archiveArtifacts(
-                        artifacts: 'elohim/holochain/tests/sweettest/dna-integration.log',
+                        artifacts: 'elohim/holochain/tests/sweettest/dna-integration.log,elohim/holochain/tests/sweettest/dna-integration-sccache-daemon.log,elohim/holochain/tests/sweettest/dna-integration-sccache-stats.txt',
                         allowEmptyArchive: true
                     )
                     // Clean leaked temp conductor dirs (panicked tests can skip Drop).
