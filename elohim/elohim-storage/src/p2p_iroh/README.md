@@ -108,14 +108,38 @@ divergent message schemas.
 - `IrohConfig.use_n0_discovery` + `Endpoint::builder().discovery_n0()`
   replace libp2p Kademlia for peer record publication
 - `cross_stack_peer_map` table (Diesel migration 2026-05-08-045024)
-  bridges libp2p `PeerId` ↔ iroh `NodeId` for the same `agent_cid`
-  during the hybrid window. `peer_map::{record_libp2p, record_iroh,
-  iroh_for_libp2p, libp2p_for_iroh}` upsert + resolve helpers.
+  bridged libp2p `PeerId` ↔ iroh `NodeId` — **graduated to permanent schema
+  in Phase 12** (see below).
+
+**Peer transport manifest (Phase 12):**
+- `peer_transport_manifest` table (Diesel migration 2026-05-10-120000)
+  is the permanent structural replacement for the Phase 10 bridge table.
+  Carries per-transport profiles (libp2p addrs + iroh relays), supported
+  planes (kebab-case: `blob`, `gossip`, `sync`, `epr`, `epr-atom`, `shard`,
+  `view-fed`, `identity-handshake`, `trust`), discovery methods, and
+  capability_level (0-5 from device archetypes).
+- `peer_map::{record_libp2p_observation, record_iroh_observation,
+  record_capability, record_discovery, lookup_by_agent_cid,
+  lookup_by_libp2p_peer_id, lookup_by_iroh_node_id, select_transport,
+  list_libp2p_peer_ids, list_libp2p_to_agent}` — full Phase 12 API.
+- `peer_map::{record_libp2p, record_iroh, iroh_for_libp2p, libp2p_for_iroh}`
+  — Phase 10 back-compat shims; delegate to the new API.
+- `select_transport(self, peer, plane)` — implements spec lines 480-490:
+  prefer iroh when both support the plane on iroh, fall back to libp2p,
+  route via Track3Bridge for consumer-grade peers with hub-capable self,
+  else NoSharedTransport.
+- Four iroh adapters wired to the manifest: `epr_atom_backend`
+  (caller identity from iroh NodeId lookup), `view_fed_backend`
+  (connected_peers from manifest libp2p rows), `auth_backends::trust`
+  (cache hydrated from manifest at construction), `auth_backends::
+  identity_handshake` (peer label from manifest agent_cid).
 
 **Test coverage:** 26 unit + 19 integration tests (parity tests for every
-plane + 4 peer-map tests). Run via `cargo test --features "p2p p2p-iroh"
---test 'iroh_*' -- --test-threads=1` (or `just test-iroh` which enforces
-serialization for the integration binaries).
+plane + 4 peer-map tests → Phase 12 acceptance: 5 back-compat + extended API
+tests in `iroh_peer_map`, 2 migration tests in `iroh_peer_transport_manifest_migration`,
+4 integration tests in `iroh_peer_transport_manifest`). Run via
+`cargo test --features "p2p p2p-iroh" --test 'iroh_*' -- --test-threads=1`
+(or `just test-iroh` which enforces serialization for the integration binaries).
 
 **Bench coverage:** 9 head-to-head perf benches (loopback, release; iroh
 ALPN vs libp2p `/elohim/<plane>/1.0.0`). Each runs both REUSE

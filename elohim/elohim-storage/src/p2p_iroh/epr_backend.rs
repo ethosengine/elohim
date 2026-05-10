@@ -15,6 +15,12 @@
 //! `Announced { accepted: false, reason: ... }` so callers see a clean
 //! "not yet wired" rather than a silent drop.
 //!
+//! Announce graduation: blocked on Plan 4 (gossip dual-publish wires the
+//! identity-binding gossip topic over both transports) + Plan 5 (recovery
+//! e2e validates the dual-published path). Phase 12's peer_transport_manifest
+//! is a prerequisite (provides the per-peer support map) but does not by
+//! itself unblock Announce.
+//!
 //! Construction:
 //! ```ignore
 //! let epr_service = Arc::new(EprService::new(db_pool, policy, cache, trust_cache));
