@@ -2399,24 +2399,29 @@ impl P2PNode {
                     .collect();
                 let _ = reply.send(peers);
             }
+            // Plan 4: route through DualGossipPublisher for dual-stack publish.
             P2PCommand::PublishRecoveryInvitation(inv) => {
-                let topic = libp2p::gossipsub::IdentTopic::new(RECOVERY_INVITATION_TOPIC);
                 match inv.to_bytes() {
-                    Ok(bytes) => match swarm.behaviour_mut().gossipsub.publish(topic, bytes) {
-                        Ok(msg_id) => info!(
-                            target: "elohim_storage::recovery",
-                            request_hash = %inv.request_hash,
-                            human_id = %inv.human_id,
-                            message_id = ?msg_id,
-                            "Published RecoveryInvitation to recovery.invitation"
-                        ),
-                        Err(e) => warn!(
-                            target: "elohim_storage::recovery",
-                            request_hash = %inv.request_hash,
-                            error = ?e,
-                            "gossipsub publish failed (often: no peers subscribed yet)"
-                        ),
-                    },
+                    Ok(bytes) => {
+                        if let Err(e) = self
+                            .gossip_publisher
+                            .publish(RECOVERY_INVITATION_TOPIC, bytes)
+                        {
+                            warn!(
+                                target: "elohim_storage::recovery",
+                                request_hash = %inv.request_hash,
+                                error = %e,
+                                "PublishRecoveryInvitation dual-publish failed"
+                            );
+                        } else {
+                            info!(
+                                target: "elohim_storage::recovery",
+                                request_hash = %inv.request_hash,
+                                human_id = %inv.human_id,
+                                "Published RecoveryInvitation via DualGossipPublisher"
+                            );
+                        }
+                    }
                     Err(e) => warn!(
                         target: "elohim_storage::recovery",
                         request_hash = %inv.request_hash,
@@ -2464,25 +2469,30 @@ impl P2PNode {
                     ),
                 }
             }
+            // Plan 4: route through DualGossipPublisher for dual-stack publish.
             P2PCommand::PublishRecoveryRevocation(msg) => {
-                let topic = libp2p::gossipsub::IdentTopic::new(RECOVERY_REVOCATION_TOPIC);
                 match msg.to_bytes() {
-                    Ok(bytes) => match swarm.behaviour_mut().gossipsub.publish(topic, bytes) {
-                        Ok(msg_id) => info!(
-                            target: "elohim_storage::recovery",
-                            revocation_id = %msg.revocation_id,
-                            human_id = %msg.human_id,
-                            status = %msg.status,
-                            message_id = ?msg_id,
-                            "Published RecoveryRevocationMessage to recovery.revocation"
-                        ),
-                        Err(e) => warn!(
-                            target: "elohim_storage::recovery",
-                            revocation_id = %msg.revocation_id,
-                            error = ?e,
-                            "gossipsub publish failed (often: no peers subscribed yet)"
-                        ),
-                    },
+                    Ok(bytes) => {
+                        if let Err(e) = self
+                            .gossip_publisher
+                            .publish(RECOVERY_REVOCATION_TOPIC, bytes)
+                        {
+                            warn!(
+                                target: "elohim_storage::recovery",
+                                revocation_id = %msg.revocation_id,
+                                error = %e,
+                                "PublishRecoveryRevocation dual-publish failed"
+                            );
+                        } else {
+                            info!(
+                                target: "elohim_storage::recovery",
+                                revocation_id = %msg.revocation_id,
+                                human_id = %msg.human_id,
+                                status = %msg.status,
+                                "Published RecoveryRevocationMessage via DualGossipPublisher"
+                            );
+                        }
+                    }
                     Err(e) => warn!(
                         target: "elohim_storage::recovery",
                         revocation_id = %msg.revocation_id,
