@@ -21,6 +21,7 @@ pub mod auth_backends;
 mod blob_store;
 pub mod codec;
 mod config;
+pub mod dual_publish;
 mod endpoint;
 pub mod epr;
 pub mod epr_atom_backend;
@@ -37,6 +38,7 @@ pub mod sync_backend;
 pub mod view_fed;
 pub mod view_fed_backend;
 
+pub use dual_publish::{classify_topic, DualGossipPublisher, IrohGossipPublisher, TopicTransports};
 pub use auth::{
     IdentityHandshakeBackend, IrohIdentityHandshakeClient, IrohIdentityHandshakeProtocol,
     IrohTrustClient, IrohTrustProtocol, TrustBackend, IDENTITY_HANDSHAKE_ALPN, TRUST_ALPN,
