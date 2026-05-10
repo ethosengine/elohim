@@ -7,6 +7,15 @@
 //! Spec: genesis/docs/superpowers/specs/2026-05-08-ssr-capability-design.md
 //! Plan: genesis/docs/superpowers/plans/2026-05-08-ssr-capability-implementation.md
 
+// Each `#[tokio::test]` constructs its own current-thread runtime, so the
+// shared std::sync::Mutex serializes ACROSS those runtimes (across OS threads),
+// not within a single async runtime. The deadlock risk that motivates the
+// `await_holding_lock` lint (one task awaiting while another contends for the
+// same lock on the same runtime) does not apply here. Switching to
+// `tokio::sync::Mutex` would be wrong: that's a task-level mutex and would
+// not protect against cross-runtime env-var contention.
+#![allow(clippy::await_holding_lock)]
+
 use elohim_storage::{
     build_peer_status_view, load_render_capability_from_url, BundleEntry, RendererKind,
 };
@@ -137,6 +146,68 @@ async fn view_with_no_capability_emits_null_render_capability() {
     let view = build_peer_status_view(row, None, None, None);
     assert!(view.render_capability.is_none());
     assert!(view.extensions.is_none());
+}
+
+/// Cross-stack contract: doorway's `fetch_compute_budget` extracts CPU fields
+/// at three JSON pointer paths. This test asserts that a SheafaDashboardStateView
+/// assembled from `current_compute_metrics()` + the env-driven operator limits
+/// actually carries values at those paths, so the doorway-side pointer access
+/// will succeed against a real storage payload.
+#[test]
+fn storage_compute_view_satisfies_doorway_pointer_paths() {
+    use elohim_storage::api::compute::{
+        current_allocation_block, current_ceiling_limit, current_compute_metrics,
+    };
+
+    let compute_metrics = current_compute_metrics();
+    let ceiling = current_ceiling_limit();
+    let allocation = current_allocation_block();
+
+    // Probes are live on every CI host: at least 1 CPU core present.
+    assert!(
+        compute_metrics.cpu_total_cores >= 1,
+        "cpu_count probe must succeed on test host"
+    );
+
+    // Build the minimal subset of SheafaDashboardStateView's wire shape that
+    // doorway's fetch_compute_budget cares about. We project the views via
+    // serde_json::to_value to test the actual camelCase output, not the Rust
+    // field names.
+    let computed = serde_json::to_value(&compute_metrics).unwrap();
+    let ceiling_v = serde_json::to_value(&ceiling).unwrap();
+    let allocation_v = serde_json::to_value(&allocation).unwrap();
+    let body = serde_json::json!({
+        "computeMetrics": computed,
+        "constitutionalLimits": { "ceilingLimit": ceiling_v },
+        "allocations": { "allocationBlocks": [allocation_v] },
+    });
+
+    // Three pointer paths must resolve — these are the same paths used by
+    // `doorway/render::fetch_compute_budget`. Drift here would silently
+    // collapse the budget to None and SSR concurrency would fall back to
+    // DEFAULT_MAX_CONCURRENT.
+    assert!(
+        body.pointer("/computeMetrics/cpuTotalCores").is_some(),
+        "/computeMetrics/cpuTotalCores must be present (doorway extracts cpu_total_cores)"
+    );
+    assert!(
+        body.pointer("/constitutionalLimits/ceilingLimit/computeMaxCores")
+            .is_some(),
+        "/constitutionalLimits/ceilingLimit/computeMaxCores must be present (doorway extracts ceiling_max_cores)"
+    );
+    assert!(
+        body.pointer("/allocations/allocationBlocks/0/cpuCores")
+            .is_some(),
+        "/allocations/allocationBlocks/0/cpuCores must be present (doorway extracts allocation_cpu_cores)"
+    );
+
+    // Round-trip the live cpu probe through JSON to confirm the integer
+    // doorway reads is the integer the probe reported.
+    let cpu = body
+        .pointer("/computeMetrics/cpuTotalCores")
+        .and_then(|v| v.as_u64())
+        .unwrap();
+    assert_eq!(cpu as u32, compute_metrics.cpu_total_cores);
 }
 
 #[tokio::test]

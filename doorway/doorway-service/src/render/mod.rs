@@ -13,5 +13,7 @@
 pub mod capability;
 pub mod types;
 
-pub use capability::{derive_capability, CapabilityDeriverError};
+pub use capability::{
+    derive_capability, fetch_compute_budget, CapabilityDeriverError, ComputeBudget,
+};
 pub use types::{BundleEntry, RenderCapabilityProfile, RendererKind};

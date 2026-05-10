@@ -8,6 +8,14 @@
 //! The harness inlines `$ref` before compiling because the jsonschema
 //! crate doesn't resolve file-based references automatically.
 
+// `DOORWAY_CAP_ENV_LOCK` (defined later) serializes env-var mutations across
+// `#[tokio::test]` functions, each of which runs on its own current-thread
+// runtime. The lock contention is therefore across OS threads, not across
+// tasks within a single runtime — the deadlock pattern `await_holding_lock`
+// guards against doesn't apply. Switching to `tokio::sync::Mutex` would be a
+// task-level mutex (wrong granularity for cross-runtime env-var contention).
+#![allow(clippy::await_holding_lock)]
+
 use elohim_storage::p2p::replication::ReplicationStatus;
 use elohim_storage::p2p::DrainStatusInfo;
 use elohim_storage::P2PStatusInfo;

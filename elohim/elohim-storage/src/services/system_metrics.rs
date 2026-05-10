@@ -114,6 +114,35 @@ pub fn total_memory_bytes() -> Option<u64> {
     }
 }
 
+/// Count CPU cores available to this process.
+///
+/// Uses `std::thread::available_parallelism`, which respects cgroup CPU
+/// quotas on Linux (so a pod with `--cpus=2` reports 2, not the host count).
+/// Matches the precedent at `doorway/orchestrator/node_bootstrap.rs:144`
+/// so per-node compute features stay on a single foundation. Returns
+/// `None` when the platform refuses to answer.
+pub fn cpu_count() -> Option<u32> {
+    std::thread::available_parallelism()
+        .ok()
+        .map(|n| n.get() as u32)
+}
+
+/// Read POSIX 1/5/15-minute load averages.
+///
+/// `libc::getloadavg` is POSIX (Linux/macOS/BSD); returns `None` when the
+/// syscall fails or the platform does not support it. Values are unitless
+/// run-queue averages — interpreted relative to `cpu_count()`.
+pub fn load_average() -> Option<(f64, f64, f64)> {
+    let mut buf = [0.0f64; 3];
+    // SAFETY: getloadavg writes up to `nelem` doubles into `loadavg`. Buffer
+    // is sized for 3 elements; the call writes that many or returns -1.
+    let n = unsafe { libc::getloadavg(buf.as_mut_ptr(), 3) };
+    if n != 3 {
+        return None;
+    }
+    Some((buf[0], buf[1], buf[2]))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -168,6 +197,22 @@ mod tests {
     fn total_memory_returns_nonzero_on_linux() {
         if cfg!(target_os = "linux") {
             assert!(total_memory_bytes().unwrap_or(0) > 0);
+        }
+    }
+
+    #[test]
+    fn cpu_count_returns_nonzero_on_real_host() {
+        // Any test host has at least one core.
+        assert!(cpu_count().unwrap_or(0) >= 1);
+    }
+
+    #[test]
+    fn load_average_returns_three_finite_values() {
+        // POSIX hosts (linux/macOS) return 3 doubles; CI runners always do.
+        if let Some((one, five, fifteen)) = load_average() {
+            assert!(one.is_finite() && one >= 0.0);
+            assert!(five.is_finite() && five >= 0.0);
+            assert!(fifteen.is_finite() && fifteen >= 0.0);
         }
     }
 }

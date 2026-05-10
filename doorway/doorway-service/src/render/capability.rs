@@ -18,19 +18,105 @@ pub enum CapabilityDeriverError {
     OverrideMalformed(String),
 }
 
-// TODO: subscribe to elohim-storage's ComputeMetricsView surface.
-// Today this is a static fallback; the right derivation is
-//   min(probe_cpu_count, ceiling_max_cores, allocation_cpu_cores)
-// once `services/system_metrics.rs` ships a CPU probe and `api/compute.rs`
-// stops returning stubbed zeros. See the SSR capability plan's
-// "Known follow-up: compute-aware default" section and memory
-// `project_storage_as_pod_operator_sets_virtual_limits`.
+/// Static fallback used when no compute budget is available (e.g.
+/// `STORAGE_COMPUTE_URL` unset or unreachable). When a budget *is* available,
+/// `max_concurrent_renders` is derived as
+/// `min(probe_cpu_count, ceiling_max_cores, allocation_cpu_cores)` — the
+/// operator-as-pod model from
+/// `project_storage_as_pod_operator_sets_virtual_limits`.
 const DEFAULT_MAX_CONCURRENT: u32 = 8;
 const DEFAULT_AUTH_MODES: &[&str] = &["anonymous", "doorway-hosted"];
+
+/// Per-node compute budget extracted from elohim-storage's
+/// `/api/v1/compute/dashboard`. Each field is `0` when unknown / not
+/// declared (consumers ignore zeros when taking the min).
+#[derive(Debug, Clone, Default)]
+pub struct ComputeBudget {
+    /// `computeMetrics.cpuTotalCores` — actual hardware probe.
+    pub cpu_total_cores: u32,
+    /// `constitutionalLimits.ceilingLimit.computeMaxCores` — operator hard cap.
+    pub ceiling_max_cores: u32,
+    /// `allocations.allocationBlocks[0].cpuCores` — operator virtual allocation
+    /// for this workload.
+    pub allocation_cpu_cores: u32,
+}
+
+impl ComputeBudget {
+    /// Take the min of the non-zero fields. Returns `None` when every field
+    /// is unknown (zero) — caller should fall back to `DEFAULT_MAX_CONCURRENT`.
+    pub fn min_cpu_budget(&self) -> Option<u32> {
+        [
+            self.cpu_total_cores,
+            self.ceiling_max_cores,
+            self.allocation_cpu_cores,
+        ]
+        .into_iter()
+        .filter(|v| *v > 0)
+        .min()
+    }
+}
+
+/// Fetch the storage compute dashboard and extract the SSR-relevant CPU fields.
+///
+/// Returns `None` (honest degradation) when the URL is unreachable, the
+/// response is non-2xx, or the body fails to parse. Mirrors the shape of
+/// `views::load_render_capability_from_url` in elohim-storage.
+pub async fn fetch_compute_budget(dashboard_url: &str) -> Option<ComputeBudget> {
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(5))
+        .build()
+        .ok()?;
+    let resp = match client.get(dashboard_url).send().await {
+        Ok(r) => r,
+        Err(e) => {
+            tracing::warn!(
+                url = %dashboard_url,
+                error = %e,
+                "compute dashboard unreachable — falling back to DEFAULT_MAX_CONCURRENT"
+            );
+            return None;
+        }
+    };
+    if !resp.status().is_success() {
+        tracing::warn!(
+            url = %dashboard_url,
+            status = %resp.status(),
+            "compute dashboard returned non-success — falling back to DEFAULT_MAX_CONCURRENT"
+        );
+        return None;
+    }
+    let body: serde_json::Value = resp.json().await.ok()?;
+    let cpu_total_cores = body
+        .pointer("/computeMetrics/cpuTotalCores")
+        .and_then(|v| v.as_u64())
+        .unwrap_or(0) as u32;
+    let ceiling_max_cores = body
+        .pointer("/constitutionalLimits/ceilingLimit/computeMaxCores")
+        .and_then(|v| v.as_f64())
+        .unwrap_or(0.0)
+        .round() as u32;
+    let allocation_cpu_cores = body
+        .pointer("/allocations/allocationBlocks/0/cpuCores")
+        .and_then(|v| v.as_f64())
+        .unwrap_or(0.0)
+        .round() as u32;
+    Some(ComputeBudget {
+        cpu_total_cores,
+        ceiling_max_cores,
+        allocation_cpu_cores,
+    })
+}
 
 /// Auto-derive a render-capability claim. Honest by construction:
 /// only bundles on disk whose renderer is referenced in storage's manifest
 /// can appear in the claim. Override may reduce the claim but never inflate.
+///
+/// `compute_budget` carries the live per-node compute-as-pod view from
+/// elohim-storage. When present and non-zero, the default for
+/// `max_concurrent_renders` becomes
+/// `min(cpu_total_cores, ceiling_max_cores, allocation_cpu_cores)` rather
+/// than the static `DEFAULT_MAX_CONCURRENT`. Override (`override.toml`)
+/// still wins and may only reduce.
 ///
 /// Returns `Ok(None)` when:
 /// - No bundles on disk match a manifest renderer (storage-only doorway)
@@ -40,6 +126,7 @@ pub async fn derive_capability(
     bundles_dir: &std::path::Path,
     storage_manifest_url: &str,
     override_path: Option<&std::path::Path>,
+    compute_budget: Option<&ComputeBudget>,
 ) -> Result<Option<RenderCapabilityProfile>, CapabilityDeriverError> {
     let on_disk = scan_bundles(bundles_dir).await?;
     let manifest_renderers = match fetch_manifest_renderers(storage_manifest_url).await {
@@ -100,9 +187,13 @@ pub async fn derive_capability(
         None => DEFAULT_AUTH_MODES.iter().map(|s| s.to_string()).collect(),
     };
 
-    let max_concurrent_renders = override_cfg
-        .max_concurrent
+    // Default derives from the operator-as-pod budget when available; falls
+    // back to DEFAULT_MAX_CONCURRENT only when probes are entirely unknown.
+    // Override always wins.
+    let derived_default = compute_budget
+        .and_then(|b| b.min_cpu_budget())
         .unwrap_or(DEFAULT_MAX_CONCURRENT);
+    let max_concurrent_renders = override_cfg.max_concurrent.unwrap_or(derived_default);
     let memory_budget_mib = override_cfg.memory_budget_mib;
 
     Ok(Some(RenderCapabilityProfile {
@@ -324,7 +415,7 @@ mod derive_tests {
         let server = MockServer::start().await;
         mock_manifest_with_angular(&server).await;
         let manifest_url = format!("{}/admin/manifest", server.uri());
-        let result = derive_capability(bundles.path(), &manifest_url, None)
+        let result = derive_capability(bundles.path(), &manifest_url, None, None)
             .await
             .expect("derive ok");
         let profile = result.expect("non-null");
@@ -346,6 +437,7 @@ mod derive_tests {
             bundles.path(),
             &format!("{}/admin/manifest", server.uri()),
             None,
+            None,
         )
         .await
         .expect("derive ok");
@@ -356,7 +448,7 @@ mod derive_tests {
     async fn returns_none_when_manifest_fetch_fails() {
         let bundles = TempDir::new().unwrap();
         write_lamad_bundle(bundles.path());
-        let result = derive_capability(bundles.path(), "http://127.0.0.1:1/never", None)
+        let result = derive_capability(bundles.path(), "http://127.0.0.1:1/never", None, None)
             .await
             .expect("derive ok (Ok(None) on manifest failure)");
         assert!(result.is_none());
@@ -379,6 +471,7 @@ mod derive_tests {
             bundles.path(),
             &format!("{}/admin/manifest", server.uri()),
             None,
+            None,
         )
         .await
         .expect("derive ok");
@@ -400,6 +493,7 @@ mod derive_tests {
             bundles.path(),
             &format!("{}/admin/manifest", server.uri()),
             Some(override_file.as_path()),
+            None,
         )
         .await
         .expect("derive ok");
@@ -426,6 +520,7 @@ bundles_hidden = ["qahal-app"]
             bundles.path(),
             &format!("{}/admin/manifest", server.uri()),
             Some(override_file.as_path()),
+            None,
         )
         .await
         .expect("derive ok");
@@ -452,6 +547,7 @@ bundles_hidden = ["lamad-app"]
             bundles.path(),
             &format!("{}/admin/manifest", server.uri()),
             Some(override_file.as_path()),
+            None,
         )
         .await
         .expect("derive ok");
@@ -481,6 +577,7 @@ auth_modes = ["doorway-hosted"]
             bundles.path(),
             &format!("{}/admin/manifest", server.uri()),
             Some(override_file.as_path()),
+            None,
         )
         .await
         .expect("derive ok");
@@ -507,11 +604,114 @@ auth_modes = ["anonymous"]
             bundles.path(),
             &format!("{}/admin/manifest", server.uri()),
             Some(override_file.as_path()),
+            None,
         )
         .await
         .expect("derive ok");
         let profile = result.unwrap();
         assert_eq!(profile.auth_modes, vec!["anonymous".to_string()]);
+    }
+
+    #[tokio::test]
+    async fn compute_budget_drives_max_concurrent_default() {
+        let bundles = TempDir::new().unwrap();
+        write_lamad_bundle(bundles.path());
+        let server = MockServer::start().await;
+        mock_manifest_with_angular(&server).await;
+        // Probes report 8 CPUs, operator ceiling is 2, allocation is 4.
+        // min(8, 2, 4) = 2, so default max_concurrent_renders should be 2.
+        let budget = ComputeBudget {
+            cpu_total_cores: 8,
+            ceiling_max_cores: 2,
+            allocation_cpu_cores: 4,
+        };
+        let result = derive_capability(
+            bundles.path(),
+            &format!("{}/admin/manifest", server.uri()),
+            None,
+            Some(&budget),
+        )
+        .await
+        .expect("derive ok");
+        let profile = result.unwrap();
+        assert_eq!(profile.max_concurrent_renders, 2);
+    }
+
+    #[tokio::test]
+    async fn override_still_wins_over_compute_budget() {
+        let bundles = TempDir::new().unwrap();
+        write_lamad_bundle(bundles.path());
+        let override_file = bundles.path().join("override.toml");
+        fs::write(&override_file, "[render]\nmax_concurrent = 1\n").unwrap();
+        let server = MockServer::start().await;
+        mock_manifest_with_angular(&server).await;
+        // Budget would resolve to 4, but override pins to 1.
+        let budget = ComputeBudget {
+            cpu_total_cores: 8,
+            ceiling_max_cores: 4,
+            allocation_cpu_cores: 8,
+        };
+        let result = derive_capability(
+            bundles.path(),
+            &format!("{}/admin/manifest", server.uri()),
+            Some(override_file.as_path()),
+            Some(&budget),
+        )
+        .await
+        .expect("derive ok");
+        let profile = result.unwrap();
+        assert_eq!(profile.max_concurrent_renders, 1);
+    }
+
+    #[tokio::test]
+    async fn budget_with_all_zeros_falls_back_to_default() {
+        let bundles = TempDir::new().unwrap();
+        write_lamad_bundle(bundles.path());
+        let server = MockServer::start().await;
+        mock_manifest_with_angular(&server).await;
+        let budget = ComputeBudget::default();
+        let result = derive_capability(
+            bundles.path(),
+            &format!("{}/admin/manifest", server.uri()),
+            None,
+            Some(&budget),
+        )
+        .await
+        .expect("derive ok");
+        let profile = result.unwrap();
+        assert_eq!(profile.max_concurrent_renders, DEFAULT_MAX_CONCURRENT);
+    }
+
+    #[tokio::test]
+    async fn fetch_compute_budget_extracts_cpu_fields() {
+        let server = MockServer::start().await;
+        Mock::given(matchers::method("GET"))
+            .and(matchers::path("/api/v1/compute/dashboard"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "computeMetrics": { "cpuTotalCores": 12 },
+                "constitutionalLimits": {
+                    "ceilingLimit": { "computeMaxCores": 6.0 }
+                },
+                "allocations": {
+                    "allocationBlocks": [
+                        { "cpuCores": 8.0 }
+                    ]
+                }
+            })))
+            .mount(&server)
+            .await;
+        let url = format!("{}/api/v1/compute/dashboard", server.uri());
+        let budget = fetch_compute_budget(&url).await.expect("budget present");
+        assert_eq!(budget.cpu_total_cores, 12);
+        assert_eq!(budget.ceiling_max_cores, 6);
+        assert_eq!(budget.allocation_cpu_cores, 8);
+        assert_eq!(budget.min_cpu_budget(), Some(6));
+    }
+
+    #[tokio::test]
+    async fn fetch_compute_budget_unreachable_returns_none() {
+        let result = fetch_compute_budget("http://127.0.0.1:1/never").await;
+        assert!(result.is_none());
     }
 
     #[tokio::test]
@@ -532,6 +732,7 @@ memory_budget_mib = 768
             bundles.path(),
             &format!("{}/admin/manifest", server.uri()),
             Some(override_file.as_path()),
+            None,
         )
         .await
         .expect("derive ok");

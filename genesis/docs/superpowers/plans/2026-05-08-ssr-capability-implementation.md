@@ -2728,4 +2728,4 @@ Deferred (explicitly out of scope): substrate routing on `renderCapability`, cro
 
 The right wiring for SSR's concurrency budget is `min(probe_cpu_count, ceiling_max_cores, allocation_cpu_cores)`, with `override.toml` as a debugging escape hatch. That's blocked on un-stubbing the compute-metrics surface itself, which is **not** an SSR-sprint concern — it's a dwellinghub-orchestration sprint.
 
-Follow-up plan to write: `genesis/docs/superpowers/plans/2026-05-XX-compute-metrics-un-stub.md` covering CPU count probe, populated `ComputeMetricsView`, env-driven `AllocationBlockView` + `CeilingLimitView`, and a final patch swapping SSR's `DEFAULT_MAX_CONCURRENT` for a subscriber to the live view.
+Follow-up plan: [`genesis/docs/superpowers/plans/2026-05-10-compute-metrics-un-stub.md`](./2026-05-10-compute-metrics-un-stub.md) (in flight, 2026-05-10) — covers CPU count + load-average probes, populated `ComputeMetricsView`, env-driven `AllocationBlockView` + `CeilingLimitView`, and the final patch swapping SSR's `DEFAULT_MAX_CONCURRENT` for a subscriber to the live view.

@@ -465,10 +465,34 @@ async fn main() -> anyhow::Result<()> {
             let override_path = std::env::var("DOORWAY_RENDER_OVERRIDE")
                 .ok()
                 .map(std::path::PathBuf::from);
+            // Subscribe to elohim-storage's per-node compute view (operator-as-pod
+            // model). When set, the deriver picks max_concurrent_renders =
+            // min(cpu_total_cores, ceiling_max_cores, allocation_cpu_cores) instead
+            // of the static fallback. Falls back to STORAGE_URL/api/v1/compute/dashboard
+            // when STORAGE_COMPUTE_URL is unset.
+            let compute_url = std::env::var("STORAGE_COMPUTE_URL").ok().or_else(|| {
+                std::env::var("STORAGE_URL")
+                    .ok()
+                    .map(|u| format!("{}/api/v1/compute/dashboard", u.trim_end_matches('/')))
+            });
+            let compute_budget = match compute_url.as_deref() {
+                Some(url) => doorway::render::fetch_compute_budget(url).await,
+                None => None,
+            };
+            if let Some(b) = &compute_budget {
+                tracing::info!(
+                    cpu_total_cores = b.cpu_total_cores,
+                    ceiling_max_cores = b.ceiling_max_cores,
+                    allocation_cpu_cores = b.allocation_cpu_cores,
+                    derived_default = ?b.min_cpu_budget(),
+                    "compute budget subscribed for SSR concurrency derivation"
+                );
+            }
             match doorway::render::derive_capability(
                 std::path::Path::new(&bundles_dir),
                 &manifest_url,
                 override_path.as_deref(),
+                compute_budget.as_ref(),
             )
             .await
             {
