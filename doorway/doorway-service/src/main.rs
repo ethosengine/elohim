@@ -522,6 +522,19 @@ async fn main() -> anyhow::Result<()> {
         state.render_capability = render_capability;
     }
 
+    // Wire pkarr resolver service (cutover gate #10).
+    // Opt-in via DOORWAY_PKARR_RESOLVER_ENABLED=true.
+    if args.pkarr_resolver_enabled {
+        use doorway::services::pkarr_resolver::{PkarrResolverConfig, PkarrResolverService};
+        let cfg = PkarrResolverConfig {
+            enabled: true,
+            cache_capacity: args.pkarr_cache_capacity,
+            persist_dir: args.pkarr_cache_dir.clone(),
+        };
+        state.pkarr_resolver = Some(Arc::new(PkarrResolverService::new(cfg)));
+        info!("pkarr resolver enabled at /pkarr/{{key}} (gate #10)");
+    }
+
     // Create WarmupState before Arc::new(state) so it can be stored in AppState
     // and also passed to spawn_stream_task later.
     if args.projection_writer && !peer_urls.is_empty() && state.projection.is_some() {

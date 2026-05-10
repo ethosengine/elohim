@@ -20,6 +20,7 @@ pub mod identity;
 pub mod import;
 pub mod import_ws;
 pub mod journal;
+pub mod pkarr_resolver;
 pub mod root_app;
 pub mod seed;
 pub mod status;

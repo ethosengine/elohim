@@ -237,6 +237,12 @@ pub struct AppState {
     ///
     /// `None` means no SSR claim was published, so no limiter needed.
     pub render_semaphore: Option<Arc<tokio::sync::Semaphore>>,
+
+    /// Self-hostable pkarr relay service (cutover gate #10).
+    /// When `Some`, serves `GET /pkarr/{key}` and `PUT /pkarr/{key}`.
+    /// Enabled via `DOORWAY_PKARR_RESOLVER_ENABLED=true`.
+    /// `None` means all `/pkarr/*` requests return 404.
+    pub pkarr_resolver: Option<Arc<crate::services::pkarr_resolver::PkarrResolverService>>,
 }
 
 /// Build the shared HTTP client used by SSR `ResolverFetcher` instances.
@@ -369,6 +375,7 @@ impl AppState {
             ssr_http_client: init_ssr_http_client(),
             render_capability: None,
             render_semaphore: None,
+            pkarr_resolver: None,
         }
     }
 
@@ -459,6 +466,7 @@ impl AppState {
             ssr_http_client: init_ssr_http_client(),
             render_capability: None,
             render_semaphore: None,
+            pkarr_resolver: None,
         }
     }
 
@@ -564,6 +572,7 @@ impl AppState {
             ssr_http_client: init_ssr_http_client(),
             render_capability: None,
             render_semaphore: None,
+            pkarr_resolver: None,
         }
     }
 
@@ -1730,6 +1739,76 @@ async fn handle_request(
             return Ok(to_boxed(
                 routes::handle_identity_api_request(req, Arc::clone(&state), p).await,
             ));
+        }
+
+        // pkarr resolver endpoint — cutover gate #10 (n0 mitigation step 2).
+        // Doorway-specific because the bytes terminate inside doorway's LRU
+        // cache; not a storage-proxy concern.
+        (_, p) if p.starts_with("/pkarr/") => {
+            let key = &p["/pkarr/".len()..];
+            let svc = match state.pkarr_resolver.as_ref() {
+                Some(s) => Arc::clone(s),
+                None => {
+                    return Ok(to_boxed(
+                        Response::builder()
+                            .status(StatusCode::NOT_FOUND)
+                            .header("content-type", "text/plain; charset=utf-8")
+                            .body(Full::new(Bytes::from(
+                                "pkarr resolver not enabled on this doorway",
+                            )))
+                            .expect("response builds"),
+                    ));
+                }
+            };
+            match method {
+                Method::GET => {
+                    let ims = req
+                        .headers()
+                        .get(hyper::header::IF_MODIFIED_SINCE)
+                        .and_then(|v| v.to_str().ok())
+                        .map(|s| s.to_string());
+                    return Ok(to_boxed(
+                        routes::pkarr_resolver::handle_get_pkarr(svc, key, ims.as_deref()).await,
+                    ));
+                }
+                Method::PUT => {
+                    let body_bytes = match req.collect().await {
+                        Ok(collected) => collected.to_bytes(),
+                        Err(e) => {
+                            warn!("pkarr PUT body read error: {}", e);
+                            return Ok(to_boxed(bad_request_response("Failed to read body")));
+                        }
+                    };
+                    // Enforce size cap before passing to handler (handler double-checks).
+                    if body_bytes.len() as u64
+                        > pkarr::SignedPacket::MAX_BYTES + 1
+                    {
+                        return Ok(to_boxed(
+                            Response::builder()
+                                .status(StatusCode::PAYLOAD_TOO_LARGE)
+                                .body(Full::new(Bytes::new()))
+                                .expect("response builds"),
+                        ));
+                    }
+                    return Ok(to_boxed(
+                        routes::pkarr_resolver::handle_put_pkarr(
+                            svc,
+                            key,
+                            body_bytes,
+                            None,
+                        )
+                        .await,
+                    ));
+                }
+                _ => {
+                    return Ok(to_boxed(
+                        Response::builder()
+                            .status(StatusCode::METHOD_NOT_ALLOWED)
+                            .body(Full::new(Bytes::new()))
+                            .expect("response builds"),
+                    ));
+                }
+            }
         }
 
         // ====================================================================

@@ -119,6 +119,20 @@ pub struct Args {
     #[arg(long, env = "DOORWAY_ID")]
     pub doorway_id: Option<String>,
 
+    /// Enable the self-hostable pkarr resolver endpoint at /pkarr/{key}.
+    /// See genesis/docs/superpowers/specs/2026-05-08-iroh-libp2p-complementarity.md
+    /// (cutover gate #10).
+    #[arg(long, env = "DOORWAY_PKARR_RESOLVER_ENABLED", default_value_t = false)]
+    pub pkarr_resolver_enabled: bool,
+
+    /// LRU cache capacity for pkarr packets. Default 1000.
+    #[arg(long, env = "DOORWAY_PKARR_CACHE_CAPACITY")]
+    pub pkarr_cache_capacity: Option<usize>,
+
+    /// If set, persist the pkarr cache to <dir>/packets.bin across restarts.
+    #[arg(long, env = "DOORWAY_PKARR_CACHE_DIR")]
+    pub pkarr_cache_dir: Option<std::path::PathBuf>,
+
     /// Public URL of this doorway for cross-doorway validation
     /// (e.g., "https://alpha.elohim.host")
     #[arg(long, env = "DOORWAY_URL")]
