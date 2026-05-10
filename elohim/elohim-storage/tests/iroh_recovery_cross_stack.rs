@@ -90,7 +90,7 @@ use tempfile::tempdir;
 fn stub_split(seed: &[u8; 32], n: usize) -> Vec<Vec<u8>> {
     (0..n)
         .map(|i| {
-            let mask: Vec<u8> = (0..32).map(|b| ((i as u8).wrapping_add(b as u8))).collect();
+            let mask: Vec<u8> = (0..32).map(|b| (i as u8).wrapping_add(b as u8)).collect();
             seed.iter().zip(mask.iter()).map(|(s, m)| s ^ m).collect()
         })
         .collect()
@@ -236,7 +236,7 @@ fn test_invitation(request_hash: &str) -> RecoveryInvitation {
 }
 
 /// Build a test `RecoveryRevocationMessage`.
-fn test_revocation(request_hash: &str, revoker: &str) -> RecoveryRevocationMessage {
+fn test_revocation(_request_hash: &str, revoker: &str) -> RecoveryRevocationMessage {
     RecoveryRevocationMessage {
         revocation_id: format!("rev-{revoker}-001"),
         human_id: "human-abby-001".to_string(),
@@ -505,14 +505,14 @@ async fn recovery_threshold_with_one_offline() -> Result<()> {
     let seed = [0x11_u8; 32];
     let shares = stub_split(&seed, 3); // 3 online peers.
 
-    // Verify "Cara" is not in the fixture.
-    let cara_result = std::panic::catch_unwind(|| {
-        // slot() panics if the name isn't found — we expect a panic.
-        fixture.slot("Cara");
-    });
+    // Verify "Cara" is not in the fixture (simulates offline).
+    let cara_present = fixture
+        .nodes
+        .iter()
+        .any(|s| s.name.eq_ignore_ascii_case("Cara"));
     assert!(
-        cara_result.is_err(),
-        "Cara must not be present in fixture (simulates offline)"
+        !cara_present,
+        "Cara must not be in the fixture — she is offline for this scenario"
     );
 
     // The 3 online share-holders receive the invitation.

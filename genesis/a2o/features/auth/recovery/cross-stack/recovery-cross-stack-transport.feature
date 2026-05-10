@@ -1,4 +1,4 @@
-@e2e @auth @recovery-cross-stack @iroh @phase11-gate5 @wip
+@e2e @auth @recovery-cross-stack @iroh @phase11-gate5
 Feature: Recovery completes across mixed iroh/libp2p share-holder transports
 
   Cutover gate #5 (spec 2026-05-08-iroh-libp2p-complementarity.md line 514).

@@ -75,12 +75,15 @@ pub enum TransportProfile {
 // Capture mock (libp2p stub for tests)
 // ────────────────────────────────────────────────────────────────────────────
 
+/// Captured gossip call: (topic_name, payload_bytes).
+type CapturedCall = (String, Vec<u8>);
+
 /// Thread-safe capture of (topic, payload) calls. Simulates a libp2p
 /// gossipsub subscriber sink — structurally identical to what
 /// `DualGossipPublisher` treats as its `libp2p_pub` half.
 #[derive(Clone, Default)]
 pub struct CaptureMock {
-    calls: Arc<Mutex<Vec<(String, Vec<u8>)>>>,
+    calls: Arc<Mutex<Vec<CapturedCall>>>,
 }
 
 impl CaptureMock {
