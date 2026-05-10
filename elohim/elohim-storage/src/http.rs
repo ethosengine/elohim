@@ -419,10 +419,7 @@ impl HttpServer {
     /// serve from BLAKE3-keyed iroh storage for iroh-capable callers
     /// before falling through to the legacy SHA256 path.
     #[cfg(feature = "p2p-iroh")]
-    pub fn with_iroh_blob_store(
-        mut self,
-        store: Arc<crate::p2p_iroh::IrohBlobStore>,
-    ) -> Self {
+    pub fn with_iroh_blob_store(mut self, store: Arc<crate::p2p_iroh::IrohBlobStore>) -> Self {
         self.iroh_blob_store = Some(store);
         self
     }
@@ -1742,11 +1739,9 @@ impl HttpServer {
                 };
 
                 let caller_manifest = match (agent_id, conn_opt.as_mut()) {
-                    (Some(cid), Some(c)) => {
-                        crate::p2p_iroh::peer_map::lookup_by_agent_cid(c, cid)
-                            .ok()
-                            .flatten()
-                    }
+                    (Some(cid), Some(c)) => crate::p2p_iroh::peer_map::lookup_by_agent_cid(c, cid)
+                        .ok()
+                        .flatten(),
                     _ => None,
                 };
 
@@ -1765,8 +1760,7 @@ impl HttpServer {
                     ..
                 } = choice
                 {
-                    let blake3_hex =
-                        blake3_hash.strip_prefix("blake3-").unwrap_or(&blake3_hash);
+                    let blake3_hex = blake3_hash.strip_prefix("blake3-").unwrap_or(&blake3_hash);
                     if let Ok(iroh_hash) = blake3_hex.parse::<iroh_blobs::Hash>() {
                         match iroh.get_bytes(iroh_hash).await {
                             Ok(data) => {
@@ -7775,9 +7769,7 @@ impl HttpServer {
     /// Returns the full health JSON body. Used to verify blob backend counters
     /// surface correctly in the health response.
     #[cfg(test)]
-    pub async fn handle_status_for_test(
-        &self,
-    ) -> Result<Response<Full<Bytes>>, StorageError> {
+    pub async fn handle_status_for_test(&self) -> Result<Response<Full<Bytes>>, StorageError> {
         self.handle_health("").await
     }
 
@@ -9953,9 +9945,8 @@ mod blob_backend_wiring_tests {
                 .await
                 .unwrap(),
         );
-        let manifest = Arc::new(
-            crate::p2p_iroh::peer_map::PeerTransportManifest::iroh_capable_for_test(),
-        );
+        let manifest =
+            Arc::new(crate::p2p_iroh::peer_map::PeerTransportManifest::iroh_capable_for_test());
         let server = HttpServer::new(blob_store, "127.0.0.1:0".parse().unwrap())
             .with_self_transport_manifest(manifest);
         assert!(server.self_transport_manifest.is_some());

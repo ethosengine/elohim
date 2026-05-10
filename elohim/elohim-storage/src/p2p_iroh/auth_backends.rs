@@ -118,9 +118,7 @@ impl std::fmt::Debug for IdentityHandshakeServiceBackend {
 #[async_trait::async_trait]
 impl IdentityHandshakeBackend for IdentityHandshakeServiceBackend {
     async fn handle(&self, request: IdentityHandshakeRequest) -> IdentityHandshakeResponse {
-        let now_iso = chrono::Utc::now()
-            .format("%Y-%m-%dT%H:%M:%SZ")
-            .to_string();
+        let now_iso = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
         let peer_label = self.resolve_peer_label(&request);
         self.service.handle(request, &peer_label, &now_iso)
     }
@@ -172,7 +170,9 @@ impl TrustServiceBackend {
         let (Some(cache), Some(pool)) = (self.trust_cache.as_ref(), self.pool.as_ref()) else {
             return;
         };
-        let Ok(mut conn) = pool.get() else { return; };
+        let Ok(mut conn) = pool.get() else {
+            return;
+        };
         let pairs = match list_libp2p_to_agent(&mut conn) {
             Ok(v) => v,
             Err(e) => {
@@ -295,8 +295,8 @@ mod tests {
     async fn trust_backend_hydrates_libp2p_rows_into_cache() {
         use crate::db::{init_pool_from_dir, run_migrations};
         use crate::p2p_iroh::peer_map::{record_libp2p_observation, Plane};
-        use tempfile::tempdir;
         use libp2p::PeerId;
+        use tempfile::tempdir;
 
         let dir = tempdir().unwrap();
         let pool = init_pool_from_dir(dir.path()).expect("pool");
@@ -311,7 +311,8 @@ mod tests {
                 &[],
                 &[Plane::Trust],
                 1746878400,
-            ).unwrap();
+            )
+            .unwrap();
         }
         let cache = PeerTrustCache::new();
         let _backend = TrustServiceBackend::with_trust_cache(
@@ -342,7 +343,8 @@ mod tests {
                 &[],
                 &[Plane::IdentityHandshake],
                 1746878400,
-            ).unwrap();
+            )
+            .unwrap();
         }
         let backend = IdentityHandshakeServiceBackend::with_caller_resolver(
             Arc::new(IdentityHandshakeService::new(None)),

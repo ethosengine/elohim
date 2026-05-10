@@ -64,5 +64,8 @@ fn iroh_only_observation_defaults_discovery_to_pkarr_kademlia() {
     let m = peer_map::lookup_by_agent_cid(&mut conn, "bafyrei...agent-iroh")
         .unwrap()
         .unwrap();
-    assert_eq!(m.discovery, vec!["pkarr".to_string(), "kademlia".to_string()]);
+    assert_eq!(
+        m.discovery,
+        vec!["pkarr".to_string(), "kademlia".to_string()]
+    );
 }

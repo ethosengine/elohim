@@ -57,14 +57,20 @@ fn full_crud_persists_and_reads_back() {
     peer_map::record_capability(&mut conn, agent, 4).unwrap();
     peer_map::record_discovery(&mut conn, agent, &["pkarr", "mdns"]).unwrap();
 
-    let m = peer_map::lookup_by_agent_cid(&mut conn, agent).unwrap().unwrap();
+    let m = peer_map::lookup_by_agent_cid(&mut conn, agent)
+        .unwrap()
+        .unwrap();
     assert_eq!(m.capability_level, 4);
     assert_eq!(m.libp2p.as_ref().unwrap().supports.len(), 3);
     assert_eq!(m.iroh.as_ref().unwrap().supports.len(), 3);
 
-    let m2 = peer_map::lookup_by_libp2p_peer_id(&mut conn, "12D3KooWCrud").unwrap().unwrap();
+    let m2 = peer_map::lookup_by_libp2p_peer_id(&mut conn, "12D3KooWCrud")
+        .unwrap()
+        .unwrap();
     assert_eq!(m2.agent_cid, agent);
-    let m3 = peer_map::lookup_by_iroh_node_id(&mut conn, "node-crud").unwrap().unwrap();
+    let m3 = peer_map::lookup_by_iroh_node_id(&mut conn, "node-crud")
+        .unwrap()
+        .unwrap();
     assert_eq!(m3.agent_cid, agent);
 }
 

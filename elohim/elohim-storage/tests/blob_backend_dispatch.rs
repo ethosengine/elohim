@@ -15,7 +15,7 @@
 use elohim_storage::blob_store::BlobStore;
 use elohim_storage::http::HttpServer;
 use elohim_storage::p2p_iroh::peer_map::{
-    PeerTransportManifest, Plane, record_iroh_observation, record_libp2p_observation,
+    record_iroh_observation, record_libp2p_observation, PeerTransportManifest, Plane,
 };
 use elohim_storage::p2p_iroh::IrohBlobStore;
 use elohim_storage::test_util::test_pool;
@@ -60,7 +60,11 @@ async fn blake3_only_blob_served_from_iroh_for_iroh_capable_caller() {
     let blake3 = iroh.add_bytes(payload.clone()).await.unwrap();
 
     let legacy_dir = tempdir().unwrap();
-    let legacy = Arc::new(BlobStore::new(legacy_dir.path().to_path_buf()).await.unwrap());
+    let legacy = Arc::new(
+        BlobStore::new(legacy_dir.path().to_path_buf())
+            .await
+            .unwrap(),
+    );
 
     // Seed a transport manifest for the caller so lookup_by_agent_cid finds it.
     let caller_cid = "did:elohim:test-iroh-caller";
@@ -103,7 +107,11 @@ async fn sha256_only_blob_served_from_libp2p_even_for_iroh_capable_caller() {
     );
 
     let legacy_dir = tempdir().unwrap();
-    let legacy = Arc::new(BlobStore::new(legacy_dir.path().to_path_buf()).await.unwrap());
+    let legacy = Arc::new(
+        BlobStore::new(legacy_dir.path().to_path_buf())
+            .await
+            .unwrap(),
+    );
     let payload = b"sha256 only blob".to_vec();
     let stored = legacy.store(&payload).await.unwrap();
 

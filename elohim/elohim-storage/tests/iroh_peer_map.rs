@@ -9,9 +9,7 @@ use tempfile::tempdir;
 
 fn setup() -> (
     tempfile::TempDir,
-    diesel::r2d2::PooledConnection<
-        diesel::r2d2::ConnectionManager<diesel::SqliteConnection>,
-    >,
+    diesel::r2d2::PooledConnection<diesel::r2d2::ConnectionManager<diesel::SqliteConnection>>,
 ) {
     let dir = tempdir().unwrap();
     let pool = init_pool_from_dir(dir.path()).expect("pool");
@@ -55,8 +53,14 @@ fn back_compat_libp2p_only_observation_returns_no_iroh() {
 #[test]
 fn back_compat_unknown_peer_id_resolves_to_none() {
     let (_dir, mut conn) = setup();
-    assert_eq!(peer_map::iroh_for_libp2p(&mut conn, "12D3Koo...nope").unwrap(), None);
-    assert_eq!(peer_map::libp2p_for_iroh(&mut conn, "node-id-nope").unwrap(), None);
+    assert_eq!(
+        peer_map::iroh_for_libp2p(&mut conn, "12D3Koo...nope").unwrap(),
+        None
+    );
+    assert_eq!(
+        peer_map::libp2p_for_iroh(&mut conn, "node-id-nope").unwrap(),
+        None
+    );
 }
 
 #[test]
@@ -77,14 +81,20 @@ fn extended_api_full_manifest_roundtrip() {
         agent,
         "node-id-full",
         &["https://relay.iroh.network".to_string()],
-        &[peer_map::Plane::Blob, peer_map::Plane::Sync, peer_map::Plane::Epr],
+        &[
+            peer_map::Plane::Blob,
+            peer_map::Plane::Sync,
+            peer_map::Plane::Epr,
+        ],
         1746878401,
     )
     .unwrap();
     peer_map::record_capability(&mut conn, agent, 4).unwrap();
     peer_map::record_discovery(&mut conn, agent, &["pkarr", "mdns"]).unwrap();
 
-    let m = peer_map::lookup_by_agent_cid(&mut conn, agent).unwrap().unwrap();
+    let m = peer_map::lookup_by_agent_cid(&mut conn, agent)
+        .unwrap()
+        .unwrap();
     assert_eq!(m.capability_level, 4);
     assert_eq!(m.discovery, vec!["pkarr".to_string(), "mdns".to_string()]);
     assert!(m.libp2p.is_some());
