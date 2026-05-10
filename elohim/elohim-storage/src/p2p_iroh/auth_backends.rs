@@ -16,30 +16,46 @@
 //! security property. Both transports preserve DHT-derived integrity
 //! equally.
 //!
-//! ## Authoritative peer identifier
+//! ## Trust cache hydration (Phase 12)
 //!
-//! The iroh-side identity-handshake adapter holds the local node's
-//! iroh `NodeId` string and uses it as the authoritative peer
-//! identifier when calling the service. (libp2p uses
-//! `peer.to_base58()`; iroh uses the connecting peer's NodeId, which
-//! is observable but not yet plumbed through `ProtocolHandler::accept`
-//! in the parity-harness API surface — the adapter therefore uses the
-//! local node-id as a placeholder until Phase 12 cross-stack peer-map
-//! threads connecting-peer NodeId through the handler.)
+//! [`TrustServiceBackend::with_trust_cache`] hydrates the libp2p-PeerId-keyed
+//! trust cache from all manifest rows with a `libp2p_peer_id` at construction
+//! time. This mirrors the libp2p side's per-handshake cache insertion at
+//! `src/p2p/mod.rs`.
+//!
+//! ## Authoritative peer identifier (Phase 12)
+//!
+//! [`IdentityHandshakeServiceBackend::with_caller_resolver`] looks up the
+//! connecting iroh NodeId in `peer_transport_manifest` and surfaces the
+//! `agent_cid` as the authoritative peer label, replacing the Phase 11
+//! fallback that used the claimed `binding.peer_id`.
 
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 
 use super::auth::{IdentityHandshakeBackend, TrustBackend};
+use crate::db::DbPool;
 use crate::identity_handshake_service::IdentityHandshakeService;
 use crate::p2p::identity_handshake::{IdentityHandshakeRequest, IdentityHandshakeResponse};
+use crate::p2p::trust_cache::PeerTrustCache;
 use crate::p2p::trust_protocol::{TrustHandshake, TrustResponse};
+use crate::p2p_iroh::peer_map::{list_libp2p_to_agent, lookup_by_iroh_node_id};
 use crate::trust_service::TrustService;
+use crate::trust_verification::VerifiedTrustContext;
+use libp2p::PeerId;
+
+// ────────────────────────────────────────────────────────────────
+// IdentityHandshakeServiceBackend
+// ────────────────────────────────────────────────────────────────
 
 /// Routes [`IdentityHandshakeRequest`]s into a shared
-/// [`IdentityHandshakeService`] with a fixed local-peer-id label.
+/// [`IdentityHandshakeService`] with caller-identity resolved from the
+/// peer_transport_manifest when a resolver is wired.
 pub struct IdentityHandshakeServiceBackend {
     service: Arc<IdentityHandshakeService>,
     local_peer_id_label: String,
+    caller_resolver: Option<Arc<dyn Fn() -> Option<String> + Send + Sync>>,
+    pool: Option<DbPool>,
 }
 
 impl IdentityHandshakeServiceBackend {
@@ -47,6 +63,46 @@ impl IdentityHandshakeServiceBackend {
         Self {
             service,
             local_peer_id_label,
+            caller_resolver: None,
+            pool: None,
+        }
+    }
+
+    /// Phase 12 wiring: pass a DbPool and a closure that returns the
+    /// connecting peer's iroh NodeId. The backend looks up the NodeId
+    /// in peer_transport_manifest and surfaces agent_cid as the
+    /// authoritative peer label.
+    pub fn with_caller_resolver(
+        service: Arc<IdentityHandshakeService>,
+        local_peer_id_label: String,
+        pool: DbPool,
+        resolver: Arc<dyn Fn() -> Option<String> + Send + Sync>,
+    ) -> Self {
+        Self {
+            service,
+            local_peer_id_label,
+            caller_resolver: Some(resolver),
+            pool: Some(pool),
+        }
+    }
+
+    pub(crate) fn resolve_peer_label(&self, request: &IdentityHandshakeRequest) -> String {
+        let Some(resolver) = self.caller_resolver.as_ref() else {
+            return request.binding.peer_id.clone();
+        };
+        let Some(node_id) = resolver() else {
+            return request.binding.peer_id.clone();
+        };
+        let Some(pool) = self.pool.as_ref() else {
+            return node_id;
+        };
+        let mut conn = match pool.get() {
+            Ok(c) => c,
+            Err(_) => return node_id,
+        };
+        match lookup_by_iroh_node_id(&mut conn, &node_id) {
+            Ok(Some(m)) => m.agent_cid,
+            _ => node_id,
         }
     }
 }
@@ -62,31 +118,90 @@ impl std::fmt::Debug for IdentityHandshakeServiceBackend {
 #[async_trait::async_trait]
 impl IdentityHandshakeBackend for IdentityHandshakeServiceBackend {
     async fn handle(&self, request: IdentityHandshakeRequest) -> IdentityHandshakeResponse {
-        let now_iso = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
-        // The connecting peer's NodeId is not yet exposed to the
-        // ProtocolHandler::accept signature in our harness; we fall
-        // back to using the binding's claimed peer_id as the
-        // authoritative label so verify_handshake_request's
-        // peer_id-mismatch rule still functions structurally. The
-        // libp2p side has access to the actual transport-layer
-        // PeerId; closing this asymmetry is a Phase 12 concern that
-        // graduates with the cross-stack peer-map.
-        let peer_label = request.binding.peer_id.clone();
+        let now_iso = chrono::Utc::now()
+            .format("%Y-%m-%dT%H:%M:%SZ")
+            .to_string();
+        let peer_label = self.resolve_peer_label(&request);
         self.service.handle(request, &peer_label, &now_iso)
     }
 }
 
+// ────────────────────────────────────────────────────────────────
+// TrustServiceBackend
+// ────────────────────────────────────────────────────────────────
+
 /// Routes [`TrustHandshake`] requests into a shared [`TrustService`]
-/// and produces the matching [`TrustResponse`]. Cache insertion (the
-/// libp2p `peer_trust_cache` keyed by libp2p PeerId) is intentionally
-/// skipped in iroh mode — see module-level docs.
+/// and produces the matching [`TrustResponse`].
+///
+/// When constructed with [`Self::with_trust_cache`], hydrates the
+/// libp2p-PeerId-keyed trust cache from the peer_transport_manifest
+/// at construction time.
 pub struct TrustServiceBackend {
     service: Arc<TrustService>,
+    trust_cache: Option<PeerTrustCache>,
+    pool: Option<DbPool>,
 }
 
 impl TrustServiceBackend {
     pub fn new(service: Arc<TrustService>) -> Self {
-        Self { service }
+        Self {
+            service,
+            trust_cache: None,
+            pool: None,
+        }
+    }
+
+    /// Phase 12 wiring: hydrate the libp2p-keyed trust cache from
+    /// the manifest at construction. Subsequent identity-handshake
+    /// arrivals call `hydrate_one(node_id)` to refresh.
+    pub fn with_trust_cache(
+        service: Arc<TrustService>,
+        trust_cache: PeerTrustCache,
+        pool: DbPool,
+    ) -> Self {
+        let backend = Self {
+            service,
+            trust_cache: Some(trust_cache),
+            pool: Some(pool),
+        };
+        backend.hydrate_all();
+        backend
+    }
+
+    fn hydrate_all(&self) {
+        let (Some(cache), Some(pool)) = (self.trust_cache.as_ref(), self.pool.as_ref()) else {
+            return;
+        };
+        let Ok(mut conn) = pool.get() else { return; };
+        let pairs = match list_libp2p_to_agent(&mut conn) {
+            Ok(v) => v,
+            Err(e) => {
+                tracing::warn!(target: "elohim_storage::trust",
+                    error = %e, "iroh trust-cache hydrate: list failed");
+                return;
+            }
+        };
+        for (peer_str, agent_cid) in pairs {
+            if let Ok(peer) = peer_str.parse::<PeerId>() {
+                let ctx = VerifiedTrustContext {
+                    agent_pubkey: agent_cid,
+                    agent_verified: true,
+                    reach_ceiling: "public".to_string(),
+                    verified_memberships: vec![],
+                    verified_relationships: vec![],
+                    verified_attestations: vec![],
+                    verified_stewardship: vec![],
+                    verified_at: Instant::now(),
+                    ttl: Duration::from_secs(3600),
+                };
+                // PeerTrustCache::insert is async; tokio::block_in_place
+                // is the safest path inside a sync construction context.
+                let cache = cache.clone();
+                tokio::task::block_in_place(|| {
+                    tokio::runtime::Handle::current().block_on(cache.insert(peer, ctx));
+                });
+            }
+        }
     }
 }
 
@@ -174,5 +289,69 @@ mod tests {
             }
             other => panic!("expected Verified, got {other:?}"),
         }
+    }
+
+    #[tokio::test]
+    async fn trust_backend_hydrates_libp2p_rows_into_cache() {
+        use crate::db::{init_pool_from_dir, run_migrations};
+        use crate::p2p_iroh::peer_map::{record_libp2p_observation, Plane};
+        use tempfile::tempdir;
+        use libp2p::PeerId;
+
+        let dir = tempdir().unwrap();
+        let pool = init_pool_from_dir(dir.path()).expect("pool");
+        run_migrations(&pool).expect("migrations");
+        let known_peer = "12D3KooWNZyfTfb1ENd1HRgGTbvXebvA7iJfCRZHm9NzpDdEsTwo";
+        {
+            let mut conn = pool.get().unwrap();
+            record_libp2p_observation(
+                &mut conn,
+                "bafyrei...trust",
+                known_peer,
+                &[],
+                &[Plane::Trust],
+                1746878400,
+            ).unwrap();
+        }
+        let cache = PeerTrustCache::new();
+        let _backend = TrustServiceBackend::with_trust_cache(
+            Arc::new(TrustService::new()),
+            cache.clone(),
+            pool,
+        );
+        // The cache should now contain an entry keyed by the parsed PeerId.
+        let peer = known_peer.parse::<PeerId>().unwrap();
+        assert!(cache.try_get(&peer).is_some());
+    }
+
+    #[tokio::test]
+    async fn identity_handshake_uses_manifest_agent_cid_when_resolver_yields_known_node() {
+        use crate::db::{init_pool_from_dir, run_migrations};
+        use crate::p2p_iroh::peer_map::{record_iroh_observation, Plane};
+        use tempfile::tempdir;
+
+        let dir = tempdir().unwrap();
+        let pool = init_pool_from_dir(dir.path()).expect("pool");
+        run_migrations(&pool).expect("migrations");
+        {
+            let mut conn = pool.get().unwrap();
+            record_iroh_observation(
+                &mut conn,
+                "bafyrei...idh",
+                "node-idh",
+                &[],
+                &[Plane::IdentityHandshake],
+                1746878400,
+            ).unwrap();
+        }
+        let backend = IdentityHandshakeServiceBackend::with_caller_resolver(
+            Arc::new(IdentityHandshakeService::new(None)),
+            "iroh-local-node".to_string(),
+            pool,
+            Arc::new(|| Some("node-idh".to_string())),
+        );
+        let req = sample_id_request("12D3KooWClaim", "agent-cid-claimed");
+        let label = backend.resolve_peer_label(&req);
+        assert_eq!(label, "bafyrei...idh");
     }
 }
