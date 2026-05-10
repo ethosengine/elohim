@@ -291,7 +291,7 @@ mod tests {
         }
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn trust_backend_hydrates_libp2p_rows_into_cache() {
         use crate::db::{init_pool_from_dir, run_migrations};
         use crate::p2p_iroh::peer_map::{record_libp2p_observation, Plane};
