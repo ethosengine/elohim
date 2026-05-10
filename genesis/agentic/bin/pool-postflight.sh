@@ -29,6 +29,13 @@ pool_init
 DRY="${CARGO_TARGET_POOL_POSTFLIGHT_DRY:-0}"
 steward_all_worktrees "$DRY" >/dev/null 2>&1 || true
 
+# Sample slot watermarks — HWM rises monotonically across sessions; feeds
+# `cargo-pool estimate` so it can ground predictions in observed peaks
+# rather than hardcoded 10G/3G.
+if [ "$DRY" != "1" ]; then
+  record_all_slot_watermarks >/dev/null 2>&1 || true
+fi
+
 # Optional cold-slot GC. Off by default; opt-in via env to avoid
 # surprising operators with disk activity at session-end.
 if [ -n "${CARGO_TARGET_POOL_POSTFLIGHT_GC_DAYS:-}" ]; then

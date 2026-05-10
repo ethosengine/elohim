@@ -32,8 +32,14 @@ Usage:
   cargo-pool status
   cargo-pool steward [--dry-run]
   cargo-pool key
+  cargo-pool estimate [worktree-path]
+  cargo-pool legacy-targets [--clean] [--yes]
+  cargo-pool node-modules [--clean [--stale|--all]] [--yes]
+  cargo-pool angular-cache [--clean] [--older-than-days N] [--yes]
+  cargo-pool watermark [show|update]
   cargo-pool prune family <name> [--yes]
   cargo-pool prune --older-than <duration> [--yes]
+  cargo-pool prune --stale-incrementals [--older-than-days N] [--yes]
   cargo-pool log [-n N]
   cargo-pool orphans
 
@@ -55,11 +61,16 @@ confirm() {
 
 cmd_status() {
   pool_init
+  local pct status
+  pct="$(disk_pct_used)"
+  status="$(disk_status_for_pct "$pct")"
   echo "Pool root:    $POOL_ROOT"
   echo "Pool size:    $(human_bytes "$(pool_disk_bytes)")"
-  local pdf
-  pdf="$(df -h "$POOL_PARENT_REPO" 2>/dev/null | awk 'NR==2 {print $5 " of " $2 " used"}')"
-  echo "Volume:       $pdf"
+  echo "Volume:       $(disk_human_summary) (${pct}% used, status=$status)"
+  case "$status" in
+    critical) echo "              !! CRITICAL — see preflight banner or run: cargo-pool prune --stale-incrementals --yes" ;;
+    warn)     echo "              !  Disk above 80%; consider cargo-pool prune --stale-incrementals" ;;
+  esac
   echo
   printf '%-20s %-10s %-10s %s\n' FAMILY DISK SLOTS LAST_TOUCHED
   local fam fd disk slots last
@@ -76,6 +87,41 @@ cmd_status() {
     fi
     printf '%-20s %-10s %-10s %s\n' "$fam" "$disk" "$slots" "$last"
   done
+
+  # Legacy target/ dirs outside the pool — surface for operator triage.
+  local legacy; legacy="$(legacy_native_bytes)"
+  if [ "${legacy:-0}" -gt 0 ]; then
+    echo
+    echo "Legacy target/ dirs outside pool (native, recoverable): $(human_bytes "$legacy")"
+    echo "  Review: cargo-pool legacy-targets"
+    echo "  Clean:  cargo-pool legacy-targets --clean --yes"
+  fi
+
+  # Stale incrementals.
+  local stale; stale="$(stale_incremental_bytes 3)"
+  if [ "${stale:-0}" -gt 0 ]; then
+    echo
+    echo "Stale incremental hash dirs (>3d): $(human_bytes "$stale")"
+    echo "  Review: cargo-pool prune --stale-incrementals"
+    echo "  Clean:  cargo-pool prune --stale-incrementals --yes"
+  fi
+
+  # Stale node_modules (pnpm-lock drift) and .angular caches.
+  local nm_stale ang_stale
+  nm_stale="$(node_modules_stale_bytes)"
+  ang_stale="$(angular_cache_stale_bytes 7)"
+  if [ "${nm_stale:-0}" -gt 0 ]; then
+    echo
+    echo "Stale node_modules (lockfile newer than install): $(human_bytes "$nm_stale")"
+    echo "  Review: cargo-pool node-modules"
+    echo "  Clean:  cargo-pool node-modules --clean --yes"
+  fi
+  if [ "${ang_stale:-0}" -gt 0 ]; then
+    echo
+    echo "Old .angular caches (>7d): $(human_bytes "$ang_stale")"
+    echo "  Review: cargo-pool angular-cache"
+    echo "  Clean:  cargo-pool angular-cache --clean --yes"
+  fi
 }
 
 cmd_steward() {
@@ -110,10 +156,20 @@ cmd_key() {
     echo "cargo-pool key: no Cargo.toml found from $PWD" >&2; return 1
   fi
   slot="$(slot_path "$family" "$ws_rel" dev)"
+  local slot_release; slot_release="$(slot_path "$family" "$ws_rel" release)"
+  local wm_dev wm_rel
+  wm_dev="$(read_slot_watermark "$slot")"
+  wm_rel="$(read_slot_watermark "$slot_release")"
   echo "family=$family"
   echo "workspace=$ws_rel"
   echo "slot_dev=$slot"
-  echo "slot_release=$(slot_path "$family" "$ws_rel" release)"
+  if [ "${wm_dev:-0}" -gt 0 ]; then
+    echo "  hwm_dev=$(human_bytes "$wm_dev") (observed peak — used by estimate)"
+  fi
+  echo "slot_release=$slot_release"
+  if [ "${wm_rel:-0}" -gt 0 ]; then
+    echo "  hwm_release=$(human_bytes "$wm_rel")"
+  fi
   echo
   echo "# Use:"
   echo "#   export CARGO_TARGET_DIR=\"$slot\""
@@ -166,11 +222,242 @@ cmd_prune() {
       done < <(find "$POOL_ROOT/family" -mindepth 4 -maxdepth 4 -type f \
         -name '.last-build' -mtime "$mtime_arg" -print0 2>/dev/null)
       ;;
+    --stale-incrementals)
+      shift
+      local days=3 yes=0
+      while [ "$#" -gt 0 ]; do
+        case "$1" in
+          --older-than-days) days="${2:?}"; shift 2 ;;
+          --yes|-y) yes=1; shift ;;
+          *) echo "unknown flag: $1" >&2; return 2 ;;
+        esac
+      done
+      local total; total="$(stale_incremental_bytes "$days")"
+      if [ "${total:-0}" -eq 0 ]; then
+        echo "(no stale incremental hash dirs older than ${days}d)"
+        return 0
+      fi
+      if [ "$yes" != 1 ]; then
+        echo "Stale incremental dirs older than ${days}d ($(human_bytes "$total") recoverable):"
+        prune_stale_incrementals "$days" 0
+        confirm "Prune all? [y/N] " || { echo aborted; return 1; }
+      fi
+      prune_stale_incrementals "$days" 1
+      echo "# recovered: $(human_bytes "$total")"
+      ;;
     *)
       echo "usage: cargo-pool prune family <name> [--yes]" >&2
       echo "       cargo-pool prune --older-than <duration> [--yes]" >&2
+      echo "       cargo-pool prune --stale-incrementals [--older-than-days N] [--yes]" >&2
       return 2
       ;;
+  esac
+}
+
+cmd_legacy_targets() {
+  pool_init
+  local clean=0 yes=0
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --clean) clean=1; shift ;;
+      --yes|-y) yes=1; shift ;;
+      *) echo "unknown flag: $1" >&2; return 2 ;;
+    esac
+  done
+
+  if [ "$clean" = 0 ]; then
+    echo "Legacy target/ dirs outside pool (CLASSIFICATION  SIZE  PATH):"
+    list_legacy_targets | while IFS=$'\t' read -r cls bytes path; do
+      printf '  %-10s %8s  %s\n' "$cls" "$(human_bytes "$bytes")" "$path"
+    done
+    echo
+    local nat; nat="$(legacy_native_bytes)"
+    echo "Native (safe to clean): $(human_bytes "${nat:-0}")"
+    echo "WASM / typesrc / unknown: kept; see --clean only removes 'native'."
+    return 0
+  fi
+
+  local total; total="$(legacy_native_bytes)"
+  if [ "${total:-0}" -eq 0 ]; then
+    echo "(no native legacy target/ dirs to clean)"
+    return 0
+  fi
+  if [ "$yes" != 1 ]; then
+    echo "Would clean native legacy target/ dirs ($(human_bytes "$total") recoverable):"
+    clean_legacy_native_targets 1
+    confirm "Proceed? [y/N] " || { echo aborted; return 1; }
+  fi
+  clean_legacy_native_targets 0
+  echo "# recovered: $(human_bytes "$total")"
+}
+
+cmd_watermark() {
+  pool_init
+  case "${1:-show}" in
+    update)
+      record_all_slot_watermarks
+      echo "Watermarks updated for all slots."
+      ;;
+    show|*)
+      echo "Per-slot HWM (FAMILY  WORKSPACE  PROFILE  HWM  CURRENT_SIZE):"
+      [ -d "$POOL_ROOT/family" ] || { echo "(no families)"; return 0; }
+      local fam ws_dir prof slot wm cur
+      while IFS= read -r slot; do
+        prof="${slot##*/}"
+        ws_dir="$(dirname "$slot")"
+        local ws_flat; ws_flat="${ws_dir##*/}"
+        local fam_dir; fam_dir="$(dirname "$ws_dir")"
+        fam="${fam_dir##*/}"
+        wm="$(read_slot_watermark "$slot")"
+        cur="$(dir_disk_bytes "$slot")"
+        printf '  %-8s %-32s %-8s %8s  %s\n' \
+          "$fam" "$ws_flat" "$prof" \
+          "$(human_bytes "${wm:-0}")" "$(human_bytes "${cur:-0}")"
+      done < <(find "$POOL_ROOT/family" -mindepth 3 -maxdepth 3 -type d \
+        \( -name dev -o -name release \) 2>/dev/null | sort)
+      ;;
+  esac
+}
+
+cmd_node_modules() {
+  pool_init
+  local clean=0 yes=0 mode=stale
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --clean) clean=1; shift ;;
+      --stale) mode=stale; shift ;;
+      --all)   mode=all; shift ;;
+      --yes|-y) yes=1; shift ;;
+      *) echo "unknown flag: $1" >&2; return 2 ;;
+    esac
+  done
+
+  if [ "$clean" = 0 ]; then
+    echo "node_modules trees outside pool / sophia (CLASSIFICATION  SIZE  PATH):"
+    list_node_modules | while IFS=$'\t' read -r cls bytes path; do
+      printf '  %-8s %8s  %s\n' "$cls" "$(human_bytes "$bytes")" "$path"
+    done
+    echo
+    echo "  stale  = pnpm-lock.yaml newer than .modules.yaml (install drift)"
+    echo "  fresh  = lockfile matches install marker"
+    echo "  active = a subagent process has CWD inside the containing worktree"
+    echo "  unknown = no lockfile found (left alone)"
+    local s n; s="$(node_modules_stale_bytes)"; n="$(node_modules_nuke_bytes)"
+    echo
+    echo "Stale recoverable:    $(human_bytes "${s:-0}")"
+    echo "Full nuke recoverable: $(human_bytes "${n:-0}") (excludes active)"
+    return 0
+  fi
+
+  local total
+  if [ "$mode" = "stale" ]; then
+    total="$(node_modules_stale_bytes)"
+  else
+    total="$(node_modules_nuke_bytes)"
+  fi
+  if [ "${total:-0}" -eq 0 ]; then
+    echo "(no node_modules in '$mode' class to clean)"
+    return 0
+  fi
+  if [ "$yes" != 1 ]; then
+    echo "Would clean node_modules ($mode mode, $(human_bytes "$total") recoverable):"
+    clean_node_modules "$mode" 1
+    confirm "Proceed? [y/N] " || { echo aborted; return 1; }
+  fi
+  clean_node_modules "$mode" 0
+  echo "# recovered: $(human_bytes "$total")"
+  echo "# remember: run 'pnpm install' in each cleaned project before building"
+}
+
+cmd_angular_cache() {
+  pool_init
+  local clean=0 yes=0 days=7
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --clean) clean=1; shift ;;
+      --older-than-days) days="${2:?}"; shift 2 ;;
+      --yes|-y) yes=1; shift ;;
+      *) echo "unknown flag: $1" >&2; return 2 ;;
+    esac
+  done
+
+  if [ "$clean" = 0 ]; then
+    echo ".angular caches (AGE  SIZE  PATH):"
+    list_angular_caches | while IFS=$'\t' read -r age bytes path; do
+      if [ "$age" = "active" ]; then
+        printf '  %-8s %8s  %s\n' "active" "$(human_bytes "$bytes")" "$path"
+      else
+        printf '  %-8s %8s  %s\n' "${age}d" "$(human_bytes "$bytes")" "$path"
+      fi
+    done
+    local t; t="$(angular_cache_total_bytes)"
+    echo
+    echo "Total non-active: $(human_bytes "${t:-0}")"
+    echo "Stale (>${days}d):  $(human_bytes "$(angular_cache_stale_bytes "$days")")"
+    return 0
+  fi
+
+  local total; total="$(angular_cache_stale_bytes "$days")"
+  if [ "${total:-0}" -eq 0 ]; then
+    echo "(no .angular caches older than ${days}d to clean)"
+    return 0
+  fi
+  if [ "$yes" != 1 ]; then
+    echo "Would clean .angular caches older than ${days}d ($(human_bytes "$total") recoverable):"
+    clean_angular_caches "$days" 1
+    confirm "Proceed? [y/N] " || { echo aborted; return 1; }
+  fi
+  clean_angular_caches "$days" 0
+  echo "# recovered: $(human_bytes "$total")"
+}
+
+cmd_estimate() {
+  pool_init
+  local wt="${1:-$PWD}"
+  if ! wt="$(find_worktree_root "$wt")"; then
+    echo "estimate: $1 is not inside a git worktree" >&2; return 1
+  fi
+  local family budget est free verdict
+  family="$(detect_family "$wt")"
+  budget="$(disk_budget_for_worktree "$wt")"
+  est="$(echo "$budget" | cut -f1)"
+  free="$(echo "$budget" | cut -f2)"
+  verdict="$(echo "$budget" | cut -f3)"
+  echo "worktree:  $wt"
+  echo "family:    $family"
+  echo "estimate:  ~${est} GB (HWM × 1.2 where observed; else 10G cold / 3G warm)"
+  echo "free:      ${free} GB"
+  echo "verdict:   $verdict"
+
+  # Per-workspace breakdown so the operator sees which estimate comes from
+  # ground truth (HWM) vs hardcoded fallback.
+  echo
+  echo "Per-workspace basis (workspace : peak observed | source):"
+  local ws slot wm sib
+  for ws in "${NATIVE_WORKSPACES[@]}"; do
+    [ -d "$wt/$ws" ] || continue
+    slot="$(slot_path "$family" "$ws" dev)"
+    if [ -d "$slot" ]; then
+      wm="$(read_slot_watermark "$slot")"
+      if [ "${wm:-0}" -gt 0 ]; then
+        printf '  %-40s %8s | this slot HWM\n' "$ws" "$(human_bytes "$wm")"
+      else
+        printf '  %-40s %8s | warm slot (no HWM yet)\n' "$ws" "3.0G"
+      fi
+    else
+      sib="$(cross_family_watermark "$ws")"
+      if [ "${sib:-0}" -gt 0 ]; then
+        printf '  %-40s %8s | sibling-family HWM (cold slot)\n' "$ws" "$(human_bytes "$sib")"
+      else
+        printf '  %-40s %8s | hardcoded cold fallback\n' "$ws" "10.0G"
+      fi
+    fi
+  done
+  case "$verdict" in
+    short) echo "           !! BUDGET SHORT — clean before dispatching:"
+           echo "              cargo-pool prune --stale-incrementals --yes"
+           echo "              cargo-pool legacy-targets --clean --yes" ;;
+    tight) echo "           !  Tight — consider cleanup before parallel waves" ;;
   esac
 }
 
@@ -183,21 +470,44 @@ cmd_log() {
 
 cmd_orphans() {
   pool_init
+  echo "== Logged orphans (merged-dirty worktrees, deduped by wt+branch+class) =="
   if [ -s "$(pool_orphan_log)" ]; then
-    echo "orphan worktrees (timestamp / path / branch / classification):"
-    cat "$(pool_orphan_log)"
+    # Awk dedupe keeps the first-seen timestamp per (wt, branch, classification)
+    # tuple. The raw log can contain pre-dedupe-fix bloat; this presents a
+    # sane operator view without rewriting historical data.
+    awk -F'\t' '!seen[$2 FS $3 FS $4]++' "$(pool_orphan_log)"
   else
-    echo "(no orphans logged)"
+    echo "(none)"
+  fi
+
+  # Live scan: any worktree with uncommitted work but no active subagent.
+  # These are crash-recovery candidates worth surfacing to the operator —
+  # do not auto-clean.
+  echo
+  echo "== Uncommitted-orphan worktrees (live scan: dirty + no active process) =="
+  local out; out="$(list_uncommitted_orphans)"
+  if [ -z "$out" ]; then
+    echo "(none)"
+  else
+    echo "$out" | while IFS=$'\t' read -r wt branch count first; do
+      printf '  %s  (branch=%s, %s dirty file(s))\n' "$wt" "$branch" "$count"
+      printf '    first: %s\n' "$first"
+    done
   fi
 }
 
 case "$cmd" in
-  status)   cmd_status "$@" ;;
-  steward)  cmd_steward "$@" ;;
-  key)      cmd_key "$@" ;;
-  prune)    cmd_prune "$@" ;;
-  log)      cmd_log "$@" ;;
-  orphans)  cmd_orphans "$@" ;;
+  status)         cmd_status "$@" ;;
+  steward)        cmd_steward "$@" ;;
+  key)            cmd_key "$@" ;;
+  prune)          cmd_prune "$@" ;;
+  legacy-targets) cmd_legacy_targets "$@" ;;
+  node-modules)   cmd_node_modules "$@" ;;
+  angular-cache)  cmd_angular_cache "$@" ;;
+  estimate)       cmd_estimate "$@" ;;
+  watermark)      cmd_watermark "$@" ;;
+  log)            cmd_log "$@" ;;
+  orphans)        cmd_orphans "$@" ;;
   help|-h|--help) usage ;;
   *) usage; exit 2 ;;
 esac

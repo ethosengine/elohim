@@ -20,8 +20,9 @@ worktrees whose branches have already merged to dev.
 
   | Classification | Action |
   |---|---|
+  | **process CWD inside** (any classification) | `active-subagent` → left alone (race-safe override) |
   | branch merged to dev, clean status | `git worktree remove --force` |
-  | branch merged to dev, dirty status | log to `orphan-worktrees.tsv` |
+  | branch merged to dev, dirty status | log to `orphan-worktrees.tsv` (deduped by wt+branch+class) |
   | branch active on origin | left alone |
   | branch not merged + not on origin | left alone (conservative; can't tell `deleted-upstream` from `never-pushed`) |
   | broken `.git` or missing dir | left alone |
@@ -29,6 +30,17 @@ worktrees whose branches have already merged to dev.
   Then it computes the slot path for the current worktree's family and
   emits an `additionalContext` block telling the agent which
   `CARGO_TARGET_DIR` to set for each native cargo workspace.
+
+  The preflight block also surfaces:
+
+  | Trigger | Banner |
+  |---|---|
+  | volume ≥90% used | `!! CRITICAL DISK PRESSURE` with one-command cleanups |
+  | volume ≥80% used | `!  Disk pressure` with prune suggestion |
+  | legacy `target/` outside pool > 256MB recoverable | `!  Legacy target/` with `legacy-targets --clean --yes` |
+  | stale incremental hash dirs >1GB | `!  Stale incremental` with `prune --stale-incrementals --yes` |
+  | newly-created worktree since last preflight + free disk < estimate × 1.5 | `!! BUDGET SHORT` (or `!  Budget tight`) with pre-dispatch cleanup |
+  | stale `node_modules` + old `.angular` caches > 2GB combined | `!  JS-cache pressure` with per-class clean commands |
 
 - **Post-flight (Stop hook).** `pool-postflight.sh` re-runs stewardship
   to catch worktrees that finished during the session (typical case:
@@ -67,15 +79,87 @@ The hook derives the family for a worktree as:
 The `cargo-pool` script is on PATH (via devfile PATH addition).
 
 ```sh
-cargo-pool status            # families table — disk, slot count, last touched
-cargo-pool steward --dry-run # preview stewardship without applying
+cargo-pool status            # families table — disk + pressure indicators
+cargo-pool steward --dry-run # preview stewardship; respects active-subagent override
 cargo-pool steward           # apply stewardship now
-cargo-pool key               # print slot path for current PWD
+cargo-pool key               # print slot path for current PWD; shows HWM if observed
+cargo-pool estimate [wt]     # GB cost of next cargo in this worktree (uses HWM × 1.2)
+cargo-pool watermark         # print observed peak size per slot
+cargo-pool watermark update  # re-sample now (postflight does this automatically)
+cargo-pool legacy-targets    # find target/ dirs outside pool; classifies native/wasm/typesrc/unknown
+cargo-pool legacy-targets --clean --yes  # remove the `native` class
+cargo-pool node-modules      # find node_modules; classifies stale/fresh/active/unknown
+cargo-pool node-modules --clean --yes        # remove stale (default); --all for everything non-active
+cargo-pool angular-cache     # find .angular caches; by age
+cargo-pool angular-cache --clean --older-than-days 7 --yes
 cargo-pool prune family iroh # nuke a family slot tree (interactive)
-cargo-pool prune --older-than 7d --yes  # GC slot subdirs untouched > 7 days
+cargo-pool prune --older-than 7d --yes        # GC slot subdirs untouched > 7 days
+cargo-pool prune --stale-incrementals --yes   # GC per-crate incremental hash dirs >3d old
+cargo-pool prune --stale-incrementals --older-than-days N --yes
 cargo-pool log -n 20         # tail steward.log
-cargo-pool orphans           # print orphan-worktrees.tsv
+cargo-pool orphans           # deduped merged-dirty history + live dirty-no-process scan
 ```
+
+### What each pressure command actually does
+
+- **`prune --stale-incrementals`** walks `family/*/*/*/{debug,release}/incremental/*-<hash>/`
+  and removes per-crate fingerprint dirs whose mtime is older than N days
+  (default 3). These are the cargo-incremental remnants of source diffs from
+  branches that have been merged and removed — Cargo never GCs them.
+  Naive (mtime-only) — branch-aware variant deferred until naive proves
+  insufficient.
+
+- **`legacy-targets`** finds `target/` directories outside the pool root and
+  classifies each:
+  - `native`: under a known cargo workspace (`elohim/elohim-storage`,
+    `doorway/doorway-service`, `steward/node`, `elohim/holochain/tests/sweettest`,
+    `crates`). Safe to remove — pool will rebuild on next cargo invocation.
+  - `wasm`: under `elohim/holochain/dna/*` or sibling of `dna.yaml`/`happ.yaml`
+    or has `crate-type = ["cdylib"]`. **Never removed by `--clean`** — `hc dna
+    pack` canonicalizes `./target` and would break.
+  - `typesrc`: under `elohim/sdk/domains/*/types/*`. Small TS-codegen artifacts;
+    not on the disk-pressure path; left alone.
+  - `unknown`: anything else (e.g., workspace-root invocations bypassing
+    `CARGO_TARGET_DIR`). Reported, not auto-cleaned.
+
+- **`estimate`** sums per-workspace cost for every `NATIVE_WORKSPACES` entry
+  present in the worktree. Prefers observed peaks (`<slot>/.peak-size`) ×
+  1.2 safety margin; falls back to a sibling family's HWM for cold slots;
+  falls back to hardcoded 10G cold / 3G warm when nothing is observed.
+  Per-workspace breakdown labels each number with its source. Verdict is
+  `ok` / `tight` / `short` based on free disk vs estimate × 1.5.
+
+- **`watermark`** prints (or updates) the per-slot HWM file
+  `<slot>/.peak-size`. Postflight (Stop hook) automatically samples after
+  every session, so HWMs rise monotonically as builds get bigger. After ~5
+  sessions of real activity the estimator is grounded in this workspace's
+  actual cargo footprint rather than guessed constants.
+
+- **`node-modules`** finds `node_modules/` trees outside the pool root and
+  outside the sophia submodule. Classifications:
+  - `stale`: pnpm-lock.yaml (or package-lock.json/yarn.lock) is newer than
+    `.modules.yaml`. The install has drifted from the lockfile — reinstall
+    needed anyway, safe to remove.
+  - `fresh`: lockfile matches the install marker.
+  - `active`: a process has CWD inside the *project directory* (parent of
+    the node_modules, not the whole worktree — narrower than the cargo
+    steward check, because a shell at the repo root would otherwise mark
+    every sub-project node_modules as active).
+  - `unknown`: no lockfile found nearby. Left alone.
+
+  `--clean --stale` (default) removes only stale class. `--clean --all`
+  nukes everything non-active. Either way, `pnpm install` is required in
+  each cleaned project before the next build.
+
+- **`angular-cache`** finds `.angular/` cache directories with size + age in
+  days. `--clean --older-than-days N` removes those exceeding N days
+  (default 7). Always safe — Angular CLI rebuilds on next start/build.
+
+- **`orphans`** combines the dedup view of `orphan-worktrees.tsv` (merged-dirty
+  history, one row per `wt+branch+class` tuple) with a live `git status`
+  scan of every worktree, filtering out any whose CWD is held by a live
+  subagent process. The live scan surfaces crash-recovery candidates without
+  storing them.
 
 ## Env vars
 
