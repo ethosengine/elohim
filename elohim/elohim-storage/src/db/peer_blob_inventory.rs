@@ -191,6 +191,47 @@ pub fn lookup_hosts(
         .map_err(|e| StorageError::Database(format!("lookup_hosts: {e}")))
 }
 
+/// Reverse-lookup the BLAKE3 alias for a SHA256-addressed blob. Returns
+/// `None` when no row in `peer_blob_inventory` has a populated
+/// `blake3_hash` for this `blob_hash`. Used by the HTTP `/blob/{hash}`
+/// router to decide whether the iroh path is reachable for a given
+/// SHA256 caller-supplied address.
+///
+/// Picks the first non-NULL `blake3_hash` observed across peers; the
+/// schema's content-addressed identity guarantees all rows agree when
+/// any agree.
+pub fn lookup_blake3_for_sha256(
+    conn: &mut SqliteConnection,
+    sha256_hash: &str,
+) -> Result<Option<String>, StorageError> {
+    use peer_blob_inventory::dsl;
+    dsl::peer_blob_inventory
+        .filter(dsl::blob_hash.eq(sha256_hash))
+        .filter(dsl::blake3_hash.is_not_null())
+        .select(dsl::blake3_hash)
+        .first::<Option<String>>(conn)
+        .optional()
+        .map(|opt_opt| opt_opt.flatten())
+        .map_err(|e| StorageError::Database(format!("lookup_blake3_for_sha256: {e}")))
+}
+
+/// Reverse-lookup the SHA256 alias for a BLAKE3-addressed blob. Mirror
+/// of [`lookup_blake3_for_sha256`]. Used by the libp2p-fallback path
+/// when the caller supplied a `blake3-` prefixed address but the chosen
+/// transport is libp2p (no Iroh manifest).
+pub fn lookup_sha256_for_blake3(
+    conn: &mut SqliteConnection,
+    blake3_hash: &str,
+) -> Result<Option<String>, StorageError> {
+    use peer_blob_inventory::dsl;
+    dsl::peer_blob_inventory
+        .filter(dsl::blake3_hash.eq(blake3_hash))
+        .select(dsl::blob_hash)
+        .first::<String>(conn)
+        .optional()
+        .map_err(|e| StorageError::Database(format!("lookup_sha256_for_blake3: {e}")))
+}
+
 /// Outcome of `apply_delta`. Used by the caller to decide whether to request
 /// a snapshot from the source peer.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -451,5 +492,55 @@ mod tests {
         // Fresh-after threshold beyond the snapshot timestamp.
         let rows = lookup_hosts(&mut conn, "h1", "2026-05-02T00:00:00Z").unwrap();
         assert!(rows.is_empty(), "stale entries must not appear");
+    }
+
+    #[test]
+    fn lookup_blake3_for_sha256_returns_some_when_present() {
+        let pool = test_pool();
+        let mut conn = pool.get().unwrap();
+
+        diesel::insert_into(peer_blob_inventory::table)
+            .values((
+                peer_blob_inventory::peer_id.eq("peer-A"),
+                peer_blob_inventory::blob_hash.eq("sha256-aaaa"),
+                peer_blob_inventory::blake3_hash.eq(Some("blake3-bbbb")),
+                peer_blob_inventory::source.eq("gossip-snapshot"),
+                peer_blob_inventory::sequence.eq(0i64),
+                peer_blob_inventory::last_seen_at.eq("2026-05-10T00:00:00Z"),
+            ))
+            .execute(&mut conn)
+            .unwrap();
+
+        let got = lookup_blake3_for_sha256(&mut conn, "sha256-aaaa").unwrap();
+        assert_eq!(got, Some("blake3-bbbb".to_string()));
+    }
+
+    #[test]
+    fn lookup_blake3_for_sha256_returns_none_when_absent() {
+        let pool = test_pool();
+        let mut conn = pool.get().unwrap();
+        let got = lookup_blake3_for_sha256(&mut conn, "sha256-absent").unwrap();
+        assert_eq!(got, None);
+    }
+
+    #[test]
+    fn lookup_sha256_for_blake3_returns_some_when_present() {
+        let pool = test_pool();
+        let mut conn = pool.get().unwrap();
+
+        diesel::insert_into(peer_blob_inventory::table)
+            .values((
+                peer_blob_inventory::peer_id.eq("peer-A"),
+                peer_blob_inventory::blob_hash.eq("sha256-aaaa"),
+                peer_blob_inventory::blake3_hash.eq(Some("blake3-bbbb")),
+                peer_blob_inventory::source.eq("gossip-snapshot"),
+                peer_blob_inventory::sequence.eq(0i64),
+                peer_blob_inventory::last_seen_at.eq("2026-05-10T00:00:00Z"),
+            ))
+            .execute(&mut conn)
+            .unwrap();
+
+        let got = lookup_sha256_for_blake3(&mut conn, "blake3-bbbb").unwrap();
+        assert_eq!(got, Some("sha256-aaaa".to_string()));
     }
 }
