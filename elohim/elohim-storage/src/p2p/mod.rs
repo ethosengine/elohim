@@ -510,6 +510,12 @@ pub struct P2PNode {
     /// run-loop broadcaster tick allocates the next value before each
     /// publish via `inventory_broadcaster::build_snapshot`.
     inventory_seq: inventory_broadcaster::SequenceAllocator,
+    /// Plan 4: dual-publish gossip publisher.
+    ///
+    /// Defaults to a `LibP2PGossipPublisher` using the node's own command channel.
+    /// Replaced by `DualGossipPublisher` via `with_gossip_publisher()` when the
+    /// iroh stack is running — fans out to both libp2p and iroh simultaneously.
+    gossip_publisher: Arc<dyn crate::services::gossip_flood::GossipPublisher>,
 }
 
 /// Cached identify protocol info for a connected peer.
@@ -1527,6 +1533,13 @@ impl P2PNode {
 
         info!(peer_id = %peer_id, relay_mode = %config.relay_mode, "Created P2P node with NAT traversal");
 
+        // Default gossip publisher: libp2p-only using the command channel.
+        // Replaced by DualGossipPublisher via with_gossip_publisher() when the iroh stack runs.
+        let default_gossip_publisher: Arc<dyn crate::services::gossip_flood::GossipPublisher> =
+            Arc::new(crate::p2p::adapters::LibP2PGossipPublisher::new(
+                command_tx.clone(),
+            ));
+
         Ok(Self {
             identity,
             config,
@@ -1583,6 +1596,7 @@ impl P2PNode {
             reconciliation_metrics: std::sync::Arc::new(ReconciliationMetrics::default()),
             last_gossiped: Arc::new(std::sync::RwLock::new(Vec::new())),
             inventory_seq: inventory_broadcaster::SequenceAllocator::new(0),
+            gossip_publisher: default_gossip_publisher,
         })
     }
 
@@ -1606,6 +1620,31 @@ impl P2PNode {
     ) -> Self {
         self.policy_enforcement = Some(enforcement);
         self
+    }
+
+    /// Replace the default `LibP2PGossipPublisher` with a `DualGossipPublisher`
+    /// (or any other [`GossipPublisher`] impl). Consuming builder variant.
+    ///
+    /// Call this when the iroh node is available to enable dual-stack publish
+    /// for inventory snapshots. The replacement is consumed by
+    /// [`Self::broadcast_inventory_snapshot`].
+    pub fn with_gossip_publisher(
+        mut self,
+        publisher: Arc<dyn crate::services::gossip_flood::GossipPublisher>,
+    ) -> Self {
+        self.gossip_publisher = publisher;
+        self
+    }
+
+    /// Replace the gossip publisher in-place (non-consuming `&mut self` variant).
+    ///
+    /// Used when the caller needs to mutate an already-constructed node — e.g.
+    /// after the iroh node is started and its gossip handle becomes available.
+    pub fn set_gossip_publisher(
+        &mut self,
+        publisher: Arc<dyn crate::services::gossip_flood::GossipPublisher>,
+    ) {
+        self.gossip_publisher = publisher;
     }
 
     /// D.6: Return dedup cache stats as `(unique_len, total_seen)`.
@@ -2175,33 +2214,28 @@ impl P2PNode {
             }
         };
 
-        let topic = libp2p::gossipsub::IdentTopic::new(INVENTORY_TOPIC);
-        let mut swarm = self.swarm.write().await;
-        let publish_result = swarm.behaviour_mut().gossipsub.publish(topic, bytes);
-        drop(swarm);
-
-        match publish_result {
-            Ok(msg_id) => {
-                // T22 review fix #3: delegate the parity-record write to the
-                // shared method so poisoned-lock handling stays consistent
-                // with `P2PHandle::set_last_gossiped_inventory`.
-                self.set_last_gossiped_inventory(hashes_for_record);
-                info!(
-                    target: "elohim_storage::inventory",
-                    msg_id = ?msg_id,
-                    count,
-                    sequence = snapshot_sequence,
-                    "T22: published inventory snapshot"
-                );
-            }
-            Err(e) => {
-                warn!(
-                    target: "elohim_storage::inventory",
-                    error = ?e,
-                    "T22: gossipsub publish failed (often: no subscribed peers yet)"
-                );
-            }
+        // Plan 4: route through DualGossipPublisher (fans out to libp2p + iroh).
+        // LibP2PGossipPublisher sends GossipPublish to the swarm event loop which
+        // calls gossipsub.publish() — the libp2p code path is unchanged.
+        if let Err(e) = self.gossip_publisher.publish(INVENTORY_TOPIC, bytes) {
+            warn!(
+                target: "elohim_storage::inventory",
+                error = %e,
+                "T22: dual-publish failed (often: no subscribed peers yet)"
+            );
+            return;
         }
+
+        // T22 review fix #3: delegate the parity-record write to the
+        // shared method so poisoned-lock handling stays consistent
+        // with `P2PHandle::set_last_gossiped_inventory`.
+        self.set_last_gossiped_inventory(hashes_for_record);
+        info!(
+            target: "elohim_storage::inventory",
+            count,
+            sequence = snapshot_sequence,
+            "T22: published inventory snapshot via DualGossipPublisher"
+        );
     }
 
     /// T22 review fix #3: write the parity-tracking record from the P2PNode

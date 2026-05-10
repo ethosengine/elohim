@@ -1075,6 +1075,27 @@ async fn async_main(
     #[cfg(not(feature = "p2p-iroh"))]
     let (_iroh_node, iroh_blob_store_for_http): (Option<()>, Option<()>) = (None, None);
 
+    // Plan 4: Wire DualGossipPublisher into the libp2p P2PNode so inventory snapshots
+    // are published to both transports. Must happen after iroh node creation, before
+    // P2PNode::run(). No-op when either stack is absent.
+    #[cfg(all(feature = "p2p", feature = "p2p-iroh"))]
+    if let (Some(libp2p_n), Some(iroh_n)) = (p2p_node.as_mut(), _iroh_node.as_ref()) {
+        let libp2p_tx = libp2p_n.handle().command_sender();
+        let libp2p_pub: Arc<dyn elohim_storage::services::gossip_flood::GossipPublisher> =
+            Arc::new(elohim_storage::p2p::adapters::LibP2PGossipPublisher::new(libp2p_tx));
+        let iroh_pub: Arc<dyn elohim_storage::services::gossip_flood::GossipPublisher> =
+            Arc::new(elohim_storage::p2p_iroh::dual_publish::IrohGossipPublisher::spawn(
+                iroh_n.gossip().clone(),
+            ));
+        let dual: Arc<dyn elohim_storage::services::gossip_flood::GossipPublisher> =
+            Arc::new(elohim_storage::p2p_iroh::dual_publish::DualGossipPublisher::new(
+                Some(libp2p_pub),
+                Some(iroh_pub),
+            ));
+        libp2p_n.set_gossip_publisher(dual);
+        info!("Plan 4: DualGossipPublisher wired into P2PNode — inventory snapshots now dual-stack");
+    }
+
     // Start HTTP server for shard API
     let http_addr: SocketAddr = format!("0.0.0.0:{}", config.http_port).parse()?;
 
