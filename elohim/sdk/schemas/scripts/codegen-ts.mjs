@@ -141,6 +141,24 @@ async function loadRefMap(baseDir) {
     }
   }
 
+  // Load manifest schemas for cross-dir $ref (e.g., dashboard-federation-peer
+  // → discovery-resolvers#DiscoveryResolver, gate #10).
+  const manifestDir = join(baseDir, 'manifests');
+  let manifestFiles;
+  try {
+    manifestFiles = (await readdir(manifestDir)).filter((f) => f.endsWith('.schema.json'));
+  } catch {
+    manifestFiles = [];
+  }
+  for (const file of manifestFiles) {
+    const schema = JSON.parse(await readFile(join(manifestDir, file), 'utf8'));
+    refMap.set(`../manifests/${file}`, schema);
+    refMap.set(`manifests/${file}`, schema);
+    if (schema.$id) {
+      refMap.set(schema.$id, schema);
+    }
+  }
+
   return refMap;
 }
 
@@ -157,12 +175,32 @@ function inlineRefs(schema, refMap) {
   const result = {};
   for (const [key, value] of Object.entries(schema)) {
     if (key === '$ref' && typeof value === 'string' && !value.startsWith('#')) {
-      const referenced = refMap.get(value);
+      // Support cross-file fragment refs like
+      // "../manifests/discovery-resolvers.schema.json#/definitions/DiscoveryResolver".
+      const [filePath, fragment] = value.split('#');
+      const referenced = refMap.get(filePath);
       if (referenced) {
-        // Inline the referenced schema (strip meta-schema fields),
-        // then recursively inline any nested $ref in the result
-        const { $id, $schema, _dna, _source, ...rest } = referenced;
-        Object.assign(result, inlineRefs(rest, refMap));
+        // If the ref includes a JSON-pointer fragment, navigate to it.
+        let target = referenced;
+        if (fragment) {
+          const parts = fragment.split('/').filter(Boolean);
+          for (const part of parts) {
+            if (target && typeof target === 'object' && part in target) {
+              target = target[part];
+            } else {
+              target = null;
+              break;
+            }
+          }
+        }
+        if (target) {
+          // Inline the referenced schema (strip meta-schema fields),
+          // then recursively inline any nested $ref in the result
+          const { $id, $schema, _dna, _source, ...rest } = target;
+          Object.assign(result, inlineRefs(rest, refMap));
+        } else {
+          result[key] = value;
+        }
       } else {
         result[key] = value;
       }

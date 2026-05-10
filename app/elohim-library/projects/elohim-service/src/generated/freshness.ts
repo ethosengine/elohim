@@ -8,13 +8,7 @@ export interface Freshness {
   /**
    * Liveness bucket. live = fresh signal; stale = past freshness window; offline = no signal; cached_offline_until_reconnect = served from cache awaiting reconnect; unverifiable = signal received but signature/freshness cannot be checked; all_offline = entire device set is offline.
    */
-  state:
-    | 'live'
-    | 'stale'
-    | 'offline'
-    | 'cached_offline_until_reconnect'
-    | 'unverifiable'
-    | 'all_offline';
+  state: 'live' | 'stale' | 'offline' | 'cached_offline_until_reconnect' | 'unverifiable' | 'all_offline';
   /**
    * Milliseconds since the last fresh signal, when state != live.
    */
