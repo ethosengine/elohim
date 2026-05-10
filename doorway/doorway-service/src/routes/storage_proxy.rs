@@ -17,6 +17,18 @@
 //! - Blobs exceeding [`BLOB_PANTRY_MAX_BYTES`] (protects ContentCache entry budget)
 //!
 //! Cache failures are logged at `warn!` and never fail the user response.
+//!
+//! ## Iroh / BLAKE3 dispatch — handled inside elohim-storage, NOT here
+//!
+//! The parallel iroh P2P stack (cutover gate #2) selects between the BLAKE3-keyed
+//! `IrohBlobStore` and the SHA256-keyed legacy `BlobStore` per-request inside
+//! elohim-storage's `GET /blob/{hash}` handler. Doorway is intentionally unaware of
+//! this: it forwards the hash verbatim (sha256- or blake3- prefixed) with the
+//! `X-Agent-Cid` header so storage can look up the caller's transport manifest.
+//!
+//! This module must NEVER contain blake3/iroh dispatch logic. The three-layer truth
+//! model places that decision in the P2P data-plane layer (elohim-storage), not the
+//! web2 projection layer (doorway).
 
 use bytes::Bytes;
 use http_body_util::{BodyExt, Full};
