@@ -43,7 +43,7 @@ pub use auth::{
 };
 pub use auth_backends::{IdentityHandshakeServiceBackend, TrustServiceBackend};
 pub use blob_store::IrohBlobStore;
-pub use config::IrohConfig;
+pub use config::{DiscoveryResolverConfig, DiscoveryResolverKind, IrohConfig};
 pub use endpoint::{build_endpoint, BuildEndpointError};
 pub use epr::{
     EprAtomBackend, EprBackend, IrohEprAtomClient, IrohEprAtomProtocol, IrohEprClient,

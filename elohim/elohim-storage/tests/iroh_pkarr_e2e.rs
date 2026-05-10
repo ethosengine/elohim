@@ -31,8 +31,7 @@ use std::time::Duration;
 
 use bytes::Bytes;
 use elohim_storage::p2p_iroh::{
-    build_endpoint,
-    config::{DiscoveryResolverConfig, DiscoveryResolverKind, IrohConfig},
+    build_endpoint, DiscoveryResolverConfig, DiscoveryResolverKind, IrohConfig,
 };
 use http_body_util::{BodyExt, Full};
 use hyper::body::Incoming;
@@ -176,6 +175,7 @@ async fn iroh_resolves_via_self_hosted_pkarr_only() {
     // Force A to publish: PkarrPublisher publishes when the endpoint's
     // direct addresses are populated. Calling node_addr().initialized()
     // (via .await on the future) triggers that.
+    use iroh::Watcher;
     let _addr_a = ep_a.node_addr().initialized().await;
 
     // Allow the publish to flush.
