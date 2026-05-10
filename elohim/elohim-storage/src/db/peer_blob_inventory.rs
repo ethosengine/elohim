@@ -154,6 +154,43 @@ pub fn record_fetch_success(
     .map_err(|e| StorageError::Database(format!("record_fetch_success: {e}")))
 }
 
+/// Stamp a row recording that *this* peer holds these bytes locally, with
+/// both the legacy SHA256 address and (optionally) the BLAKE3 address under
+/// which the same bytes were written to `IrohBlobStore`.
+///
+/// Used by the seeder dual-write path (`handle_put_blob`). Idempotent via
+/// `replace_into` on the existing `(peer_id, blob_hash)` PK. Does NOT touch
+/// the cursor — self-custody is local evidence, not a gossip arrival.
+///
+/// When `blake3_hash` is `None` (libp2p-only deployment, or the iroh write
+/// failed), the row is still stamped — the SHA256 path succeeded and the peer
+/// holds the bytes; the blake3 column stays NULL until backfill or a future
+/// re-seed with iroh enabled.
+///
+/// Category C operational projection — rebuildable from the local `BlobStore`
+/// filesystem scan via the `backfill-blake3` binary.
+pub fn record_self_custody(
+    conn: &mut SqliteConnection,
+    peer_id: &str,
+    blob_hash: &str,
+    blake3_hash: Option<&str>,
+    observed_at: &str,
+) -> Result<(), StorageError> {
+    let row = NewPeerBlobInventoryRow {
+        peer_id: peer_id.to_string(),
+        blob_hash: blob_hash.to_string(),
+        last_seen_at: observed_at.to_string(),
+        source: "self-custody".to_string(),
+        sequence: 0,
+        blake3_hash: blake3_hash.map(|s| s.to_string()),
+    };
+    diesel::replace_into(peer_blob_inventory::table)
+        .values(&row)
+        .execute(conn)
+        .map(|_| ())
+        .map_err(|e| StorageError::Database(format!("record_self_custody: {e}")))
+}
+
 /// Look up the set of peers known to host a blob, ordered by evidence
 /// strength (fetch-success first, then by recency).
 pub fn lookup_hosts(
@@ -542,5 +579,67 @@ mod tests {
 
         let got = lookup_sha256_for_blake3(&mut conn, "blake3-bbbb").unwrap();
         assert_eq!(got, Some("sha256-aaaa".to_string()));
+    }
+
+    // ── record_self_custody — cutover gate #3 ───────────────────────────────
+
+    #[test]
+    fn record_self_custody_writes_both_hashes() {
+        let pool = test_pool();
+        let mut conn = pool.get().unwrap();
+
+        record_self_custody(
+            &mut conn,
+            "peer_self",
+            "sha256-aa00",
+            Some("blake3-bb00"),
+            "2026-05-10T00:00:00Z",
+        )
+        .unwrap();
+
+        let rows = lookup_hosts(&mut conn, "sha256-aa00", "2026-05-09T00:00:00Z").unwrap();
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].peer_id, "peer_self");
+        assert_eq!(rows[0].source, "self-custody");
+        assert_eq!(rows[0].blake3_hash.as_deref(), Some("blake3-bb00"));
+    }
+
+    #[test]
+    fn record_self_custody_is_idempotent() {
+        let pool = test_pool();
+        let mut conn = pool.get().unwrap();
+
+        for _ in 0..3 {
+            record_self_custody(
+                &mut conn,
+                "peer_self",
+                "sha256-aa00",
+                Some("blake3-bb00"),
+                "2026-05-10T00:00:00Z",
+            )
+            .unwrap();
+        }
+        let rows = lookup_hosts(&mut conn, "sha256-aa00", "2026-05-09T00:00:00Z").unwrap();
+        assert_eq!(rows.len(), 1, "re-seed must not duplicate inventory rows");
+    }
+
+    #[test]
+    fn record_self_custody_accepts_null_blake3() {
+        let pool = test_pool();
+        let mut conn = pool.get().unwrap();
+
+        // libp2p-only deployment: iroh side unavailable, blake3 is None.
+        record_self_custody(
+            &mut conn,
+            "peer_self",
+            "sha256-aa00",
+            None,
+            "2026-05-10T00:00:00Z",
+        )
+        .unwrap();
+
+        let rows = lookup_hosts(&mut conn, "sha256-aa00", "2026-05-09T00:00:00Z").unwrap();
+        assert_eq!(rows.len(), 1);
+        assert!(rows[0].blake3_hash.is_none());
     }
 }
