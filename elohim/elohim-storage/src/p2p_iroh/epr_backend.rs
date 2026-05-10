@@ -122,9 +122,7 @@ mod tests {
     async fn get_document_returns_unimplemented() {
         let backend = fresh_backend();
         let res = backend
-            .handle(EprRequest::GetDocument {
-                id: "doc-1".into(),
-            })
+            .handle(EprRequest::GetDocument { id: "doc-1".into() })
             .await;
         match res {
             EprResponse::Error(msg) => assert!(msg.contains("not yet implemented")),

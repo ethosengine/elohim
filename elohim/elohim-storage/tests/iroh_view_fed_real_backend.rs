@@ -43,10 +43,8 @@ fn build_real_backend() -> (Arc<dyn ViewFederationBackend>, String, String) {
         kp,
         None, // no DB pool — payload defaults to empty json (owning agent) or null (other)
     ));
-    let backend: Arc<dyn ViewFederationBackend> = Arc::new(ViewFedServiceBackend::new(
-        service,
-        local_peer_id.clone(),
-    ));
+    let backend: Arc<dyn ViewFederationBackend> =
+        Arc::new(ViewFedServiceBackend::new(service, local_peer_id.clone()));
     (backend, local_peer_id, agent_cid)
 }
 
@@ -56,8 +54,7 @@ async fn fixture_with_real_provider_backend(
 ) -> Result<(TwoNodeFixture, String, String)> {
     let (backend, peer_id, agent_cid) = build_real_backend();
     let handler = IrohViewFederationProtocol::new(backend);
-    let provider_extras: Vec<AlpnRegistration> =
-        vec![(VIEW_FED_ALPN.to_vec(), Box::new(handler))];
+    let provider_extras: Vec<AlpnRegistration> = vec![(VIEW_FED_ALPN.to_vec(), Box::new(handler))];
     let fixture =
         TwoNodeFixture::new_asymmetric(provider_dir, provider_extras, fetcher_dir, Vec::new())
             .await?;

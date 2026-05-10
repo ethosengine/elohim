@@ -904,8 +904,7 @@ async fn async_main(
             None
         };
         let epr_policy = epr_db_pool.as_ref().map(|pool| {
-            let policy_cache =
-                elohim_storage::db::policy_cache::PolicyCache::new(pool.clone());
+            let policy_cache = elohim_storage::db::policy_cache::PolicyCache::new(pool.clone());
             Arc::new(elohim_storage::db::policy_cache::PolicyEnforcement::new(
                 policy_cache,
             ))
@@ -975,8 +974,8 @@ async fn async_main(
                     e
                 })?;
         let mut iroh_secret_bytes = iroh_secret.to_bytes();
-        let view_fed_signer = libp2p_keypair_from_ed25519_bytes(&mut iroh_secret_bytes)
-            .map_err(|e| {
+        let view_fed_signer =
+            libp2p_keypair_from_ed25519_bytes(&mut iroh_secret_bytes).map_err(|e| {
                 error!(error = %e, "iroh: failed to derive libp2p keypair from iroh secret");
                 std::io::Error::other(format!("iroh keypair derivation: {e}"))
             })?;
@@ -996,24 +995,21 @@ async fn async_main(
                 None
             },
         ));
-        let view_fed_backend: Arc<dyn elohim_storage::p2p_iroh::ViewFederationBackend> =
-            Arc::new(ViewFedServiceBackend::new(
-                view_fed_service,
-                iroh_node_id_str.clone(),
-            ));
+        let view_fed_backend: Arc<dyn elohim_storage::p2p_iroh::ViewFederationBackend> = Arc::new(
+            ViewFedServiceBackend::new(view_fed_service, iroh_node_id_str.clone()),
+        );
         let view_fed_handler = IrohViewFederationProtocol::new(view_fed_backend);
 
         // Identity-handshake backend — transport-neutral service
         // sharing the libp2p path's verify+persist sequence. Per spec
         // dual-stack permanent; integrity via DHT-anchored signed
         // wire frames (Track 1), not transport-level security.
-        let identity_handshake_service = Arc::new(IdentityHandshakeService::new(
-            if args.enable_content_db {
+        let identity_handshake_service =
+            Arc::new(IdentityHandshakeService::new(if args.enable_content_db {
                 db_pool.clone()
             } else {
                 None
-            },
-        ));
+            }));
         let identity_handshake_backend: Arc<
             dyn elohim_storage::p2p_iroh::IdentityHandshakeBackend,
         > = Arc::new(IdentityHandshakeServiceBackend::new(

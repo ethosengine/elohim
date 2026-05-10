@@ -454,7 +454,8 @@ mod tests {
         };
         // Config with conductor requires zome config for conductor to be available
         let resolver = DoorwayResolver::new(None, None, Some(config));
-        // Still no conductor available because no worker pool
-        assert!(!resolver.stats.read().unwrap().resolution_count > 0 || true);
+        // Still no conductor available because no worker pool — resolution_count
+        // should be zero since nothing has been resolved.
+        assert_eq!(resolver.stats.read().unwrap().resolution_count, 0);
     }
 }

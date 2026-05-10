@@ -62,9 +62,7 @@ impl std::fmt::Debug for IdentityHandshakeServiceBackend {
 #[async_trait::async_trait]
 impl IdentityHandshakeBackend for IdentityHandshakeServiceBackend {
     async fn handle(&self, request: IdentityHandshakeRequest) -> IdentityHandshakeResponse {
-        let now_iso = chrono::Utc::now()
-            .format("%Y-%m-%dT%H:%M:%SZ")
-            .to_string();
+        let now_iso = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
         // The connecting peer's NodeId is not yet exposed to the
         // ProtocolHandler::accept signature in our harness; we fall
         // back to using the binding's claimed peer_id as the
@@ -94,7 +92,8 @@ impl TrustServiceBackend {
 
 impl std::fmt::Debug for TrustServiceBackend {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("TrustServiceBackend").finish_non_exhaustive()
+        f.debug_struct("TrustServiceBackend")
+            .finish_non_exhaustive()
     }
 }
 
@@ -117,9 +116,7 @@ mod tests {
 
     fn sample_id_request(peer_id: &str, agent_cid: &str) -> IdentityHandshakeRequest {
         IdentityHandshakeRequest {
-            timestamp: chrono::Utc::now()
-                .format("%Y-%m-%dT%H:%M:%SZ")
-                .to_string(),
+            timestamp: chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string(),
             nonce: "AAAAAAAAAAAAAAAAAAAAAA==".to_string(),
             binding: HandshakeBindingPayload {
                 peer_id: peer_id.to_string(),

@@ -41,6 +41,7 @@ pub use auth::{
     IdentityHandshakeBackend, IrohIdentityHandshakeClient, IrohIdentityHandshakeProtocol,
     IrohTrustClient, IrohTrustProtocol, TrustBackend, IDENTITY_HANDSHAKE_ALPN, TRUST_ALPN,
 };
+pub use auth_backends::{IdentityHandshakeServiceBackend, TrustServiceBackend};
 pub use blob_store::IrohBlobStore;
 pub use config::IrohConfig;
 pub use endpoint::{build_endpoint, BuildEndpointError};
@@ -48,20 +49,19 @@ pub use epr::{
     EprAtomBackend, EprBackend, IrohEprAtomClient, IrohEprAtomProtocol, IrohEprClient,
     IrohEprProtocol, EPR_ALPN, EPR_ATOM_ALPN,
 };
+pub use epr_atom_backend::EprAtomServiceBackend;
+pub use epr_backend::EprServiceBackend;
 pub use gossip::{GossipEvent, IrohGossip};
 pub use identity::load_or_generate as load_or_generate_secret_key;
 pub use node::{AlpnRegistration, IrohNode};
 pub use shard::{IrohShardClient, IrohShardProtocol, ShardBackend, SHARD_ALPN};
-pub use sync::{IrohSyncClient, IrohSyncProtocol, SyncBackend, SYNC_ALPN};
-pub use auth_backends::{IdentityHandshakeServiceBackend, TrustServiceBackend};
-pub use epr_atom_backend::EprAtomServiceBackend;
-pub use epr_backend::EprServiceBackend;
 pub use shard_backend::ShardServiceBackend;
+pub use sync::{IrohSyncClient, IrohSyncProtocol, SyncBackend, SYNC_ALPN};
 pub use sync_backend::SyncManagerBackend;
-pub use view_fed_backend::ViewFedServiceBackend;
 pub use view_fed::{
     IrohViewFederationClient, IrohViewFederationProtocol, ViewFederationBackend, VIEW_FED_ALPN,
 };
+pub use view_fed_backend::ViewFedServiceBackend;
 
 // Re-export the iroh-blobs Hash type so callers don't have to depend on
 // iroh-blobs directly when they live behind this module's API.

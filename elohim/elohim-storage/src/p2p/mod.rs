@@ -5233,7 +5233,6 @@ impl P2PNode {
             .handle(&peer.to_string(), caller, request)
     }
 
-
     /// Handle an incoming EPR atom response to one of our outbound requests.
     async fn handle_epr_atom_response(
         &self,

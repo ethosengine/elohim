@@ -835,7 +835,7 @@ mod tests {
         let (addr, captured, _handle) = spawn_capturing_mock_storage().await;
         let storage_url = format!("http://{addr}");
 
-        let req = make_get_request(&format!("http://doorway/api/v1/cluster"));
+        let req = make_get_request("http://doorway/api/v1/cluster");
         let ctx = ForwardCtx {
             agent_cid: Some("matthew"),
         };
@@ -858,7 +858,7 @@ mod tests {
         let (addr, captured, _handle) = spawn_capturing_mock_storage().await;
         let storage_url = format!("http://{addr}");
 
-        let req = make_get_request(&format!("http://doorway/api/v1/cluster"));
+        let req = make_get_request("http://doorway/api/v1/cluster");
         let resp =
             forward_to_storage(req, &storage_url, "/api/v1/cluster", ForwardCtx::default()).await;
         assert_eq!(resp.status(), StatusCode::OK);

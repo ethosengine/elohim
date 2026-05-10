@@ -83,11 +83,7 @@ impl EprService {
     /// Resolve a single EPR Head with full reach-authorization gating
     /// (cached fast-path → reach tier check → policy ceiling → attestation
     /// gate → serve). Mirrors the libp2p path before extraction.
-    pub async fn handle_resolve(
-        &self,
-        id: String,
-        agent_pubkey: Option<String>,
-    ) -> EprResponse {
+    pub async fn handle_resolve(&self, id: String, agent_pubkey: Option<String>) -> EprResponse {
         debug!(id = %id, "Handling EPR Resolve request");
 
         // Check reach authorization before serving
@@ -150,9 +146,8 @@ impl EprService {
                                 .collect();
 
                             if !prereq_atts.is_empty() {
-                                let human = crate::db::humans::get_human_by_agent_key(
-                                    &mut conn, agent_key,
-                                );
+                                let human =
+                                    crate::db::humans::get_human_by_agent_key(&mut conn, agent_key);
                                 if let Ok(Some(human)) = human {
                                     for att in &prereq_atts {
                                         let prereq_content_id =

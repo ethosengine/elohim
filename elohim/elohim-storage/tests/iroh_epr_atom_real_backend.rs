@@ -24,9 +24,7 @@ use std::sync::Arc;
 use anyhow::Result;
 use elohim_storage::epr_atom_service::EprAtomService;
 use elohim_storage::p2p::dedup::DedupLru;
-use elohim_storage::p2p::epr_atom_protocol::{
-    EprAtomRequest, EprAtomResponse, MAX_BATCH_CIDS,
-};
+use elohim_storage::p2p::epr_atom_protocol::{EprAtomRequest, EprAtomResponse, MAX_BATCH_CIDS};
 use elohim_storage::p2p_iroh::{
     parity_harness::TwoNodeFixture, AlpnRegistration, EprAtomBackend, EprAtomServiceBackend,
     IrohEprAtomClient, IrohEprAtomProtocol, EPR_ATOM_ALPN,
@@ -48,8 +46,7 @@ async fn fixture_with_real_provider_backend(
 ) -> Result<TwoNodeFixture> {
     let backend = build_real_backend();
     let handler = IrohEprAtomProtocol::new(backend);
-    let provider_extras: Vec<AlpnRegistration> =
-        vec![(EPR_ATOM_ALPN.to_vec(), Box::new(handler))];
+    let provider_extras: Vec<AlpnRegistration> = vec![(EPR_ATOM_ALPN.to_vec(), Box::new(handler))];
     TwoNodeFixture::new_asymmetric(provider_dir, provider_extras, fetcher_dir, Vec::new()).await
 }
 

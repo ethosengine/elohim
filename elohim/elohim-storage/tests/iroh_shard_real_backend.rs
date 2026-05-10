@@ -123,10 +123,7 @@ async fn pre_seeded_shard_serves_via_iroh_get() -> Result<()> {
 
     // Have should also report true.
     let res = client
-        .request(
-            fixture.provider_addr.clone(),
-            &ShardRequest::Have { hash },
-        )
+        .request(fixture.provider_addr.clone(), &ShardRequest::Have { hash })
         .await?;
     match res {
         ShardResponse::Have(true) => {}
@@ -152,7 +149,9 @@ async fn push_via_iroh_writes_to_provider_blob_store() -> Result<()> {
     // provider's pool below to verify the push got there.)
     let payload = b"push via iroh".to_vec();
     let probe_dir = tempdir().unwrap();
-    let probe_store = BlobStore::new(probe_dir.path().to_path_buf()).await.unwrap();
+    let probe_store = BlobStore::new(probe_dir.path().to_path_buf())
+        .await
+        .unwrap();
     let canonical = probe_store.store(&payload).await.unwrap();
 
     let client = IrohShardClient::new(fixture.fetcher.endpoint());

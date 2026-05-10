@@ -318,6 +318,6 @@ mod tests {
 
         assert_eq!(batch_types.get("content").map(|v| v.len()), Some(2));
         assert_eq!(batch_types.get("paths").map(|v| v.len()), Some(1));
-        assert!(batch_types.get("steps").is_none());
+        assert!(!batch_types.contains_key("steps"));
     }
 }

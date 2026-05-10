@@ -120,9 +120,7 @@ mod tests {
         let cids: Vec<String> = (0..MAX_BATCH_CIDS + 1)
             .map(|i| format!("bafy-{i}"))
             .collect();
-        let res = backend
-            .handle(EprAtomRequest::FetchBatch { cids })
-            .await;
+        let res = backend.handle(EprAtomRequest::FetchBatch { cids }).await;
         match res {
             EprAtomResponse::Error { message } => {
                 assert!(message.contains("batch too large"));

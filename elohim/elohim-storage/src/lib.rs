@@ -54,21 +54,21 @@ pub mod epr_atom_service;
 pub mod epr_codec;
 pub mod epr_head;
 pub mod epr_service;
-pub mod identity_handshake_service;
-pub mod shard_service;
-pub mod trust_service;
-pub mod view_fed_service;
 pub mod error;
 pub mod happ_manager;
 pub mod hc_client;
 pub mod hc_client_registry;
 pub mod http;
+pub mod identity_handshake_service;
 pub mod import_handler;
 pub mod metadata;
 pub mod rea_projection; // REA projection signal handler (DHT → SQLite sync)
+pub mod shard_service;
 pub mod sharding;
 pub mod signals; // Official holochain_client wrapper with signing support
 pub mod signing; // ConductorSigningClient — EPR Phase 2B Task C.1 (imagodei sign_for_agent wrapper)
+pub mod trust_service;
+pub mod view_fed_service;
 pub mod write_through; // Write-through flag state — EPR Phase 2B Task C.4 (4-layer override stack)
 pub use hc_client::{ConductorHealth, HcClient, HcClientConfig, NetworkHealth, StorageHealth};
 pub mod cell_discovery;

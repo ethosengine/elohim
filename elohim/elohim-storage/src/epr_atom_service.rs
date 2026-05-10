@@ -219,11 +219,7 @@ impl EprAtomService {
         }
     }
 
-    fn handle_fetch_batch(
-        &self,
-        cids: Vec<String>,
-        caller: &CallerIdentity,
-    ) -> EprAtomResponse {
+    fn handle_fetch_batch(&self, cids: Vec<String>, caller: &CallerIdentity) -> EprAtomResponse {
         if cids.len() > MAX_BATCH_CIDS {
             debug!(
                 count = cids.len(),
@@ -261,24 +257,19 @@ impl EprAtomService {
         let mut atoms: Vec<Option<Vec<u8>>> = Vec::with_capacity(cids.len());
         let mut served = 0usize;
         for cid in &cids {
-            let slot =
-                match crate::services::epr_service::fetch_wire_bytes_by_cid(&mut conn, cid) {
-                    Ok(Some(fetched))
-                        if reach_gate_allows(
-                            &fetched.reach,
-                            caller,
-                            Some(&fetched.signer_cid),
-                        ) =>
-                    {
-                        served += 1;
-                        Some(fetched.wire_bytes)
-                    }
-                    Ok(_) => None,
-                    Err(e) => {
-                        warn!(cid = %cid, error = ?e, "EPR atom fetch batch: row error");
-                        None
-                    }
-                };
+            let slot = match crate::services::epr_service::fetch_wire_bytes_by_cid(&mut conn, cid) {
+                Ok(Some(fetched))
+                    if reach_gate_allows(&fetched.reach, caller, Some(&fetched.signer_cid)) =>
+                {
+                    served += 1;
+                    Some(fetched.wire_bytes)
+                }
+                Ok(_) => None,
+                Err(e) => {
+                    warn!(cid = %cid, error = ?e, "EPR atom fetch batch: row error");
+                    None
+                }
+            };
             atoms.push(slot);
         }
         debug!(

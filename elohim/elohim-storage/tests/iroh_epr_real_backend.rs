@@ -29,8 +29,8 @@ use elohim_storage::epr_service::EprService;
 use elohim_storage::p2p::epr_protocol::{EprRequest, EprResponse};
 use elohim_storage::p2p::trust_cache::PeerTrustCache;
 use elohim_storage::p2p_iroh::{
-    parity_harness::TwoNodeFixture, AlpnRegistration, EprBackend, EprServiceBackend,
-    IrohEprClient, IrohEprProtocol, EPR_ALPN,
+    parity_harness::TwoNodeFixture, AlpnRegistration, EprBackend, EprServiceBackend, IrohEprClient,
+    IrohEprProtocol, EPR_ALPN,
 };
 use tempfile::tempdir;
 
@@ -178,9 +178,7 @@ async fn get_document_via_iroh_reports_not_yet_implemented() -> Result<()> {
     let res = client
         .request(
             fixture.provider_addr.clone(),
-            &EprRequest::GetDocument {
-                id: "doc-9".into(),
-            },
+            &EprRequest::GetDocument { id: "doc-9".into() },
         )
         .await?;
 

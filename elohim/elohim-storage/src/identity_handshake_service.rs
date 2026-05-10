@@ -131,9 +131,7 @@ mod tests {
 
     fn sample_request(peer_id: &str, agent_cid: &str) -> IdentityHandshakeRequest {
         IdentityHandshakeRequest {
-            timestamp: chrono::Utc::now()
-                .format("%Y-%m-%dT%H:%M:%SZ")
-                .to_string(),
+            timestamp: chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string(),
             nonce: "AAAAAAAAAAAAAAAAAAAAAA==".to_string(), // 16 zero bytes b64
             binding: HandshakeBindingPayload {
                 peer_id: peer_id.to_string(),
@@ -150,9 +148,7 @@ mod tests {
     #[test]
     fn verify_with_no_pool_accepts_without_persistence() {
         let svc = fresh_service();
-        let now = chrono::Utc::now()
-            .format("%Y-%m-%dT%H:%M:%SZ")
-            .to_string();
+        let now = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
         let req = sample_request("peer-x", "agent-x");
         let res = svc.handle(req, "peer-x", &now);
         assert!(matches!(res, IdentityHandshakeResponse::Accepted));
@@ -161,9 +157,7 @@ mod tests {
     #[test]
     fn verify_rejects_when_payload_peer_id_mismatches_actual() {
         let svc = fresh_service();
-        let now = chrono::Utc::now()
-            .format("%Y-%m-%dT%H:%M:%SZ")
-            .to_string();
+        let now = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
         let req = sample_request("peer-payload", "agent-x");
         let res = svc.handle(req, "peer-actual", &now);
         match res {
@@ -177,9 +171,7 @@ mod tests {
     #[test]
     fn verify_rejects_when_signature_empty() {
         let svc = fresh_service();
-        let now = chrono::Utc::now()
-            .format("%Y-%m-%dT%H:%M:%SZ")
-            .to_string();
+        let now = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
         let mut req = sample_request("peer-x", "agent-x");
         req.binding.signature.clear();
         let res = svc.handle(req, "peer-x", &now);

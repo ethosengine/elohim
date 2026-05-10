@@ -22,8 +22,8 @@ use elohim_storage::p2p::trust_protocol::{TrustHandshake, TrustResponse};
 use elohim_storage::p2p_iroh::{
     parity_harness::TwoNodeFixture, AlpnRegistration, IdentityHandshakeBackend,
     IdentityHandshakeServiceBackend, IrohIdentityHandshakeClient, IrohIdentityHandshakeProtocol,
-    IrohTrustClient, IrohTrustProtocol, TrustBackend, TrustServiceBackend,
-    IDENTITY_HANDSHAKE_ALPN, TRUST_ALPN,
+    IrohTrustClient, IrohTrustProtocol, TrustBackend, TrustServiceBackend, IDENTITY_HANDSHAKE_ALPN,
+    TRUST_ALPN,
 };
 use elohim_storage::trust_service::TrustService;
 use tempfile::tempdir;
@@ -42,9 +42,7 @@ fn build_trust_backend() -> Arc<dyn TrustBackend> {
 
 fn sample_id_request(peer_id: &str, agent_cid: &str) -> IdentityHandshakeRequest {
     IdentityHandshakeRequest {
-        timestamp: chrono::Utc::now()
-            .format("%Y-%m-%dT%H:%M:%SZ")
-            .to_string(),
+        timestamp: chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string(),
         nonce: "AAAAAAAAAAAAAAAAAAAAAA==".to_string(),
         binding: HandshakeBindingPayload {
             peer_id: peer_id.to_string(),
@@ -79,8 +77,8 @@ async fn identity_handshake_via_iroh_against_real_backend_accepts() -> Result<()
     let provider_dir = tempdir().unwrap();
     let fetcher_dir = tempdir().unwrap();
 
-    let fixture = fixture_with_real_provider_backends(provider_dir.path(), fetcher_dir.path())
-        .await?;
+    let fixture =
+        fixture_with_real_provider_backends(provider_dir.path(), fetcher_dir.path()).await?;
 
     let client = IrohIdentityHandshakeClient::new(fixture.fetcher.endpoint());
     let res = client
@@ -107,8 +105,8 @@ async fn identity_handshake_via_iroh_rejects_empty_signature() -> Result<()> {
     let provider_dir = tempdir().unwrap();
     let fetcher_dir = tempdir().unwrap();
 
-    let fixture = fixture_with_real_provider_backends(provider_dir.path(), fetcher_dir.path())
-        .await?;
+    let fixture =
+        fixture_with_real_provider_backends(provider_dir.path(), fetcher_dir.path()).await?;
 
     let client = IrohIdentityHandshakeClient::new(fixture.fetcher.endpoint());
     let mut req = sample_id_request("peer-claim", "agent-claim");
@@ -136,8 +134,8 @@ async fn identity_handshake_via_iroh_rejects_stale_timestamp() -> Result<()> {
     let provider_dir = tempdir().unwrap();
     let fetcher_dir = tempdir().unwrap();
 
-    let fixture = fixture_with_real_provider_backends(provider_dir.path(), fetcher_dir.path())
-        .await?;
+    let fixture =
+        fixture_with_real_provider_backends(provider_dir.path(), fetcher_dir.path()).await?;
 
     let client = IrohIdentityHandshakeClient::new(fixture.fetcher.endpoint());
     let mut req = sample_id_request("peer-claim", "agent-claim");
@@ -166,8 +164,8 @@ async fn trust_handshake_via_iroh_returns_public_one_hour_verified() -> Result<(
     let provider_dir = tempdir().unwrap();
     let fetcher_dir = tempdir().unwrap();
 
-    let fixture = fixture_with_real_provider_backends(provider_dir.path(), fetcher_dir.path())
-        .await?;
+    let fixture =
+        fixture_with_real_provider_backends(provider_dir.path(), fetcher_dir.path()).await?;
 
     let client = IrohTrustClient::new(fixture.fetcher.endpoint());
     let res = client
