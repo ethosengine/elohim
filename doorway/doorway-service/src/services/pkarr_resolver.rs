@@ -61,9 +61,9 @@ pub struct PkarrResolverConfig {
 
 /// Cache entry. `received_at` is for HTTP If-Modified-Since support.
 #[derive(Clone)]
-struct CachedPacket {
-    packet: SignedPacket,
-    received_at: Instant,
+pub struct CachedPacket {
+    pub packet: SignedPacket,
+    pub received_at: Instant,
 }
 
 /// In-memory LRU cache of signed packets keyed by z32-encoded public key.
@@ -96,6 +96,10 @@ impl PkarrCache {
 
     pub async fn len(&self) -> usize {
         self.lru.lock().await.len()
+    }
+
+    pub async fn is_empty(&self) -> bool {
+        self.lru.lock().await.is_empty()
     }
 }
 
