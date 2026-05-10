@@ -17,7 +17,15 @@ export type EprKind =
 /**
  * Content reach/visibility level. Ordered from most restrictive to most open. Source of truth: DNA-notarized CORE_REACH_LEVELS constant in content_store_integrity zome. Category A — enumeration values are part of the protocol vocabulary enforced by gateways without parsing payload.
  */
-export type Reach = 'private' | 'self' | 'intimate' | 'trusted' | 'familiar' | 'community' | 'public' | 'commons';
+export type Reach =
+  | 'private'
+  | 'self'
+  | 'intimate'
+  | 'trusted'
+  | 'familiar'
+  | 'community'
+  | 'public'
+  | 'commons';
 
 /**
  * Source of truth: EPR atoms (self-notarized). Paged list response for GET /api/v1/epr?... Items are envelope-only (no payload). Category A — atoms are notarized; the list projection is a query-time operation.

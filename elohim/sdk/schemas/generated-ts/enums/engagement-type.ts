@@ -4,4 +4,12 @@
 /**
  * Types of learner engagement with content. Drive recognition flows and mastery progression.
  */
-export type EngagementType = 'view' | 'quiz' | 'practice' | 'discuss' | 'create' | 'peer' | 'teach' | 'apply';
+export type EngagementType =
+  | 'view'
+  | 'quiz'
+  | 'practice'
+  | 'discuss'
+  | 'create'
+  | 'peer'
+  | 'teach'
+  | 'apply';

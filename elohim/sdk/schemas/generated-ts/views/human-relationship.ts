@@ -4,11 +4,27 @@
 /**
  * Reach level corresponding to intimacy (private → commons)
  */
-export type Reach = 'private' | 'self' | 'intimate' | 'trusted' | 'familiar' | 'community' | 'public' | 'commons';
+export type Reach =
+  | 'private'
+  | 'self'
+  | 'intimate'
+  | 'trusted'
+  | 'familiar'
+  | 'community'
+  | 'public'
+  | 'commons';
 /**
  * Content reach/visibility level. Ordered from most restrictive to most open. Source of truth: DNA-notarized CORE_REACH_LEVELS constant in content_store_integrity zome. Category A — enumeration values are part of the protocol vocabulary enforced by gateways without parsing payload.
  */
-export type Reach1 = 'private' | 'self' | 'intimate' | 'trusted' | 'familiar' | 'community' | 'public' | 'commons';
+export type Reach1 =
+  | 'private'
+  | 'self'
+  | 'intimate'
+  | 'trusted'
+  | 'familiar'
+  | 'community'
+  | 'public'
+  | 'commons';
 
 /**
  * Source of truth: DHT (Notarized, Category A). Projection of the imagodei HumanRelationship DHT entry. Rebuildable via signal replay on RelationshipCreated signals. dhtAnchorHash is null for pre-coherence rows.
