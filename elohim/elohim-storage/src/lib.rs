@@ -191,6 +191,7 @@ pub use views::ChallengeOutcomeView;
 pub use views::ElohimReputationProfileView;
 pub use views::GateDecisionAttestationView;
 pub use views::GateDecisionChallengeView;
+pub use views::PutBlobResponseView;
 pub use views::{
     build_peer_status_view, load_elohim_capability_from_env, load_render_capability_from_url,
     load_render_capability_from_url_blocking, BundleEntry, CapabilityExtensionEntry,

@@ -7815,3 +7815,56 @@ pub struct PeerTransportManifestView {
     pub capability_level: u8,
     pub last_observed: i64,
 }
+
+/// Response view for `PUT /blob/{hash}`.
+///
+/// Wire-compatible superset of the legacy `ShardManifest` JSON (all pre-existing
+/// fields retained). Adds `blake3_hash` as an optional field populated by the
+/// iroh dual-write path. Clients on the libp2p-only path receive `blake3_hash: null`.
+///
+/// Source of truth: `BlobStore` filesystem (SHA256-keyed, Category C operational)
+/// and `IrohBlobStore` filesystem (BLAKE3-keyed, Category C operational). This
+/// view is a projection of both for the single PUT response.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct PutBlobResponseView {
+    pub blob_hash: String,
+    pub total_size: u64,
+    pub mime_type: String,
+    pub encoding: String,
+    pub data_shards: u8,
+    pub total_shards: u8,
+    pub shard_size: u64,
+    pub shard_hashes: Vec<String>,
+    pub reach: String,
+    pub author_id: Option<String>,
+    pub created_at: String,
+    pub verified_at: Option<String>,
+    /// BLAKE3 hash the same bytes were written to in `IrohBlobStore`.
+    /// `None` (serialises as `null`) when the iroh side is not configured or
+    /// the dual-write failed — the SHA256 write still succeeded in that case.
+    pub blake3_hash: Option<String>,
+}
+
+impl PutBlobResponseView {
+    /// Build from an existing `ShardManifest` plus the optional BLAKE3 hash
+    /// produced by the iroh-side dual-write.
+    pub fn from_manifest(m: crate::sharding::ShardManifest, blake3_hash: Option<String>) -> Self {
+        Self {
+            blob_hash: m.blob_hash,
+            total_size: m.total_size,
+            mime_type: m.mime_type,
+            encoding: m.encoding,
+            data_shards: m.data_shards,
+            total_shards: m.total_shards,
+            shard_size: m.shard_size,
+            shard_hashes: m.shard_hashes,
+            reach: m.reach,
+            author_id: m.author_id,
+            created_at: m.created_at,
+            verified_at: m.verified_at,
+            blake3_hash,
+        }
+    }
+}

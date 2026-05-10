@@ -1059,8 +1059,7 @@ async fn async_main(
                      /elohim/trust/2.0.0"
                 );
                 // Cutover gate #2 (Plan 2): clone blob store for HTTP server wiring.
-                let iroh_blob_store_for_http =
-                    Arc::new(node.store().clone());
+                let iroh_blob_store_for_http = Arc::new(node.store().clone());
                 (Some(node), Some(iroh_blob_store_for_http))
             }
             Err(e) => {

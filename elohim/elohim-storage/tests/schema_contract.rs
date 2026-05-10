@@ -2505,3 +2505,52 @@ fn peer_transport_manifest_view_iroh_only() {
     let json = serde_json::to_value(&manifest).unwrap();
     validate_against_schema("views/peer-transport-manifest.schema.json", &json);
 }
+
+// ── PUT /blob/{hash} response — Cutover gate #3 ─────────────────────────────
+
+#[test]
+fn put_blob_response_view_matches_schema_with_blake3() {
+    use elohim_storage::PutBlobResponseView;
+
+    let sample = PutBlobResponseView {
+        blob_hash: format!("sha256-{}", "aa".repeat(32)),
+        total_size: 42,
+        mime_type: "application/octet-stream".to_string(),
+        encoding: "none".to_string(),
+        data_shards: 1,
+        total_shards: 1,
+        shard_size: 42,
+        shard_hashes: vec![format!("sha256-{}", "bb".repeat(32))],
+        reach: "commons".to_string(),
+        author_id: None,
+        created_at: "2026-05-10T00:00:00Z".to_string(),
+        verified_at: None,
+        blake3_hash: Some("a".repeat(64)),
+    };
+    let json = serde_json::to_value(&sample).unwrap();
+    validate_against_schema("views/put-blob-response.schema.json", &json);
+}
+
+#[test]
+fn put_blob_response_view_matches_schema_libp2p_only() {
+    use elohim_storage::PutBlobResponseView;
+
+    // libp2p-only deployment: blake3_hash is None → serialises as null
+    let sample = PutBlobResponseView {
+        blob_hash: format!("sha256-{}", "cc".repeat(32)),
+        total_size: 1024,
+        mime_type: "application/zip".to_string(),
+        encoding: "none".to_string(),
+        data_shards: 1,
+        total_shards: 1,
+        shard_size: 1024,
+        shard_hashes: vec![format!("sha256-{}", "dd".repeat(32))],
+        reach: "commons".to_string(),
+        author_id: Some("did:elohim:test".to_string()),
+        created_at: "2026-05-10T01:00:00Z".to_string(),
+        verified_at: Some("2026-05-10T01:00:01Z".to_string()),
+        blake3_hash: None,
+    };
+    let json = serde_json::to_value(&sample).unwrap();
+    validate_against_schema("views/put-blob-response.schema.json", &json);
+}
