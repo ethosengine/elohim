@@ -17,7 +17,7 @@ use crate::p2p::recovery_invitation::RecoveryInvitation;
 use crate::p2p::recovery_revocation::RecoveryRevocationMessage;
 use crate::services::gossip_flood::{GossipPublisher, PublishError};
 
-use super::{DualGossipPublisher, IrohGossipPublisher, TopicTransports, classify_topic};
+use super::{DualGossipPublisher, TopicTransports, classify_topic};
 
 // ---------------------------------------------------------------------------
 // Shared mock

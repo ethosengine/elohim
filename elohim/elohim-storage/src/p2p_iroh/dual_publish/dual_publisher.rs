@@ -170,6 +170,7 @@ mod tests {
         // We can't easily inject a custom verdict, so we test via a custom wrapper.
         struct LibP2POnlyPublisher {
             libp2p: Arc<MockGossipPublisher>,
+            #[allow(dead_code)]
             iroh: Arc<MockGossipPublisher>,
         }
         impl GossipPublisher for LibP2POnlyPublisher {
