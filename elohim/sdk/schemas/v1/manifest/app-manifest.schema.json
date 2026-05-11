@@ -43,6 +43,33 @@
     },
     "writeThrough": {
       "$ref": "#/$defs/WriteThrough"
+    },
+    "observation_kinds": {
+      "type": "array",
+      "description": "Optional. Observation kinds this app's substrate emits. See observation-kind.schema.json and observation-event-layer-design.md spec §7.",
+      "items": { "$ref": "./observation-kind.schema.json" }
+    },
+    "signalKinds": {
+      "type": "object",
+      "description": "Optional. Map from signal_kind name to declaration. Signal kinds extend the FeedbackSignal vocabulary; their integrity-zome whitelist lives in feedback_signal.rs.",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["description", "target_kinds"],
+        "properties": {
+          "description": { "type": "string", "minLength": 1 },
+          "target_kinds": {
+            "type": "array",
+            "items": { "type": "string" },
+            "minItems": 1
+          },
+          "evidence_required": { "type": "boolean" },
+          "standing_impact_allowed": {
+            "type": "array",
+            "items": { "type": "string", "enum": ["advisory", "consequential", "binding"] }
+          }
+        },
+        "additionalProperties": false
+      }
     }
   },
   "additionalProperties": false,
