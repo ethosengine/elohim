@@ -199,6 +199,18 @@
       }
     }
   },
+  "observation_kinds": [
+    {
+      "kind": "imagodei:presence-tick",
+      "namespace": "elohim/observations/imagodei",
+      "schema": { "device_cid": "Cid" },
+      "retention_class": "operational",
+      "reach": "community",
+      "diversity_threshold": null,
+      "graduates_to": null,
+      "graduation_policy": null
+    }
+  ],
   "attestations": {
     "attestation:humanness": {
       "description": "Witness that an agent is human, derived from behavioral / interaction / video-call / in-person / elohim-check observation streams. Replaces HumanityWitness entry type.",

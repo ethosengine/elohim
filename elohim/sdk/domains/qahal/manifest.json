@@ -427,5 +427,6 @@
         "polarity": "negative"
       }
     }
-  }
+  },
+  "observation_kinds": []
 }

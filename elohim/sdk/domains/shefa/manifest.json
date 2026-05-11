@@ -252,6 +252,19 @@
       }
     }
   },
+  "observation_kinds": [
+    {
+      "kind": "shefa:appreciation-emitted",
+      "namespace": "elohim/observations/shefa",
+      "schema": { "recipient_cid": "Cid", "magnitude": "f32", "context_cid": "Cid" },
+      "retention_class": "archival",
+      "reach": "community",
+      "diversity_threshold": null,
+      "graduates_to": "event:appreciation-summary",
+      "graduation_window_seconds": 3600,
+      "graduation_policy": "summarize"
+    }
+  ],
   "projections": [
     {
       "kind": "EconomicEvent",
