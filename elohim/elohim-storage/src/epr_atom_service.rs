@@ -337,6 +337,59 @@ impl EprAtomService {
                     }
                 }
             }
+            "KeyRotation" => {
+                match crate::p2p::recovery_rotation::RecoveryRotationMessage::from_bytes(
+                    &payload_bytes,
+                ) {
+                    Ok(msg) => {
+                        // W2B: dedup on synthetic KeyRotation:<id> key. Same rotation
+                        // arriving via direct-notify + signal stream will not double-
+                        // process after the first delivery.
+                        let dedup_key = format!("KeyRotation:{}", msg.rotation_id);
+                        if !self.dedup.insert(&dedup_key) {
+                            debug!(
+                                target: "elohim_storage::dedup",
+                                from = %peer_label,
+                                rotation_id = %msg.rotation_id,
+                                "duplicate KeyRotation direct-notify — dropped"
+                            );
+                            return EprAtomResponse::IntegrityAck {
+                                received: true,
+                                reason: Some("duplicate".to_string()),
+                            };
+                        }
+                        info!(
+                            target: "elohim_storage::recovery",
+                            from = %peer_label,
+                            rotation_id = %msg.rotation_id,
+                            human_agent_pubkey = %msg.human_agent_pubkey,
+                            rotated_at = %msg.rotated_at,
+                            "W2B: Received KeyRotation via direct-notify"
+                        );
+                        // Note: the canonical write to key_rotations table happens via
+                        // the local conductor's RecoveryV2Signal::KeyRotationCommitted
+                        // handler (signals.rs:1013). Direct-notify is delivery-
+                        // optimistic — it does not write to the projection here, to
+                        // avoid divergence with the signal-stream-driven canonical path.
+                        EprAtomResponse::IntegrityAck {
+                            received: true,
+                            reason: None,
+                        }
+                    }
+                    Err(e) => {
+                        warn!(
+                            target: "elohim_storage::recovery",
+                            from = %peer_label,
+                            error = %e,
+                            "W2B: Failed to decode RecoveryRotationMessage from direct-notify"
+                        );
+                        EprAtomResponse::IntegrityAck {
+                            received: false,
+                            reason: Some(format!("decode failed: {e}")),
+                        }
+                    }
+                }
+            }
             other_kind => {
                 warn!(
                     target: "elohim_storage::integrity",
@@ -393,6 +446,86 @@ mod tests {
                 assert!(message.contains("batch too large"));
             }
             other => panic!("expected Error, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn integrity_notify_keyrotation_acks_received_true() {
+        let svc = fresh_service();
+        let msg = crate::p2p::recovery_rotation::RecoveryRotationMessage {
+            rotation_id: "uhCAkRecoveryRequest-test1".into(),
+            human_agent_pubkey: "uhCAkHumanAgentPubkey".into(),
+            new_agent_pubkey: "uhCAkNewKey".into(),
+            superseded_agent_pubkey: "uhCAkOldKey".into(),
+            recovery_request_hash: "uhCAkRecoveryRequest-test1".into(),
+            rotated_at: "2026-05-11T12:00:00Z".into(),
+            sender_peer_id: "12D3KooWtest".into(),
+            sent_at: "2026-05-11T12:00:01Z".into(),
+        };
+        let bytes = msg.to_bytes().expect("encode");
+
+        let response = svc.handle(
+            "test-peer",
+            CallerIdentity::Anonymous,
+            EprAtomRequest::IntegrityNotify {
+                kind: "KeyRotation".to_string(),
+                payload_bytes: bytes,
+            },
+        );
+
+        match response {
+            EprAtomResponse::IntegrityAck {
+                received: true,
+                reason: None,
+            } => {}
+            other => panic!(
+                "expected IntegrityAck {{ received: true }}, got {:?}",
+                other
+            ),
+        }
+    }
+
+    #[test]
+    fn integrity_notify_keyrotation_dedup_returns_duplicate_reason() {
+        let svc = fresh_service();
+        let msg = crate::p2p::recovery_rotation::RecoveryRotationMessage {
+            rotation_id: "uhCAkRecoveryRequest-dedup".into(),
+            human_agent_pubkey: "uhCAkHumanPubkey".into(),
+            new_agent_pubkey: "uhCAkNewKey2".into(),
+            superseded_agent_pubkey: "uhCAkOldKey2".into(),
+            recovery_request_hash: "uhCAkRecoveryRequest-dedup".into(),
+            rotated_at: "2026-05-11T12:00:00Z".into(),
+            sender_peer_id: "12D3KooWdedup".into(),
+            sent_at: "2026-05-11T12:00:01Z".into(),
+        };
+        let bytes = msg.to_bytes().expect("encode");
+
+        // First delivery: received: true, reason: None
+        let _ = svc.handle(
+            "test-peer",
+            CallerIdentity::Anonymous,
+            EprAtomRequest::IntegrityNotify {
+                kind: "KeyRotation".into(),
+                payload_bytes: bytes.clone(),
+            },
+        );
+
+        // Second delivery: dedup'd, received: true, reason: Some("duplicate")
+        let response = svc.handle(
+            "test-peer",
+            CallerIdentity::Anonymous,
+            EprAtomRequest::IntegrityNotify {
+                kind: "KeyRotation".into(),
+                payload_bytes: bytes,
+            },
+        );
+
+        match response {
+            EprAtomResponse::IntegrityAck {
+                received: true,
+                reason: Some(r),
+            } if r == "duplicate" => {}
+            other => panic!("expected dedup'd IntegrityAck, got {:?}", other),
         }
     }
 

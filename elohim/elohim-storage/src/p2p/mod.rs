@@ -48,6 +48,7 @@ pub mod projection_ack_handler; // Phase 4 T4 — ack-projection side-projection
 pub mod reach_authorization;
 pub mod recovery_invitation;
 pub mod recovery_revocation;
+pub mod recovery_rotation;
 pub mod replication;
 pub mod shard_protocol;
 pub mod sync_protocol;
