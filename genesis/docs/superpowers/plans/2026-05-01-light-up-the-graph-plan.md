@@ -63,13 +63,13 @@ The Vouch primitive REUSES the existing FeedbackSignal entry type as a new `sign
 **Files:**
 - Modify: `elohim/sdk/schemas/v1/p2p/feedback-signal.schema.json`
 
-- [ ] **Step 1: Read current schema**
+- [x] **Step 1: Read current schema**
 
 ```bash
 cat elohim/sdk/schemas/v1/p2p/feedback-signal.schema.json
 ```
 
-- [ ] **Step 2: Add `vouch` to the `signalKind` enum and optional `vouchKind` field**
+- [x] **Step 2: Add `vouch` to the `signalKind` enum and optional `vouchKind` field**
 
 Edit the schema to add `"vouch"` to the `signalKind` enum and add an optional `vouchKind` property:
 
@@ -115,14 +115,14 @@ Edit the schema to add `"vouch"` to the `signalKind` enum and add an optional `v
 
 Preserve any existing top-level fields/comments not shown.
 
-- [ ] **Step 3: Validate the schema**
+- [x] **Step 3: Validate the schema**
 
 ```bash
 pnpm run schema:validate
 ```
 Expected: PASS (no schema validation errors).
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add elohim/sdk/schemas/v1/p2p/feedback-signal.schema.json
@@ -137,14 +137,14 @@ git commit -m "feat(epr-light-up): T01 — add vouch signal_kind variant to Feed
 - Modify: `elohim/sdk/schemas/v1/manifests/bootstrap-standing-policy.json`
 - Modify: `elohim/sdk/schemas/v1/manifest/standing-policy-floor.schema.json`
 
-- [ ] **Step 1: Read both files first**
+- [x] **Step 1: Read both files first**
 
 ```bash
 cat elohim/sdk/schemas/v1/manifests/bootstrap-standing-policy.json
 cat elohim/sdk/schemas/v1/manifest/standing-policy-floor.schema.json
 ```
 
-- [ ] **Step 2: Add `vouch` to `debitWeights`, plus `unknownTreatment` and `reachThresholds` to bootstrap-standing-policy.json**
+- [x] **Step 2: Add `vouch` to `debitWeights`, plus `unknownTreatment` and `reachThresholds` to bootstrap-standing-policy.json**
 
 Add these three blocks (preserve the rest of the file, including the existing `floor` and `newVoiceBaseline` sections):
 
@@ -177,7 +177,7 @@ Add these three blocks (preserve the rest of the file, including the existing `f
 
 Replace any existing `debitWeights` block in full with the version above. Add `unknownTreatment` and `reachThresholds` if not present.
 
-- [ ] **Step 3: Extend the schema (`standing-policy-floor.schema.json`)**
+- [x] **Step 3: Extend the schema (`standing-policy-floor.schema.json`)**
 
 Add property definitions matching the new manifest fields. The schema validates the bootstrap manifest, so the schema must permit the new fields:
 
@@ -225,7 +225,7 @@ Add property definitions matching the new manifest fields. The schema validates 
 }
 ```
 
-- [ ] **Step 4: Validate**
+- [x] **Step 4: Validate**
 
 ```bash
 pnpm run schema:validate
@@ -233,7 +233,7 @@ pnpm run schema:check-dna
 ```
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add elohim/sdk/schemas/v1/manifests/bootstrap-standing-policy.json \
@@ -248,28 +248,28 @@ git commit -m "feat(epr-light-up): T02 — add vouch debit weights, unknownTreat
 **Files:**
 - Modify (auto): `elohim/sdk/schemas/generated-ts/**` and TS distributions
 
-- [ ] **Step 1: Run codegen**
+- [x] **Step 1: Run codegen**
 
 ```bash
 pnpm run schema:codegen:ts
 ```
 Expected: PASS. Generated TS files reflect the new `signalKind` enum value.
 
-- [ ] **Step 2: Inspect what changed**
+- [x] **Step 2: Inspect what changed**
 
 ```bash
 git diff --stat elohim/sdk/schemas/generated-ts/
 ```
 Expected: small number of files in `generated-ts/p2p/feedback-signal*.ts` updated.
 
-- [ ] **Step 3: Verify the generated TS has the new variant**
+- [x] **Step 3: Verify the generated TS has the new variant**
 
 ```bash
 grep -A2 "signalKind" elohim/sdk/schemas/generated-ts/p2p/feedback-signal.ts | head -20
 ```
 Expected: enum literal includes `'vouch'`.
 
-- [ ] **Step 4: Commit codegen artifacts**
+- [x] **Step 4: Commit codegen artifacts**
 
 ```bash
 git add elohim/sdk/schemas/generated-ts/
@@ -283,13 +283,13 @@ git commit -m "chore(epr-light-up): T03 — regenerate TS bindings for vouch sig
 **Files:**
 - Modify: `elohim/elohim-storage/src/p2p/feedback_signal.rs`
 
-- [ ] **Step 1: Read the current Rust mirror**
+- [x] **Step 1: Read the current Rust mirror**
 
 ```bash
 cat elohim/elohim-storage/src/p2p/feedback_signal.rs | head -120
 ```
 
-- [ ] **Step 2: Add `Vouch` variant to `SignalKind` and `vouch_kind: Option<VouchKind>` to FeedbackSignal**
+- [x] **Step 2: Add `Vouch` variant to `SignalKind` and `vouch_kind: Option<VouchKind>` to FeedbackSignal**
 
 Edit `elohim/elohim-storage/src/p2p/feedback_signal.rs`:
 
@@ -335,7 +335,7 @@ pub struct FeedbackSignal {
 }
 ```
 
-- [ ] **Step 3: Add a unit test that round-trips a vouch FeedbackSignal**
+- [x] **Step 3: Add a unit test that round-trips a vouch FeedbackSignal**
 
 In the same file's `#[cfg(test)] mod tests`:
 
@@ -374,7 +374,7 @@ fn non_vouch_signals_omit_vouch_kind() {
 }
 ```
 
-- [ ] **Step 4: Run the new tests**
+- [x] **Step 4: Run the new tests**
 
 ```bash
 cd elohim/elohim-storage
@@ -382,7 +382,7 @@ RUSTFLAGS='--cfg getrandom_backend="custom"' cargo test --lib feedback_signal::t
 ```
 Expected: PASS.
 
-- [ ] **Step 5: Run all p2p::feedback_signal tests + lints**
+- [x] **Step 5: Run all p2p::feedback_signal tests + lints**
 
 ```bash
 RUSTFLAGS='--cfg getrandom_backend="custom"' cargo test --lib p2p::feedback_signal
@@ -391,7 +391,7 @@ cargo fmt --check
 ```
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add elohim/elohim-storage/src/p2p/feedback_signal.rs
@@ -405,13 +405,13 @@ git commit -m "feat(epr-light-up): T04 — add Vouch variant to SignalKind + Vou
 **Files:**
 - Modify: `elohim/holochain/dna/elohim/zomes/content_store_integrity/src/feedback_signal.rs`
 
-- [ ] **Step 1: Read the current validator**
+- [x] **Step 1: Read the current validator**
 
 ```bash
 cat elohim/holochain/dna/elohim/zomes/content_store_integrity/src/feedback_signal.rs
 ```
 
-- [ ] **Step 2: Update the SignalKind whitelist + add vouch validation**
+- [x] **Step 2: Update the SignalKind whitelist + add vouch validation**
 
 Locate the validator function (commonly `pub fn validate_create_feedback_signal` or `validate_feedback_signal`) and:
 
@@ -503,7 +503,7 @@ pub fn validate_create_feedback_signal(
 }
 ```
 
-- [ ] **Step 3: Build the integrity zome**
+- [x] **Step 3: Build the integrity zome**
 
 ```bash
 cd elohim/holochain/dna/elohim/zomes/content_store_integrity
@@ -511,14 +511,14 @@ RUSTFLAGS='--cfg getrandom_backend="custom"' cargo build --release --target wasm
 ```
 Expected: PASS.
 
-- [ ] **Step 4: Run integrity unit tests if any exist**
+- [x] **Step 4: Run integrity unit tests if any exist**
 
 ```bash
 RUSTFLAGS='--cfg getrandom_backend="custom"' cargo test --lib
 ```
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add elohim/holochain/dna/elohim/zomes/content_store_integrity/src/feedback_signal.rs
@@ -532,13 +532,13 @@ git commit -m "feat(epr-light-up): T05 — extend FeedbackSignal validator with 
 **Files:**
 - Modify: `elohim/holochain/dna/elohim/zomes/content_store/src/feedback_signal.rs`
 
-- [ ] **Step 1: Read the existing coordinator**
+- [x] **Step 1: Read the existing coordinator**
 
 ```bash
 cat elohim/holochain/dna/elohim/zomes/content_store/src/feedback_signal.rs
 ```
 
-- [ ] **Step 2: Add `CreateVouchInput` struct and `create_vouch` function**
+- [x] **Step 2: Add `CreateVouchInput` struct and `create_vouch` function**
 
 Add to the same file (preserving existing items):
 
@@ -609,7 +609,7 @@ pub fn create_vouch(input: CreateVouchInput) -> ExternResult<ActionHash> {
 
 (Adapt `EntryTypes`, `LinkTypes`, `ProjectionSignal` to the existing module's actual paths/names — see neighbouring `create_feedback_signal` function for reference.)
 
-- [ ] **Step 3: Build the coordinator zome**
+- [x] **Step 3: Build the coordinator zome**
 
 ```bash
 cd elohim/holochain/dna/elohim/zomes/content_store
@@ -617,7 +617,7 @@ RUSTFLAGS='--cfg getrandom_backend="custom"' cargo build --release --target wasm
 ```
 Expected: PASS.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add elohim/holochain/dna/elohim/zomes/content_store/src/feedback_signal.rs
@@ -631,13 +631,13 @@ git commit -m "feat(epr-light-up): T06 — add content_store::create_vouch coord
 **Files:**
 - Locate the existing FeedbackSignal sweettest (likely `elohim/holochain/dna/elohim/tests/feedback_signal.rs` or similar). If absent, create it.
 
-- [ ] **Step 1: Find existing sweettest**
+- [x] **Step 1: Find existing sweettest**
 
 ```bash
 find elohim/holochain/dna -name "*.rs" -path "*tests*" -exec grep -l "feedback_signal\|create_feedback_signal" {} \;
 ```
 
-- [ ] **Step 2: Add a vouch sweettest case**
+- [x] **Step 2: Add a vouch sweettest case**
 
 Append to the discovered file (or create a new `tests/vouch.rs` module if no existing test file):
 
@@ -701,7 +701,7 @@ async fn create_vouch_rejects_self_vouch() {
 
 (Adapt `CreateFeedbackSignalInput` to match the existing struct in the coordinator. If the sweettest framework uses a different invocation pattern, follow neighbouring tests' conventions.)
 
-- [ ] **Step 3: Build sweettest** (Eclipse Che cannot run sweettests; build-only verification per `feedback_shift_measure_jenkins`)
+- [x] **Step 3: Build sweettest** (Eclipse Che cannot run sweettests; build-only verification per `feedback_shift_measure_jenkins`)
 
 ```bash
 cd elohim/holochain
@@ -709,7 +709,7 @@ RUSTFLAGS='--cfg getrandom_backend="custom"' cargo build --tests --release
 ```
 Expected: PASS (no compile errors).
 
-- [ ] **Step 4: Commit. Sweettest execution validation will happen on Jenkins after push.**
+- [x] **Step 4: Commit. Sweettest execution validation will happen on Jenkins after push.**
 
 ```bash
 git add elohim/holochain/dna/elohim/tests/  # adapt path
@@ -723,13 +723,13 @@ git commit -m "test(epr-light-up): T07 — sweettest scaffolding for create_vouc
 **Files:**
 - Modify: `elohim/elohim-storage/src/services/manifest_registry.rs`
 
-- [ ] **Step 1: Read the current ManifestRegistry**
+- [x] **Step 1: Read the current ManifestRegistry**
 
 ```bash
 cat elohim/elohim-storage/src/services/manifest_registry.rs
 ```
 
-- [ ] **Step 2: Write a failing test for `debit_weights()`**
+- [x] **Step 2: Write a failing test for `debit_weights()`**
 
 Append to the same file's `#[cfg(test)] mod tests`:
 
@@ -788,7 +788,7 @@ fn unknown_treatment_defaults_when_missing() {
 }
 ```
 
-- [ ] **Step 3: Run tests — expect FAIL (methods not defined)**
+- [x] **Step 3: Run tests — expect FAIL (methods not defined)**
 
 ```bash
 cd elohim/elohim-storage
@@ -796,7 +796,7 @@ RUSTFLAGS='--cfg getrandom_backend="custom"' cargo test --lib services::manifest
 ```
 Expected: FAIL — `debit_weights`, `reach_threshold`, `unknown_treatment`, `from_payload_json`, `UnknownTreatment` don't exist.
 
-- [ ] **Step 4: Implement the new accessors**
+- [x] **Step 4: Implement the new accessors**
 
 Add to `services/manifest_registry.rs`:
 
@@ -893,14 +893,14 @@ impl ManifestRegistry {
 
 If `ManifestRegistry` doesn't have a `standing_policy_payload: Option<serde_json::Value>` field yet, add it. Update `load_from_db` to populate it when a `manifestKind == "standing-policy"` row is found.
 
-- [ ] **Step 5: Run tests — expect PASS**
+- [x] **Step 5: Run tests — expect PASS**
 
 ```bash
 RUSTFLAGS='--cfg getrandom_backend="custom"' cargo test --lib services::manifest_registry::tests
 ```
 Expected: PASS.
 
-- [ ] **Step 6: Run lints**
+- [x] **Step 6: Run lints**
 
 ```bash
 RUSTFLAGS='--cfg getrandom_backend="custom"' cargo clippy --lib -- -D warnings
@@ -908,7 +908,7 @@ cargo fmt --check
 ```
 Expected: PASS.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add elohim/elohim-storage/src/services/manifest_registry.rs
@@ -922,13 +922,13 @@ git commit -m "feat(epr-light-up): T08 — add ManifestRegistry accessors (debit
 **Files:**
 - Modify: `elohim/elohim-storage/src/services/standing_projector.rs`
 
-- [ ] **Step 1: Read the current standing_projector**
+- [x] **Step 1: Read the current standing_projector**
 
 ```bash
 grep -n "DebitWeightPolicy\|DefaultDebitWeightPolicy" elohim/elohim-storage/src/services/standing_projector.rs
 ```
 
-- [ ] **Step 2: Add a failing test**
+- [x] **Step 2: Add a failing test**
 
 In `services/standing_projector.rs` `#[cfg(test)] mod tests`:
 
@@ -965,14 +965,14 @@ fn manifest_policy_falls_back_to_default_when_empty() {
 }
 ```
 
-- [ ] **Step 3: Run — expect FAIL** (`ManifestDebitWeightPolicy` undefined)
+- [x] **Step 3: Run — expect FAIL** (`ManifestDebitWeightPolicy` undefined)
 
 ```bash
 RUSTFLAGS='--cfg getrandom_backend="custom"' cargo test --lib services::standing_projector::tests::manifest_policy
 ```
 Expected: FAIL.
 
-- [ ] **Step 4: Implement `ManifestDebitWeightPolicy`**
+- [x] **Step 4: Implement `ManifestDebitWeightPolicy`**
 
 Add to `services/standing_projector.rs`:
 
@@ -1038,14 +1038,14 @@ impl DebitWeightPolicy for ManifestDebitWeightPolicy {
 
 (Adjust `DefaultDebitWeightPolicy` and the `DebitWeightPolicy` trait imports based on the actual module shape.)
 
-- [ ] **Step 5: Run tests — expect PASS**
+- [x] **Step 5: Run tests — expect PASS**
 
 ```bash
 RUSTFLAGS='--cfg getrandom_backend="custom"' cargo test --lib services::standing_projector
 ```
 Expected: PASS.
 
-- [ ] **Step 6: Lint**
+- [x] **Step 6: Lint**
 
 ```bash
 RUSTFLAGS='--cfg getrandom_backend="custom"' cargo clippy --lib -- -D warnings
@@ -1053,7 +1053,7 @@ cargo fmt --check
 ```
 Expected: PASS.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add elohim/elohim-storage/src/services/standing_projector.rs
@@ -1067,7 +1067,7 @@ git commit -m "feat(epr-light-up): T09 — ManifestDebitWeightPolicy with regist
 **Files:**
 - Modify: `elohim/elohim-storage/src/services/standing.rs`
 
-- [ ] **Step 1: Add a failing test**
+- [x] **Step 1: Add a failing test**
 
 In `services/standing.rs` `mod tests`:
 
@@ -1099,14 +1099,14 @@ fn with_lift_none_is_identity() {
 }
 ```
 
-- [ ] **Step 2: Run — expect FAIL**
+- [x] **Step 2: Run — expect FAIL**
 
 ```bash
 RUSTFLAGS='--cfg getrandom_backend="custom"' cargo test --lib services::standing::tests::with_lift
 ```
 Expected: FAIL — `with_lift` not defined.
 
-- [ ] **Step 3: Implement `with_lift` and `Ord` over StandingScore**
+- [x] **Step 3: Implement `with_lift` and `Ord` over StandingScore**
 
 Add to `services/standing.rs`:
 
@@ -1138,14 +1138,14 @@ impl Standing {
 }
 ```
 
-- [ ] **Step 4: Run — expect PASS**
+- [x] **Step 4: Run — expect PASS**
 
 ```bash
 RUSTFLAGS='--cfg getrandom_backend="custom"' cargo test --lib services::standing
 ```
 Expected: PASS.
 
-- [ ] **Step 5: Lint + commit**
+- [x] **Step 5: Lint + commit**
 
 ```bash
 RUSTFLAGS='--cfg getrandom_backend="custom"' cargo clippy --lib -- -D warnings
@@ -1161,13 +1161,13 @@ git commit -m "feat(epr-light-up): T10 — Standing::with_lift baseline-lift hel
 **Files:**
 - Locate or create: where `Reach` is defined (likely `services/epr_kind.rs` or `p2p/feedback_signal.rs`)
 
-- [ ] **Step 1: Find Reach**
+- [x] **Step 1: Find Reach**
 
 ```bash
 grep -rn "pub enum Reach\b" elohim/elohim-storage/src/ | head -10
 ```
 
-- [ ] **Step 2: If `Reach` exists, add `is_floor_allowed`. If it does NOT exist, declare it.**
+- [x] **Step 2: If `Reach` exists, add `is_floor_allowed`. If it does NOT exist, declare it.**
 
 If `Reach` exists, add a method. Else, create the type at `services/epr_kind.rs` (or wherever EPR types live):
 
@@ -1211,7 +1211,7 @@ impl Reach {
 }
 ```
 
-- [ ] **Step 3: Add unit tests**
+- [x] **Step 3: Add unit tests**
 
 ```rust
 #[cfg(test)]
@@ -1228,7 +1228,7 @@ mod reach_tests {
 }
 ```
 
-- [ ] **Step 4: Run, lint, commit**
+- [x] **Step 4: Run, lint, commit**
 
 ```bash
 RUSTFLAGS='--cfg getrandom_backend="custom"' cargo test --lib reach_tests
@@ -1246,7 +1246,7 @@ git commit -m "feat(epr-light-up): T11 — Reach::is_floor_allowed helper"
 - Create: `elohim/elohim-storage/src/services/reach_earning.rs`
 - Modify: `elohim/elohim-storage/src/services/mod.rs` (add `pub mod reach_earning;`)
 
-- [ ] **Step 1: Create the file with type definitions and a failing test scaffold**
+- [x] **Step 1: Create the file with type definitions and a failing test scaffold**
 
 Write `elohim/elohim-storage/src/services/reach_earning.rs`:
 
@@ -1398,7 +1398,7 @@ fn score_rank(s: StandingScore) -> u8 {
 }
 ```
 
-- [ ] **Step 2: Add comprehensive unit tests**
+- [x] **Step 2: Add comprehensive unit tests**
 
 Append to the same file:
 
@@ -1526,7 +1526,7 @@ mod tests {
 }
 ```
 
-- [ ] **Step 3: Register the module**
+- [x] **Step 3: Register the module**
 
 Edit `elohim/elohim-storage/src/services/mod.rs` and add:
 
@@ -1536,7 +1536,7 @@ pub mod reach_earning;
 
 (Position alphabetically with neighbouring `pub mod` declarations.)
 
-- [ ] **Step 4: Run all reach_earning tests**
+- [x] **Step 4: Run all reach_earning tests**
 
 ```bash
 cd elohim/elohim-storage
@@ -1544,7 +1544,7 @@ RUSTFLAGS='--cfg getrandom_backend="custom"' cargo test --lib services::reach_ea
 ```
 Expected: PASS (all six tests).
 
-- [ ] **Step 5: Lint**
+- [x] **Step 5: Lint**
 
 ```bash
 RUSTFLAGS='--cfg getrandom_backend="custom"' cargo clippy --lib -- -D warnings
@@ -1552,7 +1552,7 @@ cargo fmt --check
 ```
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add elohim/elohim-storage/src/services/reach_earning.rs \
@@ -1568,7 +1568,7 @@ git commit -m "feat(epr-light-up): T12 — services/reach_earning.rs ReachVerdic
 - Create: `elohim/elohim-storage/src/services/epr_compose.rs`
 - Modify: `elohim/elohim-storage/src/services/mod.rs` (add `pub mod epr_compose;`)
 
-- [ ] **Step 1: Create the file**
+- [x] **Step 1: Create the file**
 
 ```rust
 //! Author-side EPR compose helper.
@@ -1656,7 +1656,7 @@ mod tests {
 }
 ```
 
-- [ ] **Step 2: Register the module + run + lint + commit**
+- [x] **Step 2: Register the module + run + lint + commit**
 
 ```bash
 # Edit services/mod.rs: add `pub mod epr_compose;`
@@ -1675,13 +1675,13 @@ git commit -m "feat(epr-light-up): T13 — services/epr_compose.rs author-side g
 **Files:**
 - Modify: `elohim/elohim-storage/src/p2p/mod.rs`
 
-- [ ] **Step 1: Read existing P2PCommand**
+- [x] **Step 1: Read existing P2PCommand**
 
 ```bash
 sed -n '500,560p' elohim/elohim-storage/src/p2p/mod.rs
 ```
 
-- [ ] **Step 2: Add variants if missing**
+- [x] **Step 2: Add variants if missing**
 
 Add to the `P2PCommand` enum in `p2p/mod.rs` (preserve existing variants):
 
@@ -1705,7 +1705,7 @@ pub enum P2PCommand {
 }
 ```
 
-- [ ] **Step 3: Wire the swarm event loop to handle them**
+- [x] **Step 3: Wire the swarm event loop to handle them**
 
 Find the swarm event loop function (likely in the same file or `p2p/swarm.rs`) and add match arms in the `P2PCommand` dispatcher:
 
@@ -1730,7 +1730,7 @@ P2PCommand::GossipPublish { topic, payload } => {
 
 (If a `feedback_signal_protocol` request-response handler doesn't exist, register a new one in the existing behaviour composition. Check `p2p/behaviour.rs` for how other protocols are wired.)
 
-- [ ] **Step 4: Build to verify**
+- [x] **Step 4: Build to verify**
 
 ```bash
 cd elohim/elohim-storage
@@ -1738,7 +1738,7 @@ RUSTFLAGS='--cfg getrandom_backend="custom"' cargo build --lib
 ```
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add elohim/elohim-storage/src/p2p/mod.rs elohim/elohim-storage/src/p2p/behaviour.rs
@@ -1753,7 +1753,7 @@ git commit -m "feat(epr-light-up): T14 — add P2PCommand::SendDirect + GossipPu
 - Create: `elohim/elohim-storage/src/p2p/adapters.rs`
 - Modify: `elohim/elohim-storage/src/p2p/mod.rs` (re-export)
 
-- [ ] **Step 1: Create the file**
+- [x] **Step 1: Create the file**
 
 ```rust
 //! Production swarm-backed adapters for back_prop and gossip_flood services.
@@ -1865,7 +1865,7 @@ mod tests {
 }
 ```
 
-- [ ] **Step 2: Register module**
+- [x] **Step 2: Register module**
 
 Edit `elohim/elohim-storage/src/p2p/mod.rs` and add:
 
@@ -1875,14 +1875,14 @@ pub mod adapters;
 
 If `gossip_flood::PublishError` does not exist as a public type (the existing trait might use a different error name), grep `services/gossip_flood.rs` and adapt.
 
-- [ ] **Step 3: Run**
+- [x] **Step 3: Run**
 
 ```bash
 RUSTFLAGS='--cfg getrandom_backend="custom"' cargo test --lib p2p::adapters
 ```
 Expected: PASS (4 tests).
 
-- [ ] **Step 4: Lint + commit**
+- [x] **Step 4: Lint + commit**
 
 ```bash
 RUSTFLAGS='--cfg getrandom_backend="custom"' cargo clippy --lib -- -D warnings
@@ -1898,13 +1898,13 @@ git commit -m "feat(epr-light-up): T15 — p2p/adapters.rs LibP2POutboundSink + 
 **Files:**
 - Modify: `elohim/elohim-storage/src/services/tending.rs`
 
-- [ ] **Step 1: Read current state**
+- [x] **Step 1: Read current state**
 
 ```bash
 cat elohim/elohim-storage/src/services/tending.rs
 ```
 
-- [ ] **Step 2: Write a failing test**
+- [x] **Step 2: Write a failing test**
 
 Append to `services/tending.rs`'s `mod tests` (or create one):
 
@@ -1979,14 +1979,14 @@ mod tests {
 
 (Adapt `crate::db::attention_tending::insert_raw` and `list_all` to whatever helpers the existing module exposes. If they don't exist, add minimal helpers in `db/attention_tending.rs`.)
 
-- [ ] **Step 3: Run — expect FAIL** (sweep_expired not implemented or stub)
+- [x] **Step 3: Run — expect FAIL** (sweep_expired not implemented or stub)
 
 ```bash
 RUSTFLAGS='--cfg getrandom_backend="custom"' cargo test --lib services::tending::tests
 ```
 Expected: FAIL.
 
-- [ ] **Step 4: Implement `sweep_expired`**
+- [x] **Step 4: Implement `sweep_expired`**
 
 In `services/tending.rs`:
 
@@ -2025,14 +2025,14 @@ pub fn sweep_expired(conn: &mut SqliteConnection) -> Result<usize, StorageError>
 
 If the actual schema column is `tended_at_last_ms` (denormalized) rather than a JSON array, simplify the WHERE clause accordingly. Inspect via `cat elohim/elohim-storage/src/schema.rs | grep attention_tending -A 20`.
 
-- [ ] **Step 5: Run — expect PASS**
+- [x] **Step 5: Run — expect PASS**
 
 ```bash
 RUSTFLAGS='--cfg getrandom_backend="custom"' cargo test --lib services::tending::tests
 ```
 Expected: PASS (3 tests).
 
-- [ ] **Step 6: Lint + commit**
+- [x] **Step 6: Lint + commit**
 
 ```bash
 RUSTFLAGS='--cfg getrandom_backend="custom"' cargo clippy --lib -- -D warnings
@@ -2048,13 +2048,13 @@ git commit -m "feat(epr-light-up): T16 — tending::sweep_expired with safety fl
 **Files:**
 - Modify: `elohim/elohim-storage/src/api/epr.rs`
 
-- [ ] **Step 1: Locate the put_epr handler**
+- [x] **Step 1: Locate the put_epr handler**
 
 ```bash
 grep -n "fn put_epr\|TODO(T19)" elohim/elohim-storage/src/api/epr.rs | head -10
 ```
 
-- [ ] **Step 2: Add a helper near the top of the file**
+- [x] **Step 2: Add a helper near the top of the file**
 
 ```rust
 /// Returns true if the FeedbackSignal was sent by us (local node) — used to
@@ -2076,7 +2076,7 @@ mod dedup_tests {
 }
 ```
 
-- [ ] **Step 3: Run + commit**
+- [x] **Step 3: Run + commit**
 
 ```bash
 RUSTFLAGS='--cfg getrandom_backend="custom"' cargo test --lib api::epr::dedup_tests
@@ -2087,6 +2087,8 @@ git commit -m "feat(epr-light-up): T17 — local-origin dedup helper for Feedbac
 ---
 
 ## Task 18: api/epr.rs — wire record_predecessor on EPR ingest
+
+<!-- AUDIT 2026-05-11: GENUINE GAP. put_epr HTTP path explicitly documents record_predecessor as NOT wired (api/epr.rs:618). epr_atom_service.rs:189 also defers it. p2p/mod.rs swarm handler does not call it either. Wave-2 item W2A in the master plan. -->
 
 **Files:**
 - Modify: `elohim/elohim-storage/src/api/epr.rs`
@@ -2156,13 +2158,13 @@ git commit -m "feat(epr-light-up): T18 — wire record_predecessor on EPR ingest
 **Files:**
 - Modify: `elohim/elohim-storage/src/api/epr.rs`
 
-- [ ] **Step 1: Find the FeedbackSignal arrival site**
+- [x] **Step 1: Find the FeedbackSignal arrival site**
 
 ```bash
 grep -n "TODO(T19)\|FeedbackSignal" elohim/elohim-storage/src/api/epr.rs | head -20
 ```
 
-- [ ] **Step 2: Add the fan-out block at the FeedbackSignal arrival site**
+- [x] **Step 2: Add the fan-out block at the FeedbackSignal arrival site**
 
 The fan-out runs after persisting the FeedbackSignal envelope. It performs:
 - Local-origin dedup
@@ -2231,21 +2233,21 @@ if epr_kind == "feedback-signal" {
 
 (Adapt `state.outbound_sink`, `state.gossip_publisher`, `state.manifest_registry`, `state.local_pubkey`, `state.local_peer_id`, `state.standing_policy_cid` to whatever the actual shared state struct holds. Add fields if needed — see Task 22.)
 
-- [ ] **Step 3: Verify compilation**
+- [x] **Step 3: Verify compilation**
 
 ```bash
 RUSTFLAGS='--cfg getrandom_backend="custom"' cargo build --lib
 ```
 Expected: PASS (after ensuring shared state type has the new fields).
 
-- [ ] **Step 4: Run existing api::epr tests**
+- [x] **Step 4: Run existing api::epr tests**
 
 ```bash
 RUSTFLAGS='--cfg getrandom_backend="custom"' cargo test --lib api::epr
 ```
 Expected: PASS (existing tests still green).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add elohim/elohim-storage/src/api/epr.rs
@@ -2259,13 +2261,13 @@ git commit -m "feat(epr-light-up): T19 — FeedbackSignal arrival fan-out (proje
 **Files:**
 - Modify: `elohim/elohim-storage/src/main.rs`
 
-- [ ] **Step 1: Find startup sequence**
+- [x] **Step 1: Find startup sequence**
 
 ```bash
 grep -n "run_migrations\|TODO(T19)\|seed_if_empty\|bootstrap_manifests" elohim/elohim-storage/src/main.rs | head -10
 ```
 
-- [ ] **Step 2: Add the call after migrations, before HTTP/swarm spawn**
+- [x] **Step 2: Add the call after migrations, before HTTP/swarm spawn**
 
 ```rust
 // Phase 3.5 — Light Up the Graph: seed bootstrap manifests after migrations.
@@ -2279,7 +2281,7 @@ grep -n "run_migrations\|TODO(T19)\|seed_if_empty\|bootstrap_manifests" elohim/e
 
 (Use the actual crate path for the storage crate — `crate::` if main.rs is inside elohim-storage, otherwise `elohim_storage::`.)
 
-- [ ] **Step 3: Build**
+- [x] **Step 3: Build**
 
 ```bash
 cd elohim/elohim-storage
@@ -2287,7 +2289,7 @@ RUSTFLAGS='--cfg getrandom_backend="custom"' cargo build --release
 ```
 Expected: PASS.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add elohim/elohim-storage/src/main.rs
@@ -2301,7 +2303,7 @@ git commit -m "feat(epr-light-up): T20 — wire bootstrap_manifests::seed_if_emp
 **Files:**
 - Modify: `elohim/elohim-storage/src/main.rs`
 
-- [ ] **Step 1: Add the spawn after seed_if_empty (Task 20), before HTTP server bind**
+- [x] **Step 1: Add the spawn after seed_if_empty (Task 20), before HTTP server bind**
 
 ```rust
 // Phase 3.5 — Light Up the Graph: tending TTL sweep task (5-min interval).
@@ -2331,7 +2333,7 @@ tokio::spawn(async move {
 
 (Use the actual `shutdown_token` / `CancellationToken` variable name from existing main.rs — search for `CancellationToken` or `shutdown` to find it.)
 
-- [ ] **Step 2: Build + commit**
+- [x] **Step 2: Build + commit**
 
 ```bash
 RUSTFLAGS='--cfg getrandom_backend="custom"' cargo build --release
@@ -2347,13 +2349,13 @@ git commit -m "feat(epr-light-up): T21 — spawn tending TTL sweep task (5-min, 
 - Modify: `elohim/elohim-storage/src/main.rs`
 - Modify: shared state struct (likely in `src/state.rs` or `src/api/state.rs` or inline in main.rs)
 
-- [ ] **Step 1: Locate the shared state struct**
+- [x] **Step 1: Locate the shared state struct**
 
 ```bash
 grep -rn "pub struct AppState\|pub struct SharedState\|http_state" elohim/elohim-storage/src/ | head -10
 ```
 
-- [ ] **Step 2: Add fields to shared state**
+- [x] **Step 2: Add fields to shared state**
 
 Add these fields (adapt names to existing struct):
 
@@ -2371,7 +2373,7 @@ pub struct AppState {
 }
 ```
 
-- [ ] **Step 3: Construct the new fields in `main.rs` after seed_if_empty + before HTTP bind**
+- [x] **Step 3: Construct the new fields in `main.rs` after seed_if_empty + before HTTP bind**
 
 ```rust
 let registry = std::sync::Arc::new(
@@ -2391,7 +2393,7 @@ let publisher: Option<std::sync::Arc<dyn elohim_storage::services::gossip_flood:
 
 Plug `registry`, `policy`, `sink`, `publisher`, `local_peer_id`, `local_pubkey`, `standing_policy_cid` into the AppState struct passed to the HTTP router. The actual `p2p_command_tx` channel handle should already exist from the swarm task spawn — find it with `grep "P2PCommand\|command_tx" main.rs`.
 
-- [ ] **Step 4: Build + commit**
+- [x] **Step 4: Build + commit**
 
 ```bash
 RUSTFLAGS='--cfg getrandom_backend="custom"' cargo build --release
@@ -2406,7 +2408,7 @@ git commit -m "feat(epr-light-up): T22 — wire registry/policy/adapters into HT
 **Files:**
 - Create: `elohim/elohim-storage/tests/startup_wiring.rs`
 
-- [ ] **Step 1: Create the test**
+- [x] **Step 1: Create the test**
 
 ```rust
 //! Startup wiring smoke test — verifies seed_if_empty + sweep_expired
@@ -2455,7 +2457,7 @@ fn sweep_expired_clean_db_returns_zero() {
 }
 ```
 
-- [ ] **Step 2: Run**
+- [x] **Step 2: Run**
 
 ```bash
 cd elohim/elohim-storage
@@ -2463,7 +2465,7 @@ RUSTFLAGS='--cfg getrandom_backend="custom"' cargo test --test startup_wiring
 ```
 Expected: PASS (3 tests).
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add elohim/elohim-storage/tests/startup_wiring.rs
@@ -2477,13 +2479,13 @@ git commit -m "test(epr-light-up): T23 — startup_wiring smoke test (seed + swe
 **Files:**
 - Read: `elohim/elohim-storage/tests/aunt_and_rage_bait_integration.rs`
 
-- [ ] **Step 1: Find the `MOCKED STEP` markers**
+- [x] **Step 1: Find the `MOCKED STEP` markers**
 
 ```bash
 grep -n "MOCKED STEP\|MOCK\|TODO(T20)" elohim/elohim-storage/tests/aunt_and_rage_bait_integration.rs
 ```
 
-- [ ] **Step 2: Read the surrounding context for each mock**
+- [x] **Step 2: Read the surrounding context for each mock**
 
 For each marker found, read 30 lines of context before and after:
 
@@ -2495,7 +2497,7 @@ Document what each mock simulates:
 - Mock #1 (reach gate fails Bob's compose): which function, what assertions
 - Mock #2 (Vouch + restitution recovers Bob): which function, what data flow
 
-- [ ] **Step 3: No commit — this is a reading task. Take notes for tasks 25 and 26.**
+- [x] **Step 3: No commit — this is a reading task. Take notes for tasks 25 and 26.**
 
 ---
 
@@ -2504,7 +2506,7 @@ Document what each mock simulates:
 **Files:**
 - Modify: `elohim/elohim-storage/tests/aunt_and_rage_bait_integration.rs`
 
-- [ ] **Step 1: Replace Mock #1 scaffold with real `compose_epr` call**
+- [x] **Step 1: Replace Mock #1 scaffold with real `compose_epr` call**
 
 Change the mocked block (typically a comment-out + assertion stub) to:
 
@@ -2543,11 +2545,11 @@ Change the mocked block (typically a comment-out + assertion stub) to:
 
 (Adapt `bob_keypair`, `bob_node.pool`, `bob_node.manifest_registry`, the `Bob` evaluator's actual binding to whatever the test currently uses. The test already has a `bob_node` with components — extend it.)
 
-- [ ] **Step 2: Add `manifest_registry` to the test node helper if missing**
+- [x] **Step 2: Add `manifest_registry` to the test node helper if missing**
 
 If the test's per-node helper struct doesn't already have a `manifest_registry`, add the field and populate it via `ManifestRegistry::load_from_db` after running migrations + seed_if_empty.
 
-- [ ] **Step 3: Run the test**
+- [x] **Step 3: Run the test**
 
 ```bash
 cd elohim/elohim-storage
@@ -2555,7 +2557,7 @@ RUSTFLAGS='--cfg getrandom_backend="custom"' cargo test --test aunt_and_rage_bai
 ```
 Expected: PASS through Mock #1 lifted phase.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add elohim/elohim-storage/tests/aunt_and_rage_bait_integration.rs
@@ -2569,7 +2571,7 @@ git commit -m "test(epr-light-up): T25 — lift Mock #1 (reach-earning gate fail
 **Files:**
 - Modify: `elohim/elohim-storage/tests/aunt_and_rage_bait_integration.rs`
 
-- [ ] **Step 1: Replace Mock #2 scaffold with real Vouch flow**
+- [x] **Step 1: Replace Mock #2 scaffold with real Vouch flow**
 
 Replace the `// MOCKED STEP: Sarah signs Vouch...` block with:
 
@@ -2630,28 +2632,28 @@ tokio::time::sleep(std::time::Duration::from_millis(500)).await;
 
 (Adapt `bob_node.put_epr`, `sarah_node.put_epr`, `sarah_correction_cid`, `bob_keypair`, `sarah_keypair` to actual variable names.)
 
-- [ ] **Step 2: Remove the two `MOCKED STEP` comments and any stale assertion stubs**
+- [x] **Step 2: Remove the two `MOCKED STEP` comments and any stale assertion stubs**
 
 ```bash
 grep -n "MOCKED STEP" elohim/elohim-storage/tests/aunt_and_rage_bait_integration.rs
 ```
 Should return no results after this task.
 
-- [ ] **Step 3: Run**
+- [x] **Step 3: Run**
 
 ```bash
 RUSTFLAGS='--cfg getrandom_backend="custom"' cargo test --test aunt_and_rage_bait_integration -- --nocapture --test-threads=1
 ```
 Expected: PASS end-to-end. Both mocks lifted.
 
-- [ ] **Step 4: Verify the existing 2-of-2 negative sealed-decrypt assertion still passes**
+- [x] **Step 4: Verify the existing 2-of-2 negative sealed-decrypt assertion still passes**
 
 ```bash
 RUSTFLAGS='--cfg getrandom_backend="custom"' cargo test --test aunt_and_rage_bait_integration negative_sealed_decrypt
 ```
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add elohim/elohim-storage/tests/aunt_and_rage_bait_integration.rs
@@ -2664,7 +2666,7 @@ git commit -m "test(epr-light-up): T26 — lift Mock #2 (Vouch primitive recover
 
 **Files:** entire crate
 
-- [ ] **Step 1: Format**
+- [x] **Step 1: Format**
 
 ```bash
 cd elohim/elohim-storage
@@ -2673,28 +2675,28 @@ git diff --stat
 git add -u && git commit -m "chore(epr-light-up): T27 — cargo fmt"   # if fmt produced changes
 ```
 
-- [ ] **Step 2: Clippy**
+- [x] **Step 2: Clippy**
 
 ```bash
 RUSTFLAGS='--cfg getrandom_backend="custom"' cargo clippy --all-targets -- -D warnings
 ```
 Expected: PASS.
 
-- [ ] **Step 3: Build release**
+- [x] **Step 3: Build release**
 
 ```bash
 RUSTFLAGS='--cfg getrandom_backend="custom"' cargo build --release
 ```
 Expected: PASS.
 
-- [ ] **Step 4: Run all storage tests**
+- [x] **Step 4: Run all storage tests**
 
 ```bash
 RUSTFLAGS='--cfg getrandom_backend="custom"' cargo test --release -- --test-threads=1
 ```
 Expected: PASS.
 
-- [ ] **Step 5: Schema validation**
+- [x] **Step 5: Schema validation**
 
 ```bash
 cd /projects/elohim/.claude/worktrees/light-up-graph
@@ -2708,11 +2710,15 @@ Expected: PASS. If codegen produced any drift, commit it.
 
 - [ ] **Step 6: Push branch**
 
+<!-- AUDIT 2026-05-11: NOT APPLICABLE. Work landed directly on dev (per feedback_dev_branch_no_pr memory pin). No feature/light-up-graph branch was created. Jenkins CI validates via the normal dev push trigger. -->
+
 ```bash
 git push -u origin feature/light-up-graph
 ```
 
 - [ ] **Step 7: Verify Jenkins picked up the build via orchestrator**
+
+<!-- AUDIT 2026-05-11: Deferred to Wave-4 soak. CI validates on dev push; separate Jenkins verification step not tracked here. -->
 
 Use Jenkins MCP to check: orchestrator picks up changes to elohim-storage + DNA, kicks off App + Edge + DNA pipelines. Sweettest validation runs on Jenkins. Watch for green build on the DNA pipeline (validates the integrity validator + create_vouch coordinator) and the App pipeline (validates aunt-and-rage-bait integration end-to-end).
 
