@@ -638,8 +638,7 @@ async fn details_projector_identities_stubbed_empty() {
 
     assert!(
         details.projector_identities.is_empty(),
-        // TODO(Phase 4 follow-up): remove stub once doorway_projector_acks lands
-        "projector_identities must be empty (stubbed) until projector source lands"
+        "projector_identities must be empty when no ack-projection events have been recorded"
     );
 }
 
@@ -659,7 +658,6 @@ async fn details_recent_projection_events_stubbed_empty() {
 
     assert!(
         details.recent_projection_events.is_empty(),
-        // TODO(Phase 4 follow-up): remove stub once projection-events log exists
-        "recent_projection_events must be empty (stubbed) until projection-events source lands"
+        "recent_projection_events must be empty when no ack-projection events have been recorded"
     );
 }
