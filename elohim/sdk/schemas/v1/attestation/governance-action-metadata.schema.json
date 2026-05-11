@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://elohim.protocol/schemas/v1/attestation/governance-action-metadata.schema.json",
+  "$comment": "Source of truth: Holochain DHT (sub-shape of governance-action Content entry's metadata_json). Category A per p2p-design-gate.",
+  "title": "GovernanceActionMetadata",
+  "description": "Structured payload inside Content.metadata_json for governance-action entries. Declares threshold, eligibility predicate, ballot format, and deadline. Immutable after publish; child attestation Content entries (votes) reference this entry's CID.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["governance_kind", "subject_cid", "threshold", "ballot_format", "closes_at"],
+  "properties": {
+    "governance_kind": {
+      "type": "string",
+      "description": "Mirrors content_type subtype, denormalized for query (e.g. 'governance-action:renewal-request')"
+    },
+    "subject_cid": {
+      "type": "string",
+      "description": "CID of the agent / content / device this governance action concerns"
+    },
+    "threshold": {
+      "type": "object",
+      "description": "Quorum requirement — either m-of-n vote count or percentage of eligible voters",
+      "oneOf": [
+        {
+          "required": ["type", "m", "n"],
+          "properties": {
+            "type": { "const": "m-of-n" },
+            "m": { "type": "integer", "minimum": 1 },
+            "n": { "type": "integer", "minimum": 1 }
+          }
+        },
+        {
+          "required": ["type", "percentage"],
+          "properties": {
+            "type": { "const": "percentage" },
+            "percentage": { "type": "number", "minimum": 0, "maximum": 100 }
+          }
+        }
+      ]
+    },
+    "eligibility_predicate": {
+      "type": ["object", "null"],
+      "description": "Optional eligibility check evaluated against each voting issuer at child commit time. When null, all agents are eligible.",
+      "required": ["type"],
+      "properties": {
+        "type": { "type": "string" },
+        "manifest_ref": { "type": "string" },
+        "parameters": { "type": "object", "additionalProperties": true }
+      }
+    },
+    "ballot_format": {
+      "type": "string",
+      "enum": ["approve-reject", "ranked-choice", "approval", "quadratic"],
+      "description": "Determines how child votes are tallied"
+    },
+    "closes_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Child attestations committed after this timestamp are rejected by the validator"
+    },
+    "parameters_json": {
+      "type": ["object", "null"],
+      "description": "Governance-kind-specific parameters (e.g., the candidate slate for an election)",
+      "additionalProperties": true
+    }
+  }
+}

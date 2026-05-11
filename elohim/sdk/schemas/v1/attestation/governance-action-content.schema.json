@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://elohim.protocol/schemas/v1/attestation/governance-action-content.schema.json",
+  "$comment": "Source of truth: Holochain DHT (notarized Content entry with content_type LIKE 'governance-action:%'). Category A per p2p-design-gate.",
+  "title": "GovernanceActionContent",
+  "description": "Wire shape for a governance-action realized as a Content entry on elohim DNA. Parent of child attestation Content entries that cast votes. Source of truth is the Holochain DHT — this schema describes the JSON-on-wire shape only. See spec §4.2.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "content_type", "title", "author_id", "reach", "metadata_json", "created_at"],
+  "properties": {
+    "id": { "type": "string", "description": "CIDv1 — content-derived identity" },
+    "content_type": {
+      "type": "string",
+      "pattern": "^governance-action:[a-z][a-z0-9-]*$",
+      "description": "Discriminator. Subtype must be declared in some pillar manifest's governance-actions section"
+    },
+    "title": { "type": "string", "minLength": 1 },
+    "description": { "type": "string" },
+    "author_id": { "type": "string", "description": "Proposer's agent CID (signed via Content action header)" },
+    "reach": { "$ref": "../enums/reach.schema.json" },
+    "metadata_json": {
+      "type": "string",
+      "description": "Serialized JSON conforming to GovernanceActionMetadata (sibling schema)"
+    },
+    "tags": { "type": "array", "items": { "type": "string" } },
+    "related_node_ids": { "type": "array", "items": { "type": "string" } },
+    "created_at": { "type": "string", "format": "date-time" },
+    "schema_version": { "type": "integer", "minimum": 0 },
+    "validation_status": { "type": "string" }
+  }
+}
