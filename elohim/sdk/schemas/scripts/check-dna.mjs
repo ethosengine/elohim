@@ -17,6 +17,11 @@ const GENERATED_RS = resolve(
   REPO_ROOT,
   'elohim/holochain/dna/elohim/zomes/content_store_integrity/src/generated_enums.rs',
 );
+const GENERATED_RS_ATTESTATION_KINDS = resolve(
+  REPO_ROOT,
+  'elohim/holochain/dna/elohim/zomes/content_store_integrity/src/generated_attestation_kinds.rs',
+);
+const DOMAINS_DIR = resolve(REPO_ROOT, 'elohim/sdk/domains');
 
 /**
  * Extract a `pub const NAME: &[&str] = &[...]` array from generated Rust source.
@@ -40,6 +45,132 @@ function extractRustConstArray(source, constName) {
     .split(',')
     .map((s) => s.trim().replace(/^"/, '').replace(/"$/, ''))
     .filter((s) => s.length > 0);
+}
+
+/**
+ * Check that ATTESTATION_KINDS and GOVERNANCE_ACTION_KINDS in generated_attestation_kinds.rs
+ * exactly match the union of keys declared in pillar manifests' attestations / governance-actions
+ * sections, and vice versa.
+ *
+ * @returns {Promise<{failures: number, checks: number}>}
+ */
+async function checkAttestationKindsParity() {
+  let failures = 0;
+  let checks = 0;
+
+  // --- Read generated Rust constants ---
+  let attestationSource;
+  try {
+    attestationSource = await readFile(GENERATED_RS_ATTESTATION_KINDS, 'utf8');
+  } catch {
+    console.error(
+      `FAIL: Could not read generated attestation kinds: ${GENERATED_RS_ATTESTATION_KINDS}`,
+    );
+    console.error('Run: pnpm run schema:codegen:rs');
+    return { failures: 1, checks: 0 };
+  }
+
+  const rustAttestationKinds = extractRustConstArray(attestationSource, 'ATTESTATION_KINDS');
+  const rustGovernanceActionKinds = extractRustConstArray(
+    attestationSource,
+    'GOVERNANCE_ACTION_KINDS',
+  );
+
+  if (!rustAttestationKinds) {
+    console.error('FAIL: Could not find ATTESTATION_KINDS in generated_attestation_kinds.rs');
+    return { failures: 1, checks: 0 };
+  }
+  if (!rustGovernanceActionKinds) {
+    console.error(
+      'FAIL: Could not find GOVERNANCE_ACTION_KINDS in generated_attestation_kinds.rs',
+    );
+    return { failures: 1, checks: 0 };
+  }
+
+  // --- Read manifest keys across all pillar domains ---
+  const PILLAR_DOMAINS = ['imagodei', 'lamad', 'infrastructure', 'mishpat'];
+  const manifestAttestationKinds = new Set();
+  const manifestGovernanceActionKinds = new Set();
+
+  for (const domain of PILLAR_DOMAINS) {
+    const manifestPath = join(DOMAINS_DIR, domain, 'manifest.json');
+    let manifest;
+    try {
+      manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
+    } catch {
+      console.error(`FAIL: Could not read manifest for domain "${domain}": ${manifestPath}`);
+      failures++;
+      continue;
+    }
+    for (const key of Object.keys(manifest.attestations ?? {})) {
+      manifestAttestationKinds.add(key);
+    }
+    for (const key of Object.keys(manifest['governance-actions'] ?? {})) {
+      manifestGovernanceActionKinds.add(key);
+    }
+  }
+
+  console.log('\nAttestation-kinds parity check:');
+
+  // --- Compare ATTESTATION_KINDS ---
+  checks++;
+  {
+    const rustSet = new Set(rustAttestationKinds);
+    const inRustNotManifest = rustAttestationKinds.filter((k) => !manifestAttestationKinds.has(k));
+    const inManifestNotRust = [...manifestAttestationKinds].filter((k) => !rustSet.has(k));
+
+    if (inRustNotManifest.length === 0 && inManifestNotRust.length === 0) {
+      console.log(
+        `  ATTESTATION_KINDS: ${rustAttestationKinds.length} in Rust, ${manifestAttestationKinds.size} in manifests — ✓ matched`,
+      );
+    } else {
+      console.error('  ATTESTATION_KINDS:');
+      if (inRustNotManifest.length > 0) {
+        console.error(
+          `    in Rust but missing from manifests: ${JSON.stringify(inRustNotManifest)}`,
+        );
+      }
+      if (inManifestNotRust.length > 0) {
+        console.error(
+          `    in manifests but missing from Rust: ${JSON.stringify(inManifestNotRust)}`,
+        );
+      }
+      console.error('  FAIL');
+      failures += inRustNotManifest.length + inManifestNotRust.length;
+    }
+  }
+
+  // --- Compare GOVERNANCE_ACTION_KINDS ---
+  checks++;
+  {
+    const rustSet = new Set(rustGovernanceActionKinds);
+    const inRustNotManifest = rustGovernanceActionKinds.filter(
+      (k) => !manifestGovernanceActionKinds.has(k),
+    );
+    const inManifestNotRust = [...manifestGovernanceActionKinds].filter((k) => !rustSet.has(k));
+
+    if (inRustNotManifest.length === 0 && inManifestNotRust.length === 0) {
+      console.log(
+        `  GOVERNANCE_ACTION_KINDS: ${rustGovernanceActionKinds.length} in Rust, ${manifestGovernanceActionKinds.size} in manifests — ✓ matched`,
+      );
+    } else {
+      console.error('  GOVERNANCE_ACTION_KINDS:');
+      if (inRustNotManifest.length > 0) {
+        console.error(
+          `    in Rust but missing from manifests: ${JSON.stringify(inRustNotManifest)}`,
+        );
+      }
+      if (inManifestNotRust.length > 0) {
+        console.error(
+          `    in manifests but missing from Rust: ${JSON.stringify(inManifestNotRust)}`,
+        );
+      }
+      console.error('  FAIL');
+      failures += inRustNotManifest.length + inManifestNotRust.length;
+    }
+  }
+
+  return { failures, checks };
 }
 
 async function main() {
@@ -134,6 +265,11 @@ async function main() {
   if (checks === 0) {
     console.log('No schemas with _dna mappings found.');
   }
+
+  // Attestation-kinds parity check (DNA-vs-manifest)
+  const parityResult = await checkAttestationKindsParity();
+  failures += parityResult.failures;
+  checks += parityResult.checks;
 
   console.log(
     `\n${failures === 0 ? 'ALL DNA CHECKS PASSED' : `${failures} DNA CHECK(S) FAILED`}`,
