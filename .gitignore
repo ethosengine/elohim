@@ -9,6 +9,10 @@
 # Agentic developer shift artifacts (local only)
 .claude/shifts/*
 !.claude/shifts/.gitkeep
+**/.claude/shifts/
+
+# Local worktree-state directories used by side tooling
+.claire/
 
 # Node
 node_modules/

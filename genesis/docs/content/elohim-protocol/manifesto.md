@@ -193,6 +193,21 @@ These principles don't just improve existing systems—they engineer away the fa
 - Value generation through relationship and stewardship
 - Economic loops that regenerate rather than extract
 
+### **6. Living Memory and the Lifecycle of Data**
+
+**Principle**: Memory has the character of life — it grows where tended, fades where not, heals where faced, coalesces where it recognizes itself in kin. Bounded household compute meets unbounded conversation; intentional decay is the sustainability loop, not a flaw of memory.
+
+**What This Solves**: The false choice between "preserve everything forever" (compute footprints unsustainable for household-scale infrastructure, surveillance-shaped retention by default) and "delete on demand" (loses cultural artifacts, breaks attestation records, forfeits recovery loops, treats consequence as silence). Living memory respects the difference between a conversation, a film, a contract, and a friendship — each gets the lifecycle that fits its character.
+
+**Implementation**:
+- Lifecycle primitives (`promote`, `compact`, `merge`, `submerge`/`surface`, `close-interval`, `memorialize`, `forget`, `quarantine`) operate on every long-lived datum
+- Memory classes (contextual, archival, identity, relational, operational, attestation, wisdom) determine which primitives apply by default, with what cadence, under which authority
+- Consolidation events — discovery of equivalence or harm — are first-class judgment moments emitting signals to economic, governance, and relational layers, not silent housekeeping
+- Reach-dropped content submerges to an elohim-visible tier, surface-able through intentional facing — a recovery loop, not permanent disenfranchisement
+- "Right to be forgotten" reconceived: the protocol asks *who is going to hold this well?* rather than *how do we delete this?* The answer is structural, distributed, and accountable.
+
+**See also**: `living_memory/epic.md` for the full narrative treatment, including the human-scale story of what these mechanics feel like for a household participant, the recovery loop in practice, and the values-forward disclosure of what this protocol asks of you and what it refuses to negotiate.
+
 ## **Part III: The Elohim Protocol - Autonomous Guardians of Flourishing**
 
 ### **Beyond Moderation: Engineering Collective Intelligence**

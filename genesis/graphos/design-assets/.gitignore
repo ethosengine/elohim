@@ -1,0 +1,5 @@
+# raw/ is the verbatim round-trip output from claude.ai/design and is
+# regenerable from elohim-protocol-design-spec.md. Re-extractions would
+# otherwise churn the repo with bundle artifacts. The canonical layer
+# lives in curated/ — that's what the codebase consumes.
+raw/
