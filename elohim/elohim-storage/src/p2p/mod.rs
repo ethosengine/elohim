@@ -43,6 +43,7 @@ pub mod identity_handshake;
 pub mod identity_map;
 pub mod inventory_broadcaster;
 pub mod inventory_gossip;
+pub mod observation_gossip;
 pub mod kad_store;
 pub mod projection_ack_handler; // Phase 4 T4 — ack-projection side-projection writer
 pub mod reach_authorization;
