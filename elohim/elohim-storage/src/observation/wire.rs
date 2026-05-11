@@ -38,3 +38,16 @@ pub struct Observation {
 
     pub signature: Vec<u8>,
 }
+
+impl Observation {
+    /// Bytes covered by the observer's signature. By definition this excludes
+    /// the `signature` field itself — otherwise signing would be a fixed point
+    /// problem. We compute by cloning and zeroing the signature, then
+    /// MessagePack-encoding. `rmp_serde::to_vec` on owned data is infallible
+    /// for this struct (all fields are serialisable primitives).
+    pub fn canonical_signing_bytes(&self) -> Vec<u8> {
+        let mut clone = self.clone();
+        clone.signature = Vec::new();
+        rmp_serde::to_vec(&clone).expect("infallible: Observation has no non-serialisable fields")
+    }
+}
