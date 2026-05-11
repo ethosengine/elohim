@@ -21,5 +21,52 @@
       "uniqueness_anchor": "attestation:doorway-health-summary:{subject_cid}:{period_start}",
       "revocable_by": ["issuer"]
     }
-  }
+  },
+  "observation_kinds": [
+    {
+      "kind": "infrastructure:doorway-heartbeat",
+      "namespace": "elohim/observations/infrastructure",
+      "schema": {
+        "doorway_id": "Cid",
+        "peer_count": "u32",
+        "uptime_secs": "u64"
+      },
+      "retention_class": "operational",
+      "reach": "community",
+      "diversity_threshold": { "distinct_households": 3, "min_count": 5 },
+      "graduates_to": "attestation:doorway-health-summary",
+      "graduation_window_seconds": 3600,
+      "graduation_policy": "diversity-threshold"
+    },
+    {
+      "kind": "infrastructure:blob-served",
+      "namespace": "elohim/observations/infrastructure",
+      "schema": {
+        "blob_cid": "Cid",
+        "bytes": "u64",
+        "peer_cid": "Cid"
+      },
+      "retention_class": "operational",
+      "reach": "community",
+      "diversity_threshold": null,
+      "graduates_to": "event:served-blob-summary",
+      "graduation_window_seconds": 3600,
+      "graduation_policy": "summarize"
+    },
+    {
+      "kind": "infrastructure:system-sample",
+      "namespace": "elohim/observations/infrastructure",
+      "schema": {
+        "cpu_pct": "f32",
+        "mem_used_bytes": "u64",
+        "disk_used_bytes": "u64",
+        "disk_total_bytes": "u64"
+      },
+      "retention_class": "operational",
+      "reach": "agent-private",
+      "diversity_threshold": null,
+      "graduates_to": null,
+      "graduation_policy": null
+    }
+  ]
 }
