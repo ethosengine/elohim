@@ -390,6 +390,37 @@ pub fn create_challenge(input: CreateChallengeInput) -> ExternResult<ChallengeOu
         (),
     )?;
 
+    // B.10 bridge: additionally write to elohim DNA's consolidated governance-action store.
+    // Local entry and links are kept so get_challenge_by_id / query_challenges continue to work.
+    // Stage C removes local write once storage projects from elohim signals.
+    let _ = call_elohim_propose_governance_action(ConsolidatedProposeGovernanceActionInput {
+        governance_kind: "governance-action:challenge".to_string(),
+        subject_cid: format!("{}:{}", challenge.entity_type, challenge.entity_id),
+        title: format!(
+            "Challenge on {}:{} by {}",
+            challenge.entity_type, challenge.entity_id, challenge.challenger_id
+        ),
+        description: Some(challenge.description.clone()),
+        reach: "community".to_string(),
+        threshold: serde_json::json!({"type": "adjudication"}),
+        eligibility_predicate: None,
+        ballot_format: "adjudication".to_string(),
+        closes_at: challenge
+            .sla_deadline
+            .clone()
+            .unwrap_or_else(|| challenge.updated_at.clone()),
+        parameters: Some(serde_json::json!({
+            "entity_type": challenge.entity_type,
+            "entity_id": challenge.entity_id,
+            "challenger_id": challenge.challenger_id,
+            "grounds": challenge.grounds,
+            "status": challenge.status,
+            "priority": challenge.priority,
+            "assigned_elohim": challenge.assigned_elohim,
+            "metadata_json": challenge.metadata_json,
+        })),
+    });
+
     Ok(ChallengeOutput {
         action_hash,
         challenge: wire_challenge(&challenge),
@@ -566,6 +597,39 @@ pub fn create_proposal(input: CreateProposalInput) -> ExternResult<ProposalOutpu
         LinkTypes::ProposalByStatus,
         (),
     )?;
+
+    // B.10 bridge: additionally write to elohim DNA's consolidated governance-action store.
+    // Local entry and links are kept so get_proposal_by_id / query_proposals continue to work.
+    // closes_at is extracted from voting_config_json if available; falls back to placeholder.
+    // Stage C removes local write once storage projects from elohim signals.
+    let closes_at = serde_json::from_str::<serde_json::Value>(&proposal.voting_config_json)
+        .ok()
+        .and_then(|v| v.get("closes_at").and_then(|c| c.as_str()).map(String::from))
+        .unwrap_or_else(|| proposal.updated_at.clone());
+    let _ = call_elohim_propose_governance_action(ConsolidatedProposeGovernanceActionInput {
+        governance_kind: "governance-action:proposal".to_string(),
+        subject_cid: input.proposer_id.clone(),
+        title: proposal.title.clone(),
+        description: Some(proposal.description.clone()),
+        reach: "community".to_string(),
+        threshold: serde_json::json!({"type": "majority"}),
+        eligibility_predicate: None,
+        ballot_format: serde_json::from_str::<serde_json::Value>(&proposal.voting_config_json)
+            .ok()
+            .and_then(|v| v.get("ballot_format").and_then(|b| b.as_str()).map(String::from))
+            .unwrap_or_else(|| "consent".to_string()),
+        closes_at,
+        parameters: Some(serde_json::json!({
+            "proposal_type": proposal.proposal_type,
+            "phase": proposal.phase,
+            "status": proposal.status,
+            "rationale": proposal.rationale,
+            "related_entity_type": proposal.related_entity_type,
+            "related_entity_id": proposal.related_entity_id,
+            "voting_config_json": proposal.voting_config_json,
+            "metadata_json": proposal.metadata_json,
+        })),
+    });
 
     Ok(ProposalOutput {
         action_hash,
@@ -1472,6 +1536,35 @@ pub fn create_proposal_vote(input: CreateProposalVoteInput) -> ExternResult<Prop
         (),
     )?;
 
+    // B.10 bridge: additionally write to elohim DNA's consolidated attestation store.
+    // Local entry and links are kept so query_proposal_votes continues to work.
+    // Stage C removes local write once storage projects from elohim signals.
+    let _ = call_elohim_issue_attestation(ConsolidatedIssueAttestationInput {
+        attestation_kind: "attestation:proposal-vote".to_string(),
+        subject_cid: vote.proposal_id.clone(),
+        subject_kind: "governance-action".to_string(),
+        title: format!("Vote on proposal {} by {}", vote.proposal_id, vote.voter_id),
+        description: Some(format!("Position: {}", vote.position)),
+        reach: "community".to_string(),
+        metadata: serde_json::json!({
+            "proposal_id": vote.proposal_id,
+            "voter_id": vote.voter_id,
+            "voter_name": vote.voter_name,
+            "position": vote.position,
+            "version": vote.version,
+            "previous_position": vote.previous_position,
+            "metadata_json": vote.metadata_json,
+        }),
+        parent_governance_action_cid: Some(vote.proposal_id.clone()),
+        vote_value: Some(vote.position.clone()),
+        proof_class: "witness".to_string(),
+        proof_evidence: serde_json::json!({
+            "class": "witness",
+            "reasoning": vote.reasoning,
+        }),
+        expires_at: None,
+    });
+
     Ok(ProposalVoteOutput {
         action_hash,
         vote: wire_proposal_vote(&vote),
@@ -1743,6 +1836,32 @@ pub fn create_statement_vote(input: CreateStatementVoteInput) -> ExternResult<St
         (),
     )?;
 
+    // B.10 bridge: additionally write to elohim DNA's consolidated attestation store.
+    // Local entry and links are kept so query_statement_votes continues to work.
+    // Stage C removes local write once storage projects from elohim signals.
+    let _ = call_elohim_issue_attestation(ConsolidatedIssueAttestationInput {
+        attestation_kind: "attestation:statement-vote".to_string(),
+        subject_cid: statement_vote.statement_id.clone(),
+        subject_kind: "governance-action".to_string(),
+        title: format!(
+            "Statement vote on {} by {}",
+            statement_vote.statement_id, statement_vote.voter_id
+        ),
+        description: Some(format!("Vote: {}", statement_vote.vote)),
+        reach: "community".to_string(),
+        metadata: serde_json::json!({
+            "statement_id": statement_vote.statement_id,
+            "voter_id": statement_vote.voter_id,
+            "vote": statement_vote.vote,
+            "metadata_json": statement_vote.metadata_json,
+        }),
+        parent_governance_action_cid: Some(statement_vote.statement_id.clone()),
+        vote_value: Some(statement_vote.vote.clone()),
+        proof_class: "witness".to_string(),
+        proof_evidence: serde_json::json!({"class": "witness"}),
+        expires_at: None,
+    });
+
     Ok(StatementVoteOutput {
         action_hash,
         statement_vote: wire_statement_vote(&statement_vote),
@@ -1928,6 +2047,39 @@ pub fn create_gate_decision_attestation(
         LinkTypes::PhaseToDecisions,
         (),
     )?;
+
+    // B.10 bridge: additionally write to elohim DNA's consolidated attestation store.
+    // Local entry is kept so post_commit emits MishpatSignal::GateDecisionCreated.
+    // Stage C removes local write once storage projects from elohim signals.
+    let _ = call_elohim_issue_attestation(ConsolidatedIssueAttestationInput {
+        attestation_kind: "attestation:gate-decision".to_string(),
+        subject_cid: input.elohim_id.clone(),
+        subject_kind: "agent".to_string(),
+        title: format!("Gate decision: {} by {}", input.gate_name, input.elohim_id),
+        description: Some(format!("Phase: {} — decision: {}", input.phase, input.decision)),
+        reach: "community".to_string(),
+        metadata: serde_json::json!({
+            "decision_id": input.decision_id,
+            "phase": input.phase,
+            "elohim_id": input.elohim_id,
+            "elohim_substance_cid": input.elohim_substance_cid,
+            "gate_name": input.gate_name,
+            "gate_process_cid": input.gate_process_cid,
+            "request_ref_json": input.request_ref_json,
+            "decision": input.decision,
+            "context_summary_cid": input.context_summary_cid,
+            "decided_at": input.decided_at,
+            "universal_band_cid": input.universal_band_cid,
+        }),
+        parent_governance_action_cid: None,
+        vote_value: None,
+        proof_class: "audit".to_string(),
+        proof_evidence: serde_json::json!({
+            "class": "audit",
+            "reasoning_json": input.reasoning_json,
+        }),
+        expires_at: None,
+    });
 
     Ok(action_hash)
 }
@@ -2462,20 +2614,139 @@ pub fn post_commit(committed_actions: Vec<SignedActionHashed>) -> ExternResult<(
 }
 
 // ============================================================
-// CROSS-DNA BRIDGES (future)
+// CROSS-DNA BRIDGES (Stage B consolidation — B.10)
 // ============================================================
 //
-// Bridge to imagodei for identity verification will be added
-// when signal wiring connects governance to identity attestations.
+// All bridges are ADDITIVE (dual-write during Stage B). The local entry writes
+// are preserved so existing query functions (get_*_by_id, query_*) continue to
+// work from mishpat DHT. Stage C will remove local entry types once storage
+// projects from elohim signals.
 //
-// Example pattern:
-//   let response: ZomeCallResponse = call(
-//       CallTargetCell::OtherRole("imagodei".into()),
-//       "imagodei",
-//       "get_agent_attestations".into(),
-//       None,
-//       challenger_id,
-//   )?;
+// Bridged functions:
+//   create_gate_decision_attestation  → attestation:gate-decision   (additive; has post_commit signal)
+//   create_proposal_vote              → attestation:proposal-vote    (additive)
+//   create_statement_vote             → attestation:statement-vote   (additive)
+//   create_proposal                   → governance-action:proposal   (additive)
+//   create_challenge                  → governance-action:challenge  (additive)
+
+/// Input wire type — wire-compatible with elohim DNA's content_store::issue_attestation.
+/// Defined locally because cross-DNA calls serialise through msgpack;
+/// mishpat cannot depend on elohim crates directly.
+#[derive(Debug, Serialize, Deserialize)]
+struct ConsolidatedIssueAttestationInput {
+    pub attestation_kind: String,
+    pub subject_cid: String,
+    pub subject_kind: String,
+    pub title: String,
+    pub description: Option<String>,
+    pub reach: String,
+    pub metadata: serde_json::Value,
+    pub parent_governance_action_cid: Option<String>,
+    pub vote_value: Option<String>,
+    pub proof_class: String,
+    pub proof_evidence: serde_json::Value,
+    pub expires_at: Option<String>,
+}
+
+/// Output wire type — wire-compatible with elohim DNA's content_store::issue_attestation.
+#[derive(Debug, Serialize, Deserialize)]
+struct ConsolidatedAttestationOutput {
+    pub cid: String,
+    pub attestation_kind: String,
+    pub subject_cid: String,
+    pub issuer_cid: String,
+}
+
+/// Input wire type — wire-compatible with elohim DNA's content_store::propose_governance_action.
+#[derive(Debug, Serialize, Deserialize)]
+struct ConsolidatedProposeGovernanceActionInput {
+    pub governance_kind: String,
+    pub subject_cid: String,
+    pub title: String,
+    pub description: Option<String>,
+    pub reach: String,
+    pub threshold: serde_json::Value,
+    pub eligibility_predicate: Option<serde_json::Value>,
+    pub ballot_format: String,
+    pub closes_at: String,
+    pub parameters: Option<serde_json::Value>,
+}
+
+/// Output wire type — wire-compatible with elohim DNA's content_store::propose_governance_action.
+#[derive(Debug, Serialize, Deserialize)]
+struct ConsolidatedGovernanceActionOutput {
+    pub cid: String,
+    pub governance_kind: String,
+    pub subject_cid: String,
+    pub proposer_cid: String,
+    pub closes_at: String,
+}
+
+/// Bridge helper: call elohim content_store::issue_attestation.
+/// Mirrors the pattern from imagodei B.9 bridge. Returns Ok(output) on success;
+/// errors are non-fatal (bridge best-effort during Stage B).
+fn call_elohim_issue_attestation(
+    input: ConsolidatedIssueAttestationInput,
+) -> ExternResult<ConsolidatedAttestationOutput> {
+    let response = call(
+        CallTargetCell::OtherRole("elohim".into()),
+        ZomeName::from("content_store"),
+        FunctionName::from("issue_attestation"),
+        None,
+        input,
+    )?;
+    match response {
+        ZomeCallResponse::Ok(result) => result.decode().map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "bridge decode (elohim::issue_attestation): {e}"
+            )))
+        }),
+        ZomeCallResponse::Unauthorized(_, _, _, _) => Err(wasm_error!(WasmErrorInner::Guest(
+            "Unauthorized bridge call to elohim::issue_attestation".to_string()
+        ))),
+        ZomeCallResponse::NetworkError(err) => Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Network error bridging to elohim::issue_attestation: {err}"
+        )))),
+        ZomeCallResponse::CountersigningSession(err) => Err(wasm_error!(WasmErrorInner::Guest(
+            format!("Countersigning error bridging to elohim: {err}")
+        ))),
+        ZomeCallResponse::AuthenticationFailed(_, _) => Err(wasm_error!(WasmErrorInner::Guest(
+            "Authentication failed bridging to elohim::issue_attestation".to_string()
+        ))),
+    }
+}
+
+/// Bridge helper: call elohim content_store::propose_governance_action.
+fn call_elohim_propose_governance_action(
+    input: ConsolidatedProposeGovernanceActionInput,
+) -> ExternResult<ConsolidatedGovernanceActionOutput> {
+    let response = call(
+        CallTargetCell::OtherRole("elohim".into()),
+        ZomeName::from("content_store"),
+        FunctionName::from("propose_governance_action"),
+        None,
+        input,
+    )?;
+    match response {
+        ZomeCallResponse::Ok(result) => result.decode().map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "bridge decode (elohim::propose_governance_action): {e}"
+            )))
+        }),
+        ZomeCallResponse::Unauthorized(_, _, _, _) => Err(wasm_error!(WasmErrorInner::Guest(
+            "Unauthorized bridge call to elohim::propose_governance_action".to_string()
+        ))),
+        ZomeCallResponse::NetworkError(err) => Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Network error bridging to elohim::propose_governance_action: {err}"
+        )))),
+        ZomeCallResponse::CountersigningSession(err) => Err(wasm_error!(WasmErrorInner::Guest(
+            format!("Countersigning error bridging to elohim: {err}")
+        ))),
+        ZomeCallResponse::AuthenticationFailed(_, _) => Err(wasm_error!(WasmErrorInner::Guest(
+            "Authentication failed bridging to elohim::propose_governance_action".to_string()
+        ))),
+    }
+}
 
 // =============================================================================
 // Credential Verification (for P2P trust negotiation)
