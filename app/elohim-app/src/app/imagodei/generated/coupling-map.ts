@@ -22,7 +22,7 @@ export interface ContentTypeCoupling {
 }
 
 export const IMAGODEI_COUPLING_MAP: Record<string, ContentTypeCoupling> = {
-  human: {
+  'human': {
     value: {
       onConsume: { action: 'use', resourceConformsTo: 'identity', recognition: 'presence-record' },
     },
@@ -33,13 +33,9 @@ export const IMAGODEI_COUPLING_MAP: Record<string, ContentTypeCoupling> = {
       signalTypes: ['identity-created', 'presence-established', 'agency-progressed'],
     },
   },
-  role: {
+  'role': {
     value: {
-      onConsume: {
-        action: 'use',
-        resourceConformsTo: 'capability-grant',
-        recognition: 'role-record',
-      },
+      onConsume: { action: 'use', resourceConformsTo: 'capability-grant', recognition: 'role-record' },
     },
     governance: {
       defaultReach: 'community',
@@ -48,13 +44,9 @@ export const IMAGODEI_COUPLING_MAP: Record<string, ContentTypeCoupling> = {
       signalTypes: ['attestation-granted', 'attestation-revoked'],
     },
   },
-  contributor: {
+  'contributor': {
     value: {
-      onContribute: {
-        action: 'produce',
-        resourceConformsTo: 'contribution',
-        recognition: 'stewardship-standing',
-      },
+      onContribute: { action: 'produce', resourceConformsTo: 'contribution', recognition: 'stewardship-standing' },
     },
     governance: {
       defaultReach: 'commons',

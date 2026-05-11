@@ -114,6 +114,116 @@ function formatTsConst(name, values) {
   return `export const ${name} = [\n${items}\n] as const;`;
 }
 
+/**
+ * Emit the shared ObservationKindDeclaration + SignalKindDeclaration interfaces
+ * and the domain-specific observation_kinds const array.
+ */
+function generateObservationKindTypes(manifest, prefix) {
+  const observationKinds = manifest.observation_kinds || [];
+  const signalKinds = manifest.signalKinds || {};
+
+  const blocks = [];
+
+  blocks.push(`export interface DiversityThreshold {
+  distinct_households?: number;
+  distinct_collectives?: number;
+  distinct_regions?: number;
+  distinct_archetypes?: number;
+  min_count?: number;
+}
+
+export interface ObservationKindDeclaration {
+  kind: string;
+  namespace: string;
+  schema: Record<string, string>;
+  retention_class: 'operational' | 'contextual' | 'archival' | 'attestation-feeding' | 'wisdom';
+  reach: 'agent-private' | 'household' | 'community' | 'commons' | 'commons-attested';
+  diversity_threshold?: DiversityThreshold | null;
+  graduates_to?: string | null;
+  graduation_window_seconds?: number | null;
+  graduation_policy?: 'self-threshold' | 'diversity-threshold' | 'summarize' | null;
+}`);
+
+  blocks.push('');
+
+  blocks.push(`export interface SignalKindDeclaration {
+  description: string;
+  target_kinds: string[];
+  evidence_required?: boolean;
+  standing_impact_allowed?: Array<'advisory' | 'consequential' | 'binding'>;
+}`);
+
+  blocks.push('');
+
+  if (observationKinds.length === 0) {
+    blocks.push(
+      `export const ${prefix}_OBSERVATION_KINDS: ObservationKindDeclaration[] = [];`,
+    );
+  } else {
+    const kindEntries = observationKinds
+      .map((ok) => {
+        const schemaEntries = Object.entries(ok.schema || {})
+          .map(([k, v]) => `    ${k}: '${v}',`)
+          .join('\n');
+        const dt = ok.diversity_threshold
+          ? JSON.stringify(ok.diversity_threshold)
+          : 'null';
+        const gt = ok.graduates_to != null ? `'${ok.graduates_to}'` : 'null';
+        const gw = ok.graduation_window_seconds != null ? String(ok.graduation_window_seconds) : 'null';
+        const gp = ok.graduation_policy != null ? `'${ok.graduation_policy}'` : 'null';
+        return `  {
+    kind: '${ok.kind}',
+    namespace: '${ok.namespace}',
+    schema: {
+${schemaEntries}
+    },
+    retention_class: '${ok.retention_class}',
+    reach: '${ok.reach}',
+    diversity_threshold: ${dt},
+    graduates_to: ${gt},
+    graduation_window_seconds: ${gw},
+    graduation_policy: ${gp},
+  },`;
+      })
+      .join('\n');
+    blocks.push(
+      `export const ${prefix}_OBSERVATION_KINDS: ObservationKindDeclaration[] = [\n${kindEntries}\n];`,
+    );
+  }
+
+  blocks.push('');
+
+  const signalKindEntries = Object.entries(signalKinds);
+  if (signalKindEntries.length === 0) {
+    blocks.push(
+      `export const ${prefix}_SIGNAL_KINDS: Record<string, SignalKindDeclaration> = {};`,
+    );
+  } else {
+    const entries = signalKindEntries
+      .map(([name, decl]) => {
+        const targetKinds = (decl.target_kinds || []).map((k) => `'${k}'`).join(', ');
+        const evidenceRequired =
+          decl.evidence_required != null ? String(decl.evidence_required) : 'undefined';
+        const impactAllowed =
+          decl.standing_impact_allowed
+            ? `[${decl.standing_impact_allowed.map((v) => `'${v}'`).join(', ')}]`
+            : 'undefined';
+        return `  '${name}': {
+    description: '${decl.description.replace(/'/g, "\\'")}',
+    target_kinds: [${targetKinds}],
+    evidence_required: ${evidenceRequired},
+    standing_impact_allowed: ${impactAllowed},
+  },`;
+      })
+      .join('\n');
+    blocks.push(
+      `export const ${prefix}_SIGNAL_KINDS: Record<string, SignalKindDeclaration> = {\n${entries}\n};`,
+    );
+  }
+
+  return blocks.join('\n');
+}
+
 function generateManifestTypes(manifest) {
   const appName = manifest.name;
   const prefix = appName.toUpperCase();
@@ -138,6 +248,10 @@ function generateManifestTypes(manifest) {
 
   blocks.push(formatTsConst(`${prefix}_SIGNALS`, signals));
   blocks.push(`export type ${titlePrefix}Signal = (typeof ${prefix}_SIGNALS)[number];`);
+  blocks.push('');
+
+  // ObservationKindDeclaration + SignalKindDeclaration + domain arrays
+  blocks.push(generateObservationKindTypes(manifest, prefix));
 
   while (blocks.length > 0 && blocks[blocks.length - 1] === '') blocks.pop();
 

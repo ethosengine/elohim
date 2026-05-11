@@ -22,13 +22,9 @@ export interface ContentTypeCoupling {
 }
 
 export const QAHAL_COUPLING_MAP: Record<string, ContentTypeCoupling> = {
-  collective: {
+  'collective': {
     value: {
-      onContribute: {
-        action: 'produce',
-        resourceConformsTo: 'governance-structure',
-        recognition: 'stewardship-standing',
-      },
+      onContribute: { action: 'produce', resourceConformsTo: 'governance-structure', recognition: 'stewardship-standing' },
     },
     governance: {
       defaultReach: 'community',
@@ -37,18 +33,10 @@ export const QAHAL_COUPLING_MAP: Record<string, ContentTypeCoupling> = {
       signalTypes: ['governance-decision', 'community-report'],
     },
   },
-  proposal: {
+  'proposal': {
     value: {
-      onConsume: {
-        action: 'use',
-        resourceConformsTo: 'governance-participation',
-        recognition: 'governance-credit',
-      },
-      onComplete: {
-        action: 'produce',
-        resourceConformsTo: 'governance-decision',
-        recognition: 'governance-credit',
-      },
+      onConsume: { action: 'use', resourceConformsTo: 'governance-participation', recognition: 'governance-credit' },
+      onComplete: { action: 'produce', resourceConformsTo: 'governance-decision', recognition: 'governance-credit' },
     },
     governance: {
       defaultReach: 'community',
@@ -57,13 +45,9 @@ export const QAHAL_COUPLING_MAP: Record<string, ContentTypeCoupling> = {
       signalTypes: ['governance-decision', 'consensus-reached'],
     },
   },
-  challenge: {
+  'challenge': {
     value: {
-      onContribute: {
-        action: 'produce',
-        resourceConformsTo: 'constitutional-review',
-        recognition: 'governance-credit',
-      },
+      onContribute: { action: 'produce', resourceConformsTo: 'constitutional-review', recognition: 'governance-credit' },
     },
     governance: {
       defaultReach: 'community',
@@ -72,13 +56,9 @@ export const QAHAL_COUPLING_MAP: Record<string, ContentTypeCoupling> = {
       signalTypes: ['challenge-filed', 'governance-decision'],
     },
   },
-  appeal: {
+  'appeal': {
     value: {
-      onContribute: {
-        action: 'produce',
-        resourceConformsTo: 'constitutional-review',
-        recognition: 'governance-credit',
-      },
+      onContribute: { action: 'produce', resourceConformsTo: 'constitutional-review', recognition: 'governance-credit' },
     },
     governance: {
       defaultReach: 'community',
@@ -87,13 +67,9 @@ export const QAHAL_COUPLING_MAP: Record<string, ContentTypeCoupling> = {
       signalTypes: ['appeal-filed', 'governance-decision'],
     },
   },
-  statement: {
+  'statement': {
     value: {
-      onContribute: {
-        action: 'produce',
-        resourceConformsTo: 'deliberation-input',
-        recognition: 'governance-credit',
-      },
+      onContribute: { action: 'produce', resourceConformsTo: 'deliberation-input', recognition: 'governance-credit' },
     },
     governance: {
       defaultReach: 'community',
@@ -102,13 +78,9 @@ export const QAHAL_COUPLING_MAP: Record<string, ContentTypeCoupling> = {
       signalTypes: ['social-engagement', 'consensus-reached'],
     },
   },
-  post: {
+  'post': {
     value: {
-      onContribute: {
-        action: 'produce',
-        resourceConformsTo: 'social-content',
-        recognition: 'community-standing',
-      },
+      onContribute: { action: 'produce', resourceConformsTo: 'social-content', recognition: 'community-standing' },
     },
     governance: {
       defaultReach: 'community',
@@ -117,18 +89,10 @@ export const QAHAL_COUPLING_MAP: Record<string, ContentTypeCoupling> = {
       signalTypes: ['social-engagement'],
     },
   },
-  event: {
+  'event': {
     value: {
-      onConsume: {
-        action: 'use',
-        resourceConformsTo: 'community-gathering',
-        recognition: 'community-standing',
-      },
-      onContribute: {
-        action: 'produce',
-        resourceConformsTo: 'community-gathering',
-        recognition: 'stewardship-standing',
-      },
+      onConsume: { action: 'use', resourceConformsTo: 'community-gathering', recognition: 'community-standing' },
+      onContribute: { action: 'produce', resourceConformsTo: 'community-gathering', recognition: 'stewardship-standing' },
     },
     governance: {
       defaultReach: 'community',
@@ -137,13 +101,9 @@ export const QAHAL_COUPLING_MAP: Record<string, ContentTypeCoupling> = {
       signalTypes: ['social-engagement', 'relationship-formed'],
     },
   },
-  group: {
+  'group': {
     value: {
-      onContribute: {
-        action: 'produce',
-        resourceConformsTo: 'governance-structure',
-        recognition: 'stewardship-standing',
-      },
+      onContribute: { action: 'produce', resourceConformsTo: 'governance-structure', recognition: 'stewardship-standing' },
     },
     governance: {
       defaultReach: 'community',
@@ -152,13 +112,9 @@ export const QAHAL_COUPLING_MAP: Record<string, ContentTypeCoupling> = {
       signalTypes: ['relationship-formed'],
     },
   },
-  message: {
+  'message': {
     value: {
-      onContribute: {
-        action: 'produce',
-        resourceConformsTo: 'social-content',
-        recognition: 'community-standing',
-      },
+      onContribute: { action: 'produce', resourceConformsTo: 'social-content', recognition: 'community-standing' },
     },
     governance: {
       defaultReach: 'intimate',
@@ -167,13 +123,9 @@ export const QAHAL_COUPLING_MAP: Record<string, ContentTypeCoupling> = {
       signalTypes: ['social-engagement'],
     },
   },
-  thread: {
+  'thread': {
     value: {
-      onContribute: {
-        action: 'produce',
-        resourceConformsTo: 'social-content',
-        recognition: 'community-standing',
-      },
+      onContribute: { action: 'produce', resourceConformsTo: 'social-content', recognition: 'community-standing' },
     },
     governance: {
       defaultReach: 'community',
