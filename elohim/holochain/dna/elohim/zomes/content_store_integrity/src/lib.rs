@@ -192,7 +192,7 @@ pub const RECOGNITION_FLOW_TYPES: [&str; 4] = [
 
 /// REA Action vocabulary - what happened in an economic event
 /// Aligned with ValueFlows specification: https://www.valueflo.ws/concepts/actions/
-pub const REA_ACTIONS: [&str; 20] = [
+pub const REA_ACTIONS: [&str; 23] = [
     // Input actions (consume/use resources)
     "use",     // Use without consuming (view content, attend session)
     "consume", // Use up completely (one-time access tokens)
@@ -221,6 +221,10 @@ pub const REA_ACTIONS: [&str; 20] = [
     "take", // Take a resource (other side of exchange)
     // Acceptance
     "accept", // Accept a transfer or commitment (claim presence)
+    // Storage-specific actions (elohim-storage protocol)
+    "custody-blob",    // Commit custody of a blob (storage stewardship)
+    "serve-blob",      // Deliver a blob to a requester (projection service delivery)
+    "ack-projection",  // Phase 4 — doorway projector acks successful projection of a blob
 ];
 
 /// Resource classifications for Shefa economy
