@@ -65,8 +65,7 @@ fn diversity_view_aggregates_households() {
     let (agents, households, total): (i64, i64, i64) = observation_diversity_summary::table
         .filter(observation_diversity_summary::subject_cid.eq("doorway:abc"))
         .filter(
-            observation_diversity_summary::observation_kind
-                .eq("infrastructure:doorway-heartbeat"),
+            observation_diversity_summary::observation_kind.eq("infrastructure:doorway-heartbeat"),
         )
         .select((
             observation_diversity_summary::distinct_agents,

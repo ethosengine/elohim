@@ -54,7 +54,10 @@ fn project_idempotent_on_same_primary_key() {
     projector.project(&mut conn, &obs).unwrap();
 
     let count: i64 = observations::table.count().get_result(&mut conn).unwrap();
-    assert_eq!(count, 1, "duplicate (observer_cid, log_cid, log_offset) must not produce a second row");
+    assert_eq!(
+        count, 1,
+        "duplicate (observer_cid, log_cid, log_offset) must not produce a second row"
+    );
 }
 
 #[test]
@@ -72,5 +75,8 @@ fn project_encodes_signature_as_base64() {
         .select(observations::signature_b64)
         .first(&mut conn)
         .unwrap();
-    assert_eq!(stored, base64::engine::general_purpose::STANDARD.encode([0xff, 0x00, 0xab]));
+    assert_eq!(
+        stored,
+        base64::engine::general_purpose::STANDARD.encode([0xff, 0x00, 0xab])
+    );
 }

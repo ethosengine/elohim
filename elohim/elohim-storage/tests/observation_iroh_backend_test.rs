@@ -43,7 +43,10 @@ async fn fetch_segment_filters_by_observer_cid() {
     log.append(fixture("agent:obs-A", 0)).await.unwrap();
     let backend = IrohObservationBackend::new_in_memory(log);
     let mismatch = backend.fetch_segment("agent:obs-B", 0, 1).await.unwrap();
-    assert!(mismatch.is_empty(), "different observer_cid must return empty");
+    assert!(
+        mismatch.is_empty(),
+        "different observer_cid must return empty"
+    );
 }
 
 #[tokio::test]

@@ -54,8 +54,8 @@ impl ObservationLog {
     /// Append an observation. Hashes its MessagePack encoding into the rolling
     /// root and stores the row in order.
     pub async fn append(&mut self, obs: Observation) -> Result<(), ObservationLogError> {
-        let bytes = rmp_serde::to_vec(&obs)
-            .map_err(|e| ObservationLogError::Encoding(e.to_string()))?;
+        let bytes =
+            rmp_serde::to_vec(&obs).map_err(|e| ObservationLogError::Encoding(e.to_string()))?;
         self.rolling_hasher.update(&bytes);
         self.current_root = format!("blake3:{}", self.rolling_hasher.finalize().to_hex());
         self.entries.push(obs);
@@ -64,11 +64,6 @@ impl ObservationLog {
 
     /// Read all observations at or after the given offset, in append order.
     pub async fn read_from(&self, offset: u64) -> Result<Vec<Observation>, ObservationLogError> {
-        Ok(self
-            .entries
-            .iter()
-            .skip(offset as usize)
-            .cloned()
-            .collect())
+        Ok(self.entries.iter().skip(offset as usize).cloned().collect())
     }
 }

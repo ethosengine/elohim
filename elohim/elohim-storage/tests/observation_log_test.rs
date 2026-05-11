@@ -39,7 +39,10 @@ async fn appending_advances_log_cid() {
     let initial_root = log.current_log_cid();
     log.append(fixture_obs(0)).await.unwrap();
     let after_append = log.current_log_cid();
-    assert_ne!(initial_root, after_append, "log_cid must advance after append");
+    assert_ne!(
+        initial_root, after_append,
+        "log_cid must advance after append"
+    );
 }
 
 #[tokio::test]
@@ -67,5 +70,9 @@ async fn latest_offset_reflects_append_count() {
 async fn current_log_cid_uses_blake3_prefix() {
     let log = ObservationLog::new_in_memory("agent:test".into());
     let cid = log.current_log_cid();
-    assert!(cid.starts_with("blake3:"), "log_cid must use blake3: prefix, got: {}", cid);
+    assert!(
+        cid.starts_with("blake3:"),
+        "log_cid must use blake3: prefix, got: {}",
+        cid
+    );
 }

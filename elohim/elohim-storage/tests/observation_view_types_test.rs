@@ -79,8 +79,9 @@ fn observation_view_converts_from_row() {
 fn diversity_summary_row_loads_zero_rows_when_empty() {
     let pool = test_pool();
     let mut conn = pool.get().unwrap();
-    let rows: Vec<ObservationDiversitySummaryRow> =
-        observation_diversity_summary::table.load(&mut conn).expect("load empty view");
+    let rows: Vec<ObservationDiversitySummaryRow> = observation_diversity_summary::table
+        .load(&mut conn)
+        .expect("load empty view");
     assert!(rows.is_empty());
 }
 

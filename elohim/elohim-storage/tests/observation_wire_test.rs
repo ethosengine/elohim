@@ -48,7 +48,10 @@ fn deterministic_encoding_for_identical_values() {
     };
     let bytes1 = rmp_serde::to_vec(&obs).unwrap();
     let bytes2 = rmp_serde::to_vec(&obs).unwrap();
-    assert_eq!(bytes1, bytes2, "encoding must be deterministic for identical struct values");
+    assert_eq!(
+        bytes1, bytes2,
+        "encoding must be deterministic for identical struct values"
+    );
 }
 
 #[test]
@@ -73,10 +76,16 @@ fn canonical_signing_bytes_do_not_depend_on_signature_field() {
 
     let with_empty_sig = base.canonical_signing_bytes();
 
-    let with_dummy_sig = Observation { signature: vec![0xff; 64], ..base.clone() };
+    let with_dummy_sig = Observation {
+        signature: vec![0xff; 64],
+        ..base.clone()
+    };
     let with_dummy_sig_bytes = with_dummy_sig.canonical_signing_bytes();
 
-    let with_real_sig = Observation { signature: vec![0x01, 0x02, 0x03, 0x04], ..base.clone() };
+    let with_real_sig = Observation {
+        signature: vec![0x01, 0x02, 0x03, 0x04],
+        ..base.clone()
+    };
     let with_real_sig_bytes = with_real_sig.canonical_signing_bytes();
 
     assert_eq!(

@@ -1,4 +1,4 @@
-use elohim_storage::p2p::observation_gossip::{CursorAnnouncement, observation_topic};
+use elohim_storage::p2p::observation_gossip::{observation_topic, CursorAnnouncement};
 
 #[test]
 fn observation_topic_for_infrastructure_kind() {
@@ -29,7 +29,9 @@ fn cursor_announcement_msgpack_under_512_bytes() {
         kind: "infrastructure:doorway-heartbeat".into(),
         log_cid: "blake3:abc123def456".into(),
         latest_offset: 12345,
-        subject_cid: Some("doorway:bafyreigdyrzt5sfbtgnnwphhbofgw57x3sjyiyq2r4f4tymqxznkjkzgfa".into()),
+        subject_cid: Some(
+            "doorway:bafyreigdyrzt5sfbtgnnwphhbofgw57x3sjyiyq2r4f4tymqxznkjkzgfa".into(),
+        ),
         observed_at_window: 1715420400,
     };
     let bytes = rmp_serde::to_vec(&ann).unwrap();
