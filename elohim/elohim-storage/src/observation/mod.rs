@@ -4,4 +4,5 @@
 //! Source of truth for an observation is the observer's iroh-blob log; the SQL
 //! projection is rebuildable by log replay. This module owns the wire format.
 
+pub mod log;
 pub mod wire;
