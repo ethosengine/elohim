@@ -18,6 +18,7 @@ pub use manifest::*;
 
 // Attestation consolidation: consolidated attestation coordinator.
 pub mod attestation;
+pub mod governance_action;
 
 // EPR Phase 3.5 T8: FeedbackSignal coordinator functions.
 pub mod feedback_signal;
