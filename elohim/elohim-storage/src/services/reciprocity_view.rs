@@ -11,6 +11,8 @@
 //! committed P bytes to me, delivered Q." This is the per-agent reciprocity
 //! ledger that powers the topology UI's reciprocation-count drilldown.
 
+use std::collections::HashSet;
+
 use diesel::dsl::sql;
 use diesel::prelude::*;
 use diesel::sql_types::{Float, Nullable};
@@ -37,15 +39,17 @@ pub enum ReciprocityViewError {
 ///
 /// # Arguments
 /// * `pool` — shared SQLite connection pool
-/// * `agent_cid` — the agent whose ledger to build (used as `agent_cid` in the
-///   returned view; not used in SQL matching — pairing is by `peer_id`s from
-///   `bindings`)
+/// * `agent_cid` — the agent whose ledger to build
 /// * `bindings` — the agent's active `PeerIdentityBindingRow`s (provider of the
 ///   peer_id set)
+/// * `connected_peers` — snapshot from `swarm.connected_peers()` at request time.
+///   HTTP callers (no live swarm) pass `&HashSet::new()` — online will be
+///   `Some(false)` for all rows, which is correct semantics for cold-cache reads.
 pub async fn aggregate_reciprocity_view(
     pool: &DbPool,
     agent_cid: &str,
     bindings: &[PeerIdentityBindingRow],
+    connected_peers: &HashSet<String>,
 ) -> Result<ReciprocityView, ReciprocityViewError> {
     let mut conn = pool
         .get()
@@ -63,19 +67,26 @@ pub async fn aggregate_reciprocity_view(
         });
     }
 
-    let outflow = compute_flow_rows(&mut conn, &my_peers, FlowDirection::Outflow)?;
-    let inflow = compute_flow_rows(&mut conn, &my_peers, FlowDirection::Inflow)?;
+    let outflow =
+        compute_flow_rows(&mut conn, &my_peers, FlowDirection::Outflow, pool, connected_peers)
+            .await?;
+    let inflow =
+        compute_flow_rows(&mut conn, &my_peers, FlowDirection::Inflow, pool, connected_peers)
+            .await?;
 
     let total_outflow_delivered: i64 = outflow.iter().map(|r| r.delivered_bytes as i64).sum();
     let total_inflow_delivered: i64 = inflow.iter().map(|r| r.delivered_bytes as i64).sum();
     let net_hosted_bytes = total_inflow_delivered - total_outflow_delivered;
+
+    let capacity_available_bytes =
+        crate::services::device_capacity::available_bytes_for(pool, agent_cid).await;
 
     Ok(ReciprocityView {
         agent_cid: agent_cid.to_string(),
         inflow,
         outflow,
         net_hosted_bytes,
-        capacity_available_bytes: 0, // TODO(Phase 4 follow-up): device capacity totals minus committed
+        capacity_available_bytes,
     })
 }
 
@@ -97,10 +108,16 @@ enum FlowDirection {
 ///         where `action='serve-blob'`, matching `(provider, receiver)` pair.
 ///         Pairing by `(provider, receiver, action_pair)` because there is no
 ///         `commitment_id` column linking events to commitments.
-fn compute_flow_rows(
+///
+/// Phase 4 additions:
+/// - `display_name`: resolved via `imagodei_lookup::resolve_display_name` per counterparty.
+/// - `online`: computed via `connectivity::any_online_in` against the connected-peers snapshot.
+async fn compute_flow_rows(
     conn: &mut diesel::SqliteConnection,
     my_peers: &[&str],
     direction: FlowDirection,
+    pool: &DbPool,
+    connected_peers: &HashSet<String>,
 ) -> Result<Vec<ReciprocityRow>, ReciprocityViewError> {
     use crate::db::diesel_schema::economic_events::dsl as ev;
     use crate::db::diesel_schema::rea_commitments::dsl as rc;
@@ -154,13 +171,35 @@ fn compute_flow_rows(
             (delivered_bytes as f64 / committed_bytes as f64) * 100.0
         };
 
+        // Phase 4: resolve display_name via imagodei lookup.
+        let display_name =
+            crate::services::imagodei_lookup::resolve_display_name(pool, &counterparty).await;
+
+        // Phase 4: determine online status via connected-peers snapshot.
+        // Look up counterparty's peer_ids from peer_identity_bindings.
+        let counterparty_peers: Vec<String> = {
+            use crate::db::diesel_schema::peer_identity_bindings::dsl as bind;
+            bind::peer_identity_bindings
+                .filter(bind::agent_cid.eq(&counterparty))
+                .filter(bind::superseded_by.is_null())
+                .select(bind::peer_id)
+                .load::<String>(conn)
+                .unwrap_or_default()
+        };
+        let counterparty_peer_strs: Vec<&str> =
+            counterparty_peers.iter().map(String::as_str).collect();
+        let online = Some(crate::services::connectivity::any_online_in(
+            &counterparty_peer_strs,
+            connected_peers,
+        ));
+
         rows.push(ReciprocityRow {
             counterparty_household_id: counterparty,
-            display_name: None, // TODO(Phase 4 follow-up): resolve display name via imagodei lookup
+            display_name,
             committed_bytes,
             delivered_bytes,
             honored_percent,
-            online: None, // TODO(Phase 4 follow-up): annotate from libp2p connected-peers
+            online,
         });
     }
 

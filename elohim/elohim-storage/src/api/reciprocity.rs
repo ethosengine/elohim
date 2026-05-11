@@ -70,7 +70,11 @@ async fn handle_reciprocity_self(
     let bindings = peer_identity_bindings::list_active_for_agent(&mut conn, &agent_cid, &now_iso)
         .map_err(|e| StorageError::Internal(format!("bindings lookup failed: {}", e)))?;
 
-    match aggregate_reciprocity_view(pool, &agent_cid, &bindings).await {
+    // HTTP callers have no live P2P swarm — pass empty snapshot.
+    // Per Phase 4 T10 design: online will be Some(false) for all rows,
+    // which is correct semantics for cold-cache HTTP reads.
+    let connected_peers = std::collections::HashSet::new();
+    match aggregate_reciprocity_view(pool, &agent_cid, &bindings, &connected_peers).await {
         Ok(view) => Ok(response::ok(&view)),
         Err(e) => Ok(response::internal_error(&format!(
             "aggregate_reciprocity_view failed: {}",
