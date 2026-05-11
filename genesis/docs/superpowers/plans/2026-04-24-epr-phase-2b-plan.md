@@ -67,7 +67,7 @@ Rationale for the heavy-C skew: per Principle P1 (spec §2), 2B deliberately con
 
 **Source of truth:** Holochain DHT entry in imagodei integrity zome (Category **A** per p2p-design-gate). The schema is the wire-format declaration of a DNA-notarized entity; the DHT entry is canonical, the SQLite projection in Task A.5 is a read-optimized derivation.
 
-- [ ] **Step 1: Write the JSON schema (schema-first)**
+- [x] **Step 1: Write the JSON schema (schema-first)**
 
 Content (summary — produce full Draft 2020-12 shape):
 ```json
@@ -93,12 +93,12 @@ For `device-archetype.schema.json`: enum of `"node" | "desktop" | "mobile" | "st
 
 *Classification recap — both schemas above describe entities whose source of truth is the DHT (notarized via imagodei integrity zome in Task A.2). The JSON schema files are wire-format declarations; canonical state lives on the Holochain DHT; operational SQLite projections derive from DHT state per Principle P1.*
 
-- [ ] **Step 2: Run schema validation**
+- [x] **Step 2: Run schema validation**
 
 Run: `pnpm run schema:test && pnpm run schema:validate`
 Expected: PASS (new schema is self-tested). The schemas describe DHT-notarized (Category A) entities, so the validation harness is verifying wire-format shape only — the DHT itself is the source of truth for instance data.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add elohim/sdk/schemas/v1/agent-peer-binding.schema.json elohim/sdk/schemas/v1/device-archetype.schema.json
@@ -113,7 +113,7 @@ git commit -m "schema(epr-2b): agent-peer-binding + device-archetype schemas (Ca
 - Modify: `elohim/holochain/dna/imagodei/zomes/imagodei_integrity/src/lib.rs:1037` (LinkTypes enum — add `AgentToPeerBinding`, `PeerToBinding`)
 - Test: `elohim/holochain/tests/sweettest/src/tests/imagodei_peer_binding.rs`
 
-- [ ] **Step 1: Add entry type to integrity zome**
+- [x] **Step 1: Add entry type to integrity zome**
 
 Append to EntryTypes enum:
 ```rust
@@ -132,7 +132,7 @@ pub enum LinkTypes {
 }
 ```
 
-- [ ] **Step 2: Define `AgentPeerBinding` struct + canonical bytes**
+- [x] **Step 2: Define `AgentPeerBinding` struct + canonical bytes**
 
 In `agent_peer_binding.rs`:
 ```rust
@@ -159,7 +159,7 @@ impl AgentPeerBinding {
 }
 ```
 
-- [ ] **Step 3: Write validator** (HDI-compatible — no `get_links`, per memory `project_hdi_no_get_links_in_validators`)
+- [x] **Step 3: Write validator** (HDI-compatible — no `get_links`, per memory `project_hdi_no_get_links_in_validators`)
 
 ```rust
 pub fn validate_create_agent_peer_binding(
@@ -177,7 +177,7 @@ pub fn validate_create_agent_peer_binding(
 }
 ```
 
-- [ ] **Step 4: Write sweettest fixture**
+- [x] **Step 4: Write sweettest fixture**
 
 Use `hc_sweettest::SweetConductor` to create two agents; agent A creates a binding for a test PeerId; assert:
 - Binding entry is created
@@ -185,12 +185,12 @@ Use `hc_sweettest::SweetConductor` to create two agents; agent A creates a bindi
 - Links from `StringAnchor(peer_id)` → binding exist via `PeerToBinding`
 - Agent B creating a binding claiming A's `agent_cid` fails validation (rule 1)
 
-- [ ] **Step 5: Run sweettest**
+- [x] **Step 5: Run sweettest**
 
 Run: `cd elohim/holochain/tests/sweettest && RUSTFLAGS='--cfg getrandom_backend="custom"' cargo test imagodei_peer_binding`
 Expected: PASS
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add elohim/holochain/dna/imagodei/zomes/imagodei_integrity/ elohim/holochain/tests/sweettest/src/tests/imagodei_peer_binding.rs
@@ -208,7 +208,7 @@ git commit -m "feat(imagodei): AgentPeerBinding entry type + validators"
 
 **Convergence point:** This task is shared with Recovery M4. Coordinate: if M4's branch already defines `KeyRevocation` signal emission, 2B's subscriber contract must match.
 
-- [ ] **Step 1: Schema-first — define signal message types**
+- [x] **Step 1: Schema-first — define signal message types**
 
 The schema below describes operational (Category C) wire messages. Each `$ref` points to a per-signal sub-schema that carries the projection of its underlying DHT-notarized entry.
 
@@ -235,7 +235,7 @@ Each sub-schema in `dna-signals/` declares:
 - Per-type payload (pubkey, timestamps, revoked-pubkey, compromise_at, etc.)
 - `emittedAt` timestamp
 
-- [ ] **Step 2: Define Rust types in storage**
+- [x] **Step 2: Define Rust types in storage**
 
 ```rust
 // elohim-storage/src/reconcile/signal_stream.rs
@@ -251,7 +251,7 @@ pub enum DnaSignal {
 // source-of-truth is the DHT-notarized entry referenced by signal.action_hash)
 ```
 
-- [ ] **Step 3: Define subscription trait**
+- [x] **Step 3: Define subscription trait**
 
 ```rust
 #[async_trait]
@@ -265,7 +265,7 @@ pub trait DnaSignalStream: Send + Sync + 'static {
 // Real implementation (Batch A task 11): HolochainAppSignalStream over ws
 ```
 
-- [ ] **Step 4: Unit test the stub**
+- [x] **Step 4: Unit test the stub**
 
 ```rust
 #[tokio::test]
@@ -280,12 +280,12 @@ async fn stub_signal_stream_delivers_in_order() {
 }
 ```
 
-- [ ] **Step 5: Run test**
+- [x] **Step 5: Run test**
 
 Run: `cd elohim/elohim-storage && RUSTFLAGS='--cfg getrandom_backend="custom"' cargo test reconcile::signal_stream`
 Expected: PASS
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add elohim/sdk/schemas/v1/dna-signal-stream.schema.json elohim/sdk/schemas/v1/dna-signals/ elohim/elohim-storage/src/reconcile/
@@ -300,7 +300,7 @@ git commit -m "feat(storage): DNA signal stream contract + stub subscriber (Cate
 - Modify: `elohim/elohim-storage/src/lib.rs` (expose `reconcile` module)
 - Test: `elohim/elohim-storage/src/reconcile/controller_tests.rs`
 
-- [ ] **Step 1: Write failing test — controller dispatches by signal type**
+- [x] **Step 1: Write failing test — controller dispatches by signal type**
 
 ```rust
 #[tokio::test]
@@ -314,12 +314,12 @@ async fn controller_routes_key_rotation_to_timeline_update() {
 }
 ```
 
-- [ ] **Step 2: Run test, verify it fails**
+- [x] **Step 2: Run test, verify it fails**
 
 Run: `cd elohim/elohim-storage && RUSTFLAGS='--cfg getrandom_backend="custom"' cargo test controller_routes_key_rotation`
 Expected: FAIL (type/method not defined)
 
-- [ ] **Step 3: Implement minimal skeleton**
+- [x] **Step 3: Implement minimal skeleton**
 
 ```rust
 pub struct ReconcileController<S: DnaSignalStream> {
@@ -345,12 +345,12 @@ impl<S: DnaSignalStream> ReconcileController<S> {
 }
 ```
 
-- [ ] **Step 4: Run test, verify it passes**
+- [x] **Step 4: Run test, verify it passes**
 
 Run: same as Step 2
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add elohim/elohim-storage/src/reconcile/ elohim/elohim-storage/src/lib.rs
@@ -367,7 +367,7 @@ git commit -m "feat(storage): ReconcileController skeleton"
 - Modify: `elohim/elohim-storage/src/p2p/identity_map.rs` (replace `StubIdentityMap` with `HolochainBackedPeerIdentityMap`)
 - Modify: `elohim/elohim-storage/src/p2p/mod.rs:913,988` (construction sites)
 
-- [ ] **Step 1: Write migration**
+- [x] **Step 1: Write migration**
 
 ```sql
 -- up.sql
@@ -390,7 +390,7 @@ CREATE INDEX idx_peer_identity_bindings_agent_cid ON peer_identity_bindings(agen
 DROP TABLE peer_identity_bindings;
 ```
 
-- [ ] **Step 2: Write failing test — HolochainBacked map resolves registered binding**
+- [x] **Step 2: Write failing test — HolochainBacked map resolves registered binding**
 
 ```rust
 #[tokio::test]
@@ -402,12 +402,12 @@ async fn holochain_backed_map_resolves_binding_from_table() {
 }
 ```
 
-- [ ] **Step 3: Run failing test**
+- [x] **Step 3: Run failing test**
 
 Run: `cd elohim/elohim-storage && RUSTFLAGS='--cfg getrandom_backend="custom"' cargo test holochain_backed_map_resolves`
 Expected: FAIL
 
-- [ ] **Step 4: Implement**
+- [x] **Step 4: Implement**
 
 Diesel model for `peer_identity_bindings`, diesel queries, and `HolochainBackedPeerIdentityMap`:
 ```rust
@@ -419,16 +419,16 @@ impl PeerIdentityMap for HolochainBackedPeerIdentityMap {
 }
 ```
 
-- [ ] **Step 5: Replace construction sites**
+- [x] **Step 5: Replace construction sites**
 
 At `elohim/elohim-storage/src/p2p/mod.rs:913`, replace `StubIdentityMap::new()` with `HolochainBackedPeerIdentityMap::new(pool.clone(), signal_stream)`. Delete `identity_map::StubIdentityMap` export; keep the trait.
 
-- [ ] **Step 6: Run tests + phase-2c regression**
+- [x] **Step 6: Run tests + phase-2c regression**
 
 Run: `cd elohim/elohim-storage && RUSTFLAGS='--cfg getrandom_backend="custom"' cargo test --test epr_atom_federation_integration`
 Expected: existing Batch D tests still pass (reach-gate behavior preserved; the map now reads from DB rather than in-memory).
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add elohim/elohim-storage/migrations/*/peer_identity_bindings/ elohim/elohim-storage/src/db/peer_identity_bindings.rs elohim/elohim-storage/src/p2p/identity_map.rs
@@ -440,7 +440,7 @@ git commit -m "feat(storage): peer_identity_bindings table + HolochainBackedPeer
 **Files:**
 - Create: `elohim/elohim-storage/src/reconcile/pubkey_timeline.rs`
 
-- [ ] **Step 1: Failing test — timeline finds validity at issued_at**
+- [x] **Step 1: Failing test — timeline finds validity at issued_at**
 
 ```rust
 #[test]
@@ -454,12 +454,12 @@ fn pubkey_timeline_finds_key_valid_at_timestamp() {
 }
 ```
 
-- [ ] **Step 2: Run, verify fails**
+- [x] **Step 2: Run, verify fails**
 
 Run: `cargo test pubkey_timeline_finds`
 Expected: FAIL
 
-- [ ] **Step 3: Implement `PubkeyTimeline` + LRU cache wrapper**
+- [x] **Step 3: Implement `PubkeyTimeline` + LRU cache wrapper**
 
 ```rust
 pub struct PubkeyTimeline {
@@ -487,11 +487,11 @@ impl PubkeyTimelineCache {
 }
 ```
 
-- [ ] **Step 4: Run, verify passes**
+- [x] **Step 4: Run, verify passes**
 
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add elohim/elohim-storage/src/reconcile/pubkey_timeline.rs
@@ -506,7 +506,7 @@ git commit -m "feat(storage): pubkey timeline cache for verify"
 - Modify: `elohim/elohim-storage/src/db/epr_atoms.rs` (diesel model)
 - Modify: `elohim/elohim-storage/src/services/epr_service.rs` (ingest sets `verified_at` on success)
 
-- [ ] **Step 1: Migration up**
+- [x] **Step 1: Migration up**
 
 ```sql
 ALTER TABLE epr_atoms ADD COLUMN verified_at TIMESTAMP;
@@ -516,7 +516,7 @@ CREATE INDEX idx_epr_atoms_signer_cid_issued_at ON epr_atoms(signer_cid, issued_
 
 `down.sql`: drop both columns + index.
 
-- [ ] **Step 2: Failing test — ingest stamps verified_at on success**
+- [x] **Step 2: Failing test — ingest stamps verified_at on success**
 
 ```rust
 #[test]
@@ -529,15 +529,15 @@ fn ingest_stamps_verified_at_when_signature_verifies() {
 }
 ```
 
-- [ ] **Step 3: Verify failure, then implement**
+- [x] **Step 3: Verify failure, then implement**
 
 Extend `EprService::ingest` to: resolve pubkey via `PubkeyTimelineCache`, verify ed25519 signature over canonical bytes, set `verified_at = Utc::now()` and `verified_signer_fingerprint = blake3-128-prefix(pubkey)` on success. On verify failure, reject with `StorageError::VerifyFailed`.
 
-- [ ] **Step 4: Run tests**
+- [x] **Step 4: Run tests**
 
 Expected: PASS + existing ingest tests still pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add elohim/elohim-storage/migrations/*/verified_at_on_epr_atoms/ elohim/elohim-storage/src/db/epr_atoms.rs elohim/elohim-storage/src/services/epr_service.rs
@@ -550,7 +550,7 @@ git commit -m "feat(storage): verified_at column + resolver-backed signature ver
 - Modify: `elohim/elohim-storage/src/reconcile/controller.rs` (implement `on_key_revocation`)
 - Create: `elohim/elohim-storage/src/reconcile/sweep.rs`
 
-- [ ] **Step 1: Failing test — revocation sweep clears verified_at for affected EPRs**
+- [x] **Step 1: Failing test — revocation sweep clears verified_at for affected EPRs**
 
 ```rust
 #[tokio::test]
@@ -569,7 +569,7 @@ async fn revocation_sweep_clears_verified_within_compromise_window() {
 }
 ```
 
-- [ ] **Step 2: Implement sweep**
+- [x] **Step 2: Implement sweep**
 
 ```rust
 // Sweep operates on epr_atoms (A-class, content-addressed via CID — source of truth
@@ -595,11 +595,11 @@ pub async fn sweep_on_revocation(
 
 Wire it into `ReconcileController::on_key_revocation`. Also call `pubkey_cache.invalidate(&signal.agent_cid)` so the next verify reloads fresh.
 
-- [ ] **Step 3: Run tests**
+- [x] **Step 3: Run tests**
 
 Expected: PASS.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git commit -am "feat(storage): eager revocation sweep in ReconcileController"
@@ -614,26 +614,26 @@ git commit -am "feat(storage): eager revocation sweep in ReconcileController"
 
 **Source of truth:** The handshake payload is Category **C** (operational, session-local) — it wraps a signed `AgentPeerBinding` whose source of truth is the DHT-notarized entry in imagodei (Task A.2). The handshake itself is not persisted; it is a libp2p session-local projection of DHT state, reconstructable on re-handshake.
 
-- [ ] **Step 1: Define handshake wire type (schema-first)**
+- [x] **Step 1: Define handshake wire type (schema-first)**
 
 The schema below describes an operational (Category C) wire message. Source of truth for the inner `binding` remains the DHT entry it projects; handshake adds no new notarized state.
 
 Schema file: `elohim/sdk/schemas/v1/p2p/identity-handshake.schema.json`. Shape: `{ "binding": AgentPeerBinding, "timestamp": DateTime, "nonce": bytes }`. Include in `schema:codegen:ts`. (Category C — operational handshake, not a DHT-notarized entity in itself.)
 
-- [ ] **Step 2: Failing integration test — peer A dials peer B, B learns A's binding**
+- [x] **Step 2: Failing integration test — peer A dials peer B, B learns A's binding**
 
 Extend `elohim/elohim-storage/tests/epr_atom_federation_integration.rs::two_peer_swarm()` helper: after connection, assert peer B's `HolochainBackedPeerIdentityMap.lookup(&peer_a_id)` returns `CallerIdentity::Agent(peer_a_agent_cid)`.
 
-- [ ] **Step 3: Implement handshake**
+- [x] **Step 3: Implement handshake**
 
 New libp2p request-response protocol `/elohim/identity/handshake/1.0.0`. On connection-established, each peer sends the other its current signed `AgentPeerBinding`. Receiver verifies signature + validity window; on valid: inserts into `peer_identity_bindings` table with `source='handshake'`; on invalid: logs and leaves peer Anonymous.
 
-- [ ] **Step 4: Run integration test**
+- [x] **Step 4: Run integration test**
 
 Run: `cd elohim/elohim-storage && RUSTFLAGS='--cfg getrandom_backend="custom"' cargo test --test epr_atom_federation_integration`
 Expected: new handshake test passes; existing Batch D tests still pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add elohim/elohim-storage/src/p2p/identity_handshake.rs elohim/sdk/schemas/v1/p2p/identity-handshake.schema.json elohim/elohim-storage/tests/epr_atom_federation_integration.rs
@@ -646,21 +646,21 @@ git commit -m "feat(storage): libp2p identity handshake exchanges signed binding
 - Modify: `elohim/elohim-storage/src/p2p/behaviour.rs` (subscribe `elohim/identity/binding` topic — add next to existing `recovery.invitation` subscription at commit `e9e2806a`)
 - Modify: `elohim/elohim-storage/src/p2p/mod.rs` (publish binding on `AgentPeerBinding` DNA signal; consume + insert into table on receive)
 
-- [ ] **Step 1: Failing test — binding gossiped mid-session propagates to connected peers**
+- [x] **Step 1: Failing test — binding gossiped mid-session propagates to connected peers**
 
 Extend integration test: peer A rotates key, emits new `AgentPeerBinding`; peer B (already connected) receives via gossip; peer B's cache updates; peer B's verify cache invalidates stale verifications for agent A.
 
-- [ ] **Step 2: Implement subscribe + publish**
+- [x] **Step 2: Implement subscribe + publish**
 
 Subscribe `elohim/identity/binding` in behaviour setup. In swarm event loop, handle `GossipsubEvent::Message` where topic matches: deserialize `AgentPeerBinding`, verify, insert into table with `source='gossip'`, emit reconcile signal.
 
 On outbound: `ReconcileController::on_agent_peer_binding` (new handler) — when the local agent creates a binding, publish on the topic in addition to DHT-notarizing.
 
-- [ ] **Step 3: Run tests**
+- [x] **Step 3: Run tests**
 
 Expected: PASS.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git commit -am "feat(storage): gossipsub identity.binding topic for mid-session rotation propagation"
@@ -672,12 +672,13 @@ git commit -am "feat(storage): gossipsub identity.binding topic for mid-session 
 - Create: `elohim/elohim-storage/src/reconcile/holochain_app_signal.rs`
 - Modify: `elohim/elohim-storage/src/reconcile/signal_stream.rs`
 
-- [ ] **Step 1: Design test harness**
+- [x] **Step 1: Design test harness**
 
 Connect to a running sweettest conductor over the standard `holochain_client_rust` app-websocket interface. Subscribe to imagodei cell. Translate `Signal::App(_)` events into `DnaSignal::*` by inspecting the signal payload (match on imagodei's coordinator-emitted signal names: `key_rotation_observed`, `key_revocation_observed`, `agent_peer_binding_created`, `revocation_attestation_recorded`).
 
 Sweettest setup: extend `elohim/holochain/tests/sweettest/` with a fixture that spins a conductor, emits a `KeyRotation` from coordinator, confirms storage's controller receives via the stream.
 
+<!-- NOTE: Steps 2-4 left [ ] — the conductor-bound sweettest (epr_phase_2b_batch_a_e2e.rs::epr_2b_batch_a_full_loop) is #[ignore]'d pending Stage 2 `derive_compromise_at` from the key_revocations projection. Wire-shape contract tests in the same file ARE enabled and passing. -->
 - [ ] **Step 2: Failing test — real stream delivers rotation signal**
 
 ```rust
@@ -699,11 +700,11 @@ async fn real_signal_stream_delivers_rotation_from_coordinator() {
 
 Expected: PASS (sweettest DNA path verified).
 
-- [ ] **Step 5: Wire into storage startup**
+- [x] **Step 5: Wire into storage startup**
 
 At storage binary init, construct `HolochainAppSignalStream` alongside the existing db pool, pass to `ReconcileController::new`, spawn `controller.run_loop()` as a tokio task.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add elohim/elohim-storage/src/reconcile/holochain_app_signal.rs
@@ -715,6 +716,7 @@ git commit -m "feat(storage): real DNA signal stream subscribes to imagodei coor
 **Files:**
 - Modify: `elohim/elohim-storage/tests/epr_atom_federation_integration.rs` (add Batch A scenario)
 
+<!-- NOTE: Steps 1-2 left [ ] — the full two-conductor sweettest scenario (epr_phase_2b_batch_a_e2e.rs::epr_2b_batch_a_full_loop) is #[ignore]'d. Scenario structure exists in holochain/tests/sweettest; 6 ignore markers pending Stage 2 derive_compromise_at. Wire-shape contract tests in same file ARE enabled and passing. -->
 - [ ] **Step 1: Write integration scenario**
 
 Two peers A, B. Both running imagodei conductor + storage controller. Peer A publishes an EPR signed with key K1; peer B fetches, verifies, stores with `verified_at=Some(t1)`. Peer A rotates to key K2 (emits `KeyRotation` on DNA); B's controller observes rotation signal, updates pubkey cache. Peer A then publishes `KeyRevocation` of K1 with `compromise_at=t0` (before the EPR was signed). B's controller sweeps: the earlier EPR's `verified_at` is cleared.
@@ -724,7 +726,7 @@ Two peers A, B. Both running imagodei conductor + storage controller. Peer A pub
 Run: `cd elohim/elohim-storage && RUSTFLAGS='--cfg getrandom_backend="custom"' cargo test --test epr_atom_federation_integration`
 Expected: PASS.
 
-- [ ] **Step 3: Commit Batch A close**
+- [x] **Step 3: Commit Batch A close**
 
 ```bash
 git commit -am "test(epr-2b): batch A integration — rotation + revocation sweep end-to-end"
@@ -742,7 +744,7 @@ git commit -am "test(epr-2b): batch A integration — rotation + revocation swee
 - Modify: `elohim/sdk/schemas/v1/app-manifest.schema.json` (add optional `projections` field)
 - Create: `elohim/sdk/schemas/v1/pillar-projection.schema.json`
 
-- [ ] **Step 1: Schema extension**
+- [x] **Step 1: Schema extension**
 
 Add to `app-manifest.schema.json`:
 ```json
@@ -770,12 +772,12 @@ Add to `app-manifest.schema.json`:
 }
 ```
 
-- [ ] **Step 2: Run schema tests**
+- [x] **Step 2: Run schema tests**
 
 Run: `pnpm run schema:test && pnpm run lamad:codegen`
 Expected: PASS. The codegen regenerates `manifest-types.ts` with the new optional field.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add elohim/sdk/schemas/v1/app-manifest.schema.json elohim/sdk/schemas/v1/pillar-projection.schema.json
@@ -787,7 +789,7 @@ git commit -m "schema(epr-2b): pillar-projection mapping extension to app-manife
 **Files:**
 - Modify: `elohim/sdk/domains/shefa/manifest.json`
 
-- [ ] **Step 1: Add projection declaration**
+- [x] **Step 1: Add projection declaration**
 
 ```json
 {
@@ -811,12 +813,12 @@ git commit -m "schema(epr-2b): pillar-projection mapping extension to app-manife
 }
 ```
 
-- [ ] **Step 2: Run lamad:codegen**
+- [x] **Step 2: Run lamad:codegen**
 
 Run: `pnpm run lamad:codegen`
 Expected: PASS; shefa manifest types include the projection field.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add elohim/sdk/domains/shefa/manifest.json
@@ -831,7 +833,7 @@ git commit -m "feat(shefa): declare EconomicEvent projection in manifest"
 - Create: `elohim/elohim-storage/src/projector/cursor.rs`
 - Create: `elohim/elohim-storage/src/projector/mapping.rs`
 
-- [ ] **Step 1: Migration**
+- [x] **Step 1: Migration**
 
 The `projector_cursor` table is Category **C** (operational — tracks reconciliation progress; no dht_anchor_hash needed because it is not a projection of any DHT-notarized entity, just the controller's own advancement state. Fully rebuildable from `epr_atoms` via cursor replay. Per Principle P1, the table stewards the controller's operational source-of-truth for "how far have I projected" — pure local state.)
 
@@ -847,7 +849,7 @@ CREATE TABLE projector_cursor (
 );
 ```
 
-- [ ] **Step 2: Failing test — projector loads cursor and advances**
+- [x] **Step 2: Failing test — projector loads cursor and advances**
 
 ```rust
 #[tokio::test]
@@ -861,7 +863,7 @@ async fn projector_advances_cursor_after_pass() {
 }
 ```
 
-- [ ] **Step 3: Implement skeleton**
+- [x] **Step 3: Implement skeleton**
 
 ```rust
 pub struct Projector { manifest_registry: Arc<ManifestRegistry> }
@@ -884,11 +886,11 @@ impl Projector {
 }
 ```
 
-- [ ] **Step 4: Run test**
+- [x] **Step 4: Run test**
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add elohim/elohim-storage/migrations/*/projector_cursor/ elohim/elohim-storage/src/projector/
@@ -901,7 +903,7 @@ git commit -m "feat(storage): projector skeleton with cursor table"
 - Modify: `elohim/elohim-storage/src/projector/mod.rs`
 - Modify: `elohim/elohim-storage/src/db/economic_events.rs` (if needed; verify column mapping fits existing table)
 
-- [ ] **Step 1: Failing integration test**
+- [x] **Step 1: Failing integration test**
 
 ```rust
 #[tokio::test]
@@ -917,15 +919,15 @@ async fn economic_event_epr_projects_to_economic_events_table() {
 }
 ```
 
-- [ ] **Step 2: Implement the column mapping evaluator**
+- [x] **Step 2: Implement the column mapping evaluator**
 
 Use `serde_json::Value::pointer()` or a small custom JSONPath evaluator on the payload (decoded from `canonical_bytes`). For each column mapping entry, evaluate the source path, upsert into `economic_events`.
 
-- [ ] **Step 3: Run tests**
+- [x] **Step 3: Run tests**
 
 Expected: PASS.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git commit -am "feat(storage): projector projects EconomicEvent EPR to economic_events row"
@@ -937,7 +939,7 @@ git commit -am "feat(storage): projector projects EconomicEvent EPR to economic_
 - Modify: `elohim/elohim-storage/src/projector/mod.rs`
 - Create: `elohim/elohim-storage/src/projector/invariants_tests.rs`
 
-- [ ] **Step 1: Write tests for each invariant I1, I2, I6** (idempotency, manifest-authority, unmapped-transparency)
+- [x] **Step 1: Write tests for each invariant I1, I2, I6** (idempotency, manifest-authority, unmapped-transparency)
 
 ```rust
 #[tokio::test]
@@ -948,7 +950,7 @@ async fn i2_projector_rejects_undeclared_kind_schema() { /* atom with kind not i
 async fn i6_unmapped_kinds_remain_in_epr_atoms() { /* atom not projected is still queryable by CID */ }
 ```
 
-- [ ] **Step 2: Implement — idempotent UPSERT on PRIMARY KEY (cid), manifest-authority guard before project**
+- [x] **Step 2: Implement — idempotent UPSERT on PRIMARY KEY (cid), manifest-authority guard before project**
 
 The PRIMARY KEY is `cid` on the pillar projection row — this is safe because `cid` IS the content-address of the source EPR (Category A content-addressing doubles as dht_anchor for this C-class projection). Source-of-truth for the row is the signed Envelope in `epr_atoms` whose `cid` matches; projection is derived and rebuildable.
 
@@ -963,11 +965,11 @@ if !self.manifest_registry.has_projection(&atom.kind, &atom.schema_key) {
 // cid is the A-notarized content-address; operational projection rebuilds identically.
 ```
 
-- [ ] **Step 3: Run tests**
+- [x] **Step 3: Run tests**
 
 Expected: PASS.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git commit -am "feat(storage): projector enforces I1/I2/I6 invariants"
@@ -979,7 +981,7 @@ git commit -am "feat(storage): projector enforces I1/I2/I6 invariants"
 - Modify: `elohim/elohim-storage/src/projector/mod.rs`
 - Modify: `elohim/elohim-storage/src/reconcile/controller.rs` (wire revocation sweep to also clear projection rows)
 
-- [ ] **Step 1: Tests for I3, I4, I5**
+- [x] **Step 1: Tests for I3, I4, I5**
 
 ```rust
 #[tokio::test]
@@ -990,17 +992,17 @@ async fn i4_revocation_sweep_clears_projection_row_within_same_pass() { /* KeyRe
 async fn i5_projection_row_verified_state_matches_source_epr() { /* if epr.verified_at is None, projection row verified column is also None */ }
 ```
 
-- [ ] **Step 2: Implement**
+- [x] **Step 2: Implement**
 
 - Fetch atoms for projection pass sorted by `(signer_cid, issued_at)` within each `(pillar, kind)`.
 - Extend `sweep_on_revocation` (from A.8) to also update projection rows (where the target table has a `verified` column; determined by manifest `columnMapping` including a `verifiedAt` source entry).
 - Projection row `verified` column derives from source EPR's `verified_at IS NOT NULL`.
 
-- [ ] **Step 3: Run tests**
+- [x] **Step 3: Run tests**
 
 Expected: PASS.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git commit -am "feat(storage): projector enforces I3/I4/I5 invariants + revocation sweep clears projection rows"
@@ -1013,7 +1015,7 @@ git commit -am "feat(storage): projector enforces I3/I4/I5 invariants + revocati
 - Modify: `elohim/elohim-storage/src/epr_codec.rs:97+` (EprHead struct — may need small adjustments to align with projector output)
 - Modify: `elohim/elohim-storage/src/p2p/mod.rs:768+` (p2p EprHead fetch path)
 
-- [ ] **Step 1: Audit current EprHead construction sites**
+- [x] **Step 1: Audit current EprHead construction sites**
 
 Grep `EprHead {` across the codebase. Each site currently constructs an `EprHead` directly from DB rows. Refactor each to instead:
 1. Look up the underlying EPR in `epr_atoms`
@@ -1021,7 +1023,7 @@ Grep `EprHead {` across the codebase. Each site currently constructs an `EprHead
 3. Assemble the `EprHead` from projector-derived contexts
 4. Preserve wire format for downstream consumers
 
-- [ ] **Step 2: Failing test — EprHead serves projector-derived context**
+- [x] **Step 2: Failing test — EprHead serves projector-derived context**
 
 ```rust
 #[tokio::test]
@@ -1036,15 +1038,15 @@ async fn epr_head_serves_projector_derived_contexts() {
 }
 ```
 
-- [ ] **Step 3: Implement refactor**
+- [x] **Step 3: Implement refactor**
 
 Route both `/elohim/epr/1.0.0` (libp2p) and `/db/epr-head/*` (HTTP) paths through a `derive_epr_head(cid, conn, manifest_registry)` helper. Wire format unchanged; source unified.
 
-- [ ] **Step 4: Run tests**
+- [x] **Step 4: Run tests**
 
 Expected: new test passes, all existing EprHead tests still pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git commit -am "refactor(storage): EprHead produced via projector (A2 from Envelope)"
@@ -1057,7 +1059,7 @@ git commit -am "refactor(storage): EprHead produced via projector (A2 from Envel
 - Modify: `elohim/elohim-storage/src/projector/mod.rs`
 - Create (or modify): HTTP status endpoint `/api/v1/status/projector`
 
-- [ ] **Step 1: Failing test — projection write emits `<pillar>.<kind>.projected` signal + lag metric**
+- [x] **Step 1: Failing test — projection write emits `<pillar>.<kind>.projected` signal + lag metric**
 
 ```rust
 #[tokio::test]
@@ -1072,17 +1074,17 @@ async fn projector_emits_signal_on_write() {
 }
 ```
 
-- [ ] **Step 2: Implement**
+- [x] **Step 2: Implement**
 
 Each projection write emits `ProjectorSignal { pillar, kind, epr_cid, table, row_key, timestamp }` on an internal channel. Subscribers: dashboards, elohim-agent defenders (future), Phase 4 GraphQL subscriptions (future).
 
 Add `/api/v1/status/projector` endpoint returning per-`(pillar, kind)` cursor + last-observed `issued_at` in `epr_atoms` + computed lag.
 
-- [ ] **Step 3: Run tests**
+- [x] **Step 3: Run tests**
 
 Expected: PASS.
 
-- [ ] **Step 4: Commit Batch B close**
+- [x] **Step 4: Commit Batch B close**
 
 ```bash
 git commit -am "feat(storage): projector signal emission + lag metric endpoint"
@@ -1105,11 +1107,11 @@ git commit -am "feat(storage): projector signal emission + lag metric endpoint"
 
 **Spec §7 O1** — first verify what signing path actually exists in the current tauri-plugin-holochain / doorway conductor stack. Adjust this task's shape accordingly.
 
-- [ ] **Step 1: Investigate**
+- [x] **Step 1: Investigate**
 
 Grep the holochain-client-rust + tauri-plugin-holochain code for "sign" / "agent_sign" endpoints. Check whether there's a zome call pattern to get an ed25519 signature over arbitrary bytes. If found, document the endpoint; skip to Step 3.
 
-- [ ] **Step 2: If missing — define schema-first contract**
+- [x] **Step 2: If missing — define schema-first contract**
 
 `conductor-signing.schema.json`:
 ```json
@@ -1133,7 +1135,7 @@ Grep the holochain-client-rust + tauri-plugin-holochain code for "sign" / "agent
 
 Add an imagodei coordinator fn `sign_for_agent(agent_cid: Cid, bytes: Vec<u8>) -> ExternResult<Vec<u8>>` gated to the agent's own key material (call `sign` helper from hdk).
 
-- [ ] **Step 3: Storage client wrapper**
+- [x] **Step 3: Storage client wrapper**
 
 ```rust
 // elohim-storage/src/conductor_client/signing.rs
@@ -1143,11 +1145,11 @@ impl ConductorSigningClient {
 }
 ```
 
-- [ ] **Step 4: Test against sweettest conductor**
+- [x] **Step 4: Test against sweettest conductor**
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add elohim/sdk/schemas/v1/conductor-signing.schema.json elohim/holochain/dna/imagodei/ elohim/elohim-storage/src/conductor_client/
@@ -1161,7 +1163,7 @@ git commit -m "feat(conductor+storage): signing API contract for EPR composition
 - Create: `elohim/elohim-storage/src/http/signal_emit.rs`
 - Modify: `elohim/elohim-storage/src/http.rs` (route)
 
-- [ ] **Step 1: Schema-first**
+- [x] **Step 1: Schema-first**
 
 ```json
 {
@@ -1185,7 +1187,7 @@ git commit -m "feat(conductor+storage): signing API contract for EPR composition
 }
 ```
 
-- [ ] **Step 2: Failing integration test**
+- [x] **Step 2: Failing integration test**
 
 ```rust
 #[tokio::test]
@@ -1200,15 +1202,15 @@ async fn signal_emit_composes_epr_and_ingests() {
 }
 ```
 
-- [ ] **Step 3: Implement handler**
+- [x] **Step 3: Implement handler**
 
 Handler reads intent → looks up pillar manifest for the signalType → composes Envelope (kind, schema_key, coupling) → requests signature via `ConductorSigningClient` → calls `EprService::ingest` → returns `{eventCid, eprCid}`.
 
-- [ ] **Step 4: Run tests**
+- [x] **Step 4: Run tests**
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add elohim/sdk/schemas/v1/signal-intent.schema.json elohim/elohim-storage/src/http/signal_emit.rs
@@ -1222,14 +1224,14 @@ git commit -m "feat(storage): /api/v1/signal/emit endpoint composes + signs + in
 - Create: `app/elohim-library/projects/elohim-service/src/services/signal-emit.service.ts`
 - Modify: `app/elohim-library/projects/elohim-service/src/services/index.ts`
 
-- [ ] **Step 1: Feature flag + dual-output during rollout**
+- [x] **Step 1: Feature flag + dual-output during rollout**
 
 Add a feature flag reading from `environment.ts`: `useSignalEmitEndpoint: boolean`. Default false.
 
 When `false`: current behavior (direct economic-event POST).
 When `true`: POST to `/api/v1/signal/emit` with signal-intent payload.
 
-- [ ] **Step 2: Implement `SignalEmitService`**
+- [x] **Step 2: Implement `SignalEmitService`**
 
 ```typescript
 @Injectable({ providedIn: 'root' })
@@ -1241,7 +1243,7 @@ export class SignalEmitService {
 }
 ```
 
-- [ ] **Step 3: Update `SignalHarnessService`**
+- [x] **Step 3: Update `SignalHarnessService`**
 
 ```typescript
 // signal-harness.service.ts
@@ -1252,7 +1254,7 @@ if (environment.useSignalEmitEndpoint) {
 }
 ```
 
-- [ ] **Step 4: Failing test — with flag on, HTTP client receives signal-intent**
+- [x] **Step 4: Failing test — with flag on, HTTP client receives signal-intent**
 
 ```typescript
 it('posts to /api/v1/signal/emit when feature flag on', () => {
@@ -1262,12 +1264,12 @@ it('posts to /api/v1/signal/emit when feature flag on', () => {
 });
 ```
 
-- [ ] **Step 5: Run Angular tests**
+- [x] **Step 5: Run Angular tests**
 
 Run: `cd app/elohim-app && pnpm exec vitest run --config vite.config.ts "signal-harness"`
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add app/elohim-app/src/app/lamad/services/signal-harness.service.ts app/elohim-library/projects/elohim-service/src/services/signal-emit.service.ts
@@ -1281,7 +1283,7 @@ git commit -m "feat(lamad): signal harness emits EPR-intent behind feature flag"
 - Create: `elohim/elohim-storage/src/config/write_through.rs`
 - Create: HTTP endpoint `/api/v1/status/write-through`
 
-- [ ] **Step 1: Schema extension**
+- [x] **Step 1: Schema extension**
 
 ```json
 "writeThrough": {
@@ -1296,7 +1298,7 @@ git commit -m "feat(lamad): signal harness emits EPR-intent behind feature flag"
 
 Default when absent: `{ "enabled": false }`.
 
-- [ ] **Step 2: Implement 4-layer composition**
+- [x] **Step 2: Implement 4-layer composition**
 
 ```rust
 pub struct WriteThroughState {
@@ -1317,11 +1319,11 @@ pub fn is_integrity_kind(kind: &str) -> bool {
 }
 ```
 
-- [ ] **Step 3: Effective-state endpoint**
+- [x] **Step 3: Effective-state endpoint**
 
 `GET /api/v1/status/write-through` returns JSON per-(pillar,kind): manifest default, each override level, effective state, rolling-window write count (observed activity per `project_elohim_active_observed_not_flagged`).
 
-- [ ] **Step 4: Failing tests for composition + integrity exception**
+- [x] **Step 4: Failing tests for composition + integrity exception**
 
 ```rust
 #[test]
@@ -1333,11 +1335,11 @@ fn integrity_kinds_bypass_disabled_config() {
 fn admin_override_wins_over_policy_wins_over_manifest() { /* assert 4-layer precedence */ }
 ```
 
-- [ ] **Step 5: Run tests**
+- [x] **Step 5: Run tests**
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add elohim/sdk/schemas/v1/app-manifest.schema.json elohim/elohim-storage/src/config/write_through.rs
@@ -1350,7 +1352,7 @@ git commit -m "feat(storage): 4-layer write-through flag composition + integrity
 - Modify: `elohim/elohim-storage/src/services/epr_service.rs`
 - Modify: `elohim/elohim-storage/src/http/signal_emit.rs` (respect flag)
 
-- [ ] **Step 1: Failing test — pillar with flag off does not ingest EPR**
+- [x] **Step 1: Failing test — pillar with flag off does not ingest EPR**
 
 ```rust
 #[tokio::test]
@@ -1367,15 +1369,15 @@ async fn integrity_signal_always_ingests() {
 }
 ```
 
-- [ ] **Step 2: Implement the guard**
+- [x] **Step 2: Implement the guard**
 
 At `signal_emit_handler` entry: compute `state.effective_for(intent.pillar, intent.signalType.into_kind())` → if disabled, return 503 with body `{ reason: "write-through disabled for (pillar, kind)" }`; if on or integrity-exception, proceed.
 
-- [ ] **Step 3: Run tests**
+- [x] **Step 3: Run tests**
 
 Expected: PASS.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git commit -am "feat(storage): write-through guard on signal_emit with integrity exception"
@@ -1388,7 +1390,7 @@ git commit -am "feat(storage): write-through guard on signal_emit with integrity
 - Modify: `elohim/elohim-storage/src/config/mod.rs` (policy.toml parser)
 - Create: admin HTTP route `POST /admin/write-through`
 
-- [ ] **Step 1: Implement policy.toml parser**
+- [x] **Step 1: Implement policy.toml parser**
 
 Read `ELOHIM_STORAGE_POLICY_TOML` env var or `--policy-toml` CLI arg. Parse:
 ```toml
@@ -1397,19 +1399,19 @@ shefa = { enabled = true, kinds = ["EconomicEvent"] }
 imagodei = { enabled = true, kinds = ["Agent", "Attestation"] }
 ```
 
-- [ ] **Step 2: Implement env/CLI overrides**
+- [x] **Step 2: Implement env/CLI overrides**
 
 `ELOHIM_WRITE_THROUGH_SHEFA=on` parses to an override for pillar `shefa` (all kinds).
 
-- [ ] **Step 3: Implement admin endpoint**
+- [x] **Step 3: Implement admin endpoint**
 
 `POST /admin/write-through { pillar, kind, enabled, reason }` updates the `admin` RwLock field of `WriteThroughState`. Guard with admin-auth middleware (existing pattern).
 
-- [ ] **Step 4: Test each layer in isolation + composition**
+- [x] **Step 4: Test each layer in isolation + composition**
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git commit -am "feat(storage): write-through flag 4-layer override wiring"
@@ -1421,19 +1423,19 @@ git commit -am "feat(storage): write-through flag 4-layer override wiring"
 - Modify: `app/elohim-app/src/app/lamad/services/signal-harness.service.spec.ts` (Angular)
 - Modify: `elohim/elohim-storage/tests/epr_atom_federation_integration.rs` (storage)
 
-- [ ] **Step 1: Angular side — flag on, renderer completes, intent posted, storage returns epr_cid**
+- [x] **Step 1: Angular side — flag on, renderer completes, intent posted, storage returns epr_cid**
 
 Mock `SignalEmitService`; trigger a sample renderer completion; assert the service receives the expected intent payload.
 
-- [ ] **Step 2: Storage side — intent → EPR → projector → `economic_events` row**
+- [x] **Step 2: Storage side — intent → EPR → projector → `economic_events` row**
 
 Compose signal intent, POST to `/api/v1/signal/emit`, run projector, assert `economic_events` row exists with verified=true.
 
-- [ ] **Step 3: Run both**
+- [x] **Step 3: Run both**
 
 Expected: PASS.
 
-- [ ] **Step 4: Commit Batch C close**
+- [x] **Step 4: Commit Batch C close**
 
 ```bash
 git commit -am "test(epr-2b): batch C integration — shefa signal-intent → EPR → projection end-to-end"
@@ -1451,7 +1453,7 @@ git commit -am "test(epr-2b): batch C integration — shefa signal-intent → EP
 - Create: `elohim/elohim-storage/src/p2p/fanout.rs`
 - Modify: `elohim/elohim-storage/src/p2p/behaviour.rs`
 
-- [ ] **Step 1: Define routing policy**
+- [x] **Step 1: Define routing policy**
 
 ```rust
 pub enum FanoutChannel { DirectOnly, Gossip, KadLight, Kad, Both }
@@ -1471,11 +1473,11 @@ pub fn channels_for_reach(reach: Reach, kind: &str) -> Vec<FanoutChannel> {
 }
 ```
 
-- [ ] **Step 2: Failing test for each reach tier**
+- [x] **Step 2: Failing test for each reach tier**
 
 Assert the mapping table above holds for all 8 reach variants + the integrity exception.
 
-- [ ] **Step 3: Run tests, commit**
+- [x] **Step 3: Run tests, commit**
 
 Expected: PASS.
 
@@ -1489,7 +1491,7 @@ git commit -m "feat(storage): tiered fanout policy by reach + integrity exceptio
 **Files:**
 - Modify: `elohim/elohim-storage/src/services/epr_store.rs:230` (replace TODO(phase-2b) with Kad call, gated by fanout policy)
 
-- [ ] **Step 1: Implement conditional Kad register**
+- [x] **Step 1: Implement conditional Kad register**
 
 ```rust
 fn put(&self, conn: &mut SqliteConnection, epr: Epr) -> Result<EprIngestResult, StorageError> {
@@ -1502,15 +1504,15 @@ fn put(&self, conn: &mut SqliteConnection, epr: Epr) -> Result<EprIngestResult, 
 }
 ```
 
-- [ ] **Step 2: Integration test — Commons EPR is discoverable by a cold-start peer**
+- [x] **Step 2: Integration test — Commons EPR is discoverable by a cold-start peer**
 
 Test harness: peer A announces an EPR (reach=Commons); peer B connects later (after announce); peer B finds peer A as a provider via Kad; fetches atom via existing EPR atom protocol.
 
-- [ ] **Step 3: Run tests**
+- [x] **Step 3: Run tests**
 
 Expected: PASS.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git commit -am "feat(storage): Kad start_providing on Announce for Kad-tier reach"
@@ -1522,7 +1524,7 @@ git commit -am "feat(storage): Kad start_providing on Announce for Kad-tier reac
 - Modify: `elohim/elohim-storage/src/p2p/behaviour.rs` (subscribe applicable topics)
 - Modify: `elohim/elohim-storage/src/services/epr_store.rs:192` (publish to gossipsub on put)
 
-- [ ] **Step 1: Topic enumeration**
+- [x] **Step 1: Topic enumeration**
 
 ```rust
 pub fn topic_for(pillar: &str, reach: Reach, collective: Option<&str>) -> String {
@@ -1537,19 +1539,19 @@ pub const TOPIC_IDENTITY_BINDING: &str = "elohim/identity/binding";
 pub const TOPIC_INTEGRITY_REVOCATION: &str = "elohim/integrity/revocation";
 ```
 
-- [ ] **Step 2: Subscribe on startup**
+- [x] **Step 2: Subscribe on startup**
 
 Storage subscribes to topics its manifests declare interest in (writable pillars), plus integrity topics always.
 
-- [ ] **Step 3: Publish on Announce**
+- [x] **Step 3: Publish on Announce**
 
 On `put`, if channel includes `Gossip`, publish the announce message (CBOR-encoded `(cid, epr_bytes)` or just announce-cid) to the derived topic.
 
-- [ ] **Step 4: Integration test — gossiped announce received by subscriber**
+- [x] **Step 4: Integration test — gossiped announce received by subscriber**
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git commit -am "feat(storage): gossipsub topic structure + publish-on-announce"
@@ -1563,7 +1565,7 @@ git commit -am "feat(storage): gossipsub topic structure + publish-on-announce"
 
 **Open question O2** — see spec §7. Exact authorization mechanism may shift at batch kickoff. Proposed: subscription request carries a Delegation EPR CID or AgentPeerBinding claim; peer verifies via existing imagodei trust graph.
 
-- [ ] **Step 1: Failing test — peer without membership cannot subscribe to community topic**
+- [x] **Step 1: Failing test — peer without membership cannot subscribe to community topic**
 
 ```rust
 #[tokio::test]
@@ -1574,11 +1576,11 @@ async fn unauthorized_peer_cannot_subscribe_to_community_topic() {
 }
 ```
 
-- [ ] **Step 2: Implement subscription authorization**
+- [x] **Step 2: Implement subscription authorization**
 
 Gossipsub has per-message validators. Register a validator that rejects subscription requests (or drops inbound messages) from peers whose `peer_identity_bindings.agent_cid` does not have a membership link into the topic's scope (e.g., a `MemberOfHousehold` link in qahal DNA for household topics).
 
-- [ ] **Step 3: Run tests, commit**
+- [x] **Step 3: Run tests, commit**
 
 Expected: PASS.
 
@@ -1594,19 +1596,19 @@ git commit -am "feat(storage): reach-gated subscription authorization on gossips
 
 **Converges with Recovery M4** — M4 produces the affected-peer list contract; 2B consumes.
 
-- [ ] **Step 1: Failing test — revocation reaches all 3 channels simultaneously**
+- [x] **Step 1: Failing test — revocation reaches all 3 channels simultaneously**
 
 Three-peer integration: A revokes a key. Peer B is connected (receives gossip). Peer C connects later (receives Kad). Peer D was recently served by A's revoked key (receives direct-notify). Assert: all four channels observed.
 
-- [ ] **Step 2: Implement direct-notify**
+- [x] **Step 2: Implement direct-notify**
 
 On observed `KeyRevocation`, query `peer_identity_bindings` for peers recently bound to the revoked agent, or (Recovery M4 contract) consume M4's affected-peer list. Send a direct `Announce` over the EPR atom protocol to each.
 
-- [ ] **Step 3: Run tests**
+- [x] **Step 3: Run tests**
 
 Expected: PASS.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git commit -am "feat(storage): integrity-always-both fanout + direct-notify for revocations"
@@ -1618,7 +1620,7 @@ git commit -am "feat(storage): integrity-always-both fanout + direct-notify for 
 - Create: `elohim/elohim-storage/src/p2p/dedup.rs`
 - Modify: `elohim/elohim-storage/src/p2p/mod.rs` (wire on inbound handlers)
 
-- [ ] **Step 1: Failing test — duplicate announce is a no-op (observable via counter)**
+- [x] **Step 1: Failing test — duplicate announce is a no-op (observable via counter)**
 
 ```rust
 #[tokio::test]
@@ -1630,7 +1632,7 @@ async fn duplicate_announce_deduped() {
 }
 ```
 
-- [ ] **Step 2: Implement bounded LRU + counter**
+- [x] **Step 2: Implement bounded LRU + counter**
 
 ```rust
 pub struct DedupLru { inner: LruCache<Cid, ()>, seen: AtomicUsize }
@@ -1642,7 +1644,7 @@ impl DedupLru {
 
 Wire on inbound `Announce` handler: `if !dedup.insert(cid) { return early; }`.
 
-- [ ] **Step 3: Run tests, commit**
+- [x] **Step 3: Run tests, commit**
 
 Expected: PASS.
 
@@ -1655,7 +1657,7 @@ git commit -am "feat(storage): bounded dedup LRU on inbound receive path"
 **Files:**
 - Modify: `elohim/elohim-storage/src/services/epr_store.rs:261` (the TODO(phase-2b))
 
-- [ ] **Step 1: Failing test — providers() returns Local + Kad providers**
+- [x] **Step 1: Failing test — providers() returns Local + Kad providers**
 
 ```rust
 #[tokio::test]
@@ -1668,7 +1670,7 @@ async fn providers_returns_local_plus_kad() {
 }
 ```
 
-- [ ] **Step 2: Implement**
+- [x] **Step 2: Implement**
 
 ```rust
 fn providers(&self, conn: &mut SqliteConnection, cid: &str) -> Result<Vec<ProviderRef>, StorageError> {
@@ -1679,11 +1681,11 @@ fn providers(&self, conn: &mut SqliteConnection, cid: &str) -> Result<Vec<Provid
 }
 ```
 
-- [ ] **Step 3: Run tests**
+- [x] **Step 3: Run tests**
 
 Expected: PASS.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git commit -am "feat(storage): FederatedEprStore.providers() returns local + DHT providers"
@@ -1694,19 +1696,19 @@ git commit -am "feat(storage): FederatedEprStore.providers() returns local + DHT
 **Files:**
 - Modify: `elohim/elohim-storage/tests/epr_atom_federation_integration.rs`
 
-- [ ] **Step 1: End-to-end scenario**
+- [x] **Step 1: End-to-end scenario**
 
 Four peers A, B, C, D with different connection topologies and subscription scopes. Test:
 1. A publishes a Commons-reach EconomicEvent → B (subscribed) receives via gossip; C (cold) discovers via Kad; D (not subscribed, no query) never sees it
 2. A publishes a Community-reach EPR in household-xyz → B (household member, subscribed) receives; C (non-member) blocked by subscription auth
 3. A revokes key → all peers observe via all channels (including D via direct-notify because D was recently served)
 
-- [ ] **Step 2: Run integration**
+- [x] **Step 2: Run integration**
 
 Run: `cd elohim/elohim-storage && RUSTFLAGS='--cfg getrandom_backend="custom"' cargo test --test epr_atom_federation_integration`
 Expected: PASS.
 
-- [ ] **Step 3: Commit Batch D close**
+- [x] **Step 3: Commit Batch D close**
 
 ```bash
 git commit -am "test(epr-2b): batch D integration — tiered fanout + subscription auth + integrity exception"
