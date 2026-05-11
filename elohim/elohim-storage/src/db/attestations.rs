@@ -13,10 +13,7 @@ use crate::error::StorageError;
 ///
 /// Idempotent: replaying the same signal produces the same row.
 /// Conflict on `id` (CID — primary key) replaces all columns.
-pub fn upsert(
-    conn: &mut SqliteConnection,
-    row: &AttestationRow,
-) -> Result<(), StorageError> {
+pub fn upsert(conn: &mut SqliteConnection, row: &AttestationRow) -> Result<(), StorageError> {
     diesel::insert_into(attestations::table)
         .values(row)
         .on_conflict(attestations::id)
@@ -96,10 +93,7 @@ pub fn list_by_issuer(
 ///
 /// Note: deletion from the projection does NOT revoke the DHT entry.
 /// Use `upsert` with a `revoked_at` timestamp to represent revocation.
-pub fn delete_by_id(
-    conn: &mut SqliteConnection,
-    id: &str,
-) -> Result<usize, StorageError> {
+pub fn delete_by_id(conn: &mut SqliteConnection, id: &str) -> Result<usize, StorageError> {
     diesel::delete(attestations::table.filter(attestations::id.eq(id)))
         .execute(conn)
         .map_err(|e| StorageError::Internal(format!("Failed to delete attestation {id}: {e}")))
@@ -111,13 +105,11 @@ mod tests {
     use diesel::prelude::*;
     use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
 
-    const MIGRATIONS: EmbeddedMigrations =
-        embed_migrations!("migrations");
+    const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations");
 
     fn setup() -> SqliteConnection {
         let mut conn = SqliteConnection::establish(":memory:").expect("in-memory DB");
-        conn.run_pending_migrations(MIGRATIONS)
-            .expect("migrations");
+        conn.run_pending_migrations(MIGRATIONS).expect("migrations");
         conn
     }
 
@@ -169,26 +161,36 @@ mod tests {
     #[test]
     fn list_by_subject_with_kind_filter() {
         let mut conn = setup();
-        upsert(&mut conn, &make_row("cid-003", "subject-003", "attestation:humanness")).unwrap();
-        upsert(&mut conn, &make_row("cid-004", "subject-003", "attestation:mastery")).unwrap();
+        upsert(
+            &mut conn,
+            &make_row("cid-003", "subject-003", "attestation:humanness"),
+        )
+        .unwrap();
+        upsert(
+            &mut conn,
+            &make_row("cid-004", "subject-003", "attestation:mastery"),
+        )
+        .unwrap();
 
         let all = list_by_subject(&mut conn, "subject-003", None).unwrap();
         assert_eq!(all.len(), 2);
 
-        let filtered = list_by_subject(&mut conn, "subject-003", Some("attestation:humanness")).unwrap();
+        let filtered =
+            list_by_subject(&mut conn, "subject-003", Some("attestation:humanness")).unwrap();
         assert_eq!(filtered.len(), 1);
         assert_eq!(filtered[0].attestation_kind, "attestation:humanness");
     }
 
     #[test]
-    fn list_by_parent_governance_action() {
+    fn vote_children_list_by_parent() {
         let mut conn = setup();
         let mut vote = make_row("cid-005", "subject-005", "attestation:governance-vote");
         vote.parent_governance_action_cid = Some("gov-action-001".to_string());
         vote.vote_value = Some("approve".to_string());
         upsert(&mut conn, &vote).unwrap();
 
-        let children = list_by_parent_governance_action(&mut conn, "gov-action-001").unwrap();
+        let children =
+            super::list_by_parent_governance_action(&mut conn, "gov-action-001").unwrap();
         assert_eq!(children.len(), 1);
         assert_eq!(children[0].vote_value.as_deref(), Some("approve"));
     }

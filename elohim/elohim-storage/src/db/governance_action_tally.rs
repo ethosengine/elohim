@@ -20,7 +20,9 @@ pub fn upsert(
         .set(row)
         .execute(conn)
         .map(|_| ())
-        .map_err(|e| StorageError::Internal(format!("Failed to upsert governance_action_tally: {e}")))
+        .map_err(|e| {
+            StorageError::Internal(format!("Failed to upsert governance_action_tally: {e}"))
+        })
 }
 
 /// Fetch the tally for a governance action by its CID.
@@ -184,8 +186,8 @@ mod tests {
     use diesel::prelude::*;
     use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
 
-    use crate::db::{attestations as attest_db, governance_actions as gov_db};
     use crate::db::models::{AttestationRow, GovernanceActionRow};
+    use crate::db::{attestations as attest_db, governance_actions as gov_db};
 
     const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations");
 
@@ -257,9 +259,39 @@ mod tests {
     fn tally_reaches_quorum() {
         let mut conn = setup();
         gov_db::upsert(&mut conn, &make_gov("gov-002", 3, "2099-01-01T00:00:00Z")).unwrap();
-        attest_db::upsert(&mut conn, &make_vote("v1", "gov-002", "issuer-1", "approve", "2026-05-12T10:01:00Z")).unwrap();
-        attest_db::upsert(&mut conn, &make_vote("v2", "gov-002", "issuer-2", "approve", "2026-05-12T10:02:00Z")).unwrap();
-        attest_db::upsert(&mut conn, &make_vote("v3", "gov-002", "issuer-3", "approve", "2026-05-12T10:03:00Z")).unwrap();
+        attest_db::upsert(
+            &mut conn,
+            &make_vote(
+                "v1",
+                "gov-002",
+                "issuer-1",
+                "approve",
+                "2026-05-12T10:01:00Z",
+            ),
+        )
+        .unwrap();
+        attest_db::upsert(
+            &mut conn,
+            &make_vote(
+                "v2",
+                "gov-002",
+                "issuer-2",
+                "approve",
+                "2026-05-12T10:02:00Z",
+            ),
+        )
+        .unwrap();
+        attest_db::upsert(
+            &mut conn,
+            &make_vote(
+                "v3",
+                "gov-002",
+                "issuer-3",
+                "approve",
+                "2026-05-12T10:03:00Z",
+            ),
+        )
+        .unwrap();
         let tally = compute_tally(&mut conn, "gov-002").unwrap();
         assert_eq!(tally.computed_status, "reached-quorum");
         assert_eq!(tally.current_approve_count, 3);
@@ -271,10 +303,40 @@ mod tests {
         let mut conn = setup();
         gov_db::upsert(&mut conn, &make_gov("gov-003", 2, "2099-01-01T00:00:00Z")).unwrap();
         // Older vote — reject
-        attest_db::upsert(&mut conn, &make_vote("v4", "gov-003", "issuer-1", "reject", "2026-05-12T10:00:00Z")).unwrap();
+        attest_db::upsert(
+            &mut conn,
+            &make_vote(
+                "v4",
+                "gov-003",
+                "issuer-1",
+                "reject",
+                "2026-05-12T10:00:00Z",
+            ),
+        )
+        .unwrap();
         // Newer vote — approve (latest wins)
-        attest_db::upsert(&mut conn, &make_vote("v5", "gov-003", "issuer-1", "approve", "2026-05-12T10:05:00Z")).unwrap();
-        attest_db::upsert(&mut conn, &make_vote("v6", "gov-003", "issuer-2", "approve", "2026-05-12T10:06:00Z")).unwrap();
+        attest_db::upsert(
+            &mut conn,
+            &make_vote(
+                "v5",
+                "gov-003",
+                "issuer-1",
+                "approve",
+                "2026-05-12T10:05:00Z",
+            ),
+        )
+        .unwrap();
+        attest_db::upsert(
+            &mut conn,
+            &make_vote(
+                "v6",
+                "gov-003",
+                "issuer-2",
+                "approve",
+                "2026-05-12T10:06:00Z",
+            ),
+        )
+        .unwrap();
         let tally = compute_tally(&mut conn, "gov-003").unwrap();
         // Both should count as approve with latest-per-issuer
         assert_eq!(tally.current_approve_count, 2);
@@ -286,7 +348,17 @@ mod tests {
         let mut conn = setup();
         // Closes in the past
         gov_db::upsert(&mut conn, &make_gov("gov-004", 3, "2020-01-01T00:00:00Z")).unwrap();
-        attest_db::upsert(&mut conn, &make_vote("v7", "gov-004", "issuer-1", "approve", "2019-12-31T23:00:00Z")).unwrap();
+        attest_db::upsert(
+            &mut conn,
+            &make_vote(
+                "v7",
+                "gov-004",
+                "issuer-1",
+                "approve",
+                "2019-12-31T23:00:00Z",
+            ),
+        )
+        .unwrap();
         let tally = compute_tally(&mut conn, "gov-004").unwrap();
         assert_eq!(tally.computed_status, "closed-no-decision");
         assert_eq!(tally.current_approve_count, 1);

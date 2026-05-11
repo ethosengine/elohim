@@ -13,10 +13,7 @@ use crate::error::StorageError;
 ///
 /// Idempotent: replaying the same signal produces the same row.
 /// Conflict on `id` (CID — primary key) replaces all columns.
-pub fn upsert(
-    conn: &mut SqliteConnection,
-    row: &GovernanceActionRow,
-) -> Result<(), StorageError> {
+pub fn upsert(conn: &mut SqliteConnection, row: &GovernanceActionRow) -> Result<(), StorageError> {
     diesel::insert_into(governance_actions::table)
         .values(row)
         .on_conflict(governance_actions::id)
@@ -36,9 +33,7 @@ pub fn get_by_id(
         .filter(governance_actions::id.eq(id))
         .first::<GovernanceActionRow>(conn)
         .optional()
-        .map_err(|e| {
-            StorageError::Internal(format!("Failed to fetch governance_action {id}: {e}"))
-        })
+        .map_err(|e| StorageError::Internal(format!("Failed to fetch governance_action {id}: {e}")))
 }
 
 /// List governance actions for a subject CID.
@@ -75,10 +70,7 @@ pub fn list_open(
 /// Delete a governance action projection row by CID.
 ///
 /// Note: deletion from the projection does NOT invalidate the DHT entry.
-pub fn delete_by_id(
-    conn: &mut SqliteConnection,
-    id: &str,
-) -> Result<usize, StorageError> {
+pub fn delete_by_id(conn: &mut SqliteConnection, id: &str) -> Result<usize, StorageError> {
     diesel::delete(governance_actions::table.filter(governance_actions::id.eq(id)))
         .execute(conn)
         .map_err(|e| {
@@ -141,8 +133,16 @@ mod tests {
     #[test]
     fn list_open_filters_by_closes_at() {
         let mut conn = setup();
-        upsert(&mut conn, &make_row("gov-003", "subj-003", "2099-01-01T00:00:00Z")).unwrap();
-        upsert(&mut conn, &make_row("gov-004", "subj-004", "2020-01-01T00:00:00Z")).unwrap();
+        upsert(
+            &mut conn,
+            &make_row("gov-003", "subj-003", "2099-01-01T00:00:00Z"),
+        )
+        .unwrap();
+        upsert(
+            &mut conn,
+            &make_row("gov-004", "subj-004", "2020-01-01T00:00:00Z"),
+        )
+        .unwrap();
 
         // Only gov-003 should be "open" relative to now (2026)
         let open = list_open(&mut conn, "2026-05-12T00:00:00Z").unwrap();

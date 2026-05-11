@@ -7,8 +7,8 @@
 
 use diesel::prelude::*;
 
-use crate::db::governance_action_tally;
 use crate::db::diesel_schema::governance_actions;
+use crate::db::governance_action_tally;
 use crate::db::models::GovernanceActionTallyRow;
 use crate::error::StorageError;
 
@@ -33,7 +33,9 @@ pub fn rebuild_all(conn: &mut SqliteConnection) -> Result<usize, StorageError> {
         .select(governance_actions::id)
         .load(conn)
         .map_err(|e| {
-            StorageError::Internal(format!("Failed to list governance_actions for rebuild: {e}"))
+            StorageError::Internal(format!(
+                "Failed to list governance_actions for rebuild: {e}"
+            ))
         })?;
 
     let mut count = 0usize;
@@ -51,7 +53,8 @@ mod tests {
     use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
 
     use crate::db::attestations as attest_db;
-    use crate::db::models::GovernanceActionRow;
+    use crate::db::governance_actions as gov_db;
+    use crate::db::models::{AttestationRow, GovernanceActionRow};
 
     const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations");
 

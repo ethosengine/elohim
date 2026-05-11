@@ -12,8 +12,8 @@
 use diesel::sqlite::SqliteConnection;
 use tracing::debug;
 
-use crate::db::{attestations, governance_actions};
 use crate::db::models::{AttestationRow, GovernanceActionRow};
+use crate::db::{attestations, governance_actions};
 use crate::error::StorageError;
 use crate::services::tally_projector;
 use crate::signals::ElohimContentSignal;
@@ -218,7 +218,8 @@ mod tests {
     use diesel::prelude::*;
     use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
 
-    use crate::db::governance_actions as _gov_db;
+    use crate::db::attestations;
+    use crate::db::governance_action_tally;
 
     const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations");
 
@@ -250,7 +251,9 @@ mod tests {
             r#"{"subject_cid":"subj-001","subject_kind":"human"}"#,
         );
         handle_content_signal(&mut conn, &signal).unwrap();
-        let row = attestations::get_by_id(&mut conn, "attest-001").unwrap().unwrap();
+        let row = attestations::get_by_id(&mut conn, "attest-001")
+            .unwrap()
+            .unwrap();
         assert_eq!(row.attestation_kind, "attestation:humanness");
         assert_eq!(row.subject_cid, "subj-001");
         assert_eq!(row.manifest_ref, "imagodei");
@@ -305,7 +308,9 @@ mod tests {
         // Must not error
         handle_content_signal(&mut conn, &signal).unwrap();
         // Must not project anything
-        assert!(attestations::get_by_id(&mut conn, "content-001").unwrap().is_none());
+        assert!(attestations::get_by_id(&mut conn, "content-001")
+            .unwrap()
+            .is_none());
     }
 
     #[test]
@@ -313,8 +318,14 @@ mod tests {
         assert_eq!(resolve_manifest_ref("attestation:humanness"), "imagodei");
         assert_eq!(resolve_manifest_ref("attestation:mastery"), "lamad");
         assert_eq!(resolve_manifest_ref("attestation:content-quality"), "lamad");
-        assert_eq!(resolve_manifest_ref("attestation:device-binding"), "infrastructure");
-        assert_eq!(resolve_manifest_ref("attestation:governance-vote"), "mishpat");
+        assert_eq!(
+            resolve_manifest_ref("attestation:device-binding"),
+            "infrastructure"
+        );
+        assert_eq!(
+            resolve_manifest_ref("attestation:governance-vote"),
+            "mishpat"
+        );
         assert_eq!(resolve_manifest_ref("attestation:custom"), "unknown");
     }
 }
