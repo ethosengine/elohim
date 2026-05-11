@@ -14,10 +14,14 @@ use std::time::Duration;
 use chrono::Utc;
 use thiserror::Error;
 
+use diesel::prelude::*;
+
 use crate::db::models::PeerIdentityBindingRow;
 use crate::db::DbPool;
 use crate::services::federator::Federator;
-use crate::views::{Freshness, FreshnessState, PeerHouseholdEdge, PeerTopologyView, ViewKind};
+use crate::views::{
+    Freshness, FreshnessState, PeerHouseholdEdge, PeerTopologyView, ResilienceCliff, ViewKind,
+};
 
 const FEDERATION_TIMEOUT_MS: u64 = 3000;
 
@@ -177,9 +181,13 @@ pub async fn aggregate_peer_topology_view(
     // 6) Reciprocation count = online edges.
     let reciprocation_count = edges.iter().filter(|e| e.online).count() as u32;
 
-    // 7) TODO(Phase 4 follow-up): compute resilience_cliffs from sole-replica
-    // analysis once the quilt distribution layer surfaces per-CID replica sets.
-    let resilience_cliffs = vec![];
+    // 7) Resilience cliffs: sole-replica analysis over the agent's authored content.
+    let resilience_cliffs = {
+        let mut conn = pool
+            .get()
+            .map_err(|e| PeerTopologyError::Pool(e.to_string()))?;
+        compute_resilience_cliffs(&mut conn, agent_cid).unwrap_or_default()
+    };
 
     // 8) Freshness rollup: AllOffline if no peer returned Live data.
     let freshness = if !any_live && !bindings.is_empty() {
@@ -201,6 +209,81 @@ pub async fn aggregate_peer_topology_view(
         resilience_cliffs,
         freshness,
     })
+}
+
+// ============================================================================
+// Phase 4 T11 — resilience cliff computation
+// ============================================================================
+
+/// Compute resilience cliffs for an agent.
+///
+/// A resilience cliff means: "I (or my peers) am the sole replica for a CID
+/// that the given household authored." If that household goes offline and I go
+/// offline, that content is lost.
+///
+/// Algorithm:
+/// 1. Find all blob_hashes authored by `agent_cid` (via `content.created_by`).
+/// 2. For each blob_hash, count distinct replica holders in `peer_blob_inventory`.
+/// 3. If replica_count == 1, the sole holder is at risk.
+/// 4. Resolve the sole holder to their household_id.
+/// 5. Group by household_id, count sole-replica CIDs per household.
+fn compute_resilience_cliffs(
+    conn: &mut diesel::SqliteConnection,
+    agent_cid: &str,
+) -> Result<Vec<ResilienceCliff>, diesel::result::Error> {
+    use crate::db::diesel_schema::content::dsl as c;
+    use crate::db::diesel_schema::peer_blob_inventory::dsl as inv;
+    use crate::db::diesel_schema::peer_identity_bindings::dsl as bind;
+
+    // 1) CIDs authored by this agent (content.created_by = agent_cid).
+    let my_blob_hashes: Vec<String> = c::content
+        .filter(c::created_by.eq(agent_cid))
+        .filter(c::blob_hash.is_not_null())
+        .select(c::blob_hash)
+        .load::<Option<String>>(conn)?
+        .into_iter()
+        .flatten()
+        .collect();
+
+    if my_blob_hashes.is_empty() {
+        return Ok(vec![]);
+    }
+
+    // 2-4) For each blob, check if there is exactly one replica holder;
+    //      resolve that holder's household_id (falls back to peer_id).
+    let mut cliff_map: std::collections::HashMap<String, u32> = std::collections::HashMap::new();
+
+    for blob_hash in &my_blob_hashes {
+        let replica_peers: Vec<String> = inv::peer_blob_inventory
+            .filter(inv::blob_hash.eq(blob_hash))
+            .select(inv::peer_id)
+            .load::<String>(conn)?;
+
+        if replica_peers.len() == 1 {
+            let sole_peer = &replica_peers[0];
+            // Resolve to household_id via peer_identity_bindings → humans.
+            // Fall back to peer_id if no binding found.
+            let household_id: String = bind::peer_identity_bindings
+                .filter(bind::peer_id.eq(sole_peer))
+                .filter(bind::superseded_by.is_null())
+                .select(bind::agent_cid)
+                .first::<String>(conn)
+                .unwrap_or_else(|_| sole_peer.clone());
+
+            *cliff_map.entry(household_id).or_insert(0) += 1;
+        }
+    }
+
+    // 5) Convert map to sorted Vec<ResilienceCliff>.
+    let mut cliffs: Vec<ResilienceCliff> = cliff_map
+        .into_iter()
+        .map(|(household_id, sole_replica_cid_count)| ResilienceCliff {
+            household_id,
+            sole_replica_cid_count,
+        })
+        .collect();
+    cliffs.sort_by(|a, b| a.household_id.cmp(&b.household_id));
+    Ok(cliffs)
 }
 
 /// Build the per-peer slice payload that this node returns when asked for its
