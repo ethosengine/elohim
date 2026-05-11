@@ -484,6 +484,17 @@ impl ElohimStorageBehaviour {
         gossipsub
             .subscribe(&inventory_topic)
             .expect("subscribe to elohim/inventory/blob");
+        // Task 4.4: subscribe to all observation namespaces so peers receive
+        // CursorAnnouncements.  Role-based subscription override is a follow-on
+        // (see spec §5.3 + open question 4).
+        for namespace in &["infrastructure", "lamad", "imagodei", "shefa", "qahal"] {
+            let obs_topic = gossipsub::IdentTopic::new(format!(
+                "{}{}",
+                crate::p2p::topics::OBSERVATION_GOSSIP_TOPIC_PREFIX,
+                namespace
+            ));
+            let _ = gossipsub.subscribe(&obs_topic);
+        }
 
         Self {
             kademlia,
