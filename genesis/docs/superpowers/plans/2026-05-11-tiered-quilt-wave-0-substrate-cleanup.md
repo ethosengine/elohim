@@ -2,72 +2,51 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Land two substrate corrections that the tiered-quilt waves depend on, with **zero new feature code**: (1) resolve the duplicate `Attestation` entry type across elohim + imagodei DNAs, (2) rename the field `lamad_event_type` → `elohim_event_type` across the entire stack (83 files affected).
+> **⚠️ SUPERSEDED Stage A direction (2026-05-11):** The Attestation dedupe stage of this plan has been superseded by a deeper consolidation. See the new direction block below before dispatching any work.
 
-**Architecture:** Single sequenced PR. Stage A handles the Attestation dedupe; Stage B handles the rename. Stages share a feature branch and a single integration test pass before merge.
+**Goal:** Land two substrate corrections that the tiered-quilt waves depend on, with **zero new feature code**: (1) execute the Attestation Consolidation spec/plan as Stage A, (2) rename the field `lamad_event_type` → `elohim_event_type` across the entire stack (83 files affected) as Stage B.
 
-**Tech Stack:** Rust 2021 (elohim DNA + imagodei DNA + elohim-storage), Diesel migrations, JSON Schema codegen, TypeScript codegen, Angular 19 consumers.
+**Architecture:** Two sequenced stages. Stage A is now the multi-stage Attestation Consolidation work (DELEGATED to a sibling plan — see below). Stage B remains the rename, running against the post-consolidation tree.
 
-**Source-of-truth spec:** `genesis/docs/superpowers/specs/2026-05-11-tiered-quilt-stewardship-design.md` (§1 "Wave 0 substrate cleanup")
+**Tech Stack:** Rust 2021 (elohim DNA + imagodei DNA + infrastructure DNA + mishpat DNA + elohim-storage), Diesel migrations, JSON Schema codegen, TypeScript codegen, Angular 19 consumers, libp2p 0.54 (for Stage A Shamir transport).
+
+**Source-of-truth spec:** `genesis/docs/superpowers/specs/2026-05-11-tiered-quilt-stewardship-design.md` (§1 "Wave 0 substrate cleanup") — **except for the Attestation dedupe, which is now governed by** `genesis/docs/superpowers/specs/2026-05-11-attestation-consolidation-design.md`.
 
 **Delivery master:** `genesis/docs/superpowers/plans/2026-05-11-tiered-quilt-delivery-master.md` (§2 Wave 0)
 
 ---
 
-## ⚠️ Pre-flight correction — operator decision required
+## ⚠️ Stage A is now the Attestation Consolidation (supersedes the Option A/B decision)
 
-The spec asserted that Wave 0 would "remove `Attestation` from imagodei DNA; single source of truth becomes the elohim DNA copy." **Deeper pre-flight against the actual codebase (2026-05-11 evening) found this direction is opposite to existing reality:**
+The original Stage A scope here was "dedupe the two duplicate `Attestation` entry types between imagodei + elohim DNAs," with an outstanding operator decision between two paths (Option A — move ownership to elohim DNA, or Option B — keep imagodei as owner). The Option A/B decision **no longer applies**.
 
-- **imagodei DNA is currently the OWNER** of the `Attestation` entry type. `imagodei/src/lib.rs:581` `issue_attestation` actually calls `create_entry(&EntryTypes::Attestation(...))`. Real attestation entries on the DHT are issued there.
-- **elohim DNA's `Attestation` enum variant is VESTIGIAL.** It is declared in the EntryTypes enum at `content_store_integrity:1052` but **no coordinator function ever instantiates it.** Verified via `grep -rn "EntryTypes::Attestation\b" elohim/holochain/dna/elohim/zomes/` returning zero hits.
-- **A cross-DNA bridge already exists:** elohim DNA's `content_store/src/lib.rs:1004` defines `issue_attestation_via_imagodei` which uses `CallTargetCell::OtherRole(IMAGODEI_ROLE)` to call into imagodei DNA's `issue_attestation`. This is the canonical attestation issuance pattern today.
+A 2026-05-11 brainstorm pass revealed the duplicate `Attestation` is only the visible tip of a broader pattern: **18+ attestation-shaped entry types are scattered across four DNAs (imagodei, elohim, infrastructure, mishpat) with overlapping but inconsistent fields and no shared validator floor.** The right move is to consolidate ALL of them into a single primitive — `Content` entries with `content_type: "attestation:<subtype>"`, with the per-pillar subtype vocabulary declared in manifests — and to decouple Shamir share material (which the recovery flow conflated with M-of-N social attestations) onto an off-chain libp2p transport.
 
-**Two resolutions are available. Operator must choose before Stage A dispatches.**
+This consolidation is now governed by:
 
-### Option A — Honor the user's brainstorm preference (more invasive)
+- **Spec:** `genesis/docs/superpowers/specs/2026-05-11-attestation-consolidation-design.md` (12 sections; "validated recognition of capabilities" framing; Shape A — parent governance-action Content + child attestation Content + derived tally projection)
+- **Plan:** `genesis/docs/superpowers/plans/2026-05-11-attestation-consolidation-implementation-plan.md` (7 stages A–G with bite-sized tasks for Stages A–D and task headers + acceptance criteria for Stages E–G)
 
-Move ownership FROM imagodei TO elohim DNA. The user said during brainstorming
-(2026-05-11): "let's see if we can move that to elohim core."
+### What this means for Wave 0
 
-**What this means:**
-1. Migrate `issue_attestation` coordinator (and `get_agent_attestations`, `get_my_attestations`) from imagodei DNA to elohim DNA's content_store coordinator zome.
-2. Remove `Attestation` entry type from imagodei DNA integrity zome (struct + enum variant + validate handler).
-3. Remove the cross-DNA bridge `issue_attestation_via_imagodei` and inline its body — the call becomes local.
-4. Migrate any existing Attestation entries from imagodei DHT to elohim DHT (a one-time migration tool — minor concern at pre-launch; nontrivial post-launch).
-5. Tiered-quilt waves 4–6 use elohim DNA's local `create_attestation` directly. Cleaner downstream.
+**Wave 0's Stage A is now: execute Stages A–F of the attestation-consolidation implementation plan** (Stage G of that plan — Shamir off-chain transport — is deferrable per spec §8 and may land as a follow-up). The consolidation's stages dovetail into Wave 0's existing sequencing:
 
-**Pros:** Storage-stewardship attestations live in the same DNA as `Commitment`. No cross-DNA hops for tier-breach / tier-restitution / tier-holdings / tier-accounting. Stronger coherence: identity attestations (imagodei) stay separable but operate via the elohim DNA Attestation type.
+| Wave 0 stage | Old scope | New scope |
+|---|---|---|
+| **Stage A** | "Dedupe the two Attestation entry types" (Option A or B) | **Execute Stages A–F of attestation-consolidation plan** (manifests + coordinators + integrity zomes + storage projection + HTTP API + Angular consumers). Stage G of that plan is OPTIONAL within Wave 0; if PVC/time tightens, defer. |
+| **Stage B** | "Rename `lamad_event_type` → `elohim_event_type` across 83 files" | UNCHANGED. Runs after Stage A completes, against the post-consolidation tree. |
 
-**Cons:** Higher blast radius. Touches imagodei coordinator API surface. Any imagodei zome consumer that calls `issue_attestation` directly must move to the elohim DNA call. Pre-launch makes this tractable; post-launch this is non-trivial.
+### What this resolves
 
-### Option B — Honor the existing implementation (less invasive)
+- **The Option A vs Option B decision becomes moot.** Neither path is taken — both `Attestation` entry types are *removed*, and the new attestations are issued as `Content` entries with content_type discriminators per the spec.
+- **Standing vs Attestation duplication** investigated during the brainstorm: NOT a duplication. Standing is a derived projection (graph walk over attestation/feedback subgraph), not an entity. Per memory pin `project_standing_composes_multiple_evidence_streams.md`.
+- **ContentMastery handling**: stays as private agent progress (Category B2). The `attestation:mastery` minting is core (manifest-governed); the private progress data is app/UX layer. Confirmed during 2026-05-11 user review of the spec.
 
-Keep imagodei DNA as the Attestation owner. Remove only the vestigial elohim
-DNA declaration.
+### What still needs your sign-off before dispatch
 
-**What this means:**
-1. Remove the unused `Attestation(Attestation)` enum variant and `pub struct Attestation { ... }` from `elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs` (lines 1052+ for the struct, ~1130 for the EntryTypes variant — need to verify exact lines).
-2. Verify nothing references it: `grep -rn "EntryTypes::Attestation\b" elohim/holochain/dna/elohim/zomes/`.
-3. The cross-DNA bridge `issue_attestation_via_imagodei` stays as the canonical pattern.
-4. Tiered-quilt waves 4–6 issue storage-stewardship attestations VIA the bridge — same shape as today, just five new `attestation_type` discriminator strings flowing through the existing path.
-
-**Pros:** Far smaller blast radius. Honors existing working code. The cross-DNA bridge is already wired and tested.
-
-**Cons:** Storage-stewardship attestations cross a DNA boundary on every breach/restitution/holdings/accounting write. Cross-DNA calls have measurable latency vs local writes. The bridge marshalling adds a serialization round-trip per attestation. Conceptually muddier — "imagodei stores tier-breach attestations" reads weird if you don't know the history.
-
-### Recommendation (this plan author)
-
-**Option B for Wave 0; revisit Option A as a separate sprint after tiered-quilt
-stabilizes.** Reasoning: Wave 0's scope is already large (the rename touches 83
-files). Compounding it with Attestation ownership migration risks Wave 0
-becoming a rollback nightmare. The cross-DNA latency of Option B is real but
-amortizes over the per-attestation cadence (one tier-accounting per agent per
-day; breach attestations are rare; holdings are periodic but throttled). The
-conceptual muddiness is documentable.
-
-**Operator: please mark which option in this plan before Stage A starts.**
-
-> Operator choice: ☐ Option A  ☐ Option B  ☐ Other (annotate below)
+1. **Pacing**: confirm we run the consolidation in a single worktree with sequential cargo builds across DNAs + storage + Angular. PVC budget is shared.
+2. **Stage G in or out**: do we land Shamir off-chain transport (consolidation Stage G) inside Wave 0, or defer to a follow-up? Spec says deferrable; recovery flow keeps working without it (shares stay in `metadata_json.evidence_json` temporarily).
+3. **Wave 0 success criteria growth**: Wave 0's "scope is already large" note (below) is now substantially larger. If this exceeds an acceptable Wave-0 scope, the consolidation could be reclassified as its own wave (call it Wave -1) and Wave 0 reverts to just the rename. Either framing works; pick before dispatch.
 
 ---
 
