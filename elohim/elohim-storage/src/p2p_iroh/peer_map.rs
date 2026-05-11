@@ -68,6 +68,7 @@ pub enum Plane {
     ViewFed,
     IdentityHandshake,
     Trust,
+    Observation,
 }
 
 impl Plane {
@@ -82,6 +83,7 @@ impl Plane {
             Plane::ViewFed => "view-fed",
             Plane::IdentityHandshake => "identity-handshake",
             Plane::Trust => "trust",
+            Plane::Observation => "observation",
         }
     }
 
@@ -96,6 +98,7 @@ impl Plane {
             "view-fed" => Some(Plane::ViewFed),
             "identity-handshake" => Some(Plane::IdentityHandshake),
             "trust" => Some(Plane::Trust),
+            "observation" => Some(Plane::Observation),
             _ => None,
         }
     }
