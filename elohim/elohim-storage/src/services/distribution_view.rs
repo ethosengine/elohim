@@ -18,7 +18,7 @@ use thiserror::Error;
 use crate::db::models::{PeerIdentityBindingRow, PlacementGapRow};
 use crate::db::DbPool;
 use crate::views::{
-    DeviceArchetype, DistributionDetails, DistributionSummary, DiversityHint, FetchSource, JsonVal,
+    DeviceArchetype, DistributionDetails, DistributionSummary, FetchSource, JsonVal,
     MyRole, ProjectorIdentity, ReachClass, ReplicaHealth, ReplicaPeer,
 };
 
@@ -156,13 +156,29 @@ pub async fn compose_distribution_summary(
     let replica_target = replica_target_for(&reach_class);
     let replica_health = replica_health_for(replica_count, replica_target);
 
-    // --- projector_count: stubbed ---
-    // TODO(Phase 4 follow-up): wire projector identity once doorway_projector_acks lands
-    let projector_count: u32 = 0;
+    // --- projector_count: from projection_events distinct projectors ---
+    let projector_count = crate::db::projection_events::distinct_projectors_for_blob(
+        &mut conn,
+        blob_hash,
+    )
+    .map(|v| v.len() as u32)
+    .unwrap_or(0);
 
-    // --- diversity_hint: stubbed ---
-    // TODO(Phase 4 follow-up): compose from peer geo/archetype index
-    let diversity_hint = DiversityHint::None;
+    // --- diversity_hint: archetype-mix over peer_identity_bindings for seen peers ---
+    let archetypes_in_replicas: Vec<String> = {
+        use crate::db::diesel_schema::peer_identity_bindings::dsl as bind;
+        let seen_vec: Vec<&str> = seen_peers.iter().map(String::as_str).collect();
+        bind::peer_identity_bindings
+            .filter(bind::peer_id.eq_any(&seen_vec))
+            .filter(bind::superseded_by.is_null())
+            .select(bind::device_archetype)
+            .distinct()
+            .load::<String>(&mut conn)
+            .unwrap_or_default()
+    };
+    let diversity_hint = crate::services::peer_diversity::diversity_hint_from_archetype_strs(
+        &archetypes_in_replicas,
+    );
 
     // --- this_fetch_source: constant for T23 ---
     let this_fetch_source = FetchSource::ProjectedViaDoorway;
@@ -179,8 +195,14 @@ pub async fn compose_distribution_summary(
 
             // Determine my_role by intersecting with inventory replica set.
             let any_replica = seen_peers.iter().any(|p| my_peers.contains(p.as_str()));
-            // TODO(Phase 4 follow-up): any_projector when doorway_projector_acks lands
-            let any_projector = false;
+            // any_projector: check if any of my agent_cids appear in projection_events
+            let my_agent_cids: HashSet<&str> = bindings.iter().map(|b| b.agent_cid.as_str()).collect();
+            let any_projector = crate::db::projection_events::distinct_projectors_for_blob(
+                &mut conn,
+                blob_hash,
+            )
+            .map(|projectors| projectors.iter().any(|p| my_agent_cids.contains(p.as_str())))
+            .unwrap_or(false);
 
             let role = if any_replica && any_projector {
                 MyRole::ReplicaAndProjector
@@ -253,11 +275,63 @@ pub async fn compose_distribution_details(
         .map_err(|e| DistributionViewError::Pool(e.to_string()))?;
 
     let replica_peers = load_replica_peers_full(&mut conn, blob_hash)?;
-    // TODO(Phase 4 follow-up): wire projector identities once doorway_projector_acks lands.
-    let projector_identities: Vec<ProjectorIdentity> = vec![];
+
+    // projector_identities: from distinct_projectors_for_blob; use agent_cid as
+    // doorway_hostname (best available until a real hostname registry lands),
+    // last_ack_seconds derived from most-recent emitted_at for each projector.
+    let projector_identities: Vec<ProjectorIdentity> = {
+        let projector_cids =
+            crate::db::projection_events::distinct_projectors_for_blob(&mut conn, blob_hash)
+                .unwrap_or_default();
+        let now_seconds = chrono::Utc::now().timestamp().max(0) as u64;
+        let mut out = Vec::with_capacity(projector_cids.len());
+        for cid in projector_cids {
+            // Find the most-recent ack for this projector.
+            let recent_for_cid: Vec<crate::db::projection_events::ProjectionEventRow> = {
+                use crate::db::diesel_schema::projection_events::dsl as pe;
+                pe::projection_events
+                    .filter(pe::blob_hash.eq(blob_hash))
+                    .filter(pe::projector_agent_cid.eq(&cid))
+                    .order(pe::emitted_at.desc())
+                    .limit(1)
+                    .load(&mut conn)
+                    .unwrap_or_default()
+            };
+            let last_ack_seconds = recent_for_cid
+                .first()
+                .and_then(|r| DateTime::parse_from_rfc3339(&r.emitted_at).ok())
+                .map(|dt| {
+                    let secs = dt.timestamp().max(0) as u64;
+                    now_seconds.saturating_sub(secs)
+                })
+                .unwrap_or(0);
+            out.push(ProjectorIdentity {
+                doorway_hostname: cid,
+                last_ack_seconds,
+                region_tier: None,
+            });
+        }
+        out
+    };
+
     let placement_gaps = load_placement_gaps_for(&mut conn, blob_hash)?;
-    // TODO(Phase 4 follow-up): wire projection events once a projection-events log exists.
-    let recent_projection_events: Vec<JsonVal> = vec![];
+
+    // recent_projection_events: last 20 events as open-shape JSON.
+    let recent_projection_events: Vec<JsonVal> = {
+        let recent = crate::db::projection_events::list_recent_for_blob(&mut conn, blob_hash, 20)
+            .unwrap_or_default();
+        recent
+            .into_iter()
+            .map(|r| {
+                JsonVal(serde_json::json!({
+                    "blobHash": r.blob_hash,
+                    "projectorAgentCid": r.projector_agent_cid,
+                    "emittedAt": r.emitted_at,
+                    "sourceActionHash": r.source_action_hash,
+                }))
+            })
+            .collect()
+    };
 
     let commitment_references = match &ctx {
         DistributionContext::Visitor => None,
