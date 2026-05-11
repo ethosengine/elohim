@@ -1006,42 +1006,65 @@ fn upsert_mastery(input: UpsertMasteryInput) -> ExternResult<ContentMasteryOutpu
     }
 }
 
-/// Bridge call to issue attestation via imagodei DNA
+/// Issue attestation in-process via the consolidated attestation module.
+///
+/// Previously this bridged to imagodei DNA's issue_attestation, which created a
+/// call cycle: elohim::grant_attestation → issue_attestation_via_imagodei →
+/// imagodei::issue_attestation → elohim::issue_attestation (infinite loop).
+///
+/// Fixed in Task B.10: call crate::attestation::issue_attestation directly.
+/// The canonical entry now lives on elohim DHT (content_type "attestation:identity-credential").
+/// The returned AttestationOutput uses a zero sentinel action_hash — callers that
+/// inspect the Attestation fields (e.g. grant_attestation which ignores the result)
+/// continue to work. Callers that use action_hash for further HDK lookups must
+/// migrate before Stage C removes the AttestationOutput wrapper entirely.
 fn issue_attestation_via_imagodei(
     input: IssueAttestationBridgeInput,
 ) -> ExternResult<AttestationOutput> {
-    let response = call(
-        CallTargetCell::OtherRole(IMAGODEI_ROLE.into()),
-        IMAGODEI_ZOME,
-        "issue_attestation".into(),
-        None,
-        input,
-    )?;
+    let consolidated = attestation::issue_attestation(IssueAttestationInput {
+        attestation_kind: "attestation:identity-credential".to_string(),
+        subject_cid: input.agent_id.clone(),
+        subject_kind: "agent".to_string(),
+        title: input.display_name.clone(),
+        description: Some(input.description.clone()),
+        reach: "community".to_string(),
+        metadata: serde_json::json!({
+            "category": input.category,
+            "credential_type": input.attestation_type,
+            "tier": input.tier,
+            "icon_url": input.icon_url,
+            "earned_via": input.earned_via_json,
+        }),
+        parent_governance_action_cid: None,
+        vote_value: None,
+        proof_class: "witness".to_string(),
+        proof_evidence: serde_json::json!({"class": "witness"}),
+        expires_at: input.expires_at.clone(),
+    })?;
 
-    match response {
-        ZomeCallResponse::Ok(result) => {
-            let output: AttestationOutput = result.decode().map_err(|e| {
-                wasm_error!(WasmErrorInner::Guest(format!(
-                    "Failed to decode attestation: {:?}",
-                    e
-                )))
-            })?;
-            Ok(output)
-        }
-        ZomeCallResponse::Unauthorized(_, _, _, _) => Err(wasm_error!(WasmErrorInner::Guest(
-            "Unauthorized call to imagodei".to_string()
-        ))),
-        ZomeCallResponse::NetworkError(err) => Err(wasm_error!(WasmErrorInner::Guest(format!(
-            "Network error calling imagodei: {}",
-            err
-        )))),
-        ZomeCallResponse::CountersigningSession(err) => Err(wasm_error!(WasmErrorInner::Guest(
-            format!("Countersigning error: {}", err)
-        ))),
-        ZomeCallResponse::AuthenticationFailed(_, _) => Err(wasm_error!(WasmErrorInner::Guest(
-            "Authentication failed calling imagodei".to_string()
-        ))),
-    }
+    // Synthesise a legacy AttestationOutput shape for backward-compatible callers.
+    // The action_hash is a zero sentinel — the canonical record is the elohim Content
+    // entry whose entry_hash == consolidated.cid.
+    let attestation = Attestation {
+        id: consolidated.cid.clone(),
+        agent_id: input.agent_id,
+        category: input.category,
+        attestation_type: input.attestation_type,
+        display_name: input.display_name,
+        description: input.description,
+        icon_url: input.icon_url,
+        tier: input.tier,
+        earned_via_json: input.earned_via_json,
+        issued_at: String::new(),
+        issued_by: consolidated.issuer_cid,
+        expires_at: input.expires_at,
+        proof: None,
+    };
+
+    Ok(AttestationOutput {
+        action_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+        attestation,
+    })
 }
 
 /// Input for issuing attestation via bridge (matches imagodei's IssueAttestationInput)
