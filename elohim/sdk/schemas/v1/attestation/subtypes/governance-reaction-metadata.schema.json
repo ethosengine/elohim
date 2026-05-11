@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://elohim.protocol/schemas/v1/attestation/subtypes/governance-reaction-metadata.schema.json",
+  "$comment": "Source of truth: Holochain DHT (sub-shape of attestation:governance-reaction's evidence_json.summary_metric). Category A. Replaces mishpat DNA's GovernanceReaction entry type.",
+  "title": "GovernanceReactionAttestationMetadata",
+  "description": "Per-subtype metadata for attestation:governance-reaction (mishpat). Lightweight reaction to a governance artifact (proposal, statement, decision).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["reaction_kind", "reacted_to_cid"],
+  "properties": {
+    "reaction_kind": {
+      "type": "string",
+      "description": "Free-form reaction kind (e.g., 'support', 'concern', 'question', 'amendment-suggested')"
+    },
+    "reacted_to_cid": { "type": "string", "description": "CID of the artifact being reacted to" }
+  }
+}

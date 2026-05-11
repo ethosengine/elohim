@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://elohim.protocol/schemas/v1/attestation/subtypes/device-health-metadata.schema.json",
+  "$comment": "Source of truth: Holochain DHT (sub-shape of attestation:device-health's evidence_json.summary_metric). Category A. Replaces infrastructure DNA's HealthAttestation entry type. Raw heartbeats stay observation-layer (per spec §6.4 + observation-layer sibling spec).",
+  "title": "DeviceHealthAttestationMetadata",
+  "description": "Per-subtype metadata for attestation:device-health (infrastructure). Derived summary of device/doorway health across an observation window. Raw heartbeat data lives on the operational observation layer, not on the DHT.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["device_id", "health_metric", "period_start", "period_end"],
+  "properties": {
+    "device_id": { "type": "string" },
+    "health_metric": {
+      "type": "string",
+      "enum": ["uptime", "latency", "availability", "throughput", "error-rate"]
+    },
+    "period_start": { "type": "string", "format": "date-time" },
+    "period_end": { "type": "string", "format": "date-time" },
+    "sample_count": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Number of raw observation samples summarized into this attestation"
+    },
+    "summary_value": {
+      "type": ["string", "null"],
+      "description": "Free-form summary value (e.g., '99.97%' for uptime). Renderers interpret per health_metric."
+    }
+  }
+}

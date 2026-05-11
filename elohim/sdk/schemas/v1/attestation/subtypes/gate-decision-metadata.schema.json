@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://elohim.protocol/schemas/v1/attestation/subtypes/gate-decision-metadata.schema.json",
+  "$comment": "Source of truth: Holochain DHT (sub-shape of attestation:gate-decision's evidence_json.summary_metric). Category A. Replaces mishpat DNA's GateDecisionAttestation entry type.",
+  "title": "GateDecisionAttestationMetadata",
+  "description": "Per-subtype metadata for attestation:gate-decision (mishpat). Records a gate's decision on a subject (allow / block / pending).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["gated_subject_cid", "decision_outcome", "gate_kind"],
+  "properties": {
+    "gated_subject_cid": { "type": "string" },
+    "decision_outcome": {
+      "type": "string",
+      "enum": ["allow", "block", "pending"]
+    },
+    "gate_kind": {
+      "type": "string",
+      "description": "Free-form gate identifier (e.g., 'reach-gate', 'standing-floor', 'compute-tier')"
+    },
+    "rationale": { "type": ["string", "null"] }
+  }
+}

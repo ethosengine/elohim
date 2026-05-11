@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://elohim.protocol/schemas/v1/attestation/subtypes/content-succession-metadata.schema.json",
+  "$comment": "Source of truth: Holochain DHT (sub-shape of attestation:content-succession's evidence_json.summary_metric). Category A. Replaces elohim DNA's ContentSuccession entry type.",
+  "title": "ContentSuccessionAttestationMetadata",
+  "description": "Per-subtype metadata for attestation:content-succession (lamad). Declares that one content node supersedes another (e.g., a revised lesson replaces an obsolete one).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["superseded_content_cid", "succession_reason"],
+  "properties": {
+    "superseded_content_cid": { "type": "string", "description": "CID of the content being superseded" },
+    "succession_reason": {
+      "type": "string",
+      "enum": ["revision", "correction", "deprecation", "merge", "split", "other"]
+    },
+    "notes": { "type": ["string", "null"] }
+  }
+}

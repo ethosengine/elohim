@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://elohim.protocol/schemas/v1/attestation/subtypes/proposal-vote-metadata.schema.json",
+  "$comment": "Source of truth: Holochain DHT (sub-shape of attestation:proposal-vote's evidence_json.summary_metric). Category A. Vote-child of governance-action:proposal. Replaces mishpat DNA's ProposalVote entry type.",
+  "title": "ProposalVoteAttestationMetadata",
+  "description": "Per-subtype metadata for attestation:proposal-vote (mishpat). Vote on a governance proposal.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["proposal_cid"],
+  "properties": {
+    "proposal_cid": { "type": "string", "description": "CID of the governance-action:proposal being voted on (also mirrored as parent_governance_action_cid on the attestation)" },
+    "rationale": { "type": ["string", "null"] }
+  }
+}

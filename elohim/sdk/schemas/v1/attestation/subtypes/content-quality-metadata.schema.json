@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://elohim.protocol/schemas/v1/attestation/subtypes/content-quality-metadata.schema.json",
+  "$comment": "Source of truth: Holochain DHT (sub-shape of attestation:content-quality's evidence_json.summary_metric). Category A. Replaces elohim DNA's ContentAttestation entry type.",
+  "title": "ContentQualityAttestationMetadata",
+  "description": "Per-subtype metadata for attestation:content-quality (lamad). Quality / reach-grant attestation on a content node. Replaces ContentAttestation entry type.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["quality_dimension", "reach_granted"],
+  "properties": {
+    "quality_dimension": {
+      "type": "string",
+      "enum": [
+        "author-verified",
+        "steward-approved",
+        "community-endorsed",
+        "peer-reviewed",
+        "governance-ratified",
+        "curriculum-canonical",
+        "safety-reviewed",
+        "accuracy-verified",
+        "accessibility-checked",
+        "license-cleared"
+      ],
+      "description": "Which quality property is being attested. Mirrors CONTENT_ATTESTATION_TYPES from the legacy entry."
+    },
+    "reach_granted": { "$ref": "../../enums/reach.schema.json" },
+    "evidence_review_count": {
+      "type": ["integer", "null"],
+      "minimum": 0,
+      "description": "Number of reviews / endorsements backing this attestation"
+    },
+    "scope_json": {
+      "type": ["object", "null"],
+      "additionalProperties": true,
+      "description": "Optional scope restriction (e.g., specific domain or curriculum context)"
+    }
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://elohim.protocol/schemas/v1/attestation/subtypes/governance-role-metadata.schema.json",
+  "$comment": "Source of truth: Holochain DHT (sub-shape of attestation:governance-role's evidence_json.summary_metric). Category A. New subtype (no legacy entry type — previously implicit in challenge/proposal flows).",
+  "title": "GovernanceRoleAttestationMetadata",
+  "description": "Per-subtype metadata for attestation:governance-role (mishpat). Declares a subject holds a specific governance role within a scope.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["role_kind", "role_scope"],
+  "properties": {
+    "role_kind": {
+      "type": "string",
+      "description": "Free-form role kind (e.g., 'council-member', 'mediator', 'steward', 'rapporteur')"
+    },
+    "role_scope": {
+      "type": "string",
+      "description": "Scope identifier (e.g., 'collective:cooperative-x', 'qahal:proposal-review')"
+    },
+    "electing_body_cid": {
+      "type": ["string", "null"],
+      "description": "CID of the body / governance-action that elected this role-holder"
+    }
+  }
+}

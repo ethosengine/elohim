@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://elohim.protocol/schemas/v1/attestation/subtypes/doorway-health-summary-metadata.schema.json",
+  "$comment": "Source of truth: Holochain DHT (sub-shape of attestation:doorway-health-summary's evidence_json.summary_metric). Category A. Replaces infrastructure DNA's DoorwayHeartbeatSummary entry type. Raw DoorwayHeartbeat entries remain on the observation layer.",
+  "title": "DoorwayHealthSummaryAttestationMetadata",
+  "description": "Per-subtype metadata for attestation:doorway-health-summary (infrastructure). Derived summary of doorway health/availability over an observation window.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["doorway_id", "uptime_percentage", "period_start", "period_end"],
+  "properties": {
+    "doorway_id": { "type": "string" },
+    "uptime_percentage": { "type": "number", "minimum": 0, "maximum": 100 },
+    "request_volume": { "type": ["integer", "null"], "minimum": 0 },
+    "period_start": { "type": "string", "format": "date-time" },
+    "period_end": { "type": "string", "format": "date-time" }
+  }
+}

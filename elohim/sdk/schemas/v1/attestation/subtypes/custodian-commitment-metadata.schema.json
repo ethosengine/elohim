@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://elohim.protocol/schemas/v1/attestation/subtypes/custodian-commitment-metadata.schema.json",
+  "$comment": "Source of truth: Holochain DHT (sub-shape of attestation:custodian-commitment's evidence_json.summary_metric). Category A. Replaces elohim DNA's CustodianCommitment entry type.",
+  "title": "CustodianCommitmentAttestationMetadata",
+  "description": "Per-subtype metadata for attestation:custodian-commitment (lamad). An agent commits to custodianship of a content / digital presence.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["custodied_subject_cid", "commitment_scope"],
+  "properties": {
+    "custodied_subject_cid": { "type": "string", "description": "CID of the content / presence being custodied" },
+    "commitment_scope": {
+      "type": "string",
+      "description": "Scope of custodianship (e.g., 'stewardship', 'archival', 'translation')"
+    },
+    "expires_at": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "description": "Optional commitment expiration; null means open-ended"
+    }
+  }
+}

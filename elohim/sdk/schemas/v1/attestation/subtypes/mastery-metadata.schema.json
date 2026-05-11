@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://elohim.protocol/schemas/v1/attestation/subtypes/mastery-metadata.schema.json",
+  "$comment": "Source of truth: Holochain DHT (sub-shape of attestation:mastery's evidence_json.summary_metric). Category A. ContentMastery stays as private agent progress (Category B2 in storage); this attestation is the public proof per spec §11.2.",
+  "title": "MasteryAttestationMetadata",
+  "description": "Per-subtype metadata for attestation:mastery (lamad). Public proof of an agent's mastery of a specific content node. Minted from private ContentMastery progress when policy fires.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["concept_cid", "mastery_level"],
+  "properties": {
+    "concept_cid": { "type": "string", "description": "CID of the Content entry whose mastery is being attested" },
+    "mastery_level": {
+      "type": "string",
+      "enum": ["familiar", "proficient", "expert", "teaching"],
+      "description": "Tier of mastery"
+    },
+    "evidence_session_count": {
+      "type": ["integer", "null"],
+      "minimum": 0,
+      "description": "Number of practice sessions backing this attestation"
+    },
+    "last_practiced_at": {
+      "type": ["string", "null"],
+      "format": "date-time"
+    }
+  }
+}

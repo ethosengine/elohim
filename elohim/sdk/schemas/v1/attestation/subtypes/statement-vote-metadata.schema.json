@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://elohim.protocol/schemas/v1/attestation/subtypes/statement-vote-metadata.schema.json",
+  "$comment": "Source of truth: Holochain DHT (sub-shape of attestation:statement-vote's evidence_json.summary_metric). Category A. Vote on a Polis-style OpinionStatement; replaces mishpat DNA's StatementVote entry type. (Note: OpinionStatement itself moves to the observation layer per spec §6.4.)",
+  "title": "StatementVoteAttestationMetadata",
+  "description": "Per-subtype metadata for attestation:statement-vote (mishpat). Polis-style agree/disagree/pass vote on an OpinionStatement.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["statement_cid", "polis_axis"],
+  "properties": {
+    "statement_cid": { "type": "string" },
+    "polis_axis": {
+      "type": "string",
+      "enum": ["agree", "disagree", "pass"]
+    }
+  }
+}
