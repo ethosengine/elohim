@@ -99,6 +99,13 @@ struct VoteOnGovernanceActionInput {
     pub evidence: Option<Value>,
 }
 
+/// Mirror of `content_store::governance_action::GovernanceActionWithChildren`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct GovernanceActionWithChildren {
+    pub parent: GovernanceActionOutput,
+    pub children: Vec<AttestationOutput>,
+}
+
 // ---------------------------------------------------------------------------
 // Scenario 1: issue_attestation_humanness creates Content entry + subject link
 // ---------------------------------------------------------------------------
@@ -365,6 +372,138 @@ async fn vote_on_governance_action_creates_child_attestation_with_parent_link() 
     assert!(!vote.cid.is_empty(), "vote cid must be set");
     // The GovernanceActionChild link is created by issue_attestation when
     // parent_governance_action_cid is Some — verified implicitly (wasm_error! would surface).
+
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Scenario 6: get_attestations_for_subject returns issued attestations (B.7)
+// ---------------------------------------------------------------------------
+
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "Requires packed DNA from Jenkins pipeline (just pack in dna/elohim)"]
+async fn get_attestations_for_subject_returns_issued_attestations() -> Result<()> {
+    let (mut conductor, agent) = single_agent_conductor().await?;
+    let dna = load_dna(DNA, &network_seed(DNA), Some(agent.clone())).await?;
+    let app = conductor
+        .setup_app_for_agent("lamad-app-query-attest", agent.clone(), &[dna])
+        .await?;
+    let cell = app.cells().first().expect("cell installed").clone();
+
+    let subject_cid = agent.to_string();
+
+    // Issue an attestation against the subject
+    let issue_input = IssueAttestationInput {
+        attestation_kind: "attestation:humanness".to_string(),
+        subject_cid: subject_cid.clone(),
+        subject_kind: "agent".to_string(),
+        title: "Humanness — confirmed".to_string(),
+        description: None,
+        reach: "community".to_string(),
+        metadata: serde_json::json!({ "humanness_method": "video_call", "confidence_score": 0.9 }),
+        parent_governance_action_cid: None,
+        vote_value: None,
+        proof_class: "witness".to_string(),
+        proof_evidence: serde_json::json!({ "class": "witness" }),
+        expires_at: None,
+    };
+
+    let issued: AttestationOutput = conductor
+        .call(&cell.zome("content_store"), "issue_attestation", issue_input)
+        .await;
+    assert!(!issued.cid.is_empty(), "issued cid must be set");
+
+    // Query attestations for the same subject_cid
+    let results: Vec<AttestationOutput> = conductor
+        .call(
+            &cell.zome("content_store"),
+            "get_attestations_for_subject",
+            subject_cid.clone(),
+        )
+        .await;
+
+    // At least the attestation we just issued must appear
+    assert!(!results.is_empty(), "must return at least one attestation");
+    let found = results
+        .iter()
+        .any(|a| a.cid == issued.cid && a.attestation_kind == "attestation:humanness");
+    assert!(found, "issued attestation must appear in query results");
+
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Scenario 7: get_governance_action_with_children returns parent + child votes (B.7)
+// ---------------------------------------------------------------------------
+
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "Requires packed DNA from Jenkins pipeline (just pack in dna/elohim)"]
+async fn get_governance_action_with_children_returns_parent_and_votes() -> Result<()> {
+    let (mut conductor, agent) = single_agent_conductor().await?;
+    let dna = load_dna(DNA, &network_seed(DNA), Some(agent.clone())).await?;
+    let app = conductor
+        .setup_app_for_agent("lamad-app-gov-children", agent.clone(), &[dna])
+        .await?;
+    let cell = app.cells().first().expect("cell installed").clone();
+
+    let subject_cid = agent.to_string();
+
+    // Propose a governance action
+    let propose_input = ProposeGovernanceActionInput {
+        governance_kind: "governance-action:renewal-request".to_string(),
+        subject_cid: subject_cid.clone(),
+        title: "Renewal — query test".to_string(),
+        description: None,
+        reach: "community".to_string(),
+        threshold: serde_json::json!({ "type": "m-of-n", "m": 3, "n": 5 }),
+        eligibility_predicate: None,
+        ballot_format: "approve-reject".to_string(),
+        closes_at: "2026-05-25T00:00:00Z".to_string(),
+        parameters: None,
+    };
+
+    let parent: GovernanceActionOutput = conductor
+        .call(&cell.zome("content_store"), "propose_governance_action", propose_input)
+        .await;
+    assert!(!parent.cid.is_empty(), "parent cid must be set");
+
+    // Cast a vote (creates a GovernanceActionChild link)
+    let vote_input = VoteOnGovernanceActionInput {
+        parent_governance_action_cid: parent.cid.clone(),
+        vote_value: "approve".to_string(),
+        vote_weight: None,
+        evidence: None,
+    };
+
+    let vote: AttestationOutput = conductor
+        .call(&cell.zome("content_store"), "vote_on_governance_action", vote_input)
+        .await;
+    assert!(!vote.cid.is_empty(), "vote cid must be set");
+
+    // Query the governance action with its children
+    let result: GovernanceActionWithChildren = conductor
+        .call(
+            &cell.zome("content_store"),
+            "get_governance_action_with_children",
+            parent.cid.clone(),
+        )
+        .await;
+
+    assert_eq!(result.parent.cid, parent.cid, "parent cid must match");
+    assert_eq!(
+        result.parent.governance_kind,
+        "governance-action:renewal-request"
+    );
+    // At least the one vote we cast must appear in children
+    assert!(
+        !result.children.is_empty(),
+        "children must contain at least one vote"
+    );
+    let child_found = result
+        .children
+        .iter()
+        .any(|c| c.cid == vote.cid && c.attestation_kind == "attestation:renewal-approval");
+    assert!(child_found, "our vote must appear in children");
 
     Ok(())
 }

@@ -22,7 +22,7 @@
 //! The `child_attestation_kind_for_governance_action` mapping is hardcoded here pending
 //! a codegen-emitted constant in a Task A.7 follow-up.
 
-use content_store_integrity::{EntryTypes, GOVERNANCE_ACTION_KINDS};
+use content_store_integrity::{EntryTypes, LinkTypes, StringAnchor, GOVERNANCE_ACTION_KINDS};
 use hdk::prelude::*;
 
 use crate::attestation::{issue_attestation, AttestationOutput, IssueAttestationInput};
@@ -198,7 +198,87 @@ fn child_attestation_kind_for_governance_action(governance_kind: &str) -> Option
 }
 
 pub fn get_governance_action_with_children(
-    _parent_cid: String,
+    parent_cid: String,
 ) -> ExternResult<GovernanceActionWithChildren> {
-    unimplemented!("Task B.7")
+    // Resolve the parent governance-action Content entry by its CID (entry hash).
+    // Mirror B.6 adaptation: use get(AnyDhtHash) which accepts EntryHash,
+    // not must_get_valid_record which only accepts ActionHash.
+    let parent_entry_hash = EntryHash::try_from(parent_cid.clone())
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("invalid parent_cid: {e}"))))?;
+    let parent_record = get(AnyDhtHash::from(parent_entry_hash), GetOptions::default())?
+        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("parent governance action not found".into())))?;
+    let parent_content: content_store_integrity::Content = parent_record
+        .entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("decode parent: {e}"))))?
+        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("parent is not a Content entry".into())))?;
+
+    let proposer_cid = parent_content.author_id.clone().unwrap_or_default();
+    let parent_metadata: serde_json::Value = serde_json::from_str(&parent_content.metadata_json)
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("decode parent metadata: {e}"))))?;
+    let subject_cid = parent_metadata["subject_cid"]
+        .as_str()
+        .unwrap_or_default()
+        .to_string();
+    let closes_at = parent_metadata["closes_at"]
+        .as_str()
+        .unwrap_or_default()
+        .to_string();
+
+    let parent_output = GovernanceActionOutput {
+        cid: parent_cid.clone(),
+        governance_kind: parent_content.content_type,
+        subject_cid,
+        proposer_cid,
+        closes_at,
+    };
+
+    // Retrieve child attestations via GovernanceActionChild links.
+    // B.3/issue_attestation creates these links with base = StringAnchor keyed by
+    // "governance_action" + parent_cid (same pattern as AttestationToSubject anchor).
+    let parent_anchor = StringAnchor::new("governance_action", &parent_cid);
+    let parent_anchor_hash = hash_entry(&EntryTypes::StringAnchor(parent_anchor))?;
+
+    let child_links = get_links(
+        LinkQuery::try_new(parent_anchor_hash, LinkTypes::GovernanceActionChild)?,
+        GetStrategy::default(),
+    )?;
+
+    let mut children = Vec::with_capacity(child_links.len());
+    for link in child_links {
+        let child_entry_hash = link
+            .target
+            .into_entry_hash()
+            .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("child link target is not an EntryHash".into())))?;
+
+        let record = get(AnyDhtHash::from(child_entry_hash.clone()), GetOptions::default())?;
+        let Some(record) = record else {
+            continue;
+        };
+
+        let child_content: content_store_integrity::Content = record
+            .entry()
+            .to_app_option()
+            .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("decode child: {e}"))))?
+            .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("child link target is not a Content entry".into())))?;
+
+        let child_metadata: serde_json::Value =
+            serde_json::from_str(&child_content.metadata_json).unwrap_or_default();
+        let child_subject_cid = child_metadata["subject_cid"]
+            .as_str()
+            .unwrap_or_default()
+            .to_string();
+
+        children.push(crate::attestation::AttestationOutput {
+            cid: child_entry_hash.to_string(),
+            attestation_kind: child_content.content_type,
+            subject_cid: child_subject_cid,
+            issuer_cid: child_content.author_id.unwrap_or_default(),
+        });
+    }
+
+    Ok(GovernanceActionWithChildren {
+        parent: parent_output,
+        children,
+    })
 }

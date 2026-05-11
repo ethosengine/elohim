@@ -20,7 +20,7 @@ pub use manifest::*;
 pub mod attestation;
 pub mod governance_action;
 pub use attestation::{AttestationOutput as ConsolidatedAttestationOutput, IssueAttestationInput, RevokeAttestationInput};
-pub use governance_action::{GovernanceActionOutput, ProposeGovernanceActionInput, VoteOnGovernanceActionInput};
+pub use governance_action::{GovernanceActionOutput, GovernanceActionWithChildren, ProposeGovernanceActionInput, VoteOnGovernanceActionInput};
 
 // EPR Phase 3.5 T8: FeedbackSignal coordinator functions.
 pub mod feedback_signal;
@@ -11962,4 +11962,25 @@ pub fn vote_on_governance_action(
     input: VoteOnGovernanceActionInput,
 ) -> ExternResult<ConsolidatedAttestationOutput> {
     governance_action::vote_on_governance_action(input)
+}
+
+/// Query all attestations issued against a given subject CID.
+///
+/// Walks the `AttestationToSubject` links from the StringAnchor keyed by `subject_cid`
+/// (mirroring the link-creation pattern in `issue_attestation`) and returns all
+/// Content entries found at the link targets.
+#[hdk_extern]
+pub fn get_attestations_for_subject(subject_cid: String) -> ExternResult<Vec<ConsolidatedAttestationOutput>> {
+    attestation::get_attestations_for_subject(subject_cid)
+}
+
+/// Query a governance action Content entry and all of its child vote attestations.
+///
+/// Resolves the parent via its CID (entry hash), then walks the `GovernanceActionChild`
+/// links from the StringAnchor keyed by `parent_cid` and returns the tally-ready struct.
+#[hdk_extern]
+pub fn get_governance_action_with_children(
+    parent_cid: String,
+) -> ExternResult<GovernanceActionWithChildren> {
+    governance_action::get_governance_action_with_children(parent_cid)
 }

@@ -163,6 +163,51 @@ fn determine_validation_method(input: &IssueAttestationInput) -> &'static str {
     }
 }
 
+pub fn get_attestations_for_subject(subject_cid: String) -> ExternResult<Vec<AttestationOutput>> {
+    // Mirror B.3's link-creation pattern: base is a StringAnchor keyed by
+    // "attestation_subject" + subject_cid. This is the same anchor B.3 wrote to.
+    let subject_anchor = StringAnchor::new("attestation_subject", &subject_cid);
+    let subject_anchor_hash = hash_entry(&EntryTypes::StringAnchor(subject_anchor))?;
+
+    let links = get_links(
+        LinkQuery::try_new(subject_anchor_hash, LinkTypes::AttestationToSubject)?,
+        GetStrategy::default(),
+    )?;
+
+    let mut results = Vec::with_capacity(links.len());
+    for link in links {
+        let entry_hash = link
+            .target
+            .into_entry_hash()
+            .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("link target is not an EntryHash".into())))?;
+
+        // Mirror B.4 adaptation: use get(AnyDhtHash) which accepts EntryHash,
+        // not must_get_valid_record which only accepts ActionHash.
+        let record = get(AnyDhtHash::from(entry_hash.clone()), GetOptions::default())?;
+        let Some(record) = record else {
+            // Entry may have been pruned; skip silently.
+            continue;
+        };
+
+        let content: content_store_integrity::Content = record
+            .entry()
+            .to_app_option()
+            .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("decode attestation: {e}"))))?
+            .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("linked entry is not a Content entry".into())))?;
+
+        let issuer_cid = content.author_id.unwrap_or_default();
+
+        results.push(AttestationOutput {
+            cid: entry_hash.to_string(),
+            attestation_kind: content.content_type,
+            subject_cid: subject_cid.clone(),
+            issuer_cid,
+        });
+    }
+
+    Ok(results)
+}
+
 pub fn revoke_attestation(input: RevokeAttestationInput) -> ExternResult<AttestationOutput> {
     // Resolve the original attestation entry by its CID (entry hash).
     // Note: `must_get_valid_record` accepts ActionHash only; we use `get` with
