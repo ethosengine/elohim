@@ -1397,6 +1397,19 @@ diesel::table! {
     }
 }
 
+// Phase 4 — projection_events append-only log
+// Source of truth: DHT (EconomicEvent entry, content_store zome, action='ack-projection').
+// Rebuildable from rea_projection signal stream. Category C operational.
+diesel::table! {
+    projection_events (id) {
+        id                   -> Integer,
+        blob_hash            -> Text,
+        projector_agent_cid  -> Text,
+        emitted_at           -> Text,
+        source_action_hash   -> Text,
+    }
+}
+
 diesel::joinable!(epr_coupling -> epr_atoms (epr_cid));
 diesel::joinable!(epr_claims -> epr_atoms (epr_cid));
 
@@ -1477,6 +1490,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     premium_gates,
     proposal_options,
     projector_cursor,
+    projection_events,
     proposals,
     peer_transport_manifest,
     ranked_votes,

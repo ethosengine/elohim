@@ -130,6 +130,9 @@ pub mod tending;
 // EPR Phase 3.5 — standing_view (per-evaluator StandingScore projection, Category C operational)
 pub mod standing_view;
 
+// Phase 4 — projection_events append-only log (Category C, rebuildable from rea_projection stream)
+pub mod projection_events;
+
 use std::path::Path;
 use std::time::Duration;
 
