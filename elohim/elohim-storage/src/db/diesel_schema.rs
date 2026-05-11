@@ -1161,6 +1161,24 @@ diesel::table! {
     }
 }
 
+// View — diversity rollup over `observations`. Source of truth: aggregation
+// over the observations table. Classification: C.
+diesel::table! {
+    observation_diversity_summary (subject_cid, observation_kind) {
+        subject_cid              -> Text,
+        observation_kind         -> Text,
+        distinct_agents          -> BigInt,
+        distinct_households      -> BigInt,
+        distinct_collectives     -> BigInt,
+        distinct_regions         -> BigInt,
+        distinct_archetypes      -> BigInt,
+        distinct_compute_classes -> BigInt,
+        total_count              -> BigInt,
+        first_observed_at        -> BigInt,
+        last_observed_at         -> BigInt,
+    }
+}
+
 diesel::table! {
     audit_observations (id) {
         id               -> Integer,
@@ -1537,6 +1555,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     observations,
     observation_logs,
     observation_cursors,
+    observation_diversity_summary,
     peer_blob_inventory,
     peer_identity_bindings,
     peer_inventory_cursor,
