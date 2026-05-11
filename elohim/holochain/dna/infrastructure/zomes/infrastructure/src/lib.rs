@@ -49,20 +49,6 @@ fn doorway_to_wire(
     }
 }
 
-/// Convert integrity HealthAttestation to wire type.
-fn attestation_to_wire(
-    entry: &infrastructure_integrity::HealthAttestation,
-) -> infrastructure_types::HealthAttestation {
-    infrastructure_types::HealthAttestation {
-        attestor_doorway_id: entry.attestor_doorway_id.clone(),
-        operator_agent: entry.operator_agent.clone(),
-        subject_doorway_id: entry.subject_doorway_id.clone(),
-        observed_status: entry.observed_status.clone(),
-        response_time_ms: entry.response_time_ms,
-        conductor_healthy: entry.conductor_healthy,
-        timestamp: entry.timestamp,
-    }
-}
 
 /// Convert integrity ContentServer to wire type.
 fn content_server_to_wire(
@@ -112,12 +98,17 @@ pub enum InfrastructureSignal {
         heartbeat: DoorwayHeartbeat,
         author: AgentPubKey,
     },
-    /// DoorwayHeartbeatSummary was recorded (daily aggregate)
+    /// DoorwayHeartbeatSummary was committed to the consolidated attestation store.
+    /// action_hash and entry_hash are the elohim DNA's attestation record, not a local entry.
     DoorwaySummaryCommitted {
-        action_hash: ActionHash,
-        entry_hash: EntryHash,
-        summary: DoorwayHeartbeatSummary,
-        author: AgentPubKey,
+        doorway_id: String,
+        date: String,
+        uptime_ratio: f32,
+        total_content_served: u64,
+        peak_connections: u32,
+        heartbeat_count: u32,
+        /// CID of the consolidated attestation in elohim DNA (for provenance)
+        consolidated_cid: String,
     },
     /// ContentServer was registered or updated
     ContentServerCommitted {
@@ -126,12 +117,18 @@ pub enum InfrastructureSignal {
         server: ContentServer,
         author: AgentPubKey,
     },
-    /// HealthAttestation was recorded (peer observed another doorway)
+    /// HealthAttestation was committed to the consolidated attestation store.
+    /// Fields are sourced from the bridge output, not a local DHT entry.
     HealthAttestationCommitted {
-        action_hash: String,
-        entry_hash: String,
-        attestation: HealthAttestation,
-        author: String,
+        attestor_doorway_id: String,
+        subject_doorway_id: String,
+        observed_status: String,
+        response_time_ms: Option<u32>,
+        conductor_healthy: Option<bool>,
+        timestamp: i64,
+        operator_agent: String,
+        /// CID of the consolidated attestation in elohim DNA (for provenance)
+        consolidated_cid: String,
     },
     /// PeerStatus was recorded (self-authored availability snapshot)
     ///
@@ -199,18 +196,6 @@ pub fn post_commit(committed_actions: Vec<SignedActionHashed>) -> ExternResult<(
                 heartbeat,
                 author,
             })?;
-        } else if let Some(summary) = record
-            .entry()
-            .to_app_option::<DoorwayHeartbeatSummary>()
-            .ok()
-            .flatten()
-        {
-            emit_signal(InfrastructureSignal::DoorwaySummaryCommitted {
-                action_hash,
-                entry_hash,
-                summary,
-                author,
-            })?;
         } else if let Some(server) = record
             .entry()
             .to_app_option::<ContentServer>()
@@ -222,18 +207,6 @@ pub fn post_commit(committed_actions: Vec<SignedActionHashed>) -> ExternResult<(
                 entry_hash,
                 server,
                 author,
-            })?;
-        } else if let Some(attestation) = record
-            .entry()
-            .to_app_option::<HealthAttestation>()
-            .ok()
-            .flatten()
-        {
-            emit_signal(InfrastructureSignal::HealthAttestationCommitted {
-                action_hash: action_hash.to_string(),
-                entry_hash: entry_hash.to_string(),
-                attestation,
-                author: author.to_string(),
             })?;
         } else if let Some(ps) = record
             .entry()
@@ -525,6 +498,11 @@ pub fn record_heartbeat(input: RecordHeartbeatInput) -> ExternResult<ActionHash>
 ///
 /// Called at midnight UTC to summarize the previous day's heartbeats.
 /// Only the doorway's operator can record summaries.
+///
+/// Full-replacement bridge (Stage C): the local DoorwayHeartbeatSummary entry type
+/// has been removed. Summaries are now consolidated into elohim DNA via
+/// issue_attestation with attestation_kind "attestation:doorway-summary".
+/// The signal is emitted directly from this function after the bridge call succeeds.
 #[hdk_extern]
 pub fn record_daily_summary(input: RecordSummaryInput) -> ExternResult<ActionHash> {
     let agent_info = agent_info()?;
@@ -542,36 +520,50 @@ pub fn record_daily_summary(input: RecordSummaryInput) -> ExternResult<ActionHas
         )));
     }
 
-    let summary = DoorwayHeartbeatSummary {
-        doorway_id: input.doorway_id,
+    // Full-replacement: bridge to elohim consolidated attestation store.
+    let bridge_result = call_elohim_issue_attestation(ConsolidatedIssueAttestationInput {
+        attestation_kind: "attestation:doorway-summary".to_string(),
+        subject_cid: input.doorway_id.clone(),
+        subject_kind: "doorway".to_string(),
+        title: format!("Daily summary: {} for {}", input.doorway_id, input.date),
+        description: Some(format!(
+            "uptime={:.4} heartbeats={} peak_connections={}",
+            input.uptime_ratio, input.heartbeat_count, input.peak_connections
+        )),
+        reach: "community".to_string(),
+        metadata: serde_json::json!({
+            "doorway_id": input.doorway_id,
+            "date": input.date,
+            "uptime_ratio": input.uptime_ratio,
+            "total_content_served": input.total_content_served,
+            "peak_connections": input.peak_connections,
+            "heartbeat_count": input.heartbeat_count,
+        }),
+        parent_governance_action_cid: None,
+        vote_value: None,
+        proof_class: "operator-report".to_string(),
+        proof_evidence: serde_json::json!({
+            "class": "operator-report",
+            "operator_agent": agent_info.agent_initial_pubkey.to_string(),
+        }),
+        expires_at: None,
+    })?;
+
+    // Emit signal directly (no local entry — signal fires from bridge result).
+    emit_signal(InfrastructureSignal::DoorwaySummaryCommitted {
+        doorway_id: input.doorway_id.clone(),
         date: input.date.clone(),
         uptime_ratio: input.uptime_ratio,
         total_content_served: input.total_content_served,
         peak_connections: input.peak_connections,
         heartbeat_count: input.heartbeat_count,
-    };
+        consolidated_cid: bridge_result.cid.clone(),
+    })?;
 
-    let action_hash = create_entry(&EntryTypes::DoorwayHeartbeatSummary(summary))?;
-
-    // Link from doorway to summary
-    create_link(
-        doorway.action_hash,
-        action_hash.clone(),
-        LinkTypes::DoorwayToSummary,
-        (),
-    )?;
-
-    // Link by date for cross-doorway queries
-    let date_anchor = StringAnchor::new("summary_date", &input.date);
-    let date_anchor_hash = hash_entry(&EntryTypes::StringAnchor(date_anchor))?;
-    create_link(
-        date_anchor_hash,
-        action_hash.clone(),
-        LinkTypes::SummaryByDate,
-        (),
-    )?;
-
-    Ok(action_hash)
+    // Return a stable handle: the bridge CID hashed as a pseudo-ActionHash substitute.
+    // Callers receiving ActionHash use it as an opaque token; the real anchor is consolidated_cid.
+    // We return the doorway's action_hash as a stable, verifiable handle for this doorway.
+    Ok(doorway.action_hash)
 }
 
 /// Get recent heartbeats for a doorway
@@ -606,36 +598,29 @@ pub fn get_doorway_heartbeats(doorway_id: String) -> ExternResult<Vec<DoorwayHea
     Ok(heartbeats)
 }
 
-/// Get daily summaries for a doorway
+/// Get daily summaries for a doorway.
+///
+/// Stage C bridge: DoorwayHeartbeatSummary local entry type has been removed.
+/// Summaries are now consolidated into elohim DNA. This function returns an empty
+/// vec — callers (including update_doorway_tier) degrade gracefully to "Emerging"
+/// until Stage F wires a bridge query to elohim's get_attestations_for_subject.
 #[hdk_extern]
-pub fn get_doorway_summaries(doorway_id: String) -> ExternResult<Vec<DoorwayHeartbeatSummary>> {
-    let doorway = get_doorway_by_id(doorway_id.clone())?.ok_or_else(|| {
-        wasm_error!(WasmErrorInner::Guest(format!(
-            "Doorway '{}' not found",
-            doorway_id
-        )))
-    })?;
+pub fn get_doorway_summaries(_doorway_id: String) -> ExternResult<Vec<SummaryPlaceholder>> {
+    // TODO(Stage-F): bridge to elohim::get_attestations_for_subject(doorway_id,
+    // attestation_kind="attestation:doorway-summary") and translate results.
+    Ok(Vec::new())
+}
 
-    let query = LinkQuery::try_new(doorway.action_hash, LinkTypes::DoorwayToSummary)?;
-    let links = get_links(query, GetStrategy::default())?;
-
-    let mut summaries = Vec::new();
-    for link in links {
-        if let Some(action_hash) = link.target.clone().into_action_hash() {
-            if let Some(record) = get(action_hash, GetOptions::default())? {
-                if let Some(summary) = record
-                    .entry()
-                    .to_app_option::<DoorwayHeartbeatSummary>()
-                    .ok()
-                    .flatten()
-                {
-                    summaries.push(summary);
-                }
-            }
-        }
-    }
-
-    Ok(summaries)
+/// Placeholder shape for get_doorway_summaries pending Stage F bridge wiring.
+/// Mirrors the fields callers need for tier computation.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SummaryPlaceholder {
+    pub doorway_id: String,
+    pub date: String,
+    pub uptime_ratio: f32,
+    pub total_content_served: u64,
+    pub peak_connections: u32,
+    pub heartbeat_count: u32,
 }
 
 // =============================================================================
@@ -645,7 +630,11 @@ pub fn get_doorway_summaries(doorway_id: String) -> ExternResult<Vec<DoorwayHear
 /// Record a health attestation (peer observation of another doorway).
 ///
 /// Only a registered doorway operator can attest about another doorway.
-/// The attestation is linked from the SUBJECT doorway for discovery.
+///
+/// Full-replacement bridge (Stage C): the local HealthAttestation entry type has been
+/// removed. Attestations are consolidated into elohim DNA via issue_attestation with
+/// attestation_kind "attestation:device-health". Signal is emitted directly after the
+/// bridge call succeeds.
 #[hdk_extern]
 pub fn record_health_attestation(input: RecordHealthAttestationInput) -> ExternResult<ActionHash> {
     let agent_info = agent_info()?;
@@ -667,8 +656,8 @@ pub fn record_health_attestation(input: RecordHealthAttestationInput) -> ExternR
         )));
     }
 
-    // Verify subject doorway exists
-    let subject_doorway =
+    // Verify subject doorway exists (no local link needed — bridge handles DHT anchor)
+    let _subject_doorway =
         get_doorway_by_id(input.subject_doorway_id.clone())?.ok_or_else(|| {
             wasm_error!(WasmErrorInner::Guest(format!(
                 "Subject doorway '{}' not found",
@@ -676,103 +665,64 @@ pub fn record_health_attestation(input: RecordHealthAttestationInput) -> ExternR
             )))
         })?;
 
-    let attestation = HealthAttestation {
-        attestor_doorway_id: input.attestor_doorway_id,
-        operator_agent: agent_info.agent_initial_pubkey.to_string(),
-        subject_doorway_id: input.subject_doorway_id,
-        observed_status: input.observed_status,
-        response_time_ms: input.response_time_ms,
-        conductor_healthy: input.conductor_healthy,
-        timestamp,
-    };
+    let operator_agent = agent_info.agent_initial_pubkey.to_string();
 
-    let action_hash = create_entry(&EntryTypes::HealthAttestation(attestation.clone()))?;
-
-    // Link from SUBJECT doorway to attestation (for discovery: "who observed this doorway?")
-    create_link(
-        subject_doorway.action_hash,
-        action_hash.clone(),
-        LinkTypes::DoorwayToAttestation,
-        (),
-    )?;
-
-    // B.10 bridge: additionally write to elohim DNA's consolidated attestation store.
-    // The local create_entry above is kept so post_commit can still emit
-    // InfrastructureSignal::HealthAttestationCommitted for storage projection.
-    // Stage C will remove the local write once storage projects from elohim signals.
-    let _ = call_elohim_issue_attestation(ConsolidatedIssueAttestationInput {
+    // Full-replacement (Stage C): no local create_entry. Bridge to elohim consolidated store.
+    let bridge_result = call_elohim_issue_attestation(ConsolidatedIssueAttestationInput {
         attestation_kind: "attestation:device-health".to_string(),
-        subject_cid: attestation.subject_doorway_id.clone(),
+        subject_cid: input.subject_doorway_id.clone(),
         subject_kind: "device".to_string(),
-        title: format!("Health attestation: {}", attestation.subject_doorway_id),
+        title: format!("Health attestation: {}", input.subject_doorway_id),
         description: Some(format!(
-            "Observed status: {} — attestor: {}",
-            attestation.observed_status, attestation.attestor_doorway_id
+            "Observed status: {} - attestor: {}",
+            input.observed_status, input.attestor_doorway_id
         )),
         reach: "community".to_string(),
         metadata: serde_json::json!({
-            "attestor_doorway_id": attestation.attestor_doorway_id,
-            "subject_doorway_id": attestation.subject_doorway_id,
-            "observed_status": attestation.observed_status,
-            "response_time_ms": attestation.response_time_ms,
-            "conductor_healthy": attestation.conductor_healthy,
-            "timestamp": attestation.timestamp,
+            "attestor_doorway_id": input.attestor_doorway_id,
+            "subject_doorway_id": input.subject_doorway_id,
+            "observed_status": input.observed_status,
+            "response_time_ms": input.response_time_ms,
+            "conductor_healthy": input.conductor_healthy,
+            "timestamp": timestamp,
         }),
         parent_governance_action_cid: None,
         vote_value: None,
         proof_class: "witness".to_string(),
         proof_evidence: serde_json::json!({
             "class": "witness",
-            "operator_agent": attestation.operator_agent,
+            "operator_agent": operator_agent,
         }),
         expires_at: None,
-    });
+    })?;
 
-    Ok(action_hash)
+    // Emit signal directly (no local entry - signal fires from bridge result).
+    emit_signal(InfrastructureSignal::HealthAttestationCommitted {
+        attestor_doorway_id: input.attestor_doorway_id.clone(),
+        subject_doorway_id: input.subject_doorway_id.clone(),
+        observed_status: input.observed_status.clone(),
+        response_time_ms: input.response_time_ms,
+        conductor_healthy: input.conductor_healthy,
+        timestamp,
+        operator_agent,
+        consolidated_cid: bridge_result.cid.clone(),
+    })?;
+
+    // Return attestor doorway's action_hash as stable opaque handle.
+    // The real DHT anchor is bridge_result.cid in elohim DNA.
+    Ok(attestor_doorway.action_hash)
 }
 
 /// Get all health attestations for a doorway (observations by peers).
+///
+/// Stage C bridge: HealthAttestation local entry type has been removed.
+/// Returns empty vec — callers preserve their signature pending Stage F wiring to
+/// elohim's get_attestations_for_subject(doorway_id, "attestation:device-health").
 #[hdk_extern]
-pub fn get_doorway_attestations(doorway_id: String) -> ExternResult<Vec<HealthAttestationOutput>> {
-    let doorway = get_doorway_by_id(doorway_id.clone())?.ok_or_else(|| {
-        wasm_error!(WasmErrorInner::Guest(format!(
-            "Doorway '{}' not found",
-            doorway_id
-        )))
-    })?;
-
-    let query = LinkQuery::try_new(doorway.action_hash, LinkTypes::DoorwayToAttestation)?;
-    let links = get_links(query, GetStrategy::default())?;
-
-    let mut attestations = Vec::new();
-    for link in links {
-        if let Some(action_hash) = link.target.clone().into_action_hash() {
-            if let Some(record) = get(action_hash.clone(), GetOptions::default())? {
-                if let Some(attestation) = record
-                    .entry()
-                    .to_app_option::<HealthAttestation>()
-                    .ok()
-                    .flatten()
-                {
-                    let entry_hash = record
-                        .action()
-                        .entry_hash()
-                        .map(|h| h.to_string())
-                        .unwrap_or_default();
-                    let author = record.action().author().to_string();
-
-                    attestations.push(HealthAttestationOutput {
-                        action_hash: action_hash.to_string(),
-                        entry_hash,
-                        attestation: attestation_to_wire(&attestation),
-                        author,
-                    });
-                }
-            }
-        }
-    }
-
-    Ok(attestations)
+pub fn get_doorway_attestations(_doorway_id: String) -> ExternResult<Vec<HealthAttestationOutput>> {
+    // TODO(Stage-F): bridge to elohim::get_attestations_for_subject(doorway_id,
+    // attestation_kind="attestation:device-health") and translate to HealthAttestationOutput.
+    Ok(Vec::new())
 }
 
 // =============================================================================
@@ -1182,15 +1132,14 @@ pub fn init(_: ()) -> ExternResult<InitCallbackResult> {
 }
 
 // =============================================================================
-// Cross-DNA Bridges (Stage B consolidation)
+// Cross-DNA Bridges (Stage C — full-replacement)
 //
-// B.10: Bridge health attestations to elohim DNA's content_store::issue_attestation
-// so they are consolidated under "attestation:device-health" on elohim DHT.
-//
-// The local create_entry(&EntryTypes::HealthAttestation) is PRESERVED because
-// post_commit emits InfrastructureSignal::HealthAttestationCommitted from the
-// local entry. The bridge call is ADDITIVE (dual-write during Stage B).
-// Stage C will remove the legacy HealthAttestation entry type and local write.
+// C.3.a: HealthAttestation and DoorwayHeartbeatSummary local entry types removed.
+// Both record_health_attestation and record_daily_summary now bridge exclusively to
+// elohim DNA's content_store::issue_attestation under:
+//   - "attestation:device-health"  (health attestations)
+//   - "attestation:doorway-summary" (daily summaries)
+// Signals are emitted directly from coordinator functions after bridge success.
 // =============================================================================
 
 /// Input wire type — wire-compatible with elohim DNA's content_store::issue_attestation.

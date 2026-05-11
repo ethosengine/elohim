@@ -117,43 +117,11 @@ pub struct DoorwayHeartbeat {
     pub timestamp: String,
 }
 
-/// DoorwayHeartbeatSummary - Daily aggregate kept forever for reputation.
-///
-/// At midnight UTC, doorways summarize their previous day's heartbeats
-/// and prune the detailed records. Summaries build the long-term trust history.
-#[hdk_entry_helper]
-#[derive(Clone, PartialEq)]
-pub struct DoorwayHeartbeatSummary {
-    pub doorway_id: String,               // References DoorwayRegistration.id
-    pub date: String,                     // "2024-01-15" (UTC date)
-    pub uptime_ratio: f32,                // Average uptime for the day
-    pub total_content_served: u64,        // Total bytes served
-    pub peak_connections: u32,            // Maximum concurrent connections
-    pub heartbeat_count: u32,             // How many heartbeats received (expect ~1440)
-}
+// DoorwayHeartbeatSummary removed (Stage C.3.a): consolidated into elohim DNA under
+// attestation_kind "attestation:doorway-summary" via content_store::issue_attestation.
 
-/// A peer doorway's observation of another doorway's health.
-/// Published to DHT so all nodes see cross-validated health.
-#[hdk_entry_helper]
-#[derive(Clone, PartialEq)]
-pub struct HealthAttestation {
-    /// Doorway ID of the observer (must match author's DoorwayRegistration)
-    pub attestor_doorway_id: String,
-    /// Agent pubkey of the attestor (must match entry author)
-    pub operator_agent: String,
-    /// Doorway ID of the subject being observed
-    pub subject_doorway_id: String,
-    /// Observed status: "online", "degraded", "unreachable"
-    pub observed_status: String,
-    /// Response time in milliseconds (None if unreachable)
-    pub response_time_ms: Option<u32>,
-    /// Whether the subject's conductor pool was healthy (from /health response)
-    pub conductor_healthy: Option<bool>,
-    /// When the probe happened
-    pub timestamp: i64,
-}
-
-const ATTESTATION_STATUSES: &[&str] = &["online", "degraded", "unreachable"];
+// HealthAttestation removed (Stage C.3.a): consolidated into elohim DNA under
+// attestation_kind "attestation:device-health" via content_store::issue_attestation.
 
 // =============================================================================
 // Content Server Types (P2P Content Publishing)
@@ -266,8 +234,8 @@ impl StringAnchor {
 pub enum EntryTypes {
     DoorwayRegistration(DoorwayRegistration),
     DoorwayHeartbeat(DoorwayHeartbeat),
-    DoorwayHeartbeatSummary(DoorwayHeartbeatSummary),
-    HealthAttestation(HealthAttestation),
+    // DoorwayHeartbeatSummary removed (Stage C.3.a) — see comment above
+    // HealthAttestation removed (Stage C.3.a) — see comment above
     ContentServer(ContentServer),
     StringAnchor(StringAnchor),
     PeerStatus(PeerStatus),
@@ -289,12 +257,9 @@ pub enum LinkTypes {
     // DoorwayHeartbeat links (recent, pruned daily)
     DoorwayToHeartbeat,         // DoorwayRegistration -> DoorwayHeartbeat
 
-    // HealthAttestation links
-    DoorwayToAttestation,       // DoorwayRegistration (subject) -> HealthAttestation (peer observations about this doorway)
-
-    // DoorwayHeartbeatSummary links (kept forever)
-    DoorwayToSummary,           // DoorwayRegistration -> DoorwayHeartbeatSummary
-    SummaryByDate,              // Anchor(date) -> DoorwayHeartbeatSummary
+    // DoorwayToAttestation removed (Stage C.3.a) — HealthAttestation entry type removed
+    // DoorwayToSummary removed (Stage C.3.a) — DoorwayHeartbeatSummary entry type removed
+    // SummaryByDate removed (Stage C.3.a) — DoorwayHeartbeatSummary entry type removed
 
     // ContentServer links (P2P content publishing)
     HashToContentServer,        // Anchor(content_hash) -> ContentServer
@@ -326,12 +291,6 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                     }
                     EntryTypes::DoorwayHeartbeat(heartbeat) => {
                         validate_doorway_heartbeat(&heartbeat)
-                    }
-                    EntryTypes::DoorwayHeartbeatSummary(summary) => {
-                        validate_doorway_summary(&summary)
-                    }
-                    EntryTypes::HealthAttestation(attestation) => {
-                        validate_health_attestation(&attestation, &action)
                     }
                     EntryTypes::ContentServer(server) => {
                         validate_content_server(&server)
@@ -438,66 +397,6 @@ fn validate_doorway_heartbeat(heartbeat: &DoorwayHeartbeat) -> ExternResult<Vali
     if heartbeat.uptime_ratio < 0.0 || heartbeat.uptime_ratio > 1.0 {
         return Ok(ValidateCallbackResult::Invalid(
             "uptime_ratio must be between 0.0 and 1.0".to_string(),
-        ));
-    }
-
-    Ok(ValidateCallbackResult::Valid)
-}
-
-/// Validate DoorwayHeartbeatSummary
-fn validate_doorway_summary(summary: &DoorwayHeartbeatSummary) -> ExternResult<ValidateCallbackResult> {
-    // Validate uptime_ratio is in valid range
-    if summary.uptime_ratio < 0.0 || summary.uptime_ratio > 1.0 {
-        return Ok(ValidateCallbackResult::Invalid(
-            "uptime_ratio must be between 0.0 and 1.0".to_string(),
-        ));
-    }
-
-    // Validate date format (basic check for YYYY-MM-DD)
-    if summary.date.len() != 10 || summary.date.chars().nth(4) != Some('-') {
-        return Ok(ValidateCallbackResult::Invalid(
-            "date must be in YYYY-MM-DD format".to_string(),
-        ));
-    }
-
-    Ok(ValidateCallbackResult::Valid)
-}
-
-/// Validate HealthAttestation
-fn validate_health_attestation(
-    attestation: &HealthAttestation,
-    action: &Create,
-) -> ExternResult<ValidateCallbackResult> {
-    if attestation.attestor_doorway_id.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid(
-            "attestor_doorway_id cannot be empty".to_string(),
-        ));
-    }
-
-    if attestation.subject_doorway_id.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid(
-            "subject_doorway_id cannot be empty".to_string(),
-        ));
-    }
-
-    if attestation.attestor_doorway_id == attestation.subject_doorway_id {
-        return Ok(ValidateCallbackResult::Invalid(
-            "Cannot attest about yourself".to_string(),
-        ));
-    }
-
-    if attestation.operator_agent != action.author.to_string() {
-        return Ok(ValidateCallbackResult::Invalid(
-            "operator_agent must match the entry author".to_string(),
-        ));
-    }
-
-    if !ATTESTATION_STATUSES.contains(&attestation.observed_status.as_str()) {
-        return Ok(ValidateCallbackResult::Invalid(
-            format!(
-                "Invalid observed_status '{}'. Must be one of: {:?}",
-                attestation.observed_status, ATTESTATION_STATUSES
-            ),
         ));
     }
 
