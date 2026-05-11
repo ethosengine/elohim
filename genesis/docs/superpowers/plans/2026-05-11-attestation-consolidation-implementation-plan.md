@@ -98,19 +98,44 @@
 
 ## Stage ordering and dependencies
 
-| Order | Stage | Depends on | Build surface | Estimated tasks |
+**Revised 2026-05-11 (mid-sprint)** — after Stages A, B, C.1 landed, reality drift forced a re-org of the destructive removals and a parallel-execution structure for the back half.
+
+| Order | Stage | Depends on | Build surface | Parallel group |
 |---|---|---|---|---|
-| 1 | A — Manifest & schema substrate | none | sdk only | 8 |
-| 2 | B — Coordinator zomes (elohim DNA) | A | elohim DNA only | 10 |
-| 3 | C — Integrity zomes + legacy removal | A, B | all 4 DNAs | 9 |
-| 4 | D — Storage projection | A, B (signal types) | elohim-storage | 11 |
-| 5 | E — HTTP API + storage-client | D | elohim-storage + storage-client-ts | 7 |
-| 6 | F — Angular consumers + a2o updates | E | app/elohim-app + a2o features | 8 |
-| 7 | G — Recovery protocol decoupling | B, D | elohim-storage + DNAs | 6 |
+| 1 | A — Manifest & schema substrate | none | sdk only | sequential (✅ landed) |
+| 2 | B — Coordinator zomes + bridges | A | elohim DNA + 3 bridge DNAs | sequential (✅ landed) |
+| 3 | C.1 — Discriminator-chain validator | B | elohim DNA (additive) | sequential (✅ landed) |
+| 4a | C.2 — Imagodei safe-removals | C.1 | imagodei DNA + elohim DNA scaffold | **Phase 1 parallel** |
+| 4b | C.3 — Mishpat + infra full-replacement | C.1 | mishpat + infrastructure DNAs | **Phase 1 parallel** |
+| 4c | C.4 — Elohim audited vestigial removals | C.1 | elohim DNA only | **Phase 1 parallel** |
+| 4d | D — Storage projection | A, B | elohim-storage (independent crate) | **Phase 1 parallel** |
+| 4e | G — Recovery decoupling | B | steward/node + imagodei DNA | **Phase 1 parallel** |
+| 5 | C.5 — DNA pack + sweettest | C.2, C.3, C.4 | all 4 DNAs | sequential gate |
+| 6 | E — HTTP API + storage-client | D | elohim-storage + storage-client-ts | sequential after Phase 1 |
+| 7 | F — Angular consumers + a2o | E | app/elohim-app + a2o features | sequential after E |
 
-Stages A–F are sequential and gate the consolidation. Stage G is optional in scope for this plan — per the spec, recovery flow keeps working via the unified primitive even before Shamir off-chain transport lands (shares stay in `metadata_json.evidence_json` temporarily). If PVC budget or time gets tight, defer Stage G to a follow-up plan.
+### Parallel-execution invariants
 
-This document covers Stages A through G in detail. Stages A–D are foundational and described with full task granularity. Stages E–G are described with task headers + key file paths + acceptance criteria; the engineer extends the bite-sized steps as they go, following the patterns established in earlier stages.
+**Phase 1 (C.2/C.3/C.4/D/G run in parallel as 5 subagents):**
+- Each subagent touches a *different cargo workspace* — no target/ contention.
+- Each subagent commits to the same branch via the worktree filesystem — git serializes commits naturally.
+- DO NOT run more than ONE `cargo build` concurrently at the operating-system level; subagents must each verify `df -h /projects ≥ 10G free` before building. The subagent framework's sequential build pattern handles this when subagents are dispatched one at a time within the SAME orchestration call; for cross-DNA parallelism, dispatch them in a single message and let each subagent run its own sequential builds inside its scope.
+- Forbid scopes per subagent:
+  - C.2 → only touches `elohim/holochain/dna/imagodei/` + small cleanup in `elohim/holochain/dna/elohim/zomes/content_store/src/lib.rs` (cycle-fix scaffold)
+  - C.3 → only touches `elohim/holochain/dna/mishpat/` + `elohim/holochain/dna/infrastructure/`
+  - C.4 → only touches `elohim/holochain/dna/elohim/zomes/content_store_integrity/`
+  - D → only touches `elohim/elohim-storage/`
+  - G → only touches `steward/` + `elohim/holochain/dna/imagodei/zomes/imagodei/` recovery flow (NOT entry types — those defer to Stage G's own internal sequencing)
+
+**Sequential gate after Phase 1:** C.5 packs all four DNAs and runs the sweettest suite. If any Phase 1 subagent reported BLOCKED, C.5 is held until the blocker is resolved.
+
+**Phase 2 (E) and Phase 3 (F):** strictly sequential after Phase 1 + C.5, because they cross the wire-protocol boundary that Phase 1 settled.
+
+### Reality-drift adjustments applied to revised Stage C
+
+The original Stage C plan assumed B.10 produced *full-replacement* bridges everywhere. Reality: B.9 (imagodei) was full-replacement but B.10 (mishpat + infrastructure) was *additive* (writes both locally and via cross-DNA call). The original C.4 "vestigial" claim was wrong for `CustodianCommitment` (14 live callers in shard replication) and `ContentSuccession` (live callers in versioning). Revised C.2/C.3/C.4 below reflect a "verify-before-remove" pattern and an explicit handoff between bridge-conversion and entry-type-removal.
+
+This document covers Stages A through G. Stages A–C.1 are landed. C.2–C.5 are revised below. D / E / F / G are described with task headers + key file paths + acceptance criteria; the engineer extends bite-sized steps as they go.
 
 ---
 
@@ -2206,36 +2231,63 @@ git add elohim/holochain/dna/elohim/zomes/content_store_integrity/src/attestatio
 git commit -m "feat(attestation): integrity zome discriminator-chain validator + 8 floors"
 ```
 
-### Task C.2 — Remove legacy entry types from imagodei DNA
+### Task C.2 — Imagodei safe-removals (REVISED 2026-05-11)
+
+**Source of truth:** Holochain DHT (Category A — removing redundant entry types; canonical state remains on DHT via the consolidated `Content` + `content_type: "attestation:*"` discriminator on elohim DNA).
+
+**Scope narrowed.** The original C.2 listed 14 entry types for removal. Reality audit (`grep create_entry imagodei/zomes/imagodei/src/lib.rs`) found 4 of those types are still actively written by the recovery protocol coordinator and have pre-commit security gates that B.9 deliberately did not bridge. Those types defer to **Stage G** (recovery decoupling), where they get migrated alongside the Shamir off-chain transport work.
 
 **Files:**
-- Modify: `elohim/holochain/dna/imagodei/zomes/imagodei_integrity/src/lib.rs`
+- Modify: `elohim/holochain/dna/imagodei/zomes/imagodei_integrity/src/lib.rs` (remove safe types only)
+- Modify: `elohim/holochain/dna/imagodei/zomes/imagodei/src/lib.rs` (remove dead `Attestation` struct usage in bridge return-shape construction)
+- Modify: `elohim/holochain/dna/elohim/zomes/content_store/src/lib.rs` (remove dead `Attestation` struct usage in `issue_attestation_via_imagodei` cycle-fix scaffold — synthesize `AttestationOutput` without constructing the legacy struct)
 
-- [ ] **Step 1: Delete the 11 legacy entry type definitions**
+**Entry types to remove NOW (safe — already fully bridged by B.9):**
+- `Attestation` (struct + variant + Link types AgentToAttestation, AttestationByCategory, AttestationByType)
+- `RenewalAttestation` (struct + variant + any associated link types)
+- `KeyStewardship` (struct + variant + links) — confirm no live callers via `grep create_entry.*EntryTypes::KeyStewardship` first; if any exist, defer to Stage G
+- `StewardshipGrant` (struct + variant + links) — confirm no live callers via grep first; if any exist, defer to Stage G
+- `IdentityChallenge` (struct + variant + links) — confirm no live callers; if any exist, defer to Stage G
+- `ChallengeSupport` (struct + variant + links) — confirm no live callers; if any exist, defer to Stage G
+- `IdentityFreeze` (struct + variant + links) — confirm no live callers; if any exist, defer to Stage G
+- `StewardshipAppeal` (struct + variant + links) — confirm no live callers; if any exist, defer to Stage G
+- `PolicyInheritance` (struct + variant + links) — confirm no live callers; if any exist, defer to Stage G
 
-Remove these struct definitions and their EntryTypes variants:
-- `Attestation` (struct + variant)
-- `HumanityWitness`
-- `KeyStewardship`
-- `StewardshipGrant`
-- `RenewalAttestation`
-- `RecoveryRequest`
-- `RecoveryVote`
-- `IdentityChallenge`
-- `ChallengeSupport`
-- `KeyRevocation`
-- `RevocationVote`
-- `IdentityFreeze`
-- `StewardshipAppeal`
-- `PolicyInheritance`
+**Entry types DEFERRED to Stage G (have live callers with security gates):**
+- `HumanityWitness` — `submit_intimate_witness` has 3 pre-commit gates + RecoveryV2Signal emission; bridge to `attestation:humanness` requires gate preservation
+- `RecoveryRequest` — recovery protocol primary entry
+- `RecoveryVote` — recovery protocol child vote entry
+- `KeyRevocation` — key rotation flow (lines 2195, 2337 of imagodei coordinator)
+- `RevocationVote` — key rotation voting (line 2543 of imagodei coordinator)
 
-NOTE: This is the destructive removal — the bridge wrappers in Task B.9 are now the only path. Sweettests for legacy imagodei coordinator functions MUST be updated to assert the bridged behavior.
+- [ ] **Step 1: Pre-audit each candidate**
 
-- [ ] **Step 2: Remove corresponding LinkTypes**
+```bash
+cd /projects/elohim/.claude/worktrees/attestation-consolidation
+for kind in Attestation RenewalAttestation KeyStewardship StewardshipGrant IdentityChallenge ChallengeSupport IdentityFreeze StewardshipAppeal PolicyInheritance; do
+  echo "=== $kind ==="
+  grep -n "create_entry.*EntryTypes::${kind}\b" elohim/holochain/dna/imagodei/zomes/imagodei/src/lib.rs
+done
+```
 
-Remove `AgentToAttestation`, `AttestationByCategory`, `AttestationByType`, and any other link types pointing to the removed entry types.
+For each candidate: if zero create_entry calls, proceed; if any calls exist (other than the Attestation cycle-fix scaffold), DEFER that one to Stage G with a comment.
 
-- [ ] **Step 3: Build the imagodei DNA**
+- [ ] **Step 2: Replace Attestation struct usage in bridge return-shapes**
+
+In `elohim/holochain/dna/imagodei/zomes/imagodei/src/lib.rs`, the bridge wrappers (`issue_attestation`, `get_agent_attestations`) currently build `Attestation { id, agent_id, ... }` structs to populate the legacy `AttestationOutput { action_hash, attestation: Attestation }` shape. Replace each construction site with a non-EntryType `AttestationView` plain struct (move the struct out of `imagodei_integrity::EntryTypes::Attestation` and into the coordinator module as a regular `#[derive(Serialize, Deserialize, Clone)]` struct named `LegacyAttestationView`). Update `AttestationOutput.attestation` to point at the view type. This keeps the legacy public API surface working until Stage F migrates the consumers.
+
+In `elohim/holochain/dna/elohim/zomes/content_store/src/lib.rs` line ~1048, do the same — replace the `Attestation { ... }` construction with `LegacyAttestationView { ... }` (or stop constructing it at all and return a minimal AttestationOutput with just `action_hash: ActionHash::from_raw_36(...) + attestation: None`).
+
+- [ ] **Step 3: Remove the entry-type definitions from imagodei_integrity**
+
+For each verified-safe candidate, delete:
+- The `pub struct <Name> { ... }` block
+- The `<Name>(<Name>)` variant in the `EntryTypes` enum
+- Any associated link types in the `LinkTypes` enum (search for the type name in link variants)
+
+- [ ] **Step 4: Build both DNAs**
+
+Verify `df -h /projects` shows ≥10G free, then run sequentially:
 
 ```bash
 cd elohim/holochain/dna/imagodei
@@ -2243,45 +2295,103 @@ cargo build --target wasm32-unknown-unknown -p imagodei_integrity
 cargo build --target wasm32-unknown-unknown -p imagodei
 ```
 
-Expected: SUCCESS (the coordinator's bridge wrappers from Task B.9 should not reference the removed types).
-
-- [ ] **Step 4: Commit**
+Then (because the elohim DNA imports imagodei_integrity types via cross-DNA import — verify by `grep imagodei_integrity elohim/holochain/dna/elohim/zomes/content_store/src/lib.rs`):
 
 ```bash
-git add elohim/holochain/dna/imagodei/zomes/imagodei_integrity/src/lib.rs
-git commit -m "remove(attestation): delete 14 legacy attestation-shaped entry types from imagodei DNA"
+cd ../elohim
+just check
 ```
 
-### Task C.3 — Remove legacy entry types from infrastructure + mishpat DNAs
+Expected: SUCCESS on all three builds.
 
-**Files:**
-- Modify: `elohim/holochain/dna/infrastructure/zomes/infrastructure_integrity/src/lib.rs`
-- Modify: `elohim/holochain/dna/mishpat/zomes/mishpat_integrity/src/lib.rs`
-
-- [ ] **Step 1: Remove infrastructure entries**
-
-Delete `HealthAttestation` and `DoorwayHeartbeatSummary` struct definitions and their EntryTypes variants.
-
-NOTE: Per spec §6.4, `DoorwayHeartbeat` is observation-shaped and stays in this DNA pending the Observation layer spec. Do NOT remove it now.
-
-- [ ] **Step 2: Remove mishpat entries**
-
-Delete struct definitions and EntryTypes variants:
-- `GateDecisionAttestation`
-- `ProposalVote`
-- `StatementVote`
-- `GovernanceReaction`
-- `Proposal`
-- `Challenge`
-- `GateDecisionChallenge`
-
-NOTE: Per spec §6.4, `OpinionStatement`, `Discussion`, `Precedent`, `GovernanceState`, `ChallengeOutcome`, `GraduatedFeedback` are NOT consolidated. Do NOT remove them.
-
-- [ ] **Step 3: Build both DNAs**
+- [ ] **Step 5: Commit**
 
 ```bash
-cd elohim/holochain/dna/infrastructure && cargo build --target wasm32-unknown-unknown -p infrastructure_integrity
-cd ../mishpat && cargo build --target wasm32-unknown-unknown -p mishpat_integrity
+git add elohim/holochain/dna/imagodei/zomes/imagodei_integrity/src/lib.rs \
+  elohim/holochain/dna/imagodei/zomes/imagodei/src/lib.rs \
+  elohim/holochain/dna/elohim/zomes/content_store/src/lib.rs
+git commit -m "remove(attestation): delete safely-bridged legacy entry types from imagodei DNA (recovery types deferred to Stage G)"
+```
+
+### Task C.3 — Convert additive bridges to full-replacement + remove legacy entry types (REVISED 2026-05-11)
+
+**Source of truth:** Holochain DHT (Category A — removing redundant per-DNA entry types; canonical state for the consolidated subtypes lives on elohim DNA via `Content` + `content_type` discriminator). Local query surfaces in mishpat/infrastructure that read these entry types must EITHER (a) be removed if no consumers OR (b) be rewritten to query elohim DNA via cross-DNA `call(...)`.
+
+**Scope reality:** B.10's bridges were *additive* (both local `create_entry` AND cross-DNA call). Removing entry types requires first removing local writes, then re-routing any query functions that read those entries. Each removed type needs three coordinated changes: (1) remove `create_entry(...)` calls in coordinator, (2) rework `get_*` / `query_*` functions that read those entries (route to elohim DNA or remove), (3) remove the entry-type definition from integrity.
+
+**Two separable scopes — commit each separately:**
+
+#### C.3.a — Infrastructure DNA (small surface)
+
+- Modify: `elohim/holochain/dna/infrastructure/zomes/infrastructure/src/lib.rs`
+- Modify: `elohim/holochain/dna/infrastructure/zomes/infrastructure_integrity/src/lib.rs`
+
+Target removals: `HealthAttestation`, `DoorwayHeartbeatSummary`.
+
+Per spec §6.4: `DoorwayHeartbeat` is observation-shaped and stays pending the Observation layer spec — DO NOT remove.
+
+- [ ] **Step 1: Convert `record_health_attestation` bridge from additive to full-replacement.** Remove the local `create_entry(&EntryTypes::HealthAttestation(...))` call (added in commit 563b07c93). Preserve the post-commit signal emission — the signal should fire AFTER the cross-DNA bridge call returns successfully, not from the local create.
+- [ ] **Step 2: Audit query functions.** Grep `grep -n "EntryTypes::HealthAttestation\|EntryTypes::DoorwayHeartbeatSummary" elohim/holochain/dna/infrastructure/zomes/infrastructure/src/lib.rs`. For each query: if it has Stage F consumers, replace with a bridge to elohim's `get_attestations_for_subject`; if no live consumers, remove the function.
+- [ ] **Step 3: Remove from integrity.** Delete the two struct definitions, EntryTypes variants, and associated LinkTypes.
+- [ ] **Step 4: Build.** Verify ≥10G free disk, then `cd elohim/holochain/dna/infrastructure && cargo build --target wasm32-unknown-unknown -p infrastructure_integrity && cargo build --target wasm32-unknown-unknown -p infrastructure`.
+- [ ] **Step 5: Commit.** `git commit -m "remove(attestation): convert infrastructure bridge to full-replacement + delete HealthAttestation/DoorwayHeartbeatSummary entry types"`.
+
+#### C.3.b — Mishpat DNA (large surface — 5 additive bridges from baf9e77b8)
+
+- Modify: `elohim/holochain/dna/mishpat/zomes/mishpat/src/lib.rs`
+- Modify: `elohim/holochain/dna/mishpat/zomes/mishpat_integrity/src/lib.rs`
+
+Target removals: `GateDecisionAttestation`, `ProposalVote`, `StatementVote`, `GovernanceReaction`, `Proposal`, `Challenge`, `GateDecisionChallenge`.
+
+Per spec §6.4: `OpinionStatement`, `Discussion`, `Precedent`, `GovernanceState`, `ChallengeOutcome`, `GraduatedFeedback` are NOT consolidated — DO NOT remove.
+
+- [ ] **Step 1: Flip each of the 5 additive bridges to full-replacement.** From commit baf9e77b8, the bridges are: `create_gate_decision_attestation`, `create_proposal_vote`, `create_statement_vote`, `create_proposal`, `create_challenge`. For each: remove the local `create_entry(...)` call; preserve any signal emissions AROUND the bridge call.
+- [ ] **Step 2: Audit query/read surfaces for each removed type.** Grep `grep -n "EntryTypes::TYPE\|to_app_option::<TYPE>" elohim/holochain/dna/mishpat/zomes/mishpat/src/lib.rs` for each. For functions like `get_proposal_by_id` / `query_proposals_by_status` / `list_proposal_votes`: each becomes a bridge call to elohim's `get_attestations_for_subject` or `get_governance_action_with_children` (mapped through the parent CID). If a query has no consumers Stage F will touch, remove it.
+- [ ] **Step 3: Remove all 7 entry-type definitions + variants from `mishpat_integrity`.** Also remove their LinkTypes if any.
+- [ ] **Step 4: Build.** Verify ≥10G free, then `cd elohim/holochain/dna/mishpat && cargo build --target wasm32-unknown-unknown -p mishpat_integrity && cargo build --target wasm32-unknown-unknown -p mishpat`.
+- [ ] **Step 5: Commit.** `git commit -m "remove(attestation): convert mishpat bridges to full-replacement + delete 7 legacy entry types"`.
+
+**Parallel-execution note:** C.3.a and C.3.b touch different DNAs (different cargo workspaces) and can run in parallel subagents. Within Phase 1 of the revised stage ordering they each run as their own subagent.
+
+### Task C.4 — Elohim DNA audited vestigial removals (REVISED 2026-05-11)
+
+**Source of truth:** Holochain DHT (Category A — removing redundant elohim DNA duplicate entry types; canonical attestation state lives via the consolidated `Content` + `content_type` discriminator on this same DNA).
+
+**Scope corrected.** The original plan claimed `Attestation`, `ContentAttestation`, `ContentSuccession`, `CustodianCommitment` were "never instantiated." Reality audit (2026-05-11): `CustodianCommitment` has 14 active `create_entry` calls in shard-replication code; `ContentSuccession` has at least one call (line 11474). Both are LIVE — NOT vestigial. Removing them would break the lamad blob/shard system and content versioning.
+
+**Confirmed-vestigial entry types (safe to remove):**
+- `Attestation` (in elohim DNA's content_store_integrity — duplicate of imagodei's; the cycle-fix scaffold at `content_store/lib.rs:1048` uses imagodei_integrity's struct after C.2's struct-relocation, so the elohim duplicate becomes truly unused)
+- `ContentAttestation` — confirm zero `create_entry` calls via `grep -n "EntryTypes::ContentAttestation" elohim/holochain/dna/elohim/zomes/`
+
+**Confirmed-live entry types (DO NOT remove in this plan):**
+- `ContentSuccession` (line 11474 of content_store/lib.rs — content versioning)
+- `CustodianCommitment` (14 callers in shard-replication code) — annotated to stay but not consolidated into the discriminator chain (it's a different category — shard custodianship is operational state, not credential-shaped attestation)
+
+**Files:**
+- Modify: `elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs`
+
+- [ ] **Step 1: Re-audit each candidate**
+
+```bash
+cd /projects/elohim/.claude/worktrees/attestation-consolidation
+for kind in Attestation ContentAttestation ContentSuccession CustodianCommitment; do
+  echo "=== $kind ==="
+  grep -n "EntryTypes::${kind}\b" elohim/holochain/dna/elohim/zomes/content_store/src/lib.rs | wc -l
+done
+```
+
+Expected: 0 for Attestation (after C.2 lands), 0 for ContentAttestation, ≥1 for ContentSuccession, ≥10 for CustodianCommitment. Remove only the zero-caller types.
+
+- [ ] **Step 2: Remove zero-caller types from integrity**
+
+Delete the struct definitions and EntryTypes variants for ONLY the audited-safe types. Add a comment near the remaining types noting "kept — consolidated path does not cover this shape (see spec §6.4 for category boundary)."
+
+- [ ] **Step 3: Build**
+
+Verify ≥10G free disk:
+```bash
+cd elohim/holochain/dna/elohim
+just check
 ```
 
 Expected: SUCCESS.
@@ -2289,40 +2399,11 @@ Expected: SUCCESS.
 - [ ] **Step 4: Commit**
 
 ```bash
-git add elohim/holochain/dna/infrastructure/zomes/infrastructure_integrity/src/lib.rs \
-  elohim/holochain/dna/mishpat/zomes/mishpat_integrity/src/lib.rs
-git commit -m "remove(attestation): delete 2 infrastructure + 7 mishpat legacy entry types"
-```
-
-### Task C.4 — Remove vestigial elohim DNA Attestation + ContentAttestation
-
-**Files:**
-- Modify: `elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs`
-
-- [ ] **Step 1: Delete vestigial entry types**
-
-Remove from the EntryTypes enum and struct definitions:
-- `Attestation` (vestigial duplicate of imagodei's, never instantiated)
-- `ContentAttestation`
-- `ContentSuccession`
-- `CustodianCommitment`
-
-- [ ] **Step 2: Build the DNA**
-
-```bash
-cd elohim/holochain/dna/elohim
-cargo build --target wasm32-unknown-unknown -p content_store_integrity
-cargo build --target wasm32-unknown-unknown -p content_store
-```
-
-Expected: SUCCESS (no callers — these were not instantiated).
-
-- [ ] **Step 3: Commit**
-
-```bash
 git add elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs
-git commit -m "remove(attestation): delete 4 vestigial / legacy attestation entry types from elohim DNA"
+git commit -m "remove(attestation): delete audited-vestigial Attestation/ContentAttestation from elohim DNA (ContentSuccession + CustodianCommitment kept — see plan)"
 ```
+
+**Sequencing:** C.4 depends on C.2 landing first because the elohim DNA's vestigial `Attestation` only becomes truly unused after C.2 relocates the bridge return-shape struct. If C.4 runs in parallel with C.2 via subagents, C.4 dispatch is gated by C.2's commit SHA being present on the worktree branch — verify before C.4 starts.
 
 ### Task C.5 — Pack and verify all DNAs
 
