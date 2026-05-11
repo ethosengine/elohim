@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://elohim.protocol/schemas/v1/attestation/attestation-content.schema.json",
+  "$comment": "Source of truth: Holochain DHT (notarized Content entry with content_type LIKE 'attestation:%'). Category A per p2p-design-gate.",
+  "title": "AttestationContent",
+  "description": "Wire shape for an attestation realized as a Content entry on elohim DNA. Source of truth is the Holochain DHT — this schema describes the JSON-on-wire shape only. See genesis/docs/superpowers/specs/2026-05-11-attestation-consolidation-design.md §3.",
+  "type": "object",
+  "required": [
+    "id",
+    "content_type",
+    "title",
+    "author_id",
+    "reach",
+    "metadata_json",
+    "created_at"
+  ],
+  "properties": {
+    "id": { "type": "string", "description": "CIDv1 — content-derived identity" },
+    "content_type": {
+      "type": "string",
+      "pattern": "^attestation:[a-z][a-z0-9-]*$",
+      "description": "Discriminator. Subtype must be declared in some pillar manifest's attestations section"
+    },
+    "title": { "type": "string", "minLength": 1 },
+    "description": { "type": "string" },
+    "author_id": { "type": "string", "description": "Issuer's agent CID (signed via Content action header)" },
+    "reach": { "type": "string", "enum": ["private", "community", "public", "commons"] },
+    "metadata_json": {
+      "type": "string",
+      "description": "Serialized JSON conforming to AttestationMetadata. See sibling proof-evidence.schema.json + per-subtype metadata schemas"
+    },
+    "tags": { "type": "array", "items": { "type": "string" } },
+    "related_node_ids": { "type": "array", "items": { "type": "string" } },
+    "created_at": { "type": "string", "format": "date-time" },
+    "schema_version": { "type": "integer", "minimum": 0 },
+    "validation_status": { "type": "string" }
+  }
+}

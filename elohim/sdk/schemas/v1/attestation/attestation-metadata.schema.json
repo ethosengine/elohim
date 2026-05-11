@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://elohim.protocol/schemas/v1/attestation/attestation-metadata.schema.json",
+  "$comment": "Source of truth: Holochain DHT (sub-shape of attestation Content entry's metadata_json). Category A per p2p-design-gate.",
+  "title": "AttestationMetadata",
+  "description": "Structured payload inside Content.metadata_json for attestation entries. Source of truth is the Holochain DHT — this schema describes the parsed JSON shape only.",
+  "type": "object",
+  "required": [
+    "attestation_kind",
+    "subject_cid",
+    "subject_kind",
+    "validation_method",
+    "proof_evidence"
+  ],
+  "properties": {
+    "attestation_kind": { "type": "string", "description": "Mirrors content_type subtype, denormalized for query" },
+    "subject_cid": { "type": "string" },
+    "subject_kind": { "type": "string", "enum": ["agent", "content", "device", "hub", "computation", "governance-action"] },
+    "validation_method": {
+      "type": "string",
+      "enum": ["self-attest", "peer-confirm", "M-of-N-vote", "audit-signature", "computational"]
+    },
+    "evidence_json": {
+      "type": "object",
+      "properties": {
+        "observation_refs": { "type": "array", "items": { "type": "string" } },
+        "observation_period_start": { "type": "string", "format": "date-time" },
+        "observation_period_end": { "type": "string", "format": "date-time" },
+        "summary_metric": { "type": "object", "additionalProperties": true }
+      }
+    },
+    "proof_evidence": { "$ref": "./proof-evidence.schema.json" },
+    "expires_at": { "type": ["string", "null"], "format": "date-time" },
+    "revocation": {
+      "type": ["object", "null"],
+      "properties": {
+        "reason": { "type": "string" },
+        "revoked_at": { "type": "string", "format": "date-time" },
+        "supersedes_cid": { "type": "string" }
+      },
+      "required": ["reason", "revoked_at", "supersedes_cid"]
+    },
+    "parent_governance_action_cid": { "type": ["string", "null"] },
+    "vote_value": { "type": ["string", "null"], "enum": ["approve", "reject", "abstain", null] },
+    "vote_weight": { "type": ["string", "null"] }
+  }
+}

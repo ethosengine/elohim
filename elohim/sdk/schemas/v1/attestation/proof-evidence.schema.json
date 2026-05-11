@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://elohim.protocol/schemas/v1/attestation/proof-evidence.schema.json",
+  "title": "ProofEvidence",
+  "description": "Pluggable proof-class evidence carried in AttestationMetadata.proof_evidence. See spec §3.3 + computation-attestation-graduated-rigor-design.md.",
+  "type": "object",
+  "required": ["class"],
+  "properties": {
+    "class": { "type": "string", "enum": ["witness", "audit", "proof", "confirmation"] },
+    "issuer_signature": { "type": "string", "description": "Inherited from Content action header for witness class" },
+    "merkle_root": { "type": "string", "description": "Required for audit class — Merkle root over Merkle-rooted inputs" },
+    "algorithm_id": { "type": "string", "description": "Required for audit/proof — pinned algorithm + version" },
+    "zkml_proof": { "type": "string", "description": "Required for proof class — zkML or equivalent cryptographic proof" },
+    "multi_attestor_chain": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Required for confirmation class — CIDs of corroborating attestations"
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "class": { "const": "audit" } } },
+      "then": { "required": ["merkle_root", "algorithm_id"] }
+    },
+    {
+      "if": { "properties": { "class": { "const": "proof" } } },
+      "then": { "required": ["zkml_proof", "algorithm_id"] }
+    },
+    {
+      "if": { "properties": { "class": { "const": "confirmation" } } },
+      "then": { "required": ["multi_attestor_chain"] }
+    }
+  ]
+}
