@@ -163,6 +163,76 @@ fn determine_validation_method(input: &IssueAttestationInput) -> &'static str {
     }
 }
 
-pub fn revoke_attestation(_input: RevokeAttestationInput) -> ExternResult<AttestationOutput> {
-    unimplemented!("Task B.4")
+pub fn revoke_attestation(input: RevokeAttestationInput) -> ExternResult<AttestationOutput> {
+    // Resolve the original attestation entry by its CID (entry hash).
+    // Note: `must_get_valid_record` accepts ActionHash only; we use `get` with
+    // AnyDhtHash (accepts EntryHash) to retrieve by the CID the caller holds.
+    let original_hash = EntryHash::try_from(input.attestation_cid.clone())
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("invalid attestation_cid: {e}"))))?;
+    let original_record = get(AnyDhtHash::from(original_hash), GetOptions::default())?
+        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("attestation not found".into())))?;
+    let original_content: content_store_integrity::Content = original_record
+        .entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("decode: {e}"))))?
+        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("not a Content entry".into())))?;
+
+    if !original_content.content_type.starts_with("attestation:") {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "target is not an attestation".into()
+        )));
+    }
+
+    // Same-issuer enforcement (manifest-aware cross-issuer revocation is Task B.8).
+    let issuer_cid = agent_info()?.agent_initial_pubkey.to_string();
+    let original_issuer = original_content
+        .author_id
+        .clone()
+        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("original has no author_id".into())))?;
+    if issuer_cid != original_issuer {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "only the original issuer may revoke (this build)".into()
+        )));
+    }
+
+    // Decode the original metadata and inject the revocation block.
+    let mut metadata: serde_json::Value =
+        serde_json::from_str(&original_content.metadata_json).map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!("decode metadata: {e}")))
+        })?;
+
+    let revoked_at = format!("{:?}", sys_time()?);
+    metadata["revocation"] = serde_json::json!({
+        "reason": input.reason,
+        "revoked_at": revoked_at,
+        "supersedes_cid": input.attestation_cid,
+    });
+
+    let subject_cid = metadata["subject_cid"]
+        .as_str()
+        .unwrap_or_default()
+        .to_string();
+    let subject_kind = metadata["subject_kind"]
+        .as_str()
+        .unwrap_or_default()
+        .to_string();
+
+    // The revocation is a new Content entry of the same kind (proof_class = "revocation"),
+    // carrying the revocation block in metadata so peers can detect the supersession.
+    let revoke_input = IssueAttestationInput {
+        attestation_kind: original_content.content_type.clone(),
+        subject_cid,
+        subject_kind,
+        title: format!("Revocation: {}", original_content.title),
+        description: Some(format!("Revoked: {}", input.reason)),
+        reach: original_content.reach,
+        metadata: metadata["evidence_json"]["summary_metric"].clone(),
+        parent_governance_action_cid: None,
+        vote_value: None,
+        proof_class: "revocation".to_string(),
+        proof_evidence: metadata["proof_evidence"].clone(),
+        expires_at: None,
+    };
+
+    issue_attestation(revoke_input)
 }

@@ -55,6 +55,13 @@ struct AttestationOutput {
     pub issuer_cid: String,
 }
 
+/// Mirror of `content_store::attestation::RevokeAttestationInput`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct RevokeAttestationInput {
+    pub attestation_cid: String,
+    pub reason: String,
+}
+
 // ---------------------------------------------------------------------------
 // Scenario 1: issue_attestation_humanness creates Content entry + subject link
 // ---------------------------------------------------------------------------
@@ -149,5 +156,72 @@ async fn issue_attestation_with_unknown_kind_is_rejected() -> Result<()> {
     //
     // For now: document the expected rejection; manual verification required.
     let _ = input; // suppress unused warning when test is #[ignore]d
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Scenario 3: revoke_attestation issues a superseding Content entry
+// ---------------------------------------------------------------------------
+
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "Requires packed DNA from Jenkins pipeline (just pack in dna/elohim)"]
+async fn revoke_attestation_issues_superseding_content_entry() -> Result<()> {
+    let (mut conductor, agent) = single_agent_conductor().await?;
+    let dna = load_dna(DNA, &network_seed(DNA), Some(agent.clone())).await?;
+    let app = conductor
+        .setup_app_for_agent("lamad-app-revoke", agent.clone(), &[dna])
+        .await?;
+    let cell = app.cells().first().expect("cell installed").clone();
+
+    // Issue the original attestation first. Use the agent's own pubkey as the
+    // subject_cid — same adaptation as Scenario 1 (no create_test_human helper).
+    let subject_cid = agent.to_string();
+    let issue_input = IssueAttestationInput {
+        attestation_kind: "attestation:humanness".to_string(),
+        subject_cid: subject_cid.clone(),
+        subject_kind: "agent".to_string(),
+        title: "Humanness — video call".to_string(),
+        description: None,
+        reach: "community".to_string(),
+        metadata: serde_json::json!({ "humanness_method": "video_call", "confidence_score": 0.9 }),
+        parent_governance_action_cid: None,
+        vote_value: None,
+        proof_class: "witness".to_string(),
+        proof_evidence: serde_json::json!({ "class": "witness" }),
+        expires_at: None,
+    };
+
+    let original: AttestationOutput = conductor
+        .call(&cell.zome("content_store"), "issue_attestation", issue_input)
+        .await;
+
+    assert!(!original.cid.is_empty(), "original cid must be set");
+
+    // Now revoke the original.
+    let revoke_input = RevokeAttestationInput {
+        attestation_cid: original.cid.clone(),
+        reason: "credential expired early due to policy change".to_string(),
+    };
+
+    let revocation: AttestationOutput = conductor
+        .call(&cell.zome("content_store"), "revoke_attestation", revoke_input)
+        .await;
+
+    // The revocation is a NEW attestation entry of the same kind.
+    assert_eq!(
+        revocation.attestation_kind, "attestation:humanness",
+        "revocation kind must match original"
+    );
+    assert_ne!(
+        revocation.cid, original.cid,
+        "revocation must be a distinct entry"
+    );
+    assert_eq!(
+        revocation.issuer_cid, original.issuer_cid,
+        "same issuer must hold for revocation"
+    );
+    // The CID is non-empty — the revocation Content was committed to the chain.
+    assert!(!revocation.cid.is_empty(), "revocation cid must be set");
+
     Ok(())
 }
