@@ -1045,7 +1045,8 @@ fn issue_attestation_via_imagodei(
     // Synthesise a legacy AttestationOutput shape for backward-compatible callers.
     // The action_hash is a zero sentinel — the canonical record is the elohim Content
     // entry whose entry_hash == consolidated.cid.
-    let attestation = Attestation {
+    // C.4: uses LegacyAttestationShim (local) — content_store_integrity::Attestation removed.
+    let attestation = LegacyAttestationShim {
         id: consolidated.cid.clone(),
         agent_id: input.agent_id,
         category: input.category,
@@ -1081,11 +1082,31 @@ pub struct IssueAttestationBridgeInput {
     pub expires_at: Option<String>,
 }
 
+/// Legacy shim for the Attestation struct field (C.4: integrity Attestation entry type removed).
+/// Mirrors content_store_integrity::Attestation's field layout to keep the backward-compat
+/// issue_attestation_via_imagodei shim compiling. Stage F removes this surface entirely.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LegacyAttestationShim {
+    pub id: String,
+    pub agent_id: String,
+    pub category: String,
+    pub attestation_type: String,
+    pub display_name: String,
+    pub description: String,
+    pub icon_url: Option<String>,
+    pub tier: Option<String>,
+    pub earned_via_json: String,
+    pub issued_at: String,
+    pub issued_by: String,
+    pub expires_at: Option<String>,
+    pub proof: Option<String>,
+}
+
 /// Output from attestation operations (matches imagodei's AttestationOutput)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AttestationOutput {
     pub action_hash: ActionHash,
-    pub attestation: Attestation,
+    pub attestation: LegacyAttestationShim,
 }
 
 // =============================================================================
@@ -1933,55 +1954,10 @@ pub struct UpdateAgentProgressInput {
 // Input/Output Types for Content Attestations (Trust claims about content)
 // =============================================================================
 
-/// Input for creating a content attestation
-#[derive(Serialize, Deserialize, Debug)]
-pub struct CreateContentAttestationInput {
-    pub id: Option<String>,
-    pub content_id: String,
-    pub attestation_type: String,
-    pub reach_granted: String,
-    pub granted_by_json: String,
-    pub expires_at: Option<String>,
-    pub evidence_json: Option<String>,
-    pub scope_json: Option<String>,
-    pub metadata_json: Option<String>,
-}
-
-/// Output for content attestation
-#[derive(Serialize, Deserialize, Debug)]
-pub struct ContentAttestationOutput {
-    pub action_hash: ActionHash,
-    pub entry_hash: EntryHash,
-    pub content_attestation: ContentAttestation,
-}
-
-/// Input for querying content attestations
-#[derive(Serialize, Deserialize, Debug)]
-pub struct QueryContentAttestationsInput {
-    pub content_id: Option<String>,
-    pub attestation_type: Option<String>,
-    pub reach_granted: Option<String>,
-    pub status: Option<String>,
-    pub limit: Option<u32>,
-}
-
-/// Input for updating a content attestation
-#[derive(Serialize, Deserialize, Debug)]
-pub struct UpdateContentAttestationInput {
-    pub id: String,
-    pub status: Option<String>,
-    pub revocation_json: Option<String>,
-    pub metadata_json: Option<String>,
-}
-
-/// Input for revoking a content attestation
-#[derive(Serialize, Deserialize, Debug)]
-pub struct RevokeContentAttestationInput {
-    pub id: String,
-    pub revoked_by: String,
-    pub reason: String,
-    pub appealable: bool,
-}
+// REMOVED: ContentAttestationOutput, CreateContentAttestationInput,
+// QueryContentAttestationsInput, UpdateContentAttestationInput,
+// RevokeContentAttestationInput — all referenced content_store_integrity::ContentAttestation
+// which was removed in C.4. No hdk_extern functions implemented these types.
 
 // =============================================================================
 // Input/Output Types for Learning Paths

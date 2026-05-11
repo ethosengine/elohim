@@ -1054,27 +1054,11 @@ pub struct ContentMastery {
     pub validation_status: String,
 }
 
-/// Attestation - Permanent achievement record.
-///
-/// Attestations are PERMANENT ACHIEVEMENTS, not competency tracking.
-/// ContentMastery handles graduated competency.
-#[hdk_entry_helper]
-#[derive(Clone, PartialEq)]
-pub struct Attestation {
-    pub id: String,
-    pub agent_id: String,
-    pub category: String,         // AttestationCategory
-    pub attestation_type: String, // Specific type within category
-    pub display_name: String,
-    pub description: String,
-    pub icon_url: Option<String>,
-    pub tier: Option<String>,    // bronze, silver, gold, platinum
-    pub earned_via_json: String, // EarnedVia details as JSON
-    pub issued_at: String,
-    pub issued_by: String, // System, steward, governance, or peer
-    pub expires_at: Option<String>,
-    pub proof: Option<String>, // Cryptographic signature
-}
+// REMOVED: `Attestation` DHT entry type (attestation-consolidation C.4).
+// Was a duplicate of imagodei_integrity::Attestation; zero EntryTypes callers after C.2
+// relocated the bridge return-shape to imagodei_integrity::LegacyAttestationView.
+// Canonical attestation entries now live as elohim DNA Content entries with
+// content_type "attestation:<subtype>" discriminator. See spec §6.4.
 
 // =============================================================================
 // Shefa: Economic Event Entry
@@ -2877,66 +2861,11 @@ pub struct MediationLog {
 
 pub const MEDIATION_CHOICES: [&str; 3] = ["proceed", "reconsider", "escalate"];
 
-// =============================================================================
-// Lamad: Content Attestation Entry - Trust Claims About Content
-// =============================================================================
-//
-// ContentAttestation is DIFFERENT from Attestation (agent credentials):
-// - Attestation = credentials granted to AGENTS (path completion, role credentials)
-// - ContentAttestation = trust claims about CONTENT (author verified, peer reviewed)
-//
-// ContentAttestation enables the bidirectional trust model:
-// - Agents need attestations to ACCESS content (via ContentReach)
-// - Content needs attestations to REACH audiences (via reachGranted)
-//
-// See: elohim-app/src/app/lamad/models/content-attestation.model.ts
-
-/// ContentAttestation - Trust credential granted to CONTENT.
-///
-/// Enables reach-based access control:
-/// - Content starts with minimal reach (private)
-/// - Attestations grant additional reach levels
-/// - Reach levels: private < invited < local < community < commons
-#[hdk_entry_helper]
-#[derive(Clone, PartialEq)]
-pub struct ContentAttestation {
-    pub id: String,
-    pub content_id: String,
-    pub attestation_type: String, // CONTENT_ATTESTATION_TYPES
-    pub reach_granted: String,    // CONTENT_REACH_LEVELS
-    pub granted_by_json: String,  // AttestationGrantor serialized
-    pub granted_at: String,
-    pub expires_at: Option<String>,
-    pub status: String,                  // CONTENT_ATTESTATION_STATUS
-    pub revocation_json: Option<String>, // AttestationRevocation if revoked
-    pub evidence_json: Option<String>,   // AttestationEvidence
-    pub scope_json: Option<String>,      // AttestationScope (optional)
-    pub metadata_json: String,
-    pub created_at: String,
-    pub updated_at: String,
-    // Self-healing DNA fields
-    #[serde(default)]
-    pub schema_version: u32,
-    #[serde(default)]
-    pub validation_status: String,
-}
-
-/// Content attestation types (different from agent attestation categories)
-pub const CONTENT_ATTESTATION_TYPES: [&str; 10] = [
-    "author-verified",       // Author identity confirmed
-    "steward-approved",      // Domain steward reviewed and approved
-    "community-endorsed",    // Received N endorsements from community
-    "peer-reviewed",         // Formal review by qualified peers
-    "governance-ratified",   // Approved through governance process
-    "curriculum-canonical",  // Official learning content for a path
-    "safety-reviewed",       // Checked for harmful content
-    "accuracy-verified",     // Factual accuracy validated
-    "accessibility-checked", // Meets accessibility standards
-    "license-cleared",       // IP/licensing verified
-];
-
-/// Content attestation statuses
-pub const CONTENT_ATTESTATION_STATUS: [&str; 4] = ["active", "expired", "revoked", "superseded"];
+// REMOVED: `ContentAttestation` DHT entry type + CONTENT_ATTESTATION_TYPES/STATUS
+// constants (attestation-consolidation C.4). Zero EntryTypes::ContentAttestation
+// create_entry callers. Content trust claims are now expressed as elohim DNA
+// Content entries with content_type "attestation:content-trust" discriminator.
+// See spec §6.4.
 
 // =============================================================================
 // hREA Point System Entries - Value Flow Demonstration
@@ -3709,7 +3638,7 @@ pub enum EntryTypes {
     MasteryChallenge(MasteryChallenge),
     KnowledgeMap(KnowledgeMap),
     PathExtension(PathExtension),
-    ContentAttestation(ContentAttestation),
+    // REMOVED: ContentAttestation(ContentAttestation) — vestigial; see C.4 comment block above.
     // EPR Phase 3: Manifest entry — pillar projection mappings, app vocabularies, standing policies.
     Manifest(Manifest),
     // EPR Phase 3.5: FeedbackSignal — sense-respond signal on a content EPR.
@@ -3738,7 +3667,11 @@ pub enum EntryTypes {
     HumanProgress(HumanProgress), // Legacy
     Agent(Agent),                 // Expanded identity model
     AgentProgress(AgentProgress), // Expanded progress model
-    Attestation(Attestation),
+    // REMOVED: Attestation(Attestation) — vestigial duplicate of imagodei DNA type;
+    // zero create_entry callers after C.2 relocated the bridge return-shape. See C.4 comment.
+    // KEPT — not part of attestation-consolidation Category A. Shard custodianship
+    // (CustodianCommitment) is operational state, not credential-shaped attestation.
+    // 14 live callers in shard-replication code. See spec §6.4 for the category boundary.
     CustodianCommitment(CustodianCommitment), // Digital presence stewardship
 
     // Shefa: Economy (REA/ValueFlows)
@@ -3813,6 +3746,9 @@ pub enum EntryTypes {
     ImportBatch(ImportBatch),
 
     // Renewal Protocol: Content succession
+    // KEPT — not part of attestation-consolidation Category A. Content versioning
+    // (ContentSuccession) is a separate Content-shaped primitive with live callers.
+    // See spec §6.4 for the category boundary.
     ContentSuccession(ContentSuccession),
 
     // Infrastructure: Anchors
@@ -3937,13 +3873,10 @@ pub enum LinkTypes {
     // See: holochain/dna/imagodei/zomes/imagodei_integrity
     // =========================================================================
 
-    // =========================================================================
-    // Lamad: Content Attestation links (Content trust claims)
-    // =========================================================================
-    IdToContentAttestation, // Anchor(attestation_id) -> ContentAttestation
-    ContentToContentAttestation, // Anchor(content_id) -> ContentAttestation
-    ContentAttestationByType, // Anchor(attestation_type) -> ContentAttestation
-    ContentAttestationByReach, // Anchor(reach_granted) -> ContentAttestation
+    // REMOVED: Content Attestation links (C.4 attestation-consolidation)
+    // IdToContentAttestation, ContentToContentAttestation,
+    // ContentAttestationByType, ContentAttestationByReach —
+    // all pointed to the removed ContentAttestation entry type; zero callers.
 
     // =========================================================================
     // Imago Dei: CustodianCommitment links (Digital Presence Stewardship)
