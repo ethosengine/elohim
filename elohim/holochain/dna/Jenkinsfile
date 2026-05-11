@@ -542,7 +542,10 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                 [ -f "$HOME/.gitconfig" ] || printf "[safe]\\n    directory = *\\n" > "$HOME/.gitconfig"
                                 export GIT_CONFIG_GLOBAL="$HOME/.gitconfig"
 
-                                LOG="$(pwd)/dna-integration.log"
+                                # LOG is exported (not just set) so the inner
+                                # `bash -c '...'` invocation inherits it via
+                                # `nix develop --impure` env preservation.
+                                export LOG="$(pwd)/dna-integration.log"
                                 : > "$LOG"
 
                                 # Resource guards:
@@ -561,7 +564,20 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                 # (see SCCACHE_LOG_FILE below) so if the build-script
                                 # bug recurs we have ground truth in dna-integration-
                                 # sccache-daemon.log instead of guessing.
-                                nix develop --impure --accept-flake-config "$WORKSPACE/elohim/holochain/dna/elohim" --command bash -c "
+                                # `bash -c '...'` (single-quoted outer) — the inner
+                                # script is passed verbatim through Groovy and the
+                                # outer bash. Variables are expanded by the INNER
+                                # bash (which inherits SCCACHE_*, AWS_*, WORKSPACE,
+                                # LOG via env from the pod and outer shell). No
+                                # backslash escapes for $ or " are needed inside.
+                                # The only constraint here: avoid literal apostrophes
+                                # in this block (use double quotes for echo args,
+                                # reword apostrophes in comments). Prior double-quoted
+                                # variant broke twice (#1222, #1224) on quoting and
+                                # comment edge cases. The other DNA stages above
+                                # (manifest-hygiene, build-wasm, build-dna) all use
+                                # single-quoted bash -c and have shipped fine.
+                                nix develop --impure --accept-flake-config "$WORKSPACE/elohim/holochain/dna/elohim" --command bash -c '
                                     set -uo pipefail
                                     # sccache daemon log capture — written by sccache
                                     # daemon itself, not by cargo. SCCACHE_LOG=info
@@ -571,17 +587,9 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                     # patterns and surface any S3 write errors that
                                     # sccache silently swallows.
                                     export SCCACHE_LOG=info
-                                    # Note: outer bash sees this through `bash -c "..."`. The
-                                    # surrounding quotes around the path MUST be \\" (double
-                                    # backslash) so Groovy emits \" and bash treats it as an
-                                    # escaped quote inside the outer "..." rather than a
-                                    # premature terminator. Single backslash here is the
-                                    # bug from #1222 — it terminates the outer early and
-                                    # leaves $SCCACHE_LOG_FILE unbound in the OUTER shell.
-                                    # Match the same convention used by lines 631/639 below.
-                                    export SCCACHE_LOG_FILE=\\"\$WORKSPACE/elohim/holochain/tests/sweettest/dna-integration-sccache-daemon.log\\"
-                                    : > \\"\$SCCACHE_LOG_FILE\\"
-                                    # Defensive: explicitly disable cargo's incremental
+                                    export SCCACHE_LOG_FILE="$WORKSPACE/elohim/holochain/tests/sweettest/dna-integration-sccache-daemon.log"
+                                    : > "$SCCACHE_LOG_FILE"
+                                    # Defensive: explicitly disable cargo incremental
                                     # compilation (release profile already does this,
                                     # but explicit prevents any incremental/sccache
                                     # interaction surprise). Build-script caching is
@@ -593,19 +601,19 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                     sccache --start-server
                                     sccache --zero-stats
                                     export CARGO_BUILD_JOBS=2
-                                    # The flake exports RUSTFLAGS='--cfg getrandom_backend=\"custom\"'
+                                    # The flake exports RUSTFLAGS=--cfg getrandom_backend=custom
                                     # for WASM zome builds (Holochain provides the host RNG fn).
                                     # Sweettest is a NATIVE build — that flag makes the linker
-                                    # search for __getrandom_v03_custom which doesn't exist off-WASM.
+                                    # search for __getrandom_v03_custom which does not exist off-WASM.
                                     # See CLAUDE.md §RUSTFLAGS Override Required.
-                                    export RUSTFLAGS=\"\"
+                                    export RUSTFLAGS=""
 
                                     # Quarantined tests:
-                                    #   epr_2b_batch_a_full_loop — discards `create_human` output
-                                    #     into `serde_json::Value`, but `create_human` returns a
-                                    #     bare `ActionHash` (msgpack BIN, no Value variant). Test
-                                    #     body needs `let _human: ActionHash = ...` (one-line
-                                    #     type-annotation fix on a discarded var). Tracked under
+                                    #   epr_2b_batch_a_full_loop — discards create_human output
+                                    #     into serde_json::Value, but create_human returns a
+                                    #     bare ActionHash (msgpack BIN, no Value variant). Test
+                                    #     body needs (let _human: ActionHash = ...) one-line
+                                    #     type-annotation fix on a discarded var. Tracked under
                                     #     shift 2026-04-27T03-56-all-pipelines-green-or-unstable.
                                     #
                                     #   create_and_list_succeeds (attention_tending T9) —
@@ -622,7 +630,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                     #     list_my_tending output. Will resolve when #1 resolves.
                                     #
                                     #   cross_agent_get_returns_none (attention_tending T9) —
-                                    #     test asserts get(action_hash) returns None for a peer's
+                                    #     test asserts get(action_hash) returns None for a peer
                                     #     private entry, but Holochain 0.6 may return Some(Record)
                                     #     with NotStored entry (action header is public; entry is
                                     #     private). Test expectation likely needs revision to
@@ -636,18 +644,18 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                         --skip create_and_list_succeeds \\
                                         --skip refresh_ttl_appends_timestamp \\
                                         --skip cross_agent_get_returns_none \\
-                                        2>&1 | tee \\"$LOG\\"
-                                    CARGO_RC=\\${PIPESTATUS[0]}
+                                        2>&1 | tee "$LOG"
+                                    CARGO_RC=${PIPESTATUS[0]}
                                     # Capture sccache hit/miss/write stats to the
                                     # build log (visible immediately) and a sidecar
                                     # file (archived). Stop the daemon so its log
                                     # gets fully flushed before archive.
-                                    echo ''
-                                    echo '=== sccache stats (sweettest stage) ==='
-                                    sccache --show-stats 2>&1 | tee \\"\$WORKSPACE/elohim/holochain/tests/sweettest/dna-integration-sccache-stats.txt\\"
+                                    echo ""
+                                    echo "=== sccache stats (sweettest stage) ==="
+                                    sccache --show-stats 2>&1 | tee "$WORKSPACE/elohim/holochain/tests/sweettest/dna-integration-sccache-stats.txt"
                                     sccache --stop-server >/dev/null 2>&1 || true
-                                    exit \\$CARGO_RC
-                                "
+                                    exit $CARGO_RC
+                                '
                                 RC=${PIPESTATUS[0]}
 
                                 # Happy path — surface only the per-binary summary lines.
