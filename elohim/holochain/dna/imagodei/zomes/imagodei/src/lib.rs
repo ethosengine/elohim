@@ -2872,8 +2872,14 @@ fn is_active_emergency_contact(
     Ok(false)
 }
 
-/// Returns true if `authorizer_human_id` already has a `HumanityWitness` linked
+/// Returns true if `authorizer_human_id` already has a witness linked
 /// from the given request (via `RecoveryRequestToHumanityWitness`).
+///
+/// Stage G.A.2 bridge: after `submit_intimate_witness` writes to elohim DNA
+/// (not imagodei), the link target is a StringAnchor sentinel hash rather
+/// than a HumanityWitness entry. Dedupe is now tag-based: the link tag stores
+/// the authorizer_human_id bytes. This avoids the cross-DNA `to_app_option`
+/// deserialization that would fail if the target lived on elohim's DHT.
 fn has_existing_witness_for_request(
     request_hash: &ActionHash,
     authorizer_human_id: &str,
@@ -2885,21 +2891,9 @@ fn has_existing_witness_for_request(
         )?,
         GetStrategy::default(),
     )?;
+    let tag_bytes = authorizer_human_id.as_bytes();
     for link in links {
-        let Some(w_hash) = link.target.clone().into_action_hash() else {
-            continue;
-        };
-        let Some(record) = get(w_hash, GetOptions::default())? else {
-            continue;
-        };
-        let Some(w): Option<HumanityWitness> = record
-            .entry()
-            .to_app_option()
-            .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        else {
-            continue;
-        };
-        if w.witness_agent_id == authorizer_human_id {
+        if link.tag.0.as_slice() == tag_bytes {
             return Ok(true);
         }
     }
@@ -2908,16 +2902,39 @@ fn has_existing_witness_for_request(
 
 /// Submit an intimate witness attestation for a recovery request.
 ///
-/// Gates:
+/// Stage G.A.2 bridge: writes `attestation:humanness` to elohim DNA via
+/// `call_elohim_issue_attestation`. The legacy `HumanityWitness` entry type
+/// is NOT written to imagodei's source chain; the canonical entry lives on
+/// elohim DNA's DHT (content_type "attestation:humanness").
+///
+/// Gates are preserved in full ABOVE the bridge call:
 /// 1. RecoveryRequest must exist and have a populated human_id.
+///    Gate reads RecoveryRequest by hash (to_app_option::<RecoveryRequest>()).
+///    RecoveryRequest entry type STAYS on imagodei — see TODO below for why
+///    create_recovery_request cannot yet be bridged.
 /// 2. Authorizer must be an active emergency contact of the target human
 ///    (has a HumanRelationship with emergency_access_enabled = true).
-/// 3. Dedupe: authorizer cannot witness the same request twice.
+/// 3. Dedupe: tag-based check on RecoveryRequestToHumanityWitness links
+///    (tag = authorizer_human_id bytes). Entry-deserialization no longer used.
+///
+/// Signal: emits IntimateWitnessSubmitted with the synthesised HumanityWitness
+/// struct and a zero ActionHash sentinel (CID cannot be converted to ActionHash).
+/// elohim-storage consumers that key on action_hash must migrate to CID-based
+/// lookup before Stage F removes this bridge.
+///
+/// TODO(stage-G-followup): create_recovery_request cannot be bridged yet because
+/// submit_intimate_witness Gate 1 and commit_key_rotation revocation-floor gate
+/// both deserialize RecoveryRequest / KeyRevocation entries from the imagodei DHT
+/// via to_app_option(). Bridging create_recovery_request to elohim would leave
+/// those entries on elohim's DHT in Content encoding, breaking all downstream
+/// gate readers. Requires a coordinated migration: all gate readers must switch
+/// to cross-DNA get() + Content deserialization before the create_entry calls
+/// can move. Tracked as Stage G follow-up (G.A.2 deferred functions).
 #[hdk_extern]
 pub fn submit_intimate_witness(
     input: SubmitIntimateWitnessInput,
 ) -> ExternResult<SubmitIntimateWitnessOutput> {
-    // Gate 1: fetch the RecoveryRequest; must exist.
+    // Gate 1: fetch the RecoveryRequest; must exist (still on imagodei DHT).
     let request_record =
         get(input.recovery_request_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
             WasmErrorInner::Guest("RecoveryRequest not found at given hash".into())
@@ -2945,15 +2962,15 @@ pub fn submit_intimate_witness(
         )));
     }
 
-    // Gate 3: dedupe — the authorizer cannot witness the same request twice.
+    // Gate 3: tag-based dedupe — the authorizer cannot witness the same request twice.
+    // Tag stores authorizer_human_id bytes; no entry deserialization needed.
     if has_existing_witness_for_request(&input.recovery_request_hash, &authorizer_human_id)? {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "this agent has already submitted a witness for this request".into()
         )));
     }
 
-    // Commit the HumanityWitness. HumanityWitness has no `note` field;
-    // the optional note is stored in evidence_json.
+    // Build the synthesised HumanityWitness for signal emission (not written locally).
     let now = sys_time()?;
     let timestamp = format!("{:?}", now);
     let expiry_micros = WITNESS_EXPIRY_DAYS * MICROS_PER_DAY;
@@ -2962,49 +2979,88 @@ pub fn submit_intimate_witness(
         now.checked_add(&Duration::from_micros(expiry_micros))
             .unwrap_or(now)
     );
-    // Sanitize characters that appear in Timestamp Debug output; match the
-    // convention used by other id generators in this zome (e.g., renewals).
     let witness_id_ts = timestamp.replace([':', ' ', '(', ')'], "-");
     let witness_id = format!("intimate-witness-{}-{}", human_id, witness_id_ts);
-    let witness = HumanityWitness {
-        id: witness_id,
+    let witness_for_signal = HumanityWitness {
+        id: witness_id.clone(),
         human_id: human_id.clone(),
         // NOTE: M3 stores authorizer's human_id here, not agent pubkey.
-        // The field's name is a pre-M3 misnomer the protocol accepts.
-        // Dedupe gate `has_existing_witness_for_request` depends on this convention.
         witness_agent_id: authorizer_human_id.clone(),
         attestation_type: "intimate_recovery".into(),
         confidence: 1.0,
         behavioral_hash: None,
         evidence_json: input
             .note
+            .as_ref()
             .map(|n| serde_json::json!({ "note": n }).to_string()),
         verification_method: Some("intimate_recovery_ceremony".into()),
-        created_at: timestamp,
-        expires_at,
+        created_at: timestamp.clone(),
+        expires_at: expires_at.clone(),
         revoked_at: None,
     };
-    let action_hash = create_entry(&EntryTypes::HumanityWitness(witness.clone()))?;
 
-    // Create the M3 link from the request to the witness.
+    // Bridge: write attestation:humanness to elohim DNA (canonical truth).
+    // Shamir share material does NOT travel on the DHT — see spec §5 and Stage G.B.
+    let note_json = input
+        .note
+        .as_ref()
+        .map(|n| serde_json::json!({ "note": n }))
+        .unwrap_or(serde_json::Value::Null);
+    let consolidated_input = ConsolidatedIssueAttestationInput {
+        attestation_kind: "attestation:humanness".to_string(),
+        subject_cid: human_id.clone(),
+        subject_kind: "agent".to_string(),
+        title: format!("Intimate witness for recovery request"),
+        description: Some(format!(
+            "Witness submitted by {} for recovery request",
+            authorizer_human_id
+        )),
+        reach: "private".to_string(),
+        metadata: serde_json::json!({
+            "witness_id": witness_id,
+            "attestation_type": "intimate_recovery",
+            "confidence": 1.0,
+            "verification_method": "intimate_recovery_ceremony",
+            "recovery_request_hash": input.recovery_request_hash.to_string(),
+            "expires_at": expires_at,
+            "evidence": note_json,
+        }),
+        parent_governance_action_cid: None,
+        vote_value: None,
+        proof_class: "social-witness".to_string(),
+        proof_evidence: serde_json::json!({
+            "class": "intimate_recovery",
+            "authorizer_human_id": authorizer_human_id,
+        }),
+        expires_at: Some(expires_at),
+    };
+    let _consolidated = call_elohim_issue_attestation(consolidated_input)?;
+
+    // Create the M3 link from the request to the witness anchor.
+    // Tag = authorizer_human_id bytes for tag-based dedupe (Gate 3).
+    // Target = sentinel StringAnchor hash (no local HumanityWitness entry written).
+    let sentinel_anchor = StringAnchor::new("intimate_witness_sentinel", &witness_id);
+    let sentinel_hash = hash_entry(&EntryTypes::StringAnchor(sentinel_anchor))?;
     create_link(
         input.recovery_request_hash.clone(),
-        action_hash.clone(),
+        sentinel_hash,
         LinkTypes::RecoveryRequestToHumanityWitness,
-        (),
+        LinkTag::new(authorizer_human_id.as_bytes()),
     )?;
 
-    // Emit rich signal.
+    // Emit signal. action_hash is a zero sentinel — CID cannot be converted to
+    // ActionHash. Consumers keyed on action_hash must migrate to CID lookup.
+    let sentinel_action_hash = ActionHash::from_raw_36(vec![0u8; 36]);
     emit_signal(RecoveryV2Signal::IntimateWitnessSubmitted {
-        action_hash: action_hash.clone(),
+        action_hash: sentinel_action_hash.clone(),
         request_hash: input.recovery_request_hash,
-        witness: witness.clone(),
+        witness: witness_for_signal.clone(),
         witness_agent_id: authorizer_pubkey,
     })?;
 
     Ok(SubmitIntimateWitnessOutput {
-        action_hash,
-        witness,
+        action_hash: sentinel_action_hash,
+        witness: witness_for_signal,
     })
 }
 

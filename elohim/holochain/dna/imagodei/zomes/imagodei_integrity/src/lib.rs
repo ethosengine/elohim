@@ -959,20 +959,52 @@ pub enum EntryTypes {
     ContentMastery(ContentMastery),
     ContributorPresence(ContributorPresence),
     StringAnchor(StringAnchor),
-    // Recovery entry types (deferred to Stage G)
+    // Recovery entry types — Stage G.A.2 deferral audit results:
+    //
+    // RecoveryRequest: CANNOT bridge create_recovery_request to elohim yet.
+    //   submit_intimate_witness Gate 1 reads RecoveryRequest by ActionHash via
+    //   to_app_option::<RecoveryRequest>(). If create_recovery_request moves to
+    //   elohim, the returned hash points to a Content-encoded entry on elohim's
+    //   DHT, and to_app_option() here would fail. Gate readers must be redesigned
+    //   to do cross-DNA get() + Content deserialization before this can move.
+    //   Tracked as Stage G follow-up.
     RecoveryRequest(RecoveryRequest),
+    // RecoveryVote: no live create_entry callers found (zero calls). Entry type
+    //   kept to avoid DHT schema breakage on existing nodes. Bridge when
+    //   create_recovery_request is bridged (they are coupled via request_id).
     RecoveryVote(RecoveryVote),
     RecoveryHint(RecoveryHint),
     // Network-Attested Identity entry types (Phase 2)
-    // KeyStewardship: deferred to Stage G — referenced by recovery_v2 DHT validation.
+    // KeyStewardship: CANNOT bridge — recovery_v2 DHT validation reads KeyStewardship
+    //   entries via to_app_option() during KeyRotation validation. Must stay until
+    //   the validator is redesigned. Tracked as Stage G follow-up.
     KeyStewardship(KeyStewardship),
     // IdentityChallenge removed C.2: zero callers; deferred to Stage G.
     // ChallengeSupport removed C.2: zero callers; deferred to Stage G.
+    //
+    // HumanityWitness: entry type KEPT for legacy link-target compatibility.
+    //   Stage G.A.2 bridge: submit_intimate_witness now writes to elohim DNA
+    //   (attestation:humanness) instead of creating local HumanityWitness entries.
+    //   Gate 3 dedupe is now tag-based (no entry reads). The entry type stays in
+    //   the integrity enum to preserve DHT schema for existing witness entries
+    //   committed before Stage G. Remove when all historic entries are migrated.
     HumanityWitness(HumanityWitness),
     IdentityAnomaly(IdentityAnomaly),
+    // KeyRevocation: CANNOT bridge create_self_revocation / create_revocation_request
+    //   to elohim yet. submit_revocation_vote reads KeyRevocation via to_app_option()
+    //   and update_entry() for the threshold flip. commit_key_rotation revocation-
+    //   floor gate also reads KeyRevocation from PendingRevocations/EffectiveRevocations
+    //   links. Moving these entries to elohim DHT breaks all gate readers.
+    //   Tracked as Stage G follow-up (requires coordinated migration of all readers).
     KeyRevocation(KeyRevocation),
+    // RevocationVote: coupled to KeyRevocation (same gate chain). CANNOT bridge until
+    //   KeyRevocation moves. Zero create_entry callers found in pre-bridge audit.
     RevocationVote(RevocationVote),
-    IdentityFreeze(IdentityFreeze), // deferred to Stage G (live usage in freeze-floor gate)
+    // IdentityFreeze: CANNOT bridge — collect_active_freezes_for_human reads
+    //   IdentityFreeze entries via to_app_option() for the freeze-floor gate in
+    //   commit_key_rotation. No create_entry callers found (zero); entry type kept
+    //   for DHT schema compat and freeze-floor gate reads on historic entries.
+    IdentityFreeze(IdentityFreeze),
     // Stewardship entry types (Graduated Capabilities)
     // StewardshipGrant: deferred to Stage G (3 live create_entry callers in stewardship.rs).
     StewardshipGrant(StewardshipGrant),
