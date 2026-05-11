@@ -1,0 +1,56 @@
+{
+  "$id": "epr:schema:manifest:observation-kind",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ObservationKindDeclaration",
+  "description": "Per-pillar manifest declaration of an observation_kind. See genesis/docs/superpowers/specs/2026-05-11-observation-event-layer-design.md §7.",
+  "type": "object",
+  "required": ["kind", "namespace", "schema", "retention_class", "reach"],
+  "properties": {
+    "kind": {
+      "type": "string",
+      "description": "Fully-qualified kind name, e.g. 'infrastructure:doorway-heartbeat'. Must include namespace prefix.",
+      "pattern": "^[a-z][a-z0-9-]*:[a-z][a-z0-9-]*$"
+    },
+    "namespace": {
+      "type": "string",
+      "description": "Gossipsub topic namespace, e.g. 'elohim/observations/infrastructure'.",
+      "pattern": "^elohim/observations/[a-z][a-z0-9-]*$"
+    },
+    "schema": {
+      "type": "object",
+      "description": "Field map from name to Rust type (Cid, u64, f32, String, bool). Used by codegen and validators.",
+      "additionalProperties": { "type": "string" }
+    },
+    "retention_class": {
+      "type": "string",
+      "enum": ["operational", "contextual", "archival", "attestation-feeding", "wisdom"]
+    },
+    "reach": {
+      "type": "string",
+      "enum": ["agent-private", "household", "community", "commons", "commons-attested"]
+    },
+    "diversity_threshold": {
+      "type": ["object", "null"],
+      "properties": {
+        "distinct_households": { "type": "integer", "minimum": 1 },
+        "distinct_collectives": { "type": "integer", "minimum": 1 },
+        "distinct_regions": { "type": "integer", "minimum": 1 },
+        "distinct_archetypes": { "type": "integer", "minimum": 1 },
+        "min_count": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "graduates_to": {
+      "type": ["string", "null"],
+      "description": "Optional. 'attestation:<subtype>' or 'event:<verb>' indicating graduation target."
+    },
+    "graduation_window_seconds": {
+      "type": ["integer", "null"],
+      "minimum": 1
+    },
+    "graduation_policy": {
+      "type": ["string", "null"],
+      "enum": [null, "self-threshold", "diversity-threshold", "summarize"]
+    }
+  },
+  "additionalProperties": false
+}
