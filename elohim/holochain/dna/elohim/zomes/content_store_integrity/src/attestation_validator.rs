@@ -103,6 +103,18 @@ fn validate_attestation(content: &Content) -> ExternResult<ValidateCallbackResul
         return Ok(ValidateCallbackResult::Invalid(reason));
     }
 
+    // Floor G3 — attestation:recovery-approval must NOT carry Shamir share material.
+    //
+    // Enforces the "Shamir off-DHT" boundary: share bytes are expensive, ephemeral,
+    // and point-to-point — they belong on the libp2p transport layer, NOT on the DHT.
+    // Any attempt to embed share material in attestation metadata is rejected here so
+    // the integrity layer enforces the architectural boundary unconditionally.
+    if content.content_type == "attestation:recovery-approval" {
+        if let Err(reason) = floor_g3_no_share_material_in_metadata(&meta) {
+            return Ok(ValidateCallbackResult::Invalid(reason));
+        }
+    }
+
     Ok(ValidateCallbackResult::Valid)
 }
 
@@ -559,6 +571,85 @@ fn chrono_parse_rfc3339(s: &str) -> Result<(), &'static str> {
     } else {
         Err("timezone suffix invalid")
     }
+}
+
+/// Floor G3: `attestation:recovery-approval` entries MUST NOT carry Shamir share material.
+///
+/// Enforces the Shamir-off-DHT architectural boundary established in the
+/// attestation-consolidation sprint Stage G. Share material (bytes, indexes, blobs)
+/// is expensive, ephemeral, and point-to-point — it belongs on the libp2p transport
+/// layer (`/elohim/shamir-share/1.0.0`), NOT embedded in DHT entries.
+///
+/// ## Why this floor exists
+///
+/// Without this floor a malicious coordinator could attempt to push share material
+/// onto the DHT by embedding it in an `attestation:recovery-approval` entry's
+/// `metadata.evidence_json.summary_metric` field (or top-level metadata). The DHT
+/// would then gossip the share material to all peers — defeating the point-to-point
+/// security model and making share material permanently visible to any DHT observer.
+///
+/// This floor rejects any `attestation:recovery-approval` entry that contains
+/// `share_data`, `share_index`, or `share_blob` anywhere in its metadata JSON,
+/// including in nested objects (checked at the top-level metadata object and within
+/// `metadata.evidence_json` / `metadata.summary_metric`).
+///
+/// ## Checked fields
+///
+/// Forbidden field names (anywhere in the metadata object tree):
+/// - `share_data`
+/// - `share_index`
+/// - `share_blob`
+fn floor_g3_no_share_material_in_metadata(meta: &Value) -> Result<(), String> {
+    const FORBIDDEN: &[&str] = &["share_data", "share_index", "share_blob"];
+
+    // Check top-level metadata object
+    if let Value::Object(map) = meta {
+        for key in FORBIDDEN {
+            if map.contains_key(*key) {
+                return Err(format!(
+                    "recovery_approval_must_not_carry_share_material: \
+                     metadata.{} is forbidden in attestation:recovery-approval entries. \
+                     Share material belongs on the libp2p transport layer, not the DHT.",
+                    key
+                ));
+            }
+        }
+    }
+
+    // Check nested metadata.evidence_json (may be a JSON object or a JSON string
+    // that encodes an object — we check the Value representation, not raw string)
+    if let Some(evidence) = meta.get("evidence_json") {
+        if let Value::Object(ev_map) = evidence {
+            for key in FORBIDDEN {
+                if ev_map.contains_key(*key) {
+                    return Err(format!(
+                        "recovery_approval_must_not_carry_share_material: \
+                         metadata.evidence_json.{} is forbidden in \
+                         attestation:recovery-approval entries.",
+                        key
+                    ));
+                }
+            }
+        }
+    }
+
+    // Check nested metadata.summary_metric (used by some proof_evidence shapes)
+    if let Some(summary) = meta.get("summary_metric") {
+        if let Value::Object(sm_map) = summary {
+            for key in FORBIDDEN {
+                if sm_map.contains_key(*key) {
+                    return Err(format!(
+                        "recovery_approval_must_not_carry_share_material: \
+                         metadata.summary_metric.{} is forbidden in \
+                         attestation:recovery-approval entries.",
+                        key
+                    ));
+                }
+            }
+        }
+    }
+
+    Ok(())
 }
 
 /// Decode a base64url string into raw bytes.

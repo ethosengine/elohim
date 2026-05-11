@@ -50,6 +50,7 @@ pub mod recovery_invitation;
 pub mod recovery_revocation;
 pub mod recovery_rotation;
 pub mod replication;
+pub mod shamir_transport;
 pub mod shard_protocol;
 pub mod sync_protocol;
 pub mod topics;
