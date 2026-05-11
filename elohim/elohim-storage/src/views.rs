@@ -7868,3 +7868,101 @@ impl PutBlobResponseView {
         }
     }
 }
+
+// ============================================================================
+// Observation Views
+// ============================================================================
+
+/// HTTP view of a single row from the `observations` table.
+///
+/// Source of truth for any observation is the per-observer iroh-blob log;
+/// this projection is rebuildable by log replay. Classification: Category C
+/// (operational, reconstructable from log_cid + log_offset).
+///
+/// `payloadJson` is forwarded as a raw JSON string — clients parse according
+/// to `observationKind`. This preserves forward-compatibility: new payload
+/// shapes do not require a Rust redeploy.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct ObservationView {
+    pub observer_cid: String,
+    pub log_cid: String,
+    pub log_offset: i64,
+    pub observed_at: i64,
+    pub seq: i64,
+    pub observation_kind: String,
+    pub subject_cid: Option<String>,
+    pub subject_kind: Option<String>,
+    pub payload_json: String,
+    pub observer_household_cid: Option<String>,
+    pub observer_collective_cid: Option<String>,
+    pub observer_region: Option<String>,
+    pub observer_archetype: Option<String>,
+    pub observer_compute_class: Option<String>,
+    pub signature_b64: String,
+}
+
+impl From<crate::db::models::ObservationRow> for ObservationView {
+    fn from(r: crate::db::models::ObservationRow) -> Self {
+        Self {
+            observer_cid: r.observer_cid,
+            log_cid: r.log_cid,
+            log_offset: r.log_offset,
+            observed_at: r.observed_at,
+            seq: r.seq,
+            observation_kind: r.observation_kind,
+            subject_cid: r.subject_cid,
+            subject_kind: r.subject_kind,
+            payload_json: r.payload_json,
+            observer_household_cid: r.observer_household_cid,
+            observer_collective_cid: r.observer_collective_cid,
+            observer_region: r.observer_region,
+            observer_archetype: r.observer_archetype,
+            observer_compute_class: r.observer_compute_class,
+            signature_b64: r.signature_b64,
+        }
+    }
+}
+
+/// HTTP view of a row from the `observation_diversity_summary` SQLite view.
+///
+/// Diversity rollup over `observations` — one row per (subject_cid,
+/// observation_kind) with distinct-counts across diversity dimensions. Used
+/// by the graduation evaluator (Stage 5) to gate attestation graduation.
+/// Classification: Category C (aggregation; reconstructable by re-querying
+/// the observations table).
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct ObservationDiversitySummaryView {
+    pub subject_cid: String,
+    pub observation_kind: String,
+    pub distinct_agents: i64,
+    pub distinct_households: i64,
+    pub distinct_collectives: i64,
+    pub distinct_regions: i64,
+    pub distinct_archetypes: i64,
+    pub distinct_compute_classes: i64,
+    pub total_count: i64,
+    pub first_observed_at: i64,
+    pub last_observed_at: i64,
+}
+
+impl From<crate::db::models::ObservationDiversitySummaryRow> for ObservationDiversitySummaryView {
+    fn from(r: crate::db::models::ObservationDiversitySummaryRow) -> Self {
+        Self {
+            subject_cid: r.subject_cid,
+            observation_kind: r.observation_kind,
+            distinct_agents: r.distinct_agents,
+            distinct_households: r.distinct_households,
+            distinct_collectives: r.distinct_collectives,
+            distinct_regions: r.distinct_regions,
+            distinct_archetypes: r.distinct_archetypes,
+            distinct_compute_classes: r.distinct_compute_classes,
+            total_count: r.total_count,
+            first_observed_at: r.first_observed_at,
+            last_observed_at: r.last_observed_at,
+        }
+    }
+}

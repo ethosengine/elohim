@@ -18,8 +18,9 @@ use super::diesel_schema::{
     contributor_presences, custodian_metrics, device_policies, discussions, economic_events,
     enum_registry, governance_dispositions, governance_signals, governance_states, hazards,
     human_relationships, humans, imagodei_observations, key_revocations, key_rotations,
-    knowledge_maps, local_sessions, node_stewardship, observation_entries, observation_sessions,
-    peer_blob_inventory, peer_identity_bindings, peer_inventory_cursor, placement_gaps, places,
+    knowledge_maps, local_sessions, node_stewardship, observation_diversity_summary,
+    observation_entries, observation_sessions, observations, peer_blob_inventory,
+    peer_identity_bindings, peer_inventory_cursor, placement_gaps, places,
     portal_hosts, precedents, premium_gates, proposal_options, proposals, ranked_votes,
     rea_commitments, recovery_requests, recovery_witnesses, relationships,
     responsibility_demand_configs, revocation_votes, risk_alerts, schedules, shard_locations,
@@ -3180,4 +3181,79 @@ pub struct NewPeerInventoryCursorRow {
     pub peer_id: String,
     pub last_sequence: i64,
     pub last_updated: String,
+}
+
+// ============================================================================
+// observations (Category C — per-observer iroh-blob log projection)
+//
+// Source of truth: per-observer iroh-blob log at log_cid. This table is a
+// read-optimised projection rebuildable by replaying the log from log_cid
+// starting at log_offset 0. Classification: C (operational, reconstructable).
+// ============================================================================
+
+/// Queryable row from the `observations` table (SELECT).
+#[derive(Debug, Clone, Queryable, Selectable)]
+#[diesel(table_name = observations)]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+pub struct ObservationRow {
+    pub observer_cid: String,
+    pub log_cid: String,
+    pub log_offset: i64,
+    pub observed_at: i64,
+    pub seq: i64,
+    pub observation_kind: String,
+    pub subject_cid: Option<String>,
+    pub subject_kind: Option<String>,
+    pub payload_json: String,
+    pub observer_household_cid: Option<String>,
+    pub observer_collective_cid: Option<String>,
+    pub observer_region: Option<String>,
+    pub observer_archetype: Option<String>,
+    pub observer_compute_class: Option<String>,
+    pub signature_b64: String,
+}
+
+/// Insertable row for the `observations` table (INSERT).
+#[derive(Debug, Clone, Insertable)]
+#[diesel(table_name = observations)]
+pub struct NewObservationRow<'a> {
+    pub observer_cid: &'a str,
+    pub log_cid: &'a str,
+    pub log_offset: i64,
+    pub observed_at: i64,
+    pub seq: i64,
+    pub observation_kind: &'a str,
+    pub subject_cid: Option<&'a str>,
+    pub subject_kind: Option<&'a str>,
+    pub payload_json: &'a str,
+    pub observer_household_cid: Option<&'a str>,
+    pub observer_collective_cid: Option<&'a str>,
+    pub observer_region: Option<&'a str>,
+    pub observer_archetype: Option<&'a str>,
+    pub observer_compute_class: Option<&'a str>,
+    pub signature_b64: &'a str,
+}
+
+// ============================================================================
+// observation_diversity_summary (Category C — SQLite view, aggregation of
+// the observations table). Source of truth: aggregation over observations.
+// Rebuildable by re-running the CREATE VIEW DDL. Classification: C.
+// ============================================================================
+
+/// Queryable row from the `observation_diversity_summary` view (SELECT).
+#[derive(Debug, Clone, Queryable, Selectable)]
+#[diesel(table_name = observation_diversity_summary)]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+pub struct ObservationDiversitySummaryRow {
+    pub subject_cid: String,
+    pub observation_kind: String,
+    pub distinct_agents: i64,
+    pub distinct_households: i64,
+    pub distinct_collectives: i64,
+    pub distinct_regions: i64,
+    pub distinct_archetypes: i64,
+    pub distinct_compute_classes: i64,
+    pub total_count: i64,
+    pub first_observed_at: i64,
+    pub last_observed_at: i64,
 }
