@@ -51,9 +51,9 @@
 - `elohim/elohim-storage/Cargo.toml` — (if needed) feature flags / deps
 
 **Migrations (create):**
-- `elohim/elohim-storage/migrations/2026-05-12-100000_observations/up.sql` + `down.sql`
-- `elohim/elohim-storage/migrations/2026-05-12-110000_observation_diversity_view/up.sql` + `down.sql`
-- `elohim/elohim-storage/migrations/2026-05-12-120000_retire_doorway_heartbeat_entries/up.sql` + `down.sql`
+- `elohim/elohim-storage/migrations/2026-05-13-100000_observations/up.sql` + `down.sql`
+- `elohim/elohim-storage/migrations/2026-05-13-110000_observation_diversity_view/up.sql` + `down.sql`
+- `elohim/elohim-storage/migrations/2026-05-13-120000_retire_doorway_heartbeat_entries/up.sql` + `down.sql`
 
 **Holochain (modify):**
 - `elohim/holochain/dna/elohim/zomes/content_store_coordinator/src/lib.rs` — stake-class gate on `create_economic_event`
@@ -246,28 +246,24 @@ git commit -m "schema(manifest): allow observation_kinds array at app-manifest t
 
 ---
 
-## Task 1.3: Create infrastructure manifest
+## Task 1.3: Add observation_kinds to infrastructure manifest
 
 **Files:**
-- Create: `elohim/sdk/domains/infrastructure/manifest.json`
+- Modify: `elohim/sdk/domains/infrastructure/manifest.json` (already created by attestation Stage A — commit `0f63468fc`; contains `vocabulary.contentTypes`, `attestations` sections)
 
-- [ ] **Step 1: Write the failing validation test**
+**Coordination note:** Before starting this task, confirm `git log --oneline dev | head -5` includes the attestation Stage A commit. If not, parallel session's merge to dev is still pending — DO NOT start this task yet.
 
-Run: `pnpm run schema:validate -- elohim/sdk/domains/infrastructure/manifest.json`
-Expected: fail — file does not exist
+- [ ] **Step 1: Read the existing manifest to know what to preserve**
 
-- [ ] **Step 2: Create the manifest**
+Run: `cat elohim/sdk/domains/infrastructure/manifest.json`
+Expected: object with `id`, `name`, `version`, `description`, `vocabulary.contentTypes`, `attestations` (2 entries). Do not delete or modify any of these — only ADD the `observation_kinds` array.
+
+- [ ] **Step 2: Add the observation_kinds top-level array**
+
+Insert at the top level of the JSON (after the existing top-level fields, before the closing brace):
 
 ```json
-{
-  "id": "manifest-infrastructure",
-  "name": "infrastructure",
-  "version": "1.0.0",
-  "description": "Substrate infrastructure observation kinds — doorway heartbeats, blob serving, system samples. Observations on libp2p+iroh; graduations produce DHT attestations and summary EconomicEvents.",
-  "vocabulary": {
-    "contentTypes": {}
-  },
-  "observation_kinds": [
+"observation_kinds": [
     {
       "kind": "infrastructure:doorway-heartbeat",
       "namespace": "elohim/observations/infrastructure",
@@ -314,58 +310,102 @@ Expected: fail — file does not exist
       "graduation_policy": null
     }
   ]
-}
 ```
+
+(Note: the snippet above is the array property only. Add a comma after the previous top-level field's closing brace, then paste the property. The trailing `}` of the manifest is unchanged.)
 
 - [ ] **Step 3: Validate**
 
 Run: `pnpm run schema:validate -- elohim/sdk/domains/infrastructure/manifest.json`
-Expected: PASS
+Expected: PASS — and the manifest still contains the pre-existing `attestations` array (do not let it be removed by your edit).
 
 - [ ] **Step 4: Commit**
 
 ```bash
 git add elohim/sdk/domains/infrastructure/manifest.json
-git commit -m "manifest(infrastructure): declare doorway-heartbeat, blob-served, system-sample observation kinds"
+git commit -m "manifest(infrastructure): add observation_kinds — doorway-heartbeat, blob-served, system-sample"
 ```
 
 ---
 
-## Task 1.4: Create mishpat manifest with forget-decision subtype
+## Task 1.4: Add forget-decision subtype + observation_kinds to mishpat manifest
 
 **Files:**
-- Create: `elohim/sdk/domains/mishpat/manifest.json`
+- Modify: `elohim/sdk/domains/mishpat/manifest.json` (already created by attestation Stage A — commit `0f63468fc`; contains `vocabulary.contentTypes`, `attestations` (5 entries), `governance-actions` (3 entries))
 
-- [ ] **Step 1: Create the manifest**
+**Coordination note:** Same as Task 1.3 — confirm attestation Stage A is on dev before starting.
+
+- [ ] **Step 1: Read existing manifest**
+
+Run: `cat elohim/sdk/domains/mishpat/manifest.json`
+Confirm it contains `attestations` and `governance-actions` arrays. Note the existing attestation subtypes.
+
+- [ ] **Step 2: Add `forget-decision` to the existing `attestations` array**
+
+Append a new entry to the existing `attestations` array (do NOT replace the array). Use the same shape as the existing entries (the schema is locked by the attestation consolidation spec — examine an existing entry to mirror its required fields). The new entry:
 
 ```json
 {
-  "id": "manifest-mishpat",
-  "name": "mishpat",
-  "version": "1.0.0",
-  "description": "Governance manifest — attestation subtypes for adjudication and forget-decisions.",
-  "vocabulary": {
-    "contentTypes": {
-      "attestation": {
-        "description": "Validated recognition issued by mishpat. See attestation-consolidation spec.",
-        "subtypes": ["forget-decision", "gate-decision", "appeal-outcome"]
-      }
-    }
-  },
-  "observation_kinds": []
+  "subtype": "forget-decision",
+  "description": "Mishpat-issued decision on a forget-request signal. See observation-event-layer spec §9.4.",
+  "subject_kinds": ["agent", "content", "attestation"],
+  "metadata_schema": "./schemas/attestation-forget-decision-metadata.schema.json"
 }
 ```
 
-- [ ] **Step 2: Validate**
+If the existing `attestations` entry shape differs (e.g., uses different field names like `kind` instead of `subtype`), mirror the existing fields exactly. Use `cat` and pattern-match.
+
+- [ ] **Step 3: Add the empty observation_kinds top-level array**
+
+Append at top level (after existing top-level fields, before closing brace):
+
+```json
+"observation_kinds": []
+```
+
+Mishpat has no observation kinds in this sprint — but the declaration makes the manifest's intent explicit and lets the codegen run idempotently.
+
+- [ ] **Step 4: Create the forget-decision metadata schema**
+
+Create `elohim/sdk/domains/mishpat/schemas/attestation-forget-decision-metadata.schema.json`. Mirror the shape of an existing attestation-subtype metadata schema in the same directory (e.g., `attestation-gate-decision-metadata.schema.json` if present). Use:
+
+```json
+{
+  "$id": "epr:manifest:mishpat:attestation:forget-decision:metadata",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ForgetDecisionMetadata",
+  "type": "object",
+  "required": ["outcome", "reasoning_md", "constraint_applied"],
+  "properties": {
+    "outcome": {
+      "type": "string",
+      "enum": ["granted", "granted-with-redaction", "refused-per-constraint"]
+    },
+    "reasoning_md": { "type": "string", "minLength": 1 },
+    "constraint_applied": {
+      "type": "string",
+      "description": "Manifest-declared constraint key that drove the decision (graduated-harm tier, accountability claim, evidence dependency)."
+    },
+    "redacted_fields": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  },
+  "additionalProperties": false
+}
+```
+
+- [ ] **Step 5: Validate**
 
 Run: `pnpm run schema:validate -- elohim/sdk/domains/mishpat/manifest.json`
-Expected: PASS
+Expected: PASS — including the new subtype and schema reference resolving correctly.
 
-- [ ] **Step 3: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
-git add elohim/sdk/domains/mishpat/manifest.json
-git commit -m "manifest(mishpat): create with forget-decision attestation subtype"
+git add elohim/sdk/domains/mishpat/manifest.json \
+        elohim/sdk/domains/mishpat/schemas/attestation-forget-decision-metadata.schema.json
+git commit -m "manifest(mishpat): add forget-decision attestation subtype + observation_kinds slot"
 ```
 
 ---
@@ -889,8 +929,8 @@ git commit -m "feat(observation): declare libp2p protocol id and iroh ALPN"
 ## Task 3.1: Observation tables migration
 
 **Files:**
-- Create: `elohim/elohim-storage/migrations/2026-05-12-100000_observations/up.sql`
-- Create: `elohim/elohim-storage/migrations/2026-05-12-100000_observations/down.sql`
+- Create: `elohim/elohim-storage/migrations/2026-05-13-100000_observations/up.sql`
+- Create: `elohim/elohim-storage/migrations/2026-05-13-100000_observations/down.sql`
 
 - [ ] **Step 1: Create up.sql**
 
@@ -987,7 +1027,7 @@ Expected: four table definitions present
 - [ ] **Step 5: Commit**
 
 ```bash
-git add elohim/elohim-storage/migrations/2026-05-12-100000_observations/ \
+git add elohim/elohim-storage/migrations/2026-05-13-100000_observations/ \
         elohim/elohim-storage/src/db/schema.rs
 git commit -m "migration(observation): create observations, logs, cursors, audit tables"
 ```
@@ -997,8 +1037,8 @@ git commit -m "migration(observation): create observations, logs, cursors, audit
 ## Task 3.2: Diversity summary view
 
 **Files:**
-- Create: `elohim/elohim-storage/migrations/2026-05-12-110000_observation_diversity_view/up.sql`
-- Create: `elohim/elohim-storage/migrations/2026-05-12-110000_observation_diversity_view/down.sql`
+- Create: `elohim/elohim-storage/migrations/2026-05-13-110000_observation_diversity_view/up.sql`
+- Create: `elohim/elohim-storage/migrations/2026-05-13-110000_observation_diversity_view/down.sql`
 
 - [ ] **Step 1: Create up.sql**
 
@@ -1063,7 +1103,7 @@ diesel::table! {
 - [ ] **Step 5: Commit**
 
 ```bash
-git add elohim/elohim-storage/migrations/2026-05-12-110000_observation_diversity_view/ \
+git add elohim/elohim-storage/migrations/2026-05-13-110000_observation_diversity_view/ \
         elohim/elohim-storage/src/db/schema.rs
 git commit -m "migration(observation): create observation_diversity_summary view"
 ```
@@ -2586,7 +2626,7 @@ Check: `ls elohim/elohim-storage/migrations/ | grep -i heartbeat`
 If a heartbeat projection table exists, create a retirement migration:
 
 ```bash
-mkdir -p elohim/elohim-storage/migrations/2026-05-12-120000_retire_doorway_heartbeat
+mkdir -p elohim/elohim-storage/migrations/2026-05-13-120000_retire_doorway_heartbeat
 ```
 
 `up.sql`:
@@ -2611,7 +2651,7 @@ Expected: success
 
 ```bash
 git add elohim/elohim-storage/src/projector/signals.rs \
-        elohim/elohim-storage/migrations/2026-05-12-120000_retire_doorway_heartbeat/ \
+        elohim/elohim-storage/migrations/2026-05-13-120000_retire_doorway_heartbeat/ \
         elohim/elohim-storage/src/db/schema.rs
 git commit -m "feat(storage)!: drop retired DHT projection handlers and tables"
 ```
