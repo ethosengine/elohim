@@ -93,6 +93,10 @@ pub mod token_mint_service;
 pub mod vulnerability;
 pub mod weather;
 
+// Attestation Consolidation Sprint — projection signal handler + tally projector
+pub mod attestation_projector;
+pub mod tally_projector;
+
 // Re-exports
 pub use content_service::ContentService;
 pub use economic_event_service::EconomicEventService;
