@@ -1126,9 +1126,9 @@ async fn async_main(
 
     // EPR Phase 2B Task C.6 — compose the 4-layer write-through state.
     //
-    // Layer 1 (manifest defaults) — TODO: Phase 4 manifest registry will load
-    // pillar manifests from disk and pass them in. For now we start with an
-    // empty manifest layer; layers 2-4 cover real configuration intent.
+    // Layer 1 (manifest defaults) — loaded from pillar manifest files on disk.
+    // ELOHIM_PILLAR_MANIFEST_DIR env var overrides the default path.
+    // Failure degrades gracefully to an empty layer (same as before Phase 4 T12).
     //
     // Layer 2 (policy.toml) — read from PolicyConfig::write_through if present.
     //
@@ -1136,7 +1136,21 @@ async fn async_main(
     //
     // Layer 4 (admin override) — mutated live via `POST /admin/write-through`.
     let write_through_state = {
-        let manifest_layer = std::collections::HashMap::new();
+        let manifest_dir = std::env::var("ELOHIM_PILLAR_MANIFEST_DIR")
+            .map(std::path::PathBuf::from)
+            .unwrap_or_else(|_| std::path::PathBuf::from("elohim/sdk/domains"));
+        let manifest_layer =
+            elohim_storage::services::manifest_registry::load_pillar_manifest_layer1(
+                &manifest_dir,
+            )
+            .unwrap_or_else(|e| {
+                tracing::warn!(
+                    target = "phase4::manifest_layer1",
+                    error = %e,
+                    "failed to load pillar manifest layer-1; layer stays empty"
+                );
+                std::collections::HashMap::new()
+            });
         let mut state =
             elohim_storage::write_through::WriteThroughState::from_manifest(manifest_layer);
         // Layer 2 — policy.toml. Try to load; failures are warned, not fatal.

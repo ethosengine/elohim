@@ -326,6 +326,116 @@ fn kind_canonical_str(kind: EprKind) -> &'static str {
     }
 }
 
+// ============================================================================
+// Phase 4 T12 — disk-based pillar manifest layer-1 loader
+// ============================================================================
+
+/// Error type for `load_pillar_manifest_layer1`.
+#[derive(Debug)]
+pub enum ManifestLayer1Error {
+    Io(std::io::Error),
+    Json(serde_json::Error),
+}
+
+impl std::fmt::Display for ManifestLayer1Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ManifestLayer1Error::Io(e) => write!(f, "IO error: {e}"),
+            ManifestLayer1Error::Json(e) => write!(f, "JSON error: {e}"),
+        }
+    }
+}
+
+impl From<std::io::Error> for ManifestLayer1Error {
+    fn from(e: std::io::Error) -> Self {
+        ManifestLayer1Error::Io(e)
+    }
+}
+
+impl From<serde_json::Error> for ManifestLayer1Error {
+    fn from(e: serde_json::Error) -> Self {
+        ManifestLayer1Error::Json(e)
+    }
+}
+
+/// Load layer-1 write-through defaults from pillar manifests on disk.
+///
+/// Scans `manifest_dir/{pillar}/manifest.json` for each pillar directory.
+/// Extracts the optional `writeThrough` block (shape: `{ enabled: bool, kinds?: [..] }`)
+/// and returns a map of `pillar_name → WriteThroughConfig`.
+///
+/// Pillars without a `writeThrough` block are silently skipped — no opinion
+/// means they inherit the global off-default from lower layers.
+///
+/// If `manifest_dir` does not exist or is empty, returns an empty map
+/// (same behaviour as before Phase 4 T12).
+///
+/// Replaces the `let manifest_layer = std::collections::HashMap::new()` stub
+/// at `main.rs:1129`. Controlled by `ELOHIM_PILLAR_MANIFEST_DIR` env var;
+/// falls back to `elohim/sdk/domains` relative to CWD.
+pub fn load_pillar_manifest_layer1(
+    manifest_dir: &std::path::Path,
+) -> Result<HashMap<String, crate::write_through::WriteThroughConfig>, ManifestLayer1Error> {
+    use std::io::ErrorKind;
+
+    let mut layer1 = HashMap::new();
+
+    match std::fs::read_dir(manifest_dir) {
+        Err(e) if e.kind() == ErrorKind::NotFound => {
+            tracing::warn!(
+                target = "phase4::manifest_layer1",
+                dir = ?manifest_dir,
+                "manifest directory not found; layer-1 write-through stays empty"
+            );
+            return Ok(layer1);
+        }
+        Err(e) => return Err(e.into()),
+        Ok(entries) => {
+            for entry in entries {
+                let entry = entry?;
+                let pillar_name = entry.file_name().to_string_lossy().to_string();
+                let manifest_path = entry.path().join("manifest.json");
+                if !manifest_path.exists() {
+                    continue;
+                }
+                let body = std::fs::read_to_string(&manifest_path)?;
+                let json: serde_json::Value = match serde_json::from_str(&body) {
+                    Ok(v) => v,
+                    Err(e) => {
+                        tracing::warn!(
+                            target = "phase4::manifest_layer1",
+                            pillar = %pillar_name,
+                            path = ?manifest_path,
+                            error = %e,
+                            "failed to parse manifest JSON; skipping pillar"
+                        );
+                        continue;
+                    }
+                };
+                if let Some(wt) = json.get("writeThrough") {
+                    match serde_json::from_value::<crate::write_through::WriteThroughConfig>(
+                        wt.clone(),
+                    ) {
+                        Ok(config) => {
+                            layer1.insert(pillar_name, config);
+                        }
+                        Err(e) => {
+                            tracing::warn!(
+                                target = "phase4::manifest_layer1",
+                                pillar = %pillar_name,
+                                error = %e,
+                                "writeThrough block failed to parse as WriteThroughConfig; skipping"
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(layer1)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
