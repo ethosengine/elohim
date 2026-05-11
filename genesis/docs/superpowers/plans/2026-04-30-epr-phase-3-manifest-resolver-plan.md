@@ -64,7 +64,7 @@
 
 **Files:** none (repo state)
 
-- [ ] **Step 1: Create the worktree off origin/dev**
+- [x] **Step 1: Create the worktree off origin/dev**
 
 ```bash
 cd /projects/elohim
@@ -75,7 +75,7 @@ cd /projects/elohim/.claude/worktrees/epr-phase-3
 
 Expected: `Preparing worktree (new branch 'feature/epr-phase-3-manifest-resolver')`. The worktree is the working directory for all subsequent tasks.
 
-- [ ] **Step 2: Verify the worktree is clean and at expected commit**
+- [x] **Step 2: Verify the worktree is clean and at expected commit**
 
 ```bash
 git status
@@ -84,7 +84,7 @@ git log --oneline -3
 
 Expected: clean working tree; HEAD matches `origin/dev` (commit `8bf95933` or later — the post-brainstorm commit).
 
-- [ ] **Step 3: Confirm the brainstorm artifact and refreshed kickoff are visible**
+- [x] **Step 3: Confirm the brainstorm artifact and refreshed kickoff are visible**
 
 ```bash
 ls genesis/docs/superpowers/specs/2026-04-30-trust-compute-gradient-brainstorm.md
@@ -94,7 +94,7 @@ grep -c '6.4 Trust as efficiency signal' genesis/docs/superpowers/specs/2026-04-
 
 Expected: both files exist; the §6.4 grep returns `1`.
 
-- [ ] **Step 4: No commit needed — Task 0 is workspace setup only.**
+- [x] **Step 4: No commit needed — Task 0 is workspace setup only.**
 
 ---
 
@@ -105,7 +105,7 @@ Expected: both files exist; the §6.4 grep returns `1`.
 - Modify: `elohim/elohim-storage/src/services/mod.rs`
 - Test: inline `#[cfg(test)] mod tests` in `standing.rs`
 
-- [ ] **Step 1: Write failing tests in `standing.rs`**
+- [x] **Step 1: Write failing tests in `standing.rs`**
 
 Create `elohim/elohim-storage/src/services/standing.rs`:
 
@@ -224,7 +224,7 @@ mod tests {
 }
 ```
 
-- [ ] **Step 2: Wire the new module**
+- [x] **Step 2: Wire the new module**
 
 Edit `elohim/elohim-storage/src/services/mod.rs` and add (preserving alphabetical order if applicable):
 
@@ -232,7 +232,7 @@ Edit `elohim/elohim-storage/src/services/mod.rs` and add (preserving alphabetica
 pub mod standing;
 ```
 
-- [ ] **Step 3: Run tests and verify they pass**
+- [x] **Step 3: Run tests and verify they pass**
 
 ```bash
 cd /projects/elohim/.claude/worktrees/epr-phase-3/elohim/elohim-storage
@@ -241,7 +241,7 @@ RUSTFLAGS='--cfg getrandom_backend="custom"' cargo test --lib services::standing
 
 Expected: `test result: ok. 6 passed`.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add elohim/elohim-storage/src/services/standing.rs elohim/elohim-storage/src/services/mod.rs
@@ -267,7 +267,7 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 - Create: `elohim/elohim-storage/src/services/floor_protections.rs`
 - Modify: `elohim/elohim-storage/src/services/mod.rs`
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 Create `elohim/elohim-storage/src/services/floor_protections.rs`:
 
@@ -337,7 +337,7 @@ mod tests {
 }
 ```
 
-- [ ] **Step 2: Wire the module**
+- [x] **Step 2: Wire the module**
 
 Add to `elohim/elohim-storage/src/services/mod.rs`:
 
@@ -345,7 +345,7 @@ Add to `elohim/elohim-storage/src/services/mod.rs`:
 pub mod floor_protections;
 ```
 
-- [ ] **Step 3: Run tests**
+- [x] **Step 3: Run tests**
 
 ```bash
 RUSTFLAGS='--cfg getrandom_backend="custom"' cargo test --lib services::floor_protections
@@ -353,7 +353,7 @@ RUSTFLAGS='--cfg getrandom_backend="custom"' cargo test --lib services::floor_pr
 
 Expected: `test result: ok. 6 passed`.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add elohim/elohim-storage/src/services/floor_protections.rs elohim/elohim-storage/src/services/mod.rs
@@ -377,7 +377,7 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 - Create: `elohim/elohim-storage/migrations/<timestamp>_manifest_projection/up.sql`
 - Create: `elohim/elohim-storage/migrations/<timestamp>_manifest_projection/down.sql`
 
-- [ ] **Step 1: Generate the migration directory**
+- [x] **Step 1: Generate the migration directory**
 
 ```bash
 cd /projects/elohim/.claude/worktrees/epr-phase-3/elohim/elohim-storage
@@ -387,7 +387,7 @@ mkdir -p "migrations/${TIMESTAMP}_manifest_projection"
 
 NOTE: per memory pin `feedback_diesel_migration_timestamp_collision`, double-check no other migration was created in the same second. Run `ls migrations/ | sort` and verify uniqueness.
 
-- [ ] **Step 2: Write up.sql**
+- [x] **Step 2: Write up.sql**
 
 Write to `migrations/<timestamp>_manifest_projection/up.sql`:
 
@@ -412,7 +412,7 @@ CREATE INDEX idx_manifests_pillar ON manifests(pillar) WHERE pillar IS NOT NULL;
 CREATE INDEX idx_manifests_kind ON manifests(manifest_kind);
 ```
 
-- [ ] **Step 3: Write down.sql**
+- [x] **Step 3: Write down.sql**
 
 Write to `migrations/<timestamp>_manifest_projection/down.sql`:
 
@@ -422,7 +422,7 @@ DROP INDEX IF EXISTS idx_manifests_pillar;
 DROP TABLE IF EXISTS manifests;
 ```
 
-- [ ] **Step 4: Verify migration applies cleanly**
+- [x] **Step 4: Verify migration applies cleanly**
 
 ```bash
 RUSTFLAGS='--cfg getrandom_backend="custom"' cargo test --lib --features p2p db::migrations -- --nocapture 2>&1 | head -40
@@ -430,7 +430,7 @@ RUSTFLAGS='--cfg getrandom_backend="custom"' cargo test --lib --features p2p db:
 
 Expected: existing migration tests pass; `manifests` table created in test DB.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add elohim/elohim-storage/migrations
@@ -455,7 +455,7 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 - Modify: `elohim/elohim-storage/src/db/mod.rs`
 - Modify: `elohim/elohim-storage/src/schema.rs` (auto-generated by diesel CLI; regenerate)
 
-- [ ] **Step 1: Regenerate diesel schema after migration**
+- [x] **Step 1: Regenerate diesel schema after migration**
 
 ```bash
 cd /projects/elohim/.claude/worktrees/epr-phase-3/elohim/elohim-storage
@@ -468,7 +468,7 @@ rm test_codegen.db
 
 Verify the new `manifests` table appears in `src/schema.rs`.
 
-- [ ] **Step 2: Write failing tests for the model**
+- [x] **Step 2: Write failing tests for the model**
 
 Create `elohim/elohim-storage/src/db/manifests.rs`:
 
@@ -593,7 +593,7 @@ mod tests {
 }
 ```
 
-- [ ] **Step 3: Wire module**
+- [x] **Step 3: Wire module**
 
 Add to `elohim/elohim-storage/src/db/mod.rs`:
 
@@ -601,7 +601,7 @@ Add to `elohim/elohim-storage/src/db/mod.rs`:
 pub mod manifests;
 ```
 
-- [ ] **Step 4: Run tests**
+- [x] **Step 4: Run tests**
 
 ```bash
 RUSTFLAGS='--cfg getrandom_backend="custom"' cargo test --lib db::manifests
@@ -609,7 +609,7 @@ RUSTFLAGS='--cfg getrandom_backend="custom"' cargo test --lib db::manifests
 
 Expected: `test result: ok. 4 passed`.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add elohim/elohim-storage/src/db/manifests.rs elohim/elohim-storage/src/db/mod.rs elohim/elohim-storage/src/schema.rs
@@ -630,7 +630,7 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 - Create: `elohim/elohim-storage/src/services/manifest_registry.rs`
 - Modify: `elohim/elohim-storage/src/services/mod.rs`
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 Create `elohim/elohim-storage/src/services/manifest_registry.rs`:
 
@@ -792,7 +792,7 @@ mod tests {
 }
 ```
 
-- [ ] **Step 2: Wire module**
+- [x] **Step 2: Wire module**
 
 Add to `elohim/elohim-storage/src/services/mod.rs`:
 
@@ -800,7 +800,7 @@ Add to `elohim/elohim-storage/src/services/mod.rs`:
 pub mod manifest_registry;
 ```
 
-- [ ] **Step 3: Run tests**
+- [x] **Step 3: Run tests**
 
 ```bash
 RUSTFLAGS='--cfg getrandom_backend="custom"' cargo test --lib services::manifest_registry
@@ -808,7 +808,7 @@ RUSTFLAGS='--cfg getrandom_backend="custom"' cargo test --lib services::manifest
 
 Expected: `test result: ok. 3 passed`.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add elohim/elohim-storage/src/services/manifest_registry.rs elohim/elohim-storage/src/services/mod.rs
@@ -831,7 +831,7 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 - Modify: `elohim/elohim-storage/src/services/epr_kind.rs:33-43`
 - Modify: `elohim/elohim-storage/src/services/epr_store.rs:199, 375`
 
-- [ ] **Step 1: Update `pillar_for_kind_provisional`**
+- [x] **Step 1: Update `pillar_for_kind_provisional`**
 
 In `elohim/elohim-storage/src/services/epr_kind.rs`, replace lines 33-43:
 
@@ -863,7 +863,7 @@ pub(crate) fn pillar_for_kind_provisional(kind: EprKind) -> String {
 }
 ```
 
-- [ ] **Step 2: Update epr_store.rs callsite**
+- [x] **Step 2: Update epr_store.rs callsite**
 
 Find the call at line 375 in `elohim/elohim-storage/src/services/epr_store.rs`:
 
@@ -890,7 +890,7 @@ use crate::services::standing::Standing;
 use crate::services::epr_kind::pillar_for_kind;
 ```
 
-- [ ] **Step 3: Run tests to verify nothing broke**
+- [x] **Step 3: Run tests to verify nothing broke**
 
 ```bash
 RUSTFLAGS='--cfg getrandom_backend="custom"' cargo test --lib --features p2p services::epr_store
@@ -899,7 +899,7 @@ RUSTFLAGS='--cfg getrandom_backend="custom"' cargo build --release --features p2
 
 Expected: clean build; existing tests pass (pillar_for_kind falls back to lowercased name when registry empty, matching old behavior).
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add elohim/elohim-storage/src/services/epr_kind.rs elohim/elohim-storage/src/services/epr_store.rs
@@ -923,7 +923,7 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 - Create: `elohim/holochain/dna/elohim/zomes/content_store_integrity/src/manifest.rs`
 - Modify: `elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs`
 
-- [ ] **Step 1: Write the integrity entry type with HDI-deterministic validator**
+- [x] **Step 1: Write the integrity entry type with HDI-deterministic validator**
 
 Create `elohim/holochain/dna/elohim/zomes/content_store_integrity/src/manifest.rs`:
 
@@ -1018,7 +1018,7 @@ pub fn validate_delete_manifest(
 }
 ```
 
-- [ ] **Step 2: Register the entry type in lib.rs**
+- [x] **Step 2: Register the entry type in lib.rs**
 
 In `elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs`, find the `#[hdk_entry_types]` enum (around line 3701 per the explore agent's report) and add:
 
@@ -1044,7 +1044,7 @@ EntryTypes::Manifest(m) => manifest::validate_create_manifest(action, m),
 
 (Pattern-match the existing dispatch shape in `lib.rs`; the explore agent noted it follows the standard HDI dispatch idiom.)
 
-- [ ] **Step 3: Build the DNA**
+- [x] **Step 3: Build the DNA**
 
 ```bash
 cd /projects/elohim/.claude/worktrees/epr-phase-3/elohim/holochain/dna/elohim
@@ -1053,7 +1053,7 @@ RUSTFLAGS='--cfg getrandom_backend="custom"' cargo build --release --target wasm
 
 Expected: clean build. Inspect the output `.wasm` is generated.
 
-- [ ] **Step 4: Add a sweettest for the new entry type**
+- [x] **Step 4: Add a sweettest for the new entry type**
 
 Create or append to existing `elohim/holochain/dna/elohim/tests/manifest_entry_test.rs` (follow existing sweettest patterns in `tests/`):
 
@@ -1096,7 +1096,7 @@ async fn manifest_unknown_kind_rejected() {
 
 (Coordinator's `create_manifest`/`get_manifest` come in Task 8; the sweettest will fail until Task 8 lands. Mark this with `#[ignore]` until then if blocking matters; otherwise the test sequence drives the next task.)
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add elohim/holochain/dna/elohim/zomes/content_store_integrity elohim/holochain/dna/elohim/tests/manifest_entry_test.rs
@@ -1124,7 +1124,7 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 - Modify: `elohim/holochain/dna/elohim/zomes/content_store/src/lib.rs`
 - Modify: `elohim/elohim-storage/src/services/epr_store.rs` — projector branch
 
-- [ ] **Step 1: Coordinator `create_manifest` + `get_manifest` + signal emission**
+- [x] **Step 1: Coordinator `create_manifest` + `get_manifest` + signal emission**
 
 Create `elohim/holochain/dna/elohim/zomes/content_store/src/manifest.rs`:
 
@@ -1185,7 +1185,7 @@ pub fn query_manifests_by_pillar(pillar: String) -> ExternResult<Vec<Manifest>> 
 
 (Note: `EntryDefIndex` and `ZomeIndex` literals depend on the dna_def — pattern-match against existing entry-type queries in the same file for the correct integer indices.)
 
-- [ ] **Step 2: Wire signal in coordinator's lib.rs**
+- [x] **Step 2: Wire signal in coordinator's lib.rs**
 
 In `elohim/holochain/dna/elohim/zomes/content_store/src/lib.rs`, add to the `ContentStoreSignal` enum (or equivalent signal type used for projector signals):
 
@@ -1198,7 +1198,7 @@ ManifestCreated {
 
 Add `mod manifest; pub use manifest::*;`.
 
-- [ ] **Step 3: Wire the projector branch in elohim-storage**
+- [x] **Step 3: Wire the projector branch in elohim-storage**
 
 In `elohim/elohim-storage/src/services/epr_store.rs`, the projector code (search for "project_atom" or similar) must branch on `EprKind::Manifest` and write to the manifests table.
 
@@ -1250,7 +1250,7 @@ if epr.envelope.kind == EprKind::Manifest {
 }
 ```
 
-- [ ] **Step 4: Run unit + sweettest**
+- [x] **Step 4: Run unit + sweettest**
 
 ```bash
 cd /projects/elohim/.claude/worktrees/epr-phase-3
@@ -1262,7 +1262,7 @@ RUSTFLAGS='--cfg getrandom_backend="custom"' cargo test --release manifest_entry
 
 Expected: unit tests pass; sweettests pass (manifest create + get round-trip; unknown-kind rejected).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add elohim/holochain/dna/elohim/zomes/content_store/src/manifest.rs elohim/holochain/dna/elohim/zomes/content_store/src/lib.rs elohim/elohim-storage/src/services/epr_store.rs elohim/elohim-storage/src/services/manifest_registry.rs
@@ -1288,7 +1288,7 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 - Create: `elohim/elohim-storage/src/services/schemaref_resolver.rs`
 - Modify: `elohim/elohim-storage/src/services/mod.rs`
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 Create `elohim/elohim-storage/src/services/schemaref_resolver.rs`:
 
@@ -1465,7 +1465,7 @@ mod tests {
 }
 ```
 
-- [ ] **Step 2: Wire module**
+- [x] **Step 2: Wire module**
 
 Add to `elohim/elohim-storage/src/services/mod.rs`:
 
@@ -1473,7 +1473,7 @@ Add to `elohim/elohim-storage/src/services/mod.rs`:
 pub mod schemaref_resolver;
 ```
 
-- [ ] **Step 3: Run tests**
+- [x] **Step 3: Run tests**
 
 ```bash
 RUSTFLAGS='--cfg getrandom_backend="custom"' cargo test --lib services::schemaref_resolver
@@ -1481,7 +1481,7 @@ RUSTFLAGS='--cfg getrandom_backend="custom"' cargo test --lib services::schemare
 
 Expected: `test result: ok. 6 passed`.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add elohim/elohim-storage/src/services/schemaref_resolver.rs elohim/elohim-storage/src/services/mod.rs
@@ -1507,7 +1507,7 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 - Modify: `elohim/elohim-storage/src/services/epr_store.rs` (lines ~285-301)
 - Modify: `elohim/elohim-storage/src/p2p/mod.rs` (add `ResolveEpr` command)
 
-- [ ] **Step 1: Add the `ResolveEpr` swarm command**
+- [x] **Step 1: Add the `ResolveEpr` swarm command**
 
 In `elohim/elohim-storage/src/p2p/mod.rs` (or wherever `P2PCommand` is defined), add:
 
@@ -1536,7 +1536,7 @@ pub enum ResolveEprError {
 
 Implement the handler in the swarm event loop: query Kademlia for providers; for each provider (sorted by Standing — placeholder uses ordering arrival), send `EprAtomRequest::Resolve { id: cid }`; first valid `EprAtomResponse::Atom` wins.
 
-- [ ] **Step 2: Wire cold-fetch in `FederatedEprStore::fetch`**
+- [x] **Step 2: Wire cold-fetch in `FederatedEprStore::fetch`**
 
 Replace the TODO block at `elohim/elohim-storage/src/services/epr_store.rs:285-301`:
 
@@ -1576,7 +1576,7 @@ fn fetch(
 }
 ```
 
-- [ ] **Step 3: Run feature-gated tests**
+- [x] **Step 3: Run feature-gated tests**
 
 ```bash
 RUSTFLAGS='--cfg getrandom_backend="custom"' cargo test --lib --features p2p services::epr_store
@@ -1585,7 +1585,7 @@ RUSTFLAGS='--cfg getrandom_backend="custom"' cargo build --release --features p2
 
 Expected: clean build; existing local-only tests still pass (no swarm_tx → cold fetch returns None as before).
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add elohim/elohim-storage/src/services/epr_store.rs elohim/elohim-storage/src/p2p/mod.rs
@@ -1612,7 +1612,7 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 **Files:**
 - Modify: `elohim/elohim-storage/src/write_through.rs:225-260`
 
-- [ ] **Step 1: Add `from_registry` builder**
+- [x] **Step 1: Add `from_registry` builder**
 
 In `elohim/elohim-storage/src/write_through.rs`, after the `from_manifest` constructor, add:
 
@@ -1647,7 +1647,7 @@ impl WriteThroughState {
 
 (Pattern-match the existing `WriteThroughConfig` shape; if it doesn't have a `Default` impl, add one returning the off-state.)
 
-- [ ] **Step 2: Add a unit test in the same file**
+- [x] **Step 2: Add a unit test in the same file**
 
 In the existing `#[cfg(test)] mod tests` block in `write_through.rs`, add:
 
@@ -1685,7 +1685,7 @@ fn from_registry_reads_pillar_projection_manifests() {
 
 (`is_empty` may not exist; add `pub fn is_empty(&self) -> bool { self.manifest.is_empty() }` to the impl.)
 
-- [ ] **Step 3: Run tests**
+- [x] **Step 3: Run tests**
 
 ```bash
 RUSTFLAGS='--cfg getrandom_backend="custom"' cargo test --lib write_through::tests::from_registry
@@ -1693,7 +1693,7 @@ RUSTFLAGS='--cfg getrandom_backend="custom"' cargo test --lib write_through::tes
 
 Expected: test passes.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add elohim/elohim-storage/src/write_through.rs
@@ -1716,7 +1716,7 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 **Files:**
 - Modify: `elohim/elohim-storage/src/api/epr.rs` — 5 sites
 
-- [ ] **Step 1: Site 1 — `get_epr` (line 176)**
+- [x] **Step 1: Site 1 — `get_epr` (line 176)**
 
 Replace at line 175-176:
 
@@ -1737,11 +1737,11 @@ async fn get_epr(
 
 (Update `default_epr_store` signature to accept `Option<String>` for `local_peer_id` parameter; thread through to `FederatedEprStore`.)
 
-- [ ] **Step 2: Sites 2-4 (lines 209, 241, 291) — same pattern**
+- [x] **Step 2: Sites 2-4 (lines 209, 241, 291) — same pattern**
 
 Apply the same edit to `get_envelope`, `get_payload`, `get_verify`. Change `_ctx: &AppContext` to `ctx: &AppContext` and pass `ctx.local_libp2p_peer_id.clone()` into `default_epr_store`.
 
-- [ ] **Step 3: Site 5 — `list_epr` (line 538)**
+- [x] **Step 3: Site 5 — `list_epr` (line 538)**
 
 ```rust
 async fn list_epr(
@@ -1754,7 +1754,7 @@ async fn list_epr(
     // local_peer is the dedup anchor here too.
 ```
 
-- [ ] **Step 4: Update `default_epr_store` signature**
+- [x] **Step 4: Update `default_epr_store` signature**
 
 In `elohim/elohim-storage/src/services/epr_store.rs`, find `default_epr_store` and add the new parameter:
 
@@ -1773,7 +1773,7 @@ pub fn default_epr_store(
 
 Add `with_local_peer_id` builder method to `FederatedEprStore` that stores the `Option<String>` as a field; `providers()` already uses `local_libp2p_peer_id` for dedup at line 357 — verify it still works.
 
-- [ ] **Step 5: Run tests**
+- [x] **Step 5: Run tests**
 
 ```bash
 RUSTFLAGS='--cfg getrandom_backend="custom"' cargo test --lib --features p2p api::epr
@@ -1782,7 +1782,7 @@ RUSTFLAGS='--cfg getrandom_backend="custom"' cargo build --release --features p2
 
 Expected: build clean; existing api tests pass.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add elohim/elohim-storage/src/api/epr.rs elohim/elohim-storage/src/services/epr_store.rs
@@ -1803,7 +1803,7 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 **Files:**
 - Create: `elohim/sdk/schemas/v1/manifest/manifest-epr.schema.json`
 
-- [ ] **Step 1: Author the JSON schema**
+- [x] **Step 1: Author the JSON schema**
 
 Create `elohim/sdk/schemas/v1/manifest/manifest-epr.schema.json`:
 
@@ -1856,7 +1856,7 @@ Create `elohim/sdk/schemas/v1/manifest/manifest-epr.schema.json`:
 }
 ```
 
-- [ ] **Step 2: Validate the schema**
+- [x] **Step 2: Validate the schema**
 
 ```bash
 cd /projects/elohim/.claude/worktrees/epr-phase-3
@@ -1865,7 +1865,7 @@ pnpm run schema:test
 
 Expected: existing 24 assertions pass; new schema parses cleanly.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add elohim/sdk/schemas/v1/manifest/manifest-epr.schema.json
@@ -1889,7 +1889,7 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 - Create: `elohim/elohim-storage/tests/manifest_resolver_integration.rs`
 - Modify: `elohim/elohim-storage/tests/epr_atom_federation_integration.rs` (add floor-protection scenarios)
 
-- [ ] **Step 1: Manifest resolver integration test**
+- [x] **Step 1: Manifest resolver integration test**
 
 Create `elohim/elohim-storage/tests/manifest_resolver_integration.rs`:
 
@@ -2019,7 +2019,7 @@ async fn floor_protocol_load_bearing_schemaref_full_depth() {
 
 (Note: `harness::connect_nodes` and `node.author_epr` may need helper additions to the harness; pattern-match against the Phase 2C harness in `tests/harness/mod.rs`.)
 
-- [ ] **Step 2: Floor-protection scenarios in existing federation test**
+- [x] **Step 2: Floor-protection scenarios in existing federation test**
 
 In `elohim/elohim-storage/tests/epr_atom_federation_integration.rs`, add (at the bottom):
 
@@ -2051,7 +2051,7 @@ async fn floor_constitutional_kind_validation_per_message() {
 }
 ```
 
-- [ ] **Step 3: Run integration tests**
+- [x] **Step 3: Run integration tests**
 
 ```bash
 cd /projects/elohim/.claude/worktrees/epr-phase-3/elohim/elohim-storage
@@ -2061,7 +2061,7 @@ RUSTFLAGS='--cfg getrandom_backend="custom"' cargo test --test epr_atom_federati
 
 Expected: all integration tests pass.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add elohim/elohim-storage/tests/manifest_resolver_integration.rs elohim/elohim-storage/tests/epr_atom_federation_integration.rs
@@ -2089,7 +2089,7 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 
 **Files:** none (verification + branch hygiene)
 
-- [ ] **Step 1: Full workspace build + test sweep**
+- [x] **Step 1: Full workspace build + test sweep**
 
 ```bash
 cd /projects/elohim/.claude/worktrees/epr-phase-3
@@ -2099,7 +2099,7 @@ RUSTFLAGS='--cfg getrandom_backend="custom"' cargo test --workspace --features p
 
 Expected: clean build, all tests pass.
 
-- [ ] **Step 2: Format + clippy**
+- [x] **Step 2: Format + clippy**
 
 ```bash
 RUSTFLAGS='--cfg getrandom_backend="custom"' cargo fmt --all
@@ -2108,7 +2108,7 @@ RUSTFLAGS='--cfg getrandom_backend="custom"' cargo clippy -p elohim-storage --te
 
 Expected: no formatting changes (or commit any drift); clippy passes.
 
-- [ ] **Step 3: Schema gates**
+- [x] **Step 3: Schema gates**
 
 ```bash
 pnpm run schema:test
@@ -2118,7 +2118,7 @@ pnpm run schema:check-dna
 
 Expected: all gates pass.
 
-- [ ] **Step 4: Verify TODO(phase-3) markers are resolved**
+- [x] **Step 4: Verify TODO(phase-3) markers are resolved**
 
 ```bash
 grep -rn 'TODO(phase-3)\|FIXME(phase-3)' elohim/elohim-storage/src/
@@ -2126,7 +2126,7 @@ grep -rn 'TODO(phase-3)\|FIXME(phase-3)' elohim/elohim-storage/src/
 
 Expected: zero results. (FIXME(phase-3) on `pillar_for_kind_provisional` is now `#[deprecated]` not FIXME.)
 
-- [ ] **Step 5: Pre-push hooks**
+- [x] **Step 5: Pre-push hooks**
 
 ```bash
 git push --dry-run origin feature/epr-phase-3-manifest-resolver
@@ -2134,7 +2134,7 @@ git push --dry-run origin feature/epr-phase-3-manifest-resolver
 
 Expected: pre-push hooks (.husky/pre-push) all pass.
 
-- [ ] **Step 6: Commit any format drift + tag close-out**
+- [x] **Step 6: Commit any format drift + tag close-out**
 
 ```bash
 git add -A
@@ -2142,7 +2142,7 @@ git diff --staged --quiet || git commit -m "chore(epr-3): T15 — fmt + lint clo
 git log --oneline | head -20
 ```
 
-- [ ] **Step 7: Optional — merge to dev**
+- [x] **Step 7: Optional — merge to dev**
 
 ```bash
 cd /projects/elohim
@@ -2170,17 +2170,17 @@ substrate that lights up the gradient signal."
 
 ## Done Definition (mirrors kickoff prompt)
 
-- [ ] `pillar_for_kind_provisional` replaced by `ManifestRegistry`; all existing projector tests still pass
-- [ ] `kind: Manifest` EPR variant defined with DNA entry type; HDI-deterministic validation (no `get_links`); projector maps to `manifests` table; full per-message verification (never amortized)
-- [ ] `schemaRef` resolver walks CID chains; unit tests cover depth limit + cycle detection; protocol-load-bearing schemaRef walks at full depth regardless of `Standing` arg (floor protection)
-- [ ] `FederatedEprStore::fetch` cold-miss triggers `swarm_handle.resolve_epr(cid)`; integration test verifies cross-peer resolution; CID-targeted fetch returns content even at `Standing::Unknown` (floor protection)
-- [ ] `WriteThroughState` loaded from real manifest defaults; layer-1 no longer `HashMap::new()`; absorption rate per-manifest declared (paced reconciliation)
-- [ ] All 5 `TODO(phase-3)` dedup wiring sites in `api/epr.rs` resolved with standing-aware window length (placeholder)
-- [ ] `manifest_resolver_integration` extends with cold-fetch + schemaRef walk scenarios + **floor-protection scenarios** + persona-stress-test scenarios
-- [ ] Standing-aware function signatures: every gradient-relevant function takes a `Standing` argument; control flow respects gradient policy; signal returns `Standing::Unknown` placeholder
-- [ ] No `FeedbackSignal` or `AttentionTending` EPR work — those are Phase 3.5
-- [ ] No VF-GraphQL semantics — that is Phase 4
-- [ ] Pre-push hooks pass; clippy + fmt clean; `--features p2p` builds clean
+- [x] `pillar_for_kind_provisional` replaced by `ManifestRegistry`; all existing projector tests still pass
+- [x] `kind: Manifest` EPR variant defined with DNA entry type; HDI-deterministic validation (no `get_links`); projector maps to `manifests` table; full per-message verification (never amortized)
+- [x] `schemaRef` resolver walks CID chains; unit tests cover depth limit + cycle detection; protocol-load-bearing schemaRef walks at full depth regardless of `Standing` arg (floor protection)
+- [x] `FederatedEprStore::fetch` cold-miss triggers `swarm_handle.resolve_epr(cid)`; integration test verifies cross-peer resolution; CID-targeted fetch returns content even at `Standing::Unknown` (floor protection)
+- [x] `WriteThroughState` loaded from real manifest defaults; layer-1 no longer `HashMap::new()`; absorption rate per-manifest declared (paced reconciliation)
+- [x] All 5 `TODO(phase-3)` dedup wiring sites in `api/epr.rs` resolved with standing-aware window length (placeholder)
+- [x] `manifest_resolver_integration` extends with cold-fetch + schemaRef walk scenarios + **floor-protection scenarios** + persona-stress-test scenarios
+- [x] Standing-aware function signatures: every gradient-relevant function takes a `Standing` argument; control flow respects gradient policy; signal returns `Standing::Unknown` placeholder
+- [x] No `FeedbackSignal` or `AttentionTending` EPR work — those are Phase 3.5
+- [x] No VF-GraphQL semantics — that is Phase 4
+- [x] Pre-push hooks pass; clippy + fmt clean; `--features p2p` builds clean
 
 ---
 
