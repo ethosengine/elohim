@@ -27,6 +27,10 @@ pub const DEFAULT_MAX_FRAME_SIZE: usize = 16 * 1024 * 1024; // 16 MiB
 /// `HARD_MAX_RESPONSE_SIZE` convention.
 pub const HARD_MAX_FRAME_SIZE: usize = 64 * 1024 * 1024; // 64 MiB
 
+/// iroh ALPN for the observation-log segment fetch protocol. Parity with
+/// libp2p OBSERVATION_LOG_PROTOCOL_ID — same wire format, two transports.
+pub const OBSERVATION_LOG_ALPN: &[u8] = b"/elohim/observation/1.0.0";
+
 /// Read a length-prefixed MessagePack frame from a stream.
 ///
 /// `max_size` caps the inbound length and is itself capped at

@@ -60,6 +60,15 @@ pub fn integrity_topics() -> &'static [&'static str] {
     &[TOPIC_IDENTITY_BINDING, TOPIC_INTEGRITY_REVOCATION]
 }
 
+/// libp2p request-response protocol id for fetching observation-log segments
+/// from an observer's iroh-blob log.
+pub const OBSERVATION_LOG_PROTOCOL_ID: &str = "/elohim/observation/1.0.0";
+
+/// Gossipsub topic prefix for observation cursor announcements. Per-kind
+/// topics are formed by appending the namespace, e.g.
+/// `elohim/observations/infrastructure`.
+pub const OBSERVATION_GOSSIP_TOPIC_PREFIX: &str = "elohim/observations/";
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
