@@ -76,53 +76,6 @@ pub use qahal_types::{
 // These convert integrity entry types (which use #[hdk_entry_helper])
 // to qahal-types wire types (plain serde) at construction sites.
 
-fn wire_challenge(e: &mishpat_integrity::Challenge) -> qahal_types::Challenge {
-    qahal_types::Challenge {
-        id: e.id.clone(),
-        entity_type: e.entity_type.clone(),
-        entity_id: e.entity_id.clone(),
-        challenger_id: e.challenger_id.clone(),
-        challenger_name: e.challenger_name.clone(),
-        challenger_standing: e.challenger_standing.clone(),
-        grounds: e.grounds.clone(),
-        description: e.description.clone(),
-        evidence_json: e.evidence_json.clone(),
-        status: e.status.clone(),
-        filed_at: e.filed_at.clone(),
-        acknowledged_at: e.acknowledged_at.clone(),
-        sla_deadline: e.sla_deadline.clone(),
-        assigned_elohim: e.assigned_elohim.clone(),
-        priority: e.priority.clone(),
-        resolution_json: e.resolution_json.clone(),
-        created_at: e.created_at.clone(),
-        updated_at: e.updated_at.clone(),
-        metadata_json: e.metadata_json.clone(),
-    }
-}
-
-fn wire_proposal(e: &mishpat_integrity::Proposal) -> qahal_types::Proposal {
-    qahal_types::Proposal {
-        id: e.id.clone(),
-        title: e.title.clone(),
-        proposal_type: e.proposal_type.clone(),
-        description: e.description.clone(),
-        proposer_id: e.proposer_id.clone(),
-        proposer_name: e.proposer_name.clone(),
-        rationale: e.rationale.clone(),
-        status: e.status.clone(),
-        phase: e.phase.clone(),
-        amendments_json: e.amendments_json.clone(),
-        voting_config_json: e.voting_config_json.clone(),
-        current_votes_json: e.current_votes_json.clone(),
-        outcome_json: e.outcome_json.clone(),
-        related_entity_type: e.related_entity_type.clone(),
-        related_entity_id: e.related_entity_id.clone(),
-        created_at: e.created_at.clone(),
-        updated_at: e.updated_at.clone(),
-        metadata_json: e.metadata_json.clone(),
-    }
-}
-
 fn wire_precedent(e: &mishpat_integrity::Precedent) -> qahal_types::Precedent {
     qahal_types::Precedent {
         id: e.id.clone(),
@@ -177,25 +130,6 @@ fn wire_governance_state(e: &mishpat_integrity::GovernanceState) -> qahal_types:
     }
 }
 
-fn wire_governance_reaction(
-    e: &mishpat_integrity::GovernanceReaction,
-) -> qahal_types::GovernanceReaction {
-    qahal_types::GovernanceReaction {
-        id: e.id.clone(),
-        content_id: e.content_id.clone(),
-        content_type: e.content_type.clone(),
-        reactor_id: e.reactor_id.clone(),
-        reaction: e.reaction.clone(),
-        intensity: e.intensity,
-        mediated: e.mediated,
-        mediation_accepted: e.mediation_accepted,
-        context_json: e.context_json.clone(),
-        created_at: e.created_at.clone(),
-        updated_at: e.updated_at.clone(),
-        metadata_json: e.metadata_json.clone(),
-    }
-}
-
 fn wire_graduated_feedback(
     e: &mishpat_integrity::GraduatedFeedback,
 ) -> qahal_types::GraduatedFeedback {
@@ -209,22 +143,6 @@ fn wire_graduated_feedback(
         intensity: e.intensity,
         reasoning: e.reasoning.clone(),
         updated_count: e.updated_count,
-        created_at: e.created_at.clone(),
-        updated_at: e.updated_at.clone(),
-        metadata_json: e.metadata_json.clone(),
-    }
-}
-
-fn wire_proposal_vote(e: &mishpat_integrity::ProposalVote) -> qahal_types::ProposalVote {
-    qahal_types::ProposalVote {
-        id: e.id.clone(),
-        proposal_id: e.proposal_id.clone(),
-        voter_id: e.voter_id.clone(),
-        voter_name: e.voter_name.clone(),
-        position: e.position.clone(),
-        reasoning: e.reasoning.clone(),
-        version: e.version,
-        previous_position: e.previous_position.clone(),
         created_at: e.created_at.clone(),
         updated_at: e.updated_at.clone(),
         metadata_json: e.metadata_json.clone(),
@@ -252,51 +170,6 @@ fn wire_opinion_statement(
     }
 }
 
-fn wire_statement_vote(e: &mishpat_integrity::StatementVote) -> qahal_types::StatementVote {
-    qahal_types::StatementVote {
-        id: e.id.clone(),
-        statement_id: e.statement_id.clone(),
-        voter_id: e.voter_id.clone(),
-        vote: e.vote.clone(),
-        created_at: e.created_at.clone(),
-        metadata_json: e.metadata_json.clone(),
-    }
-}
-
-fn wire_gate_decision_attestation(
-    e: &mishpat_integrity::GateDecisionAttestation,
-) -> qahal_types::GateDecisionAttestation {
-    qahal_types::GateDecisionAttestation {
-        decision_id: e.decision_id.clone(),
-        phase: e.phase.clone(),
-        elohim_id: e.elohim_id.clone(),
-        elohim_substance_cid: e.elohim_substance_cid.clone(),
-        gate_name: e.gate_name.clone(),
-        gate_process_cid: e.gate_process_cid.clone(),
-        request_ref_json: e.request_ref_json.clone(),
-        decision: e.decision.clone(),
-        reasoning_json: e.reasoning_json.clone(),
-        context_summary_cid: e.context_summary_cid.clone(),
-        decided_at: e.decided_at.clone(),
-        universal_band_cid: e.universal_band_cid.clone(),
-    }
-}
-
-fn wire_gate_decision_challenge(
-    e: &mishpat_integrity::GateDecisionChallenge,
-) -> qahal_types::GateDecisionChallenge {
-    qahal_types::GateDecisionChallenge {
-        challenge_id: e.challenge_id.clone(),
-        challenged_decision_cid: e.challenged_decision_cid.clone(),
-        challenger_id: e.challenger_id.clone(),
-        grounds: e.grounds.clone(),
-        summary: e.summary.clone(),
-        evidence_refs: e.evidence_refs.clone(),
-        filed_at: e.filed_at.clone(),
-        reach: e.reach.clone(),
-    }
-}
-
 fn wire_challenge_outcome(
     e: &mishpat_integrity::ChallengeOutcome,
 ) -> qahal_types::ChallengeOutcome {
@@ -315,7 +188,10 @@ fn wire_challenge_outcome(
 // CHALLENGE FUNCTIONS
 // ============================================================
 
-/// Create a challenge
+/// Create a challenge (Stage C: full-replacement bridge — local Challenge entry removed).
+///
+/// Writes exclusively to elohim DNA via governance-action:challenge.
+/// get_challenge_by_id / query_challenges removed (Stage F will query elohim DNA directly).
 #[hdk_extern]
 pub fn create_challenge(input: CreateChallengeInput) -> ExternResult<ChallengeOutput> {
     let now = sys_time()?;
@@ -325,409 +201,142 @@ pub fn create_challenge(input: CreateChallengeInput) -> ExternResult<ChallengeOu
         .id
         .unwrap_or_else(|| format!("chal-{}-{}", input.entity_id, timestamp));
 
-    let challenge = Challenge {
+    // Build a local value for the wire output without creating a DHT entry.
+    let challenge_wire = qahal_types::Challenge {
         id: challenge_id.clone(),
         entity_type: input.entity_type.clone(),
         entity_id: input.entity_id.clone(),
         challenger_id: input.challenger_id.clone(),
-        challenger_name: input.challenger_name,
-        challenger_standing: input.challenger_standing,
-        grounds: input.grounds,
-        description: input.description,
-        evidence_json: input.evidence_json,
+        challenger_name: input.challenger_name.clone(),
+        challenger_standing: input.challenger_standing.clone(),
+        grounds: input.grounds.clone(),
+        description: input.description.clone(),
+        evidence_json: input.evidence_json.clone(),
         status: input.status.clone(),
         filed_at: timestamp.clone(),
         acknowledged_at: None,
-        sla_deadline: input.sla_deadline,
-        assigned_elohim: input.assigned_elohim,
-        priority: input.priority,
-        resolution_json: input.resolution_json,
+        sla_deadline: input.sla_deadline.clone(),
+        assigned_elohim: input.assigned_elohim.clone(),
+        priority: input.priority.clone(),
+        resolution_json: input.resolution_json.clone(),
         created_at: timestamp.clone(),
-        updated_at: timestamp,
-        metadata_json: input.metadata_json,
+        updated_at: timestamp.clone(),
+        metadata_json: input.metadata_json.clone(),
     };
 
-    let action_hash = create_entry(&EntryTypes::Challenge(challenge.clone()))?;
-
-    // Link by ID
-    let id_anchor = StringAnchor::new("challenge_id", &challenge_id);
-    let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
-    create_link(
-        id_anchor_hash,
-        action_hash.clone(),
-        LinkTypes::IdToChallenge,
-        (),
-    )?;
-
-    // Link by entity
-    let entity_key = format!("{}:{}", input.entity_type, input.entity_id);
-    let entity_anchor = StringAnchor::new("challenge_entity", &entity_key);
-    let entity_anchor_hash = hash_entry(&EntryTypes::StringAnchor(entity_anchor))?;
-    create_link(
-        entity_anchor_hash,
-        action_hash.clone(),
-        LinkTypes::EntityToChallenge,
-        (),
-    )?;
-
-    // Link by challenger
-    let challenger_anchor = StringAnchor::new("challenge_challenger", &input.challenger_id);
-    let challenger_anchor_hash = hash_entry(&EntryTypes::StringAnchor(challenger_anchor))?;
-    create_link(
-        challenger_anchor_hash,
-        action_hash.clone(),
-        LinkTypes::ChallengerToChallenge,
-        (),
-    )?;
-
-    // Link by status
-    let status_anchor = StringAnchor::new("challenge_status", &input.status);
-    let status_anchor_hash = hash_entry(&EntryTypes::StringAnchor(status_anchor))?;
-    create_link(
-        status_anchor_hash,
-        action_hash.clone(),
-        LinkTypes::ChallengeByStatus,
-        (),
-    )?;
-
-    // B.10 bridge: additionally write to elohim DNA's consolidated governance-action store.
-    // Local entry and links are kept so get_challenge_by_id / query_challenges continue to work.
-    // Stage C removes local write once storage projects from elohim signals.
     let _ = call_elohim_propose_governance_action(ConsolidatedProposeGovernanceActionInput {
         governance_kind: "governance-action:challenge".to_string(),
-        subject_cid: format!("{}:{}", challenge.entity_type, challenge.entity_id),
+        subject_cid: format!("{}:{}", input.entity_type, input.entity_id),
         title: format!(
             "Challenge on {}:{} by {}",
-            challenge.entity_type, challenge.entity_id, challenge.challenger_id
+            input.entity_type, input.entity_id, input.challenger_id
         ),
-        description: Some(challenge.description.clone()),
+        description: Some(input.description.clone()),
         reach: "community".to_string(),
         threshold: serde_json::json!({"type": "adjudication"}),
         eligibility_predicate: None,
         ballot_format: "adjudication".to_string(),
-        closes_at: challenge
+        closes_at: input
             .sla_deadline
             .clone()
-            .unwrap_or_else(|| challenge.updated_at.clone()),
+            .unwrap_or_else(|| timestamp.clone()),
         parameters: Some(serde_json::json!({
-            "entity_type": challenge.entity_type,
-            "entity_id": challenge.entity_id,
-            "challenger_id": challenge.challenger_id,
-            "grounds": challenge.grounds,
-            "status": challenge.status,
-            "priority": challenge.priority,
-            "assigned_elohim": challenge.assigned_elohim,
-            "metadata_json": challenge.metadata_json,
+            "entity_type": input.entity_type,
+            "entity_id": input.entity_id,
+            "challenger_id": input.challenger_id,
+            "grounds": input.grounds,
+            "status": input.status,
+            "priority": input.priority,
+            "assigned_elohim": input.assigned_elohim,
+            "metadata_json": input.metadata_json,
         })),
     });
 
+    // Sentinel ActionHash — canonical state now lives on elohim DNA.
+    // Stage F will migrate callers to query elohim::get_governance_action_with_children.
+    let action_hash = ActionHash::from_raw_36(vec![0u8; 36]);
+
     Ok(ChallengeOutput {
         action_hash,
-        challenge: wire_challenge(&challenge),
+        challenge: challenge_wire,
     })
-}
-
-/// Get challenge by ID
-#[hdk_extern]
-pub fn get_challenge_by_id(id: String) -> ExternResult<Option<ChallengeOutput>> {
-    let id_anchor = StringAnchor::new("challenge_id", &id);
-    let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
-
-    let query = LinkQuery::try_new(id_anchor_hash, LinkTypes::IdToChallenge)?;
-    let links = get_links(query, GetStrategy::default())?;
-
-    if let Some(link) = links.first() {
-        let action_hash = ActionHash::try_from(link.target.clone()).map_err(|_| {
-            wasm_error!(WasmErrorInner::Guest("Invalid challenge hash".to_string()))
-        })?;
-
-        let record = get(action_hash.clone(), GetOptions::default())?;
-        if let Some(record) = record {
-            if let Some(challenge) = record.entry().to_app_option::<Challenge>().ok().flatten() {
-                return Ok(Some(ChallengeOutput {
-                    action_hash,
-                    challenge: wire_challenge(&challenge),
-                }));
-            }
-        }
-    }
-
-    Ok(None)
-}
-
-/// Query challenges
-#[hdk_extern]
-pub fn query_challenges(input: QueryChallengesInput) -> ExternResult<Vec<ChallengeOutput>> {
-    let mut results = Vec::new();
-    let limit = input.limit.unwrap_or(100) as usize;
-
-    if input.entity_type.is_some() && input.entity_id.is_some() {
-        let entity_key = format!(
-            "{}:{}",
-            input.entity_type.as_ref().unwrap(),
-            input.entity_id.as_ref().unwrap()
-        );
-        let entity_anchor = StringAnchor::new("challenge_entity", &entity_key);
-        let entity_anchor_hash = hash_entry(&EntryTypes::StringAnchor(entity_anchor))?;
-
-        let query = LinkQuery::try_new(entity_anchor_hash, LinkTypes::EntityToChallenge)?;
-        let links = get_links(query, GetStrategy::default())?;
-
-        for link in links.iter().take(limit) {
-            let action_hash = ActionHash::try_from(link.target.clone()).map_err(|_| {
-                wasm_error!(WasmErrorInner::Guest("Invalid challenge hash".to_string()))
-            })?;
-
-            let record = get(action_hash.clone(), GetOptions::default())?;
-            if let Some(record) = record {
-                if let Some(challenge) = record.entry().to_app_option::<Challenge>().ok().flatten()
-                {
-                    // Filter by status if specified
-                    if let Some(ref status) = input.status {
-                        if &challenge.status != status {
-                            continue;
-                        }
-                    }
-                    results.push(ChallengeOutput {
-                        action_hash,
-                        challenge: wire_challenge(&challenge),
-                    });
-                }
-            }
-        }
-    } else if let Some(status) = &input.status {
-        let status_anchor = StringAnchor::new("challenge_status", status);
-        let status_anchor_hash = hash_entry(&EntryTypes::StringAnchor(status_anchor))?;
-
-        let query = LinkQuery::try_new(status_anchor_hash, LinkTypes::ChallengeByStatus)?;
-        let links = get_links(query, GetStrategy::default())?;
-
-        for link in links.iter().take(limit) {
-            let action_hash = ActionHash::try_from(link.target.clone()).map_err(|_| {
-                wasm_error!(WasmErrorInner::Guest("Invalid challenge hash".to_string()))
-            })?;
-
-            let record = get(action_hash.clone(), GetOptions::default())?;
-            if let Some(record) = record {
-                if let Some(challenge) = record.entry().to_app_option::<Challenge>().ok().flatten()
-                {
-                    results.push(ChallengeOutput {
-                        action_hash,
-                        challenge: wire_challenge(&challenge),
-                    });
-                }
-            }
-        }
-    }
-
-    Ok(results)
 }
 
 // ============================================================
 // PROPOSAL FUNCTIONS
 // ============================================================
 
-/// Create a proposal
+/// Create a proposal (Stage C: full-replacement bridge — local Proposal entry removed).
+///
+/// Writes exclusively to elohim DNA via governance-action:proposal.
+/// get_proposal_by_id / query_proposals removed (Stage F queries elohim DNA directly).
 #[hdk_extern]
 pub fn create_proposal(input: CreateProposalInput) -> ExternResult<ProposalOutput> {
     let now = sys_time()?;
     let timestamp = format!("{:?}", now);
 
-    let proposal_id = input.id.unwrap_or_else(|| format!("prop-{}", timestamp));
+    let proposal_id = input.id.clone().unwrap_or_else(|| format!("prop-{}", timestamp));
 
-    let proposal = Proposal {
+    let proposal_wire = qahal_types::Proposal {
         id: proposal_id.clone(),
-        title: input.title,
+        title: input.title.clone(),
         proposal_type: input.proposal_type.clone(),
-        description: input.description,
+        description: input.description.clone(),
         proposer_id: input.proposer_id.clone(),
-        proposer_name: input.proposer_name,
-        rationale: input.rationale,
+        proposer_name: input.proposer_name.clone(),
+        rationale: input.rationale.clone(),
         status: input.status.clone(),
-        phase: input.phase,
-        amendments_json: input.amendments_json,
-        voting_config_json: input.voting_config_json,
-        current_votes_json: input.current_votes_json,
-        outcome_json: input.outcome_json,
-        related_entity_type: input.related_entity_type,
-        related_entity_id: input.related_entity_id,
+        phase: input.phase.clone(),
+        amendments_json: input.amendments_json.clone(),
+        voting_config_json: input.voting_config_json.clone(),
+        current_votes_json: input.current_votes_json.clone(),
+        outcome_json: input.outcome_json.clone(),
+        related_entity_type: input.related_entity_type.clone(),
+        related_entity_id: input.related_entity_id.clone(),
         created_at: timestamp.clone(),
-        updated_at: timestamp,
-        metadata_json: input.metadata_json,
+        updated_at: timestamp.clone(),
+        metadata_json: input.metadata_json.clone(),
     };
 
-    let action_hash = create_entry(&EntryTypes::Proposal(proposal.clone()))?;
-
-    // Link by ID
-    let id_anchor = StringAnchor::new("proposal_id", &proposal_id);
-    let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
-    create_link(
-        id_anchor_hash,
-        action_hash.clone(),
-        LinkTypes::IdToProposal,
-        (),
-    )?;
-
-    // Link by type
-    let type_anchor = StringAnchor::new("proposal_type", &input.proposal_type);
-    let type_anchor_hash = hash_entry(&EntryTypes::StringAnchor(type_anchor))?;
-    create_link(
-        type_anchor_hash,
-        action_hash.clone(),
-        LinkTypes::ProposalByType,
-        (),
-    )?;
-
-    // Link by proposer
-    let proposer_anchor = StringAnchor::new("proposal_proposer", &input.proposer_id);
-    let proposer_anchor_hash = hash_entry(&EntryTypes::StringAnchor(proposer_anchor))?;
-    create_link(
-        proposer_anchor_hash,
-        action_hash.clone(),
-        LinkTypes::ProposerToProposal,
-        (),
-    )?;
-
-    // Link by status
-    let status_anchor = StringAnchor::new("proposal_status", &input.status);
-    let status_anchor_hash = hash_entry(&EntryTypes::StringAnchor(status_anchor))?;
-    create_link(
-        status_anchor_hash,
-        action_hash.clone(),
-        LinkTypes::ProposalByStatus,
-        (),
-    )?;
-
-    // B.10 bridge: additionally write to elohim DNA's consolidated governance-action store.
-    // Local entry and links are kept so get_proposal_by_id / query_proposals continue to work.
-    // closes_at is extracted from voting_config_json if available; falls back to placeholder.
-    // Stage C removes local write once storage projects from elohim signals.
-    let closes_at = serde_json::from_str::<serde_json::Value>(&proposal.voting_config_json)
+    let closes_at = serde_json::from_str::<serde_json::Value>(&input.voting_config_json)
         .ok()
         .and_then(|v| v.get("closes_at").and_then(|c| c.as_str()).map(String::from))
-        .unwrap_or_else(|| proposal.updated_at.clone());
+        .unwrap_or_else(|| timestamp.clone());
+    let ballot_format = serde_json::from_str::<serde_json::Value>(&input.voting_config_json)
+        .ok()
+        .and_then(|v| v.get("ballot_format").and_then(|b| b.as_str()).map(String::from))
+        .unwrap_or_else(|| "consent".to_string());
+
     let _ = call_elohim_propose_governance_action(ConsolidatedProposeGovernanceActionInput {
         governance_kind: "governance-action:proposal".to_string(),
         subject_cid: input.proposer_id.clone(),
-        title: proposal.title.clone(),
-        description: Some(proposal.description.clone()),
+        title: input.title.clone(),
+        description: Some(input.description.clone()),
         reach: "community".to_string(),
         threshold: serde_json::json!({"type": "majority"}),
         eligibility_predicate: None,
-        ballot_format: serde_json::from_str::<serde_json::Value>(&proposal.voting_config_json)
-            .ok()
-            .and_then(|v| v.get("ballot_format").and_then(|b| b.as_str()).map(String::from))
-            .unwrap_or_else(|| "consent".to_string()),
+        ballot_format,
         closes_at,
         parameters: Some(serde_json::json!({
-            "proposal_type": proposal.proposal_type,
-            "phase": proposal.phase,
-            "status": proposal.status,
-            "rationale": proposal.rationale,
-            "related_entity_type": proposal.related_entity_type,
-            "related_entity_id": proposal.related_entity_id,
-            "voting_config_json": proposal.voting_config_json,
-            "metadata_json": proposal.metadata_json,
+            "proposal_type": input.proposal_type,
+            "phase": input.phase,
+            "status": input.status,
+            "rationale": input.rationale,
+            "related_entity_type": input.related_entity_type,
+            "related_entity_id": input.related_entity_id,
+            "voting_config_json": input.voting_config_json,
+            "metadata_json": input.metadata_json,
         })),
     });
 
+    // Sentinel ActionHash — canonical state now lives on elohim DNA.
+    // Stage F will migrate callers to query elohim::get_governance_action_with_children.
+    let action_hash = ActionHash::from_raw_36(vec![0u8; 36]);
+
     Ok(ProposalOutput {
         action_hash,
-        proposal: wire_proposal(&proposal),
+        proposal: proposal_wire,
     })
-}
-
-/// Get proposal by ID
-#[hdk_extern]
-pub fn get_proposal_by_id(id: String) -> ExternResult<Option<ProposalOutput>> {
-    let id_anchor = StringAnchor::new("proposal_id", &id);
-    let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
-
-    let query = LinkQuery::try_new(id_anchor_hash, LinkTypes::IdToProposal)?;
-    let links = get_links(query, GetStrategy::default())?;
-
-    if let Some(link) = links.first() {
-        let action_hash = ActionHash::try_from(link.target.clone())
-            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid proposal hash".to_string())))?;
-
-        let record = get(action_hash.clone(), GetOptions::default())?;
-        if let Some(record) = record {
-            if let Some(proposal) = record.entry().to_app_option::<Proposal>().ok().flatten() {
-                return Ok(Some(ProposalOutput {
-                    action_hash,
-                    proposal: wire_proposal(&proposal),
-                }));
-            }
-        }
-    }
-
-    Ok(None)
-}
-
-/// Query proposals
-#[hdk_extern]
-pub fn query_proposals(input: QueryProposalsInput) -> ExternResult<Vec<ProposalOutput>> {
-    let mut results = Vec::new();
-    let limit = input.limit.unwrap_or(100) as usize;
-
-    if let Some(status) = &input.status {
-        let status_anchor = StringAnchor::new("proposal_status", status);
-        let status_anchor_hash = hash_entry(&EntryTypes::StringAnchor(status_anchor))?;
-
-        let query = LinkQuery::try_new(status_anchor_hash, LinkTypes::ProposalByStatus)?;
-        let links = get_links(query, GetStrategy::default())?;
-
-        for link in links.iter().take(limit) {
-            let action_hash = ActionHash::try_from(link.target.clone()).map_err(|_| {
-                wasm_error!(WasmErrorInner::Guest("Invalid proposal hash".to_string()))
-            })?;
-
-            let record = get(action_hash.clone(), GetOptions::default())?;
-            if let Some(record) = record {
-                if let Some(proposal) = record.entry().to_app_option::<Proposal>().ok().flatten() {
-                    // Filter by type and proposer if specified
-                    if let Some(ref proposal_type) = input.proposal_type {
-                        if &proposal.proposal_type != proposal_type {
-                            continue;
-                        }
-                    }
-                    if let Some(ref proposer_id) = input.proposer_id {
-                        if &proposal.proposer_id != proposer_id {
-                            continue;
-                        }
-                    }
-                    results.push(ProposalOutput {
-                        action_hash,
-                        proposal: wire_proposal(&proposal),
-                    });
-                }
-            }
-        }
-    } else if let Some(proposal_type) = &input.proposal_type {
-        let type_anchor = StringAnchor::new("proposal_type", proposal_type);
-        let type_anchor_hash = hash_entry(&EntryTypes::StringAnchor(type_anchor))?;
-
-        let query = LinkQuery::try_new(type_anchor_hash, LinkTypes::ProposalByType)?;
-        let links = get_links(query, GetStrategy::default())?;
-
-        for link in links.iter().take(limit) {
-            let action_hash = ActionHash::try_from(link.target.clone()).map_err(|_| {
-                wasm_error!(WasmErrorInner::Guest("Invalid proposal hash".to_string()))
-            })?;
-
-            let record = get(action_hash.clone(), GetOptions::default())?;
-            if let Some(record) = record {
-                if let Some(proposal) = record.entry().to_app_option::<Proposal>().ok().flatten() {
-                    results.push(ProposalOutput {
-                        action_hash,
-                        proposal: wire_proposal(&proposal),
-                    });
-                }
-            }
-        }
-    }
-
-    Ok(results)
 }
 
 // ============================================================
@@ -1192,7 +801,10 @@ pub fn query_governance_states(
 // GOVERNANCE REACTION FUNCTIONS
 // ============================================================
 
-/// Record a low-friction emotional reaction to content
+/// Record a low-friction emotional reaction to content (Stage C: full-replacement bridge).
+///
+/// GovernanceReaction had no B.10 bridge. Stage C bridges it to attestation:governance-reaction
+/// on elohim DNA. Local entry removed; query_governance_reactions removed (no live consumers).
 #[hdk_extern]
 pub fn create_governance_reaction(
     input: CreateGovernanceReactionInput,
@@ -1200,14 +812,14 @@ pub fn create_governance_reaction(
     let now = sys_time()?;
     let timestamp = format!("{:?}", now);
 
-    let reaction_id = input.id.unwrap_or_else(|| {
+    let reaction_id = input.id.clone().unwrap_or_else(|| {
         format!(
             "rxn-{}-{}-{}",
             input.content_id, input.reactor_id, timestamp
         )
     });
 
-    let reaction = GovernanceReaction {
+    let reaction_wire = qahal_types::GovernanceReaction {
         id: reaction_id.clone(),
         content_id: input.content_id.clone(),
         content_type: input.content_type.clone(),
@@ -1216,120 +828,44 @@ pub fn create_governance_reaction(
         intensity: input.intensity,
         mediated: input.mediated,
         mediation_accepted: input.mediation_accepted,
-        context_json: input.context_json,
+        context_json: input.context_json.clone(),
         created_at: timestamp.clone(),
-        updated_at: timestamp,
-        metadata_json: input.metadata_json,
+        updated_at: timestamp.clone(),
+        metadata_json: input.metadata_json.clone(),
     };
 
-    let action_hash = create_entry(&EntryTypes::GovernanceReaction(reaction.clone()))?;
+    let _ = call_elohim_issue_attestation(ConsolidatedIssueAttestationInput {
+        attestation_kind: "attestation:governance-reaction".to_string(),
+        subject_cid: input.content_id.clone(),
+        subject_kind: "content".to_string(),
+        title: format!(
+            "Reaction {} on {} by {}",
+            input.reaction, input.content_id, input.reactor_id
+        ),
+        description: None,
+        reach: "community".to_string(),
+        metadata: serde_json::json!({
+            "reaction": input.reaction,
+            "intensity": input.intensity,
+            "mediated": input.mediated,
+            "mediation_accepted": input.mediation_accepted,
+            "context_json": input.context_json,
+            "metadata_json": input.metadata_json,
+        }),
+        parent_governance_action_cid: None,
+        vote_value: Some(input.reaction.clone()),
+        proof_class: "witness".to_string(),
+        proof_evidence: serde_json::json!({"class": "witness"}),
+        expires_at: None,
+    });
 
-    // Link by content
-    let content_anchor = StringAnchor::new("reaction_content", &input.content_id);
-    let content_anchor_hash = hash_entry(&EntryTypes::StringAnchor(content_anchor))?;
-    create_link(
-        content_anchor_hash,
-        action_hash.clone(),
-        LinkTypes::ContentToReactions,
-        (),
-    )?;
-
-    // Link by agent
-    let agent_anchor = StringAnchor::new("reaction_agent", &input.reactor_id);
-    let agent_anchor_hash = hash_entry(&EntryTypes::StringAnchor(agent_anchor))?;
-    create_link(
-        agent_anchor_hash,
-        action_hash.clone(),
-        LinkTypes::AgentToReactions,
-        (),
-    )?;
-
-    // Link by reaction type
-    let type_anchor = StringAnchor::new("reaction_type", &input.reaction);
-    let type_anchor_hash = hash_entry(&EntryTypes::StringAnchor(type_anchor))?;
-    create_link(
-        type_anchor_hash,
-        action_hash.clone(),
-        LinkTypes::ReactionByType,
-        (),
-    )?;
+    // Sentinel ActionHash — canonical state now lives on elohim DNA.
+    let action_hash = ActionHash::from_raw_36(vec![0u8; 36]);
 
     Ok(GovernanceReactionOutput {
         action_hash,
-        reaction: wire_governance_reaction(&reaction),
+        reaction: reaction_wire,
     })
-}
-
-/// Query governance reactions
-#[hdk_extern]
-pub fn query_governance_reactions(
-    input: QueryGovernanceReactionsInput,
-) -> ExternResult<Vec<GovernanceReactionOutput>> {
-    let mut results = Vec::new();
-    let limit = input.limit.unwrap_or(100) as usize;
-
-    if let Some(content_id) = &input.content_id {
-        let content_anchor = StringAnchor::new("reaction_content", content_id);
-        let content_anchor_hash = hash_entry(&EntryTypes::StringAnchor(content_anchor))?;
-
-        let query = LinkQuery::try_new(content_anchor_hash, LinkTypes::ContentToReactions)?;
-        let links = get_links(query, GetStrategy::default())?;
-
-        for link in links.iter().take(limit) {
-            let action_hash = ActionHash::try_from(link.target.clone()).map_err(|_| {
-                wasm_error!(WasmErrorInner::Guest("Invalid reaction hash".to_string()))
-            })?;
-
-            let record = get(action_hash.clone(), GetOptions::default())?;
-            if let Some(record) = record {
-                if let Some(reaction) = record
-                    .entry()
-                    .to_app_option::<GovernanceReaction>()
-                    .ok()
-                    .flatten()
-                {
-                    if let Some(ref reaction_type) = input.reaction_type {
-                        if &reaction.reaction != reaction_type {
-                            continue;
-                        }
-                    }
-                    results.push(GovernanceReactionOutput {
-                        action_hash,
-                        reaction: wire_governance_reaction(&reaction),
-                    });
-                }
-            }
-        }
-    } else if let Some(reactor_id) = &input.reactor_id {
-        let agent_anchor = StringAnchor::new("reaction_agent", reactor_id);
-        let agent_anchor_hash = hash_entry(&EntryTypes::StringAnchor(agent_anchor))?;
-
-        let query = LinkQuery::try_new(agent_anchor_hash, LinkTypes::AgentToReactions)?;
-        let links = get_links(query, GetStrategy::default())?;
-
-        for link in links.iter().take(limit) {
-            let action_hash = ActionHash::try_from(link.target.clone()).map_err(|_| {
-                wasm_error!(WasmErrorInner::Guest("Invalid reaction hash".to_string()))
-            })?;
-
-            let record = get(action_hash.clone(), GetOptions::default())?;
-            if let Some(record) = record {
-                if let Some(reaction) = record
-                    .entry()
-                    .to_app_option::<GovernanceReaction>()
-                    .ok()
-                    .flatten()
-                {
-                    results.push(GovernanceReactionOutput {
-                        action_hash,
-                        reaction: wire_governance_reaction(&reaction),
-                    });
-                }
-            }
-        }
-    }
-
-    Ok(results)
 }
 
 // ============================================================
@@ -1480,7 +1016,10 @@ pub fn query_graduated_feedback(
 // PROPOSAL VOTE FUNCTIONS
 // ============================================================
 
-/// Cast a Loomio-style 4-position vote on a proposal
+/// Cast a Loomio-style 4-position vote on a proposal (Stage C: full-replacement bridge).
+///
+/// Local ProposalVote entry removed; writes exclusively to elohim DNA via
+/// attestation:proposal-vote. query_proposal_votes removed (Stage F queries elohim DNA directly).
 #[hdk_extern]
 pub fn create_proposal_vote(input: CreateProposalVoteInput) -> ExternResult<ProposalVoteOutput> {
     let now = sys_time()?;
@@ -1488,157 +1027,56 @@ pub fn create_proposal_vote(input: CreateProposalVoteInput) -> ExternResult<Prop
 
     let vote_id = input
         .id
+        .clone()
         .unwrap_or_else(|| format!("pv-{}-{}", input.proposal_id, input.voter_id));
 
-    let vote = ProposalVote {
+    let vote_wire = qahal_types::ProposalVote {
         id: vote_id.clone(),
         proposal_id: input.proposal_id.clone(),
         voter_id: input.voter_id.clone(),
-        voter_name: input.voter_name,
+        voter_name: input.voter_name.clone(),
         position: input.position.clone(),
-        reasoning: input.reasoning,
+        reasoning: input.reasoning.clone(),
         version: input.version,
-        previous_position: input.previous_position,
+        previous_position: input.previous_position.clone(),
         created_at: timestamp.clone(),
-        updated_at: timestamp,
-        metadata_json: input.metadata_json,
+        updated_at: timestamp.clone(),
+        metadata_json: input.metadata_json.clone(),
     };
 
-    let action_hash = create_entry(&EntryTypes::ProposalVote(vote.clone()))?;
-
-    // Link from proposal
-    let proposal_anchor = StringAnchor::new("proposal_vote_proposal", &input.proposal_id);
-    let proposal_anchor_hash = hash_entry(&EntryTypes::StringAnchor(proposal_anchor))?;
-    create_link(
-        proposal_anchor_hash,
-        action_hash.clone(),
-        LinkTypes::ProposalToVotes,
-        (),
-    )?;
-
-    // Link by agent
-    let agent_anchor = StringAnchor::new("proposal_vote_agent", &input.voter_id);
-    let agent_anchor_hash = hash_entry(&EntryTypes::StringAnchor(agent_anchor))?;
-    create_link(
-        agent_anchor_hash,
-        action_hash.clone(),
-        LinkTypes::AgentToVotes,
-        (),
-    )?;
-
-    // Link by position
-    let position_anchor = StringAnchor::new("proposal_vote_position", &input.position);
-    let position_anchor_hash = hash_entry(&EntryTypes::StringAnchor(position_anchor))?;
-    create_link(
-        position_anchor_hash,
-        action_hash.clone(),
-        LinkTypes::VoteByPosition,
-        (),
-    )?;
-
-    // B.10 bridge: additionally write to elohim DNA's consolidated attestation store.
-    // Local entry and links are kept so query_proposal_votes continues to work.
-    // Stage C removes local write once storage projects from elohim signals.
     let _ = call_elohim_issue_attestation(ConsolidatedIssueAttestationInput {
         attestation_kind: "attestation:proposal-vote".to_string(),
-        subject_cid: vote.proposal_id.clone(),
+        subject_cid: input.proposal_id.clone(),
         subject_kind: "governance-action".to_string(),
-        title: format!("Vote on proposal {} by {}", vote.proposal_id, vote.voter_id),
-        description: Some(format!("Position: {}", vote.position)),
+        title: format!("Vote on proposal {} by {}", input.proposal_id, input.voter_id),
+        description: Some(format!("Position: {}", input.position)),
         reach: "community".to_string(),
         metadata: serde_json::json!({
-            "proposal_id": vote.proposal_id,
-            "voter_id": vote.voter_id,
-            "voter_name": vote.voter_name,
-            "position": vote.position,
-            "version": vote.version,
-            "previous_position": vote.previous_position,
-            "metadata_json": vote.metadata_json,
+            "proposal_id": input.proposal_id,
+            "voter_id": input.voter_id,
+            "voter_name": input.voter_name,
+            "position": input.position,
+            "version": input.version,
+            "previous_position": input.previous_position,
+            "metadata_json": input.metadata_json,
         }),
-        parent_governance_action_cid: Some(vote.proposal_id.clone()),
-        vote_value: Some(vote.position.clone()),
+        parent_governance_action_cid: Some(input.proposal_id.clone()),
+        vote_value: Some(input.position.clone()),
         proof_class: "witness".to_string(),
         proof_evidence: serde_json::json!({
             "class": "witness",
-            "reasoning": vote.reasoning,
+            "reasoning": input.reasoning,
         }),
         expires_at: None,
     });
 
+    // Sentinel ActionHash — canonical state now lives on elohim DNA.
+    let action_hash = ActionHash::from_raw_36(vec![0u8; 36]);
+
     Ok(ProposalVoteOutput {
         action_hash,
-        vote: wire_proposal_vote(&vote),
+        vote: vote_wire,
     })
-}
-
-/// Query proposal votes
-#[hdk_extern]
-pub fn query_proposal_votes(
-    input: QueryProposalVotesInput,
-) -> ExternResult<Vec<ProposalVoteOutput>> {
-    let mut results = Vec::new();
-    let limit = input.limit.unwrap_or(100) as usize;
-
-    if let Some(proposal_id) = &input.proposal_id {
-        let proposal_anchor = StringAnchor::new("proposal_vote_proposal", proposal_id);
-        let proposal_anchor_hash = hash_entry(&EntryTypes::StringAnchor(proposal_anchor))?;
-
-        let query = LinkQuery::try_new(proposal_anchor_hash, LinkTypes::ProposalToVotes)?;
-        let links = get_links(query, GetStrategy::default())?;
-
-        for link in links.iter().take(limit) {
-            let action_hash = ActionHash::try_from(link.target.clone())
-                .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid vote hash".to_string())))?;
-
-            let record = get(action_hash.clone(), GetOptions::default())?;
-            if let Some(record) = record {
-                if let Some(vote) = record
-                    .entry()
-                    .to_app_option::<ProposalVote>()
-                    .ok()
-                    .flatten()
-                {
-                    if let Some(ref position) = input.position {
-                        if &vote.position != position {
-                            continue;
-                        }
-                    }
-                    results.push(ProposalVoteOutput {
-                        action_hash,
-                        vote: wire_proposal_vote(&vote),
-                    });
-                }
-            }
-        }
-    } else if let Some(voter_id) = &input.voter_id {
-        let agent_anchor = StringAnchor::new("proposal_vote_agent", voter_id);
-        let agent_anchor_hash = hash_entry(&EntryTypes::StringAnchor(agent_anchor))?;
-
-        let query = LinkQuery::try_new(agent_anchor_hash, LinkTypes::AgentToVotes)?;
-        let links = get_links(query, GetStrategy::default())?;
-
-        for link in links.iter().take(limit) {
-            let action_hash = ActionHash::try_from(link.target.clone())
-                .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid vote hash".to_string())))?;
-
-            let record = get(action_hash.clone(), GetOptions::default())?;
-            if let Some(record) = record {
-                if let Some(vote) = record
-                    .entry()
-                    .to_app_option::<ProposalVote>()
-                    .ok()
-                    .flatten()
-                {
-                    results.push(ProposalVoteOutput {
-                        action_hash,
-                        vote: wire_proposal_vote(&vote),
-                    });
-                }
-            }
-        }
-    }
-
-    Ok(results)
 }
 
 // ============================================================
@@ -1795,7 +1233,10 @@ pub fn query_opinion_statements(
 // STATEMENT VOTE FUNCTIONS
 // ============================================================
 
-/// Cast a vote on an opinion statement (agree/disagree/pass)
+/// Cast a vote on an opinion statement (Stage C: full-replacement bridge).
+///
+/// Local StatementVote entry removed; writes exclusively to elohim DNA via
+/// attestation:statement-vote. query_statement_votes removed (Stage F queries elohim DNA directly).
 #[hdk_extern]
 pub fn create_statement_vote(input: CreateStatementVoteInput) -> ExternResult<StatementVoteOutput> {
     let now = sys_time()?;
@@ -1803,173 +1244,67 @@ pub fn create_statement_vote(input: CreateStatementVoteInput) -> ExternResult<St
 
     let vote_id = input
         .id
+        .clone()
         .unwrap_or_else(|| format!("sv-{}-{}", input.statement_id, input.voter_id));
 
-    let statement_vote = StatementVote {
+    let vote_wire = qahal_types::StatementVote {
         id: vote_id.clone(),
         statement_id: input.statement_id.clone(),
         voter_id: input.voter_id.clone(),
-        vote: input.vote,
-        created_at: timestamp,
-        metadata_json: input.metadata_json,
+        vote: input.vote.clone(),
+        created_at: timestamp.clone(),
+        metadata_json: input.metadata_json.clone(),
     };
 
-    let action_hash = create_entry(&EntryTypes::StatementVote(statement_vote.clone()))?;
-
-    // Link from statement
-    let statement_anchor = StringAnchor::new("statement_vote_statement", &input.statement_id);
-    let statement_anchor_hash = hash_entry(&EntryTypes::StringAnchor(statement_anchor))?;
-    create_link(
-        statement_anchor_hash,
-        action_hash.clone(),
-        LinkTypes::StatementToVotes,
-        (),
-    )?;
-
-    // Link by agent
-    let agent_anchor = StringAnchor::new("statement_vote_agent", &input.voter_id);
-    let agent_anchor_hash = hash_entry(&EntryTypes::StringAnchor(agent_anchor))?;
-    create_link(
-        agent_anchor_hash,
-        action_hash.clone(),
-        LinkTypes::AgentToStatementVotes,
-        (),
-    )?;
-
-    // B.10 bridge: additionally write to elohim DNA's consolidated attestation store.
-    // Local entry and links are kept so query_statement_votes continues to work.
-    // Stage C removes local write once storage projects from elohim signals.
     let _ = call_elohim_issue_attestation(ConsolidatedIssueAttestationInput {
         attestation_kind: "attestation:statement-vote".to_string(),
-        subject_cid: statement_vote.statement_id.clone(),
+        subject_cid: input.statement_id.clone(),
         subject_kind: "governance-action".to_string(),
         title: format!(
             "Statement vote on {} by {}",
-            statement_vote.statement_id, statement_vote.voter_id
+            input.statement_id, input.voter_id
         ),
-        description: Some(format!("Vote: {}", statement_vote.vote)),
+        description: Some(format!("Vote: {}", input.vote)),
         reach: "community".to_string(),
         metadata: serde_json::json!({
-            "statement_id": statement_vote.statement_id,
-            "voter_id": statement_vote.voter_id,
-            "vote": statement_vote.vote,
-            "metadata_json": statement_vote.metadata_json,
+            "statement_id": input.statement_id,
+            "voter_id": input.voter_id,
+            "vote": input.vote,
+            "metadata_json": input.metadata_json,
         }),
-        parent_governance_action_cid: Some(statement_vote.statement_id.clone()),
-        vote_value: Some(statement_vote.vote.clone()),
+        parent_governance_action_cid: Some(input.statement_id.clone()),
+        vote_value: Some(input.vote.clone()),
         proof_class: "witness".to_string(),
         proof_evidence: serde_json::json!({"class": "witness"}),
         expires_at: None,
     });
 
+    // Sentinel ActionHash — canonical state now lives on elohim DNA.
+    let action_hash = ActionHash::from_raw_36(vec![0u8; 36]);
+
     Ok(StatementVoteOutput {
         action_hash,
-        statement_vote: wire_statement_vote(&statement_vote),
+        statement_vote: vote_wire,
     })
 }
 
-/// Query statement votes
-#[hdk_extern]
-pub fn query_statement_votes(
-    input: QueryStatementVotesInput,
-) -> ExternResult<Vec<StatementVoteOutput>> {
-    let mut results = Vec::new();
-    let limit = input.limit.unwrap_or(100) as usize;
-
-    if let Some(statement_id) = &input.statement_id {
-        let statement_anchor = StringAnchor::new("statement_vote_statement", statement_id);
-        let statement_anchor_hash = hash_entry(&EntryTypes::StringAnchor(statement_anchor))?;
-
-        let query = LinkQuery::try_new(statement_anchor_hash, LinkTypes::StatementToVotes)?;
-        let links = get_links(query, GetStrategy::default())?;
-
-        for link in links.iter().take(limit) {
-            let action_hash = ActionHash::try_from(link.target.clone()).map_err(|_| {
-                wasm_error!(WasmErrorInner::Guest(
-                    "Invalid statement vote hash".to_string()
-                ))
-            })?;
-
-            let record = get(action_hash.clone(), GetOptions::default())?;
-            if let Some(record) = record {
-                if let Some(statement_vote) = record
-                    .entry()
-                    .to_app_option::<StatementVote>()
-                    .ok()
-                    .flatten()
-                {
-                    results.push(StatementVoteOutput {
-                        action_hash,
-                        statement_vote: wire_statement_vote(&statement_vote),
-                    });
-                }
-            }
-        }
-    } else if let Some(voter_id) = &input.voter_id {
-        let agent_anchor = StringAnchor::new("statement_vote_agent", voter_id);
-        let agent_anchor_hash = hash_entry(&EntryTypes::StringAnchor(agent_anchor))?;
-
-        let query = LinkQuery::try_new(agent_anchor_hash, LinkTypes::AgentToStatementVotes)?;
-        let links = get_links(query, GetStrategy::default())?;
-
-        for link in links.iter().take(limit) {
-            let action_hash = ActionHash::try_from(link.target.clone()).map_err(|_| {
-                wasm_error!(WasmErrorInner::Guest(
-                    "Invalid statement vote hash".to_string()
-                ))
-            })?;
-
-            let record = get(action_hash.clone(), GetOptions::default())?;
-            if let Some(record) = record {
-                if let Some(statement_vote) = record
-                    .entry()
-                    .to_app_option::<StatementVote>()
-                    .ok()
-                    .flatten()
-                {
-                    results.push(StatementVoteOutput {
-                        action_hash,
-                        statement_vote: wire_statement_vote(&statement_vote),
-                    });
-                }
-            }
-        }
-    }
-
-    Ok(results)
-}
-
 // ============================================================
-// GATE DECISION ATTESTATION FUNCTIONS
+// GATE DECISION ATTESTATION FUNCTIONS (Stage C: bridge-only)
 // ============================================================
 //
-// GateDecisionAttestation is a notarized record of every gate evaluation.
-// Indexed by: decision_id, elohim_id, gate_name, phase.
-// elohim-storage (Task 4.2) receives the post-commit signal and projects
-// into SQLite with dht_anchor_hash for fast query.
+// GateDecisionAttestation and GateDecisionChallenge local entry types removed.
+// All writes now go exclusively to elohim DNA via consolidated attestation store.
+// Query functions removed — Stage F will query elohim::get_attestations_for_subject.
 
-/// Signal emitted after a notarized gate entry is committed to the DHT.
+/// Signal emitted when a ChallengeOutcome is committed.
 ///
-/// elohim-storage listens for these signals and projects entries into its
-/// local SQLite index with dht_anchor_hash for downstream query.
-/// Task 11.2 adds the projection handlers for Challenge and Outcome variants.
+/// GateDecisionCreated and GateDecisionChallengeCreated variants removed (Stage C) —
+/// those entry types now live on elohim DNA and elohim-storage projects from
+/// elohim's content_store signals.
+/// elohim-storage Task 11.2 handles ChallengeOutcome projection from this signal.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(tag = "type", content = "payload")]
 pub enum MishpatSignal {
-    GateDecisionCreated {
-        action_hash: ActionHash,
-        entry_hash: EntryHash,
-        entry: mishpat_integrity::GateDecisionAttestation,
-        author: AgentPubKey,
-    },
-    /// Emitted when a GateDecisionChallenge is committed (Phase 11 Task 11.1).
-    /// elohim-storage Task 11.2 handles projection from this signal.
-    GateDecisionChallengeCreated {
-        action_hash: ActionHash,
-        entry_hash: EntryHash,
-        entry: mishpat_integrity::GateDecisionChallenge,
-        author: AgentPubKey,
-    },
     /// Emitted when a ChallengeOutcome is committed (Phase 11 Task 11.1).
     /// elohim-storage Task 11.2 handles projection from this signal.
     ChallengeOutcomeCreated {
@@ -1980,77 +1315,15 @@ pub enum MishpatSignal {
     },
 }
 
-/// Create and notarize a GateDecisionAttestation on the Mishpat DHT.
+/// Create a gate decision attestation (Stage C: full-replacement bridge).
 ///
-/// Indexes via four StringAnchor links so storage can query by
-/// decision_id, elohim_id, gate_name, or phase without a full DHT scan.
-///
-/// Returns the ActionHash of the committed record. The caller receives the
-/// entry hash via the post-commit signal (MishpatSignal::GateDecisionCreated).
+/// Local GateDecisionAttestation entry removed; writes exclusively to elohim DNA
+/// via attestation:gate-decision. get_gate_decision_by_id / get_decisions_by_* removed
+/// (Stage F queries elohim::get_attestations_for_subject directly).
 #[hdk_extern]
 pub fn create_gate_decision_attestation(
     input: CreateGateDecisionAttestationInput,
 ) -> ExternResult<ActionHash> {
-    let entry = mishpat_integrity::GateDecisionAttestation {
-        decision_id: input.decision_id.clone(),
-        phase: input.phase.clone(),
-        elohim_id: input.elohim_id.clone(),
-        elohim_substance_cid: input.elohim_substance_cid.clone(),
-        gate_name: input.gate_name.clone(),
-        gate_process_cid: input.gate_process_cid.clone(),
-        request_ref_json: input.request_ref_json.clone(),
-        decision: input.decision.clone(),
-        reasoning_json: input.reasoning_json.clone(),
-        context_summary_cid: input.context_summary_cid.clone(),
-        decided_at: input.decided_at.clone(),
-        universal_band_cid: input.universal_band_cid.clone(),
-    };
-
-    let action_hash = create_entry(&EntryTypes::GateDecisionAttestation(entry.clone()))?;
-
-    // Index by decision_id (primary lookup — one attestation per CID)
-    let id_anchor = StringAnchor::new("gate_decision_id", &input.decision_id);
-    let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
-    create_link(
-        id_anchor_hash,
-        action_hash.clone(),
-        LinkTypes::IdToGateDecision,
-        (),
-    )?;
-
-    // Index by elohim_id (all decisions by a given elohim agent)
-    let elohim_anchor = StringAnchor::new("gate_decision_elohim", &input.elohim_id);
-    let elohim_anchor_hash = hash_entry(&EntryTypes::StringAnchor(elohim_anchor))?;
-    create_link(
-        elohim_anchor_hash,
-        action_hash.clone(),
-        LinkTypes::ElohimToGateDecisions,
-        (),
-    )?;
-
-    // Index by gate_name (all decisions produced by a given gate)
-    let gate_anchor = StringAnchor::new("gate_decision_gate_name", &input.gate_name);
-    let gate_anchor_hash = hash_entry(&EntryTypes::StringAnchor(gate_anchor))?;
-    create_link(
-        gate_anchor_hash,
-        action_hash.clone(),
-        LinkTypes::GateNameToDecisions,
-        (),
-    )?;
-
-    // Index by phase (dev-context vs elohim-active audit split)
-    let phase_anchor = StringAnchor::new("gate_decision_phase", &input.phase);
-    let phase_anchor_hash = hash_entry(&EntryTypes::StringAnchor(phase_anchor))?;
-    create_link(
-        phase_anchor_hash,
-        action_hash.clone(),
-        LinkTypes::PhaseToDecisions,
-        (),
-    )?;
-
-    // B.10 bridge: additionally write to elohim DNA's consolidated attestation store.
-    // Local entry is kept so post_commit emits MishpatSignal::GateDecisionCreated.
-    // Stage C removes local write once storage projects from elohim signals.
     let _ = call_elohim_issue_attestation(ConsolidatedIssueAttestationInput {
         attestation_kind: "attestation:gate-decision".to_string(),
         subject_cid: input.elohim_id.clone(),
@@ -2081,326 +1354,51 @@ pub fn create_gate_decision_attestation(
         expires_at: None,
     });
 
-    Ok(action_hash)
-}
-
-/// Get a GateDecisionAttestation by its decision_id CID.
-#[hdk_extern]
-pub fn get_gate_decision_by_id(
-    decision_id: String,
-) -> ExternResult<Option<GateDecisionAttestationOutput>> {
-    let id_anchor = StringAnchor::new("gate_decision_id", &decision_id);
-    let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
-
-    let query = LinkQuery::try_new(id_anchor_hash, LinkTypes::IdToGateDecision)?;
-    let links = get_links(query, GetStrategy::default())?;
-
-    if let Some(link) = links.first() {
-        let action_hash = ActionHash::try_from(link.target.clone()).map_err(|_| {
-            wasm_error!(WasmErrorInner::Guest(
-                "Invalid gate decision hash".to_string()
-            ))
-        })?;
-
-        let record = get(action_hash.clone(), GetOptions::default())?;
-        if let Some(record) = record {
-            if let Some(entry) = record
-                .entry()
-                .to_app_option::<mishpat_integrity::GateDecisionAttestation>()
-                .ok()
-                .flatten()
-            {
-                return Ok(Some(GateDecisionAttestationOutput {
-                    action_hash,
-                    attestation: wire_gate_decision_attestation(&entry),
-                }));
-            }
-        }
-    }
-
-    Ok(None)
-}
-
-/// Query all GateDecisionAttestations by elohim_id.
-///
-/// Returns all gate decisions made by the given elohim agent, up to limit.
-#[hdk_extern]
-pub fn get_decisions_by_elohim(
-    input: QueryGateDecisionsInput,
-) -> ExternResult<Vec<GateDecisionAttestationOutput>> {
-    let elohim_id = input.elohim_id.ok_or_else(|| {
-        wasm_error!(WasmErrorInner::Guest(
-            "elohim_id is required for get_decisions_by_elohim".to_string()
-        ))
-    })?;
-    let limit = input.limit.unwrap_or(100) as usize;
-
-    let elohim_anchor = StringAnchor::new("gate_decision_elohim", &elohim_id);
-    let elohim_anchor_hash = hash_entry(&EntryTypes::StringAnchor(elohim_anchor))?;
-
-    let query = LinkQuery::try_new(elohim_anchor_hash, LinkTypes::ElohimToGateDecisions)?;
-    let links = get_links(query, GetStrategy::default())?;
-
-    let mut results = Vec::new();
-    for link in links.iter().take(limit) {
-        let action_hash = ActionHash::try_from(link.target.clone()).map_err(|_| {
-            wasm_error!(WasmErrorInner::Guest(
-                "Invalid gate decision hash".to_string()
-            ))
-        })?;
-
-        let record = get(action_hash.clone(), GetOptions::default())?;
-        if let Some(record) = record {
-            if let Some(entry) = record
-                .entry()
-                .to_app_option::<mishpat_integrity::GateDecisionAttestation>()
-                .ok()
-                .flatten()
-            {
-                results.push(GateDecisionAttestationOutput {
-                    action_hash,
-                    attestation: wire_gate_decision_attestation(&entry),
-                });
-            }
-        }
-    }
-
-    Ok(results)
-}
-
-/// Query all GateDecisionAttestations by gate_name.
-///
-/// Returns all gate decisions produced by the named gate, up to limit.
-#[hdk_extern]
-pub fn get_decisions_by_gate(
-    input: QueryGateDecisionsInput,
-) -> ExternResult<Vec<GateDecisionAttestationOutput>> {
-    let gate_name = input.gate_name.ok_or_else(|| {
-        wasm_error!(WasmErrorInner::Guest(
-            "gate_name is required for get_decisions_by_gate".to_string()
-        ))
-    })?;
-    let limit = input.limit.unwrap_or(100) as usize;
-
-    let gate_anchor = StringAnchor::new("gate_decision_gate_name", &gate_name);
-    let gate_anchor_hash = hash_entry(&EntryTypes::StringAnchor(gate_anchor))?;
-
-    let query = LinkQuery::try_new(gate_anchor_hash, LinkTypes::GateNameToDecisions)?;
-    let links = get_links(query, GetStrategy::default())?;
-
-    let mut results = Vec::new();
-    for link in links.iter().take(limit) {
-        let action_hash = ActionHash::try_from(link.target.clone()).map_err(|_| {
-            wasm_error!(WasmErrorInner::Guest(
-                "Invalid gate decision hash".to_string()
-            ))
-        })?;
-
-        let record = get(action_hash.clone(), GetOptions::default())?;
-        if let Some(record) = record {
-            if let Some(entry) = record
-                .entry()
-                .to_app_option::<mishpat_integrity::GateDecisionAttestation>()
-                .ok()
-                .flatten()
-            {
-                results.push(GateDecisionAttestationOutput {
-                    action_hash,
-                    attestation: wire_gate_decision_attestation(&entry),
-                });
-            }
-        }
-    }
-
-    Ok(results)
-}
-
-/// Query all GateDecisionAttestations by phase.
-///
-/// Returns all gate decisions for the given phase discriminator, up to limit.
-#[hdk_extern]
-pub fn get_decisions_by_phase(
-    input: QueryGateDecisionsInput,
-) -> ExternResult<Vec<GateDecisionAttestationOutput>> {
-    let phase = input.phase.ok_or_else(|| {
-        wasm_error!(WasmErrorInner::Guest(
-            "phase is required for get_decisions_by_phase".to_string()
-        ))
-    })?;
-    let limit = input.limit.unwrap_or(100) as usize;
-
-    let phase_anchor = StringAnchor::new("gate_decision_phase", &phase);
-    let phase_anchor_hash = hash_entry(&EntryTypes::StringAnchor(phase_anchor))?;
-
-    let query = LinkQuery::try_new(phase_anchor_hash, LinkTypes::PhaseToDecisions)?;
-    let links = get_links(query, GetStrategy::default())?;
-
-    let mut results = Vec::new();
-    for link in links.iter().take(limit) {
-        let action_hash = ActionHash::try_from(link.target.clone()).map_err(|_| {
-            wasm_error!(WasmErrorInner::Guest(
-                "Invalid gate decision hash".to_string()
-            ))
-        })?;
-
-        let record = get(action_hash.clone(), GetOptions::default())?;
-        if let Some(record) = record {
-            if let Some(entry) = record
-                .entry()
-                .to_app_option::<mishpat_integrity::GateDecisionAttestation>()
-                .ok()
-                .flatten()
-            {
-                results.push(GateDecisionAttestationOutput {
-                    action_hash,
-                    attestation: wire_gate_decision_attestation(&entry),
-                });
-            }
-        }
-    }
-
-    Ok(results)
+    // Sentinel ActionHash — canonical state now lives on elohim DNA.
+    Ok(ActionHash::from_raw_36(vec![0u8; 36]))
 }
 
 // =============================================================================
-// Gate Decision Challenge + Outcome coordinators (Phase 11 Task 11.1)
+// Gate Decision Challenge + Outcome coordinators (Phase 11 / Stage C)
 // =============================================================================
 
-/// Create and notarize a GateDecisionChallenge on the Mishpat DHT.
+/// Create a gate decision challenge (Stage C: full-replacement bridge).
 ///
-/// Indexes via three StringAnchor links so storage can query by
-/// challenge_id, challenged_decision_cid, or challenger_id.
+/// Local GateDecisionChallenge entry removed; writes exclusively to elohim DNA
+/// via attestation:gate-decision-challenge. get_challenge_by_id_v2 /
+/// get_challenges_against_decision removed (Stage F queries elohim DNA directly).
 #[hdk_extern]
 pub fn create_gate_decision_challenge(
     input: CreateGateDecisionChallengeInput,
 ) -> ExternResult<ActionHash> {
-    let entry = mishpat_integrity::GateDecisionChallenge {
-        challenge_id: input.challenge_id.clone(),
-        challenged_decision_cid: input.challenged_decision_cid.clone(),
-        challenger_id: input.challenger_id.clone(),
-        grounds: input.grounds.clone(),
-        summary: input.summary.clone(),
-        evidence_refs: input.evidence_refs.clone(),
-        filed_at: input.filed_at.clone(),
+    let _ = call_elohim_issue_attestation(ConsolidatedIssueAttestationInput {
+        attestation_kind: "attestation:gate-decision-challenge".to_string(),
+        subject_cid: input.challenged_decision_cid.clone(),
+        subject_kind: "governance-action".to_string(),
+        title: format!(
+            "Challenge on gate decision {} by {}",
+            input.challenged_decision_cid, input.challenger_id
+        ),
+        description: Some(input.summary.clone()),
         reach: input.reach.clone(),
-    };
+        metadata: serde_json::json!({
+            "challenge_id": input.challenge_id,
+            "challenged_decision_cid": input.challenged_decision_cid,
+            "challenger_id": input.challenger_id,
+            "grounds": input.grounds,
+            "evidence_refs": input.evidence_refs,
+            "filed_at": input.filed_at,
+            "reach": input.reach,
+        }),
+        parent_governance_action_cid: Some(input.challenged_decision_cid.clone()),
+        vote_value: None,
+        proof_class: "witness".to_string(),
+        proof_evidence: serde_json::json!({"class": "witness"}),
+        expires_at: None,
+    });
 
-    let action_hash = create_entry(&EntryTypes::GateDecisionChallenge(entry.clone()))?;
-
-    // Index by challenge_id (primary lookup — one challenge per CID)
-    let id_anchor = StringAnchor::new("gate_decision_challenge_id", &input.challenge_id);
-    let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
-    create_link(
-        id_anchor_hash,
-        action_hash.clone(),
-        LinkTypes::IdToChallenge2,
-        (),
-    )?;
-
-    // Index by challenged_decision_cid (all challenges against a decision)
-    let decision_anchor =
-        StringAnchor::new("challenged_decision", &input.challenged_decision_cid);
-    let decision_anchor_hash = hash_entry(&EntryTypes::StringAnchor(decision_anchor))?;
-    create_link(
-        decision_anchor_hash,
-        action_hash.clone(),
-        LinkTypes::ChallengedDecisionToChallenges,
-        (),
-    )?;
-
-    // Index by challenger_id (all challenges by an agent)
-    let challenger_anchor = StringAnchor::new("gate_challenger", &input.challenger_id);
-    let challenger_anchor_hash = hash_entry(&EntryTypes::StringAnchor(challenger_anchor))?;
-    create_link(
-        challenger_anchor_hash,
-        action_hash.clone(),
-        LinkTypes::ChallengerToChallenges,
-        (),
-    )?;
-
-    Ok(action_hash)
-}
-
-/// Get a GateDecisionChallenge by its challenge_id CID.
-#[hdk_extern]
-pub fn get_challenge_by_id_v2(
-    challenge_id: String,
-) -> ExternResult<Option<GateDecisionChallengeOutput>> {
-    let id_anchor = StringAnchor::new("gate_decision_challenge_id", &challenge_id);
-    let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
-
-    let query = LinkQuery::try_new(id_anchor_hash, LinkTypes::IdToChallenge2)?;
-    let links = get_links(query, GetStrategy::default())?;
-
-    if let Some(link) = links.first() {
-        let action_hash = ActionHash::try_from(link.target.clone()).map_err(|_| {
-            wasm_error!(WasmErrorInner::Guest(
-                "Invalid challenge hash".to_string()
-            ))
-        })?;
-
-        let record = get(action_hash.clone(), GetOptions::default())?;
-        if let Some(record) = record {
-            if let Some(entry) = record
-                .entry()
-                .to_app_option::<mishpat_integrity::GateDecisionChallenge>()
-                .ok()
-                .flatten()
-            {
-                return Ok(Some(GateDecisionChallengeOutput {
-                    action_hash,
-                    challenge: wire_gate_decision_challenge(&entry),
-                }));
-            }
-        }
-    }
-
-    Ok(None)
-}
-
-/// Query all challenges against a given decision CID.
-#[hdk_extern]
-pub fn get_challenges_against_decision(
-    input: QueryGateChallengesInput,
-) -> ExternResult<Vec<GateDecisionChallengeOutput>> {
-    let decision_cid = input.challenged_decision_cid.ok_or_else(|| {
-        wasm_error!(WasmErrorInner::Guest(
-            "challenged_decision_cid is required for get_challenges_against_decision".to_string()
-        ))
-    })?;
-    let limit = input.limit.unwrap_or(100) as usize;
-
-    let anchor = StringAnchor::new("challenged_decision", &decision_cid);
-    let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor))?;
-
-    let query = LinkQuery::try_new(anchor_hash, LinkTypes::ChallengedDecisionToChallenges)?;
-    let links = get_links(query, GetStrategy::default())?;
-
-    let mut results = Vec::new();
-    for link in links.iter().take(limit) {
-        let action_hash = ActionHash::try_from(link.target.clone()).map_err(|_| {
-            wasm_error!(WasmErrorInner::Guest(
-                "Invalid challenge hash".to_string()
-            ))
-        })?;
-
-        let record = get(action_hash.clone(), GetOptions::default())?;
-        if let Some(record) = record {
-            if let Some(entry) = record
-                .entry()
-                .to_app_option::<mishpat_integrity::GateDecisionChallenge>()
-                .ok()
-                .flatten()
-            {
-                results.push(GateDecisionChallengeOutput {
-                    action_hash,
-                    challenge: wire_gate_decision_challenge(&entry),
-                });
-            }
-        }
-    }
-
-    Ok(results)
+    // Sentinel ActionHash — canonical state now lives on elohim DNA.
+    Ok(ActionHash::from_raw_36(vec![0u8; 36]))
 }
 
 /// Create and notarize a ChallengeOutcome on the Mishpat DHT.
@@ -2543,11 +1541,12 @@ pub fn get_outcomes_by_verdict(
     Ok(results)
 }
 
-/// Post-commit hook — emits MishpatSignal::GateDecisionCreated for each
-/// committed GateDecisionAttestation so elohim-storage can project it.
+/// Post-commit hook — emits MishpatSignal::ChallengeOutcomeCreated for each
+/// committed ChallengeOutcome so elohim-storage can project it.
 ///
-/// Other entry types currently have no post-commit projection needs;
-/// this hook is a no-op for them.
+/// GateDecisionAttestation and GateDecisionChallenge arms removed (Stage C) —
+/// those entry types now live on elohim DNA and elohim-storage projects from
+/// elohim's content_store signals.
 #[hdk_extern]
 pub fn post_commit(committed_actions: Vec<SignedActionHashed>) -> ExternResult<()> {
     for signed_action in committed_actions {
@@ -2568,36 +1567,6 @@ pub fn post_commit(committed_actions: Vec<SignedActionHashed>) -> ExternResult<(
 
         if let Some(entry) = record
             .entry()
-            .to_app_option::<mishpat_integrity::GateDecisionAttestation>()
-            .ok()
-            .flatten()
-        {
-            let _ = emit_signal(MishpatSignal::GateDecisionCreated {
-                action_hash: action_hash.clone(),
-                entry_hash: entry_hash.clone(),
-                entry,
-                author: author.clone(),
-            });
-            continue;
-        }
-
-        if let Some(entry) = record
-            .entry()
-            .to_app_option::<mishpat_integrity::GateDecisionChallenge>()
-            .ok()
-            .flatten()
-        {
-            let _ = emit_signal(MishpatSignal::GateDecisionChallengeCreated {
-                action_hash: action_hash.clone(),
-                entry_hash: entry_hash.clone(),
-                entry,
-                author: author.clone(),
-            });
-            continue;
-        }
-
-        if let Some(entry) = record
-            .entry()
             .to_app_option::<mishpat_integrity::ChallengeOutcome>()
             .ok()
             .flatten()
@@ -2614,20 +1583,22 @@ pub fn post_commit(committed_actions: Vec<SignedActionHashed>) -> ExternResult<(
 }
 
 // ============================================================
-// CROSS-DNA BRIDGES (Stage B consolidation — B.10)
+// CROSS-DNA BRIDGES (Stage C consolidation — full-replacement)
 // ============================================================
 //
-// All bridges are ADDITIVE (dual-write during Stage B). The local entry writes
-// are preserved so existing query functions (get_*_by_id, query_*) continue to
-// work from mishpat DHT. Stage C will remove local entry types once storage
-// projects from elohim signals.
+// All bridges are FULL-REPLACEMENT (Stage C). Local entry writes removed;
+// canonical state lives on elohim DNA. Stage F will migrate callers to
+// query elohim DNA directly (get_governance_action_with_children /
+// get_attestations_for_subject).
 //
 // Bridged functions:
-//   create_gate_decision_attestation  → attestation:gate-decision   (additive; has post_commit signal)
-//   create_proposal_vote              → attestation:proposal-vote    (additive)
-//   create_statement_vote             → attestation:statement-vote   (additive)
-//   create_proposal                   → governance-action:proposal   (additive)
-//   create_challenge                  → governance-action:challenge  (additive)
+//   create_gate_decision_attestation  → attestation:gate-decision         (bridge-only)
+//   create_gate_decision_challenge    → attestation:gate-decision-challenge (bridge-only, new in C)
+//   create_proposal_vote              → attestation:proposal-vote          (bridge-only)
+//   create_statement_vote             → attestation:statement-vote         (bridge-only)
+//   create_governance_reaction        → attestation:governance-reaction    (bridge-only, new in C)
+//   create_proposal                   → governance-action:proposal         (bridge-only)
+//   create_challenge                  → governance-action:challenge        (bridge-only)
 
 /// Input wire type — wire-compatible with elohim DNA's content_store::issue_attestation.
 /// Defined locally because cross-DNA calls serialise through msgpack;
