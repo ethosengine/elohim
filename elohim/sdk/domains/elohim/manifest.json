@@ -1,0 +1,18 @@
+{
+  "id": "manifest-elohim",
+  "name": "elohim",
+  "version": "1.0.0",
+  "description": "Cross-cutting elohim-pillar declarations — signal_kinds that span pillars and substrate-level coordination primitives.",
+  "vocabulary": {
+    "contentTypes": {}
+  },
+  "signalKinds": {
+    "forget-request": {
+      "description": "Right-to-be-forgotten request flowing through the EPR feedback pipeline. Mishpat governance evaluates the request against constitutional constraints and emits an attestation:forget-decision. See observation-event-layer spec §9.4.",
+      "target_kinds": ["agent", "content", "attestation"],
+      "evidence_required": false,
+      "standing_impact_allowed": ["advisory"]
+    }
+  },
+  "observation_kinds": []
+}

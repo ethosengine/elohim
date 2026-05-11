@@ -13,7 +13,7 @@
 //!
 //! ## Validation floors (deterministic, create-time)
 //!
-//! 1. `signal_kind` must be one of the four bootstrap kinds.
+//! 1. `signal_kind` must be one of the six bootstrap kinds.
 //! 2. `standing_impact` must be one of the three bootstrap impacts.
 //! 3. `squelch` ⇒ `standing_impact` MUST be `advisory`.
 //! 4. `correction` ⇒ `evidence_cid` MUST be `Some`.
@@ -38,7 +38,8 @@ use hdi::prelude::*;
 ///
 /// Values mirror `SignalKind` enum wire names (kebab-case) from T1.
 /// `"vouch"` added in T5 (Light Up the Graph sprint).
-const SIGNAL_KINDS: &[&str] = &["squelch", "correction", "retraction", "quarantine", "vouch"];
+/// `"forget-request"` added in observation-event-layer §9.4 (right-to-be-forgotten flow).
+const SIGNAL_KINDS: &[&str] = &["squelch", "correction", "retraction", "quarantine", "vouch", "forget-request"];
 
 /// Bootstrap `vouch_kind` taxonomy.
 ///
@@ -467,5 +468,17 @@ mod tests {
             "vouch must not require evidence_cid"
         );
         assert!(sig.validate().is_ok());
+    }
+
+    // -----------------------------------------------------------------------
+    // forget-request signal_kind (observation-event-layer §9.4)
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn forget_request_is_accepted_signal_kind() {
+        assert!(
+            SIGNAL_KINDS.contains(&"forget-request"),
+            "forget-request must be in the bootstrap whitelist for right-to-be-forgotten flow"
+        );
     }
 }
