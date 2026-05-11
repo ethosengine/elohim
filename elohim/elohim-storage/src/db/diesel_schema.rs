@@ -1118,6 +1118,60 @@ diesel::table! {
 
 diesel::joinable!(observation_entries -> observation_sessions (session_id));
 
+// Observation/Event Layer — Stage 3 projection tables.
+// See genesis/docs/superpowers/specs/2026-05-11-observation-event-layer-design.md
+// All four tables are Category C (operational); source of truth is the iroh-blob log.
+
+diesel::table! {
+    observations (observer_cid, log_cid, log_offset) {
+        observer_cid             -> Text,
+        log_cid                  -> Text,
+        log_offset               -> BigInt,
+        observed_at              -> BigInt,
+        seq                      -> BigInt,
+        observation_kind         -> Text,
+        subject_cid              -> Nullable<Text>,
+        subject_kind             -> Nullable<Text>,
+        payload_json             -> Text,
+        observer_household_cid   -> Nullable<Text>,
+        observer_collective_cid  -> Nullable<Text>,
+        observer_region          -> Nullable<Text>,
+        observer_archetype       -> Nullable<Text>,
+        observer_compute_class   -> Nullable<Text>,
+        signature_b64            -> Text,
+    }
+}
+
+diesel::table! {
+    observation_logs (observer_cid) {
+        observer_cid     -> Text,
+        latest_log_cid   -> Text,
+        latest_offset    -> BigInt,
+        retention_class  -> Text,
+        last_attested_at -> Nullable<BigInt>,
+    }
+}
+
+diesel::table! {
+    observation_cursors (observer_cid, viewer_peer_id) {
+        observer_cid          -> Text,
+        viewer_peer_id        -> Text,
+        last_projected_offset -> BigInt,
+        last_seen_at          -> BigInt,
+    }
+}
+
+diesel::table! {
+    audit_observations (id) {
+        id               -> Integer,
+        requested_at     -> BigInt,
+        requester_cid    -> Text,
+        subject_cid      -> Text,
+        observation_kind -> Text,
+        result_json      -> Text,
+    }
+}
+
 diesel::table! {
     placement_gaps (id) {
         id -> Text,
@@ -1477,8 +1531,12 @@ diesel::allow_tables_to_appear_in_same_query!(
     local_sessions,
     manifests,
     node_stewardship,
+    audit_observations,
     observation_entries,
     observation_sessions,
+    observations,
+    observation_logs,
+    observation_cursors,
     peer_blob_inventory,
     peer_identity_bindings,
     peer_inventory_cursor,
