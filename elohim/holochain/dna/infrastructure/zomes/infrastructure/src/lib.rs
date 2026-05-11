@@ -686,7 +686,7 @@ pub fn record_health_attestation(input: RecordHealthAttestationInput) -> ExternR
         timestamp,
     };
 
-    let action_hash = create_entry(&EntryTypes::HealthAttestation(attestation))?;
+    let action_hash = create_entry(&EntryTypes::HealthAttestation(attestation.clone()))?;
 
     // Link from SUBJECT doorway to attestation (for discovery: "who observed this doorway?")
     create_link(
@@ -695,6 +695,38 @@ pub fn record_health_attestation(input: RecordHealthAttestationInput) -> ExternR
         LinkTypes::DoorwayToAttestation,
         (),
     )?;
+
+    // B.10 bridge: additionally write to elohim DNA's consolidated attestation store.
+    // The local create_entry above is kept so post_commit can still emit
+    // InfrastructureSignal::HealthAttestationCommitted for storage projection.
+    // Stage C will remove the local write once storage projects from elohim signals.
+    let _ = call_elohim_issue_attestation(ConsolidatedIssueAttestationInput {
+        attestation_kind: "attestation:device-health".to_string(),
+        subject_cid: attestation.subject_doorway_id.clone(),
+        subject_kind: "device".to_string(),
+        title: format!("Health attestation: {}", attestation.subject_doorway_id),
+        description: Some(format!(
+            "Observed status: {} — attestor: {}",
+            attestation.observed_status, attestation.attestor_doorway_id
+        )),
+        reach: "community".to_string(),
+        metadata: serde_json::json!({
+            "attestor_doorway_id": attestation.attestor_doorway_id,
+            "subject_doorway_id": attestation.subject_doorway_id,
+            "observed_status": attestation.observed_status,
+            "response_time_ms": attestation.response_time_ms,
+            "conductor_healthy": attestation.conductor_healthy,
+            "timestamp": attestation.timestamp,
+        }),
+        parent_governance_action_cid: None,
+        vote_value: None,
+        proof_class: "witness".to_string(),
+        proof_evidence: serde_json::json!({
+            "class": "witness",
+            "operator_agent": attestation.operator_agent,
+        }),
+        expires_at: None,
+    });
 
     Ok(action_hash)
 }
@@ -1147,4 +1179,77 @@ pub fn get_content_servers_by_capability(
 #[hdk_extern]
 pub fn init(_: ()) -> ExternResult<InitCallbackResult> {
     Ok(InitCallbackResult::Pass)
+}
+
+// =============================================================================
+// Cross-DNA Bridges (Stage B consolidation)
+//
+// B.10: Bridge health attestations to elohim DNA's content_store::issue_attestation
+// so they are consolidated under "attestation:device-health" on elohim DHT.
+//
+// The local create_entry(&EntryTypes::HealthAttestation) is PRESERVED because
+// post_commit emits InfrastructureSignal::HealthAttestationCommitted from the
+// local entry. The bridge call is ADDITIVE (dual-write during Stage B).
+// Stage C will remove the legacy HealthAttestation entry type and local write.
+// =============================================================================
+
+/// Input wire type — wire-compatible with elohim DNA's content_store::issue_attestation.
+/// Defined locally because cross-DNA calls serialise through msgpack;
+/// infrastructure cannot depend on elohim crates directly.
+#[derive(Debug, Serialize, Deserialize)]
+struct ConsolidatedIssueAttestationInput {
+    pub attestation_kind: String,
+    pub subject_cid: String,
+    pub subject_kind: String,
+    pub title: String,
+    pub description: Option<String>,
+    pub reach: String,
+    pub metadata: serde_json::Value,
+    pub parent_governance_action_cid: Option<String>,
+    pub vote_value: Option<String>,
+    pub proof_class: String,
+    pub proof_evidence: serde_json::Value,
+    pub expires_at: Option<String>,
+}
+
+/// Output wire type — wire-compatible with elohim DNA's content_store::issue_attestation.
+#[derive(Debug, Serialize, Deserialize)]
+struct ConsolidatedAttestationOutput {
+    pub cid: String,
+    pub attestation_kind: String,
+    pub subject_cid: String,
+    pub issuer_cid: String,
+}
+
+/// Bridge helper: call elohim content_store::issue_attestation and handle all
+/// ZomeCallResponse arms uniformly. Mirrors the pattern from imagodei B.9 bridge.
+fn call_elohim_issue_attestation(
+    input: ConsolidatedIssueAttestationInput,
+) -> ExternResult<ConsolidatedAttestationOutput> {
+    let response = call(
+        CallTargetCell::OtherRole("elohim".into()),
+        ZomeName::from("content_store"),
+        FunctionName::from("issue_attestation"),
+        None,
+        input,
+    )?;
+    match response {
+        ZomeCallResponse::Ok(result) => result.decode().map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "bridge decode (elohim::issue_attestation): {e}"
+            )))
+        }),
+        ZomeCallResponse::Unauthorized(_, _, _, _) => Err(wasm_error!(WasmErrorInner::Guest(
+            "Unauthorized bridge call to elohim::issue_attestation".to_string()
+        ))),
+        ZomeCallResponse::NetworkError(err) => Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Network error bridging to elohim::issue_attestation: {err}"
+        )))),
+        ZomeCallResponse::CountersigningSession(err) => Err(wasm_error!(WasmErrorInner::Guest(
+            format!("Countersigning error bridging to elohim: {err}")
+        ))),
+        ZomeCallResponse::AuthenticationFailed(_, _) => Err(wasm_error!(WasmErrorInner::Guest(
+            "Authentication failed bridging to elohim::issue_attestation".to_string()
+        ))),
+    }
 }
