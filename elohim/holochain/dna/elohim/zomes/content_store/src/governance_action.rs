@@ -5,6 +5,22 @@
 //! by issuing a child attestation Content; this module provides the wrapper
 //! that ensures the child carries the correct parent_governance_action_cid
 //! and is committed against the validator floors for M-of-N children.
+//!
+//! ## Task B.5 — propose_governance_action
+//! Validates `governance_kind` against the codegen-emitted `GOVERNANCE_ACTION_KINDS`
+//! catalog (floor 1 in coordinator; integrity zome enforces by content_type). Creates a
+//! `Content` entry of `content_type == governance_kind` with the threshold / ballot_format
+//! / closes_at / subject_cid embedded in `metadata_json` for downstream tally projection.
+//!
+//! ## Task B.6 — vote_on_governance_action
+//! Resolves the parent governance-action Content entry via `get(AnyDhtHash::from(...))`,
+//! maps `content_type` → child `attestation_kind` via `child_attestation_kind_for_governance_action`,
+//! and delegates to `issue_attestation` so the child carries both the `AttestationToSubject`
+//! link (subject from parent metadata) and the `GovernanceActionChild` link
+//! (parent_governance_action_cid → child entry_hash).
+//!
+//! The `child_attestation_kind_for_governance_action` mapping is hardcoded here pending
+//! a codegen-emitted constant in a Task A.7 follow-up.
 
 use content_store_integrity::{EntryTypes, GOVERNANCE_ACTION_KINDS};
 use hdk::prelude::*;
