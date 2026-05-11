@@ -1,4 +1,4 @@
-//! Sweettest — issue_attestation coordinator (Attestation Consolidation, Task B.3).
+//! Sweettest — attestation coordinator (Attestation Consolidation, Tasks B.3 / B.4 / B.5 / B.6).
 //!
 //! Verifies the end-to-end flow: `issue_attestation` creates a Content entry
 //! with `content_type == attestation_kind` and returns the correct `AttestationOutput`
@@ -7,8 +7,11 @@
 //! surface as a panic if LinkTypes::AttestationToSubject were missing from the enum).
 //!
 //! Scenarios:
-//!   1. `issue_attestation_humanness_creates_content_entry_with_subject_link`
-//!      — single-agent issues a humanness attestation; output fields verified.
+//!   1. `issue_attestation_humanness_creates_content_entry_with_subject_link`   (B.3)
+//!   2. `issue_attestation_with_unknown_kind_is_rejected`                        (B.3)
+//!   3. `revoke_attestation_issues_superseding_content_entry`                    (B.4)
+//!   4. `propose_governance_action_renewal_request_creates_parent_content`       (B.5)
+//!   5. `vote_on_governance_action_creates_child_attestation_with_parent_link`   (B.6)
 //!
 //! Tests are `#[ignore]` until the DNA is packed by Jenkins (just pack produces
 //! `workdir/lamad.dna`). Remove `#[ignore]` once the pipeline's pack-then-test
@@ -60,6 +63,40 @@ struct AttestationOutput {
 struct RevokeAttestationInput {
     pub attestation_cid: String,
     pub reason: String,
+}
+
+/// Mirror of `content_store::governance_action::ProposeGovernanceActionInput`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct ProposeGovernanceActionInput {
+    pub governance_kind: String,
+    pub subject_cid: String,
+    pub title: String,
+    pub description: Option<String>,
+    pub reach: String,
+    pub threshold: Value,
+    pub eligibility_predicate: Option<Value>,
+    pub ballot_format: String,
+    pub closes_at: String,
+    pub parameters: Option<Value>,
+}
+
+/// Mirror of `content_store::governance_action::GovernanceActionOutput`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct GovernanceActionOutput {
+    pub cid: String,
+    pub governance_kind: String,
+    pub subject_cid: String,
+    pub proposer_cid: String,
+    pub closes_at: String,
+}
+
+/// Mirror of `content_store::governance_action::VoteOnGovernanceActionInput`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct VoteOnGovernanceActionInput {
+    pub parent_governance_action_cid: String,
+    pub vote_value: String,
+    pub vote_weight: Option<String>,
+    pub evidence: Option<Value>,
 }
 
 // ---------------------------------------------------------------------------
@@ -222,6 +259,112 @@ async fn revoke_attestation_issues_superseding_content_entry() -> Result<()> {
     );
     // The CID is non-empty — the revocation Content was committed to the chain.
     assert!(!revocation.cid.is_empty(), "revocation cid must be set");
+
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Scenario 4: propose_governance_action creates a parent governance-action Content entry (B.5)
+// ---------------------------------------------------------------------------
+
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "Requires packed DNA from Jenkins pipeline (just pack in dna/elohim)"]
+async fn propose_governance_action_renewal_request_creates_parent_content() -> Result<()> {
+    let (mut conductor, agent) = single_agent_conductor().await?;
+    let dna = load_dna(DNA, &network_seed(DNA), Some(agent.clone())).await?;
+    let app = conductor
+        .setup_app_for_agent("lamad-app-propose-gov", agent.clone(), &[dna])
+        .await?;
+    let cell = app.cells().first().expect("cell installed").clone();
+
+    // Adaptation note: plan used create_test_human helper which does not exist.
+    // Using the agent's own pubkey as subject_cid — valid for testing coordinator logic
+    // without a second conductor. In production the subject would be a peer's pubkey or CID.
+    let subject_cid = agent.to_string();
+
+    let input = ProposeGovernanceActionInput {
+        governance_kind: "governance-action:renewal-request".to_string(),
+        subject_cid: subject_cid.clone(),
+        title: "Renewal request for identity key".to_string(),
+        description: None,
+        reach: "community".to_string(),
+        threshold: serde_json::json!({ "type": "m-of-n", "m": 3, "n": 5 }),
+        eligibility_predicate: None,
+        ballot_format: "approve-reject".to_string(),
+        closes_at: "2026-05-25T00:00:00Z".to_string(),
+        parameters: None,
+    };
+
+    let output: GovernanceActionOutput = conductor
+        .call(&cell.zome("content_store"), "propose_governance_action", input)
+        .await;
+
+    assert_eq!(output.governance_kind, "governance-action:renewal-request");
+    assert_eq!(output.subject_cid, subject_cid);
+    assert!(!output.cid.is_empty(), "governance action cid must be set");
+    assert!(!output.proposer_cid.is_empty(), "proposer_cid must be set");
+
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Scenario 5: vote_on_governance_action creates a child attestation (B.6)
+// ---------------------------------------------------------------------------
+
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "Requires packed DNA from Jenkins pipeline (just pack in dna/elohim)"]
+async fn vote_on_governance_action_creates_child_attestation_with_parent_link() -> Result<()> {
+    let (mut conductor, agent) = single_agent_conductor().await?;
+    let dna = load_dna(DNA, &network_seed(DNA), Some(agent.clone())).await?;
+    let app = conductor
+        .setup_app_for_agent("lamad-app-vote-gov", agent.clone(), &[dna])
+        .await?;
+    let cell = app.cells().first().expect("cell installed").clone();
+
+    // Adaptation note: plan used create_test_human helper which does not exist.
+    // Using the agent's own pubkey as subject_cid — same as Scenario 4.
+    let subject_cid = agent.to_string();
+
+    // Step 1: propose the governance action
+    let propose_input = ProposeGovernanceActionInput {
+        governance_kind: "governance-action:renewal-request".to_string(),
+        subject_cid: subject_cid.clone(),
+        title: "Renewal".to_string(),
+        description: None,
+        reach: "community".to_string(),
+        threshold: serde_json::json!({ "type": "m-of-n", "m": 3, "n": 5 }),
+        eligibility_predicate: None,
+        ballot_format: "approve-reject".to_string(),
+        closes_at: "2026-05-25T00:00:00Z".to_string(),
+        parameters: None,
+    };
+
+    let parent: GovernanceActionOutput = conductor
+        .call(&cell.zome("content_store"), "propose_governance_action", propose_input)
+        .await;
+
+    assert!(!parent.cid.is_empty(), "parent cid must be set");
+
+    // Step 2: vote on the governance action
+    let vote_input = VoteOnGovernanceActionInput {
+        parent_governance_action_cid: parent.cid.clone(),
+        vote_value: "approve".to_string(),
+        vote_weight: None,
+        evidence: None,
+    };
+
+    let vote: AttestationOutput = conductor
+        .call(&cell.zome("content_store"), "vote_on_governance_action", vote_input)
+        .await;
+
+    // The child attestation kind must match the governance-action → attestation mapping.
+    assert_eq!(
+        vote.attestation_kind, "attestation:renewal-approval",
+        "child attestation kind must match governance-action mapping"
+    );
+    assert!(!vote.cid.is_empty(), "vote cid must be set");
+    // The GovernanceActionChild link is created by issue_attestation when
+    // parent_governance_action_cid is Some — verified implicitly (wasm_error! would surface).
 
     Ok(())
 }

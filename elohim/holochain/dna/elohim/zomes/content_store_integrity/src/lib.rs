@@ -72,7 +72,7 @@ pub use generated_enums::{
 
 // Attestation Consolidation: codegen-emitted catalog of valid attestation subtypes.
 pub mod generated_attestation_kinds;
-pub use generated_attestation_kinds::ATTESTATION_KINDS;
+pub use generated_attestation_kinds::{ATTESTATION_KINDS, GOVERNANCE_ACTION_KINDS};
 
 // =============================================================================
 // Protocol Constants (non-generated)

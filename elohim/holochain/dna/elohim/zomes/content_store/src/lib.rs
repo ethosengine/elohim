@@ -19,7 +19,8 @@ pub use manifest::*;
 // Attestation consolidation: consolidated attestation coordinator.
 pub mod attestation;
 pub mod governance_action;
-pub use attestation::{AttestationOutput as ConsolidatedAttestationOutput, IssueAttestationInput};
+pub use attestation::{AttestationOutput as ConsolidatedAttestationOutput, IssueAttestationInput, RevokeAttestationInput};
+pub use governance_action::{GovernanceActionOutput, ProposeGovernanceActionInput, VoteOnGovernanceActionInput};
 
 // EPR Phase 3.5 T8: FeedbackSignal coordinator functions.
 pub mod feedback_signal;
@@ -11914,7 +11915,7 @@ pub fn get_rea_economic_event(id: String) -> ExternResult<Option<ReaEconomicEven
 }
 
 // =============================================================================
-// Attestation Consolidation — Task B.3
+// Attestation Consolidation — Tasks B.3 / B.4 / B.5 / B.6
 // =============================================================================
 
 /// Issue an attestation as a Content entry on elohim DNA.
@@ -11927,4 +11928,38 @@ pub fn issue_attestation(
     input: IssueAttestationInput,
 ) -> ExternResult<ConsolidatedAttestationOutput> {
     attestation::issue_attestation(input)
+}
+
+/// Revoke an attestation by issuing a superseding Content entry of proof_class "revocation".
+///
+/// Only the original issuer may revoke (cross-issuer revocation via governance is Task B.8).
+#[hdk_extern]
+pub fn revoke_attestation(
+    input: RevokeAttestationInput,
+) -> ExternResult<ConsolidatedAttestationOutput> {
+    attestation::revoke_attestation(input)
+}
+
+/// Propose a governance action (renewal, recovery, key-revocation, challenge, etc.).
+///
+/// Creates a parent governance-action Content entry. Votes arrive as child attestations
+/// via `vote_on_governance_action`. Validates `governance_kind` against the
+/// codegen-emitted GOVERNANCE_ACTION_KINDS catalog.
+#[hdk_extern]
+pub fn propose_governance_action(
+    input: ProposeGovernanceActionInput,
+) -> ExternResult<GovernanceActionOutput> {
+    governance_action::propose_governance_action(input)
+}
+
+/// Cast a vote on an existing governance action.
+///
+/// Resolves the parent governance-action Content entry, maps its `governance_kind` to the
+/// correct child `attestation_kind`, and delegates to `issue_attestation` so the child
+/// carries the `GovernanceActionChild` link from the parent's StringAnchor.
+#[hdk_extern]
+pub fn vote_on_governance_action(
+    input: VoteOnGovernanceActionInput,
+) -> ExternResult<ConsolidatedAttestationOutput> {
+    governance_action::vote_on_governance_action(input)
 }
