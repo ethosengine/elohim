@@ -74,6 +74,9 @@ pub use generated_enums::{
 pub mod generated_attestation_kinds;
 pub use generated_attestation_kinds::{ATTESTATION_KINDS, GOVERNANCE_ACTION_KINDS};
 
+// Attestation Consolidation Task C.1: discriminator-chain validator (spec §9 floors).
+pub mod attestation_validator;
+
 // =============================================================================
 // Protocol Constants (non-generated)
 // =============================================================================
@@ -4292,7 +4295,22 @@ fn validate_create_entry(app_entry: &EntryTypes) -> ExternResult<ValidateCallbac
 
     match app_entry {
         // High-priority: Lamad learning types (used in bulk imports)
-        EntryTypes::Content(content) => adapt_validation(content.validate()),
+        EntryTypes::Content(content) => {
+            // Step 1: run structural SelfHealingEntry validation (field presence, enum checks).
+            let basic = adapt_validation(content.validate())?;
+            if let ValidateCallbackResult::Invalid(_) = &basic {
+                return Ok(basic);
+            }
+            // Step 2: if this is an attestation or governance-action entry, run
+            // the discriminator-chain validator (spec §9 floors).
+            if content.content_type.starts_with("attestation:")
+                || content.content_type.starts_with("governance-action:")
+            {
+                attestation_validator::validate_attestation_floors(content)
+            } else {
+                Ok(basic)
+            }
+        }
         EntryTypes::LearningPath(path) => adapt_validation(path.validate()),
         EntryTypes::PathStep(step) => adapt_validation(step.validate()),
         EntryTypes::ContentMastery(mastery) => adapt_validation(mastery.validate()),
