@@ -571,8 +571,16 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                     # patterns and surface any S3 write errors that
                                     # sccache silently swallows.
                                     export SCCACHE_LOG=info
-                                    export SCCACHE_LOG_FILE=\"\$WORKSPACE/elohim/holochain/tests/sweettest/dna-integration-sccache-daemon.log\"
-                                    : > \"\$SCCACHE_LOG_FILE\"
+                                    # Note: outer bash sees this through `bash -c "..."`. The
+                                    # surrounding quotes around the path MUST be \\" (double
+                                    # backslash) so Groovy emits \" and bash treats it as an
+                                    # escaped quote inside the outer "..." rather than a
+                                    # premature terminator. Single backslash here is the
+                                    # bug from #1222 — it terminates the outer early and
+                                    # leaves $SCCACHE_LOG_FILE unbound in the OUTER shell.
+                                    # Match the same convention used by lines 631/639 below.
+                                    export SCCACHE_LOG_FILE=\\"\$WORKSPACE/elohim/holochain/tests/sweettest/dna-integration-sccache-daemon.log\\"
+                                    : > \\"\$SCCACHE_LOG_FILE\\"
                                     # Defensive: explicitly disable cargo's incremental
                                     # compilation (release profile already does this,
                                     # but explicit prevents any incremental/sccache
