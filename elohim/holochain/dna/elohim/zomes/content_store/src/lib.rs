@@ -16,6 +16,12 @@ pub mod bootstrap_steward;
 pub mod manifest;
 pub use manifest::*;
 
+// Attestation consolidation: consolidated attestation coordinator.
+pub mod attestation;
+pub mod governance_action;
+pub use attestation::{AttestationOutput as ConsolidatedAttestationOutput, IssueAttestationInput, RevokeAttestationInput};
+pub use governance_action::{GovernanceActionOutput, GovernanceActionWithChildren, ProposeGovernanceActionInput, VoteOnGovernanceActionInput};
+
 // EPR Phase 3.5 T8: FeedbackSignal coordinator functions.
 pub mod feedback_signal;
 pub use feedback_signal::{
@@ -1000,42 +1006,66 @@ fn upsert_mastery(input: UpsertMasteryInput) -> ExternResult<ContentMasteryOutpu
     }
 }
 
-/// Bridge call to issue attestation via imagodei DNA
+/// Issue attestation in-process via the consolidated attestation module.
+///
+/// Previously this bridged to imagodei DNA's issue_attestation, which created a
+/// call cycle: elohim::grant_attestation → issue_attestation_via_imagodei →
+/// imagodei::issue_attestation → elohim::issue_attestation (infinite loop).
+///
+/// Fixed in Task B.10: call crate::attestation::issue_attestation directly.
+/// The canonical entry now lives on elohim DHT (content_type "attestation:identity-credential").
+/// The returned AttestationOutput uses a zero sentinel action_hash — callers that
+/// inspect the Attestation fields (e.g. grant_attestation which ignores the result)
+/// continue to work. Callers that use action_hash for further HDK lookups must
+/// migrate before Stage C removes the AttestationOutput wrapper entirely.
 fn issue_attestation_via_imagodei(
     input: IssueAttestationBridgeInput,
 ) -> ExternResult<AttestationOutput> {
-    let response = call(
-        CallTargetCell::OtherRole(IMAGODEI_ROLE.into()),
-        IMAGODEI_ZOME,
-        "issue_attestation".into(),
-        None,
-        input,
-    )?;
+    let consolidated = attestation::issue_attestation(IssueAttestationInput {
+        attestation_kind: "attestation:identity-credential".to_string(),
+        subject_cid: input.agent_id.clone(),
+        subject_kind: "agent".to_string(),
+        title: input.display_name.clone(),
+        description: Some(input.description.clone()),
+        reach: "community".to_string(),
+        metadata: serde_json::json!({
+            "category": input.category,
+            "credential_type": input.attestation_type,
+            "tier": input.tier,
+            "icon_url": input.icon_url,
+            "earned_via": input.earned_via_json,
+        }),
+        parent_governance_action_cid: None,
+        vote_value: None,
+        proof_class: "witness".to_string(),
+        proof_evidence: serde_json::json!({"class": "witness"}),
+        expires_at: input.expires_at.clone(),
+    })?;
 
-    match response {
-        ZomeCallResponse::Ok(result) => {
-            let output: AttestationOutput = result.decode().map_err(|e| {
-                wasm_error!(WasmErrorInner::Guest(format!(
-                    "Failed to decode attestation: {:?}",
-                    e
-                )))
-            })?;
-            Ok(output)
-        }
-        ZomeCallResponse::Unauthorized(_, _, _, _) => Err(wasm_error!(WasmErrorInner::Guest(
-            "Unauthorized call to imagodei".to_string()
-        ))),
-        ZomeCallResponse::NetworkError(err) => Err(wasm_error!(WasmErrorInner::Guest(format!(
-            "Network error calling imagodei: {}",
-            err
-        )))),
-        ZomeCallResponse::CountersigningSession(err) => Err(wasm_error!(WasmErrorInner::Guest(
-            format!("Countersigning error: {}", err)
-        ))),
-        ZomeCallResponse::AuthenticationFailed(_, _) => Err(wasm_error!(WasmErrorInner::Guest(
-            "Authentication failed calling imagodei".to_string()
-        ))),
-    }
+    // Synthesise a legacy AttestationOutput shape for backward-compatible callers.
+    // The action_hash is a zero sentinel — the canonical record is the elohim Content
+    // entry whose entry_hash == consolidated.cid.
+    // C.4: uses LegacyAttestationShim (local) — content_store_integrity::Attestation removed.
+    let attestation = LegacyAttestationShim {
+        id: consolidated.cid.clone(),
+        agent_id: input.agent_id,
+        category: input.category,
+        attestation_type: input.attestation_type,
+        display_name: input.display_name,
+        description: input.description,
+        icon_url: input.icon_url,
+        tier: input.tier,
+        earned_via_json: input.earned_via_json,
+        issued_at: String::new(),
+        issued_by: consolidated.issuer_cid,
+        expires_at: input.expires_at,
+        proof: None,
+    };
+
+    Ok(AttestationOutput {
+        action_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+        attestation,
+    })
 }
 
 /// Input for issuing attestation via bridge (matches imagodei's IssueAttestationInput)
@@ -1052,11 +1082,31 @@ pub struct IssueAttestationBridgeInput {
     pub expires_at: Option<String>,
 }
 
+/// Legacy shim for the Attestation struct field (C.4: integrity Attestation entry type removed).
+/// Mirrors content_store_integrity::Attestation's field layout to keep the backward-compat
+/// issue_attestation_via_imagodei shim compiling. Stage F removes this surface entirely.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LegacyAttestationShim {
+    pub id: String,
+    pub agent_id: String,
+    pub category: String,
+    pub attestation_type: String,
+    pub display_name: String,
+    pub description: String,
+    pub icon_url: Option<String>,
+    pub tier: Option<String>,
+    pub earned_via_json: String,
+    pub issued_at: String,
+    pub issued_by: String,
+    pub expires_at: Option<String>,
+    pub proof: Option<String>,
+}
+
 /// Output from attestation operations (matches imagodei's AttestationOutput)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AttestationOutput {
     pub action_hash: ActionHash,
-    pub attestation: Attestation,
+    pub attestation: LegacyAttestationShim,
 }
 
 // =============================================================================
@@ -1904,55 +1954,10 @@ pub struct UpdateAgentProgressInput {
 // Input/Output Types for Content Attestations (Trust claims about content)
 // =============================================================================
 
-/// Input for creating a content attestation
-#[derive(Serialize, Deserialize, Debug)]
-pub struct CreateContentAttestationInput {
-    pub id: Option<String>,
-    pub content_id: String,
-    pub attestation_type: String,
-    pub reach_granted: String,
-    pub granted_by_json: String,
-    pub expires_at: Option<String>,
-    pub evidence_json: Option<String>,
-    pub scope_json: Option<String>,
-    pub metadata_json: Option<String>,
-}
-
-/// Output for content attestation
-#[derive(Serialize, Deserialize, Debug)]
-pub struct ContentAttestationOutput {
-    pub action_hash: ActionHash,
-    pub entry_hash: EntryHash,
-    pub content_attestation: ContentAttestation,
-}
-
-/// Input for querying content attestations
-#[derive(Serialize, Deserialize, Debug)]
-pub struct QueryContentAttestationsInput {
-    pub content_id: Option<String>,
-    pub attestation_type: Option<String>,
-    pub reach_granted: Option<String>,
-    pub status: Option<String>,
-    pub limit: Option<u32>,
-}
-
-/// Input for updating a content attestation
-#[derive(Serialize, Deserialize, Debug)]
-pub struct UpdateContentAttestationInput {
-    pub id: String,
-    pub status: Option<String>,
-    pub revocation_json: Option<String>,
-    pub metadata_json: Option<String>,
-}
-
-/// Input for revoking a content attestation
-#[derive(Serialize, Deserialize, Debug)]
-pub struct RevokeContentAttestationInput {
-    pub id: String,
-    pub revoked_by: String,
-    pub reason: String,
-    pub appealable: bool,
-}
+// REMOVED: ContentAttestationOutput, CreateContentAttestationInput,
+// QueryContentAttestationsInput, UpdateContentAttestationInput,
+// RevokeContentAttestationInput — all referenced content_store_integrity::ContentAttestation
+// which was removed in C.4. No hdk_extern functions implemented these types.
 
 // =============================================================================
 // Input/Output Types for Learning Paths
@@ -11906,4 +11911,75 @@ pub fn get_rea_economic_event(id: String) -> ExternResult<Option<ReaEconomicEven
     } else {
         Ok(None)
     }
+}
+
+// =============================================================================
+// Attestation Consolidation — Tasks B.3 / B.4 / B.5 / B.6
+// =============================================================================
+
+/// Issue an attestation as a Content entry on elohim DNA.
+///
+/// Validates `attestation_kind` against the codegen-emitted catalog, creates a
+/// `Content` entry with `content_type == attestation_kind`, and wires the
+/// `AttestationToSubject` link from the subject's StringAnchor to the new entry.
+#[hdk_extern]
+pub fn issue_attestation(
+    input: IssueAttestationInput,
+) -> ExternResult<ConsolidatedAttestationOutput> {
+    attestation::issue_attestation(input)
+}
+
+/// Revoke an attestation by issuing a superseding Content entry of proof_class "revocation".
+///
+/// Only the original issuer may revoke (cross-issuer revocation via governance is Task B.8).
+#[hdk_extern]
+pub fn revoke_attestation(
+    input: RevokeAttestationInput,
+) -> ExternResult<ConsolidatedAttestationOutput> {
+    attestation::revoke_attestation(input)
+}
+
+/// Propose a governance action (renewal, recovery, key-revocation, challenge, etc.).
+///
+/// Creates a parent governance-action Content entry. Votes arrive as child attestations
+/// via `vote_on_governance_action`. Validates `governance_kind` against the
+/// codegen-emitted GOVERNANCE_ACTION_KINDS catalog.
+#[hdk_extern]
+pub fn propose_governance_action(
+    input: ProposeGovernanceActionInput,
+) -> ExternResult<GovernanceActionOutput> {
+    governance_action::propose_governance_action(input)
+}
+
+/// Cast a vote on an existing governance action.
+///
+/// Resolves the parent governance-action Content entry, maps its `governance_kind` to the
+/// correct child `attestation_kind`, and delegates to `issue_attestation` so the child
+/// carries the `GovernanceActionChild` link from the parent's StringAnchor.
+#[hdk_extern]
+pub fn vote_on_governance_action(
+    input: VoteOnGovernanceActionInput,
+) -> ExternResult<ConsolidatedAttestationOutput> {
+    governance_action::vote_on_governance_action(input)
+}
+
+/// Query all attestations issued against a given subject CID.
+///
+/// Walks the `AttestationToSubject` links from the StringAnchor keyed by `subject_cid`
+/// (mirroring the link-creation pattern in `issue_attestation`) and returns all
+/// Content entries found at the link targets.
+#[hdk_extern]
+pub fn get_attestations_for_subject(subject_cid: String) -> ExternResult<Vec<ConsolidatedAttestationOutput>> {
+    attestation::get_attestations_for_subject(subject_cid)
+}
+
+/// Query a governance action Content entry and all of its child vote attestations.
+///
+/// Resolves the parent via its CID (entry hash), then walks the `GovernanceActionChild`
+/// links from the StringAnchor keyed by `parent_cid` and returns the tally-ready struct.
+#[hdk_extern]
+pub fn get_governance_action_with_children(
+    parent_cid: String,
+) -> ExternResult<GovernanceActionWithChildren> {
+    governance_action::get_governance_action_with_children(parent_cid)
 }

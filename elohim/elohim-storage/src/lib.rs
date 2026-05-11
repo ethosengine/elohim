@@ -97,6 +97,9 @@ pub mod tally;
 // Sensemaking: opinion clustering for governance deliberation
 pub mod sensemaking;
 
+// Recovery — optional cryptographic share assembly (G.1/G.2 attestation-consolidation sprint)
+pub mod recovery;
+
 // View types for HTTP API responses (camelCase serialization for TypeScript)
 pub mod views;
 
@@ -210,3 +213,4 @@ pub use views::{
     PlacementGapView, RegionalDistributionView, ResilienceSnapshotDetailsView,
     ResilienceSnapshotView, StewardingCollectiveEntry,
 };
+pub use views::{AttestationView, GovernanceActionTallyView, GovernanceActionView};

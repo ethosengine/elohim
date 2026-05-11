@@ -44,6 +44,10 @@ const INTERFACE_FILES = [
   { src: 'views/peer-info-view.ts', dest: 'peer-info-view.ts' },
   { src: 'views/peer-list-view.ts', dest: 'peer-list-view.ts' },
   { src: 'views/gate-decision-attestation-view.ts', dest: 'gate-decision-attestation-view.ts' },
+  // Attestation consolidation sprint — unified attestation + governance-action views
+  { src: 'views/attestation-view.ts', dest: 'attestation-view.ts' },
+  { src: 'views/governance-action-view.ts', dest: 'governance-action-view.ts' },
+  { src: 'views/governance-action-tally-view.ts', dest: 'governance-action-tally-view.ts' },
   { src: 'views/gate-decision-challenge-view.ts', dest: 'gate-decision-challenge-view.ts' },
   { src: 'views/challenge-outcome-view.ts', dest: 'challenge-outcome-view.ts' },
   { src: 'inputs/wisdom-invocation-input.ts', dest: 'wisdom-invocation-input.ts' },

@@ -10,84 +10,6 @@ use hdi::prelude::*;
 // Governance Entry Types
 // =============================================================================
 
-/// Challenge - A formal challenge to content or decisions.
-///
-/// Enables community members with standing to challenge content quality,
-/// accuracy, safety, or constitutional alignment.
-#[hdk_entry_helper]
-#[derive(Clone, PartialEq)]
-pub struct Challenge {
-    pub id: String,
-    pub entity_type: String, // content, path, extension, attestation, decision
-    pub entity_id: String,
-    pub challenger_id: String,
-    pub challenger_name: String,
-    pub challenger_standing: String, // Attestation level granting standing
-    pub grounds: String,             // factual-error, safety, policy, constitutional
-    pub description: String,
-    pub evidence_json: String, // Evidence[] as JSON
-    pub status: String,        // filed, acknowledged, under-review, resolved, dismissed
-    pub filed_at: String,
-    pub acknowledged_at: Option<String>,
-    pub sla_deadline: Option<String>,
-    pub assigned_elohim: Option<String>,
-    pub priority: String,                // normal, high, critical
-    pub resolution_json: Option<String>, // ChallengeResolution as JSON
-    pub created_at: String,
-    pub updated_at: String,
-    pub metadata_json: String,
-}
-
-/// Challenge grounds
-pub const CHALLENGE_GROUNDS: [&str; 5] = [
-    "factual-error",
-    "new-evidence",
-    "safety",
-    "policy",
-    "constitutional",
-];
-
-/// Challenge status states
-pub const CHALLENGE_STATUS: [&str; 5] = [
-    "filed",
-    "acknowledged",
-    "under-review",
-    "resolved",
-    "dismissed",
-];
-
-/// Proposal - A formal proposal for changes.
-///
-/// Supports various governance decision-making mechanisms.
-#[hdk_entry_helper]
-#[derive(Clone, PartialEq)]
-pub struct Proposal {
-    pub id: String,
-    pub title: String,
-    pub proposal_type: String, // sense-check, consent, consensus, supermajority
-    pub description: String,
-    pub proposer_id: String,
-    pub proposer_name: String,
-    pub rationale: String,
-    pub status: String,          // draft, discussion, voting, decided, dismissed
-    pub phase: String,           // Current phase
-    pub amendments_json: String, // Amendment[] as JSON
-    pub voting_config_json: String, // VotingConfig as JSON
-    pub current_votes_json: String, // VoteCount as JSON
-    pub outcome_json: Option<String>, // ProposalOutcome as JSON
-    pub related_entity_type: Option<String>,
-    pub related_entity_id: Option<String>,
-    pub created_at: String,
-    pub updated_at: String,
-    pub metadata_json: String,
-}
-
-/// Proposal types
-pub const PROPOSAL_TYPES: [&str; 4] = ["sense-check", "consent", "consensus", "supermajority"];
-
-/// Proposal status states
-pub const PROPOSAL_STATUS: [&str; 5] = ["draft", "discussion", "voting", "decided", "dismissed"];
-
 /// Precedent - A binding decision that guides future decisions.
 ///
 /// Precedents form the case law of the governance system.
@@ -179,33 +101,6 @@ pub const GOVERNANCE_STATUS: [&str; 4] = ["approved", "pending", "challenged", "
 // - Forby: ARCH intensity-based voting
 // - Polis: 2D opinion clustering and consensus discovery
 
-/// GovernanceReaction - Low friction emotional feedback on content.
-#[hdk_entry_helper]
-#[derive(Clone, PartialEq)]
-pub struct GovernanceReaction {
-    pub id: String,
-    pub content_id: String,
-    pub content_type: String,
-    pub reactor_id: String,
-    pub reaction: String,
-    pub intensity: u8,
-    pub mediated: bool,
-    pub mediation_accepted: bool,
-    pub context_json: String,
-    pub created_at: String,
-    pub updated_at: String,
-    pub metadata_json: String,
-}
-
-pub const REACTION_TYPES: [&str; 6] = [
-    "moved",
-    "grateful",
-    "challenged",
-    "concerned",
-    "surprised",
-    "illuminated",
-];
-
 /// GraduatedFeedback - Medium friction scaled feedback (Loomio/Forby style).
 #[hdk_entry_helper]
 #[derive(Clone, PartialEq)]
@@ -227,25 +122,6 @@ pub struct GraduatedFeedback {
 pub const FEEDBACK_CONTEXTS: [&str; 5] =
     ["accuracy", "usefulness", "proposal", "clarity", "relevance"];
 
-/// ProposalVote - Loomio-style 4-position voting on proposals.
-#[hdk_entry_helper]
-#[derive(Clone, PartialEq)]
-pub struct ProposalVote {
-    pub id: String,
-    pub proposal_id: String,
-    pub voter_id: String,
-    pub voter_name: String,
-    pub position: String,
-    pub reasoning: Option<String>,
-    pub version: u32,
-    pub previous_position: Option<String>,
-    pub created_at: String,
-    pub updated_at: String,
-    pub metadata_json: String,
-}
-
-pub const VOTE_POSITIONS: [&str; 4] = ["agree", "abstain", "disagree", "block"];
-
 /// OpinionStatement - Polis-style statement for clustering.
 #[hdk_entry_helper]
 #[derive(Clone, PartialEq)]
@@ -265,20 +141,6 @@ pub struct OpinionStatement {
     pub updated_at: String,
     pub metadata_json: String,
 }
-
-/// StatementVote - Individual vote on an OpinionStatement.
-#[hdk_entry_helper]
-#[derive(Clone, PartialEq)]
-pub struct StatementVote {
-    pub id: String,
-    pub statement_id: String,
-    pub voter_id: String,
-    pub vote: String,
-    pub created_at: String,
-    pub metadata_json: String,
-}
-
-pub const STATEMENT_VOTES: [&str; 3] = ["agree", "disagree", "pass"];
 
 // =============================================================================
 // Spatial Governance — Place (governed spatial entity)
@@ -336,117 +198,6 @@ pub const PLACE_TYPES: [&str; 8] = [
 ];
 
 pub const PLACE_STATUS: [&str; 4] = ["active", "proposed", "disputed", "dissolved"];
-
-// =============================================================================
-// Gate Decision Attestation — Agent-gate interaction record
-// =============================================================================
-//
-// Notarized on Mishpat DNA because gate decisions are constitutional artifacts.
-// If an agent's gate decision were controlled by a single party, that party
-// becomes the arbiter of all AI-mediated interactions — the rent-extraction
-// vector the protocol is designed to prevent.
-//
-// Source of truth: Mishpat DHT.
-// elohim-storage projection is a read-optimized index with dht_anchor_hash.
-
-/// GateDecisionAttestation — Immutable record of a gate's decision on an interaction.
-///
-/// Created by the elohim agent after evaluating a RelationalImpactEvent through
-/// a declared gate process. All references are content-addressed (CIDs) so the
-/// full reasoning chain is auditable without centralized storage.
-#[hdk_entry_helper]
-#[derive(Clone, PartialEq)]
-pub struct GateDecisionAttestation {
-    /// CID of this attestation (self-addressing). Computed by caller from content hash.
-    pub decision_id: String,
-    /// Phase discriminator: "dev-context" | "elohim-active"
-    pub phase: String,
-    /// AgentPubKey of the elohim that made the decision (base64 encoded).
-    pub elohim_id: String,
-    /// CID of the elohim's substance declaration (model-weights + constitution + deployment-context).
-    pub elohim_substance_cid: String,
-    /// Name of the gate that produced this decision (e.g. "discernment-gate-v1-mechanical").
-    pub gate_name: String,
-    /// CID of the GateProcessDeclaration DAG that was executed.
-    pub gate_process_cid: String,
-    /// Serialized RequestRef — identifies the RelationalImpactEvent that triggered the gate.
-    pub request_ref_json: String,
-    /// Serialized GateStatus: "allow" | "decline" | "escalate" | "verdict"
-    pub decision: String,
-    /// Full ConstitutionalReasoning as JSON.
-    pub reasoning_json: String,
-    /// CID of the assembled GateContext summary (privacy-respecting snapshot).
-    pub context_summary_cid: String,
-    /// ISO-8601 timestamp of the decision.
-    pub decided_at: String,
-    /// CID of the universal-band DAG declaration that ran above the domain gate.
-    pub universal_band_cid: String,
-}
-
-/// Valid phase discriminators for GateDecisionAttestation.
-pub const GATE_DECISION_PHASES: [&str; 2] = ["dev-context", "elohim-active"];
-
-/// Valid decision status values for GateDecisionAttestation.
-pub const GATE_DECISION_STATUSES: [&str; 4] = ["allow", "decline", "escalate", "verdict"];
-
-// =============================================================================
-// Gate Decision Challenge — Formal challenge against a GateDecisionAttestation
-// =============================================================================
-//
-// Notarized on Mishpat DNA because a challenge is a governance event: it affects
-// the elohim's standing, the affected party's remediation, and the protocol's
-// understanding of what correct decisions look like. Centralized challenge tracking
-// would make the challenger and the challenged subject to the same party's whims.
-//
-// Source of truth: Mishpat DHT.
-// elohim-storage projection (Task 11.2) receives post-commit signal with dht_anchor_hash.
-
-/// GateDecisionChallenge — Formal challenge filed against a GateDecisionAttestation.
-///
-/// A challenge is a governance event asserting that a gate decision was wrong —
-/// factually, ethically, structurally, or constitutionally — and that the error
-/// caused or could cause harm. Challenges are themselves notarized because the
-/// community must witness them: they affect elohim standing, affected-party
-/// remediation, and the protocol's understanding of correct decisions.
-///
-/// Ref: gate-challenge-and-indemnification-design.md §2.2
-#[hdk_entry_helper]
-#[derive(Clone, PartialEq)]
-pub struct GateDecisionChallenge {
-    /// CID of this challenge (self-addressing; content-derived from fields).
-    pub challenge_id: String,
-    /// CID of the GateDecisionAttestation being challenged.
-    pub challenged_decision_cid: String,
-    /// AgentPubKey of the challenger (base64 encoded).
-    pub challenger_id: String,
-    /// Grounds: factual-error | safety | policy | constitutional | indemnification-request
-    pub grounds: String,
-    /// Challenger's articulation of the grievance.
-    pub summary: String,
-    /// Content-addressed evidence refs (comma-separated CIDs; empty string if none).
-    /// Stored as comma-separated String in integrity; Vec<String> in wire type.
-    pub evidence_refs: String,
-    /// ISO-8601 timestamp when the challenge was filed.
-    pub filed_at: String,
-    /// Reach level: self | intimate | community | commons
-    pub reach: String,
-}
-
-/// Valid grounds for GateDecisionChallenge.
-///
-/// NOTE: These overlap with CHALLENGE_GROUNDS on the existing Challenge entry but
-/// are a distinct constant because GateDecisionChallenge adds "indemnification-request"
-/// which is gate-specific and not present on the general governance Challenge type.
-pub const GATE_CHALLENGE_GROUNDS: [&str; 5] = [
-    "factual-error",
-    "safety",
-    "policy",
-    "constitutional",
-    "indemnification-request",
-];
-
-/// Valid reach values for GateDecisionChallenge.
-pub const GATE_CHALLENGE_REACH: [&str; 4] = ["self", "intimate", "community", "commons"];
 
 // =============================================================================
 // Challenge Outcome — Verdict + indemnification after review
@@ -523,21 +274,14 @@ impl StringAnchor {
 #[hdk_entry_types]
 #[unit_enum(UnitEntryTypes)]
 pub enum EntryTypes {
-    Challenge(Challenge),
-    Proposal(Proposal),
     Precedent(Precedent),
     Discussion(Discussion),
     GovernanceState(GovernanceState),
-    GovernanceReaction(GovernanceReaction),
     GraduatedFeedback(GraduatedFeedback),
-    ProposalVote(ProposalVote),
     OpinionStatement(OpinionStatement),
-    StatementVote(StatementVote),
     Place(Place),
     StringAnchor(StringAnchor),
-    GateDecisionAttestation(GateDecisionAttestation), // #12 (Phase 4 Task 4.1)
-    GateDecisionChallenge(GateDecisionChallenge),      // #13 (Phase 11 Task 11.1)
-    ChallengeOutcome(ChallengeOutcome),                // #14 (Phase 11 Task 11.1)
+    ChallengeOutcome(ChallengeOutcome), // Stage C: Challenge/Proposal/GovernanceReaction/ProposalVote/StatementVote/GateDecisionAttestation/GateDecisionChallenge moved to elohim DNA
 }
 
 // ============================================================
@@ -549,34 +293,20 @@ pub enum LinkTypes {
     // =========================================================================
     // Qahal: Governance Signal links (Loomio/Forby/Polis patterns)
     // =========================================================================
-    ContentToReactions,    // Content -> GovernanceReaction
-    AgentToReactions,      // Anchor(agent_id) -> GovernanceReaction
-    ReactionByType,        // Anchor(reaction_type) -> GovernanceReaction
-    ContentToFeedback,     // Content -> GraduatedFeedback
-    AgentToFeedback,       // Anchor(agent_id) -> GraduatedFeedback
-    FeedbackByContext,     // Anchor(feedback_context) -> GraduatedFeedback
-    ProposalToVotes,       // Proposal -> ProposalVote
-    AgentToVotes,          // Anchor(agent_id) -> ProposalVote
-    VoteByPosition,        // Anchor(position) -> ProposalVote
-    ContextToStatements,   // Anchor(context_id) -> OpinionStatement
-    AgentToStatements,     // Anchor(agent_id) -> OpinionStatement
-    StatementToVotes,      // OpinionStatement -> StatementVote
-    AgentToStatementVotes, // Anchor(agent_id) -> StatementVote
+    // GovernanceReaction links removed (Stage C) — reactions live on elohim DNA
+    ContentToFeedback,   // Content -> GraduatedFeedback
+    AgentToFeedback,     // Anchor(agent_id) -> GraduatedFeedback
+    FeedbackByContext,   // Anchor(feedback_context) -> GraduatedFeedback
+    // ProposalVote links removed (Stage C) — votes live on elohim DNA
+    ContextToStatements, // Anchor(context_id) -> OpinionStatement
+    AgentToStatements,   // Anchor(agent_id) -> OpinionStatement
+    // StatementVote links removed (Stage C) — votes live on elohim DNA
 
     // =========================================================================
     // Qahal: Formal Governance links
     // =========================================================================
-    // Challenge
-    IdToChallenge,         // Anchor(challenge_id) -> Challenge
-    EntityToChallenge,     // Anchor(entity_type:entity_id) -> Challenge
-    ChallengerToChallenge, // Anchor(challenger_id) -> Challenge
-    ChallengeByStatus,     // Anchor(status) -> Challenge
-
-    // Proposal
-    IdToProposal,       // Anchor(proposal_id) -> Proposal
-    ProposalByType,     // Anchor(proposal_type) -> Proposal
-    ProposerToProposal, // Anchor(proposer_id) -> Proposal
-    ProposalByStatus,   // Anchor(status) -> Proposal
+    // Challenge links removed (Stage C) — challenges live on elohim DNA
+    // Proposal links removed (Stage C) — proposals live on elohim DNA
 
     // Precedent
     IdToPrecedent,     // Anchor(precedent_id) -> Precedent
@@ -604,26 +334,16 @@ pub enum LinkTypes {
     PlaceToCollective,  // Place -> Anchor(collective_id)
 
     // =========================================================================
-    // Gate Decision Attestation — AI gate interaction records
+    // Gate Decision Attestation / Challenge links removed (Stage C)
+    // — attestations and challenges live on elohim DNA
     // =========================================================================
-    IdToGateDecision,      // Anchor(decision_id) -> GateDecisionAttestation
-    ElohimToGateDecisions, // Anchor(elohim_id) -> GateDecisionAttestation
-    GateNameToDecisions,   // Anchor(gate_name) -> GateDecisionAttestation
-    PhaseToDecisions,      // Anchor(phase) -> GateDecisionAttestation
-
-    // =========================================================================
-    // Gate Decision Challenge — Formal challenges against GateDecisionAttestations
-    // =========================================================================
-    IdToChallenge2,                     // Anchor(challenge_id) -> GateDecisionChallenge
-    ChallengedDecisionToChallenges,     // Anchor(challenged_decision_cid) -> GateDecisionChallenge
-    ChallengerToChallenges,             // Anchor(challenger_id) -> GateDecisionChallenge
 
     // =========================================================================
     // Challenge Outcome — Verdicts closing GateDecisionChallenges
     // =========================================================================
-    IdToOutcome,           // Anchor(outcome_id) -> ChallengeOutcome
-    ChallengeToOutcome,    // Anchor(challenge_cid) -> ChallengeOutcome
-    VerdictToOutcomes,     // Anchor(verdict) -> ChallengeOutcome
+    IdToOutcome,        // Anchor(outcome_id) -> ChallengeOutcome
+    ChallengeToOutcome, // Anchor(challenge_cid) -> ChallengeOutcome
+    VerdictToOutcomes,  // Anchor(verdict) -> ChallengeOutcome
 }
 
 // =============================================================================
@@ -662,72 +382,19 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
 
 fn validate_create_entry(app_entry: &EntryTypes) -> ExternResult<ValidateCallbackResult> {
     match app_entry {
-        EntryTypes::Challenge(challenge) => validate_challenge(challenge),
-        EntryTypes::Proposal(proposal) => validate_proposal(proposal),
         EntryTypes::Precedent(precedent) => validate_precedent(precedent),
         EntryTypes::Discussion(discussion) => validate_discussion(discussion),
         EntryTypes::GovernanceState(state) => validate_governance_state(state),
-        EntryTypes::GovernanceReaction(reaction) => validate_governance_reaction(reaction),
         EntryTypes::GraduatedFeedback(feedback) => validate_graduated_feedback(feedback),
-        EntryTypes::ProposalVote(vote) => validate_proposal_vote(vote),
         EntryTypes::OpinionStatement(statement) => validate_opinion_statement(statement),
-        EntryTypes::StatementVote(vote) => validate_statement_vote(vote),
         EntryTypes::Place(place) => validate_place(place),
         EntryTypes::StringAnchor(_) => Ok(ValidateCallbackResult::Valid),
-        EntryTypes::GateDecisionAttestation(attestation) => {
-            validate_gate_decision_attestation(attestation)
-        }
-        EntryTypes::GateDecisionChallenge(challenge) => {
-            validate_gate_decision_challenge(challenge)
-        }
         EntryTypes::ChallengeOutcome(outcome) => validate_challenge_outcome(outcome),
     }
 }
 
 fn validate_update_entry(app_entry: &EntryTypes) -> ExternResult<ValidateCallbackResult> {
     validate_create_entry(app_entry)
-}
-
-fn validate_challenge(challenge: &Challenge) -> ExternResult<ValidateCallbackResult> {
-    if challenge.id.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid(
-            "Challenge id cannot be empty".into(),
-        ));
-    }
-    if !CHALLENGE_GROUNDS.contains(&challenge.grounds.as_str()) {
-        return Ok(ValidateCallbackResult::Invalid(format!(
-            "Invalid challenge grounds: {}",
-            challenge.grounds
-        )));
-    }
-    if !CHALLENGE_STATUS.contains(&challenge.status.as_str()) {
-        return Ok(ValidateCallbackResult::Invalid(format!(
-            "Invalid challenge status: {}",
-            challenge.status
-        )));
-    }
-    Ok(ValidateCallbackResult::Valid)
-}
-
-fn validate_proposal(proposal: &Proposal) -> ExternResult<ValidateCallbackResult> {
-    if proposal.id.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid(
-            "Proposal id cannot be empty".into(),
-        ));
-    }
-    if !PROPOSAL_TYPES.contains(&proposal.proposal_type.as_str()) {
-        return Ok(ValidateCallbackResult::Invalid(format!(
-            "Invalid proposal type: {}",
-            proposal.proposal_type
-        )));
-    }
-    if !PROPOSAL_STATUS.contains(&proposal.status.as_str()) {
-        return Ok(ValidateCallbackResult::Invalid(format!(
-            "Invalid proposal status: {}",
-            proposal.status
-        )));
-    }
-    Ok(ValidateCallbackResult::Valid)
 }
 
 fn validate_precedent(precedent: &Precedent) -> ExternResult<ValidateCallbackResult> {
@@ -775,23 +442,6 @@ fn validate_governance_state(state: &GovernanceState) -> ExternResult<ValidateCa
     Ok(ValidateCallbackResult::Valid)
 }
 
-fn validate_governance_reaction(
-    reaction: &GovernanceReaction,
-) -> ExternResult<ValidateCallbackResult> {
-    if reaction.id.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid(
-            "GovernanceReaction id cannot be empty".into(),
-        ));
-    }
-    if !REACTION_TYPES.contains(&reaction.reaction.as_str()) {
-        return Ok(ValidateCallbackResult::Invalid(format!(
-            "Invalid reaction type: {}",
-            reaction.reaction
-        )));
-    }
-    Ok(ValidateCallbackResult::Valid)
-}
-
 fn validate_graduated_feedback(
     feedback: &GraduatedFeedback,
 ) -> ExternResult<ValidateCallbackResult> {
@@ -809,21 +459,6 @@ fn validate_graduated_feedback(
     Ok(ValidateCallbackResult::Valid)
 }
 
-fn validate_proposal_vote(vote: &ProposalVote) -> ExternResult<ValidateCallbackResult> {
-    if vote.id.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid(
-            "ProposalVote id cannot be empty".into(),
-        ));
-    }
-    if !VOTE_POSITIONS.contains(&vote.position.as_str()) {
-        return Ok(ValidateCallbackResult::Invalid(format!(
-            "Invalid vote position: {}",
-            vote.position
-        )));
-    }
-    Ok(ValidateCallbackResult::Valid)
-}
-
 fn validate_opinion_statement(
     statement: &OpinionStatement,
 ) -> ExternResult<ValidateCallbackResult> {
@@ -836,21 +471,6 @@ fn validate_opinion_statement(
         return Ok(ValidateCallbackResult::Invalid(
             "OpinionStatement text cannot be empty".into(),
         ));
-    }
-    Ok(ValidateCallbackResult::Valid)
-}
-
-fn validate_statement_vote(vote: &StatementVote) -> ExternResult<ValidateCallbackResult> {
-    if vote.id.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid(
-            "StatementVote id cannot be empty".into(),
-        ));
-    }
-    if !STATEMENT_VOTES.contains(&vote.vote.as_str()) {
-        return Ok(ValidateCallbackResult::Invalid(format!(
-            "Invalid statement vote: {}",
-            vote.vote
-        )));
     }
     Ok(ValidateCallbackResult::Valid)
 }
@@ -906,76 +526,6 @@ fn validate_place(place: &Place) -> ExternResult<ValidateCallbackResult> {
     Ok(ValidateCallbackResult::Valid)
 }
 
-fn validate_gate_decision_attestation(
-    attestation: &GateDecisionAttestation,
-) -> ExternResult<ValidateCallbackResult> {
-    if attestation.decision_id.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid(
-            "GateDecisionAttestation decision_id cannot be empty".into(),
-        ));
-    }
-    if attestation.elohim_id.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid(
-            "GateDecisionAttestation elohim_id cannot be empty".into(),
-        ));
-    }
-    if attestation.gate_name.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid(
-            "GateDecisionAttestation gate_name cannot be empty".into(),
-        ));
-    }
-    if !GATE_DECISION_PHASES.contains(&attestation.phase.as_str()) {
-        return Ok(ValidateCallbackResult::Invalid(format!(
-            "Invalid gate decision phase: {} (expected one of {:?})",
-            attestation.phase, GATE_DECISION_PHASES
-        )));
-    }
-    if !GATE_DECISION_STATUSES.contains(&attestation.decision.as_str()) {
-        return Ok(ValidateCallbackResult::Invalid(format!(
-            "Invalid gate decision status: {} (expected one of {:?})",
-            attestation.decision, GATE_DECISION_STATUSES
-        )));
-    }
-    Ok(ValidateCallbackResult::Valid)
-}
-
-fn validate_gate_decision_challenge(
-    challenge: &GateDecisionChallenge,
-) -> ExternResult<ValidateCallbackResult> {
-    if challenge.challenge_id.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid(
-            "GateDecisionChallenge challenge_id cannot be empty".into(),
-        ));
-    }
-    if challenge.challenger_id.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid(
-            "GateDecisionChallenge challenger_id cannot be empty".into(),
-        ));
-    }
-    if challenge.challenged_decision_cid.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid(
-            "GateDecisionChallenge challenged_decision_cid cannot be empty".into(),
-        ));
-    }
-    if !GATE_CHALLENGE_GROUNDS.contains(&challenge.grounds.as_str()) {
-        return Ok(ValidateCallbackResult::Invalid(format!(
-            "Invalid GateDecisionChallenge grounds: {} (expected one of {:?})",
-            challenge.grounds, GATE_CHALLENGE_GROUNDS
-        )));
-    }
-    if !GATE_CHALLENGE_REACH.contains(&challenge.reach.as_str()) {
-        return Ok(ValidateCallbackResult::Invalid(format!(
-            "Invalid GateDecisionChallenge reach: {} (expected one of {:?})",
-            challenge.reach, GATE_CHALLENGE_REACH
-        )));
-    }
-    // NOTE: dangling-ref validation (challenged_decision_cid must resolve in DHT)
-    // requires must_get_entry or get() which are non-deterministic across network
-    // conditions. Full integration test with SweetConductor is deferred to
-    // Phase 11 close-out (Task 11.x integration tests).
-    Ok(ValidateCallbackResult::Valid)
-}
-
 fn validate_challenge_outcome(outcome: &ChallengeOutcome) -> ExternResult<ValidateCallbackResult> {
     if outcome.outcome_id.is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
@@ -1019,211 +569,6 @@ fn validate_challenge_outcome(outcome: &ChallengeOutcome) -> ExternResult<Valida
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    fn make_valid_attestation() -> GateDecisionAttestation {
-        GateDecisionAttestation {
-            decision_id: "bafybeigdecision1".into(),
-            phase: "dev-context".into(),
-            elohim_id: "uhCAktest".into(),
-            elohim_substance_cid: "bafybeielohimsubstance".into(),
-            gate_name: "discernment-gate-v1-mechanical".into(),
-            gate_process_cid: "bafybeigateprocess".into(),
-            request_ref_json: r#"{"eventId":"evt-1"}"#.into(),
-            decision: "allow".into(),
-            reasoning_json: r#"{"summary":"ok"}"#.into(),
-            context_summary_cid: "bafybeicontextsummary".into(),
-            decided_at: "2026-04-18T00:00:00Z".into(),
-            universal_band_cid: "bafybeiband".into(),
-        }
-    }
-
-    #[test]
-    fn valid_attestation_passes_validation() {
-        let att = make_valid_attestation();
-        let result = validate_gate_decision_attestation(&att).unwrap();
-        assert_eq!(result, ValidateCallbackResult::Valid);
-    }
-
-    #[test]
-    fn valid_elohim_active_phase_passes() {
-        let mut att = make_valid_attestation();
-        att.phase = "elohim-active".into();
-        let result = validate_gate_decision_attestation(&att).unwrap();
-        assert_eq!(result, ValidateCallbackResult::Valid);
-    }
-
-    #[test]
-    fn all_valid_decision_statuses_pass() {
-        for status in &["allow", "decline", "escalate", "verdict"] {
-            let mut att = make_valid_attestation();
-            att.decision = (*status).into();
-            let result = validate_gate_decision_attestation(&att).unwrap();
-            assert_eq!(
-                result,
-                ValidateCallbackResult::Valid,
-                "status {} should pass",
-                status
-            );
-        }
-    }
-
-    #[test]
-    fn invalid_phase_fails_validation() {
-        let mut att = make_valid_attestation();
-        att.phase = "unknown-phase".into();
-        let result = validate_gate_decision_attestation(&att).unwrap();
-        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
-    }
-
-    #[test]
-    fn invalid_decision_status_fails_validation() {
-        let mut att = make_valid_attestation();
-        att.decision = "maybe".into();
-        let result = validate_gate_decision_attestation(&att).unwrap();
-        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
-    }
-
-    #[test]
-    fn empty_decision_id_fails_validation() {
-        let mut att = make_valid_attestation();
-        att.decision_id = "".into();
-        let result = validate_gate_decision_attestation(&att).unwrap();
-        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
-    }
-
-    #[test]
-    fn empty_elohim_id_fails_validation() {
-        let mut att = make_valid_attestation();
-        att.elohim_id = "".into();
-        let result = validate_gate_decision_attestation(&att).unwrap();
-        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
-    }
-
-    #[test]
-    fn empty_gate_name_fails_validation() {
-        let mut att = make_valid_attestation();
-        att.gate_name = "".into();
-        let result = validate_gate_decision_attestation(&att).unwrap();
-        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
-    }
-
-    #[test]
-    fn gate_decision_attestation_serde_roundtrip() {
-        let att = make_valid_attestation();
-        // Use serde_json for roundtrip (native-compilable, no HDK required)
-        let json = serde_json::to_string(&att).unwrap();
-        let decoded: GateDecisionAttestation = serde_json::from_str(&json).unwrap();
-        assert_eq!(decoded.decision_id, att.decision_id);
-        assert_eq!(decoded.phase, att.phase);
-        assert_eq!(decoded.elohim_id, att.elohim_id);
-        assert_eq!(decoded.gate_name, att.gate_name);
-        assert_eq!(decoded.decision, att.decision);
-    }
-
-    // =========================================================================
-    // GateDecisionChallenge tests
-    // =========================================================================
-
-    fn make_valid_challenge() -> GateDecisionChallenge {
-        GateDecisionChallenge {
-            challenge_id: "bafybeichallenge1".into(),
-            challenged_decision_cid: "bafybeigdecision1".into(),
-            challenger_id: "uhCAkchallenger".into(),
-            grounds: "factual-error".into(),
-            summary: "The decision rested on incorrect facts about the content format.".into(),
-            evidence_refs: "bafybeiref1,bafybeiref2".into(),
-            filed_at: "2026-04-19T10:00:00Z".into(),
-            reach: "community".into(),
-        }
-    }
-
-    #[test]
-    fn valid_challenge_passes_validation() {
-        let c = make_valid_challenge();
-        let result = validate_gate_decision_challenge(&c).unwrap();
-        assert_eq!(result, ValidateCallbackResult::Valid);
-    }
-
-    #[test]
-    fn all_valid_challenge_grounds_pass() {
-        for grounds in &GATE_CHALLENGE_GROUNDS {
-            let mut c = make_valid_challenge();
-            c.grounds = (*grounds).into();
-            let result = validate_gate_decision_challenge(&c).unwrap();
-            assert_eq!(
-                result,
-                ValidateCallbackResult::Valid,
-                "grounds {} should pass",
-                grounds
-            );
-        }
-    }
-
-    #[test]
-    fn all_valid_challenge_reach_values_pass() {
-        for reach in &GATE_CHALLENGE_REACH {
-            let mut c = make_valid_challenge();
-            c.reach = (*reach).into();
-            let result = validate_gate_decision_challenge(&c).unwrap();
-            assert_eq!(
-                result,
-                ValidateCallbackResult::Valid,
-                "reach {} should pass",
-                reach
-            );
-        }
-    }
-
-    #[test]
-    fn invalid_challenge_grounds_fails() {
-        let mut c = make_valid_challenge();
-        c.grounds = "made-up-grounds".into();
-        let result = validate_gate_decision_challenge(&c).unwrap();
-        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
-    }
-
-    #[test]
-    fn invalid_challenge_reach_fails() {
-        let mut c = make_valid_challenge();
-        c.reach = "global".into();
-        let result = validate_gate_decision_challenge(&c).unwrap();
-        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
-    }
-
-    #[test]
-    fn empty_challenge_id_fails() {
-        let mut c = make_valid_challenge();
-        c.challenge_id = "".into();
-        let result = validate_gate_decision_challenge(&c).unwrap();
-        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
-    }
-
-    #[test]
-    fn empty_challenger_id_fails() {
-        let mut c = make_valid_challenge();
-        c.challenger_id = "".into();
-        let result = validate_gate_decision_challenge(&c).unwrap();
-        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
-    }
-
-    #[test]
-    fn empty_challenged_decision_cid_fails() {
-        let mut c = make_valid_challenge();
-        c.challenged_decision_cid = "".into();
-        let result = validate_gate_decision_challenge(&c).unwrap();
-        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
-    }
-
-    #[test]
-    fn challenge_serde_roundtrip() {
-        let c = make_valid_challenge();
-        let json = serde_json::to_string(&c).unwrap();
-        let decoded: GateDecisionChallenge = serde_json::from_str(&json).unwrap();
-        assert_eq!(decoded.challenge_id, c.challenge_id);
-        assert_eq!(decoded.challenged_decision_cid, c.challenged_decision_cid);
-        assert_eq!(decoded.grounds, c.grounds);
-        assert_eq!(decoded.reach, c.reach);
-    }
 
     // =========================================================================
     // ChallengeOutcome tests

@@ -18,6 +18,7 @@ pub mod account;
 pub mod agreements;
 pub mod attestations;
 pub mod blob;
+pub mod governance_actions;
 pub mod cluster;
 pub mod comments;
 pub mod compute;
@@ -138,6 +139,10 @@ pub async fn handle_api_request(
     } else if sub_path.starts_with("flow-planning") {
         let resource_path = sub_path.strip_prefix("flow-planning").unwrap_or("");
         flow_planning::handle(req, method, resource_path, &pool, &app_ctx).await
+    } else if sub_path.starts_with("governance-actions") {
+        // Must precede "governance" to avoid prefix collision.
+        let resource_path = sub_path.strip_prefix("governance-actions").unwrap_or("");
+        governance_actions::handle(req, method, resource_path, &pool, &app_ctx).await
     } else if sub_path.starts_with("governance") {
         let resource_path = sub_path.strip_prefix("governance").unwrap_or("");
         governance::handle(req, method, resource_path, &pool, &app_ctx).await

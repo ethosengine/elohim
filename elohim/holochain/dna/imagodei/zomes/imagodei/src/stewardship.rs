@@ -32,12 +32,7 @@ pub struct DevicePolicyOutput {
     pub policy: DevicePolicy,
 }
 
-/// Output from policy inheritance operations
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PolicyInheritanceOutput {
-    pub action_hash: ActionHash,
-    pub inheritance: PolicyInheritance,
-}
+// PolicyInheritanceOutput removed C.2 — PolicyInheritance entry type removed (zero callers).
 
 /// Output from appeal operations
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -110,11 +110,15 @@ pub struct IssueAttestationInput {
     pub expires_at: Option<String>,
 }
 
-/// Output from attestation operations
+/// Output from attestation operations.
+///
+/// Stage C.2: `attestation` field type changed from the removed `Attestation` entry
+/// type to `LegacyAttestationView` (plain struct, same fields, no #[hdk_entry_helper]).
+/// The serde wire format is identical — consumers in elohim-storage are unaffected.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AttestationOutput {
     pub action_hash: ActionHash,
-    pub attestation: Attestation,
+    pub attestation: LegacyAttestationView,
 }
 
 // =============================================================================
@@ -143,10 +147,15 @@ pub enum ImagodeiSignal {
         relationship: HumanRelationship,
         author: AgentPubKey,
     },
+    /// Stage C.2: field type changed from removed `Attestation` entry type to
+    /// `LegacyAttestationView`. Wire format is identical (same fields). The
+    /// post_commit emission branch is removed — B.9 bridge never writes
+    /// Attestation entries to imagodei DHT, so this variant is never emitted.
+    /// Kept for elohim-storage serde compatibility until Stage F removes consumers.
     AttestationCommitted {
         action_hash: ActionHash,
         entry_hash: EntryHash,
-        attestation: Attestation,
+        attestation: LegacyAttestationView,
         author: AgentPubKey,
     },
     /// Emitted by `create_agent_peer_binding` (Task A.13).
@@ -247,16 +256,11 @@ pub fn post_commit(committed_actions: Vec<SignedActionHashed>) -> ExternResult<(
                 relationship,
                 author,
             })?;
-        } else if let Some(attestation) =
-            record.entry().to_app_option::<Attestation>().ok().flatten()
-        {
-            emit_signal(ImagodeiSignal::AttestationCommitted {
-                action_hash,
-                entry_hash,
-                attestation,
-                author,
-            })?;
         }
+        // AttestationCommitted emission removed C.2: Attestation is no longer a
+        // DHT entry type — B.9 bridge never writes it to imagodei source chain,
+        // so to_app_option::<Attestation>() could never fire. The signal variant
+        // is kept for serde compat until Stage F removes elohim-storage consumers.
     }
 
     Ok(())
@@ -574,67 +578,261 @@ pub fn get_my_relationships(_: ()) -> ExternResult<Vec<RelationshipOutput>> {
 
 // =============================================================================
 // Attestation Functions
+//
+// B.9 bridge: these coordinator functions delegate to elohim DNA's
+// content_store::issue_attestation / get_attestations_for_subject.
+// Stage C will remove the legacy Attestation entry type from imagodei entirely.
 // =============================================================================
 
-/// Issue an attestation to an agent
+// ---------------------------------------------------------------------------
+// Consolidated bridge structs — wire-compatible with elohim DNA's public API.
+// Defined locally because cross-DNA calls serialise through msgpack; imagodei
+// cannot depend on elohim crates directly.
+// ---------------------------------------------------------------------------
+
+/// Input for elohim DNA's content_store::issue_attestation (B.9 bridge copy).
+#[derive(Debug, Serialize, Deserialize)]
+struct ConsolidatedIssueAttestationInput {
+    pub attestation_kind: String,
+    pub subject_cid: String,
+    pub subject_kind: String,
+    pub title: String,
+    pub description: Option<String>,
+    pub reach: String,
+    pub metadata: serde_json::Value,
+    pub parent_governance_action_cid: Option<String>,
+    pub vote_value: Option<String>,
+    pub proof_class: String,
+    pub proof_evidence: serde_json::Value,
+    pub expires_at: Option<String>,
+}
+
+/// Output from elohim DNA's content_store::issue_attestation (B.9 bridge copy).
+#[derive(Debug, Serialize, Deserialize)]
+struct ConsolidatedAttestationOutput {
+    pub cid: String,
+    pub attestation_kind: String,
+    pub subject_cid: String,
+    pub issuer_cid: String,
+}
+
+/// Input for elohim DNA's content_store::propose_governance_action (B.9 bridge copy).
+#[derive(Debug, Serialize, Deserialize)]
+struct ConsolidatedProposeGovernanceActionInput {
+    pub governance_kind: String,
+    pub subject_cid: String,
+    pub title: String,
+    pub description: Option<String>,
+    pub reach: String,
+    pub threshold: serde_json::Value,
+    pub eligibility_predicate: Option<serde_json::Value>,
+    pub ballot_format: String,
+    pub closes_at: String,
+    pub parameters: Option<serde_json::Value>,
+}
+
+/// Output from elohim DNA's content_store::propose_governance_action (B.9 bridge copy).
+#[derive(Debug, Serialize, Deserialize)]
+struct ConsolidatedGovernanceActionOutput {
+    pub cid: String,
+    pub governance_kind: String,
+    pub subject_cid: String,
+    pub proposer_cid: String,
+    pub closes_at: String,
+}
+
+// ---------------------------------------------------------------------------
+// Bridge helper: call elohim content_store::issue_attestation and handle all
+// ZomeCallResponse arms uniformly.
+// ---------------------------------------------------------------------------
+fn call_elohim_issue_attestation(
+    consolidated_input: ConsolidatedIssueAttestationInput,
+) -> ExternResult<ConsolidatedAttestationOutput> {
+    let response = call(
+        CallTargetCell::OtherRole("elohim".into()),
+        ZomeName::from("content_store"),
+        FunctionName::from("issue_attestation"),
+        None,
+        consolidated_input,
+    )?;
+    match response {
+        ZomeCallResponse::Ok(result) => result.decode().map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "bridge decode (elohim::issue_attestation): {e}"
+            )))
+        }),
+        ZomeCallResponse::Unauthorized(_, _, _, _) => Err(wasm_error!(WasmErrorInner::Guest(
+            "Unauthorized bridge call to elohim::issue_attestation".to_string()
+        ))),
+        ZomeCallResponse::NetworkError(err) => Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Network error bridging to elohim::issue_attestation: {err}"
+        )))),
+        ZomeCallResponse::CountersigningSession(err) => Err(wasm_error!(WasmErrorInner::Guest(
+            format!("Countersigning error bridging to elohim: {err}")
+        ))),
+        ZomeCallResponse::AuthenticationFailed(_, _) => Err(wasm_error!(WasmErrorInner::Guest(
+            "Authentication failed bridging to elohim::issue_attestation".to_string()
+        ))),
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Bridge helper: call elohim content_store::get_attestations_for_subject.
+// ---------------------------------------------------------------------------
+fn call_elohim_get_attestations_for_subject(
+    subject_cid: String,
+) -> ExternResult<Vec<ConsolidatedAttestationOutput>> {
+    let response = call(
+        CallTargetCell::OtherRole("elohim".into()),
+        ZomeName::from("content_store"),
+        FunctionName::from("get_attestations_for_subject"),
+        None,
+        subject_cid,
+    )?;
+    match response {
+        ZomeCallResponse::Ok(result) => result.decode().map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "bridge decode (elohim::get_attestations_for_subject): {e}"
+            )))
+        }),
+        ZomeCallResponse::Unauthorized(_, _, _, _) => Err(wasm_error!(WasmErrorInner::Guest(
+            "Unauthorized bridge call to elohim::get_attestations_for_subject".to_string()
+        ))),
+        ZomeCallResponse::NetworkError(err) => Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Network error bridging to elohim::get_attestations_for_subject: {err}"
+        )))),
+        ZomeCallResponse::CountersigningSession(err) => Err(wasm_error!(WasmErrorInner::Guest(
+            format!("Countersigning error bridging to elohim: {err}")
+        ))),
+        ZomeCallResponse::AuthenticationFailed(_, _) => Err(wasm_error!(WasmErrorInner::Guest(
+            "Authentication failed bridging to elohim::get_attestations_for_subject".to_string()
+        ))),
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Bridge helper: call elohim content_store::propose_governance_action.
+// ---------------------------------------------------------------------------
+fn call_elohim_propose_governance_action(
+    consolidated_input: ConsolidatedProposeGovernanceActionInput,
+) -> ExternResult<ConsolidatedGovernanceActionOutput> {
+    let response = call(
+        CallTargetCell::OtherRole("elohim".into()),
+        ZomeName::from("content_store"),
+        FunctionName::from("propose_governance_action"),
+        None,
+        consolidated_input,
+    )?;
+    match response {
+        ZomeCallResponse::Ok(result) => result.decode().map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "bridge decode (elohim::propose_governance_action): {e}"
+            )))
+        }),
+        ZomeCallResponse::Unauthorized(_, _, _, _) => Err(wasm_error!(WasmErrorInner::Guest(
+            "Unauthorized bridge call to elohim::propose_governance_action".to_string()
+        ))),
+        ZomeCallResponse::NetworkError(err) => Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Network error bridging to elohim::propose_governance_action: {err}"
+        )))),
+        ZomeCallResponse::CountersigningSession(err) => Err(wasm_error!(WasmErrorInner::Guest(
+            format!("Countersigning error bridging to elohim: {err}")
+        ))),
+        ZomeCallResponse::AuthenticationFailed(_, _) => Err(wasm_error!(WasmErrorInner::Guest(
+            "Authentication failed bridging to elohim::propose_governance_action".to_string()
+        ))),
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Synthesise a legacy Attestation struct from a consolidated bridge response.
+// This is TEMPORARY scaffolding until Stage C removes the Attestation entry
+// type from imagodei entirely. The action_hash field cannot be derived from
+// the consolidated CID (entry hash) — callers that rely on action_hash for
+// further DHT lookups must be migrated before Stage C.
+// ---------------------------------------------------------------------------
+fn synthesise_attestation_from_consolidated(
+    consolidated: &ConsolidatedAttestationOutput,
+    input_category: &str,
+    input_attestation_type: &str,
+    input_display_name: &str,
+    input_description: &str,
+    input_icon_url: Option<String>,
+    input_tier: Option<String>,
+    input_earned_via_json: &str,
+    input_expires_at: Option<String>,
+) -> LegacyAttestationView {
+    LegacyAttestationView {
+        id: consolidated.cid.clone(),
+        agent_id: consolidated.subject_cid.clone(),
+        category: input_category.to_string(),
+        attestation_type: input_attestation_type.to_string(),
+        display_name: input_display_name.to_string(),
+        description: input_description.to_string(),
+        icon_url: input_icon_url,
+        tier: input_tier,
+        earned_via_json: input_earned_via_json.to_string(),
+        issued_at: String::new(), // populated by elohim coordinator
+        issued_by: consolidated.issuer_cid.clone(),
+        expires_at: input_expires_at,
+        proof: None,
+    }
+}
+
+/// Issue an attestation to an agent.
+///
+/// B.9 bridge: delegates to elohim DNA's content_store::issue_attestation with
+/// attestation_kind "attestation:identity-credential". The legacy Attestation
+/// entry type is NOT written to imagodei's source chain; the canonical entry
+/// lives on elohim DNA's DHT. Stage C will remove this wrapper entirely.
+///
+/// RUNTIME CONCERN: elohim::grant_attestation calls issue_attestation_via_imagodei
+/// which calls this function, which calls elohim::issue_attestation. That creates
+/// a cross-DNA call cycle (elohim → imagodei → elohim). Stage B companion task:
+/// update issue_attestation_via_imagodei in elohim to call the attestation module
+/// directly rather than bridging to imagodei.
 #[hdk_extern]
 pub fn issue_attestation(input: IssueAttestationInput) -> ExternResult<AttestationOutput> {
-    let agent_info = agent_info()?;
-    let now = sys_time()?;
-    let timestamp = format!("{:?}", now);
-
-    let attestation_id = format!(
-        "{}-{}-{}",
-        input.agent_id, input.attestation_type, timestamp
-    );
-
-    let attestation = Attestation {
-        id: attestation_id.clone(),
-        agent_id: input.agent_id.clone(),
-        category: input.category.clone(),
-        attestation_type: input.attestation_type.clone(),
-        display_name: input.display_name,
-        description: input.description,
-        icon_url: input.icon_url,
-        tier: input.tier,
-        earned_via_json: input.earned_via_json,
-        issued_at: timestamp,
-        issued_by: agent_info.agent_initial_pubkey.to_string(),
-        expires_at: input.expires_at,
-        proof: None, // TODO: Add signature
+    let consolidated_input = ConsolidatedIssueAttestationInput {
+        attestation_kind: "attestation:identity-credential".to_string(),
+        subject_cid: input.agent_id.clone(),
+        subject_kind: "agent".to_string(),
+        title: input.display_name.clone(),
+        description: Some(input.description.clone()),
+        reach: "community".to_string(),
+        metadata: serde_json::json!({
+            "category": input.category,
+            "credential_type": input.attestation_type,
+            "tier": input.tier,
+            "icon_url": input.icon_url,
+            "earned_via": input.earned_via_json,
+        }),
+        parent_governance_action_cid: None,
+        vote_value: None,
+        proof_class: "witness".to_string(),
+        proof_evidence: serde_json::json!({"class": "witness"}),
+        expires_at: input.expires_at.clone(),
     };
 
-    let action_hash = create_entry(&EntryTypes::Attestation(attestation.clone()))?;
+    let consolidated = call_elohim_issue_attestation(consolidated_input)?;
 
-    // Create agent lookup link
-    let agent_anchor = StringAnchor::new("agent_attestations", &input.agent_id);
-    let agent_anchor_hash = hash_entry(&EntryTypes::StringAnchor(agent_anchor))?;
-    create_link(
-        agent_anchor_hash,
-        action_hash.clone(),
-        LinkTypes::AgentToAttestation,
-        (),
-    )?;
+    let attestation = synthesise_attestation_from_consolidated(
+        &consolidated,
+        &input.category,
+        &input.attestation_type,
+        &input.display_name,
+        &input.description,
+        input.icon_url,
+        input.tier,
+        &input.earned_via_json,
+        input.expires_at,
+    );
 
-    // Create category lookup link
-    let category_anchor = StringAnchor::new("attestation_category", &input.category);
-    let category_anchor_hash = hash_entry(&EntryTypes::StringAnchor(category_anchor))?;
-    create_link(
-        category_anchor_hash,
-        action_hash.clone(),
-        LinkTypes::AttestationByCategory,
-        (),
-    )?;
-
-    // Create type lookup link
-    let type_anchor = StringAnchor::new("attestation_type", &input.attestation_type);
-    let type_anchor_hash = hash_entry(&EntryTypes::StringAnchor(type_anchor))?;
-    create_link(
-        type_anchor_hash,
-        action_hash.clone(),
-        LinkTypes::AttestationByType,
-        (),
-    )?;
+    // The action_hash field cannot be derived from the consolidated CID (entry
+    // hash). Use a zero sentinel so the struct satisfies callers that only
+    // inspect the attestation fields; callers that pass action_hash to HDK get
+    // must migrate before Stage C removes this bridge.
+    let action_hash = ActionHash::from_raw_36(vec![0u8; 36]);
 
     Ok(AttestationOutput {
         action_hash,
@@ -642,30 +840,40 @@ pub fn issue_attestation(input: IssueAttestationInput) -> ExternResult<Attestati
     })
 }
 
-/// Get attestations for an agent
+/// Get attestations for an agent.
+///
+/// B.9 bridge: delegates to elohim DNA's content_store::get_attestations_for_subject
+/// keyed on the agent_id as subject CID. Returns legacy AttestationOutput shapes
+/// with synthesised Attestation fields from the consolidated output.
 #[hdk_extern]
 pub fn get_agent_attestations(agent_id: String) -> ExternResult<Vec<AttestationOutput>> {
-    let anchor = StringAnchor::new("agent_attestations", &agent_id);
-    let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor))?;
+    let consolidated_list = call_elohim_get_attestations_for_subject(agent_id.clone())?;
 
-    let query = LinkQuery::try_new(anchor_hash, LinkTypes::AgentToAttestation)?;
-    let links = get_links(query, GetStrategy::default())?;
-
-    let mut results = Vec::new();
-    for link in links {
-        if let Some(action_hash) = link.target.clone().into_action_hash() {
-            if let Some(record) = get(action_hash.clone(), GetOptions::default())? {
-                if let Some(attestation) =
-                    record.entry().to_app_option::<Attestation>().ok().flatten()
-                {
-                    results.push(AttestationOutput {
-                        action_hash,
-                        attestation,
-                    });
-                }
+    let results = consolidated_list
+        .into_iter()
+        .map(|c| {
+            let attestation = LegacyAttestationView {
+                id: c.cid.clone(),
+                agent_id: agent_id.clone(),
+                category: c.attestation_kind.clone(),
+                attestation_type: c.attestation_kind.clone(),
+                display_name: c.attestation_kind.clone(),
+                description: String::new(),
+                icon_url: None,
+                tier: None,
+                earned_via_json: "{}".to_string(),
+                issued_at: String::new(),
+                issued_by: c.issuer_cid.clone(),
+                expires_at: None,
+                proof: None,
+            };
+            AttestationOutput {
+                // Sentinel — see note in issue_attestation bridge above.
+                action_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+                attestation,
             }
-        }
-    }
+        })
+        .collect();
 
     Ok(results)
 }
@@ -2664,8 +2872,14 @@ fn is_active_emergency_contact(
     Ok(false)
 }
 
-/// Returns true if `authorizer_human_id` already has a `HumanityWitness` linked
+/// Returns true if `authorizer_human_id` already has a witness linked
 /// from the given request (via `RecoveryRequestToHumanityWitness`).
+///
+/// Stage G.A.2 bridge: after `submit_intimate_witness` writes to elohim DNA
+/// (not imagodei), the link target is a StringAnchor sentinel hash rather
+/// than a HumanityWitness entry. Dedupe is now tag-based: the link tag stores
+/// the authorizer_human_id bytes. This avoids the cross-DNA `to_app_option`
+/// deserialization that would fail if the target lived on elohim's DHT.
 fn has_existing_witness_for_request(
     request_hash: &ActionHash,
     authorizer_human_id: &str,
@@ -2677,21 +2891,9 @@ fn has_existing_witness_for_request(
         )?,
         GetStrategy::default(),
     )?;
+    let tag_bytes = authorizer_human_id.as_bytes();
     for link in links {
-        let Some(w_hash) = link.target.clone().into_action_hash() else {
-            continue;
-        };
-        let Some(record) = get(w_hash, GetOptions::default())? else {
-            continue;
-        };
-        let Some(w): Option<HumanityWitness> = record
-            .entry()
-            .to_app_option()
-            .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        else {
-            continue;
-        };
-        if w.witness_agent_id == authorizer_human_id {
+        if link.tag.0.as_slice() == tag_bytes {
             return Ok(true);
         }
     }
@@ -2700,16 +2902,39 @@ fn has_existing_witness_for_request(
 
 /// Submit an intimate witness attestation for a recovery request.
 ///
-/// Gates:
+/// Stage G.A.2 bridge: writes `attestation:humanness` to elohim DNA via
+/// `call_elohim_issue_attestation`. The legacy `HumanityWitness` entry type
+/// is NOT written to imagodei's source chain; the canonical entry lives on
+/// elohim DNA's DHT (content_type "attestation:humanness").
+///
+/// Gates are preserved in full ABOVE the bridge call:
 /// 1. RecoveryRequest must exist and have a populated human_id.
+///    Gate reads RecoveryRequest by hash (to_app_option::<RecoveryRequest>()).
+///    RecoveryRequest entry type STAYS on imagodei — see TODO below for why
+///    create_recovery_request cannot yet be bridged.
 /// 2. Authorizer must be an active emergency contact of the target human
 ///    (has a HumanRelationship with emergency_access_enabled = true).
-/// 3. Dedupe: authorizer cannot witness the same request twice.
+/// 3. Dedupe: tag-based check on RecoveryRequestToHumanityWitness links
+///    (tag = authorizer_human_id bytes). Entry-deserialization no longer used.
+///
+/// Signal: emits IntimateWitnessSubmitted with the synthesised HumanityWitness
+/// struct and a zero ActionHash sentinel (CID cannot be converted to ActionHash).
+/// elohim-storage consumers that key on action_hash must migrate to CID-based
+/// lookup before Stage F removes this bridge.
+///
+/// TODO(stage-G-followup): create_recovery_request cannot be bridged yet because
+/// submit_intimate_witness Gate 1 and commit_key_rotation revocation-floor gate
+/// both deserialize RecoveryRequest / KeyRevocation entries from the imagodei DHT
+/// via to_app_option(). Bridging create_recovery_request to elohim would leave
+/// those entries on elohim's DHT in Content encoding, breaking all downstream
+/// gate readers. Requires a coordinated migration: all gate readers must switch
+/// to cross-DNA get() + Content deserialization before the create_entry calls
+/// can move. Tracked as Stage G follow-up (G.A.2 deferred functions).
 #[hdk_extern]
 pub fn submit_intimate_witness(
     input: SubmitIntimateWitnessInput,
 ) -> ExternResult<SubmitIntimateWitnessOutput> {
-    // Gate 1: fetch the RecoveryRequest; must exist.
+    // Gate 1: fetch the RecoveryRequest; must exist (still on imagodei DHT).
     let request_record =
         get(input.recovery_request_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
             WasmErrorInner::Guest("RecoveryRequest not found at given hash".into())
@@ -2737,15 +2962,15 @@ pub fn submit_intimate_witness(
         )));
     }
 
-    // Gate 3: dedupe — the authorizer cannot witness the same request twice.
+    // Gate 3: tag-based dedupe — the authorizer cannot witness the same request twice.
+    // Tag stores authorizer_human_id bytes; no entry deserialization needed.
     if has_existing_witness_for_request(&input.recovery_request_hash, &authorizer_human_id)? {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "this agent has already submitted a witness for this request".into()
         )));
     }
 
-    // Commit the HumanityWitness. HumanityWitness has no `note` field;
-    // the optional note is stored in evidence_json.
+    // Build the synthesised HumanityWitness for signal emission (not written locally).
     let now = sys_time()?;
     let timestamp = format!("{:?}", now);
     let expiry_micros = WITNESS_EXPIRY_DAYS * MICROS_PER_DAY;
@@ -2754,49 +2979,88 @@ pub fn submit_intimate_witness(
         now.checked_add(&Duration::from_micros(expiry_micros))
             .unwrap_or(now)
     );
-    // Sanitize characters that appear in Timestamp Debug output; match the
-    // convention used by other id generators in this zome (e.g., renewals).
     let witness_id_ts = timestamp.replace([':', ' ', '(', ')'], "-");
     let witness_id = format!("intimate-witness-{}-{}", human_id, witness_id_ts);
-    let witness = HumanityWitness {
-        id: witness_id,
+    let witness_for_signal = HumanityWitness {
+        id: witness_id.clone(),
         human_id: human_id.clone(),
         // NOTE: M3 stores authorizer's human_id here, not agent pubkey.
-        // The field's name is a pre-M3 misnomer the protocol accepts.
-        // Dedupe gate `has_existing_witness_for_request` depends on this convention.
         witness_agent_id: authorizer_human_id.clone(),
         attestation_type: "intimate_recovery".into(),
         confidence: 1.0,
         behavioral_hash: None,
         evidence_json: input
             .note
+            .as_ref()
             .map(|n| serde_json::json!({ "note": n }).to_string()),
         verification_method: Some("intimate_recovery_ceremony".into()),
-        created_at: timestamp,
-        expires_at,
+        created_at: timestamp.clone(),
+        expires_at: expires_at.clone(),
         revoked_at: None,
     };
-    let action_hash = create_entry(&EntryTypes::HumanityWitness(witness.clone()))?;
 
-    // Create the M3 link from the request to the witness.
+    // Bridge: write attestation:humanness to elohim DNA (canonical truth).
+    // Shamir share material does NOT travel on the DHT — see spec §5 and Stage G.B.
+    let note_json = input
+        .note
+        .as_ref()
+        .map(|n| serde_json::json!({ "note": n }))
+        .unwrap_or(serde_json::Value::Null);
+    let consolidated_input = ConsolidatedIssueAttestationInput {
+        attestation_kind: "attestation:humanness".to_string(),
+        subject_cid: human_id.clone(),
+        subject_kind: "agent".to_string(),
+        title: format!("Intimate witness for recovery request"),
+        description: Some(format!(
+            "Witness submitted by {} for recovery request",
+            authorizer_human_id
+        )),
+        reach: "private".to_string(),
+        metadata: serde_json::json!({
+            "witness_id": witness_id,
+            "attestation_type": "intimate_recovery",
+            "confidence": 1.0,
+            "verification_method": "intimate_recovery_ceremony",
+            "recovery_request_hash": input.recovery_request_hash.to_string(),
+            "expires_at": expires_at,
+            "evidence": note_json,
+        }),
+        parent_governance_action_cid: None,
+        vote_value: None,
+        proof_class: "social-witness".to_string(),
+        proof_evidence: serde_json::json!({
+            "class": "intimate_recovery",
+            "authorizer_human_id": authorizer_human_id,
+        }),
+        expires_at: Some(expires_at),
+    };
+    let _consolidated = call_elohim_issue_attestation(consolidated_input)?;
+
+    // Create the M3 link from the request to the witness anchor.
+    // Tag = authorizer_human_id bytes for tag-based dedupe (Gate 3).
+    // Target = sentinel StringAnchor hash (no local HumanityWitness entry written).
+    let sentinel_anchor = StringAnchor::new("intimate_witness_sentinel", &witness_id);
+    let sentinel_hash = hash_entry(&EntryTypes::StringAnchor(sentinel_anchor))?;
     create_link(
         input.recovery_request_hash.clone(),
-        action_hash.clone(),
+        sentinel_hash,
         LinkTypes::RecoveryRequestToHumanityWitness,
-        (),
+        LinkTag::new(authorizer_human_id.as_bytes()),
     )?;
 
-    // Emit rich signal.
+    // Emit signal. action_hash is a zero sentinel — CID cannot be converted to
+    // ActionHash. Consumers keyed on action_hash must migrate to CID lookup.
+    let sentinel_action_hash = ActionHash::from_raw_36(vec![0u8; 36]);
     emit_signal(RecoveryV2Signal::IntimateWitnessSubmitted {
-        action_hash: action_hash.clone(),
+        action_hash: sentinel_action_hash.clone(),
         request_hash: input.recovery_request_hash,
-        witness: witness.clone(),
+        witness: witness_for_signal.clone(),
         witness_agent_id: authorizer_pubkey,
     })?;
 
     Ok(SubmitIntimateWitnessOutput {
-        action_hash,
-        witness,
+        action_hash: sentinel_action_hash,
+        witness: witness_for_signal,
     })
 }
 
@@ -2993,7 +3257,13 @@ pub struct CreateRelationshipRenewalInput {
 // Renewal Protocol Functions
 // =============================================================================
 
-/// Create a renewal attestation (initiates the social witness ceremony)
+/// Create a renewal attestation (initiates the social witness ceremony).
+///
+/// B.9 bridge: delegates to elohim DNA's content_store::propose_governance_action
+/// with governance_kind "governance-action:renewal-request". The legacy
+/// RenewalAttestation entry type is NOT written to imagodei's source chain;
+/// the canonical entry lives on elohim DNA's DHT. Stage C will remove this
+/// wrapper entirely.
 #[hdk_extern]
 pub fn create_renewal_attestation(
     input: CreateRenewalAttestationInput,
@@ -3015,11 +3285,38 @@ pub fn create_renewal_attestation(
         timestamp.replace([':', ' ', '(', ')'], "-")
     );
 
+    let consolidated_input = ConsolidatedProposeGovernanceActionInput {
+        governance_kind: "governance-action:renewal-request".to_string(),
+        subject_cid: input.human_id.clone(),
+        title: format!("Key renewal for human {}", input.human_id),
+        description: Some(input.renewal_reason.clone()),
+        reach: "community".to_string(),
+        threshold: serde_json::json!({
+            "required": input.required_approvals,
+            "strategy": "simple-majority",
+        }),
+        eligibility_predicate: None,
+        ballot_format: "approve-reject".to_string(),
+        closes_at: expires_at.clone(),
+        parameters: Some(serde_json::json!({
+            "old_agent_key": input.old_agent_key,
+            "new_agent_key": input.new_agent_key,
+            "doorway_id": input.doorway_id,
+            "recovery_request_id": input.recovery_request_id,
+            "renewal_reason": input.renewal_reason,
+        })),
+    };
+
+    let consolidated = call_elohim_propose_governance_action(consolidated_input)?;
+
+    // Synthesise the legacy RenewalAttestation struct from the consolidated output.
+    // Fields that have no consolidated equivalent (votes_json, current_approvals,
+    // confidence_score, witnessed_at) are set to their initial/zero values.
     let attestation = RenewalAttestation {
-        id: attestation_id.clone(),
+        id: attestation_id,
         human_id: input.human_id.clone(),
-        old_agent_key: input.old_agent_key,
-        new_agent_key: input.new_agent_key,
+        old_agent_key: String::new(), // stored in elohim parameters metadata
+        new_agent_key: String::new(), // stored in elohim parameters metadata
         renewal_reason: input.renewal_reason,
         doorway_id: input.doorway_id,
         recovery_request_id: input.recovery_request_id,
@@ -3030,40 +3327,11 @@ pub fn create_renewal_attestation(
         status: "pending".to_string(),
         witnessed_at: None,
         created_at: timestamp,
-        expires_at,
+        expires_at: consolidated.closes_at,
     };
 
-    let action_hash = create_entry(&EntryTypes::RenewalAttestation(attestation.clone()))?;
-
-    // Create ID lookup link
-    let id_anchor = StringAnchor::new("renewal_id", &attestation_id);
-    let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
-    create_link(
-        id_anchor_hash,
-        action_hash.clone(),
-        LinkTypes::IdToRenewalAttestation,
-        (),
-    )?;
-
-    // Create human lookup link
-    let human_anchor = StringAnchor::new("human_renewals", &input.human_id);
-    let human_anchor_hash = hash_entry(&EntryTypes::StringAnchor(human_anchor))?;
-    create_link(
-        human_anchor_hash,
-        action_hash.clone(),
-        LinkTypes::HumanToRenewalAttestation,
-        (),
-    )?;
-
-    // Create status link
-    let status_anchor = StringAnchor::new("renewal_status", "pending");
-    let status_anchor_hash = hash_entry(&EntryTypes::StringAnchor(status_anchor))?;
-    create_link(
-        status_anchor_hash,
-        action_hash.clone(),
-        LinkTypes::RenewalAttestationByStatus,
-        (),
-    )?;
+    // Sentinel action_hash — see note in issue_attestation bridge above.
+    let action_hash = ActionHash::from_raw_36(vec![0u8; 36]);
 
     Ok(RenewalAttestationOutput {
         action_hash,
@@ -3071,61 +3339,28 @@ pub fn create_renewal_attestation(
     })
 }
 
-/// Get a renewal attestation by ID
+/// Get a renewal attestation by ID.
+///
+/// Stage C.2: RenewalAttestation is no longer a DHT entry type — canonical
+/// governance-action entries live on elohim DNA via propose_governance_action
+/// bridge. The imagodei link types (IdToRenewalAttestation, HumanToRenewalAttestation)
+/// were removed. Stage F will replace this stub with a bridge call to
+/// elohim's `get_governance_action_with_children`.
 #[hdk_extern]
-pub fn get_renewal_attestation_by_id(id: String) -> ExternResult<Option<RenewalAttestationOutput>> {
-    let id_anchor = StringAnchor::new("renewal_id", &id);
-    let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
-
-    let query = LinkQuery::try_new(id_anchor_hash, LinkTypes::IdToRenewalAttestation)?;
-    let links = get_links(query, GetStrategy::default())?;
-
-    if let Some(link) = links.first() {
-        if let Some(action_hash) = link.target.clone().into_action_hash() {
-            if let Some(record) = get(action_hash.clone(), GetOptions::default())? {
-                if let Some(entry) = record
-                    .entry()
-                    .to_app_option::<RenewalAttestation>()
-                    .ok()
-                    .flatten()
-                {
-                    return Ok(Some(RenewalAttestationOutput { action_hash, entry }));
-                }
-            }
-        }
-    }
-
+pub fn get_renewal_attestation_by_id(_id: String) -> ExternResult<Option<RenewalAttestationOutput>> {
+    // TODO(Stage F): bridge to elohim get_governance_action_with_children keyed by id
     Ok(None)
 }
 
-/// Get all renewal attestations for a human
+/// Get all renewal attestations for a human.
+///
+/// Stage C.2: stub — see get_renewal_attestation_by_id for migration note.
 #[hdk_extern]
 pub fn get_renewal_attestations_for_human(
-    human_id: String,
+    _human_id: String,
 ) -> ExternResult<Vec<RenewalAttestationOutput>> {
-    let human_anchor = StringAnchor::new("human_renewals", &human_id);
-    let human_anchor_hash = hash_entry(&EntryTypes::StringAnchor(human_anchor))?;
-
-    let query = LinkQuery::try_new(human_anchor_hash, LinkTypes::HumanToRenewalAttestation)?;
-    let links = get_links(query, GetStrategy::default())?;
-
-    let mut results = Vec::new();
-    for link in links {
-        if let Some(action_hash) = link.target.clone().into_action_hash() {
-            if let Some(record) = get(action_hash.clone(), GetOptions::default())? {
-                if let Some(entry) = record
-                    .entry()
-                    .to_app_option::<RenewalAttestation>()
-                    .ok()
-                    .flatten()
-                {
-                    results.push(RenewalAttestationOutput { action_hash, entry });
-                }
-            }
-        }
-    }
-
-    Ok(results)
+    // TODO(Stage F): bridge to elohim get_attestations_for_subject keyed by human_id
+    Ok(vec![])
 }
 
 /// Create an agent retirement (marks old key as superseded)

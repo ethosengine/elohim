@@ -11,6 +11,14 @@ export { LocalSourceChainService } from './local-source-chain.service';
 export { HolochainClientService } from './holochain-client.service';
 export { GovernanceApiService } from './governance-api.service';
 export { ContentAttestationApiService } from './content-attestation-api.service';
+export { AttestationApiService } from './attestation-api.service';
+export type { IssueAttestationInput, RevokeAttestationInput } from './attestation-api.service';
+export { GovernanceActionApiService } from './governance-action-api.service';
+export type {
+  ProposeGovernanceActionInput,
+  VoteInput,
+  GovernanceActionWithChildrenView,
+} from './governance-action-api.service';
 export { LearnerBackendApiService } from './learner-backend-api.service';
 
 // Agent & Trust

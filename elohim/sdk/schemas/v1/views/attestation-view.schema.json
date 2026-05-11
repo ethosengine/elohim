@@ -1,0 +1,105 @@
+{
+  "$id": "epr:schema:view:attestation",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AttestationView",
+  "description": "Source of truth: Holochain DHT (elohim DNA, Content entry, content_type LIKE 'attestation:%', Category A per p2p-design-gate). This record is a read-optimised projection populated by the AttestationProjector post-commit signal. If this projection and the DHT disagree, the DHT wins.",
+  "type": "object",
+  "required": [
+    "id",
+    "dhtAnchorHash",
+    "attestationKind",
+    "subjectCid",
+    "subjectKind",
+    "issuerCid",
+    "proofClass",
+    "proofEvidenceJson",
+    "evidenceJson",
+    "createdAt",
+    "manifestRef",
+    "title"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "CID of this attestation (content-derived identity)"
+    },
+    "dhtAnchorHash": {
+      "type": "string",
+      "description": "ActionHash (hex) of the DHT entry — provenance anchor"
+    },
+    "attestationKind": {
+      "type": "string",
+      "description": "Discriminator matching attestation:<subtype>"
+    },
+    "subjectCid": {
+      "type": "string",
+      "description": "CID of the entity being attested"
+    },
+    "subjectKind": {
+      "type": "string",
+      "description": "Kind of the subject: agent | content | device | hub | computation | governance-action"
+    },
+    "issuerCid": {
+      "type": "string",
+      "description": "CID of the issuing agent"
+    },
+    "parentGovernanceActionCid": {
+      "type": ["string", "null"],
+      "description": "CID of the parent governance-action, if this attestation is a vote"
+    },
+    "voteValue": {
+      "type": ["string", "null"],
+      "enum": ["approve", "reject", "abstain", null],
+      "description": "Vote value (null for non-votes)"
+    },
+    "voteWeight": {
+      "type": ["string", "null"],
+      "description": "Optional vote weight as a decimal string (null when unweighted)"
+    },
+    "proofClass": {
+      "type": "string",
+      "description": "Proof class: witness | self-attest | audit-signature | computational"
+    },
+    "proofEvidenceJson": {
+      "type": "string",
+      "description": "Serialised proof evidence JSON (opaque string)"
+    },
+    "evidenceJson": {
+      "type": "string",
+      "description": "Serialised full evidence JSON (opaque string)"
+    },
+    "expiresAt": {
+      "type": ["string", "null"],
+      "description": "ISO 8601 expiry timestamp, if any"
+    },
+    "supersedesCid": {
+      "type": ["string", "null"],
+      "description": "CID of the attestation this one supersedes, if any"
+    },
+    "revocationReason": {
+      "type": ["string", "null"],
+      "description": "Reason this attestation was revoked, if revoked"
+    },
+    "revokedAt": {
+      "type": ["string", "null"],
+      "description": "ISO 8601 revocation timestamp, if revoked"
+    },
+    "createdAt": {
+      "type": "string",
+      "description": "ISO 8601 creation timestamp"
+    },
+    "manifestRef": {
+      "type": "string",
+      "description": "Manifest reference (e.g. mishpat, lamad)"
+    },
+    "title": {
+      "type": "string",
+      "description": "Human-readable title from the Content entry"
+    },
+    "description": {
+      "type": ["string", "null"],
+      "description": "Optional description from the Content entry"
+    }
+  }
+}

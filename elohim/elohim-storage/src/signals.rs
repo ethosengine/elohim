@@ -1825,3 +1825,46 @@ mod recovery_v2_signal_tests {
         assert!(recovery_invitation_from_signal(&signal).is_none());
     }
 }
+
+// =============================================================================
+// ElohimContentSignal — post-commit signal for attestation + governance-action
+// Content entries from the elohim DNA.
+// =============================================================================
+//
+// These signals are emitted by the elohim coordinator zome after a Content
+// entry whose `content_type` starts with `attestation:` or `governance-action:`
+// is committed to the source chain.
+//
+// Field notes:
+// - `entry_hash`: ActionHash (base64 String) — stored as Vec<u8> after b64 decode
+//   in the projector. This field IS the dht_anchor_hash for these projections.
+// - `metadata_json`: JSON-stringified metadata field from the Content entry.
+//   The projector unpacks known keys (subject_cid, vote_value, threshold, etc.).
+// - `author_id`: AgentPubKey of the committing agent (base64 String on wire).
+
+/// Post-commit signal for a Content entry whose content_type starts with
+/// `attestation:` or `governance-action:`.
+///
+/// Emitted by the elohim coordinator zome. The `AttestationProjector`
+/// subscribes to this signal and upserts the appropriate projection table.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ElohimContentSignal {
+    /// CID of the Content entry — used as the projection table primary key.
+    pub id: String,
+    /// `content_type` field from the Content entry (e.g. `attestation:humanness`,
+    /// `governance-action:recovery`).
+    pub content_type: String,
+    /// ActionHash of the committed DHT entry (base64 String on the wire).
+    /// Stored as `dht_anchor_hash` in projection tables.
+    pub entry_hash: String,
+    /// JSON-encoded metadata field from the Content entry.
+    pub metadata_json: String,
+    /// AgentPubKey of the committing agent (base64 String).
+    pub author_id: Option<String>,
+    /// `title` field from the Content entry.
+    pub title: String,
+    /// `description` field from the Content entry (may be empty).
+    pub description: String,
+    /// ISO 8601 / RFC 3339 creation timestamp.
+    pub created_at: String,
+}

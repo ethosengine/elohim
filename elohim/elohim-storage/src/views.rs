@@ -7870,6 +7870,7 @@ impl PutBlobResponseView {
 }
 
 // ============================================================================
+
 // Observation Views
 // ============================================================================
 
@@ -7963,6 +7964,233 @@ impl From<crate::db::models::ObservationDiversitySummaryRow> for ObservationDive
             total_count: r.total_count,
             first_observed_at: r.first_observed_at,
             last_observed_at: r.last_observed_at,
+
+// Unified Attestation View (Category A — source of truth: Holochain DHT)
+// ============================================================================
+//
+// Source of truth: Holochain DHT (notarized Content entry with
+// `content_type LIKE 'attestation:%'` in the elohim DNA). This view is served
+// from the read-optimised SQLite projection populated by the
+// `AttestationProjector` on post-commit signal. If this projection and the
+// DHT disagree, the DHT wins. `dht_anchor_hash` is the ActionHash (hex) of
+// the DHT entry — clients MAY verify provenance against the conductor.
+
+use crate::db::models::AttestationRow;
+
+/// Wire view for a notarized attestation Content entry.
+///
+/// Source of truth: Holochain DHT (elohim DNA, Content entry,
+/// `content_type LIKE 'attestation:%'`, Category A per p2p-design-gate).
+/// This record is a read-optimised projection populated by the
+/// `AttestationProjector` post-commit signal. DHT is authoritative.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct AttestationView {
+    /// CID of this attestation (content-derived identity).
+    pub id: String,
+    /// ActionHash (hex) of the DHT entry — provenance anchor.
+    pub dht_anchor_hash: String,
+    /// Discriminator matching `attestation:<subtype>`.
+    pub attestation_kind: String,
+    /// CID of the entity being attested.
+    pub subject_cid: String,
+    /// Kind of the subject: "agent" | "content" | "device" | "hub" | "computation" | "governance-action".
+    pub subject_kind: String,
+    /// CID of the issuing agent.
+    pub issuer_cid: String,
+    /// CID of the parent governance-action, if this attestation is a vote.
+    pub parent_governance_action_cid: Option<String>,
+    /// Vote value: "approve" | "reject" | "abstain" (null for non-votes).
+    pub vote_value: Option<String>,
+    /// Optional vote weight as a decimal string (null when unweighted).
+    pub vote_weight: Option<String>,
+    /// Proof class: "witness" | "self-attest" | "audit-signature" | "computational".
+    pub proof_class: String,
+    /// Serialised proof evidence JSON (opaque string — parse only when needed).
+    pub proof_evidence_json: String,
+    /// Serialised full evidence JSON (opaque string).
+    pub evidence_json: String,
+    /// ISO 8601 expiry timestamp, if any.
+    pub expires_at: Option<String>,
+    /// CID of the attestation this one supersedes, if any.
+    pub supersedes_cid: Option<String>,
+    /// Reason this attestation was revoked, if revoked.
+    pub revocation_reason: Option<String>,
+    /// ISO 8601 revocation timestamp, if revoked.
+    pub revoked_at: Option<String>,
+    /// ISO 8601 creation timestamp.
+    pub created_at: String,
+    /// Manifest reference (e.g. "mishpat", "lamad").
+    pub manifest_ref: String,
+    /// Human-readable title from the Content entry.
+    pub title: String,
+    /// Optional description from the Content entry.
+    pub description: Option<String>,
+}
+
+impl From<AttestationRow> for AttestationView {
+    fn from(row: AttestationRow) -> Self {
+        Self {
+            id: row.id,
+            dht_anchor_hash: hex::encode(&row.dht_anchor_hash),
+            attestation_kind: row.attestation_kind,
+            subject_cid: row.subject_cid,
+            subject_kind: row.subject_kind,
+            issuer_cid: row.issuer_cid,
+            parent_governance_action_cid: row.parent_governance_action_cid,
+            vote_value: row.vote_value,
+            vote_weight: row.vote_weight,
+            proof_class: row.proof_class,
+            proof_evidence_json: row.proof_evidence_json,
+            evidence_json: row.evidence_json,
+            expires_at: row.expires_at,
+            supersedes_cid: row.supersedes_cid,
+            revocation_reason: row.revocation_reason,
+            revoked_at: row.revoked_at,
+            created_at: row.created_at,
+            manifest_ref: row.manifest_ref,
+            title: row.title,
+            description: row.description,
+        }
+    }
+}
+
+// ============================================================================
+// Governance Action View (Category A — source of truth: Holochain DHT)
+// ============================================================================
+//
+// Source of truth: Holochain DHT (notarized Content entry with
+// `content_type LIKE 'governance-action:%'` in the elohim DNA). This view is
+// a read-optimised projection populated by the `AttestationProjector` on
+// post-commit signal. If this projection and the DHT disagree, the DHT wins.
+
+use crate::db::models::GovernanceActionRow;
+
+/// Wire view for a notarized governance-action Content entry.
+///
+/// Source of truth: Holochain DHT (elohim DNA, Content entry,
+/// `content_type LIKE 'governance-action:%'`, Category A per p2p-design-gate).
+/// Parent entry; vote attestations reference its CID as
+/// `parent_governance_action_cid`. DHT is authoritative.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct GovernanceActionView {
+    /// CID of this governance action (content-derived identity).
+    pub id: String,
+    /// ActionHash (hex) of the DHT entry — provenance anchor.
+    pub dht_anchor_hash: String,
+    /// Discriminator matching `governance-action:<subtype>`.
+    pub governance_kind: String,
+    /// CID of the entity being acted upon.
+    pub subject_cid: String,
+    /// CID of the proposing agent.
+    pub proposer_cid: String,
+    /// Serialised threshold JSON (e.g. `{"m":3}` or `{"percentage":0.51}`).
+    pub threshold_json: String,
+    /// Serialised eligibility predicate JSON, if constrained.
+    pub eligibility_predicate_json: Option<String>,
+    /// Ballot format: "approve-reject" | "ranked-choice" | "weighted".
+    pub ballot_format: String,
+    /// ISO 8601 close time for the voting window.
+    pub closes_at: String,
+    /// Serialised additional parameters JSON, if any.
+    pub parameters_json: Option<String>,
+    /// Human-readable title.
+    pub title: String,
+    /// Optional description.
+    pub description: Option<String>,
+    /// ISO 8601 creation timestamp.
+    pub created_at: String,
+}
+
+impl From<GovernanceActionRow> for GovernanceActionView {
+    fn from(row: GovernanceActionRow) -> Self {
+        Self {
+            id: row.id,
+            dht_anchor_hash: hex::encode(&row.dht_anchor_hash),
+            governance_kind: row.governance_kind,
+            subject_cid: row.subject_cid,
+            proposer_cid: row.proposer_cid,
+            threshold_json: row.threshold_json,
+            eligibility_predicate_json: row.eligibility_predicate_json,
+            ballot_format: row.ballot_format,
+            closes_at: row.closes_at,
+            parameters_json: row.parameters_json,
+            title: row.title,
+            description: row.description,
+            created_at: row.created_at,
+        }
+    }
+}
+
+// ============================================================================
+// Governance Action Tally View (Category C — local operational derived projection)
+// ============================================================================
+//
+// Source of truth: local (operational) — recomputable at any time from
+// governance_actions JOIN attestations. The `TallyProjector` maintains this
+// derived table; the DHT does NOT store tallies directly. If the tally is
+// stale, call `tally_projector::recompute(conn, parent_cid)` to rebuild.
+
+use crate::db::models::GovernanceActionTallyRow;
+
+/// Wire view for a locally-derived governance-action vote tally.
+///
+/// Source of truth: local (operational, Category C per p2p-design-gate).
+/// This record is recomputable from `governance_actions JOIN attestations`
+/// at any time via `tally_projector::recompute`. It is NOT notarized on the
+/// DHT — only the constituent vote attestations are.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
+pub struct GovernanceActionTallyView {
+    /// CID of the parent governance-action.
+    pub parent_cid: String,
+    /// Governance kind discriminator (copied from parent).
+    pub governance_kind: String,
+    /// CID of the subject being acted upon (copied from parent).
+    pub subject_cid: String,
+    /// Required count for M-of-N quorum (threshold.m).
+    pub threshold_m: i32,
+    /// Optional N for M-of-N quorum (threshold.n).
+    pub threshold_n: Option<i32>,
+    /// Optional percentage for percentage-threshold ballots.
+    pub threshold_percentage: Option<f64>,
+    /// ISO 8601 close time (copied from parent).
+    pub closes_at: String,
+    /// Current count of approve votes.
+    pub current_approve_count: i32,
+    /// Current count of reject votes.
+    pub current_reject_count: i32,
+    /// Current count of abstain votes.
+    pub current_abstain_count: i32,
+    /// Computed status: "pending" | "reached-quorum" | "rejected" | "expired" | "tied".
+    pub computed_status: String,
+    /// ISO 8601 timestamp of the most recent child vote, if any.
+    pub last_child_at: Option<String>,
+    /// ISO 8601 timestamp when this tally row was last recomputed.
+    pub rebuilt_at: String,
+}
+
+impl From<GovernanceActionTallyRow> for GovernanceActionTallyView {
+    fn from(row: GovernanceActionTallyRow) -> Self {
+        Self {
+            parent_cid: row.parent_cid,
+            governance_kind: row.governance_kind,
+            subject_cid: row.subject_cid,
+            threshold_m: row.threshold_m,
+            threshold_n: row.threshold_n,
+            threshold_percentage: row.threshold_percentage,
+            closes_at: row.closes_at,
+            current_approve_count: row.current_approve_count,
+            current_reject_count: row.current_reject_count,
+            current_abstain_count: row.current_abstain_count,
+            computed_status: row.computed_status,
+            last_child_at: row.last_child_at,
+            rebuilt_at: row.rebuilt_at,
+
         }
     }
 }

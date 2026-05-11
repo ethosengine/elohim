@@ -404,16 +404,21 @@ pub struct HumanRelationship {
 }
 
 // =============================================================================
-// Attestation Entry
+// Attestation — legacy view shape (Stage C.2)
 // =============================================================================
 
-/// Attestation - Permanent achievement record.
+/// LegacyAttestationView — plain view struct for bridge return shapes.
 ///
-/// Attestations are PERMANENT ACHIEVEMENTS, not competency tracking.
-/// ContentMastery handles graduated competency.
-#[hdk_entry_helper]
-#[derive(Clone, PartialEq)]
-pub struct Attestation {
+/// Formerly the `Attestation` DHT entry type. Stage B.9 moved the canonical
+/// attestation entry to elohim DNA (content_type "attestation:identity-credential").
+/// This struct is NO LONGER a DHT entry type — it is a plain Serialize/Deserialize
+/// struct used to populate the legacy `AttestationOutput` public API surface until
+/// Stage F removes the consuming callers.
+///
+/// DEFERRED to Stage G: HumanityWitness, RecoveryRequest, RecoveryVote,
+/// KeyRevocation, RevocationVote, IdentityFreeze, RenewalAttestation.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct LegacyAttestationView {
     pub id: String,
     pub agent_id: String,
     pub category: String,         // AttestationCategory
@@ -664,6 +669,9 @@ pub struct HumanityWitness {
 /// - normal: Standard threshold for everyday actions
 /// - elevated: Higher threshold for relationship changes, transfers
 /// - emergency: Recovery mode allows threshold reduction
+///
+/// NOTE: deferred to Stage G — referenced by recovery_v2::validate_cryptographic_quorum
+/// for DHT deserialization during KeyRotation validation.
 #[hdk_entry_helper]
 #[derive(Clone, PartialEq)]
 pub struct KeyStewardship {
@@ -680,8 +688,8 @@ pub struct KeyStewardship {
     pub elevated_threshold: Option<u32>, // Higher M for sensitive ops
 
     // === KEY METADATA ===
-    pub key_generation_id: String, // Which key generation this stewardship covers
-    pub shard_commitment_hash: String, // Commitment to verify shards
+    pub key_generation_id: String,       // Which key generation this stewardship covers
+    pub shard_commitment_hash: String,   // Commitment to verify shards
 
     // === LIFECYCLE ===
     pub created_at: String,
@@ -728,66 +736,11 @@ pub struct IdentityAnomaly {
     pub expires_at: Option<String>, // Anomalies may expire if not concerning
 }
 
-/// IdentityChallenge - Community override mechanism.
-///
-/// When humans report "this isn't the real person," challenges accumulate.
-/// Each challenger's report is weighted by their relationship trust level.
-/// When weighted_support exceeds threshold, automatic action is triggered.
-///
-/// Unlike Meta's ignored reports, challenges have BINDING EFFECT.
-/// The architecture makes ignoring mass reports impossible.
-///
-/// Key innovation: Reports from intimate relationships count 3x,
-/// from trusted 2x, familiar 1x, acquaintances 0.5x, public 0.1x.
-#[hdk_entry_helper]
-#[derive(Clone, PartialEq)]
-pub struct IdentityChallenge {
-    pub id: String,
-    pub human_id: String, // Human being challenged
+// IdentityChallenge removed in Stage C.2 (zero create_entry callers; weighted
+// community-challenge mechanism deferred to Stage G alongside IdentityFreeze).
 
-    // === CHALLENGE DETAILS ===
-    pub challenge_type: String, // See CHALLENGE_TYPES
-    pub initiator_id: String,   // Who started the challenge
-    pub initiator_weight: f64,  // Weight of initial challenger
-
-    // === EVIDENCE ===
-    pub evidence_json: String, // JSON: { description: "", screenshots: [], etc. }
-    pub supporting_anomaly_id: Option<String>, // Link to IdentityAnomaly if related
-
-    // === SUPPORT ACCUMULATION ===
-    pub weighted_support: f64,   // Sum of all supporter weights
-    pub supporter_count: u32,    // Number of unique supporters
-    pub supporters_json: String, // JSON array of { agent_id, weight, voted_at }
-
-    // === THRESHOLDS ===
-    pub freeze_threshold: f64, // Weight needed to trigger freeze (default 10.0)
-    pub revoke_threshold: f64, // Weight needed to trigger revocation (default 25.0)
-
-    // === STATUS ===
-    pub status: String, // See CHALLENGE_STATUSES
-    pub status_changed_at: Option<String>,
-    pub resolution_json: Option<String>, // How challenge was resolved
-
-    // === TIMESTAMPS ===
-    pub created_at: String,
-    pub expires_at: String, // Challenges expire after timeout (default 7 days)
-}
-
-/// ChallengeSupport - Support for an IdentityChallenge.
-///
-/// Separate entry type to prevent single-point manipulation of
-/// the challenge's weighted_support field.
-#[hdk_entry_helper]
-#[derive(Clone, PartialEq)]
-pub struct ChallengeSupport {
-    pub id: String,
-    pub challenge_id: String,          // Challenge being supported
-    pub supporter_id: String,          // Human supporting the challenge
-    pub weight: f64,                   // Trust weight of supporter
-    pub intimacy_level: String,        // Relationship intimacy level
-    pub evidence_json: Option<String>, // Optional additional evidence
-    pub created_at: String,
-}
+// ChallengeSupport removed in Stage C.2 (zero create_entry callers; companion
+// to IdentityChallenge, deferred to Stage G).
 
 /// KeyRevocation - DHT consensus to invalidate a compromised key.
 ///
@@ -895,23 +848,14 @@ pub struct IdentityFreeze {
 // Renewal Protocol Entry Types
 // =============================================================================
 
-/// RenewalAttestation - Core witness entry for identity renewal.
+/// RenewalAttestation — plain view struct for bridge return shapes (Stage C.2).
 ///
-/// When a steward's devices are destroyed, the Holochain agent key dies.
-/// Rather than fighting lair's constraints (keys aren't exportable), the
-/// community witnesses a social ceremony and helps re-author the human's
-/// world under a new identity.
-///
-/// This is the same protocol for ALL life transitions:
-/// - Device loss → new key
-/// - Graduation → new key (child→adult autonomy)
-/// - Key compromise → new key (emergency rotation)
-/// - Custodianship → steward takes over
-/// - Legacy → community preserves after death
-///
-/// Signed by creating agent (a steward voter).
-#[hdk_entry_helper]
-#[derive(Clone, PartialEq)]
+/// Formerly the `RenewalAttestation` DHT entry type. Stage B.9 moved the canonical
+/// entry to elohim DNA (governance_kind "governance-action:renewal-request").
+/// This struct is NO LONGER a DHT entry type — it is a plain Serialize/Deserialize
+/// struct used to populate the legacy `RenewalAttestationOutput` public API surface
+/// until Stage F removes the consuming callers.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct RenewalAttestation {
     pub id: String,
     pub human_id: String,                    // Stable identity being renewed
@@ -1010,31 +954,69 @@ pub enum EntryTypes {
     Agent(Agent),
     AgentProgress(AgentProgress),
     HumanRelationship(HumanRelationship),
-    Attestation(Attestation),
+    // Attestation removed C.2: canonical entry lives on elohim DNA (content_type
+    // "attestation:identity-credential"). LegacyAttestationView is a plain struct.
     ContentMastery(ContentMastery),
     ContributorPresence(ContributorPresence),
     StringAnchor(StringAnchor),
-    // Recovery entry types
+    // Recovery entry types — Stage G.A.2 deferral audit results:
+    //
+    // RecoveryRequest: CANNOT bridge create_recovery_request to elohim yet.
+    //   submit_intimate_witness Gate 1 reads RecoveryRequest by ActionHash via
+    //   to_app_option::<RecoveryRequest>(). If create_recovery_request moves to
+    //   elohim, the returned hash points to a Content-encoded entry on elohim's
+    //   DHT, and to_app_option() here would fail. Gate readers must be redesigned
+    //   to do cross-DNA get() + Content deserialization before this can move.
+    //   Tracked as Stage G follow-up.
     RecoveryRequest(RecoveryRequest),
+    // RecoveryVote: no live create_entry callers found (zero calls). Entry type
+    //   kept to avoid DHT schema breakage on existing nodes. Bridge when
+    //   create_recovery_request is bridged (they are coupled via request_id).
     RecoveryVote(RecoveryVote),
     RecoveryHint(RecoveryHint),
     // Network-Attested Identity entry types (Phase 2)
-    HumanityWitness(HumanityWitness),
+    // KeyStewardship: CANNOT bridge — recovery_v2 DHT validation reads KeyStewardship
+    //   entries via to_app_option() during KeyRotation validation. Must stay until
+    //   the validator is redesigned. Tracked as Stage G follow-up.
     KeyStewardship(KeyStewardship),
+    // IdentityChallenge removed C.2: zero callers; deferred to Stage G.
+    // ChallengeSupport removed C.2: zero callers; deferred to Stage G.
+    //
+    // HumanityWitness: entry type KEPT for legacy link-target compatibility.
+    //   Stage G.A.2 bridge: submit_intimate_witness now writes to elohim DNA
+    //   (attestation:humanness) instead of creating local HumanityWitness entries.
+    //   Gate 3 dedupe is now tag-based (no entry reads). The entry type stays in
+    //   the integrity enum to preserve DHT schema for existing witness entries
+    //   committed before Stage G. Remove when all historic entries are migrated.
+    HumanityWitness(HumanityWitness),
     IdentityAnomaly(IdentityAnomaly),
-    IdentityChallenge(IdentityChallenge),
-    ChallengeSupport(ChallengeSupport),
+    // KeyRevocation: CANNOT bridge create_self_revocation / create_revocation_request
+    //   to elohim yet. submit_revocation_vote reads KeyRevocation via to_app_option()
+    //   and update_entry() for the threshold flip. commit_key_rotation revocation-
+    //   floor gate also reads KeyRevocation from PendingRevocations/EffectiveRevocations
+    //   links. Moving these entries to elohim DHT breaks all gate readers.
+    //   Tracked as Stage G follow-up (requires coordinated migration of all readers).
     KeyRevocation(KeyRevocation),
+    // RevocationVote: coupled to KeyRevocation (same gate chain). CANNOT bridge until
+    //   KeyRevocation moves. Zero create_entry callers found in pre-bridge audit.
     RevocationVote(RevocationVote),
+    // IdentityFreeze: CANNOT bridge — collect_active_freezes_for_human reads
+    //   IdentityFreeze entries via to_app_option() for the freeze-floor gate in
+    //   commit_key_rotation. No create_entry callers found (zero); entry type kept
+    //   for DHT schema compat and freeze-floor gate reads on historic entries.
     IdentityFreeze(IdentityFreeze),
     // Stewardship entry types (Graduated Capabilities)
+    // StewardshipGrant: deferred to Stage G (3 live create_entry callers in stewardship.rs).
     StewardshipGrant(StewardshipGrant),
-    DevicePolicy(DevicePolicy),
-    PolicyInheritance(PolicyInheritance),
+    // PolicyInheritance removed C.2: zero callers across all coordinator files.
+    // StewardshipAppeal: deferred to Stage G (1 live create_entry caller in stewardship.rs).
     StewardshipAppeal(StewardshipAppeal),
+    DevicePolicy(DevicePolicy),
     ActivityLog(ActivityLog),
     // Renewal protocol entry types
-    RenewalAttestation(RenewalAttestation),
+    // RenewalAttestation removed C.2: zero create_entry callers; bridge returns
+    //   synthesised view; get_* fns read from elohim DHT via governance-action bridge.
+    //   Kept as plain struct (no #[hdk_entry_helper]) for return-shape compat.
     AgentRetirement(AgentRetirement),
     RelationshipRenewal(RelationshipRenewal),
     // Recovery Protocol Phase 2
@@ -1073,10 +1055,8 @@ pub enum LinkTypes {
     RelationshipPendingConsent,  // Anchor(pending) -> HumanRelationship
     RelationshipWithCustody,     // Anchor(custody_enabled) -> HumanRelationship
 
-    // Attestation links
-    AgentToAttestation,    // Anchor(agent_id) -> Attestation
-    AttestationByCategory, // Anchor(category) -> Attestation
-    AttestationByType,     // Anchor(attestation_type) -> Attestation
+    // Attestation links removed C.2: AgentToAttestation, AttestationByCategory,
+    // AttestationByType — canonical attestation entries now live on elohim DNA.
 
     // Content Mastery links
     HumanToMastery,   // Anchor(human_id) -> ContentMastery
@@ -1106,10 +1086,10 @@ pub enum LinkTypes {
     WitnessByType,         // Anchor(attestation_type) -> HumanityWitness
     ActiveWitnesses,       // Anchor(active) -> HumanityWitness (non-expired, non-revoked)
 
-    // KeyStewardship links
+    // KeyStewardship links: deferred to Stage G (entry type kept; live in recovery_v2).
     IdToKeyStewardship,       // Anchor(stewardship_id) -> KeyStewardship
     HumanToKeyStewardship,    // Anchor(human_id) -> KeyStewardship
-    ShardHolderToStewardship, // Anchor(shard_holder_id) -> KeyStewardship (stewardships this agent participates in)
+    ShardHolderToStewardship, // Anchor(shard_holder_id) -> KeyStewardship
 
     // IdentityAnomaly links
     IdToIdentityAnomaly, // Anchor(anomaly_id) -> IdentityAnomaly
@@ -1118,18 +1098,8 @@ pub enum LinkTypes {
     AnomalyBySeverity,   // Anchor(severity) -> IdentityAnomaly
     UnresolvedAnomalies, // Anchor(unresolved) -> IdentityAnomaly
 
-    // IdentityChallenge links
-    IdToIdentityChallenge, // Anchor(challenge_id) -> IdentityChallenge
-    HumanToChallenge,      // Anchor(human_id) -> IdentityChallenge (challenges against this human)
-    InitiatorToChallenge,  // Anchor(initiator_id) -> IdentityChallenge
-    ChallengeByType,       // Anchor(challenge_type) -> IdentityChallenge
-    ChallengeByStatus,     // Anchor(status) -> IdentityChallenge
-    ActiveChallenges,      // Anchor(active) -> IdentityChallenge (pending, not expired)
-
-    // ChallengeSupport links
-    IdToChallengeSupport, // Anchor(support_id) -> ChallengeSupport
-    ChallengeToSupport,   // Anchor(challenge_id) -> ChallengeSupport
-    SupporterToSupport,   // Anchor(supporter_id) -> ChallengeSupport
+    // IdentityChallenge links removed C.2 (entry type removed).
+    // ChallengeSupport links removed C.2 (entry type removed).
 
     // KeyRevocation links
     IdToKeyRevocation,      // Anchor(revocation_id) -> KeyRevocation
@@ -1150,7 +1120,7 @@ pub enum LinkTypes {
     FreezeByType,       // Anchor(freeze_type) -> IdentityFreeze
 
     // Stewardship links (Graduated Capabilities)
-    // StewardshipGrant links
+    // StewardshipGrant links: deferred to Stage G (entry type kept; live callers).
     IdToStewardshipGrant,  // Anchor(grant_id) -> StewardshipGrant
     StewardToGrant,        // Anchor(steward_id) -> StewardshipGrant (grants where I am steward)
     SubjectToGrant,        // Anchor(subject_id) -> StewardshipGrant (grants affecting me)
@@ -1167,11 +1137,8 @@ pub enum LinkTypes {
     InheritedFromPolicy, // Anchor(parent_policy_id) -> DevicePolicy (children)
     EffectivePolicies,   // Anchor(effective) -> DevicePolicy (currently in effect)
 
-    // PolicyInheritance links
-    IdToPolicyInheritance, // Anchor(inheritance_id) -> PolicyInheritance
-    SubjectToInheritance,  // Anchor(subject_id) -> PolicyInheritance
-
-    // StewardshipAppeal links
+    // PolicyInheritance links removed C.2 (entry type removed; zero callers).
+    // StewardshipAppeal links: deferred to Stage G (entry type kept; live caller).
     IdToStewardshipAppeal, // Anchor(appeal_id) -> StewardshipAppeal
     AppellantToAppeal,     // Anchor(appellant_id) -> StewardshipAppeal
     GrantToAppeal,         // Anchor(grant_id) -> StewardshipAppeal (appeals against grant)
@@ -1185,14 +1152,13 @@ pub enum LinkTypes {
     SessionToActivityLog, // Anchor(session_id) -> ActivityLog
 
     // Renewal protocol links
-    IdToRenewalAttestation,     // Anchor(renewal_id) -> RenewalAttestation
-    HumanToRenewalAttestation,  // Anchor(human_id) -> RenewalAttestation
-    OldAgentToRetirement,       // Anchor(retired_agent_key) -> AgentRetirement
-    NewAgentFromRetirement,     // Anchor(renewed_into_key) -> AgentRetirement
-    IdToAgentRetirement,        // Anchor(retirement_id) -> AgentRetirement
-    IdToRelationshipRenewal,    // Anchor(rel_renewal_id) -> RelationshipRenewal
-    OriginalRelToRenewal,       // Anchor(original_relationship_id) -> RelationshipRenewal
-    RenewalAttestationByStatus, // Anchor(renewal_status) -> RenewalAttestation
+    // IdToRenewalAttestation, HumanToRenewalAttestation, RenewalAttestationByStatus
+    // removed C.2 (RenewalAttestation entry type removed; bridge returns synthesised view).
+    OldAgentToRetirement,    // Anchor(retired_agent_key) -> AgentRetirement
+    NewAgentFromRetirement,  // Anchor(renewed_into_key) -> AgentRetirement
+    IdToAgentRetirement,     // Anchor(retirement_id) -> AgentRetirement
+    IdToRelationshipRenewal, // Anchor(rel_renewal_id) -> RelationshipRenewal
+    OriginalRelToRenewal,    // Anchor(original_relationship_id) -> RelationshipRenewal
 
     // Recovery Protocol Phase 2
     HumanToCurrentAgent, // Anchor(human_pubkey) -> KeyRotation (latest = current)
@@ -1201,7 +1167,7 @@ pub enum LinkTypes {
 
     // Recovery Protocol Phase 2 — M3
     RecoveryRequestToHumanityWitness, // RecoveryRequest -> HumanityWitness (IntimateQuorum link)
-    RecoveryRequestToKeyStewardship, // RecoveryRequest -> KeyStewardship (CryptographicQuorum link; M3 registers type, no coordinator creates yet)
+    RecoveryRequestToKeyStewardship, // RecoveryRequest -> KeyStewardship (CryptographicQuorum link; deferred to Stage G)
 
     // EPR Phase 2B — AgentPeerBinding links
     AgentToPeerBinding, // AgentPubKey -> AgentPeerBinding (current bindings for this agent)
@@ -1228,7 +1194,7 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 EntryTypes::Human(human) => validate_human(&human),
                 EntryTypes::Agent(agent) => validate_agent(&agent),
                 EntryTypes::HumanRelationship(rel) => validate_human_relationship(&rel, &action),
-                EntryTypes::Attestation(attestation) => validate_attestation(&attestation),
+                // Attestation removed C.2 — no validate_attestation arm needed.
                 EntryTypes::ContentMastery(mastery) => validate_content_mastery(&mastery),
                 EntryTypes::ContributorPresence(presence) => {
                     validate_contributor_presence(&presence)
@@ -1237,26 +1203,25 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 EntryTypes::RecoveryVote(vote) => validate_recovery_vote(&vote),
                 EntryTypes::RecoveryHint(hint) => validate_recovery_hint(&hint),
                 // Network-Attested Identity validation (Phase 2)
-                EntryTypes::HumanityWitness(witness) => validate_humanity_witness(&witness),
+                // KeyStewardship: deferred to Stage G (live in recovery_v2 validator).
                 EntryTypes::KeyStewardship(stewardship) => validate_key_stewardship(&stewardship),
+                // IdentityChallenge removed C.2 (zero callers).
+                // ChallengeSupport removed C.2 (zero callers).
+                EntryTypes::HumanityWitness(witness) => validate_humanity_witness(&witness),
                 EntryTypes::IdentityAnomaly(anomaly) => validate_identity_anomaly(&anomaly),
-                EntryTypes::IdentityChallenge(challenge) => validate_identity_challenge(&challenge),
-                EntryTypes::ChallengeSupport(support) => validate_challenge_support(&support),
                 EntryTypes::KeyRevocation(revocation) => validate_key_revocation(&revocation),
                 EntryTypes::RevocationVote(vote) => validate_revocation_vote(&vote),
                 EntryTypes::IdentityFreeze(freeze) => validate_identity_freeze(&freeze),
                 // Stewardship entry validation
+                // StewardshipGrant: deferred to Stage G (live callers).
                 EntryTypes::StewardshipGrant(grant) => validate_stewardship_grant(&grant),
-                EntryTypes::DevicePolicy(policy) => validate_device_policy(&policy),
-                EntryTypes::PolicyInheritance(inheritance) => {
-                    validate_policy_inheritance(&inheritance)
-                }
+                // PolicyInheritance removed C.2 (zero callers).
+                // StewardshipAppeal: deferred to Stage G (live caller).
                 EntryTypes::StewardshipAppeal(appeal) => validate_stewardship_appeal(&appeal),
+                EntryTypes::DevicePolicy(policy) => validate_device_policy(&policy),
                 EntryTypes::ActivityLog(log) => validate_activity_log(&log),
                 // Renewal protocol validation
-                EntryTypes::RenewalAttestation(attestation) => {
-                    validate_renewal_attestation(&attestation)
-                }
+                // RenewalAttestation removed C.2 (plain struct, not an entry type).
                 EntryTypes::AgentRetirement(retirement) => validate_agent_retirement(&retirement),
                 EntryTypes::RelationshipRenewal(renewal) => validate_relationship_renewal(&renewal),
                 // Recovery Protocol Phase 2 validation
@@ -1394,38 +1359,7 @@ fn validate_human_relationship(
     Ok(ValidateCallbackResult::Valid)
 }
 
-/// Validate Attestation entry
-fn validate_attestation(attestation: &Attestation) -> ExternResult<ValidateCallbackResult> {
-    if attestation.id.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid(
-            "Attestation ID cannot be empty".to_string(),
-        ));
-    }
-
-    if attestation.agent_id.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid(
-            "Attestation agent_id cannot be empty".to_string(),
-        ));
-    }
-
-    if !ATTESTATION_CATEGORIES.contains(&attestation.category.as_str()) {
-        return Ok(ValidateCallbackResult::Invalid(format!(
-            "Invalid category '{}'. Must be one of: {:?}",
-            attestation.category, ATTESTATION_CATEGORIES
-        )));
-    }
-
-    if let Some(ref tier) = attestation.tier {
-        if !ATTESTATION_TIERS.contains(&tier.as_str()) {
-            return Ok(ValidateCallbackResult::Invalid(format!(
-                "Invalid tier '{}'. Must be one of: {:?}",
-                tier, ATTESTATION_TIERS
-            )));
-        }
-    }
-
-    Ok(ValidateCallbackResult::Valid)
-}
+// validate_attestation removed C.2 — Attestation is no longer an entry type.
 
 /// Validate ContentMastery entry
 fn validate_content_mastery(mastery: &ContentMastery) -> ExternResult<ValidateCallbackResult> {
@@ -1667,7 +1601,7 @@ fn validate_humanity_witness(witness: &HumanityWitness) -> ExternResult<Validate
     Ok(ValidateCallbackResult::Valid)
 }
 
-/// Validate KeyStewardship entry
+/// Validate KeyStewardship entry (deferred to Stage G — live in recovery_v2 validator).
 fn validate_key_stewardship(stewardship: &KeyStewardship) -> ExternResult<ValidateCallbackResult> {
     if stewardship.id.is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
@@ -1762,99 +1696,8 @@ fn validate_identity_anomaly(anomaly: &IdentityAnomaly) -> ExternResult<Validate
     Ok(ValidateCallbackResult::Valid)
 }
 
-/// Validate IdentityChallenge entry
-fn validate_identity_challenge(
-    challenge: &IdentityChallenge,
-) -> ExternResult<ValidateCallbackResult> {
-    if challenge.id.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid(
-            "IdentityChallenge ID cannot be empty".to_string(),
-        ));
-    }
-
-    if challenge.human_id.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid(
-            "IdentityChallenge human_id cannot be empty".to_string(),
-        ));
-    }
-
-    if challenge.initiator_id.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid(
-            "IdentityChallenge initiator_id cannot be empty".to_string(),
-        ));
-    }
-
-    // Cannot challenge yourself
-    if challenge.human_id == challenge.initiator_id {
-        return Ok(ValidateCallbackResult::Invalid(
-            "Cannot challenge your own identity".to_string(),
-        ));
-    }
-
-    if !CHALLENGE_TYPES.contains(&challenge.challenge_type.as_str()) {
-        return Ok(ValidateCallbackResult::Invalid(format!(
-            "Invalid challenge_type '{}'. Must be one of: {:?}",
-            challenge.challenge_type, CHALLENGE_TYPES
-        )));
-    }
-
-    if !CHALLENGE_STATUSES.contains(&challenge.status.as_str()) {
-        return Ok(ValidateCallbackResult::Invalid(format!(
-            "Invalid status '{}'. Must be one of: {:?}",
-            challenge.status, CHALLENGE_STATUSES
-        )));
-    }
-
-    if challenge.freeze_threshold <= 0.0 {
-        return Ok(ValidateCallbackResult::Invalid(
-            "freeze_threshold must be positive".to_string(),
-        ));
-    }
-
-    if challenge.revoke_threshold <= challenge.freeze_threshold {
-        return Ok(ValidateCallbackResult::Invalid(
-            "revoke_threshold must be greater than freeze_threshold".to_string(),
-        ));
-    }
-
-    Ok(ValidateCallbackResult::Valid)
-}
-
-/// Validate ChallengeSupport entry
-fn validate_challenge_support(support: &ChallengeSupport) -> ExternResult<ValidateCallbackResult> {
-    if support.id.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid(
-            "ChallengeSupport ID cannot be empty".to_string(),
-        ));
-    }
-
-    if support.challenge_id.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid(
-            "ChallengeSupport challenge_id cannot be empty".to_string(),
-        ));
-    }
-
-    if support.supporter_id.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid(
-            "ChallengeSupport supporter_id cannot be empty".to_string(),
-        ));
-    }
-
-    if support.weight < 0.0 {
-        return Ok(ValidateCallbackResult::Invalid(
-            "weight cannot be negative".to_string(),
-        ));
-    }
-
-    if !INTIMACY_LEVELS.contains(&support.intimacy_level.as_str()) {
-        return Ok(ValidateCallbackResult::Invalid(format!(
-            "Invalid intimacy_level '{}'. Must be one of: {:?}",
-            support.intimacy_level, INTIMACY_LEVELS
-        )));
-    }
-
-    Ok(ValidateCallbackResult::Valid)
-}
+// validate_identity_challenge removed C.2 — IdentityChallenge is no longer an entry type.
+// validate_challenge_support removed C.2 — ChallengeSupport is no longer an entry type.
 
 /// Validate KeyRevocation entry
 fn validate_key_revocation(revocation: &KeyRevocation) -> ExternResult<ValidateCallbackResult> {
@@ -2011,68 +1854,9 @@ fn validate_identity_freeze(freeze: &IdentityFreeze) -> ExternResult<ValidateCal
 // Renewal Protocol Validation Functions
 // =============================================================================
 
-/// Validate RenewalAttestation entry
-fn validate_renewal_attestation(
-    attestation: &RenewalAttestation,
-) -> ExternResult<ValidateCallbackResult> {
-    if attestation.id.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid(
-            "RenewalAttestation ID cannot be empty".to_string(),
-        ));
-    }
-
-    if attestation.human_id.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid(
-            "RenewalAttestation human_id cannot be empty".to_string(),
-        ));
-    }
-
-    if attestation.old_agent_key.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid(
-            "RenewalAttestation old_agent_key cannot be empty".to_string(),
-        ));
-    }
-
-    if attestation.new_agent_key.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid(
-            "RenewalAttestation new_agent_key cannot be empty".to_string(),
-        ));
-    }
-
-    if attestation.old_agent_key == attestation.new_agent_key {
-        return Ok(ValidateCallbackResult::Invalid(
-            "old_agent_key and new_agent_key must be different".to_string(),
-        ));
-    }
-
-    if !RENEWAL_REASONS.contains(&attestation.renewal_reason.as_str()) {
-        return Ok(ValidateCallbackResult::Invalid(format!(
-            "Invalid renewal_reason '{}'. Must be one of: {:?}",
-            attestation.renewal_reason, RENEWAL_REASONS
-        )));
-    }
-
-    if !RENEWAL_STATUSES.contains(&attestation.status.as_str()) {
-        return Ok(ValidateCallbackResult::Invalid(format!(
-            "Invalid status '{}'. Must be one of: {:?}",
-            attestation.status, RENEWAL_STATUSES
-        )));
-    }
-
-    if attestation.required_approvals < 2 {
-        return Ok(ValidateCallbackResult::Invalid(
-            "required_approvals must be at least 2 for security".to_string(),
-        ));
-    }
-
-    if attestation.confidence_score < 0.0 || attestation.confidence_score > 1.0 {
-        return Ok(ValidateCallbackResult::Invalid(
-            "confidence_score must be between 0.0 and 1.0".to_string(),
-        ));
-    }
-
-    Ok(ValidateCallbackResult::Valid)
-}
+// validate_renewal_attestation removed C.2 — RenewalAttestation is no longer an
+// entry type (bridge returns synthesised view; canonical governance-action entry
+// lives on elohim DNA via propose_governance_action bridge).
 
 /// Validate AgentRetirement entry
 fn validate_agent_retirement(retirement: &AgentRetirement) -> ExternResult<ValidateCallbackResult> {
