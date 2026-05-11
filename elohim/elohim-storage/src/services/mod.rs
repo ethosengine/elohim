@@ -47,10 +47,14 @@ pub mod hazard;
 pub mod holochain_humans_replayer;
 pub mod household_backfill;
 pub mod household_resilience;
+pub mod connectivity;      // Phase 4 T6 — libp2p connected-peers snapshot helper
+pub mod device_capacity;   // Phase 4 T7 — available bytes helper
+pub mod imagodei_lookup;   // Phase 4 T5 — display name resolver
 pub mod inference_engine;
 pub mod inference_router;
 pub mod knowledge_service;
 pub mod manifest_registry;
+pub mod peer_diversity;    // Phase 4 T8 — archetype-mix diversity helper
 pub mod mastery_depth;
 pub mod peer_selection;
 pub mod peer_topology_view;
