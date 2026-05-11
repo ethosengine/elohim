@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://elohim.protocol/schemas/v1/attestation/subtypes/forget-decision-metadata.schema.json",
+  "$comment": "Source of truth: Holochain DHT (sub-shape of attestation:forget-decision's evidence_json.summary_metric). Category A. Outcome record for right-to-be-forgotten governance requests.",
+  "title": "ForgetDecisionMetadata",
+  "description": "Per-subtype metadata for attestation:forget-decision (mishpat). Records mishpat governance's decision on a forget-request signal. See observation-event-layer spec §9.4.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["outcome", "reasoning_md", "constraint_applied"],
+  "properties": {
+    "outcome": {
+      "type": "string",
+      "enum": ["granted", "granted-with-redaction", "refused-per-constraint"],
+      "description": "The forget-request decision: granted (full redaction), granted-with-redaction (selective fields), or refused-per-constraint (graduated-harm / accountability / evidence-dependency)."
+    },
+    "reasoning_md": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Governance reasoning in markdown. Required even for grants; documents the deliberation."
+    },
+    "constraint_applied": {
+      "type": "string",
+      "description": "Manifest-declared constraint key that drove the decision (e.g., 'graduated-harm-tier-3', 'accountability-claim-live', 'evidence-dependency-outstanding')."
+    },
+    "redacted_fields": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "If outcome is 'granted-with-redaction', list of Content field keys that were redacted. Omit or empty for 'granted' or 'refused'."
+    }
+  }
+}

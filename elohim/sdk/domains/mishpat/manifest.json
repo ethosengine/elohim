@@ -39,8 +39,16 @@
       "subject_kinds": ["content", "governance-action"],
       "metadata_schema": { "$ref": "../../schemas/v1/attestation/subtypes/governance-reaction-metadata.schema.json" },
       "revocable_by": ["issuer"]
+    },
+    "attestation:forget-decision": {
+      "description": "Mishpat-issued decision on a forget-request signal. Records outcome of right-to-be-forgotten governance request. See observation-event-layer spec §9.4.",
+      "subject_kinds": ["agent", "content", "attestation"],
+      "metadata_schema": { "$ref": "../../schemas/v1/attestation/subtypes/forget-decision-metadata.schema.json" },
+      "uniqueness_anchor": "attestation:forget-decision:{subject_cid}:{request_cid}",
+      "revocable_by": ["issuer", "governance"]
     }
   },
+  "observation_kinds": [],
   "governance-actions": {
     "governance-action:proposal": {
       "description": "Generic governance proposal voted on by qahal members. Replaces Proposal entry type.",
