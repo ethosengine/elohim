@@ -3,8 +3,7 @@
 //! Routes served by this module:
 //!
 //! ## Unified attestation projection (Category A — DHT source of truth)
-//! - `POST   /api/v1/attestations/unified`         — upsert projection row (for signal replay /
-//!                                                    admin backfill; regular creation goes via zome)
+//! - `POST   /api/v1/attestations/unified`         — upsert projection row (for signal replay /admin backfill; regular creation goes via zome)
 //! - `GET    /api/v1/attestations/unified/{id}`    — fetch by CID
 //! - `GET    /api/v1/attestations/unified`         — list by subjectCid / issuerCid
 //! - `POST   /api/v1/attestations/unified/{id}/revoke` — record revocation on projection

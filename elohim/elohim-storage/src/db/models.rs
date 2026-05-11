@@ -3256,6 +3256,7 @@ pub struct ObservationDiversitySummaryRow {
     pub total_count: i64,
     pub first_observed_at: i64,
     pub last_observed_at: i64,
+}
 
 // Unified attestations projection (Category A — source of truth: Holochain DHT)
 // Projection of Content entries with content_type LIKE 'attestation:%'.

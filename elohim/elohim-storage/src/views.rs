@@ -7964,6 +7964,9 @@ impl From<crate::db::models::ObservationDiversitySummaryRow> for ObservationDive
             total_count: r.total_count,
             first_observed_at: r.first_observed_at,
             last_observed_at: r.last_observed_at,
+        }
+    }
+}
 
 // Unified Attestation View (Category A — source of truth: Holochain DHT)
 // ============================================================================
