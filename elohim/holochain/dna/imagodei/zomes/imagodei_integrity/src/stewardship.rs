@@ -16,6 +16,10 @@
 //! - Adults with disabilities receiving guardian support
 //! - Community intervention for moral deficit (with appeal rights)
 //! - Self-imposed limits for personal discipline
+//!
+//! Stage C.2 removals: PolicyInheritance only (zero create_entry callers).
+//! StewardshipGrant and StewardshipAppeal deferred to Stage G (live callers
+//! in stewardship coordinator).
 
 use hdi::prelude::*;
 
@@ -117,6 +121,8 @@ pub const INALIENABLE_FEATURES: [&str; 6] = [
 // StewardshipGrant - Authority to manage another's capabilities
 // =============================================================================
 
+// NOTE: deferred to Stage G (3 live create_entry callers in stewardship coordinator).
+
 /// Authority to steward another agent's device capabilities.
 /// Earned through trust + verified need, not role assignment.
 ///
@@ -213,30 +219,13 @@ pub struct DevicePolicy {
     pub updated_at: String,
 }
 
-// =============================================================================
-// PolicyInheritance - How policies compose across layers
-// =============================================================================
-
-/// How policies compose across governance layers.
-/// Each layer can only ADD restrictions, never remove.
-///
-/// Chain order: org (0) -> guardian (1) -> elohim (2) -> subject (3)
-/// Subject layer is for self-imposed limits.
-#[hdk_entry_helper]
-#[derive(Clone, PartialEq)]
-pub struct PolicyInheritance {
-    pub id: String,
-    pub subject_id: String,
-    pub chain_json: String,         // Vec<PolicyChainLink> as JSON
-    pub computed_policy_id: String, // Merged result policy ID
-    pub computed_at: String,
-    pub created_at: String,
-    pub updated_at: String,
-}
+// PolicyInheritance removed Stage C.2 (zero create_entry callers; deferred to Stage G).
 
 // =============================================================================
 // StewardshipAppeal - Challenge a grant or policy
 // =============================================================================
+
+// NOTE: deferred to Stage G (1 live create_entry caller in stewardship coordinator).
 
 /// Appeal against stewardship grant or policy.
 /// Everyone has the right to appeal - this is inalienable.
@@ -425,30 +414,7 @@ pub fn validate_device_policy(policy: &DevicePolicy) -> ExternResult<ValidateCal
     Ok(ValidateCallbackResult::Valid)
 }
 
-/// Validate PolicyInheritance entry
-pub fn validate_policy_inheritance(
-    inheritance: &PolicyInheritance,
-) -> ExternResult<ValidateCallbackResult> {
-    if inheritance.id.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid(
-            "PolicyInheritance ID cannot be empty".to_string(),
-        ));
-    }
-
-    if inheritance.subject_id.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid(
-            "PolicyInheritance subject_id cannot be empty".to_string(),
-        ));
-    }
-
-    if inheritance.computed_policy_id.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid(
-            "PolicyInheritance computed_policy_id cannot be empty".to_string(),
-        ));
-    }
-
-    Ok(ValidateCallbackResult::Valid)
-}
+// validate_policy_inheritance removed C.2 — PolicyInheritance is no longer an entry type.
 
 /// Validate StewardshipAppeal entry
 pub fn validate_stewardship_appeal(

@@ -110,11 +110,15 @@ pub struct IssueAttestationInput {
     pub expires_at: Option<String>,
 }
 
-/// Output from attestation operations
+/// Output from attestation operations.
+///
+/// Stage C.2: `attestation` field type changed from the removed `Attestation` entry
+/// type to `LegacyAttestationView` (plain struct, same fields, no #[hdk_entry_helper]).
+/// The serde wire format is identical — consumers in elohim-storage are unaffected.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AttestationOutput {
     pub action_hash: ActionHash,
-    pub attestation: Attestation,
+    pub attestation: LegacyAttestationView,
 }
 
 // =============================================================================
@@ -143,10 +147,15 @@ pub enum ImagodeiSignal {
         relationship: HumanRelationship,
         author: AgentPubKey,
     },
+    /// Stage C.2: field type changed from removed `Attestation` entry type to
+    /// `LegacyAttestationView`. Wire format is identical (same fields). The
+    /// post_commit emission branch is removed — B.9 bridge never writes
+    /// Attestation entries to imagodei DHT, so this variant is never emitted.
+    /// Kept for elohim-storage serde compatibility until Stage F removes consumers.
     AttestationCommitted {
         action_hash: ActionHash,
         entry_hash: EntryHash,
-        attestation: Attestation,
+        attestation: LegacyAttestationView,
         author: AgentPubKey,
     },
     /// Emitted by `create_agent_peer_binding` (Task A.13).
@@ -247,16 +256,11 @@ pub fn post_commit(committed_actions: Vec<SignedActionHashed>) -> ExternResult<(
                 relationship,
                 author,
             })?;
-        } else if let Some(attestation) =
-            record.entry().to_app_option::<Attestation>().ok().flatten()
-        {
-            emit_signal(ImagodeiSignal::AttestationCommitted {
-                action_hash,
-                entry_hash,
-                attestation,
-                author,
-            })?;
         }
+        // AttestationCommitted emission removed C.2: Attestation is no longer a
+        // DHT entry type — B.9 bridge never writes it to imagodei source chain,
+        // so to_app_option::<Attestation>() could never fire. The signal variant
+        // is kept for serde compat until Stage F removes elohim-storage consumers.
     }
 
     Ok(())
@@ -757,8 +761,8 @@ fn synthesise_attestation_from_consolidated(
     input_tier: Option<String>,
     input_earned_via_json: &str,
     input_expires_at: Option<String>,
-) -> Attestation {
-    Attestation {
+) -> LegacyAttestationView {
+    LegacyAttestationView {
         id: consolidated.cid.clone(),
         agent_id: consolidated.subject_cid.clone(),
         category: input_category.to_string(),
@@ -848,7 +852,7 @@ pub fn get_agent_attestations(agent_id: String) -> ExternResult<Vec<AttestationO
     let results = consolidated_list
         .into_iter()
         .map(|c| {
-            let attestation = Attestation {
+            let attestation = LegacyAttestationView {
                 id: c.cid.clone(),
                 agent_id: agent_id.clone(),
                 category: c.attestation_kind.clone(),
@@ -3279,61 +3283,28 @@ pub fn create_renewal_attestation(
     })
 }
 
-/// Get a renewal attestation by ID
+/// Get a renewal attestation by ID.
+///
+/// Stage C.2: RenewalAttestation is no longer a DHT entry type — canonical
+/// governance-action entries live on elohim DNA via propose_governance_action
+/// bridge. The imagodei link types (IdToRenewalAttestation, HumanToRenewalAttestation)
+/// were removed. Stage F will replace this stub with a bridge call to
+/// elohim's `get_governance_action_with_children`.
 #[hdk_extern]
-pub fn get_renewal_attestation_by_id(id: String) -> ExternResult<Option<RenewalAttestationOutput>> {
-    let id_anchor = StringAnchor::new("renewal_id", &id);
-    let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor))?;
-
-    let query = LinkQuery::try_new(id_anchor_hash, LinkTypes::IdToRenewalAttestation)?;
-    let links = get_links(query, GetStrategy::default())?;
-
-    if let Some(link) = links.first() {
-        if let Some(action_hash) = link.target.clone().into_action_hash() {
-            if let Some(record) = get(action_hash.clone(), GetOptions::default())? {
-                if let Some(entry) = record
-                    .entry()
-                    .to_app_option::<RenewalAttestation>()
-                    .ok()
-                    .flatten()
-                {
-                    return Ok(Some(RenewalAttestationOutput { action_hash, entry }));
-                }
-            }
-        }
-    }
-
+pub fn get_renewal_attestation_by_id(_id: String) -> ExternResult<Option<RenewalAttestationOutput>> {
+    // TODO(Stage F): bridge to elohim get_governance_action_with_children keyed by id
     Ok(None)
 }
 
-/// Get all renewal attestations for a human
+/// Get all renewal attestations for a human.
+///
+/// Stage C.2: stub — see get_renewal_attestation_by_id for migration note.
 #[hdk_extern]
 pub fn get_renewal_attestations_for_human(
-    human_id: String,
+    _human_id: String,
 ) -> ExternResult<Vec<RenewalAttestationOutput>> {
-    let human_anchor = StringAnchor::new("human_renewals", &human_id);
-    let human_anchor_hash = hash_entry(&EntryTypes::StringAnchor(human_anchor))?;
-
-    let query = LinkQuery::try_new(human_anchor_hash, LinkTypes::HumanToRenewalAttestation)?;
-    let links = get_links(query, GetStrategy::default())?;
-
-    let mut results = Vec::new();
-    for link in links {
-        if let Some(action_hash) = link.target.clone().into_action_hash() {
-            if let Some(record) = get(action_hash.clone(), GetOptions::default())? {
-                if let Some(entry) = record
-                    .entry()
-                    .to_app_option::<RenewalAttestation>()
-                    .ok()
-                    .flatten()
-                {
-                    results.push(RenewalAttestationOutput { action_hash, entry });
-                }
-            }
-        }
-    }
-
-    Ok(results)
+    // TODO(Stage F): bridge to elohim get_attestations_for_subject keyed by human_id
+    Ok(vec![])
 }
 
 /// Create an agent retirement (marks old key as superseded)
