@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://elohim.protocol/schemas/v1/attestation/subtypes/recovery-approval-metadata.schema.json",
+  "$comment": "Source of truth: Holochain DHT (sub-shape of attestation:recovery-approval's evidence_json.summary_metric). Category A. Vote-child of governance-action:recovery-request. Shamir share material is NOT carried here — it travels off-chain via libp2p direct message gated by this attestation (see spec §5).",
+  "title": "RecoveryApprovalAttestationMetadata",
+  "description": "Per-subtype metadata for attestation:recovery-approval (vote-child of governance-action:recovery-request). Carries social-threshold approval only; cryptographic share material is decoupled off-DHT per spec §5.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["custodian_intimacy_tier"],
+  "properties": {
+    "custodian_intimacy_tier": {
+      "type": "string",
+      "enum": ["primary", "intimate", "trusted", "familiar", "community"]
+    },
+    "share_commitment_hash": {
+      "type": ["string", "null"],
+      "description": "Optional hash-commitment to the Shamir share the custodian will deliver off-chain. Allows the recovery agent to verify share authenticity without the share material being on the DHT."
+    }
+  }
+}

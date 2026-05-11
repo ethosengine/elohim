@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://elohim.protocol/schemas/v1/attestation/subtypes/renewal-approval-metadata.schema.json",
+  "$comment": "Source of truth: Holochain DHT (sub-shape of attestation:renewal-approval's evidence_json.summary_metric). Category A. This subtype is a vote-child of governance-action:renewal-request.",
+  "title": "RenewalApprovalAttestationMetadata",
+  "description": "Per-subtype metadata for attestation:renewal-approval (vote-child of governance-action:renewal-request). Approval vote on a key-renewal proposal.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["renewal_intimacy_tier"],
+  "properties": {
+    "renewal_intimacy_tier": {
+      "type": "string",
+      "enum": ["primary", "intimate", "trusted", "familiar", "community"],
+      "description": "Custodian's relationship-intimacy tier to the renewing subject; informs vote weight"
+    },
+    "notes": { "type": ["string", "null"] }
+  }
+}

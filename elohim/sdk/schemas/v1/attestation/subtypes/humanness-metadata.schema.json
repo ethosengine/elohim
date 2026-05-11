@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://elohim.protocol/schemas/v1/attestation/subtypes/humanness-metadata.schema.json",
+  "$comment": "Source of truth: Holochain DHT (sub-shape of attestation:humanness's evidence_json.summary_metric). Category A.",
+  "title": "HumannessAttestationMetadata",
+  "description": "Per-subtype metadata payload for attestation:humanness. Replaces imagodei's HumanityWitness entry type.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["humanness_method"],
+  "properties": {
+    "humanness_method": {
+      "type": "string",
+      "enum": ["behavioral", "interaction", "video_call", "in_person", "elohim_check"],
+      "description": "How the humanness was verified"
+    },
+    "confidence_score": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "Issuer's confidence in this humanness assertion (0.0–1.0)"
+    }
+  }
+}

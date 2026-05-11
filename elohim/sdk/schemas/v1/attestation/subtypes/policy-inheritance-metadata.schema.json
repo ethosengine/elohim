@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://elohim.protocol/schemas/v1/attestation/subtypes/policy-inheritance-metadata.schema.json",
+  "$comment": "Source of truth: Holochain DHT (sub-shape of attestation:policy-inheritance's evidence_json.summary_metric). Category A.",
+  "title": "PolicyInheritanceAttestationMetadata",
+  "description": "Per-subtype metadata for attestation:policy-inheritance. Declares which parent policy a subject inherits, and which capabilities are inherited. Replaces imagodei's PolicyInheritance entry type.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["parent_policy_cid", "inherited_capabilities"],
+  "properties": {
+    "parent_policy_cid": { "type": "string" },
+    "inherited_capabilities": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://elohim.protocol/schemas/v1/attestation/subtypes/revocation-vote-metadata.schema.json",
+  "$comment": "Source of truth: Holochain DHT (sub-shape of attestation:revocation-vote's evidence_json.summary_metric). Category A. Vote-child of governance-action:key-revocation.",
+  "title": "RevocationVoteAttestationMetadata",
+  "description": "Per-subtype metadata for attestation:revocation-vote. Vote on a key-revocation proposal.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["revocation_reason_code"],
+  "properties": {
+    "revocation_reason_code": {
+      "type": "string",
+      "enum": ["key-compromise", "device-loss", "policy-violation", "voluntary-retirement", "other"]
+    },
+    "notes": { "type": ["string", "null"] }
+  }
+}

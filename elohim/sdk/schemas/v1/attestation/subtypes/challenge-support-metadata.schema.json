@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://elohim.protocol/schemas/v1/attestation/subtypes/challenge-support-metadata.schema.json",
+  "$comment": "Source of truth: Holochain DHT (sub-shape of attestation:challenge-support's evidence_json.summary_metric). Category A. Vote-child of governance-action:identity-challenge.",
+  "title": "ChallengeSupportAttestationMetadata",
+  "description": "Per-subtype metadata for attestation:challenge-support. Vote in support of a governance-action:identity-challenge.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["evidence_class", "severity"],
+  "properties": {
+    "evidence_class": {
+      "type": "string",
+      "enum": ["behavioral-anomaly", "key-anomaly", "attestation-anomaly", "third-party-report", "other"]
+    },
+    "severity": {
+      "type": "string",
+      "enum": ["low", "moderate", "high", "critical"]
+    },
+    "evidence_refs": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Optional list of EPR/observation CIDs supporting the claim"
+    }
+  }
+}

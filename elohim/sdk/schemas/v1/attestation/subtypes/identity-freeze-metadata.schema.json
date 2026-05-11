@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://elohim.protocol/schemas/v1/attestation/subtypes/identity-freeze-metadata.schema.json",
+  "$comment": "Source of truth: Holochain DHT (sub-shape of attestation:identity-freeze's evidence_json.summary_metric). Category A. This is a derived attestation — synthesized when a governance-action:identity-challenge reaches challenge-support quorum.",
+  "title": "IdentityFreezeAttestationMetadata",
+  "description": "Per-subtype metadata for attestation:identity-freeze. Asserts that an identity has been frozen following a governance-action:identity-challenge that reached quorum. Replaces imagodei's IdentityFreeze entry type.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["freeze_reason"],
+  "properties": {
+    "freeze_reason": { "type": "string", "minLength": 1 },
+    "freeze_duration_hours": {
+      "type": ["integer", "null"],
+      "minimum": 1,
+      "description": "Optional duration of the freeze; null means indefinite"
+    },
+    "derived_from_challenge_cid": {
+      "type": ["string", "null"],
+      "description": "CID of the originating governance-action:identity-challenge if this freeze was derived from a challenge tally"
+    }
+  }
+}

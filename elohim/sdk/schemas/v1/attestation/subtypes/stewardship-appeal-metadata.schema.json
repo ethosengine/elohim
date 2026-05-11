@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://elohim.protocol/schemas/v1/attestation/subtypes/stewardship-appeal-metadata.schema.json",
+  "$comment": "Source of truth: Holochain DHT (sub-shape of attestation:stewardship-appeal's evidence_json.summary_metric). Category A.",
+  "title": "StewardshipAppealAttestationMetadata",
+  "description": "Per-subtype metadata for attestation:stewardship-appeal. Appeals against a stewardship grant. Replaces imagodei's StewardshipAppeal entry type.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["appealed_grant_cid", "appeal_reason"],
+  "properties": {
+    "appealed_grant_cid": { "type": "string", "description": "CID of the attestation:stewardship-grant being appealed" },
+    "appeal_reason": { "type": "string", "minLength": 1 },
+    "appeal_class": {
+      "type": ["string", "null"],
+      "enum": ["scope-overreach", "capability-misuse", "revocation-request", "other", null]
+    }
+  }
+}

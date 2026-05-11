@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://elohim.protocol/schemas/v1/attestation/subtypes/stewardship-grant-metadata.schema.json",
+  "$comment": "Source of truth: Holochain DHT (sub-shape of attestation:stewardship-grant's evidence_json.summary_metric). Category A.",
+  "title": "StewardshipGrantAttestationMetadata",
+  "description": "Per-subtype metadata for attestation:stewardship-grant. Grant of stewardship capability from grantor to subject. Replaces imagodei's StewardshipGrant entry type.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["capability_set", "grant_scope"],
+  "properties": {
+    "capability_set": {
+      "type": "array",
+      "items": { "type": "string" },
+      "minItems": 1,
+      "description": "Capabilities being granted (free-form string set; semantics defined by grant_scope manifest)"
+    },
+    "grant_scope": {
+      "type": "string",
+      "description": "Scope identifier (e.g. 'household:alice', 'collective:cooperative-x')"
+    },
+    "conditions_json": {
+      "type": ["object", "null"],
+      "additionalProperties": true,
+      "description": "Optional conditions/restrictions on the grant"
+    }
+  }
+}

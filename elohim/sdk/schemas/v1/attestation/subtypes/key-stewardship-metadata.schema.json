@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://elohim.protocol/schemas/v1/attestation/subtypes/key-stewardship-metadata.schema.json",
+  "$comment": "Source of truth: Holochain DHT (sub-shape of attestation:key-stewardship's evidence_json.summary_metric). Category A.",
+  "title": "KeyStewardshipAttestationMetadata",
+  "description": "Per-subtype metadata for attestation:key-stewardship. Asserts that a device-key is stewarded for a human's identity.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["device_id", "stewardship_class"],
+  "properties": {
+    "device_id": { "type": "string", "description": "Stable device identifier (typically the device's libp2p PeerId or a device-archetype-prefixed UUID)" },
+    "stewardship_class": {
+      "type": "string",
+      "enum": ["primary", "secondary", "recovery-witness", "delegated"],
+      "description": "What role this device plays in the human's key stewardship"
+    },
+    "device_archetype": {
+      "type": ["string", "null"],
+      "enum": ["node", "desktop", "mobile", "steward", null],
+      "description": "Optional archetype tag for diversity hints"
+    }
+  }
+}
