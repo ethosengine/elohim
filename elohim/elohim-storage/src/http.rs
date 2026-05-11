@@ -8975,6 +8975,54 @@ pub fn build_manifest() -> doorway_client::DoorwayRoutes {
                 .build(),
         )
         // =====================================================================
+        // /api/v1/attestations/unified — Unified attestation projection (Category A, DHT)
+        // =====================================================================
+        .route(
+            Route::get("/api/v1/attestations/unified")
+                .handler("list_unified_attestations")
+                .cache_ttl(60)
+                .build(),
+        )
+        .route(
+            Route::get("/api/v1/attestations/unified/{id}")
+                .handler("get_unified_attestation")
+                .cache_ttl(60)
+                .build(),
+        )
+        .route(
+            Route::post("/api/v1/attestations/unified/{id}/revoke")
+                .handler("revoke_unified_attestation")
+                .auth_required()
+                .build(),
+        )
+        // =====================================================================
+        // /api/v1/governance-actions — Governance action projection + tally (Category A/C)
+        // =====================================================================
+        .route(
+            Route::get("/api/v1/governance-actions")
+                .handler("list_governance_actions")
+                .cache_ttl(60)
+                .build(),
+        )
+        .route(
+            Route::get("/api/v1/governance-actions/{id}")
+                .handler("get_governance_action")
+                .cache_ttl(30)
+                .build(),
+        )
+        .route(
+            Route::get("/api/v1/governance-actions/{id}/tally")
+                .handler("get_governance_action_tally")
+                .cache_ttl(10)
+                .build(),
+        )
+        .route(
+            Route::post("/api/v1/governance-actions/{id}/vote")
+                .handler("cast_governance_vote")
+                .auth_required()
+                .build(),
+        )
+        // =====================================================================
         // /api/v1/steward — Steward credentials, gates, grants, access
         // =====================================================================
         .route(
