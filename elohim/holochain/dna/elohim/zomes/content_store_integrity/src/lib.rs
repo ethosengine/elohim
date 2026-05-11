@@ -70,6 +70,10 @@ pub use generated_enums::{
     CORE_REACH_LEVELS as REACH_LEVELS, CORE_STEP_TYPES as STEP_TYPES,
 };
 
+// Attestation Consolidation: codegen-emitted catalog of valid attestation subtypes.
+pub mod generated_attestation_kinds;
+pub use generated_attestation_kinds::ATTESTATION_KINDS;
+
 // =============================================================================
 // Protocol Constants (non-generated)
 // =============================================================================
@@ -4233,6 +4237,16 @@ pub enum LinkTypes {
     TargetToFeedbackSignal,
     /// Per-agent anchor → FeedbackSignal action (for list_feedback_signals_by_signer)
     SignerToFeedbackSignal,
+
+    // =========================================================================
+    // Attestation Consolidation: Task B.3
+    // =========================================================================
+    /// subject_cid (ActionHash) → attestation Content entry_hash
+    /// Tag carries the subject_kind (agent | content | device | hub | …)
+    AttestationToSubject,
+    /// Parent governance-action entry_hash → child attestation entry_hash
+    /// Tag carries the vote_value (approve | reject | abstain)
+    GovernanceActionChild,
 }
 
 // =============================================================================

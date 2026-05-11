@@ -19,6 +19,7 @@ pub use manifest::*;
 // Attestation consolidation: consolidated attestation coordinator.
 pub mod attestation;
 pub mod governance_action;
+pub use attestation::{AttestationOutput as ConsolidatedAttestationOutput, IssueAttestationInput};
 
 // EPR Phase 3.5 T8: FeedbackSignal coordinator functions.
 pub mod feedback_signal;
@@ -11910,4 +11911,20 @@ pub fn get_rea_economic_event(id: String) -> ExternResult<Option<ReaEconomicEven
     } else {
         Ok(None)
     }
+}
+
+// =============================================================================
+// Attestation Consolidation — Task B.3
+// =============================================================================
+
+/// Issue an attestation as a Content entry on elohim DNA.
+///
+/// Validates `attestation_kind` against the codegen-emitted catalog, creates a
+/// `Content` entry with `content_type == attestation_kind`, and wires the
+/// `AttestationToSubject` link from the subject's StringAnchor to the new entry.
+#[hdk_extern]
+pub fn issue_attestation(
+    input: IssueAttestationInput,
+) -> ExternResult<ConsolidatedAttestationOutput> {
+    attestation::issue_attestation(input)
 }

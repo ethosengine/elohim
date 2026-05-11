@@ -55,8 +55,14 @@ impl SelfHealingEntry for Content {
             return Err("Content type is required".to_string());
         }
 
-        // Validate against known content types
-        if !CONTENT_TYPES.contains(&self.content_type.as_str()) {
+        // Validate against known content types.
+        // Attestation consolidation (Task B.3): content_type values matching the
+        // "attestation:<subtype>" or "governance-action:<subtype>" pattern are
+        // always valid — they are enumerated in generated_attestation_kinds, not
+        // in the lamad content-type list.
+        let is_attestation_subtype = self.content_type.starts_with("attestation:")
+            || self.content_type.starts_with("governance-action:");
+        if !is_attestation_subtype && !CONTENT_TYPES.contains(&self.content_type.as_str()) {
             return Err(format!(
                 "Invalid content_type '{}'. Must be one of: {:?}",
                 self.content_type, CONTENT_TYPES

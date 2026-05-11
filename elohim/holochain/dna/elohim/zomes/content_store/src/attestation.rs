@@ -8,6 +8,7 @@
 //! provides the coordinator-facing API for callers in elohim DNA and via
 //! cross-DNA bridge for imagodei / infrastructure / mishpat callers.
 
+use content_store_integrity::{EntryTypes, LinkTypes, StringAnchor, ATTESTATION_KINDS};
 use hdk::prelude::*;
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -40,9 +41,126 @@ pub struct RevokeAttestationInput {
     pub reason: String,
 }
 
-// Stubs — to be implemented in subsequent tasks
-pub fn issue_attestation(_input: IssueAttestationInput) -> ExternResult<AttestationOutput> {
-    unimplemented!("Task B.3")
+pub fn issue_attestation(input: IssueAttestationInput) -> ExternResult<AttestationOutput> {
+    // Validate kind is in the codegen-emitted catalog (floor 1 in coordinator;
+    // the integrity zome also enforces this — defense in depth)
+    if !ATTESTATION_KINDS.contains(&input.attestation_kind.as_str()) {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "unknown_attestation_subtype: {}", input.attestation_kind
+        ))));
+    }
+
+    let issuer_cid = agent_info()?.agent_initial_pubkey.to_string();
+
+    let now = sys_time()?;
+    let timestamp = format!("{:?}", now);
+
+    // Build the metadata JSON with denormalized fields
+    let mut metadata = serde_json::json!({
+        "attestation_kind": input.attestation_kind,
+        "subject_cid": input.subject_cid,
+        "subject_kind": input.subject_kind,
+        "validation_method": determine_validation_method(&input),
+        "proof_evidence": input.proof_evidence,
+    });
+    if let Some(ref expires_at) = input.expires_at {
+        metadata["expires_at"] = serde_json::json!(expires_at);
+    }
+    if let Some(ref parent_cid) = input.parent_governance_action_cid {
+        metadata["parent_governance_action_cid"] = serde_json::json!(parent_cid);
+    }
+    if let Some(ref vote_value) = input.vote_value {
+        metadata["vote_value"] = serde_json::json!(vote_value);
+    }
+    // Merge subtype-specific metadata fields into evidence_json.summary_metric
+    metadata["evidence_json"] = serde_json::json!({
+        "summary_metric": input.metadata,
+    });
+
+    let metadata_json = serde_json::to_string(&metadata)
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("metadata serialization: {e}"))))?;
+
+    // Build a unique id for this attestation
+    // (uuid crate is not available in WASM — derive from entry_hash post-create)
+    let placeholder_id = format!("attest-{}-{}", input.attestation_kind, issuer_cid);
+
+    // Build the Content entry
+    let content = content_store_integrity::Content {
+        id: placeholder_id,
+        content_type: input.attestation_kind.clone(),
+        title: input.title,
+        description: input.description.unwrap_or_default(),
+        summary: None,
+        content: String::new(),
+        content_format: "epr-composite".to_string(),
+        tags: vec![input.attestation_kind.clone()],
+        source_path: None,
+        related_node_ids: vec![input.subject_cid.clone()],
+        author_id: Some(issuer_cid.clone()),
+        reach: input.reach,
+        trust_score: 0.0,
+        estimated_minutes: None,
+        thumbnail_url: None,
+        metadata_json,
+        created_at: timestamp.clone(),
+        updated_at: timestamp,
+        schema_version: 2,
+        validation_status: "Valid".to_string(),
+        blob_cid: None,
+        content_size_bytes: None,
+        content_hash: None,
+    };
+
+    let action_hash = create_entry(&EntryTypes::Content(content.clone()))?;
+    let entry_hash = hash_entry(&EntryTypes::Content(content.clone()))?;
+
+    // Create AttestationToSubject link
+    // Base: StringAnchor keyed on subject_cid (works for any subject type: agent, content, device).
+    // Adaptation from plan: plan used ActionHash::try_from which doesn't handle agent pubkey
+    // strings. StringAnchor is consistent with existing IdToContent pattern and allows any
+    // string CID (agent pubkey, entry hash, or opaque ID) to serve as the lookup key.
+    let subject_anchor = StringAnchor::new("attestation_subject", &input.subject_cid);
+    let subject_anchor_hash = hash_entry(&EntryTypes::StringAnchor(subject_anchor))?;
+    create_link(
+        subject_anchor_hash.clone(),
+        entry_hash.clone(),
+        LinkTypes::AttestationToSubject,
+        LinkTag::new(input.subject_kind.as_bytes()),
+    )?;
+
+    // If this is an M-of-N child, also create GovernanceActionChild link parent → child.
+    // Base: StringAnchor keyed on parent_governance_action_cid (same pattern as above).
+    if let Some(ref parent_cid) = input.parent_governance_action_cid {
+        let parent_anchor = StringAnchor::new("governance_action", parent_cid.as_str());
+        let parent_anchor_hash = hash_entry(&EntryTypes::StringAnchor(parent_anchor))?;
+        create_link(
+            parent_anchor_hash,
+            entry_hash.clone(),
+            LinkTypes::GovernanceActionChild,
+            LinkTag::new(input.vote_value.as_deref().unwrap_or("approve").as_bytes()),
+        )?;
+    }
+
+    // Update the content id to the entry hash (content-addressed identity)
+    // Note: The entry was committed with placeholder_id; in production the elohim-storage
+    // post-commit projection will use action_hash as the dht_anchor_hash and entry_hash as the
+    // cid column. We return entry_hash as the canonical CID.
+    let _ = action_hash; // stored in source chain; post-commit signal will project to storage
+
+    Ok(AttestationOutput {
+        cid: entry_hash.to_string(),
+        attestation_kind: input.attestation_kind,
+        subject_cid: input.subject_cid,
+        issuer_cid,
+    })
+}
+
+fn determine_validation_method(input: &IssueAttestationInput) -> &'static str {
+    if input.parent_governance_action_cid.is_some() {
+        "M-of-N-vote"
+    } else {
+        "peer-confirm"  // default for unilateral attestations issued via this coordinator
+    }
 }
 
 pub fn revoke_attestation(_input: RevokeAttestationInput) -> ExternResult<AttestationOutput> {
