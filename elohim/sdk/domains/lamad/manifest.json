@@ -1740,5 +1740,33 @@
       "peerReviewedBy": [],
       "supersedes": null
     }
+  },
+  "attestations": {
+    "attestation:mastery": {
+      "description": "Public proof of an agent's mastery of a content node. Private progress (ContentMastery — Category B2) stays separate; this attestation is minted from that progress when policy fires.",
+      "subject_kinds": ["agent"],
+      "metadata_schema": { "$ref": "../../schemas/v1/attestation/subtypes/mastery-metadata.schema.json" },
+      "uniqueness_anchor": "attestation:mastery:{subject_cid}:{concept_cid}:{issuer_cid}",
+      "revocable_by": ["issuer", "domain-steward"]
+    },
+    "attestation:content-quality": {
+      "description": "Quality / reach-grant attestation on a content node. Replaces ContentAttestation entry type.",
+      "subject_kinds": ["content"],
+      "metadata_schema": { "$ref": "../../schemas/v1/attestation/subtypes/content-quality-metadata.schema.json" },
+      "uniqueness_anchor": "attestation:content-quality:{subject_cid}:{issuer_cid}:{quality_dimension}",
+      "revocable_by": ["issuer", "domain-steward"]
+    },
+    "attestation:content-succession": {
+      "description": "Declares that one content node supersedes another. Replaces ContentSuccession entry type.",
+      "subject_kinds": ["content"],
+      "metadata_schema": { "$ref": "../../schemas/v1/attestation/subtypes/content-succession-metadata.schema.json" },
+      "revocable_by": ["issuer"]
+    },
+    "attestation:custodian-commitment": {
+      "description": "Commitment of custodianship over a content / digital presence. Replaces CustodianCommitment entry type.",
+      "subject_kinds": ["content", "agent"],
+      "metadata_schema": { "$ref": "../../schemas/v1/attestation/subtypes/custodian-commitment-metadata.schema.json" },
+      "revocable_by": ["issuer", "subject"]
+    }
   }
 }

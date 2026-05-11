@@ -198,5 +198,124 @@
         "polarity": "negative"
       }
     }
+  },
+  "attestations": {
+    "attestation:humanness": {
+      "description": "Witness that an agent is human, derived from behavioral / interaction / video-call / in-person / elohim-check observation streams. Replaces HumanityWitness entry type.",
+      "subject_kinds": ["agent"],
+      "metadata_schema": { "$ref": "../../schemas/v1/attestation/subtypes/humanness-metadata.schema.json" },
+      "authorization_predicate": {
+        "type": "issuer-has-attestation",
+        "attestation_kind": "attestation:humanness",
+        "scope": "any"
+      },
+      "uniqueness_anchor": "attestation:humanness:{subject_cid}:{issuer_cid}",
+      "default_expiration_days": 365,
+      "revocable_by": ["issuer"]
+    },
+    "attestation:identity-credential": {
+      "description": "General identity credential. Replaces imagodei's Attestation entry type (plus the vestigial elohim DNA copy). Discriminated by category (learning / stewardship / governance / community / technical / conduct / identity / peer).",
+      "subject_kinds": ["agent"],
+      "metadata_schema": { "$ref": "../../schemas/v1/attestation/subtypes/identity-credential-metadata.schema.json" },
+      "uniqueness_anchor": "attestation:identity-credential:{subject_cid}:{issuer_cid}",
+      "revocable_by": ["issuer", "domain-steward"]
+    },
+    "attestation:key-stewardship": {
+      "description": "Attestation that a specific device-key is stewarded by an agent. Replaces KeyStewardship entry type.",
+      "subject_kinds": ["device"],
+      "metadata_schema": { "$ref": "../../schemas/v1/attestation/subtypes/key-stewardship-metadata.schema.json" },
+      "uniqueness_anchor": "attestation:key-stewardship:{subject_cid}",
+      "revocable_by": ["issuer", "subject"]
+    },
+    "attestation:stewardship-grant": {
+      "description": "Capability grant from steward to subject. Replaces StewardshipGrant entry type.",
+      "subject_kinds": ["agent"],
+      "metadata_schema": { "$ref": "../../schemas/v1/attestation/subtypes/stewardship-grant-metadata.schema.json" },
+      "revocable_by": ["issuer", "governance"]
+    },
+    "attestation:stewardship-appeal": {
+      "description": "Appeal against a stewardship grant. Replaces StewardshipAppeal entry type.",
+      "subject_kinds": ["agent"],
+      "metadata_schema": { "$ref": "../../schemas/v1/attestation/subtypes/stewardship-appeal-metadata.schema.json" },
+      "revocable_by": ["issuer"]
+    },
+    "attestation:policy-inheritance": {
+      "description": "Policy inheritance binding. Replaces PolicyInheritance entry type.",
+      "subject_kinds": ["agent", "device"],
+      "metadata_schema": { "$ref": "../../schemas/v1/attestation/subtypes/policy-inheritance-metadata.schema.json" },
+      "revocable_by": ["issuer", "governance"]
+    },
+    "attestation:identity-freeze": {
+      "description": "Derived attestation that identity is frozen, synthesized when governance-action:identity-challenge reaches challenge-support quorum. Replaces IdentityFreeze entry type.",
+      "subject_kinds": ["agent"],
+      "metadata_schema": { "$ref": "../../schemas/v1/attestation/subtypes/identity-freeze-metadata.schema.json" },
+      "revocable_by": ["governance"]
+    },
+    "attestation:renewal-approval": {
+      "description": "Vote-child attestation approving a renewal-request governance-action. Replaces RenewalAttestation's vote-collection state.",
+      "subject_kinds": ["agent"],
+      "metadata_schema": { "$ref": "../../schemas/v1/attestation/subtypes/renewal-approval-metadata.schema.json" },
+      "authorization_predicate": {
+        "type": "manifest-defined",
+        "manifest_ref": "imagodei:custodian-eligibility-v1"
+      },
+      "uniqueness_anchor": "attestation:renewal-approval:{parent_governance_action_cid}:{issuer_cid}",
+      "revocable_by": ["issuer"]
+    },
+    "attestation:recovery-approval": {
+      "description": "Vote-child attestation approving a recovery-request governance-action. Shamir share material does NOT travel on the DHT — see spec §5 for the off-chain libp2p transport.",
+      "subject_kinds": ["agent"],
+      "metadata_schema": { "$ref": "../../schemas/v1/attestation/subtypes/recovery-approval-metadata.schema.json" },
+      "authorization_predicate": {
+        "type": "manifest-defined",
+        "manifest_ref": "imagodei:custodian-eligibility-v1"
+      },
+      "uniqueness_anchor": "attestation:recovery-approval:{parent_governance_action_cid}:{issuer_cid}",
+      "revocable_by": ["issuer"]
+    },
+    "attestation:revocation-vote": {
+      "description": "Vote-child attestation on a key-revocation governance-action. Replaces RevocationVote entry type.",
+      "subject_kinds": ["agent"],
+      "metadata_schema": { "$ref": "../../schemas/v1/attestation/subtypes/revocation-vote-metadata.schema.json" },
+      "uniqueness_anchor": "attestation:revocation-vote:{parent_governance_action_cid}:{issuer_cid}",
+      "revocable_by": ["issuer"]
+    },
+    "attestation:challenge-support": {
+      "description": "Vote-child attestation supporting an identity-challenge governance-action. Replaces ChallengeSupport entry type.",
+      "subject_kinds": ["agent"],
+      "metadata_schema": { "$ref": "../../schemas/v1/attestation/subtypes/challenge-support-metadata.schema.json" },
+      "uniqueness_anchor": "attestation:challenge-support:{parent_governance_action_cid}:{issuer_cid}",
+      "revocable_by": ["issuer"]
+    }
+  },
+  "governance-actions": {
+    "governance-action:renewal-request": {
+      "description": "Request for identity-key renewal, voted on by custodians. Replaces RenewalAttestation's request portion.",
+      "child_attestation_kind": "attestation:renewal-approval",
+      "default_ballot_format": "approve-reject",
+      "default_eligibility_predicate": {
+        "type": "manifest-defined",
+        "manifest_ref": "imagodei:custodian-eligibility-v1"
+      }
+    },
+    "governance-action:recovery-request": {
+      "description": "Request for account recovery, voted on by custodians. Replaces RecoveryRequest entry type.",
+      "child_attestation_kind": "attestation:recovery-approval",
+      "default_ballot_format": "approve-reject",
+      "default_eligibility_predicate": {
+        "type": "manifest-defined",
+        "manifest_ref": "imagodei:custodian-eligibility-v1"
+      }
+    },
+    "governance-action:key-revocation": {
+      "description": "Proposal to revoke a key, voted on by stewards. Replaces KeyRevocation entry type.",
+      "child_attestation_kind": "attestation:revocation-vote",
+      "default_ballot_format": "approve-reject"
+    },
+    "governance-action:identity-challenge": {
+      "description": "Challenge an identity's authenticity, supported by N witnesses. Replaces IdentityChallenge entry type.",
+      "child_attestation_kind": "attestation:challenge-support",
+      "default_ballot_format": "approve-reject"
+    }
   }
 }

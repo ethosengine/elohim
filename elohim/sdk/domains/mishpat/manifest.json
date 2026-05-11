@@ -1,0 +1,61 @@
+{
+  "id": "manifest-mishpat",
+  "name": "mishpat",
+  "version": "1.0.0",
+  "description": "Governance — proposals, challenges, gate-decisions, deliberation. Validators of community decisions.",
+  "vocabulary": {
+    "contentTypes": {}
+  },
+  "attestations": {
+    "attestation:governance-role": {
+      "description": "Declares a subject holds a specific governance role within a scope. New subtype (previously implicit in challenge / proposal flows).",
+      "subject_kinds": ["agent"],
+      "metadata_schema": { "$ref": "../../schemas/v1/attestation/subtypes/governance-role-metadata.schema.json" },
+      "uniqueness_anchor": "attestation:governance-role:{subject_cid}:{role_kind}:{role_scope}",
+      "revocable_by": ["governance", "issuer"]
+    },
+    "attestation:gate-decision": {
+      "description": "Records a gate's decision on a subject (allow / block / pending). Replaces GateDecisionAttestation entry type.",
+      "subject_kinds": ["agent", "content"],
+      "metadata_schema": { "$ref": "../../schemas/v1/attestation/subtypes/gate-decision-metadata.schema.json" },
+      "revocable_by": ["issuer", "governance"]
+    },
+    "attestation:proposal-vote": {
+      "description": "Vote on a governance proposal. Replaces ProposalVote entry type. Vote-child of governance-action:proposal.",
+      "subject_kinds": ["governance-action"],
+      "metadata_schema": { "$ref": "../../schemas/v1/attestation/subtypes/proposal-vote-metadata.schema.json" },
+      "uniqueness_anchor": "attestation:proposal-vote:{parent_governance_action_cid}:{issuer_cid}",
+      "revocable_by": ["issuer"]
+    },
+    "attestation:statement-vote": {
+      "description": "Polis-style agree/disagree/pass vote on an OpinionStatement. Replaces StatementVote entry type. (OpinionStatement itself moves to the observation layer per spec §6.4.)",
+      "subject_kinds": ["content"],
+      "metadata_schema": { "$ref": "../../schemas/v1/attestation/subtypes/statement-vote-metadata.schema.json" },
+      "uniqueness_anchor": "attestation:statement-vote:{subject_cid}:{issuer_cid}",
+      "revocable_by": ["issuer"]
+    },
+    "attestation:governance-reaction": {
+      "description": "Lightweight reaction (support / concern / question / amendment-suggested) to a governance artifact. Replaces GovernanceReaction entry type.",
+      "subject_kinds": ["content", "governance-action"],
+      "metadata_schema": { "$ref": "../../schemas/v1/attestation/subtypes/governance-reaction-metadata.schema.json" },
+      "revocable_by": ["issuer"]
+    }
+  },
+  "governance-actions": {
+    "governance-action:proposal": {
+      "description": "Generic governance proposal voted on by qahal members. Replaces Proposal entry type.",
+      "child_attestation_kind": "attestation:proposal-vote",
+      "default_ballot_format": "approve-reject"
+    },
+    "governance-action:challenge": {
+      "description": "Challenge against a governance decision or gate. Replaces Challenge + GateDecisionChallenge entry types.",
+      "child_attestation_kind": "attestation:proposal-vote",
+      "default_ballot_format": "approve-reject"
+    },
+    "governance-action:election": {
+      "description": "Election of a governance role. New capability (previously not modeled).",
+      "child_attestation_kind": "attestation:proposal-vote",
+      "default_ballot_format": "ranked-choice"
+    }
+  }
+}

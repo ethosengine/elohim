@@ -1,0 +1,25 @@
+{
+  "id": "manifest-infrastructure",
+  "name": "infrastructure",
+  "version": "1.0.0",
+  "description": "Substrate infrastructure — device health, doorway health, observation-layer heartbeats, and derived attestations.",
+  "vocabulary": {
+    "contentTypes": {}
+  },
+  "attestations": {
+    "attestation:device-health": {
+      "description": "Derived device-health attestation from observation-layer heartbeat data. Replaces HealthAttestation entry type. Raw heartbeats stay on the observation layer per spec §6.4.",
+      "subject_kinds": ["device"],
+      "metadata_schema": { "$ref": "../../schemas/v1/attestation/subtypes/device-health-metadata.schema.json" },
+      "uniqueness_anchor": "attestation:device-health:{subject_cid}:{period_start}:{health_metric}",
+      "revocable_by": ["issuer"]
+    },
+    "attestation:doorway-health-summary": {
+      "description": "Periodic doorway health summary. Replaces DoorwayHeartbeatSummary entry type. Raw DoorwayHeartbeat entries remain operational on the observation layer.",
+      "subject_kinds": ["device"],
+      "metadata_schema": { "$ref": "../../schemas/v1/attestation/subtypes/doorway-health-summary-metadata.schema.json" },
+      "uniqueness_anchor": "attestation:doorway-health-summary:{subject_cid}:{period_start}",
+      "revocable_by": ["issuer"]
+    }
+  }
+}
