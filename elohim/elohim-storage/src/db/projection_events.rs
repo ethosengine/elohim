@@ -52,10 +52,10 @@ pub fn list_recent_for_blob(
     blob_hash_arg: &str,
     limit: i64,
 ) -> diesel::result::QueryResult<Vec<ProjectionEventRow>> {
-    use projection_events::dsl::*;
-    projection_events
-        .filter(blob_hash.eq(blob_hash_arg))
-        .order(emitted_at.desc())
+    use crate::db::diesel_schema::projection_events::dsl as pe;
+    pe::projection_events
+        .filter(pe::blob_hash.eq(blob_hash_arg))
+        .order(pe::emitted_at.desc())
         .limit(limit)
         .load(conn)
 }
@@ -66,10 +66,10 @@ pub fn distinct_projectors_for_blob(
     conn: &mut SqliteConnection,
     blob_hash_arg: &str,
 ) -> diesel::result::QueryResult<Vec<String>> {
-    use projection_events::dsl::*;
-    projection_events
-        .filter(blob_hash.eq(blob_hash_arg))
-        .select(projector_agent_cid)
+    use crate::db::diesel_schema::projection_events::dsl as pe;
+    pe::projection_events
+        .filter(pe::blob_hash.eq(blob_hash_arg))
+        .select(pe::projector_agent_cid)
         .distinct()
         .load(conn)
 }

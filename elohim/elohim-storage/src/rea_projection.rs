@@ -23,6 +23,7 @@
 //! the HcClient (hc_client.rs) may already have signal handling that can
 //! dispatch to this handler.
 
+use chrono::Utc;
 use serde::Deserialize;
 use tracing::info;
 
@@ -173,6 +174,32 @@ pub fn handle_rea_signal(
         }
         ReaProjectionSignal::ReaEconomicEventCommitted { action_hash, event } => {
             info!(id = %event.id, hash = %action_hash, "Projecting EconomicEvent from DHT");
+
+            // Phase 4 T4 — side-projection: if action='ack-projection', also
+            // write into the projection_events operational log. Self-filtering:
+            // other EconomicEvent actions (custody-blob, serve-blob) are ignored.
+            {
+                let first_resource = event.resource_classified_as.first().cloned().unwrap_or_default();
+                let emitted_at = event
+                    .has_point_in_time
+                    .clone()
+                    .unwrap_or_else(|| Utc::now().to_rfc3339());
+                if let Err(e) = crate::p2p::projection_ack_handler::handle_projection_ack_sync(
+                    pool,
+                    &event.action,
+                    &event.provider,
+                    &first_resource,
+                    &action_hash,
+                    &emitted_at,
+                ) {
+                    tracing::warn!(
+                        target = "rea_projection",
+                        error = %e,
+                        "projection_ack side-projection failed (non-fatal)"
+                    );
+                }
+            }
+
             let input = CreateEconomicEventInput {
                 id: Some(event.id),
                 action: event.action,

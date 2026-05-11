@@ -30,6 +30,7 @@
 
 pub mod adapters;
 pub mod attention_tending;
+pub mod projection_ack_handler; // Phase 4 T4 — ack-projection side-projection writer
 pub mod behaviour;
 pub mod blob_fetch;
 pub mod blob_protocol;
