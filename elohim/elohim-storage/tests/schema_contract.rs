@@ -37,7 +37,7 @@ fn load_ref_map() -> HashMap<String, Value> {
     let base = schema_dir();
     let mut refs = HashMap::new();
 
-    for subdir in &["enums", "views"] {
+    for subdir in &["enums", "views", "manifests"] {
         let dir = base.join(subdir);
         if let Ok(entries) = fs::read_dir(&dir) {
             for entry in entries.flatten() {
@@ -76,12 +76,28 @@ fn inline_refs(schema: &Value, refs: &HashMap<String, Value>) -> Value {
             // If this object has a $ref, replace with the referenced schema
             if let Some(Value::String(ref_path)) = map.get("$ref") {
                 if !ref_path.starts_with('#') {
-                    if let Some(referenced) = refs.get(ref_path) {
+                    // Split file portion from JSON Pointer fragment (e.g. "file.json#/definitions/X")
+                    let (file_part, fragment) = match ref_path.split_once('#') {
+                        Some((file, frag)) => (file, Some(frag)),
+                        None => (ref_path.as_str(), None),
+                    };
+                    if let Some(referenced) = refs.get(file_part) {
                         // Inline: take the referenced schema, strip meta fields, inline its refs too
                         let mut inlined = referenced.clone();
                         if let Value::Object(ref mut obj) = inlined {
                             obj.remove("$id");
                             obj.remove("$schema");
+                        }
+                        // If a JSON Pointer fragment is present, walk into it
+                        if let Some(frag) = fragment {
+                            let pointer = if frag.starts_with('/') {
+                                frag.to_string()
+                            } else {
+                                format!("/{frag}")
+                            };
+                            if let Some(sub) = inlined.pointer(&pointer) {
+                                return inline_refs(&sub.clone(), refs);
+                            }
                         }
                         return inline_refs(&inlined, refs);
                     }
