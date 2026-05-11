@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://elohim.protocol/schemas/v1/attestation/manifest-governance-action-declaration.schema.json",
+  "$comment": "Source of truth: pillar manifest JSON on disk (operator-controlled config). Not a DHT entry; the entries this schema describes live in elohim/sdk/domains/<pillar>/manifest.json under the governance-actions section.",
+  "title": "ManifestGovernanceActionDeclaration",
+  "description": "Per-kind governance-action declaration inside a pillar manifest's governance-actions section. Maps a governance-action kind to its child-attestation kind and default ballot semantics. Source of truth is the manifest JSON file on disk.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["description", "child_attestation_kind", "default_ballot_format"],
+  "properties": {
+    "description": { "type": "string", "minLength": 1 },
+    "child_attestation_kind": {
+      "type": "string",
+      "pattern": "^attestation:[a-z][a-z0-9-]*$",
+      "description": "The attestation_kind that a vote-child of this governance-action uses (e.g., 'attestation:renewal-approval' for governance-action:renewal-request)"
+    },
+    "default_ballot_format": {
+      "type": "string",
+      "enum": ["approve-reject", "ranked-choice", "approval", "quadratic"]
+    },
+    "default_eligibility_predicate": {
+      "type": ["object", "null"],
+      "description": "Default eligibility check applied when the proposing agent doesn't provide one explicitly. Null means default-all-eligible.",
+      "required": ["type"],
+      "properties": {
+        "type": { "type": "string" },
+        "manifest_ref": { "type": "string" }
+      }
+    }
+  }
+}

@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://elohim.protocol/schemas/v1/attestation/manifest-attestation-declaration.schema.json",
+  "$comment": "Source of truth: pillar manifest JSON on disk (operator-controlled config). Not a DHT entry; the entries this schema describes live in elohim/sdk/domains/<pillar>/manifest.json under the attestations section. See spec §6.1.",
+  "title": "ManifestAttestationDeclaration",
+  "description": "Per-subtype attestation declaration inside a pillar manifest's attestations section. Source of truth is the manifest JSON file on disk.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["description", "subject_kinds", "metadata_schema", "revocable_by"],
+  "properties": {
+    "description": { "type": "string", "minLength": 1 },
+    "subject_kinds": {
+      "type": "array",
+      "items": { "type": "string", "enum": ["agent", "content", "device", "hub", "computation", "governance-action"] },
+      "minItems": 1,
+      "description": "Which kinds of subject this attestation subtype is permitted to target"
+    },
+    "metadata_schema": {
+      "type": "object",
+      "required": ["$ref"],
+      "additionalProperties": false,
+      "properties": {
+        "$ref": {
+          "type": "string",
+          "description": "Relative path to the per-subtype metadata schema, e.g. ../../schemas/v1/attestation/subtypes/humanness-metadata.schema.json"
+        }
+      }
+    },
+    "authorization_predicate": {
+      "type": ["object", "null"],
+      "description": "Optional predicate enforced at coordinator-zome time when an attestation of this kind is issued. Null means any agent may issue.",
+      "required": ["type"],
+      "properties": {
+        "type": { "type": "string" },
+        "attestation_kind": { "type": "string" },
+        "scope": { "type": "string" },
+        "manifest_ref": { "type": "string" }
+      }
+    },
+    "uniqueness_anchor": {
+      "type": ["string", "null"],
+      "description": "Optional anchor template for issuer-unique-per-subject attestations. Variables: {kind}, {subject_cid}, {issuer_cid}, {parent_cid}. Null means duplicates are allowed."
+    },
+    "default_expiration_days": { "type": ["integer", "null"], "minimum": 1 },
+    "revocable_by": {
+      "type": "array",
+      "items": { "type": "string", "enum": ["issuer", "subject", "domain-steward", "governance"] },
+      "minItems": 1,
+      "description": "Who may issue a revocation attestation that supersedes an existing one of this kind"
+    }
+  }
+}
