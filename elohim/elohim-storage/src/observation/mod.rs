@@ -5,5 +5,6 @@
 //! projection is rebuildable by log replay. This module owns the wire format.
 
 pub mod log;
+pub mod manager;
 pub mod projector;
 pub mod wire;
