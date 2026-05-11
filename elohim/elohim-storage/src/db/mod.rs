@@ -133,6 +133,13 @@ pub mod standing_view;
 // Phase 4 — projection_events append-only log (Category C, rebuildable from rea_projection stream)
 pub mod projection_events;
 
+// Attestation Consolidation Sprint — unified attestation + governance projection tables
+// Category A (DHT projection): attestations, governance_actions
+// Category C (derived operational): governance_action_tally
+pub mod attestations;
+pub mod governance_action_tally;
+pub mod governance_actions;
+
 use std::path::Path;
 use std::time::Duration;
 
