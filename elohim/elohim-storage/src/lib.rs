@@ -208,3 +208,4 @@ pub use views::{
     PlacementGapView, RegionalDistributionView, ResilienceSnapshotDetailsView,
     ResilienceSnapshotView, StewardingCollectiveEntry,
 };
+pub use views::{AttestationView, GovernanceActionTallyView, GovernanceActionView};

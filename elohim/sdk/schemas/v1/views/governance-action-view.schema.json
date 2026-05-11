@@ -1,0 +1,74 @@
+{
+  "$id": "epr:schema:view:governance-action",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "GovernanceActionView",
+  "description": "Source of truth: Holochain DHT (elohim DNA, Content entry, content_type LIKE 'governance-action:%', Category A per p2p-design-gate). Parent entry; vote attestations reference its CID as parentGovernanceActionCid. If this projection and the DHT disagree, the DHT wins.",
+  "type": "object",
+  "required": [
+    "id",
+    "dhtAnchorHash",
+    "governanceKind",
+    "subjectCid",
+    "proposerCid",
+    "thresholdJson",
+    "ballotFormat",
+    "closesAt",
+    "title",
+    "createdAt"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "CID of this governance action (content-derived identity)"
+    },
+    "dhtAnchorHash": {
+      "type": "string",
+      "description": "ActionHash (hex) of the DHT entry — provenance anchor"
+    },
+    "governanceKind": {
+      "type": "string",
+      "description": "Discriminator matching governance-action:<subtype>"
+    },
+    "subjectCid": {
+      "type": "string",
+      "description": "CID of the entity being acted upon"
+    },
+    "proposerCid": {
+      "type": "string",
+      "description": "CID of the proposing agent"
+    },
+    "thresholdJson": {
+      "type": "string",
+      "description": "Serialised threshold JSON (e.g. {\"m\":3} or {\"percentage\":0.51})"
+    },
+    "eligibilityPredicateJson": {
+      "type": ["string", "null"],
+      "description": "Serialised eligibility predicate JSON, if constrained"
+    },
+    "ballotFormat": {
+      "type": "string",
+      "description": "Ballot format: approve-reject | ranked-choice | weighted"
+    },
+    "closesAt": {
+      "type": "string",
+      "description": "ISO 8601 close time for the voting window"
+    },
+    "parametersJson": {
+      "type": ["string", "null"],
+      "description": "Serialised additional parameters JSON, if any"
+    },
+    "title": {
+      "type": "string",
+      "description": "Human-readable title"
+    },
+    "description": {
+      "type": ["string", "null"],
+      "description": "Optional description"
+    },
+    "createdAt": {
+      "type": "string",
+      "description": "ISO 8601 creation timestamp"
+    }
+  }
+}

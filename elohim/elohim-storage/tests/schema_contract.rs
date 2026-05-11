@@ -2570,3 +2570,249 @@ fn put_blob_response_view_matches_schema_libp2p_only() {
     let json = serde_json::to_value(&sample).unwrap();
     validate_against_schema("views/put-blob-response.schema.json", &json);
 }
+
+// ── Unified AttestationView (Category A — DHT source of truth) ──────────────
+
+#[test]
+fn attestation_view_matches_schema_full() {
+    use elohim_storage::AttestationView;
+
+    let view = AttestationView {
+        id: "bafyreiattestation001234567890123456789012345678901234567890123".to_string(),
+        dht_anchor_hash: "aabbccdd0011223344556677889900aabbccdd001122334455667788990011"
+            .to_string(),
+        attestation_kind: "attestation:peer-endorsement".to_string(),
+        subject_cid: "bafyreisubject001234567890123456789012345678901234567890123456"
+            .to_string(),
+        subject_kind: "agent".to_string(),
+        issuer_cid: "bafyreiissuer0012345678901234567890123456789012345678901234567"
+            .to_string(),
+        parent_governance_action_cid: None,
+        vote_value: None,
+        vote_weight: None,
+        proof_class: "witness".to_string(),
+        proof_evidence_json: r#"{"witnessCount":3}"#.to_string(),
+        evidence_json: r#"{"observationPeriodStart":"2026-01-01T00:00:00Z"}"#.to_string(),
+        expires_at: None,
+        supersedes_cid: None,
+        revocation_reason: None,
+        revoked_at: None,
+        created_at: "2026-05-12T10:00:00Z".to_string(),
+        manifest_ref: "lamad".to_string(),
+        title: "Peer endorsement for agent-001".to_string(),
+        description: None,
+    };
+
+    let json = serde_json::to_value(&view).unwrap();
+    validate_against_schema("views/attestation-view.schema.json", &json);
+}
+
+#[test]
+fn attestation_view_matches_schema_vote() {
+    use elohim_storage::AttestationView;
+
+    // Vote attestation — child of a governance-action.
+    let view = AttestationView {
+        id: "bafyreivote00001234567890123456789012345678901234567890123456789".to_string(),
+        dht_anchor_hash: "11223344556677889900aabbccdd00112233445566778899001122334455"
+            .to_string(),
+        attestation_kind: "attestation:governance-vote".to_string(),
+        subject_cid: "bafyreisubject001234567890123456789012345678901234567890123456"
+            .to_string(),
+        subject_kind: "governance-action".to_string(),
+        issuer_cid: "bafyreiissuer0012345678901234567890123456789012345678901234567"
+            .to_string(),
+        parent_governance_action_cid: Some(
+            "bafyreigovaction01234567890123456789012345678901234567890123".to_string(),
+        ),
+        vote_value: Some("approve".to_string()),
+        vote_weight: Some("1.0".to_string()),
+        proof_class: "self-attest".to_string(),
+        proof_evidence_json: r#"{}"#.to_string(),
+        evidence_json: r#"{}"#.to_string(),
+        expires_at: Some("2099-12-31T23:59:59Z".to_string()),
+        supersedes_cid: None,
+        revocation_reason: None,
+        revoked_at: None,
+        created_at: "2026-05-12T10:05:00Z".to_string(),
+        manifest_ref: "mishpat".to_string(),
+        title: "Vote: approve recovery-001".to_string(),
+        description: Some("Approving this recovery request".to_string()),
+    };
+
+    let json = serde_json::to_value(&view).unwrap();
+    validate_against_schema("views/attestation-view.schema.json", &json);
+}
+
+#[test]
+fn attestation_view_matches_schema_revoked() {
+    use elohim_storage::AttestationView;
+
+    // Revoked attestation — revocation_reason and revoked_at present.
+    let view = AttestationView {
+        id: "bafyreirevoked001234567890123456789012345678901234567890123456".to_string(),
+        dht_anchor_hash: "99887766554433221100ffeeddccbbaa99887766554433221100ffeeddccbb"
+            .to_string(),
+        attestation_kind: "attestation:mastery-endorsement".to_string(),
+        subject_cid: "bafyreisubject001234567890123456789012345678901234567890123456"
+            .to_string(),
+        subject_kind: "content".to_string(),
+        issuer_cid: "bafyreiissuer0012345678901234567890123456789012345678901234567"
+            .to_string(),
+        parent_governance_action_cid: None,
+        vote_value: None,
+        vote_weight: None,
+        proof_class: "audit-signature".to_string(),
+        proof_evidence_json: r#"{"auditRef":"audit-2026-001"}"#.to_string(),
+        evidence_json: r#"{"summary":"mastery demonstrated"}"#.to_string(),
+        expires_at: None,
+        supersedes_cid: Some(
+            "bafyreioldattestation01234567890123456789012345678901234567890".to_string(),
+        ),
+        revocation_reason: Some("superseded by updated assessment".to_string()),
+        revoked_at: Some("2026-05-13T08:00:00Z".to_string()),
+        created_at: "2026-05-12T09:00:00Z".to_string(),
+        manifest_ref: "lamad".to_string(),
+        title: "Mastery endorsement — deprecated".to_string(),
+        description: None,
+    };
+
+    let json = serde_json::to_value(&view).unwrap();
+    validate_against_schema("views/attestation-view.schema.json", &json);
+}
+
+// ── GovernanceActionView (Category A — DHT source of truth) ─────────────────
+
+#[test]
+fn governance_action_view_matches_schema_full() {
+    use elohim_storage::GovernanceActionView;
+
+    let view = GovernanceActionView {
+        id: "bafyreigovaction01234567890123456789012345678901234567890123456".to_string(),
+        dht_anchor_hash: "aabbccdd0011223344556677889900aabbccdd001122334455667788990011"
+            .to_string(),
+        governance_kind: "governance-action:recovery".to_string(),
+        subject_cid: "bafyreiagent001234567890123456789012345678901234567890123456789"
+            .to_string(),
+        proposer_cid: "bafyreiproposer01234567890123456789012345678901234567890123456"
+            .to_string(),
+        threshold_json: r#"{"m":3}"#.to_string(),
+        eligibility_predicate_json: None,
+        ballot_format: "approve-reject".to_string(),
+        closes_at: "2099-01-01T00:00:00Z".to_string(),
+        parameters_json: None,
+        title: "Recovery request for agent-001".to_string(),
+        description: Some("Agent has lost access to their device".to_string()),
+        created_at: "2026-05-12T10:00:00Z".to_string(),
+    };
+
+    let json = serde_json::to_value(&view).unwrap();
+    validate_against_schema("views/governance-action-view.schema.json", &json);
+}
+
+#[test]
+fn governance_action_view_matches_schema_with_eligibility() {
+    use elohim_storage::GovernanceActionView;
+
+    let view = GovernanceActionView {
+        id: "bafyreigovaction-eligibility-01234567890123456789012345678901".to_string(),
+        dht_anchor_hash: "11223344556677889900aabbccdd0011223344556677889900aabbccdd0011"
+            .to_string(),
+        governance_kind: "governance-action:content-moderation".to_string(),
+        subject_cid: "bafyreicontent01234567890123456789012345678901234567890123456".to_string(),
+        proposer_cid: "bafyreiproposer01234567890123456789012345678901234567890123456"
+            .to_string(),
+        threshold_json: r#"{"m":5,"n":7}"#.to_string(),
+        eligibility_predicate_json: Some(r#"{"role":"moderator"}"#.to_string()),
+        ballot_format: "approve-reject".to_string(),
+        closes_at: "2026-12-31T23:59:59Z".to_string(),
+        parameters_json: Some(r#"{"appealWindow":"7d"}"#.to_string()),
+        title: "Content moderation vote".to_string(),
+        description: None,
+        created_at: "2026-05-12T10:30:00Z".to_string(),
+    };
+
+    let json = serde_json::to_value(&view).unwrap();
+    validate_against_schema("views/governance-action-view.schema.json", &json);
+}
+
+// ── GovernanceActionTallyView (Category C — local operational) ───────────────
+
+#[test]
+fn governance_action_tally_view_matches_schema_pending() {
+    use elohim_storage::GovernanceActionTallyView;
+
+    let view = GovernanceActionTallyView {
+        parent_cid: "bafyreigovaction01234567890123456789012345678901234567890123456"
+            .to_string(),
+        governance_kind: "governance-action:recovery".to_string(),
+        subject_cid: "bafyreiagent001234567890123456789012345678901234567890123456789"
+            .to_string(),
+        threshold_m: 3,
+        threshold_n: None,
+        threshold_percentage: None,
+        closes_at: "2099-01-01T00:00:00Z".to_string(),
+        current_approve_count: 1,
+        current_reject_count: 0,
+        current_abstain_count: 0,
+        computed_status: "pending".to_string(),
+        last_child_at: Some("2026-05-12T10:05:00Z".to_string()),
+        rebuilt_at: "2026-05-12T10:05:01Z".to_string(),
+    };
+
+    let json = serde_json::to_value(&view).unwrap();
+    validate_against_schema("views/governance-action-tally-view.schema.json", &json);
+}
+
+#[test]
+fn governance_action_tally_view_matches_schema_quorum_reached() {
+    use elohim_storage::GovernanceActionTallyView;
+
+    let view = GovernanceActionTallyView {
+        parent_cid: "bafyreigovaction01234567890123456789012345678901234567890123456"
+            .to_string(),
+        governance_kind: "governance-action:recovery".to_string(),
+        subject_cid: "bafyreiagent001234567890123456789012345678901234567890123456789"
+            .to_string(),
+        threshold_m: 3,
+        threshold_n: Some(5),
+        threshold_percentage: None,
+        closes_at: "2099-01-01T00:00:00Z".to_string(),
+        current_approve_count: 3,
+        current_reject_count: 0,
+        current_abstain_count: 1,
+        computed_status: "reached-quorum".to_string(),
+        last_child_at: Some("2026-05-12T11:00:00Z".to_string()),
+        rebuilt_at: "2026-05-12T11:00:01Z".to_string(),
+    };
+
+    let json = serde_json::to_value(&view).unwrap();
+    validate_against_schema("views/governance-action-tally-view.schema.json", &json);
+}
+
+#[test]
+fn governance_action_tally_view_matches_schema_no_votes_yet() {
+    use elohim_storage::GovernanceActionTallyView;
+
+    // Edge case: tally row exists but no votes cast yet.
+    let view = GovernanceActionTallyView {
+        parent_cid: "bafyreigovaction-empty-01234567890123456789012345678901234567"
+            .to_string(),
+        governance_kind: "governance-action:recovery".to_string(),
+        subject_cid: "bafyreiagent001234567890123456789012345678901234567890123456789"
+            .to_string(),
+        threshold_m: 2,
+        threshold_n: None,
+        threshold_percentage: None,
+        closes_at: "2099-06-01T00:00:00Z".to_string(),
+        current_approve_count: 0,
+        current_reject_count: 0,
+        current_abstain_count: 0,
+        computed_status: "pending".to_string(),
+        last_child_at: None,
+        rebuilt_at: "2026-05-12T09:00:00Z".to_string(),
+    };
+
+    let json = serde_json::to_value(&view).unwrap();
+    validate_against_schema("views/governance-action-tally-view.schema.json", &json);
+}
