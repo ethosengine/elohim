@@ -42,17 +42,7 @@ export interface Libp2PTransportProfileView {
   /**
    * Planes this peer supports over libp2p.
    */
-  supports: (
-    | 'blob'
-    | 'gossip'
-    | 'sync'
-    | 'epr'
-    | 'epr-atom'
-    | 'shard'
-    | 'view-fed'
-    | 'identity-handshake'
-    | 'trust'
-  )[];
+  supports: ('blob' | 'gossip' | 'sync' | 'epr' | 'epr-atom' | 'shard' | 'view-fed' | 'identity-handshake' | 'trust')[];
 }
 export interface IrohTransportProfileView {
   /**
@@ -66,15 +56,5 @@ export interface IrohTransportProfileView {
   /**
    * Planes this peer supports over iroh.
    */
-  supports: (
-    | 'blob'
-    | 'gossip'
-    | 'sync'
-    | 'epr'
-    | 'epr-atom'
-    | 'shard'
-    | 'view-fed'
-    | 'identity-handshake'
-    | 'trust'
-  )[];
+  supports: ('blob' | 'gossip' | 'sync' | 'epr' | 'epr-atom' | 'shard' | 'view-fed' | 'identity-handshake' | 'trust')[];
 }

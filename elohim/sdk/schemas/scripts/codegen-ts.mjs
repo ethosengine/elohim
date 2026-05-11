@@ -118,6 +118,8 @@ async function loadRefMap(baseDir) {
     refMap.set(`../enums/${file}`, schema);
     // Also map from same-level reference
     refMap.set(`enums/${file}`, schema);
+    // From attestation/subtypes/: ../../enums/<file>
+    refMap.set(`../../enums/${file}`, schema);
   }
 
   // Load view schemas for cross-view $ref (e.g., p2p-status-view → drain-status-view)
@@ -156,6 +158,48 @@ async function loadRefMap(baseDir) {
     const schema = JSON.parse(await readFile(join(manifestDir, file), 'utf8'));
     refMap.set(`../manifests/${file}`, schema);
     refMap.set(`manifests/${file}`, schema);
+    if (schema.$id) {
+      refMap.set(schema.$id, schema);
+    }
+  }
+
+  // Load attestation schemas (cross-schema $ref between content/metadata/proof-evidence
+  // and from subtypes/ back up to enums/ via ../../enums/).
+  const attestationDir = join(baseDir, 'attestation');
+  let attestationFiles;
+  try {
+    attestationFiles = (await readdir(attestationDir))
+      .filter((f) => f.endsWith('.schema.json'));
+  } catch {
+    attestationFiles = [];
+  }
+  for (const file of attestationFiles) {
+    const schema = JSON.parse(await readFile(join(attestationDir, file), 'utf8'));
+    // Same-dir refs (e.g., "./proof-evidence.schema.json" from attestation-metadata)
+    refMap.set(file, schema);
+    refMap.set(`./${file}`, schema);
+    // From subtypes/ subdir: "../proof-evidence.schema.json" (unlikely but safe)
+    refMap.set(`../${file}`, schema);
+    // Canonical $id
+    if (schema.$id) {
+      refMap.set(schema.$id, schema);
+    }
+  }
+
+  // Subtypes subdir
+  const subtypesDir = join(baseDir, 'attestation', 'subtypes');
+  let subtypeFiles;
+  try {
+    subtypeFiles = (await readdir(subtypesDir))
+      .filter((f) => f.endsWith('.schema.json'));
+  } catch {
+    subtypeFiles = [];
+  }
+  for (const file of subtypeFiles) {
+    const schema = JSON.parse(await readFile(join(subtypesDir, file), 'utf8'));
+    refMap.set(`subtypes/${file}`, schema);
+    refMap.set(`./subtypes/${file}`, schema);
+    refMap.set(`../subtypes/${file}`, schema);
     if (schema.$id) {
       refMap.set(schema.$id, schema);
     }
@@ -325,7 +369,7 @@ async function main() {
     const refMap = await loadRefMap(SCHEMA_DIR);
 
     const allGenerated = [];
-    for (const subdir of ['enums', 'inputs', 'views', 'p2p', 'manifests']) {
+    for (const subdir of ['enums', 'inputs', 'views', 'p2p', 'manifests', 'attestation', 'attestation/subtypes']) {
       const results = await generateFromDir(subdir, refMap);
       allGenerated.push(...results);
     }
