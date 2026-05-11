@@ -1140,17 +1140,15 @@ async fn async_main(
             .map(std::path::PathBuf::from)
             .unwrap_or_else(|_| std::path::PathBuf::from("elohim/sdk/domains"));
         let manifest_layer =
-            elohim_storage::services::manifest_registry::load_pillar_manifest_layer1(
-                &manifest_dir,
-            )
-            .unwrap_or_else(|e| {
-                tracing::warn!(
-                    target = "phase4::manifest_layer1",
-                    error = %e,
-                    "failed to load pillar manifest layer-1; layer stays empty"
-                );
-                std::collections::HashMap::new()
-            });
+            elohim_storage::services::manifest_registry::load_pillar_manifest_layer1(&manifest_dir)
+                .unwrap_or_else(|e| {
+                    tracing::warn!(
+                        target = "phase4::manifest_layer1",
+                        error = %e,
+                        "failed to load pillar manifest layer-1; layer stays empty"
+                    );
+                    std::collections::HashMap::new()
+                });
         let mut state =
             elohim_storage::write_through::WriteThroughState::from_manifest(manifest_layer);
         // Layer 2 — policy.toml. Try to load; failures are warned, not fatal.
@@ -1433,6 +1431,16 @@ async fn async_main(
             imagodei_pk,
             imagodei_sk,
         });
+
+        // W2A: inject sealing keys into the libp2p P2PNode so that
+        // handle_epr_atom_request can call record_predecessor on Content-kind
+        // Announce ingests. The same SealingKeyPair is also passed to
+        // EprFanOutCtx below for the HTTP fan-out path.
+        #[cfg(feature = "p2p")]
+        if let Some(ref mut node) = p2p_node {
+            node.set_sealing_keys(sealing_keys.clone());
+            info!("W2A: sealing keys wired into P2PNode — record_predecessor active on Content-kind Announce");
+        }
 
         // P2P adapters — only wired when a live swarm is available.
         #[cfg(all(feature = "p2p", feature = "p2p-iroh"))]

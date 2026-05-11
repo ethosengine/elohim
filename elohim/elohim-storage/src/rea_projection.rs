@@ -179,7 +179,11 @@ pub fn handle_rea_signal(
             // write into the projection_events operational log. Self-filtering:
             // other EconomicEvent actions (custody-blob, serve-blob) are ignored.
             {
-                let first_resource = event.resource_classified_as.first().cloned().unwrap_or_default();
+                let first_resource = event
+                    .resource_classified_as
+                    .first()
+                    .cloned()
+                    .unwrap_or_default();
                 let emitted_at = event
                     .has_point_in_time
                     .clone()

@@ -4,10 +4,10 @@
 //! applied these columns. These tests confirm the projection works end-to-end with
 //! the full Diesel model.
 
+use chrono::Utc;
 use elohim_storage::db::models::NewPeerIdentityBindingRow;
 use elohim_storage::db::peer_identity_bindings;
 use elohim_storage::test_util::test_pool;
-use chrono::Utc;
 
 fn now_iso() -> String {
     Utc::now().to_rfc3339()
@@ -40,7 +40,13 @@ fn binding_carries_device_archetype() {
 
     peer_identity_bindings::upsert(
         &mut conn,
-        &binding("12D3KooWtest1", "agent-matthew-desktop", "u-action-hash-1", "desktop", None),
+        &binding(
+            "12D3KooWtest1",
+            "agent-matthew-desktop",
+            "u-action-hash-1",
+            "desktop",
+            None,
+        ),
     )
     .expect("insert");
 

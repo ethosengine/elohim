@@ -33,7 +33,10 @@ fn missing_manifest_dir_returns_empty_map() {
         std::path::PathBuf::from("/tmp/phase4_nonexistent_dir_for_test_do_not_create");
     // Should not panic; should return empty map.
     let layer1 = load_pillar_manifest_layer1(&non_existent).expect("load");
-    assert!(layer1.is_empty(), "non-existent dir should produce empty map");
+    assert!(
+        layer1.is_empty(),
+        "non-existent dir should produce empty map"
+    );
 }
 
 #[test]

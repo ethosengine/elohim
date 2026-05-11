@@ -71,5 +71,12 @@ pub async fn handle_projection_ack(
     action_hash: &str,
     emitted_at: &str,
 ) -> Result<(), ProjectionAckError> {
-    handle_projection_ack_sync(pool, action, provider, resource_classified_as, action_hash, emitted_at)
+    handle_projection_ack_sync(
+        pool,
+        action,
+        provider,
+        resource_classified_as,
+        action_hash,
+        emitted_at,
+    )
 }

@@ -186,9 +186,10 @@ impl EprAtomService {
                     bytes = envelope_bytes.len(),
                     "EPR atom announce accepted"
                 );
-                // record_predecessor TODO is intentionally left in
-                // P2PNode-side wiring for now; see the original site in
-                // p2p/mod.rs::handle_epr_atom_request.
+                // record_predecessor wiring lives in p2p/mod.rs::handle_epr_atom_request
+                // (W2A landed; see services::back_prop::record_predecessor for the recorder).
+                // EprAtomService stays transport-neutral and does not call record_predecessor —
+                // the libp2p sender PeerId is only available at the protocol boundary.
                 EprAtomResponse::Announced {
                     accepted: true,
                     reason: None,

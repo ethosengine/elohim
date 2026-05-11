@@ -67,12 +67,22 @@ pub async fn aggregate_reciprocity_view(
         });
     }
 
-    let outflow =
-        compute_flow_rows(&mut conn, &my_peers, FlowDirection::Outflow, pool, connected_peers)
-            .await?;
-    let inflow =
-        compute_flow_rows(&mut conn, &my_peers, FlowDirection::Inflow, pool, connected_peers)
-            .await?;
+    let outflow = compute_flow_rows(
+        &mut conn,
+        &my_peers,
+        FlowDirection::Outflow,
+        pool,
+        connected_peers,
+    )
+    .await?;
+    let inflow = compute_flow_rows(
+        &mut conn,
+        &my_peers,
+        FlowDirection::Inflow,
+        pool,
+        connected_peers,
+    )
+    .await?;
 
     let total_outflow_delivered: i64 = outflow.iter().map(|r| r.delivered_bytes as i64).sum();
     let total_inflow_delivered: i64 = inflow.iter().map(|r| r.delivered_bytes as i64).sum();

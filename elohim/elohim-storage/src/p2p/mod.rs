@@ -30,7 +30,6 @@
 
 pub mod adapters;
 pub mod attention_tending;
-pub mod projection_ack_handler; // Phase 4 T4 — ack-projection side-projection writer
 pub mod behaviour;
 pub mod blob_fetch;
 pub mod blob_protocol;
@@ -45,6 +44,7 @@ pub mod identity_map;
 pub mod inventory_broadcaster;
 pub mod inventory_gossip;
 pub mod kad_store;
+pub mod projection_ack_handler; // Phase 4 T4 — ack-projection side-projection writer
 pub mod reach_authorization;
 pub mod recovery_invitation;
 pub mod recovery_revocation;
@@ -517,6 +517,13 @@ pub struct P2PNode {
     /// Replaced by `DualGossipPublisher` via `with_gossip_publisher()` when the
     /// iroh stack is running — fans out to both libp2p and iroh simultaneously.
     gossip_publisher: Arc<dyn crate::services::gossip_flood::GossipPublisher>,
+    /// W2A / T22: sealing public keys for `services::back_prop::record_predecessor`.
+    ///
+    /// Injected via `with_sealing_keys()` when the 2-of-2 sealing infra is
+    /// available (same keys the HTTP fan-out layer uses). When `None`, the
+    /// `record_predecessor` call in `handle_epr_atom_request` is silently skipped
+    /// (best-effort — the Announce response is never affected).
+    sealing_keys: Option<Arc<crate::api::epr::SealingKeyPair>>,
 }
 
 /// Cached identify protocol info for a connected peer.
@@ -1598,6 +1605,7 @@ impl P2PNode {
             last_gossiped: Arc::new(std::sync::RwLock::new(Vec::new())),
             inventory_seq: inventory_broadcaster::SequenceAllocator::new(0),
             gossip_publisher: default_gossip_publisher,
+            sealing_keys: None,
         })
     }
 
@@ -1635,6 +1643,31 @@ impl P2PNode {
     ) -> Self {
         self.gossip_publisher = publisher;
         self
+    }
+
+    /// Inject sealing keys for `back_prop::record_predecessor` on the libp2p
+    /// Announce path (W2A / T22) — consuming builder variant.
+    ///
+    /// When supplied, every successful Content-kind EPR Atom Announce seals and
+    /// stores the sender PeerId in `predecessor_records` via
+    /// `services::back_prop::record_predecessor`. Errors are logged at warn level
+    /// and never surfaced to the wire response (best-effort, non-fatal).
+    ///
+    /// When absent (`None`), the record step is silently skipped — the Announce
+    /// ingest succeeds normally. FeedbackSignal-kind Announces are excluded
+    /// regardless: the back-prop graph is for content provenance only.
+    pub fn with_sealing_keys(mut self, keys: Arc<crate::api::epr::SealingKeyPair>) -> Self {
+        self.sealing_keys = Some(keys);
+        self
+    }
+
+    /// Inject sealing keys in-place (`&mut self` variant for post-construction wiring).
+    ///
+    /// Equivalent to `with_sealing_keys` but does not consume `self`. Used in
+    /// `main.rs` where `p2p_node` is stored in an `Option<P2PNode>` and the
+    /// sealing keys are constructed after the node.
+    pub fn set_sealing_keys(&mut self, keys: Arc<crate::api::epr::SealingKeyPair>) {
+        self.sealing_keys = Some(keys);
     }
 
     /// Replace the gossip publisher in-place (non-consuming `&mut self` variant).
@@ -5274,8 +5307,79 @@ impl P2PNode {
         request: EprAtomRequest,
     ) -> EprAtomResponse {
         let caller = self.identity_map.lookup(&peer);
-        self.epr_atom_service()
-            .handle(&peer.to_string(), caller, request)
+
+        // W2A / T22: capture (kind, cid) from Announce envelope bytes BEFORE
+        // consuming `request` via EprAtomService::handle. Lightweight CBOR
+        // decode — only the envelope header, no DB I/O. Returns None if the
+        // bytes can't be minimally decoded; record_predecessor is best-effort
+        // and we never reject an Announce on account of a back-prop failure.
+        let predecessor_target: Option<(elohim_epr::EprKind, String)> =
+            if let EprAtomRequest::Announce {
+                envelope_bytes: ref bytes,
+            } = request
+            {
+                ciborium::de::from_reader::<elohim_epr::Epr, _>(bytes.as_slice())
+                    .ok()
+                    .map(|epr| (epr.envelope.kind, epr.envelope.cid.to_string()))
+            } else {
+                None
+            };
+
+        let response = self
+            .epr_atom_service()
+            .handle(&peer.to_string(), caller, request);
+
+        // W2A / T22: after a successful Content-kind Announce, record the
+        // sender PeerId as a predecessor in `predecessor_records`.
+        //
+        // Constraints:
+        //   - Content-kind only — FeedbackSignal and other kinds are excluded;
+        //     the back-prop graph is for content provenance, not signal propagation.
+        //   - Best-effort + non-fatal — DB / seal errors are logged at warn level
+        //     and never bubble to the EprAtomResponse.
+        //   - Idempotent — record_predecessor uses ON CONFLICT DO NOTHING (T10).
+        //   - Skipped when sealing_keys is None (dev/test without key infra).
+        if let EprAtomResponse::Announced { accepted: true, .. } = &response {
+            if let Some((elohim_epr::EprKind::Content, ref cid)) = predecessor_target {
+                if let Some(ref sealing_keys) = self.sealing_keys {
+                    if let Some(ref pool) = self.db_pool {
+                        match pool.get() {
+                            Ok(mut conn) => {
+                                let keys = crate::services::back_prop::SealingPubKeys {
+                                    mishpat_pk: &sealing_keys.mishpat_pk,
+                                    imagodei_pk: &sealing_keys.imagodei_pk,
+                                };
+                                if let Err(e) = crate::services::back_prop::record_predecessor(
+                                    &mut conn,
+                                    cid,
+                                    &peer.to_string(),
+                                    &keys,
+                                ) {
+                                    warn!(
+                                        target: "epr::back_prop",
+                                        cid = %cid,
+                                        peer = %peer,
+                                        error = ?e,
+                                        "W2A: record_predecessor failed (best-effort, non-fatal)"
+                                    );
+                                }
+                            }
+                            Err(e) => {
+                                warn!(
+                                    target: "epr::back_prop",
+                                    cid = %cid,
+                                    peer = %peer,
+                                    error = %e,
+                                    "W2A: record_predecessor skipped — db pool exhausted"
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        response
     }
 
     /// Handle an incoming EPR atom response to one of our outbound requests.

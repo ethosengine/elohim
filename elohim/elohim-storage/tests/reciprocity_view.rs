@@ -140,9 +140,14 @@ async fn reciprocity_empty_when_no_bindings() {
     let pool = test_pool();
     let bindings = vec![];
 
-    let view = aggregate_reciprocity_view(&pool, "agent-alice", &bindings, &std::collections::HashSet::new())
-        .await
-        .expect("aggregate should succeed");
+    let view = aggregate_reciprocity_view(
+        &pool,
+        "agent-alice",
+        &bindings,
+        &std::collections::HashSet::new(),
+    )
+    .await
+    .expect("aggregate should succeed");
 
     assert!(view.inflow.is_empty(), "inflow must be empty");
     assert!(view.outflow.is_empty(), "outflow must be empty");
@@ -171,9 +176,14 @@ async fn reciprocity_outflow_committed_no_delivered_zero_percent() {
     // No economic_events seeded.
 
     let bindings = load_bindings(&pool, agent_cid);
-    let view = aggregate_reciprocity_view(&pool, agent_cid, &bindings, &std::collections::HashSet::new())
-        .await
-        .expect("aggregate should succeed");
+    let view = aggregate_reciprocity_view(
+        &pool,
+        agent_cid,
+        &bindings,
+        &std::collections::HashSet::new(),
+    )
+    .await
+    .expect("aggregate should succeed");
 
     assert_eq!(view.outflow.len(), 1, "one outflow counterparty");
     assert!(view.inflow.is_empty(), "no inflow");
@@ -212,9 +222,14 @@ async fn reciprocity_outflow_partially_delivered() {
     );
 
     let bindings = load_bindings(&pool, agent_cid);
-    let view = aggregate_reciprocity_view(&pool, agent_cid, &bindings, &std::collections::HashSet::new())
-        .await
-        .expect("aggregate should succeed");
+    let view = aggregate_reciprocity_view(
+        &pool,
+        agent_cid,
+        &bindings,
+        &std::collections::HashSet::new(),
+    )
+    .await
+    .expect("aggregate should succeed");
 
     assert_eq!(view.outflow.len(), 1);
     let row = &view.outflow[0];
@@ -256,9 +271,14 @@ async fn reciprocity_inflow_partially_delivered() {
     );
 
     let bindings = load_bindings(&pool, agent_cid);
-    let view = aggregate_reciprocity_view(&pool, agent_cid, &bindings, &std::collections::HashSet::new())
-        .await
-        .expect("aggregate should succeed");
+    let view = aggregate_reciprocity_view(
+        &pool,
+        agent_cid,
+        &bindings,
+        &std::collections::HashSet::new(),
+    )
+    .await
+    .expect("aggregate should succeed");
 
     assert!(view.outflow.is_empty(), "no outflow");
     assert_eq!(view.inflow.len(), 1, "one inflow counterparty");
@@ -302,9 +322,14 @@ async fn reciprocity_over_delivered_flagged() {
     );
 
     let bindings = load_bindings(&pool, agent_cid);
-    let view = aggregate_reciprocity_view(&pool, agent_cid, &bindings, &std::collections::HashSet::new())
-        .await
-        .expect("aggregate should succeed");
+    let view = aggregate_reciprocity_view(
+        &pool,
+        agent_cid,
+        &bindings,
+        &std::collections::HashSet::new(),
+    )
+    .await
+    .expect("aggregate should succeed");
 
     assert_eq!(view.outflow.len(), 1);
     let row = &view.outflow[0];
@@ -350,9 +375,14 @@ async fn reciprocity_aggregates_multiple_commitments_to_same_counterparty() {
     );
 
     let bindings = load_bindings(&pool, agent_cid);
-    let view = aggregate_reciprocity_view(&pool, agent_cid, &bindings, &std::collections::HashSet::new())
-        .await
-        .expect("aggregate should succeed");
+    let view = aggregate_reciprocity_view(
+        &pool,
+        agent_cid,
+        &bindings,
+        &std::collections::HashSet::new(),
+    )
+    .await
+    .expect("aggregate should succeed");
 
     assert_eq!(view.outflow.len(), 1, "still one counterparty");
     let row = &view.outflow[0];
@@ -402,9 +432,14 @@ async fn reciprocity_separates_inflow_and_outflow() {
     );
 
     let bindings = load_bindings(&pool, agent_cid);
-    let view = aggregate_reciprocity_view(&pool, agent_cid, &bindings, &std::collections::HashSet::new())
-        .await
-        .expect("aggregate should succeed");
+    let view = aggregate_reciprocity_view(
+        &pool,
+        agent_cid,
+        &bindings,
+        &std::collections::HashSet::new(),
+    )
+    .await
+    .expect("aggregate should succeed");
 
     assert_eq!(view.outflow.len(), 1, "one outflow counterparty");
     assert_eq!(view.inflow.len(), 1, "one inflow counterparty");
@@ -462,9 +497,14 @@ async fn reciprocity_net_hosted_bytes_is_inflow_minus_outflow_delivered() {
     );
 
     let bindings = load_bindings(&pool, agent_cid);
-    let view = aggregate_reciprocity_view(&pool, agent_cid, &bindings, &std::collections::HashSet::new())
-        .await
-        .expect("aggregate should succeed");
+    let view = aggregate_reciprocity_view(
+        &pool,
+        agent_cid,
+        &bindings,
+        &std::collections::HashSet::new(),
+    )
+    .await
+    .expect("aggregate should succeed");
 
     // net = inflow_delivered (9 MB) - outflow_delivered (6 MB) = 3 MB
     let expected_net: i64 = 9_000_000 - 6_000_000;

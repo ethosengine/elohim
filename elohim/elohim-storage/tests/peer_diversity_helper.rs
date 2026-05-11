@@ -1,6 +1,8 @@
 //! Phase 4 T8 — tests for peer_diversity::diversity_hint_for.
 
-use elohim_storage::services::peer_diversity::{diversity_hint_for, diversity_hint_from_archetype_strs};
+use elohim_storage::services::peer_diversity::{
+    diversity_hint_for, diversity_hint_from_archetype_strs,
+};
 use elohim_storage::views::{DeviceArchetype, DiversityHint, ReplicaPeer};
 
 fn replica(peer_id: &str, archetype: DeviceArchetype) -> ReplicaPeer {

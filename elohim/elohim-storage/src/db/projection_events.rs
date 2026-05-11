@@ -5,8 +5,8 @@
 //! peer's content_store via the rea_projection signal stream. No SQLite
 //! row here is authoritative.
 
-use diesel::prelude::*;
 use crate::db::diesel_schema::projection_events;
+use diesel::prelude::*;
 
 /// Row model for projection_events table (SELECT — excludes auto-increment id).
 #[derive(Debug, Clone, Queryable, Selectable)]

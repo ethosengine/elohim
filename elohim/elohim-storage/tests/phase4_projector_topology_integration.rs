@@ -127,13 +127,10 @@ async fn end_to_end_projector_ack_surfaces_in_distribution_view() {
     }
 
     // Compose details — projector_identities should reflect the acking doorway.
-    let details = compose_distribution_details(
-        &pool,
-        "sha256-blobX-e2e",
-        DistributionContext::Visitor,
-    )
-    .await
-    .unwrap();
+    let details =
+        compose_distribution_details(&pool, "sha256-blobX-e2e", DistributionContext::Visitor)
+            .await
+            .unwrap();
 
     assert_eq!(
         details.projector_identities.len(),

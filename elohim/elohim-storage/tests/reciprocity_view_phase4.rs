@@ -86,8 +86,18 @@ async fn reciprocity_view_resolves_display_name_and_online() {
     {
         let mut conn = pool.get().expect("conn");
         insert_human(&mut conn, "agent-jessica-rv4", "Jessica");
-        insert_binding(&mut conn, "agent-jessica-rv4", "12D3KooWjessica-rv4", "desktop");
-        insert_binding(&mut conn, "agent-matthew-rv4", "12D3KooWmatthew-rv4", "desktop");
+        insert_binding(
+            &mut conn,
+            "agent-jessica-rv4",
+            "12D3KooWjessica-rv4",
+            "desktop",
+        );
+        insert_binding(
+            &mut conn,
+            "agent-matthew-rv4",
+            "12D3KooWmatthew-rv4",
+            "desktop",
+        );
         // matthew commits to provide to jessica's peer
         insert_commitment(
             &mut conn,
@@ -129,7 +139,12 @@ async fn reciprocity_capacity_returns_total_minus_committed() {
 
     {
         let mut conn = pool.get().expect("conn");
-        insert_binding(&mut conn, "agent-matthew-cap", "12D3KooWmatthew-cap", "desktop");
+        insert_binding(
+            &mut conn,
+            "agent-matthew-cap",
+            "12D3KooWmatthew-cap",
+            "desktop",
+        );
         insert_commitment(&mut conn, "12D3KooWmatthew-cap", "agent-other", 250_000.0);
     }
 
@@ -145,14 +160,9 @@ async fn reciprocity_capacity_returns_total_minus_committed() {
         .unwrap()
     };
 
-    let view = aggregate_reciprocity_view(
-        &pool,
-        "agent-matthew-cap",
-        &bindings,
-        &HashSet::new(),
-    )
-    .await
-    .unwrap();
+    let view = aggregate_reciprocity_view(&pool, "agent-matthew-cap", &bindings, &HashSet::new())
+        .await
+        .unwrap();
 
     assert_eq!(view.capacity_available_bytes, 750_000);
 }

@@ -615,15 +615,14 @@ async fn put_epr(
     let mut conn = get_conn(pool)?;
     let result = store.put(&mut conn, epr)?;
 
-    // T18: record_predecessor is NOT wired here.
+    // T18 / T22 wiring landed: see p2p/mod.rs::handle_epr_atom_request —
+    // Content-kind Announce ingests record sender PeerId via
+    // services::back_prop::record_predecessor (W2A, closes T18 and T22).
     //
-    // put_epr is the HTTP ingest path — the caller is the local HTTP client, not
-    // a remote peer. The sender PeerId (required for back-prop graph construction)
-    // is only available on the libp2p ingest path (EprAtomRequest::Announce handler
-    // in p2p/mod.rs), where the `peer` variable carries the PeerId of the sender.
-    //
-    // T22 wires record_predecessor in p2p/mod.rs on the Announce handler — see the
-    // `TODO(T22): record_predecessor` comment in handle_epr_atom_request.
+    // HTTP put_epr (this function) does NOT record predecessors because the
+    // caller is the local HTTP client, not a remote peer; back-prop is for
+    // cross-peer content provenance. The sender PeerId is only available at
+    // the libp2p protocol boundary (EprAtomRequest::Announce handler).
 
     // Phase 3.5 — Light Up the Graph T19: FeedbackSignal arrival fan-out.
     //

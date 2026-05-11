@@ -2,8 +2,7 @@
 
 use chrono::Utc;
 use elohim_storage::db::projection_events::{
-    append_projection_event, list_recent_for_blob, distinct_projectors_for_blob,
-    NewProjectionEvent,
+    append_projection_event, distinct_projectors_for_blob, list_recent_for_blob, NewProjectionEvent,
 };
 use elohim_storage::test_util::test_pool;
 
@@ -74,7 +73,11 @@ fn dedup_on_source_action_hash() {
     }
 
     let recent = list_recent_for_blob(&mut conn, "sha256-test3", 10).expect("list");
-    assert_eq!(recent.len(), 1, "duplicate source_action_hash must be deduplicated");
+    assert_eq!(
+        recent.len(),
+        1,
+        "duplicate source_action_hash must be deduplicated"
+    );
 }
 
 #[test]

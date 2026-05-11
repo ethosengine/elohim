@@ -18,8 +18,8 @@ use thiserror::Error;
 use crate::db::models::{PeerIdentityBindingRow, PlacementGapRow};
 use crate::db::DbPool;
 use crate::views::{
-    DeviceArchetype, DistributionDetails, DistributionSummary, FetchSource, JsonVal,
-    MyRole, ProjectorIdentity, ReachClass, ReplicaHealth, ReplicaPeer,
+    DeviceArchetype, DistributionDetails, DistributionSummary, FetchSource, JsonVal, MyRole,
+    ProjectorIdentity, ReachClass, ReplicaHealth, ReplicaPeer,
 };
 
 // ============================================================================
@@ -157,12 +157,10 @@ pub async fn compose_distribution_summary(
     let replica_health = replica_health_for(replica_count, replica_target);
 
     // --- projector_count: from projection_events distinct projectors ---
-    let projector_count = crate::db::projection_events::distinct_projectors_for_blob(
-        &mut conn,
-        blob_hash,
-    )
-    .map(|v| v.len() as u32)
-    .unwrap_or(0);
+    let projector_count =
+        crate::db::projection_events::distinct_projectors_for_blob(&mut conn, blob_hash)
+            .map(|v| v.len() as u32)
+            .unwrap_or(0);
 
     // --- diversity_hint: archetype-mix over peer_identity_bindings for seen peers ---
     let archetypes_in_replicas: Vec<String> = {
@@ -196,13 +194,16 @@ pub async fn compose_distribution_summary(
             // Determine my_role by intersecting with inventory replica set.
             let any_replica = seen_peers.iter().any(|p| my_peers.contains(p.as_str()));
             // any_projector: check if any of my agent_cids appear in projection_events
-            let my_agent_cids: HashSet<&str> = bindings.iter().map(|b| b.agent_cid.as_str()).collect();
-            let any_projector = crate::db::projection_events::distinct_projectors_for_blob(
-                &mut conn,
-                blob_hash,
-            )
-            .map(|projectors| projectors.iter().any(|p| my_agent_cids.contains(p.as_str())))
-            .unwrap_or(false);
+            let my_agent_cids: HashSet<&str> =
+                bindings.iter().map(|b| b.agent_cid.as_str()).collect();
+            let any_projector =
+                crate::db::projection_events::distinct_projectors_for_blob(&mut conn, blob_hash)
+                    .map(|projectors| {
+                        projectors
+                            .iter()
+                            .any(|p| my_agent_cids.contains(p.as_str()))
+                    })
+                    .unwrap_or(false);
 
             let role = if any_replica && any_projector {
                 MyRole::ReplicaAndProjector

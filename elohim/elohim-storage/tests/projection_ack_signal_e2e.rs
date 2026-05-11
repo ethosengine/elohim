@@ -70,17 +70,19 @@ async fn distribution_summary_returns_real_projector_count_after_ack() {
     // Pre-condition: blob has 1 replica entry.
     {
         let mut conn = pool.get().expect("conn");
-        diesel::insert_or_ignore_into(elohim_storage::db::diesel_schema::peer_blob_inventory::table)
-            .values(&NewPeerBlobInventoryRow {
-                peer_id: "12D3KooWreplica".to_string(),
-                blob_hash: "sha256-blob-A".to_string(),
-                last_seen_at: "2026-05-11T12:00:00Z".to_string(),
-                source: "gossip-snapshot".to_string(),
-                sequence: 1,
-                blake3_hash: None,
-            })
-            .execute(&mut conn)
-            .expect("seed inventory");
+        diesel::insert_or_ignore_into(
+            elohim_storage::db::diesel_schema::peer_blob_inventory::table,
+        )
+        .values(&NewPeerBlobInventoryRow {
+            peer_id: "12D3KooWreplica".to_string(),
+            blob_hash: "sha256-blob-A".to_string(),
+            last_seen_at: "2026-05-11T12:00:00Z".to_string(),
+            source: "gossip-snapshot".to_string(),
+            sequence: 1,
+            blake3_hash: None,
+        })
+        .execute(&mut conn)
+        .expect("seed inventory");
     }
 
     // Act: 2 different doorway projectors ack the projection.
