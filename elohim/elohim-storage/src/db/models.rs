@@ -3181,3 +3181,89 @@ pub struct NewPeerInventoryCursorRow {
     pub last_sequence: i64,
     pub last_updated: String,
 }
+
+// ============================================================================
+// Unified attestations projection (Category A — source of truth: Holochain DHT)
+// Projection of Content entries with content_type LIKE 'attestation:%'.
+// See genesis/docs/superpowers/specs/2026-05-11-attestation-consolidation-design.md §7.4.
+// ============================================================================
+
+/// Projection row for a unified attestation Content entry from elohim DNA.
+/// Source of truth: Holochain DHT (Content entry with content_type LIKE 'attestation:%').
+#[derive(Queryable, Insertable, AsChangeset, Debug, Clone, Selectable)]
+#[diesel(table_name = crate::db::diesel_schema::attestations)]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+pub struct AttestationRow {
+    pub id: String,
+    pub dht_anchor_hash: Vec<u8>,
+    pub attestation_kind: String,
+    pub subject_cid: String,
+    pub subject_kind: String,
+    pub issuer_cid: String,
+    pub parent_governance_action_cid: Option<String>,
+    pub vote_value: Option<String>,
+    pub vote_weight: Option<String>,
+    pub proof_class: String,
+    pub proof_evidence_json: String,
+    pub evidence_json: String,
+    pub expires_at: Option<String>,
+    pub supersedes_cid: Option<String>,
+    pub revocation_reason: Option<String>,
+    pub revoked_at: Option<String>,
+    pub created_at: String,
+    pub manifest_ref: String,
+    pub title: String,
+    pub description: Option<String>,
+}
+
+// ============================================================================
+// Unified governance_actions projection (Category A — source of truth: Holochain DHT)
+// Projection of Content entries with content_type LIKE 'governance-action:%'.
+// ============================================================================
+
+/// Projection row for a governance-action Content entry.
+/// Source of truth: Holochain DHT.
+#[derive(Queryable, Insertable, AsChangeset, Debug, Clone, Selectable)]
+#[diesel(table_name = crate::db::diesel_schema::governance_actions)]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+pub struct GovernanceActionRow {
+    pub id: String,
+    pub dht_anchor_hash: Vec<u8>,
+    pub governance_kind: String,
+    pub subject_cid: String,
+    pub proposer_cid: String,
+    pub threshold_json: String,
+    pub eligibility_predicate_json: Option<String>,
+    pub ballot_format: String,
+    pub closes_at: String,
+    pub parameters_json: Option<String>,
+    pub title: String,
+    pub description: Option<String>,
+    pub created_at: String,
+}
+
+// ============================================================================
+// governance_action_tally derived projection (Category C — operational)
+// Recomputable from governance_actions JOIN attestations at any time.
+// ============================================================================
+
+/// Derived tally projection row.
+/// Source of truth: local (operational) — recomputable from parent + children.
+#[derive(Queryable, Insertable, AsChangeset, Debug, Clone, Selectable)]
+#[diesel(table_name = crate::db::diesel_schema::governance_action_tally)]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+pub struct GovernanceActionTallyRow {
+    pub parent_cid: String,
+    pub governance_kind: String,
+    pub subject_cid: String,
+    pub threshold_m: i32,
+    pub threshold_n: Option<i32>,
+    pub threshold_percentage: Option<f64>,
+    pub closes_at: String,
+    pub current_approve_count: i32,
+    pub current_reject_count: i32,
+    pub current_abstain_count: i32,
+    pub computed_status: String,
+    pub last_child_at: Option<String>,
+    pub rebuilt_at: String,
+}

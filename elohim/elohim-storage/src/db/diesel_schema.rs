@@ -1438,9 +1438,77 @@ diesel::table! {
     }
 }
 
+// Source of truth: Holochain DHT (projection of attestation Content entries)
+// Category A — consolidated unified attestation projection table.
+diesel::table! {
+    attestations (id) {
+        id -> Text,
+        dht_anchor_hash -> Binary,
+        attestation_kind -> Text,
+        subject_cid -> Text,
+        subject_kind -> Text,
+        issuer_cid -> Text,
+        parent_governance_action_cid -> Nullable<Text>,
+        vote_value -> Nullable<Text>,
+        vote_weight -> Nullable<Text>,
+        proof_class -> Text,
+        proof_evidence_json -> Text,
+        evidence_json -> Text,
+        expires_at -> Nullable<Text>,
+        supersedes_cid -> Nullable<Text>,
+        revocation_reason -> Nullable<Text>,
+        revoked_at -> Nullable<Text>,
+        created_at -> Text,
+        manifest_ref -> Text,
+        title -> Text,
+        description -> Nullable<Text>,
+    }
+}
+
+// Source of truth: Holochain DHT (projection of governance-action Content entries)
+// Category A — consolidated unified governance-action projection table.
+diesel::table! {
+    governance_actions (id) {
+        id -> Text,
+        dht_anchor_hash -> Binary,
+        governance_kind -> Text,
+        subject_cid -> Text,
+        proposer_cid -> Text,
+        threshold_json -> Text,
+        eligibility_predicate_json -> Nullable<Text>,
+        ballot_format -> Text,
+        closes_at -> Text,
+        parameters_json -> Nullable<Text>,
+        title -> Text,
+        description -> Nullable<Text>,
+        created_at -> Text,
+    }
+}
+
+// Source of truth: local (operational) — Category C derived from parent + children
+// Rebuildable from governance_actions JOIN attestations at any time.
+diesel::table! {
+    governance_action_tally (parent_cid) {
+        parent_cid -> Text,
+        governance_kind -> Text,
+        subject_cid -> Text,
+        threshold_m -> Integer,
+        threshold_n -> Nullable<Integer>,
+        threshold_percentage -> Nullable<Double>,
+        closes_at -> Text,
+        current_approve_count -> Integer,
+        current_reject_count -> Integer,
+        current_abstain_count -> Integer,
+        computed_status -> Text,
+        last_child_at -> Nullable<Text>,
+        rebuilt_at -> Text,
+    }
+}
+
 diesel::allow_tables_to_appear_in_same_query!(
     access_grants,
     agreements,
+    attestations,
     attention_tending,
     appeals,
     apps,
@@ -1466,6 +1534,8 @@ diesel::allow_tables_to_appear_in_same_query!(
     epr_supersedence,
     gate_decision_attestations,
     gate_decision_challenges,
+    governance_action_tally,
+    governance_actions,
     governance_dispositions,
     governance_signals,
     governance_states,
