@@ -4,10 +4,11 @@
   "title": "ProofEvidence",
   "description": "Pluggable proof-class evidence carried in AttestationMetadata.proof_evidence. See spec §3.3 + computation-attestation-graduated-rigor-design.md.",
   "type": "object",
+  "additionalProperties": false,
   "required": ["class"],
   "properties": {
     "class": { "type": "string", "enum": ["witness", "audit", "proof", "confirmation"] },
-    "issuer_signature": { "type": "string", "description": "Inherited from Content action header for witness class" },
+    "issuer_signature": { "type": "string", "description": "Optional convenience copy of the issuer's signature. The authoritative signature for witness-class proof is always the Holochain action header on the parent Content entry; this field is populated only when the issuer wants to embed it inline (e.g., for off-chain verification)." },
     "merkle_root": { "type": "string", "description": "Required for audit class — Merkle root over Merkle-rooted inputs" },
     "algorithm_id": { "type": "string", "description": "Required for audit/proof — pinned algorithm + version" },
     "zkml_proof": { "type": "string", "description": "Required for proof class — zkML or equivalent cryptographic proof" },

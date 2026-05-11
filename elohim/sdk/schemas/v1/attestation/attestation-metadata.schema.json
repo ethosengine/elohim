@@ -5,6 +5,7 @@
   "title": "AttestationMetadata",
   "description": "Structured payload inside Content.metadata_json for attestation entries. Source of truth is the Holochain DHT — this schema describes the parsed JSON shape only.",
   "type": "object",
+  "additionalProperties": false,
   "required": [
     "attestation_kind",
     "subject_cid",
@@ -42,6 +43,9 @@
     },
     "parent_governance_action_cid": { "type": ["string", "null"] },
     "vote_value": { "type": ["string", "null"], "enum": ["approve", "reject", "abstain", null] },
-    "vote_weight": { "type": ["string", "null"] }
+    "vote_weight": {
+      "type": ["string", "null"],
+      "description": "Optional voting weight as a decimal string (e.g., '1.0' for unweighted). Null when unweighted. Tally semantics defined per ballot_format on the parent governance-action."
+    }
   }
 }
