@@ -85,11 +85,23 @@ export type ElohimStrength =
 /**
  * Kind of server-side renderer a doorway carries. Reserved values are valid claim values; only `angular-ssr` is implemented in elohim-render today. Source of truth: doorway runtime (Category C operational). Not a DHT entry type.
  */
-export type RendererKind = 'angular-ssr' | 'react-rsc' | 'vue-ssr' | 'svelte-ssr' | 'lit-ssr' | 'static-html';
+export type RendererKind =
+  | 'angular-ssr'
+  | 'react-rsc'
+  | 'vue-ssr'
+  | 'svelte-ssr'
+  | 'lit-ssr'
+  | 'static-html';
 /**
  * Kind of server-side renderer a doorway carries. Reserved values are valid claim values; only `angular-ssr` is implemented in elohim-render today. Source of truth: doorway runtime (Category C operational). Not a DHT entry type.
  */
-export type RendererKind1 = 'angular-ssr' | 'react-rsc' | 'vue-ssr' | 'svelte-ssr' | 'lit-ssr' | 'static-html';
+export type RendererKind1 =
+  | 'angular-ssr'
+  | 'react-rsc'
+  | 'vue-ssr'
+  | 'svelte-ssr'
+  | 'lit-ssr'
+  | 'static-html';
 
 /**
  * Source of truth: Holochain infrastructure DNA DHT (Notarized, Category A). This view is a read-optimized projection from the peer_statuses SQLite table, itself populated by InfrastructureSignal::PeerStatusRecorded post-commit projections. If the projection and the DHT disagree, the DHT wins.
