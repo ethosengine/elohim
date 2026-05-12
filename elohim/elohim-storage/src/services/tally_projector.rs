@@ -49,7 +49,6 @@ pub fn rebuild_all(conn: &mut SqliteConnection) -> Result<usize, StorageError> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use diesel::prelude::*;
     use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
 
     use crate::db::attestations as attest_db;

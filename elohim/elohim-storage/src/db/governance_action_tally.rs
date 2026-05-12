@@ -183,7 +183,6 @@ fn derive_status(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use diesel::prelude::*;
     use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
 
     use crate::db::models::{AttestationRow, GovernanceActionRow};

@@ -11,9 +11,10 @@
  * parameters and returns parsed views.
  */
 
-import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
+import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
+
 import type { ObservationView, ObservationDiversitySummaryView } from '@elohim/storage-client';
 
 @Injectable({ providedIn: 'root' })
@@ -60,10 +61,7 @@ export class ObservationService {
    * @param kind - Observation kind
    * @returns Observable of diversity summary, or null if no observations exist
    */
-  diversity(
-    subjectCid: string,
-    kind: string
-  ): Observable<ObservationDiversitySummaryView | null> {
+  diversity(subjectCid: string, kind: string): Observable<ObservationDiversitySummaryView | null> {
     return this.http.get<ObservationDiversitySummaryView | null>(`${this.base}/diversity`, {
       params: new HttpParams().set('subjectCid', subjectCid).set('kind', kind),
     });

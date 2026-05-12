@@ -23,8 +23,7 @@
 //!    `ShareTransport` (libp2p in production, mock in tests).
 //! 3. Verify each `ShamirShareResponse`:
 //!    (a) `attestation_cid` must match a real `attestations` DB row.
-//!    (b) `signature` must verify against the custodian's Ed25519 key
-//!        (obtained from the `attestations.issuer_cid` → key resolution step).
+//!    (b) `signature` must verify against the custodian's Ed25519 key (obtained from the `attestations.issuer_cid` → key resolution step).
 //! 4. Accumulate verified shares until the threshold `m` declared in the
 //!    governance-action's `threshold_json` is reached.
 //! 5. Return the raw share bytes — the CALLER reconstructs the secret via
@@ -393,7 +392,6 @@ fn derive_verifying_key_stub(issuer_cid: &str) -> Option<[u8; 32]> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use diesel::prelude::*;
     use std::sync::Arc;
 
     // ── DB setup helpers ──────────────────────────────────────────────────────

@@ -59,6 +59,7 @@
 //!   1. `DualGossipPublisher` publishes `RecoveryInvitation` on both stacks.
 //!   2. Each share-holder receives via its supported transport.
 //!   3. Each share-holder fetches its stub share-blob via the same transport.
+//!
 //! Then asserts transport-tag correctness on each receipt.
 
 #![cfg(feature = "p2p-iroh")]

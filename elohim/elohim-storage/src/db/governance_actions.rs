@@ -81,7 +81,6 @@ pub fn delete_by_id(conn: &mut SqliteConnection, id: &str) -> Result<usize, Stor
 #[cfg(test)]
 mod tests {
     use super::*;
-    use diesel::prelude::*;
     use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
 
     const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations");
