@@ -43,7 +43,13 @@ fn graduation_emits_plan_when_threshold_met() {
     let mut conn = pool.get().unwrap();
 
     for (i, hh) in [(0i64, "h1"), (1, "h2"), (2, "h3"), (3, "h1"), (4, "h2")].iter() {
-        insert_obs(&mut conn, &format!("agent:{}", i), &format!("household:{}", hh), "doorway:abc", *i);
+        insert_obs(
+            &mut conn,
+            &format!("agent:{}", i),
+            &format!("household:{}", hh),
+            "doorway:abc",
+            *i,
+        );
     }
 
     let spec = AttestationGraduationSpec {
@@ -71,7 +77,13 @@ fn graduation_returns_none_below_threshold() {
     let mut conn = pool.get().unwrap();
 
     for i in 0..2i64 {
-        insert_obs(&mut conn, &format!("agent:{}", i), "household:single", "doorway:abc", i);
+        insert_obs(
+            &mut conn,
+            &format!("agent:{}", i),
+            "household:single",
+            "doorway:abc",
+            i,
+        );
     }
 
     let spec = AttestationGraduationSpec {
@@ -83,10 +95,7 @@ fn graduation_returns_none_below_threshold() {
             ..Default::default()
         },
     };
-    assert!(spec
-        .evaluate(&mut conn, "doorway:abc")
-        .unwrap()
-        .is_none());
+    assert!(spec.evaluate(&mut conn, "doorway:abc").unwrap().is_none());
 }
 
 #[test]
@@ -95,7 +104,13 @@ fn observation_refs_use_iroh_url_format() {
     let mut conn = pool.get().unwrap();
 
     for (i, hh) in [(0i64, "h1"), (1, "h2"), (2, "h3")].iter() {
-        insert_obs(&mut conn, &format!("agent:{}", i), &format!("household:{}", hh), "doorway:abc", *i);
+        insert_obs(
+            &mut conn,
+            &format!("agent:{}", i),
+            &format!("household:{}", hh),
+            "doorway:abc",
+            *i,
+        );
     }
 
     let spec = AttestationGraduationSpec {
@@ -107,10 +122,7 @@ fn observation_refs_use_iroh_url_format() {
             ..Default::default()
         },
     };
-    let plan = spec
-        .evaluate(&mut conn, "doorway:abc")
-        .unwrap()
-        .unwrap();
+    let plan = spec.evaluate(&mut conn, "doorway:abc").unwrap().unwrap();
     assert!(
         plan.observation_refs[0].starts_with("iroh://"),
         "refs must use iroh URL, got: {}",

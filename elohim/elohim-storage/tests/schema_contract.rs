@@ -2582,11 +2582,9 @@ fn attestation_view_matches_schema_full() {
         dht_anchor_hash: "aabbccdd0011223344556677889900aabbccdd001122334455667788990011"
             .to_string(),
         attestation_kind: "attestation:peer-endorsement".to_string(),
-        subject_cid: "bafyreisubject001234567890123456789012345678901234567890123456"
-            .to_string(),
+        subject_cid: "bafyreisubject001234567890123456789012345678901234567890123456".to_string(),
         subject_kind: "agent".to_string(),
-        issuer_cid: "bafyreiissuer0012345678901234567890123456789012345678901234567"
-            .to_string(),
+        issuer_cid: "bafyreiissuer0012345678901234567890123456789012345678901234567".to_string(),
         parent_governance_action_cid: None,
         vote_value: None,
         vote_weight: None,
@@ -2614,14 +2612,11 @@ fn attestation_view_matches_schema_vote() {
     // Vote attestation — child of a governance-action.
     let view = AttestationView {
         id: "bafyreivote00001234567890123456789012345678901234567890123456789".to_string(),
-        dht_anchor_hash: "11223344556677889900aabbccdd00112233445566778899001122334455"
-            .to_string(),
+        dht_anchor_hash: "11223344556677889900aabbccdd00112233445566778899001122334455".to_string(),
         attestation_kind: "attestation:governance-vote".to_string(),
-        subject_cid: "bafyreisubject001234567890123456789012345678901234567890123456"
-            .to_string(),
+        subject_cid: "bafyreisubject001234567890123456789012345678901234567890123456".to_string(),
         subject_kind: "governance-action".to_string(),
-        issuer_cid: "bafyreiissuer0012345678901234567890123456789012345678901234567"
-            .to_string(),
+        issuer_cid: "bafyreiissuer0012345678901234567890123456789012345678901234567".to_string(),
         parent_governance_action_cid: Some(
             "bafyreigovaction01234567890123456789012345678901234567890123".to_string(),
         ),
@@ -2654,11 +2649,9 @@ fn attestation_view_matches_schema_revoked() {
         dht_anchor_hash: "99887766554433221100ffeeddccbbaa99887766554433221100ffeeddccbb"
             .to_string(),
         attestation_kind: "attestation:mastery-endorsement".to_string(),
-        subject_cid: "bafyreisubject001234567890123456789012345678901234567890123456"
-            .to_string(),
+        subject_cid: "bafyreisubject001234567890123456789012345678901234567890123456".to_string(),
         subject_kind: "content".to_string(),
-        issuer_cid: "bafyreiissuer0012345678901234567890123456789012345678901234567"
-            .to_string(),
+        issuer_cid: "bafyreiissuer0012345678901234567890123456789012345678901234567".to_string(),
         parent_governance_action_cid: None,
         vote_value: None,
         vote_weight: None,
@@ -2692,10 +2685,8 @@ fn governance_action_view_matches_schema_full() {
         dht_anchor_hash: "aabbccdd0011223344556677889900aabbccdd001122334455667788990011"
             .to_string(),
         governance_kind: "governance-action:recovery".to_string(),
-        subject_cid: "bafyreiagent001234567890123456789012345678901234567890123456789"
-            .to_string(),
-        proposer_cid: "bafyreiproposer01234567890123456789012345678901234567890123456"
-            .to_string(),
+        subject_cid: "bafyreiagent001234567890123456789012345678901234567890123456789".to_string(),
+        proposer_cid: "bafyreiproposer01234567890123456789012345678901234567890123456".to_string(),
         threshold_json: r#"{"m":3}"#.to_string(),
         eligibility_predicate_json: None,
         ballot_format: "approve-reject".to_string(),
@@ -2720,8 +2711,7 @@ fn governance_action_view_matches_schema_with_eligibility() {
             .to_string(),
         governance_kind: "governance-action:content-moderation".to_string(),
         subject_cid: "bafyreicontent01234567890123456789012345678901234567890123456".to_string(),
-        proposer_cid: "bafyreiproposer01234567890123456789012345678901234567890123456"
-            .to_string(),
+        proposer_cid: "bafyreiproposer01234567890123456789012345678901234567890123456".to_string(),
         threshold_json: r#"{"m":5,"n":7}"#.to_string(),
         eligibility_predicate_json: Some(r#"{"role":"moderator"}"#.to_string()),
         ballot_format: "approve-reject".to_string(),
@@ -2743,11 +2733,9 @@ fn governance_action_tally_view_matches_schema_pending() {
     use elohim_storage::GovernanceActionTallyView;
 
     let view = GovernanceActionTallyView {
-        parent_cid: "bafyreigovaction01234567890123456789012345678901234567890123456"
-            .to_string(),
+        parent_cid: "bafyreigovaction01234567890123456789012345678901234567890123456".to_string(),
         governance_kind: "governance-action:recovery".to_string(),
-        subject_cid: "bafyreiagent001234567890123456789012345678901234567890123456789"
-            .to_string(),
+        subject_cid: "bafyreiagent001234567890123456789012345678901234567890123456789".to_string(),
         threshold_m: 3,
         threshold_n: None,
         threshold_percentage: None,
@@ -2769,11 +2757,9 @@ fn governance_action_tally_view_matches_schema_quorum_reached() {
     use elohim_storage::GovernanceActionTallyView;
 
     let view = GovernanceActionTallyView {
-        parent_cid: "bafyreigovaction01234567890123456789012345678901234567890123456"
-            .to_string(),
+        parent_cid: "bafyreigovaction01234567890123456789012345678901234567890123456".to_string(),
         governance_kind: "governance-action:recovery".to_string(),
-        subject_cid: "bafyreiagent001234567890123456789012345678901234567890123456789"
-            .to_string(),
+        subject_cid: "bafyreiagent001234567890123456789012345678901234567890123456789".to_string(),
         threshold_m: 3,
         threshold_n: Some(5),
         threshold_percentage: None,
@@ -2796,11 +2782,9 @@ fn governance_action_tally_view_matches_schema_no_votes_yet() {
 
     // Edge case: tally row exists but no votes cast yet.
     let view = GovernanceActionTallyView {
-        parent_cid: "bafyreigovaction-empty-01234567890123456789012345678901234567"
-            .to_string(),
+        parent_cid: "bafyreigovaction-empty-01234567890123456789012345678901234567".to_string(),
         governance_kind: "governance-action:recovery".to_string(),
-        subject_cid: "bafyreiagent001234567890123456789012345678901234567890123456789"
-            .to_string(),
+        subject_cid: "bafyreiagent001234567890123456789012345678901234567890123456789".to_string(),
         threshold_m: 2,
         threshold_n: None,
         threshold_percentage: None,

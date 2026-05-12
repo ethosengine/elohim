@@ -8193,7 +8193,6 @@ impl From<GovernanceActionTallyRow> for GovernanceActionTallyView {
             computed_status: row.computed_status,
             last_child_at: row.last_child_at,
             rebuilt_at: row.rebuilt_at,
-
         }
     }
 }

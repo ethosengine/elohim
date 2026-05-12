@@ -79,10 +79,7 @@ pub trait ShareTransport: Send + Sync {
     ///
     /// Returns `Ok(ShamirShareResponse)` on success, `Err(msg)` if the peer is
     /// unreachable, the protocol is not supported, or the request times out.
-    async fn request_share(
-        &self,
-        req: ShamirShareRequest,
-    ) -> Result<ShamirShareResponse, String>;
+    async fn request_share(&self, req: ShamirShareRequest) -> Result<ShamirShareResponse, String>;
 }
 
 /// Test double: returns canned share responses keyed by `custodian_cid`.
@@ -128,7 +125,10 @@ pub enum AssemblyResult {
     /// Not enough custodians approved (below threshold m).
     ///
     /// Contains the number of approvals found and the threshold required.
-    BelowThreshold { approvals_found: usize, threshold: usize },
+    BelowThreshold {
+        approvals_found: usize,
+        threshold: usize,
+    },
 
     /// Threshold reached. Contains verified share bytes in share-index order.
     ///
@@ -194,9 +194,10 @@ impl ShareAssembler {
     ) -> Result<AssemblyResult, StorageError> {
         // Step 1: load governance action to get threshold
         let threshold = {
-            let mut conn = self.pool.get().map_err(|e| {
-                StorageError::Database(format!("pool.get error: {}", e))
-            })?;
+            let mut conn = self
+                .pool
+                .get()
+                .map_err(|e| StorageError::Database(format!("pool.get error: {}", e)))?;
             let action = governance_actions::table
                 .filter(governance_actions::id.eq(recovery_governance_action_cid))
                 .first::<GovernanceActionRow>(&mut conn)
@@ -214,13 +215,13 @@ impl ShareAssembler {
 
         // Step 2: load recovery-approval attestations for this governance action
         let approvals: Vec<AttestationRow> = {
-            let mut conn = self.pool.get().map_err(|e| {
-                StorageError::Database(format!("pool.get error: {}", e))
-            })?;
+            let mut conn = self
+                .pool
+                .get()
+                .map_err(|e| StorageError::Database(format!("pool.get error: {}", e)))?;
             attestations::table
                 .filter(
-                    attestations::parent_governance_action_cid
-                        .eq(recovery_governance_action_cid),
+                    attestations::parent_governance_action_cid.eq(recovery_governance_action_cid),
                 )
                 .filter(attestations::attestation_kind.eq("attestation:recovery-approval"))
                 .filter(attestations::revoked_at.is_null())
@@ -264,9 +265,10 @@ impl ShareAssembler {
 
             // Step 3a: verify attestation_cid matches a real DB row
             let attestation_exists = {
-                let mut conn = self.pool.get().map_err(|e| {
-                    StorageError::Database(format!("pool.get error: {}", e))
-                })?;
+                let mut conn = self
+                    .pool
+                    .get()
+                    .map_err(|e| StorageError::Database(format!("pool.get error: {}", e)))?;
                 attestations::table
                     .filter(attestations::id.eq(&response.attestation_cid))
                     .filter(
@@ -302,11 +304,9 @@ impl ShareAssembler {
             // Until then, skip signature verification if no key bytes are available and
             // log a warning — the DHT attestation check in step 3a is the primary guard.
             if let Some(key_bytes) = derive_verifying_key_stub(&approval.issuer_cid) {
-                if let Err(e) = verify_share_response(
-                    &response,
-                    recovery_governance_action_cid,
-                    &key_bytes,
-                ) {
+                if let Err(e) =
+                    verify_share_response(&response, recovery_governance_action_cid, &key_bytes)
+                {
                     tracing::warn!(
                         custodian_cid = %approval.issuer_cid,
                         error = %e,
@@ -354,9 +354,8 @@ impl ShareAssembler {
 /// Expected shape: `{ "type": "shamir", "m": 3, "n": 5 }`.
 /// Returns `StorageError::InvalidInput` if the field is absent or malformed.
 fn parse_threshold_m(threshold_json: &str) -> Result<usize, StorageError> {
-    let val: Value = serde_json::from_str(threshold_json).map_err(|e| {
-        StorageError::InvalidInput(format!("threshold_json parse error: {}", e))
-    })?;
+    let val: Value = serde_json::from_str(threshold_json)
+        .map_err(|e| StorageError::InvalidInput(format!("threshold_json parse error: {}", e)))?;
     val.get("m")
         .and_then(|v| v.as_u64())
         .map(|m| m as usize)
@@ -413,11 +412,7 @@ mod tests {
     }
 
     /// Insert a governance-action row into the test DB.
-    fn insert_governance_action(
-        conn: &mut SqliteConnection,
-        id: &str,
-        threshold_json: &str,
-    ) {
+    fn insert_governance_action(conn: &mut SqliteConnection, id: &str, threshold_json: &str) {
         diesel::replace_into(governance_actions::table)
             .values((
                 governance_actions::id.eq(id),
@@ -469,11 +464,7 @@ mod tests {
         let pool = test_pool();
         {
             let mut conn = pool.get().expect("conn");
-            insert_governance_action(
-                &mut conn,
-                "action-001",
-                r#"{"type":"shamir","m":2,"n":3}"#,
-            );
+            insert_governance_action(&mut conn, "action-001", r#"{"type":"shamir","m":2,"n":3}"#);
         }
 
         let transport = Arc::new(MockShareTransport::new(HashMap::new()));
@@ -499,11 +490,7 @@ mod tests {
         let pool = test_pool();
         {
             let mut conn = pool.get().expect("conn");
-            insert_governance_action(
-                &mut conn,
-                "action-002",
-                r#"{"type":"shamir","m":3,"n":5}"#,
-            );
+            insert_governance_action(&mut conn, "action-002", r#"{"type":"shamir","m":3,"n":5}"#);
             // Only 2 approvals inserted, threshold is 3
             insert_approval_attestation(&mut conn, "attest-A", "action-002", "custodian-A-cid");
             insert_approval_attestation(&mut conn, "attest-B", "action-002", "custodian-B-cid");
@@ -550,7 +537,10 @@ mod tests {
             }
             AssemblyResult::Shares(shares) => {
                 // Only acceptable if 3+ shares collected — impossible with 2 approvals
-                panic!("unexpected Shares result with only 2 approvals: {} shares", shares.len());
+                panic!(
+                    "unexpected Shares result with only 2 approvals: {} shares",
+                    shares.len()
+                );
             }
         }
     }
@@ -569,11 +559,7 @@ mod tests {
         let threshold = 2usize;
         {
             let mut conn = pool.get().expect("conn");
-            insert_governance_action(
-                &mut conn,
-                "action-003",
-                r#"{"type":"shamir","m":2,"n":3}"#,
-            );
+            insert_governance_action(&mut conn, "action-003", r#"{"type":"shamir","m":2,"n":3}"#);
             insert_approval_attestation(&mut conn, "attest-1", "action-003", "custC1");
             insert_approval_attestation(&mut conn, "attest-2", "action-003", "custC2");
             insert_approval_attestation(&mut conn, "attest-3", "action-003", "custC3");

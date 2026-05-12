@@ -28,7 +28,9 @@ pub fn threshold_met(
         .filter(ods::observation_kind.eq(observation_kind))
         .first(conn)
         .optional()?;
-    let Some(row) = row else { return Ok(false); };
+    let Some(row) = row else {
+        return Ok(false);
+    };
 
     if let Some(t) = threshold.distinct_households {
         if row.distinct_households < t {

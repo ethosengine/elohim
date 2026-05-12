@@ -3,7 +3,13 @@ use elohim_storage::observation::manager::ObservationManagerBackend;
 use elohim_storage::observation::wire::Observation;
 use elohim_storage::test_util::test_pool;
 
-fn obs(observer: &str, household: Option<&str>, subject: &str, kind: &str, seq: u64) -> Observation {
+fn obs(
+    observer: &str,
+    household: Option<&str>,
+    subject: &str,
+    kind: &str,
+    seq: u64,
+) -> Observation {
     Observation {
         observer_cid: observer.into(),
         log_cid: String::new(),
@@ -60,15 +66,7 @@ async fn threshold_met_with_three_households() {
     let mut conn = pool.get().unwrap();
     let mgr = ObservationManagerBackend::new_in_memory("agent:self".into());
 
-    for (i, hh) in [
-        (0u64, "h1"),
-        (1, "h1"),
-        (2, "h2"),
-        (3, "h2"),
-        (4, "h3"),
-    ]
-    .iter()
-    {
+    for (i, hh) in [(0u64, "h1"), (1, "h1"), (2, "h2"), (3, "h2"), (4, "h3")].iter() {
         let obs = obs(
             &format!("agent:{}", i),
             Some(&format!("household:{}", hh)),

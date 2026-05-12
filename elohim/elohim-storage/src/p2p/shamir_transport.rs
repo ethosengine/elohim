@@ -286,9 +286,8 @@ pub fn verify_share_response(
     let sig = Signature::from_bytes(&sig_bytes);
 
     // Canonical message: cid_bytes ‖ share_data ‖ share_index_le4
-    let mut message = Vec::with_capacity(
-        recovery_governance_action_cid.len() + response.share_data.len() + 4,
-    );
+    let mut message =
+        Vec::with_capacity(recovery_governance_action_cid.len() + response.share_data.len() + 4);
     message.extend_from_slice(recovery_governance_action_cid.as_bytes());
     message.extend_from_slice(&response.share_data);
     message.extend_from_slice(&response.share_index.to_le_bytes());
@@ -313,9 +312,11 @@ mod tests {
             custodian_cid: "uhCqkXyz9876543210".to_string(),
         };
         let encoded = rmp_serde::to_vec(&req).expect("encode request");
-        let decoded: ShamirShareRequest =
-            rmp_serde::from_slice(&encoded).expect("decode request");
-        assert_eq!(decoded.recovery_governance_action_cid, req.recovery_governance_action_cid);
+        let decoded: ShamirShareRequest = rmp_serde::from_slice(&encoded).expect("decode request");
+        assert_eq!(
+            decoded.recovery_governance_action_cid,
+            req.recovery_governance_action_cid
+        );
         assert_eq!(decoded.custodian_cid, req.custodian_cid);
     }
 

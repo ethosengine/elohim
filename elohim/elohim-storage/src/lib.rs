@@ -204,6 +204,7 @@ pub use views::{
     HouseholdDevicesView, HouseholdResilienceDetails, HouseholdResilienceView, NetworkPostureView,
     NodeShapeView, PeerStatusView, RenderCapabilityProfile, RendererKind,
 };
+pub use views::{AttestationView, GovernanceActionTallyView, GovernanceActionView};
 pub use views::{
     EprCouplingView, EprEnvelopeView, EprListView, EprProvidersView, EprPublishInput,
     EprSignatureView, EprVerifyErrorView, EprVerifyView, EprView,
@@ -213,4 +214,3 @@ pub use views::{
     PlacementGapView, RegionalDistributionView, ResilienceSnapshotDetailsView,
     ResilienceSnapshotView, StewardingCollectiveEntry,
 };
-pub use views::{AttestationView, GovernanceActionTallyView, GovernanceActionView};

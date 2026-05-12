@@ -13,9 +13,9 @@ use elohim_storage::observation::wire::Observation;
 use elohim_storage::test_util::test_pool;
 use elohim_storage::views::{ObservationDiversitySummaryView, ObservationView};
 
+use diesel::prelude::*;
 use elohim_storage::db::diesel_schema::{observation_diversity_summary, observations};
 use elohim_storage::db::models::ObservationDiversitySummaryRow;
-use diesel::prelude::*;
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -52,7 +52,11 @@ async fn by_subject_returns_empty_when_no_rows() {
     let mgr = ObservationManagerBackend::new_in_memory("agent:self".into());
 
     let rows = mgr
-        .query_by_subject(&mut conn, "doorway:never", "infrastructure:doorway-heartbeat")
+        .query_by_subject(
+            &mut conn,
+            "doorway:never",
+            "infrastructure:doorway-heartbeat",
+        )
         .unwrap();
 
     assert!(rows.is_empty(), "expected no rows for unknown subject_cid");
@@ -86,7 +90,11 @@ async fn by_subject_returns_matching_rows_newest_first() {
     mgr.project_remote(&mut conn, &other).await.unwrap();
 
     let rows = mgr
-        .query_by_subject(&mut conn, "doorway:target", "infrastructure:doorway-heartbeat")
+        .query_by_subject(
+            &mut conn,
+            "doorway:target",
+            "infrastructure:doorway-heartbeat",
+        )
         .unwrap();
 
     assert_eq!(rows.len(), 2, "should return 2 rows for doorway:target");
@@ -99,9 +107,18 @@ async fn by_subject_returns_matching_rows_newest_first() {
     // Verify camelCase wire format on ObservationView
     let json = serde_json::to_string(&rows[0]).unwrap();
     let v: serde_json::Value = serde_json::from_str(&json).unwrap();
-    assert!(v.get("observerCid").is_some(), "wire must have camelCase observerCid");
-    assert!(v.get("observationKind").is_some(), "wire must have camelCase observationKind");
-    assert!(v.get("observedAt").is_some(), "wire must have camelCase observedAt");
+    assert!(
+        v.get("observerCid").is_some(),
+        "wire must have camelCase observerCid"
+    );
+    assert!(
+        v.get("observationKind").is_some(),
+        "wire must have camelCase observationKind"
+    );
+    assert!(
+        v.get("observedAt").is_some(),
+        "wire must have camelCase observedAt"
+    );
 }
 
 #[tokio::test]
@@ -120,21 +137,42 @@ async fn by_subject_filters_by_kind() {
     );
     mgr.project_remote(&mut conn, &heartbeat).await.unwrap();
 
-    let mut capacity = obs("agent:beta", "log:b", 1, "doorway:same", "compute:capacity-report");
+    let mut capacity = obs(
+        "agent:beta",
+        "log:b",
+        1,
+        "doorway:same",
+        "compute:capacity-report",
+    );
     capacity.log_offset = 1;
     capacity.seq = 1;
     mgr.project_remote(&mut conn, &capacity).await.unwrap();
 
     let heartbeat_rows = mgr
-        .query_by_subject(&mut conn, "doorway:same", "infrastructure:doorway-heartbeat")
+        .query_by_subject(
+            &mut conn,
+            "doorway:same",
+            "infrastructure:doorway-heartbeat",
+        )
         .unwrap();
-    assert_eq!(heartbeat_rows.len(), 1, "kind filter must isolate heartbeat");
-    assert_eq!(heartbeat_rows[0].observation_kind, "infrastructure:doorway-heartbeat");
+    assert_eq!(
+        heartbeat_rows.len(),
+        1,
+        "kind filter must isolate heartbeat"
+    );
+    assert_eq!(
+        heartbeat_rows[0].observation_kind,
+        "infrastructure:doorway-heartbeat"
+    );
 
     let capacity_rows = mgr
         .query_by_subject(&mut conn, "doorway:same", "compute:capacity-report")
         .unwrap();
-    assert_eq!(capacity_rows.len(), 1, "kind filter must isolate capacity-report");
+    assert_eq!(
+        capacity_rows.len(),
+        1,
+        "kind filter must isolate capacity-report"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -164,7 +202,11 @@ async fn by_observer_returns_all_kinds_when_no_kind_filter() {
         .unwrap();
 
     let views: Vec<ObservationView> = rows.into_iter().map(ObservationView::from).collect();
-    assert_eq!(views.len(), 2, "by-observer with no kind filter returns all kinds");
+    assert_eq!(
+        views.len(),
+        2,
+        "by-observer with no kind filter returns all kinds"
+    );
 }
 
 #[tokio::test]
@@ -209,14 +251,16 @@ async fn diversity_returns_none_when_no_observations() {
     let row: Option<ObservationDiversitySummaryRow> = observation_diversity_summary::table
         .filter(observation_diversity_summary::subject_cid.eq("doorway:ghost"))
         .filter(
-            observation_diversity_summary::observation_kind
-                .eq("infrastructure:doorway-heartbeat"),
+            observation_diversity_summary::observation_kind.eq("infrastructure:doorway-heartbeat"),
         )
         .first(&mut conn)
         .optional()
         .unwrap();
 
-    assert!(row.is_none(), "diversity summary must return None for unknown subject");
+    assert!(
+        row.is_none(),
+        "diversity summary must return None for unknown subject"
+    );
 }
 
 #[tokio::test]
@@ -226,22 +270,33 @@ async fn diversity_returns_summary_after_observations_seeded() {
     let mgr = ObservationManagerBackend::new_in_memory("agent:epsilon".into());
 
     // Seed 3 observations from 3 distinct observers for same subject+kind.
-    for (i, observer) in ["agent:epsilon", "agent:zeta", "agent:eta"].iter().enumerate() {
-        let o = obs(observer, "log:e", i as u64, "doorway:multi", "infrastructure:doorway-heartbeat");
+    for (i, observer) in ["agent:epsilon", "agent:zeta", "agent:eta"]
+        .iter()
+        .enumerate()
+    {
+        let o = obs(
+            observer,
+            "log:e",
+            i as u64,
+            "doorway:multi",
+            "infrastructure:doorway-heartbeat",
+        );
         mgr.project_remote(&mut conn, &o).await.unwrap();
     }
 
     let row: Option<ObservationDiversitySummaryRow> = observation_diversity_summary::table
         .filter(observation_diversity_summary::subject_cid.eq("doorway:multi"))
         .filter(
-            observation_diversity_summary::observation_kind
-                .eq("infrastructure:doorway-heartbeat"),
+            observation_diversity_summary::observation_kind.eq("infrastructure:doorway-heartbeat"),
         )
         .first(&mut conn)
         .optional()
         .unwrap();
 
-    assert!(row.is_some(), "diversity summary must exist after observations seeded");
+    assert!(
+        row.is_some(),
+        "diversity summary must exist after observations seeded"
+    );
     let summary = row.unwrap();
     assert_eq!(summary.total_count, 3, "total_count should be 3");
     assert_eq!(
@@ -253,10 +308,22 @@ async fn diversity_returns_summary_after_observations_seeded() {
     let view = ObservationDiversitySummaryView::from(summary);
     let json = serde_json::to_string(&view).unwrap();
     let v: serde_json::Value = serde_json::from_str(&json).unwrap();
-    assert!(v.get("subjectCid").is_some(), "wire must have camelCase subjectCid");
-    assert!(v.get("distinctAgents").is_some(), "wire must have camelCase distinctAgents");
-    assert!(v.get("totalCount").is_some(), "wire must have camelCase totalCount");
-    assert!(v.get("firstObservedAt").is_some(), "wire must have camelCase firstObservedAt");
+    assert!(
+        v.get("subjectCid").is_some(),
+        "wire must have camelCase subjectCid"
+    );
+    assert!(
+        v.get("distinctAgents").is_some(),
+        "wire must have camelCase distinctAgents"
+    );
+    assert!(
+        v.get("totalCount").is_some(),
+        "wire must have camelCase totalCount"
+    );
+    assert!(
+        v.get("firstObservedAt").is_some(),
+        "wire must have camelCase firstObservedAt"
+    );
 }
 
 // ---------------------------------------------------------------------------

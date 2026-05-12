@@ -101,9 +101,7 @@ fn tick_emits_summary_when_observations_in_window() {
         3600,
     )]);
     // window_end = window_start + 3600; observations are at base+0..2, all < window_end
-    let plans = evaluator
-        .tick(&mut conn, 1_715_420_400 + 3600)
-        .unwrap();
+    let plans = evaluator.tick(&mut conn, 1_715_420_400 + 3600).unwrap();
     assert_eq!(plans.summaries.len(), 1);
     assert_eq!(plans.summaries[0].action, "served-blob-summary");
     assert!(plans.attestations.is_empty());
@@ -148,9 +146,7 @@ fn tick_handles_multiple_subjects_for_same_attestation_kind() {
             ..Default::default()
         },
     )]);
-    let plans = evaluator
-        .tick(&mut conn, 1_715_420_400 + 100)
-        .unwrap();
+    let plans = evaluator.tick(&mut conn, 1_715_420_400 + 100).unwrap();
     assert_eq!(
         plans.attestations.len(),
         2,

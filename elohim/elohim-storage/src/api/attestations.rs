@@ -234,8 +234,9 @@ async fn handle_unified(
 
         // GET /api/v1/attestations/unified/{id}
         (&Method::GET, p) if !p.contains('/') || p == "/" => {
-            let id = extract_id(p)
-                .ok_or_else(|| StorageError::InvalidInput("Attestation CID required".to_string()))?;
+            let id = extract_id(p).ok_or_else(|| {
+                StorageError::InvalidInput("Attestation CID required".to_string())
+            })?;
             let mut conn = get_conn(pool)?;
             let row = unified_attestations::get_by_id(&mut conn, id)?;
             Ok(response::from_option(
@@ -248,8 +249,9 @@ async fn handle_unified(
         // Note: this does NOT revoke the DHT entry. It records the revocation signal.
         (&Method::POST, p) if p.ends_with("/revoke") => {
             let id_part = p.strip_suffix("/revoke").unwrap_or("");
-            let id = extract_id(id_part.trim_start_matches('/'))
-                .ok_or_else(|| StorageError::InvalidInput("Attestation CID required".to_string()))?;
+            let id = extract_id(id_part.trim_start_matches('/')).ok_or_else(|| {
+                StorageError::InvalidInput("Attestation CID required".to_string())
+            })?;
             let input: RevokeUnifiedInput = parse_body(req).await?;
             let mut conn = get_conn(pool)?;
             // Fetch, apply revocation fields, upsert back.
@@ -341,8 +343,7 @@ mod tests {
         unified_attestations::upsert(&mut conn, &row1).unwrap();
         unified_attestations::upsert(&mut conn, &row2).unwrap();
 
-        let rows =
-            unified_attestations::list_by_subject(&mut conn, "subject-abc", None).unwrap();
+        let rows = unified_attestations::list_by_subject(&mut conn, "subject-abc", None).unwrap();
         assert_eq!(rows.len(), 2);
 
         let views: Vec<AttestationView> = rows.into_iter().map(AttestationView::from).collect();

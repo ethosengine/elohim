@@ -56,7 +56,10 @@ async fn append_local_stamps_log_metadata_and_projects() {
         .unwrap();
     assert_eq!(rows.len(), 1);
     assert_eq!(rows[0].observer_cid, "agent:self");
-    assert!(!rows[0].log_cid.is_empty(), "log_cid must be stamped by append_local");
+    assert!(
+        !rows[0].log_cid.is_empty(),
+        "log_cid must be stamped by append_local"
+    );
 }
 
 #[tokio::test]

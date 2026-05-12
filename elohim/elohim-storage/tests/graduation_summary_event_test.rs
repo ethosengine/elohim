@@ -1,6 +1,6 @@
+use diesel::RunQueryDsl;
 use elohim_storage::graduation::summary_event::SummaryEventSpec;
 use elohim_storage::test_util::test_pool;
-use diesel::RunQueryDsl;
 
 #[test]
 fn summarise_blob_served_aggregates_three_observations() {
@@ -9,10 +9,7 @@ fn summarise_blob_served_aggregates_three_observations() {
 
     // Insert three observations using raw SQL (simpler than ORM with type inference)
     for i in 0..3i64 {
-        let payload = format!(
-            r#"{{"blob_cid":"b{}","bytes":1000,"peer_cid":"r1"}}"#,
-            i
-        );
+        let payload = format!(r#"{{"blob_cid":"b{}","bytes":1000,"peer_cid":"r1"}}"#, i);
         let sql = format!(
             "INSERT INTO observations (observer_cid, log_cid, log_offset, observed_at, seq, \
              observation_kind, subject_cid, subject_kind, payload_json, signature_b64) \
@@ -24,9 +21,7 @@ fn summarise_blob_served_aggregates_three_observations() {
             i,
             payload.replace("'", "''")
         );
-        diesel::sql_query(sql)
-            .execute(&mut conn)
-            .unwrap();
+        diesel::sql_query(sql).execute(&mut conn).unwrap();
     }
 
     let spec = SummaryEventSpec {
@@ -72,9 +67,7 @@ fn observation_refs_use_iroh_url_format() {
          'blob:b0', 'blob', '{}', '')",
         payload.replace("'", "''")
     );
-    diesel::sql_query(sql)
-        .execute(&mut conn)
-        .unwrap();
+    diesel::sql_query(sql).execute(&mut conn).unwrap();
 
     let spec = SummaryEventSpec {
         observation_kind: "infrastructure:blob-served".into(),

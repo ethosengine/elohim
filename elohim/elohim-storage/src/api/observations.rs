@@ -175,5 +175,7 @@ async fn handle_diversity(
                 StorageError::Internal(format!("observation_diversity_summary query failed: {}", e))
             })?;
 
-    Ok(response::ok(&row.map(ObservationDiversitySummaryView::from)))
+    Ok(response::ok(
+        &row.map(ObservationDiversitySummaryView::from),
+    ))
 }

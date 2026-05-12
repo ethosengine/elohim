@@ -21,7 +21,9 @@ use http_body_util::Full;
 use hyper::{body::Incoming, Method, Request, Response};
 use serde::{Deserialize, Serialize};
 
-use crate::db::{attestations as attestation_db, governance_action_tally, governance_actions, AppContext, DbPool};
+use crate::db::{
+    attestations as attestation_db, governance_action_tally, governance_actions, AppContext, DbPool,
+};
 use crate::error::StorageError;
 use crate::services::{response, tally_projector};
 use crate::views::{AttestationView, GovernanceActionTallyView, GovernanceActionView};
@@ -147,8 +149,7 @@ pub async fn handle(
                 StorageError::InvalidInput("Governance action CID required".to_string())
             })?;
             let mut conn = get_conn(pool)?;
-            let tally_row =
-                governance_action_tally::get_by_parent_cid(&mut conn, id)?;
+            let tally_row = governance_action_tally::get_by_parent_cid(&mut conn, id)?;
             Ok(response::from_option(
                 Ok(tally_row.map(GovernanceActionTallyView::from)),
                 &format!("Tally for {} not found", id),
@@ -170,8 +171,7 @@ pub async fn handle(
                 )));
             };
 
-            let vote_rows =
-                attestation_db::list_by_parent_governance_action(&mut conn, id)?;
+            let vote_rows = attestation_db::list_by_parent_governance_action(&mut conn, id)?;
             let tally_row = governance_action_tally::get_by_parent_cid(&mut conn, id)?;
 
             let detail = GovernanceActionDetailView {
@@ -192,13 +192,9 @@ pub async fn handle(
             let mut conn = get_conn(pool)?;
 
             // Verify parent governance action exists.
-            governance_actions::get_by_id(&mut conn, parent_id)?
-                .ok_or_else(|| {
-                    StorageError::NotFound(format!(
-                        "Governance action {} not found",
-                        parent_id
-                    ))
-                })?;
+            governance_actions::get_by_id(&mut conn, parent_id)?.ok_or_else(|| {
+                StorageError::NotFound(format!("Governance action {} not found", parent_id))
+            })?;
 
             // Decode hex dht_anchor_hash back to Vec<u8>.
             let dht_anchor_hash = hex::decode(&input.dht_anchor_hash).map_err(|e| {
@@ -325,8 +321,7 @@ mod tests {
         assert_eq!(tally.computed_status, "reached-quorum");
 
         // Verify list of children.
-        let votes =
-            attestation_db::list_by_parent_governance_action(&mut conn, "gov-002").unwrap();
+        let votes = attestation_db::list_by_parent_governance_action(&mut conn, "gov-002").unwrap();
         assert_eq!(votes.len(), 2);
 
         // Verify tally view.
@@ -354,8 +349,17 @@ mod tests {
         };
         let view = GovernanceActionTallyView::from(row);
         let json = serde_json::to_value(&view).unwrap();
-        assert!(json.get("parentCid").is_some(), "parentCid must be camelCase");
-        assert!(json.get("currentApproveCount").is_some(), "currentApproveCount must be camelCase");
-        assert!(json.get("thresholdN").is_some(), "thresholdN must be camelCase");
+        assert!(
+            json.get("parentCid").is_some(),
+            "parentCid must be camelCase"
+        );
+        assert!(
+            json.get("currentApproveCount").is_some(),
+            "currentApproveCount must be camelCase"
+        );
+        assert!(
+            json.get("thresholdN").is_some(),
+            "thresholdN must be camelCase"
+        );
     }
 }

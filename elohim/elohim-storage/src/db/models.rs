@@ -3341,5 +3341,4 @@ pub struct GovernanceActionTallyRow {
     pub computed_status: String,
     pub last_child_at: Option<String>,
     pub rebuilt_at: String,
-
 }

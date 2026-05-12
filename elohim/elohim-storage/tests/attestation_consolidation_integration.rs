@@ -37,10 +37,10 @@ use std::sync::Arc;
 use diesel::prelude::*;
 use elohim_storage::db::diesel_schema::{attestations, governance_actions};
 use elohim_storage::db::{init_pool_from_dir, run_migrations};
+use elohim_storage::p2p::shamir_transport::ShamirShareResponse;
 use elohim_storage::recovery::share_assembler::{
     AssemblyResult, MockShareTransport, ShareAssembler,
 };
-use elohim_storage::p2p::shamir_transport::ShamirShareResponse;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // DB seed helpers
@@ -122,9 +122,24 @@ async fn dht_attested_libp2p_transported_recovery_2_of_3() {
 
         // Mock DHT → SQLite projection: 3 attestation:recovery-approval entries
         // (from custodians Bob, Carol, Dave)
-        seed_recovery_approval(&mut conn, "attest-bob-001", governance_action_cid, "bob-cid");
-        seed_recovery_approval(&mut conn, "attest-carol-001", governance_action_cid, "carol-cid");
-        seed_recovery_approval(&mut conn, "attest-dave-001", governance_action_cid, "dave-cid");
+        seed_recovery_approval(
+            &mut conn,
+            "attest-bob-001",
+            governance_action_cid,
+            "bob-cid",
+        );
+        seed_recovery_approval(
+            &mut conn,
+            "attest-carol-001",
+            governance_action_cid,
+            "carol-cid",
+        );
+        seed_recovery_approval(
+            &mut conn,
+            "attest-dave-001",
+            governance_action_cid,
+            "dave-cid",
+        );
     }
 
     // ── 2. Wire mock transport with canned ShamirShareResponses ────────────
@@ -195,10 +210,7 @@ async fn dht_attested_libp2p_transported_recovery_2_of_3() {
             let mut conn = pool.get().expect("conn");
             let approval_rows: Vec<elohim_storage::db::models::AttestationRow> =
                 attestations::table
-                    .filter(
-                        attestations::parent_governance_action_cid
-                            .eq(governance_action_cid),
-                    )
+                    .filter(attestations::parent_governance_action_cid.eq(governance_action_cid))
                     .load(&mut conn)
                     .expect("load attestations");
 
@@ -253,17 +265,29 @@ async fn transport_failure_tolerated_when_remaining_meet_threshold() {
     {
         let mut conn = pool.get().expect("conn");
         seed_governance_action(&mut conn, governance_action_cid, 2, 3);
-        seed_recovery_approval(&mut conn, "attest-p1-001", governance_action_cid, "peer1-cid");
-        seed_recovery_approval(&mut conn, "attest-p2-001", governance_action_cid, "peer2-cid");
-        seed_recovery_approval(&mut conn, "attest-p3-001", governance_action_cid, "peer3-cid");
+        seed_recovery_approval(
+            &mut conn,
+            "attest-p1-001",
+            governance_action_cid,
+            "peer1-cid",
+        );
+        seed_recovery_approval(
+            &mut conn,
+            "attest-p2-001",
+            governance_action_cid,
+            "peer2-cid",
+        );
+        seed_recovery_approval(
+            &mut conn,
+            "attest-p3-001",
+            governance_action_cid,
+            "peer3-cid",
+        );
     }
 
     let mut canned: HashMap<String, Result<ShamirShareResponse, String>> = HashMap::new();
     // peer1 fails
-    canned.insert(
-        "peer1-cid".to_string(),
-        Err("peer unreachable".to_string()),
-    );
+    canned.insert("peer1-cid".to_string(), Err("peer unreachable".to_string()));
     // peer2 + peer3 succeed
     canned.insert(
         "peer2-cid".to_string(),
@@ -293,7 +317,10 @@ async fn transport_failure_tolerated_when_remaining_meet_threshold() {
 
     match result {
         AssemblyResult::Shares(shares) => {
-            assert!(shares.len() >= 2, "should have ≥ 2 shares despite one failure");
+            assert!(
+                shares.len() >= 2,
+                "should have ≥ 2 shares despite one failure"
+            );
         }
         AssemblyResult::BelowThreshold { .. } => {
             panic!("should reach threshold with peer2 + peer3 even if peer1 fails");
