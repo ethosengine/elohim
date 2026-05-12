@@ -147,6 +147,8 @@ export * from "./HumanRelationship";
 export * from "./HumanRelationshipView";
 export * from "./HumanView";
 export * from "./ImagodeiObservationView";
+export * from "./ObservationDiversitySummaryView";
+export * from "./ObservationView";
 export * from "./InfrastructureTokenBalanceView";
 export * from "./InitiateClaimInputView";
 export * from "./JsonValue";

@@ -4,13 +4,14 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
   test: {
     globals: true,
-    environment: 'node',
+    environment: 'jsdom',
     root: './src',
     include: ['**/*.spec.ts'],
     exclude: ['node_modules', 'dist', 'resilience/**', 'distribution/**'],
     pool: 'forks',
     maxForks: 8,
     reporters: ['default'],
+    setupFiles: ['./vitest.setup.ts'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'lcov', 'html'],

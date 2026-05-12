@@ -19,3 +19,5 @@ export type { ResilienceSnapshotDensity } from './resilience/resilience-snapshot
 
 export { DistributionService } from './distribution/distribution.service';
 export { DistributionBadgeComponent } from './distribution/distribution-badge/distribution-badge.component';
+
+export { ObservationService } from './services/observation.service';
