@@ -3,4 +3,5 @@
 
 pub mod attestation;
 pub mod diversity;
+pub mod evaluator;
 pub mod summary_event;
