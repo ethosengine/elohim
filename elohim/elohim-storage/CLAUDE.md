@@ -207,6 +207,18 @@ const response = await api.createContent(input);  // camelCase in, camelCase out
 
 ---
 
+## Observation Layer Projections
+
+Per `genesis/docs/superpowers/specs/2026-05-11-observation-event-layer-design.md`, the following existing operational SQL tables are observation projections:
+
+- `peer_blob_inventory` — projects `infrastructure:blob-served` and `infrastructure:blob-hosted` observations. The legacy gossipsub topic `elohim/inventory/blob` is the cursor-announcement stream for both kinds.
+- `system_metrics` — projects `infrastructure:system-sample` observations (per-node only per `project_node_metrics_vs_hub_aggregation_boundary`).
+- `projection_events` — stays as is (already correctly operational; observation primitive is separate).
+
+The Observation primitive itself lives in the `observations` table (Stage 3.1 migration). Diversity aggregations live in the `observation_diversity_summary` view (Stage 3.2). New observation kinds are declared in pillar manifests under `observation_kinds`.
+
+The Track 2 substrate plane for observations is `IROH_OBSERVATION_ALPN` / libp2p `OBSERVATION_LOG_PROTOCOL_ID` with cursor announcements gossiped via `elohim/observations/<kind_namespace>` topics. See spec §5 for the dataflow.
+
 ## Design Vocabulary
 
 Storage and distribution language — `quilt` (RS-encoded distribution of a content unit), `pantry` (peer-tended container), `stock`/`draw` (deposit/retrieve verbs), `shard`, `RS(N,K)` — is defined in `genesis/graphos/vocabulary.md`. Wire-level identifiers (`/blob/{hash}`, `BlobStore`, `sha256-{hex}`) keep their existing names. New design discussion, signal/event names, and any fresh identifiers should use the new vocabulary. Legacy `/store/{hash}` paths were retired 2026-04-30 — the canonical HTTP path is `/blob/{hash}`.
