@@ -4,8 +4,9 @@
 use crate::db::diesel_schema::observation_diversity_summary as ods;
 use crate::db::models::ObservationDiversitySummaryRow;
 use diesel::prelude::*;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct DiversityThreshold {
     pub distinct_households: Option<i64>,
     pub distinct_collectives: Option<i64>,
