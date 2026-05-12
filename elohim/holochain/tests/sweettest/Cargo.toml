@@ -77,6 +77,10 @@ path = "src/tests/attention_tending.rs"
 name = "attestation_coordinator"
 path = "src/tests/attestation_coordinator.rs"
 
+[[test]]
+name = "stake_class_gate"
+path = "src/tests/stake_class_gate.rs"
+
 [dependencies]
 # Holochain runtime — sweettest embeds a real conductor in-process.
 # Versions are pinned to match the DNAs (HDK 0.6.0 / HDI 0.7.0).

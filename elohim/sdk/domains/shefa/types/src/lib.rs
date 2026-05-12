@@ -183,6 +183,12 @@ pub struct CreateReaEconomicEventInput {
     pub note: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub metadata_json: Option<String>,
+    /// Substrate observation refs proving this event was graduated from observed data.
+    /// Required for operational verbs (served-blob-summary, appreciation-summary,
+    /// consumed-compute-summary). Omit for high-stakes authored verbs.
+    /// See observation-event-layer spec §8.3.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub observation_refs: Option<Vec<String>>,
 }
 
 /// EconomicEvent wire type. Mirrors the integrity zome's EconomicEvent entry type.
@@ -790,6 +796,7 @@ mod tests {
             lamad_event_type: Some("content_consumed".into()),
             note: None,
             metadata_json: None,
+            observation_refs: None,
         };
         let bytes = rmp_serde::to_vec_named(&input).unwrap();
         let decoded: CreateReaEconomicEventInput = rmp_serde::from_slice(&bytes).unwrap();

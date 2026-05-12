@@ -11764,10 +11764,54 @@ pub fn get_commitments_by_agreement(
 // =============================================================================
 // CreateReaEconomicEventInput, ReaEconomicEventOutput re-exported from shefa-types above.
 
+/// Classifies an economic action verb into a stake class.
+///
+/// - `"high"` — authored directly by a human agent; no observation evidence required.
+/// - `"operational"` — graduated from substrate observations; MUST carry `observation_refs`.
+///
+/// Default is `"high"` so existing callers and unmigrated action verbs are unaffected.
+/// New operational verbs MUST be registered here to activate the §8.3 gate.
+fn lookup_stake_class(action: &str) -> ExternResult<&'static str> {
+    match action {
+        // High-stakes verbs — authored directly, no observation evidence required.
+        "transfer-standing"
+        | "grant-stewardship"
+        | "custody-handoff"
+        | "enact-governance-action"
+        | "appreciate"
+        | "use" => Ok("high"),
+
+        // Operational verbs — MUST carry observation_refs (graduated from substrate observations).
+        "served-blob-summary" | "appreciation-summary" | "consumed-compute-summary" => {
+            Ok("operational")
+        }
+
+        // Default: high. New operational verbs must be explicitly registered above.
+        // Fail-closed is preferred but would break unmigrated callers; defer to follow-on.
+        _ => Ok("high"),
+    }
+}
+
 #[hdk_extern]
 pub fn create_rea_economic_event(
     input: CreateReaEconomicEventInput,
 ) -> ExternResult<ReaEconomicEventOutput> {
+    // Stake-class gate (§8.3): operational verbs must carry substrate observation refs.
+    // High-stakes verbs are authored directly and need no evidence proof.
+    let stake_class = lookup_stake_class(&input.action)?;
+    if stake_class == "operational" {
+        let refs = input.observation_refs.as_deref().unwrap_or(&[]);
+        if refs.is_empty() {
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "operational action verb '{}' requires non-empty observation_refs \
+                 (substrate-graduated economic event). High-stakes verbs are authored \
+                 directly; operational verbs must reference the observations that \
+                 aggregated into them. See observation-event-layer spec §8.3.",
+                input.action
+            ))));
+        }
+    }
+
     let now = sys_time()?;
     let timestamp = format!("{:?}", now);
 
