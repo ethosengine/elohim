@@ -36,6 +36,7 @@ pub mod identity;
 pub mod mastery;
 pub mod network_posture;
 pub mod node_shape;
+pub mod observations;
 pub mod peer_statuses;
 pub mod peer_topology;
 pub mod placement_gaps;
@@ -207,6 +208,9 @@ pub async fn handle_api_request(
     } else if sub_path.starts_with("hazards") {
         let resource_path = sub_path.strip_prefix("hazards").unwrap_or("");
         hazards::handle(req, method, resource_path, &pool, &app_ctx).await
+    } else if sub_path.starts_with("observations") {
+        let resource_path = sub_path.strip_prefix("observations").unwrap_or("");
+        observations::handle(req, method, resource_path, &pool, &app_ctx).await
     } else if sub_path.starts_with("placement-gaps") {
         let resource_path = sub_path.strip_prefix("placement-gaps").unwrap_or("");
         placement_gaps::handle(req, method, resource_path, &pool, &app_ctx).await
