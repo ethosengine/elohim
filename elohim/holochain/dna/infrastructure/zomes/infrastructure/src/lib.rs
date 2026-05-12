@@ -5,8 +5,7 @@
 //!
 //! Key functions:
 //! - register_doorway: Self-registration (operator = author)
-//! - record_heartbeat: 60s status updates
-//! - record_daily_summary: Midnight aggregation
+//! - record_daily_summary: Midnight aggregation (heartbeats moved to Track 2 substrate)
 //! - update_doorway_tier: Recompute trust tier from history
 
 use hdk::prelude::*;
@@ -21,7 +20,7 @@ pub use peer_status::*;
 
 pub use infrastructure_types::{
     ContentServerOutput, DoorwayOutput, FindPublishersInput, FindPublishersOutput,
-    HealthAttestationOutput, RecordHealthAttestationInput, RecordHeartbeatInput,
+    HealthAttestationOutput, RecordHealthAttestationInput,
     RecordSummaryInput, RegisterContentServerInput, RegisterDoorwayInput, StorageEndpointInput,
 };
 
@@ -91,13 +90,7 @@ pub enum InfrastructureSignal {
         doorway: DoorwayRegistration,
         author: AgentPubKey,
     },
-    /// DoorwayHeartbeat was recorded
-    DoorwayHeartbeatCommitted {
-        action_hash: ActionHash,
-        entry_hash: EntryHash,
-        heartbeat: DoorwayHeartbeat,
-        author: AgentPubKey,
-    },
+    // DoorwayHeartbeatCommitted removed (observation-event-layer spec §10 Stage 6) — DoorwayHeartbeat entry type removed
     /// DoorwayHeartbeatSummary was committed to the consolidated attestation store.
     /// action_hash and entry_hash are the elohim DNA's attestation record, not a local entry.
     DoorwaySummaryCommitted {
@@ -184,18 +177,7 @@ pub fn post_commit(committed_actions: Vec<SignedActionHashed>) -> ExternResult<(
                 doorway,
                 author,
             })?;
-        } else if let Some(heartbeat) = record
-            .entry()
-            .to_app_option::<DoorwayHeartbeat>()
-            .ok()
-            .flatten()
-        {
-            emit_signal(InfrastructureSignal::DoorwayHeartbeatCommitted {
-                action_hash,
-                entry_hash,
-                heartbeat,
-                author,
-            })?;
+        // DoorwayHeartbeat signal branch removed (observation-event-layer spec §10 Stage 6)
         } else if let Some(server) = record
             .entry()
             .to_app_option::<ContentServer>()
@@ -447,52 +429,11 @@ pub fn get_doorways_by_region(region: String) -> ExternResult<Vec<DoorwayOutput>
 }
 
 // =============================================================================
-// Heartbeat Functions
+// Daily Summary Functions
 // =============================================================================
-
-/// Record a doorway heartbeat.
-///
-/// Only the doorway's operator can record heartbeats for it.
-#[hdk_extern]
-pub fn record_heartbeat(input: RecordHeartbeatInput) -> ExternResult<ActionHash> {
-    let agent_info = agent_info()?;
-    let now = sys_time()?;
-    let timestamp = format!("{:?}", now);
-
-    let doorway = get_doorway_by_id(input.doorway_id.clone())?.ok_or_else(|| {
-        wasm_error!(WasmErrorInner::Guest(format!(
-            "Doorway '{}' not found",
-            input.doorway_id
-        )))
-    })?;
-
-    if doorway.doorway.operator_agent != agent_info.agent_initial_pubkey.to_string() {
-        return Err(wasm_error!(WasmErrorInner::Guest(
-            "Only the doorway operator can record heartbeats".to_string()
-        )));
-    }
-
-    let heartbeat = DoorwayHeartbeat {
-        doorway_id: input.doorway_id,
-        status: input.status,
-        uptime_ratio: input.uptime_ratio,
-        active_connections: input.active_connections,
-        content_served: input.content_served,
-        timestamp,
-    };
-
-    let action_hash = create_entry(&EntryTypes::DoorwayHeartbeat(heartbeat))?;
-
-    // Link from doorway to heartbeat
-    create_link(
-        doorway.action_hash,
-        action_hash.clone(),
-        LinkTypes::DoorwayToHeartbeat,
-        (),
-    )?;
-
-    Ok(action_hash)
-}
+// record_heartbeat removed (observation-event-layer spec §10 Stage 6):
+// heartbeats now flow through infrastructure:doorway-heartbeat observations
+// on Track 2 substrate (ObservationManagerBackend).
 
 /// Record a daily heartbeat summary.
 ///
@@ -566,37 +507,8 @@ pub fn record_daily_summary(input: RecordSummaryInput) -> ExternResult<ActionHas
     Ok(doorway.action_hash)
 }
 
-/// Get recent heartbeats for a doorway
-#[hdk_extern]
-pub fn get_doorway_heartbeats(doorway_id: String) -> ExternResult<Vec<DoorwayHeartbeat>> {
-    let doorway = get_doorway_by_id(doorway_id.clone())?.ok_or_else(|| {
-        wasm_error!(WasmErrorInner::Guest(format!(
-            "Doorway '{}' not found",
-            doorway_id
-        )))
-    })?;
-
-    let query = LinkQuery::try_new(doorway.action_hash, LinkTypes::DoorwayToHeartbeat)?;
-    let links = get_links(query, GetStrategy::default())?;
-
-    let mut heartbeats = Vec::new();
-    for link in links {
-        if let Some(action_hash) = link.target.clone().into_action_hash() {
-            if let Some(record) = get(action_hash, GetOptions::default())? {
-                if let Some(heartbeat) = record
-                    .entry()
-                    .to_app_option::<DoorwayHeartbeat>()
-                    .ok()
-                    .flatten()
-                {
-                    heartbeats.push(heartbeat);
-                }
-            }
-        }
-    }
-
-    Ok(heartbeats)
-}
+// get_doorway_heartbeats removed (observation-event-layer spec §10 Stage 6):
+// query heartbeat observations via ObservationManagerBackend instead.
 
 /// Get daily summaries for a doorway.
 ///

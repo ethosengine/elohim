@@ -102,20 +102,10 @@ pub struct DoorwayRegistration {
     pub updated_at: String,
 }
 
-/// DoorwayHeartbeat - Lightweight status update (60s interval).
-///
-/// Detailed heartbeats are kept for 24 hours only, then summarized.
-/// This enables real-time health monitoring without unbounded storage.
-#[hdk_entry_helper]
-#[derive(Clone, PartialEq)]
-pub struct DoorwayHeartbeat {
-    pub doorway_id: String,               // References DoorwayRegistration.id
-    pub status: String,                   // online, degraded, maintenance, offline
-    pub uptime_ratio: f32,                // Rolling uptime since last summary
-    pub active_connections: u32,          // Current active connections
-    pub content_served: u64,              // Bytes served since last heartbeat
-    pub timestamp: String,
-}
+// DoorwayHeartbeat removed (observation-event-layer spec §10 Stage 6):
+// functionality moved to infrastructure:doorway-heartbeat observations on
+// Track 2 substrate (ObservationManagerBackend). Health attestations graduate
+// from accumulated observations via GraduationEvaluator (Stages 5.3 + 5.5).
 
 // DoorwayHeartbeatSummary removed (Stage C.3.a): consolidated into elohim DNA under
 // attestation_kind "attestation:doorway-summary" via content_store::issue_attestation.
@@ -233,7 +223,7 @@ impl StringAnchor {
 #[unit_enum(UnitEntryTypes)]
 pub enum EntryTypes {
     DoorwayRegistration(DoorwayRegistration),
-    DoorwayHeartbeat(DoorwayHeartbeat),
+    // DoorwayHeartbeat removed (observation-event-layer spec §10 Stage 6) — moved to Track 2 substrate
     // DoorwayHeartbeatSummary removed (Stage C.3.a) — see comment above
     // HealthAttestation removed (Stage C.3.a) — see comment above
     ContentServer(ContentServer),
@@ -254,8 +244,7 @@ pub enum LinkTypes {
     ReachToDoorway,             // Anchor(reach) -> DoorwayRegistration
     TierToDoorway,              // Anchor(tier) -> DoorwayRegistration
 
-    // DoorwayHeartbeat links (recent, pruned daily)
-    DoorwayToHeartbeat,         // DoorwayRegistration -> DoorwayHeartbeat
+    // DoorwayToHeartbeat removed (observation-event-layer spec §10 Stage 6) — DoorwayHeartbeat entry type removed
 
     // DoorwayToAttestation removed (Stage C.3.a) — HealthAttestation entry type removed
     // DoorwayToSummary removed (Stage C.3.a) — DoorwayHeartbeatSummary entry type removed
@@ -289,9 +278,7 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                     EntryTypes::DoorwayRegistration(doorway) => {
                         validate_doorway_registration(&doorway, &action)
                     }
-                    EntryTypes::DoorwayHeartbeat(heartbeat) => {
-                        validate_doorway_heartbeat(&heartbeat)
-                    }
+                    // DoorwayHeartbeat removed (observation-event-layer spec §10 Stage 6)
                     EntryTypes::ContentServer(server) => {
                         validate_content_server(&server)
                     }
@@ -384,24 +371,7 @@ fn validate_doorway_update(
     Ok(ValidateCallbackResult::Valid)
 }
 
-/// Validate DoorwayHeartbeat
-fn validate_doorway_heartbeat(heartbeat: &DoorwayHeartbeat) -> ExternResult<ValidateCallbackResult> {
-    // Validate status is valid
-    if !DOORWAY_STATUSES.contains(&heartbeat.status.as_str()) {
-        return Ok(ValidateCallbackResult::Invalid(
-            format!("Invalid status '{}'. Must be one of: {:?}", heartbeat.status, DOORWAY_STATUSES),
-        ));
-    }
-
-    // Validate uptime_ratio is in valid range
-    if heartbeat.uptime_ratio < 0.0 || heartbeat.uptime_ratio > 1.0 {
-        return Ok(ValidateCallbackResult::Invalid(
-            "uptime_ratio must be between 0.0 and 1.0".to_string(),
-        ));
-    }
-
-    Ok(ValidateCallbackResult::Valid)
-}
+// validate_doorway_heartbeat removed (observation-event-layer spec §10 Stage 6) — DoorwayHeartbeat entry type removed
 
 /// Validate PeerStatus
 ///
