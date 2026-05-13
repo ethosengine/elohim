@@ -37,6 +37,16 @@
     ],
     "PreToolUse": [
       {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/pre-tool-memory.py\"",
+            "timeout": 5000
+          }
+        ]
+      },
+      {
         "matcher": "Edit|Write",
         "hooks": [
           {
@@ -58,6 +68,11 @@
             "type": "command",
             "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/rust-holochain-validation.py\"",
             "timeout": 3000
+          },
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/claude-md-structural-signal.py\"",
+            "timeout": 2000
           }
         ]
       },
@@ -76,6 +91,11 @@
       {
         "matcher": "Edit|Write",
         "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/claude-md-drift-signal.py\"",
+            "timeout": 2000
+          },
           {
             "type": "command",
             "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/sync-check.py\"",

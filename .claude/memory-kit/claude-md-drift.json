@@ -1,0 +1,240 @@
+{
+  "files": {
+    "CLAUDE.md": {
+      "last_audited": "2026-05-13",
+      "direct_edits": 0,
+      "scope_edits": 27,
+      "lines_changed_in_scope": 0,
+      "drift_score": 2.606,
+      "rescore_counter": 2,
+      "claude_md_mtime": "2026-05-01T15:11:32Z",
+      "last_signal_at": "2026-05-13T19:06:56Z",
+      "structural_edits": 0,
+      "last_structural_op": "mv"
+    },
+    "app/elohim-app/CLAUDE.md": {
+      "last_audited": "2026-05-13",
+      "direct_edits": 0,
+      "scope_edits": 0,
+      "lines_changed_in_scope": 0,
+      "drift_score": 0.0,
+      "rescore_counter": 0,
+      "structural_edits": 0,
+      "last_signal_at": "2026-05-13T18:41:29Z",
+      "last_structural_op": "git mv"
+    },
+    "app/elohim-app/src/app/elohim/adapters/CLAUDE.md": {
+      "last_audited": "2026-05-13",
+      "direct_edits": 0,
+      "scope_edits": 0,
+      "lines_changed_in_scope": 0,
+      "drift_score": 0.0,
+      "rescore_counter": 0,
+      "structural_edits": 0
+    },
+    "app/elohim-app/src/app/shefa/CLAUDE.md": {
+      "last_audited": "2026-05-13",
+      "direct_edits": 0,
+      "scope_edits": 0,
+      "lines_changed_in_scope": 0,
+      "drift_score": 0.0,
+      "rescore_counter": 0,
+      "structural_edits": 0
+    },
+    "app/elohim-library/projects/elohim-service/src/adapters/CLAUDE.md": {
+      "last_audited": "2026-05-13",
+      "direct_edits": 0,
+      "scope_edits": 0,
+      "lines_changed_in_scope": 0,
+      "drift_score": 0.0,
+      "rescore_counter": 0,
+      "structural_edits": 0
+    },
+    "app/elohim-library/projects/perseus-plugin/CLAUDE.md": {
+      "last_audited": "2026-05-13",
+      "direct_edits": 0,
+      "scope_edits": 0,
+      "lines_changed_in_scope": 0,
+      "drift_score": 0.0,
+      "rescore_counter": 0,
+      "structural_edits": 0
+    },
+    "app/lamad/CLAUDE.md": {
+      "last_audited": "2026-05-13",
+      "direct_edits": 0,
+      "scope_edits": 0,
+      "lines_changed_in_scope": 0,
+      "drift_score": 0.0,
+      "rescore_counter": 0,
+      "structural_edits": 0
+    },
+    "doorway/CLAUDE.md": {
+      "last_audited": "2026-05-13",
+      "direct_edits": 0,
+      "scope_edits": 0,
+      "lines_changed_in_scope": 0,
+      "drift_score": 0.0,
+      "rescore_counter": 0,
+      "structural_edits": 0,
+      "last_signal_at": "2026-05-13T18:41:29Z",
+      "last_structural_op": "rm -rf"
+    },
+    "doorway/doorway-app/CLAUDE.md": {
+      "last_audited": "2026-05-13",
+      "direct_edits": 0,
+      "scope_edits": 0,
+      "lines_changed_in_scope": 0,
+      "drift_score": 0.0,
+      "rescore_counter": 0,
+      "structural_edits": 0
+    },
+    "doorway/doorway-service/CLAUDE.md": {
+      "last_audited": "2026-05-13",
+      "direct_edits": 0,
+      "scope_edits": 0,
+      "lines_changed_in_scope": 0,
+      "drift_score": 0.0,
+      "rescore_counter": 0,
+      "structural_edits": 0,
+      "last_signal_at": "2026-05-13T18:41:29Z",
+      "last_structural_op": "rm -rf"
+    },
+    "doorway/doorway-service/src/server/CLAUDE.md": {
+      "last_audited": "2026-05-13",
+      "direct_edits": 0,
+      "scope_edits": 0,
+      "lines_changed_in_scope": 0,
+      "drift_score": 0.0,
+      "rescore_counter": 0,
+      "structural_edits": 0
+    },
+    "elohim/elohim-cache-core/CLAUDE.md": {
+      "last_audited": "2026-05-13",
+      "direct_edits": 0,
+      "scope_edits": 0,
+      "lines_changed_in_scope": 0,
+      "drift_score": 0.0,
+      "rescore_counter": 0,
+      "structural_edits": 0
+    },
+    "elohim/elohim-storage/CLAUDE.md": {
+      "last_audited": "2026-05-13",
+      "direct_edits": 0,
+      "scope_edits": 0,
+      "lines_changed_in_scope": 0,
+      "drift_score": 0.0,
+      "rescore_counter": 0,
+      "structural_edits": 0
+    },
+    "elohim/holochain/dna/CLAUDE.md": {
+      "last_audited": "2026-05-13",
+      "direct_edits": 0,
+      "scope_edits": 0,
+      "lines_changed_in_scope": 0,
+      "drift_score": 0.0,
+      "rescore_counter": 0,
+      "structural_edits": 0
+    },
+    "elohim/sdk/CLAUDE.md": {
+      "last_audited": "2026-05-13",
+      "direct_edits": 0,
+      "scope_edits": 0,
+      "lines_changed_in_scope": 0,
+      "drift_score": 0.0,
+      "rescore_counter": 0,
+      "structural_edits": 0
+    },
+    "elohim/sdk/domains/CLAUDE.md": {
+      "last_audited": "2026-05-13",
+      "direct_edits": 0,
+      "scope_edits": 0,
+      "lines_changed_in_scope": 0,
+      "drift_score": 0.0,
+      "rescore_counter": 0,
+      "structural_edits": 0
+    },
+    "elohim/sdk/domains/imagodei/CLAUDE.md": {
+      "last_audited": "2026-05-13",
+      "direct_edits": 0,
+      "scope_edits": 0,
+      "lines_changed_in_scope": 0,
+      "drift_score": 0.0,
+      "rescore_counter": 0,
+      "structural_edits": 0
+    },
+    "elohim/sdk/domains/lamad/CLAUDE.md": {
+      "last_audited": "2026-05-13",
+      "direct_edits": 0,
+      "scope_edits": 0,
+      "lines_changed_in_scope": 0,
+      "drift_score": 0.0,
+      "rescore_counter": 0,
+      "structural_edits": 0
+    },
+    "elohim/sdk/domains/qahal/CLAUDE.md": {
+      "last_audited": "2026-05-13",
+      "direct_edits": 0,
+      "scope_edits": 0,
+      "lines_changed_in_scope": 0,
+      "drift_score": 0.0,
+      "rescore_counter": 0,
+      "structural_edits": 0
+    },
+    "elohim/sdk/domains/shefa/CLAUDE.md": {
+      "last_audited": "2026-05-13",
+      "direct_edits": 0,
+      "scope_edits": 0,
+      "lines_changed_in_scope": 0,
+      "drift_score": 0.0,
+      "rescore_counter": 0,
+      "structural_edits": 0
+    },
+    "elohim/sdk/schemas/CLAUDE.md": {
+      "last_audited": "2026-05-13",
+      "direct_edits": 0,
+      "scope_edits": 0,
+      "lines_changed_in_scope": 0,
+      "drift_score": 0.0,
+      "rescore_counter": 0,
+      "structural_edits": 0
+    },
+    "elohim/sdk/storage-client-ts/CLAUDE.md": {
+      "last_audited": "2026-05-13",
+      "direct_edits": 0,
+      "scope_edits": 0,
+      "lines_changed_in_scope": 0,
+      "drift_score": 0.0,
+      "rescore_counter": 0,
+      "structural_edits": 0
+    },
+    "genesis/a2o/CLAUDE.md": {
+      "last_audited": "2026-05-13",
+      "direct_edits": 0,
+      "scope_edits": 0,
+      "lines_changed_in_scope": 0,
+      "drift_score": 0.0,
+      "rescore_counter": 0,
+      "structural_edits": 0
+    },
+    "steward/device/CLAUDE.md": {
+      "last_audited": "2026-05-13",
+      "direct_edits": 0,
+      "scope_edits": 0,
+      "lines_changed_in_scope": 0,
+      "drift_score": 0.0,
+      "rescore_counter": 0,
+      "structural_edits": 0
+    },
+    ".claude/scripts/memory-kit/CLAUDE.md": {
+      "last_audited": null,
+      "claude_md_mtime": "2026-05-13T19:06:56Z",
+      "direct_edits": 1,
+      "scope_edits": 0,
+      "lines_changed_in_scope": 0,
+      "drift_score": 0.0,
+      "last_signal_at": "2026-05-13T19:06:56Z",
+      "rescore_counter": 1
+    }
+  },
+  "threshold": 3.0
+}
