@@ -1,6 +1,6 @@
 ---
 name: memory-kit
-description: Maintain the project's complement to Claude's native auto-memory. Six deterministic-first tools (cleanup, path-update, dedupe-memory, memory-review, skill-audit, claude-md-review) plus the PreToolUse memory injector hook and the PostToolUse CLAUDE.md drift signal accumulator. Use weekly or before a major /shift to keep MEMORY.md, CLAUDE.md surfaces, and the skill catalog healthy. Read-only by default; mutations are operator-gated. Not always-active.
+description: Maintain the project's complement to Claude's native auto-memory. Seven deterministic-first tools (cleanup, path-update, dedupe-memory, memory-review, claude-md-review, skill-audit, agent-audit) plus the PreToolUse memory injector hook and PostToolUse CLAUDE.md drift signal accumulators. Use weekly or before a major /shift to keep MEMORY.md, CLAUDE.md surfaces, the skill catalog, and the agent catalog healthy. Read-only by default; mutations are operator-gated. Not always-active.
 ---
 
 # Memory Kit — Maintain the Auto-Memory Complement
@@ -32,7 +32,7 @@ The frame, after Pawel Huryn's article ("How I Finally Sorted My Claude Code Mem
 - **Archive destination** (cleanup only): `.claude/archive/<YYYY-MM-DD>/<original-relative-path>`. Mirrors repo structure so trajectory stays walkable backward.
 - **Skill entry point**: this single skill, deferred-loaded. **Not always-active** — pull out periodically.
 
-## The Six Tools
+## The Seven Tools
 
 ### 1. `cleanup` — archive stale specs/plans/memory
 
@@ -126,7 +126,25 @@ CLAUDE.md files are gospel (always-loaded, treated as authoritative) — until t
 
 **Boundary**: read-only ceremony. Operator decides whether to revise any flagged CLAUDE.md. Never auto-writes.
 
-### 6. `skill-audit` — skill catalog quality
+### 6. `agent-audit` — agent catalog quality
+
+```bash
+python3 .claude/scripts/memory-kit/agent-audit.py
+```
+
+Parallel to `skill-audit` but for `.claude/agents/*.md`. Agent metadata (name + description) is always-loaded into context; bodies encode role + tool grants + model assignments and drift like any doc surface. Checks:
+
+- **VAGUE-DESCRIPTION**: too-short, generic phrases ("use this agent for…"), no trigger/when language
+- **TRIGGER-OVERLAP**: distinctive token overlap with sibling agents (may indicate competing trigger surfaces)
+- **STALE-MTIME**: untouched > 90 days
+- **DRIFTED-FACTUAL**: dead multi-component path citations (bare filenames excluded to limit false positives)
+- **OVER-IMPERATIVE**: "always/never/must" without rationale (same regex as claude-md-audit; excludes code fences)
+- **TOOLS-MISMATCH**: tools declared in frontmatter but not referenced in body (currently noisy — agent prompts often describe role, not tool mechanics; refinement candidate)
+- **MISSING-MODEL**: no `model:` field (inheritance from parent is usually unintended)
+
+**Boundary**: read-only diagnostic. Operator decides which agents to revise.
+
+### 7. `skill-audit` — skill catalog quality
 
 ```bash
 python3 .claude/scripts/memory-kit/skill-audit.py

@@ -3,12 +3,12 @@
     "CLAUDE.md": {
       "last_audited": "2026-05-13",
       "direct_edits": 0,
-      "scope_edits": 27,
+      "scope_edits": 32,
       "lines_changed_in_scope": 0,
-      "drift_score": 2.606,
+      "drift_score": 2.747,
       "rescore_counter": 2,
       "claude_md_mtime": "2026-05-01T15:11:32Z",
-      "last_signal_at": "2026-05-13T19:06:56Z",
+      "last_signal_at": "2026-05-13T20:14:12Z",
       "structural_edits": 0,
       "last_structural_op": "mv"
     },
@@ -229,11 +229,11 @@
       "last_audited": null,
       "claude_md_mtime": "2026-05-13T19:06:56Z",
       "direct_edits": 1,
-      "scope_edits": 0,
+      "scope_edits": 2,
       "lines_changed_in_scope": 0,
       "drift_score": 0.0,
-      "last_signal_at": "2026-05-13T19:06:56Z",
-      "rescore_counter": 1
+      "last_signal_at": "2026-05-13T20:11:01Z",
+      "rescore_counter": 3
     }
   },
   "threshold": 3.0
