@@ -11,6 +11,11 @@
 !.claude/shifts/.gitkeep
 **/.claude/shifts/
 
+# Memory-kit dated reports — regenerable by re-running the audits
+.claude/memory-kit/[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]/
+# Memory-kit accumulator state — local-machine signal counters
+.claude/memory-kit/claude-md-drift.json
+
 # Local worktree-state directories used by side tooling
 .claire/
 
