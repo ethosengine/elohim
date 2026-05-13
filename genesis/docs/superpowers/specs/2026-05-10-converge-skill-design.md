@@ -143,8 +143,8 @@ The menu is not interactive — it's a markdown file. The session-start UX is "a
 
 ## File locations
 
-- Skill: `.claude/skills/memory-kit/converge.md` (sub-doc within memory-kit; or its own dir — see open question)
-- Scripts: `.claude/scripts/memory-kit/converge-scan.py` + `.claude/scripts/memory-kit/converge-apply.py`
+- Skill: `.claude/skills/converge/SKILL.md` (extracted from memory-kit 2026-05-13 — open question answered: own dir)
+- Scripts: `.claude/scripts/converge/converge-scan.py` + `.claude/scripts/converge/converge-apply.py`
 - Per-theme proposals: `.claude/memory-kit/<YYYY-MM-DD>/converge/<theme>-proposal.md`
 - Theme report (Phase 1 output): `.claude/memory-kit/<YYYY-MM-DD>/convergence-themes.md`
 - **Next-actions menu (Phase 4 output)**: `.claude/memory-kit/<YYYY-MM-DD>/next-actions.md` — the "what's next" surface
