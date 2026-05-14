@@ -73,7 +73,7 @@ Feature: SPA Bundle Delivery — Root App from Blob Storage
   Scenario: /apps/ still serves html5-apps and is not intercepted by the root app
     Given the SPA bundle for "lamad-spa" is extracted and cached
     And content "evolution-of-trust" has been seeded as html5-app
-    When Timothy navigates to /apps/evolution-of-trust/index.html
+    When Terrance navigates to /apps/evolution-of-trust/index.html
     Then the response is the evolution-of-trust html5-app entry point
     And the SPA catch-all does not intercept the /apps/ route
 
@@ -109,7 +109,7 @@ Feature: SPA Bundle Delivery — Root App from Blob Storage
     And /health/startup is returning rootApp: pending
     When the SPA extraction completes and /health/startup returns rootApp: ready
     Then the bootstrap page navigates to / automatically
-    And Timothy sees the SPA without manually refreshing
+    And Terrance sees the SPA without manually refreshing
 
   @wip @browser-only
   Scenario: Bootstrap page falls back to reload timer when /health/startup is unreachable

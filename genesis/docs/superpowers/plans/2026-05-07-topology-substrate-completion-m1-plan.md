@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Land all 6 topology surfaces fully `delivered` for the matthew↔timothy cross-household pair on alpha — substrate-driven (real DHT bindings, real REA flows, real libp2p connected-peer queries, real blob transfers) — as the vertical slice that proves every layer end-to-end before broadening to adam in M2.
+**Goal:** Land all 6 topology surfaces fully `delivered` for the matthew↔terrance cross-household pair on alpha — substrate-driven (real DHT bindings, real REA flows, real libp2p connected-peer queries, real blob transfers) — as the vertical slice that proves every layer end-to-end before broadening to adam in M2.
 
 **Architecture:** Three Rust changes in elohim-storage (system_metrics helper, real cluster slice, real peer-topology slice) + one wire-format refactor (view_federation passes connected_peers snapshot to slice builders) + one TypeScript shape rewrite (seed-commitments) + Jenkinsfile wiring (3 new stages). One real blob upload for D1/D6, one real CI fetch step for D4. Verification via local Playwright probe + a2o Gherkin scenarios.
 
@@ -43,9 +43,9 @@ Any line in this plan that mentions a table or route is referencing one of these
 | `elohim/elohim-storage/src/services/peer_topology_view.rs` | Modify | Real `build_local_slice` accepting connected_peers snapshot, joining peer_identity_bindings → humans |
 | `elohim/elohim-storage/src/p2p/view_federation.rs` | Modify | `build_response_slice` accepts connected_peers param; dispatches per view_kind |
 | `elohim/elohim-storage/src/p2p/mod.rs` | Modify | At F-T20 responder arm (line ~4160), snapshot `swarm.connected_peers()` before calling build_response_slice |
-| `genesis/Jenkinsfile` | Modify | 3 new stages after seed-accounts (~line 925): seed-conductor-identities, seed-agent-bindings, seed-commitments + 1 stage for matthew↔timothy fetch orchestration |
+| `genesis/Jenkinsfile` | Modify | 3 new stages after seed-accounts (~line 925): seed-conductor-identities, seed-agent-bindings, seed-commitments + 1 stage for matthew↔terrance fetch orchestration |
 | `genesis/orchestrator/manifests/humans/_edgenode-consolidated.template.yaml` (or equivalent) | Modify | Add `ELOHIM_DISPLAY_NAME` env var derived from humanLabel |
-| `genesis/a2o/features/topology/m1-matthew-timothy-delivery.feature` | Create | a2o scenarios asserting matthew sees timothy across 6 surfaces |
+| `genesis/a2o/features/topology/m1-matthew-terrance-delivery.feature` | Create | a2o scenarios asserting matthew sees terrance across 6 surfaces |
 | `genesis/seeder/src/probe-topology-m1.ts` | Create | Local Playwright probe replacing prior `/tmp/verify-topology.mjs` ad-hoc — committed to repo |
 
 ---
@@ -85,8 +85,8 @@ describe('deterministicPeerId', () => {
 
   it('differs across humans for the same archetype', () => {
     const matthew = deterministicPeerId('human-matthew-manager', 'desktop');
-    const timothy = deterministicPeerId('human-timothy-tutor', 'desktop');
-    expect(matthew).not.toBe(timothy);
+    const terrance = deterministicPeerId('human-terrance-tutor', 'desktop');
+    expect(matthew).not.toBe(terrance);
   });
 
   it('matches the existing seed-agent-bindings formula exactly', () => {
@@ -727,7 +727,7 @@ Add to the existing `#[cfg(test)] mod tests` block in `peer_topology_view.rs`:
     // requires populating peer_identity_bindings + humans tables. Defer to the
     // integration test suite once test fixtures are easier to set up. The unit
     // tests above cover the empty + unbound paths; the binding-resolution
-    // logic is exercised at integration time via the matthew↔timothy probe.
+    // logic is exercised at integration time via the matthew↔terrance probe.
 ```
 
 - [ ] **Step 2: Run test to confirm signature mismatch**
@@ -904,7 +904,7 @@ describe('buildCustodyCommitmentBody', () => {
   const pair: CustodyPair = {
     providerHumanId: 'human-matthew-manager',
     providerArchetype: 'desktop',
-    receiverHumanId: 'human-timothy-tutor',
+    receiverHumanId: 'human-terrance-tutor',
     receiverArchetype: 'desktop',
     blobHash: 'sha256-deadbeef',
     blobSizeBytes: 12345,
@@ -980,7 +980,7 @@ Replace the entire contents of `genesis/seeder/src/seed-commitments.ts` with:
  *     CUSTODY_PAIRS_JSON=./pairs.json npx tsx src/seed-commitments.ts
  *
  * If CUSTODY_PAIRS_JSON is not set, falls back to the M1 default pair set
- * (matthew-desktop ↔ timothy-desktop, both directions, one blob).
+ * (matthew-desktop ↔ terrance-desktop, both directions, one blob).
  */
 
 import { readFileSync } from 'node:fs';
@@ -1075,13 +1075,13 @@ function defaultM1Pairs(): CustodyPair[] {
     {
       providerHumanId: 'human-matthew-manager',
       providerArchetype: 'desktop',
-      receiverHumanId: 'human-timothy-tutor',
+      receiverHumanId: 'human-terrance-tutor',
       receiverArchetype: 'desktop',
       blobHash: M1_DEFAULT_BLOB_HASH,
       blobSizeBytes: M1_DEFAULT_BLOB_SIZE,
     },
     {
-      providerHumanId: 'human-timothy-tutor',
+      providerHumanId: 'human-terrance-tutor',
       providerArchetype: 'desktop',
       receiverHumanId: 'human-matthew-manager',
       receiverArchetype: 'desktop',
@@ -1246,7 +1246,7 @@ def getConductorAppUrls() {
         humans = [
             [name: 'matthew', service: 'elohim-matthew-alpha', namespace: 'elohim-alpha', agencyPhase: 'doorway'],
             [name: 'jessica', service: 'elohim-jessica-alpha', namespace: 'elohim-alpha', agencyPhase: 'device'],
-            [name: 'timothy', service: 'elohim-timothy-alpha', namespace: 'elohim-alpha', agencyPhase: 'device'],
+            [name: 'terrance', service: 'elohim-terrance-alpha', namespace: 'elohim-alpha', agencyPhase: 'device'],
         ]
     }
     def urls = humans
@@ -1403,7 +1403,7 @@ MAX(valid_from_micros) selection handles dedup at read time."
                                 sh """#!/bin/bash
                                     set -euo pipefail
                                     echo "═══════════════════════════════════════════════════════════"
-                                    echo "SEED CUSTODY COMMITMENTS (M1 matthew↔timothy pair)"
+                                    echo "SEED CUSTODY COMMITMENTS (M1 matthew↔terrance pair)"
                                     echo "═══════════════════════════════════════════════════════════"
                                     echo "Doorway: ${doorwayHost}"
                                     echo "Blob:    ${blobHash} (${blobSize} bytes)"
@@ -1430,7 +1430,7 @@ git add genesis/Jenkinsfile
 git commit -m "ci(genesis): wire seed-commitments custody-blob stage
 
 Runs after seed-agent-bindings + after the M1 blob is uploaded. Writes
-the matthew↔timothy custody-blob commitment pair using the M1_BLOB_HASH
+the matthew↔terrance custody-blob commitment pair using the M1_BLOB_HASH
 build parameter. Seeder fail-fast policy ensures shape drift surfaces
 as a UNSTABLE CI mark, not a silent skip."
 ```
@@ -1584,10 +1584,10 @@ resilience metadata via the existing distribution_view path."
 
 ---
 
-## Task 12 — Add CI fetch orchestration step (matthew↔timothy real fetch)
+## Task 12 — Add CI fetch orchestration step (matthew↔terrance real fetch)
 
 **Files:**
-- Modify: `genesis/Jenkinsfile` (add stage that triggers a real blob fetch from timothy → matthew)
+- Modify: `genesis/Jenkinsfile` (add stage that triggers a real blob fetch from terrance → matthew)
 
 - [ ] **Step 1: Add the fetch orchestration stage**
 
@@ -1604,16 +1604,16 @@ Immediately after `Seed Custody Commitments`:
                 container('builder') {
                     script {
                         def blobHash = env.M1_BLOB_HASH
-                        def timothyUrl = 'http://elohim-timothy-alpha.elohim-alpha.svc.cluster.local:8090'
+                        def terranceUrl = 'http://elohim-terrance-alpha.elohim-alpha.svc.cluster.local:8090'
                         catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
                             sh """#!/bin/bash
                                 set -euo pipefail
                                 echo "═══════════════════════════════════════════════════════════"
-                                echo "M1 CROSS-POD FETCH — timothy fetches blob ${blobHash} from matthew"
+                                echo "M1 CROSS-POD FETCH — terrance fetches blob ${blobHash} from matthew"
                                 echo "═══════════════════════════════════════════════════════════"
                                 # GET (not HEAD per memory feedback_head_vs_get_blob_asymmetry)
                                 STATUS=\$(curl -s -o /dev/null -w '%{http_code}' \\
-                                  "${timothyUrl}/blob/${blobHash}")
+                                  "${terranceUrl}/blob/${blobHash}")
                                 echo "Fetch status: \$STATUS"
                                 if [ "\$STATUS" != "200" ]; then
                                   echo "Fetch failed — substrate did not propagate the blob"
@@ -1632,9 +1632,9 @@ Immediately after `Seed Custody Commitments`:
 
 ```bash
 git add genesis/Jenkinsfile
-git commit -m "ci(genesis): trigger cross-pod fetch matthew→timothy after seeders
+git commit -m "ci(genesis): trigger cross-pod fetch matthew→terrance after seeders
 
-Forces the substrate's blob fetch path: timothy GETs the M1 blob from its
+Forces the substrate's blob fetch path: terrance GETs the M1 blob from its
 local storage (not present), which triggers a libp2p fetch from matthew's
 peer (where the blob lives), which emits a serve-blob EconomicEvent on
 success per p2p/blob_fetch.rs:206. That event is what populates the D4
@@ -1643,15 +1643,15 @@ reciprocity 'delivered' column."
 
 ---
 
-## Task 13 — Write a2o Gherkin scenarios for matthew↔timothy delivery
+## Task 13 — Write a2o Gherkin scenarios for matthew↔terrance delivery
 
 **Files:**
-- Create: `genesis/a2o/features/topology/m1-matthew-timothy-delivery.feature`
+- Create: `genesis/a2o/features/topology/m1-matthew-terrance-delivery.feature`
 
 - [ ] **Step 1: Create the feature file**
 
 ```gherkin
-# genesis/a2o/features/topology/m1-matthew-timothy-delivery.feature
+# genesis/a2o/features/topology/m1-matthew-terrance-delivery.feature
 Feature: Matthew sees real topology data after M1 substrate completion
   As Matthew, the household operator,
   I want to see real device, peer, reciprocity, and content data
@@ -1666,14 +1666,14 @@ Feature: Matthew sees real topology data after M1 substrate completion
     Then he sees at least one device tile labeled with his display name
     And the storage usage shows non-zero total bytes for his blob filesystem
 
-  Scenario: Peer topology page shows Timothy's household
+  Scenario: Peer topology page shows Terrance's household
     When Matthew opens the peer topology page
-    Then he sees a peer-household-card for household-timothy
-    And the card displays Timothy's display name
+    Then he sees a peer-household-card for household-terrance
+    And the card displays Terrance's display name
 
-  Scenario: Reciprocity page shows inflow from Timothy
+  Scenario: Reciprocity page shows inflow from Terrance
     When Matthew opens the reciprocity page
-    Then he sees at least one inflow row whose counterparty is household-timothy
+    Then he sees at least one inflow row whose counterparty is household-terrance
     And the committed bytes column shows a non-zero value
     And the delivered bytes column shows a non-zero value once the cross-pod fetch has completed
 
@@ -1702,8 +1702,8 @@ The scenarios are the verification target. They MUST fail at this point (substra
 - [ ] **Step 4: Commit**
 
 ```bash
-git add genesis/a2o/features/topology/m1-matthew-timothy-delivery.feature
-git commit -m "feat(a2o): m1 matthew↔timothy topology delivery scenarios
+git add genesis/a2o/features/topology/m1-matthew-terrance-delivery.feature
+git commit -m "feat(a2o): m1 matthew↔terrance topology delivery scenarios
 
 Five scenarios covering D1 (distribution-badge), D2 (cluster device tile),
 D3 (peer-household-card), D4 (reciprocity inflow row), D6 (resilience-
@@ -1943,7 +1943,7 @@ If any surface still fails after step 4-5: do NOT advance to M2. Re-read the fai
 - [ ] **Step 7: Final commit (manifest update)**
 
 ```bash
-git commit --allow-empty -m "docs: M1 topology vertical slice delivered (matthew↔timothy 6/6)
+git commit --allow-empty -m "docs: M1 topology vertical slice delivered (matthew↔terrance 6/6)
 
 Closes Section 'M1 — Vertical slice' of
 genesis/docs/superpowers/specs/2026-05-07-topology-substrate-completion-design.md.

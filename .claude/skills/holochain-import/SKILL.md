@@ -1,3 +1,8 @@
+---
+name: holochain-import
+description: Holochain content import pipeline. Use when "seed DHT with content", "run hc-rna fixtures", "import content to Holochain", "manage seed snapshots", or troubleshooting DHT seeding. Complements elohim-import (transformation layer) by handling the DHT-seed layer.
+---
+
 # Holochain Content Import Pipeline
 
 This skill provides tools and knowledge for importing content to the Holochain DHT, bypassing Kuzu WASM string size limitations.
@@ -191,19 +196,19 @@ pub enum LinkTypes {
 ## File Locations
 
 ### CLI & Node.js Services
-- `elohim-library/projects/elohim-service/src/cli/holo-import.ts` - CLI entry point
-- `elohim-library/projects/elohim-service/src/services/holochain-client.service.ts` - WebSocket client
-- `elohim-library/projects/elohim-service/src/services/holochain-import.service.ts` - Import adapter
-- `elohim-library/projects/elohim-service/src/models/holochain.model.ts` - TypeScript types
+- `app/elohim-library/projects/elohim-service/src/cli/holo-import.ts` - CLI entry point
+- `app/elohim-library/projects/elohim-service/src/services/holochain-client.service.ts` - WebSocket client
+- `app/elohim-library/projects/elohim-service/src/services/holochain-import.service.ts` - Import adapter
+- `app/elohim-library/projects/elohim-service/src/models/holochain.model.ts` - TypeScript types
 
 ### Angular Services
-- `elohim-app/src/app/elohim/services/holochain-client.service.ts` - Browser WebSocket client
+- `app/elohim-app/src/app/elohim/services/holochain-client.service.ts` - Browser WebSocket client
 - `elohim-app/src/app/elohim/services/holochain-content.service.ts` - Content retrieval service
-- `elohim-app/src/app/elohim/models/holochain-connection.model.ts` - Shared types
+- `app/elohim-app/src/app/elohim/models/holochain-connection.model.ts` - Shared types
 
 ### DNA Source
-- `holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs` - Entry types + validation
-- `holochain/dna/elohim/zomes/content_store/src/lib.rs` - Coordinator functions
+- `elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs` - Entry types + validation
+- `elohim/holochain/dna/elohim/zomes/content_store/src/lib.rs` - Coordinator functions
 
 ## Validation Rules
 

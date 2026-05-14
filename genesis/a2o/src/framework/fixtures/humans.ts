@@ -211,7 +211,7 @@ export function relationshipsFor(humanId: string): HumansJsonRelationship[] {
 // Deployment topology awareness (reads deployments.json)
 // ---------------------------------------------------------------------------
 //
-// Some fixture humans (matthew, jessica, timothy, adam, pete, frank) have
+// Some fixture humans (matthew, jessica, terrance, adam, pete, frank) have
 // k8s pods declared in genesis/orchestrator/data/deployments.json. Others
 // (Susan, Tommy, Georgina, Maria, etc.) are doorway-seeded personas without
 // a k8s pod. When a node fails (e.g. shem 2026-05-04), affected humans get
@@ -263,7 +263,7 @@ function ensureDeploymentsLoaded(): DeploymentsCache {
 
 /**
  * Returns true if the named human is currently deployable for live testing:
- *   - matthew/jessica/timothy → true (in deployments.json, not suspended)
+ *   - matthew/jessica/terrance → true (in deployments.json, not suspended)
  *   - adam/pete/frank (suspended) → false (conductor pod won't run)
  *   - Susan/Tommy/Georgina/etc. → true (doorway-only personas, no k8s pod)
  *

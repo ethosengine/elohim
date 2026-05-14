@@ -57,7 +57,7 @@ Feature: Human Resilience Profile
     Given human "Matthew" is logged in on doorway "alpha" with device
     And human "Susan" is in Matthew's household with relationship "spouse"
     And human "Pete" is at congregation with relationship "congregation_member"
-    And human "Timothy" is connected via relationship "learning_partner"
+    And human "Terrance" is connected via relationship "learning_partner"
     And human "Frank" is connected via relationship "community_member"
     And there are 3 reciprocated mutual aid commitments
     When the resilience profile is computed for Matthew

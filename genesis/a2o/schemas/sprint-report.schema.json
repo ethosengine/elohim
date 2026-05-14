@@ -99,7 +99,7 @@
         },
         "peer": {
           "type": "string",
-          "description": "Target-peer slug (e.g., 'timothy-household', 'shem'). Populated by Plan B once request-ID/peer routing is live; absent for local-only runs."
+          "description": "Target-peer slug (e.g., 'terrance-household', 'shem'). Populated by Plan B once request-ID/peer routing is live; absent for local-only runs."
         },
         "severity": { "type": "string", "enum": ["error", "warning", "info"], "default": "error" },
         "message": { "type": "string" },

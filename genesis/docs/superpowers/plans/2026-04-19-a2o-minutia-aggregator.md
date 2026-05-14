@@ -47,7 +47,7 @@ genesis/a2o/
 │       ├── render-markdown.test.ts
 │       └── fixtures/                     # Tiny JSON fixtures
 │           ├── cucumber-mixed.json
-│           ├── console-timothy-errors.json
+│           ├── console-terrance-errors.json
 │           ├── console-mary-errors.json
 │           └── coverage-gap.json
 ```
@@ -122,7 +122,7 @@ Schema-first — every downstream type and assertion derives from this contract.
         "fingerprint": { "type": "string", "description": "Stable hash over the normalized message" },
         "source":      { "enum": ["console-error", "page-error", "failed-request", "scenario-failure", "pending-step", "coverage-gap"] },
         "pillar":      { "type": "string", "description": "lamad | imagodei | elohim | federation | delivery | browser | content | deployment | qahal | shefa | unknown" },
-        "peer":        { "type": "string", "description": "Target-peer slug (e.g., 'timothy-household', 'shem'). Populated by Plan B once request-ID/peer routing is live; absent for local-only runs." },
+        "peer":        { "type": "string", "description": "Target-peer slug (e.g., 'terrance-household', 'shem'). Populated by Plan B once request-ID/peer routing is live; absent for local-only runs." },
         "severity":    { "enum": ["error", "warning", "info"], "default": "error" },
         "message":     { "type": "string" },
         "firstSeenUrl":{ "type": "string" },
@@ -392,7 +392,7 @@ Cucumber's JSON format is one array of feature objects, each with `elements` (sc
     "name": "Learning Journey",
     "elements": [
       {
-        "name": "Timothy completes path",
+        "name": "Terrance completes path",
         "type": "scenario",
         "steps": [
           { "name": "doorway is reachable", "result": { "status": "passed", "duration": 100 } }
@@ -449,7 +449,7 @@ describe('loadCucumber', () => {
   it('parses all scenarios with feature URI', () => {
     const results = loadCucumber(fixture);
     assert.equal(results.length, 3);
-    assert.equal(results[0].name, 'Timothy completes path');
+    assert.equal(results[0].name, 'Terrance completes path');
     assert.equal(results[0].feature, 'features/lamad/learning-journey.feature');
   });
 
@@ -579,7 +579,7 @@ git commit -m "feat(a2o): cucumber report loader with scenario status + failure 
 
 **Files:**
 - Create: `genesis/a2o/scripts/lib/load-console.ts`
-- Create: `genesis/a2o/scripts/__tests__/fixtures/console-timothy-errors.json`
+- Create: `genesis/a2o/scripts/__tests__/fixtures/console-terrance-errors.json`
 - Create: `genesis/a2o/scripts/__tests__/fixtures/console-mary-errors.json`
 - Create: `genesis/a2o/scripts/__tests__/load-console.test.ts`
 
@@ -588,7 +588,7 @@ Step-level capture in `steps/common.steps.ts:89` writes `reports/console/{safeNa
 - [ ] **Step 1: Write the fixtures**
 
 ```json
-// genesis/a2o/scripts/__tests__/fixtures/console-timothy-errors.json
+// genesis/a2o/scripts/__tests__/fixtures/console-terrance-errors.json
 {
   "consoleErrors": [
     {
@@ -638,7 +638,7 @@ const fixturesDir = fileURLToPath(new URL('./fixtures/', import.meta.url));
 
 function makeReportsDir(): string {
   const tmp = mkdtempSync(join(tmpdir(), 'a2o-console-'));
-  cpSync(join(fixturesDir, 'console-timothy-errors.json'), join(tmp, 'learning-journey-timothy-errors.json'));
+  cpSync(join(fixturesDir, 'console-terrance-errors.json'), join(tmp, 'learning-journey-terrance-errors.json'));
   cpSync(join(fixturesDir, 'console-mary-errors.json'),    join(tmp, 'learning-journey-mary-errors.json'));
   writeFileSync(join(tmp, 'not-an-artifact.txt'), 'ignored');
   return tmp;
@@ -647,8 +647,8 @@ function makeReportsDir(): string {
 describe('parseScenarioHumanFromFilename', () => {
   it('splits scenario and human on last hyphen before "errors"', () => {
     assert.deepEqual(
-      parseScenarioHumanFromFilename('learning-journey-timothy-errors.json'),
-      { scenario: 'learning-journey', human: 'timothy' }
+      parseScenarioHumanFromFilename('learning-journey-terrance-errors.json'),
+      { scenario: 'learning-journey', human: 'terrance' }
     );
   });
 
@@ -758,7 +758,7 @@ Expected: all 5 tests pass.
 ```bash
 git add genesis/a2o/scripts/lib/load-console.ts \
         genesis/a2o/scripts/__tests__/load-console.test.ts \
-        genesis/a2o/scripts/__tests__/fixtures/console-timothy-errors.json \
+        genesis/a2o/scripts/__tests__/fixtures/console-terrance-errors.json \
         genesis/a2o/scripts/__tests__/fixtures/console-mary-errors.json
 git commit -m "feat(a2o): console-artifact loader with scenario/human inference"
 ```
@@ -783,7 +783,7 @@ The existing `scan-coverage.ts` CLI emits a JSON report. We read it with toleran
   "gaps": [
     {
       "feature": "features/lamad/path-adaptation.feature",
-      "missing": "Scenario: Timothy's path reorders after rapid mastery",
+      "missing": "Scenario: Terrance's path reorders after rapid mastery",
       "severity": "high"
     },
     {
@@ -903,13 +903,13 @@ import type { GapFinding } from '../lib/load-coverage-gap.js';
 
 function input() {
   const scenarios: ScenarioResult[] = [
-    { name: 'Timothy completes path', feature: 'features/lamad/learning-journey.feature', status: 'passed' },
+    { name: 'Terrance completes path', feature: 'features/lamad/learning-journey.feature', status: 'passed' },
     { name: 'Mary fails on assessment', feature: 'features/lamad/learning-journey.feature', status: 'failed', failureMessage: 'AssertionError: expected 500 to be 200' },
     { name: 'Stub not implemented', feature: 'features/auth/fixture-humans.feature', status: 'pending' },
   ];
   const console: ConsoleArtifact[] = [
     {
-      scenario: 'learning-journey', human: 'timothy',
+      scenario: 'learning-journey', human: 'terrance',
       consoleErrors: [
         { level: 'error', text: 'ReferenceError: Sophia is not defined', url: 'https://doorway-alpha.elohim.host/a.js' },
       ],
@@ -1253,7 +1253,7 @@ const report: SprintReport = {
       firstSeenUrl: 'https://doorway-alpha.elohim.host/a.js',
       occurrences: 2,
       scenarios: [
-        { name: 'learning-journey', feature: 'browser', human: 'timothy' },
+        { name: 'learning-journey', feature: 'browser', human: 'terrance' },
         { name: 'learning-journey', feature: 'browser', human: 'mary' },
       ],
       suggestedObjective: 'Fix browser console error: ReferenceError: Sophia is not defined',
@@ -1289,7 +1289,7 @@ describe('renderMarkdown', () => {
 
   it('lists each scenario that triggered the finding', () => {
     const md = renderMarkdown(report);
-    assert.match(md, /timothy/);
+    assert.match(md, /terrance/);
     assert.match(md, /mary/);
   });
 });
@@ -1515,7 +1515,7 @@ Build a tiny staged-reports directory using test fixtures and run the CLI agains
 cd genesis/a2o
 mkdir -p /tmp/a2o-verify/reports/console
 cp scripts/__tests__/fixtures/cucumber-mixed.json        /tmp/a2o-verify/reports/cucumber-report.json
-cp scripts/__tests__/fixtures/console-timothy-errors.json /tmp/a2o-verify/reports/console/learning-journey-timothy-errors.json
+cp scripts/__tests__/fixtures/console-terrance-errors.json /tmp/a2o-verify/reports/console/learning-journey-terrance-errors.json
 cp scripts/__tests__/fixtures/console-mary-errors.json    /tmp/a2o-verify/reports/console/learning-journey-mary-errors.json
 cp scripts/__tests__/fixtures/coverage-gap.json          /tmp/a2o-verify/reports/coverage-gap.json
 

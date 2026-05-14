@@ -83,6 +83,6 @@ Feature: Authentication Lifecycle
   Scenario: Multiple humans logged in simultaneously
     Given human "Matthew" is logged in on doorway "alpha"
     And human "Susan" is logged in on doorway "alpha"
-    And human "Timothy" is logged in on doorway "alpha"
+    And human "Terrance" is logged in on doorway "alpha"
     Then all 3 humans should have distinct tokens
     And all 3 humans should have distinct humanIds

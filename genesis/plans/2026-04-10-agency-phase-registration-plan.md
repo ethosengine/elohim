@@ -27,7 +27,7 @@ Add `"agencyPhase"` field to each human. Place it after `"id"` for readability:
 {"id": "human-eve-firstwoman", "agencyPhase": "device", ...}
 {"id": "human-jessica-spouse", "agencyPhase": "device", ...}
 {"id": "human-pete-pastor", "agencyPhase": "device", ...}
-{"id": "human-timothy-tutor", "agencyPhase": "device", ...}
+{"id": "human-terrance-tutor", "agencyPhase": "device", ...}
 {"id": "human-nancy-neighbor", "agencyPhase": "hosted", ...}
 ```
 
@@ -920,7 +920,7 @@ node      Adam
 device    Eve
 device    Jessica
 device    Pete
-device    Timothy
+device    Terrance
 hosted    Nancy
 ```
 
@@ -930,7 +930,7 @@ Push to dev, wait for doorway pipeline to build and deploy the new image to alph
 
 - [ ] **Step 3: Run conductor identity seeding**
 
-Run: `cd genesis/seeder && CONDUCTOR_URLS="ws://elohim-adam-alpha:4445,ws://elohim-jessica-alpha:4445,ws://elohim-frank-alpha:4445,ws://elohim-pete-alpha:4445,ws://elohim-timothy-alpha:4445" pnpm run seed:conductors`
+Run: `cd genesis/seeder && CONDUCTOR_URLS="ws://elohim-adam-alpha:4445,ws://elohim-jessica-alpha:4445,ws://elohim-frank-alpha:4445,ws://elohim-pete-alpha:4445,ws://elohim-terrance-alpha:4445" pnpm run seed:conductors`
 
 Expected: All node/device humans show `[+]` or `[=]`
 
@@ -945,7 +945,7 @@ Expected:
   [+] Eve              eve@test.elohim.host                    device
   [+] Jessica          jessica@test.elohim.host                device
   [+] Pete             pastor-pete@test.elohim.host            device
-  [+] Timothy          timothy@test.elohim.host                device
+  [+] Terrance          terrance@test.elohim.host                device
   [+] Nancy            nancy@test.elohim.host                  hosted
 ```
 

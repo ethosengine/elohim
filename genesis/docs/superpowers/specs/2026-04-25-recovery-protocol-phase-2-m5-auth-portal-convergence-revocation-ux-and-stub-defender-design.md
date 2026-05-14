@@ -98,10 +98,10 @@ This reframe aligns with three durable framings recorded in memory:
 **Schemas (schema-first per `feedback_schema_first_ioc`):**
 - `elohim/sdk/schemas/v1/views/portal-host-view.schema.json`
 - `elohim/sdk/schemas/v1/views/agent-peer-binding-view.schema.json`
-- `elohim/sdk/schemas/v1/views/key-rotation-view.schema.json`
-- `elohim/sdk/schemas/v1/views/key-revocation-view.schema.json`
-- `elohim/sdk/schemas/v1/views/revocation-vote-view.schema.json`
-- `elohim/sdk/schemas/v1/views/recovery-request-view.schema.json`
+- `elohim/sdk/schemas/v1/views/key-rotation.schema.json`
+- `elohim/sdk/schemas/v1/views/key-revocation.schema.json`
+- `elohim/sdk/schemas/v1/views/revocation-vote.schema.json`
+- `elohim/sdk/schemas/v1/views/recovery-request.schema.json`
 - `elohim/sdk/schemas/v1/views/account-view.schema.json`
 - `elohim/sdk/schemas/v1/zome-inputs/add-portal-host.schema.json`
 - `elohim/sdk/schemas/v1/zome-inputs/submit-specialist-revocation.schema.json`
@@ -474,7 +474,7 @@ If the human has a reachable portal host, `portal_host_url` is populated; otherw
 
 ### 10.3 doorway-app changes
 
-`doorway-app/src/app/components/account/doorway-account.component.ts` — add a section:
+`doorway/doorway-app/src/app/components/account/doorway-account.component.ts` — add a section:
 
 ```html
 @if (portalHostUrl(); as hostUrl) {
@@ -878,10 +878,10 @@ The graduation is incremental. M5 ships the canonical example; future sprints re
 
 - `elohim/sdk/schemas/v1/views/portal-host-view.schema.json`
 - `elohim/sdk/schemas/v1/views/agent-peer-binding-view.schema.json`
-- `elohim/sdk/schemas/v1/views/key-rotation-view.schema.json`
-- `elohim/sdk/schemas/v1/views/key-revocation-view.schema.json`
-- `elohim/sdk/schemas/v1/views/revocation-vote-view.schema.json`
-- `elohim/sdk/schemas/v1/views/recovery-request-view.schema.json`
+- `elohim/sdk/schemas/v1/views/key-rotation.schema.json`
+- `elohim/sdk/schemas/v1/views/key-revocation.schema.json`
+- `elohim/sdk/schemas/v1/views/revocation-vote.schema.json`
+- `elohim/sdk/schemas/v1/views/recovery-request.schema.json`
 - `elohim/sdk/schemas/v1/views/account-view.schema.json`
 - `elohim/sdk/schemas/v1/zome-inputs/add-portal-host.schema.json`
 - `elohim/sdk/schemas/v1/zome-inputs/submit-specialist-revocation.schema.json`

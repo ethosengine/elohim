@@ -156,7 +156,7 @@ Feature: Delivery Diagnostics — Observability and Controlled Degradation
     Given the projection cache for "evolution-of-trust" is empty
     And the Service Worker is registered same-origin
     And browser console logging is enabled
-    When Timothy loads "evolution-of-trust"
+    When Terrance loads "evolution-of-trust"
     Then the SW capability probe returns deliveryMode "compressed"
     And the SW downloads the ZIP blob via a single GET /blob/{hash} request
     And the SW extracts all app files into CacheStorage

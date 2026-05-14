@@ -701,9 +701,9 @@ POST   /replication/:hash/pin   Request increased replication
 - `elohim-storage/src/blob_store.rs` - Blob storage logic
 
 ### Frontend (elohim-app)
-- `elohim-app/src/app/elohim/services/storage-client.service.ts` - Storage client
-- `elohim-app/src/app/elohim/services/storage-api.service.ts` - API service
-- `elohim-app/src/app/elohim/services/content.service.ts` - Content loading
+- `app/elohim-app/src/app/elohim/services/storage-client.service.ts` - Storage client
+- `app/elohim-app/src/app/elohim/services/storage-api.service.ts` - API service
+- `app/elohim-app/src/app/elohim/services/content.service.ts` - Content loading
 
 ### Seeding
 - `genesis/seeder/src/` - Content seeding pipeline

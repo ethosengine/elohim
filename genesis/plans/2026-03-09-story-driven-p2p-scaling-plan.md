@@ -98,7 +98,7 @@ Each human stewards content that matches their story:
 - Matthew: governance, protocol core, family learning
 - Susan: family curriculum, relationship content
 - Pastor Pete: faith community, pastoral care
-- Timothy: tutorials, mentorship, learning paths
+- Terrance: tutorials, mentorship, learning paths
 - Frank: agriculture, supply chain, local economy
 
 Content with no matching rule defaults to Matthew (founder, backwards compat).
@@ -124,9 +124,9 @@ class Steward(TypedDict):
 # A content node can match multiple rules — stewards accumulate.
 
 STEWARDSHIP_RULES: list[tuple[set[str], list[Steward]]] = [
-    # Assessments — Timothy (tutor) is primary, Susan (homeschool) curates
+    # Assessments — Terrance (tutor) is primary, Susan (homeschool) curates
     ({"assessment"}, [
-        {"humanId": "human-timothy-tutor", "affinity": 0.8, "role": "author"},
+        {"humanId": "human-terrance-tutor", "affinity": 0.8, "role": "author"},
         {"humanId": "human-susan-partner", "affinity": 0.5, "role": "curator"},
     ]),
 
@@ -165,9 +165,9 @@ STEWARDSHIP_RULES: list[tuple[set[str], list[Steward]]] = [
         {"humanId": "human-pastor-pete-pastor", "affinity": 0.4, "role": "endorser"},
     ]),
 
-    # Learning paths, education — Timothy primary
+    # Learning paths, education — Terrance primary
     ({"learning", "tutorial", "path", "education"}, [
-        {"humanId": "human-timothy-tutor", "affinity": 0.7, "role": "author"},
+        {"humanId": "human-terrance-tutor", "affinity": 0.7, "role": "author"},
     ]),
 
     # Elohim agent content — Matthew (protocol architect)
@@ -273,7 +273,7 @@ Expected: 3,525 files annotated with stewardedBy
 **Step 4: Spot-check a few files**
 
 Run: `python3 -c "import json; d=json.load(open('genesis/data/lamad/content/assessment-attachment-style.json')); print(json.dumps(d.get('stewardedBy'), indent=2))"`
-Expected: Timothy as author (0.8), Susan as curator (0.5)
+Expected: Terrance as author (0.8), Susan as curator (0.5)
 
 Run: `python3 -c "import json; d=json.load(open('genesis/data/lamad/content/governance-organizations-solarpunk-readme.json')); print(json.dumps(d.get('stewardedBy'), indent=2))"`
 Expected: Matthew as primary steward
@@ -388,10 +388,10 @@ Insert after line 13 (after the Background block):
 
   @scaling @compute
   Scenario: Step 5 — Five conductors with multi-hop content discovery
-    Given 5 conductors are running for "Matthew", "Susan", "Pastor Pete", "Timothy", and "Frank"
+    Given 5 conductors are running for "Matthew", "Susan", "Pastor Pete", "Terrance", and "Frank"
     And each conductor is seeded with its stewardship content
     When all conductors have discovered their peers
-    Then Timothy sees learning content via Susan's learning_partner bridge
+    Then Terrance sees learning content via Susan's learning_partner bridge
     And Frank's economy content is NOT directly visible to Matthew
     And content discovery paths match the relationship graph
     And compute for 5 conductors is within budget
@@ -548,8 +548,8 @@ if (conductorFor) {
 
 **Step 5: Test with dry run**
 
-Run: `cd /projects/elohim/genesis/seeder && npx tsx src/seed.ts --dry-run --conductor-for=human-timothy-tutor 2>&1 | grep stewardship`
-Expected: Shows filtered count (Timothy should get assessment + tutorial content)
+Run: `cd /projects/elohim/genesis/seeder && npx tsx src/seed.ts --dry-run --conductor-for=human-terrance-tutor 2>&1 | grep stewardship`
+Expected: Shows filtered count (Terrance should get assessment + tutorial content)
 
 **Step 6: Commit**
 

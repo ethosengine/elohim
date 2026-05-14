@@ -28,10 +28,12 @@ from dataclasses import dataclass, field
 from datetime import date, datetime, timezone
 from pathlib import Path
 
-# Bootstrap: locate .claude/scripts/_lib by walking up
+# Bootstrap: locate .claude/scripts/_lib by walking up. Anchor on .git too
+# so an accidental .claude/.claude/ artifact can't trick the walk into
+# resolving to .claude/ as repo root.
 _here = Path(__file__).resolve()
 for _ in range(8):
-    if (_here / ".claude" / "scripts" / "_lib").is_dir():
+    if (_here / ".claude" / "scripts" / "_lib").is_dir() and (_here / ".git").exists():
         sys.path.insert(0, str(_here / ".claude" / "scripts"))
         break
     _here = _here.parent
@@ -79,11 +81,57 @@ MULTICOMPONENT_PATH_RE = re.compile(
     r"`([a-zA-Z0-9_./\-]+/[a-zA-Z0-9_./\-]+\.(?:rs|ts|tsx|js|jsx|py|toml|md|json|yaml|yml|sh|sql|html|scss|css|feature))`"
 )
 
-# Tool grants we know about (used for tools-declared analysis)
+# Tool grants we know about (used for tools-declared analysis).
+# Known false-positive class: "declared-but-unreferenced" for builtin tools
+# (Bash/Read/Edit/Write/Glob/Grep/Task/TodoWrite/LSP) is mostly noise — agents
+# CALL these tools functionally; the audit can't see invocation, only literal
+# mentions in body text. Spot-check before stripping any builtin grant.
 KNOWN_TOOLS = {
+    # Built-in Claude Code tools
     "Task", "Bash", "Glob", "Grep", "Read", "Edit", "Write", "TodoWrite",
-    "LSP", "WebFetch", "WebSearch", "NotebookEdit", "TaskList", "TaskGet",
-    "TaskUpdate", "TaskCreate", "SendMessage", "ExitPlanMode", "EnterPlanMode",
+    "LSP", "LS", "WebFetch", "WebSearch", "NotebookEdit", "MultiEdit",
+    "BashOutput", "KillBash", "ListMcpResourcesTool", "ReadMcpResourceTool",
+    "TaskList", "TaskGet", "TaskUpdate", "TaskCreate", "TaskStop",
+    "TaskDelete", "SendMessage", "ExitPlanMode", "EnterPlanMode",
+    # MCP: jenkins (anonymous-read CI surface)
+    "mcp__jenkins__getBuildLog", "mcp__jenkins__searchBuildLog",
+    "mcp__jenkins__getBuild", "mcp__jenkins__getJob", "mcp__jenkins__getJobs",
+    "mcp__jenkins__triggerBuild", "mcp__jenkins__updateBuild",
+    "mcp__jenkins__getStatus", "mcp__jenkins__whoAmI",
+    "mcp__jenkins__getJobScm", "mcp__jenkins__getBuildScm",
+    "mcp__jenkins__getBuildChangeSets", "mcp__jenkins__getTestResults",
+    "mcp__jenkins__getFlakyFailures",
+    # MCP: sonarqube
+    "mcp__sonarqube__analyze_code_snippet",
+    "mcp__sonarqube__search_sonar_issues_in_projects",
+    "mcp__sonarqube__get_project_quality_gate_status",
+    "mcp__sonarqube__show_rule", "mcp__sonarqube__get_component_measures",
+    # MCP: mempalace (memory-team agents)
+    "mcp__mempalace__mempalace_search", "mcp__mempalace__mempalace_status",
+    "mcp__mempalace__mempalace_list_wings", "mcp__mempalace__mempalace_list_rooms",
+    "mcp__mempalace__mempalace_list_drawers", "mcp__mempalace__mempalace_get_drawer",
+    "mcp__mempalace__mempalace_check_duplicate",
+    "mcp__mempalace__mempalace_memories_filed_away",
+    "mcp__mempalace__mempalace_kg_query", "mcp__mempalace__mempalace_kg_timeline",
+    "mcp__mempalace__mempalace_kg_stats", "mcp__mempalace__mempalace_traverse",
+    "mcp__mempalace__mempalace_find_tunnels",
+    "mcp__mempalace__mempalace_follow_tunnels",
+    "mcp__mempalace__mempalace_list_tunnels",
+    "mcp__mempalace__mempalace_get_taxonomy",
+    "mcp__mempalace__mempalace_get_aaak_spec",
+    "mcp__mempalace__mempalace_graph_stats", "mcp__mempalace__mempalace_sync",
+    "mcp__mempalace__mempalace_add_drawer", "mcp__mempalace__mempalace_update_drawer",
+    "mcp__mempalace__mempalace_delete_drawer", "mcp__mempalace__mempalace_kg_add",
+    "mcp__mempalace__mempalace_kg_invalidate",
+    "mcp__mempalace__mempalace_create_tunnel",
+    "mcp__mempalace__mempalace_delete_tunnel",
+    "mcp__mempalace__mempalace_hook_settings",
+    # MCP: elohim-content (content-pipeline agent)
+    "mcp__elohim-content__read_seed", "mcp__elohim-content__write_seed",
+    "mcp__elohim-content__list_seeds", "mcp__elohim-content__delete_seed",
+    "mcp__elohim-content__search_docs", "mcp__elohim-content__read_doc",
+    "mcp__elohim-content__list_docs", "mcp__elohim-content__create_concept",
+    "mcp__elohim-content__create_relationship",
 }
 
 

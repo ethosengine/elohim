@@ -94,7 +94,7 @@ Ground CI/CD planning decisions in actual cluster topology and observed capacity
 |---|---|---|---|---|---|---|---|---|
 | matthew (manager) | `elohim-matthew-alpha-0` | ethosengine | 1c | 2 GiB | 3c | 8 GiB | 40 GiB | Running (TEMP BUMP active) |
 | jessica (spouse) | `elohim-jessica-alpha-0` | intel-nuc | 250m | 512 Mi | 1c | 1.5 GiB | 40 GiB | Running |
-| timothy (tutor) | `elohim-timothy-alpha-0` | thinkc-p0h | 250m | 1 GiB | 1c | 3 GiB | 40 GiB | Running |
+| terrance (tutor) | `elohim-terrance-alpha-0` | thinkc-p0h | 250m | 1 GiB | 1c | 3 GiB | 40 GiB | Running |
 | **adam (firstman)** | `elohim-adam-alpha-0` | (was shem) | 500m | 2 GiB | 2c | 6 GiB | 40 GiB lost | **Pending — node-type=remote unavailable** |
 | **frank (farmer)** | `elohim-frank-alpha-0` | (was shem) | 250m | 512 Mi | 1c | 1.5 GiB | 40 GiB lost | **Pending — node-type=remote unavailable** |
 | **pete (pastor)** | `elohim-pete-alpha-0` | (was shem) | 250m | 512 Mi | 1c | 1.5 GiB | 40 GiB lost | **Pending — node-type=remote unavailable** |
@@ -107,7 +107,7 @@ Shared infra (alpha): doorway (110m/160 Mi req), site (100m/128 Mi), mongodb (10
 |---|---|---|---|---|---|---|---|
 | frank (farmer) | prod | intel-nuc | 330m | 616 Mi | 1.4c | 1.95 GiB | 15 GiB |
 | pete (pastor) | staging | intel-nuc | 330m | 616 Mi | 1.4c | 1.95 GiB | 15 GiB |
-| timothy (tutor) | staging | intel-nuc | 330m | 616 Mi | 1.4c | 1.95 GiB | 15 GiB |
+| terrance (tutor) | staging | intel-nuc | 330m | 616 Mi | 1.4c | 1.95 GiB | 15 GiB |
 
 **Elohim total (declared, including stranded):** 4.1c req / 15.8c lim, 9.1 GiB req / 36 GiB lim, 320 GiB PVC.
 
@@ -152,8 +152,8 @@ Shared infra (alpha): doorway (110m/160 Mi req), site (100m/128 Mi), mongodb (10
 Once we formalize "story groups" as deployment groups that share fate when a node goes down, the natural groupings on this cluster are:
 
 - **`group:ethosengine-perf`** — matthew-alpha, ee-jenkins-0, harbor (most), workspace48851cf, sonarqube. Loss of ethosengine breaks all build/CI + matthew + sonarqube simultaneously.
-- **`group:intel-nuc-ops`** — jessica-alpha, frank-prod, pete-staging, timothy-staging, mongodb-alpha, nats-alpha, doorway-alpha, site-alpha. Loss of intel-nuc breaks all elohim envs.
-- **`group:edge-builders`** — timothy-alpha, eclipse-che gateway/operator, jenkins build agents. Edge throttling delays merges.
+- **`group:intel-nuc-ops`** — jessica-alpha, frank-prod, pete-staging, terrance-staging, mongodb-alpha, nats-alpha, doorway-alpha, site-alpha. Loss of intel-nuc breaks all elohim envs.
+- **`group:edge-builders`** — terrance-alpha, eclipse-che gateway/operator, jenkins build agents. Edge throttling delays merges.
 - **`group:hp-micro10-storage`** — nexus, harbor-registry. Loss = lost artifacts.
 - **`group:shem-remote`** — adam, frank-alpha, pete-alpha. Already realized: node death = pod stranding + data loss.
 

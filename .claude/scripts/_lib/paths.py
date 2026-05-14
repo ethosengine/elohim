@@ -13,23 +13,44 @@ from pathlib import Path
 
 
 def repo_root_from_file(file: str | Path, max_depth: int = 8) -> Path:
-    """Walk up from a script file to the repo root (parent of .claude/).
+    """Walk up from a script file to the repo root.
 
-    More robust than `parents[N]` — works regardless of where in the tree
-    the script lives, as long as the repo has a top-level `.claude/`.
+    Repo root is the directory that contains BOTH `.claude/` and `.git`
+    (file in worktrees, dir in the main repo). Requiring both anchors is
+    important: a `.claude/.claude/` artifact from a buggy run would
+    otherwise satisfy a `.claude/`-only check and cause the helper to
+    return `.claude/` itself as repo root — recursively reinforcing the
+    doubled-path bug. The `.git` anchor breaks that cycle.
+
+    Falls back to a `.claude/`-only match (legacy behavior) if no `.git`
+    marker is found within `max_depth` levels — preserves usefulness in
+    exotic layouts (e.g. monorepo subtrees vendored without `.git`).
     """
-    p = Path(file).resolve()
+    start = Path(file).resolve()
+
+    # First pass: strict — require both .claude and .git
+    p = start
+    for _ in range(max_depth):
+        if (p / ".claude").is_dir() and (p / ".git").exists():
+            return p
+        if p.parent == p:
+            break
+        p = p.parent
+
+    # Fallback to env if available
+    env = os.environ.get("CLAUDE_PROJECT_DIR")
+    if env:
+        return Path(env).resolve()
+
+    # Last-resort: legacy `.claude/`-only walk
+    p = start
     for _ in range(max_depth):
         if (p / ".claude").is_dir():
             return p
         if p.parent == p:
             break
         p = p.parent
-    # Fallback to env if available, else last-attempted dir
-    env = os.environ.get("CLAUDE_PROJECT_DIR")
-    if env:
-        return Path(env).resolve()
-    return Path(file).resolve().parent
+    return start.parent
 
 
 def reports_root(repo_root: Path) -> Path:

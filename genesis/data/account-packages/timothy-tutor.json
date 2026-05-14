@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "identity": {
-    "humanId": "human-timothy-tutor",
-    "displayName": "Timothy",
+    "humanId": "human-terrance-tutor",
+    "displayName": "Terrance",
     "category": "affinity",
     "profileReach": "community",
     "bio": "Educator and learning facilitator. Helping kids and adults discover the joy of learning.",
@@ -12576,7 +12576,7 @@
       "stewardRatio": null
     },
     {
-      "contentId": "human-timothy-tutor",
+      "contentId": "human-terrance-tutor",
       "reach": "commons",
       "reason": "commons",
       "stewardRatio": null

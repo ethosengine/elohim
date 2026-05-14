@@ -5,7 +5,7 @@ Feature: EPR Cross-Peer Content Resolution
   So that learning paths work regardless of stewardship partitioning
 
   When Matthew authors a guide and Pete on a different peer stewards it,
-  Timothy reading the guide on yet a third peer should never need to know
+  Terrance reading the guide on yet a third peer should never need to know
   the topology. The protocol resolves across peers, the body fetches
   across peers, and recognition flows back to the stewards who carry the
   load — all transparent to the reader.
@@ -102,39 +102,39 @@ Feature: EPR Cross-Peer Content Resolution
     # Calculus 201 only opens for learners who have demonstrated mastery
     # of Calculus 101. The attestation is on the DHT (notarized);
     # checking it is a graph traversal, not a database query at the
-    # publisher. Timothy sees a respectful "build prerequisites first"
+    # publisher. Terrance sees a respectful "build prerequisites first"
     # affordance pointing to the prerequisite path.
     Given peer "alpha" has content "calculus-201" with reach "public"
     And content "calculus-201" requires prerequisite mastery of "calculus-101"
     And human "Matthew" has mastery of "calculus-101"
-    And human "Timothy" does not have mastery of "calculus-101"
+    And human "Terrance" does not have mastery of "calculus-101"
     When human "Matthew" requests the body of content "calculus-201"
     Then the content body is served successfully
-    When human "Timothy" requests the body of content "calculus-201"
+    When human "Terrance" requests the body of content "calculus-201"
     Then the response is 403 with reason "Prerequisite mastery required"
 
   @wip
   Scenario: Recognition distributes proportionally to stewards on P2P delivery
     # Stewardship is real work and the protocol counts it. When peer
-    # "staging" fetches Pete and Timothy's co-stewarded content, both
+    # "staging" fetches Pete and Terrance's co-stewarded content, both
     # stewards receive recognition events proportional to their declared
     # share. This is shefa — value flowing where work was done.
-    Given peer "alpha" has content "economics-primer" stewarded by "Pete" at 60% and "Timothy" at 40%
+    Given peer "alpha" has content "economics-primer" stewarded by "Pete" at 60% and "Terrance" at 40%
     When peer "staging" resolves "economics-primer" via P2P from peer "alpha"
-    Then recognition events are created for steward "Pete" and steward "Timothy"
+    Then recognition events are created for steward "Pete" and steward "Terrance"
     And steward "Pete" receives approximately 60% of the recognition
-    And steward "Timothy" receives approximately 40% of the recognition
+    And steward "Terrance" receives approximately 40% of the recognition
 
   @wip
   Scenario: Policy ceiling blocks content above the device's reach level max
-    # Timothy's device — a stewarded-child device — has a policy ceiling
-    # on reach level. Even when Timothy holds the structural standing to
+    # Terrance's device — a stewarded-child device — has a policy ceiling
+    # on reach level. Even when Terrance holds the structural standing to
     # access "intimate" content, the device-side policy refuses, and the
     # refusal is local + visible — no awkward attempt-and-deny round-trip
     # to the server.
     Given peer "alpha" has content "intimate-journal" with reach "intimate"
-    And human "Timothy" has a device policy with reach_level_max of 3
-    When human "Timothy" requests content "intimate-journal" from peer "alpha"
+    And human "Terrance" has a device policy with reach_level_max of 3
+    When human "Terrance" requests content "intimate-journal" from peer "alpha"
     Then the response is 403 with reason matching "Reach level .* exceeds maximum"
 
   # --- Wave 3 additions: cross-peer human moments the substrate enables ---
@@ -158,11 +158,11 @@ Feature: EPR Cross-Peer Content Resolution
     # other stewards" affordance and tries another peer that holds the
     # CID. The reader sees latency, not failure.
     Given peer "alpha" has content "module-X" with multiple stewards "Pete", "Jessica"
-    And Timothy's peer "household-timothy" begins resolving "module-X"
+    And Terrance's peer "household-terrance" begins resolving "module-X"
     When peer "alpha" disconnects mid-fetch before delivering the body
     Then the renderer surfaces a "fetching from another steward" indicator
     And the resolver attempts a different peer that holds the CID
-    And the body eventually delivers without Timothy seeing an error page
+    And the body eventually delivers without Terrance seeing an error page
 
   @wip
   Scenario: Identity binding allows cross-peer fetches to attribute reach correctly

@@ -6,10 +6,10 @@
 Phase 1 delivers **domain models + service stubs** for autonomous mutual insurance.
 
 **Files to know:**
-- `elohim-app/src/app/shefa/models/insurance-mutual.model.ts` - Data models
-- `elohim-app/src/app/shefa/services/insurance-mutual.service.ts` - Service stubs
-- `docs/integration/insurance-mutual-integration-guide.md` - How it integrates
-- `docs/analysis/shefa-models-for-mutual-review.md` - Why this design
+- `app/elohim-app/src/app/shefa/models/insurance-mutual.model.ts` - Data models
+- `app/elohim-app/src/app/shefa/services/insurance-mutual.service.ts` - Service stubs
+- `genesis/docs/integration/insurance-mutual-integration-guide.md` - How it integrates
+- `genesis/docs/analysis/shefa-models-for-mutual-review.md` - Why this design
 
 ### The Big Picture
 ```
@@ -500,8 +500,8 @@ explanation = 'Your claim for cosmetic work is not covered. The policy covers me
 ## Questions?
 
 Refer to:
-1. `docs/integration/insurance-mutual-integration-guide.md` - Detailed examples
-2. `docs/analysis/shefa-models-for-mutual-review.md` - Why this design
+1. `genesis/docs/integration/insurance-mutual-integration-guide.md` - Detailed examples
+2. `genesis/docs/analysis/shefa-models-for-mutual-review.md` - Why this design
 3. Models: Type definitions with extensive JSDoc comments
 
 ---

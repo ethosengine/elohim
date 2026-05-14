@@ -13,18 +13,18 @@ Feature: Feedback dialogue panel — accountable peer surface
 
   Background:
     Given doorway "alpha" at "E2E_DOORWAY_ALPHA"
-    And human "Timothy" is logged in on doorway "alpha" with device
+    And human "Terrance" is logged in on doorway "alpha" with device
 
   @happy-path @reach
   Scenario: Learner reaches the feedback dialogue from a content page
-    When Timothy navigates to a markdown content page
+    When Terrance navigates to a markdown content page
     Then the feedback trigger should be visible in the content actions
     And the feedback trigger should have an accessible label
 
   @happy-path @menu
   Scenario: Trigger reveals the four governance feedback choices
-    Given Timothy is viewing a markdown content page
-    When Timothy opens the feedback trigger menu
+    Given Terrance is viewing a markdown content page
+    When Terrance opens the feedback trigger menu
     Then the feedback menu should list "Flag"
     And the feedback menu should list "Challenge"
     And the feedback menu should list "Feedback"
@@ -32,9 +32,9 @@ Feature: Feedback dialogue panel — accountable peer surface
 
   @happy-path @modal-stack
   Scenario: Selecting a category opens a readable, selectable card above page chrome
-    Given Timothy is viewing a markdown content page
-    And Timothy has opened the feedback trigger menu
-    When Timothy selects "Feedback" from the menu
+    Given Terrance is viewing a markdown content page
+    And Terrance has opened the feedback trigger menu
+    When Terrance selects "Feedback" from the menu
     Then the feedback dialogue panel should be visible
     And the feedback dialogue panel should stack above any table-of-contents sidebar
     And the artifact textarea should be selectable and focusable
@@ -42,9 +42,9 @@ Feature: Feedback dialogue panel — accountable peer surface
 
   @category-vocabulary
   Scenario Outline: Each category renders the spec's grievance vocabulary
-    Given Timothy is viewing a markdown content page
-    And Timothy has opened the feedback trigger menu
-    When Timothy selects "<menu-label>" from the menu
+    Given Terrance is viewing a markdown content page
+    And Terrance has opened the feedback trigger menu
+    When Terrance selects "<menu-label>" from the menu
     Then the feedback dialogue panel title should read "<panel-title>"
     And the artifact textarea placeholder should be "<placeholder>"
 
@@ -57,18 +57,18 @@ Feature: Feedback dialogue panel — accountable peer surface
 
   @dismiss
   Scenario: Learner can close the dialogue without submitting
-    Given Timothy has the feedback dialogue panel open with "Feedback" selected
-    When Timothy clicks the dialogue close button
+    Given Terrance has the feedback dialogue panel open with "Feedback" selected
+    When Terrance clicks the dialogue close button
     Then the feedback dialogue panel should not be visible
 
   @dismiss @backdrop
   Scenario: Clicking outside the card dismisses the dialogue
-    Given Timothy has the feedback dialogue panel open with "Feedback" selected
-    When Timothy clicks the dialogue backdrop
+    Given Terrance has the feedback dialogue panel open with "Feedback" selected
+    When Terrance clicks the dialogue backdrop
     Then the feedback dialogue panel should not be visible
 
   @dismiss @keyboard
   Scenario: Pressing Escape dismisses the dialogue
-    Given Timothy has the feedback dialogue panel open with "Feedback" selected
-    When Timothy presses the Escape key
+    Given Terrance has the feedback dialogue panel open with "Feedback" selected
+    When Terrance presses the Escape key
     Then the feedback dialogue panel should not be visible

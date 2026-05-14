@@ -28,7 +28,7 @@ Feature: Network Health Posture — Aggregate Awareness and Attestation-Gated In
     Given the neighbor table on doorway "alpha" contains:
       | peer             | ready | budget_remaining | always_on | last_seen      |
       | matthew-home     | true  | 42               | true      | 10 seconds ago |
-      | timothy-laptop   | true  | 15               | false     | 20 seconds ago |
+      | terrance-laptop   | true  | 15               | false     | 20 seconds ago |
       | community-node   | true  | 100              | true      | 5 seconds ago  |
     When Matthew queries the network posture
     Then the posture shows 3 active peers, 0 stale peers
@@ -57,7 +57,7 @@ Feature: Network Health Posture — Aggregate Awareness and Attestation-Gated In
   Scenario: Network posture shows storage pressure across the network
     Given "matthew-home" is at 95% storage capacity
     And "community-node" is at 30% storage capacity
-    And "timothy-laptop" is at 60% storage capacity
+    And "terrance-laptop" is at 60% storage capacity
     When Matthew queries the network posture
     Then the posture shows 1 peer under storage pressure
     And the posture shows total available storage across all peers
@@ -125,28 +125,28 @@ Feature: Network Health Posture — Aggregate Awareness and Attestation-Gated In
   @wip
   Scenario: Operator grants diagnostic attestation to a peer
     Given Matthew operates "matthew-home"
-    When Matthew grants a diagnostic attestation to "timothy-laptop":
+    When Matthew grants a diagnostic attestation to "terrance-laptop":
       | field    | value          |
       | grantor  | matthew-home   |
-      | grantee  | timothy-laptop |
+      | grantee  | terrance-laptop |
       | scope    | compute:debug  |
       | expires  | 24 hours       |
-    Then "timothy-laptop" can request debug-level health from "matthew-home"
+    Then "terrance-laptop" can request debug-level health from "matthew-home"
     And the attestation is stored in the trust cache with TTL
 
   @wip
   Scenario: Diagnostic attestation expires and access reverts
-    Given "timothy-laptop" holds a "compute:debug" attestation from "matthew-home"
+    Given "terrance-laptop" holds a "compute:debug" attestation from "matthew-home"
     And the attestation expires
-    When "timothy-laptop" requests debug-level health from "matthew-home"
+    When "terrance-laptop" requests debug-level health from "matthew-home"
     Then the response is filtered to info level
-    And "timothy-laptop" is informed the attestation has expired
+    And "terrance-laptop" is informed the attestation has expired
 
   @wip
   Scenario: Operator revokes diagnostic attestation
-    Given "timothy-laptop" holds a "compute:debug" attestation from "matthew-home"
+    Given "terrance-laptop" holds a "compute:debug" attestation from "matthew-home"
     When Matthew revokes the attestation
-    Then "timothy-laptop" can no longer request debug-level health from "matthew-home"
+    Then "terrance-laptop" can no longer request debug-level health from "matthew-home"
     And the revocation takes effect within the trust cache TTL
 
   # --- Elohim Agent Network Reasoning ------------------------------------------
@@ -162,10 +162,10 @@ Feature: Network Health Posture — Aggregate Awareness and Attestation-Gated In
 
   @wip
   Scenario: Elohim agent requests diagnostic attestation to investigate degradation
-    Given "timothy-laptop" reports health=degraded in its CapacityAnnouncement
+    Given "terrance-laptop" reports health=degraded in its CapacityAnnouncement
     When the elohim agent on "matthew-home" investigates the degradation
-    Then the agent requests a "compute:debug" attestation from "timothy-laptop"
-    And the request is presented to "timothy-laptop"'s operator for approval
+    Then the agent requests a "compute:debug" attestation from "terrance-laptop"
+    And the request is presented to "terrance-laptop"'s operator for approval
     And the agent does not proceed with introspection without explicit operator consent
 
   @wip
@@ -174,10 +174,10 @@ Feature: Network Health Posture — Aggregate Awareness and Attestation-Gated In
       | peer             | ready | budget_remaining | queue_depth |
       | matthew-home     | true  | 42               | 2           |
       | community-node   | true  | 100              | 0           |
-      | timothy-laptop   | false | 0                | 10          |
+      | terrance-laptop   | false | 0                | 10          |
     When a compute request arrives
     Then the request is routed to "community-node" (highest budget, lowest queue)
-    And "timothy-laptop" is excluded (not ready)
+    And "terrance-laptop" is excluded (not ready)
     And the routing decision is based on live gossipsub data, not stale state
 
   # --- Transition: Query Param to Attestation ----------------------------------

@@ -55,10 +55,10 @@ Feature: Persona Testnet — 20 Humans on One Box
 
   @scaling @compute
   Scenario: Step 5 — Five conductors with multi-hop content discovery
-    Given 5 conductors are running for "Matthew", "Susan", "Pete", "Timothy", and "Frank"
+    Given 5 conductors are running for "Matthew", "Susan", "Pete", "Terrance", and "Frank"
     And each conductor is seeded with its stewardship content
     When all conductors have discovered their peers
-    Then Timothy sees learning content via Susan's learning_partner bridge
+    Then Terrance sees learning content via Susan's learning_partner bridge
     And Frank's economy content is NOT directly visible to Matthew
     And content discovery paths match the relationship graph
     And compute for 5 conductors is within budget
@@ -80,7 +80,7 @@ Feature: Persona Testnet — 20 Humans on One Box
     Given cluster "faith-community" has 5 personas
     When the cluster has been running for 30 seconds
     Then Pete should see 4 peers in his cluster
-    And Timothy should see Sammy as a cross-cluster mentee
+    And Terrance should see Sammy as a cross-cluster mentee
 
   Scenario: Local economy nodes discover business partners
     Given cluster "local-economy" has 5 personas

@@ -16,7 +16,7 @@ The alpha cluster topology (per memory `project_alpha_topology_bootstrap_pair`):
 | adam | Bootstrap pair (node 0) | `edgenode/alpha.yaml` StatefulSet replica 0 | `elohim-alpha` |
 | matthew | Bootstrap pair (node 1) + doorway operator | `edgenode/alpha.yaml` StatefulSet replica 1 | `elohim-alpha` |
 | jessica | Household peer | `edgenode/alpha.yaml` StatefulSet replica 2 | `elohim-alpha` |
-| timothy | Stewarded-child peer | `edgenode/alpha.yaml` StatefulSet replica 3 | `elohim-alpha` |
+| terrance | Stewarded-child peer | `edgenode/alpha.yaml` StatefulSet replica 3 | `elohim-alpha` |
 | shem-* | Multi-tenant shem peers (2) | `edgenode/alpha.yaml` StatefulSet replicas 4-5 | `elohim-alpha` |
 
 Che workspace does not have `kubectl`. The operator must verify actual state

@@ -228,10 +228,10 @@ app/elohim-app/
 **Files:**
 - Create: `elohim/sdk/schemas/v1/views/portal-host-view.schema.json`
 - Create: `elohim/sdk/schemas/v1/views/agent-peer-binding-view.schema.json`
-- Create: `elohim/sdk/schemas/v1/views/key-rotation-view.schema.json`
-- Create: `elohim/sdk/schemas/v1/views/key-revocation-view.schema.json`
-- Create: `elohim/sdk/schemas/v1/views/revocation-vote-view.schema.json`
-- Create: `elohim/sdk/schemas/v1/views/recovery-request-view.schema.json`
+- Create: `elohim/sdk/schemas/v1/views/key-rotation.schema.json`
+- Create: `elohim/sdk/schemas/v1/views/key-revocation.schema.json`
+- Create: `elohim/sdk/schemas/v1/views/revocation-vote.schema.json`
+- Create: `elohim/sdk/schemas/v1/views/recovery-request.schema.json`
 - Create: `elohim/sdk/schemas/v1/views/account-view.schema.json`
 - Create: `elohim/sdk/schemas/v1/zome-inputs/add-portal-host.schema.json`
 - Create: `elohim/sdk/schemas/v1/zome-inputs/submit-specialist-revocation.schema.json`
@@ -474,10 +474,10 @@ Expected: PASS (24 existing assertions remain green; new schemas don't break exi
 ```bash
 git add elohim/sdk/schemas/v1/views/portal-host-view.schema.json \
         elohim/sdk/schemas/v1/views/agent-peer-binding-view.schema.json \
-        elohim/sdk/schemas/v1/views/key-rotation-view.schema.json \
-        elohim/sdk/schemas/v1/views/key-revocation-view.schema.json \
-        elohim/sdk/schemas/v1/views/revocation-vote-view.schema.json \
-        elohim/sdk/schemas/v1/views/recovery-request-view.schema.json \
+        elohim/sdk/schemas/v1/views/key-rotation.schema.json \
+        elohim/sdk/schemas/v1/views/key-revocation.schema.json \
+        elohim/sdk/schemas/v1/views/revocation-vote.schema.json \
+        elohim/sdk/schemas/v1/views/recovery-request.schema.json \
         elohim/sdk/schemas/v1/views/account-view.schema.json \
         elohim/sdk/schemas/v1/zome-inputs/add-portal-host.schema.json \
         elohim/sdk/schemas/v1/zome-inputs/submit-specialist-revocation.schema.json \
@@ -2110,13 +2110,13 @@ git commit -m "doorway-app(account): Manage-from-steward section + portal-host s
 - Create: `elohim/elohim-agent/specialists/defender/src/role_marker.rs`
 - Create: `elohim/elohim-agent/specialists/defender/src/detection.rs`
 - Create: `elohim/elohim-agent/specialists/defender/src/attestation.rs`
-- Modify: `elohim/elohim-agent/Cargo.toml` (add specialists/defender to workspace)
+- Modify: `elohim/elohim-agent/elohim-agent-service/Cargo.toml` (add specialists/defender to workspace)
 - Modify: `elohim/elohim-agent/elohim-agent-service/Cargo.toml` (add dep)
 - Modify: `elohim/elohim-agent/elohim-agent-service/src/lib.rs`
 
 - [ ] **Step 1: Workspace member**
 
-Append to `elohim/elohim-agent/Cargo.toml` `[workspace] members`:
+Append to `elohim/elohim-agent/elohim-agent-service/Cargo.toml` `[workspace] members`:
 
 ```toml
 "specialists/defender",
@@ -2306,7 +2306,7 @@ Expected: PASS.
 - [ ] **Step 9: Commit**
 
 ```bash
-git add elohim/elohim-agent/Cargo.toml \
+git add elohim/elohim-agent/elohim-agent-service/Cargo.toml \
         elohim/elohim-agent/specialists/
 git commit -m "elohim-agent(specialists): defender stub crate — manifest, role marker, detection+attestation stubs"
 ```

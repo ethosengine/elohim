@@ -5,7 +5,7 @@
   "activityPubType": "Group",
   "title": "Local Church",
   "description": "Community with 13 members",
-  "content": "# Local Church\n\n**Members:** 13\n\n## Member List\n\n- human-matthew-manager\n- human-jessica-spouse\n- human-gertrude-grandma\n- human-nancy-neighbor\n- human-pam-polarized\n- human-janice-janitor\n- human-pete-pastor\n- human-timothy-tutor\n- human-tommy-teacher\n- human-meriadoc-moneybags\n- human-bub-builder\n- human-lenny-lineworker\n- human-mary-migrant",
+  "content": "# Local Church\n\n**Members:** 13\n\n## Member List\n\n- human-matthew-manager\n- human-jessica-spouse\n- human-gertrude-grandma\n- human-nancy-neighbor\n- human-pam-polarized\n- human-janice-janitor\n- human-pete-pastor\n- human-terrance-tutor\n- human-tommy-teacher\n- human-meriadoc-moneybags\n- human-bub-builder\n- human-lenny-lineworker\n- human-mary-migrant",
   "contentFormat": "markdown",
   "tags": [
     "community",

@@ -6,7 +6,7 @@
 
 ## The Problem
 
-Humans have fixture data — Matthew, Frank, Timothy — each with a story that gives meaning to testable specifications. The protocol has no equivalent for hardware. We test on k8s pods that all look the same. But the real network will have phones, Chromebooks, Raspberry Pis, family nodes with AI accelerators, IoT sensors, recycled laptops, and gaming desktops that are only online when someone isn't playing.
+Humans have fixture data — Matthew, Frank, Terrance — each with a story that gives meaning to testable specifications. The protocol has no equivalent for hardware. We test on k8s pods that all look the same. But the real network will have phones, Chromebooks, Raspberry Pis, family nodes with AI accelerators, IoT sensors, recycled laptops, and gaming desktops that are only online when someone isn't playing.
 
 Without device archetypes, we can't:
 - Prove operations adapt to resource constraints

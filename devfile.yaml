@@ -16,6 +16,7 @@ metadata:
     - Java
     - ubi10
     - Claude
+    - mempalace
   projectType: holochain
   language: Polyglot
   version: 2.0.0
@@ -29,7 +30,16 @@ projects:
 components:
   - name: tools
     container:
-      image: harbor.ethosengine.com/devspaces/rust-nix-dev:latest
+      # Image build source: https://github.com/ethosengine/che-devworkspaces
+      #   containers/udi-plus/Dockerfile   — base: claude-code, SonarQube MCP jar,
+      #                                       Java 21, Node, Chrome for Testing,
+      #                                       hadolint, yamllint, nerdctl/buildctl
+      #   containers/rust-dev/Dockerfile   — adds Rust toolchain at /opt/rust,
+      #                                       Holochain binaries at /opt/holochain,
+      #                                       sccache, just, cached nix-installer
+      # Built via Jenkins (devspaces-udi-plus, devspaces-rust-nix-dev). Image name
+      # rust-nix-dev:latest is historical — current source folder is rust-dev/.
+      image: harbor.ethosengine.com/devspaces/udi-plus-mem-rust-nix:latest
       memoryLimit: 20Gi
       memoryRequest: 8Gi
       cpuLimit: '10'
@@ -121,6 +131,19 @@ components:
           value: "true"
         - name: DOORWAY_PKARR_CACHE_DIR
           value: "/projects/elohim/.doorway/pkarr-cache"
+        # ===== MemPalace =====
+        - name: MEMPALACE_HOME
+          value: /projects/elohim/.mempalace
+        - name: MEMPALACE_EMBEDDING_BACKEND
+          value: local
+        - name: MEMPALACE_EMBEDDING_MODEL
+          value: sentence-transformers/all-MiniLM-L6-v2
+        - name: HF_HOME
+          value: /opt/mempalace/hf-cache
+        - name: HF_HUB_OFFLINE
+          value: "1"
+        - name: TRANSFORMERS_OFFLINE
+          value: "1"
       endpoints:
         - name: angular-dev
           targetPort: 4200
@@ -245,8 +268,26 @@ commands:
       commandLine: |
         pnpm install && pnpm run seed
 
+  - id: setup-mempalace
+    exec:
+      component: tools
+      commandLine: |
+        set -e
+        # MemPalace CLI does NOT read $MEMPALACE_HOME. Default palace is
+        # ~/.mempalace/palace. To make all CLI calls and the MCP server
+        # land in the PVC-persisted slot without --palace plumbing, we
+        # symlink ~/.mempalace -> $MEMPALACE_HOME (mirrors ~/.claude
+        # -> $CLAUDE_CONFIG_DIR pattern from setup-vscode-cli above).
+        mkdir -p "$MEMPALACE_HOME/palace"
+        rm -rf /home/user/.mempalace 2>/dev/null || true
+        ln -sf "$MEMPALACE_HOME" /home/user/.mempalace
+        # Mining is operator/agent-driven — historian decides what to mine
+        # and when. See .claude/agents/historian.md (mcpServers frontmatter)
+        # for the read-side wiring. Probe palace state so postStart logs it.
+        mempalace status 2>&1 || true
 events:
   postStart:
     - setup-pnpm
     - setup-vscode-cli
     - setup-claude-mcp
+ #   - setup-mempalace

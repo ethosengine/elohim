@@ -106,8 +106,8 @@
       "connectionCount": 5
     },
     {
-      "id": "human-timothy-tutor",
-      "displayName": "Timothy",
+      "id": "human-terrance-tutor",
+      "displayName": "Terrance",
       "category": "affinity",
       "profileReach": "community",
       "position": {
@@ -364,14 +364,14 @@
     {
       "id": "rel-0008",
       "source": "human-jessica-spouse",
-      "target": "human-timothy-tutor",
+      "target": "human-terrance-tutor",
       "type": "learning_partner",
       "intimacyLevel": "connection"
     },
     {
       "id": "rel-0009",
       "source": "human-james-son",
-      "target": "human-timothy-tutor",
+      "target": "human-terrance-tutor",
       "type": "mentee",
       "intimacyLevel": "connection"
     },

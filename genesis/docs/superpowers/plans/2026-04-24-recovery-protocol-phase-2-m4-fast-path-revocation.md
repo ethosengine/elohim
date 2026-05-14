@@ -1896,7 +1896,7 @@ Feature: Emergency contacts kill a captured key
 
   Scenario: Four emergency contacts revoke a captured key by quorum
     Given Matthew has one agent key "K1"
-    And Matthew has 4 active emergency contacts: Jessica, David, Sarah, and Timothy
+    And Matthew has 4 active emergency contacts: Jessica, David, Sarah, and Terrance
     And an attacker has captured "K1"
     When Jessica initiates a revocation request for "K1" with reason "compromised"
     Then the revocation is created in pending state with required_votes 3

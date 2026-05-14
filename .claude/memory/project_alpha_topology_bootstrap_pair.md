@@ -13,7 +13,7 @@ Alpha is a 6-peer test fabric where the k8s node split represents household boun
 | pete | shem | secondary peer (intra-household w/ adam) |
 | matthew | ethosengine | other half of bootstrap pair; bulk seed receiver |
 | jessica | intel-nuc | separate household |
-| timothy | thinkc-p0h | separate household |
+| terrance | thinkc-p0h | separate household |
 
 Doorway runs on intel-nuc (`elohim-doorway-alpha`).
 

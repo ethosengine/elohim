@@ -169,7 +169,7 @@ Pick the **most representative service/component** in the module (usually the on
 ```markdown
 ## Reference Spec Created
 
-- **File**: `src/app/moduleName/services/target.service.spec.ts`
+- **File**: `app/elohim-app/src/app/<pillar>/services/<target>.service.spec.ts`
 - **Patterns established**: TestBed setup, HolochainClient mock, Observable testing
 - **Mock factories**: createMockUser(), createMockHolochainClient()
 
@@ -598,13 +598,13 @@ When tests reveal design issues, add suggestions:
 
 ### High Impact
 - [ ] **EXTRACT** `PathService.calculateProgress` → `ProgressCalculator`
-  - File: `src/app/lamad/services/path.service.ts:89`
+  - File: `app/elohim-app/src/app/lamad/services/path.service.ts:89`
   - Reason: 45-line method with 3 responsibilities
   - Benefit: Reusable, independently testable
 
 ### Medium Impact
 - [ ] **INJECT** `ContentService` dependencies
-  - File: `src/app/lamad/services/content.service.ts`
+  - File: `app/elohim-app/src/app/lamad/services/content.service.ts`
   - Reason: Creates own HttpClient instance
   - Benefit: Mockable, configurable
 

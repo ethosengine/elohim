@@ -175,7 +175,7 @@ swarm.behaviour_mut().kademlia.get_closest_peers(PeerId::random());
 
 ### Current State
 
-NAT traversal is currently **stub/TODO** in `elohim-node/src/p2p/nat.rs`.
+NAT traversal is currently **stub/TODO** in `steward/node/src/p2p/nat.rs`.
 
 ### Planned: Relay Protocol
 
@@ -245,7 +245,7 @@ let autonat = autonat::Behaviour::new(
 The `SyncCoordinator` tracks known peers and their sync state:
 
 ```rust
-// elohim-node/src/network/operator.rs
+// steward/node/src/network/operator.rs
 pub struct PeerState {
     pub peer_id: PeerId,
     pub addrs: Vec<Multiaddr>,
@@ -298,12 +298,12 @@ pub struct PeerState {
 
 | File | Purpose |
 |------|---------|
-| `elohim-node/src/p2p/transport.rs` | Swarm builder, Kademlia + mDNS + identify setup |
-| `elohim-node/src/p2p/nat.rs` | NAT traversal (stub - TODO) |
-| `elohim-node/src/network/operator.rs` | Peer tracking, sync state |
-| `elohim-node/src/config.rs` | P2PConfig (listen addrs, bootstrap nodes) |
-| `holochain/P2P-DATAPLANE.md` | Bootstrap flow, architecture |
-| `holochain/elohim-storage/src/p2p/behaviour.rs` | Storage P2P behaviour |
+| `steward/node/src/p2p/transport.rs` | Swarm builder, Kademlia + mDNS + identify setup |
+| `steward/node/src/p2p/nat.rs` | NAT traversal (stub - TODO) |
+| `steward/node/src/network/operator.rs` | Peer tracking, sync state |
+| `steward/node/src/config.rs` | P2PConfig (listen addrs, bootstrap nodes) |
+| `elohim/holochain/docs/P2P-DATAPLANE.md` | Bootstrap flow, architecture |
+| `elohim/elohim-storage/src/p2p/behaviour.rs` | Storage P2P behaviour |
 
 ## External References
 

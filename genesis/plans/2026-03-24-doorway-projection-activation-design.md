@@ -19,7 +19,7 @@ Doorway is not anonymous infrastructure — it's attested for by the operator's 
 Doorway does NOT write into the peer's SQLite — that's the peer's data. Doorway projects into MongoDB, its own data store.
 
 ```
-5 peer conductors (Matthew, Jessica, Pete, Timothy, Frank)
+5 peer conductors (Matthew, Jessica, Pete, Terrance, Frank)
   → signal subscribers in doorway (one per conductor)
   → MongoDB projection cache (doorway's own data store)
   → /api/v1/cache/ serves aggregated commons content

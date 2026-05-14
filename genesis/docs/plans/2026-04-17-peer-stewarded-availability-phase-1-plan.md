@@ -710,7 +710,7 @@ mod tests {
             updated_at: 1,
         };
         upsert(&mut conn, &mk("adam", true)).unwrap();
-        upsert(&mut conn, &mk("timothy", false)).unwrap();
+        upsert(&mut conn, &mk("terrance", false)).unwrap();
 
         let members = list_pool_members(&mut conn).unwrap();
         assert_eq!(members.len(), 1);

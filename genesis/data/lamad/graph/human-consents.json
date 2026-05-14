@@ -180,7 +180,7 @@
     {
       "id": "consent-0008",
       "initiatorId": "human-jessica-spouse",
-      "participantId": "human-timothy-tutor",
+      "participantId": "human-terrance-tutor",
       "intimacyLevel": "connection",
       "consentState": "accepted",
       "createdAt": "2025-12-01T20:29:49.320609Z",
@@ -201,7 +201,7 @@
     {
       "id": "consent-0009",
       "initiatorId": "human-james-son",
-      "participantId": "human-timothy-tutor",
+      "participantId": "human-terrance-tutor",
       "intimacyLevel": "connection",
       "consentState": "accepted",
       "createdAt": "2025-12-01T20:29:49.320609Z",

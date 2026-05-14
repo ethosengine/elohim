@@ -20,7 +20,7 @@ Conceptual scenarios (in `genesis/docs/`) describe the human experience. Executa
 
 - Tags: `@e2e @{domain}` on first line; add `@browser-only` for Playwright-dependent scenarios
 - Background: always include `Given doorway "alpha" at "E2E_DOORWAY_ALPHA"`
-- Humans: use named personas (`Given human "Timothy" is logged in on doorway "alpha" with device`)
+- Humans: use named personas (`Given human "Terrance" is logged in on doorway "alpha" with device`)
 - Add `@wip` to scenarios with unimplemented step definitions
 - Add `@regression` to scenarios that guard against specific past bugs
 

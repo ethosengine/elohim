@@ -36,7 +36,7 @@ The app runs in three deployment modes with different content loading paths:
 The Che dev-proxy **strips CORS headers** from responses, causing issues with cross-origin requests. Solution:
 
 1. Route all API requests through Angular's dev server proxy (same-origin)
-2. `doorway-connection-strategy.ts` returns `window.location.origin` for Che environment
+2. `app/elohim-library/projects/elohim-service/src/connection/doorway-connection-strategy.ts` returns `window.location.origin` for Che environment
 3. All `/api/*`, `/db/*`, `/blob/*`, `/apps/*` routes proxy to doorway
 
 ```typescript
@@ -163,10 +163,10 @@ console.log('[SophiaRenderer] loadMoments:', { nodeId, contentFormat });
 
 | File | Purpose |
 |------|---------|
-| `src/app/elohim/services/content.service.ts` | Content fetching, blob resolution |
-| `src/app/elohim/services/storage-client.service.ts` | Storage API client, URL construction |
-| `proxy.conf.mjs` | Angular dev server proxy config |
-| `elohim-library/.../doorway-connection-strategy.ts` | Deployment context detection |
+| `app/elohim-app/src/app/elohim/services/content.service.ts` | Content fetching, blob resolution |
+| `app/elohim-app/src/app/elohim/services/storage-client.service.ts` | Storage API client, URL construction |
+| `app/elohim-app/proxy.conf.mjs` | Angular dev server proxy config |
+| `app/elohim-library/projects/elohim-service/src/connection/doorway-connection-strategy.ts` | Deployment context detection |
 
 ---
 

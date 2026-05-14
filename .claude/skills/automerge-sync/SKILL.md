@@ -246,13 +246,13 @@ Key methods: `listDocuments()`, `getHeads()`, `getChangesSince()`, `applyChanges
 
 | File | Purpose |
 |------|---------|
-| `holochain/SYNC-ENGINE.md` | Primary design document |
-| `elohim-node/src/sync/coordinator.rs` | SyncCoordinator (peer tracking, scheduling) |
-| `elohim-node/src/sync/protocol.rs` | SyncMessage types |
-| `elohim-node/src/sync/stream.rs` | AgentStream, position tracking |
-| `elohim-node/src/sync/merge.rs` | Automerge merge operations |
-| `holochain/sdk/storage-client-ts/src/client.ts` | TypeScript sync API |
-| `holochain/P2P-DATAPLANE.md` | Overall P2P architecture |
+| `elohim/holochain/docs/SYNC-ENGINE.md` | Primary design document |
+| `steward/node/src/sync/coordinator.rs` | SyncCoordinator (peer tracking, scheduling) |
+| `steward/node/src/sync/protocol.rs` | SyncMessage types |
+| `steward/node/src/sync/stream.rs` | AgentStream, position tracking |
+| `steward/node/src/sync/merge.rs` | Automerge merge operations |
+| `elohim/sdk/storage-client-ts/src/client.ts` | TypeScript sync API |
+| `elohim/holochain/docs/P2P-DATAPLANE.md` | Overall P2P architecture |
 
 ## External References
 

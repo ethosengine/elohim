@@ -38,7 +38,7 @@ Content delivery triggers an REA (Resource-Event-Agent) economic event — not a
 Each community defines circulation rules (decay rates, accumulation limits, dignity thresholds) in their constitutional documents. The `StewardshipAllocationView` tracks `recognitionAccumulated` per steward per content item.
 
 **Key files**:
-- REA bridge models: `elohim-app/src/app/elohim/models/rea-bridge.model.ts`
+- REA bridge models: `app/elohim-app/src/app/elohim/models/rea-bridge.model.ts`
 - Stewardship tracking: `holochain/sdk/storage-client-ts/dist/generated/StewardshipAllocationView.d.ts`
 - Economic events: `holochain/sdk/storage-client-ts/dist/generated/EconomicEventView.d.ts`
 
@@ -61,7 +61,7 @@ The resolver is a pure function — it never fetches data itself. The caller pas
 
 This keeps the protocol layer independent of the learning domain. The protocol doesn't know about learning paths — it just resolves based on the context it's given.
 
-**Key file**: `elohim-app/src/app/elohim/services/epr-resolver.service.ts`
+**Key file**: `app/elohim-app/src/app/elohim/services/epr-resolver.service.ts`
 
 ### Resolution priority
 
@@ -102,9 +102,9 @@ Every piece of content has a small (~500 byte) metadata envelope that can be sha
 The envelope serializes in a compact binary format for efficient transmission, but auto-detects and accepts plain text format too for backward compatibility.
 
 **Key files**:
-- TypeScript model: `elohim-app/src/app/elohim/models/epr-head.model.ts`
-- TypeScript encoder/decoder: `elohim-app/src/app/elohim/utils/epr-codec.ts`
-- Rust encoder/decoder: `holochain/elohim-storage/src/epr_codec.rs`
+- TypeScript model: `app/elohim-app/src/app/elohim/models/epr-head.model.ts`
+- TypeScript encoder/decoder: `app/elohim-app/src/app/elohim/utils/epr-codec.ts`
+- Rust encoder/decoder: `elohim/elohim-storage/src/epr_codec.rs`
 
 ## Content Link Format
 
@@ -126,7 +126,7 @@ const ref = parseEpr('epr:fair-exchange@2#section-3');
 // { id: 'fair-exchange', version: '2', fragment: 'section-3' }
 ```
 
-**Key file**: `elohim-app/src/app/elohim/utils/epr-ref.ts` (40+ tests)
+**Key file**: `app/elohim-app/src/app/elohim/utils/epr-ref.ts` (40+ tests)
 
 ## Content Verification
 
@@ -150,8 +150,8 @@ import { BLOB_FETCHER } from '@app/elohim';
 ```
 
 **Key files**:
-- Interface: `elohim-app/src/app/elohim/interfaces/blob-fetcher.interface.ts`
-- Implementation: `elohim-app/src/app/elohim/services/helia-fetch.service.ts`
+- Interface: `app/elohim-app/src/app/elohim/interfaces/blob-fetcher.interface.ts`
+- Implementation: `app/elohim-app/src/app/elohim/services/helia-fetch.service.ts`
 
 ## Three Content Tiers
 
@@ -175,7 +175,7 @@ Content comes in three sizes, each optimized for different use:
 <app-epr-link epr="epr:fair-exchange" display="inline"></app-epr-link>
 ```
 
-**Key file**: `elohim-app/src/app/elohim/components/epr-link/epr-link.component.ts`
+**Key file**: `app/elohim-app/src/app/elohim/components/epr-link/epr-link.component.ts`
 
 ### In written content (markdown)
 
@@ -186,7 +186,7 @@ Learn about [fair exchange](epr:fair-exchange) to understand
 how communities can share resources without exploitation.
 ```
 
-**Key file**: `elohim-app/src/app/lamad/renderers/markdown-renderer/markdown-renderer.component.ts`
+**Key file**: `app/elohim-app/src/app/lamad/renderers/markdown-renderer/markdown-renderer.component.ts`
 
 ### In code
 
@@ -245,7 +245,7 @@ interface IEprContentResolver {
 }
 ```
 
-**Key file**: `elohim-app/src/app/elohim/interfaces/epr-resolver.interface.ts`
+**Key file**: `app/elohim-app/src/app/elohim/interfaces/epr-resolver.interface.ts`
 
 ## Metadata Envelope Wire Format
 
@@ -259,8 +259,8 @@ Prefer plain text     → plain text response (fallback)
 The decoder auto-detects: if the first byte looks like plain text, it parses as text. Otherwise, it parses the compact binary. This ensures backward compatibility.
 
 **Key files**:
-- Gateway proxy: `doorway/src/routes/epr.rs`
-- Storage encoder: `holochain/elohim-storage/src/epr_codec.rs`
+- Gateway proxy: `doorway/doorway-service/src/routes/epr.rs`
+- Storage encoder: `elohim/elohim-storage/src/epr_codec.rs`
 
 ## Key Files
 
@@ -275,8 +275,8 @@ The decoder auto-detects: if the first byte looks like plain text, it parses as 
 | `elohim-app/.../interfaces/epr-resolver.interface.ts` | Resolver abstractions |
 | `elohim-app/.../components/epr-link/epr-link.component.ts` | Content link component |
 | `elohim-app/.../components/epr-popover/epr-popover.component.ts` | Three-pillar hover preview |
-| `holochain/elohim-storage/src/epr_codec.rs` | Rust metadata envelope codec |
-| `doorway/src/routes/epr.rs` | Gateway proxy for metadata envelopes |
+| `elohim/elohim-storage/src/epr_codec.rs` | Rust metadata envelope codec |
+| `doorway/doorway-service/src/routes/epr.rs` | Gateway proxy for metadata envelopes |
 | `genesis/docs/.../protocol-specification.md` | Full protocol specification |
 | `genesis/docs/.../epr-developer-guide.md` | Architecture guide (accessible version) |
 

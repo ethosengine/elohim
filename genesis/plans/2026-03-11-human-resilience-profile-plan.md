@@ -210,7 +210,7 @@ export interface ResilienceAction {
  *
  * Elohim are LLMs — they need narrative memory alongside quantitative scores.
  * A concern isn't just a flag; it's a remembered observation that might matter
- * later: "Timothy mentioned he's moving countries — his jurisdictional diversity
+ * later: "Terrance mentioned he's moving countries — his jurisdictional diversity
  * is about to change."
  */
 export interface ElohimResilienceAssessment {
@@ -906,9 +906,9 @@ const resolvedMemory: ResilienceMemory = {
   id: 'mem-2',
   recordedAt: '2026-03-01T10:00:00Z',
   updatedAt: '2026-03-11T10:00:00Z',
-  content: 'Timothy concentrated in one region. Resolved via learning community mutual aid.',
+  content: 'Terrance concentrated in one region. Resolved via learning community mutual aid.',
   relevance: 'resolved',
-  relatedHumanIds: ['human-timothy-learner'],
+  relatedHumanIds: ['human-terrance-learner'],
   supersededBy: 'mem-3',
 };
 
@@ -954,7 +954,7 @@ Create the acceptance scenarios that drive the resilience projection through our
 - Tags: `@e2e @shefa` on first line; `@wip` on all scenarios (step defs not yet implemented)
 - Background: `Given doorway "alpha" at "E2E_DOORWAY_ALPHA"`
 - Uses named personas from genesis humans
-- Graduated through trust topology: Matthew → +Susan → +Pete → +Timothy+Frank → Maria cold start → degradation → graceful release
+- Graduated through trust topology: Matthew → +Susan → +Pete → +Terrance+Frank → Maria cold start → degradation → graceful release
 - These scenarios match the design doc stories exactly
 
 **Step 1: Create the feature file**
@@ -1021,8 +1021,8 @@ Feature: Human Resilience — P2P Data Protection at a Glance
     And the elohim assessment confirms personal-reach content is appropriately household-only
 
   @wip @scaling
-  Scenario: Full network — Matthew + Susan + Pete + Timothy + Frank
-    Given 5 conductors are running for Matthew, Susan, Pete, Timothy, and Frank
+  Scenario: Full network — Matthew + Susan + Pete + Terrance + Frank
+    Given 5 conductors are running for Matthew, Susan, Pete, Terrance, and Frank
     And content is distributed by stewardship affinity
     And mutual aid commitments are reciprocated across trust circles
     When Matthew views his resilience profile

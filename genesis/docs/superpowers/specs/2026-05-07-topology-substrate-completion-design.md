@@ -15,7 +15,7 @@ The `light-up-the-topology` sprint delivered the substrate code for all six topo
 
 2. `peer_topology_view::build_local_slice` returns hardcoded `{connected_peer_households: []}` and `cluster_view::build_local_slice` returns hardcoded zero-valued metrics. Even with bindings + commitments seeded correctly, both views aggregate empty federation slices.
 
-3. The alpha cluster has only 3 active conductors (matthew/jessica/timothy) after shem's decommissioning. Cross-household reciprocation pairs from matthew's perspective collapse to `{timothy}` — not enough graph for D3 to feel real.
+3. The alpha cluster has only 3 active conductors (matthew/jessica/terrance) after shem's decommissioning. Cross-household reciprocation pairs from matthew's perspective collapse to `{terrance}` — not enough graph for D3 to feel real.
 
 4. No ContentNode on alpha has a non-null `blobHash`, so D1 (distribution-badge) and D6 (resilience-snapshot in content-viewer) correctly hide per their conditional render logic but the surfaces never light up.
 
@@ -33,7 +33,7 @@ The user has chosen substrate-driven delivery: real DHT writes, real REA flows, 
 
 Three milestones; each ends in a stable fresh-trigger-verifiable state. No partial deliveries.
 
-### M1 — Vertical slice (matthew↔timothy)
+### M1 — Vertical slice (matthew↔terrance)
 
 Land all 6 surfaces real end-to-end for one cross-household pair. Skips adam entirely. Smallest exercise of every layer (DHT bind → REA write → libp2p slice → federation aggregate → UI render).
 
@@ -119,16 +119,16 @@ Pick one existing manifesto chapter (e.g., `genesis/docs/content/elohim-protocol
 Verify EPR head response hydrates both `distribution` (replica count, hosting peers — sourced from `distribution_view.rs`) and `resilience` (cliff state — sourced from quilt distribution layer). Either or both may have hydration gaps that surface during M1 verification — those become M3 line items.
 
 #### M1-F. Real fetch orchestration
-Add a CI step that, after seeders run, triggers a real blob fetch from timothy's pod requesting matthew's manifesto-chapter blob. The substrate's `p2p/blob_fetch.rs:206` then auto-emits a `serve-blob` EconomicEvent on success.
+Add a CI step that, after seeders run, triggers a real blob fetch from terrance's pod requesting matthew's manifesto-chapter blob. The substrate's `p2p/blob_fetch.rs:206` then auto-emits a `serve-blob` EconomicEvent on success.
 
-Implementation: `curl -s 'http://elohim-timothy-alpha:8090/blob/<hash>'`. Forces the fetch path. Verify post-fetch that `economic_events WHERE action='serve-blob'` has at least one row matching the (provider=matthew_peer_id, receiver=timothy_peer_id) pair.
+Implementation: `curl -s 'http://elohim-terrance-alpha:8090/blob/<hash>'`. Forces the fetch path. Verify post-fetch that `economic_events WHERE action='serve-blob'` has at least one row matching the (provider=matthew_peer_id, receiver=terrance_peer_id) pair.
 
 #### M1-G. Verification harness
 Local Playwright probe (per prior sprint precedent) that logs in as matthew, screenshots all 6 surfaces, and asserts non-empty data shape. Accept-criteria:
 - D1: `<elohim-distribution-badge>` renders (manifesto chapter has blobHash + hydrated distribution).
 - D2: at least 1 device-tile in /shefa/cluster.
-- D3: at least 1 peer-household-card in /shefa/peers (timothy's household).
-- D4: at least 1 inflow row + 1 outflow row in /shefa/reciprocity (matthew↔timothy bytes).
+- D3: at least 1 peer-household-card in /shefa/peers (terrance's household).
+- D4: at least 1 inflow row + 1 outflow row in /shefa/reciprocity (matthew↔terrance bytes).
 - D5: doorway dashboard topology tab unchanged from prior `delivered`.
 - D6: `<elohim-resilience-snapshot>` renders side-by-side with `<elohim-distribution-badge>` in content-viewer for the manifesto chapter.
 
@@ -141,20 +141,20 @@ Edit `genesis/orchestrator/data/deployments.json` adam entry: set `suspended: fa
 
 Conductor genesis: fresh agent key (seeded chain lost with shem PVC), empty source chain. seed-conductor-identities runs against adam's pod and creates the Human entry pinned to `id="human-adam-firstman"` from humans.json.
 
-Identity-drift mitigation: keep humans.json's `id` as the canonical reference (existing pattern). The Holochain agent_cid — different from `id` — is internal to the conductor's source chain. View predicates that join on `humans.id` continue working unchanged. Verify in M1 that this pattern actually works for matthew↔timothy before M2 lands.
+Identity-drift mitigation: keep humans.json's `id` as the canonical reference (existing pattern). The Holochain agent_cid — different from `id` — is internal to the conductor's source chain. View predicates that join on `humans.id` continue working unchanged. Verify in M1 that this pattern actually works for matthew↔terrance before M2 lands.
 
 If M1 surfaces that view predicates expect agent_cid (not humans.id) on certain joins, M2 documents the gap and either (a) re-keys downstream seed data, or (b) lands a `humans.holochain_agent_cid` column to bridge the two identifiers.
 
 #### M2-B. Cross-household custody-blob seeding
 Extend the rewritten seed-commitments to emit pairs across the 3-household graph:
 - matthew↔adam (new — household-matthew × household-adam)
-- timothy↔adam (new — household-timothy × household-adam)
-- matthew↔timothy (already from M1)
+- terrance↔adam (new — household-terrance × household-adam)
+- matthew↔terrance (already from M1)
 
 Volume per pair: 1-3 distinct blob_hashes per direction. Not load-testing; validating shape multiplies cleanly.
 
 #### M2-C. Cross-pair fetch orchestration
-Extend M1-F's CI fetch step to trigger fetches across all 3 pairs (6 directional fetches total). Each successful fetch emits a serve-blob event; D4 then shows 3 inflow rows + 3 outflow rows for matthew, similarly for adam and timothy.
+Extend M1-F's CI fetch step to trigger fetches across all 3 pairs (6 directional fetches total). Each successful fetch emits a serve-blob event; D4 then shows 3 inflow rows + 3 outflow rows for matthew, similarly for adam and terrance.
 
 #### M2-D. Verification
 Playwright probe extended to assert: ≥2 peer-household-cards in D3, ≥2 inflow rows + ≥2 outflow rows in D4. Other surfaces unchanged.
@@ -251,9 +251,9 @@ Anti-pattern to prevent: silent `[=] already exists` masking shape drift. Use di
 Layered per `feedback_a2o_is_human_experience_not_dev_bugs`:
 
 - **a2o (Gherkin)**: extend topology scenarios in `genesis/a2o/features/` to assert human-experience promises:
-  - "matthew sees timothy's household card on his peer-topology page" (M1)
+  - "matthew sees terrance's household card on his peer-topology page" (M1)
   - "matthew sees adam's household card on his peer-topology page" (M2)
-  - "matthew's reciprocity page shows ≥1 inflow row from timothy" (M1)
+  - "matthew's reciprocity page shows ≥1 inflow row from terrance" (M1)
   - "matthew sees a distribution badge on the manifesto chapter content viewer" (M1)
   - "matthew sees the resilience snapshot side-by-side with the distribution badge" (M1)
 - **Unit / integration tests in elohim-storage**:
@@ -265,7 +265,7 @@ Layered per `feedback_a2o_is_human_experience_not_dev_bugs`:
 
 ## Risks and known unknowns
 
-1. **Adam identity-drift unknown until M1 lands**: the assumption that humans.id (not agent_cid) is the canonical join key for view predicates is tested implicitly by M1's matthew↔timothy slice. If M1 surfaces that views actually expect agent_cid on certain paths, M2 documents the gap and adapts.
+1. **Adam identity-drift unknown until M1 lands**: the assumption that humans.id (not agent_cid) is the canonical join key for view predicates is tested implicitly by M1's matthew↔terrance slice. If M1 surfaces that views actually expect agent_cid on certain paths, M2 documents the gap and adapts.
 
 2. **resilience-snapshot hydration gap for M3**: `resilience_cliffs` calculation depends on the quilt distribution layer surfacing per-CID replica sets, which is itself a TODO. M3 may surface a substrate gap that defers cliff computation to a later sprint; the spec acknowledges this is acceptable.
 
@@ -278,7 +278,7 @@ Layered per `feedback_a2o_is_human_experience_not_dev_bugs`:
 ## Memory candidates (write after operator validates spec)
 
 - `feedback_custody_blob_shape_contract` — action="custody-blob", peer_id-keyed provider/receiver, resourceClassifiedAs is raw blob hash with sha256- prefix; SQL filters drop wrong-shape rows silently
-- `project_topology_substrate_completion_2026_05_07` — vertical-slice approach; M1 = matthew↔timothy, M2 = adam reactivation, M3 = polish; substrate-driven (no fixture stubs)
+- `project_topology_substrate_completion_2026_05_07` — vertical-slice approach; M1 = matthew↔terrance, M2 = adam reactivation, M3 = polish; substrate-driven (no fixture stubs)
 - `feedback_peer_id_derivation_shared_utility` — single source `genesis/seeder/src/peer-id.ts`; both bindings + commitments seeders import; drift = empty SQL
 
 ## Out-of-scope cleanup (named so we don't drift)

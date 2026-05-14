@@ -8,7 +8,7 @@
 
 Doorway treats every registration as a "hosted" user — calling `create_human` on the operator's conductor via a singleton `ZomeCaller`. This is architecturally wrong:
 
-1. **Node/device humans** (Adam, Jessica, Frank, Pete, Timothy) have their own conductors with their own agent keys. `create_human` should run on *their* conductor, not the operator's.
+1. **Node/device humans** (Adam, Jessica, Frank, Pete, Terrance) have their own conductors with their own agent keys. `create_human` should run on *their* conductor, not the operator's.
 2. **Hosted humans** (Nancy) should be provisioned on the operator's conductor, but `create_human` runs *before* provisioning — hitting the wrong conductor.
 3. **The operator** (Matthew) is the only case where the current flow is correct.
 
@@ -39,7 +39,7 @@ Key insight: agency phase and compute capacity are loosely coupled but correlate
 | Eve | `device` | `elohim-eve-alpha` (simulated) | Device steward, Adam's household |
 | Jessica | `device` | `elohim-jessica-alpha` (simulated) | Device steward in Matthew's household |
 | Pete | `device` | `elohim-pete-alpha` (simulated) | Device steward |
-| Timothy | `device` | `elohim-timothy-alpha` (simulated) | Device steward |
+| Terrance | `device` | `elohim-terrance-alpha` (simulated) | Device steward |
 | Nancy | `hosted` | `elohim-matthew-alpha` (pooled) | Hosted by Matthew's doorway |
 
 The remaining 26 humans are story personas (`visitor` or unset) — not active participants on alpha.

@@ -10,7 +10,7 @@ import type { ScenarioResult } from '../lib/load-cucumber.js';
 function input() {
   const scenarios: ScenarioResult[] = [
     {
-      name: 'Timothy completes path',
+      name: 'Terrance completes path',
       feature: 'features/lamad/learning-journey.feature',
       status: 'passed',
       tags: [],
@@ -32,7 +32,7 @@ function input() {
   const console: ConsoleArtifact[] = [
     {
       scenario: 'learning-journey',
-      human: 'timothy',
+      human: 'terrance',
       consoleErrors: [
         {
           level: 'error',

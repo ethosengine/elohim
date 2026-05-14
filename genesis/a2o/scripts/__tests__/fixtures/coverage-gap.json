@@ -3,7 +3,7 @@
   "gaps": [
     {
       "feature": "features/lamad/path-adaptation.feature",
-      "missing": "Scenario: Timothy's path reorders after rapid mastery",
+      "missing": "Scenario: Terrance's path reorders after rapid mastery",
       "severity": "high"
     },
     {

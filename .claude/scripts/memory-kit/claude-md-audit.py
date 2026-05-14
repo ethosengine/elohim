@@ -33,10 +33,12 @@ from dataclasses import dataclass, field
 from datetime import date, datetime, timezone
 from pathlib import Path
 
-# Bootstrap: locate .claude/scripts/_lib by walking up
+# Bootstrap: locate .claude/scripts/_lib by walking up. Anchor on .git too
+# so an accidental .claude/.claude/ artifact can't trick the walk into
+# resolving to .claude/ as repo root.
 _here = Path(__file__).resolve()
 for _ in range(8):
-    if (_here / ".claude" / "scripts" / "_lib").is_dir():
+    if (_here / ".claude" / "scripts" / "_lib").is_dir() and (_here / ".git").exists():
         sys.path.insert(0, str(_here / ".claude" / "scripts"))
         break
     _here = _here.parent
@@ -178,13 +180,68 @@ def extract_cited_paths(text: str) -> list[str]:
     return list({m.group(1) for m in PATH_CITATION_RE.finditer(text)})
 
 
-def check_dead_paths(repo_root: Path, citations: list[str]) -> list[str]:
+def check_dead_paths(repo_root: Path, citations: list[str],
+                     citing_file_dir: Path | None = None) -> list[str]:
+    """Check each citation for existence; try multiple resolution strategies.
+
+    Strategies (first match wins):
+      1. Relative to the citing CLAUDE.md's directory (most natural for prose
+         like "see `views.rs`" when CLAUDE.md lives next to views.rs).
+      2. Relative to repo root.
+      3. Walk up from citing dir toward repo root, checking at each level.
+      4. Filesystem fallback: rglob for bare-basename citations (single match
+         under repo root, excluding skip-dirs).
+
+    A citation is "dead" only if NONE of these resolve to an existing path.
+    """
     dead: list[str] = []
     for cit in citations:
-        # Citations may be absolute, relative to repo root, or relative-with-leading-slash
-        candidate = repo_root / cit.lstrip("/")
-        if not candidate.exists():
-            dead.append(cit)
+        stripped = cit.lstrip("/")
+        # Strategy 1: relative to citing file's dir
+        if citing_file_dir is not None:
+            candidate = (citing_file_dir / stripped).resolve()
+            if candidate.exists():
+                continue
+        # Strategy 2: relative to repo root
+        candidate = (repo_root / stripped).resolve()
+        if candidate.exists():
+            continue
+        # Strategy 3: walk up from citing dir toward repo root
+        found = False
+        if citing_file_dir is not None:
+            cur = citing_file_dir.parent
+            try:
+                cur.relative_to(repo_root)
+                walking = True
+            except ValueError:
+                walking = False
+            while walking:
+                cand = (cur / stripped).resolve()
+                if cand.exists():
+                    found = True
+                    break
+                if cur == repo_root:
+                    break
+                cur = cur.parent
+                try:
+                    cur.relative_to(repo_root)
+                except ValueError:
+                    break
+        if found:
+            continue
+        # Strategy 4: bare-basename rglob fallback (only when citation has no
+        # path separator — otherwise the prior strategies would have found it)
+        if "/" not in stripped:
+            # Cheap check via os.walk skipping known noise dirs
+            hit = False
+            for root, dirs, files in os.walk(repo_root):
+                dirs[:] = [d for d in dirs if d not in SCOPE_SKIP_DIRS]
+                if stripped in files:
+                    hit = True
+                    break
+            if hit:
+                continue
+        dead.append(cit)
     return dead
 
 
@@ -493,7 +550,8 @@ def analyze_file(path: Path, drift_store: dict, threshold: float,
 
     # Phase 1 deterministic checks
     rep.cited_paths = extract_cited_paths(text)
-    rep.dead_paths = check_dead_paths(REPO_ROOT, rep.cited_paths)
+    rep.dead_paths = check_dead_paths(REPO_ROOT, rep.cited_paths,
+                                       citing_file_dir=path.parent.resolve())
     rep.imperatives_without_rationale = find_imperatives(lines)
 
     # Fit analysis (new dimension)

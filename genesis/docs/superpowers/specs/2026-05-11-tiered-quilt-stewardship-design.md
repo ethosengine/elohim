@@ -724,7 +724,7 @@ Reuses the sweettest harness (per `2026-04-22-sweettest-integration-layer-design
 ### Band 3: Chaos demo on shem (absorbs Plan 5)
 
 Live multi-node topology per `project_shem_is_p2p_live_canvas`:
-Matthew/Jessica/Timothy on household cluster; others on shem.
+Matthew/Jessica/Terrance on household cluster; others on shem.
 
 #### Existing Plan 5 scenarios (extended with tier assertions)
 

@@ -1,0 +1,27 @@
+{
+  "verdicts": [
+    {
+      "feature_path": "genesis/a2o/features/lamad/stewarded-device-sync.feature",
+      "feature_file_exists": false,
+      "story_slug": "james-son--as-stewardee--stewarded-device-sync",
+      "backlog_slug": null,
+      "delivery_status_at_inspection": "undelivered",
+      "delivery_status": null,
+      "regression_from": null,
+      "verdict": "deferred-substrate-missing",
+      "verdict_iteration": "iter0-bootstrap-2026-05-14",
+      "verdict_timestamp": "2026-05-14T18:59:12Z",
+      "sprint_result_path": null,
+      "evidence": {
+        "gherkin_scenarios_passing": 0,
+        "gherkin_scenarios_failing": 0,
+        "visual_validation": null,
+        "screenshot_path": null,
+        "fresh_trigger_confirmed": false,
+        "root_cause_path": null
+      },
+      "deliverables_cited": [],
+      "verdict_note": "Bootstrap inventory pass. Feature file `stewarded-device-sync.feature` does not exist under `genesis/a2o/features/` (declared adjacent_features point at `lamad/learning-journey.feature` etc., but the canonical feature triple's slug has no on-disk `.feature`). Per SKILL.md step-2 existence gate: `delivery_status` cannot advance above `wip` when the canonical .feature is missing on disk. /deliver has no authority to write `wip`/`refined`/`backlog` (those are sprint/cartographer authority), and the substrate to confer `active.*`/`stable`/`regression` does not exist. Therefore: no story frontmatter mutation this run. Story remains at `undelivered` (deliver-bridge-floor). Surfacing backlog candidate for cartographer: author the canonical `stewarded-device-sync.feature` with visually-validated scenarios so a real /deliver run becomes possible. This is the first run of the manifest; the file is initialized here per skill schema. The pickup-queue auto-poller will see this verdict on next sweep and understand the gap is `feature_file_missing`, not `verdict_pending`."
+    }
+  ]
+}

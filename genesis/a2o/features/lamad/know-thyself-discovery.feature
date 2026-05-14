@@ -8,8 +8,8 @@ Feature: Know Thyself Discovery Path
     Given doorway "alpha" at "E2E_DOORWAY_ALPHA"
 
   @values-hierarchy
-  Scenario: Timothy completes the Values Hierarchy assessment
-    Given human "Timothy" is logged in on doorway "alpha" with device
+  Scenario: Terrance completes the Values Hierarchy assessment
+    Given human "Terrance" is logged in on doorway "alpha" with device
     When I navigate to the "Know Thyself" path
     And I advance to the "Values Hierarchy" assessment step
     And I start the assessment
@@ -32,8 +32,8 @@ Feature: Know Thyself Discovery Path
 
   @attestation
   Scenario: First discovery assessment earns a milestone attestation
-    Given human "Timothy" is logged in on doorway "alpha" with device
-    And Timothy has not completed any discovery assessments
+    Given human "Terrance" is logged in on doorway "alpha" with device
+    And Terrance has not completed any discovery assessments
     When I navigate to the "Know Thyself" path
     And I advance to the "Values Hierarchy" assessment step
     And I start the assessment
@@ -45,7 +45,7 @@ Feature: Know Thyself Discovery Path
 
   @regression
   Scenario: Single radio/likert selection does not select all options
-    Given human "Timothy" is logged in on doorway "alpha" with device
+    Given human "Terrance" is logged in on doorway "alpha" with device
     When I navigate to the "Know Thyself" path
     And I advance to the "Values Hierarchy" assessment step
     And I start the assessment
@@ -55,7 +55,7 @@ Feature: Know Thyself Discovery Path
 
   @regression
   Scenario: No console errors during assessment navigation
-    Given human "Timothy" is logged in on doorway "alpha" with device
+    Given human "Terrance" is logged in on doorway "alpha" with device
     When I navigate to the "Know Thyself" path
     And I advance through each chapter
     Then no JavaScript errors should be captured

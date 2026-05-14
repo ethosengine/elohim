@@ -45,7 +45,7 @@ describe('resolveTargetUrl', () => {
   });
 
   it('distributes the five legacy humans across two peers non-trivially', () => {
-    const legacy = ['human-matthew-manager', 'human-adam-firstman', 'human-jessica-spouse', 'human-pete-pastor', 'human-frank-farmer', 'human-timothy-tutor'];
+    const legacy = ['human-matthew-manager', 'human-adam-firstman', 'human-jessica-spouse', 'human-pete-pastor', 'human-frank-farmer', 'human-terrance-tutor'];
     const counts = new Map<string, number>([[peers[0], 0], [peers[1], 0]]);
     for (const id of legacy) {
       const t = resolveTargetUrl(pkg(id), peers);

@@ -1,6 +1,6 @@
 ---
 name: sophia-integration
-description: Reference for integrating the Sophia assessment engine into Angular. Covers the sophia-question web component API, Recognition callbacks, and three assessment modes (mastery, discovery, reflection). Use when someone asks "how do I render a quiz", "add an assessment", "handle Recognition callbacks", "implement mastery scoring", or works with psychometric instruments and session management.
+description: REFERENCE for integrating the Sophia assessment engine into Angular FRONTEND — the sophia-question web component API, Recognition callbacks, three assessment modes (mastery / discovery / reflection). Use when "render a quiz", "add an assessment to a learning path", "handle Recognition callbacks", "implement mastery scoring", or working with psychometric instruments + session management in the UI. For backend storage of mastery records, use holochain-storage-api.
 metadata:
   author: elohim-protocol
   version: 1.0.0

@@ -18,7 +18,7 @@
  *     CUSTODY_PAIRS_JSON=./pairs.json npx tsx src/seed-commitments.ts
  *
  * If CUSTODY_PAIRS_JSON is not set, falls back to the M1 default pair set
- * (matthew-desktop ↔ timothy-desktop, both directions, one blob).
+ * (matthew-desktop ↔ terrance-desktop, both directions, one blob).
  */
 
 import { readFileSync } from 'node:fs';
@@ -113,13 +113,13 @@ function defaultM1Pairs(): CustodyPair[] {
     {
       providerHumanId: 'human-matthew-manager',
       providerArchetype: 'desktop',
-      receiverHumanId: 'human-timothy-tutor',
+      receiverHumanId: 'human-terrance-tutor',
       receiverArchetype: 'desktop',
       blobHash: M1_DEFAULT_BLOB_HASH,
       blobSizeBytes: M1_DEFAULT_BLOB_SIZE,
     },
     {
-      providerHumanId: 'human-timothy-tutor',
+      providerHumanId: 'human-terrance-tutor',
       providerArchetype: 'desktop',
       receiverHumanId: 'human-matthew-manager',
       receiverArchetype: 'desktop',

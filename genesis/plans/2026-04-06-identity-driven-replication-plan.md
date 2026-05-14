@@ -748,7 +748,7 @@ batches and 100ms inter-batch delay."
 
 **Note:** Adam already exists as a persona — `human-adam-firstman` is in `genesis/data/account-packages/adam-firstman.json`, `genesis/data/lamad/presences/adam-firstman.json`, and `genesis/docs/humans/humans.json`. He's in the "Eden Household" group in `conductor-groups.json`. What's missing is the K8s deployment manifest. We're adding the deployment, not the persona.
 
-The current K8s topology deploys 5 humans (matthew, jessica, pete, timothy, frank). Adam will be the 6th, with elevated CPU/memory resources to handle the initial seed write before other peers replicate from him.
+The current K8s topology deploys 5 humans (matthew, jessica, pete, terrance, frank). Adam will be the 6th, with elevated CPU/memory resources to handle the initial seed write before other peers replicate from him.
 
 - [ ] **Step 1: Create Adam's K8s manifest**
 

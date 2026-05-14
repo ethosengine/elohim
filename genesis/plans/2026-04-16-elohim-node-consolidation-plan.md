@@ -1084,7 +1084,7 @@ Once adam is validated on shem, convert the remaining 5 human manifests to conso
 **Files:**
 - Modify: `genesis/orchestrator/manifests/humans/matthew-manager.yaml`
 - Modify: `genesis/orchestrator/manifests/humans/jessica-spouse.yaml`
-- Modify: `genesis/orchestrator/manifests/humans/timothy-tutor.yaml`
+- Modify: `genesis/orchestrator/manifests/humans/terrance-tutor.yaml`
 - Modify: `genesis/orchestrator/manifests/humans/frank-farmer.yaml`
 - Modify: `genesis/orchestrator/manifests/humans/pete-pastor.yaml`
 
@@ -1099,7 +1099,7 @@ Apply the same transformation as Task 6 to each manifest:
 |-------|---------------------|-------------------|-----------|
 | matthew | 2Gi / 6Gi | 500m / 2000m | Bootstrap anchor + doorway host |
 | jessica | 1Gi / 3Gi | 250m / 1000m | Typical device steward |
-| timothy | 512Mi / 1.5Gi | 150m / 500m | Chromebook profile |
+| terrance | 512Mi / 1.5Gi | 150m / 500m | Chromebook profile |
 | frank | 1Gi / 3Gi | 250m / 1000m | Remote peer |
 | pete | 1Gi / 3Gi | 250m / 1000m | Remote peer |
 
@@ -1128,7 +1128,7 @@ git commit -m "feat(orchestrator): convert all humans to consolidated single-con
 git push
 ```
 
-Pipeline deploys all humans with consolidated containers. Delete PVCs for each human that needs to reschedule (frank, pete, jessica, timothy — matthew may need careful handling as bootstrap anchor).
+Pipeline deploys all humans with consolidated containers. Delete PVCs for each human that needs to reschedule (frank, pete, jessica, terrance — matthew may need careful handling as bootstrap anchor).
 
 ---
 

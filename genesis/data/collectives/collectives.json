@@ -88,7 +88,7 @@
       "governanceLayer": "family",
       "reach": "trusted",
       "constitutionalParentId": "neighborhood-valley",
-      "description": "Nuclear family — Matthew, Jessica, Timothy. Co-stewards of household, education, and faith formation.",
+      "description": "Nuclear family — Matthew, Jessica, Terrance. Co-stewards of household, education, and faith formation.",
       "governanceModel": "steward-consent",
       "domain": "household",
       "place": null,
@@ -104,7 +104,7 @@
       "governanceLayer": "faith",
       "reach": "familiar",
       "constitutionalParentId": "community-local-church",
-      "description": "Weekly bible study — Matthew, Jessica, Timothy, Pete",
+      "description": "Weekly bible study — Matthew, Jessica, Terrance, Pete",
       "governanceModel": "consent",
       "domain": "worship",
       "place": null,
@@ -120,7 +120,7 @@
       "governanceLayer": "geographic",
       "reach": "familiar",
       "constitutionalParentId": "community-neighborhood-association",
-      "description": "Immediate neighborhood — Matthew, Jessica, Timothy, Nancy",
+      "description": "Immediate neighborhood — Matthew, Jessica, Terrance, Nancy",
       "governanceModel": "community-vote",
       "domain": "land-use",
       "place": null,
@@ -522,11 +522,11 @@
       "domain": "household"
     },
     {
-      "id": "household-timothy",
-      "name": "Timothy's Household",
+      "id": "household-terrance",
+      "name": "Terrance's Household",
       "governanceLayer": "family",
       "reach": "trusted",
-      "description": "Compute shard — Timothy's household",
+      "description": "Compute shard — Terrance's household",
       "domain": "household"
     },
     {

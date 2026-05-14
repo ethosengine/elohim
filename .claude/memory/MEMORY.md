@@ -1,157 +1,171 @@
-- [Tiered quilt stewardship spec (2026-05-11)](project_tiered_quilt_spec_landed_2026_05_11.md) — 8-wave; zero new DHT types; MinIO not Garage; grandma's family cluster bar.
-- [EPR delivery sprint result (2026-05-11)](project_epr_delivery_sprint_2026_05_11.md) — Phase 4 substrate + W2A/B landed; audit revealed 471/479 boxes were tracking debt not implementation debt; W2D + W3B + W4 deferred; topology last-mile bridge delivered.
-- [Agentic context graph model](project_agentic_context_graph_model.md) — skill-graph + typed baton + velocity-tiered memory; Dreams is consolidation primitive.
-- [Memory lifecycle = comet shape](project_memory_lifecycle_comet_shape.md) — 99% head + dwindling tail + memorialized core; deliberate forgetting first-class.
-- [Consolidation → economic-social feedback](project_consolidation_events_economic_feedback.md) — merge emits shefa/qahal/mishpat/imagodei signals; reach is bidirectional.
-- [Values-forward disclosure](project_values_forward_disclosure_accountability.md) — protocol takes a side against accountability-resistance; disclose clearly.
-- [Subconscious memory tier](project_subconscious_memory_tier.md) — reach-dropped → encrypted elohim-only tier; surface via facing or pattern-detection.
-- [Memory classes](project_memory_classes.md) — 7 classes (contextual/archival/identity/relational/operational/attestation/wisdom); substrate tags every entry.
-- [Submerge as routing](project_submerge_destinations_stewardship_routing.md) — destinations vary; attestation+consent+lifecycle per route; dream cycle everywhere.
-- [Three temporal perspectives](project_three_temporal_perspectives.md) — history (past) / roadmap (future) / development (present cycle); three views on the epic-graph timeline.
-- [Wisdom resolves into epics](project_wisdom_resolves_into_epics.md) — memory's destination is story-compaction; epics are the wisdom substrate; vertical flow distinct from lateral hygiene.
-- [Historian — pattern-aware un-archive](project_historian_pattern_surface_agent.md) — inverse of cleanup; surfaces archived patterns into live work as risk/precedent annotation; performs the `surface` primitive.
-- [Memory in repo — two-tier storage](project_memory_in_repo_two_tier.md) — primary at .claude/memory/ (git-tracked, PVC-recoverable); personal slot is a symlink; team-shareable substrate.
-- [Signal-driven audit ceremonies](project_signal_driven_audit_ceremonies.md) — accumulator + ceremony pattern; CLAUDE.md gospel surfaces use signal not cadence; mirrors EPR feedback.
-- [Shared _lib pattern for .claude/* tools](project_shared_lib_pattern.md) — pure-stdlib helpers at .claude/scripts/_lib/; bootstrap-by-walk-up imports; extract when ≥3 callers share.
-- [.no-claude.md opt-out marker pattern](project_no_claude_md_opt_out_pattern.md) — operator drops marker file with rationale; audit excludes from MISSING-CLAUDE-MD candidacy; decision chain preserved across cycles; generalizes to other heuristic audits.
-- [P1 — elohim-storage as reconciliation controller](project_principle_p1_reconciliation_controller.md) — DHT is manifest, libp2p is k8s controller; eager reconciliation.
-- [Orchestrator predictive build-graph](project_orchestrator_predictive_vision.md) — predict pre-push, reconcile post-run; substrate in strategy.mjs + preview.mjs.
-- [Seed whoever is ready](project_seed_whoever_is_ready.md) — per-peer seeding; partial-cluster is steady state; no all-or-nothing on conductor.
-- [CI build storage — openebs-jiva on hp-micro10](project_ci_storage_topology.md) — PVCs use openebs-jiva-csi-default; ref genesis/manifests/nix-cache-pvc.yaml.
-- [Holochain build PVCs in `jenkins` ns](project_holochain_build_pvcs_in_jenkins_ns.md) — nix-cache, cargo-cache, sweettest-target-cache; ethosengine ns has none.
-- [Verify cluster state before operator runbooks](feedback_verify_cluster_state_before_runbook.md) — manifests may not match reality; quote kubectl get; exec|apply -f - pattern.
+- [Tiered quilt spec (2026-05-11)](project_tiered_quilt_spec_landed_2026_05_11.md) — 8-wave; zero new DHT types; MinIO not Garage; grandma cluster bar.
+- [Agentic context graph model](project_agentic_context_graph_model.md) — skill-graph + typed baton + velocity-tiered memory; Dreams = consolidation primitive.
+- [Memory lifecycle = comet shape](project_memory_lifecycle_comet_shape.md) — 99% head + dwindling tail + memorialized core; deliberate forgetting.
+- [Consolidation → economic-social feedback](project_consolidation_events_economic_feedback.md) — merge emits shefa/qahal/mishpat/imagodei; reach is bidirectional.
+- [Values-forward disclosure](project_values_forward_disclosure_accountability.md) — protocol takes a side against accountability-resistance.
+- [Subconscious memory tier](project_subconscious_memory_tier.md) — reach-dropped → encrypted elohim-only; surface via facing/pattern-detection.
+- [Memory classes](project_memory_classes.md) — 7 classes (contextual/archival/identity/relational/operational/attestation/wisdom); tags every entry.
+- [Submerge as routing](project_submerge_destinations_stewardship_routing.md) — destinations vary; attestation+consent+lifecycle per route.
+- [Three temporal perspectives](project_three_temporal_perspectives.md) — history/roadmap/development; three views on the epic-graph timeline.
+- [Wisdom resolves into epics](project_wisdom_resolves_into_epics.md) — memory's destination is story-compaction; epics are wisdom substrate.
+- [Historian — pattern-aware un-archive](project_historian_pattern_surface_agent.md) — inverse of cleanup; surfaces archived patterns as risk/precedent; `surface` primitive.
+- [Memory in repo — two-tier storage](project_memory_in_repo_two_tier.md) — primary .claude/memory/ (git-tracked); personal slot symlinked; team-shareable.
+- [Signal-driven audit ceremonies](project_signal_driven_audit_ceremonies.md) — accumulator+ceremony; signal not cadence; mirrors EPR feedback.
+- [Shared _lib pattern](project_shared_lib_pattern.md) — pure-stdlib helpers at .claude/scripts/_lib/; walk-up imports; extract at ≥3 callers.
+- [.no-claude.md opt-out marker](project_no_claude_md_opt_out_pattern.md) — rationale marker excludes dir; preserves decision chain; generalizes.
+- [P1 — storage as reconciliation controller](project_principle_p1_reconciliation_controller.md) — DHT=manifest, libp2p=k8s controller; eager reconcile.
+- [Orchestrator predictive build-graph](project_orchestrator_predictive_vision.md) — predict pre-push, reconcile post-run; strategy.mjs + preview.mjs.
+- [Seed whoever is ready](project_seed_whoever_is_ready.md) — per-peer seeding; partial-cluster = steady state; no all-or-nothing.
+- [CI build storage — openebs-jiva](project_ci_storage_topology.md) — PVCs use openebs-jiva-csi-default; see genesis/manifests/nix-cache-pvc.yaml.
+- [Holochain build PVCs in `jenkins` ns](project_holochain_build_pvcs_in_jenkins_ns.md) — nix-cache, cargo-cache, sweettest-target-cache; not ethosengine.
+- [Verify cluster state before runbooks](feedback_verify_cluster_state_before_runbook.md) — manifests ≠ reality; quote kubectl get; exec|apply -f - pattern.
 - [Check helm chart status before runbooks](feedback_check_helm_chart_status_before_runbooks.md) — Bitnami blocking/deprecating; prefer upstream official charts.
 - [Pause sprint when substrate change in flight](feedback_pause_sprint_when_substrate_in_flight.md) — image rebuild/restart in motion → minimum-revert mode only.
-- [MinIO sccache substrate (2026-05-09)](project_garage_sccache_substrate_2026_05_09.md) — sccache-elohim on MinIO not Garage; endpoint abstraction = tiered-quilt Wave 3.
-- [Understand orchestrator substrate before dispatch changes](feedback_understand_orchestrator_substrate_before_changes.md) — read strategy.mjs + Jenkinsfile + drift test first.
-- [Per-node metrics vs hub aggregation](project_node_metrics_vs_hub_aggregation_boundary.md) — single-node probes in system_metrics.rs; cross-node sums are hub-design.
-- [elohim-storage as pod / operator sets limits](project_storage_as_pod_operator_sets_virtual_limits.md) — min(probes, allocation, ceiling); env-driven until DHT-attested.
-- [Check existing compute-reporting foundation first](feedback_check_existing_compute_foundation.md) — grep fs4/heartbeat::/capacity_bytes first; synthesize, don't duplicate.
-- [Rust signature changes need crate-wide caller grep](feedback_signature_changes_grep_callers.md) — integration tests in tests/ missed; fail at pre-push 30+ min later.
-- [iroh stack — pinned blobs 0.94 + iroh 0.92](project_iroh_parallel_stack_phase0_blocker.md) — 0.95+ has curve25519-dalek bug; 0.94 is soaked-crypto boundary.
-- [iroh stack — Phases 1–10 landed, cutover-ready](project_iroh_parallel_stack_phases3_7_landed.md) — all planes parity-tested; Phase 11 = backend wiring + graduation.
-- [iroh Phase 11 — sync is first wired plane](project_iroh_phase11_sync_first_plane_landed.md) — SyncManagerBackend pattern set; copy for 5 remaining backends.
-- [iroh Phase 11 — all six backends wired](project_iroh_phase11_all_backends_wired.md) — EPR/EPR-atom/Shard/View-fed/IdentityHandshake/Trust as neutral services; 43 green.
-- [Cargo probes — resolution ≠ compilation](feedback_cargo_resolution_vs_compilation.md) — pre-release crates can resolve but fail compile; run cargo build before pinning.
-- [Subagents off-script on Cargo dep conflicts](feedback_subagent_dep_conflict_supervision.md) — explicit version-forbid + scope-creep-forbid in dispatch prompts.
+- [Understand orchestrator substrate first](feedback_understand_orchestrator_substrate_before_changes.md) — read strategy.mjs + Jenkinsfile + drift test before changes.
+- [Per-node metrics vs hub aggregation](project_node_metrics_vs_hub_aggregation_boundary.md) — single-node probes in system_metrics.rs; cross-node = hub.
+- [storage as pod / operator sets limits](project_storage_as_pod_operator_sets_virtual_limits.md) — min(probes, allocation, ceiling); env-driven pre-DHT.
+- [Check existing compute-reporting first](feedback_check_existing_compute_foundation.md) — grep fs4/heartbeat::/capacity_bytes; synthesize, don't duplicate.
+- [Rust signature changes need crate-wide grep](feedback_signature_changes_grep_callers.md) — tests/ missed; fails pre-push 30+ min later.
+- [iroh stack — Phases 1–10 landed](project_iroh_parallel_stack_phases3_7_landed.md) — all planes parity-tested; Phase 11 = backend wiring + graduation.
+- [Cargo probes — resolution ≠ compilation](feedback_cargo_resolution_vs_compilation.md) — pre-release crates resolve but fail compile; cargo build before pinning.
+- [Subagents off-script on Cargo conflicts](feedback_subagent_dep_conflict_supervision.md) — explicit version-forbid + scope-creep-forbid in dispatch.
 - [dev branch is integration target — no PR needed](feedback_dev_branch_no_pr.md) — feature → dev = local merge; PR review at dev → main only.
-- [EPR 2B ↔ Recovery M4 on DNA signal stream](project_epr2b_recovery_m4_convergence.md) — shared dna-signal-stream.schema.json; coordinate PRs touching either.
-- [Humans have multiple device archetypes](project_multi_device_humans.md) — don't assume one pod per human; node + device + mobile archetypes.
-- [Elohim operator as household fabric manager](project_household_fabric.md) — local cluster operator distinct from P2P dataplane; nodes join/leave fluidly.
-- [Doorway as peer registration point](project_doorway_peer_registration.md) — inside-out: peers register content with doorway, not Holo's marketplace.
+- [EPR 2B ↔ Recovery M4 DNA signal stream](project_epr2b_recovery_m4_convergence.md) — shared dna-signal-stream.schema.json; coordinate PRs.
+- [Doorway as peer registration point](project_doorway_peer_registration.md) — peers register with doorway, not Holo's marketplace.
 - [P2P mesh is the hosting layer](project_p2p_is_hosting.md) — peer-sharding IS hosting; doorway is optional web2 projection.
-- [Household horizontal scaling](project_household_horizontal_scaling.md) — more blades = more elohim-node instances with different roles.
-- [Frame agents as first-class developers](feedback_agent_framing.md) — autonomous loops are agentic developers with full dev cycle; never "babysitter."
-- [Agentic loop economics](project_agentic_loop_economics.md) — optimize for iteration count; Opus orchestrates, Haiku reduces data, Sonnet delegates.
-- [Permission allowlist philosophy](project_permission_allowlist_philosophy.md) — make allowlist as broad as safely possible, not more numerous.
+- [Household horizontal scaling](project_household_horizontal_scaling.md) — more blades = more elohim-node instances, different roles.
+- [Frame agents as first-class developers](feedback_agent_framing.md) — autonomous loops are devs with full cycle; never "babysitter."
+- [Agentic loop economics](project_agentic_loop_economics.md) — optimize iteration count; Opus orchestrates, Haiku reduces, Sonnet delegates.
+- [Permission allowlist philosophy](project_permission_allowlist_philosophy.md) — broad as safely possible, not more numerous.
 - [No /generalize-permissions in /shift kickoff](feedback_no_generalize_permissions_in_shift.md) — auto mode handles prompts inline; skip pre-shift palette pass.
 - [Skip spec doc for minor changes](feedback_skip_spec_doc_for_minor_changes.md) — small edits: brainstorm inline, implement, done.
 - [Shift palette wishlist feedback loop](project_shift_palette_wishlist.md) — agent surfaces intended-but-blocked commands as proposed palette additions.
 - [Plan/spec locations](reference_superpowers_docs_location.md) — plans → genesis/docs/plans/; superpowers → genesis/docs/superpowers/.
-- [MemPalace — proposed historian substrate](reference_mempalace.md) — Python CLI + ChromaDB + SQLite temporal graph; wings/rooms/drawers; auto-save at compaction; named in historian spec.
-- [Stewarded-child identity archetype](project_stewarded_child_identity.md) — Timothy is the canonical ward-with-capability-grant; cradle-to-grave lifecycle.
-- [Stewardship philosophy — six principles](project_stewardship_philosophy.md) — graduated capability, accountable authority, visible shape; rubric for custodial flows.
-- [No sovereignty — stewardship instead](project_no_sovereignty_stewardship_over_ownership.md) — reject own/ownership/sovereign; use steward/contributor/agency/authored.
+- [MemPalace — wired substrate](reference_mempalace.md) — wired 2026-05-14; image-baked; 4 wings/12,866 drawers; MCP per-subagent.
+- [No sovereignty — stewardship](project_no_sovereignty_stewardship_over_ownership.md) — reject own/ownership/sovereign; use steward/contributor/authored.
 - [elohim-node as deployment wrapper](project_elohim_node_role.md) — packages elohim-storage like tauri/browser do; handles deployment glue.
-- [elohim-agent sense-and-respond architecture](project_elohim_agent_sense_respond_architecture.md) — discernment/gates in Rust; .ts is sense-and-respond only, never evaluator.
+- [elohim-agent sense-and-respond](project_elohim_agent_sense_respond_architecture.md) — gates in Rust; .ts sense-and-respond only, never evaluator.
 - [Schema-first is IoC](feedback_schema_first_ioc.md) — write JSON schema FIRST for any wire contract; Rust/TS comply.
-- [Doorway routes are manifest-driven](project_doorway_manifest_driven_routes.md) — manifests declare HTTP routes; registry proxy; direct code for web2 concerns only.
-- [Elohim active is observed, not flagged](project_elohim_active_observed_not_flagged.md) — Phase::ElohimActive derives from real inference; stub running = DevContext.
-- [Household is the resilience unit](project_household_is_resilience_unit.md) — resilience is household-to-household; top card is reciprocation count.
+- [Doorway routes are manifest-driven](project_doorway_manifest_driven_routes.md) — manifests declare HTTP routes; direct code for web2 only.
+- [Elohim active is observed, not flagged](project_elohim_active_observed_not_flagged.md) — Phase::ElohimActive from real inference; stub = DevContext.
+- [Household is the resilience unit](project_household_is_resilience_unit.md) — household-to-household; top card = reciprocation count.
 - [Collective is the stewardship unit](project_social_compute_collective_is_stewardship_unit.md) — household is ONE kind of collective; design collective-general.
-- [Shem is the live P2P canvas](project_shem_is_p2p_live_canvas.md) — Matthew/Jessica/Timothy on household cluster; others on shem; cross-node proves P2P.
-- [Compute and model are independent diversity axes](project_compute_and_model_independent_diversity_surfaces.md) — hardware + model; correlate but stay independent.
+- [Shem is the live P2P canvas](project_shem_is_p2p_live_canvas.md) — Matthew/Jessica/James on household; others on shem; cross-node proves P2P.
+- [Compute and model are independent axes](project_compute_and_model_independent_diversity_surfaces.md) — hw+model; correlate but stay independent.
 - [DHT vs libp2p scoping](project_dht_vs_libp2p_scoping.md) — DHT signing is expensive; push operational state (census, gossip) to libp2p.
-- [Three-layer truth model](project_three_layer_truth_model.md) — DHT=notary, libp2p=data-ops, doorway=web2 projection; no libp2p swarm in doorway.
-- [Humans register with multiple doorways](project_multi_doorway_human_registration.md) — multi-registration is the resiliency pattern; flows must be doorway-agnostic.
-- [Account layer — OAuth-pattern graduation](project_peer_native_account_canonical_surface.md) — doorway as OAuth relying party; post-graduation loses identity agency.
-- [Imagodei three surfaces](project_imagodei_three_surfaces.md) — social profile / self-knowledge / account management; M5 lands surface 3.
-- [M5 — auth-portal convergence](project_m5_reframe_auth_portal_convergence.md) — M5 connects hosted-doorway + peer-native-steward portals via account management.
-- [M5 is plumbing/SDK convergence sprint](project_m5_is_plumbing_sprint.md) — deliverable is SDK/API surface; UI minimum scaffold; polished views separate sprint.
-- [elohim-app is composable view federation](project_elohim_app_as_composable_view_federation.md) — pillars graduate to federated surfaces; M5 graduates auth first.
+- [Three-layer truth model](project_three_layer_truth_model.md) — DHT=notary, libp2p=data-ops, doorway=web2 projection.
+- [Humans register with multiple doorways](project_multi_doorway_human_registration.md) — multi-registration = resiliency; flows doorway-agnostic.
+- [Account layer — OAuth graduation](project_peer_native_account_canonical_surface.md) — doorway as OAuth RP; post-graduation loses identity agency.
+- [Imagodei three surfaces](project_imagodei_three_surfaces.md) — social profile / self-knowledge / account mgmt; M5 lands #3.
+- [M5 — auth-portal convergence](project_m5_reframe_auth_portal_convergence.md) — connects hosted-doorway + peer-native-steward portals via account mgmt.
+- [M5 is plumbing/SDK sprint](project_m5_is_plumbing_sprint.md) — deliverable = SDK/API surface; UI min scaffold; polished views separate.
+- [elohim-app is composable view federation](project_elohim_app_as_composable_view_federation.md) — pillars → federated surfaces; M5 graduates auth.
 - [Pillar boundary violations — 174 in elohim-app](project_pillar_boundary_violations_backlog.md) — ESLint warn-level; needs dedicated cleanup sprint.
-- [serde_json::Value breaks Holochain zome boundary](feedback_serde_json_value_breaks_zome_boundary.md) — never use Value on SerializedBytes; pre-stringify `_json: String`.
-- [a2o is human experience, not dev bugs](feedback_a2o_is_human_experience_not_dev_bugs.md) — serialization bugs belong in unit tests + hooks, not feature files.
-- [A2o narrative authoring is Opus work](feedback_a2o_narrative_is_opus_work.md) — feature files/scenarios must be Opus; Haiku writes objects without interpretability.
-- [DePIN contracts are policy](project_depin_contracts_are_policy.md) — stewardship contracts on DHT (REA commitments); libp2p operates within bounds.
-- [Placement signals are shefa inputs](project_placement_signals_are_shefa_inputs.md) — gaps/breaches/recoveries are economic signals, not operational warnings.
-- [Cadences are archetype-tunable](project_cadence_archetype_tunable_with_dev_overrides.md) — 4 layers: archetype → policy.toml → env/CLI → sync admin; never hard-code.
-- [Shift measures live in Jenkins, not locally](feedback_shift_measure_jenkins.md) — Eclipse Che has no docker/k8s/holochain; Objective measures MUST use Jenkins MCP.
-- [Socially derived security](project_socially_derived_security.md) — recovery seed is Shamir-split; doorway is blind proxy; biometrics/2FA pluggable.
-- [Recovery's UX bar — grandma standard](project_recovery_grandma_standard.md) — recovery feels like "log in with help from your people"; user never sees seeds.
-- [Less pushy notifications](feedback_less_pushy_notifications.md) — do it automatically, surface ambiently; interruptive notifications for crisis only.
-- [Elohim Protocol vision — fruit back on the tree](project_elohim_vision_fruit_back_on_tree.md) — elohims carry best-self judgment at machine speed; design against weaponization.
-- [Mission — subsume G/F/A via "it just works" P2P](project_subsume_g_f_a_via_it_just_works.md) — substrate trust must reach Apple-mantra bar; credible to a grandmother.
+- [serde_json::Value breaks zome boundary](feedback_serde_json_value_breaks_zome_boundary.md) — never Value on SerializedBytes; pre-stringify `_json: String`.
+- [a2o is human experience, not dev bugs](feedback_a2o_is_human_experience_not_dev_bugs.md) — serialization bugs → unit tests, not feature files.
+- [A2o narrative is Opus work](feedback_a2o_narrative_is_opus_work.md) — feature files must be Opus; Haiku lacks interpretability.
+- [DePIN contracts are policy](project_depin_contracts_are_policy.md) — stewardship contracts on DHT (REA); libp2p operates within bounds.
+- [Placement signals are shefa inputs](project_placement_signals_are_shefa_inputs.md) — gaps/breaches = economic signals, not ops warnings.
+- [Cadences are archetype-tunable](project_cadence_archetype_tunable_with_dev_overrides.md) — 4 layers: archetype→policy.toml→env/CLI→sync admin.
+- [Shift measures live in Jenkins](feedback_shift_measure_jenkins.md) — Che has no docker/k8s/holochain; measures MUST use Jenkins MCP.
+- [Socially derived security](project_socially_derived_security.md) — Shamir-split seed; doorway blind proxy; biometrics/2FA pluggable.
+- [Recovery's UX bar — grandma standard](project_recovery_grandma_standard.md) — "log in with help from your people"; user never sees seeds.
+- [Less pushy notifications](feedback_less_pushy_notifications.md) — automatic + ambient; interruptive only for crisis.
+- [Elohim vision — fruit back on the tree](project_elohim_vision_fruit_back_on_tree.md) — elohims carry best-self judgment at machine speed; design against weaponization.
+- [Mission — subsume G/F/A](project_subsume_g_f_a_via_it_just_works.md) — substrate trust must reach Apple-mantra bar; credible to a grandmother.
 - [Avodah is protocol-as-process, not a pillar](project_avodah_pillar.md) — reference impl for work/contribution as protocol participant; not a true pillar.
-- [Graduated recovery authority](project_graduated_recovery_authority.md) — authority graduates intimate circle → qahal → global witness; absolute lockout is failure.
+- [Graduated recovery authority](project_graduated_recovery_authority.md) — intimate circle → qahal → global witness; absolute lockout = failure.
 - [Elohim as counsel — right to defense](project_elohim_as_counsel.md) — elohim has first-class standing to represent a human under duress; non-optional.
-- [Ungrudging service](project_ungrudging_service.md) — never gate on acknowledgment; externalities first-class; exit does not trigger retaliation.
-- [Elohim as specialist subagents](project_elohim_subagent_specialists.md) — spawn specialists (defender/advocate/steward/gate-discerner) with focused manifests.
-- [Bootstrap social → elohim security gradient](project_bootstrap_to_elohim_security_gradient.md) — Stage 1 = structural/social; Stage 3 = full elohim; document the stage.
-- [HDI validators cannot use get_links](project_hdi_no_get_links_in_validators.md) — integrity-zome uses only must_get_*; link traversal HDK-only; use coordinator gates.
-- [Subagent scope guardrails — forbid git revert](feedback_subagent_scope_guardrails.md) — dispatch must forbid git revert/reset; require BLOCKED report; scan SHAs post-dispatch.
-- [Pace multi-agent sprints — no concurrent cargo](feedback_multi_agent_pvc_pacing.md) — shared cargo target not safe for concurrent compilation; coordinate file scope.
-- [PVC threshold — act at 85%+](feedback_pvc_threshold_and_recovery.md) — workspace PVC is 118G; cargo-pool legacy-targets --clean --yes is safe first reclamation.
-- [Haiku needs compiler-ready scaffold](feedback_haiku_needs_compiler_ready_scaffold.md) — Sonnet scaffolds first instance of any new test type; Haiku mirrors proven patterns.
-- [Sessions: orchestrating vs implementing](feedback_session_orchestrate_vs_implement.md) — orchestrating = decisions pending; implementing = file/test/TODO pointer.
-- [EPR substrate is not VF-GraphQL](project_epr_substrate_vs_vf_graphql.md) — EPR codec/libp2p = graph substrate primitive; shefa-speaks-VF-GraphQL is app-layer.
-- [DNA upgrade path — lineage regression + rna](project_lineage_rna_upgrade_path.md) — HC 0.6 gates lineage behind unstable-migration; rna module backburnered.
-- [Swarm edits need fresh-tree cargo build first](feedback_swarm_composition_fresh_tree_build.md) — DNA worktree doesn't verify elohim-storage crate; run fmt+clippy pre-push.
-- [Storage as actor vs forwarder — two HcClient patterns](project_storage_actor_vs_forwarder_patterns.md) — service-bot vs Phase 11 forwarder; needs multi-tenant cell routing.
-- [Diesel migration timestamp collisions drop migrations](feedback_diesel_migration_timestamp_collision.md) — same YYYY-MM-DD-HHMMSS prefix → embed_migrations! keeps one.
-- [Reach is earned at authoring](project_reach_earned_at_authoring.md) — receivers pre-authorize via standing trust contract; reach/discovery/validation coupled.
-- [First-class graph pattern](project_first_class_graph_pattern.md) — EPRs are nodes, couplings/memberships/delegations are edges; design must first-class.
-- [Social reach is a sense-respond nervous system](project_social_reach_nervous_system.md) — earning is floor; needs provenance + back-prop + quarantine + restitution per edge.
-- [Trust is an efficiency signal](project_trust_as_efficiency_signal.md) — trustworthy content costs less to distribute; trust is compute-economic, not just moral.
-- [Values-forward preference guards](project_values_forward_preference_guards.md) — humans CAN filter receive-side as values-forward, tended guards; not network-imposed.
-- [Intelligence revolution scales TO humans](project_intelligence_revolution_scales_to_humans.md) — first revolution that could scale to human complexity rather than flatten it.
-- [Redeploy the substrate — capture-resistance](project_redeploy_the_substrate.md) — same tools redeployed on uncontrolled hardware become means of escape.
-- [Zero marginal cost of intelligence — fiber pattern](project_intelligence_zero_marginal_cost_inevitable.md) — inference racing to edge; same pattern that collapsed telco rental.
-- [Innovator's dilemma diagnosis](project_innovators_dilemma_diagnosis.md) — people most expected to answer are most sunk-cost in "more current system but smarter."
-- [Schema codegen Prettier oscillation](feedback_codegen_prettier_oscillation.md) — schema:codegen:ts not idempotent on Reach/ContentFormat; cosmetic drift, non-blocking.
-- [matchesGlob ** corruption — replace order matters](feedback_orchestrator_glob_replace_order.md) — sentinel placeholders required for compound glob tokens; same bug class.
-- [No Hebrew pillar names in epic/manifesto narrative](feedback_no_hebrew_pillar_names_in_narrative.md) — translate to English in genesis/docs/content; "Elohim/elohim agent" stays.
-- [Alpha cluster — 6 peers, bootstrap pair](project_alpha_topology_bootstrap_pair.md) — adam+matthew bootstrap pair across node-split; shem multi-tenant; others household.
-- [Doorway is single-target dispatch — no fan-out](project_doorway_single_target_no_fanout.md) — substrate moves bytes; doorway projects+caches; peer-iteration is regression.
-- [P2P inventory exchange ≠ byte replication](project_inventory_exchange_not_byte_replication.md) — gossip lists are metadata-only; check filesystem count for actual mobility.
+- [Elohim as specialist subagents](project_elohim_subagent_specialists.md) — defender/advocate/steward/gate-discerner; focused manifests.
+- [HDI validators cannot use get_links](project_hdi_no_get_links_in_validators.md) — integrity uses must_get_*; link traversal HDK-only; coordinator gates.
+- [Subagent scope guardrails — forbid git revert](feedback_subagent_scope_guardrails.md) — dispatch forbids git revert/reset; BLOCKED report; scan SHAs post-dispatch.
+- [Pace multi-agent sprints](feedback_multi_agent_pvc_pacing.md) — shared cargo target not safe concurrent; coordinate file scope.
+- [PVC threshold — act at 85%+](feedback_pvc_threshold_and_recovery.md) — 118G PVC; cargo-pool legacy-targets --clean --yes = safe first reclaim.
+- [Haiku needs compiler-ready scaffold](feedback_haiku_needs_compiler_ready_scaffold.md) — Sonnet scaffolds first instance; Haiku mirrors patterns.
+- [Orchestrating vs implementing](feedback_session_orchestrate_vs_implement.md) — orchestrating = decisions pending; implementing = file/test pointer.
+- [EPR substrate ≠ VF-GraphQL](project_epr_substrate_vs_vf_graphql.md) — EPR codec/libp2p = graph primitive; VF-GraphQL is app-layer.
+- [DNA upgrade path — lineage + rna](project_lineage_rna_upgrade_path.md) — HC 0.6 gates lineage behind unstable-migration; rna backburnered.
+- [Swarm edits need fresh-tree build first](feedback_swarm_composition_fresh_tree_build.md) — DNA worktree doesn't verify storage; fmt+clippy pre-push.
+- [Storage as actor vs forwarder](project_storage_actor_vs_forwarder_patterns.md) — service-bot vs Phase 11 forwarder; needs multi-tenant cell routing.
+- [Diesel migration timestamp collisions](feedback_diesel_migration_timestamp_collision.md) — same YYYY-MM-DD-HHMMSS → embed_migrations! keeps one.
+- [Reach is earned at authoring](project_reach_earned_at_authoring.md) — receivers pre-authorize via standing trust contract; reach/discovery coupled.
+- [First-class graph pattern](project_first_class_graph_pattern.md) — EPRs=nodes, couplings/memberships/delegations=edges; first-class design.
+- [Reach is sense-respond nervous system](project_social_reach_nervous_system.md) — earning is floor; +provenance/back-prop/quarantine/restitution per edge.
+- [Trust is an efficiency signal](project_trust_as_efficiency_signal.md) — trustworthy content costs less to distribute; compute-economic, not just moral.
+- [Values-forward preference guards](project_values_forward_preference_guards.md) — humans filter receive-side as tended guards; not network-imposed.
+- [Intelligence scales TO humans](project_intelligence_revolution_scales_to_humans.md) — first revolution to scale to human complexity, not flatten it.
+- [Redeploy the substrate](project_redeploy_the_substrate.md) — same tools on uncontrolled hardware become means of escape.
+- [Zero marginal cost of intelligence — fiber pattern](project_intelligence_zero_marginal_cost_inevitable.md) — inference racing to edge; same shape that collapsed telco rental.
+- [Innovator's dilemma diagnosis](project_innovators_dilemma_diagnosis.md) — most-expected-to-answer are most sunk-cost in "current system but smarter."
+- [Schema codegen Prettier oscillation](feedback_codegen_prettier_oscillation.md) — schema:codegen:ts not idempotent on Reach/ContentFormat; cosmetic.
+- [matchesGlob ** corruption — order matters](feedback_orchestrator_glob_replace_order.md) — sentinel placeholders for compound glob tokens.
+- [No Hebrew pillar names in narrative](feedback_no_hebrew_pillar_names_in_narrative.md) — translate in genesis/docs/content; "Elohim/elohim agent" stays.
+- [Alpha cluster — 6 peers](project_alpha_topology_bootstrap_pair.md) — adam+matthew bootstrap pair; shem multi-tenant; others household.
+- [Doorway is single-target dispatch](project_doorway_single_target_no_fanout.md) — substrate moves bytes; doorway projects+caches; peer-iteration = regression.
+- [P2P inventory ≠ byte replication](project_inventory_exchange_not_byte_replication.md) — gossip = metadata-only; check filesystem count for mobility.
 - [Use GET, not HEAD, when probing /blob/<hash>](feedback_head_vs_get_blob_asymmetry.md) — HEAD on content-addressed routes 404s even when GET 200s.
-- [Quilt/pantry storage vocabulary](project_quilt_pantry_vocabulary.md) — register at genesis/graphos/vocabulary.md; quilt/pantry/stock/draw.
-- [Storage vocabulary: quilt ≠ weave ≠ lattice](project_storage_vocabulary_quilt.md) — three reserved words; storage uses quilt/pantry/stock/draw; resolved 2026-04-30.
-- [Quilt is the elohim-native S3 surface](project_quilt_as_native_s3_surface.md) — sccache targets quilt; defer until iroh substrate matures.
+- [Quilt/pantry storage vocabulary](project_quilt_pantry_vocabulary.md) — genesis/graphos/vocabulary.md; quilt/pantry/stock/draw.
+- [Storage vocab: quilt ≠ weave ≠ lattice](project_storage_vocabulary_quilt.md) — three reserved words; quilt/pantry/stock/draw; resolved 2026-04-30.
+- [Quilt = elohim-native S3 surface](project_quilt_as_native_s3_surface.md) — sccache targets quilt; defer until iroh matures.
 - [Env vars in tests need a static mutex](feedback_env_var_test_flakiness.md) — set_var in test A leaks into test B; saw it on BLOB_PANTRY_MAX_BYTES.
-- [Spare no expense of intelligence on architecture](feedback_spare_no_expense_intelligence.md) — read full context in parallel before asking; auto-mode ≠ shortcut synthesis.
-- [AT Protocol interop lives at doorway](project_doorway_is_federation_surface_atproto.md) — federation interop (AT Proto/ActivityPub) is doorway projection; peer-native clean.
-- [Standing composes from multiple evidence streams](project_standing_composes_multiple_evidence_streams.md) — imagodei/lamad + FeedbackSignal debits; manifest declares streams.
-- [Reach-gate is elohim-mediated matchmaking](project_reach_gate_is_elohim_mediated_matchmaking.md) — substrate gate returns {Allowed, Blocked, Pending}; elohim adds sponsorship.
-- [signal_kind is the extensible feedback vocabulary](project_signal_kind_extensible_protocol_class.md) — new social moves via schema+validator+manifest, not new entry types.
-- [Substrate scales by federated Tier 3 nodes](project_substrate_scale_ceiling.md) — ~100M households × 1 node (email/Mastodon-shape); doorway absorbs web2 mass-readership.
-- [Hub abstraction — household and collective separate](project_hub_archetype_abstraction.md) — abstract Hub; HouseholdHub and CollectiveHub intentionally separate; @wip.
-- [elohim-hub elevation — emergent scaling primitive](project_elohim_hub_elevation.md) — elohim-node graduates into hub runtime; hub-to-hub is Tier 3 story.
+- [Spare no expense of intelligence](feedback_spare_no_expense_intelligence.md) — read full context in parallel; auto-mode ≠ shortcut synthesis.
+- [AT Protocol interop lives at doorway](project_doorway_is_federation_surface_atproto.md) — AT Proto/ActivityPub = doorway projection; peer-native clean.
+- [Standing composes evidence streams](project_standing_composes_multiple_evidence_streams.md) — imagodei/lamad + FeedbackSignal debits; manifest declares.
+- [Reach-gate is elohim-mediated matchmaking](project_reach_gate_is_elohim_mediated_matchmaking.md) — gate returns {Allowed,Blocked,Pending}; elohim adds sponsorship.
+- [signal_kind = extensible feedback vocabulary](project_signal_kind_extensible_protocol_class.md) — new social moves via schema+validator+manifest; no new entry types.
+- [Substrate scales by Tier 3 nodes](project_substrate_scale_ceiling.md) — ~100M households × 1 node (email/Mastodon-shape); doorway absorbs web2 mass-read.
+- [Hub abstraction — household ≠ collective](project_hub_archetype_abstraction.md) — abstract Hub; HouseholdHub + CollectiveHub separate; @wip.
+- [elohim-hub elevation](project_elohim_hub_elevation.md) — elohim-node graduates into hub runtime; hub-to-hub = Tier 3 story.
 - [REA prefix is redundant — drop it long-term](project_rea_prefix_redundant.md) — REA is the pattern; resolve asymmetry by dropping prefix, never adding it.
-- [Cascade-halt orchestrator masks failures](feedback_cascade_halt_masks_failures.md) — green-driving surfaces buried failures one layer at a time; budget extra iterations.
-- [Sweettest cross-agent needs explicit DHT consistency](feedback_sweettest_cross_agent_consistency.md) — two_agent_conductors() needs exchange_peer_info + await_consistency.
-- [Docker include_str! path mirroring](feedback_docker_include_str_path_mirroring.md) — include_str! resolves relative to source in container; parent-dir refs need COPY mirrors.
-- [Build-manifest.json required for orchestrator](feedback_orchestrator_build_manifest_required.md) — PIPELINES map alone won't trigger; graph-walker.mjs is authoritative.
-- [New Jenkinsfiles need safe.directory before git ops](feedback_jenkinsfile_safe_directory_required.md) — checkout scm as JNLP user, builder as different UID; mirror root pattern.
-- [Storybook lives in ethosengine namespace](project_storybook_in_ethosengine_namespace.md) — elohim-<env> enforces P2P peer isolation; tooling belongs in ethosengine.
-- [Devspace disk-fill recovery](project_devspace_disk_cleanup_procedure.md) — /projects 118G fills from build artifacts; disk-pressure.sh warns at 85%/screams at 95%.
-- [Substrate-deterministic floor + elohim ceiling](project_substrate_floor_elohim_ceiling.md) — substrate handles allocation deterministically; elohim adds discernment.
-- [Compute commitments are bounded REA primitives](project_compute_commitments_bounded.md) — compute is signal_kind extension of Commitment; breach never contaminates attribution.
-- [Collapse the bureaucracy into the protocol](project_collapse_bureaucracy_into_protocol.md) — formal substrate IS bureaucracy collapsed into primitives; relational informal.
+- [Cascade-halt masks failures](feedback_cascade_halt_masks_failures.md) — green-driving surfaces buried failures one layer at a time; budget extra iterations.
+- [Sweettest cross-agent needs DHT consistency](feedback_sweettest_cross_agent_consistency.md) — two_agent_conductors needs exchange_peer_info + await_consistency.
+- [Docker include_str! path mirroring](feedback_docker_include_str_path_mirroring.md) — resolves relative to source in container; parent-dir refs need COPY mirrors.
+- [Build-manifest.json required](feedback_orchestrator_build_manifest_required.md) — PIPELINES map alone won't trigger; graph-walker.mjs is authoritative.
+- [New Jenkinsfiles need safe.directory before git ops](feedback_jenkinsfile_safe_directory_required.md) — checkout as JNLP user, builder different UID; mirror root pattern.
+- [Storybook in ethosengine namespace](project_storybook_in_ethosengine_namespace.md) — elohim-<env> enforces P2P peer isolation; tooling → ethosengine.
+- [Devspace disk-fill recovery](project_devspace_disk_cleanup_procedure.md) — /projects 118G fills from build artifacts; disk-pressure.sh warns 85%/screams 95%.
+- [Substrate floor + elohim ceiling](project_substrate_floor_elohim_ceiling.md) — substrate handles allocation deterministically; elohim adds discernment.
+- [Compute commitments are bounded REA primitives](project_compute_commitments_bounded.md) — signal_kind extension of Commitment; breach never contaminates attribution.
+- [Collapse bureaucracy into protocol](project_collapse_bureaucracy_into_protocol.md) — formal substrate IS bureaucracy as primitives; relational stays informal.
 
-- [Jenkins MCP anonymous-mode (OIDC constraint)](project_jenkins_mcp_anonymous_mode.md) — no Authorization header; reads work, writes don't; trigger via [build:*] commit tags.
-- [Haiku observers report API-grounded facts only](feedback_haiku_observe_only_no_specifics.md) — structural constraint via schema; Sonnet ci-investigator owns specifics.
+- [Jenkins MCP anonymous-mode (OIDC)](project_jenkins_mcp_anonymous_mode.md) — no auth header; reads work, writes don't; trigger via [build:*] tags.
+- [Haiku observers: API-grounded facts only](feedback_haiku_observe_only_no_specifics.md) — schema-enforced; Sonnet ci-investigator owns specifics.
 - [Cascade-hidden test surface](feedback_cascade_hidden_test_surface.md) — fixing cascade root unmasks more scenarios; track ratio, not raw count.
-- [codegen-ts.mjs refMap needs all relative-path key forms](feedback_codegen_relative_ref_keys.md) — bare, "./" prefix, "../views/" prefix, $id all need entries; missing → ENOENT.
-- [deployments.json is the seed-or-skip source of truth](project_deployments_json_seed_or_skip_truth.md) — deploy/seed/test filter on `suspended:true`; one flag flip re-enables.
-- [Aborting orchestrator forces full-chain rebuild](feedback_orchestrator_abort_baseline_rollback.md) — abort doesn't persist state; next push rebases against last-SUCCESSFUL run.
-- [Upstream containment as brit→rakia axis](project_upstream_proxy_pattern_brit_rakia.md) — MVP is replicate-the-repo as household stewardship; doorway projects GitHub-shape.
-- [elohim-ui Lit/WC pivot — design for a generation](project_lit_wc_pivot_design_for_generation.md) — component layer goes Lit Web Components; 50+ Angular components migrate.
-- [Design for a generation — no shortcuts](feedback_design_for_a_generation_no_shortcuts.md) — when user says "design for a generation," prefer W3C/standards even at higher cost.
-- [Doorway conductor registry persistence asymmetry](feedback_doorway_registry_persistence_asymmetry.md) — in-memory pool + persisted map orphans agents; check totalAgents vs sum.
-- [ci-playwright = ci-builder + playwright layer](project_ci_playwright_image.md) — inherits node20+pnpm+CHROME_BIN; bundles playwright@1.59.1; root-launch no --no-sandbox.
-- [Doorway as full-blown web2 facilitator](project_doorway_full_facilitator_sprint.md) — sprint candidate after SSR; absorb SPA hosting into doorway, retire elohim-site sidecar.
-- [Doorway SSR pod resource floor](project_doorway_ssr_pod_resource_floor.md) — SSR needs ≥1Gi memory + startupProbe 120s; V8 parses 51MB bundle into ~200MB.
-- [SSR is a compute-shape capability claim](project_ssr_is_compute_capability_claim.md) — feature-gate locally + advertise via compute-report; matchmaking treats like model-avail.
-- [SSR fetch shim has anonymous-only auth context](project_ssr_anonymous_auth_context.md) — higher-reach content renders empty in SSR; fix needs framework-agnostic auth threading.
-- [Attestation Consolidation Sprint state (2026-05-11)](project_attestation_consolidation_sprint_state.md) — Stage A done at a9ba7f080; worktree attestation-consolidation; B-G pending; running autonomously.
+- [codegen-ts.mjs refMap needs all relative-path key forms](feedback_codegen_relative_ref_keys.md) — bare, "./", "../views/", $id all need entries; missing→ENOENT.
+- [deployments.json = seed-or-skip truth](project_deployments_json_seed_or_skip_truth.md) — deploy/seed/test filter on `suspended:true`; flag flip re-enables.
+- [Aborting orchestrator forces full-chain rebuild](feedback_orchestrator_abort_baseline_rollback.md) — abort doesn't persist state; next push rebases on last-SUCCESSFUL.
+- [Upstream containment as brit→rakia](project_upstream_proxy_pattern_brit_rakia.md) — MVP = replicate-repo as household stewardship; doorway projects GitHub-shape.
+- [elohim-ui Lit/WC pivot](project_lit_wc_pivot_design_for_generation.md) — component layer → Lit WC; 50+ Angular components migrate.
+- [Design for a generation — no shortcuts](feedback_design_for_a_generation_no_shortcuts.md) — prefer W3C/standards even at higher cost.
+- [Doorway registry persistence asymmetry](feedback_doorway_registry_persistence_asymmetry.md) — in-memory pool + persisted map orphans agents; check totalAgents vs sum.
+- [ci-playwright = ci-builder + playwright](project_ci_playwright_image.md) — node20+pnpm+CHROME_BIN; playwright@1.59.1; root-launch no --no-sandbox.
+- [Doorway as full web2 facilitator](project_doorway_full_facilitator_sprint.md) — sprint candidate post-SSR; absorb SPA hosting; retire elohim-site sidecar.
+- [Doorway SSR resource floor](project_doorway_ssr_pod_resource_floor.md) — ≥1Gi mem + startupProbe 120s; V8 parses 51MB → ~200MB.
+- [SSR is a compute-shape capability claim](project_ssr_is_compute_capability_claim.md) — feature-gate locally + advertise via compute-report; matchmaking ~ model-avail.
+- [SSR fetch shim has anonymous-only auth context](project_ssr_anonymous_auth_context.md) — higher-reach content renders empty in SSR; needs framework-agnostic auth threading.
+- [Attestation Consolidation Sprint (2026-05-11)](project_attestation_consolidation_sprint_state.md) — Stage A @a9ba7f080; B-G pending; worktree attestation-consolidation.
+- [No brittle commands in devfile postStart](feedback_no_brittle_commands_in_poststart.md) — postStart failures abort startup; new tooling → `commands:` only.
+- [Forgetting as design](project_forgetting_as_design.md) — storyteller decides graduate/memorialize/hold; meaningful re-emergence > omniscient recall.
+- [Prefer YAML config over CLI args](feedback_config_yaml_over_cli.md) — node config = declarative YAML; CLI args = dev/testing only.
+- [JENKINS_TOKEN — autonomous on verified state](feedback_jenkins_token_strictly_guarded.md) — orchestrator triggers without per-call gate; verified state prevents build storms.
+- [No (a)(b)(c)(d) menus in auto mode](feedback_no_menu_punt_in_auto_mode.md) — Opus-judgment + in-scope inputs → decide and proceed; don't offload synthesis.
+- [Research before brainstorming](feedback_research_before_brainstorming.md) — user reframe = unabsorbed context; research/debug, don't brainstorm-fresh.
+- [Schema-data enum drift fakes auth bugs](feedback_schema_data_enum_drift_cascade.md) — invalid seed enum → 503 → 401 INVALID_CREDENTIALS; check seed-humans.log.
+- [Seed-lock often means schema drift](feedback_seed_lock_means_schema_drift.md) — clustered "database is locked" = stale schema; clear DB in genesis, don't chase pragmas.
+- [Shells need explicit timeouts](feedback_shells_need_timeouts.md) — cargo/pnpm/just hang history; wrap in timeout + kill on overrun.
+- [/shift has two modes — bring-up vs integration-iteration](feedback_shift_integration_iteration_mode.md) — loop adapts to CI: single objective vs multi-class fix.
+- [Doorway + hub = symmetric projection edges](project_doorway_hub_sister_brother.md) — doorway out to web2, hub in to peers; same truth, different audience.
+- [Views are served THROUGH a doorway, not OWNED](project_doorway_views_through_not_owned.md) — CDN-shape; any doorway serves canonical content; doorway-authored logic = anti-pattern.
+- [Hub-optional floor — laptop is full participant](project_hub_optional_floor.md) — design floor: one device, no hub; hubs are convenience, never gate participation.
+- [iroh ALPN handlers — one-stream-per-conn → loop](project_iroh_alpn_handlers_one_stream_design.md) — bench forced loop-on-accept_bi across Phase 5–10 handlers.
+- [First memory-team ceremony (2026-05-14)](feedback_first_memory_team_ceremony.md) — 6 waves; signal-driven; team contested; convergence-bias caveat.
+- [Self-reinforcing path bug class](feedback_self_reinforcing_path_bug_class.md) — walk-up-to-marker satisfies own buggy output; co-anchor (.claude/ + .git).
+- [Correct re-index grows the index](feedback_correct_reindex_grows_index.md) — folding orphans adds bytes; umbrella/graduate is real compression.
+- [Memory balance sheet pattern](feedback_memory_balance_sheet_pattern.md) — memory-balance.sh Wave 0 + 6; Surface:Archive ratio; JSON for diff.
+- [/memory-ceremony skill](../skills/memory-ceremony/SKILL.md) — six-wave orchestration; signal-driven; reusable across fresh sessions.
+- [Routing-layer hygiene = librarian's scope](feedback_routing_layer_is_librarian_scope.md) — skill/agent-catalog drift → librarian, not general-purpose.
+- [Horizon scan 2026-05-14](../memory-kit/horizon-scans/2026-05-14.md) — bootstrap; 3-stage consolidation; SSGM governance; portable-agent-memory gap; next 2026-08-14.
+- [Story delivery_status axis](feedback_story_delivery_status_axis.md) — envisioned→backlog→refined→wip→active{a,b,latest}→stable + regression-sideways; unified lifecycle.
+- [Inline summary must echo frontmatter](feedback_inline_summary_must_echo_frontmatter.md) — story-as-authored is truth; frontmatter wins on divergence.
+- [Agent-audit drift-counter convergence](feedback_audit_convergence_evidence.md) — Run#2:6→Run#3:1; first cross-cycle convergence; post-deploy=baseline, delta=proof.
+- [/deliver paired verdicts — authority is attestable](project_deliver_authority_discipline_paired_verdicts.md) — May7 + 2026-05-14, opposite directions; falsifiability proof.

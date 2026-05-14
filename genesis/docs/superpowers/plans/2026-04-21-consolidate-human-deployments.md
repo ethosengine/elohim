@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Finish Option B' (extend elohim-storage's forwarder to bridge the conductor's admin port, not just app port) and migrate the 5 remaining legacy-pattern humans (matthew, jessica, pete, timothy, frank) from the 4-container `edgenode + socat + elohim-storage + happ-installer` pattern to Adam's single-container `elohim-node` pattern. At plan completion all 6 humans are consolidated, the conductor binds safely to 127.0.0.1 on every pod, and elohim-storage owns pod-network exposure with our own auth boundary.
+**Goal:** Finish Option B' (extend elohim-storage's forwarder to bridge the conductor's admin port, not just app port) and migrate the 5 remaining legacy-pattern humans (matthew, jessica, pete, terrance, frank) from the 4-container `edgenode + socat + elohim-storage + happ-installer` pattern to Adam's single-container `elohim-node` pattern. At plan completion all 6 humans are consolidated, the conductor binds safely to 127.0.0.1 on every pod, and elohim-storage owns pod-network exposure with our own auth boundary.
 
 **Architecture:**
 - The forwarder already exists as a tested tokio `copy_bidirectional` TCP proxy (`elohim-storage/src/forwarder.rs`) but currently only forwards the app port (4445). We extend `NetworkConfig` with admin fields and spawn a second forwarder for port 4444. The conductor keeps Holochain's default localhost bind (no `danger_bind_addr`) — elohim-storage is the pod-network exposure layer, not Holochain directly.
@@ -32,7 +32,7 @@
 
 **Files deleted (after full migration):**
 - `genesis/orchestrator/manifests/humans/_edgenode-legacy.template.yaml`
-- `genesis/orchestrator/manifests/humans/{matthew-manager,jessica-spouse,pete-pastor,timothy-tutor,frank-farmer}.yaml` (all were rendered from the legacy template; no longer useful)
+- `genesis/orchestrator/manifests/humans/{matthew-manager,jessica-spouse,pete-pastor,terrance-tutor,frank-farmer}.yaml` (all were rendered from the legacy template; no longer useful)
 
 ---
 
@@ -737,9 +737,9 @@ Pre-req for Tasks 9-13 where each legacy human flips to consolidated."
 
 ## Phase D — Migrate legacy humans one at a time
 
-**Ordering rationale:** Least-critical → most-critical. Jessica is lowest-resource and purely device-steward — smallest blast radius. Matthew is last because he hosts the seeder (currently carrying a temp resource bump — any regression blocks content seeding for the whole cluster). Between them, frank/pete/timothy are ordered by resource profile and trust topology: frank (remote/WireGuard, isolated), pete (remote/WireGuard, faith cluster), timothy (chromebook, stewarded-child — bumped for seeding, higher scrutiny).
+**Ordering rationale:** Least-critical → most-critical. Jessica is lowest-resource and purely device-steward — smallest blast radius. Matthew is last because he hosts the seeder (currently carrying a temp resource bump — any regression blocks content seeding for the whole cluster). Between them, frank/pete/terrance are ordered by resource profile and trust topology: frank (remote/WireGuard, isolated), pete (remote/WireGuard, faith cluster), terrance (chromebook, stewarded-child — bumped for seeding, higher scrutiny).
 
-**Final order:** jessica → frank → pete → timothy → matthew.
+**Final order:** jessica → frank → pete → terrance → matthew.
 
 ### Per-migration template (used for each of Tasks 8-12)
 
@@ -824,11 +824,11 @@ Investigate (typical root causes: Jenkinsfile render path didn't pick up the con
 
 - [ ] Follow the per-migration template with `<human> = pete`. Only proceed if Task 9 verified cleanly. Commit message format: `feat(deploy): migrate pete to consolidated single-container pattern`.
 
-### Task 11: Migrate timothy
+### Task 11: Migrate terrance
 
-- [ ] Follow the per-migration template with `<human> = timothy`. Only proceed if Task 10 verified cleanly.
+- [ ] Follow the per-migration template with `<human> = terrance`. Only proceed if Task 10 verified cleanly.
 
-Special attention: Timothy has a `$comment` about the chromebook floor and a `$chromebookFloor` record capturing the target-low-resource config. Preserve those fields unchanged — they're not instructions, they're posterity notes for when we restore chromebook-class profiling. Commit message format: `feat(deploy): migrate timothy to consolidated single-container pattern`.
+Special attention: Terrance has a `$comment` about the chromebook floor and a `$chromebookFloor` record capturing the target-low-resource config. Preserve those fields unchanged — they're not instructions, they're posterity notes for when we restore chromebook-class profiling. Commit message format: `feat(deploy): migrate terrance to consolidated single-container pattern`.
 
 ### Task 12: Migrate matthew
 
@@ -895,12 +895,12 @@ forwarder spawned by elohim-storage."
 - Delete: `genesis/orchestrator/manifests/humans/matthew-manager.yaml`
 - Delete: `genesis/orchestrator/manifests/humans/jessica-spouse.yaml`
 - Delete: `genesis/orchestrator/manifests/humans/pete-pastor.yaml`
-- Delete: `genesis/orchestrator/manifests/humans/timothy-tutor.yaml`
+- Delete: `genesis/orchestrator/manifests/humans/terrance-tutor.yaml`
 - Delete: `genesis/orchestrator/manifests/humans/frank-farmer.yaml`
 
 - [ ] **Step 1: Verify nothing else references the legacy template**
 
-Run: `grep -rn '_edgenode-legacy\|matthew-manager\.yaml\|jessica-spouse\.yaml\|pete-pastor\.yaml\|timothy-tutor\.yaml\|frank-farmer\.yaml' --include='*.{groovy,json,yaml,yml,md,sh,ts,rs}' . 2>/dev/null | grep -v '\.git/' | head -20`
+Run: `grep -rn '_edgenode-legacy\|matthew-manager\.yaml\|jessica-spouse\.yaml\|pete-pastor\.yaml\|terrance-tutor\.yaml\|frank-farmer\.yaml' --include='*.{groovy,json,yaml,yml,md,sh,ts,rs}' . 2>/dev/null | grep -v '\.git/' | head -20`
 Expected: no hits outside the files being deleted themselves (and possibly the plan + any docs referencing the migration). If a Jenkinsfile or other config still points to one of these files, update the reference before deleting.
 
 - [ ] **Step 2: Delete the files**
@@ -910,7 +910,7 @@ git rm genesis/orchestrator/manifests/humans/_edgenode-legacy.template.yaml \
        genesis/orchestrator/manifests/humans/matthew-manager.yaml \
        genesis/orchestrator/manifests/humans/jessica-spouse.yaml \
        genesis/orchestrator/manifests/humans/pete-pastor.yaml \
-       genesis/orchestrator/manifests/humans/timothy-tutor.yaml \
+       genesis/orchestrator/manifests/humans/terrance-tutor.yaml \
        genesis/orchestrator/manifests/humans/frank-farmer.yaml
 ```
 
@@ -1091,7 +1091,7 @@ If the admin-reachability feature fails, the forwarder is not spawning correctly
 
 ## Clean rebuild execution (2026-04-21)
 
-After the Phase D incremental migrations surfaced two latent Jenkinsfile bugs (`eaddeff1` source-file picker, `c202d2b8` agent-side log read), the Adam-admin forwarder fix (`5f5fbb58`), jessica/frank migrations, and the batched pete+timothy+matthew migration, the cluster accumulated stale state from a sequence of partially-completed deploys: matthew's storage :8090 unreachable, timothy's chromebook-tier memory (1536Mi) OOMKilling under sync load, and a Jiva iSCSI write-loss (`pvc-7f1595cd`) during the node write-saturation incident that also disrupted the `ethosengine` build host.
+After the Phase D incremental migrations surfaced two latent Jenkinsfile bugs (`eaddeff1` source-file picker, `c202d2b8` agent-side log read), the Adam-admin forwarder fix (`5f5fbb58`), jessica/frank migrations, and the batched pete+terrance+matthew migration, the cluster accumulated stale state from a sequence of partially-completed deploys: matthew's storage :8090 unreachable, terrance's chromebook-tier memory (1536Mi) OOMKilling under sync load, and a Jiva iSCSI write-loss (`pvc-7f1595cd`) during the node write-saturation incident that also disrupted the `ethosengine` build host.
 
 Rather than continue incrementally patching, we performed a full k8s-level reset of `elohim-alpha`:
 
@@ -1099,7 +1099,7 @@ Rather than continue incrementally patching, we performed a full k8s-level reset
 - **Preserved:** `elohim-alpha` namespace; per-human Services (ClusterIP + headless); TLS secrets; `cross-namespace-p2p-networkpolicy`; doorway + elohim-site + nats deployments (doorway will reconnect to fresh MongoDB when the pipeline brings it back).
 - **Reclaimed:** ~185 GiB, most of it Jiva-backed (relieves iSCSI load on the host that was under writeback saturation).
 
-Final tweak before re-deploy: `45235287` bumps timothy's `edgenodeMemoryLimit` from 1536Mi → 3Gi (with request 512Mi → 1Gi) per observed 1.5GB RSS + 3 OOMKilled restarts in 19 minutes during sustained content-serving load. Chromebook floor (384Mi/768Mi + 150m/500m) preserved in `$chromebookFloor` as the eventual restoration target.
+Final tweak before re-deploy: `45235287` bumps terrance's `edgenodeMemoryLimit` from 1536Mi → 3Gi (with request 512Mi → 1Gi) per observed 1.5GB RSS + 3 OOMKilled restarts in 19 minutes during sustained content-serving load. Chromebook floor (384Mi/768Mi + 150m/500m) preserved in `$chromebookFloor` as the eventual restoration target.
 
 Pipeline trigger comes via `[build:all]` on this commit. On recreation all 16 PVCs land on `openebs-hostpath` per the Jenkinsfile:460 sed rule (matthew's Jiva PVC `pvc-7f1595cd` stays deleted; jessica's other Jiva PVC likewise). Acceptance gate:
 

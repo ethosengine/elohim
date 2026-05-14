@@ -104,9 +104,9 @@ When content generates economic events (care-tokens, learning-tokens, recognitio
 - Assert: trust topology governs what replicates (not bulk access)
 - Compute: ~2.0 cores request, ~3.6GB RAM
 
-### Step 5: Five Conductors (+ Timothy + Frank)
+### Step 5: Five Conductors (+ Terrance + Frank)
 **Proves:** Multi-hop content discovery, economic flows
-- Timothy bridges learning and faith clusters (learning_partner with Susan, mentee with Sammy)
+- Terrance bridges learning and faith clusters (learning_partner with Susan, mentee with Sammy)
 - Frank bridges economy cluster (business_partner with Georgina, congregation via Bub→Pete)
 - Content flows through relationship bridges, not direct seeding
 - Compute budget tracked per-conductor in shefa vocabulary

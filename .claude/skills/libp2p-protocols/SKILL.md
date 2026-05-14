@@ -264,10 +264,10 @@ All message types must derive `Serialize` and `Deserialize` from serde.
 
 | File | Purpose |
 |------|---------|
-| `elohim-node/src/p2p/protocols.rs` | SyncCodec, protocol constants, wire format |
-| `elohim-node/src/sync/protocol.rs` | SyncMessage types, SyncEvent, EventKind |
-| `holochain/elohim-storage/src/p2p/shard_protocol.rs` | Shard protocol codec |
-| `holochain/elohim-storage/src/p2p/sync_protocol.rs` | Storage sync protocol |
+| `steward/node/src/p2p/protocols.rs` | SyncCodec, protocol constants, wire format |
+| `steward/node/src/sync/protocol.rs` | SyncMessage types, SyncEvent, EventKind |
+| `elohim/elohim-storage/src/p2p/shard_protocol.rs` | Shard protocol codec |
+| `elohim/elohim-storage/src/p2p/sync_protocol.rs` | Storage sync protocol |
 
 ## External References
 

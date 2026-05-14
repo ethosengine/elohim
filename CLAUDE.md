@@ -8,83 +8,42 @@ Polyglot monorepo for the Elohim Protocol - a distributed learning platform buil
 
 ## Build & Test Commands
 
-### elohim-app (Angular 19 - main frontend)
+Run `pnpm install` from repo root once (workspace install). Sophia is a git submodule with its own pnpm workspace.
+
+### elohim-app (Angular 19, `app/elohim-app/`)
 ```bash
-pnpm install                       # From repo root (workspace install)
-cd app/elohim-app
-pnpm start                         # Dev server at localhost:4200 (proxies to doorway at :8888)
+pnpm start                         # Dev server :4200 (proxies doorway :8888)
 pnpm run build                     # Production build
-pnpm run lint                      # ESLint
-pnpm run lint:fix                  # ESLint with auto-fix
-pnpm run lint:css                  # Stylelint (SCSS/CSS)
-pnpm run format:check              # Prettier check
-pnpm test                          # Unit tests (Vitest) with coverage
-pnpm exec vitest run --config vite.config.ts                 # CI-mode tests
-pnpm exec vitest run --config vite.config.ts "path.service"  # Single test file
-pnpm run cypress:run               # E2E tests (Cucumber BDD)
-pnpm run hc:start                  # Start Holochain + doorway + storage
-pnpm run hc:start:seed             # Start with content seeding
+pnpm run lint | lint:fix | lint:css | format:check
+pnpm test                          # Vitest with coverage
+pnpm exec vitest run --config vite.config.ts [pattern]   # CI / single-file
+pnpm run cypress:run               # E2E (Cucumber BDD)
+pnpm run hc:start[:seed]           # Start Holochain + doorway + storage [with seeding]
 ```
 
-### doorway (Rust gateway service)
+### Rust services (RUSTFLAGS override required — see Gotchas)
 ```bash
-cd doorway/doorway-service
-RUSTFLAGS="" cargo build --release     # MUST override RUSTFLAGS (see gotchas)
-RUSTFLAGS="" cargo test --lib --bins   # Unit tests
-RUSTFLAGS="" cargo clippy -- -D warnings
-cargo fmt --check
-```
+# doorway (doorway/doorway-service/) + steward/node — native builds
+RUSTFLAGS="" cargo build --release && cargo test --lib --bins && cargo clippy -- -D warnings && cargo fmt --check
 
-### doorway-app (Angular admin UI)
-```bash
-cd doorway/doorway-app
-pnpm install                       # Or from repo root
-pnpm start                         # Dev server
-pnpm run build
-pnpm exec eslint src --ext .ts,.html
-```
-
-### sophia (assessment engine - git submodule, pnpm)
-```bash
-cd sophia
-pnpm install
-pnpm build                         # Build all packages in dependency order
-pnpm test                          # Jest tests
-pnpm test -- --filter sophia-core  # Test specific package
-pnpm lint
-pnpm typecheck                     # Full type-check
-```
-
-### elohim-library (shared Angular libraries)
-```bash
-cd app/elohim-library
-pnpm install                       # Or from repo root
-cd projects/elohim-service && pnpm test   # Vitest tests for elohim-service
-```
-
-### steward/node (Rust P2P runtime)
-```bash
-cd steward/node
-RUSTFLAGS="" cargo build           # MUST override RUSTFLAGS
-RUSTFLAGS="" cargo test
-```
-
-### elohim/elohim-storage (Rust storage service)
-```bash
-cd elohim/elohim-storage
+# elohim/elohim-storage/ — Holochain WASM build
 RUSTFLAGS='--cfg getrandom_backend="custom"' cargo build --release
 cargo test export_bindings         # Regenerate TypeScript types
 ```
 
-### Protocol Schema Validation
+### Other Angular surfaces
+- `doorway/doorway-app/`: `pnpm start | build`; lint via `pnpm exec eslint src --ext .ts,.html`
+- `app/elohim-library/projects/elohim-service/`: `pnpm test` (Vitest)
+
+### sophia (submodule)
 ```bash
-pnpm run schema:test        # Schema self-tests (drop-in tests; count grows over time)
-pnpm run schema:validate    # Validate seed JSON against protocol schemas
-pnpm run schema:check-dna   # Verify DNA constants match schema enums
-pnpm run schema:codegen:ts  # Generate TypeScript from schemas (verification mode)
+cd sophia && pnpm install && pnpm build && pnpm test [-- --filter sophia-core] && pnpm lint && pnpm typecheck
 ```
 
-### Pre-push hooks
+### Schema validation & pre-push
+```bash
+pnpm run schema:{test,validate,check-dna,codegen:ts}
+```
 The `.husky/pre-push` hook auto-detects changed projects and runs their quality gates. Bypass with `HUSKY=0 git push`.
 
 ## Architecture
@@ -108,7 +67,7 @@ Import via barrel exports: `import { ContentService } from '@app/lamad'`. The `e
 
 Types flow from Rust through auto-generation to TypeScript:
 
-1. **elohim-storage** (`views.rs`) defines View types with `#[serde(rename_all = "camelCase")]` and `#[derive(TS)]`
+1. **elohim-storage** (`elohim/elohim-storage/src/views.rs`) defines View types with `#[serde(rename_all = "camelCase")]` and `#[derive(TS)]`
 2. **`cargo test export_bindings`** generates TypeScript types to `elohim/sdk/storage-client-ts/src/generated/`
 3. **storage-client-ts** (`@elohim/storage-client`) exports ready-to-use camelCase types
 4. **Adapters** (`app/elohim-app/src/app/elohim/adapters/`) add computed/derived fields only - never transform wire format
@@ -165,32 +124,17 @@ When using `finishing-a-development-branch`, invoke `story-harvest` between Step
 
 ### P2P Design Gate (MANDATORY)
 
-Before proposing design approaches for ANY feature involving data entities (tables, models, routes, sync messages), invoke the `p2p-design-gate` skill. This gates brainstorming step 3 — no approaches may be proposed until the skill's decision tree is completed and the user has validated the entity classifications.
+Before proposing design approaches for ANY feature involving data entities (tables, models, routes, sync messages), invoke the `p2p-design-gate` skill — gates brainstorming step 3. This exists because AI agents default to relational-DB patterns (UUID primary keys, REST-first, CID-as-column); the protocol requires P2P-native thinking (DHT entry types first, content addressing for identity, storage as projection not truth).
 
-**This rule exists because** AI agents default to relational-DB patterns (UUID primary keys, REST-first design, CID-as-column). The protocol requires P2P-native thinking: DHT entry types first, content addressing for identity, storage as projection not truth.
-
-**The skill forces you to answer (5 categories: A/A2/B/B2/C):**
-1. Is this entity notarized (A), derived via link (A2), agent-scoped (B), agent-scoped with attestation (B2), or operational (C)?
-2. Does a DHT entry type ALREADY EXIST? (Lamad DNA is at ~73/~100, Mishpat DNA is at 11/~100 — do NOT create new types without checking headroom.)
-3. Is identity content-derived (CID), agent-composite, or slug (must justify)?
-4. What coordinator function creates it? What signal projects it? (Answer BEFORE designing the HTTP route.)
-
-**If you're about to write "Option A: `GET /api/v1/thing`" without having answered these questions, STOP and invoke the skill.**
+**The skill forces you to answer:** (1) Is the entity notarized (A), derived via link (A2), agent-scoped (B), agent-scoped with attestation (B2), or operational (C)? (2) Does a DHT entry type already exist? (Lamad DNA ~73/~100; Mishpat ~11/~100 — check headroom.) (3) Is identity content-derived (CID), agent-composite, or slug (must justify)? (4) What coordinator function creates it; what signal projects it? Answer BEFORE designing the HTTP route. If you're about to write `GET /api/v1/thing` without having answered these, STOP and invoke the skill.
 
 ## Schema & Manifest Sources of Truth
 
-Two authoritative schemas govern content types and formats. All generated artifacts derive from these — never hand-edit generated files.
-
-| Source of Truth | Path | Governs | Generates |
-|----------------|------|---------|-----------|
-| **Protocol Schema** | `elohim/sdk/schemas/v1/` | DNA-notarized enums (ContentFormat, ContentType, etc.) — the protocol's law | `schema-enums.ts` via `pnpm run schema:codegen:ts`, Rust constants via `pnpm run schema:codegen:rs` |
-| **Lamad Manifest** | `elohim/sdk/domains/lamad/manifest.json` | App vocabulary: content types, content formats, renderer mappings, relationships, signals, coupling rules | `manifest-types.ts` via `pnpm run lamad:codegen` |
+Two authoritative schemas govern content types and formats; all generated artifacts derive from these (never hand-edit generated files). **Protocol Schema** (`elohim/sdk/schemas/v1/`) governs DNA-notarized enums — generates `<consumer>/src/generated/schema-enums.ts` via `pnpm run schema:codegen:ts` and Rust constants via `pnpm run schema:codegen:rs`. **Lamad Manifest** (`elohim/sdk/domains/lamad/manifest.json`) governs app vocabulary (content types/formats, renderer mappings, relationships, signals, coupling rules) — generates `<consumer>/src/generated/manifest-types.ts` via `pnpm run lamad:codegen`.
 
 ### Key distinction: core vs extensible formats
 
-The protocol schema defines **broad core formats** (`markdown`, `html`, `interactive`, `video`, `audio`, `external`, `epr-composite`) that are DNA-notarized. The lamad manifest defines **specific extensible formats** (`sophia-quiz-json`, `html5-app`, `gherkin`, etc.) that map to Angular renderers.
-
-**Seed data must use lamad manifest formats, not core protocol formats.** The renderer map only knows about formats declared in the lamad manifest. Using a core format like `interactive` (which has no renderer) causes content to fall through to the raw JSON fallback.
+The protocol schema defines **broad core formats** (`markdown`, `html`, `interactive`, `video`, `audio`, `external`, `epr-composite`) that are DNA-notarized. The lamad manifest defines **specific extensible formats** (`sophia-quiz-json`, `html5-app`, `gherkin`, etc.) that map to Angular renderers. **Seed data must use lamad manifest formats, not core protocol formats** — the renderer map only knows about formats declared in the lamad manifest. Using a core format like `interactive` (which has no renderer) causes content to fall through to the raw JSON fallback.
 
 | Content | Correct `contentFormat` | Wrong |
 |---------|------------------------|-------|
@@ -198,52 +142,27 @@ The protocol schema defines **broad core formats** (`markdown`, `html`, `interac
 | HTML5 simulation | `html5-app` | `interactive` |
 | Discovery assessment | `sophia-quiz-json` | `interactive` |
 
-### Validation commands
-```bash
-pnpm run schema:validate         # Validate seed JSON against protocol schemas
-pnpm run schema:check-dna        # Verify DNA constants match schema enums
-pnpm run schema:codegen:ts       # Regenerate TS from protocol schemas (verification mode)
-pnpm run lamad:codegen            # Regenerate manifest-types.ts from lamad manifest
-```
-
 ### View Schema Contract (HTTP wire shapes)
-View schemas in `elohim/sdk/schemas/v1/views/` define the JSON wire format for HTTP API responses. They are the source of truth for the Rust-to-TypeScript boundary.
+View schemas in `elohim/sdk/schemas/v1/views/` define the JSON wire format for HTTP API responses (source of truth for the Rust-to-TypeScript boundary). **Pattern:** Write the schema -> Rust structs match (`#[serde(rename_all = "camelCase")]`) -> validation harness (`elohim/elohim-storage/tests/schema_contract.rs`) catches drift -> TS codegen generates interfaces. **Conventions:** see `elohim/sdk/schemas/v1/views/CONVENTIONS.md` for the 10 rules.
 
-**Pattern:** Write the schema -> Rust structs match it (hand-written with `#[serde(rename_all = "camelCase")]`) -> validation harness (`tests/schema_contract.rs`) catches drift -> TS codegen generates TypeScript interfaces.
-
-**Conventions:** See `elohim/sdk/schemas/v1/views/CONVENTIONS.md` for the 10 rules.
-
-**Adding a new view:**
-1. Write `{name}.schema.json` in `elohim/sdk/schemas/v1/views/`
-2. Write matching Rust struct in elohim-storage with `#[serde(rename_all = "camelCase")]`
-3. Add schema contract test in `elohim/elohim-storage/tests/schema_contract.rs`
-4. Add to `INTERFACE_FILES` in `elohim/sdk/schemas/scripts/codegen-ts.mjs`
-5. Run `pnpm run schema:codegen:ts` to generate and distribute TypeScript
-6. Pre-push hook validates codegen freshness automatically
+**Adding a new view:** (1) write `{name}.schema.json` in `elohim/sdk/schemas/v1/views/`; (2) write matching Rust struct in elohim-storage; (3) add schema contract test; (4) add to `INTERFACE_FILES` in `elohim/sdk/schemas/scripts/codegen-ts.mjs`; (5) run `pnpm run schema:codegen:ts`; (6) pre-push hook validates codegen freshness automatically.
 
 ## Critical Gotchas
 
 ### RUSTFLAGS Override Required
-The system sets `RUSTFLAGS=--cfg getrandom_backend="custom"` for Holochain WASM builds. This breaks native Rust builds for doorway and steward/node. Always use:
-```bash
-RUSTFLAGS="" cargo build   # For doorway/doorway-service, steward/node
-RUSTFLAGS='--cfg getrandom_backend="custom"' cargo build  # For elohim/elohim-storage
-```
+The system sets `RUSTFLAGS=--cfg getrandom_backend="custom"` for Holochain WASM builds, which breaks native Rust builds. Use `RUSTFLAGS=""` for doorway/doorway-service and steward/node; keep the custom backend flag for elohim/elohim-storage.
 
 ### Jenkinsfile Size Limit
-`Jenkinsfile` (root, elohim-app pipeline) is ~1325 lines, near the 64KB JVM CPS method size limit. Helper methods are extracted to `// STAGE HELPER METHODS` section. Never add inline logic to stages.
+Root `Jenkinsfile` (elohim-app pipeline) is ~1325 lines, near the 64KB JVM CPS method size limit. Helper methods live in `// STAGE HELPER METHODS`; never add inline logic to stages.
 
 ### Jenkins params.MODE Null on First Build
 MultiBranch pipeline params are null until the Jenkinsfile runs once. Always use `(params.MODE ?: 'auto')`.
 
 ### sophia-element UMD Must Be Pre-built
-The sophia-element UMD bundle must be built before elohim-app builds. The `prebuild` script checks for it. Build with:
-```bash
-cd sophia && pnpm install && pnpm build && pnpm build:umd
-```
+Build before elohim-app builds; the `prebuild` script checks. Run: `cd sophia && pnpm install && pnpm build && pnpm build:umd`.
 
 ### pnpm Workspace
-All TypeScript/Node.js projects use pnpm workspaces. Run `pnpm install` from the repo root to install all dependencies. Sophia is excluded (git submodule with its own pnpm workspace). Use `pnpm --filter <package-name> <command>` to target specific packages. The `libsodium-wrappers` package is overridden to `^0.8.2` in root `package.json` to fix a broken ESM relative import in 0.7.x that fails with pnpm's strict module resolution.
+All TypeScript/Node.js projects use pnpm workspaces (sophia excluded — submodule). Target packages with `pnpm --filter <name> <cmd>`. The `libsodium-wrappers` package is overridden to `^0.8.2` in root `package.json` to fix a broken ESM relative import in 0.7.x that fails with pnpm's strict module resolution.
 
 ### libp2p 0.53 API (steward/node)
 Requires `macros` + `ed25519` features. Use `with_codec()` not `new()` for request-response. Swarm uses `StreamExt::next()` not `select_next_event()`.
@@ -264,18 +183,6 @@ Central orchestrator pattern: only `genesis/orchestrator/Jenkinsfile` receives G
 
 ## Code Style
 
-### TypeScript/Angular
-- ESLint 9 flat config with SonarQube parity rules
-- Prettier: 100 char width, single quotes, trailing commas
-- Import order: builtin -> external -> `@app/*` -> `@elohim/*`
-- Strict TypeScript with Angular strict templates
-- Path aliases defined in `app/elohim-app/tsconfig.json`
-
-### Rust
-- `cargo fmt` + clippy with `-D warnings`
-- `clippy.toml` and `rustfmt.toml` in doorway/doorway-service/
-
-### Sophia (React/TypeScript)
-- pnpm workspace, Jest + @testing-library/react
-- Packages prefixed `@ethosengine/*` (sophia) or `@khanacademy/*` (math utilities)
-- psyche-core must NEVER depend on perseus packages
+- **TypeScript/Angular**: ESLint 9 flat config with SonarQube parity rules; Prettier (100 char width, single quotes, trailing commas); import order builtin → external → `@app/*` → `@elohim/*`; strict TypeScript + Angular strict templates; path aliases in `app/elohim-app/tsconfig.json`.
+- **Rust**: `cargo fmt` + clippy with `-D warnings`; configs at `doorway/doorway-service/clippy.toml` and `rustfmt.toml`.
+- **Sophia (React/TypeScript)**: pnpm workspace, Jest + @testing-library/react; packages prefixed `@ethosengine/*` (sophia) or `@khanacademy/*` (math utilities); psyche-core must NEVER depend on perseus packages.

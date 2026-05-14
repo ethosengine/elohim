@@ -26,4 +26,4 @@ The elohim protocol rejects both **sovereignty** and **ownership** as framings �
 - When tempted to write "X owns Y," try "X stewards Y" or "X authors Y" — the shift usually reveals hidden assumptions worth examining.
 - Principle naming: prefer active description ("peers steward their own state") over abstract nouns ("sovereignty," "ownership," "autonomy").
 
-This principle is load-bearing across the protocol — it's why everything is framed as steward/stewardship/contributor/agency. It connects to the stewardship philosophy memory (graduated capability, accountable authority) and the stewarded-child identity archetype (Timothy as ward-with-capability-grant).
+This principle is load-bearing across the protocol — it's why everything is framed as steward/stewardship/contributor/agency. It connects to the stewardship philosophy memory (graduated capability, accountable authority) and the stewarded-child identity archetype (James as ward-with-capability-grant).

@@ -10,21 +10,21 @@ Feature: Shard Tracking for Content Auto-Recovery
     And doorway "gamma" at "E2E_DOORWAY_GAMMA"
 
   Scenario: Publishing content creates traceable shard assignments across the network
-    Given human "Timothy" is logged in on doorway "alpha" with device "phone"
-    When "Timothy" creates a new pathway titled "My Life Story"
+    Given human "Terrance" is logged in on doorway "alpha" with device "phone"
+    When "Terrance" creates a new pathway titled "My Life Story"
     Then doorway "alpha" should encode the content into Reed-Solomon shards
     And doorway "alpha" should register 7 ShardAssignments for the content in the node-registry
-    And the node-registry on doorway "beta" should see the ShardAssignments for "Timothy"'s content
+    And the node-registry on doorway "beta" should see the ShardAssignments for "Terrance"'s content
 
   @wip
   Scenario: Invalid shard index is rejected by the DHT
-    Given human "Timothy" is logged in on doorway "alpha" with device "phone"
+    Given human "Terrance" is logged in on doorway "alpha" with device "phone"
     When doorway "alpha" attempts to register a ShardAssignment with shard_index 99
     Then the node-registry should reject the assignment with "shard_index 99 exceeds maximum 6"
 
   @wip
   Scenario: Querying shard assignments by custodian
-    Given human "Timothy" is logged in on doorway "alpha" with device "phone"
-    And "Timothy" has published content with 7 shard assignments
+    Given human "Terrance" is logged in on doorway "alpha" with device "phone"
+    And "Terrance" has published content with 7 shard assignments
     When doorway "beta" queries shard assignments for doorway "alpha"'s custodian DID
     Then doorway "beta" should see 7 shard assignments for that custodian

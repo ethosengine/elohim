@@ -347,7 +347,7 @@ Given(
 /**
  * Navigate to the app's first visit (root URL).
  *
- * Example: When Timothy visits the app for the first time
+ * Example: When Terrance visits the app for the first time
  */
 When(
   '{word} visits the app for the first time',
@@ -364,7 +364,7 @@ When(
 /**
  * Navigate to an html5-app by slug and collect delivery evidence.
  *
- * Example: When Timothy loads the html5-app "evolution-of-trust"
+ * Example: When Terrance loads the html5-app "evolution-of-trust"
  */
 When(
   '{word} loads the html5-app {string}',
@@ -385,7 +385,7 @@ When(
  * Navigate to an html5-app by slug — generic "loads" phrasing.
  * Clears capture before navigation and stores evidence afterwards.
  *
- * Example: When Timothy loads "evolution-of-trust"
+ * Example: When Terrance loads "evolution-of-trust"
  * Example: When Matthew loads "evolution-of-trust"
  */
 When('{word} loads {string}', async function (this: E2EWorld, humanName: string, appSlug: string) {
@@ -403,7 +403,7 @@ When('{word} loads {string}', async function (this: E2EWorld, humanName: string,
 /**
  * Reload a cached app (for offline resilience scenarios).
  *
- * Example: And Timothy reloads "evolution-of-trust"
+ * Example: And Terrance reloads "evolution-of-trust"
  */
 When(
   '{word} reloads {string}',
@@ -424,7 +424,7 @@ When(
  * Simulate going offline by intercepting network requests in the browser context.
  * Uses Playwright's network interception to block all non-cached requests.
  *
- * Example: When Timothy goes offline
+ * Example: When Terrance goes offline
  */
 When('{word} goes offline', async function (this: E2EWorld, humanName: string) {
   const device = requirePlaywright(this, humanName);
@@ -441,7 +441,7 @@ When('{word} goes offline', async function (this: E2EWorld, humanName: string) {
 /**
  * Precondition: the given human has already loaded the app while online.
  *
- * Example: Given Timothy has loaded "evolution-of-trust" while online
+ * Example: Given Terrance has loaded "evolution-of-trust" while online
  */
 Given(
   '{word} has loaded {string} while online',
@@ -1187,7 +1187,7 @@ Given(
 /**
  * Navigate to a previously cached page in the app.
  *
- * Example: When Timothy navigates to a previously visited page in "evolution-of-trust"
+ * Example: When Terrance navigates to a previously visited page in "evolution-of-trust"
  */
 When(
   '{word} navigates to a previously visited page in {string}',
@@ -1335,7 +1335,7 @@ Then('{string} loads and functions normally', async function (this: E2EWorld, _a
 /**
  * Verify no JS errors are shown to the learner (pageErrors is empty).
  *
- * Example: And no errors are shown to Timothy
+ * Example: And no errors are shown to Terrance
  */
 // eslint-disable-next-line @typescript-eslint/require-await
 Then('no errors are shown to {word}', async function (this: E2EWorld, _humanName: string) {
@@ -1454,7 +1454,7 @@ Then(String.raw`the bootstrap page navigates to \/ automatically`, async functio
 /**
  * Verify the SPA is visible after bootstrap auto-navigation.
  *
- * Example: And Timothy sees the SPA without manually refreshing
+ * Example: And Terrance sees the SPA without manually refreshing
  */
 Then(
   '{word} sees the SPA without manually refreshing',

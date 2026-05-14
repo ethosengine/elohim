@@ -1,0 +1,48 @@
+================================================================
+ MEMORY BALANCE SHEET — 2026-05-14-1755
+ Prior snapshot: 2026-05-14-1711
+================================================================
+
+--- CODE (source — context for ratios below) ---
+  Rust                                           386689
+  TypeScript                                      26538
+  HTML                                            56729
+  SCSS                                            42732
+  Python                                          30169
+
+--- GOSPEL (always-loaded operating instructions) ---
+  🔴 CLAUDE.md (allowlist-filtered)                20124 lines /  145 files  (=)
+
+--- SURFACE OF COMET (live work — distill before archive) ---
+     genesis/plans                                121369 lines  (=)
+     genesis/docs/superpowers/plans                92957 lines  (=)
+     genesis/docs/superpowers/specs                19432 lines  (=)
+     .claude/shifts                                 7952 lines  (=)
+     TOTAL SURFACE                                241710 lines /  367 files
+
+--- WORKING MEMORY (crystallized lessons) ---
+     topic files                                    4498 lines /  173 files  (+41)
+  🔴 MEMORY.md size                               29.3KB  (+861)
+
+--- CANONICAL (wisdom tier — preserved) ---
+  🔴 stories (status breakdown)                 canonical=0 draft=2 retired=1
+       stories total                                 822 lines /    4 files
+     timeline/chronicle                               72 lines /    1 files
+     timeline/roadmap                                166 lines /    2 files
+     timeline/backlog                                411 lines /    5 files
+     epics (elohim-protocol)                       30957 lines /  184 files
+
+--- ARCHIVE (Isildur's-diary tier — distilled, retrievable via story-pointer) ---
+     .claude/archive/                                 93 lines /    2 files  (=)
+  ✓  archive orphans                                   0 entries  (memorialize without story_pointer)
+
+--- MEMPALACE (searchable view across tiers) ---
+     total drawers                                 12883 drawers  (=)
+
+--- DIAGNOSTIC RATIOS ---
+  🔴 Surface : Archive                                  2599 : 1   (healthy: <100:1)
+     Working memory : Stories                            5.5 : 1   (target: 2–3:1 long-term)
+
+================================================================
+ Legend:  ✓ healthy   ⚠  approaching threshold   🔴 over
+================================================================

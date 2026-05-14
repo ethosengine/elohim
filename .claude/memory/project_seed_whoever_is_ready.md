@@ -4,7 +4,7 @@ description: Seeder must not be all-or-nothing on conductor health; per-peer see
 type: project
 originSessionId: 91882765-aece-476c-a49a-85b618774d32
 ---
-When a conductor admin WS is down on one peer (e.g. timothy in alpha-cluster #1002), the seeder must continue seeding the peers that ARE ready (adam, jessica, etc.) and report the unready peer as partial — not abort the whole stage.
+When a conductor admin WS is down on one peer (e.g. terrance in alpha-cluster #1002), the seeder must continue seeding the peers that ARE ready (adam, jessica, etc.) and report the unready peer as partial — not abort the whole stage.
 
 **Why:** This aligns with the P2P-native architecture target: peers join and leave fluidly, partial-cluster operation is the steady state, and downstream consumers (a2o tests, doorway projection, federation) should already tolerate one peer being absent. An all-or-nothing seeder pretends the substrate is monolithic, masks per-peer health information, and produces 40-minute "Seed Agent Peer Bindings FAILED" stages where only one of N pods was actually unhealthy. The other (N-1) peers were ready the whole time.
 

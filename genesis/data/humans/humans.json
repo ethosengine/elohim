@@ -824,9 +824,9 @@
       "notes": "Vulnerable minor without guardian oversight. Importance of guardian controls."
     },
     {
-      "id": "human-timothy-tutor",
-      "householdId": "household-timothy",
-      "displayName": "Timothy",
+      "id": "human-terrance-tutor",
+      "householdId": "household-terrance",
+      "displayName": "Terrance",
       "agencyPhase": "device",
       "category": "affinity",
       "profileReach": "community",
@@ -964,13 +964,13 @@
     },
     {
       "source": "human-jessica-spouse",
-      "target": "human-timothy-tutor",
+      "target": "human-terrance-tutor",
       "relationshipType": "learning-partner",
       "intimacyLevel": "connection"
     },
     {
       "source": "human-james-son",
-      "target": "human-timothy-tutor",
+      "target": "human-terrance-tutor",
       "relationshipType": "mentee-of",
       "intimacyLevel": "connection"
     },

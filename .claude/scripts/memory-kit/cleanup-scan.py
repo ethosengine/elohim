@@ -27,8 +27,19 @@ from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
-MEMORY_ROOT = Path("/projects/.claude-config/projects/-projects-elohim/memory")
+# Bootstrap: locate .claude/scripts/_lib by walking up (see _lib/__init__.py)
+_here = Path(__file__).resolve()
+for _ in range(8):
+    if (_here / ".claude" / "scripts" / "_lib").is_dir() and (_here / ".git").exists():
+        sys.path.insert(0, str(_here / ".claude" / "scripts"))
+        break
+    _here = _here.parent
+from _lib import paths as _paths  # noqa: E402
+
+REPO_ROOT = _paths.repo_root_from_file(__file__)
+# Primary memory location per project_memory_in_repo_two_tier.md. The personal
+# slot at .claude-config/.../memory is a symlink to this directory.
+MEMORY_ROOT = _paths.memory_dir(REPO_ROOT)
 
 SPEC_GLOBS = [
     "genesis/docs/superpowers/specs/*.md",

@@ -481,7 +481,7 @@ Two dispatches in sequence.
 
 **Explicit guardrails in dispatch prompt**:
 - Forbid `git revert` / `git reset` on pre-existing commits. Any scope conflict → BLOCKED report, not a silent cleanup.
-- Forbid modifying files outside: `elohim/holochain/dna/imagodei/**`, `elohim/elohim-storage/src/**`, `elohim/elohim-storage/migrations/**`, `elohim/elohim-storage/tests/schema_contract.rs`, `elohim/sdk/schemas/v1/views/key-revocation-view.schema.json`, `elohim/sdk/schemas/v1/views/revocation-vote-view.schema.json`, `elohim/sdk/schemas/scripts/codegen-ts.mjs` (INTERFACE_FILES addition only).
+- Forbid modifying files outside: `elohim/holochain/dna/imagodei/**`, `elohim/elohim-storage/src/**`, `elohim/elohim-storage/migrations/**`, `elohim/elohim-storage/tests/schema_contract.rs`, `elohim/sdk/schemas/v1/views/key-revocation.schema.json`, `elohim/sdk/schemas/v1/views/revocation-vote.schema.json`, `elohim/sdk/schemas/scripts/codegen-ts.mjs` (INTERFACE_FILES addition only).
 - Mandatory: fresh-tree `cargo build --release` on `elohim-storage` with `RUSTFLAGS='--cfg getrandom_backend="custom"'` before any commit touching swarm/topic composition.
 - Mandatory: `cd elohim/holochain/dna/imagodei && just check && just pack` before commit.
 - Report BLOCKED if any gate fails.

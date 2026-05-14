@@ -1,6 +1,6 @@
 ---
 name: memory-kit
-description: Maintain the project's complement to Claude's native auto-memory. Seven deterministic-first tools (cleanup, path-update, dedupe-memory, memory-review, claude-md-review, skill-audit, agent-audit) plus the PreToolUse memory injector hook and PostToolUse CLAUDE.md drift signal accumulators. Use weekly or before a major /shift to keep MEMORY.md, CLAUDE.md surfaces, the skill catalog, and the agent catalog healthy. Read-only by default; mutations are operator-gated. Not always-active.
+description: Hygiene script runner for MEMORY.md, CLAUDE.md surfaces, and the skill/agent catalogs. Provides seven deterministic tools (cleanup, path-update, dedupe-memory, memory-review, claude-md-audit, skill-audit, agent-audit) plus a PreToolUse injector and PostToolUse drift accumulators. Read-only by default; mutations are operator-gated. Use this when you want to run a single hygiene tool ad-hoc or chain a few together to produce inspection reports.
 ---
 
 # Memory Kit — Maintain the Auto-Memory Complement

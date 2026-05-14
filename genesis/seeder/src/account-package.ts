@@ -322,7 +322,7 @@ const CONDUCTOR_GROUPS: ConductorGroup[] = [
       'human-manny-manufacturer',
       'human-bub-builder',
       'human-pete-pastor',
-      'human-timothy-tutor',
+      'human-terrance-tutor',
       'human-tommy-teacher',
     ],
   },

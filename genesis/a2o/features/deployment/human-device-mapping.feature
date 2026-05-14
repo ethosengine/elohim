@@ -60,7 +60,7 @@ Feature: Human × Device × Deployment mapping is internally consistent
     When the deployment record pattern is "legacy"
     Then the edgenode memory limit is no greater than the device's memoryGb
     And the edgenode CPU limit is no greater than the device's cpuCores in milliCPU
-    # Timothy on a Chromebook (4GB) can't request a 6Gi limit. Ensures pods
+    # Terrance on a Chromebook (4GB) can't request a 6Gi limit. Ensures pods
     # declare what their archetype can actually deliver.
 
   @wip
@@ -95,7 +95,7 @@ Feature: Human × Device × Deployment mapping is internally consistent
       | matthew |
       | jessica |
       | pete    |
-      | timothy |
+      | terrance |
       | frank   |
     # Any new human added to K8s must be declared here — the Jenkinsfile
     # reads this file as the source of truth for which StatefulSets to apply.

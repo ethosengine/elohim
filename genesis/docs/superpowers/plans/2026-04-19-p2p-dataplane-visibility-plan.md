@@ -75,7 +75,7 @@ Every new entity/route in this plan is pre-classified per the P2P design gate. S
 - `genesis/a2o/features/shefa/device-stewardship.feature`, `network-health-dashboard.feature`, `stewarded-resources-visible.feature`, `resilience-tooltip.feature`, `maintenance-choreography.feature`.
 - `genesis/a2o/features/doorway/admin-routes-visible.feature`, `admin-users-visible.feature`.
 - `genesis/a2o/steps/shefa/*.steps.ts` and `genesis/a2o/steps/doorway/*.steps.ts` as needed.
-- `infra/shem/statefulsets/` — one manifest per persona (matthew-home, matthew-laptop, jessica-phone, adam-node, eve-laptop, pete-laptop, timothy-laptop, nancy-hosted, doorway-alpha).
+- `infra/shem/statefulsets/` — one manifest per persona (matthew-home, matthew-laptop, jessica-phone, adam-node, eve-laptop, pete-laptop, terrance-laptop, nancy-hosted, doorway-alpha).
 - `infra/shem/demo/maintenance-cycle.sh` — demo script.
 
 **Modified:**
@@ -86,7 +86,7 @@ Every new entity/route in this plan is pre-classified per the P2P design gate. S
 - `elohim/elohim-storage/src/db/peer_statuses.rs` — add `list_by_household(conn, household_id)` query.
 - `elohim/elohim-storage/src/db/stewarded_nodes.rs` — add archetype/household fields + migration.
 - `elohim/holochain/dna/node-registry/zomes/node_registry_coordinator/src/lib.rs` — wire `register_node_shape` fn; retain `get_my_nodes` as thin wrapper that returns empty (retirement stub until frontend no longer calls it in next release).
-- `genesis/data/humans/*.json` — add `householdId` field to Matthew, Jessica, James, Susan, Adam, Eve, Pete, Timothy, Nancy, Gertrude, Maria, Ezra.
+- `genesis/data/humans/*.json` — add `householdId` field to Matthew, Jessica, James, Susan, Adam, Eve, Pete, Terrance, Nancy, Gertrude, Maria, Ezra.
 - `genesis/data/collectives/*.json` — add household entries (new files under existing dir).
 - `app/elohim-app/src/app/lamad/components/content-viewer/content-viewer.component.ts` — rewrite `getResilienceIcon()` + `getResilienceTooltip()` to read `this.resilience` (household-first).
 - `app/elohim-app/src/app/shefa/components/resource-explorer/resource-explorer.component.ts` — call household-scoped allocation API; render resilience badge.
@@ -1228,7 +1228,7 @@ git commit -m "feat(heartbeat): wire archetype_class from config into PeerStatus
 ### Task D1: Household collective fixtures
 
 **Files:**
-- Create: `genesis/data/collectives/household-matthew.json`, `household-adam.json`, `household-pete.json`, `household-timothy.json`, `household-nancy.json`, `household-gertrude.json`, `household-maria.json`, `household-ezra.json`.
+- Create: `genesis/data/collectives/household-matthew.json`, `household-adam.json`, `household-pete.json`, `household-terrance.json`, `household-nancy.json`, `household-gertrude.json`, `household-maria.json`, `household-ezra.json`.
 
 - [ ] **Step 1: Write household-matthew.json** (template — replicate for each)
 
@@ -1244,7 +1244,7 @@ git commit -m "feat(heartbeat): wire archetype_class from config into PeerStatus
 }
 ```
 
-Create the other seven households. Adam/Eve share one household. Pete/Timothy/Nancy/Gertrude/Maria/Ezra are each solo households for this sprint (single-member households are still households).
+Create the other seven households. Adam/Eve share one household. Pete/Terrance/Nancy/Gertrude/Maria/Ezra are each solo households for this sprint (single-member households are still households).
 
 - [ ] **Step 2: Verify collectives schema accepts `kind: "household"`**
 
@@ -1257,13 +1257,13 @@ If the `collectives` schema rejects `kind: "household"`, add `"household"` to it
 
 ```bash
 git add genesis/data/collectives/household-*.json elohim/sdk/schemas/v1/
-git commit -m "feat(collectives): household fixtures for Matthew/Adam/Pete/Timothy/Nancy/Gertrude/Maria/Ezra"
+git commit -m "feat(collectives): household fixtures for Matthew/Adam/Pete/Terrance/Nancy/Gertrude/Maria/Ezra"
 ```
 
 ### Task D2: `householdId` field on humans
 
 **Files:**
-- Modify: `genesis/data/humans/matthew.json`, `jessica.json`, `james.json`, `susan.json`, `adam.json`, `eve.json`, `pete.json`, `timothy.json`, `nancy.json`, `gertrude.json`, `maria.json`, `ezra.json`.
+- Modify: `genesis/data/humans/matthew.json`, `jessica.json`, `james.json`, `susan.json`, `adam.json`, `eve.json`, `pete.json`, `terrance.json`, `nancy.json`, `gertrude.json`, `maria.json`, `ezra.json`.
 
 - [ ] **Step 1: Add `householdId` to each humans.json**
 
@@ -2218,7 +2218,7 @@ git commit -m "infra(shem): StatefulSet template for persona elohim-node deploym
 ### Task K2: Persona manifests
 
 **Files:**
-- Create: one YAML per persona (matthew-home, matthew-laptop, jessica-phone, adam-node, eve-laptop, pete-laptop, timothy-laptop, nancy-hosted, doorway-alpha).
+- Create: one YAML per persona (matthew-home, matthew-laptop, jessica-phone, adam-node, eve-laptop, pete-laptop, terrance-laptop, nancy-hosted, doorway-alpha).
 
 - [ ] **Step 1: Generate from template**
 
@@ -2271,7 +2271,7 @@ Per-persona tuning:
 - adam-node → archetype `family-node-base`, storage 500Gi, role archival
 - eve-laptop → archetype `laptop`, storage 25Gi, role edge
 - pete-laptop → archetype `laptop`, storage 25Gi, role edge
-- timothy-laptop → archetype `chromebook-edu`, storage 16Gi, role edge
+- terrance-laptop → archetype `chromebook-edu`, storage 16Gi, role edge
 - nancy-hosted → archetype `hosted-on-doorway`, storage 4Gi, role edge (runs as a cell on doorway-alpha, not a separate StatefulSet — skip a standalone YAML)
 - doorway-alpha → archetype `doorway-steward`, storage 250Gi, role doorway
 
@@ -2323,27 +2323,27 @@ git commit --allow-empty -m "checkpoint(sprint): dashboards lit on shem with hou
 
 ```bash
 #!/usr/bin/env bash
-# Demo: Timothy offline → partial → online → protected
+# Demo: Terrance offline → partial → online → protected
 set -euo pipefail
 NS=elohim-alpha
 
 echo "[1] Baseline posture:"
 curl -sS https://doorway-alpha.elohim.host/api/v1/network/posture | jq
 
-echo "[2] Timothy enters maintenance (pre-drain check):"
-kubectl exec -n $NS timothy-laptop-0 -- \
+echo "[2] Terrance enters maintenance (pre-drain check):"
+kubectl exec -n $NS terrance-laptop-0 -- \
   curl -sS -X POST http://127.0.0.1:8090/api/v1/peer-status/maintenance
 
 echo "[3] Wait 90s for PeerStatus to propagate:"
 sleep 90
 
-echo "[4] Posture after Timothy offline:"
+echo "[4] Posture after Terrance offline:"
 curl -sS https://doorway-alpha.elohim.host/api/v1/network/posture | jq
 echo "    Matthew household resilience for family-photo-1:"
 curl -sS https://alpha.elohim.host/api/v1/resilience/family-photo-1/household | jq
 
-echo "[5] Timothy returns:"
-kubectl exec -n $NS timothy-laptop-0 -- \
+echo "[5] Terrance returns:"
+kubectl exec -n $NS terrance-laptop-0 -- \
   curl -sS -X POST http://127.0.0.1:8090/api/v1/peer-status/online
 
 echo "[6] Wait 90s:"
@@ -2546,16 +2546,16 @@ Feature: Maintenance choreography preserves household protection
     Given the full shem persona roster is running
     And matthew-household stewards content family-photo-1 with protection "protected"
 
-  Scenario: Timothy enters maintenance, Matthew's family stays protected
-    When operator flips timothy-laptop to maintenance
-    Then within 60 seconds, doorway stops routing new work to timothy-laptop
+  Scenario: Terrance enters maintenance, Matthew's family stays protected
+    When operator flips terrance-laptop to maintenance
+    Then within 60 seconds, doorway stops routing new work to terrance-laptop
     And the household resilience for family-photo-1 is "protected" or "partial"
     And the household resilience is NEVER "at-risk"
 
-  Scenario: Timothy returns, protection restores
-    Given timothy-laptop is in maintenance
-    When operator flips timothy-laptop to online
-    Then within 90 seconds, PeerStatus shows timothy-laptop online
+  Scenario: Terrance returns, protection restores
+    Given terrance-laptop is in maintenance
+    When operator flips terrance-laptop to online
+    Then within 90 seconds, PeerStatus shows terrance-laptop online
     And the household resilience for family-photo-1 is "protected"
 ```
 

@@ -5,7 +5,7 @@ describe('buildCustodyCommitmentBody', () => {
   const pair: CustodyPair = {
     providerHumanId: 'human-matthew-manager',
     providerArchetype: 'desktop',
-    receiverHumanId: 'human-timothy-tutor',
+    receiverHumanId: 'human-terrance-tutor',
     receiverArchetype: 'desktop',
     blobHash: 'sha256-deadbeef',
     blobSizeBytes: 12345,

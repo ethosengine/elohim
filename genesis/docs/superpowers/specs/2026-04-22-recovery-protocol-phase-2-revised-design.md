@@ -443,7 +443,7 @@ Unchanged in shape from 2026-04-21 (§6.3), adapted to revised data model:
 - **Integration (Rust, multi-node):** end-to-end intimate-quorum recovery; elohim defender triggering a freeze; higher-authority supersession; multi-doorway concurrent requests.
 - **Frontend (Vitest):** `RecoveryCoordinatorService` updates; holder-side prompt UI with elohim assessment; defender-visible status panel; hosted-cell landing.
 - **A2O (Gherkin):** `genesis/a2o/features/auth/recovery/` covers setup (ambient), recovery happy paths, defender flow, revocation paths, multi-doorway federation. **New:** `anti-lockout/` subdirectory for audit scenarios.
-- **Shem cross-node acceptance:** per the existing topology memory — household cluster (Matthew/Jessica/Timothy) + shem (everyone else + shem's doorway). Recovery demo: Matthew loses laptop → recovers via shem's doorway → intimate circle authorizes → lands in hosted cell.
+- **Shem cross-node acceptance:** per the existing topology memory — household cluster (Matthew/Jessica/Terrance) + shem (everyone else + shem's doorway). Recovery demo: Matthew loses laptop → recovers via shem's doorway → intimate circle authorizes → lands in hosted cell.
 
 ---
 

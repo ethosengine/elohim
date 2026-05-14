@@ -1,0 +1,165 @@
+{
+  "generated_at": "2026-05-14T20:37:35.195158+00:00",
+  "totals": {
+    "stable": 0,
+    "active.latest-stable": 0,
+    "active.beta": 0,
+    "active.alpha": 0,
+    "wip": 1,
+    "refined": 3,
+    "backlog": 7,
+    "envisioned": 0,
+    "unknown": 1,
+    "undelivered": 1,
+    "regression": 0
+  },
+  "stories": [
+    {
+      "slug": "james-and-the-spoke",
+      "path": "/projects/elohim/genesis/data/stories/james-and-the-spoke.md",
+      "author_status": "retired",
+      "delivery_status": "unknown",
+      "delivery_status_updated": "2026-05-14",
+      "delivery_status_source": "triage-2026-05-14-librarian-cartographer-retired-delivery-axis-na",
+      "declared_feature": "",
+      "feature_file_exists": false
+    },
+    {
+      "slug": "james-and-the-spoke",
+      "path": "/projects/elohim/genesis/data/stories/james-son--as-stewardee--stewarded-device-sync.md",
+      "author_status": "canonical",
+      "delivery_status": "undelivered",
+      "delivery_status_updated": "2026-05-14",
+      "delivery_status_source": "deliver-bridge-floor",
+      "declared_feature": "stewarded-device-sync",
+      "feature_file_exists": false
+    }
+  ],
+  "backlog": [
+    {
+      "slug": "attestation-consolidation-tail-sweep",
+      "path": "/projects/elohim/genesis/data/timeline/backlog/attestation-consolidation-tail-sweep.md",
+      "author_status": "",
+      "delivery_status": "backlog",
+      "delivery_status_updated": "",
+      "delivery_status_source": "",
+      "declared_feature": "",
+      "feature_file_exists": false,
+      "legacy_status_translated_from": "proposed"
+    },
+    {
+      "slug": "codegen-prettier-pin-pre-emption",
+      "path": "/projects/elohim/genesis/data/timeline/backlog/codegen-prettier-pin-pre-emption.md",
+      "author_status": "",
+      "delivery_status": "backlog",
+      "delivery_status_updated": "",
+      "delivery_status_source": "",
+      "declared_feature": "",
+      "feature_file_exists": false,
+      "legacy_status_translated_from": "proposed"
+    },
+    {
+      "slug": "fix-audit-script-discovery",
+      "path": "/projects/elohim/genesis/data/timeline/backlog/fix-audit-script-discovery.md",
+      "author_status": "",
+      "delivery_status": "refined",
+      "delivery_status_updated": "",
+      "delivery_status_source": "",
+      "declared_feature": "",
+      "feature_file_exists": false,
+      "legacy_status_translated_from": "ready"
+    },
+    {
+      "slug": "lifecycle-md-retired-class-and-source-enum",
+      "path": "/projects/elohim/genesis/data/timeline/backlog/lifecycle-md-retired-class-and-source-enum.md",
+      "author_status": "",
+      "delivery_status": "refined",
+      "delivery_status_updated": "",
+      "delivery_status_source": "",
+      "declared_feature": "",
+      "feature_file_exists": false
+    },
+    {
+      "slug": "memory-md-size-discipline",
+      "path": "/projects/elohim/genesis/data/timeline/backlog/memory-md-size-discipline.md",
+      "author_status": "",
+      "delivery_status": "backlog",
+      "delivery_status_updated": "",
+      "delivery_status_source": "",
+      "declared_feature": "",
+      "feature_file_exists": false,
+      "legacy_status_translated_from": "proposed"
+    },
+    {
+      "slug": "observation-vocabulary-collision-disambiguate",
+      "path": "/projects/elohim/genesis/data/timeline/backlog/observation-vocabulary-collision-disambiguate.md",
+      "author_status": "",
+      "delivery_status": "backlog",
+      "delivery_status_updated": "",
+      "delivery_status_source": "",
+      "declared_feature": "",
+      "feature_file_exists": false,
+      "legacy_status_translated_from": "proposed"
+    },
+    {
+      "slug": "persona-rename-canonical-flip",
+      "path": "/projects/elohim/genesis/data/timeline/backlog/persona-rename-canonical-flip.md",
+      "author_status": "",
+      "delivery_status": "wip",
+      "delivery_status_updated": "",
+      "delivery_status_source": "",
+      "declared_feature": "",
+      "feature_file_exists": false,
+      "legacy_status_translated_from": "in-progress"
+    },
+    {
+      "slug": "skill-catalog-hygiene",
+      "path": "/projects/elohim/genesis/data/timeline/backlog/skill-catalog-hygiene.md",
+      "author_status": "",
+      "delivery_status": "backlog",
+      "delivery_status_updated": "",
+      "delivery_status_source": "",
+      "declared_feature": "",
+      "feature_file_exists": false,
+      "legacy_status_translated_from": "proposed"
+    },
+    {
+      "slug": "stage-g-todo-disclosure-discipline",
+      "path": "/projects/elohim/genesis/data/timeline/backlog/stage-g-todo-disclosure-discipline.md",
+      "author_status": "",
+      "delivery_status": "backlog",
+      "delivery_status_updated": "",
+      "delivery_status_source": "",
+      "declared_feature": "",
+      "feature_file_exists": false,
+      "legacy_status_translated_from": "proposed"
+    },
+    {
+      "slug": "story-memory-team-came-online",
+      "path": "/projects/elohim/genesis/data/timeline/backlog/story-memory-team-came-online.md",
+      "author_status": "",
+      "delivery_status": "backlog",
+      "delivery_status_updated": "",
+      "delivery_status_source": "",
+      "declared_feature": "",
+      "feature_file_exists": false,
+      "legacy_status_translated_from": "proposed"
+    },
+    {
+      "slug": "storyteller-coverage-sprint",
+      "path": "/projects/elohim/genesis/data/timeline/backlog/storyteller-coverage-sprint.md",
+      "author_status": "",
+      "delivery_status": "refined",
+      "delivery_status_updated": "",
+      "delivery_status_source": "",
+      "declared_feature": "",
+      "feature_file_exists": false
+    }
+  ],
+  "pickup_queue_for_deliver": [
+    {
+      "slug": "james-and-the-spoke",
+      "reason": "delivery_status=undelivered ; feature_file_missing:stewarded-device-sync.feature"
+    }
+  ]
+}

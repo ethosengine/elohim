@@ -16,7 +16,7 @@ Feature: Emergency Contacts Kill a Captured Key by Quorum
     And Matthew has four active emergency contacts:
       | Contact  | Registered via     |
       | Jessica  | doorway-alpha      |
-      | Timothy  | doorway-alpha      |
+      | Terrance  | doorway-alpha      |
       | David    | doorway-beta       |
       | Sarah    | doorway-beta       |
     And the required vote threshold for Matthew is 3 (out of 4 contacts)
@@ -57,7 +57,7 @@ Feature: Emergency Contacts Kill a Captured Key by Quorum
   Scenario: Only two contacts respond — revocation stays pending
     Given a pending revocation request for Matthew's key "K1" with required votes 3
     When only Jessica and David approve the revocation request
-    And Timothy and Sarah have not responded
+    And Terrance and Sarah have not responded
     Then the revocation record shows "2 of 3 votes received"
     And the revocation is still pending — the key has not been revoked
     And Matthew's key "K1" is still accepted by the network

@@ -42,7 +42,7 @@ All SQLite tables, Rust view structs, and JSON schemas in this plan carry corres
 - `elohim/elohim-storage/src/migrations/2026_04_21_recovery_phase_2/down.sql` — Diesel down migration
 - `elohim/elohim-storage/tests/schema_contract_recovery_v2.rs` — schema contract tests for new views
 - `elohim/sdk/schemas/v1/views/recovery-seed-commitment.schema.json`
-- `elohim/sdk/schemas/v1/views/recovery-quorum-request.schema.json`
+- `elohim/sdk/schemas/v1/views/recovery-request.schema.json`
 - `elohim/sdk/schemas/v1/views/key-rotation.schema.json`
 
 ### Modified
@@ -1381,7 +1381,7 @@ git commit -m "feat(storage): add recovery phase 2 view types with TS codegen"
 
 **Files:**
 - Create: `elohim/sdk/schemas/v1/views/recovery-seed-commitment.schema.json`
-- Create: `elohim/sdk/schemas/v1/views/recovery-quorum-request.schema.json`
+- Create: `elohim/sdk/schemas/v1/views/recovery-request.schema.json`
 - Create: `elohim/sdk/schemas/v1/views/key-rotation.schema.json`
 - Modify: `elohim/sdk/schemas/scripts/codegen-ts.mjs` (register new interface files)
 
@@ -1540,7 +1540,7 @@ Expected: all three pass. Codegen produces matching TypeScript in `elohim/sdk/sc
 
 ```bash
 git add elohim/sdk/schemas/v1/views/recovery-seed-commitment.schema.json \
-        elohim/sdk/schemas/v1/views/recovery-quorum-request.schema.json \
+        elohim/sdk/schemas/v1/views/recovery-request.schema.json \
         elohim/sdk/schemas/v1/views/key-rotation.schema.json \
         elohim/sdk/schemas/scripts/codegen-ts.mjs \
         elohim/sdk/schemas/generated/

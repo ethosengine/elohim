@@ -1,6 +1,6 @@
 # Jessica — Household Partner
 # Stewards: family learning content, household governance
-# Trust topology: bootstraps to Matthew (spouse) + Timothy (tutor)
+# Trust topology: bootstraps to Matthew (spouse) + Terrance (tutor)
 # Resource profile: medium — household node with moderate resources
 ---
 # ConfigMap for conductor configuration
@@ -229,7 +229,7 @@ spec:
             - name: DISABLE_MDNS
               value: "true"
             - name: P2P_BOOTSTRAP_NODES
-              value: "/dns4/elohim-matthew-alpha-0.elohim-matthew-alpha-headless.elohim-alpha.svc.cluster.local/tcp/9876,/dns4/elohim-timothy-alpha-0.elohim-timothy-alpha-headless.elohim-alpha.svc.cluster.local/tcp/9876"
+              value: "/dns4/elohim-matthew-alpha-0.elohim-matthew-alpha-headless.elohim-alpha.svc.cluster.local/tcp/9876,/dns4/elohim-terrance-alpha-0.elohim-terrance-alpha-headless.elohim-alpha.svc.cluster.local/tcp/9876"
             - name: RELAY_MODE
               value: "server"
           ports:

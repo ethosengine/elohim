@@ -5,7 +5,7 @@
 #
 # Without this, Kubernetes network isolation blocks cross-namespace
 # P2P connections, preventing the WAN-like topology where:
-#   - Matthew + Jessica (alpha) <-> Pete + Timothy (staging) <-> Frank (prod)
+#   - Matthew + Jessica (alpha) <-> Pete + Terrance (staging) <-> Frank (prod)
 #
 # Apply once per namespace:
 #   kubectl apply -f cross-namespace-p2p-networkpolicy.yaml

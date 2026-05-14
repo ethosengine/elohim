@@ -1,0 +1,640 @@
+{
+  "generated_at": "2026-05-14T22:48:52.451338+00:00",
+  "totals": {
+    "features_on_disk": 73,
+    "features_canonical_in_some_story": 0,
+    "features_adjacent_only": 4,
+    "features_orphan": 69,
+    "stories_total": 2,
+    "dangling_feature_references": 1
+  },
+  "orphans": [
+    {
+      "feature_path": "genesis/a2o/features/qahal/collective-governance.feature",
+      "feature_slug": "collective-governance",
+      "vision_axis_hint": "qahal",
+      "scenario_count": 36,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 90.0
+    },
+    {
+      "feature_path": "genesis/a2o/features/content/ssr_capability.feature",
+      "feature_slug": "ssr_capability",
+      "vision_axis_hint": "content",
+      "scenario_count": 14,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 28.0
+    },
+    {
+      "feature_path": "genesis/a2o/features/auth/auth-lifecycle.feature",
+      "feature_slug": "auth-lifecycle",
+      "vision_axis_hint": "auth",
+      "scenario_count": 10,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 25.0
+    },
+    {
+      "feature_path": "genesis/a2o/features/lamad/attention-analytics.feature",
+      "feature_slug": "attention-analytics",
+      "vision_axis_hint": "lamad",
+      "scenario_count": 8,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 24.0
+    },
+    {
+      "feature_path": "genesis/a2o/features/lamad/love-map-negotiation.feature",
+      "feature_slug": "love-map-negotiation",
+      "vision_axis_hint": "lamad",
+      "scenario_count": 8,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 24.0
+    },
+    {
+      "feature_path": "genesis/a2o/features/auth/recovery/revocation-emergency-quorum.feature",
+      "feature_slug": "revocation-emergency-quorum",
+      "vision_axis_hint": "auth",
+      "scenario_count": 9,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 22.5
+    },
+    {
+      "feature_path": "genesis/a2o/features/federation/peer-advertisement.feature",
+      "feature_slug": "peer-advertisement",
+      "vision_axis_hint": "federation",
+      "scenario_count": 15,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 22.5
+    },
+    {
+      "feature_path": "genesis/a2o/features/auth/visitor-boundaries.feature",
+      "feature_slug": "visitor-boundaries",
+      "vision_axis_hint": "auth",
+      "scenario_count": 8,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 20.0
+    },
+    {
+      "feature_path": "genesis/a2o/features/federation/epr-cross-peer-resolution.feature",
+      "feature_slug": "epr-cross-peer-resolution",
+      "vision_axis_hint": "federation",
+      "scenario_count": 13,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 19.5
+    },
+    {
+      "feature_path": "genesis/a2o/features/elohim/network-health-posture.feature",
+      "feature_slug": "network-health-posture",
+      "vision_axis_hint": "elohim",
+      "scenario_count": 19,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 19.0
+    },
+    {
+      "feature_path": "genesis/a2o/features/content/epr-content-addressing.feature",
+      "feature_slug": "epr-content-addressing",
+      "vision_axis_hint": "content",
+      "scenario_count": 9,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 18.0
+    },
+    {
+      "feature_path": "genesis/a2o/features/deployment/persona-testnet-validation.feature",
+      "feature_slug": "persona-testnet-validation",
+      "vision_axis_hint": "deployment",
+      "scenario_count": 18,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 18.0
+    },
+    {
+      "feature_path": "genesis/a2o/features/qahal/feedback-dialogue-panel.feature",
+      "feature_slug": "feedback-dialogue-panel",
+      "vision_axis_hint": "qahal",
+      "scenario_count": 7,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 17.5
+    },
+    {
+      "feature_path": "genesis/a2o/features/delivery/spa-bundle-delivery.feature",
+      "feature_slug": "spa-bundle-delivery",
+      "vision_axis_hint": "delivery",
+      "scenario_count": 17,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 17.0
+    },
+    {
+      "feature_path": "genesis/a2o/features/deployment/peer-diversity.feature",
+      "feature_slug": "peer-diversity",
+      "vision_axis_hint": "deployment",
+      "scenario_count": 16,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 16.0
+    },
+    {
+      "feature_path": "genesis/a2o/features/auth/fixture-humans.feature",
+      "feature_slug": "fixture-humans",
+      "vision_axis_hint": "auth",
+      "scenario_count": 6,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 15.0
+    },
+    {
+      "feature_path": "genesis/a2o/features/elohim/content-reach-negotiation.feature",
+      "feature_slug": "content-reach-negotiation",
+      "vision_axis_hint": "elohim",
+      "scenario_count": 15,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 15.0
+    },
+    {
+      "feature_path": "genesis/a2o/features/lamad/know-thyself-discovery.feature",
+      "feature_slug": "know-thyself-discovery",
+      "vision_axis_hint": "lamad",
+      "scenario_count": 5,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 15.0
+    },
+    {
+      "feature_path": "genesis/a2o/features/resilience/observable-distribution.feature",
+      "feature_slug": "observable-distribution",
+      "vision_axis_hint": "resilience",
+      "scenario_count": 15,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 15.0
+    },
+    {
+      "feature_path": "genesis/a2o/features/delivery/client-resilience.feature",
+      "feature_slug": "client-resilience",
+      "vision_axis_hint": "delivery",
+      "scenario_count": 13,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 13.0
+    },
+    {
+      "feature_path": "genesis/a2o/features/delivery/delivery-diagnostics.feature",
+      "feature_slug": "delivery-diagnostics",
+      "vision_axis_hint": "delivery",
+      "scenario_count": 13,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 13.0
+    },
+    {
+      "feature_path": "genesis/a2o/features/auth/operator-onboarding.feature",
+      "feature_slug": "operator-onboarding",
+      "vision_axis_hint": "auth",
+      "scenario_count": 5,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 12.5
+    },
+    {
+      "feature_path": "genesis/a2o/features/auth/recovery/cross-stack/recovery-cross-stack-transport.feature",
+      "feature_slug": "recovery-cross-stack-transport",
+      "vision_axis_hint": "auth",
+      "scenario_count": 5,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 12.5
+    },
+    {
+      "feature_path": "genesis/a2o/features/auth/recovery/revocation-self.feature",
+      "feature_slug": "revocation-self",
+      "vision_axis_hint": "auth",
+      "scenario_count": 5,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 12.5
+    },
+    {
+      "feature_path": "genesis/a2o/features/auth/session-handoff.feature",
+      "feature_slug": "session-handoff",
+      "vision_axis_hint": "auth",
+      "scenario_count": 5,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 12.5
+    },
+    {
+      "feature_path": "genesis/a2o/features/auth/user-management.feature",
+      "feature_slug": "user-management",
+      "vision_axis_hint": "auth",
+      "scenario_count": 5,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 12.5
+    },
+    {
+      "feature_path": "genesis/a2o/features/delivery/protocol-omnibar.feature",
+      "feature_slug": "protocol-omnibar",
+      "vision_axis_hint": "delivery",
+      "scenario_count": 11,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 11.0
+    },
+    {
+      "feature_path": "genesis/a2o/features/deployment/compute-commitment-bounds.feature",
+      "feature_slug": "compute-commitment-bounds",
+      "vision_axis_hint": "deployment",
+      "scenario_count": 11,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 11.0
+    },
+    {
+      "feature_path": "genesis/a2o/features/shefa/human-resilience.feature",
+      "feature_slug": "human-resilience",
+      "vision_axis_hint": "shefa",
+      "scenario_count": 11,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 11.0
+    },
+    {
+      "feature_path": "genesis/a2o/features/auth/recovery/intimate-quorum-happy-path.feature",
+      "feature_slug": "intimate-quorum-happy-path",
+      "vision_axis_hint": "auth",
+      "scenario_count": 4,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 10.0
+    },
+    {
+      "feature_path": "genesis/a2o/features/content/content-lifecycle.feature",
+      "feature_slug": "content-lifecycle",
+      "vision_axis_hint": "content",
+      "scenario_count": 5,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 10.0
+    },
+    {
+      "feature_path": "genesis/a2o/features/delivery/peer-mesh.feature",
+      "feature_slug": "peer-mesh",
+      "vision_axis_hint": "delivery",
+      "scenario_count": 10,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 10.0
+    },
+    {
+      "feature_path": "genesis/a2o/features/deployment/human-device-mapping.feature",
+      "feature_slug": "human-device-mapping",
+      "vision_axis_hint": "deployment",
+      "scenario_count": 9,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 9.0
+    },
+    {
+      "feature_path": "genesis/a2o/features/delivery/landing-page.feature",
+      "feature_slug": "landing-page",
+      "vision_axis_hint": "delivery",
+      "scenario_count": 8,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 8.0
+    },
+    {
+      "feature_path": "genesis/a2o/features/deployment/sync-control.feature",
+      "feature_slug": "sync-control",
+      "vision_axis_hint": "deployment",
+      "scenario_count": 8,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 8.0
+    },
+    {
+      "feature_path": "genesis/a2o/features/auth/recovery/recovery-m5-doorway-handoff-to-steward.feature",
+      "feature_slug": "recovery-m5-doorway-handoff-to-steward",
+      "vision_axis_hint": "auth",
+      "scenario_count": 3,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 7.5
+    },
+    {
+      "feature_path": "genesis/a2o/features/auth/recovery/recovery-m5-list-my-keys.feature",
+      "feature_slug": "recovery-m5-list-my-keys",
+      "vision_axis_hint": "auth",
+      "scenario_count": 3,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 7.5
+    },
+    {
+      "feature_path": "genesis/a2o/features/browser/doorway-dashboard-health.feature",
+      "feature_slug": "doorway-dashboard-health",
+      "vision_axis_hint": "browser",
+      "scenario_count": 5,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 7.5
+    },
+    {
+      "feature_path": "genesis/a2o/features/delivery/web2-absorption.feature",
+      "feature_slug": "web2-absorption",
+      "vision_axis_hint": "delivery",
+      "scenario_count": 7,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 7.0
+    },
+    {
+      "feature_path": "genesis/a2o/features/deployment/p2p-validation.feature",
+      "feature_slug": "p2p-validation",
+      "vision_axis_hint": "deployment",
+      "scenario_count": 7,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 7.0
+    },
+    {
+      "feature_path": "genesis/a2o/features/browser/auth-browser.feature",
+      "feature_slug": "auth-browser",
+      "vision_axis_hint": "browser",
+      "scenario_count": 4,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 6.0
+    },
+    {
+      "feature_path": "genesis/a2o/features/content/relationship-idempotency.feature",
+      "feature_slug": "relationship-idempotency",
+      "vision_axis_hint": "content",
+      "scenario_count": 3,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 6.0
+    },
+    {
+      "feature_path": "genesis/a2o/features/lamad/epr-link-navigation.feature",
+      "feature_slug": "epr-link-navigation",
+      "vision_axis_hint": "lamad",
+      "scenario_count": 2,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 6.0
+    },
+    {
+      "feature_path": "genesis/a2o/features/auth/conductor-pool-recovery.feature",
+      "feature_slug": "conductor-pool-recovery",
+      "vision_axis_hint": "auth",
+      "scenario_count": 2,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 5.0
+    },
+    {
+      "feature_path": "genesis/a2o/features/auth/recovery/freeze-floor-blocks-intimate-rotation.feature",
+      "feature_slug": "freeze-floor-blocks-intimate-rotation",
+      "vision_axis_hint": "auth",
+      "scenario_count": 2,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 5.0
+    },
+    {
+      "feature_path": "genesis/a2o/features/auth/recovery/recovery-m5-defender-role-gate.feature",
+      "feature_slug": "recovery-m5-defender-role-gate",
+      "vision_axis_hint": "auth",
+      "scenario_count": 2,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 5.0
+    },
+    {
+      "feature_path": "genesis/a2o/features/auth/recovery/recovery-m5-lost-key-entry.feature",
+      "feature_slug": "recovery-m5-lost-key-entry",
+      "vision_axis_hint": "auth",
+      "scenario_count": 2,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 5.0
+    },
+    {
+      "feature_path": "genesis/a2o/features/auth/recovery/recovery-m5-portal-host-discovery.feature",
+      "feature_slug": "recovery-m5-portal-host-discovery",
+      "vision_axis_hint": "auth",
+      "scenario_count": 2,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 5.0
+    },
+    {
+      "feature_path": "genesis/a2o/features/auth/recovery/recovery-m5-self-revoke.feature",
+      "feature_slug": "recovery-m5-self-revoke",
+      "vision_axis_hint": "auth",
+      "scenario_count": 2,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 5.0
+    },
+    {
+      "feature_path": "genesis/a2o/features/auth/recovery/recovery-m5-vote-as-emergency-contact.feature",
+      "feature_slug": "recovery-m5-vote-as-emergency-contact",
+      "vision_axis_hint": "auth",
+      "scenario_count": 2,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 5.0
+    },
+    {
+      "feature_path": "genesis/a2o/features/delivery/transport-perf.feature",
+      "feature_slug": "transport-perf",
+      "vision_axis_hint": "delivery",
+      "scenario_count": 5,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 5.0
+    },
+    {
+      "feature_path": "genesis/a2o/features/deployment/ingress-body-size-budget.feature",
+      "feature_slug": "ingress-body-size-budget",
+      "vision_axis_hint": "deployment",
+      "scenario_count": 5,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 5.0
+    },
+    {
+      "feature_path": "genesis/a2o/features/elohim/compute-allocation.feature",
+      "feature_slug": "compute-allocation",
+      "vision_axis_hint": "elohim",
+      "scenario_count": 5,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 5.0
+    },
+    {
+      "feature_path": "genesis/a2o/features/shefa/m1-matthew-timothy-delivery.feature",
+      "feature_slug": "m1-matthew-timothy-delivery",
+      "vision_axis_hint": "shefa",
+      "scenario_count": 5,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 5.0
+    },
+    {
+      "feature_path": "genesis/a2o/features/browser/navigation-browser.feature",
+      "feature_slug": "navigation-browser",
+      "vision_axis_hint": "browser",
+      "scenario_count": 3,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 4.5
+    },
+    {
+      "feature_path": "genesis/a2o/features/federation/shard-tracking.feature",
+      "feature_slug": "shard-tracking",
+      "vision_axis_hint": "federation",
+      "scenario_count": 3,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 4.5
+    },
+    {
+      "feature_path": "genesis/a2o/features/delivery/content-addressing.feature",
+      "feature_slug": "content-addressing",
+      "vision_axis_hint": "delivery",
+      "scenario_count": 4,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 4.0
+    },
+    {
+      "feature_path": "genesis/a2o/features/deployment/conductor-visibility.feature",
+      "feature_slug": "conductor-visibility",
+      "vision_axis_hint": "deployment",
+      "scenario_count": 4,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 4.0
+    },
+    {
+      "feature_path": "genesis/a2o/features/deployment/seeder-registry-coherence.feature",
+      "feature_slug": "seeder-registry-coherence",
+      "vision_axis_hint": "deployment",
+      "scenario_count": 4,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 4.0
+    },
+    {
+      "feature_path": "genesis/a2o/features/elohim/elohim-presence.feature",
+      "feature_slug": "elohim-presence",
+      "vision_axis_hint": "elohim",
+      "scenario_count": 4,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 4.0
+    },
+    {
+      "feature_path": "genesis/a2o/features/deployment/doorway-self-registration.feature",
+      "feature_slug": "doorway-self-registration",
+      "vision_axis_hint": "deployment",
+      "scenario_count": 3,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 3.0
+    },
+    {
+      "feature_path": "genesis/a2o/features/deployment/staging-validation.feature",
+      "feature_slug": "staging-validation",
+      "vision_axis_hint": "deployment",
+      "scenario_count": 3,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 3.0
+    },
+    {
+      "feature_path": "genesis/a2o/features/elohim/compute-coordination.feature",
+      "feature_slug": "compute-coordination",
+      "vision_axis_hint": "elohim",
+      "scenario_count": 3,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 3.0
+    },
+    {
+      "feature_path": "genesis/a2o/features/federation/cross-doorway-content.feature",
+      "feature_slug": "cross-doorway-content",
+      "vision_axis_hint": "federation",
+      "scenario_count": 2,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 3.0
+    },
+    {
+      "feature_path": "genesis/a2o/features/browser/spatial-map.feature",
+      "feature_slug": "spatial-map",
+      "vision_axis_hint": "browser",
+      "scenario_count": 1,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 1.5
+    },
+    {
+      "feature_path": "genesis/a2o/features/deployment/conductor-admin-reachability.feature",
+      "feature_slug": "conductor-admin-reachability",
+      "vision_axis_hint": "deployment",
+      "scenario_count": 1,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 1.0
+    },
+    {
+      "feature_path": "genesis/a2o/features/ssr/browser-hydrates-without-flash.feature",
+      "feature_slug": "browser-hydrates-without-flash",
+      "vision_axis_hint": "ssr",
+      "scenario_count": 1,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 1.0
+    },
+    {
+      "feature_path": "genesis/a2o/features/ssr/external-webfetch-renders-content.feature",
+      "feature_slug": "external-webfetch-renders-content",
+      "vision_axis_hint": "ssr",
+      "scenario_count": 1,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 1.0
+    },
+    {
+      "feature_path": "genesis/a2o/features/ssr/social-card-crawler-gets-rich-preview.feature",
+      "feature_slug": "social-card-crawler-gets-rich-preview",
+      "vision_axis_hint": "ssr",
+      "scenario_count": 1,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 1.0
+    }
+  ],
+  "adjacent_only": [
+    {
+      "feature_path": "genesis/a2o/features/lamad/path-adaptation.feature",
+      "feature_slug": "path-adaptation",
+      "vision_axis_hint": "lamad",
+      "scenario_count": 11,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 33.0
+    },
+    {
+      "feature_path": "genesis/a2o/features/lamad/assessment-completion-feedback.feature",
+      "feature_slug": "assessment-completion-feedback",
+      "vision_axis_hint": "lamad",
+      "scenario_count": 9,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 27.0
+    },
+    {
+      "feature_path": "genesis/a2o/features/content/stewardship-allocation.feature",
+      "feature_slug": "stewardship-allocation",
+      "vision_axis_hint": "content",
+      "scenario_count": 6,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 12.0
+    },
+    {
+      "feature_path": "genesis/a2o/features/lamad/learning-journey.feature",
+      "feature_slug": "learning-journey",
+      "vision_axis_hint": "lamad",
+      "scenario_count": 3,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 9.0
+    }
+  ],
+  "stories_with_coverage": [
+    {
+      "slug": "james-and-the-spoke",
+      "path": "genesis/data/stories/james-and-the-spoke.md",
+      "author_status": "retired",
+      "canonical_feature_ref": "",
+      "canonical_feature_resolved": null,
+      "adjacent_count": 0,
+      "adjacent_resolved": [],
+      "covers_legacy_resolved": [
+        "genesis/a2o/features/content/stewardship-allocation.feature",
+        "genesis/a2o/features/lamad/learning-journey.feature",
+        "genesis/a2o/features/lamad/path-adaptation.feature",
+        "genesis/a2o/features/lamad/assessment-completion-feedback.feature"
+      ],
+      "dangling_ref_count": 0
+    },
+    {
+      "slug": "james-and-the-spoke",
+      "path": "genesis/data/stories/james-son--as-stewardee--stewarded-device-sync.md",
+      "author_status": "canonical",
+      "canonical_feature_ref": "stewarded-device-sync",
+      "canonical_feature_resolved": null,
+      "adjacent_count": 4,
+      "adjacent_resolved": [
+        "genesis/a2o/features/lamad/learning-journey.feature",
+        "genesis/a2o/features/lamad/path-adaptation.feature",
+        "genesis/a2o/features/lamad/assessment-completion-feedback.feature",
+        "genesis/a2o/features/content/stewardship-allocation.feature"
+      ],
+      "covers_legacy_resolved": [],
+      "dangling_ref_count": 1
+    }
+  ],
+  "dangling_references": [
+    {
+      "story_slug": "james-and-the-spoke",
+      "ref": "stewarded-device-sync",
+      "role": "canonical"
+    }
+  ]
+}

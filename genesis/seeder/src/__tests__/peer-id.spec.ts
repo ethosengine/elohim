@@ -31,8 +31,8 @@ describe('deterministicPeerId', () => {
 
   it('differs across humans for the same archetype', () => {
     const matthew = deterministicPeerId('human-matthew-manager', 'desktop');
-    const timothy = deterministicPeerId('human-timothy-tutor', 'desktop');
-    expect(matthew).not.toBe(timothy);
+    const terrance = deterministicPeerId('human-terrance-tutor', 'desktop');
+    expect(matthew).not.toBe(terrance);
   });
 
   it('matches the existing seed-agent-bindings formula exactly', () => {

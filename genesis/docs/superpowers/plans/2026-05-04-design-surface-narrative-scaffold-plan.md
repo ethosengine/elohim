@@ -431,7 +431,7 @@ test('runSync copies single-file mapping to imported/', () => {
 });
 
 test('MAPPINGS constant includes the manifesto entry', () => {
-  const entry = MAPPINGS.find(m => m.from === 'docs/content/elohim-protocol/manifesto.md');
+  const entry = MAPPINGS.find(m => m.from === 'genesis/docs/content/elohim-protocol/manifesto.md');
   assert.ok(entry, 'manifesto mapping must exist');
   assert.equal(entry.title, 'I. Why / Manifesto');
 });
@@ -475,13 +475,13 @@ const OUT_DIR = resolve(__dirname, '..', 'projects', 'graphos', 'src', 'imported
 
 export const MAPPINGS = [
   // I. Narrative Flow / Why
-  { from: 'docs/content/elohim-protocol/manifesto.md',
+  { from: 'genesis/docs/content/elohim-protocol/manifesto.md',
     to: 'narrative/why/manifesto.md',
     title: 'I. Why / Manifesto' },
-  { from: 'docs/content/elohim-protocol/constitution.md',
+  { from: 'genesis/docs/content/elohim-protocol/constitution.md',
     to: 'narrative/why/constitution.md',
     title: 'I. Why / Constitution' },
-  { from: 'docs/content/elohim-protocol/global-orchestra.md',
+  { from: 'genesis/docs/content/elohim-protocol/global-orchestra.md',
     to: 'narrative/why/vision.md',
     title: 'I. Why / Vision' },
   // I. Narrative Flow / What
@@ -492,13 +492,13 @@ export const MAPPINGS = [
   { from: 'docs/content/elohim-protocol/protocol-specification.md',
     to: 'narrative/how/protocol-specification.md',
     title: 'I. How / Protocol Specification' },
-  { from: 'docs/content/elohim-protocol/governance-layers-architecture.md',
+  { from: 'genesis/docs/content/elohim-protocol/governance-layers-architecture.md',
     to: 'narrative/how/governance-layers.md',
     title: 'I. How / Governance Layers' },
   { from: 'docs/content/elohim-protocol/epr-developer-guide.md',
     to: 'narrative/how/epr-developer-guide.md',
     title: 'I. How / EPR Developer Guide' },
-  { from: 'docs/content/elohim-protocol/hardware-spec.md',
+  { from: 'genesis/docs/content/elohim-protocol/hardware-spec.md',
     to: 'narrative/how/hardware-spec.md',
     title: 'I. How / Hardware Spec' },
   // II. Foundations
@@ -506,7 +506,7 @@ export const MAPPINGS = [
     to: 'foundations/vocabulary-register.md',
     title: 'II. Foundations / Vocabulary Register' },
   // III. Domains — single-file Reference Design (where genesis content exists)
-  { from: 'docs/content/elohim-protocol/lamad.md',
+  { from: 'genesis/docs/content/elohim-protocol/lamad.md',
     to: 'domains/learning/reference.md',
     title: 'III. Domains / Learning (Lamad) / Reference Design' },
 ];
@@ -1422,7 +1422,7 @@ Generated from `genesis/a2o/features/lamad/` and `genesis/a2o/features/content/`
 
 ## Reference Design
 
-See `Reference Design` in the sidebar — imports `genesis/docs/content/elohim-protocol/lamad.md`.
+See `Reference Design` in the sidebar — imports `genesis/genesis/docs/content/elohim-protocol/lamad.md`.
 
 ## Components
 
@@ -1685,7 +1685,7 @@ Expected: all 15 lines say FOUND.
 cd app/elohim-library && pnpm run storybook
 ```
 
-Open http://localhost:6006. Navigate to `III. Domains / Learning (Lamad) / Reference Design`. Expected: renders the actual content of `genesis/docs/content/elohim-protocol/lamad.md` (not a placeholder).
+Open http://localhost:6006. Navigate to `III. Domains / Learning (Lamad) / Reference Design`. Expected: renders the actual content of `genesis/genesis/docs/content/elohim-protocol/lamad.md` (not a placeholder).
 
 Stop server (Ctrl-C).
 
@@ -1857,9 +1857,9 @@ Expected: each `echo` shows multiple matches.
 Touch a genesis file (no real change), re-run, and verify the rebuild surfaces the touch. Use a known-mapped file:
 
 ```bash
-touch -d '+1 second' genesis/docs/content/elohim-protocol/manifesto.md
+touch -d '+1 second' genesis/genesis/docs/content/elohim-protocol/manifesto.md
 cd app/elohim-library && pnpm run build-storybook 2>&1 | tail -5
-md5sum app/elohim-library/projects/graphos/src/imported/narrative/why/manifesto.md genesis/docs/content/elohim-protocol/manifesto.md
+md5sum app/elohim-library/projects/graphos/src/imported/narrative/why/manifesto.md genesis/genesis/docs/content/elohim-protocol/manifesto.md
 ```
 
 Expected: both md5 sums match (sync re-copied the file). Note: the build-trigger broadening (Task 10) is verified by orchestrator/Jenkins on the next push, not locally; this step verifies the prebuild hook fires correctly at minimum.
@@ -1896,7 +1896,7 @@ Expected: all 5 say FOUND.
 Temporarily break a mapping to confirm validation fires:
 
 ```bash
-sed -i.bak "s|docs/content/elohim-protocol/manifesto.md|docs/content/elohim-protocol/MISSING.md|" app/elohim-library/scripts/sync-genesis.mjs
+sed -i.bak "s|genesis/docs/content/elohim-protocol/manifesto.md|docs/content/elohim-protocol/MISSING.md|" app/elohim-library/scripts/sync-genesis.mjs
 cd app/elohim-library && pnpm run sync-genesis; echo "Exit: $?"
 mv app/elohim-library/scripts/sync-genesis.mjs.bak app/elohim-library/scripts/sync-genesis.mjs
 ```

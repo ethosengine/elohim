@@ -1,3 +1,8 @@
+---
+name: quality-orchestrator
+description: Coordinate team-based quality campaigns across the three-tier pipeline — escalate from quality-sweep (Haiku, mechanical) to quality-deep (Sonnet, complex tests/refactor) to quality-architect (Opus, systemic gaps). Use when "run a quality campaign", "coverage push on X module", "orchestrate quality work across multiple agents", or planning multi-tier quality effort over a sprint.
+---
+
 # Quality Orchestrator — Team-Based Campaign System
 
 Orchestrate the three-tier quality pipeline using Agent Teams. Agents receive **campaign-sized batches** (all issues for one rule across all files) and work continuously until done, maximizing context window utilization.

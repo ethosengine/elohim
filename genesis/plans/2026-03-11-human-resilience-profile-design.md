@@ -196,7 +196,7 @@ Susan's conductor comes online, household content replicates via spouse relation
 ### + Pastor Pete (Community Depth)
 Pete's congregation node adds a third trust circle. Community-reach content replicates to Pete. Matthew's faith-related content now survives household failure. The elohim notes: personal-reach medical notes are still household-only, which is *appropriate* — they shouldn't replicate to the congregation. The adequacy score for personal-reach content is high despite low peer count, because the elohim's discernment says household-only is correct for that reach level.
 
-### + Timothy + Frank (Network Diversity)
+### + Terrance + Frank (Network Diversity)
 Multiple trust bridges. Content flows through relationship paths. The resilience projection shows different adequacy per content bucket: commons content is well-distributed (5 peers), community content has 3 peers across 2 clusters, personal content stays tight (2 peers, household). The elohim's narrative reflects that this distribution *matches* the content's nature. Protection status: `protected`.
 
 ### Maria (Cold Start)

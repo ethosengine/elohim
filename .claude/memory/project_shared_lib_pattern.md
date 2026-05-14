@@ -31,3 +31,5 @@ from _lib import paths, store  # noqa: E402
 - Older scripts (cleanup-scan, path-update-scan, dedupe-memory-scan, sprint-distill, plan-status, skill-audit, memory-review) migrate when touched for other reasons — not as a dedicated refactor sprint
 - Resist scope creep in `_lib` itself: only extract when 3+ callers share the same pattern. Two-caller patterns stay inline.
 - Pure-stdlib only — no PyYAML, no requests, no third-party deps. If a helper would require a dep, it doesn't belong in `_lib`
+
+**Co-anchor discipline (added 2026-05-14)**: `repo_root_from_file` walks up looking for BOTH `.claude/` AND `.git/` (strict mode). Single-marker walk-up resolved buggy output (`.claude/.claude/memory-kit/<date>/` satisfied the next walk-up's `.claude/`-only check, locking the bug in across invocations). When extending `_lib.paths` or any walk-up resolution helper, require two independent markers — never single. See [[feedback_self_reinforcing_path_bug_class]] for the bug class.

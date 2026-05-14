@@ -1,6 +1,6 @@
 ---
 name: hc-dev-orchestrator
-description: Start and manage the Elohim P2P Framework local development environment. Orchestrates conductor (identity/provenance), storage (content), and doorway (unified API). Use when starting dev servers, debugging service connections, or checking stack health.
+description: START and manage the Elohim P2P Framework local DEVELOPMENT STACK — runs conductor (identity/provenance), storage (content), doorway (unified API) as a coordinated service trio. Use when "start the local dev stack", "spin up holochain locally", "why isn't the conductor reachable", "is the doorway alive?", or checking service health during development. NOT for desktop Tauri shell knowledge (use tauri-desktop).
 ---
 
 # Elohim P2P Framework Orchestrator
@@ -221,9 +221,9 @@ npm run doorway:start
 
 | File | Purpose |
 |------|---------|
-| `elohim-app/scripts/hc-start.sh` | Main startup script |
-| `elohim-app/scripts/storage-start.sh` | Storage service startup |
-| `elohim-app/scripts/hc-build.sh` | Multi-DNA build |
+| `app/elohim-app/scripts/hc-start.sh` | Main startup script |
+| `app/elohim-app/scripts/storage-start.sh` | Storage service startup |
+| `app/elohim-app/scripts/hc-build.sh` | Multi-DNA build |
 | `holochain/local-dev/.hc_ports` | Dynamic port configuration |
 | `holochain/target/release/elohim-storage` | Storage binary |
 | `doorway/target/release/doorway` | Doorway binary |

@@ -1,0 +1,40 @@
+{
+  "timestamp": "2026-05-14-2248",
+  "code": {
+    "rust": 386689, "typescript": 26538, "html": 56729, "scss": 42732, "python": 31318
+  },
+  "gospel": {
+    "lines": 20124, "files": 145, "flag": "🔴"
+  },
+  "surface": {
+    "lines": 241710, "files": 367,
+    "plans": 121369, "sp_plans": 92957,
+    "sp_specs": 19432, "shifts": 7952
+  },
+  "working_memory": {
+    "lines": 4468, "files": 171,
+    "memory_md_bytes": 28882, "memory_md_flag": "🔴"
+  },
+  "canonical": {
+    "stories": {
+      "lines": 926, "total": 4,
+      "canonical": 1, "draft": 1, "retired": 1,
+      "flag": "✓ "
+    },
+    "chronicle": { "lines": 335, "files": 4 },
+    "roadmap":   { "lines": 166, "files": 2 },
+    "backlog":   { "lines": 1425, "files": 14 },
+    "epics":     { "lines": 30957, "files": 184 }
+  },
+  "archive": {
+    "lines": 258, "files": 8,
+    "orphans_missing_story_pointer": 0,
+    "orphans_flag": "✓ "
+  },
+  "mempalace": { "drawers": 0 },
+  "ratios": {
+    "surface_to_archive": "937",
+    "surface_to_archive_flag": "🔴",
+    "working_to_stories": "4.8"
+  }
+}

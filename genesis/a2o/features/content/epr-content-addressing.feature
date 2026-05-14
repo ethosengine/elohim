@@ -20,31 +20,31 @@ Feature: EPR Content Addressing
 
   Background:
     Given doorway "alpha" at "E2E_DOORWAY_ALPHA"
-    And human "Timothy" is logged in on doorway "alpha" with device
+    And human "Terrance" is logged in on doorway "alpha" with device
 
   # --- Context-Aware Resolution ---
 
   @wip @browser-only
   Scenario: EPR link in markdown resolves as cross-path
-    # Timothy is reading the manifesto. A reference to rea-foundations
+    # Terrance is reading the manifesto. A reference to rea-foundations
     # appears inline — not as a footnote, but as a living link into
     # another curriculum that develops the same idea further. Following
     # it should land him in the destination path, not lose his bearings.
-    Given Timothy is on the manifesto step of path "elohim-protocol"
+    Given Terrance is on the manifesto step of path "elohim-protocol"
     And the manifesto content contains an "epr:rea-foundations" link
-    When Timothy clicks the "epr:rea-foundations" link in the markdown content
-    Then Timothy navigates to "rea-foundations" in path "hrea-care-economy"
+    When Terrance clicks the "epr:rea-foundations" link in the markdown content
+    Then Terrance navigates to "rea-foundations" in path "hrea-care-economy"
     And the resolution type is "cross-path"
 
   @wip @browser-only
   Scenario: EPR link resolves as standalone when not in a path
-    # When Timothy reads a resource directly (no enclosing curriculum),
+    # When Terrance reads a resource directly (no enclosing curriculum),
     # the same EPR reference resolves into a standalone view — the
     # destination's own self-contained presentation, not a path-step.
     # Same address, different context, different render.
-    Given Timothy is viewing resource "manifesto" directly
-    When Timothy clicks the "epr:rea-foundations" link in the markdown content
-    Then Timothy navigates to the standalone resource view for "rea-foundations"
+    Given Terrance is viewing resource "manifesto" directly
+    When Terrance clicks the "epr:rea-foundations" link in the markdown content
+    Then Terrance navigates to the standalone resource view for "rea-foundations"
     And the resolution type is "standalone"
 
   # --- CID Content Addressing ---
@@ -69,7 +69,7 @@ Feature: EPR Content Addressing
     # what value flows it carries (shefa). DAG-CBOR encoding makes the
     # head deterministic-on-the-wire so any peer can verify it.
     Given content "manifesto" exists in storage
-    When Timothy requests the EPR Head for "manifesto"
+    When Terrance requests the EPR Head for "manifesto"
     Then the EPR Head contains lamad context with title and content type
     And the EPR Head contains qahal context with reach level
     And the EPR Head response uses DAG-CBOR content type
@@ -78,12 +78,12 @@ Feature: EPR Content Addressing
 
   @wip @browser-only
   Scenario: EPR link shows three-pillar popover on hover
-    # Before clicking, Timothy can see what the link points to. A hover
+    # Before clicking, Terrance can see what the link points to. A hover
     # popover surfaces the verified preview from the EPR Head — so he
     # makes an informed decision about whether to follow. No "trust me,
     # click this" — every link is its own little disclosure.
-    Given Timothy is viewing a page with an EPR link to "rea-foundations"
-    When Timothy hovers over the EPR link
+    Given Terrance is viewing a page with an EPR link to "rea-foundations"
+    When Terrance hovers over the EPR link
     Then a popover appears showing the content title
     And the popover shows the content type badge
     And the popover shows the reach level
@@ -94,24 +94,24 @@ Feature: EPR Content Addressing
   Scenario: EPR popover surfaces all three pillars when present
     # When content carries shefa context (a stewardship commitment, an
     # economic flow), the popover shows it alongside the lamad/qahal
-    # info. Timothy sees not just "what is this" but "who carries it
+    # info. Terrance sees not just "what is this" but "who carries it
     # forward and what does it cost them" — full disclosure at the link.
     Given content "rea-foundations" has lamad, qahal, AND shefa context populated
-    And Timothy is viewing a page with an EPR link to "rea-foundations"
-    When Timothy hovers over the EPR link
+    And Terrance is viewing a page with an EPR link to "rea-foundations"
+    When Terrance hovers over the EPR link
     Then the popover shows the lamad title and content type
     And the popover shows the qahal reach level
     And the popover shows the shefa stewardship summary
 
   @wip @browser-only
   Scenario: Following an EPR link transfers reading context to the destination
-    # The renderer at the destination should know Timothy arrived FROM
+    # The renderer at the destination should know Terrance arrived FROM
     # the manifesto, not from a search or a bookmark. Context-transfer
     # lets the destination tailor its render — a "you came from here,
     # so let's connect to that thread" affordance, not a cold landing.
-    Given Timothy is on the manifesto step of path "elohim-protocol"
+    Given Terrance is on the manifesto step of path "elohim-protocol"
     And the manifesto content contains an "epr:rea-foundations" link
-    When Timothy clicks the "epr:rea-foundations" link in the markdown content
+    When Terrance clicks the "epr:rea-foundations" link in the markdown content
     Then the destination "rea-foundations" view renders with origin context "manifesto"
     And the destination shows a back-affordance to the originating manifesto step
 
@@ -122,7 +122,7 @@ Feature: EPR Content Addressing
     # reader is told the version they reached is historical, with a path
     # to the current canonical version if they want to follow it.
     Given the manifesto contains an "epr:rea-foundations" link to a CID that has been superseded
-    When Timothy clicks the historical EPR link
+    When Terrance clicks the historical EPR link
     Then the historical content body renders with a "this version was superseded" notice
     And the notice offers to navigate to the current canonical version
     And both versions remain content-addressable and verifiable
@@ -134,7 +134,7 @@ Feature: EPR Content Addressing
     # is mine." Any peer receiving the Head can verify it independently.
     # No central authority; the signature is the authority.
     Given content "manifesto" exists in storage with author agent "agent-author"
-    When Timothy requests the EPR Head for "manifesto"
+    When Terrance requests the EPR Head for "manifesto"
     Then the EPR Head includes an Ed25519 signature by "agent-author"
     And the signature verifies against the canonical envelope bytes
     And the CID computed from the canonical envelope matches the requested CID

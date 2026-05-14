@@ -19,7 +19,7 @@ Feature: Compute commitments are bounded and breach without contagion
   Background:
     Given the alpha cluster has a compute-capacity ledger declaring per-node bounds
     And the ledger records 46 cores, 134 GiB RAM allocatable across 7 ready nodes
-    And matthew, jessica, timothy are deployed with active compute commitments
+    And matthew, jessica, terrance are deployed with active compute commitments
     And adam, pete, frank were deployed on shem with active compute commitments
     And shem has been catastrophically lost
     # Reference: shem-decommissioned anomaly in compute-capacity.json

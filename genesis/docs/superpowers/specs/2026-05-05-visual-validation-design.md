@@ -243,6 +243,6 @@ No flag day, no migration script, no feature-file rewrite.
 ## Open questions deferred to follow-ups
 
 - **Agent-assisted review** — `/shift` skill update; needs its own design conversation about prompt template, reference manifesto excerpts per pillar, PR-proposal flow.
-- **Multi-human scenarios** — when a scenario registers multiple humans (e.g., Matthew + Timothy), each human's device captures its own image. The 2×2 counts treat the scenario as one row; the per-finding render shows all images. No design change needed; documenting the behavior.
+- **Multi-human scenarios** — when a scenario registers multiple humans (e.g., Matthew + Terrance), each human's device captures its own image. The 2×2 counts treat the scenario as one row; the per-finding render shows all images. No design change needed; documenting the behavior.
 - **Reference-image storage** — explicitly out of scope. If pixel-level drift detection becomes desirable later, reference images can be added without breaking this design (extend `Finding.screenshotPath` to a path pair).
 - **Storybook integration** — Storybook lives in the `ethosengine` namespace (per memory `project_storybook_in_ethosengine_namespace`); component-level visual validation there is a separate concern from a2o scenario-level perceptual validation.

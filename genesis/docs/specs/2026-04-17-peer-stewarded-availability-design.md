@@ -8,11 +8,11 @@
 
 Peers publish their availability state directly through a single `PeerStatus` surface stewarded by elohim-storage. Doorway becomes a pure subscriber that makes routing decisions from peer-authored state, distinguishing traffic addressed to a specific agent (which reaches its hosting peer regardless of pool membership) from general load-balanced traffic (which filters to peers currently advertising pool membership). Deployment wrappers (elohim-node, tauri, browser) package elohim-storage for their context and configure its capabilities without implementing them.
 
-The design corrects a current inversion — doorway authoring heartbeats on behalf of conductors it proxies to — and lays the first concrete foundation for the Timothy-class thin-client case: a peer that belongs in the mesh but should not be asked to carry general traffic.
+The design corrects a current inversion — doorway authoring heartbeats on behalf of conductors it proxies to — and lays the first concrete foundation for the Terrance-class thin-client case: a peer that belongs in the mesh but should not be asked to carry general traffic.
 
 ## Motivating cases
 
-**Timothy (thin client).** A frequently-offline chromebook. His agent lives on his device; when he logs in, doorway must reach his conductor to serve his session. But doorway must never select his device as a general-purpose pool member when other peers could serve the request.
+**Terrance (thin client).** A frequently-offline chromebook. His agent lives on his device; when he logs in, doorway must reach his conductor to serve his session. But doorway must never select his device as a general-purpose pool member when other peers could serve the request.
 
 **Adam (bootstrapper node).** A capable Level-5 node in the alpha cluster, expected to contribute to doorway's general pool. His conductor binds localhost (per Holochain convention); today his `app_interface` on port 4445 is unreachable cross-pod because `attach_app_interface` always binds localhost. Adam sits outside the pool despite being a full node.
 
@@ -98,7 +98,7 @@ expose_conductor_externally = false  # TCP forwarder gate
 conductor_external_bind = "0.0.0.0:4445"
 ```
 
-When a flag is `"auto"`, the policy engine derives it from live state. Archetype provides the *threshold defaults* — Timothy's chromebook archetype supplies one set of numbers, Adam's node archetype supplies another — so peers rarely need to hand-author values.
+When a flag is `"auto"`, the policy engine derives it from live state. Archetype provides the *threshold defaults* — Terrance's chromebook archetype supplies one set of numbers, Adam's node archetype supplies another — so peers rarely need to hand-author values.
 
 **v2: auto-sensing.** At boot, elohim-storage queries its wrapper for container shape (memory, storage, CPU, network interfaces, archetype hint), classifies itself against the archetype library, loads the matching policy. Explicit TOML becomes an override path, used for failure-mode testing and deliberate operator tuning. The archetype library becomes a classifier, not a static lookup.
 
@@ -127,7 +127,7 @@ elohim-storage ships an optional TCP forwarder. When `[network].expose_conductor
 Doorway subscribes to `PeerStatus`. When a zome call arrives:
 
 1. **Parse for addressee agent.** If the call targets a specific agent (capability-grant flow, direct message, session-scoped call), extract the addressee pubkey.
-2. **Agent-addressed path.** Resolve addressee → hosting peer(s) via DHT lookup (new zome function; link structure already present in infrastructure DNA). Route to that peer regardless of `general_pool_member`. Timothy's chromebook receives his session traffic this way.
+2. **Agent-addressed path.** Resolve addressee → hosting peer(s) via DHT lookup (new zome function; link structure already present in infrastructure DNA). Route to that peer regardless of `general_pool_member`. Terrance's chromebook receives his session traffic this way.
 3. **General-pool path.** If no addressee, filter subscribed peers to `general_pool_member: true AND status IN (Online, Degraded)`, apply current selection logic (round-robin today, capacity-weighted when (iii) activates).
 4. **No silent fallthrough.** If agent-addressed lookup fails (no hosting peer online), return a clear error; do not fall back to the general pool (would silently route addressee-scoped traffic to a stranger).
 
@@ -153,7 +153,7 @@ Both changes are additive; v1 consumers of `PeerStatus` continue working through
 - Numeric capacity publication and backpressure-aware routing (story (iii)).
 - elohim-agent co-stewardship directive channel implementation (design hook only).
 - Attesting peer claims — v1 trusts peers to contribute their status honestly; attestation arrives with the federated-doorway-health work (plan 2026-03-12) already in flight.
-- Timothy's end-to-end thin-client session experience — v1 delivers the mechanism; the consuming feature is a separate story.
+- Terrance's end-to-end thin-client session experience — v1 delivers the mechanism; the consuming feature is a separate story.
 - Browser-context peer participation (service-worker-zip case).
 
 ## Migration plan (high level)

@@ -1,6 +1,6 @@
 ---
 name: rust-architect
-description: Use this agent for Rust backend architecture across the full spine — doorway gateway, elohim-storage domain services, diesel persistence, libp2p protocols, and Holochain zome development. Examples: <example>Context: User needs to add a new domain service. user: 'Scoring logic needs to move from Angular to Rust' assistant: 'Let me use the rust-architect agent to design the service across the right truth layers' <commentary>The agent understands the full backend spine and decides which layer owns the logic.</commentary></example> <example>Context: User is adding a new API endpoint with persistence. user: 'I need a new endpoint for economic events with diesel storage' assistant: 'I'll use the rust-architect agent to design handler, service, view, and model together' <commentary>The agent designs across the API boundary, service layer, and persistence together.</commentary></example> <example>Context: User needs to add a new zome entry type. user: 'I need to add an Attestation entry type to the imagodei zome' assistant: 'Let me use the rust-architect agent to design the entry type with validation and coordinator functions' <commentary>The agent knows HDK patterns, integrity/coordinator separation, and how zomes fit the spine.</commentary></example>
+description: Rust truth-layer architect (Sonnet). Owns the full backend spine — Holochain zomes, elohim-storage domain services, diesel persistence, libp2p protocols, doorway gateway — where domain logic, validation, and distributed state live. Decides which truth layer owns which piece of logic (DHT vs libp2p vs diesel vs doorway). Pairs with angular-architect (UI/reactive) — rust-architect owns offline-correct, P2P-native truth. Invoke when "design a new domain service in Rust", "add this zome entry type", "where should this logic live?" Examples: <example>Context: User needs to add a new domain service. user: 'Scoring logic needs to move from Angular to Rust' assistant: 'Let me use the rust-architect agent to design the service across the right truth layers' <commentary>The agent understands the full backend spine and decides which layer owns the logic.</commentary></example> <example>Context: User is adding a new API endpoint with persistence. user: 'I need a new endpoint for economic events with diesel storage' assistant: 'I'll use the rust-architect agent to design handler, service, view, and model together' <commentary>The agent designs across the API boundary, service layer, and persistence together.</commentary></example> <example>Context: User needs to add a new zome entry type. user: 'I need to add an Attestation entry type to the imagodei zome' assistant: 'Let me use the rust-architect agent to design the entry type with validation and coordinator functions' <commentary>The agent knows HDK patterns, integrity/coordinator separation, and how zomes fit the spine.</commentary></example>
 tools: Task, Bash, Glob, Grep, Read, Edit, Write, TodoWrite
 model: sonnet
 color: orange
@@ -354,12 +354,12 @@ Doorway is a web2 bridge. If you're writing business rules in `doorway/src/`, st
 
 | File | Purpose |
 |------|---------|
-| `doorway/src/proxy/pool.rs` | Worker pool for admin connection management |
-| `doorway/src/proxy/admin.rs` | Admin interface routing |
-| `doorway/src/proxy/app.rs` | App interface direct proxy |
-| `doorway/src/auth/jwt.rs` | JWT authentication |
-| `doorway/src/routes/` | HTTP and WebSocket routing |
-| `doorway/src/services/` | Discovery, custodian, verification |
+| `doorway/doorway-service/src/proxy/pool.rs` | Worker pool for admin connection management |
+| `doorway/doorway-service/src/proxy/admin.rs` | Admin interface routing |
+| `doorway/doorway-service/src/proxy/app.rs` | App interface direct proxy |
+| `doorway/doorway-service/src/auth/jwt.rs` | JWT authentication |
+| `doorway/doorway-service/src/routes/` | HTTP and WebSocket routing |
+| `doorway/doorway-service/src/services/` | Discovery, custodian, verification |
 
 ### Route Structure
 
@@ -393,9 +393,9 @@ Pool: 4 admin connections, round-robin, automatic reconnection, dev-mode fallbac
 ## Holochain Zome Development
 
 **Key references:**
-- `holochain/claude.md` (infrastructure guide)
-- `holochain/dna/LINK_ARCHITECTURE.md` (link design patterns)
-- `holochain/rna/rust/CUSTOMIZATION_PATTERNS.md` (validator customization)
+- `elohim/holochain/docs/claude.md` (infrastructure guide)
+- `elohim/holochain/dna/LINK_ARCHITECTURE.md` (link design patterns)
+- `elohim/holochain/rna/rust/CUSTOMIZATION_PATTERNS.md` (validator customization)
 - `@holochain-storage-api` skill (HTTP API layer — not zome-level)
 
 ### DNA Architecture
@@ -550,16 +550,16 @@ let buffer = WriteBuffer::for_recovery();      // Recovery/sync operations
 
 | File | Purpose |
 |------|---------|
-| `holochain/elohim-storage/src/views.rs` | API boundary — View/InputView types |
-| `holochain/elohim-storage/src/http.rs` | HTTP route registration |
-| `holochain/elohim-storage/src/api/` | Route handlers by domain |
-| `holochain/elohim-storage/src/services/` | Domain services (the heart) |
-| `holochain/elohim-storage/src/db/` | Diesel models, schema, queries |
-| `holochain/elohim-storage/src/p2p/` | libp2p protocol handlers |
-| `holochain/sdk/storage-client-ts/src/generated/` | Generated TS types |
-| `doorway/src/routes/` | Doorway HTTP/WS routing |
-| `doorway/src/services/` | Doorway web2 services |
-| `holochain/dna/` | Zome source code |
+| `elohim/elohim-storage/src/views.rs` | API boundary — View/InputView types |
+| `elohim/elohim-storage/src/http.rs` | HTTP route registration |
+| `elohim/elohim-storage/src/api/` | Route handlers by domain |
+| `elohim/elohim-storage/src/services/` | Domain services (the heart) |
+| `elohim/elohim-storage/src/db/` | Diesel models, schema, queries |
+| `elohim/elohim-storage/src/p2p/` | libp2p protocol handlers |
+| `elohim/sdk/storage-client-ts/src/generated/` | Generated TS types |
+| `doorway/doorway-service/src/routes/` | Doorway HTTP/WS routing |
+| `doorway/doorway-service/src/services/` | Doorway web2 services |
+| `elohim/holochain/dna/` | Zome source code |
 
 ## Common Issues
 

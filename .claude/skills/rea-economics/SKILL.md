@@ -195,7 +195,7 @@ await http.post(`/db/contributor-presences/${presenceId}/claim`, input);
 
 5. **Events are immutable** - Once created, economic events cannot be modified (append-only audit trail). Corrections are new events that reference the original.
 
-6. **hREA alignment** - Models align with the hREA GraphQL API. The zome types in `holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs` define the Holochain entry types.
+6. **hREA alignment** - Models align with the hREA GraphQL API. The zome types in `elohim/holochain/dna/elohim/zomes/content_store_integrity/src/lib.rs` define the Holochain entry types.
 
 ---
 
@@ -210,11 +210,11 @@ await http.post(`/db/contributor-presences/${presenceId}/claim`, input);
 | `elohim-app/src/app/shefa/services/economic.service.ts` | Core economic service |
 | `elohim-app/src/app/shefa/services/exchange.service.ts` | Marketplace |
 | `elohim-app/src/app/shefa/README-REQUESTS-AND-OFFERS.md` | Marketplace design |
-| `elohim-app/src/app/shefa/README-INSURANCE-MUTUAL.md` | Insurance mutual design |
+| `app/elohim-app/src/app/shefa/README-INSURANCE-MUTUAL.md` | Insurance mutual design |
 | `genesis/docs/Shefa_Economic_Infrastructure_Whitepaper.md` | Economic whitepaper |
 | `research/economic/README.md` | Unyt architecture exploration |
-| `holochain/sdk/storage-client-ts/src/generated/EconomicEventView.ts` | Generated type |
-| `holochain/elohim-storage/src/views.rs` | Rust view types (EconomicEventView, etc.) |
+| `elohim/sdk/storage-client-ts/src/generated/EconomicEventView.ts` | Generated type |
+| `elohim/elohim-storage/src/views.rs` | Rust view types (EconomicEventView, etc.) |
 
 ## External References
 

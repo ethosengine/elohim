@@ -482,7 +482,7 @@ soak-tested.
 
 **Scope:**
 1. **Live shem deployment** for Bands-3 chaos demo (per
-   `project_shem_is_p2p_live_canvas`): household cluster for Matthew/Jessica/Timothy
+   `project_shem_is_p2p_live_canvas`): household cluster for Matthew/Jessica/Terrance
    + shem peers for others.
 2. **Three extended Plan 5 scenarios** with tier assertions:
    - Steward offline → reach breached → restitution → reach restored;

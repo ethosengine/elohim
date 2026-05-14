@@ -82,3 +82,10 @@ genesis/.blob-cache/
 .claude/sonar-issues-summary.json
 genesis/research/repos/
 .superpowers/
+
+# MemPalace (vector store + temporal entity-graph; PVC-persisted, regenerable via mempalace mine)
+/.mempalace/
+# Per-source init artifacts (config + entities mempalace writes into mined directories)
+**/mempalace.yaml
+**/entities.json
+

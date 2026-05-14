@@ -47,7 +47,7 @@ All SQL migration tables (see Task 8), Rust view structs (Task 9), and JSON sche
 
 ### Deleted
 - `elohim/sdk/schemas/v1/views/recovery-seed-commitment.schema.json`
-- `elohim/sdk/schemas/v1/views/recovery-quorum-request.schema.json` (renamed, so old file removed)
+- `elohim/sdk/schemas/v1/views/recovery-request.schema.json` (renamed, so old file removed)
 - Generated TypeScript files for deleted views (across three consumer directories): `RecoverySeedCommitmentView.ts`, `RecoveryQuorumRequestView.ts` (regenerated as `RecoveryRequestView.ts`)
 
 ---
@@ -1049,7 +1049,7 @@ instead of seed_commitment_hash + quorum_signature."
 
 **Files:**
 - Delete: `elohim/sdk/schemas/v1/views/recovery-seed-commitment.schema.json`
-- Delete: `elohim/sdk/schemas/v1/views/recovery-quorum-request.schema.json`
+- Delete: `elohim/sdk/schemas/v1/views/recovery-request.schema.json`
 - Create: `elohim/sdk/schemas/v1/views/recovery-request.schema.json`
 - Modify: `elohim/sdk/schemas/v1/views/key-rotation.schema.json`
 - Modify: `elohim/sdk/schemas/scripts/codegen-ts.mjs`
@@ -1058,7 +1058,7 @@ instead of seed_commitment_hash + quorum_signature."
 
 ```bash
 rm /projects/elohim/elohim/sdk/schemas/v1/views/recovery-seed-commitment.schema.json
-rm /projects/elohim/elohim/sdk/schemas/v1/views/recovery-quorum-request.schema.json
+rm /projects/elohim/elohim/sdk/schemas/v1/views/recovery-request.schema.json
 ```
 
 - [ ] **Step 2: Create recovery-request.schema.json**

@@ -519,8 +519,8 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 ### Task 5: Diesel migration — the 4 EPR tables
 
 **Files:**
-- Create: `elohim/elohim-storage/migrations/2026-04-22-000000_add_epr_tables/up.sql`
-- Create: `elohim/elohim-storage/migrations/2026-04-22-000000_add_epr_tables/down.sql`
+- Create: `elohim/elohim-storage/migrations/2026-04-22-050000_add_epr_tables/up.sql`
+- Create: `elohim/elohim-storage/migrations/2026-04-22-050000_add_epr_tables/down.sql`
 - Modify: `elohim/elohim-storage/src/db/diesel_schema.rs` (auto-generated)
 
 - [ ] **Step 1: Create the migration directory**
@@ -2724,10 +2724,10 @@ If the format is unfamiliar or the existing elohim-storage pipeline already cove
 ```bash
 cd /projects/elohim/.worktrees/epr-codec-phase-1
 # simulate: stage a small change in an EPR path, then run the hook manually
-echo "# phase 2a test" >> elohim/elohim-storage/migrations/2026-04-22-000000_add_epr_tables/up.sql
-git add elohim/elohim-storage/migrations/2026-04-22-000000_add_epr_tables/up.sql
+echo "# phase 2a test" >> elohim/elohim-storage/migrations/2026-04-22-050000_add_epr_tables/up.sql
+git add elohim/elohim-storage/migrations/2026-04-22-050000_add_epr_tables/up.sql
 HUSKY=1 .husky/pre-push origin main < /dev/null
-git checkout -- elohim/elohim-storage/migrations/2026-04-22-000000_add_epr_tables/up.sql
+git checkout -- elohim/elohim-storage/migrations/2026-04-22-050000_add_epr_tables/up.sql
 ```
 
 Expected: the hook detects the changed path and runs the gate; it should succeed (all tests pass).

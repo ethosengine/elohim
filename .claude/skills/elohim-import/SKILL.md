@@ -1,6 +1,6 @@
 ---
 name: elohim-import
-description: Knowledge and workflows for importing Elohim Protocol content into the lamad learning platform
+description: Workflows for transforming Elohim Protocol source content (markdown, Gherkin) into seed-data for the lamad learning platform. Use when "import this content to lamad", "transform markdown to content nodes", "run the elohim-import CLI", or working on the genesis → seed-data pipeline. Complements holochain-import (DHT-seed layer) by handling the transformation layer.
 ---
 
 # Elohim Import Skill

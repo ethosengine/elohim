@@ -38,7 +38,7 @@ Feature: Peer Mesh — P2P App Delivery
   @wip @browser-only
   Scenario: Client resolves multiple delivery peers via EPR
     Given "evolution-of-trust" has knownLocations including doorway and 2 peers
-    When Timothy's SW needs to fetch "evolution-of-trust"
+    When Terrance's SW needs to fetch "evolution-of-trust"
     Then the SW queries EPR for knownLocations
     And receives a scored list of peers with delivery capabilities
 
@@ -48,13 +48,13 @@ Feature: Peer Mesh — P2P App Delivery
       | peer             | network  | capability        | cache_tier  |
       | matthew-laptop   | LAN      | serves_extracted  | extraction  |
       | doorway-alpha    | WAN      | serves_extracted  | projection  |
-      | timothy-remote   | relay    | serves_compressed | blob-only   |
+      | terrance-remote   | relay    | serves_compressed | blob-only   |
     When the SW scores and ranks delivery peers
     Then the preference order is:
       | rank | peer             | reason                     |
       | 1    | matthew-laptop   | LAN + warm extraction      |
       | 2    | doorway-alpha    | WAN + projection cache     |
-      | 3    | timothy-remote   | relay + client must extract |
+      | 3    | terrance-remote   | relay + client must extract |
 
   # --- Fallback Chain ---
 
@@ -62,7 +62,7 @@ Feature: Peer Mesh — P2P App Delivery
   Scenario: Fallback chain degrades gracefully
     Given the SW has scored peers for "evolution-of-trust"
     And the best peer (LAN, extracted) goes offline
-    When Timothy loads "evolution-of-trust"
+    When Terrance loads "evolution-of-trust"
     Then the SW tries the LAN peer and detects failure
     And the SW falls back to doorway projection cache
     And the app loads successfully from doorway
@@ -71,7 +71,7 @@ Feature: Peer Mesh — P2P App Delivery
   Scenario: When all extraction peers fail, client extracts ZIP
     Given all peers that serve extracted files are unavailable
     And one peer with serves_compressed: true is reachable
-    When Timothy loads "evolution-of-trust"
+    When Terrance loads "evolution-of-trust"
     Then the SW downloads the ZIP from the compressed-only peer
     And the SW extracts files locally
     And the app loads with a slightly longer initial delay
@@ -81,10 +81,10 @@ Feature: Peer Mesh — P2P App Delivery
     Given doorway "alpha" is offline
     And human "Matthew" on Tauri node "matthew-laptop" is reachable via relay
     And Matthew has "evolution-of-trust" warm
-    When Timothy loads "evolution-of-trust"
+    When Terrance loads "evolution-of-trust"
     Then the SW discovers Matthew's node via EPR knownLocations
     And the app loads from Matthew's node
-    And Timothy's experience is not degraded
+    And Terrance's experience is not degraded
 
   # --- libp2p QueryDelivery ---
 

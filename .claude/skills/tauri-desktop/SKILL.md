@@ -1,6 +1,6 @@
 ---
 name: tauri-desktop
-description: Reference for Tauri 2.9 desktop shell development, tauri-plugin-holochain integration, doorway identity handoff, deep linking, key bundle crypto, and IPC commands. Use when someone asks "set up Tauri dev environment", "embed Holochain conductor", "handle deep links", "desktop identity flow", or works on the steward app and native identity.
+description: REFERENCE knowledge for Tauri 2.9 DESKTOP SHELL development — tauri-plugin-holochain integration, doorway identity handoff via key bundle crypto, deep linking (cold-start + warm-start buffering), IPC command patterns. Use when "set up Tauri shell", "embed Holochain conductor in steward app", "handle deep links", "desktop identity flow", or working on steward native identity. NOT for starting local dev services (use hc-dev-orchestrator).
 metadata:
   author: elohim-protocol
   version: 1.0.0
@@ -43,7 +43,7 @@ The Elohim steward app (`steward/src-tauri/`) is a Tauri 2.9 desktop shell embed
 ## Dependencies
 
 ```toml
-# steward/src-tauri/Cargo.toml
+# steward/device/src-tauri/Cargo.toml
 tauri = { version = "2.9", features = ["devtools"] }
 tauri-plugin-holochain = { git = "https://github.com/darksoil-studio/tauri-plugin-holochain", branch = "main-0.6" }
 tauri-plugin-deep-link = "2"
@@ -324,11 +324,11 @@ hc app pack steward/workdir/
 
 | File | Purpose |
 |------|---------|
-| `steward/src-tauri/src/lib.rs` | Main Tauri setup, IPC commands, deep links |
-| `steward/src-tauri/src/identity.rs` | Key bundle decryption (Argon2 + ChaCha20) |
-| `steward/src-tauri/src/doorway.rs` | HTTP client for doorway API |
-| `steward/src-tauri/Cargo.toml` | Dependencies |
-| `steward/src-tauri/tauri.conf.json` | Tauri configuration |
+| `steward/device/src-tauri/src/lib.rs` | Main Tauri setup, IPC commands, deep links |
+| `steward/device/src-tauri/src/identity.rs` | Key bundle decryption (Argon2 + ChaCha20) |
+| `steward/device/src-tauri/src/doorway.rs` | HTTP client for doorway API |
+| `steward/device/src-tauri/Cargo.toml` | Dependencies |
+| `steward/device/src-tauri/tauri.conf.json` | Tauri configuration |
 | `steward/workdir/elohim.happ` | Compiled hApp bundle |
 
 ## External References

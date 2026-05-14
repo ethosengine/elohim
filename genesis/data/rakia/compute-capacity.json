@@ -238,20 +238,20 @@
         }
       }
     },
-    "timothy": {
-      "humanLabel": "timothy-tutor",
+    "terrance": {
+      "humanLabel": "terrance-tutor",
       "storyGroup": "edge-builders",
       "suspended": false,
       "deployments": {
         "alpha": {
-          "pod": "elohim-timothy-alpha-0",
+          "pod": "elohim-terrance-alpha-0",
           "node": "thinkc-p0h",
           "requests": { "cpu_m": 250, "memory_Mi": 1024 },
           "limits": { "cpu_m": 1000, "memory_Mi": 3072 },
           "pvc_Gi": 40
         },
         "staging": {
-          "pod": "elohim-timothy-staging-0",
+          "pod": "elohim-terrance-staging-0",
           "node": "intel-nuc",
           "requests_sum": { "cpu_m": 330, "memory_Mi": 616 },
           "limits_sum": { "cpu_m": 1400, "memory_Mi": 1952 },
@@ -362,14 +362,14 @@
         "memory_Mi": 512,
         "persistentVolume_Gi": 40
       },
-      "notes": "pete-staging, frank-prod, timothy-staging would also be co-located here when their distributed deployments were enabled. Currently gated by pete/frank human-level suspension; timothy-staging skipped per Q-A simplification."
+      "notes": "pete-staging, frank-prod, terrance-staging would also be co-located here when their distributed deployments were enabled. Currently gated by pete/frank human-level suspension; terrance-staging skipped per Q-A simplification."
     },
     {
       "name": "edge-builders",
-      "description": "Edge pool — timothy-alpha + eclipse-che gateway/operator + Jenkins build agents. Spans 3 thinkc nodes; throttling delays merges but doesn't strand data.",
+      "description": "Edge pool — terrance-alpha + eclipse-che gateway/operator + Jenkins build agents. Spans 3 thinkc nodes; throttling delays merges but doesn't strand data.",
       "priority": 2,
       "fateSharingNode": "edge-pool",
-      "humans": ["timothy"],
+      "humans": ["terrance"],
       "stewardWorkloads": ["eclipse-che gateway", "eclipse-che operator", "jenkins build agents"],
       "addedAt": "2026-01-15",
       "active": true,

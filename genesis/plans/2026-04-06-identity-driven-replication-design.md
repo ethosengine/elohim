@@ -32,7 +32,7 @@ There is no "seeder." There is no "bootstrap mode." There is only: I have keys, 
 
 Adam (`human-adam-firstman`) already exists as a persona at the data layer — account package, presence, conductor-groups membership ("Eden Household"). What's missing is his K8s deployment. This sprint adds Adam as the 6th deployed conductor in the genesis topology, with elevated CPU/memory/storage so he can handle the initial seed write.
 
-The deployed topology becomes: **Adam** (genesis, elevated resources), **Matthew**, **Jessica**, **Pete**, **Timothy**, **Frank**. Adam is the first and only peer to receive the direct content seed; the other five replicate from him via P2P.
+The deployed topology becomes: **Adam** (genesis, elevated resources), **Matthew**, **Jessica**, **Pete**, **Terrance**, **Frank**. Adam is the first and only peer to receive the direct content seed; the other five replicate from him via P2P.
 
 Adam's role as genesis peer establishes a reusable pattern: any peer that lends compute for network bootstrap (or recovery, or migration) earns credit on the network as a shefa contribution.
 
@@ -200,7 +200,7 @@ STORAGE_URL="http://${adamStorageUrl}" npx tsx src/seed-sqlite.ts
 
 // Step 2: Register the other humans on their conductors (identity only, no content)
 // Same as someone punching in their key on a new device
-for (human in [jessica, pete, timothy, frank]) {
+for (human in [jessica, pete, terrance, frank]) {
     curl -X POST "http://${human.doorwayUrl}/auth/register" \
         -H "Content-Type: application/json" \
         -d '{"identifier":"${human.email}","displayName":"${human.name}",...}'
@@ -210,7 +210,7 @@ for (human in [jessica, pete, timothy, frank]) {
 waitForEprPublication(adamStorageUrl, expectedCount: 1364)
 
 // Step 4: Wait for other peers to replicate via P2P
-for (human in [jessica, pete, timothy, frank]) {
+for (human in [jessica, pete, terrance, frank]) {
     waitForReplication(human.storageUrl, expectedCount: human.expectedContentCount)
 }
 ```

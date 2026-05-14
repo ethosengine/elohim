@@ -163,7 +163,7 @@ Follow this workflow:
 ## Schema Contract (view validation)
 
 View types must match their JSON Schema in `../sdk/schemas/v1/views/`.
-The `tests/schema_contract.rs` integration test validates this at `cargo test` time.
+The `elohim/elohim-storage/tests/schema_contract.rs` integration test validates this at `cargo test` time.
 
 When modifying a View struct:
 1. Update the schema first (`elohim/sdk/schemas/v1/views/{name}.schema.json`)
@@ -227,11 +227,11 @@ Storage and distribution language — `quilt` (RS-encoded distribution of a cont
 
 | File | Purpose |
 |------|---------|
-| `src/views.rs` | API boundary - all View/InputView types |
-| `src/http.rs` | HTTP routes - uses View types |
-| `src/db/models.rs` | Diesel models - internal snake_case |
-| `src/db/*_diesel.rs` | CRUD operations - internal only |
-| `src/db/mod.rs` | DB module coordination |
+| `elohim/elohim-storage/src/views.rs` | API boundary - all View/InputView types |
+| `elohim/elohim-storage/src/http.rs` | HTTP routes - uses View types |
+| `elohim/elohim-storage/src/db/models.rs` | Diesel models - internal snake_case |
+| `elohim/elohim-storage/src/db/*_diesel.rs` | CRUD operations - internal only |
+| `elohim/elohim-storage/src/db/mod.rs` | DB module coordination |
 
 ---
 

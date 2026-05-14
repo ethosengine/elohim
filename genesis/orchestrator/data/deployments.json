@@ -36,7 +36,7 @@
       "edgenodeCpuLimit": "3000m"
     },
     {
-      "$comment": "TEMPORARY BUMP (2026-05-05): jessica's edgenode OOM-flapping at 1536Mi limit (7 restarts in 26h, last OOMKilled 2026-05-05T18:43Z while serving content + handling app-WS authentication during a2o sweep). Cluster is also in scaled-down mode with shem decommissioned, so jessica picks up extra registration load via the hosted conductor pool (matthew/jessica/timothy is the only path for the 25 humans newly seeded by the iter-3 agencyPhase fix). Bumping 1536Mi → 3Gi to give ~2× headroom over observed RSS — same pattern as Timothy's 2026-04-21 chromebook bump (see Timothy's $comment block for the restoration chain). Restoration: when shem returns and the hosted-pool load drops back to baseline, restore to the device-recycled-laptop archetype floor at 512Mi/1536Mi.",
+      "$comment": "TEMPORARY BUMP (2026-05-05): jessica's edgenode OOM-flapping at 1536Mi limit (7 restarts in 26h, last OOMKilled 2026-05-05T18:43Z while serving content + handling app-WS authentication during a2o sweep). Cluster is also in scaled-down mode with shem decommissioned, so jessica picks up extra registration load via the hosted conductor pool (matthew/jessica/terrance is the only path for the 25 humans newly seeded by the iter-3 agencyPhase fix). Bumping 1536Mi → 3Gi to give ~2× headroom over observed RSS — same pattern as Terrance's 2026-04-21 chromebook bump (see Terrance's $comment block for the restoration chain). Restoration: when shem returns and the hosted-pool load drops back to baseline, restore to the device-recycled-laptop archetype floor at 512Mi/1536Mi.",
       "$recycledLaptopFloor": {
         "edgenodeMemoryRequest": "512Mi",
         "edgenodeMemoryLimit": "1536Mi",
@@ -75,21 +75,21 @@
       "edgenodeCpuLimit": "1000m"
     },
     {
-      "$comment": "THIRD TEMPORARY BUMP (2026-05-07). History: Chromebook floor 384Mi/768Mi + 150m/500m → bumped 2026-04-17 to Jessica/Frank/Pete 'typical steward' tier (512Mi/1536Mi + 250m/1000m) to survive seed burst. → 2026-04-21 bumped to 1Gi/3Gi + 250m/1000m after sustained content-serving OOMs. → 2026-05-07 bumped again to 2Gi/6Gi + 500m/2000m + added 'performance' nodeType: M1 topology-substrate-completion build #994 saw timothy's Holochain conductor admin port (:4444 socat sidecar) ETIMEDOUT during seed-conductor-identities + seed-agent-bindings stages; storage port :8090 was reachable so the pod itself was alive but the conductor + admin socat were under compute pressure. With shem decommissioned and matthew/jessica/timothy carrying the full hosted-conductor pool plus M1's three new seed stages writing to admin WS, the chromebook-tier 3Gi limit and 1000m CPU were insufficient. 'performance' nodeType added so the scheduler can land timothy on ethosengine performance hardware when available (mirrors jessica's 2026-05-05 bump). Restoration: when shem returns and the hosted-pool load drops, restore to 1Gi/3Gi or further to chromebook floor. Full design in genesis/plans/2026-04-13-device-archetypes-design.md.",
+      "$comment": "THIRD TEMPORARY BUMP (2026-05-07). History: Chromebook floor 384Mi/768Mi + 150m/500m → bumped 2026-04-17 to Jessica/Frank/Pete 'typical steward' tier (512Mi/1536Mi + 250m/1000m) to survive seed burst. → 2026-04-21 bumped to 1Gi/3Gi + 250m/1000m after sustained content-serving OOMs. → 2026-05-07 bumped again to 2Gi/6Gi + 500m/2000m + added 'performance' nodeType: M1 topology-substrate-completion build #994 saw terrance's Holochain conductor admin port (:4444 socat sidecar) ETIMEDOUT during seed-conductor-identities + seed-agent-bindings stages; storage port :8090 was reachable so the pod itself was alive but the conductor + admin socat were under compute pressure. With shem decommissioned and matthew/jessica/terrance carrying the full hosted-conductor pool plus M1's three new seed stages writing to admin WS, the chromebook-tier 3Gi limit and 1000m CPU were insufficient. 'performance' nodeType added so the scheduler can land terrance on ethosengine performance hardware when available (mirrors jessica's 2026-05-05 bump). Restoration: when shem returns and the hosted-pool load drops, restore to 1Gi/3Gi or further to chromebook floor. Full design in genesis/plans/2026-04-13-device-archetypes-design.md.",
       "$chromebookFloor": {
         "edgenodeMemoryRequest": "384Mi",
         "edgenodeMemoryLimit": "768Mi",
         "edgenodeCpuRequest": "150m",
         "edgenodeCpuLimit": "500m"
       },
-      "name": "timothy",
+      "name": "terrance",
       "role": "tutor",
-      "humanLabel": "timothy-tutor",
-      "humanId": "human-timothy-tutor",
+      "humanLabel": "terrance-tutor",
+      "humanId": "human-terrance-tutor",
       "pattern": "consolidated",
       "template": "genesis/orchestrator/manifests/humans/_edgenode-consolidated.template.yaml",
       "deviceArchetype": "device-chromebook-edu",
-      "affinityComment": "Timothy: Chromebook-class stewarded child — bumped three times for seeding + sync-load + M1 conductor admin WS load (see $comment); performance node affinity added 2026-05-07",
+      "affinityComment": "Terrance: Chromebook-class stewarded child — bumped three times for seeding + sync-load + M1 conductor admin WS load (see $comment); performance node affinity added 2026-05-07",
       "nodeTypes": ["edge", "performance"],
       "edgenodeMemoryRequest": "2Gi",
       "edgenodeMemoryLimit": "6Gi",

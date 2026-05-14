@@ -106,7 +106,7 @@
     {
       "id": "rel-0008",
       "sourceHumanId": "human-jessica-spouse",
-      "targetHumanId": "human-timothy-tutor",
+      "targetHumanId": "human-terrance-tutor",
       "type": "learning_partner",
       "consentId": "consent-0008",
       "consentState": "accepted",
@@ -118,7 +118,7 @@
     {
       "id": "rel-0009",
       "sourceHumanId": "human-james-son",
-      "targetHumanId": "human-timothy-tutor",
+      "targetHumanId": "human-terrance-tutor",
       "type": "mentee",
       "consentId": "consent-0009",
       "consentState": "accepted",

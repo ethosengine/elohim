@@ -11,7 +11,7 @@ Feature: Assessment Completion Feedback
 
   @discovery @happy-path
   Scenario: Learner sees personalized discovery result after completing assessment
-    Given human "Timothy" is logged in on doorway "alpha" with device
+    Given human "Terrance" is logged in on doorway "alpha" with device
     When I navigate to the "Know Thyself" path
     And I advance to the "Attachment Style" assessment step
     And I start the assessment
@@ -35,8 +35,8 @@ Feature: Assessment Completion Feedback
 
   @discovery @attestation
   Scenario: Discovery completion records an attestation
-    Given human "Timothy" is logged in on doorway "alpha" with device
-    And Timothy has not completed any discovery assessments
+    Given human "Terrance" is logged in on doorway "alpha" with device
+    And Terrance has not completed any discovery assessments
     When I navigate to the "Know Thyself" path
     And I advance to the "Attachment Style" assessment step
     And I start the assessment
@@ -47,7 +47,7 @@ Feature: Assessment Completion Feedback
 
   @discovery @continue
   Scenario: Learner continues after discovery feedback
-    Given human "Timothy" is logged in on doorway "alpha" with device
+    Given human "Terrance" is logged in on doorway "alpha" with device
     When I navigate to the "Know Thyself" path
     And I advance to the "Attachment Style" assessment step
     And I start the assessment
@@ -109,7 +109,7 @@ Feature: Assessment Completion Feedback
 
   @regression
   Scenario: No console errors during completion feedback
-    Given human "Timothy" is logged in on doorway "alpha" with device
+    Given human "Terrance" is logged in on doorway "alpha" with device
     When I navigate to the "Know Thyself" path
     And I advance to the "Attachment Style" assessment step
     And I start the assessment

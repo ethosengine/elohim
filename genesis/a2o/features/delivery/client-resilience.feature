@@ -12,19 +12,19 @@ Feature: Client Resilience — Service Worker and Capability Negotiation
   Background:
     Given doorway "alpha" at "E2E_DOORWAY_ALPHA"
     And content "evolution-of-trust" has been seeded as html5-app
-    And human "Timothy" is logged in on doorway "alpha" with device
+    And human "Terrance" is logged in on doorway "alpha" with device
 
   # --- Service Worker Registration ---
 
   @wip @browser-only
   Scenario: Service Worker registers in browser
-    When Timothy visits the app for the first time
+    When Terrance visits the app for the first time
     Then the Service Worker is registered and active
     And the SW intercepts requests matching "/apps/"
 
   @wip @tauri-only
   Scenario: Service Worker registers in Tauri WebView
-    When Timothy launches the Tauri desktop app
+    When Terrance launches the Tauri desktop app
     Then the Service Worker is registered in the WebView
     And the SW intercepts requests matching "/apps/"
 
@@ -32,21 +32,21 @@ Feature: Client Resilience — Service Worker and Capability Negotiation
 
   @wip @browser-only
   Scenario: Cached app works offline
-    Given Timothy has loaded "evolution-of-trust" while online
+    Given Terrance has loaded "evolution-of-trust" while online
     And the Service Worker has cached all app files
-    When Timothy goes offline
-    And Timothy reloads "evolution-of-trust"
+    When Terrance goes offline
+    And Terrance reloads "evolution-of-trust"
     Then the app loads and functions normally
     And zero network requests are attempted
 
   @wip @tauri-only
   Scenario: Cached app survives storage pod restart
-    Given Timothy has loaded "evolution-of-trust" on the Tauri client
+    Given Terrance has loaded "evolution-of-trust" on the Tauri client
     And the Service Worker has cached all app files
     When the local elohim-storage pod restarts
-    And Timothy reloads "evolution-of-trust"
+    And Terrance reloads "evolution-of-trust"
     Then the app loads from the Service Worker cache
-    And Timothy's experience is uninterrupted
+    And Terrance's experience is uninterrupted
 
   # --- Capability Negotiation ---
 
@@ -68,7 +68,7 @@ Feature: Client Resilience — Service Worker and Capability Negotiation
   @wip @browser-only
   Scenario: SW probes peer capability before fetching assets
     Given the Service Worker cache for "evolution-of-trust" is empty
-    When Timothy loads "evolution-of-trust"
+    When Terrance loads "evolution-of-trust"
     Then the SW sends a HEAD capability probe to the serving peer
     And the probe response includes the delivery mode and blob_hash
     And the SW uses the indicated delivery mode for subsequent file requests
@@ -78,7 +78,7 @@ Feature: Client Resilience — Service Worker and Capability Negotiation
   @wip @browser-only
   Scenario: SW fetches individual files from a peer with warm extraction
     Given the serving peer advertises serves_extracted: true for "evolution-of-trust"
-    When Timothy loads "evolution-of-trust"
+    When Terrance loads "evolution-of-trust"
     Then the SW fetches each file individually
     And each file is cached in SW CacheStorage
     And no ZIP download occurs
@@ -88,7 +88,7 @@ Feature: Client Resilience — Service Worker and Capability Negotiation
   @wip @browser-only
   Scenario: SW extracts ZIP locally when peer only serves compressed
     Given the serving peer advertises serves_compressed: true but not serves_extracted
-    When Timothy loads "evolution-of-trust"
+    When Terrance loads "evolution-of-trust"
     Then the SW downloads the ZIP blob once
     And the SW extracts all files from the ZIP into CacheStorage
     And the requested file is returned from the local extraction
@@ -112,7 +112,7 @@ Feature: Client Resilience — Service Worker and Capability Negotiation
     # network round-trip. Sub-5ms lookups are the design target.
     Given elohim-cache-core WASM is loaded in the browser
     And content "evolution-of-trust" has been fetched and written into the WASM IndexedDB cache
-    When Timothy navigates to a previously visited page in "evolution-of-trust"
+    When Terrance navigates to a previously visited page in "evolution-of-trust"
     Then the content lookup resolves from the WASM cache
     And no network request is made for that content
     And the lookup latency is under 5 ms
@@ -121,7 +121,7 @@ Feature: Client Resilience — Service Worker and Capability Negotiation
   Scenario: WASM cache falls back to network when content not cached
     Given elohim-cache-core WASM is loaded in the browser
     And the WASM cache has no entry for "evolution-of-trust"
-    When Timothy loads "evolution-of-trust"
+    When Terrance loads "evolution-of-trust"
     Then the request falls through to the SW → doorway → storage chain
     And the content is served successfully from the network
     And the fetched content is written into the WASM cache for subsequent lookups
@@ -133,8 +133,8 @@ Feature: Client Resilience — Service Worker and Capability Negotiation
     # 404. The app must not crash or block content delivery when this happens.
     # See known issue: "WASM cache 404 noise" in CLAUDE.md.
     Given elohim-cache-core WASM failed to load with a 404 response
-    When Timothy loads "evolution-of-trust"
+    When Terrance loads "evolution-of-trust"
     Then content requests bypass the WASM cache and go directly to the SW → network chain
     And "evolution-of-trust" loads and functions normally
-    And no errors are shown to Timothy
+    And no errors are shown to Terrance
     And the browser console contains exactly 1 warning about WASM unavailability

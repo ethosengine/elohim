@@ -9,11 +9,17 @@ This is the navigational map for the project's memory tooling. The system is str
 
 | Perspective | Subagent | Toolkit | Purpose |
 |---|---|---|---|
-| **Past** | [`historian`](../../agents/historian.md) | archive walks + git log (eventually MemPalace) | Surface precedent/risk patterns from `.claude/archive/` + epic git history into present work |
-| **Present** | [`librarian`](../../agents/librarian.md) | this directory's scripts | Tend MEMORY.md, CLAUDE.md surfaces, skill catalog — the working memory |
+| **Past** | [`historian`](../../agents/historian.md) | MemPalace MCP (wired) + archive walks + git log | Surface precedent/risk patterns from mined corpus (shifts/memory/plans/elohim-protocol wings) + archive + epic git history into present work |
+| **Present** | [`librarian`](../../agents/librarian.md) | this directory's scripts + MemPalace MCP curate-grade | Tend MEMORY.md, CLAUDE.md surfaces, skill catalog. `mempalace_sync` complements `cleanup-scan`; `mempalace_check_duplicate` replaces TF-IDF dedupe approximation. |
 | **Future** | [`cartographer`](../../agents/cartographer.md) | `/converge` skill + scripts at `.claude/scripts/converge/` | Synthesize memkit reports into a ranked next-actions menu, hand off to `/shift` |
 
 All three are Opus-tier subagents. The mechanical work (running scripts, parsing reports) is cheap; the orchestration + judgment is what they encode.
+
+### Meaning axis (orthogonal to time)
+
+A fourth subagent — the **storyteller** ([`.claude/agents/storyteller.md`](../../agents/storyteller.md)) — operates orthogonally to the three temporal perspectives. They don't tend a slice of time; they decide which memory artifacts graduate to canonical story, which are memorialized in deep archive (Isildur's-diary tier), and which are held for later. They own [`genesis/data/stories/`](../../../genesis/data/stories/) as the catalog of canonical human stories that compose with humans, devices, epics, and Gherkin scenarios. See [`project_forgetting_as_design.md`](../../memory/project_forgetting_as_design.md) for the principle.
+
+In memory sprints, the storyteller joins as a third parallel voice alongside historian and librarian, producing a graduate/memorialize/hold disposition triage that the cartographer can fold into the next-actions menu.
 
 ## Architecture
 
@@ -101,12 +107,12 @@ These are the architectural insights the subagents internalize:
 
 - `project_three_temporal_perspectives.md` — history/development/roadmap as views on the epic-graph
 - `project_memory_in_repo_two_tier.md` — primary at `.claude/memory/`, personal slot via symlink
-- `project_signal_driven_audit_ceremonies.md` — accumulator + ceremony pattern (mirrors EPR feedback)
-- `project_shared_lib_pattern.md` — `_lib/` extraction discipline
-- `project_no_claude_md_opt_out_pattern.md` — operator-rationale markers
-- `project_historian_pattern_surface_agent.md` — past-surface role
-- `project_wisdom_resolves_into_epics.md` — memory's destination is story-compaction
-- `reference_mempalace.md` — proposed substrate for historian
+- `.claude/memory/project_signal_driven_audit_ceremonies.md` — accumulator + ceremony pattern (mirrors EPR feedback)
+- `.claude/memory/project_shared_lib_pattern.md` — `_lib/` extraction discipline
+- `.claude/memory/project_no_claude_md_opt_out_pattern.md` — operator-rationale markers
+- `.claude/memory/project_historian_pattern_surface_agent.md` — past-surface role
+- `.claude/memory/project_wisdom_resolves_into_epics.md` — memory's destination is story-compaction
+- `.claude/memory/reference_mempalace.md` — proposed substrate for historian
 
 ## Specs
 

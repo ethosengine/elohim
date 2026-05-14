@@ -894,14 +894,14 @@ red-team/*.feature  (14+ scenarios)
 
 Per the corrected household-plus-shem topology:
 
-- **Household cluster:** Matthew, Jessica, Timothy on separate nodes. Matthew operates a doorway (D_matthew).
+- **Household cluster:** Matthew, Jessica, Terrance on separate nodes. Matthew operates a doorway (D_matthew).
 - **Shem:** Pete, Susan, Adam, Eve, Nancy, Gertrude, Maria, ... as real peers with their own conductors. Shem's doorway (D_shem).
 
 Phase 2 acceptance scenarios on the live cross-node topology:
 
-**Scenario 1 — Cross-doorway happy path:** Matthew loses his laptop (and D_matthew goes down). He recovers via D_shem. Jessica and Timothy (household nodes) + Pete + one other shem persona authorize. Matthew lands in a hosted cell on D_shem. Dashboards on both doorways light up correctly.
+**Scenario 1 — Cross-doorway happy path:** Matthew loses his laptop (and D_matthew goes down). He recovers via D_shem. Jessica and Terrance (household nodes) + Pete + one other shem persona authorize. Matthew lands in a hosted cell on D_shem. Dashboards on both doorways light up correctly.
 
-**Scenario 2 — Stewarded recovery (Phase 2b):** Timothy loses his tablet. Jessica (his steward) initiates recovery on his behalf from her household node. `RecoveryRequest.recovery_mode = Stewarded`. Age-appropriate ward affirmation carried via `DevicePolicy`. Timothy lands in his hosted cell.
+**Scenario 2 — Stewarded recovery (Phase 2b):** Terrance loses his tablet. Jessica (his steward) initiates recovery on his behalf from her household node. `RecoveryRequest.recovery_mode = Stewarded`. Age-appropriate ward affirmation carried via `DevicePolicy`. Terrance lands in his hosted cell.
 
 **Scenario 3 — Concurrent recovery race (red-team):** Attacker initiates `RecoveryRequest` for Matthew at D_shem simultaneously with Matthew's legitimate request at D_matthew. Holders' elohims detect concurrency. Legitimate request reaches quorum first. Attacker's `KeyRotation` attempt fails validation (commitment superseded).
 
@@ -929,7 +929,7 @@ Phase 2 is called done only when all three scenarios pass on the live topology w
 - `KeyRotation` validation rule 6 reviewed with a cryptographer (Ed25519 signature verification details, domain separation)
 - Doorway `/elohim/recovery/*` and `/elohim/recovery-provisioning/*` libp2p protocols registered in the `libp2p-protocols` skill's wire-format spec
 - Red-team participants identified (preferably external to the immediate design team)
-- Shem personas confirmed ready to run the acceptance canvas (verify household cluster has Matthew/Jessica/Timothy deployed correctly)
+- Shem personas confirmed ready to run the acceptance canvas (verify household cluster has Matthew/Jessica/Terrance deployed correctly)
 - Phase 1 shard tracking confirmed stable on shem (prerequisite for later phases; not blocking Phase 2)
 
 ---

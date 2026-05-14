@@ -10,7 +10,7 @@ void describe('loadCucumber', () => {
   void it('parses all scenarios with feature URI', () => {
     const results = loadCucumber(fixture);
     assert.equal(results.length, 3);
-    assert.equal(results[0].name, 'Timothy completes path');
+    assert.equal(results[0].name, 'Terrance completes path');
     assert.equal(results[0].feature, 'features/lamad/learning-journey.feature');
   });
 
@@ -46,9 +46,9 @@ void describe('loadCucumber', () => {
 
   void it('extracts scenario tags', () => {
     const results = loadCucumber(fixture);
-    const timothy = results.find(r => r.name === 'Timothy completes path')!;
-    assert.ok(timothy);
-    assert.deepEqual(timothy.tags, [
+    const terrance = results.find(r => r.name === 'Terrance completes path')!;
+    assert.ok(terrance);
+    assert.deepEqual(terrance.tags, [
       '@e2e',
       '@lamad',
       '@browser-only',

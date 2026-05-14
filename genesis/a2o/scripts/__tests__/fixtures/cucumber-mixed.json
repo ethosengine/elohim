@@ -4,7 +4,7 @@
     "name": "Learning Journey",
     "elements": [
       {
-        "name": "Timothy completes path",
+        "name": "Terrance completes path",
         "type": "scenario",
         "tags": [
           { "name": "@e2e" },

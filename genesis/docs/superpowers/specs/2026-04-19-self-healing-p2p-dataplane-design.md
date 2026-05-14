@@ -14,7 +14,7 @@ The p2p-dataplane-visibility sprint closed the gap between "design exists" and "
 
 This doc is about **closing the loops behind the dashboards**. Today, distribution happens but diversity isn't contract-aware; verification is a named stub at `/api/v1/resilience/{id}/verify` with no scanner behind it; reconstruction doesn't exist; trust in the shard census is peer-claimed, not attested. The dashboards are honest about the state of the dataplane — the dataplane itself is incomplete.
 
-The acceptance horizon remains *grandma-grade P2P* — Timothy offline, household survives, recovery is autonomous and visible, operator nudges are economic signals rather than error logs. Five sequenced plans get us there. Each plan is independently valuable; the user can pause between plans without stranding value.
+The acceptance horizon remains *grandma-grade P2P* — Terrance offline, household survives, recovery is autonomous and visible, operator nudges are economic signals rather than error logs. Five sequenced plans get us there. Each plan is independently valuable; the user can pause between plans without stranding value.
 
 ---
 
@@ -393,12 +393,12 @@ Four-layer control on publisher cadence. Synchronous trigger: `POST /api/v1/admi
    
    These are the synchronous hooks the cadence memory insists on — chaos tests never wait for timers.
 
-2. **Drain guard / maintenance choreography (Module J)** — peer draining advertises `PeerLifecycleState::Leaving` in PeerStatus; holds conductor-stop until replacement holdings are attested (or cadence timeout); HeartbeatControl stops last. Timothy-graceful-offline path.
+2. **Drain guard / maintenance choreography (Module J)** — peer draining advertises `PeerLifecycleState::Leaving` in PeerStatus; holds conductor-stop until replacement holdings are attested (or cadence timeout); HeartbeatControl stops last. Terrance-graceful-offline path.
 
 3. **H2 — /admin/users JWT scope fix** — doorway config aligns JWT scope requirements to grant `users:read` to authenticated admins. Config-only; no code.
 
 4. **A2O chaos feature files** (`genesis/a2o/features/resilience/*.feature`):
-   - `timothy-offline-household-survives.feature` — the grandma demo canonical flow
+   - `terrance-offline-household-survives.feature` — the grandma demo canonical flow
    - `peer-kill-reconstruction.feature` — kill + healing
    - `drain-guard-orderly-handoff.feature` — graceful leave
    - `bit-rot-detection-and-repair.feature` — verification + reconstruction loop
@@ -411,14 +411,14 @@ Four-layer control on publisher cadence. Synchronous trigger: `POST /api/v1/admi
 
 6. **Shem manifest pass** — ensure env publishing for DEVICE_ARCHETYPE, HOUSEHOLD_ID, NODE_ROLE (already landed); add CHAOS_ENABLED on dev pods only; ensure diverse archetypes across pods so diversity selection has room. Cycle pods.
 
-7. **Shem acceptance run** — full a2o suite on shem, dashboards watched during execution. Recording cut of the Timothy-offline scenario.
+7. **Shem acceptance run** — full a2o suite on shem, dashboards watched during execution. Recording cut of the Terrance-offline scenario.
 
 ### Acceptance criteria
 
 - All 8 chaos scenarios green on shem (not localhost).
 - All four dashboards (`/shefa/devices`, `/shefa/resources/category:content`, `/shefa/dashboard` Network Health, `doorway-alpha/threshold/dashboard`) show real data during + after a chaos run.
 - `<elohim-resilience-snapshot>` on content-viewer accurately flips icon color through a healing cycle.
-- Timothy-offline demoable live — peer drops, UI goes yellow, reconstruction fires, UI goes green, recovery event in shefa Signals.
+- Terrance-offline demoable live — peer drops, UI goes yellow, reconstruction fires, UI goes green, recovery event in shefa Signals.
 - Safety test: any environment without `CHAOS_ENABLED=true` refuses chaos endpoints with 403.
 - Module L intent folded in — no Phase-1 regression scenarios left orphaned.
 
@@ -527,9 +527,9 @@ User can pause the campaign between plans without stranding value. Each plan get
 **The campaign succeeds when, on shem, a Gherkin scenario can say:**
 
 ```gherkin
-Given Timothy's household has a node with content provisioned
+Given Terrance's household has a node with content provisioned
 And a remote family household holds reciprocal storage commitments
-When Timothy's node goes offline
+When Terrance's node goes offline
 Then within 60 seconds content resilience is restored on a diverse replacement peer
 And the content-viewer resilience icon flips red → yellow → green
 And a recovery event appears in shefa Signals

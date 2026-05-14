@@ -1,6 +1,6 @@
 ---
 name: ci-triage
-description: Quick CI/CD failure diagnosis. Use when builds fail.
+description: Surface-level CI/CD failure diagnosis from build logs — under 5 minutes per build. Use when "why did the build fail?", "is this red?", or quick health check on a pipeline. For multi-build flake pattern analysis or deeper investigation, escalate to ci-investigator.
 ---
 
 # CI Triage

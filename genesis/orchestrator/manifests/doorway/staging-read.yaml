@@ -88,7 +88,7 @@ spec:
               value: "info,doorway=debug"
             - name: PROJECTION_WRITER
               value: "false"
-            # Staging read-replica: same Pete + Timothy backends
+            # Staging read-replica: same Pete + Terrance backends
             - name: CONDUCTOR_URLS
               value: "CONDUCTOR_URLS_PLACEHOLDER"
             - name: CONDUCTOR_ADMIN_URL

@@ -58,7 +58,7 @@ Replace the entire contents of `genesis/a2o/scripts/__tests__/fixtures/cucumber-
     "name": "Learning Journey",
     "elements": [
       {
-        "name": "Timothy completes path",
+        "name": "Terrance completes path",
         "type": "scenario",
         "tags": [
           { "name": "@e2e" },
@@ -122,9 +122,9 @@ Append these `it` blocks at the end of the existing `describe` in `genesis/a2o/s
 ```typescript
   void it('extracts scenario tags', () => {
     const results = loadCucumber(fixture);
-    const timothy = results.find(r => r.name === 'Timothy completes path')!;
-    assert.ok(timothy);
-    assert.deepEqual(timothy.tags, ['@e2e', '@lamad', '@browser-only', '@elohim-visually-validated']);
+    const terrance = results.find(r => r.name === 'Terrance completes path')!;
+    assert.ok(terrance);
+    assert.deepEqual(terrance.tags, ['@e2e', '@lamad', '@browser-only', '@elohim-visually-validated']);
   });
 
   void it('returns empty tags array when scenario has no tags', () => {
@@ -153,7 +153,7 @@ Run from `/projects/elohim/genesis/a2o`:
 pnpm test:unit -- --test-name-pattern='loadCucumber'
 ```
 
-Expected: FAIL — TypeScript will complain that `tags` does not exist on `ScenarioResult`, or assertion fails saying `timothy.tags` is undefined.
+Expected: FAIL — TypeScript will complain that `tags` does not exist on `ScenarioResult`, or assertion fails saying `terrance.tags` is undefined.
 
 - [ ] **Step 4: Implement tag extraction in `load-cucumber.ts`**
 
@@ -231,7 +231,7 @@ In `genesis/a2o/scripts/__tests__/aggregate.test.ts`, locate the `input()` funct
 function input() {
   const scenarios: ScenarioResult[] = [
     {
-      name: 'Timothy completes path',
+      name: 'Terrance completes path',
       feature: 'features/lamad/learning-journey.feature',
       status: 'passed',
       tags: [],
@@ -378,7 +378,7 @@ Replace the `Finding` block (lines 58–109) with:
         },
         "peer": {
           "type": "string",
-          "description": "Target-peer slug (e.g., 'timothy-household', 'shem'). Populated by Plan B once request-ID/peer routing is live; absent for local-only runs."
+          "description": "Target-peer slug (e.g., 'terrance-household', 'shem'). Populated by Plan B once request-ID/peer routing is live; absent for local-only runs."
         },
         "severity": { "type": "string", "enum": ["error", "warning", "info"], "default": "error" },
         "message": { "type": "string" },
@@ -1568,4 +1568,4 @@ No additional commit unless a formatting fix was needed in Step 1. The branch is
 - **No feature-file edits required to land.** All scenarios start in `pendingPassing` / `pendingFailing` until a human reviewer adds `@elohim-visually-validated`.
 - **Jenkins archival.** The root and a2o pipelines already archive `reports/**`; per-feature screenshot subdirs are picked up automatically.
 - **Out of scope (deferred to a future `/shift` skill update):** Agent-assisted review loop where a vision-capable agent proposes tag additions in PRs. The artifacts and counts produced by this plan are exactly the inputs that loop will need.
-- **Multi-human scenarios** (e.g. Matthew + Timothy in the same scenario) produce one image per human under the same feature subdir; the finding's `screenshotPath` points at one image (Matthew's by default — first human iteration), with the per-scenario list still in `<details>`.
+- **Multi-human scenarios** (e.g. Matthew + Terrance in the same scenario) produce one image per human under the same feature subdir; the finding's `screenshotPath` points at one image (Matthew's by default — first human iteration), with the per-scenario list still in `<details>`.

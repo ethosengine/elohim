@@ -7,7 +7,7 @@
 **Architecture:** Three layers of IDs flowing through headers and tracing spans:
 
 1. **`X-Request-ID`** — stable per-request UUID, generated on first touch, propagated on every hop. Answers "which request was this?"
-2. **`X-Target-Peer`** — slug naming the intended peer (e.g., `timothy-household`, `shem`, `mary-mobile`). Answers "which peer should handle this?" Doorway uses it for federation routing.
+2. **`X-Target-Peer`** — slug naming the intended peer (e.g., `terrance-household`, `shem`, `mary-mobile`). Answers "which peer should handle this?" Doorway uses it for federation routing.
 3. **`X-Served-By`** — response-only slug naming the peer that actually handled it. Answers "which peer ran the code?" Populated by the runtime that serves the response.
 
 All three become tracing span fields on every log line. A bounded in-process ring buffer (no Loki required) retains the last N log entries indexed by request-ID. `/admin/logs?request_id=X` returns them. The a2o framework captures IDs from response headers, writes them into scenario artifacts, and fetches backend logs per peer on failure.
@@ -328,9 +328,9 @@ mod tests {
 
     #[test]
     fn captures_target_peer_when_present() {
-        let req = req_with_headers(&[("x-target-peer", "timothy-household")]);
+        let req = req_with_headers(&[("x-target-peer", "terrance-household")]);
         let ctx = RequestContext::extract(req.headers(), "doorway-alpha");
-        assert_eq!(ctx.target_peer.as_deref(), Some("timothy-household"));
+        assert_eq!(ctx.target_peer.as_deref(), Some("terrance-household"));
     }
 
     #[test]
@@ -1374,7 +1374,7 @@ mod propagation_tests {
 
         let ctx = crate::correlation::RequestContext {
             request_id: "11111111-2222-4333-8444-555555555555".into(),
-            target_peer: Some("timothy-household".into()),
+            target_peer: Some("terrance-household".into()),
             served_by: "doorway-alpha".into(),
         };
         crate::correlation::REQUEST_CTX
@@ -1394,7 +1394,7 @@ mod propagation_tests {
         );
         assert_eq!(
             captured.get("x-target-peer").and_then(|v| v.to_str().ok()),
-            Some("timothy-household")
+            Some("terrance-household")
         );
     }
 }
@@ -1477,13 +1477,13 @@ mod peer_slug_tests {
     async fn resolves_peer_url_by_slug() {
         let cache = PeerCache::default();
         cache.insert(PeerDoorway {
-            peer_id: "timothy-household".into(),
-            doorway_url: "https://timothy.peer".into(),
+            peer_id: "terrance-household".into(),
+            doorway_url: "https://terrance.peer".into(),
             // ... fill other required fields with defaults
             ..Default::default()
         }).await;
-        let url = resolve_peer_by_slug(&cache, "timothy-household").await;
-        assert_eq!(url.as_deref(), Some("https://timothy.peer"));
+        let url = resolve_peer_by_slug(&cache, "terrance-household").await;
+        assert_eq!(url.as_deref(), Some("https://terrance.peer"));
     }
 
     #[tokio::test]
@@ -1830,7 +1830,7 @@ Now that every runtime echoes IDs and serves logs by request-ID, teach the a2o f
  * Not all personas have a peer — visitors and anonymous scenarios send no slug.
  */
 export const PERSONA_PEER: Record<string, string> = {
-  timothy: 'timothy-household',
+  terrance: 'terrance-household',
   mary:    'mary-household',
   shem:    'shem',             // shem is its own peer (the live P2P canvas)
   // Anonymous / fixture humans without a peer assignment: omit.
@@ -1850,11 +1850,11 @@ import { strict as assert } from 'node:assert';
 import { peerForPersona, PERSONA_PEER } from '../persona-peer-mapping.js';
 
 describe('peerForPersona', () => {
-  it('maps Timothy to timothy-household', () => {
-    assert.equal(peerForPersona('Timothy'), 'timothy-household');
+  it('maps Terrance to terrance-household', () => {
+    assert.equal(peerForPersona('Terrance'), 'terrance-household');
   });
   it('is case-insensitive on input', () => {
-    assert.equal(peerForPersona('TIMOTHY'), PERSONA_PEER.timothy);
+    assert.equal(peerForPersona('TIMOTHY'), PERSONA_PEER.terrance);
   });
   it('returns undefined for unmapped personas', () => {
     assert.equal(peerForPersona('NotARealHuman'), undefined);

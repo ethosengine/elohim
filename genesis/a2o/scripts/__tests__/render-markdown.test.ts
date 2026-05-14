@@ -28,7 +28,7 @@ const report: SprintReport = {
       firstSeenUrl: 'https://doorway-alpha.elohim.host/a.js',
       occurrences: 2,
       scenarios: [
-        { name: 'learning-journey', feature: 'browser', human: 'timothy' },
+        { name: 'learning-journey', feature: 'browser', human: 'terrance' },
         { name: 'learning-journey', feature: 'browser', human: 'mary' },
       ],
       suggestedObjective: 'Fix browser console error: ReferenceError: Sophia is not defined',
@@ -64,7 +64,7 @@ void describe('renderMarkdown', () => {
 
   void it('lists each scenario that triggered the finding', () => {
     const md = renderMarkdown(report);
-    assert.match(md, /timothy/);
+    assert.match(md, /terrance/);
     assert.match(md, /mary/);
   });
 

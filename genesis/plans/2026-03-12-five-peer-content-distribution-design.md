@@ -32,7 +32,7 @@ The genesis Jenkinsfile seeds each conductor after deploy. Flow:
 4. For each human: `STORAGE_URL=http://{pod} npx tsx src/seed-sqlite.ts --conductor-for={humanId}`
 5. Report per-conductor content counts, assert distribution
 
-This keeps genesis as the story orchestrator. Pipeline output shows "Matthew got 1,200 nodes, Pete got 340, Timothy got 280" — aggregated feedback that drives development.
+This keeps genesis as the story orchestrator. Pipeline output shows "Matthew got 1,200 nodes, Pete got 340, Terrance got 280" — aggregated feedback that drives development.
 
 Future exploration: seeder-as-a-k8s-service where pods pull their own content (protocol-native CI/CD). Not now.
 
@@ -49,7 +49,7 @@ Port `filterBySteward()` from `seed.ts` to `seed-sqlite.ts`. The filter reads `s
 | Matthew | Founder, governance, protocol core | 1Gi RAM, 500m CPU | Susan (household) |
 | Susan | Household, family curriculum | 768Mi RAM, 400m CPU | Matthew (household) |
 | Pastor Pete | Faith community, pastoral care | 768Mi RAM, 400m CPU | Matthew (congregation) |
-| Timothy | Tutorials, mentorship, learning | 512Mi RAM, 300m CPU | Susan (learning partner) |
+| Terrance | Tutorials, mentorship, learning | 512Mi RAM, 300m CPU | Susan (learning partner) |
 | Frank | Agriculture, local economy | 512Mi RAM, 300m CPU | Pete (congregation via Bub) |
 
 ### YAML Structure
@@ -59,7 +59,7 @@ genesis/manifests/humans/
   matthew-manager.yaml     # StatefulSet + headless Service
   susan-spouse.yaml
   pete-pastor.yaml
-  timothy-tutor.yaml
+  terrance-tutor.yaml
   frank-farmer.yaml
 ```
 

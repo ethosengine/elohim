@@ -1474,7 +1474,7 @@ Feature: Elohim Compute Coordination
 
   @browser-only
   Scenario: Authenticated learner receives insight within budget
-    Given human "Timothy" is logged in on doorway "alpha" with device
+    Given human "Terrance" is logged in on doorway "alpha" with device
     And the elohim node has inference budget remaining
     When the learner completes the assessment
     Then an elohim insight section appears below the results
@@ -1483,14 +1483,14 @@ Feature: Elohim Compute Coordination
 
   @browser-only @wip
   Scenario: Request deferred when budget exhausted
-    Given human "Timothy" is logged in on doorway "alpha" with device
+    Given human "Terrance" is logged in on doorway "alpha" with device
     And the elohim node has exhausted its inference budget
     When the learner completes the assessment
     Then the insight shows a capacity unavailable message
 
   @browser-only @wip
   Scenario: Compute cost recorded as economic event
-    Given human "Timothy" is logged in on doorway "alpha" with device
+    Given human "Terrance" is logged in on doorway "alpha" with device
     When the learner receives an elohim insight
     Then a compute economic event is recorded
     And the event captures the tokens used and model

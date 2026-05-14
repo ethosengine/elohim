@@ -790,7 +790,7 @@ const PEER_COMMITMENTS: PeerCommitment[] = [
   { id: 'commitment-matthew-storage', provider: 'human-matthew-manager', displayName: 'Matthew', storageGb: 4000, region: 'home-lab' },
   { id: 'commitment-jessica-storage', provider: 'human-jessica-spouse', displayName: 'Jessica', storageGb: 2000, region: 'home-lab' },
   { id: 'commitment-pete-storage', provider: 'human-pete-pastor', displayName: 'Pete', storageGb: 1000, region: 'church-office' },
-  { id: 'commitment-timothy-storage', provider: 'human-timothy-tutor', displayName: 'Timothy', storageGb: 500, region: 'university' },
+  { id: 'commitment-terrance-storage', provider: 'human-terrance-tutor', displayName: 'Terrance', storageGb: 500, region: 'university' },
   { id: 'commitment-frank-storage', provider: 'human-frank-farmer', displayName: 'Frank', storageGb: 2000, region: 'farm' },
 ];
 
@@ -858,7 +858,7 @@ git add genesis/seeder/src/seed-commitments.ts genesis/seeder/src/seed.ts
 git commit -m "feat(seeder): seed REA storage commitments for 5 test peers
 
 Each peer declares storage capacity as a REA commitment (action=provide).
-Matthew: 4TB, Jessica: 2TB, Pete: 1TB, Timothy: 500GB, Frank: 2TB."
+Matthew: 4TB, Jessica: 2TB, Pete: 1TB, Terrance: 500GB, Frank: 2TB."
 ```
 
 ---

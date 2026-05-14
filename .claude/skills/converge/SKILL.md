@@ -1,6 +1,6 @@
 ---
 name: converge
-description: Synthesize the dev corpus into a ranked "what's next" menu — extracted from memory-kit so its planning-tier responsibilities (vision×readiness scoring, memorial-tier safeguards, search-bias compensation) stand on their own. Run after a `memory-kit` weekly sweep to convert backlog/dedupe/plan-status/sprint-digest signal into per-theme plan edits and a session-start handoff menu. Use when an operator asks "what's next?" or before kicking off a major `/shift`.
+description: Cartographer-scoped forward-projection synthesis that ranks the dev corpus into a "what's next" menu. Applies vision×readiness scoring, memorial-tier safeguards, and search-bias compensation to convert backlog/dedupe/plan-status/sprint-digest reports into per-theme plan edits and a session-start handoff. Runs after librarian hygiene has produced clean inputs. Use when the operator asks "what's next?", before a major /shift kickoff, or when planning a roadmap pass. The output is a ranked menu, not a maintenance pass.
 ---
 
 # Converge — Trajectory Synthesis + "What's Next" Menu

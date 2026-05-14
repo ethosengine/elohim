@@ -1,6 +1,6 @@
 ---
 name: holochain-storage-api
-description: Reference for elohim-storage HTTP API, storage-client SDK, type generation pipeline, and Angular adapter conventions. Use when someone asks "how do I call the storage API", "fetch content or paths", "upload a blob", "create mastery records", "generate TypeScript types from Rust", or works with the Rust-to-TypeScript type boundary.
+description: REFERENCE for elohim-storage Rust BACKEND surface — HTTP API, storage-client SDK, Rust-to-TypeScript type generation pipeline, Angular adapter conventions. Use when "call the storage HTTP API", "fetch content or paths via the SDK", "upload a blob", "create mastery records", "generate TypeScript types from Rust views", or working at the Rust→TS boundary. For Angular FRONTEND assessment rendering, use sophia-integration.
 metadata:
   author: elohim-protocol
   version: 1.0.0
@@ -321,15 +321,15 @@ Server validates against `SUPPORTED_SCHEMA_VERSIONS`. Unknown fields are silentl
 
 | File | Purpose |
 |------|---------|
-| `holochain/elohim-storage/src/views.rs` | API boundary - all View/InputView types |
-| `holochain/elohim-storage/src/http.rs` | HTTP route handlers |
-| `holochain/elohim-storage/CLAUDE.md` | Detailed boundary architecture guide |
-| `holochain/sdk/storage-client-ts/src/client.ts` | TypeScript SDK client |
+| `elohim/elohim-storage/src/views.rs` | API boundary - all View/InputView types |
+| `elohim/elohim-storage/src/http.rs` | HTTP route handlers |
+| `elohim/elohim-storage/CLAUDE.md` | Detailed boundary architecture guide |
+| `elohim/sdk/storage-client-ts/src/client.ts` | TypeScript SDK client |
 | `holochain/sdk/storage-client-ts/src/generated/` | Auto-generated TypeScript types |
-| `holochain/sdk/storage-client-ts/CLAUDE.md` | Generated types usage guide |
-| `holochain/ARCHITECTURE.md` | Overall architecture |
-| `holochain/P2P-DATAPLANE.md` | P2P data plane design |
-| `elohim-app/src/app/elohim/adapters/storage-types.adapter.ts` | Angular adapter layer |
+| `elohim/sdk/storage-client-ts/CLAUDE.md` | Generated types usage guide |
+| `elohim/holochain/docs/ARCHITECTURE.md` | Overall architecture |
+| `elohim/holochain/docs/P2P-DATAPLANE.md` | P2P data plane design |
+| `app/elohim-app/src/app/elohim/adapters/storage-types.adapter.ts` | Angular adapter layer |
 
 ## External References
 

@@ -107,7 +107,7 @@ Each collective:
   "governanceLayer": "family",
   "reach": "trusted",
   "constitutionalParentId": "neighborhood-valley",
-  "description": "Nuclear family — Matthew, Jessica, Timothy",
+  "description": "Nuclear family — Matthew, Jessica, Terrance",
   "governanceModel": "steward-consent",
   "domain": "family",
   "place": null,
@@ -293,9 +293,9 @@ Five new collectives modeling intimate-scale governance for the genesis scenario
 |----|------|-------|-------|-----------------------|--------|
 | `couple-adam-eve` | Adam & Eve | family | intimate | — | Adam, Eve |
 | `couple-matthew-jessica` | Matthew & Jessica | family | intimate | `family-dowell` | Matthew, Jessica |
-| `family-dowell` | Dowell Family | family | trusted | `neighborhood-valley` | Matthew, Jessica, Timothy |
-| `bible-study-valley` | Valley Bible Study | faith | familiar | `community-local-church` | Matthew, Jessica, Timothy, Pete |
-| `neighborhood-valley` | Valley Neighborhood | geographic | familiar | `community-neighborhood-association` | Matthew, Jessica, Timothy, Nancy |
+| `family-dowell` | Dowell Family | family | trusted | `neighborhood-valley` | Matthew, Jessica, Terrance |
+| `bible-study-valley` | Valley Bible Study | faith | familiar | `community-local-church` | Matthew, Jessica, Terrance, Pete |
+| `neighborhood-valley` | Valley Neighborhood | geographic | familiar | `community-neighborhood-association` | Matthew, Jessica, Terrance, Nancy |
 
 ### Existing collective renames
 
@@ -314,15 +314,15 @@ Constitutional hierarchy (contains):
   valley-community [geographic, community]
   ├── community-local-church [faith, community]
   │   └── bible-study-valley [faith, familiar]
-  │       Humans: Matthew, Jessica, Timothy, Pete
+  │       Humans: Matthew, Jessica, Terrance, Pete
   ├── community-neighborhood-association [geographic, community]
   │   └── neighborhood-valley [geographic, familiar]
-  │       Humans: Matthew, Jessica, Timothy, Nancy
+  │       Humans: Matthew, Jessica, Terrance, Nancy
   └── community-homeschool-coop [education, community]
 
   family-dowell [family, trusted]
     constitutional parent: neighborhood-valley
-    Humans: Matthew, Jessica, Timothy
+    Humans: Matthew, Jessica, Terrance
     └── couple-matthew-jessica [family, intimate]
         Humans: Matthew, Jessica
 

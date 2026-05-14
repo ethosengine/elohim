@@ -1,13 +1,13 @@
 {
-  "id": "human-timothy-tutor",
-  "displayName": "Timothy",
+  "id": "human-terrance-tutor",
+  "displayName": "Terrance",
   "isPseudonymous": false,
   "createdAt": "2025-12-01T20:29:49.320609Z",
   "updatedAt": "2025-12-01T20:29:49.320609Z",
   "profileReach": "community",
   "acceptingConnections": true,
   "bio": "Educator and learning facilitator. Helping kids and adults discover the joy of learning.",
-  "avatarUrl": "assets/avatars/human-timothy-tutor.jpg",
+  "avatarUrl": "assets/avatars/human-terrance-tutor.jpg",
   "primaryLocation": {
     "layer": "community",
     "displayName": "Valley Community",

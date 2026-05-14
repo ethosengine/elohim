@@ -4,7 +4,7 @@
 
 **Goal:** Replace the single anonymous alpha StatefulSet with 5 per-human StatefulSets, add stewardship filtering to `seed-sqlite.ts`, and update the genesis Jenkinsfile to seed each conductor with its human's content.
 
-**Architecture:** Each of the 5 genesis humans (Matthew, Susan, Pete, Timothy, Frank) gets a standalone StatefulSet with a `HUMAN_ID` env var, per-human resource limits, and trust-topology bootstrap peers. The SQLite seeder gains `--conductor-for` filtering (ported from `seed.ts`). The Jenkins seeding stage loops over all 5 conductors, querying each for its identity and seeding accordingly.
+**Architecture:** Each of the 5 genesis humans (Matthew, Susan, Pete, Terrance, Frank) gets a standalone StatefulSet with a `HUMAN_ID` env var, per-human resource limits, and trust-topology bootstrap peers. The SQLite seeder gains `--conductor-for` filtering (ported from `seed.ts`). The Jenkins seeding stage loops over all 5 conductors, querying each for its identity and seeding accordingly.
 
 **Tech Stack:** Kubernetes YAML (StatefulSets, Services, ConfigMap), TypeScript (seed-sqlite.ts), Groovy (Jenkinsfile)
 
@@ -515,12 +515,12 @@ Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>"
 
 ---
 
-### Task 3: Create StatefulSets for Susan, Pete, Timothy, Frank
+### Task 3: Create StatefulSets for Susan, Pete, Terrance, Frank
 
 **Files:**
 - Create: `genesis/manifests/humans/susan-spouse.yaml`
 - Create: `genesis/manifests/humans/pete-pastor.yaml`
-- Create: `genesis/manifests/humans/timothy-tutor.yaml`
+- Create: `genesis/manifests/humans/terrance-tutor.yaml`
 - Create: `genesis/manifests/humans/frank-farmer.yaml`
 
 **Step 1: Create Susan's StatefulSet**
@@ -537,12 +537,12 @@ Copy Matthew's template with these changes:
 | Conductor CPU request | `500m` | `400m` |
 | Storage memory request | `256Mi` | `128Mi` |
 | Storage CPU request | `200m` | `100m` |
-| `P2P_BOOTSTRAP_NODES` | Susan + Pete | Matthew + Timothy |
+| `P2P_BOOTSTRAP_NODES` | Susan + Pete | Matthew + Terrance |
 | Header comment | Protocol Founder | Household partner, family curriculum |
 
 Bootstrap for Susan:
 ```
-/dns4/elohim-matthew-alpha-0.elohim-matthew-alpha-headless.elohim-alpha.svc.cluster.local/tcp/9876,/dns4/elohim-timothy-alpha-0.elohim-timothy-alpha-headless.elohim-alpha.svc.cluster.local/tcp/9876
+/dns4/elohim-matthew-alpha-0.elohim-matthew-alpha-headless.elohim-alpha.svc.cluster.local/tcp/9876,/dns4/elohim-terrance-alpha-0.elohim-terrance-alpha-headless.elohim-alpha.svc.cluster.local/tcp/9876
 ```
 
 **Step 2: Create Pete's StatefulSet**
@@ -563,20 +563,20 @@ Bootstrap for Pete:
 /dns4/elohim-matthew-alpha-0.elohim-matthew-alpha-headless.elohim-alpha.svc.cluster.local/tcp/9876,/dns4/elohim-frank-alpha-0.elohim-frank-alpha-headless.elohim-alpha.svc.cluster.local/tcp/9876
 ```
 
-**Step 3: Create Timothy's StatefulSet**
+**Step 3: Create Terrance's StatefulSet**
 
 | Field | Value |
 |-------|-------|
-| Names | `elohim-timothy-alpha` |
-| Label | `elohim-human: timothy-tutor` |
-| `HUMAN_ID` | `human-timothy-tutor` |
+| Names | `elohim-terrance-alpha` |
+| Label | `elohim-human: terrance-tutor` |
+| `HUMAN_ID` | `human-terrance-tutor` |
 | Conductor memory | `512Mi` request, `1Gi` limit |
 | Conductor CPU | `300m` request |
 | Storage memory | `128Mi` request |
 | Bootstrap | Susan + Pete |
 | Comment | Learning steward, tutorials, mentorship |
 
-Bootstrap for Timothy:
+Bootstrap for Terrance:
 ```
 /dns4/elohim-susan-alpha-0.elohim-susan-alpha-headless.elohim-alpha.svc.cluster.local/tcp/9876,/dns4/elohim-pete-alpha-0.elohim-pete-alpha-headless.elohim-alpha.svc.cluster.local/tcp/9876
 ```
@@ -607,8 +607,8 @@ Expected: All 5 OK
 **Step 6: Commit**
 
 ```bash
-git add genesis/manifests/humans/susan-spouse.yaml genesis/manifests/humans/pete-pastor.yaml genesis/manifests/humans/timothy-tutor.yaml genesis/manifests/humans/frank-farmer.yaml
-git commit -m "infra(genesis): add per-human StatefulSets for Susan, Pete, Timothy, Frank
+git add genesis/manifests/humans/susan-spouse.yaml genesis/manifests/humans/pete-pastor.yaml genesis/manifests/humans/terrance-tutor.yaml genesis/manifests/humans/frank-farmer.yaml
+git commit -m "infra(genesis): add per-human StatefulSets for Susan, Pete, Terrance, Frank
 
 Each human gets their own conductor with story-appropriate resources
 and trust-topology bootstrap peers. Together with Matthew, these 5
@@ -638,7 +638,7 @@ def getHumanStorageUrls(String environment) {
         [humanId: 'human-matthew-manager',     service: 'elohim-matthew-alpha'],
         [humanId: 'human-susan-spouse',         service: 'elohim-susan-alpha'],
         [humanId: 'human-pastor-pete-pastor',   service: 'elohim-pete-alpha'],
-        [humanId: 'human-timothy-tutor',        service: 'elohim-timothy-alpha'],
+        [humanId: 'human-terrance-tutor',        service: 'elohim-terrance-alpha'],
         [humanId: 'human-frank-farmer',         service: 'elohim-frank-alpha'],
     ]
     return humans.collect { h ->
@@ -765,7 +765,7 @@ In the `resolveInternalStorageUrl` function, update the alpha mapping to point t
 git add genesis/Jenkinsfile
 git commit -m "feat(genesis): seed 5 conductors per-human in pipeline
 
-Jenkins loops over Matthew, Susan, Pete, Timothy, and Frank,
+Jenkins loops over Matthew, Susan, Pete, Terrance, and Frank,
 seeding each conductor with only its steward's content via
 --conductor-for. Pipeline output shows per-human content counts.
 
@@ -795,7 +795,7 @@ For now, the simplest approach: update the doorway alpha deployment's storage UR
 
 ```yaml
 - name: STORAGE_URLS
-  value: "http://elohim-matthew-alpha.elohim-alpha.svc.cluster.local:8090,http://elohim-susan-alpha.elohim-alpha.svc.cluster.local:8090,http://elohim-pete-alpha.elohim-alpha.svc.cluster.local:8090,http://elohim-timothy-alpha.elohim-alpha.svc.cluster.local:8090,http://elohim-frank-alpha.elohim-alpha.svc.cluster.local:8090"
+  value: "http://elohim-matthew-alpha.elohim-alpha.svc.cluster.local:8090,http://elohim-susan-alpha.elohim-alpha.svc.cluster.local:8090,http://elohim-pete-alpha.elohim-alpha.svc.cluster.local:8090,http://elohim-terrance-alpha.elohim-alpha.svc.cluster.local:8090,http://elohim-frank-alpha.elohim-alpha.svc.cluster.local:8090"
 ```
 
 **Step 3: This task is intentionally underspecified**
@@ -824,7 +824,7 @@ Run each in sequence, verify content distribution:
 
 ```bash
 cd /projects/elohim/genesis/seeder
-for human in human-matthew-manager human-susan-spouse human-pastor-pete-pastor human-timothy-tutor human-frank-farmer; do
+for human in human-matthew-manager human-susan-spouse human-pastor-pete-pastor human-terrance-tutor human-frank-farmer; do
   echo "=== $human ==="
   npx tsx src/seed-sqlite.ts --dry-run --conductor-for=$human 2>&1 | grep -E "stewardship|Loaded|Filtered"
 done
@@ -854,7 +854,7 @@ No code change — just mark the design as implemented when alpha deployment con
 |------|------|-------|------|
 | 1 | `--conductor-for` in seed-sqlite.ts | `seed-sqlite.ts` | 10 min |
 | 2 | Matthew's StatefulSet (template) | `matthew-manager.yaml` (new) | 15 min |
-| 3 | Susan, Pete, Timothy, Frank StatefulSets | 4 new YAML files | 20 min |
+| 3 | Susan, Pete, Terrance, Frank StatefulSets | 4 new YAML files | 20 min |
 | 4 | Jenkins per-conductor seeding loop | `genesis/Jenkinsfile` | 15 min |
 | 5 | Doorway multi-backend routing | `route_registry.rs` | 15 min |
 | 6 | End-to-end verification | dry-run + deploy | 10 min |

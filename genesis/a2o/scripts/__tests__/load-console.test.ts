@@ -12,8 +12,8 @@ const fixturesDir = fileURLToPath(new URL('./fixtures/', import.meta.url));
 function makeReportsDir(): string {
   const tmp = mkdtempSync(join(tmpdir(), 'a2o-console-'));
   cpSync(
-    join(fixturesDir, 'console-timothy-errors.json'),
-    join(tmp, 'learning-journey-timothy-errors.json')
+    join(fixturesDir, 'console-terrance-errors.json'),
+    join(tmp, 'learning-journey-terrance-errors.json')
   );
   cpSync(
     join(fixturesDir, 'console-mary-errors.json'),
@@ -25,9 +25,9 @@ function makeReportsDir(): string {
 
 void describe('parseScenarioHumanFromFilename', () => {
   void it('splits scenario and human on last hyphen before "errors"', () => {
-    assert.deepEqual(parseScenarioHumanFromFilename('learning-journey-timothy-errors.json'), {
+    assert.deepEqual(parseScenarioHumanFromFilename('learning-journey-terrance-errors.json'), {
       scenario: 'learning-journey',
-      human: 'timothy',
+      human: 'terrance',
     });
   });
 

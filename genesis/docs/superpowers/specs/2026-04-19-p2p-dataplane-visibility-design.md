@@ -149,14 +149,14 @@ A2O scenarios are the specifications for the sprint. Existing coverage:
 - `federation/shard-tracking.feature`, `federation/epr-cross-peer-resolution.feature`, `federation/cross-doorway-content.feature`, `delivery/peer-mesh.feature`, `delivery/client-resilience.feature`, `elohim/compute-allocation.feature`, `elohim/compute-coordination.feature`, `elohim/elohim-presence.feature`.
 
 **Gaps — new scenarios the sprint must author:**
-1. `shefa/device-stewardship.feature` — "Matthew opens `/shefa/devices` and sees his household's nodes (matthew-home, matthew-laptop, jessica-phone) plus connected peer households (Adam/Eve, Pete, Timothy, Nancy) with archetype labels, lifecycle states, and serve-family/serve-public capability badges."
+1. `shefa/device-stewardship.feature` — "Matthew opens `/shefa/devices` and sees his household's nodes (matthew-home, matthew-laptop, jessica-phone) plus connected peer households (Adam/Eve, Pete, Terrance, Nancy) with archetype labels, lifecycle states, and serve-family/serve-public capability badges."
 2. `shefa/network-health-dashboard.feature` — UI-layer scenario wrapping `network-health-posture` output into the `/shefa/dashboard` tab (peer-count card, storage-pressure gauge, always-on badge, household-reciprocation stat).
 3. `shefa/stewarded-resources-visible.feature` — "Matthew opens `/shefa/resources/category:content` and sees the content his household stewards, grouped by affinity, with per-item resilience badge."
 4. `doorway/admin-routes-visible.feature` — `GET /admin/routes` returns the registered route table with source types (Steward/DNA/Agent/Builtin) and counts; admin auth gates it.
 5. `doorway/admin-users-visible.feature` — `GET /admin/users` returns registered humans with agency phase + assigned conductor; 403 for non-admin.
 6. `shefa/resilience-tooltip.feature` — "Matthew hovers on a content's resilience icon and sees household stewards, shard encoding, peers online, health score — wired from `ResilienceView`."
 
-**Fixture personas already in tree and usable on shem:** Matthew (doorway/manager), Jessica (spouse, device), Susan (sister, household), Adam (firstman/node), Eve (firstwoman/device), Pete (pastor/device), Timothy (ward of Matthew/device with capability grant), Nancy (neighbor/hosted), Gertrude (grandmother/core-family — large-text + simple-nav), Maria (newcomer), Ezra (newcomer). Enough diversity to prove household-to-household reciprocation with a couple, a ward, a pastor, a neighbor, and a newcomer — exactly the test matrix the resilience story needs.
+**Fixture personas already in tree and usable on shem:** Matthew (doorway/manager), Jessica (spouse, device), Susan (sister, household), Adam (firstman/node), Eve (firstwoman/device), Pete (pastor/device), Terrance (ward of Matthew/device with capability grant), Nancy (neighbor/hosted), Gertrude (grandmother/core-family — large-text + simple-nav), Maria (newcomer), Ezra (newcomer). Enough diversity to prove household-to-household reciprocation with a couple, a ward, a pastor, a neighbor, and a newcomer — exactly the test matrix the resilience story needs.
 
 ## 5. Why nothing lights up — the integration gap
 
@@ -181,7 +181,7 @@ Not exploratory. These are the decisions that unblock everything else and must b
 
 **D4. Doorway stays web2-only.** Confirmed from memory and `doorway/CLAUDE.md`. This sprint adds ZERO per-domain proxy files to doorway-service. All new routes land in elohim-storage's `build_manifest()` and auto-register. The only doorway-service changes permitted: wire the existing `/admin/routes` handler into `server/http.rs` and fix `/admin/users` authorization.
 
-**D5. Shem is the acceptance target — full roster, real peers.** Shem has >100 GB RAM and ~4 TB storage, ample to run the full persona roster as independent peers. Dashboards must light up on shem with real peers before the sprint can be called done; a2o scenarios remain the logic spec, shem is the behavioral spec. The demo specifically proves resilience/recovery for Matthew's family (household) — Timothy offline doesn't lose the family's content, Timothy's return restores `protected` status, and no content Jessica or Matthew or James stewards becomes unreachable during the dip.
+**D5. Shem is the acceptance target — full roster, real peers.** Shem has >100 GB RAM and ~4 TB storage, ample to run the full persona roster as independent peers. Dashboards must light up on shem with real peers before the sprint can be called done; a2o scenarios remain the logic spec, shem is the behavioral spec. The demo specifically proves resilience/recovery for Matthew's family (household) — Terrance offline doesn't lose the family's content, Terrance's return restores `protected` status, and no content Jessica or Matthew or James stewards becomes unreachable during the dip.
 
 ## 6.A. Node-shape publish surface (concrete sketch)
 
@@ -272,26 +272,26 @@ Resilience is the P2P dataplane's job, not the storage driver's. But maintenance
 ## 7. The sprint — "Your fabric, lit up"
 
 **Goal.** By end-of-sprint, a user signed in as Matthew on `alpha.elohim.host` (projected through his doorway running on shem) sees:
-- `/shefa/devices` shows Matthew's devices + connected households (Adam/Eve, Pete, Timothy, Nancy) with lifecycle, archetype, and capability flags sourced from live PeerStatus.
+- `/shefa/devices` shows Matthew's devices + connected households (Adam/Eve, Pete, Terrance, Nancy) with lifecycle, archetype, and capability flags sourced from live PeerStatus.
 - `/shefa/resources/category:content` shows the content Matthew's household stewards, grouped by affinity, each with a resilience badge (household count + health).
 - `/shefa/dashboard` Network Health tab shows peer posture, storage pressure, always-on summary, household reciprocation count — all computed live from PeerStatus + stewardship allocations + resilience projection.
 - Any content viewer's resilience tooltip shows real data: shard encoding, household stewards, peers online, health score — not "No stewards assigned."
 - `doorway-alpha.elohim.host/threshold/dashboard` shows registered peers (via doorway's PeerStatus subscription), route registry populated, users list populated (admin-gated).
 
-Running on shem with the full persona roster as real peers. Demo scenario: bring one peer (Timothy) offline; household resilience drops to `partial`; bring them back; status restores.
+Running on shem with the full persona roster as real peers. Demo scenario: bring one peer (Terrance) offline; household resilience drops to `partial`; bring them back; status restores.
 
 **What ships (ordered by dependency):**
 
 1. **Canonical decisions locked.** D1–D5 above committed as decision record in the spec tree (new file in `genesis/docs/superpowers/specs/decisions/`). Retires `NodeRegistryAnchor`.
 2. **PeerStatus Phase 1 closeout (small).** Phase 1 is ~95% shipped — integrity types, link types, validation, all three coordinator functions, diesel model + migration with source-of-truth comment, policy engine, heartbeat tokio task, TCP forwarder, example config, post-commit signal wiring into `peer_statuses` projection, config field, lib/main spawn — all present and running (verified file-by-file against the Phase 1 plan). Two gaps remain: (a) sweettest integration test at `elohim/holochain/tests/peer_status.rs` is missing (file doesn't exist), (b) no HTTP read route for the `PeerStatusView` — the view struct and schema (`peer-status-view.schema.json`) exist but no route in `build_manifest()` serves them. This sprint lands both as Phase 1 closeout: write the sweettest test, add `GET /api/v1/peer-statuses` + household-filtered variant to storage. Small scope.
-3. **Household grouping.** Extend `humans` + `collectives` to surface a queryable `household_id`. Fixtures updated in `genesis/data/humans/*.json` for Matthew (+ Jessica, + James, + Susan), Adam (+ Eve), Pete (solo), Timothy (under Matthew's stewardship), Nancy (solo), Gertrude, Maria, Ezra.
+3. **Household grouping.** Extend `humans` + `collectives` to surface a queryable `household_id`. Fixtures updated in `genesis/data/humans/*.json` for Matthew (+ Jessica, + James, + Susan), Adam (+ Eve), Pete (solo), Terrance (under Matthew's stewardship), Nancy (solo), Gertrude, Maria, Ezra.
 4. **Node-shape publish + device list.** Implement the §6.A sketch: `node-shape-view.schema.json`, `POST /api/v1/nodes/shape` (upserts `stewarded_nodes` with archetype + household fields, triggers `node-registry::register_node` DHT commit, returns `dht_anchor_hash`), `GET /api/v1/households/{id}/devices` (LEFT JOIN stewarded_nodes × peer_statuses on nodeId, returns hard shape + live vitals). Elohim-node boot reads `DEVICE_ARCHETYPE`/`HOUSEHOLD_ID`/`NODE_ROLE`/`REGION` env vars, derives committed fields from archetype lookup, POSTs to the shape route, and passes archetype_class through to the heartbeat task so PeerStatus tagging is populated per tick. Manifest declarations only; no doorway code changes.
 5. **Stewarded-resources endpoint & page wiring.** `/shefa/resources/category:content` calls existing stewardship allocation API filtered by the signed-in human's household; resource-explorer component renders by affinity with resilience badge.
 6. **Resilience tooltip.** `getResilienceTooltip()` in `content-viewer.component.ts` reads `this.resilience` (already loaded) and displays household count + shard encoding + health score. Fallback states honest.
 7. **Network Health posture.** Compute posture from PeerStatus + shard_locations + stewardship_allocations. HTTP endpoint `GET /api/v1/network/posture`. `/shefa/dashboard` tab renders the posture card. Info-level no attestation; debug-level requires `compute:debug` attestation (per `network-health-posture.feature`).
 8. **Resilience-is-household computation.** Service-level: for any content, compute `householdsStewarding: int`, `householdsReciprocated: int`, `protectionStatus: at-risk|partial|protected`. This becomes the top-level resilience claim in UI.
 9. **Doorway admin gaps.** Wire `/admin/routes` handler in `server/http.rs`. Restore `/admin/users` authorization (admin passes, others 403). (The mastery 405 is tabled as a separate fix — out of scope here.)
-10. **Shem activation.** Deploy the household roster as real peers on shem: Matthew household (3 devices: matthew-home always-on, matthew-laptop intermittent, jessica-phone intermittent), Adam household (adam-node always-on, eve-laptop intermittent), Pete (pete-laptop intermittent), Timothy (timothy-laptop intermittent under Matthew's stewardship grant), Nancy (hosted via doorway-alpha), doorway-alpha itself. Drive the human-resilience demo scenarios against the cluster.
+10. **Shem activation.** Deploy the household roster as real peers on shem: Matthew household (3 devices: matthew-home always-on, matthew-laptop intermittent, jessica-phone intermittent), Adam household (adam-node always-on, eve-laptop intermittent), Pete (pete-laptop intermittent), Terrance (terrance-laptop intermittent under Matthew's stewardship grant), Nancy (hosted via doorway-alpha), doorway-alpha itself. Drive the human-resilience demo scenarios against the cluster.
 11. **New a2o features.** Author the six gap scenarios from §4. Step defs for `network-health-posture`, `peer-advertisement`, `human-resilience` feature files (turning @wip into executable).
 12. **WASM asset fix (small).** Resolve `elohim_cache_core.js 404` in deployment. Single-commit, not a sprint-shaping piece.
 
@@ -307,10 +307,10 @@ Running on shem with the full persona roster as real peers. Demo scenario: bring
 **Acceptance bar.**
 - All six new a2o scenarios (§4) green.
 - `human-resilience.feature`'s "Matthew + Susan + Pete" scenario green — protection_status reports `protected` with trust_circle ≥ 2 and three-household reciprocation, computed from live data.
-- `peer-advertisement.feature`'s "Heterogeneous network handles mixed availability" scenario green — timothy-laptop offline, matthew-home + adam-node stay online, routing excludes stale.
+- `peer-advertisement.feature`'s "Heterogeneous network handles mixed availability" scenario green — terrance-laptop offline, matthew-home + adam-node stay online, routing excludes stale.
 - All four dashboards on `alpha.elohim.host` + `doorway-alpha.elohim.host` display real data with no console errors.
-- Shem cluster runs the full persona roster and sustains the demo scenario (Timothy offline → partial → Timothy online → protected) over at least 10 minutes.
-- **Maintenance choreography demo (§6.B steps 1/2/3/6):** Timothy's elohim-node can be flipped to `Maintenance` via operator action → doorway stops routing to it within 60s → household-resilience reports the projected state before the drain proceeds → restart on same volume → `Starting` → `Online` → routing resumes. Household protection never drops to `at-risk` during the operation.
+- Shem cluster runs the full persona roster and sustains the demo scenario (Terrance offline → partial → Terrance online → protected) over at least 10 minutes.
+- **Maintenance choreography demo (§6.B steps 1/2/3/6):** Terrance's elohim-node can be flipped to `Maintenance` via operator action → doorway stops routing to it within 60s → household-resilience reports the projected state before the drain proceeds → restart on same volume → `Starting` → `Online` → routing resumes. Household protection never drops to `at-risk` during the operation.
 
 ## 8. Sub-project decomposition (for next sprints)
 

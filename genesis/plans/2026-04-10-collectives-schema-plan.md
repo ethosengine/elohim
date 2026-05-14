@@ -282,7 +282,7 @@ New collectives:
   "governanceLayer": "family",
   "reach": "trusted",
   "constitutionalParentId": "neighborhood-valley",
-  "description": "Nuclear family — Matthew, Jessica, Timothy. Co-stewards of household, education, and faith formation.",
+  "description": "Nuclear family — Matthew, Jessica, Terrance. Co-stewards of household, education, and faith formation.",
   "governanceModel": "steward-consent",
   "domain": "family",
   "place": null,
@@ -298,7 +298,7 @@ New collectives:
   "governanceLayer": "faith",
   "reach": "familiar",
   "constitutionalParentId": "community-local-church",
-  "description": "Weekly bible study — Matthew, Jessica, Timothy, Pete",
+  "description": "Weekly bible study — Matthew, Jessica, Terrance, Pete",
   "governanceModel": "consent",
   "domain": "worship",
   "place": null,
@@ -314,7 +314,7 @@ New collectives:
   "governanceLayer": "geographic",
   "reach": "familiar",
   "constitutionalParentId": "community-neighborhood-association",
-  "description": "Immediate neighborhood — Matthew, Jessica, Timothy, Nancy",
+  "description": "Immediate neighborhood — Matthew, Jessica, Terrance, Nancy",
   "governanceModel": "community-vote",
   "domain": "land-use",
   "place": null,
@@ -437,7 +437,7 @@ Update account packages for the humans who participate in the new collectives:
 
 **jessica-spouse.json** — add same three entries (couple, bible study, neighborhood)
 
-**timothy-tutor.json** — add entries for `bible-study-valley`, `neighborhood-valley` (not the couple)
+**terrance-tutor.json** — add entries for `bible-study-valley`, `neighborhood-valley` (not the couple)
 
 **pete-pastor.json** — add entry for `bible-study-valley`
 

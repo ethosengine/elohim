@@ -41,7 +41,7 @@ Sprint 1 builds the body. Sprint 2 wires collective-level governance. Sprint 3 a
 The seed creates a living simulation — not placeholder data, but a realistic community that feels alive before real people arrive. Constrained to current infrastructure:
 
 - **2 households**: Matthew & Jessica + 1 child (3 people), one other family (2 people)
-- **3 individual peers**: Pete, Timothy, Frank (not yet in household collectives)
+- **3 individual peers**: Pete, Terrance, Frank (not yet in household collectives)
 - **1-2 small groups**: drawn from the pool of ~7 people
 - **Total: ~7 people**
 

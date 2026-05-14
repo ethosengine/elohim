@@ -22,10 +22,10 @@ Feature: Peer Advertisement — The Network's Self-Awareness Heartbeat
 
   @wip
   Scenario: Laptop peer advertises intermittent profile
-    Given human "Timothy" has a Tauri node "timothy-laptop" configured as laptop
-    And "timothy-laptop" has capabilities: storage=true, always_on=false, max_storage=10GB, cache_budget=200MB
-    When "timothy-laptop" joins the network
-    Then "timothy-laptop" broadcasts a CapacityAnnouncement within 30 seconds
+    Given human "Terrance" has a Tauri node "terrance-laptop" configured as laptop
+    And "terrance-laptop" has capabilities: storage=true, always_on=false, max_storage=10GB, cache_budget=200MB
+    When "terrance-laptop" joins the network
+    Then "terrance-laptop" broadcasts a CapacityAnnouncement within 30 seconds
     And the announcement includes node_id, timestamp, and ready=true
     And the announcement capabilities include "storage" but not "always-on"
     And connected peers receive the announcement via gossipsub
@@ -68,18 +68,18 @@ Feature: Peer Advertisement — The Network's Self-Awareness Heartbeat
 
   @wip
   Scenario: Receiving peer builds neighbor table from announcements
-    Given "timothy-laptop" is connected to "matthew-home" via gossipsub
+    Given "terrance-laptop" is connected to "matthew-home" via gossipsub
     When "matthew-home" broadcasts a CapacityAnnouncement
-    Then "timothy-laptop" decodes the MessagePack announcement
-    And "timothy-laptop" records the announcement in its neighbor capacity table
+    Then "terrance-laptop" decodes the MessagePack announcement
+    And "terrance-laptop" records the announcement in its neighbor capacity table
     And the table entry is keyed by node_id with last_seen timestamp
 
   @wip
   Scenario: Stale announcements are evicted from neighbor table
-    Given "timothy-laptop" has a neighbor table entry for "matthew-home"
+    Given "terrance-laptop" has a neighbor table entry for "matthew-home"
     And the entry was last updated 120 seconds ago
     And the staleness threshold is 90 seconds (3 missed heartbeats)
-    When "timothy-laptop" checks the neighbor table
+    When "terrance-laptop" checks the neighbor table
     Then the entry for "matthew-home" is marked as stale
     And "matthew-home" is not considered for routing or replication decisions
 
@@ -104,19 +104,19 @@ Feature: Peer Advertisement — The Network's Self-Awareness Heartbeat
 
   @wip
   Scenario: Peer coming online announces immediately
-    Given "timothy-laptop" was previously offline (lid closed)
-    When Timothy opens the laptop and "timothy-laptop" reconnects to the network
-    Then "timothy-laptop" broadcasts a CapacityAnnouncement within 5 seconds
+    Given "terrance-laptop" was previously offline (lid closed)
+    When Terrance opens the laptop and "terrance-laptop" reconnects to the network
+    Then "terrance-laptop" broadcasts a CapacityAnnouncement within 5 seconds
     And the announcement reflects current state (cache may be cold)
     And the regular 30-second heartbeat resumes
 
   @wip
   Scenario: Peer going offline is detected by absence of heartbeats
-    Given "timothy-laptop" is connected and broadcasting
-    And "matthew-home" has a fresh neighbor table entry for "timothy-laptop"
-    When Timothy closes the laptop (ungraceful disconnect)
-    Then "matthew-home" receives no further announcements from "timothy-laptop"
-    And after 90 seconds, "matthew-home" marks "timothy-laptop" as stale
+    Given "terrance-laptop" is connected and broadcasting
+    And "matthew-home" has a fresh neighbor table entry for "terrance-laptop"
+    When Terrance closes the laptop (ungraceful disconnect)
+    Then "matthew-home" receives no further announcements from "terrance-laptop"
+    And after 90 seconds, "matthew-home" marks "terrance-laptop" as stale
     And after the connection timeout, the entry is evicted
 
   @wip
@@ -141,7 +141,7 @@ Feature: Peer Advertisement — The Network's Self-Awareness Heartbeat
   Scenario: Network shows diverse peer profiles simultaneously
     Given the following peers are connected via gossipsub:
       | peer             | profile      | always_on | storage  | cache    | serve        |
-      | timothy-laptop   | laptop       | false     | 10GB     | 200MB    | none         |
+      | terrance-laptop   | laptop       | false     | 10GB     | 200MB    | none         |
       | matthew-home     | home_node    | true      | 100GB    | 2GB      | family       |
       | community-node   | network_node | true      | 500GB    | 10GB     | public       |
       | doorway-alpha    | doorway      | true      | n/a      | mongodb  | public       |
@@ -152,7 +152,7 @@ Feature: Peer Advertisement — The Network's Self-Awareness Heartbeat
 
   @wip @requires:multi-node
   Scenario: Heterogeneous network handles mixed availability
-    Given "timothy-laptop" goes offline (intermittent)
+    Given "terrance-laptop" goes offline (intermittent)
     And "matthew-home" remains online (always-on)
     And "community-node" remains online (always-on)
     When "matthew-home" evaluates the neighbor table

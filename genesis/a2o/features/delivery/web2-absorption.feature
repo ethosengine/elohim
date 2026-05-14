@@ -15,13 +15,13 @@ Feature: Web2 Absorption — Doorway Projection Cache
   Background:
     Given doorway "alpha" at "E2E_DOORWAY_ALPHA"
     And content "evolution-of-trust" has been seeded as html5-app
-    And human "Timothy" is logged in on doorway "alpha" with device
+    And human "Terrance" is logged in on doorway "alpha" with device
 
   # --- Cache Population (Cold Start) ---
 
   Scenario: First load proxies to storage and populates cache
     Given the projection cache for "evolution-of-trust" is empty
-    When Timothy loads the html5-app "evolution-of-trust"
+    When Terrance loads the html5-app "evolution-of-trust"
     Then all app files are served with 200 status
     And the projection cache contains entries for "evolution-of-trust"
     And each cache entry records the blob_hash from storage
@@ -29,7 +29,7 @@ Feature: Web2 Absorption — Doorway Projection Cache
   @wip
   Scenario: Cache entries include EPR agreement reference
     Given the projection cache for "evolution-of-trust" is empty
-    When Timothy loads the html5-app "evolution-of-trust"
+    When Terrance loads the html5-app "evolution-of-trust"
     Then each cache entry has an agreement_id field
     And the agreement_id references a self-negotiated EPR agreement
 
@@ -37,7 +37,7 @@ Feature: Web2 Absorption — Doorway Projection Cache
 
   Scenario: Second load serves entirely from cache
     Given the projection cache for "evolution-of-trust" is warm
-    When Timothy loads the html5-app "evolution-of-trust"
+    When Terrance loads the html5-app "evolution-of-trust"
     Then all app files are served from the projection cache
     And zero requests reach elohim-storage
 
@@ -72,6 +72,6 @@ Feature: Web2 Absorption — Doorway Projection Cache
   Scenario: Cache is shared across doorway replicas
     Given doorway "alpha" has 2 replicas sharing MongoDB
     And replica 1 has served "evolution-of-trust" into the cache
-    When Timothy's request is routed to replica 2
+    When Terrance's request is routed to replica 2
     Then the response is served from the shared projection cache
     And replica 2 does not proxy to storage

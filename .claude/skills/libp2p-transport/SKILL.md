@@ -217,7 +217,7 @@ for addr_str in &config.listen_addrs {
 ## Configuration
 
 ```rust
-// elohim-node/src/config.rs
+// steward/node/src/config.rs
 pub struct P2PConfig {
     pub listen_addrs: Vec<String>,     // Multiaddr strings
     pub bootstrap_nodes: Vec<String>,  // /ip4/.../p2p/12D3Koo...
@@ -245,13 +245,13 @@ RUSTFLAGS='--cfg getrandom_backend="custom"' cargo build --release
 
 | File | Purpose |
 |------|---------|
-| `elohim-node/src/p2p/transport.rs` | Swarm builder, behaviour composition, event loop |
-| `elohim-node/src/p2p/mod.rs` | Module exports |
-| `elohim-node/src/p2p/protocols.rs` | SyncCodec, protocol constants |
-| `elohim-node/src/p2p/nat.rs` | NAT traversal (stub/TODO) |
-| `elohim-node/Cargo.toml` | libp2p 0.53 with features |
-| `holochain/elohim-storage/src/p2p/behaviour.rs` | Storage P2P behaviour (0.54) |
-| `holochain/P2P-DATAPLANE.md` | Architecture design document |
+| `steward/node/src/p2p/transport.rs` | Swarm builder, behaviour composition, event loop |
+| `steward/node/src/p2p/mod.rs` | Module exports |
+| `steward/node/src/p2p/protocols.rs` | SyncCodec, protocol constants |
+| `steward/node/src/p2p/nat.rs` | NAT traversal (stub/TODO) |
+| `steward/node/Cargo.toml` | libp2p 0.53 with features |
+| `elohim/elohim-storage/src/p2p/behaviour.rs` | Storage P2P behaviour (0.54) |
+| `elohim/holochain/docs/P2P-DATAPLANE.md` | Architecture design document |
 
 ## External References
 

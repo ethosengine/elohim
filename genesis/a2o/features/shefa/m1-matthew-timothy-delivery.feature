@@ -17,16 +17,16 @@ Feature: Matthew sees real topology data after M1 substrate completion
     And the storage usage tile shows non-zero used bytes
 
   @wip
-  Scenario: Peer topology page shows Timothy's household
+  Scenario: Peer topology page shows Terrance's household
     When Matthew opens the peer topology page at "/shefa/peers"
-    Then he sees a peer-household-card for household-timothy
-    And the peer-household-card displays Timothy's display name
-    And the card displays Timothy's household as a connected peer
+    Then he sees a peer-household-card for household-terrance
+    And the peer-household-card displays Terrance's display name
+    And the card displays Terrance's household as a connected peer
 
   @wip
-  Scenario: Reciprocity page shows inflow from Timothy
+  Scenario: Reciprocity page shows inflow from Terrance
     When Matthew opens the reciprocity page at "/shefa/reciprocity"
-    Then he sees at least one inflow row whose counterparty is household-timothy
+    Then he sees at least one inflow row whose counterparty is household-terrance
     And the committed bytes column shows a non-zero value for that row
     And the delivered bytes column shows a non-zero value once the cross-pod fetch has completed
 

@@ -23,7 +23,7 @@ Feature: Fixture Human Categories
 
   Scenario: Affinity group — learning and faith
     Given human "Pete" is logged in on doorway "alpha"
-    And human "Timothy" is logged in on doorway "alpha"
+    And human "Terrance" is logged in on doorway "alpha"
     And human "Tommy" is logged in on doorway "alpha"
     And human "Meriadoc" is logged in on doorway "alpha"
     Then all 4 humans should have distinct tokens

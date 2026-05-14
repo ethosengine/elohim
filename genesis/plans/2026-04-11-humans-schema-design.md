@@ -448,7 +448,7 @@ relationships:
     intimacyLevel: intimate
     startedAt: 2010-06-15
   - source: human-matthew-manager
-    target: human-timothy-son
+    target: human-james-son
     type: parent-of
     intimacyLevel: intimate
   - source: human-matthew-manager

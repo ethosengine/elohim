@@ -35,7 +35,7 @@ The Storybook sidebar surfaces four top-level sections plus per-domain sub-trees
 ```
 I. NARRATIVE FLOW   (designer's reading path)
    Why /
-     Manifesto                    ← genesis/docs/content/elohim-protocol/manifesto.md
+     Manifesto                    ← genesis/genesis/docs/content/elohim-protocol/manifesto.md
      Constitution                 ← .../constitution.md
      Vision                       ← .../global-orchestra.md
    What /
@@ -66,7 +66,7 @@ III. DOMAINS        (opinionated reference implementations)
     Learning (Lamad) /
       Stories                     ← genesis/a2o/features/lamad/*.feature
                                     + genesis/a2o/features/content/*.feature
-      Reference Design            ← genesis/docs/content/elohim-protocol/lamad.md
+      Reference Design            ← genesis/genesis/docs/content/elohim-protocol/lamad.md
                                     (value_scanner/ directory pointer in
                                     placeholder; needs single-file synthesis
                                     or sprint-2 directory-source support)
@@ -210,13 +210,13 @@ Encoded as a constant in `sync-genesis.mjs`. Spec author's best-effort mapping; 
 ```js
 const MAPPINGS = [
   // I. Narrative Flow / Why
-  { from: 'docs/content/elohim-protocol/manifesto.md',
+  { from: 'genesis/docs/content/elohim-protocol/manifesto.md',
     to: 'narrative/why/manifesto.md',
     title: 'I. Why / Manifesto' },
-  { from: 'docs/content/elohim-protocol/constitution.md',
+  { from: 'genesis/docs/content/elohim-protocol/constitution.md',
     to: 'narrative/why/constitution.md',
     title: 'I. Why / Constitution' },
-  { from: 'docs/content/elohim-protocol/global-orchestra.md',
+  { from: 'genesis/docs/content/elohim-protocol/global-orchestra.md',
     to: 'narrative/why/vision.md',
     title: 'I. Why / Vision' },
   // I. Narrative Flow / What
@@ -227,13 +227,13 @@ const MAPPINGS = [
   { from: 'docs/content/elohim-protocol/protocol-specification.md',
     to: 'narrative/how/protocol-specification.md',
     title: 'I. How / Protocol Specification' },
-  { from: 'docs/content/elohim-protocol/governance-layers-architecture.md',
+  { from: 'genesis/docs/content/elohim-protocol/governance-layers-architecture.md',
     to: 'narrative/how/governance-layers.md',
     title: 'I. How / Governance Layers' },
   { from: 'docs/content/elohim-protocol/epr-developer-guide.md',
     to: 'narrative/how/epr-developer-guide.md',
     title: 'I. How / EPR Developer Guide' },
-  { from: 'docs/content/elohim-protocol/hardware-spec.md',
+  { from: 'genesis/docs/content/elohim-protocol/hardware-spec.md',
     to: 'narrative/how/hardware-spec.md',
     title: 'I. How / Hardware Spec' },
   // II. Foundations
@@ -263,7 +263,7 @@ const MAPPINGS = [
     toDir: 'domains/doorway/stories/',
     titleFn: (name) => `III. Domains / Doorway / Stories / ${name}` },
   // Domain Reference Design (where genesis content exists)
-  { from: 'docs/content/elohim-protocol/lamad.md',
+  { from: 'genesis/docs/content/elohim-protocol/lamad.md',
     to: 'domains/learning/reference.md',
     title: 'III. Domains / Learning (Lamad) / Reference Design' },
   // IV. Reference
