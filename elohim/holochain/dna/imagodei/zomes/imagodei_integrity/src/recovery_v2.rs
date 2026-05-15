@@ -188,19 +188,23 @@ pub fn check_intimate_quorum_rules(
         );
     }
 
-    // Rule: target human_id matches request.human_id (coordinator must populate).
-    let req_human_id =
-        match &request.human_id {
-            Some(id) => id,
-            None => return ValidateCallbackResult::Invalid(
-                "IntimateQuorum requires RecoveryRequest.human_id to be populated by coordinator"
+    // Rule: target human_id matches request.human_id (when populated).
+    //
+    // Recovery M4 Task 15: the canonical recovery-request is now a Content entry on
+    // the elohim DNA — cross-DNA fetches are HDK-only, so the integrity validator
+    // for KeyRotation synthesises a stub RecoveryRequest with `human_id: None`. In
+    // that case the witnesses-agree-on-the-same-human_id check above remains in force
+    // and the witness↔request cross-check is deferred to the coordinator gate
+    // (`commit_key_rotation`), which has HDK access and verifies the match
+    // pre-commit. Test fixtures populate `human_id: Some(...)` so this branch
+    // continues to be exercised by unit tests.
+    if let Some(req_human_id) = &request.human_id {
+        if first_human_id != req_human_id {
+            return ValidateCallbackResult::Invalid(
+                "IntimateQuorum witness human_id does not match RecoveryRequest.human_id"
                     .to_string(),
-            ),
-        };
-    if first_human_id != req_human_id {
-        return ValidateCallbackResult::Invalid(
-            "IntimateQuorum witness human_id does not match RecoveryRequest.human_id".to_string(),
-        );
+            );
+        }
     }
 
     // Rule: no witness is explicitly revoked.
