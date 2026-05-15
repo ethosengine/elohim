@@ -73,6 +73,27 @@ pub fn list_by_parent_governance_action(
         })
 }
 
+/// Count vote-children of a governance action (parent CID).
+///
+/// Used by the recovery-flow projector to recompute `current_votes` after each
+/// vote-child upsert. Because the underlying `attestations` row is keyed on
+/// `id` (the vote's content CID), redelivering the same signal idempotently
+/// replaces the same row — the count never double-counts.
+pub fn count_by_parent_governance_action_cid(
+    conn: &mut SqliteConnection,
+    parent_cid: &str,
+) -> Result<i64, StorageError> {
+    attestations::table
+        .filter(attestations::parent_governance_action_cid.eq(parent_cid))
+        .count()
+        .get_result::<i64>(conn)
+        .map_err(|e| {
+            StorageError::Internal(format!(
+                "Failed to count attestation children of {parent_cid}: {e}"
+            ))
+        })
+}
+
 /// List all attestations issued by a given issuer CID.
 pub fn list_by_issuer(
     conn: &mut SqliteConnection,
@@ -192,6 +213,30 @@ mod tests {
             super::list_by_parent_governance_action(&mut conn, "gov-action-001").unwrap();
         assert_eq!(children.len(), 1);
         assert_eq!(children[0].vote_value.as_deref(), Some("approve"));
+    }
+
+    #[test]
+    fn count_by_parent_governance_action_cid_dedupes_on_upsert() {
+        let mut conn = setup();
+        let mut vote = make_row("vote-A", "subj-A", "attestation:recovery-approval");
+        vote.parent_governance_action_cid = Some("gov-parent-X".to_string());
+        upsert(&mut conn, &vote).unwrap();
+        // Re-upserting the same id must not bump the count.
+        upsert(&mut conn, &vote).unwrap();
+        upsert(&mut conn, &vote).unwrap();
+        assert_eq!(
+            count_by_parent_governance_action_cid(&mut conn, "gov-parent-X").unwrap(),
+            1
+        );
+
+        // A distinct vote increments the count.
+        let mut vote2 = make_row("vote-B", "subj-B", "attestation:recovery-approval");
+        vote2.parent_governance_action_cid = Some("gov-parent-X".to_string());
+        upsert(&mut conn, &vote2).unwrap();
+        assert_eq!(
+            count_by_parent_governance_action_cid(&mut conn, "gov-parent-X").unwrap(),
+            2
+        );
     }
 
     #[test]
