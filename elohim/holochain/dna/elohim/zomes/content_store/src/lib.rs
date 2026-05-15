@@ -20,7 +20,7 @@ pub use manifest::*;
 pub mod attestation;
 pub mod governance_action;
 pub use attestation::{AttestationOutput as ConsolidatedAttestationOutput, IssueAttestationInput, RevokeAttestationInput};
-pub use governance_action::{GovernanceActionOutput, GovernanceActionWithChildren, ProposeGovernanceActionInput, VoteOnGovernanceActionInput};
+pub use governance_action::{GovernanceActionOutput, GovernanceActionWithChildren, ProposeGovernanceActionInput, ProposeRecoveryGovernanceActionInput, VoteOnGovernanceActionInput};
 
 // EPR Phase 3.5 T8: FeedbackSignal coordinator functions.
 pub mod feedback_signal;
@@ -12137,6 +12137,29 @@ pub fn propose_governance_action(
     input: ProposeGovernanceActionInput,
 ) -> ExternResult<GovernanceActionOutput> {
     governance_action::propose_governance_action(input)
+}
+
+/// Recovery M4 Task 13 — bespoke producer for recovery-shaped governance actions.
+///
+/// Coexists with `propose_governance_action`. The generic function nests
+/// caller-supplied fields under `metadata.parameters_json`; this function
+/// writes them at the TOP LEVEL of `metadata_json` because the Task 4/5
+/// recovery gates read top-level keys (`human_id`, `revoked_key`,
+/// `threshold_reached`, `effective_at`, `is_active`, `frozen_at_layer`).
+///
+/// Accepts only the three recovery kinds:
+///   - `governance-action:recovery-request`
+///   - `governance-action:key-revocation`
+///   - `governance-action:identity-freeze`
+///
+/// CREATE-only: effectiveness flips and supersession transitions write a new
+/// Content entry rather than `update_entry`. The optional `supersedes_cid`
+/// captures the prior entry for downstream projection.
+#[hdk_extern]
+pub fn propose_recovery_governance_action(
+    input: ProposeRecoveryGovernanceActionInput,
+) -> ExternResult<GovernanceActionOutput> {
+    governance_action::propose_recovery_governance_action(input)
 }
 
 /// Cast a vote on an existing governance action.
