@@ -97,6 +97,9 @@ pub mod weather;
 pub mod attestation_projector;
 pub mod tally_projector;
 
+// Recovery Protocol Phase 2 (M4) — recovery_flows / key_revocations projection
+pub mod recovery_flow_projector;
+
 // Re-exports
 pub use content_service::ContentService;
 pub use economic_event_service::EconomicEventService;
