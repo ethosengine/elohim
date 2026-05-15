@@ -2152,6 +2152,12 @@ pub enum RecoveryV2Signal {
         required_votes: u32,
         threshold_now_reached: bool,
     },
+    /// Legacy flat-shape signal. Superseded by `DnaSignal::KeyRevocation`
+    /// (EPR envelope) emitted alongside at each producer site.
+    /// Remove after one release cycle (T18 back-compat window).
+    #[deprecated(
+        note = "T18: superseded by DnaSignal::KeyRevocation envelope; remove after one release cycle"
+    )]
     KeyRevocationEffective {
         /// Internal correlation id (shape `rev-{human}-{ts}`).
         /// Not in the dna-signals schema; retained for elohim-storage projector
@@ -2214,6 +2220,256 @@ pub enum RecoveryV2Signal {
         human_action_hash: ActionHash,
         host_url: String,
     },
+}
+
+// =============================================================================
+// DnaSignal — EPR-shape provenance envelope (T18+)
+// =============================================================================
+//
+// `DnaSignal` is the forward-compatible, AI-native signal type. It frames the
+// wire message as an EPR (Elohim Provenance Record): the authoring elohim's
+// attestation over a content-addressed (CID) subject, signed at emit time.
+//
+// Contrast with `RecoveryV2Signal`: that enum uses Holochain-internal
+// ActionHash as its identity anchor and carries no issuer signature. It remains
+// in place for one release cycle (back-compat window) alongside the new
+// `DnaSignal::KeyRevocation` emission at each producer site.
+//
+// Wire format: `DnaSignal` serializes via serde with `tag = "type"` (kebab
+// discriminator via camelCase). Consumers that strictly enforce
+// `additionalProperties: false` against `dna-signals/key-revocation.schema.json`
+// will see a top-level `type` field from the tag alongside the envelope fields;
+// the schema now permits this by validating only the envelope payload fields.
+//
+// Future variants (KeyRotation, AgentPeerBinding) extend the enum below.
+// The RevocationAttestation EPR-worker arm (Task 7) is a separate signal class
+// and is NOT migrated here.
+
+/// Top-level EPR-shape signal enum.
+///
+/// `#[serde(tag = "type")]` produces a discriminator field `type` on the wire
+/// whose value is the camelCase variant name (e.g. `"keyRevocation"`).
+#[derive(Serialize, Deserialize, SerializedBytes, Debug, Clone)]
+#[serde(rename_all = "camelCase", tag = "type")]
+pub enum DnaSignal {
+    KeyRevocation(KeyRevocationEnvelope),
+    // Future: KeyRotation(KeyRotationEnvelope), AgentPeerBinding(AgentPeerBindingEnvelope)
+}
+
+/// EPR envelope for a `governance-action:key-revocation` effective event.
+///
+/// Wire fields are `camelCase` (serde rename). All fields except `signature`
+/// and `relay_chain` are covered by the issuer signature — see
+/// `canonical_envelope_bytes` for the exact canonical form.
+#[derive(Serialize, Deserialize, SerializedBytes, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct KeyRevocationEnvelope {
+    /// EPR discriminator — const `"attestation:key-revocation-emit"`.
+    pub attestation_kind: String,
+    /// CIDv1 (dag-cbor sha256) of the `governance-action:key-revocation`
+    /// Content entry on the elohim DNA. Substrate-agnostic identity anchor.
+    pub subject_cid: String,
+    /// Base64-encoded 32-byte ed25519 public key of the authoring elohim agent.
+    pub issuer: String,
+    /// RFC3339 timestamp at which the authoring elohim emitted this attestation.
+    pub issued_at: String,
+    /// Base64-encoded ed25519 signature over `canonical_envelope_bytes(self)`.
+    pub signature: String,
+    /// Domain-specific metadata carried inside the envelope.
+    pub metadata: KeyRevocationMetadata,
+    /// Reserved for relay-elohim provenance accumulation. Empty in T18.
+    /// Future relay-elohims append their own attestation objects here as the
+    /// signal propagates across hops. Opaque `serde_json::Value` so the wire
+    /// field is present-but-typeless until a typed `RelayAttestation` struct
+    /// lands in a future task.
+    pub relay_chain: Vec<serde_json::Value>,
+}
+
+/// Domain metadata nested inside `KeyRevocationEnvelope`.
+#[derive(Serialize, Deserialize, SerializedBytes, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct KeyRevocationMetadata {
+    /// Stable logical dedup key. Format: `rev-{humanId}-{ts}`.
+    pub revocation_id: String,
+    /// Base64-encoded 32-byte ed25519 public key being revoked.
+    pub revoked_pubkey: String,
+    /// Stage 1: the stable `human_id` string. Stage 2: CID of the Human entry.
+    pub agent_cid: String,
+    /// Earliest point the key may have been compromised (RFC3339).
+    /// M4: coincides with `effective_at`; future revisions add a distinct
+    /// discovery timestamp. EPR W2B controller sweep uses this for retroactive
+    /// attestation invalidation.
+    pub compromise_at: String,
+    /// Point at which the revocation became effective in the notary (RFC3339).
+    pub effective_at: String,
+    /// Back-pointer to the vote/request that drove this event. Null for
+    /// defender-path or voluntary revocations (no vote chain).
+    pub triggering_revocation_id: Option<String>,
+    /// CID of the prior Content entry this supersedes (pending→effective
+    /// lineage). Null on the initial CREATE.
+    pub supersedes_cid: Option<String>,
+}
+
+// =============================================================================
+// Canonical signing bytes
+// =============================================================================
+
+/// Sub-struct for canonical serialization — covers all envelope fields
+/// EXCEPT `signature` and `relay_chain`. MessagePack-encoded via
+/// `holochain_serialized_bytes::encode`.
+///
+/// # Canonical form specification
+///
+/// The issuer signature is ed25519 over MessagePack of:
+/// ```text
+/// {
+///   attestationKind: string,
+///   subjectCid:      string,
+///   issuer:          string,
+///   issuedAt:        string,
+///   metadata: {
+///     revocationId:          string,
+///     revokedPubkey:         string,
+///     agentCid:              string,
+///     compromiseAt:          string,
+///     effectiveAt:           string,
+///     triggeringRevocationId: string | null,
+///     supersedesCid:         string | null,
+///   }
+/// }
+/// ```
+/// Field order is the struct declaration order (deterministic under
+/// `holochain_serialized_bytes::encode` which uses `rmp_serde`'s
+/// `StructMapSerializer` — field names are included, order is declaration
+/// order of `#[derive(Serialize)]`).
+///
+/// # Verification (consumer side)
+///
+/// 1. Deserialize the envelope.
+/// 2. Call `canonical_envelope_bytes` on the deserialized envelope.
+/// 3. Decode `issuer` (base64 → 32 bytes) and `signature` (base64 → 64 bytes).
+/// 4. `ed25519_dalek::VerifyingKey::verify(&canonical_bytes, &signature)`.
+#[derive(Serialize, Debug)]
+#[serde(rename_all = "camelCase")]
+struct CanonicalEnvelopeCore<'a> {
+    attestation_kind: &'a str,
+    subject_cid: &'a str,
+    issuer: &'a str,
+    issued_at: &'a str,
+    metadata: CanonicalMetadataRef<'a>,
+}
+
+#[derive(Serialize, Debug)]
+#[serde(rename_all = "camelCase")]
+struct CanonicalMetadataRef<'a> {
+    revocation_id: &'a str,
+    revoked_pubkey: &'a str,
+    agent_cid: &'a str,
+    compromise_at: &'a str,
+    effective_at: &'a str,
+    triggering_revocation_id: Option<&'a str>,
+    supersedes_cid: Option<&'a str>,
+}
+
+/// Produce the canonical bytes over which the issuer signature is computed.
+///
+/// Excludes `signature` and `relay_chain` from the input envelope.
+/// The output is MessagePack-encoded via `holochain_serialized_bytes::encode`.
+///
+/// **Must match the mirror function in `elohim-storage/src/services/recovery_flow_projector.rs`.**
+/// See spec doc at `genesis/docs/superpowers/specs/2026-05-15-dna-signal-as-epr-envelope.md`
+/// for the field-level canonical form.
+pub fn canonical_envelope_bytes(envelope: &KeyRevocationEnvelope) -> Vec<u8> {
+    let core = CanonicalEnvelopeCore {
+        attestation_kind: &envelope.attestation_kind,
+        subject_cid: &envelope.subject_cid,
+        issuer: &envelope.issuer,
+        issued_at: &envelope.issued_at,
+        metadata: CanonicalMetadataRef {
+            revocation_id: &envelope.metadata.revocation_id,
+            revoked_pubkey: &envelope.metadata.revoked_pubkey,
+            agent_cid: &envelope.metadata.agent_cid,
+            compromise_at: &envelope.metadata.compromise_at,
+            effective_at: &envelope.metadata.effective_at,
+            triggering_revocation_id: envelope
+                .metadata
+                .triggering_revocation_id
+                .as_deref(),
+            supersedes_cid: envelope.metadata.supersedes_cid.as_deref(),
+        },
+    };
+    // holochain_serialized_bytes::encode uses rmp_serde internally; the map
+    // form preserves field names and declaration order — required for
+    // deterministic cross-platform canonical bytes.
+    holochain_serialized_bytes::encode(&core)
+        .expect("canonical_envelope_bytes: encode should never fail on well-formed structs")
+}
+
+/// Build and emit a `DnaSignal::KeyRevocation` envelope, signing the canonical
+/// bytes with the calling agent's lair-managed key.
+///
+/// Called at each of the three producer sites:
+/// - `submit_specialist_revocation` (defender path)
+/// - `create_self_revocation` (voluntary path)
+/// - `submit_revocation_vote` (voted quorum path)
+///
+/// # Arguments
+/// * `revocation_id` — stable dedup key (`rev-{human}-{ts}`)
+/// * `subject_cid` — CID of the effective `governance-action:key-revocation` Content entry
+/// * `agent_cid` — Stage 1: human_id string; Stage 2: Human entry CID
+/// * `revoked_pubkey` — base64 string of the revoked ed25519 key
+/// * `compromise_at` — RFC3339 (M4: same as `effective_at`)
+/// * `effective_at` — RFC3339 timestamp of effectiveness
+/// * `triggering_revocation_id` — None for defender/voluntary; Some(vote_id) for quorum path
+/// * `supersedes_cid` — None on initial CREATE; Some(prior_cid) on quorum supersession
+pub(crate) fn emit_key_revocation_envelope(
+    revocation_id: String,
+    subject_cid: String,
+    agent_cid: String,
+    revoked_pubkey: String,
+    compromise_at: String,
+    effective_at: String,
+    triggering_revocation_id: Option<String>,
+    supersedes_cid: Option<String>,
+) -> ExternResult<()> {
+    let agent_pk = agent_info()?.agent_initial_pubkey;
+    let issuer_b64 = base64_encode(agent_pk.get_raw_32());
+    let issued_at = rfc3339_from_sys_time(&sys_time()?);
+
+    // Build the envelope without the signature first so we can compute
+    // canonical bytes.
+    let mut envelope = KeyRevocationEnvelope {
+        attestation_kind: "attestation:key-revocation-emit".to_string(),
+        subject_cid,
+        issuer: issuer_b64,
+        issued_at,
+        signature: String::new(), // placeholder; filled after signing
+        metadata: KeyRevocationMetadata {
+            revocation_id,
+            revoked_pubkey,
+            agent_cid,
+            compromise_at,
+            effective_at,
+            triggering_revocation_id,
+            supersedes_cid,
+        },
+        relay_chain: vec![],
+    };
+
+    let canonical = canonical_envelope_bytes(&envelope);
+    let raw_sig = hdk::ed25519::sign_raw(agent_pk, canonical)?;
+    envelope.signature = base64_encode(&raw_sig.0);
+
+    emit_signal(DnaSignal::KeyRevocation(envelope))?;
+    Ok(())
+}
+
+/// Encode raw bytes as standard base64 (padded, STANDARD alphabet).
+/// Used for the `issuer` pubkey (32 bytes) and `signature` (64 bytes) fields
+/// in `KeyRevocationEnvelope`. Consumers decode with the same STANDARD engine.
+fn base64_encode(bytes: &[u8]) -> String {
+    use base64::{engine::general_purpose::STANDARD, Engine as _};
+    STANDARD.encode(bytes)
 }
 
 // =============================================================================
@@ -2628,19 +2884,34 @@ pub fn create_self_revocation(
     })?;
 
     let emitted_at_self = rfc3339_from_sys_time(&sys_time()?);
+    #[allow(deprecated)]
     emit_signal(RecoveryV2Signal::KeyRevocationEffective {
         revocation_id: revocation_id.clone(),
         signal_type: "keyRevocation".to_string(),
         action_hash: revocation_cid.clone(),
-        human_id,
-        revoked_key: revoked_key_str,
+        human_id: human_id.clone(),
+        revoked_key: revoked_key_str.clone(),
         // M4: no separate compromise-discovery timestamp; coincides with effectiveAt.
         // Future revisions may populate this from revocation request metadata.
         compromise_at: timestamp.clone(),
-        effective_at: timestamp,
+        effective_at: timestamp.clone(),
         triggering_vote_id: None,
         emitted_at: emitted_at_self,
     })?;
+
+    // T18: EPR-shape envelope alongside the legacy signal (back-compat window).
+    // Voluntary path: supersedes_cid = None (initial CREATE);
+    //                 triggering_revocation_id = None (no vote chain).
+    emit_key_revocation_envelope(
+        revocation_id.clone(),
+        revocation_cid.clone(),
+        human_id,        // Stage 1: human_id; Stage 2: Human entry CID
+        revoked_key_str,
+        timestamp.clone(), // compromise_at == effective_at in M4
+        timestamp,
+        None,            // triggering_revocation_id
+        None,            // supersedes_cid
+    )?;
 
     Ok(KeyRevocationOutput {
         revocation_id,
@@ -3059,19 +3330,34 @@ pub fn submit_revocation_vote(
         })?;
 
         let emitted_at_voted = rfc3339_from_sys_time(&sys_time()?);
+        #[allow(deprecated)]
         emit_signal(RecoveryV2Signal::KeyRevocationEffective {
             revocation_id: revocation_id.clone(),
             signal_type: "keyRevocation".to_string(),
-            action_hash: effective_cid,
+            action_hash: effective_cid.clone(),
             human_id: revocation_human_id.clone(),
             revoked_key: revocation_revoked_key.clone(),
             // M4: no separate compromise-discovery timestamp; coincides with effectiveAt.
             // Future revisions may populate this from revocation request metadata.
             compromise_at: rfc3339_now.clone(),
-            effective_at: rfc3339_now,
+            effective_at: rfc3339_now.clone(),
             triggering_vote_id: Some(vote_id.clone()),
             emitted_at: emitted_at_voted,
         })?;
+
+        // T18: EPR-shape envelope alongside the legacy signal (back-compat window).
+        // Voted quorum path: supersedes_cid = prior pending CID (pending → effective
+        //                    lineage); triggering_revocation_id = vote_id.
+        emit_key_revocation_envelope(
+            revocation_id.clone(),
+            effective_cid,
+            revocation_human_id.clone(), // Stage 1: human_id; Stage 2: Human entry CID
+            revocation_revoked_key.clone(),
+            rfc3339_now.clone(),         // compromise_at == effective_at in M4
+            rfc3339_now,
+            Some(vote_id.clone()),       // triggering_revocation_id
+            Some(input.revocation_cid.clone()), // supersedes_cid: prior pending entry
+        )?;
     } else {
         emit_signal(RecoveryV2Signal::RevocationVoteSubmitted {
             id: vote_id.clone(),

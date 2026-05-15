@@ -18,3 +18,7 @@ imagodei-types = { path = "../../../../../sdk/domains/imagodei/types" }
 # Recovery Protocol Phase 2 — Shamir secret sharing + Ed25519 (coordinator zome uses vsss-rs)
 vsss-rs = { version = "5.1", default-features = false, features = ["std", "curve25519"], optional = true }
 ed25519-dalek = { version = "2", default-features = false, features = ["zeroize"] }
+
+# T18: base64 encoding for DnaSignal::KeyRevocation envelope (issuer pubkey + signature).
+# Same version as imagodei_integrity to avoid duplication within this workspace.
+base64 = { version = "0.22", default-features = false, features = ["alloc"] }

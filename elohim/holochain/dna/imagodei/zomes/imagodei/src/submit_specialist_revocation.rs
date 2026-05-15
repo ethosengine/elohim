@@ -33,9 +33,9 @@
 use hdk::prelude::*;
 
 use crate::{
-    call_elohim_propose_recovery_governance_action, resolve_human_id_for_agent,
-    rfc3339_from_sys_time, ConsolidatedProposeRecoveryGovernanceActionInput, RecoveryV2Signal,
-    REVOCATION_REASONS,
+    call_elohim_propose_recovery_governance_action, emit_key_revocation_envelope,
+    resolve_human_id_for_agent, rfc3339_from_sys_time,
+    ConsolidatedProposeRecoveryGovernanceActionInput, RecoveryV2Signal, REVOCATION_REASONS,
 };
 
 // =============================================================================
@@ -260,19 +260,34 @@ pub fn submit_specialist_revocation(
     })?;
 
     let emitted_at_defender = rfc3339_from_sys_time(&sys_time()?);
+    #[allow(deprecated)]
     emit_signal(RecoveryV2Signal::KeyRevocationEffective {
         revocation_id: revocation_id.clone(),
         signal_type: "keyRevocation".to_string(),
         action_hash: revocation_cid.clone(),
-        human_id: target_human_id,
-        revoked_key: revoked_key_str,
+        human_id: target_human_id.clone(),
+        revoked_key: revoked_key_str.clone(),
         // M4: no separate compromise-discovery timestamp; coincides with effectiveAt.
         // Future revisions may populate this from revocation request metadata.
         compromise_at: rfc3339_now.clone(),
-        effective_at: rfc3339_now,
+        effective_at: rfc3339_now.clone(),
         triggering_vote_id: None,
         emitted_at: emitted_at_defender,
     })?;
+
+    // T18: EPR-shape envelope alongside the legacy signal (back-compat window).
+    // Defender path: supersedes_cid = None (initial CREATE);
+    //                triggering_revocation_id = None (unilateral, no vote chain).
+    emit_key_revocation_envelope(
+        revocation_id.clone(),
+        revocation_cid.clone(),
+        target_human_id,  // Stage 1: human_id; Stage 2: Human entry CID
+        revoked_key_str,
+        rfc3339_now.clone(), // compromise_at == effective_at in M4
+        rfc3339_now,
+        None,  // triggering_revocation_id
+        None,  // supersedes_cid
+    )?;
 
     Ok(SubmitSpecialistRevocationOutput {
         revocation_id,
