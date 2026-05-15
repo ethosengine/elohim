@@ -705,6 +705,69 @@ pub enum RecoveryV2Signal {
 }
 
 // =============================================================================
+// T18: KeyRevocationEnvelope — EPR-shape signal mirror
+// =============================================================================
+//
+// Storage-side mirror of the imagodei coordinator's `DnaSignal::KeyRevocation`
+// EPR envelope. Used by `holochain_app_signal::try_decode_and_translate`
+// (Step 2c) to decode and signature-verify the new envelope before translating
+// into the existing `DnaSignal::KeyRevocation(KeyRevocationSignal)`.
+//
+// These types MUST remain structurally identical to the zome-side
+// `KeyRevocationEnvelope` / `KeyRevocationMetadata` in
+// `imagodei/zomes/imagodei/src/lib.rs`. The `canonical_envelope_bytes` function
+// below MUST match the zome-side implementation exactly.
+//
+// Do NOT merge into the zome crate — `elohim-storage` cannot depend on
+// Holochain DNA crates (wasm32 incompatibility). Duplication is intentional
+// and load-bearing; the comment is the contract.
+
+/// Storage-side mirror of `imagodei::KeyRevocationEnvelope`.
+///
+/// Deserialized from `DnaSignal::KeyRevocation` wire payloads emitted by the
+/// imagodei coordinator zome (T18+). The `type` discriminator on the wire is
+/// `"keyRevocation"` (serde tag from `imagodei::DnaSignal`).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct KeyRevocationEnvelope {
+    pub attestation_kind: String,
+    pub subject_cid: String,
+    pub issuer: String,
+    pub issued_at: String,
+    pub signature: String,
+    pub metadata: KeyRevocationMetadata,
+    #[serde(default)]
+    pub relay_chain: Vec<serde_json::Value>,
+}
+
+/// Storage-side mirror of `imagodei::KeyRevocationMetadata`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct KeyRevocationMetadata {
+    pub revocation_id: String,
+    pub revoked_pubkey: String,
+    pub agent_cid: String,
+    pub compromise_at: String,
+    pub effective_at: String,
+    pub triggering_revocation_id: Option<String>,
+    pub supersedes_cid: Option<String>,
+}
+
+/// Top-level discriminator wrapper for `imagodei::DnaSignal`.
+///
+/// The zome emits `DnaSignal::KeyRevocation(envelope)` with serde tag `"type"`
+/// and camelCase variant name `"keyRevocation"`. We only decode the
+/// `KeyRevocation` variant here; other variants remain unrecognised and fall
+/// through to Step 3 in `try_decode_and_translate`.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(tag = "type", rename_all = "camelCase")]
+pub enum ImagodeiDnaSignal {
+    KeyRevocation(KeyRevocationEnvelope),
+    // Other variants (KeyRotation, AgentPeerBinding migrations) not yet decoded
+    // here; they remain on the RecoveryV2Signal / ImagodeiSignal path.
+}
+
+// =============================================================================
 // ImagodeiSignal — mirror of the DNA-side enum (A.11 signal stream)
 // =============================================================================
 //
@@ -1195,6 +1258,321 @@ fn sweep_dependent_caches_on_revocation(
         "eager sweep triggered; no dependent cache tables in M4 scope"
     );
     Ok(())
+}
+
+// =============================================================================
+// T18: ImagodeiDnaSignal dispatcher — EPR envelope consumer
+// =============================================================================
+//
+// `handle_imagodei_dna_signal` is the consumer entry point for the new
+// `DnaSignal::KeyRevocation(KeyRevocationEnvelope)` signal emitted alongside
+// the legacy `RecoveryV2Signal::KeyRevocationEffective` at all three producer
+// sites (back-compat window). Callers decode the raw JSON blob into
+// `ImagodeiDnaSignal` first, then call this function.
+//
+// Signature verification: the canonical bytes are recomputed from the
+// deserialized envelope (EXCLUDING signature and relay_chain) using the same
+// MessagePack serialiser as the zome side. The issuer's ed25519 public key
+// and signature are decoded from base64 and verified via `ed25519-dalek`.
+//
+// Projection: after verification, the `KeyRevocation` arm calls
+// `crate::db::key_revocations::set_effective` using the envelope's
+// `metadata.revocation_id` as the projection table PK — the same key used by
+// the legacy `KeyRevocationEffective` handler in `handle_recovery_v2_signal`.
+// Duplicate delivery of both the legacy signal AND the new envelope therefore
+// lands the same idempotent upsert.
+//
+// **`canonical_envelope_bytes` must match the zome-side implementation in
+// `imagodei/zomes/imagodei/src/lib.rs` exactly.**
+// See spec at `genesis/docs/superpowers/specs/2026-05-15-dna-signal-as-epr-envelope.md`.
+
+/// Sub-struct for canonical serialization — matches the zome-side
+/// `CanonicalEnvelopeCore` / `CanonicalMetadataRef` pair exactly.
+///
+/// Field order and camelCase rename MUST be kept in sync with the zome.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct CanonicalEnvelopeCore<'a> {
+    attestation_kind: &'a str,
+    subject_cid: &'a str,
+    issuer: &'a str,
+    issued_at: &'a str,
+    metadata: CanonicalMetadataRef<'a>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct CanonicalMetadataRef<'a> {
+    revocation_id: &'a str,
+    revoked_pubkey: &'a str,
+    agent_cid: &'a str,
+    compromise_at: &'a str,
+    effective_at: &'a str,
+    triggering_revocation_id: Option<&'a str>,
+    supersedes_cid: Option<&'a str>,
+}
+
+/// Reproduce the canonical signing bytes for a `KeyRevocationEnvelope`.
+///
+/// **Must match the zome-side `canonical_envelope_bytes` in
+/// `imagodei/zomes/imagodei/src/lib.rs`.**
+///
+/// Excludes `signature` and `relay_chain`. Serializes via `rmp_serde`
+/// struct-map form (field names included, declaration order preserved) —
+/// the same serialiser that `holochain_serialized_bytes::encode` uses.
+///
+/// # Verification recipe
+///
+/// ```text
+/// 1. Deserialize envelope from wire JSON.
+/// 2. canonical_bytes = canonical_envelope_bytes(&envelope)
+/// 3. issuer_bytes   = base64::STANDARD.decode(&envelope.issuer)       // 32 bytes
+/// 4. sig_bytes      = base64::STANDARD.decode(&envelope.signature)    // 64 bytes
+/// 5. key   = ed25519_dalek::VerifyingKey::from_bytes(&issuer_bytes)
+/// 6. sig   = ed25519_dalek::Signature::from_bytes(&sig_bytes)
+/// 7. key.verify_strict(&canonical_bytes, &sig)  →  Ok(()) iff valid
+/// ```
+fn canonical_envelope_bytes(envelope: &KeyRevocationEnvelope) -> Vec<u8> {
+    let core = CanonicalEnvelopeCore {
+        attestation_kind: &envelope.attestation_kind,
+        subject_cid: &envelope.subject_cid,
+        issuer: &envelope.issuer,
+        issued_at: &envelope.issued_at,
+        metadata: CanonicalMetadataRef {
+            revocation_id: &envelope.metadata.revocation_id,
+            revoked_pubkey: &envelope.metadata.revoked_pubkey,
+            agent_cid: &envelope.metadata.agent_cid,
+            compromise_at: &envelope.metadata.compromise_at,
+            effective_at: &envelope.metadata.effective_at,
+            triggering_revocation_id: envelope
+                .metadata
+                .triggering_revocation_id
+                .as_deref(),
+            supersedes_cid: envelope.metadata.supersedes_cid.as_deref(),
+        },
+    };
+    let mut buf = Vec::with_capacity(256);
+    let mut se = rmp_serde::encode::Serializer::new(&mut buf).with_struct_map();
+    core.serialize(&mut se)
+        .expect("canonical_envelope_bytes: encode should never fail on well-formed structs");
+    buf
+}
+
+/// Verify the issuer signature on a `KeyRevocationEnvelope`.
+///
+/// Returns `Ok(())` on success, `Err(StorageError::SignatureVerificationFailed)`
+/// on invalid signature, or `Err(StorageError::InvalidData(...))` on key/sig
+/// decode failure.
+///
+/// Called by `handle_imagodei_dna_signal` before projection. Consumer-side
+/// verification guards against forged or mutated envelopes arriving via the
+/// Holochain app-signal stream or gossip relay.
+fn verify_envelope_signature(envelope: &KeyRevocationEnvelope) -> Result<(), crate::error::StorageError> {
+    use base64::{engine::general_purpose::STANDARD, Engine as _};
+    use ed25519_dalek::{Signature as Ed25519Sig, VerifyingKey};
+
+    let issuer_bytes = STANDARD
+        .decode(&envelope.issuer)
+        .map_err(|e| crate::error::StorageError::InvalidInput(format!(
+            "key_revocation_envelope: issuer base64 decode failed: {e}"
+        )))?;
+    let sig_bytes = STANDARD
+        .decode(&envelope.signature)
+        .map_err(|e| crate::error::StorageError::InvalidInput(format!(
+            "key_revocation_envelope: signature base64 decode failed: {e}"
+        )))?;
+
+    let key_arr: [u8; 32] = issuer_bytes.try_into().map_err(|_| {
+        crate::error::StorageError::InvalidInput(
+            "key_revocation_envelope: issuer key is not 32 bytes".into(),
+        )
+    })?;
+    let sig_arr: [u8; 64] = sig_bytes.try_into().map_err(|_| {
+        crate::error::StorageError::InvalidInput(
+            "key_revocation_envelope: signature is not 64 bytes".into(),
+        )
+    })?;
+
+    let verifying_key = VerifyingKey::from_bytes(&key_arr).map_err(|e| {
+        crate::error::StorageError::InvalidInput(format!(
+            "key_revocation_envelope: invalid ed25519 public key: {e}"
+        ))
+    })?;
+    let signature = Ed25519Sig::from_bytes(&sig_arr);
+
+    let canonical = canonical_envelope_bytes(envelope);
+    verifying_key
+        .verify_strict(&canonical, &signature)
+        .map_err(|e| crate::error::StorageError::VerifyFailed {
+            reason: format!("key_revocation_envelope: signature invalid: {e}"),
+        })
+}
+
+/// Dispatch an `ImagodeiDnaSignal` into the SQLite projection.
+///
+/// T18: only the `KeyRevocation` variant is handled here. Future variants
+/// (e.g. `KeyRotation`) extend this match arm.
+///
+/// **Verification**: the `KeyRevocation` arm verifies the issuer signature
+/// before projection. A log warning is emitted on failure and the signal is
+/// silently dropped (best-effort — the projection can be recovered from the
+/// `KeyRevocationEffective` legacy signal or from DHT replay).
+///
+/// **Dedup**: uses `metadata.revocation_id` as the projection table PK — the
+/// same key used by `handle_recovery_v2_signal` for `KeyRevocationEffective`.
+/// Delivering both the legacy signal AND the new envelope results in the same
+/// idempotent `set_effective` call.
+pub fn handle_imagodei_dna_signal(
+    conn: &mut diesel::sqlite::SqliteConnection,
+    signal: ImagodeiDnaSignal,
+) -> Result<(), crate::error::StorageError> {
+    match signal {
+        ImagodeiDnaSignal::KeyRevocation(envelope) => {
+            // Verify signature before projecting. On failure: warn + drop.
+            // Not a hard error — the legacy RecoveryV2Signal::KeyRevocationEffective
+            // still lands the same projection row during the back-compat window.
+            if let Err(e) = verify_envelope_signature(&envelope) {
+                tracing::warn!(
+                    target: "imagodei.dna_signal",
+                    revocation_id = %envelope.metadata.revocation_id,
+                    error = %e,
+                    "T18 KeyRevocation envelope signature verification failed; dropping signal"
+                );
+                return Ok(());
+            }
+
+            let now = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
+
+            // Project: mark the key_revocations row as effective.
+            // The row must already exist (created by handle_recovery_v2_signal's
+            // KeyRevocationRequested arm earlier in the same emission batch).
+            // If the row is absent (e.g. out-of-order delivery), the set_effective
+            // call will silently no-op (no row to update is not an error).
+            crate::db::key_revocations::set_effective(
+                conn,
+                &envelope.metadata.revocation_id,
+                &envelope.metadata.effective_at,
+                &now,
+            )?;
+
+            // Eager cache-invalidation sweep (same as the legacy path).
+            sweep_dependent_caches_on_revocation(conn, &envelope.metadata.revoked_pubkey)?;
+
+            // P1: Outbound reconciliation signal.
+            emit_reconciled_signal(ImagodeiReconciledEvent::RevocationObserved {
+                revocation_id: envelope.metadata.revocation_id.clone(),
+                revoked_key: envelope.metadata.revoked_pubkey.clone(),
+                human_id: envelope.metadata.agent_cid.clone(),
+                status: "effective".into(),
+                observed_at: now,
+            });
+
+            tracing::info!(
+                target: "imagodei.dna_signal",
+                revocation_id = %envelope.metadata.revocation_id,
+                subject_cid = %envelope.subject_cid,
+                issuer = %&envelope.issuer[..8],
+                "T18 KeyRevocation envelope projected"
+            );
+
+            Ok(())
+        }
+    }
+}
+
+#[cfg(test)]
+mod dna_signal_tests {
+    use super::*;
+
+    /// Verify that `ImagodeiDnaSignal::KeyRevocation` deserializes correctly
+    /// from the wire format emitted by the imagodei coordinator (camelCase,
+    /// serde tag = "type").
+    #[test]
+    fn key_revocation_envelope_deserializes_from_wire_shape() {
+        let wire = serde_json::json!({
+            "type": "keyRevocation",
+            "attestationKind": "attestation:key-revocation-emit",
+            "subjectCid": "bafybeicid001",
+            "issuer": "dGVzdGlzc3Vlcmlzc3Vl",  // base64 placeholder
+            "issuedAt": "2026-05-15T10:00:00.000Z",
+            "signature": "c2lnbmF0dXJlcGxhY2Vob2xkZXIwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMA==",
+            "metadata": {
+                "revocationId": "rev-human-X-12345",
+                "revokedPubkey": "dGVzdHJldm9rZWRwdWJrZXkwMDAwMDAwMDAwMDAwMDA=",
+                "agentCid": "human-X",
+                "compromiseAt": "2026-05-15T09:00:00.000Z",
+                "effectiveAt": "2026-05-15T09:00:00.000Z",
+                "triggeringRevocationId": null,
+                "supersedesCid": null
+            },
+            "relayChain": []
+        });
+        let signal: ImagodeiDnaSignal = serde_json::from_value(wire).unwrap();
+        match signal {
+            ImagodeiDnaSignal::KeyRevocation(env) => {
+                assert_eq!(env.attestation_kind, "attestation:key-revocation-emit");
+                assert_eq!(env.subject_cid, "bafybeicid001");
+                assert_eq!(env.metadata.revocation_id, "rev-human-X-12345");
+                assert_eq!(env.metadata.agent_cid, "human-X");
+                assert!(env.metadata.triggering_revocation_id.is_none());
+                assert!(env.metadata.supersedes_cid.is_none());
+                assert!(env.relay_chain.is_empty());
+            }
+        }
+    }
+
+    /// Verify that `canonical_envelope_bytes` is deterministic across two
+    /// identical envelopes (no runtime state in the serialiser).
+    #[test]
+    fn canonical_bytes_are_deterministic() {
+        let envelope = make_test_envelope();
+        let b1 = canonical_envelope_bytes(&envelope);
+        let b2 = canonical_envelope_bytes(&envelope);
+        assert_eq!(b1, b2, "canonical bytes must be deterministic");
+        assert!(!b1.is_empty());
+    }
+
+    /// Verify that changing any covered field produces different canonical bytes.
+    #[test]
+    fn canonical_bytes_differ_on_field_change() {
+        let mut e1 = make_test_envelope();
+        let b1 = canonical_envelope_bytes(&e1);
+        e1.subject_cid = "bafyDIFFERENT".into();
+        let b2 = canonical_envelope_bytes(&e1);
+        assert_ne!(b1, b2, "changing subjectCid must change canonical bytes");
+    }
+
+    /// Verify that `signature` and `relay_chain` fields are excluded from
+    /// canonical bytes (changing them must not change canonical bytes).
+    #[test]
+    fn canonical_bytes_exclude_signature_and_relay_chain() {
+        let mut env = make_test_envelope();
+        let b1 = canonical_envelope_bytes(&env);
+        env.signature = "CHANGED_SIGNATURE".into();
+        env.relay_chain = vec![serde_json::json!({"hop": 1})];
+        let b2 = canonical_envelope_bytes(&env);
+        assert_eq!(b1, b2, "signature/relay_chain changes must not affect canonical bytes");
+    }
+
+    fn make_test_envelope() -> KeyRevocationEnvelope {
+        KeyRevocationEnvelope {
+            attestation_kind: "attestation:key-revocation-emit".into(),
+            subject_cid: "bafybeicid001".into(),
+            issuer: "dGVzdGlzc3VlcisyMzQ1Njc4OTAxMjM0NTY3ODkwMTI=".into(),
+            issued_at: "2026-05-15T10:00:00.000Z".into(),
+            signature: "placeholder_sig".into(),
+            metadata: KeyRevocationMetadata {
+                revocation_id: "rev-human-X-12345".into(),
+                revoked_pubkey: "dGVzdHJldm9rZWRwdWJrZXkwMDAwMDAwMDAwMDAwMDA=".into(),
+                agent_cid: "human-X".into(),
+                compromise_at: "2026-05-15T09:00:00.000Z".into(),
+                effective_at: "2026-05-15T09:00:00.000Z".into(),
+                triggering_revocation_id: None,
+                supersedes_cid: None,
+            },
+            relay_chain: vec![],
+        }
+    }
 }
 
 #[cfg(test)]
