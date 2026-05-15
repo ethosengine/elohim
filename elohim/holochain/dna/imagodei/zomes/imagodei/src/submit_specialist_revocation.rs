@@ -34,7 +34,8 @@ use hdk::prelude::*;
 
 use crate::{
     call_elohim_propose_recovery_governance_action, resolve_human_id_for_agent,
-    ConsolidatedProposeRecoveryGovernanceActionInput, RecoveryV2Signal, REVOCATION_REASONS,
+    rfc3339_from_sys_time, ConsolidatedProposeRecoveryGovernanceActionInput, RecoveryV2Signal,
+    REVOCATION_REASONS,
 };
 
 // =============================================================================
@@ -200,6 +201,7 @@ pub fn submit_specialist_revocation(
     let attestation_json = input.anomaly_attestation_json.clone();
 
     let now = sys_time()?;
+    let rfc3339_now = rfc3339_from_sys_time(&now);
     let timestamp = format!("{:?}", now);
     let revocation_id = format!("rev-{}-{}", target_human_id, timestamp);
     let revoked_key_str = input.revoked_pub_key.to_string();
@@ -234,7 +236,7 @@ pub fn submit_specialist_revocation(
             // Defender authority = immediately effective on the initial
             // CREATE (no update_entry per Task 4 CREATE-only constraint).
             "threshold_reached": true,
-            "effective_at": timestamp,
+            "effective_at": rfc3339_now,
             "anomaly_attestation_json": attestation_json,
         }),
         supersedes_cid: None,
@@ -253,15 +255,15 @@ pub fn submit_specialist_revocation(
         required_votes: 1,
         current_votes: 1,
         threshold_reached: true,
-        effective_at: Some(timestamp.clone()),
-        created_at: timestamp.clone(),
+        effective_at: Some(rfc3339_now.clone()),
+        created_at: rfc3339_now.clone(),
     })?;
 
     emit_signal(RecoveryV2Signal::KeyRevocationEffective {
         revocation_id: revocation_id.clone(),
         revoked_key: revoked_key_str,
         human_id: target_human_id,
-        effective_at: timestamp,
+        effective_at: rfc3339_now,
         triggering_vote_id: None,
     })?;
 

@@ -3079,7 +3079,7 @@ pub fn submit_revocation_vote(
 /// RFC3339 UTC string `YYYY-MM-DDTHH:MM:SS.fffZ`. Used by Recovery M4 Task 14
 /// to populate `effective_at` on the fresh effective Content (Task 4 gate
 /// orders by lexicographic `updated_at`, so RFC3339 is mandatory).
-fn rfc3339_from_sys_time(now: &Timestamp) -> String {
+pub(crate) fn rfc3339_from_sys_time(now: &Timestamp) -> String {
     // Best-effort: build via chrono-equivalent decomposition. We avoid pulling
     // in chrono (extra WASM weight) — instead format manually from the
     // micros-since-epoch i64.
