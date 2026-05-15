@@ -17,12 +17,9 @@
 //!
 //! ## Swarm registration
 //!
-//! TODO(G.1-swarm-wiring): the `ShamirShareCodec` is ready for registration but
-//! adding a new field to `ElohimStorageBehaviour` requires touching the behaviour
-//! struct + `From` impls + the swarm event loop match arm — a multi-file change
-//! deferred so G.1 lands cleanly on its own commit boundary. Registration follows
-//! the exact same pattern as `trust_protocol` (see `behaviour.rs:88` and
-//! `mod.rs:2292`). Track under the share-custody epic.
+//! Recovery M4 T19 registered the codec with `ElohimStorageBehaviour` (see
+//! `behaviour.rs::shamir_share`). The swarm event-loop match arm + custodian
+//! dial logic land in T20.
 
 use async_trait::async_trait;
 use futures::prelude::*;
@@ -98,6 +95,20 @@ pub struct ShamirShareRequest {
 ///      4-byte little-endian encoding of `share_index`.
 ///
 /// Only after both checks pass does the share contribute to the assembler tally.
+///
+/// ## Error envelope
+///
+/// When the custodian rejects the request (authorization failure, custodian not
+/// recognized, share not held), it returns a response with:
+///   - `share_data = []`
+///   - `share_index = 0`
+///   - `attestation_cid = ""`
+///   - `signature = []`
+///   - `error_reason = Some("…human-readable rejection reason…")`
+///
+/// The requester MUST treat any response with `error_reason.is_some()` as a
+/// rejection and record it in the assembler's failure log.  The signed-response
+/// verification path is only entered when `error_reason.is_none()`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ShamirShareResponse {
     /// Encrypted share bytes.
@@ -109,6 +120,8 @@ pub struct ShamirShareResponse {
     /// validator (`attestation_validator.rs`) rejects any `attestation:recovery-approval`
     /// entry that carries `share_data`, `share_index`, or `share_blob` fields in its
     /// `metadata.evidence_json`. See G.3.
+    ///
+    /// Empty (`vec![]`) when `error_reason` is `Some(_)`.
     pub share_data: Vec<u8>,
 
     /// Index of this share within the (m,n) Shamir scheme.
@@ -116,6 +129,8 @@ pub struct ShamirShareResponse {
     /// Indexes are 1-based: the first custodian holds share 1, the second holds
     /// share 2, etc. The assembler uses this to avoid double-counting the same
     /// share from two different transport paths.
+    ///
+    /// `0` when `error_reason` is `Some(_)` (sentinel for error envelope).
     pub share_index: u32,
 
     /// ActionHash (base64url) of the `attestation:recovery-approval` entry on the
@@ -125,6 +140,8 @@ pub struct ShamirShareResponse {
     /// to confirm the custodian actually issued a signed approval before accepting
     /// the share bytes. This ties the ephemeral libp2p delivery back to the durable
     /// DHT social-proof chain.
+    ///
+    /// Empty when `error_reason` is `Some(_)`.
     pub attestation_cid: String,
 
     /// Ed25519 signature over the canonical message:
@@ -138,7 +155,40 @@ pub struct ShamirShareResponse {
     /// The custodian signs with the same key used to author the
     /// `attestation:recovery-approval` DHT entry. Verification uses
     /// `ed25519_dalek::VerifyingKey::verify_strict`.
+    ///
+    /// Empty when `error_reason` is `Some(_)`.
     pub signature: Vec<u8>,
+
+    /// Non-`None` when the custodian is returning an error envelope rather than
+    /// a share.  Contains a human-readable rejection reason (logged at `info!`
+    /// by the responder as an auditable security event).
+    ///
+    /// The requester MUST check this field before attempting signature
+    /// verification. Presence of a non-`None` value short-circuits share
+    /// acceptance regardless of the other fields.
+    #[serde(default)]
+    pub error_reason: Option<String>,
+}
+
+impl ShamirShareResponse {
+    /// Construct an error-envelope response.  All share-material fields are empty /
+    /// zero; only `error_reason` is populated. The custodian signs nothing (the
+    /// authorization decision is the auditable event, not the share bytes).
+    pub fn error(reason: impl Into<String>) -> Self {
+        Self {
+            share_data: Vec::new(),
+            share_index: 0,
+            attestation_cid: String::new(),
+            signature: Vec::new(),
+            error_reason: Some(reason.into()),
+        }
+    }
+
+    /// Returns `true` if this is an error-envelope (i.e. the custodian rejected
+    /// the share request).  The requester MUST check this before verification.
+    pub fn is_error(&self) -> bool {
+        self.error_reason.is_some()
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -328,6 +378,7 @@ mod tests {
             share_index: 2,
             attestation_cid: "uhCkkAttestation9999".to_string(),
             signature: vec![0u8; 64],
+            error_reason: None,
         };
         let encoded = rmp_serde::to_vec(&resp).expect("encode response");
         let decoded: ShamirShareResponse =
@@ -379,6 +430,7 @@ mod tests {
             share_index,
             attestation_cid: "uhCkkAttest001".to_string(),
             signature: sig.to_bytes().to_vec(),
+            error_reason: None,
         };
 
         // Valid signature should pass
@@ -397,6 +449,7 @@ mod tests {
             share_index,
             attestation_cid: "uhCkkAttest001".to_string(),
             signature: sig.to_bytes().to_vec(),
+            error_reason: None,
         };
         resp2.share_index = 2; // wrong index
         assert!(verify_share_response(&resp2, cid, &verifying_key2).is_err());

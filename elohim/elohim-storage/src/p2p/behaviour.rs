@@ -22,6 +22,9 @@ use super::identity_handshake::{IdentityHandshakeCodec, IdentityHandshakeProtoco
 use super::recovery_invitation::RECOVERY_INVITATION_TOPIC;
 use super::shard_protocol::{ShardCodec, ShardProtocol};
 use super::sync_protocol::{SyncCodec, SyncProtocol};
+use super::shamir_transport::{
+    ShamirShareCodec, ShamirShareProtocol, ShamirShareRequest, ShamirShareResponse,
+};
 use super::trust_protocol::{TrustCodec, TrustProtocol};
 use super::view_federation::{ViewFederationCodec, ViewFederationProtocol};
 use super::P2PConfig;
@@ -85,6 +88,16 @@ pub struct ElohimStorageBehaviour {
     pub epr_atom_protocol: RequestResponse<EprAtomCodec>,
     /// Request-response for trust negotiation
     pub trust_protocol: RequestResponse<TrustCodec>,
+    /// Request-response for Shamir share delivery (`/elohim/shamir-share/1.0.0`).
+    ///
+    /// Recovery M4 T19: optional cryptographic proof layer for key-material
+    /// recovery. The DHT carries authorization (recovery-approval attestations);
+    /// this protocol carries the share material point-to-point. Low-security
+    /// recovery completes via social-threshold quorum alone and never invokes
+    /// this transport. The swarm event-loop match arm + custodian dial logic
+    /// land in T20; until then the behaviour is registered (so peers advertise
+    /// the protocol via identify) but produces no handled events.
+    pub shamir_share: RequestResponse<ShamirShareCodec>,
     /// Request-response for identity handshake (/elohim/identity/handshake/1.0.0)
     ///
     /// Category C — session-local projection of the AgentPeerBinding DHT entry.
@@ -138,6 +151,13 @@ pub enum ElohimStorageBehaviourEvent {
             super::trust_protocol::TrustResponse,
         >,
     ),
+    /// Shamir share protocol event (`/elohim/shamir-share/1.0.0`).
+    ///
+    /// Recovery M4 T19: variant constructed via the `From` impl below. The
+    /// match arm in `p2p/mod.rs`'s swarm event loop is wired in T20 (custodian
+    /// dial logic + responder authorization checks against DHT-projected
+    /// recovery-approval attestations).
+    ShamirShare(request_response::Event<ShamirShareRequest, ShamirShareResponse>),
     /// Identity handshake event (/elohim/identity/handshake/1.0.0)
     IdentityHandshake(
         request_response::Event<
@@ -242,6 +262,14 @@ impl
         >,
     ) -> Self {
         Self::TrustProtocol(event)
+    }
+}
+
+impl From<request_response::Event<ShamirShareRequest, ShamirShareResponse>>
+    for ElohimStorageBehaviourEvent
+{
+    fn from(event: request_response::Event<ShamirShareRequest, ShamirShareResponse>) -> Self {
+        Self::ShamirShare(event)
     }
 }
 
@@ -379,6 +407,17 @@ impl ElohimStorageBehaviour {
             request_response::Config::default().with_request_timeout(config.request_timeout),
         );
 
+        // Recovery M4 T19: Shamir share request-response protocol — optional
+        // cryptographic proof layer for key-material recovery. Authorization is
+        // verified against the DHT-projected recovery-approval attestation; this
+        // channel carries only share material. Codec enforces a 1 MiB ceiling
+        // (see `MAX_SHAMIR_MESSAGE_SIZE`) — shares are always ≤ 64 bytes plus
+        // signing overhead; the cap is a runaway guard, not a tuning knob.
+        let shamir_share = RequestResponse::new(
+            [(ShamirShareProtocol, ProtocolSupport::Full)],
+            request_response::Config::default().with_request_timeout(config.request_timeout),
+        );
+
         // Identity handshake protocol — Category C session-local projection of
         // AgentPeerBinding DHT entries. Fires on ConnectionEstablished.
         let identity_handshake = RequestResponse::new(
@@ -504,6 +543,7 @@ impl ElohimStorageBehaviour {
             epr_protocol,
             epr_atom_protocol,
             trust_protocol,
+            shamir_share,
             identity_handshake,
             view_federation,
             mdns,

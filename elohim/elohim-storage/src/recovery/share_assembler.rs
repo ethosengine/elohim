@@ -43,8 +43,10 @@
 //! step 4 and return `AssemblyResult::Secret(bytes)` instead of `Shares(vec)`.
 
 use diesel::prelude::*;
+use libp2p::PeerId;
 use serde_json::Value;
 use std::collections::HashMap;
+use std::str::FromStr;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
@@ -55,6 +57,7 @@ use crate::error::StorageError;
 use crate::p2p::shamir_transport::{
     verify_share_response, ShamirShareRequest, ShamirShareResponse,
 };
+use crate::p2p::{P2PCommand, P2PHandle};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ShareTransport trait — mockable in tests, libp2p-backed in production
@@ -111,6 +114,166 @@ impl ShareTransport for MockShareTransport {
                 req.custodian_cid
             )),
         }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// LibP2PShareTransport — production implementation via swarm command channel
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Production [`ShareTransport`] implementation that routes share requests
+/// through the libp2p swarm via [`P2PHandle`].
+///
+/// ## Peer resolution
+///
+/// `custodian_cid` (the Holochain agent pubkey of the custodian) is resolved
+/// to a libp2p `PeerId` using the `peer_identity_bindings` SQLite projection
+/// via [`crate::db::recovery_approval_gate::resolve_custodian_peer_id`].
+///
+/// If no active binding exists, the request fails with a dial-failure error and
+/// the assembler skips to the next custodian.
+///
+/// TODO(T22-multi-device): when a custodian has multiple active devices
+/// (multiple bindings), this implementation tries only the most recently
+/// observed one. A future sprint should try all active peers in order,
+/// mirroring the view-federation fanout pattern.
+///
+/// ## Signature verification
+///
+/// After receiving a non-error response, the transport performs signature
+/// verification using [`verify_share_response`] and the custodian's
+/// Ed25519 verifying key.
+///
+/// The verifying key is currently derived from the `custodian_cid` bytes via
+/// the `derive_verifying_key_stub` helper — this is a placeholder that only
+/// works for test CIDs. In production, key resolution will go through the
+/// `peer_identity_bindings` DHT lookup.
+/// TODO(G.2-key-resolution): replace stub with real key resolution.
+pub struct LibP2PShareTransport {
+    /// Handle to the live P2P swarm. Used to send `P2PCommand::RequestShamirShare`.
+    handle: P2PHandle,
+    /// DB pool for resolving `custodian_cid → PeerId` via `peer_identity_bindings`.
+    pool: DbPool,
+    /// Per-request timeout for the libp2p round-trip. The swarm's own
+    /// `request_timeout` is the hard ceiling; this drives the oneshot wait.
+    request_timeout: std::time::Duration,
+}
+
+impl LibP2PShareTransport {
+    /// Create a new `LibP2PShareTransport`.
+    ///
+    /// `request_timeout` is the per-request wall-clock deadline. Recommended:
+    /// 15–30 seconds (recovery is latency-insensitive; custodians may be
+    /// temporarily offline).
+    pub fn new(handle: P2PHandle, pool: DbPool, request_timeout: std::time::Duration) -> Self {
+        Self {
+            handle,
+            pool,
+            request_timeout,
+        }
+    }
+}
+
+#[async_trait::async_trait]
+impl ShareTransport for LibP2PShareTransport {
+    async fn request_share(&self, req: ShamirShareRequest) -> Result<ShamirShareResponse, String> {
+        // ── Step 1: resolve custodian_cid → PeerId ────────────────────────
+        let peer_id_str: String = {
+            let mut conn = self
+                .pool
+                .get()
+                .map_err(|e| format!("LibP2PShareTransport: pool.get error: {e}"))?;
+            let now_iso = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
+            crate::db::recovery_approval_gate::resolve_custodian_peer_id(
+                &mut conn,
+                &req.custodian_cid,
+                &now_iso,
+            )
+            .map_err(|e| {
+                format!(
+                    "LibP2PShareTransport: peer resolution DB error for {}: {e}",
+                    req.custodian_cid
+                )
+            })?
+            .ok_or_else(|| {
+                format!(
+                    "LibP2PShareTransport: no active peer binding for custodian_cid={}; \
+                     TODO(T22-multi-device) try all active devices",
+                    req.custodian_cid
+                )
+            })?
+        };
+
+        let peer_id = PeerId::from_str(&peer_id_str).map_err(|e| {
+            format!(
+                "LibP2PShareTransport: invalid PeerId '{}' for custodian_cid={}: {e}",
+                peer_id_str, req.custodian_cid
+            )
+        })?;
+
+        // ── Step 2: send request via swarm command channel ────────────────
+        let (tx, rx) = tokio::sync::oneshot::channel();
+        let custodian_cid_for_verify = req.custodian_cid.clone();
+        let recovery_cid_for_verify = req.recovery_governance_action_cid.clone();
+
+        self.handle
+            .command_sender()
+            .send(P2PCommand::RequestShamirShare {
+                peer: peer_id,
+                request: req,
+                respond: tx,
+            })
+            .await
+            .map_err(|_| {
+                "LibP2PShareTransport: swarm command channel closed (swarm task exited)"
+                    .to_string()
+            })?;
+
+        // ── Step 3: await response with timeout ───────────────────────────
+        let response = tokio::time::timeout(self.request_timeout, rx)
+            .await
+            .map_err(|_| {
+                format!(
+                    "LibP2PShareTransport: timeout waiting for share from peer {peer_id_str}"
+                )
+            })?
+            .map_err(|_| {
+                "LibP2PShareTransport: response oneshot dropped (swarm task exited)".to_string()
+            })?
+            .map_err(|e| format!("LibP2PShareTransport: transport failure: {e}"))?;
+
+        // ── Step 4: check error envelope ──────────────────────────────────
+        if response.is_error() {
+            return Err(format!(
+                "LibP2PShareTransport: custodian {} returned error: {}",
+                custodian_cid_for_verify,
+                response.error_reason.as_deref().unwrap_or("<no reason>")
+            ));
+        }
+
+        // ── Step 5: verify signature ──────────────────────────────────────
+        //
+        // TODO(G.2-key-resolution): derive_verifying_key_stub returns None for
+        // realistic CIDs. Once real key resolution is wired (imagodei DHT lookup
+        // or peer_identity_bindings extension), replace this stub.
+        if let Some(key_bytes) = derive_verifying_key_stub(&custodian_cid_for_verify) {
+            verify_share_response(&response, &recovery_cid_for_verify, &key_bytes).map_err(
+                |e| {
+                    format!(
+                        "LibP2PShareTransport: signature verification failed for {}: {e}",
+                        custodian_cid_for_verify
+                    )
+                },
+            )?;
+        } else {
+            tracing::warn!(
+                custodian_cid = %custodian_cid_for_verify,
+                "TODO(G.2-key-resolution): verifying key not resolvable from CID — \
+                 share accepted without signature verification (security downgrade)"
+            );
+        }
+
+        Ok(response)
     }
 }
 
@@ -261,6 +424,18 @@ impl ShareAssembler {
                     continue;
                 }
             };
+
+            // T20: Check for error envelope before proceeding with verification.
+            // The custodian returns an error envelope when authorization fails,
+            // share material is unavailable, or the store is not yet implemented.
+            if response.is_error() {
+                tracing::warn!(
+                    custodian_cid = %approval.issuer_cid,
+                    reason = %response.error_reason.as_deref().unwrap_or("<no reason>"),
+                    "share response is an error envelope — skipping custodian"
+                );
+                continue;
+            }
 
             // Step 3a: verify attestation_cid matches a real DB row
             let attestation_exists = {
@@ -505,6 +680,7 @@ mod tests {
                 share_index: 1,
                 attestation_cid: "attest-A".to_string(),
                 signature: vec![0u8; 64],
+                error_reason: None,
             }),
         );
         canned.insert(
@@ -514,6 +690,7 @@ mod tests {
                 share_index: 2,
                 attestation_cid: "attest-B".to_string(),
                 signature: vec![0u8; 64],
+                error_reason: None,
             }),
         );
 
@@ -582,6 +759,7 @@ mod tests {
                     // Signature is all-zeros — derive_verifying_key_stub returns None for
                     // short CIDs, so verification is skipped (DHT-attestation-only gate).
                     signature: vec![0u8; 64],
+                    error_reason: None,
                 }),
             );
         }
@@ -616,5 +794,226 @@ mod tests {
                 );
             }
         }
+    }
+
+    // ── T20 Tests ─────────────────────────────────────────────────────────────
+    //
+    // Tests for the error-envelope path, custodian-unreachable fallback, and
+    // signature verification failure on the assembler side.
+    // The authorization-gate DB queries are covered by
+    // `crate::db::recovery_approval_gate::tests`.
+
+    /// T20: transport returns an error envelope → assembler records failure and
+    /// returns BelowThreshold (not a panic or hard error).
+    #[tokio::test]
+    async fn assembler_handles_error_envelope_response() {
+        let pool = test_pool();
+        {
+            let mut conn = pool.get().expect("conn");
+            insert_governance_action(&mut conn, "t20-action-001", r#"{"type":"shamir","m":2,"n":3}"#);
+            insert_approval_attestation(&mut conn, "t20-attest-A", "t20-action-001", "t20-custC-A");
+            insert_approval_attestation(&mut conn, "t20-attest-B", "t20-action-001", "t20-custC-B");
+        }
+
+        // Both custodians return error envelopes (authorization denied on their side)
+        let mut canned: HashMap<String, Result<ShamirShareResponse, String>> = HashMap::new();
+        canned.insert(
+            "t20-custC-A".to_string(),
+            Ok(ShamirShareResponse::error("authorization denied: no effective approval")),
+        );
+        canned.insert(
+            "t20-custC-B".to_string(),
+            Ok(ShamirShareResponse::error("authorization denied: attestation revoked")),
+        );
+
+        let transport = Arc::new(MockShareTransport::new(canned));
+        let assembler = ShareAssembler::new(pool, transport);
+        let result = assembler.assemble("t20-action-001").await.expect("assemble");
+
+        match result {
+            AssemblyResult::BelowThreshold { approvals_found, threshold } => {
+                assert_eq!(threshold, 2, "threshold should be 2");
+                assert_eq!(approvals_found, 0, "error envelopes must not count as shares");
+            }
+            AssemblyResult::Shares(shares) => {
+                panic!("expected BelowThreshold when all responses are error envelopes, got {} shares", shares.len());
+            }
+        }
+    }
+
+    /// T20: transport returns Err (custodian unreachable / OutboundFailure equivalent) →
+    /// assembler skips that custodian without poisoning the overall flow.
+    #[tokio::test]
+    async fn assembler_handles_custodian_unreachable() {
+        let pool = test_pool();
+        {
+            let mut conn = pool.get().expect("conn");
+            insert_governance_action(&mut conn, "t20-action-002", r#"{"type":"shamir","m":2,"n":3}"#);
+            insert_approval_attestation(&mut conn, "t20-attest-A2", "t20-action-002", "t20-custC-unreachable");
+            insert_approval_attestation(&mut conn, "t20-attest-B2", "t20-action-002", "t20-custC-reachable");
+        }
+
+        let mut canned: HashMap<String, Result<ShamirShareResponse, String>> = HashMap::new();
+        // First custodian: transport-level failure (dial failure / unreachable)
+        canned.insert(
+            "t20-custC-unreachable".to_string(),
+            Err("dial_failure: no route to peer".to_string()),
+        );
+        // Second custodian: returns an error envelope (not an error at the transport level)
+        canned.insert(
+            "t20-custC-reachable".to_string(),
+            Ok(ShamirShareResponse::error("TODO(T21-share-store): share store not yet implemented")),
+        );
+
+        let transport = Arc::new(MockShareTransport::new(canned));
+        let assembler = ShareAssembler::new(pool, transport);
+        let result = assembler.assemble("t20-action-002").await.expect("assemble");
+
+        // Both failed (one transport-level, one error envelope). Should be BelowThreshold.
+        match result {
+            AssemblyResult::BelowThreshold { approvals_found, threshold } => {
+                assert_eq!(threshold, 2);
+                assert_eq!(approvals_found, 0, "neither failure counts as a share");
+            }
+            AssemblyResult::Shares(shares) => {
+                panic!("expected BelowThreshold, got {} shares", shares.len());
+            }
+        }
+    }
+
+    /// T20: transport returns a response with a bad signature → assembler rejects
+    /// the share (for CIDs ≥ 32 bytes, where `derive_verifying_key_stub` returns
+    /// `Some(_)` and signature verification runs).
+    #[tokio::test]
+    async fn assembler_rejects_response_with_bad_signature() {
+        // Use a CID that is ≥ 32 bytes so derive_verifying_key_stub returns Some(_)
+        // and the signature check actually runs.
+        let long_custodian_cid = "custodian-with-a-long-cid-that-exceeds-32-bytes-xxxx";
+        let long_attest_cid = "t20-attest-sig-A";
+
+        let pool = test_pool();
+        {
+            let mut conn = pool.get().expect("conn");
+            insert_governance_action(
+                &mut conn,
+                "t20-action-sig",
+                r#"{"type":"shamir","m":1,"n":3}"#,
+            );
+            insert_approval_attestation(
+                &mut conn,
+                long_attest_cid,
+                "t20-action-sig",
+                long_custodian_cid,
+            );
+        }
+
+        let mut canned: HashMap<String, Result<ShamirShareResponse, String>> = HashMap::new();
+        // Response with all-zero signature — will fail verification because the
+        // "key" derived from the CID bytes would not have signed these bytes.
+        canned.insert(
+            long_custodian_cid.to_string(),
+            Ok(ShamirShareResponse {
+                share_data: vec![0xDE, 0xAD, 0xBE, 0xEF],
+                share_index: 1,
+                attestation_cid: long_attest_cid.to_string(),
+                signature: vec![0u8; 64], // invalid signature
+                error_reason: None,
+            }),
+        );
+
+        let transport = Arc::new(MockShareTransport::new(canned));
+        let assembler = ShareAssembler::new(pool, transport);
+        let result = assembler.assemble("t20-action-sig").await.expect("assemble");
+
+        // Threshold = 1, but the share fails signature verification → BelowThreshold.
+        match result {
+            AssemblyResult::BelowThreshold { approvals_found, threshold } => {
+                assert_eq!(threshold, 1);
+                // approvals_found should be 0 (bad sig rejected)
+                assert!(approvals_found < threshold, "bad-sig share must not count");
+            }
+            AssemblyResult::Shares(_) => {
+                panic!("expected BelowThreshold when signature is bad");
+            }
+        }
+    }
+
+    /// T20: happy path with valid mock transport (matching attestation_cid, short CIDs
+    /// that skip sig verification) → assembler reaches threshold despite one unreachable custodian.
+    #[tokio::test]
+    async fn assembler_happy_path_error_envelope_aware() {
+        let pool = test_pool();
+        {
+            let mut conn = pool.get().expect("conn");
+            insert_governance_action(
+                &mut conn,
+                "t20-action-happy",
+                r#"{"type":"shamir","m":2,"n":3}"#,
+            );
+            for (cust, att) in [("custH1", "attH1"), ("custH2", "attH2"), ("custH3", "attH3")] {
+                insert_approval_attestation(&mut conn, att, "t20-action-happy", cust);
+            }
+        }
+
+        let mut canned: HashMap<String, Result<ShamirShareResponse, String>> = HashMap::new();
+        for (i, (cust, att)) in [("custH1", "attH1"), ("custH2", "attH2")].iter().enumerate() {
+            canned.insert(
+                cust.to_string(),
+                Ok(ShamirShareResponse {
+                    share_data: vec![i as u8; 8],
+                    share_index: (i + 1) as u32,
+                    attestation_cid: att.to_string(),
+                    // Short CIDs (< 32 bytes) → derive_verifying_key_stub returns None → sig skipped
+                    signature: vec![0u8; 64],
+                    error_reason: None,
+                }),
+            );
+        }
+        // Third custodian is unreachable — threshold=2 so should still succeed
+        canned.insert(
+            "custH3".to_string(),
+            Err("timeout: peer unreachable".to_string()),
+        );
+
+        let transport = Arc::new(MockShareTransport::new(canned));
+        let assembler = ShareAssembler::new(pool, transport);
+        let result = assembler.assemble("t20-action-happy").await.expect("assemble");
+
+        match result {
+            AssemblyResult::Shares(shares) => {
+                assert!(shares.len() >= 2, "expected >= 2 shares, got {}", shares.len());
+                assert!(
+                    shares.windows(2).all(|w| w[0].share_index < w[1].share_index),
+                    "shares must be sorted by index"
+                );
+            }
+            AssemblyResult::BelowThreshold { approvals_found, threshold } => {
+                panic!(
+                    "expected Shares, got BelowThreshold(approvals={}, threshold={})",
+                    approvals_found, threshold
+                );
+            }
+        }
+    }
+
+    /// T20: sweettest-level marker — full end-to-end test (packed DNAs + live swarm)
+    /// is deferred to T23/T25. This test is `#[ignore]`d per T18's sweettest pattern.
+    #[tokio::test]
+    #[ignore]
+    async fn sweettest_shamir_share_end_to_end() {
+        // TODO(T23): wire up two conductors, seed recovery-approval attestations,
+        // and drive the full ShareAssembler → LibP2PShareTransport → swarm path.
+        // Requires packed DNAs and a live libp2p harness.
+        //
+        // Scaffold steps:
+        // 1. Start two conductors (alice = recoverer, bob = custodian).
+        // 2. Alice creates a governance-action:recovery-request.
+        // 3. Bob issues an attestation:recovery-approval on the DHT.
+        // 4. Signal replay projects the attestation to Bob's SQLite.
+        // 5. Alice's ShareAssembler calls LibP2PShareTransport::request_share.
+        // 6. Bob's swarm event arm authorizes and (once T21-share-store lands)
+        //    returns the encrypted share.
+        // 7. Alice verifies the response and ShareAssembler returns Shares(vec).
+        unimplemented!("sweettest_shamir_share_end_to_end: scaffold for T23");
     }
 }

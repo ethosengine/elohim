@@ -223,6 +223,20 @@ type PendingViewFederationMap = Arc<
     >,
 >;
 
+/// T20: Map of pending Shamir share requests on `/elohim/shamir-share/1.0.0`.
+/// Resolved when the behaviour event delivers `Message::Response` or `OutboundFailure`.
+/// `Err(String)` carries the failure reason so the `ShareAssembler` can log + skip.
+type PendingShamirShareMap = Arc<
+    tokio::sync::Mutex<
+        std::collections::HashMap<
+            request_response::OutboundRequestId,
+            oneshot::Sender<
+                Result<crate::p2p::shamir_transport::ShamirShareResponse, String>,
+            >,
+        >,
+    >,
+>;
+
 /// F-T19: Error type for the requester-side view-federation dispatch path.
 ///
 /// Returned by `P2PHandle::view_federate` when the peer does not respond in time,
@@ -503,6 +517,10 @@ pub struct P2PNode {
     /// Populated by `handle_command(ViewFederate)`, resolved in the behaviour
     /// event arm when `Message::Response` or `OutboundFailure` fires.
     pending_view_federations: PendingViewFederationMap,
+    /// T20: pending Shamir share requests on `/elohim/shamir-share/1.0.0`.
+    /// Populated by `handle_command(RequestShamirShare)`, resolved in the behaviour
+    /// event arm when `Message::Response` or `OutboundFailure` fires.
+    pending_shamir_shares: PendingShamirShareMap,
     /// T16: custody reconciliation counters — incremented by reconcile_pass.
     pub reconciliation_metrics: std::sync::Arc<ReconciliationMetrics>,
     /// T18: shared cache of last gossiped inventory hashes.
@@ -861,6 +879,21 @@ pub enum P2PCommand {
         request: crate::views::ViewFederationRequest,
         respond: oneshot::Sender<Result<crate::views::ViewFederationResponse, FederationError>>,
     },
+    /// T20: issue a `/elohim/shamir-share/1.0.0` request to `peer` for a
+    /// Shamir share belonging to `recovery_governance_action_cid`.
+    ///
+    /// The in-flight oneshot is stored in `pending_shamir_shares` keyed by the
+    /// `OutboundRequestId` returned by `send_request`. On `Message::Response`
+    /// or `OutboundFailure` the event arm removes and resolves it.
+    ///
+    /// Callers come via [`LibP2PShareTransport::request_share`].
+    RequestShamirShare {
+        peer: libp2p::PeerId,
+        request: crate::p2p::shamir_transport::ShamirShareRequest,
+        respond: oneshot::Sender<
+            Result<crate::p2p::shamir_transport::ShamirShareResponse, String>,
+        >,
+    },
 }
 
 /// RAII guard that resumes P2P sync when dropped.
@@ -994,6 +1027,12 @@ impl P2PHandle {
                         // F-T19 stub: no swarm in test — signal TransportError so callers
                         // get a deterministic non-panic result from for_testing() handles.
                         let _ = respond.send(Err(FederationError::TransportError));
+                    }
+                    P2PCommand::RequestShamirShare { respond, .. } => {
+                        // T20 stub: no swarm in test — signal dial failure.
+                        let _ = respond.send(Err(
+                            "stub: no P2P swarm in test (RequestShamirShare)".to_string(),
+                        ));
                     }
                 }
             }
@@ -1603,6 +1642,9 @@ impl P2PNode {
                 std::collections::HashMap::new(),
             )),
             pending_view_federations: Arc::new(tokio::sync::Mutex::new(
+                std::collections::HashMap::new(),
+            )),
+            pending_shamir_shares: Arc::new(tokio::sync::Mutex::new(
                 std::collections::HashMap::new(),
             )),
             reconciliation_metrics: std::sync::Arc::new(ReconciliationMetrics::default()),
@@ -2748,6 +2790,31 @@ impl P2PNode {
                     "F-T19: view-federation request sent on /elohim/view-federation/1.0.0"
                 );
                 self.pending_view_federations
+                    .lock()
+                    .await
+                    .insert(request_id, respond);
+            }
+
+            // T20: issue a `/elohim/shamir-share/1.0.0` request to the named peer
+            // and store the oneshot sender in `pending_shamir_shares`, keyed by the
+            // `OutboundRequestId`. The event arm below resolves it when
+            // `Message::Response` or `OutboundFailure` arrives.
+            P2PCommand::RequestShamirShare {
+                peer,
+                request,
+                respond,
+            } => {
+                let request_id = swarm
+                    .behaviour_mut()
+                    .shamir_share
+                    .send_request(&peer, request);
+                debug!(
+                    target: "elohim_storage::shamir_share",
+                    peer = %peer,
+                    request_id = ?request_id,
+                    "T20: shamir-share request sent on /elohim/shamir-share/1.0.0"
+                );
+                self.pending_shamir_shares
                     .lock()
                     .await
                     .insert(request_id, respond);
@@ -4349,6 +4416,248 @@ impl P2PNode {
                     peer = %peer,
                     request_id = ?request_id,
                     "F-T19: view-federation response sent"
+                );
+            }
+
+            // === Shamir share protocol (`/elohim/shamir-share/1.0.0`) ===
+            //
+            // T20: real responder (inbound Request) + requester-side response routing.
+            //
+            // Architecture note: the DHT carries authorization (recovery-approval
+            // attestation); this libp2p layer carries only the share material.
+            // The responder NEVER decides who is authorized — it looks up the
+            // DB-projected attestation and reflects the DHT verdict.
+
+            // ── Inbound Request (responder side) ────────────────────────────
+            behaviour::ElohimStorageBehaviourEvent::ShamirShare(
+                request_response::Event::Message {
+                    peer,
+                    message:
+                        request_response::Message::Request {
+                            request,
+                            channel,
+                            ..
+                        },
+                },
+            ) => {
+                use crate::db::recovery_approval_gate::{check_share_authorization, ShareAuthDecision};
+                use crate::p2p::shamir_transport::ShamirShareResponse;
+
+                let local_agent_cid = self.identity.agent_pubkey().to_string();
+
+                // Authorization gate — must hold a DB connection briefly.
+                // All IO happens before acquiring the swarm write lock.
+                let auth_result: Result<ShareAuthDecision, crate::error::StorageError> =
+                    if let Some(pool) = self.db_pool.as_ref() {
+                        pool.get()
+                            .map_err(|e| {
+                                crate::error::StorageError::Database(format!(
+                                    "shamir responder pool.get: {e}"
+                                ))
+                            })
+                            .and_then(|mut conn| {
+                                let now_iso =
+                                    chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
+                                check_share_authorization(
+                                    &mut conn,
+                                    &request.recovery_governance_action_cid,
+                                    &request.custodian_cid,
+                                    &local_agent_cid,
+                                    &now_iso,
+                                )
+                            })
+                    } else {
+                        // No DB pool — cannot authorize. Reject.
+                        Ok(ShareAuthDecision::NotAuthorized {
+                            reason: "no db pool available on responder node".to_string(),
+                        })
+                    };
+
+                let response: ShamirShareResponse = match auth_result {
+                    Ok(ShareAuthDecision::WrongCustodian) => {
+                        // Silent drop: request directed at wrong custodian. Do NOT
+                        // send an error envelope (prevents custodian enumeration).
+                        debug!(
+                            target: "elohim_storage::shamir_share",
+                            peer = %peer,
+                            requested_custodian = %request.custodian_cid,
+                            local_agent = %local_agent_cid,
+                            "T20: shamir-share request directed at wrong custodian — silently dropped"
+                        );
+                        // Drop the channel without responding — libp2p emits
+                        // InboundFailure::ResponseOmission here and OutboundFailure
+                        // at the requester, which the requester routes as dial failure.
+                        drop(channel);
+                        return;
+                    }
+
+                    Ok(ShareAuthDecision::NotAuthorized { reason }) => {
+                        // Auditable security event: authorization failed.
+                        info!(
+                            target: "elohim_storage::shamir_share",
+                            peer = %peer,
+                            recovery_governance_action_cid = %request.recovery_governance_action_cid,
+                            reason = %reason,
+                            "T20: shamir-share authorization DENIED — sending error envelope"
+                        );
+                        ShamirShareResponse::error(reason)
+                    }
+
+                    Ok(ShareAuthDecision::Authorized { ref attestation_cid }) => {
+                        // Auditable security event: authorization passed.
+                        info!(
+                            target: "elohim_storage::shamir_share",
+                            peer = %peer,
+                            recovery_governance_action_cid = %request.recovery_governance_action_cid,
+                            attestation_cid = %attestation_cid,
+                            "T20: shamir-share authorization GRANTED"
+                        );
+
+                        // TODO(T21-share-store): load the actual custodian share from the
+                        // share-custody store (not yet implemented). The share-custody epic
+                        // will persist encrypted share bytes keyed by
+                        // (recovery_governance_action_cid, share_index) and provide a
+                        // signing key derived from the custodian's ed25519 keypair.
+                        //
+                        // Until then, return an error envelope so the assembler records a
+                        // "share held but store not yet available" failure rather than
+                        // silently claiming to return a valid share.
+                        info!(
+                            target: "elohim_storage::shamir_share",
+                            peer = %peer,
+                            "TODO(T21-share-store): custodian share store not yet implemented; \
+                             returning error envelope to requester"
+                        );
+                        ShamirShareResponse::error(
+                            "TODO(T21-share-store): share store not yet implemented".to_string(),
+                        )
+                    }
+
+                    Err(e) => {
+                        tracing::error!(
+                            target: "elohim_storage::shamir_share",
+                            peer = %peer,
+                            error = %e,
+                            "T20: shamir-share authorization DB error — sending error envelope"
+                        );
+                        ShamirShareResponse::error(format!("authorization db error: {e}"))
+                    }
+                };
+
+                // Send the response (error-envelope or share payload).
+                let mut swarm = self.swarm.write().await;
+                if let Err(_returned_response) = swarm
+                    .behaviour_mut()
+                    .shamir_share
+                    .send_response(channel, response)
+                {
+                    debug!(
+                        target: "elohim_storage::shamir_share",
+                        peer = %peer,
+                        "T20: failed to send shamir-share response (peer disconnected?)"
+                    );
+                }
+            }
+
+            // ── Inbound Response (requester side) ──────────────────────────
+            behaviour::ElohimStorageBehaviourEvent::ShamirShare(
+                request_response::Event::Message {
+                    peer,
+                    message:
+                        request_response::Message::Response {
+                            request_id,
+                            response,
+                        },
+                },
+            ) => {
+                debug!(
+                    target: "elohim_storage::shamir_share",
+                    peer = %peer,
+                    request_id = ?request_id,
+                    is_error = %response.is_error(),
+                    "T20: shamir-share response received"
+                );
+                if let Some(respond) = self
+                    .pending_shamir_shares
+                    .lock()
+                    .await
+                    .remove(&request_id)
+                {
+                    let _ = respond.send(Ok(response));
+                } else {
+                    debug!(
+                        target: "elohim_storage::shamir_share",
+                        peer = %peer,
+                        request_id = ?request_id,
+                        "T20: shamir-share response with no pending entry (already resolved or timed out)"
+                    );
+                }
+            }
+
+            // ── Outbound failure (requester side) ─────────────────────────
+            behaviour::ElohimStorageBehaviourEvent::ShamirShare(
+                request_response::Event::OutboundFailure {
+                    peer,
+                    request_id,
+                    error,
+                },
+            ) => {
+                info!(
+                    target: "elohim_storage::shamir_share",
+                    peer = %peer,
+                    request_id = ?request_id,
+                    error = ?error,
+                    "T20: shamir-share outbound failure — custodian unreachable or timed out"
+                );
+                if let Some(respond) = self
+                    .pending_shamir_shares
+                    .lock()
+                    .await
+                    .remove(&request_id)
+                {
+                    use libp2p::request_response::OutboundFailure;
+                    let reason = match &error {
+                        OutboundFailure::Timeout => "timeout".to_string(),
+                        OutboundFailure::ConnectionClosed => "connection_closed".to_string(),
+                        OutboundFailure::DialFailure => "dial_failure".to_string(),
+                        OutboundFailure::UnsupportedProtocols => {
+                            "unsupported_protocols".to_string()
+                        }
+                        OutboundFailure::Io(e) => format!("io_error: {e}"),
+                    };
+                    let _ = respond.send(Err(reason));
+                }
+            }
+
+            // ── Inbound failure (responder side, protocol-level) ──────────
+            behaviour::ElohimStorageBehaviourEvent::ShamirShare(
+                request_response::Event::InboundFailure {
+                    peer,
+                    request_id,
+                    error,
+                },
+            ) => {
+                debug!(
+                    target: "elohim_storage::shamir_share",
+                    peer = %peer,
+                    request_id = ?request_id,
+                    error = ?error,
+                    "T20: shamir-share inbound failure (protocol-level — peer closed connection?)"
+                );
+            }
+
+            // ── ResponseSent (responder-side acknowledgment) ──────────────
+            behaviour::ElohimStorageBehaviourEvent::ShamirShare(
+                request_response::Event::ResponseSent {
+                    peer,
+                    request_id,
+                },
+            ) => {
+                debug!(
+                    target: "elohim_storage::shamir_share",
+                    peer = %peer,
+                    request_id = ?request_id,
+                    "T20: shamir-share response sent"
                 );
             }
 
