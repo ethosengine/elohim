@@ -328,6 +328,11 @@
       "description": "Challenge an identity's authenticity, supported by N witnesses. Replaces IdentityChallenge entry type.",
       "child_attestation_kind": "attestation:challenge-support",
       "default_ballot_format": "approve-reject"
+    },
+    "governance-action:identity-freeze": {
+      "description": "Active suspension of an identity's capabilities. Created either (a) as the derived effective record when a governance-action:identity-challenge reaches challenge-support quorum, or (b) directly as an immediately-effective single-actor record on the defender-attestation path. Recovery M4 introduces the single-actor producer pattern; voted producers continue to flow through identity-challenge. Effectiveness transitions are CREATE-only with supersedes_cid lineage. Replaces IdentityFreeze entry type.",
+      "child_attestation_kind": "attestation:freeze-vote",
+      "default_ballot_format": "approve-reject"
     }
   }
 }
