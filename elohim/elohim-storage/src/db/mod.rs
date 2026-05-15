@@ -146,6 +146,10 @@ pub mod governance_actions;
 // Category C operational (queries the attestations projection; no new table)
 pub mod recovery_approval_gate;
 
+// Recovery M4 T21 — per-custodian Shamir share store
+// Category C operational — write target of T22 extern; read by the responder
+pub mod custodian_shares;
+
 use std::path::Path;
 use std::time::Duration;
 

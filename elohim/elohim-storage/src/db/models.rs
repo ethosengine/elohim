@@ -15,7 +15,7 @@ use ts_rs::TS;
 use super::diesel_schema::{
     access_grants, agreements, appeals, apps, challenges, collective_participations, collectives,
     comments, content, content_attestations, content_mastery, content_tags, contributor_dashboards,
-    contributor_presences, custodian_metrics, device_policies, discussions, economic_events,
+    contributor_presences, custodian_metrics, custodian_shares, device_policies, discussions, economic_events,
     enum_registry, governance_dispositions, governance_signals, governance_states, hazards,
     human_relationships, humans, imagodei_observations, key_rotations,
     knowledge_maps, local_sessions, node_stewardship, observation_diversity_summary,
@@ -3355,4 +3355,59 @@ pub struct GovernanceActionTallyRow {
     pub computed_status: String,
     pub last_child_at: Option<String>,
     pub rebuilt_at: String,
+}
+
+// ============================================================================
+// Recovery M4 T21 — CustodianShare (Category C operational)
+// Source of truth: stewardship-rotation ceremony (T22 extern).
+// NOT a DHT projection — no dht_anchor_hash. These rows are the write target
+// of the T22 `create_shamir_custody_setup` coordinator function.
+// ============================================================================
+
+/// Queryable row from the `custodian_shares` table.
+///
+/// `share_data` is the raw Shamir share bytes as stored. Callers MUST verify
+/// `sha256(share_data) == share_blob_hash` before using the bytes — this
+/// detects SQLite-level corruption (bit-flip, partial write, etc.).
+///
+/// ## At-rest encryption
+///
+/// Share bytes are stored unencrypted in this release. See the migration
+/// `up.sql` comment for the deferred post-M4 threat model and remediation path.
+#[derive(Queryable, Selectable, Debug, Clone)]
+#[diesel(table_name = custodian_shares)]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+pub struct CustodianShare {
+    /// AUTOINCREMENT primary key — stable row identity for supersession updates.
+    pub id: i32,
+    /// ActionHash (base64url) of the `governance-action:recovery-request` this
+    /// share belongs to.
+    pub governance_action_cid: String,
+    /// Content-addressed CID of the custodian who holds this share (matches
+    /// `local_agent_cid` on the node that stores the row).
+    pub custodian_cid: String,
+    /// 1-based index within the (m, n) Shamir scheme.
+    pub share_index: i32,
+    /// Raw Shamir share bytes.  Verify integrity with `share_blob_hash` before use.
+    pub share_data: Vec<u8>,
+    /// Hex-encoded SHA-256 of `share_data`.  Integrity check on every read.
+    pub share_blob_hash: String,
+    /// ISO 8601 creation timestamp.
+    pub created_at: String,
+    /// Non-null when this share has been superseded by a stewardship-rotation
+    /// replacement. Superseded shares MUST NOT be returned to requesters.
+    pub superseded_at: Option<String>,
+}
+
+/// Insertable row for `custodian_shares` (omits `id` — AUTOINCREMENT).
+#[derive(Insertable, Debug, Clone)]
+#[diesel(table_name = custodian_shares)]
+pub struct NewCustodianShare {
+    pub governance_action_cid: String,
+    pub custodian_cid: String,
+    pub share_index: i32,
+    pub share_data: Vec<u8>,
+    pub share_blob_hash: String,
+    pub created_at: String,
+    pub superseded_at: Option<String>,
 }

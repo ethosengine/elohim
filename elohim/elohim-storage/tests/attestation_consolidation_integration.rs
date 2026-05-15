@@ -27,9 +27,10 @@
 //! `cargo test --test attestation_consolidation_integration --no-run` verifies
 //! that all types compile and the scenario is structurally sound.
 //!
-//! To promote to a live test: replace `MockShareTransport` with the real libp2p
-//! transport once `TODO(G.1-swarm-wiring)` is resolved and a test harness is
-//! available (see the `harness/` directory for the P2P test pattern).
+//! To promote to a live test: replace `MockShareTransport` with `LibP2PShareTransport`
+//! (Recovery M4 T20). The swarm-wiring gap was closed in T19/T20 and the live
+//! transport is available — what remains is a P2P test harness fixture (see the
+//! `harness/` directory for the existing pattern).
 
 use std::collections::HashMap;
 use std::sync::Arc;

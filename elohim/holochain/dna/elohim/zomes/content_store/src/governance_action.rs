@@ -109,6 +109,11 @@ const RECOVERY_GOVERNANCE_KINDS: &[&str] = &[
     "governance-action:recovery-request",
     "governance-action:key-revocation",
     "governance-action:identity-freeze",
+    // Recovery M4 T22 — Shamir custody setup records the custodian↔share-index
+    // assignment manifest for an agent's split seed. Share bytes never travel
+    // through this path (Floor G3 in attestation_validator.rs enforces that);
+    // only the assignment metadata + (m,n) threshold + validity horizon.
+    "governance-action:shamir-custody-setup",
 ];
 
 /// Recovery M4 Task 13 — bespoke producer for recovery-shaped governance actions.
