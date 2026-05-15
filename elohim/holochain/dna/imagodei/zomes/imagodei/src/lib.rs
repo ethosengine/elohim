@@ -653,7 +653,7 @@ struct ConsolidatedProposeGovernanceActionInput {
 ///      subjects are humans; the producer denormalises into `related_node_ids`
 ///      and surfaces through `subject_cid` on the output for parity.
 #[derive(Debug, Serialize, Deserialize)]
-struct ConsolidatedProposeRecoveryGovernanceActionInput {
+pub(crate) struct ConsolidatedProposeRecoveryGovernanceActionInput {
     pub governance_kind: String,
     pub subject_human_id: String,
     pub title: String,
@@ -667,7 +667,7 @@ struct ConsolidatedProposeRecoveryGovernanceActionInput {
 
 /// Output from elohim DNA's content_store::propose_governance_action (B.9 bridge copy).
 #[derive(Debug, Serialize, Deserialize)]
-struct ConsolidatedGovernanceActionOutput {
+pub(crate) struct ConsolidatedGovernanceActionOutput {
     pub cid: String,
     pub governance_kind: String,
     pub subject_cid: String,
@@ -818,7 +818,7 @@ fn call_elohim_propose_governance_action(
 // Mirrors the 5-arm ZomeCallResponse pattern from
 // `call_elohim_propose_governance_action` and the rest of the bridge family.
 // ---------------------------------------------------------------------------
-fn call_elohim_propose_recovery_governance_action(
+pub(crate) fn call_elohim_propose_recovery_governance_action(
     consolidated_input: ConsolidatedProposeRecoveryGovernanceActionInput,
 ) -> ExternResult<ConsolidatedGovernanceActionOutput> {
     let response = call(
@@ -2321,6 +2321,13 @@ fn compute_required_witness_count(active_emergency_contacts: u32) -> u32 {
 /// Only votes with `approved == true` count toward the quorum threshold.
 /// Rejections are preserved in the DHT for audit but never advance the
 /// pending -> effective transition.
+///
+/// Recovery M4 Task 14: this function is no longer called — `submit_revocation_vote`
+/// counts votes cross-DNA via `call_elohim_get_attestations_for_subject` +
+/// per-attestation metadata fetch (subject_cid = revocation_cid). Retained
+/// under `#[allow(dead_code)]` so the entry-type sweep in Task 15 can remove
+/// it alongside the `RevocationVote` integrity definition.
+#[allow(dead_code)]
 fn count_approved_revocation_votes(revocation_id: &str) -> ExternResult<u32> {
     let anchor = StringAnchor::new("revocation_votes", revocation_id);
     let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor))?;
@@ -2683,92 +2690,56 @@ pub fn create_revocation_request(
     let revocation_id = format!("rev-{}-{}", input.target_human_id, timestamp);
     let revoked_key_str = input.revoked_key.to_string();
 
-    let revocation = KeyRevocation {
+    // Recovery M4 Task 14: bridge to elohim DNA via
+    // `propose_recovery_governance_action`. Initial CREATE is pending
+    // (`threshold_reached: false`, `effective_at: null`); the threshold flip on
+    // quorum is a fresh CREATE driven by `submit_revocation_vote` (CREATE-only
+    // constraint, Task 4).
+    let bridge_input = ConsolidatedProposeRecoveryGovernanceActionInput {
+        governance_kind: "governance-action:key-revocation".to_string(),
+        subject_human_id: input.target_human_id.clone(),
+        title: format!("Key revocation request for {}", input.target_human_id),
+        description: Some(format!(
+            "trigger_type=steward_vote; reason={}; initiated_by={}",
+            input.reason, caller_human_id
+        )),
+        reach: "intimate".to_string(),
+        threshold: serde_json::json!({"m": required}),
+        closes_at: timestamp.clone(),
+        metadata: serde_json::json!({
+            "id": revocation_id,
+            "human_id": input.target_human_id,
+            "revoked_key": revoked_key_str,
+            "reason": input.reason,
+            "trigger_type": "steward_vote",
+            "initiated_by": caller_human_id,
+            "required_votes": required,
+            "current_votes": 0,
+            "threshold_reached": false,
+            "effective_at": serde_json::Value::Null,
+        }),
+        supersedes_cid: None,
+    };
+    let consolidated = call_elohim_propose_recovery_governance_action(bridge_input)?;
+    let revocation_cid = consolidated.cid;
+
+    emit_signal(RecoveryV2Signal::KeyRevocationRequested {
         id: revocation_id.clone(),
         human_id: input.target_human_id.clone(),
         revoked_key: revoked_key_str.clone(),
         reason: input.reason.clone(),
-        initiated_by: caller_human_id.clone(),
         trigger_type: "steward_vote".to_string(),
+        initiated_by: caller_human_id.clone(),
         required_votes: required,
         current_votes: 0,
-        votes_json: String::new(),
         threshold_reached: false,
         effective_at: None,
-        created_at: timestamp.clone(),
-        updated_at: timestamp.clone(),
-    };
-
-    let action_hash = create_entry(&EntryTypes::KeyRevocation(revocation.clone()))?;
-
-    // IdToKeyRevocation anchor
-    let id_anchor = StringAnchor::new("revocation_id", &revocation_id);
-    let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor.clone()))?;
-    create_entry(&EntryTypes::StringAnchor(id_anchor))?;
-    create_link(
-        id_anchor_hash,
-        action_hash.clone(),
-        LinkTypes::IdToKeyRevocation,
-        (),
-    )?;
-
-    // HumanToKeyRevocation anchor
-    let human_anchor = StringAnchor::new("human_revocations", &input.target_human_id);
-    let human_anchor_hash = hash_entry(&EntryTypes::StringAnchor(human_anchor.clone()))?;
-    create_entry(&EntryTypes::StringAnchor(human_anchor))?;
-    create_link(
-        human_anchor_hash,
-        action_hash.clone(),
-        LinkTypes::HumanToKeyRevocation,
-        (),
-    )?;
-
-    // RevokedKeyToRevocation anchor
-    let revoked_key_anchor = StringAnchor::new("revoked_key", &revoked_key_str);
-    let revoked_key_anchor_hash =
-        hash_entry(&EntryTypes::StringAnchor(revoked_key_anchor.clone()))?;
-    create_entry(&EntryTypes::StringAnchor(revoked_key_anchor))?;
-    create_link(
-        revoked_key_anchor_hash,
-        action_hash.clone(),
-        LinkTypes::RevokedKeyToRevocation,
-        (),
-    )?;
-
-    // PendingRevocations anchor — quorum is not yet met.
-    let pending_anchor = StringAnchor::new("pending_revocations", "global");
-    let pending_anchor_hash = hash_entry(&EntryTypes::StringAnchor(pending_anchor.clone()))?;
-    create_entry(&EntryTypes::StringAnchor(pending_anchor))?;
-    create_link(
-        pending_anchor_hash,
-        action_hash.clone(),
-        LinkTypes::PendingRevocations,
-        (),
-    )?;
-
-    emit_signal(RecoveryV2Signal::KeyRevocationRequested {
-        id: revocation.id.clone(),
-        human_id: revocation.human_id.clone(),
-        revoked_key: revocation.revoked_key.clone(),
-        reason: revocation.reason.clone(),
-        trigger_type: revocation.trigger_type.clone(),
-        initiated_by: revocation.initiated_by.clone(),
-        required_votes: revocation.required_votes,
-        current_votes: revocation.current_votes,
-        threshold_reached: revocation.threshold_reached,
-        effective_at: revocation.effective_at.clone(),
-        created_at: revocation.created_at.clone(),
+        created_at: timestamp,
     })?;
 
-    // TODO(Recovery M4 Task 14): bridge this function to elohim DNA via
-    // `propose_recovery_governance_action` mirroring `create_self_revocation`.
-    // Until then, surface the local ActionHash stringified so the output type
-    // (which T13 changed to `revocation_cid: String`) keeps compiling. Readers
-    // of this field on the legacy path should be aware that it is an
-    // imagodei-local ActionHash string, not a cross-DNA entry-hash CID.
     Ok(KeyRevocationOutput {
         revocation_id,
-        revocation_cid: action_hash.to_string(),
+        revocation_cid,
     })
 }
 
@@ -2800,15 +2771,31 @@ pub struct RevocationVoteOutput {
 }
 
 /// M4: Submit an emergency-contact vote on a pending KeyRevocation.
-/// On the threshold-meeting vote, the coordinator updates the KeyRevocation
-/// entry (flips threshold_reached, sets effective_at), moves it from
-/// PendingRevocations to EffectiveRevocations, and emits both
-/// RevocationVoteSubmitted and KeyRevocationEffective signals.
+///
+/// Recovery M4 Task 14: the vote is written as an
+/// `attestation:revocation-vote` Content entry on the elohim DNA via
+/// `call_elohim_issue_attestation`, with `parent_governance_action_cid` and
+/// `subject_cid` both set to the revocation CID. The vote's metadata carries
+/// `vote_value` ("approve" | "reject") and a top-level `voter_human_id` so
+/// downstream projection (and this function's quorum-detection re-read) can
+/// classify it. The legacy local `RevocationVote` entry + 3 anchor links are
+/// no longer written (T15 will drop the entry type definitions).
+///
+/// When the approved-vote count meets `required_votes`, the function writes a
+/// fresh `governance-action:key-revocation` Content entry on elohim with
+/// `threshold_reached: true`, `effective_at: <RFC3339 now>`, and
+/// `supersedes_cid: <input.revocation_cid>` — the "fresh effective Content"
+/// pattern from Task 4. The `query_effective_revocation_for_key` gate reads
+/// from DHT-derived Content (NOT a storage projection), so this CREATE is
+/// what flips the gate. Subsequent redelivery / racy re-entry is guarded by
+/// the per-steward duplicate-vote check (attestation issuer == voter human
+/// id) plus the gate's most-recent-wins ordering by `updated_at`.
 #[hdk_extern]
 pub fn submit_revocation_vote(
     input: SubmitRevocationVoteInput,
 ) -> ExternResult<RevocationVoteOutput> {
     let caller_pubkey = agent_info()?.agent_initial_pubkey;
+    let caller_pubkey_str = caller_pubkey.to_string();
     let caller_human_id = resolve_human_id_for_agent(&caller_pubkey)?;
 
     if input.attestation.trim().is_empty() {
@@ -2817,16 +2804,10 @@ pub fn submit_revocation_vote(
         )));
     }
 
-    // Recovery M4 Task 5 migration: previously decoded a local imagodei
-    // `KeyRevocation` entry via the `IdToKeyRevocation` anchor + `to_app_option()`.
-    // Post Stage 2 the canonical revocation entry is a
-    // `governance-action:key-revocation` Content entry on the elohim DNA, fetched
-    // by CID via the cross-DNA bridge. The interim still relies on the local
-    // imagodei KeyRevocation entry for `update_entry` (threshold-flip) and link
-    // operations (PendingRevocations → EffectiveRevocations) — those move with
-    // Task 14 (`bridge_create_revocation_request` + `bridge_submit_revocation_vote`).
-    // The local entry is re-resolved by the metadata-carried logical
-    // revocation_id (anchor `IdToKeyRevocation` on `revocation_id`).
+    // Recovery M4 Task 5 + 14 migration: the canonical revocation entry is a
+    // `governance-action:key-revocation` Content entry on the elohim DNA,
+    // fetched by CID via the cross-DNA bridge. The vote itself is also written
+    // cross-DNA as an `attestation:revocation-vote` Content (Task 14).
     let content_output = call_elohim_get_content_by_id(&input.revocation_cid)?.ok_or_else(|| {
         wasm_error!(WasmErrorInner::Guest(format!(
             "submit_revocation_vote: revocation CID {} not found on elohim DNA",
@@ -2889,6 +2870,16 @@ pub fn submit_revocation_vote(
             ))
         })?
         .to_string();
+    let revocation_reason = metadata
+        .get("reason")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
+    let revocation_initiated_by = metadata
+        .get("initiated_by")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
     let revocation_required_votes: u32 = metadata
         .get("required_votes")
         .and_then(|v| v.as_u64())
@@ -2896,33 +2887,6 @@ pub fn submit_revocation_vote(
         .ok_or_else(|| {
             wasm_error!(WasmErrorInner::Guest(
                 "submit_revocation_vote: revocation metadata missing required_votes".into(),
-            ))
-        })?;
-
-    // Local resolve: the imagodei-side KeyRevocation entry is still needed for
-    // update_entry (threshold-flip) and PendingRevocations link cleanup during
-    // the interim before Task 14 moves the producer. Re-derive its action_hash
-    // via the metadata-carried logical id (same anchor the producer creates at
-    // `create_revocation_request` line ~2576).
-    let revocation_id_anchor = StringAnchor::new("revocation_id", &revocation_id);
-    let revocation_anchor_hash = hash_entry(&EntryTypes::StringAnchor(revocation_id_anchor))?;
-    let revocation_links = get_links(
-        LinkQuery::try_new(revocation_anchor_hash, LinkTypes::IdToKeyRevocation)?,
-        GetStrategy::default(),
-    )?;
-    let revocation_link = revocation_links.first().ok_or_else(|| {
-        wasm_error!(WasmErrorInner::Guest(format!(
-            "submit_revocation_vote: no local KeyRevocation anchor for id {}",
-            revocation_id
-        )))
-    })?;
-    let revocation_action_hash = revocation_link
-        .target
-        .clone()
-        .into_action_hash()
-        .ok_or_else(|| {
-            wasm_error!(WasmErrorInner::Guest(
-                "IdToKeyRevocation target was not an ActionHash".into()
             ))
         })?;
 
@@ -2949,31 +2913,16 @@ pub fn submit_revocation_vote(
         ))));
     }
 
-    // Gate: no existing vote from this steward on this revocation.
-    let steward_anchor = StringAnchor::new("steward_revocation_votes", &caller_human_id);
-    let steward_anchor_hash = hash_entry(&EntryTypes::StringAnchor(steward_anchor.clone()))?;
-    let steward_vote_links = get_links(
-        LinkQuery::try_new(
-            steward_anchor_hash.clone(),
-            LinkTypes::StewardToRevocationVote,
-        )?,
-        GetStrategy::default(),
-    )?;
-    for link in &steward_vote_links {
-        let Some(vote_hash) = link.target.clone().into_action_hash() else {
-            continue;
-        };
-        let Some(rec) = get(vote_hash, GetOptions::default())? else {
-            continue;
-        };
-        let Some(prior_vote): Option<RevocationVote> = rec
-            .entry()
-            .to_app_option()
-            .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        else {
-            continue;
-        };
-        if prior_vote.revocation_id == revocation_id {
+    // Gate: no existing vote from this steward on this revocation. Walk the
+    // cross-DNA `attestation:revocation-vote` children (subject = revocation_cid)
+    // and reject if any was issued by the caller (issuer_cid matches caller's
+    // AgentPubKey string — `issue_attestation` stores
+    // `author_id = agent_info()?.agent_initial_pubkey.to_string()`).
+    let existing_votes = call_elohim_get_attestations_for_subject(input.revocation_cid.clone())?;
+    for prior in &existing_votes {
+        if prior.attestation_kind == "attestation:revocation-vote"
+            && prior.issuer_cid == caller_pubkey_str
+        {
             return Err(wasm_error!(WasmErrorInner::Guest(format!(
                 "submit_revocation_vote: steward {} has already voted on revocation {}",
                 caller_human_id, revocation_id
@@ -2983,117 +2932,107 @@ pub fn submit_revocation_vote(
 
     let now = sys_time()?;
     let timestamp = format!("{:?}", now);
+    // RFC3339 sortable timestamp for `effective_at` (Task 4 constraint —
+    // gate sorts most-recent-by-`updated_at` lexicographically).
+    let rfc3339_now = rfc3339_from_sys_time(&now);
     let vote_id = format!("vote-{}-{}", caller_human_id, timestamp);
+    let vote_value_str = if input.approved { "approve" } else { "reject" };
 
-    let vote = RevocationVote {
-        id: vote_id.clone(),
-        revocation_id: revocation_id.clone(),
-        steward_id: caller_human_id.clone(),
-        approved: input.approved,
-        attestation: input.attestation.clone(),
-        voted_at: timestamp.clone(),
+    // Issue the vote as an `attestation:revocation-vote` Content on elohim.
+    // The metadata carries top-level `parent_governance_action_cid`,
+    // `subject_cid`, `subject_kind`, `vote_value`, and `voter_human_id` so
+    // downstream projectors classify without further lookups.
+    let vote_metadata = serde_json::json!({
+        "parent_governance_action_cid": input.revocation_cid,
+        "subject_cid": input.revocation_cid,
+        "subject_kind": "key-revocation",
+        "vote_value": vote_value_str,
+        "voter_human_id": caller_human_id,
+        "voter_pubkey": caller_pubkey_str,
+        "vote_id": vote_id,
+        "attestation_blob": input.attestation,
+        "voted_at": timestamp,
+    });
+    let attest_input = ConsolidatedIssueAttestationInput {
+        attestation_kind: "attestation:revocation-vote".to_string(),
+        subject_cid: input.revocation_cid.clone(),
+        subject_kind: "key-revocation".to_string(),
+        title: format!("Revocation vote by {}", caller_human_id),
+        description: Some(format!("vote={}", vote_value_str)),
+        reach: "intimate".to_string(),
+        metadata: vote_metadata,
+        parent_governance_action_cid: Some(input.revocation_cid.clone()),
+        vote_value: Some(vote_value_str.to_string()),
+        proof_class: "witness".to_string(),
+        proof_evidence: serde_json::json!({"class": "witness"}),
+        expires_at: None,
     };
+    let _vote_consolidated = call_elohim_issue_attestation(attest_input)?;
 
-    let vote_action_hash = create_entry(&EntryTypes::RevocationVote(vote.clone()))?;
-
-    // IdToRevocationVote anchor
-    let vote_id_anchor = StringAnchor::new("revocation_vote_id", &vote_id);
-    let vote_id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(vote_id_anchor.clone()))?;
-    create_entry(&EntryTypes::StringAnchor(vote_id_anchor))?;
-    create_link(
-        vote_id_anchor_hash,
-        vote_action_hash.clone(),
-        LinkTypes::IdToRevocationVote,
-        (),
-    )?;
-
-    // RevocationToVote anchor (per-revocation vote list)
-    let revocation_votes_anchor = StringAnchor::new("revocation_votes", &revocation_id);
-    let revocation_votes_anchor_hash =
-        hash_entry(&EntryTypes::StringAnchor(revocation_votes_anchor.clone()))?;
-    create_entry(&EntryTypes::StringAnchor(revocation_votes_anchor))?;
-    create_link(
-        revocation_votes_anchor_hash,
-        vote_action_hash.clone(),
-        LinkTypes::RevocationToVote,
-        (),
-    )?;
-
-    // StewardToRevocationVote anchor
-    create_entry(&EntryTypes::StringAnchor(steward_anchor))?;
-    create_link(
-        steward_anchor_hash,
-        vote_action_hash.clone(),
-        LinkTypes::StewardToRevocationVote,
-        (),
-    )?;
-
-    // Recompute threshold (count approved votes from link traversal).
-    let approved_count = count_approved_revocation_votes(&revocation_id)?;
+    // Recount approved votes by re-fetching attestations for subject and
+    // decoding each one's metadata for `vote_value`. Cross-DNA fetch per
+    // attestation is O(N votes), which is small (single-digit quorum).
+    let refreshed = call_elohim_get_attestations_for_subject(input.revocation_cid.clone())?;
+    let mut approved_count: u32 = 0;
+    for child in &refreshed {
+        if child.attestation_kind != "attestation:revocation-vote" {
+            continue;
+        }
+        let Some(child_content) = call_elohim_get_content_by_id(&child.cid)? else {
+            continue;
+        };
+        let child_meta: serde_json::Value =
+            serde_json::from_str(&child_content.content.metadata_json)
+                .unwrap_or(serde_json::Value::Null);
+        let vote_value = child_meta
+            .get("vote_value")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+        if vote_value == "approve" {
+            approved_count = approved_count.saturating_add(1);
+        }
+    }
     let threshold_now_reached = approved_count >= revocation_required_votes;
 
     if threshold_now_reached {
-        // Interim (pre-Task-14): re-fetch the local KeyRevocation record and
-        // update_entry it to flip threshold_reached + set effective_at. Task 14
-        // will replace this with a fresh `governance-action:key-revocation`
-        // Content entry on elohim (create_entry, not update_entry — per Task 4's
-        // effectiveness-transition note at content_store/src/lib.rs:3185+).
-        let revocation_record = get(revocation_action_hash.clone(), GetOptions::default())?
-            .ok_or_else(|| {
-                wasm_error!(WasmErrorInner::Guest(
-                    "submit_revocation_vote: local KeyRevocation record not found".into()
-                ))
-            })?;
-        let mut updated: KeyRevocation = revocation_record
-            .entry()
-            .to_app_option()
-            .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-            .ok_or_else(|| {
-                wasm_error!(WasmErrorInner::Guest(
-                    "submit_revocation_vote: local KeyRevocation record missing entry".into(),
-                ))
-            })?;
-        updated.current_votes = approved_count;
-        updated.threshold_reached = true;
-        updated.effective_at = Some(timestamp.clone());
-        updated.updated_at = timestamp.clone();
-        update_entry(
-            revocation_action_hash.clone(),
-            &EntryTypes::KeyRevocation(updated),
-        )?;
-
-        // Move from PendingRevocations to EffectiveRevocations.
-        // Recovery M4 Task 5: the legacy cleanup loop decoded each linked
-        // KeyRevocation entry to match `rev.id == input.revocation_id`. Now we
-        // match link targets against the locally-resolved `revocation_action_hash`
-        // directly — no decode needed, and no remaining `to_app_option::<KeyRevocation>`
-        // reader on the imagodei zome.
-        let pending_global_anchor = StringAnchor::new("pending_revocations", "global");
-        let pending_global_anchor_hash =
-            hash_entry(&EntryTypes::StringAnchor(pending_global_anchor))?;
-        let pending_links = get_links(
-            LinkQuery::try_new(pending_global_anchor_hash, LinkTypes::PendingRevocations)?,
-            GetStrategy::default(),
-        )?;
-        for link in pending_links {
-            let Some(link_target_hash) = link.target.clone().into_action_hash() else {
-                continue;
-            };
-            if link_target_hash == revocation_action_hash {
-                delete_link(link.create_link_hash, GetOptions::default())?;
-            }
-        }
-
-        let effective_anchor = StringAnchor::new("effective_revocations", "global");
-        let effective_anchor_hash =
-            hash_entry(&EntryTypes::StringAnchor(effective_anchor.clone()))?;
-        create_entry(&EntryTypes::StringAnchor(effective_anchor))?;
-        create_link(
-            effective_anchor_hash,
-            revocation_link.target.clone(), // points to the local revocation entry
-            LinkTypes::EffectiveRevocations,
-            (),
-        )?;
+        // CREATE-only effectiveness transition (Task 4): emit a fresh
+        // `governance-action:key-revocation` Content entry whose metadata
+        // carries `threshold_reached: true` + `effective_at` (RFC3339 UTC)
+        // and a `supersedes_cid` pointing at the pending entry.
+        // `query_effective_revocation_for_key` selects most-recent-by-
+        // updated_at, so this new entry becomes the gate's effective record.
+        let effective_metadata = serde_json::json!({
+            "id": revocation_id,
+            "human_id": revocation_human_id,
+            "revoked_key": revocation_revoked_key,
+            "reason": revocation_reason,
+            "trigger_type": "steward_vote",
+            "initiated_by": revocation_initiated_by,
+            "required_votes": revocation_required_votes,
+            "current_votes": approved_count,
+            "threshold_reached": true,
+            "effective_at": rfc3339_now,
+            "triggering_vote_id": vote_id,
+        });
+        let effective_bridge_input = ConsolidatedProposeRecoveryGovernanceActionInput {
+            governance_kind: "governance-action:key-revocation".to_string(),
+            subject_human_id: revocation_human_id.clone(),
+            title: format!(
+                "Key revocation effective for {} (quorum reached)",
+                revocation_human_id
+            ),
+            description: Some(format!(
+                "trigger_type=steward_vote; reason={}; supersedes={}",
+                revocation_reason, input.revocation_cid
+            )),
+            reach: "intimate".to_string(),
+            threshold: serde_json::json!({"m": revocation_required_votes}),
+            closes_at: rfc3339_now.clone(),
+            metadata: effective_metadata,
+            supersedes_cid: Some(input.revocation_cid.clone()),
+        };
+        let _effective_consolidated =
+            call_elohim_propose_recovery_governance_action(effective_bridge_input)?;
 
         emit_signal(RecoveryV2Signal::RevocationVoteSubmitted {
             id: vote_id.clone(),
@@ -3111,7 +3050,7 @@ pub fn submit_revocation_vote(
             revocation_id: revocation_id.clone(),
             revoked_key: revocation_revoked_key.clone(),
             human_id: revocation_human_id.clone(),
-            effective_at: timestamp,
+            effective_at: rfc3339_now,
             triggering_vote_id: Some(vote_id.clone()),
         })?;
     } else {
@@ -3134,6 +3073,41 @@ pub fn submit_revocation_vote(
         required_votes: revocation_required_votes,
         threshold_now_reached,
     })
+}
+
+/// Convert a Holochain `Timestamp` (microseconds since epoch) to a sortable
+/// RFC3339 UTC string `YYYY-MM-DDTHH:MM:SS.fffZ`. Used by Recovery M4 Task 14
+/// to populate `effective_at` on the fresh effective Content (Task 4 gate
+/// orders by lexicographic `updated_at`, so RFC3339 is mandatory).
+fn rfc3339_from_sys_time(now: &Timestamp) -> String {
+    // Best-effort: build via chrono-equivalent decomposition. We avoid pulling
+    // in chrono (extra WASM weight) — instead format manually from the
+    // micros-since-epoch i64.
+    let micros = now.as_micros();
+    let secs = micros.div_euclid(1_000_000);
+    let sub_micros = micros.rem_euclid(1_000_000) as u32;
+    let millis = sub_micros / 1000;
+    // Days since 1970-01-01.
+    let days_since_epoch = secs.div_euclid(86_400);
+    let seconds_in_day = secs.rem_euclid(86_400) as u32;
+    let hour = seconds_in_day / 3600;
+    let minute = (seconds_in_day % 3600) / 60;
+    let second = seconds_in_day % 60;
+    // Civil from days (Howard Hinnant's algorithm, public-domain).
+    let z = days_since_epoch + 719_468;
+    let era = if z >= 0 { z } else { z - 146_096 } / 146_097;
+    let doe = (z - era * 146_097) as u32; // [0, 146096]
+    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
+    let y = (yoe as i64) + era * 400;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100); // [0, 365]
+    let mp = (5 * doy + 2) / 153;
+    let day = doy - (153 * mp + 2) / 5 + 1;
+    let month = if mp < 10 { mp + 3 } else { mp - 9 };
+    let year = if month <= 2 { y + 1 } else { y };
+    format!(
+        "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}.{:03}Z",
+        year, month, day, hour, minute, second, millis
+    )
 }
 
 /// Query elohim DNA for an active `governance-action:identity-freeze` Content
