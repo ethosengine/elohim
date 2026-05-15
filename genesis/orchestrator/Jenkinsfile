@@ -938,8 +938,27 @@ def runReconciliationBackstop() {
     def actualFile = env.ACTUAL_BUILD_GRAPH_FILE ?: 'actual-build-graph.json'
     def reconciliationFile = env.BUILD_GRAPH_RECONCILIATION_FILE ?: 'build-graph-reconciliation.json'
 
+    // Post block runs in node('built-in'); Determine Build Plan + Post
+    // Predicted Build Graph ran in container('builder') with a different
+    // workspace. Recover the archived predictedFile into this workspace
+    // before checking — otherwise we'd false-positive "Determine Build
+    // Plan did not complete" on every cascade-abort run.
     if (!fileExists(predictedFile)) {
-        echo "[backstop] No ${predictedFile} — Determine Build Plan did not complete; skipping reconciliation backstop"
+        try {
+            copyArtifacts(
+                projectName: env.JOB_NAME,
+                selector: specific(env.BUILD_NUMBER),
+                filter: predictedFile,
+                optional: true,
+                fingerprintArtifacts: false,
+            )
+        } catch (Exception e) {
+            echo "[backstop] could not copy-back ${predictedFile} from this build: ${e.message}"
+        }
+    }
+
+    if (!fileExists(predictedFile)) {
+        echo "[backstop] No ${predictedFile} after copy-back — Determine Build Plan never archived it (early abort or archive failure); skipping reconciliation backstop"
         return
     }
 
