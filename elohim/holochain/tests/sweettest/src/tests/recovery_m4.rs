@@ -1076,3 +1076,378 @@ async fn m4_signal_replay_idempotency_storage() -> Result<()> {
 
     Ok(())
 }
+
+// ============================================================================
+// Recovery M4 Task 13 — producer-side bridge scenarios.
+//
+// These scenarios assert the new `create_recovery_request` and
+// `create_self_revocation` writers correctly land
+// `governance-action:recovery-request` / `governance-action:key-revocation`
+// Content entries on the elohim DNA, with TOP-LEVEL metadata fields that the
+// Task 4/5 readers consume (`human_id`, `revoked_key`, `threshold_reached`,
+// `effective_at`).
+//
+// Both are `#[ignore]` per the codebase convention — they need packed DNA
+// bundles produced by the Jenkins pipeline.
+//
+// Adaptation note from T4/T5 patterns: install both `imagodei` and `elohim`
+// DNAs (the elohim DNA is loaded under role name "elohim" matching the
+// imagodei bridge's `CallTargetCell::OtherRole("elohim".into())`), register
+// a Human bound to the caller's agent pubkey on the imagodei cell so
+// `resolve_human_id_for_agent` succeeds, then drive the producer and assert
+// on the cross-DNA Content shape.
+// ============================================================================
+
+/// Mirror of imagodei's `CreateRecoveryRequestInput`.
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+struct CreateRecoveryRequestInputMirrorT13 {
+    pub human_agent_pubkey: holo_hash::AgentPubKey,
+    pub new_agent_pubkey: holo_hash::AgentPubKey,
+    pub hosting_doorway_pubkey: holo_hash::AgentPubKey,
+    pub proposed_authority: serde_json::Value,
+    pub request_nonce: Vec<u8>,
+}
+
+/// Mirror of imagodei's post-Task-13 `RecoveryRequestOutput` — `action_hash`
+/// is replaced by `recovery_request_cid` (the canonical CID lives cross-DNA).
+/// Mirrored as `serde_json::Value` for the `request` field so this struct
+/// does not need to know the full `RecoveryRequest` shape.
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+struct RecoveryRequestOutputMirrorT13 {
+    pub recovery_request_cid: String,
+    pub request: serde_json::Value,
+}
+
+/// Mirror of imagodei's post-Task-13 `KeyRevocationOutput` — `action_hash`
+/// is replaced by `revocation_cid` (the canonical CID lives cross-DNA).
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+struct KeyRevocationOutputMirrorT13 {
+    pub revocation_id: String,
+    pub revocation_cid: String,
+}
+
+/// Mirror of `lamad_types::QueryByTypeInput` — used to drive
+/// `get_content_by_type` on the elohim cell to look up the just-written
+/// governance-action Content entry.
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+struct QueryByTypeInputMirrorT13 {
+    pub content_type: String,
+    pub limit: Option<u32>,
+}
+
+/// Subset of `lamad_types::ContentOutput` carrying just the fields the
+/// scenarios assert on. `content` is a `serde_json::Value` because the full
+/// wire `Content` shape has many fields irrelevant to these tests.
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+struct ContentOutputMirrorT13 {
+    pub content: serde_json::Value,
+}
+
+/// Recovery M4 Task 13 Scenario 1:
+/// `create_recovery_request` (bridged via the new bespoke producer) must land
+/// a `governance-action:recovery-request` Content entry on the elohim DNA
+/// whose `metadata_json` carries `human_id` at the TOP LEVEL,
+/// `threshold_reached: false`, and `effective_at: null`. This is the shape
+/// the Task 3/4/5 readers consume.
+///
+/// The test installs both DNAs under their contract role names, creates a
+/// Human bound to the caller's pubkey on imagodei, then invokes
+/// `create_recovery_request` and walks back via
+/// `content_store::get_content_by_type` to assert the metadata shape.
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "requires packed DNAs from Jenkins pipeline — needs both imagodei.dna and lamad.dna"]
+async fn m4_t13_create_recovery_request_lands_governance_action_on_elohim_dna() -> Result<()> {
+    use holochain_types::prelude::{DnaFile, RoleName};
+
+    let (mut conductor, agent) = single_agent_conductor().await?;
+
+    let imagodei_dna =
+        load_dna("imagodei", &network_seed("imagodei"), Some(agent.clone())).await?;
+    let elohim_dna = load_dna("lamad", &network_seed("lamad"), Some(agent.clone())).await?;
+    let imagodei_dna_hash = imagodei_dna.dna_hash().clone();
+    let elohim_dna_hash = elohim_dna.dna_hash().clone();
+
+    let dnas_with_roles: Vec<(RoleName, DnaFile)> = vec![
+        ("imagodei".into(), imagodei_dna),
+        ("elohim".into(), elohim_dna),
+    ];
+
+    let app = conductor
+        .setup_app_for_agent("recovery-m4-t13-recovery", agent.clone(), &dnas_with_roles)
+        .await?;
+    let cells = app.cells();
+    let imagodei_cell = cells
+        .iter()
+        .find(|c| c.dna_hash() == &imagodei_dna_hash)
+        .expect("imagodei cell installed")
+        .clone();
+    let elohim_cell = cells
+        .iter()
+        .find(|c| c.dna_hash() == &elohim_dna_hash)
+        .expect("elohim cell installed")
+        .clone();
+
+    // Bind caller's agent pubkey to a Human so `resolve_human_id_for_agent`
+    // succeeds inside `create_recovery_request`.
+    let _human_action_hash: holo_hash::ActionHash = conductor
+        .call(
+            &imagodei_cell.zome("imagodei"),
+            "create_human",
+            human_input(HUMAN_MATTHEW, "Matthew (M4 T13 recovery)"),
+        )
+        .await;
+
+    // Drive the bridged producer.
+    let request_input = CreateRecoveryRequestInputMirrorT13 {
+        human_agent_pubkey: agent.clone(),
+        new_agent_pubkey: agent.clone(),
+        hosting_doorway_pubkey: agent.clone(),
+        proposed_authority: serde_json::json!("IntimateQuorum"),
+        request_nonce: vec![0u8; 16],
+    };
+    let request_output: RecoveryRequestOutputMirrorT13 = conductor
+        .call(
+            &imagodei_cell.zome("imagodei"),
+            "create_recovery_request",
+            request_input,
+        )
+        .await;
+
+    // The bridged producer must return a non-empty CID — the cross-DNA write
+    // succeeded.
+    assert!(
+        !request_output.recovery_request_cid.is_empty(),
+        "create_recovery_request must surface the cross-DNA Content CID"
+    );
+
+    // Walk back: query elohim DNA for the governance-action content_type and
+    // find the entry whose metadata.human_id matches the Human we registered.
+    let candidates: Vec<ContentOutputMirrorT13> = conductor
+        .call(
+            &elohim_cell.zome("content_store"),
+            "get_content_by_type",
+            QueryByTypeInputMirrorT13 {
+                content_type: "governance-action:recovery-request".to_string(),
+                limit: Some(u32::MAX),
+            },
+        )
+        .await;
+
+    let mut matched_metadata: Option<serde_json::Value> = None;
+    for candidate in candidates {
+        let metadata_json = candidate
+            .content
+            .get("metadata_json")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+        if let Ok(metadata) = serde_json::from_str::<serde_json::Value>(metadata_json) {
+            if metadata
+                .get("human_id")
+                .and_then(|v| v.as_str())
+                .map(|s| s == HUMAN_MATTHEW)
+                .unwrap_or(false)
+            {
+                matched_metadata = Some(metadata);
+                break;
+            }
+        }
+    }
+
+    let metadata = matched_metadata.expect(
+        "elohim DNA must carry a governance-action:recovery-request entry whose \
+         metadata.human_id matches the registered Human",
+    );
+
+    // Top-level fields the Task 3/4/5 readers consume.
+    assert_eq!(
+        metadata["human_id"].as_str().unwrap_or(""),
+        HUMAN_MATTHEW,
+        "human_id must be at the TOP LEVEL of metadata_json"
+    );
+    assert_eq!(
+        metadata["threshold_reached"].as_bool().unwrap_or(true),
+        false,
+        "recovery-request is pending on creation"
+    );
+    assert!(
+        metadata["effective_at"].is_null(),
+        "recovery-request effective_at must be null until quorum is reached"
+    );
+    assert!(
+        metadata.get("trigger_type").and_then(|v| v.as_str()).is_some(),
+        "trigger_type must be surfaced at top level for projector classification"
+    );
+    assert!(
+        metadata.get("session_pubkey").and_then(|v| v.as_str()).is_some(),
+        "session_pubkey (new_agent_pubkey) must be surfaced at top level"
+    );
+
+    Ok(())
+}
+
+/// Recovery M4 Task 13 Scenario 2:
+/// `create_self_revocation` (bridged via the new bespoke producer) must land
+/// a `governance-action:key-revocation` Content entry on the elohim DNA whose
+/// `metadata_json` carries `revoked_key`, `human_id`, `threshold_reached: true`,
+/// and a non-null `effective_at` — all at the TOP LEVEL — on the initial
+/// CREATE. No `update_entry` is used (CREATE-only constraint, Task 4).
+///
+/// As a regression on the Task 4 gate, the test also calls
+/// `query_effective_revocation_for_key` and asserts it returns the
+/// just-written entry — the gate sees the revocation as effective because
+/// the producer wrote `threshold_reached: true` + `effective_at`.
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "requires packed DNAs from Jenkins pipeline — needs both imagodei.dna and lamad.dna"]
+async fn m4_t13_create_self_revocation_lands_governance_action_on_elohim_dna() -> Result<()> {
+    use holochain_types::prelude::{DnaFile, RoleName};
+
+    let (mut conductor, agent) = single_agent_conductor().await?;
+
+    let imagodei_dna =
+        load_dna("imagodei", &network_seed("imagodei"), Some(agent.clone())).await?;
+    let elohim_dna = load_dna("lamad", &network_seed("lamad"), Some(agent.clone())).await?;
+    let imagodei_dna_hash = imagodei_dna.dna_hash().clone();
+    let elohim_dna_hash = elohim_dna.dna_hash().clone();
+
+    let dnas_with_roles: Vec<(RoleName, DnaFile)> = vec![
+        ("imagodei".into(), imagodei_dna),
+        ("elohim".into(), elohim_dna),
+    ];
+
+    let app = conductor
+        .setup_app_for_agent("recovery-m4-t13-revocation", agent.clone(), &dnas_with_roles)
+        .await?;
+    let cells = app.cells();
+    let imagodei_cell = cells
+        .iter()
+        .find(|c| c.dna_hash() == &imagodei_dna_hash)
+        .expect("imagodei cell installed")
+        .clone();
+    let elohim_cell = cells
+        .iter()
+        .find(|c| c.dna_hash() == &elohim_dna_hash)
+        .expect("elohim cell installed")
+        .clone();
+
+    // Bind caller's agent pubkey to a Human on imagodei. `create_self_revocation`
+    // resolves human_id for both the caller AND the revoked_key, asserting the
+    // same human owns both. With a single-agent harness, the revoked_key == caller
+    // pubkey, so the same Human binding covers both lookups.
+    let _human_action_hash: holo_hash::ActionHash = conductor
+        .call(
+            &imagodei_cell.zome("imagodei"),
+            "create_human",
+            human_input(HUMAN_MATTHEW, "Matthew (M4 T13 revocation)"),
+        )
+        .await;
+
+    // Drive the bridged producer.
+    let revocation_input = CreateSelfRevocationInput {
+        revoked_key: agent.clone(),
+        reason: "compromised".to_string(),
+    };
+    let revocation_output: KeyRevocationOutputMirrorT13 = conductor
+        .call(
+            &imagodei_cell.zome("imagodei"),
+            "create_self_revocation",
+            revocation_input,
+        )
+        .await;
+
+    assert!(
+        revocation_output.revocation_id.starts_with("rev-"),
+        "revocation_id retains the rev-{{human}}-{{ts}} shape"
+    );
+    assert!(
+        !revocation_output.revocation_cid.is_empty(),
+        "create_self_revocation must surface the cross-DNA Content CID"
+    );
+
+    // Walk back: confirm the entry lives on the elohim DNA with the
+    // top-level metadata the Task 4 gate consumes.
+    let candidates: Vec<ContentOutputMirrorT13> = conductor
+        .call(
+            &elohim_cell.zome("content_store"),
+            "get_content_by_type",
+            QueryByTypeInputMirrorT13 {
+                content_type: "governance-action:key-revocation".to_string(),
+                limit: Some(u32::MAX),
+            },
+        )
+        .await;
+
+    let revoked_key_str = agent.to_string();
+    let mut matched_metadata: Option<serde_json::Value> = None;
+    for candidate in candidates {
+        let metadata_json = candidate
+            .content
+            .get("metadata_json")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+        if let Ok(metadata) = serde_json::from_str::<serde_json::Value>(metadata_json) {
+            if metadata
+                .get("revoked_key")
+                .and_then(|v| v.as_str())
+                .map(|s| s == revoked_key_str)
+                .unwrap_or(false)
+            {
+                matched_metadata = Some(metadata);
+                break;
+            }
+        }
+    }
+
+    let metadata = matched_metadata.expect(
+        "elohim DNA must carry a governance-action:key-revocation entry whose \
+         metadata.revoked_key matches the revoked AgentPubKey",
+    );
+
+    assert_eq!(
+        metadata["human_id"].as_str().unwrap_or(""),
+        HUMAN_MATTHEW,
+        "human_id must be at the TOP LEVEL of metadata_json"
+    );
+    assert_eq!(
+        metadata["threshold_reached"].as_bool().unwrap_or(false),
+        true,
+        "self-revocation is immediately effective on the initial CREATE"
+    );
+    assert!(
+        metadata["effective_at"].as_str().is_some_and(|s| !s.is_empty()),
+        "self-revocation effective_at must be a non-empty string on the initial CREATE"
+    );
+    assert_eq!(
+        metadata["trigger_type"].as_str().unwrap_or(""),
+        "voluntary",
+        "self-revocation trigger_type is voluntary"
+    );
+
+    // Regression on the Task 4 gate: `query_effective_revocation_for_key`
+    // must return the just-written entry.
+    let effective: Option<ContentOutputMirrorT13> = conductor
+        .call(
+            &elohim_cell.zome("content_store"),
+            "query_effective_revocation_for_key",
+            revoked_key_str.clone(),
+        )
+        .await;
+
+    let effective = effective.expect(
+        "query_effective_revocation_for_key must surface the just-written \
+         self-revocation (threshold_reached=true + effective_at set)",
+    );
+    let effective_metadata_json = effective
+        .content
+        .get("metadata_json")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+    let effective_metadata: serde_json::Value =
+        serde_json::from_str(effective_metadata_json).unwrap_or(serde_json::Value::Null);
+    assert_eq!(
+        effective_metadata["revoked_key"].as_str().unwrap_or(""),
+        revoked_key_str,
+        "the effective revocation must be the one we just wrote"
+    );
+
+    Ok(())
+}
