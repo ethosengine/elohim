@@ -259,23 +259,9 @@ pub fn submit_specialist_revocation(
         created_at: rfc3339_now.clone(),
     })?;
 
-    let emitted_at_defender = rfc3339_from_sys_time(&sys_time()?);
-    #[allow(deprecated)]
-    emit_signal(RecoveryV2Signal::KeyRevocationEffective {
-        revocation_id: revocation_id.clone(),
-        signal_type: "keyRevocation".to_string(),
-        action_hash: revocation_cid.clone(),
-        human_id: target_human_id.clone(),
-        revoked_key: revoked_key_str.clone(),
-        // M4: no separate compromise-discovery timestamp; coincides with effectiveAt.
-        // Future revisions may populate this from revocation request metadata.
-        compromise_at: rfc3339_now.clone(),
-        effective_at: rfc3339_now.clone(),
-        triggering_vote_id: None,
-        emitted_at: emitted_at_defender,
-    })?;
-
-    // T18: EPR-shape envelope alongside the legacy signal (back-compat window).
+    // T18 + T30: EPR-shape envelope is the canonical effective-revocation
+    // signal. The legacy flat `KeyRevocationEffective` emit retired in T30
+    // after EPR W2B's consumer-side deletion (Path A coordination).
     // Defender path: supersedes_cid = None (initial CREATE);
     //                triggering_revocation_id = None (unilateral, no vote chain).
     emit_key_revocation_envelope(

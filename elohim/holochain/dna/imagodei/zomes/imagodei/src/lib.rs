@@ -2152,57 +2152,9 @@ pub enum RecoveryV2Signal {
         required_votes: u32,
         threshold_now_reached: bool,
     },
-    /// Legacy flat-shape signal. Superseded by `DnaSignal::KeyRevocation`
-    /// (EPR envelope) emitted alongside at each producer site.
-    /// Remove after one release cycle (T18 back-compat window).
-    #[deprecated(
-        note = "T18: superseded by DnaSignal::KeyRevocation envelope; remove after one release cycle"
-    )]
-    KeyRevocationEffective {
-        /// Internal correlation id (shape `rev-{human}-{ts}`).
-        /// Not in the dna-signals schema; retained for elohim-storage projector
-        /// correlation until T18 reconciles the full projection table design.
-        revocation_id: String,
-        /// Const discriminator required by `dna-signals/key-revocation.schema.json`.
-        /// Note: the outer `RecoveryV2Signal` enum also serializes a `type` field
-        /// via `#[serde(tag = "type")]`. Receivers that strictly enforce
-        /// `additionalProperties: false` on the schema will see both `type` and
-        /// `signalType`. T18 should either remove the outer tag or align the schema
-        /// to tolerate the extra field.
-        #[serde(rename = "signalType")]
-        signal_type: String,
-        /// CID of the `governance-action:key-revocation` Content entry on the
-        /// elohim DNA, carried as the `actionHash` wire field.  Stage 1: this is
-        /// the elohim Content CID string returned by the bridge call.  Stage 2:
-        /// should be the true Holochain ActionHash (base64) of the DHT entry once
-        /// the elohim DNA exposes the action hash alongside the CID in its output.
-        #[serde(rename = "actionHash")]
-        action_hash: String,
-        /// Stage 1: populated with `human_id` (the stable human identifier).
-        /// Stage 2: will be a content CID derived from the imagodei Human entry.
-        #[serde(rename = "agentCid")]
-        human_id: String,
-        /// The revoked ed25519 pubkey (base64 32-byte).
-        #[serde(rename = "revokedPubkey")]
-        revoked_key: String,
-        /// Earliest point the key may have been compromised (RFC3339).
-        /// M4 surface has no separate compromise-discovery timestamp; this field
-        /// is set equal to `effective_at` at emit time.  A future revision of
-        /// Recovery (post-M4) may add a distinct `compromise_at` from the
-        /// revocation request metadata, at which point this field will diverge.
-        #[serde(rename = "compromiseAt")]
-        compromise_at: String,
-        /// When the revocation became effective in the DHT (RFC3339).
-        #[serde(rename = "effectiveAt")]
-        effective_at: String,
-        /// Back-pointer to the KeyRevocation request/vote that drove this event.
-        /// Null for defender/voluntary paths (no vote chain).
-        #[serde(rename = "triggeringRevocationId")]
-        triggering_vote_id: Option<String>,
-        /// UTC timestamp at which this signal was emitted (RFC3339).
-        #[serde(rename = "emittedAt")]
-        emitted_at: String,
-    },
+    // T30 (2026-05-15): the flat-shape `KeyRevocationEffective` variant was
+    // retired after EPR W2B's consumer-side deletion (Path A coordination).
+    // Producers now emit only `DnaSignal::KeyRevocation` (EPR envelope, T18).
     // M5: portal-host signals — consumed by elohim-storage ReconcileController.
     PortalHostCreated {
         action_hash: ActionHash,
@@ -2883,23 +2835,9 @@ pub fn create_self_revocation(
         created_at: timestamp.clone(),
     })?;
 
-    let emitted_at_self = rfc3339_from_sys_time(&sys_time()?);
-    #[allow(deprecated)]
-    emit_signal(RecoveryV2Signal::KeyRevocationEffective {
-        revocation_id: revocation_id.clone(),
-        signal_type: "keyRevocation".to_string(),
-        action_hash: revocation_cid.clone(),
-        human_id: human_id.clone(),
-        revoked_key: revoked_key_str.clone(),
-        // M4: no separate compromise-discovery timestamp; coincides with effectiveAt.
-        // Future revisions may populate this from revocation request metadata.
-        compromise_at: timestamp.clone(),
-        effective_at: timestamp.clone(),
-        triggering_vote_id: None,
-        emitted_at: emitted_at_self,
-    })?;
-
-    // T18: EPR-shape envelope alongside the legacy signal (back-compat window).
+    // T18 + T30: EPR-shape envelope is the canonical effective-revocation
+    // signal. The legacy flat `KeyRevocationEffective` emit retired in T30
+    // after EPR W2B's consumer-side deletion (Path A coordination).
     // Voluntary path: supersedes_cid = None (initial CREATE);
     //                 triggering_revocation_id = None (no vote chain).
     emit_key_revocation_envelope(
@@ -3329,23 +3267,9 @@ pub fn submit_revocation_vote(
             threshold_now_reached: true,
         })?;
 
-        let emitted_at_voted = rfc3339_from_sys_time(&sys_time()?);
-        #[allow(deprecated)]
-        emit_signal(RecoveryV2Signal::KeyRevocationEffective {
-            revocation_id: revocation_id.clone(),
-            signal_type: "keyRevocation".to_string(),
-            action_hash: effective_cid.clone(),
-            human_id: revocation_human_id.clone(),
-            revoked_key: revocation_revoked_key.clone(),
-            // M4: no separate compromise-discovery timestamp; coincides with effectiveAt.
-            // Future revisions may populate this from revocation request metadata.
-            compromise_at: rfc3339_now.clone(),
-            effective_at: rfc3339_now.clone(),
-            triggering_vote_id: Some(vote_id.clone()),
-            emitted_at: emitted_at_voted,
-        })?;
-
-        // T18: EPR-shape envelope alongside the legacy signal (back-compat window).
+        // T18 + T30: EPR-shape envelope is the canonical effective-revocation
+        // signal. The legacy flat `KeyRevocationEffective` emit retired in T30
+        // after EPR W2B's consumer-side deletion (Path A coordination).
         // Voted quorum path: supersedes_cid = prior pending CID (pending → effective
         //                    lineage); triggering_revocation_id = vote_id.
         emit_key_revocation_envelope(
