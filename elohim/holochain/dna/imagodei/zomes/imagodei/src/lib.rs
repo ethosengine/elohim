@@ -33,6 +33,11 @@ pub use portal_host::*;
 pub mod submit_specialist_revocation;
 pub use submit_specialist_revocation::*;
 
+// content_decode — cross-DNA Content entry decoder (Recovery M4 completion, Task 2)
+mod content_decode;
+#[allow(unused_imports)]
+pub use content_decode::*;
+
 // Bootstrap-steward pattern — reference implementation for the protocol
 // (also ported to mishpat, node-registry, lamad). See bootstrap_steward.rs.
 pub mod bootstrap_steward;
