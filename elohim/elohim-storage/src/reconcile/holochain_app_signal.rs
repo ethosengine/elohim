@@ -24,26 +24,15 @@
 //! ReconcileController::dispatch
 //! ```
 //!
-//! ## Compromise_at derivation
+//! ## Compromise_at derivation (T6 note)
 //!
-//! `RecoveryV2Signal::KeyRevocationEffective` does not carry `compromise_at`.
-//! The controller sweep (`DnaSignal::KeyRevocation`) requires it. The translator
-//! reads the `key_revocations` SQLite projection for the matching `revocation_id`
-//! and uses that row's `created_at` as `compromise_at`.
-//!
-//! Rationale: `created_at` is the timestamp at which the revocation was
-//! initiated — the earliest point the community declared the key compromised.
-//! It is a conservative lower bound: retroactive invalidation from this point
-//! forward is safe. The DHT round-trip alternative (fetching the original
-//! `KeyRevocation` entry from the coordinator) is correct-er but adds latency
-//! and requires an extra zome call. The projection-lookup path is consistent
-//! with the local source of truth and avoids a second WebSocket round-trip.
-//!
-//! If no projection row exists (signal arrived out-of-order, fresh boot, DHT
-//! partition recovery), the translator falls back to `effective_at` as
-//! `compromise_at`. This is a safe over-estimation: it marks the window
-//! `[effective_at, ∞)` as tainted rather than the wider `[created_at, ∞)`.
-//! A TODO(A.12) marker is left to replay missed signals on reconnect.
+//! `RecoveryV2Signal::KeyRevocationEffective` was the legacy revocation signal.
+//! T6 replaced it with the `DnaSignal::KeyRevocation(KeyRevocationEnvelope)` path
+//! in `signals::handle_imagodei_dna_signal`, which carries `compromise_at` directly
+//! in the envelope metadata. The legacy `KeyRevocationEffective` arm in
+//! `translate_recovery_v2` is now a no-op (producer side still emits the variant;
+//! M4 deletes producer emissions as a follow-up). `derive_compromise_at` has been
+//! removed; the envelope path is the single source of revocation projection.
 //!
 //! ## Agent_cid derivation
 //!
@@ -53,9 +42,8 @@
 //! in the current protocol stage. Per `dna-signal-stream.schema.json`, `agentCid`
 //! accepts any agent identifier string; the pubkey satisfies this contract.
 //!
-//! For `KeyRevocationEffective`, `human_id` is used as `agent_cid` (the stable
-//! human identifier). For `AgentPeerBindingCreated`, `binding.agent_cid` is
-//! already a CID and is passed through directly.
+//! For `AgentPeerBindingCreated`, `binding.agent_cid` is already a CID and is
+//! passed through directly.
 //!
 //! ## Stage classification
 //!
@@ -91,8 +79,7 @@ use holochain_types::signal::Signal;
 use crate::db::DbPool;
 use crate::reconcile::signal_stream::{
     AgentPeerBindingSignal, AttestationKind, DeviceArchetype, DnaSignal, DnaSignalStream,
-    KeyRevocationSignal, KeyRotationSignal, RevocationAttestationSignal, SignalCursor,
-    SignalStreamError,
+    KeyRotationSignal, RevocationAttestationSignal, SignalCursor, SignalStreamError,
 };
 use crate::signals::{ImagodeiSignal, RecoveryV2Signal};
 
@@ -143,14 +130,9 @@ fn parse_iso(s: &str) -> DateTime<Utc> {
 /// one of the four the reconcile controller handles.
 ///
 /// Returns `None` for variants not yet consumed by the controller
-/// (`RecoveryRequestCreated`, `IntimateWitnessSubmitted`).
-///
-/// `db_pool` is `Some` when storage is wired. Used only for the
-/// `compromise_at` projection lookup on `KeyRevocationEffective`.
-fn translate_recovery_v2(
-    signal: RecoveryV2Signal,
-    db_pool: Option<&Arc<DbPool>>,
-) -> Option<DnaSignal> {
+/// (`RecoveryRequestCreated`, `IntimateWitnessSubmitted`,
+/// `KeyRevocationEffective` — see T6 note in module doc-comment).
+fn translate_recovery_v2(signal: RecoveryV2Signal) -> Option<DnaSignal> {
     let emitted_at = Utc::now();
 
     match signal {
@@ -170,34 +152,6 @@ fn translate_recovery_v2(
                 new_pubkey: rotation.new_agent_pubkey,
                 old_pubkey: rotation.superseded_agent_pubkey,
                 rotated_at: rotated_at_dt,
-                emitted_at,
-            }))
-        }
-
-        RecoveryV2Signal::KeyRevocationEffective {
-            revocation_id,
-            revoked_key,
-            human_id,
-            effective_at,
-            triggering_vote_id,
-        } => {
-            let effective_at_dt = parse_iso(&effective_at);
-
-            // Derive compromise_at from the projection table (see module docstring).
-            // Design choice: projection-lookup (faster, local) over DHT round-trip.
-            // Falls back to effective_at if projection row not found.
-            let compromise_at_dt = derive_compromise_at(db_pool, &revocation_id, effective_at_dt);
-
-            Some(DnaSignal::KeyRevocation(KeyRevocationSignal {
-                // `revocation_id` is used as `action_hash` in M4 (dht_anchor_hash == id).
-                // See design note in signals.rs::handle_recovery_v2_signal.
-                action_hash: revocation_id.clone(),
-                // agent_cid: use human_id as the stable human identifier.
-                agent_cid: human_id,
-                revoked_pubkey: revoked_key,
-                compromise_at: compromise_at_dt,
-                effective_at: effective_at_dt,
-                triggering_revocation_id: triggering_vote_id,
                 emitted_at,
             }))
         }
@@ -260,8 +214,12 @@ fn translate_recovery_v2(
             ))
         }
 
-        // Not yet consumed by the reconcile controller.
-        RecoveryV2Signal::RecoveryRequestCreated { .. }
+        // Not consumed by the reconcile controller.
+        // KeyRevocationEffective: superseded by the T18 DnaSignal::KeyRevocation envelope path
+        // (signals::handle_imagodei_dna_signal). Producer side still emits this variant;
+        // M4 deletes producer emissions as a follow-up.
+        RecoveryV2Signal::KeyRevocationEffective { .. }
+        | RecoveryV2Signal::RecoveryRequestCreated { .. }
         | RecoveryV2Signal::IntimateWitnessSubmitted { .. } => {
             debug!("RecoveryV2Signal variant not consumed by reconcile controller — skipping");
             None
@@ -269,32 +227,6 @@ fn translate_recovery_v2(
     }
 }
 
-/// Derive `compromise_at` for `KeyRevocationEffective`.
-///
-/// Stage 1: always returns `effective_at` as a conservative `compromise_at`.
-///
-/// This over-estimates the tainted window — it marks `[effective_at, ∞)` as
-/// tainted rather than the wider (and more accurate) `[created_at, ∞)` where
-/// `created_at` is when the community first declared the key compromised. The
-/// over-estimation is safe: no legitimate session is falsely accepted; some
-/// sessions that were legitimate may be held for re-verification.
-///
-/// TODO(A.12): When replay-on-reconnect lands and the controller's
-/// `on_revocation_attestation` handler upserts `key_revocations.created_at`,
-/// this function should query that projection to use the community's first
-/// declared compromise time rather than the protocol's effective time. The
-/// dead-on-arrival projection lookup that was here at A.11 has been removed
-/// because `signals.rs::handle_recovery_v2_signal` is no longer called on the
-/// live path — the controller path is the only signal consumer.
-fn derive_compromise_at(
-    _db_pool: Option<&Arc<DbPool>>,
-    _revocation_id: &str,
-    effective_at_fallback: DateTime<Utc>,
-) -> DateTime<Utc> {
-    // Stage 1: always use effective_at as conservative compromise_at.
-    // See TODO(A.12) above for the upgrade path.
-    effective_at_fallback
-}
 
 /// Translate an `ImagodeiSignal` into a `DnaSignal`, if the variant is
 /// consumed by the reconcile controller.
@@ -376,7 +308,7 @@ fn parse_device_archetype(s: &str) -> DeviceArchetype {
 /// - MessagePack decode failures (malformed wire data)
 /// - Neither enum matches (e.g. lamad DNA signals on the same conductor)
 /// - Recognized variants not consumed by the controller
-fn try_decode_and_translate(bytes: &[u8], db_pool: Option<&Arc<DbPool>>) -> Option<DnaSignal> {
+fn try_decode_and_translate(bytes: &[u8], _db_pool: Option<&Arc<DbPool>>) -> Option<DnaSignal> {
     // Step 1: decode MessagePack → JSON Value.
     let value = match rmp_serde::from_slice::<serde_json::Value>(bytes) {
         Ok(v) => v,
@@ -389,7 +321,7 @@ fn try_decode_and_translate(bytes: &[u8], db_pool: Option<&Arc<DbPool>>) -> Opti
     // Step 2a: try RecoveryV2Signal (tag = "type", no content wrapper).
     // RecoveryV2Signal variants have the `type` tag directly on the object.
     if let Ok(rv2) = serde_json::from_value::<RecoveryV2Signal>(value.clone()) {
-        return translate_recovery_v2(rv2, db_pool);
+        return translate_recovery_v2(rv2);
     }
 
     // Step 2b: try ImagodeiSignal (tag = "type", content = "payload").
@@ -475,7 +407,8 @@ impl HolochainAppSignalStream {
     /// `app_url`   — app interface URL (e.g. `ws://localhost:4445`).
     /// `app_id`    — installed app ID (e.g. `"imagodei"`).
     /// `role`      — cell role name (e.g. `"imagodei"`).
-    /// `db_pool`   — optional SQLite pool for `compromise_at` derivation.
+    /// `db_pool`   — accepted for API compatibility; no longer used internally
+    ///               (T6 deleted the `compromise_at` derivation path).
     ///
     /// Returns `Err` if the conductor is unreachable or the app/role is not
     /// installed. Returns `Ok(stream)` otherwise — the stream immediately starts
@@ -485,7 +418,7 @@ impl HolochainAppSignalStream {
         app_url: &str,
         app_id: &str,
         role: &str,
-        db_pool: Option<Arc<DbPool>>,
+        _db_pool: Option<Arc<DbPool>>,
     ) -> Result<Self, AppSignalStreamError> {
         let admin_addr = strip_ws_scheme(admin_url);
         let app_addr = strip_ws_scheme(app_url);
@@ -583,12 +516,11 @@ impl HolochainAppSignalStream {
         // `on_signal` clones the closure into the WebSocket internals.
         // The `tx` clone keeps the channel open for the connection lifetime.
         let tx_clone = tx.clone();
-        let pool_clone = db_pool.clone();
         app_ws
             .on_signal(move |signal| {
                 if let Signal::App { signal, .. } = signal {
                     let bytes: Vec<u8> = signal.into_inner().into();
-                    if let Some(dns) = try_decode_and_translate(&bytes, pool_clone.as_ref()) {
+                    if let Some(dns) = try_decode_and_translate(&bytes, None) {
                         // `try_send` is non-blocking. If the channel is full
                         // (controller is lagging), drop the signal and warn.
                         // The DHT is the source of truth; the controller can
@@ -795,28 +727,20 @@ mod tests {
     }
 
     // -----------------------------------------------------------------------
-    // Translate: KeyRevocationEffective → DnaSignal::KeyRevocation
-    // (no db pool — falls back to effective_at for compromise_at)
+    // Translate: KeyRevocationEffective → None (T6 no-op)
+    // The legacy signal is superseded by the T18 DnaSignal::KeyRevocation
+    // envelope path in signals::handle_imagodei_dna_signal.
     // -----------------------------------------------------------------------
 
     #[test]
-    fn translates_key_revocation_effective_with_compromise_at_fallback() {
+    fn key_revocation_effective_is_no_op_after_t6_deletion() {
         let bytes = to_msgpack(&revocation_effective_value());
-        let dns = try_decode_and_translate(&bytes, None).expect("should translate");
-        match dns {
-            DnaSignal::KeyRevocation(sig) => {
-                assert_eq!(sig.action_hash, "rev-test-001");
-                assert_eq!(sig.agent_cid, "human-matthew");
-                assert_eq!(sig.revoked_pubkey, "uhCAkRevokedKeyBase64");
-                assert_eq!(sig.triggering_revocation_id, Some("vote-003".to_string()));
-                // Without a DB pool, compromise_at == effective_at
-                assert_eq!(
-                    sig.compromise_at, sig.effective_at,
-                    "compromise_at should fall back to effective_at when no db_pool"
-                );
-            }
-            other => panic!("expected KeyRevocation, got {other:?}"),
-        }
+        // T6: KeyRevocationEffective is in the "not consumed" catch-all — returns None.
+        let dns = try_decode_and_translate(&bytes, None);
+        assert!(
+            dns.is_none(),
+            "KeyRevocationEffective must return None after T6 deletion (T18 envelope path is canonical)"
+        );
     }
 
     // -----------------------------------------------------------------------
