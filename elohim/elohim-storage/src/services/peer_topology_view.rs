@@ -46,10 +46,10 @@ pub enum PeerTopologyError {
 ///    keyed by `household_id` in a HashMap (online OR-roll, additive CID counts).
 /// 4. Compute `net_diff` per edge at fold time.
 /// 5. `reciprocation_count` = number of edges where `online == true`.
-/// 6. `resilience_cliffs` is computed via `compute_resilience_cliffs` (`:230`)
-///    on both the local-resolver path (`:185–189`) and the federation-aggregate
-///    path (`:71`). Returns sole-replica resilience cliffs derived from the
-///    quilt distribution projection.
+/// 6. `resilience_cliffs` is computed via `compute_resilience_cliffs` (`:239`)
+///    on both the local-resolver path (`:198`) and the federation-aggregate
+///    early-return path (`:74`). Returns sole-replica resilience cliffs derived
+///    from the quilt distribution projection.
 /// 7. `freshness`: `AllOffline` if no result has Live freshness; otherwise `Live`.
 pub async fn aggregate_peer_topology_view(
     pool: &DbPool,
