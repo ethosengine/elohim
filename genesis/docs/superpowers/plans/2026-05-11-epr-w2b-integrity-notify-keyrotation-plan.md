@@ -4,6 +4,8 @@
 
 **Goal:** Extend the libp2p `IntegrityNotify` direct-notify pipeline to handle `KeyRotation` events alongside the existing `KeyRevocation` handler. Per master-plan decision D3 (Stage 2): KeyRotation lands this sprint; AgentPeerBinding waits on Phase 12 (iroh master); RevocationAttestation deferred to graph-native sprint.
 
+**Status:** ✅ LANDED in dev. Live code at `elohim/elohim-storage/src/epr_atom_service.rs:340–419` with `p2p/recovery_rotation.rs` present; regression tests at `epr_atom_service.rs:453, :489`. Confirmed by Wave 0 audit on 2026-05-15 (`genesis/docs/plans/2026-05-15-epr-wave0-audit-results.md` §D3). RevocationAttestation + AgentPeerBinding arms are the remaining W2B scope — covered by `2026-05-15-epr-foundation-completion.md` Band B.
+
 **Architecture:** Mirror the proven `KeyRevocation` pattern at `epr_atom_service.rs:289-352`. Add a new `RecoveryRotationMessage` wire type (mirroring `RecoveryRevocationMessage` at `p2p/recovery_revocation.rs`). Add a `"KeyRotation"` match arm in `handle_integrity_notify` that decodes, dedups, logs, returns `IntegrityAck { received: true }`. The substantive write (`upsert_key_rotation` into `key_rotations` table) happens via the local conductor's signal stream — direct-notify is informational/optimistic delivery, not the canonical write path. This mirrors how KeyRevocation works today.
 
 **Tech Stack:** Rust (elohim-storage), libp2p 0.54, MessagePack via rmp_serde.
@@ -50,7 +52,7 @@
 - Modify: `elohim/elohim-storage/src/p2p/mod.rs` (re-export)
 - Modify: `elohim/elohim-storage/src/epr_atom_service.rs` (add match arm)
 
-- [ ] **Step 1: Read the templates**
+- [x] **Step 1: Read the templates**
 
 ```
 sed -n '1,98p' /projects/elohim/elohim/elohim-storage/src/p2p/recovery_revocation.rs
@@ -62,7 +64,7 @@ Confirm:
 - `KeyRevocation` arm decodes via `from_bytes`, dedups on `format!("KeyRevocation:{}", msg.revocation_id)`, logs at info level, returns `IntegrityAck { received: true }`
 - `KeyRotationPayload` (signals.rs:643) is the canonical field set: `human_id`, `previous_key`, `new_key`, `effective_at`, etc. — match exact field names from that struct.
 
-- [ ] **Step 2: Write the failing round-trip test inline**
+- [x] **Step 2: Write the failing round-trip test inline**
 
 In `elohim/elohim-storage/src/p2p/recovery_rotation.rs` (file does not yet exist — Step 4 creates it; for now, write the test file separately):
 
@@ -90,7 +92,7 @@ fn rotation_message_roundtrips_msgpack() {
 
 (Adapt the field set if `KeyRotationPayload` in signals.rs has additional fields — this plan uses a representative shape. Match canonical field names exactly.)
 
-- [ ] **Step 3: Run test to verify it fails**
+- [x] **Step 3: Run test to verify it fails**
 
 ```
 cd /projects/elohim/elohim/elohim-storage
@@ -100,7 +102,7 @@ cargo test --test recovery_rotation_wire 2>&1 | tail -20
 ```
 Expected: FAIL — module `recovery_rotation` does not exist.
 
-- [ ] **Step 4: Create the wire type**
+- [x] **Step 4: Create the wire type**
 
 ```rust
 // elohim/elohim-storage/src/p2p/recovery_rotation.rs
@@ -156,11 +158,11 @@ Re-export from `p2p/mod.rs`:
 pub mod recovery_rotation;
 ```
 
-- [ ] **Step 5: Run round-trip test → PASS**
+- [x] **Step 5: Run round-trip test → PASS**
 
 Same command from Step 3.
 
-- [ ] **Step 6: Add the KeyRotation match arm in `handle_integrity_notify`**
+- [x] **Step 6: Add the KeyRotation match arm in `handle_integrity_notify`**
 
 In `elohim/elohim-storage/src/epr_atom_service.rs` around line 339, INSERT a new arm BEFORE the `other_kind` catch-all:
 
@@ -220,7 +222,7 @@ In `elohim/elohim-storage/src/epr_atom_service.rs` around line 339, INSERT a new
 }
 ```
 
-- [ ] **Step 7: Add a regression test in `epr_atom_service.rs::tests`**
+- [x] **Step 7: Add a regression test in `epr_atom_service.rs::tests`**
 
 Find the existing `integrity_notify_unhandled_kind_acks_with_reason` test (line ~399). Add a sibling test:
 
@@ -286,7 +288,7 @@ fn integrity_notify_keyrotation_dedup_returns_duplicate_reason() {
 
 (Adapt `EprAtomService::new_for_test()` and import paths to match what's actually in `epr_atom_service.rs::tests`. If a fresh service constructor doesn't exist, look at how the existing `integrity_notify_unhandled_kind_acks_with_reason` test constructs it.)
 
-- [ ] **Step 8: Run tests to verify all pass**
+- [x] **Step 8: Run tests to verify all pass**
 
 ```
 RUSTFLAGS='--cfg getrandom_backend="custom"' \
@@ -296,14 +298,14 @@ cargo test --lib epr_atom_service 2>&1 | tail -20
 ```
 Expected: round-trip test PASS, both new service tests PASS, existing `integrity_notify_unhandled_kind_acks_with_reason` STILL PASS (unhandled kinds are still rejected with reason).
 
-- [ ] **Step 9: Run clippy + fmt**
+- [x] **Step 9: Run clippy + fmt**
 
 ```
 RUSTFLAGS='--cfg getrandom_backend="custom"' cargo clippy -- -D warnings 2>&1 | tail -10
 cargo fmt --check
 ```
 
-- [ ] **Step 10: Commit**
+- [x] **Step 10: Commit**
 
 ```bash
 git add elohim/elohim-storage/src/p2p/recovery_rotation.rs \
