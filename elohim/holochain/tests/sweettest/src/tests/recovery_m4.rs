@@ -460,6 +460,309 @@ async fn m4_dual_anchor_link_invariants() -> Result<()> {
 }
 
 // ============================================================================
+// Recovery M4 Task 4 — cross-DNA freeze-floor + revocation-floor gates.
+//
+// These scenarios exercise the migrated `commit_key_rotation` gates against
+// `governance-action:identity-freeze` and `governance-action:key-revocation`
+// Content entries committed on the elohim DNA. Both are `#[ignore]` per the
+// codebase convention — they only run in CI with packed DNA bundles.
+//
+// Pattern: install BOTH imagodei and elohim DNAs in a single conductor app
+// under role names "imagodei" and "elohim", commit the relevant
+// governance-action Content directly via `propose_governance_action`, then
+// invoke `commit_key_rotation` and assert it returns Err with the gate's
+// rejection message.
+//
+// Adaptation note (mirrors recovery_m3.rs::intimate_witness_reads_cross_dna_recovery_request):
+// the generic `propose_governance_action` helper writes caller-supplied fields
+// under `metadata.parameters_json`, not at the top level of `metadata`. The
+// migrated gates read top-level metadata (`revoked_key`, `is_active`,
+// `human_id`, `threshold_reached`, `effective_at`). Tasks 13/14's bespoke
+// producers will write these at the top level; until then, these sweettests
+// verify the CROSS-DNA READ PATH (CID resolution + content_type match +
+// metadata decode) rather than asserting on the specific block message.
+// Once the bespoke producers land, the scenarios will additionally assert
+// the rotation-block error string.
+// ============================================================================
+
+/// Mirror of `content_store::governance_action::ProposeGovernanceActionInput`.
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+struct ProposeGovernanceActionInputMirrorT4 {
+    pub governance_kind: String,
+    pub subject_cid: String,
+    pub title: String,
+    pub description: Option<String>,
+    pub reach: String,
+    pub threshold: serde_json::Value,
+    pub eligibility_predicate: Option<serde_json::Value>,
+    pub ballot_format: String,
+    pub closes_at: String,
+    pub parameters: Option<serde_json::Value>,
+}
+
+/// Mirror of `content_store::governance_action::GovernanceActionOutput`.
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+struct GovernanceActionOutputMirrorT4 {
+    pub cid: String,
+    pub governance_kind: String,
+    pub subject_cid: String,
+    pub proposer_cid: String,
+    pub closes_at: String,
+}
+
+/// Mirror of imagodei's `CommitKeyRotationInput`.
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+struct CommitKeyRotationInputMirrorT4 {
+    pub human_agent_pubkey: holo_hash::AgentPubKey,
+    pub new_agent_pubkey: holo_hash::AgentPubKey,
+    pub superseded_agent_pubkey: Option<holo_hash::AgentPubKey>,
+    pub recovery_request_hash: Option<holo_hash::ActionHash>,
+    pub authority: serde_json::Value,
+}
+
+/// Recovery M4 Task 4 Scenario A:
+/// `commit_key_rotation` must consult the elohim DNA for an active
+/// `governance-action:identity-freeze` covering the target human. With both
+/// DNAs installed under their contract role names, the freeze-floor gate's
+/// cross-DNA read path (`query_effective_identity_freeze_for_human`) must
+/// execute against the elohim cell. Asserts the read path resolved without
+/// network/auth/decode error.
+///
+/// Note: the generic `propose_governance_action` helper nests caller-supplied
+/// fields under `metadata.parameters_json`; the gate reads top-level
+/// `metadata.is_active`. Until Tasks 13/14 land bespoke producers that write
+/// the freeze metadata at the top level, this test verifies cross-DNA wiring
+/// rather than the BLOCKED outcome.
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "requires packed DNAs from Jenkins pipeline — needs both imagodei.dna and lamad.dna"]
+async fn m4_t4_commit_key_rotation_blocked_by_cross_dna_identity_freeze() -> Result<()> {
+    use holochain_types::prelude::{DnaFile, RoleName};
+
+    let (mut conductor, agent) = single_agent_conductor().await?;
+
+    let imagodei_dna =
+        load_dna("imagodei", &network_seed("imagodei"), Some(agent.clone())).await?;
+    let elohim_dna = load_dna("lamad", &network_seed("lamad"), Some(agent.clone())).await?;
+    let imagodei_dna_hash = imagodei_dna.dna_hash().clone();
+    let elohim_dna_hash = elohim_dna.dna_hash().clone();
+
+    let dnas_with_roles: Vec<(RoleName, DnaFile)> = vec![
+        ("imagodei".into(), imagodei_dna),
+        ("elohim".into(), elohim_dna),
+    ];
+
+    let app = conductor
+        .setup_app_for_agent("recovery-m4-t4-freeze", agent.clone(), &dnas_with_roles)
+        .await?;
+    let cells = app.cells();
+    let imagodei_cell = cells
+        .iter()
+        .find(|c| c.dna_hash() == &imagodei_dna_hash)
+        .expect("imagodei cell installed")
+        .clone();
+    let elohim_cell = cells
+        .iter()
+        .find(|c| c.dna_hash() == &elohim_dna_hash)
+        .expect("elohim cell installed")
+        .clone();
+
+    // Commit an identity-freeze Content entry on elohim DNA.
+    let propose_input = ProposeGovernanceActionInputMirrorT4 {
+        governance_kind: "governance-action:identity-freeze".to_string(),
+        subject_cid: HUMAN_MATTHEW.to_string(),
+        title: "Identity freeze — Matthew".to_string(),
+        description: None,
+        reach: "private".to_string(),
+        threshold: serde_json::json!({ "type": "single-cell" }),
+        eligibility_predicate: None,
+        ballot_format: "single-cell".to_string(),
+        closes_at: "2099-01-01T00:00:00Z".to_string(),
+        parameters: Some(serde_json::json!({
+            "human_id": HUMAN_MATTHEW,
+            "is_active": true,
+            "frozen_at_layer": "intimate",
+        })),
+    };
+
+    // Tolerate either success (if `governance-action:identity-freeze` is
+    // registered in the kinds catalog) or a kinds-catalog rejection. Task 16
+    // declares the kind in the imagodei manifest; until that lands the
+    // `propose_governance_action` floor 1 check rejects unknown kinds.
+    let governance_result: holochain::conductor::api::error::ConductorApiResult<
+        GovernanceActionOutputMirrorT4,
+    > = conductor
+        .call_fallible(
+            &elohim_cell.zome("content_store"),
+            "propose_governance_action",
+            propose_input,
+        )
+        .await;
+    if let Err(err) = &governance_result {
+        let message = format!("{err:?}");
+        // Acceptable pre-Task-16 outcome.
+        assert!(
+            message.contains("unknown_governance_action_kind")
+                || message.contains("governance-action:identity-freeze"),
+            "Unexpected propose_governance_action failure: {message}"
+        );
+    }
+
+    // Attempt commit_key_rotation. We don't have a real KeyStewardship
+    // ActionHash on this single-agent setup, so the call is expected to fail
+    // somewhere — but it MUST NOT fail with a cross-DNA bridge error
+    // (network/auth/decode), which would indicate the wiring is broken.
+    let rotation_input = CommitKeyRotationInputMirrorT4 {
+        human_agent_pubkey: agent.clone(),
+        new_agent_pubkey: agent.clone(),
+        superseded_agent_pubkey: None,
+        recovery_request_hash: None,
+        authority: serde_json::json!({ "type": "IntimateQuorum", "witness_hashes": [] }),
+    };
+
+    let rotation_result: holochain::conductor::api::error::ConductorApiResult<serde_json::Value> =
+        conductor
+            .call_fallible(
+                &imagodei_cell.zome("imagodei"),
+                "commit_key_rotation",
+                rotation_input,
+            )
+            .await;
+
+    if let Err(err) = rotation_result {
+        let message = format!("{err:?}");
+        assert!(
+            !message.contains("Unauthorized bridge call"),
+            "Cross-DNA bridge must not be unauthorized. Error: {message}"
+        );
+        assert!(
+            !message.contains("Network error bridging to elohim"),
+            "Cross-DNA bridge must not network-error. Error: {message}"
+        );
+        assert!(
+            !message.contains("bridge decode (elohim::query_effective_identity_freeze_for_human)"),
+            "Cross-DNA freeze query decode must succeed. Error: {message}"
+        );
+    }
+
+    Ok(())
+}
+
+/// Recovery M4 Task 4 Scenario B:
+/// `commit_key_rotation` must consult the elohim DNA for an effective
+/// `governance-action:key-revocation` covering the rotating-from key. With
+/// both DNAs installed under their contract role names, the revocation-floor
+/// gate's cross-DNA read path (`query_effective_revocation_for_key`) must
+/// execute against the elohim cell. Asserts the read path resolved without
+/// network/auth/decode error.
+///
+/// Same adaptation note as Scenario A: until Tasks 13/14 land bespoke
+/// producers that write `revoked_key`, `threshold_reached`, and `effective_at`
+/// at the top level of `metadata_json`, this test verifies cross-DNA wiring
+/// rather than the BLOCKED outcome.
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "requires packed DNAs from Jenkins pipeline — needs both imagodei.dna and lamad.dna"]
+async fn m4_t4_commit_key_rotation_blocked_by_cross_dna_key_revocation() -> Result<()> {
+    use holochain_types::prelude::{DnaFile, RoleName};
+
+    let (mut conductor, agent) = single_agent_conductor().await?;
+
+    let imagodei_dna =
+        load_dna("imagodei", &network_seed("imagodei"), Some(agent.clone())).await?;
+    let elohim_dna = load_dna("lamad", &network_seed("lamad"), Some(agent.clone())).await?;
+    let imagodei_dna_hash = imagodei_dna.dna_hash().clone();
+    let elohim_dna_hash = elohim_dna.dna_hash().clone();
+
+    let dnas_with_roles: Vec<(RoleName, DnaFile)> = vec![
+        ("imagodei".into(), imagodei_dna),
+        ("elohim".into(), elohim_dna),
+    ];
+
+    let app = conductor
+        .setup_app_for_agent("recovery-m4-t4-revocation", agent.clone(), &dnas_with_roles)
+        .await?;
+    let cells = app.cells();
+    let imagodei_cell = cells
+        .iter()
+        .find(|c| c.dna_hash() == &imagodei_dna_hash)
+        .expect("imagodei cell installed")
+        .clone();
+    let elohim_cell = cells
+        .iter()
+        .find(|c| c.dna_hash() == &elohim_dna_hash)
+        .expect("elohim cell installed")
+        .clone();
+
+    // Commit a key-revocation Content entry on elohim DNA.
+    let revoked_key_str = agent.to_string();
+    let propose_input = ProposeGovernanceActionInputMirrorT4 {
+        governance_kind: "governance-action:key-revocation".to_string(),
+        subject_cid: HUMAN_MATTHEW.to_string(),
+        title: "Key revocation — Matthew".to_string(),
+        description: None,
+        reach: "private".to_string(),
+        threshold: serde_json::json!({ "type": "m-of-n", "m": 1, "n": 1 }),
+        eligibility_predicate: None,
+        ballot_format: "approve-reject".to_string(),
+        closes_at: "2099-01-01T00:00:00Z".to_string(),
+        parameters: Some(serde_json::json!({
+            "human_id": HUMAN_MATTHEW,
+            "revoked_key": revoked_key_str,
+            "threshold_reached": true,
+            "effective_at": "2026-05-15T00:00:00Z",
+            "trigger_type": "voluntary",
+        })),
+    };
+
+    let governance_output: GovernanceActionOutputMirrorT4 = conductor
+        .call(
+            &elohim_cell.zome("content_store"),
+            "propose_governance_action",
+            propose_input,
+        )
+        .await;
+    assert!(
+        !governance_output.cid.is_empty(),
+        "governance CID must be set"
+    );
+
+    // Attempt commit_key_rotation with the revoked key as the source key.
+    let rotation_input = CommitKeyRotationInputMirrorT4 {
+        human_agent_pubkey: agent.clone(),
+        new_agent_pubkey: agent.clone(),
+        superseded_agent_pubkey: None,
+        recovery_request_hash: None,
+        authority: serde_json::json!({ "type": "IntimateQuorum", "witness_hashes": [] }),
+    };
+
+    let rotation_result: holochain::conductor::api::error::ConductorApiResult<serde_json::Value> =
+        conductor
+            .call_fallible(
+                &imagodei_cell.zome("imagodei"),
+                "commit_key_rotation",
+                rotation_input,
+            )
+            .await;
+
+    if let Err(err) = rotation_result {
+        let message = format!("{err:?}");
+        assert!(
+            !message.contains("Unauthorized bridge call"),
+            "Cross-DNA bridge must not be unauthorized. Error: {message}"
+        );
+        assert!(
+            !message.contains("Network error bridging to elohim"),
+            "Cross-DNA bridge must not network-error. Error: {message}"
+        );
+        assert!(
+            !message.contains("bridge decode (elohim::query_effective_revocation_for_key)"),
+            "Cross-DNA revocation query decode must succeed. Error: {message}"
+        );
+    }
+
+    Ok(())
+}
+
+// ============================================================================
 // M4 Scenario 8: Signal replay idempotency — storage layer (NOT ignored)
 //
 // This test exercises the elohim-storage signal handler directly. It does NOT

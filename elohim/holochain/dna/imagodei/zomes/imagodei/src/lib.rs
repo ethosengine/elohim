@@ -857,6 +857,79 @@ fn fetch_recovery_request_human_id(recovery_request_cid: &str) -> ExternResult<S
 }
 
 // ---------------------------------------------------------------------------
+// Bridge helper: call elohim content_store::query_effective_revocation_for_key
+// for the Recovery M4 Task 4 revocation-floor gate on `commit_key_rotation`.
+// ---------------------------------------------------------------------------
+fn call_elohim_query_effective_revocation_for_key(
+    revoked_key: &str,
+) -> ExternResult<Option<ConsolidatedContentOutput>> {
+    let response = call(
+        CallTargetCell::OtherRole("elohim".into()),
+        ZomeName::from("content_store"),
+        FunctionName::from("query_effective_revocation_for_key"),
+        None,
+        revoked_key.to_string(),
+    )?;
+    match response {
+        ZomeCallResponse::Ok(payload) => payload.decode().map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "bridge decode (elohim::query_effective_revocation_for_key): {e:?}"
+            )))
+        }),
+        ZomeCallResponse::Unauthorized(_, _, _, _) => Err(wasm_error!(WasmErrorInner::Guest(
+            "Unauthorized bridge call to elohim::query_effective_revocation_for_key".to_string()
+        ))),
+        ZomeCallResponse::NetworkError(err) => Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Network error bridging to elohim::query_effective_revocation_for_key: {err}"
+        )))),
+        ZomeCallResponse::CountersigningSession(err) => Err(wasm_error!(WasmErrorInner::Guest(
+            format!("Countersigning error bridging to elohim: {err}")
+        ))),
+        ZomeCallResponse::AuthenticationFailed(_, _) => Err(wasm_error!(WasmErrorInner::Guest(
+            "Authentication failed bridging to elohim::query_effective_revocation_for_key"
+                .to_string()
+        ))),
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Bridge helper: call elohim content_store::query_effective_identity_freeze_for_human
+// for the Recovery M4 Task 4 freeze-floor gate on `commit_key_rotation`.
+// ---------------------------------------------------------------------------
+fn call_elohim_query_effective_identity_freeze_for_human(
+    human_id: &str,
+) -> ExternResult<Option<ConsolidatedContentOutput>> {
+    let response = call(
+        CallTargetCell::OtherRole("elohim".into()),
+        ZomeName::from("content_store"),
+        FunctionName::from("query_effective_identity_freeze_for_human"),
+        None,
+        human_id.to_string(),
+    )?;
+    match response {
+        ZomeCallResponse::Ok(payload) => payload.decode().map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "bridge decode (elohim::query_effective_identity_freeze_for_human): {e:?}"
+            )))
+        }),
+        ZomeCallResponse::Unauthorized(_, _, _, _) => Err(wasm_error!(WasmErrorInner::Guest(
+            "Unauthorized bridge call to elohim::query_effective_identity_freeze_for_human"
+                .to_string()
+        ))),
+        ZomeCallResponse::NetworkError(err) => Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Network error bridging to elohim::query_effective_identity_freeze_for_human: {err}"
+        )))),
+        ZomeCallResponse::CountersigningSession(err) => Err(wasm_error!(WasmErrorInner::Guest(
+            format!("Countersigning error bridging to elohim: {err}")
+        ))),
+        ZomeCallResponse::AuthenticationFailed(_, _) => Err(wasm_error!(WasmErrorInner::Guest(
+            "Authentication failed bridging to elohim::query_effective_identity_freeze_for_human"
+                .to_string()
+        ))),
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Synthesise a legacy Attestation struct from a consolidated bridge response.
 // This is TEMPORARY scaffolding until Stage C removes the Attestation entry
 // type from imagodei entirely. The action_hash field cannot be derived from
@@ -2792,36 +2865,84 @@ pub fn submit_revocation_vote(
     })
 }
 
-/// Traverse `HumanToFreeze` links for the given `human_id` and return all
-/// `IdentityFreeze` entries with `is_active = true`. Used by the M3 freeze-
-/// floor gate on `commit_key_rotation`.
+/// Query elohim DNA for an active `governance-action:identity-freeze` Content
+/// entry covering `human_id` and synthesise a thin `IdentityFreeze` view from
+/// its metadata. Returns an empty vec when no active freeze exists.
+///
+/// Recovery M4 Task 4 migration:
+/// Previously traversed `HumanToFreeze` links + decoded `IdentityFreeze` entries
+/// from imagodei's DHT. Post Stage 2 (Tasks 13/14) the canonical freeze entries
+/// are `governance-action:identity-freeze` Content entries on the elohim DNA;
+/// this function bridges to elohim to fetch the active record and synthesises
+/// a coordinator-local `IdentityFreeze` shape with ONLY the three fields the
+/// downstream `check_freeze_floor_rules` consumer reads (per Stage 1 audit
+/// row #3): `is_active`, `human_id`, `frozen_at_layer`. All other fields are
+/// defaulted; callers must not rely on them.
 fn collect_active_freezes_for_human(human_id: &str) -> ExternResult<Vec<IdentityFreeze>> {
-    let anchor = StringAnchor::new("identity_freeze_by_human", human_id);
-    let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor))?;
-    let links = get_links(
-        LinkQuery::try_new(anchor_hash, LinkTypes::HumanToFreeze)?,
-        GetStrategy::default(),
-    )?;
-    let mut freezes = Vec::new();
-    for link in links {
-        let Some(hash) = link.target.clone().into_action_hash() else {
-            continue;
-        };
-        let Some(record) = get(hash, GetOptions::default())? else {
-            continue;
-        };
-        let Some(freeze): Option<IdentityFreeze> = record
-            .entry()
-            .to_app_option()
-            .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        else {
-            continue;
-        };
-        if freeze.is_active {
-            freezes.push(freeze);
-        }
+    let Some(content_output) = call_elohim_query_effective_identity_freeze_for_human(human_id)?
+    else {
+        return Ok(Vec::new());
+    };
+
+    if content_output.content.content_type != "governance-action:identity-freeze" {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "collect_active_freezes_for_human: expected governance-action:identity-freeze, got {}",
+            content_output.content.content_type
+        ))));
     }
-    Ok(freezes)
+
+    let metadata: serde_json::Value = serde_json::from_str(&content_output.content.metadata_json)
+        .map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "collect_active_freezes_for_human: bad metadata_json: {e}"
+            )))
+        })?;
+
+    let is_active = metadata
+        .get("is_active")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
+    if !is_active {
+        return Ok(Vec::new());
+    }
+    // Re-confirm the human_id matches what the gate is asking for. The elohim
+    // helper already filtered, but treating the gate as defensive against any
+    // future helper changes keeps this read-side authoritative.
+    let metadata_human_id = metadata
+        .get("human_id")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+    if metadata_human_id != human_id {
+        return Ok(Vec::new());
+    }
+    let frozen_at_layer = metadata
+        .get("frozen_at_layer")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
+
+    // Synthesise a view-only IdentityFreeze populating ONLY the three fields
+    // `check_freeze_floor_rules` reads. All other fields use type-appropriate
+    // defaults; do not rely on them downstream.
+    let freeze_view = IdentityFreeze {
+        id: content_output.content.id.clone(),
+        human_id: human_id.to_string(),
+        freeze_type: String::new(),
+        frozen_capabilities: Vec::new(),
+        severity: String::new(),
+        triggered_by: String::new(),
+        trigger_type: String::new(),
+        requires_verification: String::new(),
+        verification_attempts: 0,
+        last_verification_at: None,
+        is_active,
+        lifted_at: None,
+        lifted_by: None,
+        lift_reason: None,
+        frozen_at: String::new(),
+        expires_at: None,
+        frozen_at_layer,
+    };
+    Ok(vec![freeze_view])
 }
 
 /// Commit a key rotation to the DHT.
@@ -2850,53 +2971,51 @@ pub fn commit_key_rotation(input: CommitKeyRotationInput) -> ExternResult<KeyRot
     }
 
     // M4: revocation-floor gate.
-    // If a pending or effective KeyRevocation exists for the human_agent_pubkey
-    // (the key being rotated from), block the rotation. No authority-layer exemption
-    // — revocation is structural (a revoked key must not produce valid rotations under
-    // any claimed authority), intentionally asymmetric with the freeze-floor gate
-    // which exempts CryptographicQuorum.
+    // If an effective `governance-action:key-revocation` Content entry exists on
+    // the elohim DNA for the human_agent_pubkey (the key being rotated from),
+    // block the rotation. No authority-layer exemption — revocation is structural
+    // (a revoked key must not produce valid rotations under any claimed authority),
+    // intentionally asymmetric with the freeze-floor gate which exempts
+    // CryptographicQuorum.
+    //
+    // Recovery M4 Task 4 migration: previously walked imagodei-local
+    // `PendingRevocations` + `EffectiveRevocations` anchor links and decoded
+    // `KeyRevocation` entries via `to_app_option()`. Post Stage 2 the canonical
+    // revocation entries are Content entries on elohim DNA; this gate now reads
+    // through the cross-DNA bridge. Note: `query_effective_revocation_for_key`
+    // only returns *effective* records (threshold_reached || effective_at). The
+    // pre-Stage-2 gate also rejected *pending* revocations as a precaution; the
+    // post-Stage-2 producers (Tasks 13/14) MUST emit pending-state Content
+    // entries with `threshold_reached: false` AND `effective_at: null` so they
+    // are correctly excluded here, and flip those fields when quorum is met.
     {
         let rotating_from_str = input.human_agent_pubkey.to_string();
 
-        let pending_anchor = StringAnchor::new("pending_revocations", "global");
-        let pending_anchor_hash = hash_entry(&EntryTypes::StringAnchor(pending_anchor))?;
-        let pending_links = get_links(
-            LinkQuery::try_new(pending_anchor_hash, LinkTypes::PendingRevocations)?,
-            GetStrategy::default(),
-        )?;
-
-        let effective_anchor = StringAnchor::new("effective_revocations", "global");
-        let effective_anchor_hash = hash_entry(&EntryTypes::StringAnchor(effective_anchor))?;
-        let effective_links = get_links(
-            LinkQuery::try_new(effective_anchor_hash, LinkTypes::EffectiveRevocations)?,
-            GetStrategy::default(),
-        )?;
-
-        for (link, status) in pending_links
-            .iter()
-            .map(|l| (l, "pending"))
-            .chain(effective_links.iter().map(|l| (l, "effective")))
+        if let Some(content_output) =
+            call_elohim_query_effective_revocation_for_key(&rotating_from_str)?
         {
-            let Some(rev_hash) = link.target.clone().into_action_hash() else {
-                continue;
-            };
-            let Some(rec) = get(rev_hash, GetOptions::default())? else {
-                continue;
-            };
-            let Some(rev): Option<KeyRevocation> = rec
-                .entry()
-                .to_app_option()
-                .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-            else {
-                continue;
-            };
-            if rev.revoked_key == rotating_from_str {
+            if content_output.content.content_type != "governance-action:key-revocation" {
                 return Err(wasm_error!(WasmErrorInner::Guest(format!(
-                    "commit_key_rotation blocked: key {} has a {} revocation ({}). \
-                     Resolve or await the revocation before rotating.",
-                    rotating_from_str, status, rev.id
+                    "commit_key_rotation revocation-floor gate: expected \
+                     governance-action:key-revocation, got {}",
+                    content_output.content.content_type
                 ))));
             }
+            let metadata: serde_json::Value =
+                serde_json::from_str(&content_output.content.metadata_json).map_err(|e| {
+                    wasm_error!(WasmErrorInner::Guest(format!(
+                        "commit_key_rotation revocation-floor gate: bad metadata_json: {e}"
+                    )))
+                })?;
+            let rev_id = metadata
+                .get("id")
+                .and_then(|v| v.as_str())
+                .unwrap_or(&content_output.content.id);
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "commit_key_rotation blocked: key {} has an effective revocation ({}). \
+                 Resolve or await the revocation before rotating.",
+                rotating_from_str, rev_id
+            ))));
         }
     }
 
