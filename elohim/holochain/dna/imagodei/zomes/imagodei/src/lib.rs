@@ -873,7 +873,7 @@ fn call_elohim_query_effective_revocation_for_key(
     match response {
         ZomeCallResponse::Ok(payload) => payload.decode().map_err(|e| {
             wasm_error!(WasmErrorInner::Guest(format!(
-                "bridge decode (elohim::query_effective_revocation_for_key): {e:?}"
+                "bridge decode (elohim::query_effective_revocation_for_key): {e}"
             )))
         }),
         ZomeCallResponse::Unauthorized(_, _, _, _) => Err(wasm_error!(WasmErrorInner::Guest(
@@ -909,7 +909,7 @@ fn call_elohim_query_effective_identity_freeze_for_human(
     match response {
         ZomeCallResponse::Ok(payload) => payload.decode().map_err(|e| {
             wasm_error!(WasmErrorInner::Guest(format!(
-                "bridge decode (elohim::query_effective_identity_freeze_for_human): {e:?}"
+                "bridge decode (elohim::query_effective_identity_freeze_for_human): {e}"
             )))
         }),
         ZomeCallResponse::Unauthorized(_, _, _, _) => Err(wasm_error!(WasmErrorInner::Guest(
@@ -2987,7 +2987,10 @@ pub fn commit_key_rotation(input: CommitKeyRotationInput) -> ExternResult<KeyRot
     // pre-Stage-2 gate also rejected *pending* revocations as a precaution; the
     // post-Stage-2 producers (Tasks 13/14) MUST emit pending-state Content
     // entries with `threshold_reached: false` AND `effective_at: null` so they
-    // are correctly excluded here, and flip those fields when quorum is met.
+    // are correctly excluded here, and emit a NEW Content entry with the
+    // flipped fields when quorum is met. Producers must use create_entry for
+    // effectiveness transitions, not update_entry — see
+    // content_store/src/lib.rs:3185+ for the read-side rationale.
     {
         let rotating_from_str = input.human_agent_pubkey.to_string();
 

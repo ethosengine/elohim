@@ -3186,6 +3186,24 @@ pub fn get_content_by_tag(tag: String) -> ExternResult<Vec<ContentOutput>> {
 // flags into the initial metadata for already-effective ceremonies (self,
 // specialist) or by performing an `update_entry` on the Content to flip them
 // once a quorum threshold is met.
+//
+// IMPORTANT — `update_entry` race window:
+//
+// `get_content_by_type` traverses `TypeToContent` links whose target is the
+// ORIGINAL Create action hash. `update_entry` produces a new action but does
+// NOT rewire the link, so a producer that flips `threshold_reached` /
+// `effective_at` via `update_entry` will leave this gate reading stale flags.
+//
+// CONSTRAINT for Tasks 13/14 producers: when a governance flow becomes
+// effective (quorum met, self-revocation, specialist revocation), commit a
+// NEW Content entry whose `metadata_json` already has `threshold_reached: true`
+// and `effective_at: <ts>`. The original pending-state Content remains; this
+// gate filter rejects it (no flip) and accepts the new one (threshold_reached).
+// If supersession needs to be modeled, add `supersedes_cid: <predecessor_cid>`
+// to the new entry's metadata.
+//
+// If a future task needs `update_entry` semantics here, change `get_content`
+// to follow the update chain via `get_details` before relying on this gate.
 // =============================================================================
 
 /// Query elohim DNA for an effective `governance-action:key-revocation` Content
@@ -3203,9 +3221,10 @@ pub fn get_content_by_tag(tag: String) -> ExternResult<Vec<ContentOutput>> {
 pub fn query_effective_revocation_for_key(
     revoked_key: String,
 ) -> ExternResult<Option<ContentOutput>> {
+    // gate-critical: must not miss any effective entry; do NOT use default cap.
     let candidates = get_content_by_type(QueryByTypeInput {
         content_type: "governance-action:key-revocation".to_string(),
-        limit: None,
+        limit: Some(u32::MAX),
     })?;
 
     let mut matched: Vec<ContentOutput> = candidates
@@ -3255,9 +3274,10 @@ pub fn query_effective_revocation_for_key(
 pub fn query_effective_identity_freeze_for_human(
     human_id: String,
 ) -> ExternResult<Option<ContentOutput>> {
+    // gate-critical: must not miss any effective entry; do NOT use default cap.
     let candidates = get_content_by_type(QueryByTypeInput {
         content_type: "governance-action:identity-freeze".to_string(),
-        limit: None,
+        limit: Some(u32::MAX),
     })?;
 
     let mut matched: Vec<ContentOutput> = candidates
