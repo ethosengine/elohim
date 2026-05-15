@@ -424,7 +424,7 @@ impl EprAtomService {
                             action_hash = %msg.action_hash,
                             attestation_kind = %msg.attestation_kind,
                             steward_id = %msg.steward_id,
-                            threshold_reached = msg.threshold_reached,
+                            threshold_reached = %msg.threshold_reached,
                             "W2: Received RevocationAttestation via direct-notify"
                         );
                         // Per D3 duality: the canonical write to the projection happens
