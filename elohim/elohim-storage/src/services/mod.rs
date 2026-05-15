@@ -100,6 +100,10 @@ pub mod tally_projector;
 // Recovery Protocol Phase 2 (M4) — recovery_flows / key_revocations projection
 pub mod recovery_flow_projector;
 
+// Recovery Protocol Phase 2 (M4) — central ElohimContentSignal dispatcher that
+// fans signals to AttestationProjector + RecoveryFlowProjector.
+pub mod elohim_content_dispatcher;
+
 // Re-exports
 pub use content_service::ContentService;
 pub use economic_event_service::EconomicEventService;
