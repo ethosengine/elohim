@@ -97,10 +97,10 @@ pub fn replica_health_for(count: u32, target: u32) -> ReplicaHealth {
 /// - `reciprocity_hint`: REA outflow-minus-inflow for steward context (None for Visitor)
 /// - `projector_count`: count of distinct doorway projectors that have acked
 ///   this blob, computed via `projection_events::distinct_projectors_for_blob`
-///   (see body at `:159–163`).
+///   (see body at `:163–167`).
 /// - `diversity_hint`: derived from `peer_identity_bindings.device_archetype`
 ///   via `peer_diversity::diversity_hint_from_archetype_strs` (see body at
-///   `:165–179`). Returns `None` when no archetype-tagged peers are known.
+///   `:169–183`). Returns `None` when no archetype-tagged peers are known.
 pub async fn compose_distribution_summary(
     pool: &DbPool,
     blob_hash: &str,
