@@ -67,6 +67,48 @@ Feature: EPR Cross-Peer Content Resolution
 
   # --- Reach-gated access (the ones the audit confirmed have substrate but step defs may be wip) ---
 
+  # ============================================================================
+  # W5 — @wip RETENTION DECISION (2026-05-15, EPR Foundation Completion sprint)
+  # ============================================================================
+  # All 8 @wip scenarios below are retained.
+  #
+  # The Wave 0 audit counted these as candidates for lift based on substrate
+  # readiness (EPR codec + shard protocol + libp2p federation are all live on
+  # dev — verified). However, the substantive blocker is the BDD glue layer:
+  # NONE of the step phrases used by these scenarios (`peer "X" has content Y
+  # stewarded by Z`, `the EPR protocol "..." is active between peers`, `the
+  # content is resolved via EPR protocol from peer "X"`, etc.) have matching
+  # step-definitions anywhere in `genesis/a2o/steps/`.
+  #
+  # `genesis/a2o/steps/federation.steps.ts` only handles cross-doorway content
+  # sync (a different feature file: `cross-doorway-content.feature`). The 5
+  # "verified landed" foundational scenarios above (lines 26-67) are in the
+  # same step-def situation but were @wip-lifted by the audit on the substrate
+  # claim alone; if those are running green today, they're running undefined-
+  # silently, which is its own discovery.
+  #
+  # Lifting these 8 @wip tags without first implementing the federation step-
+  # def layer would convert them from "skipped" to "undefined" — strictly
+  # worse signal.
+  #
+  # CONCRETE UNBLOCK PATH (for the implementer who picks this up):
+  #   1. Add a new `genesis/a2o/steps/federation-epr.steps.ts` (or extend the
+  #      existing `federation.steps.ts`) with Given/When/Then step-defs for
+  #      the phrases used in scenarios 1-13 of this file.
+  #   2. Step-defs need the EPR/shard protocol probes (HTTP API or libp2p
+  #      probes against the test fixture cluster).
+  #   3. For reach-gated scenarios (lines 70-138): need fixture helpers that
+  #      seed content with specific reach + steward + collective-membership
+  #      configurations.
+  #   4. For Wave-3 additions (lines 142-178): need cross-peer
+  #      recognition-event tracking + cross-peer disconnect simulation +
+  #      identity-binding-aware fetch verification.
+  #
+  # Surface in sprint-result: lifted 5/17 scenarios (epr-content-addressing.
+  # feature) where step-defs are real; retained all 8 federation @wip because
+  # the federation step-def layer is the unsolved problem.
+  # ============================================================================
+
   @wip
   Scenario: Community-reach guide accessible only to consented collective members
     # Matthew's collective ("local-church") authored a governance guide
