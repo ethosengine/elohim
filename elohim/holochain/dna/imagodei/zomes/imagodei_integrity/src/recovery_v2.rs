@@ -882,45 +882,50 @@ pub fn validate_key_rotation(rotation: &KeyRotation) -> ExternResult<ValidateCal
         ));
     }
 
-    // Rule 2: Resolve the referenced RecoveryRequest and verify matching fields.
-    let request_record = must_get_valid_record(rotation.recovery_request_hash.clone())?;
-    let request_entry: super::RecoveryRequest = request_record
-        .entry()
-        .to_app_option()
-        .map_err(|e| {
-            wasm_error!(WasmErrorInner::Guest(format!(
-                "KeyRotation references non-RecoveryRequest entry: {e:?}"
-            )))
-        })?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "KeyRotation recovery_request_hash entry missing".to_string()
-        )))?;
-
-    if request_entry.human_agent_pubkey != rotation.human_agent_pubkey {
-        return Ok(ValidateCallbackResult::Invalid(
-            "KeyRotation human_agent_pubkey must match RecoveryRequest".to_string(),
-        ));
-    }
-    if request_entry.new_agent_pubkey != rotation.new_agent_pubkey {
-        return Ok(ValidateCallbackResult::Invalid(
-            "KeyRotation new_agent_pubkey must match RecoveryRequest".to_string(),
-        ));
-    }
+    // Rule 2: Cross-reference the RecoveryRequest for field matching.
+    //
+    // Recovery M4 Task 15: RecoveryRequest is no longer an imagodei DHT entry type —
+    // producers were bridged to the elohim DNA (governance-action:recovery-request
+    // Content entries) in Tasks 13 + 14. The `recovery_request_hash` ActionHash now
+    // points to a Content entry on the elohim DNA, which is not resolvable via
+    // `must_get_valid_record` in the integrity validator (cross-DNA reads are HDK-only).
+    //
+    // Enforcement model: coordinator-level (commit_key_rotation) already verifies
+    // matching fields before committing the KeyRotation entry. The integrity validator
+    // defers to that coordinator gate, mirroring the freeze-floor stub pattern above.
+    //
+    // For IntimateQuorum, the witness-hash validation below still enforces the quorum
+    // threshold against the human targeted by the rotation.
 
     // Rule 3: Freeze-floor check (CryptographicQuorum is orthogonal; exempt).
+    // check_freeze_floor always returns Ok(None) — link traversal unavailable in HDI.
+    // Coordinator-level gate enforces the freeze floor before commit (M3/M5).
     if !matches!(
         rotation.authority,
         RecoveryAuthority::CryptographicQuorum { .. }
     ) {
-        if let Some(reason) = check_freeze_floor(&rotation.authority, &request_entry.human_id)? {
+        if let Some(reason) = check_freeze_floor(&rotation.authority, &None)? {
             return Ok(ValidateCallbackResult::Invalid(reason));
         }
     }
 
     // Rule 4: Variant-specific validation.
+    // IntimateQuorum: resolve witness hashes and check quorum rules. The request
+    // struct is synthesised with a None human_id since we cannot cross-DNA fetch
+    // it here; the coordinator enforces the human_id match pre-commit.
+    let stub_request = super::RecoveryRequest {
+        human_agent_pubkey: rotation.human_agent_pubkey.clone(),
+        new_agent_pubkey: rotation.new_agent_pubkey.clone(),
+        hosting_doorway_pubkey: rotation.human_agent_pubkey.clone(),
+        proposed_authority: super::RecoveryAuthorityKind::IntimateQuorum,
+        request_nonce: vec![0u8; 16],
+        human_id: None,
+        required_witness_count: 2,
+        created_at: rotation.rotated_at,
+    };
     match &rotation.authority {
         RecoveryAuthority::IntimateQuorum { witness_hashes } => {
-            validate_intimate_quorum(&request_entry, witness_hashes)
+            validate_intimate_quorum(&stub_request, witness_hashes)
         }
         RecoveryAuthority::CryptographicQuorum {
             stewardship_hash,

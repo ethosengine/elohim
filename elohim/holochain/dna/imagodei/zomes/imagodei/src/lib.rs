@@ -2316,48 +2316,6 @@ fn compute_required_witness_count(active_emergency_contacts: u32) -> u32 {
     std::cmp::max(2, ceil_half_plus_one)
 }
 
-/// Count approved votes on a KeyRevocation by traversing RevocationToVote links.
-///
-/// Only votes with `approved == true` count toward the quorum threshold.
-/// Rejections are preserved in the DHT for audit but never advance the
-/// pending -> effective transition.
-///
-/// Recovery M4 Task 14: this function is no longer called — `submit_revocation_vote`
-/// counts votes cross-DNA via `call_elohim_get_attestations_for_subject` +
-/// per-attestation metadata fetch (subject_cid = revocation_cid). Retained
-/// under `#[allow(dead_code)]` so the entry-type sweep in Task 15 can remove
-/// it alongside the `RevocationVote` integrity definition.
-#[allow(dead_code)]
-fn count_approved_revocation_votes(revocation_id: &str) -> ExternResult<u32> {
-    let anchor = StringAnchor::new("revocation_votes", revocation_id);
-    let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor))?;
-    let links = get_links(
-        LinkQuery::try_new(anchor_hash, LinkTypes::RevocationToVote)?,
-        GetStrategy::default(),
-    )?;
-
-    let mut approved_count: u32 = 0;
-    for link in links {
-        let Some(vote_hash) = link.target.clone().into_action_hash() else {
-            continue;
-        };
-        let Some(record) = get(vote_hash, GetOptions::default())? else {
-            continue;
-        };
-        let Some(vote): Option<RevocationVote> = record
-            .entry()
-            .to_app_option()
-            .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        else {
-            continue;
-        };
-        if vote.approved {
-            approved_count += 1;
-        }
-    }
-
-    Ok(approved_count)
-}
 
 /// Intimate-recovery witness validity horizon. Matches protocol spec §5.
 const WITNESS_EXPIRY_DAYS: u64 = 90;
@@ -3413,12 +3371,6 @@ fn has_existing_witness_for_request(
 /// elohim-storage consumers must migrate to CID-based lookup. Task 17 (signal
 /// schema alignment) will replace these ActionHash fields with CIDs.
 ///
-/// TODO(stage-G-followup): commit_key_rotation revocation-floor gate still
-/// deserializes KeyRevocation entries from the imagodei DHT via
-/// `to_app_option()`. Bridging create_recovery_request to elohim is now
-/// unblocked from this site (Task 3 migrated); the revocation-floor and
-/// freeze-floor gates still need migration (Recovery M4 Tasks 4 + 5) before
-/// Task 13/14 can land. Tracked as Stage G follow-up (G.A.2 deferred functions).
 #[hdk_extern]
 pub fn submit_intimate_witness(
     input: SubmitIntimateWitnessInput,

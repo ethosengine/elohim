@@ -543,17 +543,12 @@ pub struct ContributorPresence {
 
 /// RecoveryRequest — claimant's request to rotate their agent key.
 ///
-/// Authored by the hosting doorway on behalf of the claimant's new device (which
-/// has no working cell yet). Authority for the eventual rotation is declared as
-/// `proposed_authority` (intent) but can be escalated to a higher layer by the
-/// time the KeyRotation is committed. Evidence for the rotation lives in the
-/// KeyRotation entry's `authority: RecoveryAuthority` field.
-///
-/// Supersedes the Jan 2026 stubby struct (string-IDs, elohim_score fields).
-/// The revised struct uses AgentPubKey for identity and delegates authority
-/// evidence to the graduated-authority primitives introduced in recovery_v2.
-#[hdk_entry_helper]
-#[derive(Clone, PartialEq)]
+/// Removed from EntryTypes in Recovery M4 Task 15 — superseded by elohim
+/// `governance-action:*` Content entries. Kept as a plain struct (no
+/// `#[hdk_entry_helper]`) because the coordinator synthesises this shape for
+/// the `RecoveryRequestCreated` signal payload (Task 17 will align the schema)
+/// and `validate_key_rotation` references it for field matching.
+#[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
 pub struct RecoveryRequest {
     /// The human whose identity is being recovered.
     pub human_agent_pubkey: AgentPubKey,
@@ -742,73 +737,15 @@ pub struct IdentityAnomaly {
 // ChallengeSupport removed in Stage C.2 (zero create_entry callers; companion
 // to IdentityChallenge, deferred to Stage G).
 
-/// KeyRevocation - DHT consensus to invalidate a compromised key.
-///
-/// Unlike current architecture where keys are permanent, this allows
-/// the network to revoke compromised keys via M-of-N steward consensus.
-///
-/// Once a key is revoked:
-/// - All new actions signed by that key are REJECTED
-/// - Content signed by revoked key can be flagged/removed
-/// - User must go through recovery to get new key
-///
-/// This is the "nuclear option" for account takeover scenarios.
-#[hdk_entry_helper]
-#[derive(Clone, PartialEq)]
-pub struct KeyRevocation {
-    pub id: String,
-    pub human_id: String,
+// KeyRevocation removed in Recovery M4 Task 15 — superseded by elohim `governance-action:*` Content entries.
+// RevocationVote removed in Recovery M4 Task 15 — superseded by elohim `governance-action:*` Content entries.
 
-    // === REVOKED KEY ===
-    pub revoked_key: String, // The agent_pub_key being revoked
-    pub reason: String,      // See REVOCATION_REASONS
-
-    // === TRIGGER ===
-    pub initiated_by: String, // challenge_id, steward consensus, or voluntary
-    pub trigger_type: String, // challenge, steward_vote, voluntary
-
-    // === STEWARD VOTES ===
-    pub required_votes: u32, // M required for revocation
-    pub current_votes: u32,
-    pub votes_json: String, // JSON array of RevocationVote
-
-    // === STATUS ===
-    pub threshold_reached: bool,
-    pub effective_at: Option<String>, // When revocation became active
-
-    // === TIMESTAMPS ===
-    pub created_at: String,
-    pub updated_at: String,
-}
-
-/// RevocationVote - Individual steward vote on key revocation.
-#[hdk_entry_helper]
-#[derive(Clone, PartialEq)]
-pub struct RevocationVote {
-    pub id: String,
-    pub revocation_id: String, // KeyRevocation being voted on
-    pub steward_id: String,    // Steward voting
-    pub approved: bool,        // Approve or reject revocation
-    pub attestation: String,   // Why they're voting this way
-    pub voted_at: String,
-}
-
-/// IdentityFreeze - Emergency suspension of capabilities.
-///
-/// When anomaly detection or community challenge threshold is reached,
-/// an IdentityFreeze immediately suspends specified capabilities.
-/// The hijacker cannot continue posting/acting while verification
-/// is pending.
-///
-/// Key difference from Meta: Freeze happens AUTOMATICALLY based on
-/// network consensus, not on manual review that can be ignored.
-///
-/// Freeze can be:
-/// - Partial: Only specific capabilities frozen
-/// - Total: All capabilities frozen
-/// - Time-limited: Auto-expires for low-severity
-#[hdk_entry_helper]
-#[derive(Clone, PartialEq)]
+/// IdentityFreeze — removed from EntryTypes in Recovery M4 Task 15 — superseded
+/// by elohim `governance-action:*` Content entries. Kept as a plain struct
+/// because the coordinator synthesises this shape in
+/// `collect_active_freezes_for_human` and passes it to
+/// `check_freeze_floor_rules` in recovery_v2.
+#[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
 pub struct IdentityFreeze {
     pub id: String,
     pub human_id: String,
@@ -959,21 +896,8 @@ pub enum EntryTypes {
     ContentMastery(ContentMastery),
     ContributorPresence(ContributorPresence),
     StringAnchor(StringAnchor),
-    // Recovery entry types — Stage G.A.2 deferral audit results:
-    //
-    // RecoveryRequest: gate readers MIGRATED (Recovery M4 Task 3).
-    //   submit_intimate_witness Gate 1 now resolves the human_id field via
-    //   `fetch_recovery_request_human_id(cid)` — a cross-DNA call to
-    //   elohim::content_store::get_content_by_id returning the
-    //   `governance-action:recovery-request` Content entry's metadata.
-    //   The local imagodei RecoveryRequest entry type is retained for DHT
-    //   schema compat during the interim; Task 13 bridges the producer
-    //   (create_recovery_request) at which point local writes stop.
-    //   Removal: Task 15.
-    RecoveryRequest(RecoveryRequest),
-    // RecoveryVote: no live create_entry callers found (zero calls). Entry type
-    //   kept to avoid DHT schema breakage on existing nodes. Bridge when
-    //   create_recovery_request is bridged (they are coupled via request_id).
+    // Recovery entry types — removed in Recovery M4 Task 15 — superseded by elohim `governance-action:*` Content entries.
+    // RecoveryRequest, KeyRevocation, RevocationVote, IdentityFreeze all removed here.
     RecoveryVote(RecoveryVote),
     RecoveryHint(RecoveryHint),
     // Network-Attested Identity entry types (Phase 2)
@@ -992,31 +916,6 @@ pub enum EntryTypes {
     //   committed before Stage G. Remove when all historic entries are migrated.
     HumanityWitness(HumanityWitness),
     IdentityAnomaly(IdentityAnomaly),
-    // KeyRevocation: gate readers MIGRATED (Recovery M4 Tasks 4 + 5).
-    //   - commit_key_rotation revocation-floor gate now reads the
-    //     `governance-action:key-revocation` Content entries on elohim DNA
-    //     via `collect_active_revocations_for_key` (Task 4).
-    //   - submit_revocation_vote reads gate fields (trigger_type,
-    //     threshold_reached, human_id, revoked_key, required_votes) by CID
-    //     via `call_elohim_get_content_by_id` (Task 5). Input renamed to
-    //     `revocation_cid: String`.
-    //   The local imagodei KeyRevocation entry is retained INTERIM for
-    //   update_entry()-based threshold-flip + PendingRevocations link
-    //   cleanup; Task 14 bridges the producer (create_revocation_request +
-    //   submit_revocation_vote effectiveness-transition) at which point
-    //   local writes stop. Removal: Task 15.
-    KeyRevocation(KeyRevocation),
-    // RevocationVote: coupled to KeyRevocation (same gate chain). CANNOT bridge until
-    //   KeyRevocation moves. Zero create_entry callers found in pre-bridge audit.
-    RevocationVote(RevocationVote),
-    // IdentityFreeze: gate reader MIGRATED (Recovery M4 Task 4).
-    //   commit_key_rotation freeze-floor gate now resolves active freezes
-    //   via `collect_active_identity_freezes_for_human` — a cross-DNA query
-    //   for `governance-action:identity-freeze` Content entries on elohim
-    //   DNA. Zero local create_entry callers; entry type retained for DHT
-    //   schema compat only. Manifest declaration (Task 16) + final removal
-    //   (Task 15).
-    IdentityFreeze(IdentityFreeze),
     // Stewardship entry types (Graduated Capabilities)
     // StewardshipGrant: deferred to Stage G (3 live create_entry callers in stewardship.rs).
     StewardshipGrant(StewardshipGrant),
@@ -1082,11 +981,9 @@ pub enum LinkTypes {
     ClaimedAgentToPresence, // Anchor(claimed_agent_id) -> ContributorPresence
 
     // Recovery links
-    IdToRecoveryRequest,     // Anchor(request_id) -> RecoveryRequest
-    HumanToRecoveryRequest,  // Anchor(human_id) -> RecoveryRequest (user's requests)
-    RecoveryRequestByStatus, // Anchor(status) -> RecoveryRequest
-    PendingRecoveryVote, // Anchor(voter_human_id) -> RecoveryRequest (requests voter can act on)
-    RecoveryVoteToRequest, // RecoveryVote -> RecoveryRequest
+    // IdToRecoveryRequest, HumanToRecoveryRequest, RecoveryRequestByStatus,
+    // PendingRecoveryVote, RecoveryVoteToRequest removed T15 — superseded by
+    // elohim `governance-action:*` Content entries.
     HumanToRecoveryHint, // Anchor(human_id) -> RecoveryHint
     RecoveryHintByType,  // Anchor(hint_type) -> RecoveryHint
 
@@ -1113,23 +1010,8 @@ pub enum LinkTypes {
     // IdentityChallenge links removed C.2 (entry type removed).
     // ChallengeSupport links removed C.2 (entry type removed).
 
-    // KeyRevocation links
-    IdToKeyRevocation,      // Anchor(revocation_id) -> KeyRevocation
-    HumanToKeyRevocation,   // Anchor(human_id) -> KeyRevocation
-    RevokedKeyToRevocation, // Anchor(revoked_key) -> KeyRevocation (lookup by key)
-    PendingRevocations,     // Anchor(pending) -> KeyRevocation
-    EffectiveRevocations,   // Anchor(effective) -> KeyRevocation (threshold reached)
-
-    // RevocationVote links
-    IdToRevocationVote,      // Anchor(vote_id) -> RevocationVote
-    RevocationToVote,        // Anchor(revocation_id) -> RevocationVote
-    StewardToRevocationVote, // Anchor(steward_id) -> RevocationVote
-
-    // IdentityFreeze links
-    IdToIdentityFreeze, // Anchor(freeze_id) -> IdentityFreeze
-    HumanToFreeze,      // Anchor(human_id) -> IdentityFreeze
-    ActiveFreezes,      // Anchor(active) -> IdentityFreeze (currently frozen)
-    FreezeByType,       // Anchor(freeze_type) -> IdentityFreeze
+    // KeyRevocation, RevocationVote, IdentityFreeze links removed T15 — superseded by
+    // elohim `governance-action:*` Content entries.
 
     // Stewardship links (Graduated Capabilities)
     // StewardshipGrant links: deferred to Stage G (entry type kept; live callers).
@@ -1179,7 +1061,7 @@ pub enum LinkTypes {
 
     // Recovery Protocol Phase 2 — M3
     RecoveryRequestToHumanityWitness, // RecoveryRequest -> HumanityWitness (IntimateQuorum link)
-    RecoveryRequestToKeyStewardship, // RecoveryRequest -> KeyStewardship (CryptographicQuorum link; deferred to Stage G)
+    // RecoveryRequestToKeyStewardship removed T15 — superseded by elohim `governance-action:*` Content entries.
 
     // EPR Phase 2B — AgentPeerBinding links
     AgentToPeerBinding, // AgentPubKey -> AgentPeerBinding (current bindings for this agent)
@@ -1211,7 +1093,7 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 EntryTypes::ContributorPresence(presence) => {
                     validate_contributor_presence(&presence)
                 }
-                EntryTypes::RecoveryRequest(request) => validate_recovery_request(&request),
+                // RecoveryRequest, KeyRevocation, RevocationVote, IdentityFreeze removed T15.
                 EntryTypes::RecoveryVote(vote) => validate_recovery_vote(&vote),
                 EntryTypes::RecoveryHint(hint) => validate_recovery_hint(&hint),
                 // Network-Attested Identity validation (Phase 2)
@@ -1221,9 +1103,6 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 // ChallengeSupport removed C.2 (zero callers).
                 EntryTypes::HumanityWitness(witness) => validate_humanity_witness(&witness),
                 EntryTypes::IdentityAnomaly(anomaly) => validate_identity_anomaly(&anomaly),
-                EntryTypes::KeyRevocation(revocation) => validate_key_revocation(&revocation),
-                EntryTypes::RevocationVote(vote) => validate_revocation_vote(&vote),
-                EntryTypes::IdentityFreeze(freeze) => validate_identity_freeze(&freeze),
                 // Stewardship entry validation
                 // StewardshipGrant: deferred to Stage G (live callers).
                 EntryTypes::StewardshipGrant(grant) => validate_stewardship_grant(&grant),
@@ -1463,36 +1342,10 @@ fn validate_contributor_presence(
 // Recovery Validation Functions
 // =============================================================================
 
-/// Validate RecoveryRequest entry
-fn validate_recovery_request(request: &RecoveryRequest) -> ExternResult<ValidateCallbackResult> {
-    // Rule 1: request_nonce must be 16 bytes
-    if request.request_nonce.len() != 16 {
-        return Ok(ValidateCallbackResult::Invalid(
-            "RecoveryRequest request_nonce must be exactly 16 bytes".to_string(),
-        ));
-    }
-    // Rule 2: new_agent_pubkey must differ from human_agent_pubkey
-    if request.human_agent_pubkey == request.new_agent_pubkey {
-        return Ok(ValidateCallbackResult::Invalid(
-            "RecoveryRequest new_agent_pubkey must differ from human_agent_pubkey".to_string(),
-        ));
-    }
-    // M2: required_witness_count has an absolute floor of 2 (defense-in-depth).
-    // Per the spec §5.2, intimate quorum requires at least 2 distinct witnesses.
-    if request.required_witness_count < 2 {
-        return Ok(ValidateCallbackResult::Invalid(
-            "RecoveryRequest required_witness_count must be >= 2".to_string(),
-        ));
-    }
-    // Rule 3: if proposed_authority is a stubbed variant, that's still OK at request time —
-    // the request is claimant's intent; the actual authorization may escalate. The validator
-    // only rejects stubbed variants at KeyRotation time (Task 5).
-    //
-    // Rule 4 (deferred to M3): author of the request should be the hosting_doorway's agent
-    // pubkey. We cannot enforce this here without a cross-field check against the signing
-    // action; M3 coordinator function ensures this and the validator trusts it.
-    Ok(ValidateCallbackResult::Valid)
-}
+// validate_recovery_request removed T15 — RecoveryRequest is no longer an entry type.
+// validate_key_revocation removed T15 — KeyRevocation is no longer an entry type.
+// validate_revocation_vote removed T15 — RevocationVote is no longer an entry type.
+// validate_identity_freeze removed T15 — IdentityFreeze is no longer an entry type.
 
 /// Validate RecoveryVote entry
 fn validate_recovery_vote(vote: &RecoveryVote) -> ExternResult<ValidateCallbackResult> {
@@ -1711,156 +1564,6 @@ fn validate_identity_anomaly(anomaly: &IdentityAnomaly) -> ExternResult<Validate
 // validate_identity_challenge removed C.2 — IdentityChallenge is no longer an entry type.
 // validate_challenge_support removed C.2 — ChallengeSupport is no longer an entry type.
 
-/// Validate KeyRevocation entry
-fn validate_key_revocation(revocation: &KeyRevocation) -> ExternResult<ValidateCallbackResult> {
-    if revocation.id.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid(
-            "KeyRevocation ID cannot be empty".to_string(),
-        ));
-    }
-
-    if revocation.human_id.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid(
-            "KeyRevocation human_id cannot be empty".to_string(),
-        ));
-    }
-
-    if revocation.revoked_key.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid(
-            "KeyRevocation revoked_key cannot be empty".to_string(),
-        ));
-    }
-
-    if !REVOCATION_REASONS.contains(&revocation.reason.as_str()) {
-        return Ok(ValidateCallbackResult::Invalid(format!(
-            "Invalid reason '{}'. Must be one of: {:?}",
-            revocation.reason, REVOCATION_REASONS
-        )));
-    }
-
-    // M4: trigger-type-aware required_votes.
-    // Voluntary (self-revocation) has no quorum — required_votes must be exactly 1.
-    // Steward-vote (emergency-contact quorum) and challenge (M5 specialist stub)
-    // require at least 2 votes for security.
-    match revocation.trigger_type.as_str() {
-        "voluntary" => {
-            if revocation.required_votes != 1 {
-                return Ok(ValidateCallbackResult::Invalid(
-                    "voluntary revocation must have required_votes == 1".to_string(),
-                ));
-            }
-        }
-        "steward_vote" | "challenge" => {
-            if revocation.required_votes < 2 {
-                return Ok(ValidateCallbackResult::Invalid(
-                    "quorum revocation must have required_votes >= 2".to_string(),
-                ));
-            }
-        }
-        other => {
-            return Ok(ValidateCallbackResult::Invalid(format!(
-                "Invalid trigger_type '{}'. Must be one of: voluntary, steward_vote, challenge",
-                other
-            )));
-        }
-    }
-
-    Ok(ValidateCallbackResult::Valid)
-}
-
-/// Validate RevocationVote entry
-fn validate_revocation_vote(vote: &RevocationVote) -> ExternResult<ValidateCallbackResult> {
-    if vote.id.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid(
-            "RevocationVote ID cannot be empty".to_string(),
-        ));
-    }
-
-    if vote.revocation_id.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid(
-            "RevocationVote revocation_id cannot be empty".to_string(),
-        ));
-    }
-
-    if vote.steward_id.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid(
-            "RevocationVote steward_id cannot be empty".to_string(),
-        ));
-    }
-
-    if vote.attestation.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid(
-            "RevocationVote attestation cannot be empty (must provide reason)".to_string(),
-        ));
-    }
-
-    Ok(ValidateCallbackResult::Valid)
-}
-
-/// Validate IdentityFreeze entry
-fn validate_identity_freeze(freeze: &IdentityFreeze) -> ExternResult<ValidateCallbackResult> {
-    if freeze.id.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid(
-            "IdentityFreeze ID cannot be empty".to_string(),
-        ));
-    }
-
-    if freeze.human_id.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid(
-            "IdentityFreeze human_id cannot be empty".to_string(),
-        ));
-    }
-
-    if !FREEZE_TYPES.contains(&freeze.freeze_type.as_str()) {
-        return Ok(ValidateCallbackResult::Invalid(format!(
-            "Invalid freeze_type '{}'. Must be one of: {:?}",
-            freeze.freeze_type, FREEZE_TYPES
-        )));
-    }
-
-    if freeze.frozen_capabilities.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid(
-            "IdentityFreeze must freeze at least one capability".to_string(),
-        ));
-    }
-
-    // M2: validate frozen_at_layer if present
-    if let Some(layer) = &freeze.frozen_at_layer {
-        if !crate::recovery_v2::RECOVERY_AUTHORITY_LAYERS.contains(&layer.as_str()) {
-            return Ok(ValidateCallbackResult::Invalid(format!(
-                "IdentityFreeze frozen_at_layer '{}' must be one of {:?}",
-                layer,
-                crate::recovery_v2::RECOVERY_AUTHORITY_LAYERS
-            )));
-        }
-    }
-
-    // Validate all frozen capabilities
-    for cap in &freeze.frozen_capabilities {
-        if !FREEZABLE_CAPABILITIES.contains(&cap.as_str()) {
-            return Ok(ValidateCallbackResult::Invalid(format!(
-                "Invalid frozen capability '{}'. Must be one of: {:?}",
-                cap, FREEZABLE_CAPABILITIES
-            )));
-        }
-    }
-
-    if !ANOMALY_SEVERITIES.contains(&freeze.severity.as_str()) {
-        return Ok(ValidateCallbackResult::Invalid(format!(
-            "Invalid severity '{}'. Must be one of: {:?}",
-            freeze.severity, ANOMALY_SEVERITIES
-        )));
-    }
-
-    if !UNFREEZE_REQUIREMENTS.contains(&freeze.requires_verification.as_str()) {
-        return Ok(ValidateCallbackResult::Invalid(format!(
-            "Invalid requires_verification '{}'. Must be one of: {:?}",
-            freeze.requires_verification, UNFREEZE_REQUIREMENTS
-        )));
-    }
-
-    Ok(ValidateCallbackResult::Valid)
-}
 
 // =============================================================================
 // Renewal Protocol Validation Functions
