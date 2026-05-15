@@ -569,6 +569,21 @@ async fn m4_t4_commit_key_rotation_blocked_by_cross_dna_identity_freeze() -> Res
         .expect("elohim cell installed")
         .clone();
 
+    // Register a Human bound to the caller's agent pubkey on the imagodei
+    // cell. Without this, `commit_key_rotation` returns at
+    // `resolve_human_id_for_agent` (imagodei lib.rs:~3099) BEFORE the cross-DNA
+    // bridge call (`call_elohim_query_effective_identity_freeze_for_human`)
+    // executes — making the negative bridge-error guards below vacuous. The
+    // `create_human` extern is idempotent (returns the existing ActionHash if
+    // re-called for the same agent).
+    let _human_action_hash: holo_hash::ActionHash = conductor
+        .call(
+            &imagodei_cell.zome("imagodei"),
+            "create_human",
+            human_input(HUMAN_MATTHEW, "Matthew (M4 T4 freeze)"),
+        )
+        .await;
+
     // Commit an identity-freeze Content entry on elohim DNA.
     let propose_input = ProposeGovernanceActionInputMirrorT4 {
         governance_kind: "governance-action:identity-freeze".to_string(),
@@ -695,6 +710,21 @@ async fn m4_t4_commit_key_rotation_blocked_by_cross_dna_key_revocation() -> Resu
         .expect("elohim cell installed")
         .clone();
 
+    // Register a Human bound to the caller's agent pubkey on the imagodei
+    // cell. Without this, `commit_key_rotation` returns at
+    // `resolve_human_id_for_agent` (imagodei lib.rs:~3099) BEFORE the cross-DNA
+    // bridge call (`call_elohim_query_effective_revocation_for_key`) executes
+    // — making the negative bridge-error guards below vacuous. The
+    // `create_human` extern is idempotent (returns the existing ActionHash if
+    // re-called for the same agent).
+    let _human_action_hash: holo_hash::ActionHash = conductor
+        .call(
+            &imagodei_cell.zome("imagodei"),
+            "create_human",
+            human_input(HUMAN_MATTHEW, "Matthew (M4 T4 revocation)"),
+        )
+        .await;
+
     // Commit a key-revocation Content entry on elohim DNA.
     let revoked_key_str = agent.to_string();
     let propose_input = ProposeGovernanceActionInputMirrorT4 {
@@ -820,6 +850,21 @@ async fn m4_t5_submit_revocation_vote_reads_cross_dna_content() -> Result<()> {
         .find(|c| c.dna_hash() == &elohim_dna_hash)
         .expect("elohim cell installed")
         .clone();
+
+    // Register a Human bound to the caller's agent pubkey on the imagodei
+    // cell. Without this, `submit_revocation_vote` returns at
+    // `resolve_human_id_for_agent` (imagodei lib.rs:~2678) BEFORE the cross-DNA
+    // bridge call (`call_elohim_get_content_by_id` at imagodei lib.rs:~2696)
+    // executes — making the negative bridge-error guards below vacuous. The
+    // `create_human` extern is idempotent (returns the existing ActionHash if
+    // re-called for the same agent).
+    let _human_action_hash: holo_hash::ActionHash = conductor
+        .call(
+            &imagodei_cell.zome("imagodei"),
+            "create_human",
+            human_input(HUMAN_MATTHEW, "Matthew (M4 T5 vote)"),
+        )
+        .await;
 
     // Commit a key-revocation Content entry on elohim DNA with trigger_type
     // = "steward_vote" and threshold_reached = false so the gate fields are
