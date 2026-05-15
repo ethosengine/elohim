@@ -1206,18 +1206,12 @@ pub fn handle_recovery_v2_signal(
         } => {
             // `key_revocations` PK is now `id` (== M4 revocation_id).
             let now = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
-            crate::db::key_revocations::set_effective(
-                conn,
-                &revocation_id,
-                &effective_at,
-                &now,
-            )?;
+            crate::db::key_revocations::set_effective(conn, &revocation_id, &effective_at, &now)?;
 
             // P1 — Eager cache-invalidation sweep (bounded, indexed by revoked_key).
-            // Today: best-effort stub. Future Phase 2B seam:
-            //   UPDATE epr_atoms SET verified_at = NULL WHERE signer_cid = ?revoked_key;
-            // EAGER-SWEEP HOOK (P1): extend here when epr_atoms / peer_identity_bindings land.
-            sweep_dependent_caches_on_revocation(conn, &revoked_key)?;
+            // Stage 1 fallback: legacy path uses effective_at as conservative compromise_at;
+            // T6 upgrades this via derive_compromise_at.
+            let _ = sweep_dependent_caches_on_revocation(conn, &revoked_key, &effective_at)?;
 
             // P1: Outbound reconciliation signal — imagodei.revocation_observed.
             // observed_at is the storage wallclock (when the controller reconciled),
@@ -1237,27 +1231,46 @@ pub fn handle_recovery_v2_signal(
 /// Sweep dependent cached state tied to a revoked key. Eager, bounded,
 /// indexed (not a table scan).
 ///
-/// M4: intentional no-op — no dependent cache tables exist yet at M4 scope
-/// (`peer_identity_bindings` is M5; `epr_atoms.signer_cid` is Phase 2B).
-/// Phase F sweettests assert P1 reconciliation via the
-/// `imagodei.revocation_observed` reconciled-event emission and via direct
-/// `key_revocations` row state (`threshold_reached`, `effective_at`), NOT
-/// via this sweep call.
-/// Phase 2B extension point: `UPDATE epr_atoms SET verified_at = NULL
-///   WHERE signer_cid = ?revoked_key`.
-/// M5 extension point: `DELETE FROM peer_identity_bindings WHERE pubkey = ?revoked_key`.
+/// Phase 2B (A.8): clears `verified_at` on every `epr_atom` row where
+/// `signer_cid == revoked_key` AND `issued_at > compromise_at` AND the row was
+/// previously verified (`verified_at IS NOT NULL`). The sweep is time-bounded —
+/// atoms issued strictly before the compromise window are left untouched, as
+/// their signatures cannot have been forged by the compromised key.
+///
+/// The `(signer_cid, issued_at)` index on `epr_atoms` (migration
+/// `2026-04-25-000000_verified_at_on_epr_atoms`) makes this a single indexed
+/// UPDATE with no table-scan.
+///
+/// Returns the number of rows updated. Both callers currently ignore the count
+/// via `let _ = ...?;` (unit propagation via `?` is a strict subset).
+///
+/// M5 extension point: add `DELETE FROM peer_identity_bindings WHERE pubkey = ?revoked_key`.
 fn sweep_dependent_caches_on_revocation(
-    _conn: &mut diesel::sqlite::SqliteConnection,
+    conn: &mut diesel::sqlite::SqliteConnection,
     revoked_key: &str,
-) -> Result<(), crate::error::StorageError> {
-    // EAGER-SWEEP HOOK (P1): Phase 2B adds epr_atoms sweep here.
-    // M5 adds peer_identity_bindings sweep here.
-    tracing::debug!(
+    compromise_at: &str,
+) -> Result<usize, crate::error::StorageError> {
+    use crate::db::diesel_schema::epr_atoms;
+    use diesel::prelude::*;
+
+    let updated = diesel::update(
+        epr_atoms::table
+            .filter(epr_atoms::signer_cid.eq(revoked_key))
+            .filter(epr_atoms::issued_at.gt(compromise_at))
+            .filter(epr_atoms::verified_at.is_not_null()),
+    )
+    .set(epr_atoms::verified_at.eq::<Option<String>>(None))
+    .execute(conn)
+    .map_err(|e| crate::error::StorageError::Database(e.to_string()))?;
+
+    tracing::info!(
         target: "imagodei.revocation_sweep",
         revoked_key = %revoked_key,
-        "eager sweep triggered; no dependent cache tables in M4 scope"
+        compromise_at = %compromise_at,
+        updated = %updated,
+        "A.8 EPR-atom revocation sweep complete"
     );
-    Ok(())
+    Ok(updated)
 }
 
 // =============================================================================
@@ -1344,10 +1357,7 @@ fn canonical_envelope_bytes(envelope: &KeyRevocationEnvelope) -> Vec<u8> {
             agent_cid: &envelope.metadata.agent_cid,
             compromise_at: &envelope.metadata.compromise_at,
             effective_at: &envelope.metadata.effective_at,
-            triggering_revocation_id: envelope
-                .metadata
-                .triggering_revocation_id
-                .as_deref(),
+            triggering_revocation_id: envelope.metadata.triggering_revocation_id.as_deref(),
             supersedes_cid: envelope.metadata.supersedes_cid.as_deref(),
         },
     };
@@ -1367,20 +1377,22 @@ fn canonical_envelope_bytes(envelope: &KeyRevocationEnvelope) -> Vec<u8> {
 /// Called by `handle_imagodei_dna_signal` before projection. Consumer-side
 /// verification guards against forged or mutated envelopes arriving via the
 /// Holochain app-signal stream or gossip relay.
-fn verify_envelope_signature(envelope: &KeyRevocationEnvelope) -> Result<(), crate::error::StorageError> {
+fn verify_envelope_signature(
+    envelope: &KeyRevocationEnvelope,
+) -> Result<(), crate::error::StorageError> {
     use base64::{engine::general_purpose::STANDARD, Engine as _};
     use ed25519_dalek::{Signature as Ed25519Sig, VerifyingKey};
 
-    let issuer_bytes = STANDARD
-        .decode(&envelope.issuer)
-        .map_err(|e| crate::error::StorageError::InvalidInput(format!(
+    let issuer_bytes = STANDARD.decode(&envelope.issuer).map_err(|e| {
+        crate::error::StorageError::InvalidInput(format!(
             "key_revocation_envelope: issuer base64 decode failed: {e}"
-        )))?;
-    let sig_bytes = STANDARD
-        .decode(&envelope.signature)
-        .map_err(|e| crate::error::StorageError::InvalidInput(format!(
+        ))
+    })?;
+    let sig_bytes = STANDARD.decode(&envelope.signature).map_err(|e| {
+        crate::error::StorageError::InvalidInput(format!(
             "key_revocation_envelope: signature base64 decode failed: {e}"
-        )))?;
+        ))
+    })?;
 
     let key_arr: [u8; 32] = issuer_bytes.try_into().map_err(|_| {
         crate::error::StorageError::InvalidInput(
@@ -1456,7 +1468,11 @@ pub fn handle_imagodei_dna_signal(
             )?;
 
             // Eager cache-invalidation sweep (same as the legacy path).
-            sweep_dependent_caches_on_revocation(conn, &envelope.metadata.revoked_pubkey)?;
+            let _ = sweep_dependent_caches_on_revocation(
+                conn,
+                &envelope.metadata.revoked_pubkey,
+                &envelope.metadata.compromise_at,
+            )?;
 
             // P1: Outbound reconciliation signal.
             emit_reconciled_signal(ImagodeiReconciledEvent::RevocationObserved {
@@ -1551,7 +1567,10 @@ mod dna_signal_tests {
         env.signature = "CHANGED_SIGNATURE".into();
         env.relay_chain = vec![serde_json::json!({"hop": 1})];
         let b2 = canonical_envelope_bytes(&env);
-        assert_eq!(b1, b2, "signature/relay_chain changes must not affect canonical bytes");
+        assert_eq!(
+            b1, b2,
+            "signature/relay_chain changes must not affect canonical bytes"
+        );
     }
 
     fn make_test_envelope() -> KeyRevocationEnvelope {
@@ -2253,4 +2272,204 @@ pub struct ElohimContentSignal {
     pub description: String,
     /// ISO 8601 / RFC 3339 creation timestamp.
     pub created_at: String,
+}
+
+// =============================================================================
+// A.8 sweep tests
+// =============================================================================
+
+#[cfg(test)]
+mod revocation_sweep_tests {
+    use super::*;
+    use diesel::connection::SimpleConnection;
+    use diesel::prelude::*;
+    use diesel::sqlite::SqliteConnection;
+
+    /// Stand up a minimal in-memory SQLite DB with only the `epr_atoms` columns
+    /// needed by the sweep. Mirrors the shape of the real migration without
+    /// pulling in `embed_migrations!` (which requires the full schema).
+    fn setup_epr_atoms_conn() -> SqliteConnection {
+        let mut conn =
+            SqliteConnection::establish(":memory:").expect("Failed to create in-memory SQLite");
+
+        conn.batch_execute(
+            r#"
+            CREATE TABLE epr_atoms (
+                cid                      TEXT NOT NULL PRIMARY KEY,
+                kind                     TEXT NOT NULL,
+                schema_ref               TEXT NOT NULL,
+                schema_key               TEXT NOT NULL,
+                reach                    TEXT NOT NULL,
+                issued_at                TEXT NOT NULL,
+                signer_cid               TEXT NOT NULL,
+                supersedes               TEXT,
+                canonical_bytes          BLOB NOT NULL,
+                payload_bytes            BLOB NOT NULL,
+                proof_bytes              BLOB NOT NULL,
+                proof_algorithm          TEXT NOT NULL,
+                verified_at              TEXT,
+                verified_signer_fingerprint TEXT
+            );
+            CREATE INDEX idx_epr_atoms_signer_cid_issued_at ON epr_atoms(signer_cid, issued_at);
+            "#,
+        )
+        .expect("Failed to create epr_atoms test table");
+
+        conn
+    }
+
+    fn insert_test_atom(
+        conn: &mut SqliteConnection,
+        cid: &str,
+        signer_cid: &str,
+        issued_at: &str,
+        verified_at: Option<&str>,
+    ) {
+        use crate::db::diesel_schema::epr_atoms;
+        use diesel::prelude::*;
+
+        diesel::insert_into(epr_atoms::table)
+            .values((
+                epr_atoms::cid.eq(cid),
+                epr_atoms::kind.eq("test-kind"),
+                epr_atoms::schema_ref.eq("test-schema-ref"),
+                epr_atoms::schema_key.eq("test-schema-key"),
+                epr_atoms::reach.eq("local"),
+                epr_atoms::issued_at.eq(issued_at),
+                epr_atoms::signer_cid.eq(signer_cid),
+                epr_atoms::supersedes.eq::<Option<String>>(None),
+                epr_atoms::canonical_bytes.eq(vec![0u8; 4]),
+                epr_atoms::payload_bytes.eq(vec![0u8; 4]),
+                epr_atoms::proof_bytes.eq(vec![0u8; 4]),
+                epr_atoms::proof_algorithm.eq("ed25519"),
+                epr_atoms::verified_at.eq(verified_at),
+                epr_atoms::verified_signer_fingerprint.eq::<Option<String>>(None),
+            ))
+            .execute(conn)
+            .expect("Failed to insert test atom");
+    }
+
+    fn fetch_verified_at(conn: &mut SqliteConnection, cid: &str) -> Option<String> {
+        use crate::db::diesel_schema::epr_atoms;
+        use diesel::prelude::*;
+
+        epr_atoms::table
+            .filter(epr_atoms::cid.eq(cid))
+            .select(epr_atoms::verified_at)
+            .first::<Option<String>>(conn)
+            .expect("Failed to fetch atom")
+    }
+
+    /// Matching atom (same signer, issued after compromise) must have
+    /// verified_at cleared. Atom from a different signer must be untouched.
+    #[test]
+    fn sweep_clears_verified_at_for_matching_atoms() {
+        let mut conn = setup_epr_atoms_conn();
+
+        insert_test_atom(
+            &mut conn,
+            "cid-A",
+            "revoked-key-1",
+            "2026-01-02T00:00:00Z",
+            Some("2026-01-05T00:00:00Z"),
+        );
+        insert_test_atom(
+            &mut conn,
+            "cid-B",
+            "other-key-99",
+            "2026-01-02T00:00:00Z",
+            Some("2026-01-05T00:00:00Z"),
+        );
+
+        let count = sweep_dependent_caches_on_revocation(
+            &mut conn,
+            "revoked-key-1",
+            "2026-01-01T00:00:00Z",
+        )
+        .expect("sweep must not error");
+
+        assert_eq!(count, 1, "exactly one row should have been cleared");
+        assert!(
+            fetch_verified_at(&mut conn, "cid-A").is_none(),
+            "cid-A verified_at must be NULL after sweep"
+        );
+        assert!(
+            fetch_verified_at(&mut conn, "cid-B").is_some(),
+            "cid-B (different signer) must be unchanged"
+        );
+    }
+
+    /// Atom whose issued_at is strictly before compromise_at must NOT be cleared.
+    #[test]
+    fn sweep_leaves_pre_compromise_atoms_alone() {
+        let mut conn = setup_epr_atoms_conn();
+
+        insert_test_atom(
+            &mut conn,
+            "cid-pre",
+            "revoked-key-2",
+            "2025-12-31T00:00:00Z",
+            Some("2026-01-03T00:00:00Z"),
+        );
+
+        let count = sweep_dependent_caches_on_revocation(
+            &mut conn,
+            "revoked-key-2",
+            "2026-01-01T00:00:00Z",
+        )
+        .expect("sweep must not error");
+
+        assert_eq!(count, 0, "pre-compromise atom must not be updated");
+        assert!(
+            fetch_verified_at(&mut conn, "cid-pre").is_some(),
+            "pre-compromise atom verified_at must remain set"
+        );
+    }
+
+    /// Running the sweep twice must be a no-op on the second run.
+    #[test]
+    fn sweep_is_idempotent() {
+        let mut conn = setup_epr_atoms_conn();
+
+        insert_test_atom(
+            &mut conn,
+            "cid-idem",
+            "revoked-key-3",
+            "2026-02-15T00:00:00Z",
+            Some("2026-02-20T00:00:00Z"),
+        );
+
+        let first = sweep_dependent_caches_on_revocation(
+            &mut conn,
+            "revoked-key-3",
+            "2026-01-01T00:00:00Z",
+        )
+        .expect("first sweep must not error");
+        assert_eq!(first, 1, "first run must clear the row");
+
+        let second = sweep_dependent_caches_on_revocation(
+            &mut conn,
+            "revoked-key-3",
+            "2026-01-01T00:00:00Z",
+        )
+        .expect("second sweep must not error");
+        assert_eq!(second, 0, "second run must be a no-op (already NULL)");
+
+        assert!(
+            fetch_verified_at(&mut conn, "cid-idem").is_none(),
+            "verified_at must still be NULL after second sweep"
+        );
+    }
+
+    /// An empty epr_atoms table must return Ok(0).
+    #[test]
+    fn sweep_returns_zero_on_empty_table() {
+        let mut conn = setup_epr_atoms_conn();
+
+        let count =
+            sweep_dependent_caches_on_revocation(&mut conn, "any-key", "2026-01-01T00:00:00Z")
+                .expect("sweep on empty table must not error");
+
+        assert_eq!(count, 0);
+    }
 }
