@@ -60,11 +60,11 @@ Five reader sites decode one of the three legacy types. All five live in
 
 | # | Function | File:line | Legacy entry type | Gate semantic role | Envelope fields needed after migration |
 |---|---|---|---|---|---|
-| 1 | `submit_revocation_vote` | `lib.rs:2469` | `KeyRevocation` | Load the pending revocation under vote — Gate A (existence: anchor → record), Gate B (`trigger_type == "steward_vote"`), Gate C (`!threshold_reached`), Gate D (steward is active emergency contact for `human_id`). Subsequent block also reads `required_votes`, `current_votes`, `revoked_key`, `id`, `human_id` for vote accounting + the post-threshold `KeyRevocationEffective` signal payload. | `human_id`, `revoked_key`, `id`, `trigger_type`, `required_votes`, `current_votes`, `threshold_reached`, `effective_at`, `created_at`, `updated_at`. All currently in the bespoke `KeyRevocation` struct; all must be readable from `Content.metadata` JSON for `governance-action:key-revocation` (Stage 2 schema). |
+| 1 | `submit_revocation_vote` | `lib.rs:2469–2590` (decode at 2469; gate body + signal payload through 2590) | `KeyRevocation` | Load the pending revocation under vote — Gate A (existence: anchor → record), Gate B (`trigger_type == "steward_vote"`), Gate C (`!threshold_reached`), Gate D (steward is active emergency contact for `human_id`). Subsequent block also reads `required_votes`, `current_votes`, `revoked_key`, `id`, `human_id` for vote accounting + the post-threshold `KeyRevocationEffective` signal payload. | `human_id`, `revoked_key`, `id`, `trigger_type`, `required_votes`, `current_votes`, `threshold_reached`, `effective_at`, `created_at`, `updated_at`. All currently in the bespoke `KeyRevocation` struct; all must be readable from `Content.metadata` JSON for `governance-action:key-revocation` (Stage 2 schema). |
 | 2 | `submit_revocation_vote` (pending-link cleanup loop) | `lib.rs:2614` | `KeyRevocation` | Walks `PendingRevocations` global anchor links to find the link whose target entry's `id` matches `input.revocation_id`, then `delete_link` to migrate it out of the pending set after the threshold-meeting vote. Identifier-only read: `rev.id`. | `id` only. (Cheaper post-migration: the link tag can carry `revocation_id` bytes the same way Stage G.A.2 made `RecoveryRequestToHumanityWitness` tag-based — flagged as a Stage 5 simplification candidate, but in-scope work is just the `Content.metadata` decode.) |
-| 3 | `collect_active_freezes_for_human` (called from `commit_key_rotation` M3 freeze-floor gate at lib.rs:2722–2733) | `lib.rs:2696` | `IdentityFreeze` | Traverses `HumanToFreeze` anchor links for the human, decodes each `IdentityFreeze`, keeps `is_active == true`. Result feeds `check_freeze_floor_rules(authority, human_id, &freeze_refs)` which inspects freeze fields to decide whether the key rotation is allowed under the claimed `RecoveryAuthority`. | At minimum: `is_active`, plus whatever fields `check_freeze_floor_rules` reads (likely `reason`, `frozen_at`, `frozen_until`, `frozen_by`, `human_id`, scope/level). The full `IdentityFreeze` struct is currently returned and shared by reference — post-migration the helper should return a thin `FreezeView` struct (or `Content.metadata`-parsed projection) so call sites are not coupled to wire shape. |
+| 3 | `collect_active_freezes_for_human` (called from `commit_key_rotation` M3 freeze-floor gate at lib.rs:2722–2733) | `lib.rs:2696` | `IdentityFreeze` | Traverses `HumanToFreeze` anchor links for the human, decodes each `IdentityFreeze`, keeps `is_active == true`. Result feeds `check_freeze_floor_rules(authority, human_id, &freeze_refs)` which inspects freeze fields to decide whether the key rotation is allowed under the claimed `RecoveryAuthority`. | `is_active`, `human_id`, `frozen_at_layer`. These are the only three fields `check_freeze_floor_rules` reads (`imagodei_integrity/src/recovery_v2.rs:305–338`). Task 4 can define `FreezeView { is_active: bool, human_id: String, frozen_at_layer: Option<String> }` and nothing else. |
 | 4 | `commit_key_rotation` revocation-floor gate | `lib.rs:2769` | `KeyRevocation` | Walks `PendingRevocations` + `EffectiveRevocations` global anchors. For each linked revocation, decodes the entry and rejects the rotation if `rev.revoked_key == rotating_from_str`. Error message also includes `rev.id` and the pending/effective `status` for operator-readable diagnostics. | `revoked_key`, `id`. Two-field read; cleanly maps to `Content.metadata` JSON. |
-| 5 | `submit_intimate_witness` Gate 1 | `lib.rs:2942` | `RecoveryRequest` | Gate 1 (existence: `get(input.recovery_request_hash)` must resolve to a `RecoveryRequest`), Gate 1b (must have a populated `human_id`). The decoded `human_id` is then used by Gates 2 (`is_active_emergency_contact(&human_id, &authorizer_human_id)`) and 3 (tag-based dedupe is keyed on the authorizer — but `human_id` flows into the signal payload + the synthesised `HumanityWitness` for elohim DNA). | `human_id` is the load-bearing field; the post-Gate-1 flow also reads other envelope context implicitly through the bridge call. Stage 3 must decode `Content` at `recovery_request_hash` and extract `metadata.human_id`. |
+| 5 | `submit_intimate_witness` Gate 1 | `lib.rs:2942` | `RecoveryRequest` | Gate 1 (existence: `get(input.recovery_request_hash)` must resolve to a `RecoveryRequest`), Gate 1b (must have a populated `human_id`). The decoded `human_id` is then used by Gates 2 (`is_active_emergency_contact(&human_id, &authorizer_human_id)`) and 3 (tag-based dedupe is keyed on the authorizer — but `human_id` flows into the signal payload + the synthesised `HumanityWitness` for elohim DNA). | `human_id` is the load-bearing field; the post-Gate-1 flow also reads other envelope context implicitly through the bridge call. Task 3 must decode `Content` at `recovery_request_cid` (renamed from `recovery_request_hash` by Task 3 Step 2) and extract `metadata.human_id`. |
 
 **Count: 5 reader sites.**
 
@@ -86,7 +86,7 @@ Five reader sites decode one of the three legacy types. All five live in
 ## Cross-cutting observations for Stages 2–5
 
 1. **All five sites use bare `.to_app_option()` with let-binding type inference.** None
-   use the turbofish form `::<T>()`. Stage 2's cross-DNA `Content` decoder helper
+   use the turbofish form `::<T>()`. Task 2's cross-DNA `Content` decoder helper
    should expose an equally lightweight signature so the migration is mechanical
    (e.g., `decode_content_metadata::<T: DeserializeOwned>(record: &Record) -> ExternResult<T>`),
    matching the existing call-site shape.
@@ -101,10 +101,11 @@ Five reader sites decode one of the three legacy types. All five live in
    migration lands.
 
 3. **One site (#2, the pending-link cleanup loop) reads only `id`.** It is a candidate
-   for a Stage G.A.2–style tag-based simplification (move `revocation_id` into the
-   `PendingRevocations` link tag, eliminate the entry decode entirely). Flagged here
-   but **not required** by Task 5 — Task 5's mandate is the `Content.metadata` decode
-   path; the tag-based simplification is a Stage-G-followup follow-up.
+   for tag-based simplification — move `revocation_id` into the `PendingRevocations`
+   link tag (the same pattern used by `RecoveryRequestToHumanityWitness`), eliminating
+   the entry decode entirely. Flagged here but **not required** by Task 5 — Task 5's
+   mandate is the `Content.metadata` decode path; the tag-based simplification is a
+   separate follow-up.
 
 4. **Site #3 (`collect_active_freezes_for_human`) returns `Vec<IdentityFreeze>`** which
    then feeds `check_freeze_floor_rules` taking `&[&IdentityFreeze]`. Migrating this
@@ -116,9 +117,9 @@ Five reader sites decode one of the three legacy types. All five live in
 5. **All five sites read fields that are already present in the existing
    `RecoveryRequest`, `KeyRevocation`, `IdentityFreeze` structs.** No new fields need to
    be added to the `Content.metadata` JSON beyond a faithful camelCase serialization
-   of the legacy struct. Stage 2's schemas (`governance-action:recovery-request`,
+   of the legacy struct. Task 2's schemas (`governance-action:recovery-request`,
    `governance-action:key-revocation`, `governance-action:identity-freeze`) should
-   mirror the existing struct shape one-for-one. This keeps Stage 3–5's migration
+   mirror the existing struct shape one-for-one. This keeps Tasks 3–5's migration
    purely mechanical: replace `to_app_option()` with the cross-DNA decoder helper,
    keep the gate logic verbatim.
 
@@ -185,9 +186,9 @@ extern) and Stage 4b's `ShareAssembler` (Task 21) which can rely on a stable
 discriminator for custody-manifest lookup.
 
 **References:**
-- Brainstorm D4 — `genesis/docs/plans/2026-05-15-recovery-m4-brainstorm.md` §136–170
+- Brainstorm D4 — `genesis/docs/plans/2026-05-15-recovery-m4-brainstorm.md` lines 136–170
 - Brainstorm D4 sub-question (recommended resolution moment was Stage 1 gate-reader
-  audit) — `genesis/docs/plans/2026-05-15-recovery-m4-brainstorm.md` §187
+  audit) — `genesis/docs/plans/2026-05-15-recovery-m4-brainstorm.md` line 187
 - Sprint plan Tasks 21, 22 — `genesis/docs/plans/2026-05-15-recovery-m4-completion-shamir-optional-plan.md`
 
 ## Sign-off
