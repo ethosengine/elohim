@@ -47,7 +47,7 @@ pub fn decode_content_entry(entry: Entry) -> Result<CrossDnaContent, String> {
         Entry::App(app_bytes) => {
             let sb: SerializedBytes = app_bytes.into_sb();
             holochain_serialized_bytes::decode::<_, CrossDnaContent>(sb.bytes())
-                .map_err(|e| format!("decode_content_entry: {e}"))
+                .map_err(|e| format!("decode_content_entry: {e:?}"))
         }
         _ => Err("decode_content_entry: entry is not an App entry".to_string()),
     }
@@ -99,5 +99,38 @@ mod tests {
         assert_eq!(decoded.content_type, original.content_type);
         assert_eq!(decoded.author_id, original.author_id);
         assert_eq!(decoded.metadata_json, original.metadata_json);
+    }
+
+    #[test]
+    fn decode_succeeds_when_metadata_json_omitted() {
+        // Encode a struct WITHOUT the metadata_json field to prove that the
+        // `#[serde(default)]` annotation on CrossDnaContent::metadata_json
+        // tolerates older Content entries that didn't include it.
+        //
+        // We use a local helper struct (instead of BTreeMap) because
+        // holochain_serialized_bytes::decode goes through rmp_serde's
+        // named-struct encoding — a BTreeMap would not round-trip into
+        // CrossDnaContent's named-field shape.
+        #[derive(Debug, Serialize)]
+        struct PartialContent {
+            id: String,
+            content_type: String,
+            author_id: Option<String>,
+        }
+        let partial = PartialContent {
+            id: "test-id".to_string(),
+            content_type: "concept".to_string(),
+            author_id: Some("test-author".to_string()),
+        };
+        let bytes: Vec<u8> = holochain_serialized_bytes::encode(&partial).expect("encode");
+        let sb: SerializedBytes =
+            SerializedBytes::from(holochain_serialized_bytes::UnsafeBytes::from(bytes));
+        let entry = Entry::App(AppEntryBytes::try_from(sb).expect("app entry bytes"));
+        let decoded =
+            decode_content_entry(entry).expect("decode tolerates missing metadata_json");
+        assert_eq!(decoded.id, "test-id");
+        assert_eq!(decoded.content_type, "concept");
+        assert_eq!(decoded.author_id, Some("test-author".to_string()));
+        assert_eq!(decoded.metadata_json, "");
     }
 }

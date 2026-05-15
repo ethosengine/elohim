@@ -33,10 +33,12 @@ pub use portal_host::*;
 pub mod submit_specialist_revocation;
 pub use submit_specialist_revocation::*;
 
-// content_decode — cross-DNA Content entry decoder (Recovery M4 completion, Task 2)
+// content_decode — cross-DNA Content entry decoder (Recovery M4 completion, Task 2).
+// `dead_code` allow is transient: M4 Tasks 3-5 reference
+// `crate::content_decode::{decode_content_entry, CrossDnaContent}` via explicit
+// path. Drop this allow when the first caller lands.
+#[allow(dead_code)]
 mod content_decode;
-#[allow(unused_imports)]
-pub use content_decode::*;
 
 // Bootstrap-steward pattern — reference implementation for the protocol
 // (also ported to mishpat, node-registry, lamad). See bootstrap_steward.rs.
