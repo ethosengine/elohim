@@ -24,7 +24,7 @@ Feature: EPR Content Addressing
 
   # --- Context-Aware Resolution ---
 
-  @wip @browser-only
+  @browser-only
   Scenario: EPR link in markdown resolves as cross-path
     # Terrance is reading the manifesto. A reference to rea-foundations
     # appears inline — not as a footnote, but as a living link into
@@ -36,7 +36,7 @@ Feature: EPR Content Addressing
     Then Terrance navigates to "rea-foundations" in path "hrea-care-economy"
     And the resolution type is "cross-path"
 
-  @wip @browser-only
+  @browser-only
   Scenario: EPR link resolves as standalone when not in a path
     # When Terrance reads a resource directly (no enclosing curriculum),
     # the same EPR reference resolves into a standalone view — the
@@ -49,7 +49,6 @@ Feature: EPR Content Addressing
 
   # --- CID Content Addressing ---
 
-  @wip
   Scenario: Blob content loads via CID
     # The body of every notarized piece is content-addressed (CID).
     # The renderer fetches by hash, not by location — so the same bytes
@@ -62,7 +61,6 @@ Feature: EPR Content Addressing
 
   # --- Three-Pillar Metadata ---
 
-  @wip
   Scenario: EPR Head carries three-pillar metadata
     # The EPR Head is the verifiable preview — what the content is
     # (lamad), what stewardship governs it (qahal), and (when applicable)
@@ -76,7 +74,7 @@ Feature: EPR Content Addressing
 
   # --- EPR Popover ---
 
-  @wip @browser-only
+  @browser-only
   Scenario: EPR link shows three-pillar popover on hover
     # Before clicking, Terrance can see what the link points to. A hover
     # popover surfaces the verified preview from the EPR Head — so he
@@ -90,6 +88,10 @@ Feature: EPR Content Addressing
 
   # --- New Wave 3 scenarios — dramatize the human moments the surface enables ---
 
+  # @wip retained: shefa-context population on content fixtures + popover shefa/lamad/qahal
+  # phrasing step-defs not yet implemented. The popover surface itself works (covered by
+  # scenario 5 above); this scenario asserts the three-pillar fan-out which requires
+  # shefa-context-populated fixtures.
   @wip @browser-only
   Scenario: EPR popover surfaces all three pillars when present
     # When content carries shefa context (a stewardship commitment, an
@@ -103,6 +105,10 @@ Feature: EPR Content Addressing
     And the popover shows the qahal reach level
     And the popover shows the shefa stewardship summary
 
+  # @wip retained: origin-context-aware destination rendering + back-affordance UI not yet
+  # built in elohim-app. The cross-path navigation itself works (covered by scenario 1
+  # above); this scenario asserts the destination tailors its render based on origin —
+  # a substantial UX surface still in design.
   @wip @browser-only
   Scenario: Following an EPR link transfers reading context to the destination
     # The renderer at the destination should know Terrance arrived FROM
@@ -115,6 +121,10 @@ Feature: EPR Content Addressing
     Then the destination "rea-foundations" view renders with origin context "manifesto"
     And the destination shows a back-affordance to the originating manifesto step
 
+  # @wip retained: supersedence model + "historical version" UI affordance not yet built.
+  # The EPR codec supports supersedence references but the renderer does not yet display
+  # "this version was superseded" notices. Requires both content-side supersedence wiring
+  # and a UI affordance pass.
   @wip @browser-only
   Scenario: EPR link to a versioned-since-authored CID degrades gracefully
     # An EPR reference points to a specific CID. If the content has been
@@ -127,6 +137,10 @@ Feature: EPR Content Addressing
     And the notice offers to navigate to the current canonical version
     And both versions remain content-addressable and verifiable
 
+  # @wip retained: DAG-CBOR decode + Ed25519 signature verification test infrastructure
+  # not yet wired in a2o steps. The existing EPR Head steps (scenario 4 above) assert
+  # response-shape only — verifying the signature end-to-end requires importing a CBOR
+  # decoder + signature-verify library into the step-defs.
   @wip
   Scenario: EPR Head signature is verifiable end-to-end
     # The Head isn't just metadata — it's a signed claim by a known
