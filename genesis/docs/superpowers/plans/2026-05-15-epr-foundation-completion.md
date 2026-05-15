@@ -81,13 +81,29 @@
 
 ## Sequencing (band order)
 
-Implement in this order. Bands A and B touch `elohim/elohim-storage/src/` so they share a worktree; Band C touches Markdown and a2o feature files and may parallelize.
+**REVISED 2026-05-15 — M4 coordination correction.** The Recovery M4 sprint is running in parallel (operator at `/projects/elohim` on `dev`; EPR in this worktree at `worktree-epr-foundation-completion`; merge target = dev). M4 owns the foundation:
 
-- **Band A — Wave 1 substantive + tail + plan debt** (Tasks 1–6): Land `RecoveryFlowProjector` + dispatch wiring + `derive_compromise_at` upgrade + W1 federation-aggregate tail + W2A/W2B debt cleanup.
-- **Band B — Wave 2 narrowed** (Tasks 7–8): Add `RevocationAttestation` arm. Confirm Phase 12 status, then optionally add `AgentPeerBinding` arm.
-- **Band C — Waves 5–6** (Tasks 9–11): Opus-author the @wip lift on 17 scenarios, run browser stage, kick off 1-week cross-stack soak.
+- **M4 T6:** `key_revocations` migration — 15 columns including `derived_compromise_at`. EPR T5 + T6 consume this schema; do NOT redefine.
+- **M4 T7:** Diesel models + CRUD for `recovery_flows` + `key_revocations`. EPR uses the M4 writers as-is.
+- **M4 T8:** `RecoveryFlowProjector` skeleton (Open-state branch) at `elohim/elohim-storage/src/services/recovery_flow_projector.rs`. EPR T5's contribution is the `key-revocation:effective` arm + `key_revocations` writer added as branches **INSIDE M4's `handle_content_signal` dispatcher** — co-located (per M4 brainstorm D1), NOT in a sibling module.
+- **M4 T9:** State-machine branches. Fully blocks EPR T5 until landed (~2h after T8 starts).
+- **M4 T10:** Central dispatcher `elohim_content_dispatcher::dispatch` — where prefix-routing lives. EPR T7 (signal consumer) is **upstream** of this dispatcher; EPR T5 (writer arm) is **inside** the projector M4 builds. Keep that boundary.
 
-The `epr_2b_batch_a_full_loop` `#[ignore]` at `epr_phase_2b_batch_a_e2e.rs:648` lifts as part of Task 5 (Stage 2 derive_compromise_at landed) plus the Jenkins `imagodei.dna` pack-then-test stage (out-of-scope for this plan — operator coordinates with the holochain pipeline).
+**Revised execution order:**
+
+- **Band A — debt cleanup + W1 tail** (Tasks 1–4): doc-only + federation-aggregate `resilience_cliffs`. ✅ all four landed.
+- **Band B — independent of M4** (Tasks 7–10): pivot here while M4 T6–T9 land. T7 = `RevocationAttestation` IntegrityNotify arm (D2 slim payload, no envelope inlining — M4 T17 will fail-fast if any DNA emission tries to inline `contentEnvelope`). T8 = D5 Phase 12 check + conditional `AgentPeerBinding`. T9 + T10 = Opus-authored a2o `@wip` lift.
+- **Band C — blocked on M4** (Tasks 5 + 6): resumes after M4 T6–T9 land (ETA ~4–5h from M4 kickoff). T5 becomes "add `key-revocation:effective` arm + `key_revocations` writer to M4's projector" (additive, not creation). T6 may reduce to "populate `derived_compromise_at` column" if M4 owns the computation.
+- **Band D — sprint close** (Task 11): operator-driven cross-stack soak.
+
+The `epr_2b_batch_a_full_loop` `#[ignore]` at `epr_phase_2b_batch_a_e2e.rs:648` lifts when both conditions clear: M4 T9 lands (compromise-window state machine) + Jenkins `imagodei.dna` pack-then-test stage (out of scope for this plan — operator coordinates with the holochain pipeline).
+
+### Architectural notes (from operator + M4 coordination)
+
+- **DNA role naming (saved in main checkout at `.claude/memory/project_elohim_dna_as_sdk_boundary.md`):** elohim DNA is the SDK contract; lamad is one implementation. EPR code calling into the elohim coordinator should target role `"elohim"` (SDK-correct) not `"lamad"` (implementation name). Production `happ.yaml` currently misdeclares this — backlog item `ce89d2e7e` (`genesis/data/timeline/backlog/cross-dna-role-name-and-contract-enforcement.md`). Don't fix it in this sprint; just stay consistent.
+- **Devspace quirks for SweetTest local runs:** use `env -u RUSTFLAGS BINDGEN_EXTRA_CLANG_ARGS="-I/usr/lib/clang/20/include" cargo test ...` for native builds (the `RUSTFLAGS=--cfg getrandom_backend="custom"` flag is WASM-only and breaks native).
+- **SweetTests with `#[ignore = "requires packed DNAs from Jenkins pipeline"]`** only run in CI; do not attempt locally.
+- **Disk pressure** is the dominant blocker — reclaim with `cargo-pool prune family <name>` before long Rust builds.
 
 ---
 
