@@ -851,14 +851,23 @@ EOF
 
 ## Task 6: W2D — upgrade `derive_compromise_at` from Stage-1 stub to projection lookup
 
-> **STATUS — 2026-05-15: ⏸️ DEFERRED to legacy-path-removal task (post-back-compat-window).**
+> **STATUS — 2026-05-15: ✅ LANDED (reframed as legacy-path retirement).** Closing commit `e3f03e14c`.
 >
-> Deferred for three convergent reasons:
-> 1. **Sprint acceptance is met without T6.** Load-bearing work is T5 (A.8 sweep) + T7 (RevocationAttestation IntegrityNotify arm) + Tasks 9–10 (a2o @wip lift). T6 is tail cleanup whose semantic value during the back-compat window is small.
-> 2. **The original target table doesn't exist.** Original plan referenced `revocation_votes` for the projection-lookup, but M4 landed `recovery_flows` + reused the existing `key_revocations` table instead. No `revocation_votes` migration on dev. The TODO(A.12) comment in the live code at `holochain_app_signal.rs:282–288` already points at `key_revocations.created_at` (the community's first-declared compromise time) as the right lookup column.
-> 3. **The sweep doesn't currently consume `derive_compromise_at`'s output.** The A.8 sweep at `signals.rs:1220` (legacy path) takes `effective_at` directly. T6 alone would improve only the `DnaSignal::KeyRevocation` envelope's `compromise_at` field for legacy-emitted signals — not the sweep window. Fully tightening the sweep window would require additionally plumbing the derived value into the legacy sweep callsite — a non-trivial refactor for a path that is `#[deprecated]` and removed in one release cycle.
+> User directive 2026-05-15: *"we shouldn't be worried about backwards compatibility."* T6 was reframed mid-sprint from "upgrade the Stage-1 stub" into a pure consumer-side retirement of the legacy `RecoveryV2Signal::KeyRevocationEffective` path. The new T18 `DnaSignal::KeyRevocation` envelope carries `compromise_at` directly in metadata, making the derivation lookup unnecessary.
 >
-> **When this is re-engaged:** at the moment the back-compat window closes (the release cycle in which `RecoveryV2Signal::KeyRevocationEffective` is removed per T18 spec doc), the legacy translation path goes away entirely and `derive_compromise_at` along with it. If the project decides to keep the legacy path alive longer than expected, re-engage T6 then. See memory entry `project_t6_derive_compromise_at_deferred.md`.
+> **What landed on the consumer side (elohim-storage):**
+> - `derive_compromise_at` function REMOVED entirely (was at `holochain_app_signal.rs:289-297`). Zero callers remain.
+> - `translate_recovery_v2`'s legacy `KeyRevocationEffective` arm FOLDED into the "not consumed by reconcile controller" catch-all at `holochain_app_signal.rs:222-225`.
+> - `handle_recovery_v2_signal`'s legacy arm at `signals.rs:1200-1206` REPLACED with explicit no-op (`{ .. } => Ok(())`) so producer-side emissions don't break match exhaustiveness while M4 deletes the variant.
+> - Stage-1 fallback comment that T5 left at `signals.rs:1212-1213` REMOVED.
+> - Module doc-comment at `holochain_app_signal.rs:27-35` rewritten to record the retirement.
+> - Orphaned `KeyRevocationSignal` import REMOVED.
+>
+> Most of the deletion landed on dev independently and arrived in this branch via merge `d14b0e3ae`. EPR closing commit `e3f03e14c` cleaned up the orphaned import + finalized the file state.
+>
+> **What M4 still owes (producer side):** the `RecoveryV2Signal::KeyRevocationEffective` variant + its three emission sites in the imagodei coordinator zome (`create_self_revocation`, `submit_revocation_vote` threshold-reached branch, `submit_specialist_revocation`) — these emit to dead air on the EPR consumer side and M4 deletes them as part of T19+ tail work. EPR's no-op arm stays in place until M4 confirms producer-side deletion.
+>
+> **Canonical replacement:** `DnaSignal::KeyRevocation(KeyRevocationEnvelope)` consumed by `signals::handle_imagodei_dna_signal` at `signals.rs:1425`. See memory entry `project_t6_legacy_revocation_path_retired.md`.
 
 **Files:**
 - Modify: `elohim/elohim-storage/src/reconcile/holochain_app_signal.rs:289–296`
