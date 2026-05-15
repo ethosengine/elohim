@@ -4,6 +4,8 @@
 
 **Goal:** Wire the missing `record_predecessor` call on the libp2p EPR Atom Announce path so the back-prop graph captures sender PeerId for every Content EPR arrival. Closes T18 (LUG plan) and T22 (P3.5 plan) — convergent gap surfaced by the Wave 0 audit.
 
+**Status:** ✅ LANDED in dev. Live code at `elohim/elohim-storage/src/p2p/mod.rs:5317–5372`; comment block updated at `api/epr.rs:189–191`; confirmed by Wave 0 audit on 2026-05-15 (`genesis/docs/plans/2026-05-15-epr-wave0-audit-results.md` §D6). Checkboxes ticked as plan-tracking debt cleanup on the same date.
+
 **Architecture:** Hook into `P2PNode::handle_epr_atom_request` in `p2p/mod.rs` (around line 5271 — the libp2p Announce handler that delegates to `EprAtomService`). After a successful Content-kind Announce ingest, call `services::back_prop::record_predecessor(conn, target_cid, peer.to_string(), keys)`. FeedbackSignal-kind ingests are excluded (the back-prop graph is for content provenance, not signal propagation). Sealing keys are plumbed from the same `fan_out_ctx` pattern that `api/epr.rs` uses for FeedbackSignal fan-out.
 
 **Tech Stack:** Rust (elohim-storage), libp2p 0.54, dryoc 2-of-2 sealing.
@@ -47,7 +49,7 @@
 - Modify: `elohim/elohim-storage/src/p2p/mod.rs` (around lines 5271-5290 in `handle_epr_atom_request`)
 - Create: `elohim/elohim-storage/tests/back_prop_record_predecessor_announce_e2e.rs`
 
-- [ ] **Step 1: Verify the implementation context**
+- [x] **Step 1: Verify the implementation context**
 
 Read `p2p/mod.rs` lines 5260-5320 in full. Confirm:
 - `handle_epr_atom_request` signature is `async fn handle_epr_atom_request(&self, peer: libp2p::PeerId, request: EprAtomRequest) -> EprAtomResponse`
@@ -60,7 +62,7 @@ grep -n "sealing_keys\|SealingPubKeys\|fan_out_ctx" /projects/elohim/elohim/eloh
 ```
 Identify whether `P2PNode` already has access to sealing keys (check the `Self` struct definition in `p2p/mod.rs`). If yes, use them directly. If no, the keys need to be plumbed in via P2PNode construction — which is a wider change. STOP and report BLOCKED if sealing keys are not already available to P2PNode; this plan assumes they are.
 
-- [ ] **Step 2: Write the failing E2E test**
+- [x] **Step 2: Write the failing E2E test**
 
 ```rust
 // tests/back_prop_record_predecessor_announce_e2e.rs
@@ -126,7 +128,7 @@ async fn announce_feedback_signal_epr_does_not_record_predecessor() {
 
 If `construct_test_p2p_node` doesn't exist, adapt to the closest existing test pattern in `tests/` (search for similar harness usage). If P2PNode is not test-constructible without a full swarm, adapt the test to invoke the post-ingest record_predecessor call directly with a synthetic EprAtomRequest::Announce — the goal is to verify the kind-filter + record_predecessor wiring, not to spin a swarm.
 
-- [ ] **Step 3: Run test to verify it fails**
+- [x] **Step 3: Run test to verify it fails**
 
 ```
 cd /projects/elohim/elohim/elohim-storage
@@ -136,7 +138,7 @@ cargo test --test back_prop_record_predecessor_announce_e2e 2>&1 | tail -40
 ```
 Expected: FAIL — `predecessors` is empty for the content-kind test (record_predecessor not yet called).
 
-- [ ] **Step 4: Implement the wiring in handle_epr_atom_request**
+- [x] **Step 4: Implement the wiring in handle_epr_atom_request**
 
 In `p2p/mod.rs::handle_epr_atom_request` (around line 5283 where `service.handle` returns):
 
@@ -205,11 +207,11 @@ fn decode_envelope_kind_and_cid(envelope_bytes: &[u8]) -> Option<(EprKind, Strin
 
 **STRICT FORBID:** do not change function signatures of `record_predecessor`, `EprAtomService::handle`, or any pre-existing public API. Wire only.
 
-- [ ] **Step 5: Run test to verify it passes**
+- [x] **Step 5: Run test to verify it passes**
 
 Same command as Step 3. Expected: PASS (2 tests).
 
-- [ ] **Step 6: Update stale TODO comments**
+- [x] **Step 6: Update stale TODO comments**
 
 In `api/epr.rs` lines 618-626, update the comment block:
 ```rust
@@ -228,7 +230,7 @@ In `epr_atom_service.rs` line 189, update:
 // the libp2p sender PeerId is only available at the protocol boundary.
 ```
 
-- [ ] **Step 7: Run cargo clippy + fmt**
+- [x] **Step 7: Run cargo clippy + fmt**
 
 ```
 RUSTFLAGS='--cfg getrandom_backend="custom"' \
@@ -238,7 +240,7 @@ cargo fmt --check
 ```
 Both must pass clean.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add elohim/elohim-storage/src/p2p/mod.rs \
