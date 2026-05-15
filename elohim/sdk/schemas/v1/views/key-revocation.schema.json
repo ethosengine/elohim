@@ -2,17 +2,17 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "epr:schema:view:key-revocation",
   "title": "KeyRevocationView",
-  "description": "Read-optimized projection of an imagodei KeyRevocation DHT entry. Source of truth: DHT. Rebuildable via signal replay on RecoveryV2Signal::KeyRevocationRequested/Effective.",
+  "description": "Read-optimized projection of an elohim-DNA Content key-revocation entry (content_type 'governance-action:key-revocation'). Source of truth: DHT. Rebuildable via signal replay on the ElohimContentSignal dispatcher.",
   "type": "object",
   "additionalProperties": false,
   "required": [
     "dhtAnchorHash",
     "id",
-    "humanId",
+    "subjectHumanId",
     "revokedKey",
     "reason",
     "triggerType",
-    "initiatedBy",
+    "initiatedByCid",
     "requiredVotes",
     "currentVotes",
     "thresholdReached",
@@ -22,13 +22,13 @@
   "properties": {
     "dhtAnchorHash": {
       "type": "string",
-      "description": "Holochain ActionHash of the KeyRevocation entry (base64)."
+      "description": "Hex-encoded Holochain ActionHash of the source Content entry."
     },
     "id": {
       "type": "string",
-      "description": "Coordinator-generated ID."
+      "description": "Coordinator-generated ID (primary key of the projection)."
     },
-    "humanId": {
+    "subjectHumanId": {
       "type": "string",
       "description": "String id of the human whose key is being revoked."
     },
@@ -42,12 +42,12 @@
     },
     "triggerType": {
       "type": "string",
-      "enum": ["voluntary", "steward_vote", "challenge"],
+      "enum": ["voluntary", "steward_vote", "challenge", "specialist_attestation"],
       "description": "How the revocation was initiated."
     },
-    "initiatedBy": {
+    "initiatedByCid": {
       "type": "string",
-      "description": "human_id of the initiating agent."
+      "description": "CID of the initiating agent (was: initiatedBy)."
     },
     "requiredVotes": {
       "type": "integer",
@@ -66,6 +66,10 @@
     "effectiveAt": {
       "type": ["string", "null"],
       "description": "ISO-8601 timestamp when revocation became effective. Null while pending."
+    },
+    "derivedCompromiseAt": {
+      "type": ["string", "null"],
+      "description": "EPR W2D: ISO-8601 timestamp when compromise was derived (specialist attestation, challenge upheld, etc). Null if not applicable."
     },
     "createdAt": {
       "type": "string",

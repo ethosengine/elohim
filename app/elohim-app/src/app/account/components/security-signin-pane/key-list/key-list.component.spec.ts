@@ -79,11 +79,11 @@ describe('KeyListComponent', () => {
         {
           dhtAnchorHash: 'revoc-hash-xyz',
           id: 'rev-1',
-          humanId: 'human-1',
+          subjectHumanId: 'human-1',
           revokedKey: 'revoked-pub-key-12345678',
           reason: 'voluntary',
           triggerType: 'voluntary',
-          initiatedBy: 'human-1',
+          initiatedByCid: 'human-1',
           requiredVotes: 1,
           currentVotes: 1,
           thresholdReached: true,

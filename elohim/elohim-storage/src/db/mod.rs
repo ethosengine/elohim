@@ -114,8 +114,10 @@ pub mod peer_identity_bindings;
 // T12 — peer_blob_inventory projection (libp2p gossipsub inventory, Category C operational)
 pub mod peer_blob_inventory;
 
-// Recovery Protocol Phase 2 — M4 revocation projection (KeyRevocation + RevocationVote)
+// Recovery Protocol Phase 2 — M4 revocation projection (key_revocations + revocation_votes)
+// + recovery_flows state-machine projection (T6 schema, T7 CRUD)
 pub mod key_revocations;
+pub mod recovery_flows;
 pub mod revocation_votes;
 
 // Recovery Protocol Phase 2 — M5 portal host projection (imagodei PortalHost entry, Category A)

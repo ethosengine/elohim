@@ -1050,25 +1050,29 @@ pub fn handle_recovery_v2_signal(
             effective_at,
             created_at,
         } => {
-            // Use id as dht_anchor_hash (see design note above).
-            let dht_anchor_hash = id.clone();
+            // Use id as dht_anchor_hash (see design note above). The new
+            // `key_revocations` table stores anchor as BLOB (Vec<u8>); we
+            // round-trip the M4 string id through bytes pending T13/T14
+            // cross-DNA Content wiring that supplies a real ActionHash.
+            let dht_anchor_hash = id.as_bytes().to_vec();
             let now = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
-            let row = crate::db::models::UpsertKeyRevocationRow {
-                dht_anchor_hash: dht_anchor_hash.clone(),
+            let row = crate::db::models::KeyRevocationRow {
                 id: id.clone(),
-                human_id: human_id.clone(),
+                dht_anchor_hash,
+                subject_human_id: human_id.clone(),
                 revoked_key: revoked_key.clone(),
-                reason: reason.clone(),
                 trigger_type: trigger_type.clone(),
-                initiated_by,
+                reason: reason.clone(),
+                initiated_by_cid: initiated_by,
                 required_votes: required_votes as i32,
                 current_votes: current_votes as i32,
                 threshold_reached: if threshold_reached { 1 } else { 0 },
                 effective_at: effective_at.clone(),
+                derived_compromise_at: None,
                 created_at: created_at.clone(),
                 updated_at: created_at.clone(),
             };
-            crate::db::key_revocations::upsert_key_revocation(conn, row)?;
+            crate::db::key_revocations::upsert(conn, &row)?;
 
             // P1: Outbound reconciliation signal — imagodei.revocation_observed.
             emit_reconciled_signal(ImagodeiReconciledEvent::RevocationObserved {
@@ -1095,8 +1099,12 @@ pub fn handle_recovery_v2_signal(
             required_votes: _,
             threshold_now_reached: _,
         } => {
-            // Resolve the parent key_revocation's dht_anchor_hash via revocation_id.
-            // In M4, dht_anchor_hash == revocation_id (see design note on KeyRevocationRequested).
+            // The legacy revocation_votes table still keys on `dht_anchor_hash`
+            // as String; only `key_revocations` was rewritten in T6/T7. Once
+            // T17 aligns the DNA-side signal payloads with the new Content
+            // contract, the vote pairing will be sourced via attestation
+            // children of the parent key-revocation Content rather than this
+            // separate table.
             let revocation_dht_anchor_hash = revocation_id.clone();
             let vote_dht_anchor_hash = id.clone();
             let row = crate::db::models::InsertRevocationVoteRow {
@@ -1112,6 +1120,7 @@ pub fn handle_recovery_v2_signal(
             crate::db::revocation_votes::insert_revocation_vote(conn, row)?;
 
             // Recompute current_votes from authoritative count in projection.
+            // `key_revocations` PK is now `id`; use revocation_id as that key.
             let approved_count = crate::db::revocation_votes::count_approved_votes_for_revocation(
                 conn,
                 &revocation_dht_anchor_hash,
@@ -1119,7 +1128,7 @@ pub fn handle_recovery_v2_signal(
             let now = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
             crate::db::key_revocations::update_current_votes(
                 conn,
-                &revocation_dht_anchor_hash,
+                &revocation_id,
                 approved_count as i32,
                 &now,
             )?;
@@ -1132,12 +1141,11 @@ pub fn handle_recovery_v2_signal(
             effective_at,
             triggering_vote_id: _,
         } => {
-            // In M4, dht_anchor_hash == revocation_id (see design note on KeyRevocationRequested).
-            let target_dht_anchor_hash = revocation_id.clone();
+            // `key_revocations` PK is now `id` (== M4 revocation_id).
             let now = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
-            crate::db::key_revocations::set_key_revocation_effective(
+            crate::db::key_revocations::set_effective(
                 conn,
-                &target_dht_anchor_hash,
+                &revocation_id,
                 &effective_at,
                 &now,
             )?;
