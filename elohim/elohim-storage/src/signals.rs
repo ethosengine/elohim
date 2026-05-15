@@ -1197,32 +1197,11 @@ pub fn handle_recovery_v2_signal(
             )?;
             Ok(())
         }
-        RecoveryV2Signal::KeyRevocationEffective {
-            revocation_id,
-            revoked_key,
-            human_id,
-            effective_at,
-            triggering_vote_id: _,
-        } => {
-            // `key_revocations` PK is now `id` (== M4 revocation_id).
-            let now = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
-            crate::db::key_revocations::set_effective(conn, &revocation_id, &effective_at, &now)?;
-
-            // P1 — Eager cache-invalidation sweep (bounded, indexed by revoked_key).
-            // Stage 1 fallback: legacy path uses effective_at as conservative compromise_at;
-            // T6 upgrades this via derive_compromise_at.
-            let _ = sweep_dependent_caches_on_revocation(conn, &revoked_key, &effective_at)?;
-
-            // P1: Outbound reconciliation signal — imagodei.revocation_observed.
-            // observed_at is the storage wallclock (when the controller reconciled),
-            // not the DNA's effective_at (when the threshold flipped on-DHT).
-            emit_reconciled_signal(ImagodeiReconciledEvent::RevocationObserved {
-                revocation_id,
-                revoked_key,
-                human_id,
-                status: "effective".into(),
-                observed_at: now,
-            });
+        RecoveryV2Signal::KeyRevocationEffective { .. } => {
+            // T6 deletion: legacy KeyRevocationEffective is fully superseded by the
+            // T18 DnaSignal::KeyRevocation envelope path (see handle_imagodei_dna_signal).
+            // Producer side (imagodei coordinator) still emits this variant; M4 deletes
+            // the producer emissions + variant as a follow-up. No-op until then.
             Ok(())
         }
     }
@@ -1290,10 +1269,12 @@ fn sweep_dependent_caches_on_revocation(
 //
 // Projection: after verification, the `KeyRevocation` arm calls
 // `crate::db::key_revocations::set_effective` using the envelope's
-// `metadata.revocation_id` as the projection table PK — the same key used by
-// the legacy `KeyRevocationEffective` handler in `handle_recovery_v2_signal`.
-// Duplicate delivery of both the legacy signal AND the new envelope therefore
-// lands the same idempotent upsert.
+// `metadata.revocation_id` as the projection table PK. The legacy
+// `RecoveryV2Signal::KeyRevocationEffective` handler in `handle_recovery_v2_signal`
+// is retained as an explicit no-op for match exhaustiveness during the
+// producer-side transition (M4 deletes the variant + emissions as a follow-up);
+// duplicate delivery is therefore harmless (the envelope path is the single
+// projection writer).
 //
 // **`canonical_envelope_bytes` must match the zome-side implementation in
 // `imagodei/zomes/imagodei/src/lib.rs` exactly.**
@@ -1427,13 +1408,12 @@ fn verify_envelope_signature(
 ///
 /// **Verification**: the `KeyRevocation` arm verifies the issuer signature
 /// before projection. A log warning is emitted on failure and the signal is
-/// silently dropped (best-effort — the projection can be recovered from the
-/// `KeyRevocationEffective` legacy signal or from DHT replay).
+/// silently dropped (best-effort — the projection can be recovered from DHT
+/// replay on reconnect).
 ///
-/// **Dedup**: uses `metadata.revocation_id` as the projection table PK — the
-/// same key used by `handle_recovery_v2_signal` for `KeyRevocationEffective`.
-/// Delivering both the legacy signal AND the new envelope results in the same
-/// idempotent `set_effective` call.
+/// **Dedup**: uses `metadata.revocation_id` as the projection table PK.
+/// The T6-deleted legacy path previously shared this PK; duplicate delivery
+/// would have landed the same idempotent `set_effective` call.
 pub fn handle_imagodei_dna_signal(
     conn: &mut diesel::sqlite::SqliteConnection,
     signal: ImagodeiDnaSignal,
@@ -1441,8 +1421,8 @@ pub fn handle_imagodei_dna_signal(
     match signal {
         ImagodeiDnaSignal::KeyRevocation(envelope) => {
             // Verify signature before projecting. On failure: warn + drop.
-            // Not a hard error — the legacy RecoveryV2Signal::KeyRevocationEffective
-            // still lands the same projection row during the back-compat window.
+            // Not a hard error — best-effort; if signature verify fails, the
+            // projection row is missed and the operator must replay from DHT.
             if let Err(e) = verify_envelope_signature(&envelope) {
                 tracing::warn!(
                     target: "imagodei.dna_signal",
@@ -1467,7 +1447,8 @@ pub fn handle_imagodei_dna_signal(
                 &now,
             )?;
 
-            // Eager cache-invalidation sweep (same as the legacy path).
+            // Eager cache-invalidation sweep — the single A.8 sweep callsite
+            // since the legacy path was retired in T6.
             let _ = sweep_dependent_caches_on_revocation(
                 conn,
                 &envelope.metadata.revoked_pubkey,
