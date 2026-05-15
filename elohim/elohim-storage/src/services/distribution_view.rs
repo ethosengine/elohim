@@ -95,8 +95,12 @@ pub fn replica_health_for(count: u32, target: u32) -> ReplicaHealth {
 /// - `replica_count`: from `peer_blob_inventory` (observed reality, not commitment)
 /// - `reach_class`: from `content.reach` (default `Private` on miss)
 /// - `reciprocity_hint`: REA outflow-minus-inflow for steward context (None for Visitor)
-/// - `projector_count`: stubbed 0 (TODO Phase 4 follow-up — no projector table yet)
-/// - `diversity_hint`: stubbed None (TODO Phase 4 follow-up — no geo/archetype index yet)
+/// - `projector_count`: count of distinct doorway projectors that have acked
+///   this blob, computed via `projection_events::distinct_projectors_for_blob`
+///   (see body at `:159–163`).
+/// - `diversity_hint`: derived from `peer_identity_bindings.device_archetype`
+///   via `peer_diversity::diversity_hint_from_archetype_strs` (see body at
+///   `:165–179`). Returns `None` when no archetype-tagged peers are known.
 pub async fn compose_distribution_summary(
     pool: &DbPool,
     blob_hash: &str,
