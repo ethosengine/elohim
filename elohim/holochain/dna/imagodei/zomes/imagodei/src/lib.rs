@@ -648,6 +648,36 @@ struct ConsolidatedGovernanceActionOutput {
     pub closes_at: String,
 }
 
+/// Input for elohim DNA's content_store::get_content_by_id (Recovery M4 Task 3).
+///
+/// Wire-compatible with `lamad_types::QueryByIdInput`. Defined locally because
+/// cross-DNA calls serialise through msgpack; imagodei cannot depend on the
+/// lamad domain crate directly.
+#[derive(Debug, Serialize, Deserialize)]
+struct ConsolidatedQueryByIdInput {
+    pub id: String,
+}
+
+/// Subset of elohim DNA's `content_store::ContentOutput.content` that the
+/// imagodei recovery gates need. Mirrors the relevant fields of the wire
+/// `Content` struct produced by `content_to_wire(&Content)`; serde will
+/// ignore fields outside this set on deserialization.
+#[derive(Debug, Serialize, Deserialize)]
+struct ConsolidatedContentView {
+    pub id: String,
+    pub content_type: String,
+    #[serde(default)]
+    pub metadata_json: String,
+}
+
+/// Output from elohim DNA's content_store::get_content_by_id
+/// (`Option<ContentOutput>`). Mirrors the relevant fields only — the full
+/// ContentOutput carries action_hash + entry_hash which we don't need here.
+#[derive(Debug, Serialize, Deserialize)]
+struct ConsolidatedContentOutput {
+    pub content: ConsolidatedContentView,
+}
+
 // ---------------------------------------------------------------------------
 // Bridge helper: call elohim content_store::issue_attestation and handle all
 // ZomeCallResponse arms uniformly.
@@ -749,6 +779,81 @@ fn call_elohim_propose_governance_action(
             "Authentication failed bridging to elohim::propose_governance_action".to_string()
         ))),
     }
+}
+
+// ---------------------------------------------------------------------------
+// Bridge helper: call elohim content_store::get_content_by_id to load the
+// `governance-action:recovery-request` Content entry that backs an intimate
+// witness submission (Recovery M4 Task 3). Returns the load-bearing `human_id`
+// extracted from the entry's `metadata_json` after asserting the
+// `content_type` discriminator. Validates that the entry exists, that it has
+// the expected content-type, and that the metadata carries `human_id`.
+// ---------------------------------------------------------------------------
+fn fetch_recovery_request_human_id(recovery_request_cid: &str) -> ExternResult<String> {
+    let response = call(
+        CallTargetCell::OtherRole("elohim".into()),
+        ZomeName::from("content_store"),
+        FunctionName::from("get_content_by_id"),
+        None,
+        ConsolidatedQueryByIdInput {
+            id: recovery_request_cid.to_string(),
+        },
+    )?;
+    let content_output: Option<ConsolidatedContentOutput> = match response {
+        ZomeCallResponse::Ok(payload) => payload.decode().map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "submit_intimate_witness Gate 1: decode (elohim::get_content_by_id) failed: {e:?}"
+            )))
+        })?,
+        ZomeCallResponse::Unauthorized(_, _, _, _) => {
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "submit_intimate_witness Gate 1: unauthorized cross-DNA get_content_by_id".into()
+            )))
+        }
+        ZomeCallResponse::NetworkError(err) => {
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "submit_intimate_witness Gate 1: network error on cross-DNA get_content_by_id: {err}"
+            ))))
+        }
+        ZomeCallResponse::CountersigningSession(err) => {
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "submit_intimate_witness Gate 1: countersigning error: {err}"
+            ))))
+        }
+        ZomeCallResponse::AuthenticationFailed(_, _) => {
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "submit_intimate_witness Gate 1: authentication failed on cross-DNA get_content_by_id".into()
+            )))
+        }
+    };
+    let content_output = content_output.ok_or_else(|| {
+        wasm_error!(WasmErrorInner::Guest(format!(
+            "submit_intimate_witness Gate 1: recovery-request CID {} not found on elohim DNA",
+            recovery_request_cid
+        )))
+    })?;
+    if content_output.content.content_type != "governance-action:recovery-request" {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "submit_intimate_witness Gate 1: expected governance-action:recovery-request, got {}",
+            content_output.content.content_type
+        ))));
+    }
+    let metadata: serde_json::Value = serde_json::from_str(&content_output.content.metadata_json)
+        .map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "submit_intimate_witness Gate 1: bad metadata_json: {e}"
+            )))
+        })?;
+    let human_id = metadata
+        .get("human_id")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| {
+            wasm_error!(WasmErrorInner::Guest(
+                "submit_intimate_witness Gate 1: recovery-request metadata missing human_id".into(),
+            ))
+        })?
+        .to_string();
+    Ok(human_id)
 }
 
 // ---------------------------------------------------------------------------
@@ -1917,7 +2022,12 @@ pub struct KeyRotationOutput {
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct SubmitIntimateWitnessInput {
-    pub recovery_request_hash: ActionHash,
+    /// CID (content-derived id) of the `governance-action:recovery-request`
+    /// Content entry on the elohim DNA. Renamed from `recovery_request_hash:
+    /// ActionHash` per Recovery M4 Task 3 — the recovery-request now lives
+    /// cross-DNA as a Content entry; gates resolve it by CID via
+    /// `content_store::get_content_by_id` rather than a local DHT `get()`.
+    pub recovery_request_cid: String,
     pub note: Option<String>,
 }
 
@@ -2880,20 +2990,21 @@ fn is_active_emergency_contact(
 }
 
 /// Returns true if `authorizer_human_id` already has a witness linked
-/// from the given request (via `RecoveryRequestToHumanityWitness`).
+/// from the given recovery-request-CID anchor (via
+/// `RecoveryRequestToHumanityWitness`).
 ///
-/// Stage G.A.2 bridge: after `submit_intimate_witness` writes to elohim DNA
-/// (not imagodei), the link target is a StringAnchor sentinel hash rather
-/// than a HumanityWitness entry. Dedupe is now tag-based: the link tag stores
-/// the authorizer_human_id bytes. This avoids the cross-DNA `to_app_option`
-/// deserialization that would fail if the target lived on elohim's DHT.
+/// Recovery M4 Task 3: the link source is now the `StringAnchor(
+/// "recovery_request_cid", cid)` entry hash on imagodei, because the
+/// recovery-request itself lives on the elohim DNA as a Content entry — its
+/// ActionHash is not reachable from imagodei. Dedupe is tag-based: the link
+/// tag stores the authorizer_human_id bytes.
 fn has_existing_witness_for_request(
-    request_hash: &ActionHash,
+    request_anchor_hash: &EntryHash,
     authorizer_human_id: &str,
 ) -> ExternResult<bool> {
     let links = get_links(
         LinkQuery::try_new(
-            request_hash.clone(),
+            request_anchor_hash.clone(),
             LinkTypes::RecoveryRequestToHumanityWitness,
         )?,
         GetStrategy::default(),
@@ -2915,50 +3026,44 @@ fn has_existing_witness_for_request(
 /// elohim DNA's DHT (content_type "attestation:humanness").
 ///
 /// Gates are preserved in full ABOVE the bridge call:
-/// 1. RecoveryRequest must exist and have a populated human_id.
-///    Gate reads RecoveryRequest by hash (to_app_option::<RecoveryRequest>()).
-///    RecoveryRequest entry type STAYS on imagodei — see TODO below for why
-///    create_recovery_request cannot yet be bridged.
+/// 1. Recovery-request must exist on the elohim DNA as a
+///    `governance-action:recovery-request` Content entry and its metadata
+///    must carry `human_id`. Gate calls cross-DNA
+///    `content_store::get_content_by_id` (Recovery M4 Task 3). The legacy
+///    `RecoveryRequest` entry type on imagodei is no longer read here.
 /// 2. Authorizer must be an active emergency contact of the target human
 ///    (has a HumanRelationship with emergency_access_enabled = true).
 /// 3. Dedupe: tag-based check on RecoveryRequestToHumanityWitness links
-///    (tag = authorizer_human_id bytes). Entry-deserialization no longer used.
+///    (tag = authorizer_human_id bytes). Link source is the
+///    `StringAnchor("recovery_request_cid", cid)` entry hash on imagodei —
+///    the cross-DNA recovery-request Content entry is not directly link-able
+///    from this DNA; the StringAnchor proxies it.
 ///
 /// Signal: emits IntimateWitnessSubmitted with the synthesised HumanityWitness
-/// struct and a zero ActionHash sentinel (CID cannot be converted to ActionHash).
-/// elohim-storage consumers that key on action_hash must migrate to CID-based
-/// lookup before Stage F removes this bridge.
+/// struct and zero ActionHash sentinels for both `action_hash` and
+/// `request_hash` (CIDs cannot be converted to ActionHash). The bridged
+/// `attestation:humanness` Content entry on elohim is the canonical record;
+/// elohim-storage consumers must migrate to CID-based lookup. Task 17 (signal
+/// schema alignment) will replace these ActionHash fields with CIDs.
 ///
-/// TODO(stage-G-followup): create_recovery_request cannot be bridged yet because
-/// submit_intimate_witness Gate 1 and commit_key_rotation revocation-floor gate
-/// both deserialize RecoveryRequest / KeyRevocation entries from the imagodei DHT
-/// via to_app_option(). Bridging create_recovery_request to elohim would leave
-/// those entries on elohim's DHT in Content encoding, breaking all downstream
-/// gate readers. Requires a coordinated migration: all gate readers must switch
-/// to cross-DNA get() + Content deserialization before the create_entry calls
-/// can move. Tracked as Stage G follow-up (G.A.2 deferred functions).
+/// TODO(stage-G-followup): commit_key_rotation revocation-floor gate still
+/// deserializes KeyRevocation entries from the imagodei DHT via
+/// `to_app_option()`. Bridging create_recovery_request to elohim is now
+/// unblocked from this site (Task 3 migrated); the revocation-floor and
+/// freeze-floor gates still need migration (Recovery M4 Tasks 4 + 5) before
+/// Task 13/14 can land. Tracked as Stage G follow-up (G.A.2 deferred functions).
 #[hdk_extern]
 pub fn submit_intimate_witness(
     input: SubmitIntimateWitnessInput,
 ) -> ExternResult<SubmitIntimateWitnessOutput> {
-    // Gate 1: fetch the RecoveryRequest; must exist (still on imagodei DHT).
-    let request_record =
-        get(input.recovery_request_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
-            WasmErrorInner::Guest("RecoveryRequest not found at given hash".into())
-        ))?;
-    let request: RecoveryRequest = request_record
-        .entry()
-        .to_app_option()
-        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "RecoveryRequest record has no entry".into()
-        )))?;
-    let human_id = request
-        .human_id
-        .clone()
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "RecoveryRequest has no human_id (pre-M3 entry?)".into()
-        )))?;
+    // Gate 1: fetch the recovery-request Content entry on the elohim DNA via
+    // cross-DNA call to `content_store::get_content_by_id`. Recovery M4 Task 3:
+    // the recovery-request is now a `governance-action:recovery-request` Content
+    // entry on elohim, no longer a `RecoveryRequest` entry on imagodei. Decode
+    // is structured (ContentOutput), not a raw Entry::App — so the Task 2
+    // `content_decode` helper is not needed in this code path.
+    let human_id =
+        fetch_recovery_request_human_id(&input.recovery_request_cid)?;
 
     // Gate 2: authorizer must be on an active emergency-enabled HumanRelationship.
     let authorizer_pubkey = agent_info()?.agent_initial_pubkey;
@@ -2971,7 +3076,15 @@ pub fn submit_intimate_witness(
 
     // Gate 3: tag-based dedupe — the authorizer cannot witness the same request twice.
     // Tag stores authorizer_human_id bytes; no entry deserialization needed.
-    if has_existing_witness_for_request(&input.recovery_request_hash, &authorizer_human_id)? {
+    // Dedupe is now keyed on the recovery-request CID via a StringAnchor —
+    // the ActionHash that previously anchored the link no longer exists on
+    // imagodei's DHT after the cross-DNA migration of create_recovery_request.
+    let request_anchor =
+        StringAnchor::new("recovery_request_cid", &input.recovery_request_cid);
+    let request_anchor_hash =
+        hash_entry(&EntryTypes::StringAnchor(request_anchor.clone()))?;
+    create_entry(&EntryTypes::StringAnchor(request_anchor))?;
+    if has_existing_witness_for_request(&request_anchor_hash, &authorizer_human_id)? {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "this agent has already submitted a witness for this request".into()
         )));
@@ -3028,7 +3141,7 @@ pub fn submit_intimate_witness(
             "attestation_type": "intimate_recovery",
             "confidence": 1.0,
             "verification_method": "intimate_recovery_ceremony",
-            "recovery_request_hash": input.recovery_request_hash.to_string(),
+            "recovery_request_cid": input.recovery_request_cid,
             "expires_at": expires_at,
             "evidence": note_json,
         }),
@@ -3043,24 +3156,31 @@ pub fn submit_intimate_witness(
     };
     let _consolidated = call_elohim_issue_attestation(consolidated_input)?;
 
-    // Create the M3 link from the request to the witness anchor.
+    // Create the M3 link from the request-CID anchor to the witness anchor.
     // Tag = authorizer_human_id bytes for tag-based dedupe (Gate 3).
     // Target = sentinel StringAnchor hash (no local HumanityWitness entry written).
+    // Source = `StringAnchor("recovery_request_cid", cid)` hash on imagodei
+    //  (created above in Gate 3). The recovery-request Content entry itself
+    //  lives on the elohim DNA and is not reachable as a link source from
+    //  imagodei; the StringAnchor proxies it within this DNA.
     let sentinel_anchor = StringAnchor::new("intimate_witness_sentinel", &witness_id);
     let sentinel_hash = hash_entry(&EntryTypes::StringAnchor(sentinel_anchor))?;
     create_link(
-        input.recovery_request_hash.clone(),
+        request_anchor_hash,
         sentinel_hash,
         LinkTypes::RecoveryRequestToHumanityWitness,
         LinkTag::new(authorizer_human_id.as_bytes()),
     )?;
 
-    // Emit signal. action_hash is a zero sentinel — CID cannot be converted to
-    // ActionHash. Consumers keyed on action_hash must migrate to CID lookup.
+    // Emit signal. action_hash AND request_hash are zero sentinels — CIDs
+    // cannot be converted to ActionHash. Consumers keyed on action_hash or
+    // request_hash must migrate to CID lookup via the cross-DNA Content path.
+    // Task 17 (signal schema alignment) will replace the ActionHash fields
+    // with `request_cid: String` on the schema-aligned signal payload.
     let sentinel_action_hash = ActionHash::from_raw_36(vec![0u8; 36]);
     emit_signal(RecoveryV2Signal::IntimateWitnessSubmitted {
         action_hash: sentinel_action_hash.clone(),
-        request_hash: input.recovery_request_hash,
+        request_hash: sentinel_action_hash.clone(),
         witness: witness_for_signal.clone(),
         witness_agent_id: authorizer_pubkey,
     })?;
