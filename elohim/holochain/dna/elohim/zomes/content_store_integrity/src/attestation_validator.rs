@@ -188,11 +188,15 @@ fn floor1_governance_action_kind(content: &Content) -> Result<(), String> {
 /// Two checks:
 /// 1. If `metadata["expires_at"]` is present as a string, it must parse as RFC3339.
 /// 2. If `metadata["parent_governance_action_cid"]` is present as a string (child
-///    entry), resolve the parent record via `must_get_valid_record` and verify it
-///    is a Content entry with a `governance-action:` prefix. Full `closes_at`
-///    enforcement (reject if timestamp > closes_at) requires the op's action
-///    timestamp, which is not available inside a bare SelfHealingEntry validator.
-///    This simplified check confirms the parent record is valid and decodable.
+///    entry), resolve the parent entry via `must_get_entry` and verify it is a
+///    Content entry with a `governance-action:` prefix. The CID is the parent's
+///    `EntryHash` serialized in Holochain's multibase form (the canonical CID
+///    returned by `propose_governance_action`); we parse it with
+///    `EntryHash::try_from(&str)`, mirroring the coordinator-side pattern.
+///    Full `closes_at` enforcement (reject if action_timestamp > closes_at)
+///    requires the op's action timestamp, which is not available inside a bare
+///    SelfHealingEntry validator. This simplified check confirms the parent
+///    entry is decodable and structurally valid.
 fn floor5_temporal(
     _content: &Content,
     meta: &Value,
@@ -209,63 +213,40 @@ fn floor5_temporal(
 
     // 5b: parent governance-action existence + type check
     if let Some(Value::String(parent_cid)) = meta.get("parent_governance_action_cid") {
-        let raw_bytes = decode_base64url(parent_cid).map_err(|e| {
+        let parent_hash = EntryHash::try_from(parent_cid.as_str()).map_err(|e| {
             wasm_error!(WasmErrorInner::Guest(format!(
-                "floor5_failed: parent_governance_action_cid base64 decode error: {}",
-                e
+                "floor5_failed: parent_governance_action_cid '{}' parse error: {}",
+                parent_cid, e
             )))
         })?;
-        match ActionHash::try_from_raw_39(raw_bytes) {
-            Ok(parent_hash) => {
-                let record = must_get_valid_record(parent_hash)?;
-                // Decode the parent as Content and verify it is a governance-action
-                match record.entry().to_app_option::<Content>() {
-                    Ok(Some(parent_content)) => {
-                        if !parent_content.content_type.starts_with("governance-action:") {
-                            return Ok(Err(format!(
-                                "floor5_failed: parent_governance_action_cid resolves to \
-                                 non-governance-action entry (type='{}')",
-                                parent_content.content_type
-                            )));
-                        }
-                        // Verify the parent's closes_at is parseable (structural check)
-                        let parent_meta = parse_metadata_value(&parent_content.metadata_json)?;
-                        if let Some(Value::String(closes_at)) = parent_meta.get("closes_at") {
-                            if chrono_parse_rfc3339(closes_at).is_err() {
-                                return Ok(Err(format!(
-                                    "floor5_failed: parent governance-action has invalid \
-                                     closes_at '{}' — parent entry is structurally invalid",
-                                    closes_at
-                                )));
-                            }
-                        }
-                        // NOTE: Full timestamp comparison (action_timestamp > closes_at)
-                        // requires the op's Action timestamp. That is not available here
-                        // because validate_attestation_floors() does not receive the op.
-                        // Task C.2: thread op into this function for strict enforcement.
-                    }
-                    Ok(None) => {
-                        return Ok(Err(
-                            "floor5_failed: parent_governance_action_cid resolved to a \
-                             non-app entry"
-                                .to_string(),
-                        ));
-                    }
-                    Err(e) => {
-                        return Ok(Err(format!(
-                            "floor5_failed: parent_governance_action_cid entry decode error: {}",
-                            e
-                        )));
-                    }
-                }
-            }
-            Err(_) => {
+        let parent_content = match decode_content_entry(must_get_entry(parent_hash)?.into_content())
+        {
+            Ok(c) => c,
+            Err(reason) => return Ok(Err(format!("floor5_failed: {}", reason))),
+        };
+
+        if !parent_content.content_type.starts_with("governance-action:") {
+            return Ok(Err(format!(
+                "floor5_failed: parent_governance_action_cid resolves to \
+                 non-governance-action entry (type='{}')",
+                parent_content.content_type
+            )));
+        }
+        // Verify the parent's closes_at is parseable (structural check)
+        let parent_meta = parse_metadata_value(&parent_content.metadata_json)?;
+        if let Some(Value::String(closes_at)) = parent_meta.get("closes_at") {
+            if chrono_parse_rfc3339(closes_at).is_err() {
                 return Ok(Err(format!(
-                    "floor5_failed: parent_governance_action_cid '{}' is not a valid ActionHash",
-                    parent_cid
+                    "floor5_failed: parent governance-action has invalid \
+                     closes_at '{}' — parent entry is structurally invalid",
+                    closes_at
                 )));
             }
         }
+        // NOTE: Full timestamp comparison (action_timestamp > closes_at)
+        // requires the op's Action timestamp. That is not available here
+        // because validate_attestation_floors() does not receive the op.
+        // Task C.2: thread op into this function for strict enforcement.
     }
 
     Ok(Ok(()))
@@ -274,8 +255,9 @@ fn floor5_temporal(
 /// Floor 7: revocation reference valid.
 ///
 /// If `metadata["revocation"]["supersedes_cid"]` is a string:
-/// - Parse as ActionHash
-/// - `must_get_valid_record` to confirm it exists
+/// - Parse as `EntryHash` (Holochain's multibase form — the canonical CID
+///   returned by `issue_attestation`)
+/// - `must_get_entry` to confirm the entry exists on the DHT
 /// - Decode as Content, verify `content_type` matches the current entry
 /// - Verify `author_id` matches the current entry's `author_id`
 fn floor7_revocation(
@@ -291,38 +273,16 @@ fn floor7_revocation(
         None => return Ok(Ok(())), // No revocation field — floor not applicable
     };
 
-    let hash_bytes = decode_base64url(supersedes_cid).map_err(|e| {
+    let entry_hash = EntryHash::try_from(supersedes_cid).map_err(|e| {
         wasm_error!(WasmErrorInner::Guest(format!(
-            "floor7_failed: supersedes_cid base64 decode error: {}",
-            e
+            "floor7_failed: supersedes_cid '{}' parse error: {}",
+            supersedes_cid, e
         )))
     })?;
 
-    let action_hash = match ActionHash::try_from_raw_39(hash_bytes) {
-        Ok(h) => h,
-        Err(_) => {
-            return Ok(Err(format!(
-                "floor7_failed: supersedes_cid '{}' is not a valid ActionHash",
-                supersedes_cid
-            )));
-        }
-    };
-
-    let record = must_get_valid_record(action_hash)?;
-
-    let superseded = match record.entry().to_app_option::<Content>() {
-        Ok(Some(c)) => c,
-        Ok(None) => {
-            return Ok(Err(
-                "floor7_failed: supersedes_cid resolved to a non-app entry".to_string(),
-            ));
-        }
-        Err(e) => {
-            return Ok(Err(format!(
-                "floor7_failed: supersedes_cid entry decode error: {}",
-                e
-            )));
-        }
+    let superseded = match decode_content_entry(must_get_entry(entry_hash)?.into_content()) {
+        Ok(c) => c,
+        Err(reason) => return Ok(Err(format!("floor7_failed: {}", reason))),
     };
 
     // content_type must match
@@ -652,70 +612,19 @@ fn floor_g3_no_share_material_in_metadata(meta: &Value) -> Result<(), String> {
     Ok(())
 }
 
-/// Decode a base64url string into raw bytes.
+/// Decode a raw `Entry` into a `Content` app entry.
 ///
-/// ActionHash serialises as base64url in JSON. We need the raw bytes to
-/// construct an ActionHash via `try_from_raw_39_panicky`.
-fn decode_base64url(s: &str) -> Result<Vec<u8>, String> {
-    // Holochain action hashes are 39 bytes serialised as base64url with no padding.
-    // We implement a simple decoder here to avoid pulling in the `base64` crate.
-    let mut out = Vec::with_capacity(s.len() * 3 / 4 + 3);
-    let table: [u8; 128] = {
-        let mut t = [255u8; 128];
-        for (i, &c) in b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/="
-            .iter()
-            .enumerate()
-        {
-            t[c as usize] = i as u8;
-        }
-        // base64url uses - and _ instead of + and /
-        t[b'-' as usize] = 62;
-        t[b'_' as usize] = 63;
-        t
+/// Returns a human-readable error string on failure (caller wraps with the
+/// failing floor's name). Used by floor5 and floor7 after fetching the parent
+/// or superseded entry via `must_get_entry`. The HDI does not provide a
+/// `to_app_option::<T>()` directly on `Entry` (only on `RecordEntry`), so we
+/// destructure the `Entry::App` variant and deserialize the inner
+/// `SerializedBytes` using the impl generated by `#[hdk_entry_helper]`.
+fn decode_content_entry(entry: Entry) -> Result<Content, String> {
+    let app_entry_bytes = match entry {
+        Entry::App(b) => b,
+        _ => return Err("resolved entry is not an app entry".to_string()),
     };
-
-    let bytes = s.as_bytes();
-    let mut i = 0;
-    while i < bytes.len() {
-        // Skip padding
-        if bytes[i] == b'=' {
-            break;
-        }
-        let c0 = *bytes.get(i).ok_or("decode_base64url: unexpected end")? as usize;
-        let c1 = *bytes.get(i + 1).ok_or("decode_base64url: unexpected end")? as usize;
-        let v0 = table[c0];
-        let v1 = table[c1];
-        if v0 == 255 || v1 == 255 {
-            return Err(format!("decode_base64url: invalid char at position {}", i));
-        }
-        out.push((v0 << 2) | (v1 >> 4));
-        if let Some(&c2_byte) = bytes.get(i + 2) {
-            if c2_byte == b'=' {
-                break;
-            }
-            let v2 = table[c2_byte as usize];
-            if v2 == 255 {
-                return Err(format!(
-                    "decode_base64url: invalid char at position {}",
-                    i + 2
-                ));
-            }
-            out.push(((v1 & 0x0f) << 4) | (v2 >> 2));
-            if let Some(&c3_byte) = bytes.get(i + 3) {
-                if c3_byte == b'=' {
-                    break;
-                }
-                let v3 = table[c3_byte as usize];
-                if v3 == 255 {
-                    return Err(format!(
-                        "decode_base64url: invalid char at position {}",
-                        i + 3
-                    ));
-                }
-                out.push(((v2 & 0x03) << 6) | v3);
-            }
-        }
-        i += 4;
-    }
-    Ok(out)
+    let sb: SerializedBytes = app_entry_bytes.into_sb();
+    Content::try_from(sb).map_err(|e| format!("entry decode error: {:?}", e))
 }
