@@ -961,13 +961,15 @@ pub enum EntryTypes {
     StringAnchor(StringAnchor),
     // Recovery entry types — Stage G.A.2 deferral audit results:
     //
-    // RecoveryRequest: CANNOT bridge create_recovery_request to elohim yet.
-    //   submit_intimate_witness Gate 1 reads RecoveryRequest by ActionHash via
-    //   to_app_option::<RecoveryRequest>(). If create_recovery_request moves to
-    //   elohim, the returned hash points to a Content-encoded entry on elohim's
-    //   DHT, and to_app_option() here would fail. Gate readers must be redesigned
-    //   to do cross-DNA get() + Content deserialization before this can move.
-    //   Tracked as Stage G follow-up.
+    // RecoveryRequest: gate readers MIGRATED (Recovery M4 Task 3).
+    //   submit_intimate_witness Gate 1 now resolves the human_id field via
+    //   `fetch_recovery_request_human_id(cid)` — a cross-DNA call to
+    //   elohim::content_store::get_content_by_id returning the
+    //   `governance-action:recovery-request` Content entry's metadata.
+    //   The local imagodei RecoveryRequest entry type is retained for DHT
+    //   schema compat during the interim; Task 13 bridges the producer
+    //   (create_recovery_request) at which point local writes stop.
+    //   Removal: Task 15.
     RecoveryRequest(RecoveryRequest),
     // RecoveryVote: no live create_entry callers found (zero calls). Entry type
     //   kept to avoid DHT schema breakage on existing nodes. Bridge when
@@ -990,20 +992,30 @@ pub enum EntryTypes {
     //   committed before Stage G. Remove when all historic entries are migrated.
     HumanityWitness(HumanityWitness),
     IdentityAnomaly(IdentityAnomaly),
-    // KeyRevocation: CANNOT bridge create_self_revocation / create_revocation_request
-    //   to elohim yet. submit_revocation_vote reads KeyRevocation via to_app_option()
-    //   and update_entry() for the threshold flip. commit_key_rotation revocation-
-    //   floor gate also reads KeyRevocation from PendingRevocations/EffectiveRevocations
-    //   links. Moving these entries to elohim DHT breaks all gate readers.
-    //   Tracked as Stage G follow-up (requires coordinated migration of all readers).
+    // KeyRevocation: gate readers MIGRATED (Recovery M4 Tasks 4 + 5).
+    //   - commit_key_rotation revocation-floor gate now reads the
+    //     `governance-action:key-revocation` Content entries on elohim DNA
+    //     via `collect_active_revocations_for_key` (Task 4).
+    //   - submit_revocation_vote reads gate fields (trigger_type,
+    //     threshold_reached, human_id, revoked_key, required_votes) by CID
+    //     via `call_elohim_get_content_by_id` (Task 5). Input renamed to
+    //     `revocation_cid: String`.
+    //   The local imagodei KeyRevocation entry is retained INTERIM for
+    //   update_entry()-based threshold-flip + PendingRevocations link
+    //   cleanup; Task 14 bridges the producer (create_revocation_request +
+    //   submit_revocation_vote effectiveness-transition) at which point
+    //   local writes stop. Removal: Task 15.
     KeyRevocation(KeyRevocation),
     // RevocationVote: coupled to KeyRevocation (same gate chain). CANNOT bridge until
     //   KeyRevocation moves. Zero create_entry callers found in pre-bridge audit.
     RevocationVote(RevocationVote),
-    // IdentityFreeze: CANNOT bridge — collect_active_freezes_for_human reads
-    //   IdentityFreeze entries via to_app_option() for the freeze-floor gate in
-    //   commit_key_rotation. No create_entry callers found (zero); entry type kept
-    //   for DHT schema compat and freeze-floor gate reads on historic entries.
+    // IdentityFreeze: gate reader MIGRATED (Recovery M4 Task 4).
+    //   commit_key_rotation freeze-floor gate now resolves active freezes
+    //   via `collect_active_identity_freezes_for_human` — a cross-DNA query
+    //   for `governance-action:identity-freeze` Content entries on elohim
+    //   DNA. Zero local create_entry callers; entry type retained for DHT
+    //   schema compat only. Manifest declaration (Task 16) + final removal
+    //   (Task 15).
     IdentityFreeze(IdentityFreeze),
     // Stewardship entry types (Graduated Capabilities)
     // StewardshipGrant: deferred to Stage G (3 live create_entry callers in stewardship.rs).

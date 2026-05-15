@@ -115,7 +115,10 @@ struct CreateRevocationRequestInput {
 
 #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
 struct SubmitRevocationVoteInput {
-    revocation_id: String,
+    // Recovery M4 Task 5: renamed from `revocation_id: String`. The imagodei
+    // extern now takes the CID (content-derived id) of the
+    // `governance-action:key-revocation` Content entry on the elohim DNA.
+    revocation_cid: String,
     approved: bool,
     attestation: String,
 }

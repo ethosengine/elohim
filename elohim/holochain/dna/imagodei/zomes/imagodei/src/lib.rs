@@ -930,6 +930,49 @@ fn call_elohim_query_effective_identity_freeze_for_human(
 }
 
 // ---------------------------------------------------------------------------
+// Bridge helper: call elohim content_store::get_content_by_id and return the
+// full ConsolidatedContentOutput (or None when missing). Recovery M4 Task 5:
+// `submit_revocation_vote` needs every gate field of the
+// `governance-action:key-revocation` Content entry — trigger_type,
+// threshold_reached, human_id, revoked_key, required_votes, current_votes,
+// id — so a generic Option<ConsolidatedContentOutput>-returning helper is the
+// natural shape. The Task 3 helper `fetch_recovery_request_human_id` is
+// single-field-specific and not reusable here.
+// ---------------------------------------------------------------------------
+fn call_elohim_get_content_by_id(
+    cid: &str,
+) -> ExternResult<Option<ConsolidatedContentOutput>> {
+    let response = call(
+        CallTargetCell::OtherRole("elohim".into()),
+        ZomeName::from("content_store"),
+        FunctionName::from("get_content_by_id"),
+        None,
+        ConsolidatedQueryByIdInput {
+            id: cid.to_string(),
+        },
+    )?;
+    match response {
+        ZomeCallResponse::Ok(payload) => payload.decode().map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "bridge decode (elohim::get_content_by_id): {e}"
+            )))
+        }),
+        ZomeCallResponse::Unauthorized(_, _, _, _) => Err(wasm_error!(WasmErrorInner::Guest(
+            "Unauthorized bridge call to elohim::get_content_by_id".to_string()
+        ))),
+        ZomeCallResponse::NetworkError(err) => Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Network error bridging to elohim::get_content_by_id: {err}"
+        )))),
+        ZomeCallResponse::CountersigningSession(err) => Err(wasm_error!(WasmErrorInner::Guest(
+            format!("Countersigning error bridging to elohim: {err}")
+        ))),
+        ZomeCallResponse::AuthenticationFailed(_, _) => Err(wasm_error!(WasmErrorInner::Guest(
+            "Authentication failed bridging to elohim::get_content_by_id".to_string()
+        ))),
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Synthesise a legacy Attestation struct from a consolidated bridge response.
 // This is TEMPORARY scaffolding until Stage C removes the Attestation entry
 // type from imagodei entirely. The action_hash field cannot be derived from
@@ -2597,7 +2640,19 @@ pub fn create_revocation_request(
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct SubmitRevocationVoteInput {
-    pub revocation_id: String,
+    /// CID (content-derived id) of the `governance-action:key-revocation`
+    /// Content entry on the elohim DNA. Renamed from `revocation_id: String`
+    /// per Recovery M4 Task 5 — the canonical revocation entry now lives
+    /// cross-DNA as a Content entry on elohim; gate fields are resolved by
+    /// CID via `content_store::get_content_by_id` rather than a local
+    /// `IdToKeyRevocation` anchor lookup + `to_app_option()` decode. The
+    /// logical revocation_id (shape `rev-{human}-{ts}`) is recovered from
+    /// `Content.metadata.id` and used for downstream vote linkage and signal
+    /// payloads. The local imagodei KeyRevocation entry continues to exist
+    /// during the interim (Tasks 13/14 will move the producer), and is still
+    /// reachable via the local anchor keyed by the metadata id for
+    /// update_entry + link operations.
+    pub revocation_cid: String,
     pub approved: bool,
     pub attestation: String,
 }
@@ -2628,8 +2683,94 @@ pub fn submit_revocation_vote(
         )));
     }
 
-    // Load the KeyRevocation via IdToKeyRevocation anchor.
-    let revocation_id_anchor = StringAnchor::new("revocation_id", &input.revocation_id);
+    // Recovery M4 Task 5 migration: previously decoded a local imagodei
+    // `KeyRevocation` entry via the `IdToKeyRevocation` anchor + `to_app_option()`.
+    // Post Stage 2 the canonical revocation entry is a
+    // `governance-action:key-revocation` Content entry on the elohim DNA, fetched
+    // by CID via the cross-DNA bridge. The interim still relies on the local
+    // imagodei KeyRevocation entry for `update_entry` (threshold-flip) and link
+    // operations (PendingRevocations → EffectiveRevocations) — those move with
+    // Task 14 (`bridge_create_revocation_request` + `bridge_submit_revocation_vote`).
+    // The local entry is re-resolved by the metadata-carried logical
+    // revocation_id (anchor `IdToKeyRevocation` on `revocation_id`).
+    let content_output = call_elohim_get_content_by_id(&input.revocation_cid)?.ok_or_else(|| {
+        wasm_error!(WasmErrorInner::Guest(format!(
+            "submit_revocation_vote: revocation CID {} not found on elohim DNA",
+            input.revocation_cid
+        )))
+    })?;
+    if content_output.content.content_type != "governance-action:key-revocation" {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "submit_revocation_vote: expected governance-action:key-revocation, got {}",
+            content_output.content.content_type
+        ))));
+    }
+    let metadata: serde_json::Value =
+        serde_json::from_str(&content_output.content.metadata_json).map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "submit_revocation_vote: bad metadata_json: {e}"
+            )))
+        })?;
+    let revocation_id = metadata
+        .get("id")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| {
+            wasm_error!(WasmErrorInner::Guest(
+                "submit_revocation_vote: revocation metadata missing id".into(),
+            ))
+        })?
+        .to_string();
+    let revocation_trigger_type = metadata
+        .get("trigger_type")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| {
+            wasm_error!(WasmErrorInner::Guest(
+                "submit_revocation_vote: revocation metadata missing trigger_type".into(),
+            ))
+        })?
+        .to_string();
+    let revocation_threshold_reached = metadata
+        .get("threshold_reached")
+        .and_then(|v| v.as_bool())
+        .ok_or_else(|| {
+            wasm_error!(WasmErrorInner::Guest(
+                "submit_revocation_vote: revocation metadata missing threshold_reached".into(),
+            ))
+        })?;
+    let revocation_human_id = metadata
+        .get("human_id")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| {
+            wasm_error!(WasmErrorInner::Guest(
+                "submit_revocation_vote: revocation metadata missing human_id".into(),
+            ))
+        })?
+        .to_string();
+    let revocation_revoked_key = metadata
+        .get("revoked_key")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| {
+            wasm_error!(WasmErrorInner::Guest(
+                "submit_revocation_vote: revocation metadata missing revoked_key".into(),
+            ))
+        })?
+        .to_string();
+    let revocation_required_votes: u32 = metadata
+        .get("required_votes")
+        .and_then(|v| v.as_u64())
+        .and_then(|n| u32::try_from(n).ok())
+        .ok_or_else(|| {
+            wasm_error!(WasmErrorInner::Guest(
+                "submit_revocation_vote: revocation metadata missing required_votes".into(),
+            ))
+        })?;
+
+    // Local resolve: the imagodei-side KeyRevocation entry is still needed for
+    // update_entry (threshold-flip) and PendingRevocations link cleanup during
+    // the interim before Task 14 moves the producer. Re-derive its action_hash
+    // via the metadata-carried logical id (same anchor the producer creates at
+    // `create_revocation_request` line ~2576).
+    let revocation_id_anchor = StringAnchor::new("revocation_id", &revocation_id);
     let revocation_anchor_hash = hash_entry(&EntryTypes::StringAnchor(revocation_id_anchor))?;
     let revocation_links = get_links(
         LinkQuery::try_new(revocation_anchor_hash, LinkTypes::IdToKeyRevocation)?,
@@ -2637,8 +2778,8 @@ pub fn submit_revocation_vote(
     )?;
     let revocation_link = revocation_links.first().ok_or_else(|| {
         wasm_error!(WasmErrorInner::Guest(format!(
-            "submit_revocation_vote: no KeyRevocation with id {}",
-            input.revocation_id
+            "submit_revocation_vote: no local KeyRevocation anchor for id {}",
+            revocation_id
         )))
     })?;
     let revocation_action_hash = revocation_link
@@ -2650,42 +2791,27 @@ pub fn submit_revocation_vote(
                 "IdToKeyRevocation target was not an ActionHash".into()
             ))
         })?;
-    let revocation_record = get(revocation_action_hash.clone(), GetOptions::default())?
-        .ok_or_else(|| {
-            wasm_error!(WasmErrorInner::Guest(
-                "KeyRevocation record not found".into()
-            ))
-        })?;
-    let revocation: KeyRevocation = revocation_record
-        .entry()
-        .to_app_option()
-        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        .ok_or_else(|| {
-            wasm_error!(WasmErrorInner::Guest(
-                "KeyRevocation record missing entry".into()
-            ))
-        })?;
 
     // Gate: votes only apply to the steward_vote path.
-    if revocation.trigger_type != "steward_vote" {
+    if revocation_trigger_type != "steward_vote" {
         return Err(wasm_error!(WasmErrorInner::Guest(format!(
             "submit_revocation_vote: revocation {} has trigger_type={}, votes not accepted",
-            input.revocation_id, revocation.trigger_type
+            revocation_id, revocation_trigger_type
         ))));
     }
 
-    if revocation.threshold_reached {
+    if revocation_threshold_reached {
         return Err(wasm_error!(WasmErrorInner::Guest(format!(
             "submit_revocation_vote: revocation {} already effective",
-            input.revocation_id
+            revocation_id
         ))));
     }
 
     // Gate: caller must be an active emergency contact.
-    if !is_active_emergency_contact(&revocation.human_id, &caller_human_id)? {
+    if !is_active_emergency_contact(&revocation_human_id, &caller_human_id)? {
         return Err(wasm_error!(WasmErrorInner::Guest(format!(
             "submit_revocation_vote: caller is not an active emergency contact for {}",
-            revocation.human_id
+            revocation_human_id
         ))));
     }
 
@@ -2713,10 +2839,10 @@ pub fn submit_revocation_vote(
         else {
             continue;
         };
-        if prior_vote.revocation_id == input.revocation_id {
+        if prior_vote.revocation_id == revocation_id {
             return Err(wasm_error!(WasmErrorInner::Guest(format!(
                 "submit_revocation_vote: steward {} has already voted on revocation {}",
-                caller_human_id, input.revocation_id
+                caller_human_id, revocation_id
             ))));
         }
     }
@@ -2727,7 +2853,7 @@ pub fn submit_revocation_vote(
 
     let vote = RevocationVote {
         id: vote_id.clone(),
-        revocation_id: input.revocation_id.clone(),
+        revocation_id: revocation_id.clone(),
         steward_id: caller_human_id.clone(),
         approved: input.approved,
         attestation: input.attestation.clone(),
@@ -2748,7 +2874,7 @@ pub fn submit_revocation_vote(
     )?;
 
     // RevocationToVote anchor (per-revocation vote list)
-    let revocation_votes_anchor = StringAnchor::new("revocation_votes", &input.revocation_id);
+    let revocation_votes_anchor = StringAnchor::new("revocation_votes", &revocation_id);
     let revocation_votes_anchor_hash =
         hash_entry(&EntryTypes::StringAnchor(revocation_votes_anchor.clone()))?;
     create_entry(&EntryTypes::StringAnchor(revocation_votes_anchor))?;
@@ -2769,22 +2895,45 @@ pub fn submit_revocation_vote(
     )?;
 
     // Recompute threshold (count approved votes from link traversal).
-    let approved_count = count_approved_revocation_votes(&input.revocation_id)?;
-    let threshold_now_reached = approved_count >= revocation.required_votes;
+    let approved_count = count_approved_revocation_votes(&revocation_id)?;
+    let threshold_now_reached = approved_count >= revocation_required_votes;
 
     if threshold_now_reached {
-        // Update the KeyRevocation entry: flip threshold_reached, set effective_at.
-        let mut updated = revocation.clone();
+        // Interim (pre-Task-14): re-fetch the local KeyRevocation record and
+        // update_entry it to flip threshold_reached + set effective_at. Task 14
+        // will replace this with a fresh `governance-action:key-revocation`
+        // Content entry on elohim (create_entry, not update_entry — per Task 4's
+        // effectiveness-transition note at content_store/src/lib.rs:3185+).
+        let revocation_record = get(revocation_action_hash.clone(), GetOptions::default())?
+            .ok_or_else(|| {
+                wasm_error!(WasmErrorInner::Guest(
+                    "submit_revocation_vote: local KeyRevocation record not found".into()
+                ))
+            })?;
+        let mut updated: KeyRevocation = revocation_record
+            .entry()
+            .to_app_option()
+            .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+            .ok_or_else(|| {
+                wasm_error!(WasmErrorInner::Guest(
+                    "submit_revocation_vote: local KeyRevocation record missing entry".into(),
+                ))
+            })?;
         updated.current_votes = approved_count;
         updated.threshold_reached = true;
         updated.effective_at = Some(timestamp.clone());
         updated.updated_at = timestamp.clone();
         update_entry(
-            revocation_action_hash,
-            &EntryTypes::KeyRevocation(updated.clone()),
+            revocation_action_hash.clone(),
+            &EntryTypes::KeyRevocation(updated),
         )?;
 
         // Move from PendingRevocations to EffectiveRevocations.
+        // Recovery M4 Task 5: the legacy cleanup loop decoded each linked
+        // KeyRevocation entry to match `rev.id == input.revocation_id`. Now we
+        // match link targets against the locally-resolved `revocation_action_hash`
+        // directly — no decode needed, and no remaining `to_app_option::<KeyRevocation>`
+        // reader on the imagodei zome.
         let pending_global_anchor = StringAnchor::new("pending_revocations", "global");
         let pending_global_anchor_hash =
             hash_entry(&EntryTypes::StringAnchor(pending_global_anchor))?;
@@ -2793,22 +2942,10 @@ pub fn submit_revocation_vote(
             GetStrategy::default(),
         )?;
         for link in pending_links {
-            // Each pending link points to a specific revocation's action_hash.
-            // We identify by fetching the entry and matching the id.
             let Some(link_target_hash) = link.target.clone().into_action_hash() else {
                 continue;
             };
-            let Some(rec) = get(link_target_hash, GetOptions::default())? else {
-                continue;
-            };
-            let Some(rev): Option<KeyRevocation> = rec
-                .entry()
-                .to_app_option()
-                .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-            else {
-                continue;
-            };
-            if rev.id == input.revocation_id {
+            if link_target_hash == revocation_action_hash {
                 delete_link(link.create_link_hash, GetOptions::default())?;
             }
         }
@@ -2819,40 +2956,40 @@ pub fn submit_revocation_vote(
         create_entry(&EntryTypes::StringAnchor(effective_anchor))?;
         create_link(
             effective_anchor_hash,
-            revocation_link.target.clone(), // points to the revocation entry
+            revocation_link.target.clone(), // points to the local revocation entry
             LinkTypes::EffectiveRevocations,
             (),
         )?;
 
         emit_signal(RecoveryV2Signal::RevocationVoteSubmitted {
             id: vote_id.clone(),
-            revocation_id: input.revocation_id.clone(),
+            revocation_id: revocation_id.clone(),
             steward_id: caller_human_id.clone(),
             approved: input.approved,
             attestation: input.attestation.clone(),
             voted_at: timestamp.clone(),
             current_votes: approved_count,
-            required_votes: revocation.required_votes,
+            required_votes: revocation_required_votes,
             threshold_now_reached: true,
         })?;
 
         emit_signal(RecoveryV2Signal::KeyRevocationEffective {
-            revocation_id: input.revocation_id.clone(),
-            revoked_key: revocation.revoked_key.clone(),
-            human_id: revocation.human_id.clone(),
+            revocation_id: revocation_id.clone(),
+            revoked_key: revocation_revoked_key.clone(),
+            human_id: revocation_human_id.clone(),
             effective_at: timestamp,
             triggering_vote_id: Some(vote_id.clone()),
         })?;
     } else {
         emit_signal(RecoveryV2Signal::RevocationVoteSubmitted {
             id: vote_id.clone(),
-            revocation_id: input.revocation_id.clone(),
+            revocation_id: revocation_id.clone(),
             steward_id: caller_human_id.clone(),
             approved: input.approved,
             attestation: input.attestation.clone(),
             voted_at: timestamp,
             current_votes: approved_count,
-            required_votes: revocation.required_votes,
+            required_votes: revocation_required_votes,
             threshold_now_reached: false,
         })?;
     }
@@ -2860,7 +2997,7 @@ pub fn submit_revocation_vote(
     Ok(RevocationVoteOutput {
         vote_id,
         current_votes: approved_count,
-        required_votes: revocation.required_votes,
+        required_votes: revocation_required_votes,
         threshold_now_reached,
     })
 }
