@@ -255,7 +255,7 @@ async fn m4_emergency_contact_quorum_threshold_met() -> Result<()> {
     //       revoked_key: matthew_key, reason: "compromised" }`.
     //     Assert: required_votes == 3, threshold_reached == false.
     //
-    //   - Jessica calls `submit_revocation_vote { revocation_id, approved: true,
+    //   - Jessica calls `submit_revocation_vote { revocation_cid, approved: true,
     //       attestation: "Recognized Matthew, this is legitimate." }`.
     //     Assert: vote_output.threshold_now_reached == false.
     //
@@ -338,7 +338,7 @@ async fn m4_revocation_vote_idempotency() -> Result<()> {
     // Setup (4-contact fixture, same as scenarios 2/3):
     //   - Create revocation request via Jessica: required_votes=3.
     //   - Jessica submits vote 1: approved=true. Assert: ok.
-    //   - Jessica submits vote 2 (same revocation_id, approved=true):
+    //   - Jessica submits vote 2 (same revocation_cid, approved=true):
     //     Assert: call returns Err containing "already voted".
     //     OR: call returns Ok AND the RevocationToVote link count is still 1.
     //     (Both are acceptable — test whichever path the coordinator took.)
@@ -759,6 +759,156 @@ async fn m4_t4_commit_key_rotation_blocked_by_cross_dna_key_revocation() -> Resu
         assert!(
             !message.contains("bridge decode (elohim::query_effective_revocation_for_key)"),
             "Cross-DNA revocation query decode must succeed. Error: {message}"
+        );
+    }
+
+    Ok(())
+}
+
+/// Recovery M4 Task 5:
+/// `submit_revocation_vote` must consult the elohim DNA for the canonical
+/// `governance-action:key-revocation` Content entry — Stage 2 migration moved
+/// both the `to_app_option()` decode and the trigger_type/threshold_reached/
+/// human_id/revoked_key/required_votes/id field reads to a cross-DNA bridge
+/// read (`call_elohim_get_content_by_id`). With both DNAs installed under
+/// their contract role names, the read path must execute against the elohim
+/// cell without bridge wiring failure.
+///
+/// One scenario covers both migrated readers in `submit_revocation_vote`:
+/// the `Option<KeyRevocation>` decode and the gate-field extraction are now
+/// a single `call_elohim_get_content_by_id` + metadata-extraction sequence,
+/// so a single test execution exercises both.
+///
+/// Note: same adaptation as Task 4 — the generic `propose_governance_action`
+/// helper nests caller-supplied fields under `metadata.parameters_json`; the
+/// gate reads top-level `metadata.id`/`metadata.trigger_type`/etc. Until
+/// Task 14 lands the bespoke producer (`bridge_create_revocation_request`)
+/// that writes these at the top level, this test verifies cross-DNA wiring
+/// rather than the full happy-path vote semantics (which are exercised by
+/// Task 25 once @wip lifts on revocation-self.feature). The acceptance is
+/// negative: the call may fail at any downstream gate, but it MUST NOT fail
+/// with a cross-DNA bridge error (Unauthorized / Network / decode / not-found).
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "requires packed DNAs from Jenkins pipeline — needs both imagodei.dna and lamad.dna"]
+async fn m4_t5_submit_revocation_vote_reads_cross_dna_content() -> Result<()> {
+    use holochain_types::prelude::{DnaFile, RoleName};
+
+    let (mut conductor, agent) = single_agent_conductor().await?;
+
+    let imagodei_dna =
+        load_dna("imagodei", &network_seed("imagodei"), Some(agent.clone())).await?;
+    let elohim_dna = load_dna("lamad", &network_seed("lamad"), Some(agent.clone())).await?;
+    let imagodei_dna_hash = imagodei_dna.dna_hash().clone();
+    let elohim_dna_hash = elohim_dna.dna_hash().clone();
+
+    let dnas_with_roles: Vec<(RoleName, DnaFile)> = vec![
+        ("imagodei".into(), imagodei_dna),
+        ("elohim".into(), elohim_dna),
+    ];
+
+    let app = conductor
+        .setup_app_for_agent("recovery-m4-t5-vote", agent.clone(), &dnas_with_roles)
+        .await?;
+    let cells = app.cells();
+    let imagodei_cell = cells
+        .iter()
+        .find(|c| c.dna_hash() == &imagodei_dna_hash)
+        .expect("imagodei cell installed")
+        .clone();
+    let elohim_cell = cells
+        .iter()
+        .find(|c| c.dna_hash() == &elohim_dna_hash)
+        .expect("elohim cell installed")
+        .clone();
+
+    // Commit a key-revocation Content entry on elohim DNA with trigger_type
+    // = "steward_vote" and threshold_reached = false so the gate fields are
+    // shaped for the vote path. We reuse MirrorT4 structs because the input
+    // shape is identical to Task 4's revocation-gate scenario; same producer.
+    let revoked_key_str = agent.to_string();
+    let propose_input = ProposeGovernanceActionInputMirrorT4 {
+        governance_kind: "governance-action:key-revocation".to_string(),
+        subject_cid: HUMAN_MATTHEW.to_string(),
+        title: "Key revocation (steward-vote) — Matthew".to_string(),
+        description: None,
+        reach: "private".to_string(),
+        threshold: serde_json::json!({ "type": "m-of-n", "m": 3, "n": 4 }),
+        eligibility_predicate: None,
+        ballot_format: "approve-reject".to_string(),
+        closes_at: "2099-01-01T00:00:00Z".to_string(),
+        parameters: Some(serde_json::json!({
+            "id": "rev-matthew-2026-05-15",
+            "human_id": HUMAN_MATTHEW,
+            "revoked_key": revoked_key_str,
+            "threshold_reached": false,
+            "required_votes": 3,
+            "trigger_type": "steward_vote",
+        })),
+    };
+
+    let governance_output: GovernanceActionOutputMirrorT4 = conductor
+        .call(
+            &elohim_cell.zome("content_store"),
+            "propose_governance_action",
+            propose_input,
+        )
+        .await;
+    assert!(
+        !governance_output.cid.is_empty(),
+        "governance CID must be set"
+    );
+
+    // Drive submit_revocation_vote. The caller is a fresh conductor agent
+    // with no bound Human entry, no local KeyRevocation anchor, and no
+    // emergency-contact relationship — so the call WILL fail somewhere
+    // downstream of the cross-DNA bridge read. The test asserts only the
+    // negative: no bridge wiring failure.
+    let vote_input = SubmitRevocationVoteInput {
+        revocation_cid: governance_output.cid.clone(),
+        approved: true,
+        attestation: "Recognized Matthew, this is legitimate.".to_string(),
+    };
+
+    let vote_result: holochain::conductor::api::error::ConductorApiResult<
+        RevocationVoteOutput,
+    > = conductor
+        .call_fallible(
+            &imagodei_cell.zome("imagodei"),
+            "submit_revocation_vote",
+            vote_input,
+        )
+        .await;
+
+    if let Err(err) = vote_result {
+        let message = format!("{err:?}");
+        // No bridge wiring failures — the cross-DNA Content read must succeed.
+        assert!(
+            !message.contains("Unauthorized bridge call"),
+            "Cross-DNA bridge must not be unauthorized. Error: {message}"
+        );
+        assert!(
+            !message.contains("Network error bridging to elohim::get_content_by_id"),
+            "Cross-DNA bridge must not network-error. Error: {message}"
+        );
+        assert!(
+            !message.contains("bridge decode (elohim::get_content_by_id)"),
+            "Cross-DNA Content fetch decode must succeed. Error: {message}"
+        );
+        assert!(
+            !message.contains("Countersigning error bridging to elohim::get_content_by_id"),
+            "Cross-DNA Content fetch must not surface as countersigning error. Error: {message}"
+        );
+        assert!(
+            !message.contains("Authentication failed bridging to elohim::get_content_by_id"),
+            "Cross-DNA Content fetch must not fail authentication. Error: {message}"
+        );
+        // The "not found on elohim DNA" message would mean cross-DNA call
+        // returned None for a CID we just committed — that's the bridge
+        // returning the wrong cell, not a genuine missing-entry case.
+        assert!(
+            !message.contains("not found on elohim DNA"),
+            "Just-committed governance Content must be reachable via cross-DNA \
+             read. Error: {message}"
         );
     }
 

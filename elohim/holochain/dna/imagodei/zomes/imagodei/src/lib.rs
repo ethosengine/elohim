@@ -964,7 +964,7 @@ fn call_elohim_get_content_by_id(
             "Network error bridging to elohim::get_content_by_id: {err}"
         )))),
         ZomeCallResponse::CountersigningSession(err) => Err(wasm_error!(WasmErrorInner::Guest(
-            format!("Countersigning error bridging to elohim: {err}")
+            format!("Countersigning error bridging to elohim::get_content_by_id: {err}")
         ))),
         ZomeCallResponse::AuthenticationFailed(_, _) => Err(wasm_error!(WasmErrorInner::Guest(
             "Authentication failed bridging to elohim::get_content_by_id".to_string()
