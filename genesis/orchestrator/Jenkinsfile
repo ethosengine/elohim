@@ -2103,11 +2103,11 @@ spec:
                             sh '''
                                 export CARGO_TARGET_DIR=/projects/.cargo-target-pool/family/iroh/elohim__elohim-storage/dev
                                 RUSTFLAGS=\'--cfg getrandom_backend="custom"\' \
-                                cargo test \
+                                cargo nextest run \
                                     --release \
                                     --features "p2p p2p-iroh" \
                                     --test \'iroh_*\' \
-                                    -- --test-threads=1 \
+                                    --test-threads=1 \
                                     2>&1 | tee iroh-parity-nightly.log
                             '''
                         }
