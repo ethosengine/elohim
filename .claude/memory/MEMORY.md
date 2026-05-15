@@ -170,3 +170,4 @@
 - [Agent-audit drift-counter convergence](feedback_audit_convergence_evidence.md) — Run#2:6→Run#3:1; first cross-cycle convergence; post-deploy=baseline, delta=proof.
 - [/deliver paired verdicts — authority is attestable](project_deliver_authority_discipline_paired_verdicts.md) — May7 + 2026-05-14, opposite directions; falsifiability proof.
 - [W2 AgentPeerBinding deferred until Phase 12](project_w2_agent_peer_binding_deferred.md) — D5 gate not met; Phase 12 0/59 ticked. Single-wire after Phase 12 lands; mirror EPR T7 pattern.
+- [T6 derive_compromise_at deferred to legacy-removal](project_t6_derive_compromise_at_deferred.md) — substrate misalignment + low back-compat-window gain; re-engage if legacy path outlives one release cycle.

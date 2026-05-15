@@ -438,6 +438,12 @@ EOF
 
 ## Task 5: W2D — create `RecoveryFlowProjector` (sibling) + wire central signal dispatcher
 
+> **STATUS — 2026-05-15: ✅ LANDED (reframed under M4 coordination).** Commit `0104e5e48`.
+>
+> Task 5 was substantively reframed mid-sprint when the Recovery M4 sprint claimed ownership of the `RecoveryFlowProjector` itself (M4 commits `d89abd019`, `1d34a9153`, `c2b70133c`, `596c7b8c9`) — sibling-projector pattern co-located per M4 D1. The EPR-side contribution that landed instead is the **A.8 EPR-atom revocation sweep** (`signals.rs::sweep_dependent_caches_on_revocation`), which fills the Phase-2B extension point M4 explicitly left for the EPR worker at `signals.rs:1249` (stub with comment *"Phase 2B extension point: UPDATE epr_atoms SET verified_at = NULL WHERE signer_cid = ?revoked_key"*). The sweep is time-bounded by `compromise_at`, idempotent, called from both the legacy `RecoveryV2Signal::KeyRevocationEffective` path (signals.rs:1220) and the new T18 `DnaSignal::KeyRevocation` envelope path (signals.rs:1459). Migration `2026-04-25-000000_verified_at_on_epr_atoms` pre-staged the `(signer_cid, issued_at)` index for exactly this sweep. Four tests cover the four required semantics: clears matching, leaves pre-compromise alone, idempotent, zero-on-empty.
+>
+> The original task body below is retained for historical context. Steps 1–N are NOT to be executed — M4 owns that work and it has already landed on dev.
+
 **Files:**
 - Create: `elohim/elohim-storage/src/services/recovery_flow_projector.rs`
 - Modify: `elohim/elohim-storage/src/services/mod.rs` (re-export)
@@ -844,6 +850,15 @@ EOF
 ---
 
 ## Task 6: W2D — upgrade `derive_compromise_at` from Stage-1 stub to projection lookup
+
+> **STATUS — 2026-05-15: ⏸️ DEFERRED to legacy-path-removal task (post-back-compat-window).**
+>
+> Deferred for three convergent reasons:
+> 1. **Sprint acceptance is met without T6.** Load-bearing work is T5 (A.8 sweep) + T7 (RevocationAttestation IntegrityNotify arm) + Tasks 9–10 (a2o @wip lift). T6 is tail cleanup whose semantic value during the back-compat window is small.
+> 2. **The original target table doesn't exist.** Original plan referenced `revocation_votes` for the projection-lookup, but M4 landed `recovery_flows` + reused the existing `key_revocations` table instead. No `revocation_votes` migration on dev. The TODO(A.12) comment in the live code at `holochain_app_signal.rs:282–288` already points at `key_revocations.created_at` (the community's first-declared compromise time) as the right lookup column.
+> 3. **The sweep doesn't currently consume `derive_compromise_at`'s output.** The A.8 sweep at `signals.rs:1220` (legacy path) takes `effective_at` directly. T6 alone would improve only the `DnaSignal::KeyRevocation` envelope's `compromise_at` field for legacy-emitted signals — not the sweep window. Fully tightening the sweep window would require additionally plumbing the derived value into the legacy sweep callsite — a non-trivial refactor for a path that is `#[deprecated]` and removed in one release cycle.
+>
+> **When this is re-engaged:** at the moment the back-compat window closes (the release cycle in which `RecoveryV2Signal::KeyRevocationEffective` is removed per T18 spec doc), the legacy translation path goes away entirely and `derive_compromise_at` along with it. If the project decides to keep the legacy path alive longer than expected, re-engage T6 then. See memory entry `project_t6_derive_compromise_at_deferred.md`.
 
 **Files:**
 - Modify: `elohim/elohim-storage/src/reconcile/holochain_app_signal.rs:289–296`
