@@ -26,7 +26,7 @@
 //! 3. Verify each `ShamirShareResponse`:
 //!    (a) `attestation_cid` must match a real `attestations` DB row.
 //!    (b) `signature` must verify against the custodian's Ed25519 key, resolved
-//!        via [`resolve_custodian_verifying_key`].
+//!    via [`resolve_custodian_verifying_key`].
 //! 4. Accumulate verified shares until the threshold `m` declared in the
 //!    governance-action's `threshold_json` is reached.
 //! 5. Reconstruct the secret via `sharks` (Shamir over GF(256)) and return
