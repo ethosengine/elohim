@@ -259,12 +259,19 @@ pub fn submit_specialist_revocation(
         created_at: rfc3339_now.clone(),
     })?;
 
+    let emitted_at_defender = rfc3339_from_sys_time(&sys_time()?);
     emit_signal(RecoveryV2Signal::KeyRevocationEffective {
         revocation_id: revocation_id.clone(),
-        revoked_key: revoked_key_str,
+        signal_type: "keyRevocation".to_string(),
+        action_hash: revocation_cid.clone(),
         human_id: target_human_id,
+        revoked_key: revoked_key_str,
+        // M4: no separate compromise-discovery timestamp; coincides with effectiveAt.
+        // Future revisions may populate this from revocation request metadata.
+        compromise_at: rfc3339_now.clone(),
         effective_at: rfc3339_now,
         triggering_vote_id: None,
+        emitted_at: emitted_at_defender,
     })?;
 
     Ok(SubmitSpecialistRevocationOutput {

@@ -2153,11 +2153,49 @@ pub enum RecoveryV2Signal {
         threshold_now_reached: bool,
     },
     KeyRevocationEffective {
+        /// Internal correlation id (shape `rev-{human}-{ts}`).
+        /// Not in the dna-signals schema; retained for elohim-storage projector
+        /// correlation until T18 reconciles the full projection table design.
         revocation_id: String,
-        revoked_key: String,
+        /// Const discriminator required by `dna-signals/key-revocation.schema.json`.
+        /// Note: the outer `RecoveryV2Signal` enum also serializes a `type` field
+        /// via `#[serde(tag = "type")]`. Receivers that strictly enforce
+        /// `additionalProperties: false` on the schema will see both `type` and
+        /// `signalType`. T18 should either remove the outer tag or align the schema
+        /// to tolerate the extra field.
+        #[serde(rename = "signalType")]
+        signal_type: String,
+        /// CID of the `governance-action:key-revocation` Content entry on the
+        /// elohim DNA, carried as the `actionHash` wire field.  Stage 1: this is
+        /// the elohim Content CID string returned by the bridge call.  Stage 2:
+        /// should be the true Holochain ActionHash (base64) of the DHT entry once
+        /// the elohim DNA exposes the action hash alongside the CID in its output.
+        #[serde(rename = "actionHash")]
+        action_hash: String,
+        /// Stage 1: populated with `human_id` (the stable human identifier).
+        /// Stage 2: will be a content CID derived from the imagodei Human entry.
+        #[serde(rename = "agentCid")]
         human_id: String,
+        /// The revoked ed25519 pubkey (base64 32-byte).
+        #[serde(rename = "revokedPubkey")]
+        revoked_key: String,
+        /// Earliest point the key may have been compromised (RFC3339).
+        /// M4 surface has no separate compromise-discovery timestamp; this field
+        /// is set equal to `effective_at` at emit time.  A future revision of
+        /// Recovery (post-M4) may add a distinct `compromise_at` from the
+        /// revocation request metadata, at which point this field will diverge.
+        #[serde(rename = "compromiseAt")]
+        compromise_at: String,
+        /// When the revocation became effective in the DHT (RFC3339).
+        #[serde(rename = "effectiveAt")]
         effective_at: String,
+        /// Back-pointer to the KeyRevocation request/vote that drove this event.
+        /// Null for defender/voluntary paths (no vote chain).
+        #[serde(rename = "triggeringRevocationId")]
         triggering_vote_id: Option<String>,
+        /// UTC timestamp at which this signal was emitted (RFC3339).
+        #[serde(rename = "emittedAt")]
+        emitted_at: String,
     },
     // M5: portal-host signals — consumed by elohim-storage ReconcileController.
     PortalHostCreated {
@@ -2574,9 +2612,7 @@ pub fn create_self_revocation(
     let consolidated = call_elohim_propose_recovery_governance_action(bridge_input)?;
     let revocation_cid = consolidated.cid;
 
-    // Emit both signals atomically: Requested + Effective. The signal payloads
-    // already carry CID-shape fields (no ActionHash), so they pass through
-    // unchanged from the pre-Task-13 wiring.
+    // Emit both signals atomically: Requested + Effective.
     emit_signal(RecoveryV2Signal::KeyRevocationRequested {
         id: revocation_id.clone(),
         human_id: human_id.clone(),
@@ -2591,12 +2627,19 @@ pub fn create_self_revocation(
         created_at: timestamp.clone(),
     })?;
 
+    let emitted_at_self = rfc3339_from_sys_time(&sys_time()?);
     emit_signal(RecoveryV2Signal::KeyRevocationEffective {
         revocation_id: revocation_id.clone(),
-        revoked_key: revoked_key_str,
+        signal_type: "keyRevocation".to_string(),
+        action_hash: revocation_cid.clone(),
         human_id,
+        revoked_key: revoked_key_str,
+        // M4: no separate compromise-discovery timestamp; coincides with effectiveAt.
+        // Future revisions may populate this from revocation request metadata.
+        compromise_at: timestamp.clone(),
         effective_at: timestamp,
         triggering_vote_id: None,
+        emitted_at: emitted_at_self,
     })?;
 
     Ok(KeyRevocationOutput {
@@ -2996,8 +3039,12 @@ pub fn submit_revocation_vote(
             metadata: effective_metadata,
             supersedes_cid: Some(input.revocation_cid.clone()),
         };
-        let _effective_consolidated =
+        let effective_consolidated =
             call_elohim_propose_recovery_governance_action(effective_bridge_input)?;
+        // The CID of the fresh effective Content entry on the elohim DNA.
+        // Stage 1: this is the elohim Content CID string.  Stage 2: switch to
+        // the true ActionHash once the elohim DNA exposes it alongside the CID.
+        let effective_cid = effective_consolidated.cid;
 
         emit_signal(RecoveryV2Signal::RevocationVoteSubmitted {
             id: vote_id.clone(),
@@ -3011,12 +3058,19 @@ pub fn submit_revocation_vote(
             threshold_now_reached: true,
         })?;
 
+        let emitted_at_voted = rfc3339_from_sys_time(&sys_time()?);
         emit_signal(RecoveryV2Signal::KeyRevocationEffective {
             revocation_id: revocation_id.clone(),
-            revoked_key: revocation_revoked_key.clone(),
+            signal_type: "keyRevocation".to_string(),
+            action_hash: effective_cid,
             human_id: revocation_human_id.clone(),
+            revoked_key: revocation_revoked_key.clone(),
+            // M4: no separate compromise-discovery timestamp; coincides with effectiveAt.
+            // Future revisions may populate this from revocation request metadata.
+            compromise_at: rfc3339_now.clone(),
             effective_at: rfc3339_now,
             triggering_vote_id: Some(vote_id.clone()),
+            emitted_at: emitted_at_voted,
         })?;
     } else {
         emit_signal(RecoveryV2Signal::RevocationVoteSubmitted {
