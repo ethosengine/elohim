@@ -4351,6 +4351,21 @@ impl P2PNode {
                 );
             }
 
+            // === Shamir share protocol (`/elohim/shamir-share/1.0.0`) ===
+            //
+            // Recovery M4 T19 registered the codec with the behaviour; T20 wires
+            // the responder authorization checks (DHT-projected recovery-approval
+            // attestation lookup) and the custodian dial logic. Until then, log
+            // events at trace and drop — peers advertise the protocol via
+            // identify but no message handling occurs.
+            behaviour::ElohimStorageBehaviourEvent::ShamirShare(event) => {
+                tracing::trace!(
+                    target: "elohim_storage::shamir_share",
+                    event = ?event,
+                    "T19: shamir-share protocol event observed; handler lands in T20"
+                );
+            }
+
             // === NAT traversal events ===
             behaviour::ElohimStorageBehaviourEvent::Identify(identify::Event::Received {
                 peer_id,

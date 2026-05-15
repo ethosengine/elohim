@@ -17,12 +17,9 @@
 //!
 //! ## Swarm registration
 //!
-//! TODO(G.1-swarm-wiring): the `ShamirShareCodec` is ready for registration but
-//! adding a new field to `ElohimStorageBehaviour` requires touching the behaviour
-//! struct + `From` impls + the swarm event loop match arm — a multi-file change
-//! deferred so G.1 lands cleanly on its own commit boundary. Registration follows
-//! the exact same pattern as `trust_protocol` (see `behaviour.rs:88` and
-//! `mod.rs:2292`). Track under the share-custody epic.
+//! Recovery M4 T19 registered the codec with `ElohimStorageBehaviour` (see
+//! `behaviour.rs::shamir_share`). The swarm event-loop match arm + custodian
+//! dial logic land in T20.
 
 use async_trait::async_trait;
 use futures::prelude::*;
