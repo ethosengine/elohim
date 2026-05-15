@@ -390,6 +390,70 @@ impl EprAtomService {
                     }
                 }
             }
+            "RevocationAttestation" => {
+                match crate::p2p::revocation_attestation_message::RevocationAttestationMessage::from_bytes(
+                    &payload_bytes,
+                ) {
+                    Ok(msg) => {
+                        // Dedup on synthetic key. Same attestation arriving via direct-
+                        // notify + signal stream will not double-process after the first
+                        // delivery. The dedup key includes the action_hash so two
+                        // attestations on the same revocation (a 'request' and a 'vote',
+                        // or two different stewards' votes) do not collide.
+                        let dedup_key = format!(
+                            "RevocationAttestation:{}:{}",
+                            msg.revocation_id, msg.action_hash
+                        );
+                        if !self.dedup.insert(&dedup_key) {
+                            debug!(
+                                target: "elohim_storage::dedup",
+                                from = %peer_label,
+                                revocation_id = %msg.revocation_id,
+                                action_hash = %msg.action_hash,
+                                "duplicate RevocationAttestation direct-notify — dropped"
+                            );
+                            return EprAtomResponse::IntegrityAck {
+                                received: true,
+                                reason: Some("duplicate".to_string()),
+                            };
+                        }
+                        info!(
+                            target: "elohim_storage::recovery",
+                            from = %peer_label,
+                            revocation_id = %msg.revocation_id,
+                            action_hash = %msg.action_hash,
+                            attestation_kind = %msg.attestation_kind,
+                            steward_id = %msg.steward_id,
+                            threshold_reached = msg.threshold_reached,
+                            "W2: Received RevocationAttestation via direct-notify"
+                        );
+                        // Per D3 duality: the canonical write to the projection happens
+                        // via the AttestationProjector (for attestation:revocation-vote
+                        // children landing in `attestations`) and via the
+                        // RecoveryFlowProjector (for governance-action:key-revocation
+                        // openers / key-revocation:effective signals landing in
+                        // `key_revocations`). Direct-notify is delivery-optimistic — it
+                        // does not write to projections here, to avoid divergence with
+                        // the canonical signal-stream-driven path.
+                        EprAtomResponse::IntegrityAck {
+                            received: true,
+                            reason: None,
+                        }
+                    }
+                    Err(e) => {
+                        warn!(
+                            target: "elohim_storage::recovery",
+                            from = %peer_label,
+                            error = %e,
+                            "W2: Failed to decode RevocationAttestationMessage from direct-notify"
+                        );
+                        EprAtomResponse::IntegrityAck {
+                            received: false,
+                            reason: Some(format!("decode failed: {e}")),
+                        }
+                    }
+                }
+            }
             other_kind => {
                 warn!(
                     target: "elohim_storage::integrity",
@@ -516,6 +580,92 @@ mod tests {
             CallerIdentity::Anonymous,
             EprAtomRequest::IntegrityNotify {
                 kind: "KeyRotation".into(),
+                payload_bytes: bytes,
+            },
+        );
+
+        match response {
+            EprAtomResponse::IntegrityAck {
+                received: true,
+                reason: Some(r),
+            } if r == "duplicate" => {}
+            other => panic!("expected dedup'd IntegrityAck, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn integrity_notify_revocation_attestation_acks_received_true() {
+        let svc = fresh_service();
+        let msg = crate::p2p::revocation_attestation_message::RevocationAttestationMessage {
+            signal_type: "revocationAttestation".into(),
+            action_hash: "uhCkk1".into(),
+            revocation_id: "u-rev-int-1".into(),
+            steward_id: "agent-cid".into(),
+            approved: true,
+            attestation_kind: "vote".into(),
+            current_votes: 2,
+            required_votes: 3,
+            threshold_reached: false,
+            attested_at: "2026-05-15T11:00:00Z".into(),
+            emitted_at: "2026-05-15T11:00:01Z".into(),
+        };
+        let bytes = msg.to_bytes().expect("encode");
+
+        let response = svc.handle(
+            "test-peer",
+            CallerIdentity::Anonymous,
+            EprAtomRequest::IntegrityNotify {
+                kind: "RevocationAttestation".to_string(),
+                payload_bytes: bytes,
+            },
+        );
+
+        match response {
+            EprAtomResponse::IntegrityAck {
+                received: true,
+                reason: None,
+            } => {}
+            other => panic!(
+                "expected IntegrityAck {{ received: true }}, got {:?}",
+                other
+            ),
+        }
+    }
+
+    #[test]
+    fn integrity_notify_revocation_attestation_dedup_returns_duplicate_reason() {
+        let svc = fresh_service();
+        let msg = crate::p2p::revocation_attestation_message::RevocationAttestationMessage {
+            signal_type: "revocationAttestation".into(),
+            action_hash: "uhCkk2".into(),
+            revocation_id: "u-rev-int-dedup".into(),
+            steward_id: "agent-cid".into(),
+            approved: true,
+            attestation_kind: "vote".into(),
+            current_votes: 2,
+            required_votes: 3,
+            threshold_reached: false,
+            attested_at: "2026-05-15T11:00:00Z".into(),
+            emitted_at: "2026-05-15T11:00:01Z".into(),
+        };
+        let bytes = msg.to_bytes().expect("encode");
+
+        // First delivery: received: true, reason: None
+        let _ = svc.handle(
+            "test-peer",
+            CallerIdentity::Anonymous,
+            EprAtomRequest::IntegrityNotify {
+                kind: "RevocationAttestation".into(),
+                payload_bytes: bytes.clone(),
+            },
+        );
+
+        // Second delivery: dedup'd, received: true, reason: Some("duplicate")
+        let response = svc.handle(
+            "test-peer",
+            CallerIdentity::Anonymous,
+            EprAtomRequest::IntegrityNotify {
+                kind: "RevocationAttestation".into(),
                 payload_bytes: bytes,
             },
         );
