@@ -33,10 +33,17 @@ pub use portal_host::*;
 pub mod submit_specialist_revocation;
 pub use submit_specialist_revocation::*;
 
-// content_decode — cross-DNA Content entry decoder (Recovery M4 completion, Task 2).
-// `dead_code` allow is transient: M4 Tasks 3-5 reference
-// `crate::content_decode::{decode_content_entry, CrossDnaContent}` via explicit
-// path. Drop this allow when the first caller lands.
+// content_decode — cross-DNA Content entry decoder (Recovery M4, Task 2).
+//
+// Helper for the case where a validator needs to deserialise a raw `Entry::App`
+// payload from a cross-DNA Content commit. M4 Tasks 3-5 ended up using
+// structured ContentOutput from coordinator bridge calls instead (see
+// `fetch_recovery_request_human_id` and the migrated gate readers), so the
+// helper has no caller in the M4 surface. Retained as a tested decoder
+// primitive for T17/T18 (signal alignment + cross-stack integration) and
+// future cross-DNA integrity work.
+//
+// TODO(M4 completion): if T17/T18 do not adopt this, delete the module.
 #[allow(dead_code)]
 mod content_decode;
 

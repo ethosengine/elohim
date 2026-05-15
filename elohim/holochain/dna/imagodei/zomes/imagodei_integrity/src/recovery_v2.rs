@@ -583,16 +583,21 @@ mod tests {
     }
 
     #[test]
-    fn test_intimate_request_human_id_missing() {
+    fn test_intimate_request_human_id_missing_defers_to_coordinator() {
+        // Recovery M4 Task 15: when the stub RecoveryRequest has `human_id: None`
+        // (synthesised by `validate_key_rotation` because cross-DNA fetch is
+        // HDK-only), the witnesses-agree-on-the-same-human_id check still
+        // applies, but the witness↔request cross-check is deferred to the
+        // coordinator (`commit_key_rotation`). Validator must accept.
         let req = mk_request(None, 2);
         let witnesses = vec![
             mk_witness("human-abc", None, fake_agent_pubkey(1)),
             mk_witness("human-abc", None, fake_agent_pubkey(2)),
         ];
-        assert_rejects(
+        assert!(matches!(
             check_intimate_quorum_rules(&req, &witnesses),
-            "RecoveryRequest.human_id",
-        );
+            ValidateCallbackResult::Valid
+        ));
     }
 
     // ---- CryptographicQuorum ----
@@ -886,7 +891,7 @@ pub fn validate_key_rotation(rotation: &KeyRotation) -> ExternResult<ValidateCal
         ));
     }
 
-    // Rule 2: Cross-reference the RecoveryRequest for field matching.
+    // Rule 2 (stub): RecoveryRequest cross-reference deferred to coordinator.
     //
     // Recovery M4 Task 15: RecoveryRequest is no longer an imagodei DHT entry type —
     // producers were bridged to the elohim DNA (governance-action:recovery-request
