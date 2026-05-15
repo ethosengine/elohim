@@ -333,6 +333,11 @@
       "description": "Active suspension of an identity's capabilities. Created either (a) as the derived effective record when a governance-action:identity-challenge reaches challenge-support quorum, or (b) directly as an immediately-effective single-actor record on the defender-attestation path. Recovery M4 introduces the single-actor producer pattern; voted producers continue to flow through identity-challenge. Effectiveness transitions are CREATE-only with supersedes_cid lineage. Replaces IdentityFreeze entry type.",
       "child_attestation_kind": "attestation:freeze-vote",
       "default_ballot_format": "approve-reject"
+    },
+    "governance-action:shamir-custody-setup": {
+      "description": "Records the custody manifest for an agent's Shamir-split seed: which custodian CIDs hold which share indices, the (m,n) threshold, and the validity horizon. Committed at recovery-setup time so the recovery substrate can deterministically dial custodians at recovery time without depending on live capability advertisements. Share bytes themselves NEVER touch the DHT — they are delivered out-of-band to each custodian's local custodian_shares table (T21). This entry records only the assignment metadata, never the share material itself (enforced by Floor G3 in attestation_validator.rs). Effectiveness transitions are CREATE-only with supersedes_cid lineage so stewardship-rotation can re-grant without losing the audit trail.",
+      "child_attestation_kind": "attestation:identity-credential",
+      "default_ballot_format": "approve-reject"
     }
   }
 }
