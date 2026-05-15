@@ -142,6 +142,10 @@ pub mod attestations;
 pub mod governance_action_tally;
 pub mod governance_actions;
 
+// Recovery M4 T20 — authorization gate for Shamir share responders
+// Category C operational (queries the attestations projection; no new table)
+pub mod recovery_approval_gate;
+
 use std::path::Path;
 use std::time::Duration;
 
