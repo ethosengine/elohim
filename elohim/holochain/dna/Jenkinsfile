@@ -324,7 +324,7 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                             # RUSTC_WRAPPER + PATH for sccache binary.
                             nix develop --impure --accept-flake-config \
                                 "$WORKSPACE/elohim/holochain/dna/elohim" \
-                                --command bash -c 'RUSTFLAGS="" cargo test'
+                                --command bash -c 'RUSTFLAGS="" cargo nextest run'
                         '''
                     }
                 }
@@ -629,13 +629,10 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                     #     check record.entry().is_present() instead of asserting
                                     #     the Option<Record> outer is None. Needs HDK semantic
                                     #     verification before fixing.
-                                    cargo test --release --no-fail-fast -- \\
-                                        --include-ignored \\
+                                    cargo nextest run --release --no-fail-fast \\
+                                        --run-ignored all \\
                                         --test-threads=1 \\
-                                        --skip epr_2b_batch_a_full_loop \\
-                                        --skip create_and_list_succeeds \\
-                                        --skip refresh_ttl_appends_timestamp \\
-                                        --skip cross_agent_get_returns_none \\
+                                        -E "not (test(=epr_2b_batch_a_full_loop) | test(=create_and_list_succeeds) | test(=refresh_ttl_appends_timestamp) | test(=cross_agent_get_returns_none))" \\
                                         2>&1 | tee "$LOG"
                                     CARGO_RC=${PIPESTATUS[0]}
                                     # Capture sccache hit/miss/write stats to the
@@ -650,22 +647,27 @@ BRANCH_NAME=${env.BRANCH_NAME}"""
                                 '
                                 RC=${PIPESTATUS[0]}
 
-                                # Happy path — surface only the per-binary summary lines.
+                                # Happy path — surface the nextest summary line.
                                 if [ "$RC" -eq 0 ]; then
                                     echo "--- DNA Integration: PASSED ---"
-                                    grep -E "^test result: ok" "$LOG" || true
+                                    grep -E "^ *Summary " "$LOG" || true
                                     exit 0
                                 fi
 
-                                # Failure — extract panic + failure context, silence the rest.
+                                # Failure — extract summary + failed test names + captured stdout/stderr.
+                                # nextest prints one "Summary [duration] N tests run: ..." line at the end,
+                                # FAIL lines per failed test, and "--- STDOUT: target::name ---" /
+                                # "--- STDERR: target::name ---" blocks for captured output.
                                 echo "--- DNA Integration: FAILED ---"
                                 echo ""
                                 echo "Summary:"
-                                grep -E "^test result:" "$LOG" || true
+                                grep -E "^ *Summary " "$LOG" || true
                                 echo ""
-                                echo "Failures:"
-                                awk "/^---- .* stdout ----\\$/,/^\\$/" "$LOG"
-                                awk "/^failures:\\$/,0" "$LOG" | head -50
+                                echo "Failed tests:"
+                                grep -E "^ *FAIL " "$LOG" || true
+                                echo ""
+                                echo "Failure output (first 200 lines from first STDOUT/STDERR marker):"
+                                awk "/^--- STDOUT:|^--- STDERR:/{p=1} p" "$LOG" | head -200
                                 echo ""
                                 echo "(full log archived as dna-integration.log)"
                                 exit $RC
