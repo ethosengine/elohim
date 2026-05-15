@@ -6865,42 +6865,52 @@ impl From<crate::db::models::RecoveryWitnessRow> for RecoveryWitnessView {
 // These tables are read-optimized projections rebuildable via signal replay.
 // =============================================================================
 
-/// Projection of an imagodei KeyRevocation DHT entry.
-/// Source of truth: DHT. Rebuildable via signal replay on
-/// RecoveryV2Signal::KeyRevocationRequested / KeyRevocationEffective.
+/// Projection of an elohim-DNA Content key-revocation entry
+/// (content_type = 'governance-action:key-revocation').
+/// Source of truth: DHT. Rebuildable via signal replay on the
+/// ElohimContentSignal dispatcher.
+///
+/// Field naming follows the Content-routed producer contract:
+/// `subject_human_id` / `initiated_by_cid` (replacing the legacy
+/// `human_id` / `initiated_by`). EPR W2D adds `derived_compromise_at`.
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export, export_to = "../../sdk/storage-client-ts/src/generated/")]
 pub struct KeyRevocationView {
+    /// Holochain ActionHash of the source Content entry (hex-encoded).
     pub dht_anchor_hash: String,
     pub id: String,
-    pub human_id: String,
+    pub subject_human_id: String,
     pub revoked_key: String,
     pub reason: String,
     pub trigger_type: String,
-    pub initiated_by: String,
+    pub initiated_by_cid: String,
     pub required_votes: u32,
     pub current_votes: u32,
     pub threshold_reached: bool,
     pub effective_at: Option<String>,
+    pub derived_compromise_at: Option<String>,
     pub created_at: String,
     pub updated_at: String,
 }
 
 impl From<crate::db::models::KeyRevocationRow> for KeyRevocationView {
     fn from(r: crate::db::models::KeyRevocationRow) -> Self {
+        // dht_anchor_hash is BLOB (Vec<u8>) on the DB side; serialize to
+        // hex for the wire so clients see a stable string identifier.
         Self {
-            dht_anchor_hash: r.dht_anchor_hash,
+            dht_anchor_hash: hex::encode(&r.dht_anchor_hash),
             id: r.id,
-            human_id: r.human_id,
+            subject_human_id: r.subject_human_id,
             revoked_key: r.revoked_key,
             reason: r.reason,
             trigger_type: r.trigger_type,
-            initiated_by: r.initiated_by,
+            initiated_by_cid: r.initiated_by_cid,
             required_votes: r.required_votes as u32,
             current_votes: r.current_votes as u32,
             threshold_reached: r.threshold_reached == 1,
             effective_at: r.effective_at,
+            derived_compromise_at: r.derived_compromise_at,
             created_at: r.created_at,
             updated_at: r.updated_at,
         }

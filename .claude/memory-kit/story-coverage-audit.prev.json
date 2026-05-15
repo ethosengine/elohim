@@ -1,22 +1,14 @@
 {
-  "generated_at": "2026-05-14T22:48:52.451338+00:00",
+  "generated_at": "2026-05-14T23:08:14.273329+00:00",
   "totals": {
     "features_on_disk": 73,
-    "features_canonical_in_some_story": 0,
-    "features_adjacent_only": 4,
-    "features_orphan": 69,
-    "stories_total": 2,
+    "features_canonical_in_some_story": 1,
+    "features_adjacent_only": 5,
+    "features_orphan": 67,
+    "stories_total": 3,
     "dangling_feature_references": 1
   },
   "orphans": [
-    {
-      "feature_path": "genesis/a2o/features/qahal/collective-governance.feature",
-      "feature_slug": "collective-governance",
-      "vision_axis_hint": "qahal",
-      "scenario_count": 36,
-      "delivery_status_from_deliver_manifest": null,
-      "leverage_score": 90.0
-    },
     {
       "feature_path": "genesis/a2o/features/content/ssr_capability.feature",
       "feature_slug": "ssr_capability",
@@ -104,14 +96,6 @@
       "scenario_count": 18,
       "delivery_status_from_deliver_manifest": null,
       "leverage_score": 18.0
-    },
-    {
-      "feature_path": "genesis/a2o/features/qahal/feedback-dialogue-panel.feature",
-      "feature_slug": "feedback-dialogue-panel",
-      "vision_axis_hint": "qahal",
-      "scenario_count": 7,
-      "delivery_status_from_deliver_manifest": null,
-      "leverage_score": 17.5
     },
     {
       "feature_path": "genesis/a2o/features/delivery/spa-bundle-delivery.feature",
@@ -580,6 +564,14 @@
       "leverage_score": 27.0
     },
     {
+      "feature_path": "genesis/a2o/features/qahal/feedback-dialogue-panel.feature",
+      "feature_slug": "feedback-dialogue-panel",
+      "vision_axis_hint": "qahal",
+      "scenario_count": 7,
+      "delivery_status_from_deliver_manifest": null,
+      "leverage_score": 17.5
+    },
+    {
       "feature_path": "genesis/a2o/features/content/stewardship-allocation.feature",
       "feature_slug": "stewardship-allocation",
       "vision_axis_hint": "content",
@@ -628,6 +620,20 @@
       ],
       "covers_legacy_resolved": [],
       "dangling_ref_count": 1
+    },
+    {
+      "slug": "the-coop-decides",
+      "path": "genesis/data/stories/terrance-tutor--as-collective-steward--coop-decides.md",
+      "author_status": "draft",
+      "canonical_feature_ref": "collective-governance",
+      "canonical_feature_resolved": "genesis/a2o/features/qahal/collective-governance.feature",
+      "adjacent_count": 2,
+      "adjacent_resolved": [
+        "genesis/a2o/features/qahal/collective-governance.feature",
+        "genesis/a2o/features/qahal/feedback-dialogue-panel.feature"
+      ],
+      "covers_legacy_resolved": [],
+      "dangling_ref_count": 0
     }
   ],
   "dangling_references": [

@@ -12,29 +12,31 @@
 //! the `gate-client-zome` `check_blocking` surface.  The stub signature is already
 //! the correct integration point: replace the body, do not change callers.
 //!
-//! # KeyRevocation shape
+//! # Recovery M4 Task 14 — cross-DNA bridge
 //!
-//! `KeyRevocation` uses `trigger_type: String`, not a Rust enum.  This function
-//! sets `trigger_type = "specialist_attestation"` to distinguish its entries from
-//! M4's `"voluntary"` and `"steward_vote"` paths.  The anomaly attestation body
-//! (per `anomaly-attestation.schema.json`) is stored serialised into `votes_json`
-//! — the legacy JSON blob field that M4 leaves empty.
+//! The canonical revocation record is now a
+//! `governance-action:key-revocation` Content entry on the elohim DNA,
+//! committed via `call_elohim_propose_recovery_governance_action`. Defender
+//! authority is unilateral, so the entry is written with
+//! `threshold_reached: true` and a non-null `effective_at` on the initial
+//! CREATE — the Task 4 `query_effective_revocation_for_key` gate returns it
+//! directly without ever needing a vote / supersession (CREATE-only
+//! constraint, Task 4).
 //!
-//! # Anchor / link pattern
-//!
-//! Mirrors `create_self_revocation` and `create_revocation_request` exactly:
-//! - `IdToKeyRevocation`        — by revocation_id
-//! - `HumanToKeyRevocation`     — by human_id (listing)
-//! - `RevokedKeyToRevocation`   — by revoked key (hot-gate query)
-//! - `EffectiveRevocations`     — specialist attestation is immediately effective
-//!   (single-agent authority, no quorum)
-//! - Signal: `KeyRevocationRequested` + `KeyRevocationEffective` (same as
-//!   `create_self_revocation`).
+//! The legacy local `KeyRevocation` entry + four anchor links
+//! (`IdToKeyRevocation`, `HumanToKeyRevocation`, `RevokedKeyToRevocation`,
+//! `EffectiveRevocations`) are no longer written here. Task 15 will retire
+//! the integrity definitions entirely. Signals (`KeyRevocationRequested` +
+//! `KeyRevocationEffective`) continue to emit for back-compat; Task 17 will
+//! re-align the payloads to the `dna-signals/*` schemas.
 
 use hdk::prelude::*;
-use imagodei_integrity::{EntryTypes, KeyRevocation, LinkTypes, StringAnchor};
 
-use crate::{resolve_human_id_for_agent, RecoveryV2Signal, REVOCATION_REASONS};
+use crate::{
+    call_elohim_propose_recovery_governance_action, emit_key_revocation_envelope,
+    resolve_human_id_for_agent, rfc3339_from_sys_time,
+    ConsolidatedProposeRecoveryGovernanceActionInput, RecoveryV2Signal, REVOCATION_REASONS,
+};
 
 // =============================================================================
 // Input type
@@ -108,18 +110,40 @@ fn caller_is_defender_for(human_action_hash: &ActionHash) -> ExternResult<bool> 
 // Coordinator function
 // =============================================================================
 
+/// Output of `submit_specialist_revocation` — Recovery M4 Task 14.
+///
+/// The canonical record is a `governance-action:key-revocation` Content
+/// entry on the elohim DNA (no local ActionHash). Mirrors
+/// `KeyRevocationOutput` from `create_self_revocation` /
+/// `create_revocation_request` post-T14.
+#[derive(Serialize, Deserialize, SerializedBytes, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct SubmitSpecialistRevocationOutput {
+    pub revocation_id: String,
+    pub revocation_cid: String,
+}
+
 /// Submit a specialist-attested key revocation.
 ///
 /// The calling agent must carry a defender role marker (checked via
 /// `caller_is_defender_for` — stub in Stage 1, real gate in Stage 3 / Task 15).
 ///
-/// On success the revocation is immediately effective (no quorum required for a
-/// defender attestation); both `KeyRevocationRequested` and
-/// `KeyRevocationEffective` signals are emitted atomically.
+/// Recovery M4 Task 14: writes the revocation as a
+/// `governance-action:key-revocation` Content entry on the elohim DNA via
+/// `call_elohim_propose_recovery_governance_action`. Defender authority is
+/// unilateral (single-agent attestation), so the entry is committed with
+/// `threshold_reached: true` and a non-null `effective_at` on the initial
+/// CREATE — the Task 4 gate `query_effective_revocation_for_key` returns it
+/// directly without ever needing a vote or supersession.
+///
+/// The legacy local `KeyRevocation` entry + four anchor links are no longer
+/// written. Both `KeyRevocationRequested` and `KeyRevocationEffective`
+/// signals are emitted atomically for back-compat (Task 17 will re-align
+/// payloads to the dna-signals schemas).
 #[hdk_extern]
 pub fn submit_specialist_revocation(
     input: SubmitSpecialistRevocationInput,
-) -> ExternResult<ActionHash> {
+) -> ExternResult<SubmitSpecialistRevocationOutput> {
     // --- Gate: defender role marker ---
     if !caller_is_defender_for(&input.human_action_hash)? {
         return Err(wasm_error!(WasmErrorInner::Guest(
@@ -171,102 +195,102 @@ pub fn submit_specialist_revocation(
         )));
     }
 
-    // anomaly_attestation_json arrives pre-serialised — store it verbatim.
+    // anomaly_attestation_json arrives pre-serialised — preserve verbatim in
+    // the cross-DNA Content metadata so the elohim-storage projection can
+    // surface it without lossy truncation.
     let attestation_json = input.anomaly_attestation_json.clone();
 
     let now = sys_time()?;
+    let rfc3339_now = rfc3339_from_sys_time(&now);
     let timestamp = format!("{:?}", now);
     let revocation_id = format!("rev-{}-{}", target_human_id, timestamp);
     let revoked_key_str = input.revoked_pub_key.to_string();
 
-    // --- Build KeyRevocation entry ---
-    let revocation = KeyRevocation {
+    // --- Bridge: commit governance-action:key-revocation on elohim DNA ---
+    let bridge_input = ConsolidatedProposeRecoveryGovernanceActionInput {
+        governance_kind: "governance-action:key-revocation".to_string(),
+        subject_human_id: target_human_id.clone(),
+        title: format!(
+            "Specialist revocation of {} for {}",
+            revoked_key_str, target_human_id
+        ),
+        description: Some(format!(
+            "trigger_type=specialist_attestation; reason={} (defender attestation)",
+            input.reason
+        )),
+        reach: "intimate".to_string(),
+        threshold: serde_json::json!({"m": 1}),
+        // Defender attestation is immediately effective; closes_at is
+        // informational only — set to far-future so projectors that honour
+        // closes_at for sweep windows do not prematurely expire it.
+        closes_at: "2099-01-01T00:00:00Z".to_string(),
+        metadata: serde_json::json!({
+            "id": revocation_id,
+            "human_id": target_human_id,
+            "revoked_key": revoked_key_str,
+            "reason": input.reason,
+            "trigger_type": "specialist_attestation",
+            "initiated_by": caller_human_id,
+            "required_votes": 1,
+            "current_votes": 1,
+            // Defender authority = immediately effective on the initial
+            // CREATE (no update_entry per Task 4 CREATE-only constraint).
+            "threshold_reached": true,
+            "effective_at": rfc3339_now,
+            "anomaly_attestation_json": attestation_json,
+        }),
+        supersedes_cid: None,
+    };
+    let consolidated = call_elohim_propose_recovery_governance_action(bridge_input)?;
+    let revocation_cid = consolidated.cid;
+
+    // --- Emit signals (Requested + Effective atomically) ---
+    emit_signal(RecoveryV2Signal::KeyRevocationRequested {
         id: revocation_id.clone(),
         human_id: target_human_id.clone(),
         revoked_key: revoked_key_str.clone(),
         reason: input.reason.clone(),
-        initiated_by: caller_human_id.clone(),
         trigger_type: "specialist_attestation".to_string(),
-        // Defender attestation is single-agent authority; no quorum needed.
+        initiated_by: caller_human_id.clone(),
         required_votes: 1,
         current_votes: 1,
-        // votes_json stores the anomaly_attestation body (legacy blob field).
-        votes_json: attestation_json,
         threshold_reached: true,
-        effective_at: Some(timestamp.clone()),
-        created_at: timestamp.clone(),
-        updated_at: timestamp.clone(),
-    };
-
-    let action_hash = create_entry(&EntryTypes::KeyRevocation(revocation.clone()))?;
-
-    // --- IdToKeyRevocation anchor ---
-    let id_anchor = StringAnchor::new("revocation_id", &revocation_id);
-    let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor.clone()))?;
-    create_entry(&EntryTypes::StringAnchor(id_anchor))?;
-    create_link(
-        id_anchor_hash,
-        action_hash.clone(),
-        LinkTypes::IdToKeyRevocation,
-        (),
-    )?;
-
-    // --- HumanToKeyRevocation anchor (listing by human) ---
-    let human_anchor = StringAnchor::new("human_revocations", &target_human_id);
-    let human_anchor_hash = hash_entry(&EntryTypes::StringAnchor(human_anchor.clone()))?;
-    create_entry(&EntryTypes::StringAnchor(human_anchor))?;
-    create_link(
-        human_anchor_hash,
-        action_hash.clone(),
-        LinkTypes::HumanToKeyRevocation,
-        (),
-    )?;
-
-    // --- RevokedKeyToRevocation anchor (hot-gate query) ---
-    let revoked_key_anchor = StringAnchor::new("revoked_key", &revoked_key_str);
-    let revoked_key_anchor_hash =
-        hash_entry(&EntryTypes::StringAnchor(revoked_key_anchor.clone()))?;
-    create_entry(&EntryTypes::StringAnchor(revoked_key_anchor))?;
-    create_link(
-        revoked_key_anchor_hash,
-        action_hash.clone(),
-        LinkTypes::RevokedKeyToRevocation,
-        (),
-    )?;
-
-    // --- EffectiveRevocations anchor — defender attestation is immediately effective ---
-    let effective_anchor = StringAnchor::new("effective_revocations", "global");
-    let effective_anchor_hash = hash_entry(&EntryTypes::StringAnchor(effective_anchor.clone()))?;
-    create_entry(&EntryTypes::StringAnchor(effective_anchor))?;
-    create_link(
-        effective_anchor_hash,
-        action_hash.clone(),
-        LinkTypes::EffectiveRevocations,
-        (),
-    )?;
-
-    // --- Emit signals (Requested + Effective atomically, same as create_self_revocation) ---
-    emit_signal(RecoveryV2Signal::KeyRevocationRequested {
-        id: revocation.id.clone(),
-        human_id: revocation.human_id.clone(),
-        revoked_key: revocation.revoked_key.clone(),
-        reason: revocation.reason.clone(),
-        trigger_type: revocation.trigger_type.clone(),
-        initiated_by: revocation.initiated_by.clone(),
-        required_votes: revocation.required_votes,
-        current_votes: revocation.current_votes,
-        threshold_reached: revocation.threshold_reached,
-        effective_at: revocation.effective_at.clone(),
-        created_at: revocation.created_at.clone(),
+        effective_at: Some(rfc3339_now.clone()),
+        created_at: rfc3339_now.clone(),
     })?;
 
+    let emitted_at_defender = rfc3339_from_sys_time(&sys_time()?);
+    #[allow(deprecated)]
     emit_signal(RecoveryV2Signal::KeyRevocationEffective {
-        revocation_id: revocation.id.clone(),
-        revoked_key: revocation.revoked_key.clone(),
-        human_id: revocation.human_id.clone(),
-        effective_at: timestamp,
+        revocation_id: revocation_id.clone(),
+        signal_type: "keyRevocation".to_string(),
+        action_hash: revocation_cid.clone(),
+        human_id: target_human_id.clone(),
+        revoked_key: revoked_key_str.clone(),
+        // M4: no separate compromise-discovery timestamp; coincides with effectiveAt.
+        // Future revisions may populate this from revocation request metadata.
+        compromise_at: rfc3339_now.clone(),
+        effective_at: rfc3339_now.clone(),
         triggering_vote_id: None,
+        emitted_at: emitted_at_defender,
     })?;
 
-    Ok(action_hash)
+    // T18: EPR-shape envelope alongside the legacy signal (back-compat window).
+    // Defender path: supersedes_cid = None (initial CREATE);
+    //                triggering_revocation_id = None (unilateral, no vote chain).
+    emit_key_revocation_envelope(
+        revocation_id.clone(),
+        revocation_cid.clone(),
+        target_human_id,  // Stage 1: human_id; Stage 2: Human entry CID
+        revoked_key_str,
+        rfc3339_now.clone(), // compromise_at == effective_at in M4
+        rfc3339_now,
+        None,  // triggering_revocation_id
+        None,  // supersedes_cid
+    )?;
+
+    Ok(SubmitSpecialistRevocationOutput {
+        revocation_id,
+        revocation_cid,
+    })
 }

@@ -17,7 +17,7 @@ use super::diesel_schema::{
     comments, content, content_attestations, content_mastery, content_tags, contributor_dashboards,
     contributor_presences, custodian_metrics, device_policies, discussions, economic_events,
     enum_registry, governance_dispositions, governance_signals, governance_states, hazards,
-    human_relationships, humans, imagodei_observations, key_revocations, key_rotations,
+    human_relationships, humans, imagodei_observations, key_rotations,
     knowledge_maps, local_sessions, node_stewardship, observation_diversity_summary,
     observation_entries, observation_sessions, observations, peer_blob_inventory,
     peer_identity_bindings, peer_inventory_cursor, placement_gaps, places, portal_hosts,
@@ -3021,46 +3021,60 @@ pub struct NewPeerIdentityBindingRow {
     pub superseded_by: Option<String>,
 }
 
-// Recovery Protocol Phase 2 — M4 Revocation Projection
-// Source of truth: DHT (imagodei KeyRevocation / RevocationVote entries).
+// Recovery Protocol Phase 2 — M4 Revocation + Recovery Projection
+// Source of truth: DHT (elohim DNA Content entries with content_type
+// 'governance-action:key-revocation' / 'governance-action:recovery-request' /
+// 'governance-action:identity-freeze' + 'attestation:revocation-vote' children).
 // These rows are read-optimized projections rebuildable from signal replay.
 
-/// Queryable model for key_revocations rows (SELECT).
-/// Source of truth: DHT (imagodei KeyRevocation entry). Read-optimized projection.
-#[derive(Debug, Clone, Queryable, Selectable, Serialize, Deserialize)]
-#[diesel(table_name = key_revocations)]
+/// Queryable / insertable / upsertable model for `recovery_flows` rows.
+///
+/// Source of truth: DHT (elohim DNA Content entries with content_type
+/// 'governance-action:recovery-request' or 'governance-action:identity-freeze').
+/// Read-optimized state-machine projection.
+#[derive(Debug, Clone, Insertable, Queryable, Selectable, AsChangeset, Serialize, Deserialize)]
+#[diesel(table_name = crate::db::diesel_schema::recovery_flows)]
 #[diesel(check_for_backend(diesel::sqlite::Sqlite))]
-pub struct KeyRevocationRow {
-    pub dht_anchor_hash: String,
+pub struct RecoveryFlowRow {
     pub id: String,
-    pub human_id: String,
-    pub revoked_key: String,
-    pub reason: String,
-    pub trigger_type: String,
-    pub initiated_by: String,
+    pub dht_anchor_hash: Vec<u8>,
+    pub flow_kind: String,
+    pub subject_human_id: String,
+    pub initiated_by_cid: String,
+    pub state: String,
     pub required_votes: i32,
     pub current_votes: i32,
     pub threshold_reached: i32, // 0/1 (SQLite boolean)
     pub effective_at: Option<String>,
+    pub closes_at: String,
+    pub metadata_json: String,
     pub created_at: String,
     pub updated_at: String,
 }
 
-/// Insertable / upsertable model for key_revocations rows (INSERT / UPDATE).
-#[derive(Debug, Clone, Insertable, AsChangeset)]
-#[diesel(table_name = key_revocations)]
-pub struct UpsertKeyRevocationRow {
-    pub dht_anchor_hash: String,
+/// Queryable / insertable / upsertable model for `key_revocations` rows.
+///
+/// Source of truth: DHT (elohim DNA Content entries with content_type
+/// 'governance-action:key-revocation' + 'attestation:revocation-vote' children).
+/// Read-optimized projection. Supersedes the legacy imagodei KeyRevocation
+/// shape with Content-routed producer contract column names
+/// (`subject_human_id`, `initiated_by_cid`, `derived_compromise_at`).
+#[derive(Debug, Clone, Insertable, Queryable, Selectable, AsChangeset, Serialize, Deserialize)]
+#[diesel(table_name = crate::db::diesel_schema::key_revocations)]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+pub struct KeyRevocationRow {
     pub id: String,
-    pub human_id: String,
+    pub dht_anchor_hash: Vec<u8>,
+    pub subject_human_id: String,
     pub revoked_key: String,
-    pub reason: String,
     pub trigger_type: String,
-    pub initiated_by: String,
+    pub reason: String,
+    pub initiated_by_cid: String,
     pub required_votes: i32,
     pub current_votes: i32,
-    pub threshold_reached: i32,
+    pub threshold_reached: i32, // 0/1 (SQLite boolean)
     pub effective_at: Option<String>,
+    pub derived_compromise_at: Option<String>,
     pub created_at: String,
     pub updated_at: String,
 }

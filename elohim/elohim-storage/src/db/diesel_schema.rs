@@ -1323,24 +1323,45 @@ diesel::table! {
 }
 
 // Recovery Protocol Phase 2 — M4 revocation projection tables.
-// Source of truth: DHT (imagodei KeyRevocation + RevocationVote entries).
+// Source of truth: DHT (elohim DNA Content entries with content_type
+// 'governance-action:key-revocation' + 'attestation:revocation-vote' children).
 // These tables are read-optimized projections rebuildable via signal replay.
 
 diesel::table! {
-    key_revocations (dht_anchor_hash) {
-        dht_anchor_hash   -> Text,
-        id                -> Text,
-        human_id          -> Text,
-        revoked_key       -> Text,
-        reason            -> Text,
-        trigger_type      -> Text,
-        initiated_by      -> Text,
-        required_votes    -> Integer,
-        current_votes     -> Integer,
+    recovery_flows (id) {
+        id -> Text,
+        dht_anchor_hash -> Binary,
+        flow_kind -> Text,
+        subject_human_id -> Text,
+        initiated_by_cid -> Text,
+        state -> Text,
+        required_votes -> Integer,
+        current_votes -> Integer,
         threshold_reached -> Integer,
-        effective_at      -> Nullable<Text>,
-        created_at        -> Text,
-        updated_at        -> Text,
+        effective_at -> Nullable<Text>,
+        closes_at -> Text,
+        metadata_json -> Text,
+        created_at -> Text,
+        updated_at -> Text,
+    }
+}
+
+diesel::table! {
+    key_revocations (id) {
+        id -> Text,
+        dht_anchor_hash -> Binary,
+        subject_human_id -> Text,
+        revoked_key -> Text,
+        trigger_type -> Text,
+        reason -> Text,
+        initiated_by_cid -> Text,
+        required_votes -> Integer,
+        current_votes -> Integer,
+        threshold_reached -> Integer,
+        effective_at -> Nullable<Text>,
+        derived_compromise_at -> Nullable<Text>,
+        created_at -> Text,
+        updated_at -> Text,
     }
 }
 
@@ -1643,6 +1664,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     ranked_votes,
     key_revocations,
     key_rotations,
+    recovery_flows,
     rea_commitments,
     recovery_requests,
     recovery_witnesses,

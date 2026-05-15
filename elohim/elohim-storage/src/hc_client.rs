@@ -423,6 +423,45 @@ impl HcClient {
             .await
     }
 
+    /// Subscribe to ElohimContentSignals emitted by the elohim DNA's content_store
+    /// coordinator. Each signal carries an `attestation:*` or `governance-action:*`
+    /// Content entry's projection-relevant fields.
+    ///
+    /// Non-content signals (lamad/imagodei/mishpat) are logged at debug and ignored.
+    pub async fn subscribe_elohim_content_signals<F>(&self, handler: F) -> String
+    where
+        F: Fn(crate::signals::ElohimContentSignal) + Send + Sync + 'static,
+    {
+        use holochain_types::signal::Signal;
+
+        self.app_ws
+            .on_signal(move |signal| {
+                if let Signal::App { signal, .. } = signal {
+                    let bytes: Vec<u8> = signal.into_inner().into();
+                    match rmp_serde::from_slice::<serde_json::Value>(&bytes) {
+                        Ok(value) => {
+                            match serde_json::from_value::<crate::signals::ElohimContentSignal>(
+                                value.clone(),
+                            ) {
+                                Ok(content) => handler(content),
+                                Err(e) => {
+                                    debug!(
+                                        error = %e,
+                                        value = %value,
+                                        "Received app signal not matching ElohimContentSignal — ignoring"
+                                    );
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            debug!(error = %e, "Failed to msgpack-decode app signal");
+                        }
+                    }
+                }
+            })
+            .await
+    }
+
     /// Quick health check - just verify conductor is responsive
     pub async fn ping(&self) -> Result<(), StorageError> {
         // Use list_apps as a simple ping

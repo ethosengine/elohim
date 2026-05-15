@@ -164,7 +164,7 @@ async fn get_account(
         use crate::db::diesel_schema::key_revocations::dsl;
         use diesel::prelude::*;
         dsl::key_revocations
-            .filter(dsl::human_id.eq(&human_id))
+            .filter(dsl::subject_human_id.eq(&human_id))
             .order(dsl::created_at.desc())
             .limit(10)
             .select(crate::db::models::KeyRevocationRow::as_select())
@@ -368,7 +368,7 @@ async fn get_account_revocations(
     use crate::db::diesel_schema::key_revocations::dsl;
     use diesel::prelude::*;
     let rows = dsl::key_revocations
-        .filter(dsl::human_id.eq(&human.id))
+        .filter(dsl::subject_human_id.eq(&human.id))
         .order(dsl::created_at.desc())
         .limit(50)
         .select(crate::db::models::KeyRevocationRow::as_select())
@@ -1093,17 +1093,18 @@ mod tests {
     fn revocation_view_threshold_bool_coercion() {
         use crate::db::models::KeyRevocationRow;
         let row = KeyRevocationRow {
-            dht_anchor_hash: "uhCkR1".into(),
             id: "rev-1".into(),
-            human_id: "human-matthew".into(),
+            dht_anchor_hash: b"uhCkR1".to_vec(),
+            subject_human_id: "human-matthew".into(),
             revoked_key: "uhCAkKEY".into(),
-            reason: "compromised".into(),
             trigger_type: "voluntary".into(),
-            initiated_by: "human-matthew".into(),
+            reason: "compromised".into(),
+            initiated_by_cid: "human-matthew".into(),
             required_votes: 3,
             current_votes: 3,
             threshold_reached: 1,
             effective_at: Some("2026-04-25T00:00:00Z".into()),
+            derived_compromise_at: None,
             created_at: "2026-04-25T00:00:00Z".into(),
             updated_at: "2026-04-25T00:00:00Z".into(),
         };

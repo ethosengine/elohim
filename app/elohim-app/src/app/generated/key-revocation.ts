@@ -2,21 +2,21 @@
 /* Generated from protocol schema: views/key-revocation.schema.json -- DO NOT EDIT */
 
 /**
- * Read-optimized projection of an imagodei KeyRevocation DHT entry. Source of truth: DHT. Rebuildable via signal replay on RecoveryV2Signal::KeyRevocationRequested/Effective.
+ * Read-optimized projection of an elohim-DNA Content key-revocation entry (content_type 'governance-action:key-revocation'). Source of truth: DHT. Rebuildable via signal replay on the ElohimContentSignal dispatcher.
  */
 export interface KeyRevocationView {
   /**
-   * Holochain ActionHash of the KeyRevocation entry (base64).
+   * Hex-encoded Holochain ActionHash of the source Content entry.
    */
   dhtAnchorHash: string;
   /**
-   * Coordinator-generated ID.
+   * Coordinator-generated ID (primary key of the projection).
    */
   id: string;
   /**
    * String id of the human whose key is being revoked.
    */
-  humanId: string;
+  subjectHumanId: string;
   /**
    * The AgentPubKey being revoked (stringified).
    */
@@ -28,11 +28,11 @@ export interface KeyRevocationView {
   /**
    * How the revocation was initiated.
    */
-  triggerType: 'voluntary' | 'steward_vote' | 'challenge';
+  triggerType: 'voluntary' | 'steward_vote' | 'challenge' | 'specialist_attestation';
   /**
-   * human_id of the initiating agent.
+   * CID of the initiating agent (was: initiatedBy).
    */
-  initiatedBy: string;
+  initiatedByCid: string;
   /**
    * Votes required to reach threshold. 1 for voluntary; >=2 for steward_vote/challenge.
    */
@@ -49,6 +49,10 @@ export interface KeyRevocationView {
    * ISO-8601 timestamp when revocation became effective. Null while pending.
    */
   effectiveAt?: string | null;
+  /**
+   * EPR W2D: ISO-8601 timestamp when compromise was derived (specialist attestation, challenge upheld, etc). Null if not applicable.
+   */
+  derivedCompromiseAt?: string | null;
   /**
    * ISO-8601 timestamp of initial commit.
    */

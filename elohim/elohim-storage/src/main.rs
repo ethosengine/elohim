@@ -641,6 +641,47 @@ async fn async_main(
                             "InfrastructureSignal subscriber disabled: shared DB pool unavailable"
                         );
                     }
+
+                    // Recovery M4 — subscribe to ElohimContentSignals (attestation:* and
+                    // governance-action:* Content entries) and fan them through the central
+                    // elohim_content_dispatcher to both AttestationProjector + RecoveryFlowProjector.
+                    if let Some(subscriber_pool) = db_pool.clone() {
+                        let hc_sub = hc.clone();
+                        tokio::spawn(async move {
+                            let pool = subscriber_pool;
+                            let handle_id = hc_sub
+                                .subscribe_elohim_content_signals(
+                                    move |signal: elohim_storage::signals::ElohimContentSignal| {
+                                        match pool.get() {
+                                            Ok(mut conn) => {
+                                                if let Err(e) =
+                                                    elohim_storage::services::elohim_content_dispatcher::dispatch(
+                                                        &mut conn, &signal,
+                                                    )
+                                                {
+                                                    warn!(
+                                                        kind = %signal.content_type,
+                                                        error = %e,
+                                                        "ElohimContentSignal dispatch failed"
+                                                    );
+                                                }
+                                            }
+                                            Err(e) => warn!(
+                                                error = %e,
+                                                "Failed to acquire DB connection for elohim content dispatch"
+                                            ),
+                                        }
+                                    },
+                                )
+                                .await;
+                            info!(
+                                subscription_id = %handle_id,
+                                "ElohimContentSignal subscriber registered (dispatches to AttestationProjector + RecoveryFlowProjector)"
+                            );
+                        });
+                    } else {
+                        warn!("ElohimContentSignal subscriber disabled: shared DB pool unavailable");
+                    }
                 } else {
                     warn!(
                         "PeerStatus heartbeat disabled: infrastructure HcClient unavailable in registry"

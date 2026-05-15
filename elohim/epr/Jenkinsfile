@@ -19,7 +19,7 @@ pipeline {
     stage('Rust — tests') {
       steps {
         dir('elohim') {
-          sh 'cargo test -p elohim-epr --all-targets'
+          sh 'cargo nextest run -p elohim-epr --all-targets'
         }
       }
     }

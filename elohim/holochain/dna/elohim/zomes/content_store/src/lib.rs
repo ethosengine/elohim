@@ -20,7 +20,7 @@ pub use manifest::*;
 pub mod attestation;
 pub mod governance_action;
 pub use attestation::{AttestationOutput as ConsolidatedAttestationOutput, IssueAttestationInput, RevokeAttestationInput};
-pub use governance_action::{GovernanceActionOutput, GovernanceActionWithChildren, ProposeGovernanceActionInput, VoteOnGovernanceActionInput};
+pub use governance_action::{GovernanceActionOutput, GovernanceActionWithChildren, ProposeGovernanceActionInput, ProposeRecoveryGovernanceActionInput, VoteOnGovernanceActionInput};
 
 // EPR Phase 3.5 T8: FeedbackSignal coordinator functions.
 pub mod feedback_signal;
@@ -3158,6 +3158,150 @@ pub fn get_content_by_tag(tag: String) -> ExternResult<Vec<ContentOutput>> {
     }
 
     Ok(results)
+}
+
+// =============================================================================
+// Recovery M4 — cross-DNA gate-reader query helpers.
+//
+// Added by Recovery M4 Task 4 to support imagodei's `commit_key_rotation`
+// freeze-floor + revocation-floor gates after Stage 2 bridged the create-side
+// onto `governance-action:identity-freeze` and `governance-action:key-revocation`
+// Content entries on this DNA. Pre-Stage-2 those entries lived on imagodei as
+// bespoke `IdentityFreeze` / `KeyRevocation` entry types; once Tasks 13/14 land
+// the creators bridge through here, the gates need a stable read surface.
+//
+// Both helpers fetch the active candidate set via the existing TypeToContent
+// link traversal (`get_content_by_type`), then filter in-memory by parsing
+// `metadata_json` against the lifecycle flags the gate cares about. The active
+// set per content_type + subject is small in practice (per-human freezes /
+// per-key revocations), so the O(n) filter is acceptable; if the set grows
+// large a `HumanToFreezeContent` / `RevokedKeyToRevocationContent` link
+// pattern can be added without changing this surface.
+//
+// Effective-status convention (resolved per the Stage 1 audit + current
+// in-place update pattern at imagodei lib.rs:2702-2712): a revocation is
+// effective when `metadata.threshold_reached == true` OR `metadata.effective_at`
+// is non-null. A freeze is active when `metadata.is_active == true`. Bridged
+// producers (Tasks 13/14) MUST mirror this convention either by writing those
+// flags into the initial metadata for already-effective ceremonies (self,
+// specialist) or by performing an `update_entry` on the Content to flip them
+// once a quorum threshold is met.
+//
+// IMPORTANT — `update_entry` race window:
+//
+// `get_content_by_type` traverses `TypeToContent` links whose target is the
+// ORIGINAL Create action hash. `update_entry` produces a new action but does
+// NOT rewire the link, so a producer that flips `threshold_reached` /
+// `effective_at` via `update_entry` will leave this gate reading stale flags.
+//
+// CONSTRAINT for Tasks 13/14 producers: when a governance flow becomes
+// effective (quorum met, self-revocation, specialist revocation), commit a
+// NEW Content entry whose `metadata_json` already has `threshold_reached: true`
+// and `effective_at: <ts>`. The original pending-state Content remains; this
+// gate filter rejects it (no flip) and accepts the new one (threshold_reached).
+// If supersession needs to be modeled, add `supersedes_cid: <predecessor_cid>`
+// to the new entry's metadata.
+//
+// If a future task needs `update_entry` semantics here, change `get_content`
+// to follow the update chain via `get_details` before relying on this gate.
+// =============================================================================
+
+/// Query elohim DNA for an effective `governance-action:key-revocation` Content
+/// entry covering `revoked_key`.
+///
+/// Returns the most recently `updated_at` ContentOutput whose:
+///   - `content_type == "governance-action:key-revocation"`, AND
+///   - `metadata_json` parses to an object with `revoked_key == revoked_key`, AND
+///   - `metadata_json.threshold_reached == true` OR `metadata_json.effective_at`
+///     is a non-null string.
+///
+/// Returns `None` if no such entry exists. Used by imagodei's M4 revocation-
+/// floor gate in `commit_key_rotation`.
+#[hdk_extern]
+pub fn query_effective_revocation_for_key(
+    revoked_key: String,
+) -> ExternResult<Option<ContentOutput>> {
+    // gate-critical: must not miss any effective entry; do NOT use default cap.
+    let candidates = get_content_by_type(QueryByTypeInput {
+        content_type: "governance-action:key-revocation".to_string(),
+        limit: Some(u32::MAX),
+    })?;
+
+    let mut matched: Vec<ContentOutput> = candidates
+        .into_iter()
+        .filter(|out| {
+            let metadata: serde_json::Value =
+                serde_json::from_str(&out.content.metadata_json).unwrap_or(serde_json::Value::Null);
+            let key_match = metadata
+                .get("revoked_key")
+                .and_then(|v| v.as_str())
+                .map(|s| s == revoked_key)
+                .unwrap_or(false);
+            if !key_match {
+                return false;
+            }
+            let threshold_reached = metadata
+                .get("threshold_reached")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false);
+            let effective_at_set = metadata
+                .get("effective_at")
+                .and_then(|v| v.as_str())
+                .is_some_and(|s| !s.is_empty());
+            threshold_reached || effective_at_set
+        })
+        .collect();
+
+    // Most-recent first by Content.updated_at (RFC3339-ish format, lexicographic
+    // sort is correct for ISO-8601 / RFC3339 timestamps).
+    matched.sort_by(|a, b| b.content.updated_at.cmp(&a.content.updated_at));
+    Ok(matched.into_iter().next())
+}
+
+/// Query elohim DNA for an active `governance-action:identity-freeze` Content
+/// entry covering `human_id`.
+///
+/// Returns the most recently `updated_at` ContentOutput whose:
+///   - `content_type == "governance-action:identity-freeze"`, AND
+///   - `metadata_json.human_id == human_id`, AND
+///   - `metadata_json.is_active == true`.
+///
+/// Returns `None` if no active freeze exists. Used by imagodei's M3 freeze-
+/// floor gate in `commit_key_rotation` (via `collect_active_freezes_for_human`).
+/// Per Stage 1 audit row #3, the only metadata fields the gate inspects after
+/// this query resolves are `is_active`, `human_id`, and `frozen_at_layer`.
+#[hdk_extern]
+pub fn query_effective_identity_freeze_for_human(
+    human_id: String,
+) -> ExternResult<Option<ContentOutput>> {
+    // gate-critical: must not miss any effective entry; do NOT use default cap.
+    let candidates = get_content_by_type(QueryByTypeInput {
+        content_type: "governance-action:identity-freeze".to_string(),
+        limit: Some(u32::MAX),
+    })?;
+
+    let mut matched: Vec<ContentOutput> = candidates
+        .into_iter()
+        .filter(|out| {
+            let metadata: serde_json::Value =
+                serde_json::from_str(&out.content.metadata_json).unwrap_or(serde_json::Value::Null);
+            let human_match = metadata
+                .get("human_id")
+                .and_then(|v| v.as_str())
+                .map(|s| s == human_id)
+                .unwrap_or(false);
+            if !human_match {
+                return false;
+            }
+            metadata
+                .get("is_active")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false)
+        })
+        .collect();
+
+    matched.sort_by(|a, b| b.content.updated_at.cmp(&a.content.updated_at));
+    Ok(matched.into_iter().next())
 }
 
 // PaginatedByTypeInput, PaginatedContentOutput re-exported from lamad_types
@@ -11993,6 +12137,29 @@ pub fn propose_governance_action(
     input: ProposeGovernanceActionInput,
 ) -> ExternResult<GovernanceActionOutput> {
     governance_action::propose_governance_action(input)
+}
+
+/// Recovery M4 Task 13 — bespoke producer for recovery-shaped governance actions.
+///
+/// Coexists with `propose_governance_action`. The generic function nests
+/// caller-supplied fields under `metadata.parameters_json`; this function
+/// writes them at the TOP LEVEL of `metadata_json` because the Task 4/5
+/// recovery gates read top-level keys (`human_id`, `revoked_key`,
+/// `threshold_reached`, `effective_at`, `is_active`, `frozen_at_layer`).
+///
+/// Accepts only the three recovery kinds:
+///   - `governance-action:recovery-request`
+///   - `governance-action:key-revocation`
+///   - `governance-action:identity-freeze`
+///
+/// CREATE-only: effectiveness flips and supersession transitions write a new
+/// Content entry rather than `update_entry`. The optional `supersedes_cid`
+/// captures the prior entry for downstream projection.
+#[hdk_extern]
+pub fn propose_recovery_governance_action(
+    input: ProposeRecoveryGovernanceActionInput,
+) -> ExternResult<GovernanceActionOutput> {
+    governance_action::propose_recovery_governance_action(input)
 }
 
 /// Cast a vote on an existing governance action.

@@ -188,19 +188,23 @@ pub fn check_intimate_quorum_rules(
         );
     }
 
-    // Rule: target human_id matches request.human_id (coordinator must populate).
-    let req_human_id =
-        match &request.human_id {
-            Some(id) => id,
-            None => return ValidateCallbackResult::Invalid(
-                "IntimateQuorum requires RecoveryRequest.human_id to be populated by coordinator"
+    // Rule: target human_id matches request.human_id (when populated).
+    //
+    // Recovery M4 Task 15: the canonical recovery-request is now a Content entry on
+    // the elohim DNA — cross-DNA fetches are HDK-only, so the integrity validator
+    // for KeyRotation synthesises a stub RecoveryRequest with `human_id: None`. In
+    // that case the witnesses-agree-on-the-same-human_id check above remains in force
+    // and the witness↔request cross-check is deferred to the coordinator gate
+    // (`commit_key_rotation`), which has HDK access and verifies the match
+    // pre-commit. Test fixtures populate `human_id: Some(...)` so this branch
+    // continues to be exercised by unit tests.
+    if let Some(req_human_id) = &request.human_id {
+        if first_human_id != req_human_id {
+            return ValidateCallbackResult::Invalid(
+                "IntimateQuorum witness human_id does not match RecoveryRequest.human_id"
                     .to_string(),
-            ),
-        };
-    if first_human_id != req_human_id {
-        return ValidateCallbackResult::Invalid(
-            "IntimateQuorum witness human_id does not match RecoveryRequest.human_id".to_string(),
-        );
+            );
+        }
     }
 
     // Rule: no witness is explicitly revoked.
@@ -579,16 +583,21 @@ mod tests {
     }
 
     #[test]
-    fn test_intimate_request_human_id_missing() {
+    fn test_intimate_request_human_id_missing_defers_to_coordinator() {
+        // Recovery M4 Task 15: when the stub RecoveryRequest has `human_id: None`
+        // (synthesised by `validate_key_rotation` because cross-DNA fetch is
+        // HDK-only), the witnesses-agree-on-the-same-human_id check still
+        // applies, but the witness↔request cross-check is deferred to the
+        // coordinator (`commit_key_rotation`). Validator must accept.
         let req = mk_request(None, 2);
         let witnesses = vec![
             mk_witness("human-abc", None, fake_agent_pubkey(1)),
             mk_witness("human-abc", None, fake_agent_pubkey(2)),
         ];
-        assert_rejects(
+        assert!(matches!(
             check_intimate_quorum_rules(&req, &witnesses),
-            "RecoveryRequest.human_id",
-        );
+            ValidateCallbackResult::Valid
+        ));
     }
 
     // ---- CryptographicQuorum ----
@@ -882,45 +891,50 @@ pub fn validate_key_rotation(rotation: &KeyRotation) -> ExternResult<ValidateCal
         ));
     }
 
-    // Rule 2: Resolve the referenced RecoveryRequest and verify matching fields.
-    let request_record = must_get_valid_record(rotation.recovery_request_hash.clone())?;
-    let request_entry: super::RecoveryRequest = request_record
-        .entry()
-        .to_app_option()
-        .map_err(|e| {
-            wasm_error!(WasmErrorInner::Guest(format!(
-                "KeyRotation references non-RecoveryRequest entry: {e:?}"
-            )))
-        })?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "KeyRotation recovery_request_hash entry missing".to_string()
-        )))?;
-
-    if request_entry.human_agent_pubkey != rotation.human_agent_pubkey {
-        return Ok(ValidateCallbackResult::Invalid(
-            "KeyRotation human_agent_pubkey must match RecoveryRequest".to_string(),
-        ));
-    }
-    if request_entry.new_agent_pubkey != rotation.new_agent_pubkey {
-        return Ok(ValidateCallbackResult::Invalid(
-            "KeyRotation new_agent_pubkey must match RecoveryRequest".to_string(),
-        ));
-    }
+    // Rule 2 (stub): RecoveryRequest cross-reference deferred to coordinator.
+    //
+    // Recovery M4 Task 15: RecoveryRequest is no longer an imagodei DHT entry type —
+    // producers were bridged to the elohim DNA (governance-action:recovery-request
+    // Content entries) in Tasks 13 + 14. The `recovery_request_hash` ActionHash now
+    // points to a Content entry on the elohim DNA, which is not resolvable via
+    // `must_get_valid_record` in the integrity validator (cross-DNA reads are HDK-only).
+    //
+    // Enforcement model: coordinator-level (commit_key_rotation) already verifies
+    // matching fields before committing the KeyRotation entry. The integrity validator
+    // defers to that coordinator gate, mirroring the freeze-floor stub pattern above.
+    //
+    // For IntimateQuorum, the witness-hash validation below still enforces the quorum
+    // threshold against the human targeted by the rotation.
 
     // Rule 3: Freeze-floor check (CryptographicQuorum is orthogonal; exempt).
+    // check_freeze_floor always returns Ok(None) — link traversal unavailable in HDI.
+    // Coordinator-level gate enforces the freeze floor before commit (M3/M5).
     if !matches!(
         rotation.authority,
         RecoveryAuthority::CryptographicQuorum { .. }
     ) {
-        if let Some(reason) = check_freeze_floor(&rotation.authority, &request_entry.human_id)? {
+        if let Some(reason) = check_freeze_floor(&rotation.authority, &None)? {
             return Ok(ValidateCallbackResult::Invalid(reason));
         }
     }
 
     // Rule 4: Variant-specific validation.
+    // IntimateQuorum: resolve witness hashes and check quorum rules. The request
+    // struct is synthesised with a None human_id since we cannot cross-DNA fetch
+    // it here; the coordinator enforces the human_id match pre-commit.
+    let stub_request = super::RecoveryRequest {
+        human_agent_pubkey: rotation.human_agent_pubkey.clone(),
+        new_agent_pubkey: rotation.new_agent_pubkey.clone(),
+        hosting_doorway_pubkey: rotation.human_agent_pubkey.clone(),
+        proposed_authority: super::RecoveryAuthorityKind::IntimateQuorum,
+        request_nonce: vec![0u8; 16],
+        human_id: None,
+        required_witness_count: 2,
+        created_at: rotation.rotated_at,
+    };
     match &rotation.authority {
         RecoveryAuthority::IntimateQuorum { witness_hashes } => {
-            validate_intimate_quorum(&request_entry, witness_hashes)
+            validate_intimate_quorum(&stub_request, witness_hashes)
         }
         RecoveryAuthority::CryptographicQuorum {
             stewardship_hash,

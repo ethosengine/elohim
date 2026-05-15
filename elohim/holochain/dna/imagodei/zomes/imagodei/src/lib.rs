@@ -33,6 +33,20 @@ pub use portal_host::*;
 pub mod submit_specialist_revocation;
 pub use submit_specialist_revocation::*;
 
+// content_decode — cross-DNA Content entry decoder (Recovery M4, Task 2).
+//
+// Helper for the case where a validator needs to deserialise a raw `Entry::App`
+// payload from a cross-DNA Content commit. M4 Tasks 3-5 ended up using
+// structured ContentOutput from coordinator bridge calls instead (see
+// `fetch_recovery_request_human_id` and the migrated gate readers), so the
+// helper has no caller in the M4 surface. Retained as a tested decoder
+// primitive for T17/T18 (signal alignment + cross-stack integration) and
+// future cross-DNA integrity work.
+//
+// TODO(M4 completion): if T17/T18 do not adopt this, delete the module.
+#[allow(dead_code)]
+mod content_decode;
+
 // Bootstrap-steward pattern — reference implementation for the protocol
 // (also ported to mishpat, node-registry, lamad). See bootstrap_steward.rs.
 pub mod bootstrap_steward;
@@ -631,14 +645,71 @@ struct ConsolidatedProposeGovernanceActionInput {
     pub parameters: Option<serde_json::Value>,
 }
 
+/// Input for elohim DNA's content_store::propose_recovery_governance_action
+/// — Recovery M4 Task 13 bridge copy. Mirrors
+/// `governance_action::ProposeRecoveryGovernanceActionInput` field-for-field.
+///
+/// Differs from `ConsolidatedProposeGovernanceActionInput` (the generic
+/// producer's bridge mirror) in two load-bearing ways:
+///   1. `metadata` is a flat JSON object whose fields are written at the TOP
+///      LEVEL of `metadata_json` on the elohim Content entry (not nested under
+///      `parameters_json`). The Recovery M4 Task 4/5 readers expect top-level
+///      access to `human_id`, `revoked_key`, `threshold_reached`,
+///      `effective_at`, `is_active`, `frozen_at_layer`.
+///   2. `subject_human_id` replaces `subject_cid` — recovery governance
+///      subjects are humans; the producer denormalises into `related_node_ids`
+///      and surfaces through `subject_cid` on the output for parity.
+#[derive(Debug, Serialize, Deserialize)]
+pub(crate) struct ConsolidatedProposeRecoveryGovernanceActionInput {
+    pub governance_kind: String,
+    pub subject_human_id: String,
+    pub title: String,
+    pub description: Option<String>,
+    pub reach: String,
+    pub threshold: serde_json::Value,
+    pub closes_at: String,
+    pub metadata: serde_json::Value,
+    pub supersedes_cid: Option<String>,
+}
+
 /// Output from elohim DNA's content_store::propose_governance_action (B.9 bridge copy).
 #[derive(Debug, Serialize, Deserialize)]
-struct ConsolidatedGovernanceActionOutput {
+pub(crate) struct ConsolidatedGovernanceActionOutput {
     pub cid: String,
     pub governance_kind: String,
     pub subject_cid: String,
     pub proposer_cid: String,
     pub closes_at: String,
+}
+
+/// Input for elohim DNA's content_store::get_content_by_id (Recovery M4 Task 3).
+///
+/// Wire-compatible with `lamad_types::QueryByIdInput`. Defined locally because
+/// cross-DNA calls serialise through msgpack; imagodei cannot depend on the
+/// lamad domain crate directly.
+#[derive(Debug, Serialize, Deserialize)]
+struct ConsolidatedQueryByIdInput {
+    pub id: String,
+}
+
+/// Subset of elohim DNA's `content_store::ContentOutput.content` that the
+/// imagodei recovery gates need. Mirrors the relevant fields of the wire
+/// `Content` struct produced by `content_to_wire(&Content)`; serde will
+/// ignore fields outside this set on deserialization.
+#[derive(Debug, Serialize, Deserialize)]
+struct ConsolidatedContentView {
+    pub id: String,
+    pub content_type: String,
+    #[serde(default)]
+    pub metadata_json: String,
+}
+
+/// Output from elohim DNA's content_store::get_content_by_id
+/// (`Option<ContentOutput>`). Mirrors the relevant fields only — the full
+/// ContentOutput carries action_hash + entry_hash which we don't need here.
+#[derive(Debug, Serialize, Deserialize)]
+struct ConsolidatedContentOutput {
+    pub content: ConsolidatedContentView,
 }
 
 // ---------------------------------------------------------------------------
@@ -740,6 +811,239 @@ fn call_elohim_propose_governance_action(
         ))),
         ZomeCallResponse::AuthenticationFailed(_, _) => Err(wasm_error!(WasmErrorInner::Guest(
             "Authentication failed bridging to elohim::propose_governance_action".to_string()
+        ))),
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Bridge helper: call elohim content_store::propose_recovery_governance_action.
+//
+// Recovery M4 Task 13: bespoke producer used by `create_recovery_request` and
+// `create_self_revocation` (and forthcoming Task 14 callers). Writes top-level
+// metadata fields the Task 4/5 gates depend on (`human_id`, `revoked_key`,
+// `threshold_reached`, `effective_at`, `is_active`, `frozen_at_layer`).
+// Mirrors the 5-arm ZomeCallResponse pattern from
+// `call_elohim_propose_governance_action` and the rest of the bridge family.
+// ---------------------------------------------------------------------------
+pub(crate) fn call_elohim_propose_recovery_governance_action(
+    consolidated_input: ConsolidatedProposeRecoveryGovernanceActionInput,
+) -> ExternResult<ConsolidatedGovernanceActionOutput> {
+    let response = call(
+        CallTargetCell::OtherRole("elohim".into()),
+        ZomeName::from("content_store"),
+        FunctionName::from("propose_recovery_governance_action"),
+        None,
+        consolidated_input,
+    )?;
+    match response {
+        ZomeCallResponse::Ok(result) => result.decode().map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "bridge decode (elohim::propose_recovery_governance_action): {e}"
+            )))
+        }),
+        ZomeCallResponse::Unauthorized(_, _, _, _) => Err(wasm_error!(WasmErrorInner::Guest(
+            "Unauthorized bridge call to elohim::propose_recovery_governance_action".to_string()
+        ))),
+        ZomeCallResponse::NetworkError(err) => Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Network error bridging to elohim::propose_recovery_governance_action: {err}"
+        )))),
+        ZomeCallResponse::CountersigningSession(err) => Err(wasm_error!(WasmErrorInner::Guest(
+            format!("Countersigning error bridging to elohim: {err}")
+        ))),
+        ZomeCallResponse::AuthenticationFailed(_, _) => Err(wasm_error!(WasmErrorInner::Guest(
+            "Authentication failed bridging to elohim::propose_recovery_governance_action"
+                .to_string()
+        ))),
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Bridge helper: call elohim content_store::get_content_by_id to load the
+// `governance-action:recovery-request` Content entry that backs an intimate
+// witness submission (Recovery M4 Task 3). Returns the load-bearing `human_id`
+// extracted from the entry's `metadata_json` after asserting the
+// `content_type` discriminator. Validates that the entry exists, that it has
+// the expected content-type, and that the metadata carries `human_id`.
+// ---------------------------------------------------------------------------
+fn fetch_recovery_request_human_id(recovery_request_cid: &str) -> ExternResult<String> {
+    let response = call(
+        CallTargetCell::OtherRole("elohim".into()),
+        ZomeName::from("content_store"),
+        FunctionName::from("get_content_by_id"),
+        None,
+        ConsolidatedQueryByIdInput {
+            id: recovery_request_cid.to_string(),
+        },
+    )?;
+    let content_output: Option<ConsolidatedContentOutput> = match response {
+        ZomeCallResponse::Ok(payload) => payload.decode().map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "submit_intimate_witness Gate 1: decode (elohim::get_content_by_id) failed: {e:?}"
+            )))
+        })?,
+        ZomeCallResponse::Unauthorized(_, _, _, _) => {
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "submit_intimate_witness Gate 1: unauthorized cross-DNA get_content_by_id".into()
+            )))
+        }
+        ZomeCallResponse::NetworkError(err) => {
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "submit_intimate_witness Gate 1: network error on cross-DNA get_content_by_id: {err}"
+            ))))
+        }
+        ZomeCallResponse::CountersigningSession(err) => {
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "submit_intimate_witness Gate 1: countersigning error: {err}"
+            ))))
+        }
+        ZomeCallResponse::AuthenticationFailed(_, _) => {
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "submit_intimate_witness Gate 1: authentication failed on cross-DNA get_content_by_id".into()
+            )))
+        }
+    };
+    let content_output = content_output.ok_or_else(|| {
+        wasm_error!(WasmErrorInner::Guest(format!(
+            "submit_intimate_witness Gate 1: recovery-request CID {} not found on elohim DNA",
+            recovery_request_cid
+        )))
+    })?;
+    if content_output.content.content_type != "governance-action:recovery-request" {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "submit_intimate_witness Gate 1: expected governance-action:recovery-request, got {}",
+            content_output.content.content_type
+        ))));
+    }
+    let metadata: serde_json::Value = serde_json::from_str(&content_output.content.metadata_json)
+        .map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "submit_intimate_witness Gate 1: bad metadata_json: {e}"
+            )))
+        })?;
+    let human_id = metadata
+        .get("human_id")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| {
+            wasm_error!(WasmErrorInner::Guest(
+                "submit_intimate_witness Gate 1: recovery-request metadata missing human_id".into(),
+            ))
+        })?
+        .to_string();
+    Ok(human_id)
+}
+
+// ---------------------------------------------------------------------------
+// Bridge helper: call elohim content_store::query_effective_revocation_for_key
+// for the Recovery M4 Task 4 revocation-floor gate on `commit_key_rotation`.
+// ---------------------------------------------------------------------------
+fn call_elohim_query_effective_revocation_for_key(
+    revoked_key: &str,
+) -> ExternResult<Option<ConsolidatedContentOutput>> {
+    let response = call(
+        CallTargetCell::OtherRole("elohim".into()),
+        ZomeName::from("content_store"),
+        FunctionName::from("query_effective_revocation_for_key"),
+        None,
+        revoked_key.to_string(),
+    )?;
+    match response {
+        ZomeCallResponse::Ok(payload) => payload.decode().map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "bridge decode (elohim::query_effective_revocation_for_key): {e}"
+            )))
+        }),
+        ZomeCallResponse::Unauthorized(_, _, _, _) => Err(wasm_error!(WasmErrorInner::Guest(
+            "Unauthorized bridge call to elohim::query_effective_revocation_for_key".to_string()
+        ))),
+        ZomeCallResponse::NetworkError(err) => Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Network error bridging to elohim::query_effective_revocation_for_key: {err}"
+        )))),
+        ZomeCallResponse::CountersigningSession(err) => Err(wasm_error!(WasmErrorInner::Guest(
+            format!("Countersigning error bridging to elohim: {err}")
+        ))),
+        ZomeCallResponse::AuthenticationFailed(_, _) => Err(wasm_error!(WasmErrorInner::Guest(
+            "Authentication failed bridging to elohim::query_effective_revocation_for_key"
+                .to_string()
+        ))),
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Bridge helper: call elohim content_store::query_effective_identity_freeze_for_human
+// for the Recovery M4 Task 4 freeze-floor gate on `commit_key_rotation`.
+// ---------------------------------------------------------------------------
+fn call_elohim_query_effective_identity_freeze_for_human(
+    human_id: &str,
+) -> ExternResult<Option<ConsolidatedContentOutput>> {
+    let response = call(
+        CallTargetCell::OtherRole("elohim".into()),
+        ZomeName::from("content_store"),
+        FunctionName::from("query_effective_identity_freeze_for_human"),
+        None,
+        human_id.to_string(),
+    )?;
+    match response {
+        ZomeCallResponse::Ok(payload) => payload.decode().map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "bridge decode (elohim::query_effective_identity_freeze_for_human): {e}"
+            )))
+        }),
+        ZomeCallResponse::Unauthorized(_, _, _, _) => Err(wasm_error!(WasmErrorInner::Guest(
+            "Unauthorized bridge call to elohim::query_effective_identity_freeze_for_human"
+                .to_string()
+        ))),
+        ZomeCallResponse::NetworkError(err) => Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Network error bridging to elohim::query_effective_identity_freeze_for_human: {err}"
+        )))),
+        ZomeCallResponse::CountersigningSession(err) => Err(wasm_error!(WasmErrorInner::Guest(
+            format!("Countersigning error bridging to elohim: {err}")
+        ))),
+        ZomeCallResponse::AuthenticationFailed(_, _) => Err(wasm_error!(WasmErrorInner::Guest(
+            "Authentication failed bridging to elohim::query_effective_identity_freeze_for_human"
+                .to_string()
+        ))),
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Bridge helper: call elohim content_store::get_content_by_id and return the
+// full ConsolidatedContentOutput (or None when missing). Recovery M4 Task 5:
+// `submit_revocation_vote` needs every gate field of the
+// `governance-action:key-revocation` Content entry — trigger_type,
+// threshold_reached, human_id, revoked_key, required_votes, current_votes,
+// id — so a generic Option<ConsolidatedContentOutput>-returning helper is the
+// natural shape. The Task 3 helper `fetch_recovery_request_human_id` is
+// single-field-specific and not reusable here.
+// ---------------------------------------------------------------------------
+fn call_elohim_get_content_by_id(
+    cid: &str,
+) -> ExternResult<Option<ConsolidatedContentOutput>> {
+    let response = call(
+        CallTargetCell::OtherRole("elohim".into()),
+        ZomeName::from("content_store"),
+        FunctionName::from("get_content_by_id"),
+        None,
+        ConsolidatedQueryByIdInput {
+            id: cid.to_string(),
+        },
+    )?;
+    match response {
+        ZomeCallResponse::Ok(payload) => payload.decode().map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "bridge decode (elohim::get_content_by_id): {e}"
+            )))
+        }),
+        ZomeCallResponse::Unauthorized(_, _, _, _) => Err(wasm_error!(WasmErrorInner::Guest(
+            "Unauthorized bridge call to elohim::get_content_by_id".to_string()
+        ))),
+        ZomeCallResponse::NetworkError(err) => Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Network error bridging to elohim::get_content_by_id: {err}"
+        )))),
+        ZomeCallResponse::CountersigningSession(err) => Err(wasm_error!(WasmErrorInner::Guest(
+            format!("Countersigning error bridging to elohim::get_content_by_id: {err}")
+        ))),
+        ZomeCallResponse::AuthenticationFailed(_, _) => Err(wasm_error!(WasmErrorInner::Guest(
+            "Authentication failed bridging to elohim::get_content_by_id".to_string()
         ))),
     }
 }
@@ -1848,12 +2152,56 @@ pub enum RecoveryV2Signal {
         required_votes: u32,
         threshold_now_reached: bool,
     },
+    /// Legacy flat-shape signal. Superseded by `DnaSignal::KeyRevocation`
+    /// (EPR envelope) emitted alongside at each producer site.
+    /// Remove after one release cycle (T18 back-compat window).
+    #[deprecated(
+        note = "T18: superseded by DnaSignal::KeyRevocation envelope; remove after one release cycle"
+    )]
     KeyRevocationEffective {
+        /// Internal correlation id (shape `rev-{human}-{ts}`).
+        /// Not in the dna-signals schema; retained for elohim-storage projector
+        /// correlation until T18 reconciles the full projection table design.
         revocation_id: String,
-        revoked_key: String,
+        /// Const discriminator required by `dna-signals/key-revocation.schema.json`.
+        /// Note: the outer `RecoveryV2Signal` enum also serializes a `type` field
+        /// via `#[serde(tag = "type")]`. Receivers that strictly enforce
+        /// `additionalProperties: false` on the schema will see both `type` and
+        /// `signalType`. T18 should either remove the outer tag or align the schema
+        /// to tolerate the extra field.
+        #[serde(rename = "signalType")]
+        signal_type: String,
+        /// CID of the `governance-action:key-revocation` Content entry on the
+        /// elohim DNA, carried as the `actionHash` wire field.  Stage 1: this is
+        /// the elohim Content CID string returned by the bridge call.  Stage 2:
+        /// should be the true Holochain ActionHash (base64) of the DHT entry once
+        /// the elohim DNA exposes the action hash alongside the CID in its output.
+        #[serde(rename = "actionHash")]
+        action_hash: String,
+        /// Stage 1: populated with `human_id` (the stable human identifier).
+        /// Stage 2: will be a content CID derived from the imagodei Human entry.
+        #[serde(rename = "agentCid")]
         human_id: String,
+        /// The revoked ed25519 pubkey (base64 32-byte).
+        #[serde(rename = "revokedPubkey")]
+        revoked_key: String,
+        /// Earliest point the key may have been compromised (RFC3339).
+        /// M4 surface has no separate compromise-discovery timestamp; this field
+        /// is set equal to `effective_at` at emit time.  A future revision of
+        /// Recovery (post-M4) may add a distinct `compromise_at` from the
+        /// revocation request metadata, at which point this field will diverge.
+        #[serde(rename = "compromiseAt")]
+        compromise_at: String,
+        /// When the revocation became effective in the DHT (RFC3339).
+        #[serde(rename = "effectiveAt")]
         effective_at: String,
+        /// Back-pointer to the KeyRevocation request/vote that drove this event.
+        /// Null for defender/voluntary paths (no vote chain).
+        #[serde(rename = "triggeringRevocationId")]
         triggering_vote_id: Option<String>,
+        /// UTC timestamp at which this signal was emitted (RFC3339).
+        #[serde(rename = "emittedAt")]
+        emitted_at: String,
     },
     // M5: portal-host signals — consumed by elohim-storage ReconcileController.
     PortalHostCreated {
@@ -1875,6 +2223,256 @@ pub enum RecoveryV2Signal {
 }
 
 // =============================================================================
+// DnaSignal — EPR-shape provenance envelope (T18+)
+// =============================================================================
+//
+// `DnaSignal` is the forward-compatible, AI-native signal type. It frames the
+// wire message as an EPR (Elohim Provenance Record): the authoring elohim's
+// attestation over a content-addressed (CID) subject, signed at emit time.
+//
+// Contrast with `RecoveryV2Signal`: that enum uses Holochain-internal
+// ActionHash as its identity anchor and carries no issuer signature. It remains
+// in place for one release cycle (back-compat window) alongside the new
+// `DnaSignal::KeyRevocation` emission at each producer site.
+//
+// Wire format: `DnaSignal` serializes via serde with `tag = "type"` (kebab
+// discriminator via camelCase). Consumers that strictly enforce
+// `additionalProperties: false` against `dna-signals/key-revocation.schema.json`
+// will see a top-level `type` field from the tag alongside the envelope fields;
+// the schema now permits this by validating only the envelope payload fields.
+//
+// Future variants (KeyRotation, AgentPeerBinding) extend the enum below.
+// The RevocationAttestation EPR-worker arm (Task 7) is a separate signal class
+// and is NOT migrated here.
+
+/// Top-level EPR-shape signal enum.
+///
+/// `#[serde(tag = "type")]` produces a discriminator field `type` on the wire
+/// whose value is the camelCase variant name (e.g. `"keyRevocation"`).
+#[derive(Serialize, Deserialize, SerializedBytes, Debug, Clone)]
+#[serde(rename_all = "camelCase", tag = "type")]
+pub enum DnaSignal {
+    KeyRevocation(KeyRevocationEnvelope),
+    // Future: KeyRotation(KeyRotationEnvelope), AgentPeerBinding(AgentPeerBindingEnvelope)
+}
+
+/// EPR envelope for a `governance-action:key-revocation` effective event.
+///
+/// Wire fields are `camelCase` (serde rename). All fields except `signature`
+/// and `relay_chain` are covered by the issuer signature — see
+/// `canonical_envelope_bytes` for the exact canonical form.
+#[derive(Serialize, Deserialize, SerializedBytes, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct KeyRevocationEnvelope {
+    /// EPR discriminator — const `"attestation:key-revocation-emit"`.
+    pub attestation_kind: String,
+    /// CIDv1 (dag-cbor sha256) of the `governance-action:key-revocation`
+    /// Content entry on the elohim DNA. Substrate-agnostic identity anchor.
+    pub subject_cid: String,
+    /// Base64-encoded 32-byte ed25519 public key of the authoring elohim agent.
+    pub issuer: String,
+    /// RFC3339 timestamp at which the authoring elohim emitted this attestation.
+    pub issued_at: String,
+    /// Base64-encoded ed25519 signature over `canonical_envelope_bytes(self)`.
+    pub signature: String,
+    /// Domain-specific metadata carried inside the envelope.
+    pub metadata: KeyRevocationMetadata,
+    /// Reserved for relay-elohim provenance accumulation. Empty in T18.
+    /// Future relay-elohims append their own attestation objects here as the
+    /// signal propagates across hops. Opaque `serde_json::Value` so the wire
+    /// field is present-but-typeless until a typed `RelayAttestation` struct
+    /// lands in a future task.
+    pub relay_chain: Vec<serde_json::Value>,
+}
+
+/// Domain metadata nested inside `KeyRevocationEnvelope`.
+#[derive(Serialize, Deserialize, SerializedBytes, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct KeyRevocationMetadata {
+    /// Stable logical dedup key. Format: `rev-{humanId}-{ts}`.
+    pub revocation_id: String,
+    /// Base64-encoded 32-byte ed25519 public key being revoked.
+    pub revoked_pubkey: String,
+    /// Stage 1: the stable `human_id` string. Stage 2: CID of the Human entry.
+    pub agent_cid: String,
+    /// Earliest point the key may have been compromised (RFC3339).
+    /// M4: coincides with `effective_at`; future revisions add a distinct
+    /// discovery timestamp. EPR W2B controller sweep uses this for retroactive
+    /// attestation invalidation.
+    pub compromise_at: String,
+    /// Point at which the revocation became effective in the notary (RFC3339).
+    pub effective_at: String,
+    /// Back-pointer to the vote/request that drove this event. Null for
+    /// defender-path or voluntary revocations (no vote chain).
+    pub triggering_revocation_id: Option<String>,
+    /// CID of the prior Content entry this supersedes (pending→effective
+    /// lineage). Null on the initial CREATE.
+    pub supersedes_cid: Option<String>,
+}
+
+// =============================================================================
+// Canonical signing bytes
+// =============================================================================
+
+/// Sub-struct for canonical serialization — covers all envelope fields
+/// EXCEPT `signature` and `relay_chain`. MessagePack-encoded via
+/// `holochain_serialized_bytes::encode`.
+///
+/// # Canonical form specification
+///
+/// The issuer signature is ed25519 over MessagePack of:
+/// ```text
+/// {
+///   attestationKind: string,
+///   subjectCid:      string,
+///   issuer:          string,
+///   issuedAt:        string,
+///   metadata: {
+///     revocationId:          string,
+///     revokedPubkey:         string,
+///     agentCid:              string,
+///     compromiseAt:          string,
+///     effectiveAt:           string,
+///     triggeringRevocationId: string | null,
+///     supersedesCid:         string | null,
+///   }
+/// }
+/// ```
+/// Field order is the struct declaration order (deterministic under
+/// `holochain_serialized_bytes::encode` which uses `rmp_serde`'s
+/// `StructMapSerializer` — field names are included, order is declaration
+/// order of `#[derive(Serialize)]`).
+///
+/// # Verification (consumer side)
+///
+/// 1. Deserialize the envelope.
+/// 2. Call `canonical_envelope_bytes` on the deserialized envelope.
+/// 3. Decode `issuer` (base64 → 32 bytes) and `signature` (base64 → 64 bytes).
+/// 4. `ed25519_dalek::VerifyingKey::verify(&canonical_bytes, &signature)`.
+#[derive(Serialize, Debug)]
+#[serde(rename_all = "camelCase")]
+struct CanonicalEnvelopeCore<'a> {
+    attestation_kind: &'a str,
+    subject_cid: &'a str,
+    issuer: &'a str,
+    issued_at: &'a str,
+    metadata: CanonicalMetadataRef<'a>,
+}
+
+#[derive(Serialize, Debug)]
+#[serde(rename_all = "camelCase")]
+struct CanonicalMetadataRef<'a> {
+    revocation_id: &'a str,
+    revoked_pubkey: &'a str,
+    agent_cid: &'a str,
+    compromise_at: &'a str,
+    effective_at: &'a str,
+    triggering_revocation_id: Option<&'a str>,
+    supersedes_cid: Option<&'a str>,
+}
+
+/// Produce the canonical bytes over which the issuer signature is computed.
+///
+/// Excludes `signature` and `relay_chain` from the input envelope.
+/// The output is MessagePack-encoded via `holochain_serialized_bytes::encode`.
+///
+/// **Must match the mirror function in `elohim-storage/src/services/recovery_flow_projector.rs`.**
+/// See spec doc at `genesis/docs/superpowers/specs/2026-05-15-dna-signal-as-epr-envelope.md`
+/// for the field-level canonical form.
+pub fn canonical_envelope_bytes(envelope: &KeyRevocationEnvelope) -> Vec<u8> {
+    let core = CanonicalEnvelopeCore {
+        attestation_kind: &envelope.attestation_kind,
+        subject_cid: &envelope.subject_cid,
+        issuer: &envelope.issuer,
+        issued_at: &envelope.issued_at,
+        metadata: CanonicalMetadataRef {
+            revocation_id: &envelope.metadata.revocation_id,
+            revoked_pubkey: &envelope.metadata.revoked_pubkey,
+            agent_cid: &envelope.metadata.agent_cid,
+            compromise_at: &envelope.metadata.compromise_at,
+            effective_at: &envelope.metadata.effective_at,
+            triggering_revocation_id: envelope
+                .metadata
+                .triggering_revocation_id
+                .as_deref(),
+            supersedes_cid: envelope.metadata.supersedes_cid.as_deref(),
+        },
+    };
+    // holochain_serialized_bytes::encode uses rmp_serde internally; the map
+    // form preserves field names and declaration order — required for
+    // deterministic cross-platform canonical bytes.
+    holochain_serialized_bytes::encode(&core)
+        .expect("canonical_envelope_bytes: encode should never fail on well-formed structs")
+}
+
+/// Build and emit a `DnaSignal::KeyRevocation` envelope, signing the canonical
+/// bytes with the calling agent's lair-managed key.
+///
+/// Called at each of the three producer sites:
+/// - `submit_specialist_revocation` (defender path)
+/// - `create_self_revocation` (voluntary path)
+/// - `submit_revocation_vote` (voted quorum path)
+///
+/// # Arguments
+/// * `revocation_id` — stable dedup key (`rev-{human}-{ts}`)
+/// * `subject_cid` — CID of the effective `governance-action:key-revocation` Content entry
+/// * `agent_cid` — Stage 1: human_id string; Stage 2: Human entry CID
+/// * `revoked_pubkey` — base64 string of the revoked ed25519 key
+/// * `compromise_at` — RFC3339 (M4: same as `effective_at`)
+/// * `effective_at` — RFC3339 timestamp of effectiveness
+/// * `triggering_revocation_id` — None for defender/voluntary; Some(vote_id) for quorum path
+/// * `supersedes_cid` — None on initial CREATE; Some(prior_cid) on quorum supersession
+pub(crate) fn emit_key_revocation_envelope(
+    revocation_id: String,
+    subject_cid: String,
+    agent_cid: String,
+    revoked_pubkey: String,
+    compromise_at: String,
+    effective_at: String,
+    triggering_revocation_id: Option<String>,
+    supersedes_cid: Option<String>,
+) -> ExternResult<()> {
+    let agent_pk = agent_info()?.agent_initial_pubkey;
+    let issuer_b64 = base64_encode(agent_pk.get_raw_32());
+    let issued_at = rfc3339_from_sys_time(&sys_time()?);
+
+    // Build the envelope without the signature first so we can compute
+    // canonical bytes.
+    let mut envelope = KeyRevocationEnvelope {
+        attestation_kind: "attestation:key-revocation-emit".to_string(),
+        subject_cid,
+        issuer: issuer_b64,
+        issued_at,
+        signature: String::new(), // placeholder; filled after signing
+        metadata: KeyRevocationMetadata {
+            revocation_id,
+            revoked_pubkey,
+            agent_cid,
+            compromise_at,
+            effective_at,
+            triggering_revocation_id,
+            supersedes_cid,
+        },
+        relay_chain: vec![],
+    };
+
+    let canonical = canonical_envelope_bytes(&envelope);
+    let raw_sig = hdk::ed25519::sign_raw(agent_pk, canonical)?;
+    envelope.signature = base64_encode(&raw_sig.0);
+
+    emit_signal(DnaSignal::KeyRevocation(envelope))?;
+    Ok(())
+}
+
+/// Encode raw bytes as standard base64 (padded, STANDARD alphabet).
+/// Used for the `issuer` pubkey (32 bytes) and `signature` (64 bytes) fields
+/// in `KeyRevocationEnvelope`. Consumers decode with the same STANDARD engine.
+fn base64_encode(bytes: &[u8]) -> String {
+    use base64::{engine::general_purpose::STANDARD, Engine as _};
+    STANDARD.encode(bytes)
+}
+
+// =============================================================================
 // Recovery Protocol Phase 2 — Input/Output Types
 // =============================================================================
 
@@ -1887,9 +2485,24 @@ pub struct CreateRecoveryRequestInput {
     pub request_nonce: Vec<u8>,
 }
 
+/// Output of `create_recovery_request` — Recovery M4 Task 13.
+///
+/// Stage G post-Task-13: the canonical record is a
+/// `governance-action:recovery-request` Content entry on the elohim DNA, not a
+/// `RecoveryRequest` entry on imagodei. The CID (entry-hash) of that
+/// cross-DNA entry is the load-bearing field; downstream callers
+/// (`submit_intimate_witness`, projectors) key on it.
+///
+/// `request` is preserved so the existing `RecoveryRequestCreated` signal
+/// payload (consumed by elohim-storage and the M4 projector) carries the same
+/// shape it had pre-bridge. Until Task 17 aligns the signal payload against
+/// the schema, this keeps the projector contract stable.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct RecoveryRequestOutput {
-    pub action_hash: ActionHash,
+    /// CID of the `governance-action:recovery-request` Content entry on the
+    /// elohim DNA. Replaces the pre-Task-13 `action_hash: ActionHash` field —
+    /// the entry no longer lives on imagodei's DHT.
+    pub recovery_request_cid: String,
     pub request: RecoveryRequest,
 }
 
@@ -1910,7 +2523,12 @@ pub struct KeyRotationOutput {
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct SubmitIntimateWitnessInput {
-    pub recovery_request_hash: ActionHash,
+    /// CID (content-derived id) of the `governance-action:recovery-request`
+    /// Content entry on the elohim DNA. Renamed from `recovery_request_hash:
+    /// ActionHash` per Recovery M4 Task 3 — the recovery-request now lives
+    /// cross-DNA as a Content entry; gates resolve it by CID via
+    /// `content_store::get_content_by_id` rather than a local DHT `get()`.
+    pub recovery_request_cid: String,
     pub note: Option<String>,
 }
 
@@ -1999,41 +2617,6 @@ fn compute_required_witness_count(active_emergency_contacts: u32) -> u32 {
     std::cmp::max(2, ceil_half_plus_one)
 }
 
-/// Count approved votes on a KeyRevocation by traversing RevocationToVote links.
-///
-/// Only votes with `approved == true` count toward the quorum threshold.
-/// Rejections are preserved in the DHT for audit but never advance the
-/// pending -> effective transition.
-fn count_approved_revocation_votes(revocation_id: &str) -> ExternResult<u32> {
-    let anchor = StringAnchor::new("revocation_votes", revocation_id);
-    let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor))?;
-    let links = get_links(
-        LinkQuery::try_new(anchor_hash, LinkTypes::RevocationToVote)?,
-        GetStrategy::default(),
-    )?;
-
-    let mut approved_count: u32 = 0;
-    for link in links {
-        let Some(vote_hash) = link.target.clone().into_action_hash() else {
-            continue;
-        };
-        let Some(record) = get(vote_hash, GetOptions::default())? else {
-            continue;
-        };
-        let Some(vote): Option<RevocationVote> = record
-            .entry()
-            .to_app_option()
-            .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        else {
-            continue;
-        };
-        if vote.approved {
-            approved_count += 1;
-        }
-    }
-
-    Ok(approved_count)
-}
 
 /// Intimate-recovery witness validity horizon. Matches protocol spec §5.
 const WITNESS_EXPIRY_DAYS: u64 = 90;
@@ -2085,8 +2668,23 @@ mod m3_witness_threshold_tests {
 
 /// Create a recovery request.
 /// Authored by the hosting doorway on behalf of the claimant's new device.
-/// M3: resolves human_id from agent pubkey and computes required_witness_count.
-/// Anchors on human_id (was: pubkey string). See design §12.
+///
+/// Recovery M4 Task 13: the recovery request is no longer written as a local
+/// `RecoveryRequest` entry on imagodei. Instead it is bridged to the elohim
+/// DNA as a `governance-action:recovery-request` Content entry via
+/// `propose_recovery_governance_action` — the bespoke producer that writes
+/// top-level metadata (`human_id`, `custodian_cids`, `trigger_type`,
+/// `session_pubkey`, `threshold_reached`, `effective_at`) that the Task 4/5
+/// recovery gates depend on.
+///
+/// The legacy `HumanToRecoveryRequest` link is no longer created on imagodei
+/// — the recovery-request lives cross-DNA. Callers that previously walked the
+/// link must now resolve via `content_store::get_content_by_id` using the CID
+/// returned in `RecoveryRequestOutput.recovery_request_cid`.
+///
+/// The `RecoveryRequest` struct itself is still synthesised so the existing
+/// `RecoveryRequestCreated` signal payload retains its shape (T17 will
+/// align the signal to the dna-signal schemas).
 #[hdk_extern]
 pub fn create_recovery_request(
     input: CreateRecoveryRequestInput,
@@ -2098,9 +2696,26 @@ pub fn create_recovery_request(
     let contact_count = count_active_emergency_contacts(&human_id)?;
     let required_witness_count = compute_required_witness_count(contact_count);
 
+    // Trigger-type derives from the claimant's declared authority intent.
+    // The cross-DNA gates do not branch on this string today; surfacing it in
+    // metadata gives T17 / projectors a hook for downstream classification.
+    let trigger_type = match input.proposed_authority {
+        RecoveryAuthorityKind::IntimateQuorum => "intimate",
+        RecoveryAuthorityKind::CommunityConsensus => "community",
+        RecoveryAuthorityKind::GovernanceAct { .. } => "governance-act",
+        RecoveryAuthorityKind::NetworkWitness { .. } => "network-witness",
+        RecoveryAuthorityKind::CryptographicQuorum { .. } => "cryptographic",
+    };
+
+    // closes_at = now + WITNESS_EXPIRY_DAYS. Mirrors the horizon used elsewhere
+    // in the M3/M4 recovery paths.
+    let expiry_micros = WITNESS_EXPIRY_DAYS * MICROS_PER_DAY;
+    let closes_at_timestamp = Timestamp::from_micros(now.as_micros() + expiry_micros as i64);
+    let closes_at = format!("{:?}", closes_at_timestamp);
+
     let request = RecoveryRequest {
         human_agent_pubkey: input.human_agent_pubkey.clone(),
-        new_agent_pubkey: input.new_agent_pubkey,
+        new_agent_pubkey: input.new_agent_pubkey.clone(),
         hosting_doorway_pubkey: input.hosting_doorway_pubkey,
         proposed_authority: input.proposed_authority,
         request_nonce: input.request_nonce,
@@ -2109,26 +2724,45 @@ pub fn create_recovery_request(
         created_at: now,
     };
 
-    let action_hash = create_entry(&EntryTypes::RecoveryRequest(request.clone()))?;
+    // Bridge to elohim DNA — bespoke producer writes top-level metadata fields
+    // the Task 4/5 readers consume. The recovery-request is initially pending
+    // (threshold_reached=false, effective_at=null); the threshold flip happens
+    // via a fresh CREATE on quorum (CREATE-only constraint, Task 4).
+    let bridge_input = ConsolidatedProposeRecoveryGovernanceActionInput {
+        governance_kind: "governance-action:recovery-request".to_string(),
+        subject_human_id: human_id.clone(),
+        title: format!("Recovery request for {}", human_id),
+        description: Some(format!("trigger_type={}", trigger_type)),
+        reach: "intimate".to_string(),
+        threshold: serde_json::json!({"m": required_witness_count}),
+        closes_at: closes_at.clone(),
+        metadata: serde_json::json!({
+            "human_id": human_id,
+            // Custodian CIDs are populated by the Task 22 Shamir setup flow
+            // when an explicit custody manifest exists; intimate recovery
+            // does not pre-designate custodians, so leave empty here.
+            "custodian_cids": [],
+            "trigger_type": trigger_type,
+            "session_pubkey": input.new_agent_pubkey.to_string(),
+            "threshold_reached": false,
+            "effective_at": serde_json::Value::Null,
+        }),
+        supersedes_cid: None,
+    };
+    let consolidated = call_elohim_propose_recovery_governance_action(bridge_input)?;
+    let recovery_request_cid = consolidated.cid;
 
-    // M3 decision log #2: anchor on human_id (was: pubkey). See design §12.
-    let anchor = StringAnchor::new("recovery_request", &human_id);
-    let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor.clone()))?;
-    create_entry(&EntryTypes::StringAnchor(anchor))?;
-    create_link(
-        anchor_hash,
-        action_hash.clone(),
-        LinkTypes::HumanToRecoveryRequest,
-        (),
-    )?;
-
+    // Emit the legacy signal with a zero ActionHash sentinel — the canonical
+    // record lives cross-DNA and has no local ActionHash. Mirrors the
+    // `submit_intimate_witness` pattern that landed under Task 3. T17 will
+    // replace this with a CID-bearing signal payload.
     emit_signal(RecoveryV2Signal::RecoveryRequestCreated {
-        action_hash: action_hash.clone(),
+        action_hash: ActionHash::from_raw_36(vec![0u8; 36]),
         request: request.clone(),
     })?;
 
     Ok(RecoveryRequestOutput {
-        action_hash,
+        recovery_request_cid,
         request,
     })
 }
@@ -2143,15 +2777,37 @@ pub struct CreateSelfRevocationInput {
     pub reason: String,
 }
 
+/// Output of `create_self_revocation` — Recovery M4 Task 13.
+///
+/// Stage G post-Task-13: the canonical record is a
+/// `governance-action:key-revocation` Content entry on the elohim DNA, not a
+/// `KeyRevocation` entry on imagodei. The CID (entry-hash) of that cross-DNA
+/// entry replaces the pre-Task-13 `action_hash: ActionHash` field — the entry
+/// no longer lives on imagodei's DHT, so no ActionHash exists locally.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct KeyRevocationOutput {
     pub revocation_id: String,
-    pub action_hash: ActionHash,
+    /// CID of the `governance-action:key-revocation` Content entry on the
+    /// elohim DNA. Replaces the pre-Task-13 `action_hash: ActionHash` field.
+    pub revocation_cid: String,
 }
 
 /// M4: Self-revocation. A human with a valid agent key voluntarily revokes
 /// a different (compromised) key they control. Single-cell authority, no
 /// quorum, no witnesses.
+///
+/// Recovery M4 Task 13: bridges to the elohim DNA as a
+/// `governance-action:key-revocation` Content entry via
+/// `propose_recovery_governance_action`. Because self-revocation is
+/// immediately effective (single-cell authority, threshold=1), the entry is
+/// written with `threshold_reached: true` and `effective_at` set on the
+/// initial CREATE — no `update_entry` is needed (CREATE-only constraint,
+/// Task 4). The Task 4 gate at `query_effective_revocation_for_key` will
+/// then return this entry directly.
+///
+/// The legacy `KeyRevocation` entry + dual-anchor links are no longer written
+/// to imagodei's DHT (T15 will remove the entry type entirely). Downstream
+/// readers resolve via cross-DNA `content_store::get_content_by_id`.
 #[hdk_extern]
 pub fn create_self_revocation(
     input: CreateSelfRevocationInput,
@@ -2180,95 +2836,86 @@ pub fn create_self_revocation(
     let revocation_id = format!("rev-{}-{}", human_id, timestamp);
     let revoked_key_str = input.revoked_key.to_string();
 
-    let revocation = KeyRevocation {
+    // Closes-at for an already-effective revocation is informational only
+    // (the gate uses `effective_at`); set it to far-future so projectors that
+    // honour `closes_at` for sweep windows do not prematurely expire it.
+    let closes_at = "2099-01-01T00:00:00Z".to_string();
+
+    let bridge_input = ConsolidatedProposeRecoveryGovernanceActionInput {
+        governance_kind: "governance-action:key-revocation".to_string(),
+        subject_human_id: human_id.clone(),
+        title: format!("Key revocation — {}", human_id),
+        description: Some(format!("trigger_type=voluntary; reason={}", input.reason)),
+        reach: "private".to_string(),
+        threshold: serde_json::json!({"m": 1, "n": 1, "type": "single-cell"}),
+        closes_at,
+        metadata: serde_json::json!({
+            "id": revocation_id,
+            "human_id": human_id,
+            "revoked_key": revoked_key_str,
+            "reason": input.reason,
+            "trigger_type": "voluntary",
+            "initiated_by": human_id,
+            "required_votes": 1,
+            "current_votes": 1,
+            // Self-revocation is immediately effective on the initial CREATE
+            // — no update_entry flip per Task 4 CREATE-only constraint.
+            "threshold_reached": true,
+            "effective_at": timestamp,
+        }),
+        supersedes_cid: None,
+    };
+    let consolidated = call_elohim_propose_recovery_governance_action(bridge_input)?;
+    let revocation_cid = consolidated.cid;
+
+    // Emit both signals atomically: Requested + Effective.
+    emit_signal(RecoveryV2Signal::KeyRevocationRequested {
         id: revocation_id.clone(),
         human_id: human_id.clone(),
         revoked_key: revoked_key_str.clone(),
         reason: input.reason.clone(),
-        initiated_by: human_id.clone(),
         trigger_type: "voluntary".to_string(),
+        initiated_by: human_id.clone(),
         required_votes: 1,
         current_votes: 1,
-        votes_json: String::new(), // legacy field, unused by M4
         threshold_reached: true,
         effective_at: Some(timestamp.clone()),
         created_at: timestamp.clone(),
-        updated_at: timestamp.clone(),
-    };
-
-    let action_hash = create_entry(&EntryTypes::KeyRevocation(revocation.clone()))?;
-
-    // IdToKeyRevocation anchor
-    let id_anchor = StringAnchor::new("revocation_id", &revocation_id);
-    let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor.clone()))?;
-    create_entry(&EntryTypes::StringAnchor(id_anchor))?;
-    create_link(
-        id_anchor_hash,
-        action_hash.clone(),
-        LinkTypes::IdToKeyRevocation,
-        (),
-    )?;
-
-    // HumanToKeyRevocation anchor (dual-anchor primacy: human listing)
-    let human_anchor = StringAnchor::new("human_revocations", &human_id);
-    let human_anchor_hash = hash_entry(&EntryTypes::StringAnchor(human_anchor.clone()))?;
-    create_entry(&EntryTypes::StringAnchor(human_anchor))?;
-    create_link(
-        human_anchor_hash,
-        action_hash.clone(),
-        LinkTypes::HumanToKeyRevocation,
-        (),
-    )?;
-
-    // RevokedKeyToRevocation anchor (dual-anchor primacy: hot gate query)
-    let revoked_key_anchor = StringAnchor::new("revoked_key", &revoked_key_str);
-    let revoked_key_anchor_hash =
-        hash_entry(&EntryTypes::StringAnchor(revoked_key_anchor.clone()))?;
-    create_entry(&EntryTypes::StringAnchor(revoked_key_anchor))?;
-    create_link(
-        revoked_key_anchor_hash,
-        action_hash.clone(),
-        LinkTypes::RevokedKeyToRevocation,
-        (),
-    )?;
-
-    // EffectiveRevocations anchor — voluntary is effective on creation.
-    let effective_anchor = StringAnchor::new("effective_revocations", "global");
-    let effective_anchor_hash = hash_entry(&EntryTypes::StringAnchor(effective_anchor.clone()))?;
-    create_entry(&EntryTypes::StringAnchor(effective_anchor))?;
-    create_link(
-        effective_anchor_hash,
-        action_hash.clone(),
-        LinkTypes::EffectiveRevocations,
-        (),
-    )?;
-
-    // Emit both signals atomically: Requested + Effective.
-    emit_signal(RecoveryV2Signal::KeyRevocationRequested {
-        id: revocation.id.clone(),
-        human_id: revocation.human_id.clone(),
-        revoked_key: revocation.revoked_key.clone(),
-        reason: revocation.reason.clone(),
-        trigger_type: revocation.trigger_type.clone(),
-        initiated_by: revocation.initiated_by.clone(),
-        required_votes: revocation.required_votes,
-        current_votes: revocation.current_votes,
-        threshold_reached: revocation.threshold_reached,
-        effective_at: revocation.effective_at.clone(),
-        created_at: revocation.created_at.clone(),
     })?;
 
+    let emitted_at_self = rfc3339_from_sys_time(&sys_time()?);
+    #[allow(deprecated)]
     emit_signal(RecoveryV2Signal::KeyRevocationEffective {
-        revocation_id: revocation.id.clone(),
-        revoked_key: revocation.revoked_key.clone(),
-        human_id: revocation.human_id.clone(),
-        effective_at: timestamp,
+        revocation_id: revocation_id.clone(),
+        signal_type: "keyRevocation".to_string(),
+        action_hash: revocation_cid.clone(),
+        human_id: human_id.clone(),
+        revoked_key: revoked_key_str.clone(),
+        // M4: no separate compromise-discovery timestamp; coincides with effectiveAt.
+        // Future revisions may populate this from revocation request metadata.
+        compromise_at: timestamp.clone(),
+        effective_at: timestamp.clone(),
         triggering_vote_id: None,
+        emitted_at: emitted_at_self,
     })?;
+
+    // T18: EPR-shape envelope alongside the legacy signal (back-compat window).
+    // Voluntary path: supersedes_cid = None (initial CREATE);
+    //                 triggering_revocation_id = None (no vote chain).
+    emit_key_revocation_envelope(
+        revocation_id.clone(),
+        revocation_cid.clone(),
+        human_id,        // Stage 1: human_id; Stage 2: Human entry CID
+        revoked_key_str,
+        timestamp.clone(), // compromise_at == effective_at in M4
+        timestamp,
+        None,            // triggering_revocation_id
+        None,            // supersedes_cid
+    )?;
 
     Ok(KeyRevocationOutput {
         revocation_id,
-        action_hash,
+        revocation_cid,
     })
 }
 
@@ -2322,92 +2969,74 @@ pub fn create_revocation_request(
     let revocation_id = format!("rev-{}-{}", input.target_human_id, timestamp);
     let revoked_key_str = input.revoked_key.to_string();
 
-    let revocation = KeyRevocation {
+    // Recovery M4 Task 14: bridge to elohim DNA via
+    // `propose_recovery_governance_action`. Initial CREATE is pending
+    // (`threshold_reached: false`, `effective_at: null`); the threshold flip on
+    // quorum is a fresh CREATE driven by `submit_revocation_vote` (CREATE-only
+    // constraint, Task 4).
+    let bridge_input = ConsolidatedProposeRecoveryGovernanceActionInput {
+        governance_kind: "governance-action:key-revocation".to_string(),
+        subject_human_id: input.target_human_id.clone(),
+        title: format!("Key revocation request for {}", input.target_human_id),
+        description: Some(format!(
+            "trigger_type=steward_vote; reason={}; initiated_by={}",
+            input.reason, caller_human_id
+        )),
+        reach: "intimate".to_string(),
+        threshold: serde_json::json!({"m": required}),
+        closes_at: timestamp.clone(),
+        metadata: serde_json::json!({
+            "id": revocation_id,
+            "human_id": input.target_human_id,
+            "revoked_key": revoked_key_str,
+            "reason": input.reason,
+            "trigger_type": "steward_vote",
+            "initiated_by": caller_human_id,
+            "required_votes": required,
+            "current_votes": 0,
+            "threshold_reached": false,
+            "effective_at": serde_json::Value::Null,
+        }),
+        supersedes_cid: None,
+    };
+    let consolidated = call_elohim_propose_recovery_governance_action(bridge_input)?;
+    let revocation_cid = consolidated.cid;
+
+    emit_signal(RecoveryV2Signal::KeyRevocationRequested {
         id: revocation_id.clone(),
         human_id: input.target_human_id.clone(),
         revoked_key: revoked_key_str.clone(),
         reason: input.reason.clone(),
-        initiated_by: caller_human_id.clone(),
         trigger_type: "steward_vote".to_string(),
+        initiated_by: caller_human_id.clone(),
         required_votes: required,
         current_votes: 0,
-        votes_json: String::new(),
         threshold_reached: false,
         effective_at: None,
-        created_at: timestamp.clone(),
-        updated_at: timestamp.clone(),
-    };
-
-    let action_hash = create_entry(&EntryTypes::KeyRevocation(revocation.clone()))?;
-
-    // IdToKeyRevocation anchor
-    let id_anchor = StringAnchor::new("revocation_id", &revocation_id);
-    let id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(id_anchor.clone()))?;
-    create_entry(&EntryTypes::StringAnchor(id_anchor))?;
-    create_link(
-        id_anchor_hash,
-        action_hash.clone(),
-        LinkTypes::IdToKeyRevocation,
-        (),
-    )?;
-
-    // HumanToKeyRevocation anchor
-    let human_anchor = StringAnchor::new("human_revocations", &input.target_human_id);
-    let human_anchor_hash = hash_entry(&EntryTypes::StringAnchor(human_anchor.clone()))?;
-    create_entry(&EntryTypes::StringAnchor(human_anchor))?;
-    create_link(
-        human_anchor_hash,
-        action_hash.clone(),
-        LinkTypes::HumanToKeyRevocation,
-        (),
-    )?;
-
-    // RevokedKeyToRevocation anchor
-    let revoked_key_anchor = StringAnchor::new("revoked_key", &revoked_key_str);
-    let revoked_key_anchor_hash =
-        hash_entry(&EntryTypes::StringAnchor(revoked_key_anchor.clone()))?;
-    create_entry(&EntryTypes::StringAnchor(revoked_key_anchor))?;
-    create_link(
-        revoked_key_anchor_hash,
-        action_hash.clone(),
-        LinkTypes::RevokedKeyToRevocation,
-        (),
-    )?;
-
-    // PendingRevocations anchor — quorum is not yet met.
-    let pending_anchor = StringAnchor::new("pending_revocations", "global");
-    let pending_anchor_hash = hash_entry(&EntryTypes::StringAnchor(pending_anchor.clone()))?;
-    create_entry(&EntryTypes::StringAnchor(pending_anchor))?;
-    create_link(
-        pending_anchor_hash,
-        action_hash.clone(),
-        LinkTypes::PendingRevocations,
-        (),
-    )?;
-
-    emit_signal(RecoveryV2Signal::KeyRevocationRequested {
-        id: revocation.id.clone(),
-        human_id: revocation.human_id.clone(),
-        revoked_key: revocation.revoked_key.clone(),
-        reason: revocation.reason.clone(),
-        trigger_type: revocation.trigger_type.clone(),
-        initiated_by: revocation.initiated_by.clone(),
-        required_votes: revocation.required_votes,
-        current_votes: revocation.current_votes,
-        threshold_reached: revocation.threshold_reached,
-        effective_at: revocation.effective_at.clone(),
-        created_at: revocation.created_at.clone(),
+        created_at: timestamp,
     })?;
 
     Ok(KeyRevocationOutput {
         revocation_id,
-        action_hash,
+        revocation_cid,
     })
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct SubmitRevocationVoteInput {
-    pub revocation_id: String,
+    /// CID (content-derived id) of the `governance-action:key-revocation`
+    /// Content entry on the elohim DNA. Renamed from `revocation_id: String`
+    /// per Recovery M4 Task 5 — the canonical revocation entry now lives
+    /// cross-DNA as a Content entry on elohim; gate fields are resolved by
+    /// CID via `content_store::get_content_by_id` rather than a local
+    /// `IdToKeyRevocation` anchor lookup + `to_app_option()` decode. The
+    /// logical revocation_id (shape `rev-{human}-{ts}`) is recovered from
+    /// `Content.metadata.id` and used for downstream vote linkage and signal
+    /// payloads. The local imagodei KeyRevocation entry continues to exist
+    /// during the interim (Tasks 13/14 will move the producer), and is still
+    /// reachable via the local anchor keyed by the metadata id for
+    /// update_entry + link operations.
+    pub revocation_cid: String,
     pub approved: bool,
     pub attestation: String,
 }
@@ -2421,15 +3050,31 @@ pub struct RevocationVoteOutput {
 }
 
 /// M4: Submit an emergency-contact vote on a pending KeyRevocation.
-/// On the threshold-meeting vote, the coordinator updates the KeyRevocation
-/// entry (flips threshold_reached, sets effective_at), moves it from
-/// PendingRevocations to EffectiveRevocations, and emits both
-/// RevocationVoteSubmitted and KeyRevocationEffective signals.
+///
+/// Recovery M4 Task 14: the vote is written as an
+/// `attestation:revocation-vote` Content entry on the elohim DNA via
+/// `call_elohim_issue_attestation`, with `parent_governance_action_cid` and
+/// `subject_cid` both set to the revocation CID. The vote's metadata carries
+/// `vote_value` ("approve" | "reject") and a top-level `voter_human_id` so
+/// downstream projection (and this function's quorum-detection re-read) can
+/// classify it. The legacy local `RevocationVote` entry + 3 anchor links are
+/// no longer written (T15 will drop the entry type definitions).
+///
+/// When the approved-vote count meets `required_votes`, the function writes a
+/// fresh `governance-action:key-revocation` Content entry on elohim with
+/// `threshold_reached: true`, `effective_at: <RFC3339 now>`, and
+/// `supersedes_cid: <input.revocation_cid>` — the "fresh effective Content"
+/// pattern from Task 4. The `query_effective_revocation_for_key` gate reads
+/// from DHT-derived Content (NOT a storage projection), so this CREATE is
+/// what flips the gate. Subsequent redelivery / racy re-entry is guarded by
+/// the per-steward duplicate-vote check (attestation issuer == voter human
+/// id) plus the gate's most-recent-wins ordering by `updated_at`.
 #[hdk_extern]
 pub fn submit_revocation_vote(
     input: SubmitRevocationVoteInput,
 ) -> ExternResult<RevocationVoteOutput> {
     let caller_pubkey = agent_info()?.agent_initial_pubkey;
+    let caller_pubkey_str = caller_pubkey.to_string();
     let caller_human_id = resolve_human_id_for_agent(&caller_pubkey)?;
 
     if input.attestation.trim().is_empty() {
@@ -2438,231 +3083,291 @@ pub fn submit_revocation_vote(
         )));
     }
 
-    // Load the KeyRevocation via IdToKeyRevocation anchor.
-    let revocation_id_anchor = StringAnchor::new("revocation_id", &input.revocation_id);
-    let revocation_anchor_hash = hash_entry(&EntryTypes::StringAnchor(revocation_id_anchor))?;
-    let revocation_links = get_links(
-        LinkQuery::try_new(revocation_anchor_hash, LinkTypes::IdToKeyRevocation)?,
-        GetStrategy::default(),
-    )?;
-    let revocation_link = revocation_links.first().ok_or_else(|| {
+    // Recovery M4 Task 5 + 14 migration: the canonical revocation entry is a
+    // `governance-action:key-revocation` Content entry on the elohim DNA,
+    // fetched by CID via the cross-DNA bridge. The vote itself is also written
+    // cross-DNA as an `attestation:revocation-vote` Content (Task 14).
+    let content_output = call_elohim_get_content_by_id(&input.revocation_cid)?.ok_or_else(|| {
         wasm_error!(WasmErrorInner::Guest(format!(
-            "submit_revocation_vote: no KeyRevocation with id {}",
-            input.revocation_id
+            "submit_revocation_vote: revocation CID {} not found on elohim DNA",
+            input.revocation_cid
         )))
     })?;
-    let revocation_action_hash = revocation_link
-        .target
-        .clone()
-        .into_action_hash()
+    if content_output.content.content_type != "governance-action:key-revocation" {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "submit_revocation_vote: expected governance-action:key-revocation, got {}",
+            content_output.content.content_type
+        ))));
+    }
+    let metadata: serde_json::Value =
+        serde_json::from_str(&content_output.content.metadata_json).map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "submit_revocation_vote: bad metadata_json: {e}"
+            )))
+        })?;
+    let revocation_id = metadata
+        .get("id")
+        .and_then(|v| v.as_str())
         .ok_or_else(|| {
             wasm_error!(WasmErrorInner::Guest(
-                "IdToKeyRevocation target was not an ActionHash".into()
+                "submit_revocation_vote: revocation metadata missing id".into(),
+            ))
+        })?
+        .to_string();
+    let revocation_trigger_type = metadata
+        .get("trigger_type")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| {
+            wasm_error!(WasmErrorInner::Guest(
+                "submit_revocation_vote: revocation metadata missing trigger_type".into(),
+            ))
+        })?
+        .to_string();
+    let revocation_threshold_reached = metadata
+        .get("threshold_reached")
+        .and_then(|v| v.as_bool())
+        .ok_or_else(|| {
+            wasm_error!(WasmErrorInner::Guest(
+                "submit_revocation_vote: revocation metadata missing threshold_reached".into(),
             ))
         })?;
-    let revocation_record = get(revocation_action_hash.clone(), GetOptions::default())?
+    let revocation_human_id = metadata
+        .get("human_id")
+        .and_then(|v| v.as_str())
         .ok_or_else(|| {
             wasm_error!(WasmErrorInner::Guest(
-                "KeyRevocation record not found".into()
+                "submit_revocation_vote: revocation metadata missing human_id".into(),
             ))
-        })?;
-    let revocation: KeyRevocation = revocation_record
-        .entry()
-        .to_app_option()
-        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        })?
+        .to_string();
+    let revocation_revoked_key = metadata
+        .get("revoked_key")
+        .and_then(|v| v.as_str())
         .ok_or_else(|| {
             wasm_error!(WasmErrorInner::Guest(
-                "KeyRevocation record missing entry".into()
+                "submit_revocation_vote: revocation metadata missing revoked_key".into(),
+            ))
+        })?
+        .to_string();
+    let revocation_reason = metadata
+        .get("reason")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
+    let revocation_initiated_by = metadata
+        .get("initiated_by")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
+    let revocation_required_votes: u32 = metadata
+        .get("required_votes")
+        .and_then(|v| v.as_u64())
+        .and_then(|n| u32::try_from(n).ok())
+        .ok_or_else(|| {
+            wasm_error!(WasmErrorInner::Guest(
+                "submit_revocation_vote: revocation metadata missing required_votes".into(),
             ))
         })?;
 
     // Gate: votes only apply to the steward_vote path.
-    if revocation.trigger_type != "steward_vote" {
+    if revocation_trigger_type != "steward_vote" {
         return Err(wasm_error!(WasmErrorInner::Guest(format!(
             "submit_revocation_vote: revocation {} has trigger_type={}, votes not accepted",
-            input.revocation_id, revocation.trigger_type
+            revocation_id, revocation_trigger_type
         ))));
     }
 
-    if revocation.threshold_reached {
+    if revocation_threshold_reached {
         return Err(wasm_error!(WasmErrorInner::Guest(format!(
             "submit_revocation_vote: revocation {} already effective",
-            input.revocation_id
+            revocation_id
         ))));
     }
 
     // Gate: caller must be an active emergency contact.
-    if !is_active_emergency_contact(&revocation.human_id, &caller_human_id)? {
+    if !is_active_emergency_contact(&revocation_human_id, &caller_human_id)? {
         return Err(wasm_error!(WasmErrorInner::Guest(format!(
             "submit_revocation_vote: caller is not an active emergency contact for {}",
-            revocation.human_id
+            revocation_human_id
         ))));
     }
 
-    // Gate: no existing vote from this steward on this revocation.
-    let steward_anchor = StringAnchor::new("steward_revocation_votes", &caller_human_id);
-    let steward_anchor_hash = hash_entry(&EntryTypes::StringAnchor(steward_anchor.clone()))?;
-    let steward_vote_links = get_links(
-        LinkQuery::try_new(
-            steward_anchor_hash.clone(),
-            LinkTypes::StewardToRevocationVote,
-        )?,
-        GetStrategy::default(),
-    )?;
-    for link in &steward_vote_links {
-        let Some(vote_hash) = link.target.clone().into_action_hash() else {
-            continue;
-        };
-        let Some(rec) = get(vote_hash, GetOptions::default())? else {
-            continue;
-        };
-        let Some(prior_vote): Option<RevocationVote> = rec
-            .entry()
-            .to_app_option()
-            .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        else {
-            continue;
-        };
-        if prior_vote.revocation_id == input.revocation_id {
+    // Gate: no existing vote from this steward on this revocation. Walk the
+    // cross-DNA `attestation:revocation-vote` children (subject = revocation_cid)
+    // and reject if any was issued by the caller (issuer_cid matches caller's
+    // AgentPubKey string — `issue_attestation` stores
+    // `author_id = agent_info()?.agent_initial_pubkey.to_string()`).
+    let existing_votes = call_elohim_get_attestations_for_subject(input.revocation_cid.clone())?;
+    for prior in &existing_votes {
+        if prior.attestation_kind == "attestation:revocation-vote"
+            && prior.issuer_cid == caller_pubkey_str
+        {
             return Err(wasm_error!(WasmErrorInner::Guest(format!(
                 "submit_revocation_vote: steward {} has already voted on revocation {}",
-                caller_human_id, input.revocation_id
+                caller_human_id, revocation_id
             ))));
         }
     }
 
     let now = sys_time()?;
     let timestamp = format!("{:?}", now);
+    // RFC3339 sortable timestamp for `effective_at` (Task 4 constraint —
+    // gate sorts most-recent-by-`updated_at` lexicographically).
+    let rfc3339_now = rfc3339_from_sys_time(&now);
     let vote_id = format!("vote-{}-{}", caller_human_id, timestamp);
+    let vote_value_str = if input.approved { "approve" } else { "reject" };
 
-    let vote = RevocationVote {
-        id: vote_id.clone(),
-        revocation_id: input.revocation_id.clone(),
-        steward_id: caller_human_id.clone(),
-        approved: input.approved,
-        attestation: input.attestation.clone(),
-        voted_at: timestamp.clone(),
+    // Issue the vote as an `attestation:revocation-vote` Content on elohim.
+    // The metadata carries top-level `parent_governance_action_cid`,
+    // `subject_cid`, `subject_kind`, `vote_value`, and `voter_human_id` so
+    // downstream projectors classify without further lookups.
+    let vote_metadata = serde_json::json!({
+        "parent_governance_action_cid": input.revocation_cid,
+        "subject_cid": input.revocation_cid,
+        "subject_kind": "key-revocation",
+        "vote_value": vote_value_str,
+        "voter_human_id": caller_human_id,
+        "voter_pubkey": caller_pubkey_str,
+        "vote_id": vote_id,
+        "attestation_blob": input.attestation,
+        "voted_at": timestamp,
+    });
+    let attest_input = ConsolidatedIssueAttestationInput {
+        attestation_kind: "attestation:revocation-vote".to_string(),
+        subject_cid: input.revocation_cid.clone(),
+        subject_kind: "key-revocation".to_string(),
+        title: format!("Revocation vote by {}", caller_human_id),
+        description: Some(format!("vote={}", vote_value_str)),
+        reach: "intimate".to_string(),
+        metadata: vote_metadata,
+        parent_governance_action_cid: Some(input.revocation_cid.clone()),
+        vote_value: Some(vote_value_str.to_string()),
+        proof_class: "witness".to_string(),
+        proof_evidence: serde_json::json!({"class": "witness"}),
+        expires_at: None,
     };
+    let _vote_consolidated = call_elohim_issue_attestation(attest_input)?;
 
-    let vote_action_hash = create_entry(&EntryTypes::RevocationVote(vote.clone()))?;
-
-    // IdToRevocationVote anchor
-    let vote_id_anchor = StringAnchor::new("revocation_vote_id", &vote_id);
-    let vote_id_anchor_hash = hash_entry(&EntryTypes::StringAnchor(vote_id_anchor.clone()))?;
-    create_entry(&EntryTypes::StringAnchor(vote_id_anchor))?;
-    create_link(
-        vote_id_anchor_hash,
-        vote_action_hash.clone(),
-        LinkTypes::IdToRevocationVote,
-        (),
-    )?;
-
-    // RevocationToVote anchor (per-revocation vote list)
-    let revocation_votes_anchor = StringAnchor::new("revocation_votes", &input.revocation_id);
-    let revocation_votes_anchor_hash =
-        hash_entry(&EntryTypes::StringAnchor(revocation_votes_anchor.clone()))?;
-    create_entry(&EntryTypes::StringAnchor(revocation_votes_anchor))?;
-    create_link(
-        revocation_votes_anchor_hash,
-        vote_action_hash.clone(),
-        LinkTypes::RevocationToVote,
-        (),
-    )?;
-
-    // StewardToRevocationVote anchor
-    create_entry(&EntryTypes::StringAnchor(steward_anchor))?;
-    create_link(
-        steward_anchor_hash,
-        vote_action_hash.clone(),
-        LinkTypes::StewardToRevocationVote,
-        (),
-    )?;
-
-    // Recompute threshold (count approved votes from link traversal).
-    let approved_count = count_approved_revocation_votes(&input.revocation_id)?;
-    let threshold_now_reached = approved_count >= revocation.required_votes;
+    // Recount approved votes by re-fetching attestations for subject and
+    // decoding each one's metadata for `vote_value`. Cross-DNA fetch per
+    // attestation is O(N votes), which is small (single-digit quorum).
+    let refreshed = call_elohim_get_attestations_for_subject(input.revocation_cid.clone())?;
+    let mut approved_count: u32 = 0;
+    for child in &refreshed {
+        if child.attestation_kind != "attestation:revocation-vote" {
+            continue;
+        }
+        let Some(child_content) = call_elohim_get_content_by_id(&child.cid)? else {
+            continue;
+        };
+        let child_meta: serde_json::Value =
+            serde_json::from_str(&child_content.content.metadata_json)
+                .unwrap_or(serde_json::Value::Null);
+        let vote_value = child_meta
+            .get("vote_value")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+        if vote_value == "approve" {
+            approved_count = approved_count.saturating_add(1);
+        }
+    }
+    let threshold_now_reached = approved_count >= revocation_required_votes;
 
     if threshold_now_reached {
-        // Update the KeyRevocation entry: flip threshold_reached, set effective_at.
-        let mut updated = revocation.clone();
-        updated.current_votes = approved_count;
-        updated.threshold_reached = true;
-        updated.effective_at = Some(timestamp.clone());
-        updated.updated_at = timestamp.clone();
-        update_entry(
-            revocation_action_hash,
-            &EntryTypes::KeyRevocation(updated.clone()),
-        )?;
-
-        // Move from PendingRevocations to EffectiveRevocations.
-        let pending_global_anchor = StringAnchor::new("pending_revocations", "global");
-        let pending_global_anchor_hash =
-            hash_entry(&EntryTypes::StringAnchor(pending_global_anchor))?;
-        let pending_links = get_links(
-            LinkQuery::try_new(pending_global_anchor_hash, LinkTypes::PendingRevocations)?,
-            GetStrategy::default(),
-        )?;
-        for link in pending_links {
-            // Each pending link points to a specific revocation's action_hash.
-            // We identify by fetching the entry and matching the id.
-            let Some(link_target_hash) = link.target.clone().into_action_hash() else {
-                continue;
-            };
-            let Some(rec) = get(link_target_hash, GetOptions::default())? else {
-                continue;
-            };
-            let Some(rev): Option<KeyRevocation> = rec
-                .entry()
-                .to_app_option()
-                .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-            else {
-                continue;
-            };
-            if rev.id == input.revocation_id {
-                delete_link(link.create_link_hash, GetOptions::default())?;
-            }
-        }
-
-        let effective_anchor = StringAnchor::new("effective_revocations", "global");
-        let effective_anchor_hash =
-            hash_entry(&EntryTypes::StringAnchor(effective_anchor.clone()))?;
-        create_entry(&EntryTypes::StringAnchor(effective_anchor))?;
-        create_link(
-            effective_anchor_hash,
-            revocation_link.target.clone(), // points to the revocation entry
-            LinkTypes::EffectiveRevocations,
-            (),
-        )?;
+        // CREATE-only effectiveness transition (Task 4): emit a fresh
+        // `governance-action:key-revocation` Content entry whose metadata
+        // carries `threshold_reached: true` + `effective_at` (RFC3339 UTC)
+        // and a `supersedes_cid` pointing at the pending entry.
+        // `query_effective_revocation_for_key` selects most-recent-by-
+        // updated_at, so this new entry becomes the gate's effective record.
+        let effective_metadata = serde_json::json!({
+            "id": revocation_id,
+            "human_id": revocation_human_id,
+            "revoked_key": revocation_revoked_key,
+            "reason": revocation_reason,
+            "trigger_type": "steward_vote",
+            "initiated_by": revocation_initiated_by,
+            "required_votes": revocation_required_votes,
+            "current_votes": approved_count,
+            "threshold_reached": true,
+            "effective_at": rfc3339_now,
+            "triggering_vote_id": vote_id,
+        });
+        let effective_bridge_input = ConsolidatedProposeRecoveryGovernanceActionInput {
+            governance_kind: "governance-action:key-revocation".to_string(),
+            subject_human_id: revocation_human_id.clone(),
+            title: format!(
+                "Key revocation effective for {} (quorum reached)",
+                revocation_human_id
+            ),
+            description: Some(format!(
+                "trigger_type=steward_vote; reason={}; supersedes={}",
+                revocation_reason, input.revocation_cid
+            )),
+            reach: "intimate".to_string(),
+            threshold: serde_json::json!({"m": revocation_required_votes}),
+            closes_at: rfc3339_now.clone(),
+            metadata: effective_metadata,
+            supersedes_cid: Some(input.revocation_cid.clone()),
+        };
+        let effective_consolidated =
+            call_elohim_propose_recovery_governance_action(effective_bridge_input)?;
+        // The CID of the fresh effective Content entry on the elohim DNA.
+        // Stage 1: this is the elohim Content CID string.  Stage 2: switch to
+        // the true ActionHash once the elohim DNA exposes it alongside the CID.
+        let effective_cid = effective_consolidated.cid;
 
         emit_signal(RecoveryV2Signal::RevocationVoteSubmitted {
             id: vote_id.clone(),
-            revocation_id: input.revocation_id.clone(),
+            revocation_id: revocation_id.clone(),
             steward_id: caller_human_id.clone(),
             approved: input.approved,
             attestation: input.attestation.clone(),
             voted_at: timestamp.clone(),
             current_votes: approved_count,
-            required_votes: revocation.required_votes,
+            required_votes: revocation_required_votes,
             threshold_now_reached: true,
         })?;
 
+        let emitted_at_voted = rfc3339_from_sys_time(&sys_time()?);
+        #[allow(deprecated)]
         emit_signal(RecoveryV2Signal::KeyRevocationEffective {
-            revocation_id: input.revocation_id.clone(),
-            revoked_key: revocation.revoked_key.clone(),
-            human_id: revocation.human_id.clone(),
-            effective_at: timestamp,
+            revocation_id: revocation_id.clone(),
+            signal_type: "keyRevocation".to_string(),
+            action_hash: effective_cid.clone(),
+            human_id: revocation_human_id.clone(),
+            revoked_key: revocation_revoked_key.clone(),
+            // M4: no separate compromise-discovery timestamp; coincides with effectiveAt.
+            // Future revisions may populate this from revocation request metadata.
+            compromise_at: rfc3339_now.clone(),
+            effective_at: rfc3339_now.clone(),
             triggering_vote_id: Some(vote_id.clone()),
+            emitted_at: emitted_at_voted,
         })?;
+
+        // T18: EPR-shape envelope alongside the legacy signal (back-compat window).
+        // Voted quorum path: supersedes_cid = prior pending CID (pending → effective
+        //                    lineage); triggering_revocation_id = vote_id.
+        emit_key_revocation_envelope(
+            revocation_id.clone(),
+            effective_cid,
+            revocation_human_id.clone(), // Stage 1: human_id; Stage 2: Human entry CID
+            revocation_revoked_key.clone(),
+            rfc3339_now.clone(),         // compromise_at == effective_at in M4
+            rfc3339_now,
+            Some(vote_id.clone()),       // triggering_revocation_id
+            Some(input.revocation_cid.clone()), // supersedes_cid: prior pending entry
+        )?;
     } else {
         emit_signal(RecoveryV2Signal::RevocationVoteSubmitted {
             id: vote_id.clone(),
-            revocation_id: input.revocation_id.clone(),
+            revocation_id: revocation_id.clone(),
             steward_id: caller_human_id.clone(),
             approved: input.approved,
             attestation: input.attestation.clone(),
             voted_at: timestamp,
             current_votes: approved_count,
-            required_votes: revocation.required_votes,
+            required_votes: revocation_required_votes,
             threshold_now_reached: false,
         })?;
     }
@@ -2670,41 +3375,124 @@ pub fn submit_revocation_vote(
     Ok(RevocationVoteOutput {
         vote_id,
         current_votes: approved_count,
-        required_votes: revocation.required_votes,
+        required_votes: revocation_required_votes,
         threshold_now_reached,
     })
 }
 
-/// Traverse `HumanToFreeze` links for the given `human_id` and return all
-/// `IdentityFreeze` entries with `is_active = true`. Used by the M3 freeze-
-/// floor gate on `commit_key_rotation`.
+/// Convert a Holochain `Timestamp` (microseconds since epoch) to a sortable
+/// RFC3339 UTC string `YYYY-MM-DDTHH:MM:SS.fffZ`. Used by Recovery M4 Task 14
+/// to populate `effective_at` on the fresh effective Content (Task 4 gate
+/// orders by lexicographic `updated_at`, so RFC3339 is mandatory).
+pub(crate) fn rfc3339_from_sys_time(now: &Timestamp) -> String {
+    // Best-effort: build via chrono-equivalent decomposition. We avoid pulling
+    // in chrono (extra WASM weight) — instead format manually from the
+    // micros-since-epoch i64.
+    let micros = now.as_micros();
+    let secs = micros.div_euclid(1_000_000);
+    let sub_micros = micros.rem_euclid(1_000_000) as u32;
+    let millis = sub_micros / 1000;
+    // Days since 1970-01-01.
+    let days_since_epoch = secs.div_euclid(86_400);
+    let seconds_in_day = secs.rem_euclid(86_400) as u32;
+    let hour = seconds_in_day / 3600;
+    let minute = (seconds_in_day % 3600) / 60;
+    let second = seconds_in_day % 60;
+    // Civil from days (Howard Hinnant's algorithm, public-domain).
+    let z = days_since_epoch + 719_468;
+    let era = if z >= 0 { z } else { z - 146_096 } / 146_097;
+    let doe = (z - era * 146_097) as u32; // [0, 146096]
+    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
+    let y = (yoe as i64) + era * 400;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100); // [0, 365]
+    let mp = (5 * doy + 2) / 153;
+    let day = doy - (153 * mp + 2) / 5 + 1;
+    let month = if mp < 10 { mp + 3 } else { mp - 9 };
+    let year = if month <= 2 { y + 1 } else { y };
+    format!(
+        "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}.{:03}Z",
+        year, month, day, hour, minute, second, millis
+    )
+}
+
+/// Query elohim DNA for an active `governance-action:identity-freeze` Content
+/// entry covering `human_id` and synthesise a thin `IdentityFreeze` view from
+/// its metadata. Returns an empty vec when no active freeze exists.
+///
+/// Recovery M4 Task 4 migration:
+/// Previously traversed `HumanToFreeze` links + decoded `IdentityFreeze` entries
+/// from imagodei's DHT. Post Stage 2 (Tasks 13/14) the canonical freeze entries
+/// are `governance-action:identity-freeze` Content entries on the elohim DNA;
+/// this function bridges to elohim to fetch the active record and synthesises
+/// a coordinator-local `IdentityFreeze` shape with ONLY the three fields the
+/// downstream `check_freeze_floor_rules` consumer reads (per Stage 1 audit
+/// row #3): `is_active`, `human_id`, `frozen_at_layer`. All other fields are
+/// defaulted; callers must not rely on them.
 fn collect_active_freezes_for_human(human_id: &str) -> ExternResult<Vec<IdentityFreeze>> {
-    let anchor = StringAnchor::new("identity_freeze_by_human", human_id);
-    let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor))?;
-    let links = get_links(
-        LinkQuery::try_new(anchor_hash, LinkTypes::HumanToFreeze)?,
-        GetStrategy::default(),
-    )?;
-    let mut freezes = Vec::new();
-    for link in links {
-        let Some(hash) = link.target.clone().into_action_hash() else {
-            continue;
-        };
-        let Some(record) = get(hash, GetOptions::default())? else {
-            continue;
-        };
-        let Some(freeze): Option<IdentityFreeze> = record
-            .entry()
-            .to_app_option()
-            .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        else {
-            continue;
-        };
-        if freeze.is_active {
-            freezes.push(freeze);
-        }
+    let Some(content_output) = call_elohim_query_effective_identity_freeze_for_human(human_id)?
+    else {
+        return Ok(Vec::new());
+    };
+
+    if content_output.content.content_type != "governance-action:identity-freeze" {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "collect_active_freezes_for_human: expected governance-action:identity-freeze, got {}",
+            content_output.content.content_type
+        ))));
     }
-    Ok(freezes)
+
+    let metadata: serde_json::Value = serde_json::from_str(&content_output.content.metadata_json)
+        .map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "collect_active_freezes_for_human: bad metadata_json: {e}"
+            )))
+        })?;
+
+    let is_active = metadata
+        .get("is_active")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
+    if !is_active {
+        return Ok(Vec::new());
+    }
+    // Re-confirm the human_id matches what the gate is asking for. The elohim
+    // helper already filtered, but treating the gate as defensive against any
+    // future helper changes keeps this read-side authoritative.
+    let metadata_human_id = metadata
+        .get("human_id")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+    if metadata_human_id != human_id {
+        return Ok(Vec::new());
+    }
+    let frozen_at_layer = metadata
+        .get("frozen_at_layer")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
+
+    // Synthesise a view-only IdentityFreeze populating ONLY the three fields
+    // `check_freeze_floor_rules` reads. All other fields use type-appropriate
+    // defaults; do not rely on them downstream.
+    let freeze_view = IdentityFreeze {
+        id: content_output.content.id.clone(),
+        human_id: human_id.to_string(),
+        freeze_type: String::new(),
+        frozen_capabilities: Vec::new(),
+        severity: String::new(),
+        triggered_by: String::new(),
+        trigger_type: String::new(),
+        requires_verification: String::new(),
+        verification_attempts: 0,
+        last_verification_at: None,
+        is_active,
+        lifted_at: None,
+        lifted_by: None,
+        lift_reason: None,
+        frozen_at: String::new(),
+        expires_at: None,
+        frozen_at_layer,
+    };
+    Ok(vec![freeze_view])
 }
 
 /// Commit a key rotation to the DHT.
@@ -2733,53 +3521,54 @@ pub fn commit_key_rotation(input: CommitKeyRotationInput) -> ExternResult<KeyRot
     }
 
     // M4: revocation-floor gate.
-    // If a pending or effective KeyRevocation exists for the human_agent_pubkey
-    // (the key being rotated from), block the rotation. No authority-layer exemption
-    // — revocation is structural (a revoked key must not produce valid rotations under
-    // any claimed authority), intentionally asymmetric with the freeze-floor gate
-    // which exempts CryptographicQuorum.
+    // If an effective `governance-action:key-revocation` Content entry exists on
+    // the elohim DNA for the human_agent_pubkey (the key being rotated from),
+    // block the rotation. No authority-layer exemption — revocation is structural
+    // (a revoked key must not produce valid rotations under any claimed authority),
+    // intentionally asymmetric with the freeze-floor gate which exempts
+    // CryptographicQuorum.
+    //
+    // Recovery M4 Task 4 migration: previously walked imagodei-local
+    // `PendingRevocations` + `EffectiveRevocations` anchor links and decoded
+    // `KeyRevocation` entries via `to_app_option()`. Post Stage 2 the canonical
+    // revocation entries are Content entries on elohim DNA; this gate now reads
+    // through the cross-DNA bridge. Note: `query_effective_revocation_for_key`
+    // only returns *effective* records (threshold_reached || effective_at). The
+    // pre-Stage-2 gate also rejected *pending* revocations as a precaution; the
+    // post-Stage-2 producers (Tasks 13/14) MUST emit pending-state Content
+    // entries with `threshold_reached: false` AND `effective_at: null` so they
+    // are correctly excluded here, and emit a NEW Content entry with the
+    // flipped fields when quorum is met. Producers must use create_entry for
+    // effectiveness transitions, not update_entry — see
+    // content_store/src/lib.rs:3185+ for the read-side rationale.
     {
         let rotating_from_str = input.human_agent_pubkey.to_string();
 
-        let pending_anchor = StringAnchor::new("pending_revocations", "global");
-        let pending_anchor_hash = hash_entry(&EntryTypes::StringAnchor(pending_anchor))?;
-        let pending_links = get_links(
-            LinkQuery::try_new(pending_anchor_hash, LinkTypes::PendingRevocations)?,
-            GetStrategy::default(),
-        )?;
-
-        let effective_anchor = StringAnchor::new("effective_revocations", "global");
-        let effective_anchor_hash = hash_entry(&EntryTypes::StringAnchor(effective_anchor))?;
-        let effective_links = get_links(
-            LinkQuery::try_new(effective_anchor_hash, LinkTypes::EffectiveRevocations)?,
-            GetStrategy::default(),
-        )?;
-
-        for (link, status) in pending_links
-            .iter()
-            .map(|l| (l, "pending"))
-            .chain(effective_links.iter().map(|l| (l, "effective")))
+        if let Some(content_output) =
+            call_elohim_query_effective_revocation_for_key(&rotating_from_str)?
         {
-            let Some(rev_hash) = link.target.clone().into_action_hash() else {
-                continue;
-            };
-            let Some(rec) = get(rev_hash, GetOptions::default())? else {
-                continue;
-            };
-            let Some(rev): Option<KeyRevocation> = rec
-                .entry()
-                .to_app_option()
-                .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-            else {
-                continue;
-            };
-            if rev.revoked_key == rotating_from_str {
+            if content_output.content.content_type != "governance-action:key-revocation" {
                 return Err(wasm_error!(WasmErrorInner::Guest(format!(
-                    "commit_key_rotation blocked: key {} has a {} revocation ({}). \
-                     Resolve or await the revocation before rotating.",
-                    rotating_from_str, status, rev.id
+                    "commit_key_rotation revocation-floor gate: expected \
+                     governance-action:key-revocation, got {}",
+                    content_output.content.content_type
                 ))));
             }
+            let metadata: serde_json::Value =
+                serde_json::from_str(&content_output.content.metadata_json).map_err(|e| {
+                    wasm_error!(WasmErrorInner::Guest(format!(
+                        "commit_key_rotation revocation-floor gate: bad metadata_json: {e}"
+                    )))
+                })?;
+            let rev_id = metadata
+                .get("id")
+                .and_then(|v| v.as_str())
+                .unwrap_or(&content_output.content.id);
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "commit_key_rotation blocked: key {} has an effective revocation ({}). \
+                 Resolve or await the revocation before rotating.",
+                rotating_from_str, rev_id
+            ))));
         }
     }
 
@@ -2873,20 +3662,21 @@ fn is_active_emergency_contact(
 }
 
 /// Returns true if `authorizer_human_id` already has a witness linked
-/// from the given request (via `RecoveryRequestToHumanityWitness`).
+/// from the given recovery-request-CID anchor (via
+/// `RecoveryRequestToHumanityWitness`).
 ///
-/// Stage G.A.2 bridge: after `submit_intimate_witness` writes to elohim DNA
-/// (not imagodei), the link target is a StringAnchor sentinel hash rather
-/// than a HumanityWitness entry. Dedupe is now tag-based: the link tag stores
-/// the authorizer_human_id bytes. This avoids the cross-DNA `to_app_option`
-/// deserialization that would fail if the target lived on elohim's DHT.
+/// Recovery M4 Task 3: the link source is now the `StringAnchor(
+/// "recovery_request_cid", cid)` entry hash on imagodei, because the
+/// recovery-request itself lives on the elohim DNA as a Content entry — its
+/// ActionHash is not reachable from imagodei. Dedupe is tag-based: the link
+/// tag stores the authorizer_human_id bytes.
 fn has_existing_witness_for_request(
-    request_hash: &ActionHash,
+    request_anchor_hash: &EntryHash,
     authorizer_human_id: &str,
 ) -> ExternResult<bool> {
     let links = get_links(
         LinkQuery::try_new(
-            request_hash.clone(),
+            request_anchor_hash.clone(),
             LinkTypes::RecoveryRequestToHumanityWitness,
         )?,
         GetStrategy::default(),
@@ -2908,50 +3698,38 @@ fn has_existing_witness_for_request(
 /// elohim DNA's DHT (content_type "attestation:humanness").
 ///
 /// Gates are preserved in full ABOVE the bridge call:
-/// 1. RecoveryRequest must exist and have a populated human_id.
-///    Gate reads RecoveryRequest by hash (to_app_option::<RecoveryRequest>()).
-///    RecoveryRequest entry type STAYS on imagodei — see TODO below for why
-///    create_recovery_request cannot yet be bridged.
+/// 1. Recovery-request must exist on the elohim DNA as a
+///    `governance-action:recovery-request` Content entry and its metadata
+///    must carry `human_id`. Gate calls cross-DNA
+///    `content_store::get_content_by_id` (Recovery M4 Task 3). The legacy
+///    `RecoveryRequest` entry type on imagodei is no longer read here.
 /// 2. Authorizer must be an active emergency contact of the target human
 ///    (has a HumanRelationship with emergency_access_enabled = true).
 /// 3. Dedupe: tag-based check on RecoveryRequestToHumanityWitness links
-///    (tag = authorizer_human_id bytes). Entry-deserialization no longer used.
+///    (tag = authorizer_human_id bytes). Link source is the
+///    `StringAnchor("recovery_request_cid", cid)` entry hash on imagodei —
+///    the cross-DNA recovery-request Content entry is not directly link-able
+///    from this DNA; the StringAnchor proxies it.
 ///
 /// Signal: emits IntimateWitnessSubmitted with the synthesised HumanityWitness
-/// struct and a zero ActionHash sentinel (CID cannot be converted to ActionHash).
-/// elohim-storage consumers that key on action_hash must migrate to CID-based
-/// lookup before Stage F removes this bridge.
+/// struct and zero ActionHash sentinels for both `action_hash` and
+/// `request_hash` (CIDs cannot be converted to ActionHash). The bridged
+/// `attestation:humanness` Content entry on elohim is the canonical record;
+/// elohim-storage consumers must migrate to CID-based lookup. Task 17 (signal
+/// schema alignment) will replace these ActionHash fields with CIDs.
 ///
-/// TODO(stage-G-followup): create_recovery_request cannot be bridged yet because
-/// submit_intimate_witness Gate 1 and commit_key_rotation revocation-floor gate
-/// both deserialize RecoveryRequest / KeyRevocation entries from the imagodei DHT
-/// via to_app_option(). Bridging create_recovery_request to elohim would leave
-/// those entries on elohim's DHT in Content encoding, breaking all downstream
-/// gate readers. Requires a coordinated migration: all gate readers must switch
-/// to cross-DNA get() + Content deserialization before the create_entry calls
-/// can move. Tracked as Stage G follow-up (G.A.2 deferred functions).
 #[hdk_extern]
 pub fn submit_intimate_witness(
     input: SubmitIntimateWitnessInput,
 ) -> ExternResult<SubmitIntimateWitnessOutput> {
-    // Gate 1: fetch the RecoveryRequest; must exist (still on imagodei DHT).
-    let request_record =
-        get(input.recovery_request_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
-            WasmErrorInner::Guest("RecoveryRequest not found at given hash".into())
-        ))?;
-    let request: RecoveryRequest = request_record
-        .entry()
-        .to_app_option()
-        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "RecoveryRequest record has no entry".into()
-        )))?;
-    let human_id = request
-        .human_id
-        .clone()
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "RecoveryRequest has no human_id (pre-M3 entry?)".into()
-        )))?;
+    // Gate 1: fetch the recovery-request Content entry on the elohim DNA via
+    // cross-DNA call to `content_store::get_content_by_id`. Recovery M4 Task 3:
+    // the recovery-request is now a `governance-action:recovery-request` Content
+    // entry on elohim, no longer a `RecoveryRequest` entry on imagodei. Decode
+    // is structured (ContentOutput), not a raw Entry::App — so the Task 2
+    // `content_decode` helper is not needed in this code path.
+    let human_id =
+        fetch_recovery_request_human_id(&input.recovery_request_cid)?;
 
     // Gate 2: authorizer must be on an active emergency-enabled HumanRelationship.
     let authorizer_pubkey = agent_info()?.agent_initial_pubkey;
@@ -2964,7 +3742,15 @@ pub fn submit_intimate_witness(
 
     // Gate 3: tag-based dedupe — the authorizer cannot witness the same request twice.
     // Tag stores authorizer_human_id bytes; no entry deserialization needed.
-    if has_existing_witness_for_request(&input.recovery_request_hash, &authorizer_human_id)? {
+    // Dedupe is now keyed on the recovery-request CID via a StringAnchor —
+    // the ActionHash that previously anchored the link no longer exists on
+    // imagodei's DHT after the cross-DNA migration of create_recovery_request.
+    let request_anchor =
+        StringAnchor::new("recovery_request_cid", &input.recovery_request_cid);
+    let request_anchor_hash =
+        hash_entry(&EntryTypes::StringAnchor(request_anchor.clone()))?;
+    create_entry(&EntryTypes::StringAnchor(request_anchor))?;
+    if has_existing_witness_for_request(&request_anchor_hash, &authorizer_human_id)? {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "this agent has already submitted a witness for this request".into()
         )));
@@ -3021,7 +3807,7 @@ pub fn submit_intimate_witness(
             "attestation_type": "intimate_recovery",
             "confidence": 1.0,
             "verification_method": "intimate_recovery_ceremony",
-            "recovery_request_hash": input.recovery_request_hash.to_string(),
+            "recovery_request_cid": input.recovery_request_cid,
             "expires_at": expires_at,
             "evidence": note_json,
         }),
@@ -3036,24 +3822,31 @@ pub fn submit_intimate_witness(
     };
     let _consolidated = call_elohim_issue_attestation(consolidated_input)?;
 
-    // Create the M3 link from the request to the witness anchor.
+    // Create the M3 link from the request-CID anchor to the witness anchor.
     // Tag = authorizer_human_id bytes for tag-based dedupe (Gate 3).
     // Target = sentinel StringAnchor hash (no local HumanityWitness entry written).
+    // Source = `StringAnchor("recovery_request_cid", cid)` hash on imagodei
+    //  (created above in Gate 3). The recovery-request Content entry itself
+    //  lives on the elohim DNA and is not reachable as a link source from
+    //  imagodei; the StringAnchor proxies it within this DNA.
     let sentinel_anchor = StringAnchor::new("intimate_witness_sentinel", &witness_id);
     let sentinel_hash = hash_entry(&EntryTypes::StringAnchor(sentinel_anchor))?;
     create_link(
-        input.recovery_request_hash.clone(),
+        request_anchor_hash,
         sentinel_hash,
         LinkTypes::RecoveryRequestToHumanityWitness,
         LinkTag::new(authorizer_human_id.as_bytes()),
     )?;
 
-    // Emit signal. action_hash is a zero sentinel — CID cannot be converted to
-    // ActionHash. Consumers keyed on action_hash must migrate to CID lookup.
+    // Emit signal. action_hash AND request_hash are zero sentinels — CIDs
+    // cannot be converted to ActionHash. Consumers keyed on action_hash or
+    // request_hash must migrate to CID lookup via the cross-DNA Content path.
+    // Task 17 (signal schema alignment) will replace the ActionHash fields
+    // with `request_cid: String` on the schema-aligned signal payload.
     let sentinel_action_hash = ActionHash::from_raw_36(vec![0u8; 36]);
     emit_signal(RecoveryV2Signal::IntimateWitnessSubmitted {
         action_hash: sentinel_action_hash.clone(),
-        request_hash: input.recovery_request_hash,
+        request_hash: sentinel_action_hash.clone(),
         witness: witness_for_signal.clone(),
         witness_agent_id: authorizer_pubkey,
     })?;

@@ -64,6 +64,183 @@ pub struct GovernanceActionWithChildren {
     pub children: Vec<AttestationOutput>,
 }
 
+/// Input for `propose_recovery_governance_action` — Recovery M4 Task 13.
+///
+/// Bespoke producer for the three recovery-related governance kinds. Differs
+/// from the generic `ProposeGovernanceActionInput` in two load-bearing ways:
+///
+/// 1. The `metadata` field is a **flat object** whose fields are written at
+///    the TOP LEVEL of `metadata_json` (not nested under `parameters_json`).
+///    Tasks 4/5 readers expect top-level access (`metadata["human_id"]`,
+///    `metadata["revoked_key"]`, `metadata["threshold_reached"]`,
+///    `metadata["effective_at"]`, `metadata["is_active"]`,
+///    `metadata["frozen_at_layer"]`).
+/// 2. `subject_human_id` replaces `subject_cid` — recovery governance subjects
+///    are humans (not arbitrary CIDs). The string is denormalised into
+///    `related_node_ids` and surfaced through `subject_cid` on the output for
+///    parity with the generic shape.
+///
+/// `supersedes_cid` is reserved for CREATE-only effectiveness transitions
+/// (Task 4 constraint: never `update_entry`). When present, it is preserved
+/// in metadata so projectors can follow the supersession chain.
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ProposeRecoveryGovernanceActionInput {
+    pub governance_kind: String, // "governance-action:recovery-request" | "...:key-revocation" | "...:identity-freeze"
+    pub subject_human_id: String,
+    pub title: String,
+    pub description: Option<String>,
+    pub reach: String,
+    pub threshold: serde_json::Value,
+    pub closes_at: String,
+    /// Already-flat object whose fields are merged at the top level of `metadata_json`.
+    /// Example for a recovery-request: `{ "human_id": "...", "custodian_cids": [...],
+    /// "trigger_type": "intimate", "session_pubkey": "...", "threshold_reached": false,
+    /// "effective_at": null }`.
+    pub metadata: serde_json::Value,
+    /// Optional supersession pointer (CREATE-only effectiveness transitions).
+    pub supersedes_cid: Option<String>,
+}
+
+/// Whitelist of governance kinds accepted by `propose_recovery_governance_action`.
+/// Recovery-flow gates depend on top-level metadata fields written by this function;
+/// non-recovery kinds must continue to use the generic `propose_governance_action`
+/// path which nests caller-supplied data under `parameters_json`.
+const RECOVERY_GOVERNANCE_KINDS: &[&str] = &[
+    "governance-action:recovery-request",
+    "governance-action:key-revocation",
+    "governance-action:identity-freeze",
+];
+
+/// Recovery M4 Task 13 — bespoke producer for recovery-shaped governance actions.
+///
+/// Writes a `Content` entry whose `metadata_json` carries caller-supplied fields
+/// at the TOP LEVEL (mergeable with `threshold`, `closes_at`, `supersedes_cid`).
+/// This is the shape that Tasks 4/5 readers consume; the generic
+/// `propose_governance_action` nests caller fields under `parameters_json` and
+/// would fail those gates.
+///
+/// CREATE-only per Task 4 constraint: effectiveness flips and supersessions
+/// must produce a new Content entry rather than `update_entry` on the original.
+/// Callers requesting a supersession pass `supersedes_cid`; the new entry
+/// records the pointer in metadata, and downstream projectors detect the
+/// chain via `query_effective_*` (which keep the most-recent-effective wins).
+///
+/// Post-commit signal emission is delegated to the existing
+/// `post_commit` Content handler in lib.rs — it fires `ContentCommitted` for
+/// every Content, and the prefix-routing dispatcher (Task 10) projects
+/// `governance-action:*` kinds to the recovery_flows / key_revocations tables.
+pub fn propose_recovery_governance_action(
+    input: ProposeRecoveryGovernanceActionInput,
+) -> ExternResult<GovernanceActionOutput> {
+    if !RECOVERY_GOVERNANCE_KINDS.contains(&input.governance_kind.as_str()) {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "propose_recovery_governance_action: unsupported governance_kind '{}' \
+             (recovery producer accepts {:?})",
+            input.governance_kind, RECOVERY_GOVERNANCE_KINDS
+        ))));
+    }
+    // Defense in depth: validate against the codegen-emitted kinds catalog.
+    if !GOVERNANCE_ACTION_KINDS.contains(&input.governance_kind.as_str()) {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "unknown_governance_action_kind: {}",
+            input.governance_kind
+        ))));
+    }
+
+    let proposer_cid = agent_info()?.agent_initial_pubkey.to_string();
+
+    // Compose metadata: caller-supplied fields at the top level, plus the
+    // governance bookkeeping fields the readers also look at.
+    let mut metadata = match input.metadata.clone() {
+        serde_json::Value::Object(map) => serde_json::Value::Object(map),
+        serde_json::Value::Null => serde_json::Value::Object(serde_json::Map::new()),
+        other => {
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "propose_recovery_governance_action: `metadata` must be a JSON object, got {}",
+                match other {
+                    serde_json::Value::Array(_) => "array",
+                    serde_json::Value::String(_) => "string",
+                    serde_json::Value::Number(_) => "number",
+                    serde_json::Value::Bool(_) => "bool",
+                    _ => "unknown",
+                }
+            ))));
+        }
+    };
+    let metadata_obj = metadata.as_object_mut().expect("validated as object above");
+    // Always-present bookkeeping fields (do not overwrite caller-supplied
+    // values if they happened to be set — caller is authoritative on these).
+    metadata_obj
+        .entry("governance_kind".to_string())
+        .or_insert(serde_json::json!(input.governance_kind));
+    metadata_obj
+        .entry("subject_cid".to_string())
+        .or_insert(serde_json::json!(input.subject_human_id));
+    metadata_obj
+        .entry("threshold".to_string())
+        .or_insert(input.threshold.clone());
+    metadata_obj
+        .entry("closes_at".to_string())
+        .or_insert(serde_json::json!(input.closes_at));
+    if let Some(ref supersedes) = input.supersedes_cid {
+        metadata_obj
+            .entry("supersedes_cid".to_string())
+            .or_insert(serde_json::json!(supersedes));
+    }
+
+    let metadata_json = serde_json::to_string(&metadata)
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("metadata: {e}"))))?;
+
+    let now = sys_time()?;
+    let timestamp = format!("{:?}", now);
+
+    // Mirror propose_governance_action's placeholder id pattern. Real CID is
+    // returned via entry_hash on the output.
+    let placeholder_id = format!("gov-{}-{}", input.governance_kind, proposer_cid);
+
+    let content = content_store_integrity::Content {
+        id: placeholder_id,
+        content_type: input.governance_kind.clone(),
+        title: input.title,
+        description: input.description.unwrap_or_default(),
+        summary: None,
+        content: String::new(),
+        content_format: "epr-composite".to_string(),
+        tags: vec![input.governance_kind.clone()],
+        source_path: None,
+        related_node_ids: vec![input.subject_human_id.clone()],
+        author_id: Some(proposer_cid.clone()),
+        reach: input.reach,
+        trust_score: 0.0,
+        estimated_minutes: None,
+        thumbnail_url: None,
+        metadata_json,
+        created_at: timestamp.clone(),
+        updated_at: timestamp,
+        schema_version: 1,
+        validation_status: "valid".to_string(),
+        blob_cid: None,
+        content_size_bytes: None,
+        content_hash: None,
+    };
+
+    create_entry(&EntryTypes::Content(content.clone()))?;
+    let entry_hash = hash_entry(&EntryTypes::Content(content))?;
+
+    // post_commit will emit `ContentCommitted`; the Task 10 prefix-routing
+    // dispatcher consumes it and projects to recovery_flows / key_revocations.
+    // No separate tally row is initialised — votes arrive as child attestations
+    // via `vote_on_governance_action` and are tallied via projection.
+
+    Ok(GovernanceActionOutput {
+        cid: entry_hash.to_string(),
+        governance_kind: input.governance_kind,
+        subject_cid: input.subject_human_id,
+        proposer_cid,
+        closes_at: input.closes_at,
+    })
+}
+
 pub fn propose_governance_action(
     input: ProposeGovernanceActionInput,
 ) -> ExternResult<GovernanceActionOutput> {
