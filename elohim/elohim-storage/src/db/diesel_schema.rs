@@ -1378,6 +1378,22 @@ diesel::table! {
     }
 }
 
+// Recovery M4 T21 — custodian_shares (local operational, Category C).
+// Stores Shamir share bytes installed by the stewardship-rotation ceremony (T22).
+// NOT a DHT projection; this table is the write target of the T22 extern.
+diesel::table! {
+    custodian_shares (id) {
+        id                    -> Integer,
+        governance_action_cid -> Text,
+        custodian_cid         -> Text,
+        share_index           -> Integer,
+        share_data            -> Binary,
+        share_blob_hash       -> Text,
+        created_at            -> Text,
+        superseded_at         -> Nullable<Text>,
+    }
+}
+
 // Recovery Protocol Phase 2 — M5 portal host projection (imagodei PortalHost entry)
 // Source of truth: Holochain DHT (PortalHost entry in imagodei DNA, Category A).
 diesel::table! {
@@ -1617,6 +1633,7 @@ diesel::allow_tables_to_appear_in_same_query!(
     contributor_dashboards,
     contributor_presences,
     custodian_metrics,
+    custodian_shares,
     device_policies,
     discussions,
     economic_events,

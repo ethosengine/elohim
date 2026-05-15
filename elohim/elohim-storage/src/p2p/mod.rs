@@ -4509,27 +4509,109 @@ impl P2PNode {
                             peer = %peer,
                             recovery_governance_action_cid = %request.recovery_governance_action_cid,
                             attestation_cid = %attestation_cid,
-                            "T20: shamir-share authorization GRANTED"
+                            "T21: shamir-share authorization GRANTED — loading share from store"
                         );
 
-                        // TODO(T21-share-store): load the actual custodian share from the
-                        // share-custody store (not yet implemented). The share-custody epic
-                        // will persist encrypted share bytes keyed by
-                        // (recovery_governance_action_cid, share_index) and provide a
-                        // signing key derived from the custodian's ed25519 keypair.
+                        // T21: load custodian share from the share store.
                         //
-                        // Until then, return an error envelope so the assembler records a
-                        // "share held but store not yet available" failure rather than
-                        // silently claiming to return a valid share.
-                        info!(
-                            target: "elohim_storage::shamir_share",
-                            peer = %peer,
-                            "TODO(T21-share-store): custodian share store not yet implemented; \
-                             returning error envelope to requester"
-                        );
-                        ShamirShareResponse::error(
-                            "TODO(T21-share-store): share store not yet implemented".to_string(),
-                        )
+                        // The signing key is this node's libp2p keypair (the same
+                        // key the custodian used to author the recovery-approval
+                        // attestation on the DHT). The canonical signed message is:
+                        //
+                        //   recovery_governance_action_cid.as_bytes()
+                        //   ‖ share_data
+                        //   ‖ share_index.to_le_bytes()
+                        //
+                        // Consistent with `verify_share_response` in shamir_transport.rs.
+                        let share_result: Result<ShamirShareResponse, String> =
+                            if let Some(pool) = self.db_pool.as_ref() {
+                                pool.get()
+                                    .map_err(|e| format!("T21: pool.get for share-store: {e}"))
+                                    .and_then(|mut conn| {
+                                        crate::db::custodian_shares::get_share_for_governance_action(
+                                            &mut conn,
+                                            &local_agent_cid,
+                                            &request.recovery_governance_action_cid,
+                                        )
+                                        .map_err(|e| {
+                                            format!("T21: share-store query error: {e}")
+                                        })
+                                    })
+                                    .and_then(|maybe_share| {
+                                        match maybe_share {
+                                            None => {
+                                                info!(
+                                                    target: "elohim_storage::shamir_share",
+                                                    custodian_cid = %local_agent_cid,
+                                                    recovery_governance_action_cid =
+                                                        %request.recovery_governance_action_cid,
+                                                    "T21: custodian has no share for this governance action"
+                                                );
+                                                Ok(ShamirShareResponse::error(
+                                                    "custodian has no share for this governance action"
+                                                        .to_string(),
+                                                ))
+                                            }
+                                            Some(share) => {
+                                                // Build canonical message and sign.
+                                                let mut message = Vec::with_capacity(
+                                                    request.recovery_governance_action_cid.len()
+                                                        + share.share_data.len()
+                                                        + 4,
+                                                );
+                                                message.extend_from_slice(
+                                                    request.recovery_governance_action_cid.as_bytes(),
+                                                );
+                                                message.extend_from_slice(&share.share_data);
+                                                message.extend_from_slice(
+                                                    &(share.share_index as u32).to_le_bytes(),
+                                                );
+
+                                                let signature = self
+                                                    .identity
+                                                    .keypair()
+                                                    .sign(&message)
+                                                    .map_err(|e| {
+                                                        format!("T21: signing error: {e}")
+                                                    })?;
+
+                                                info!(
+                                                    target: "elohim_storage::shamir_share",
+                                                    peer = %peer,
+                                                    share_index = %share.share_index,
+                                                    governance_action_cid =
+                                                        %request.recovery_governance_action_cid,
+                                                    "T21: share loaded and signed — responding to requester"
+                                                );
+
+                                                Ok(ShamirShareResponse {
+                                                    share_data: share.share_data,
+                                                    share_index: share.share_index as u32,
+                                                    attestation_cid: attestation_cid.clone(),
+                                                    signature,
+                                                    error_reason: None,
+                                                })
+                                            }
+                                        }
+                                    })
+                            } else {
+                                Err("T21: no DB pool on responder node".to_string())
+                            };
+
+                        match share_result {
+                            Ok(resp) => resp,
+                            Err(e) => {
+                                tracing::error!(
+                                    target: "elohim_storage::shamir_share",
+                                    peer = %peer,
+                                    error = %e,
+                                    "T21: share-store or signing error — sending error envelope"
+                                );
+                                ShamirShareResponse::error(format!(
+                                    "share-store error: {e}"
+                                ))
+                            }
+                        }
                     }
 
                     Err(e) => {
