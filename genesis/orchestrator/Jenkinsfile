@@ -241,7 +241,65 @@ def getGitCommitHashFull() {
 }
 
 /**
- * Analyze all changes since the last orchestrator build.
+ * Load and parse repo-root .ci-ignore into a list of {kind, value} maps.
+ * Single source of truth shared with orchestrator-strategy.mjs.
+ *
+ * Pattern shapes (gitignore-flavored):
+ *   trailing '/'     → kind: 'prefix'   (subtree)
+ *   contains '/'     → kind: 'exact'    (anchored path)
+ *   no '/'           → kind: 'basename' (anywhere in tree)
+ *
+ * Comment-from-#-to-EOL and blank lines are stripped. If .ci-ignore is
+ * missing or unreadable, returns [] (orchestrator falls back to
+ * triggering everything that matches changePatterns — safer than
+ * silently ignoring real source).
+ */
+def loadCiIgnore() {
+    def text
+    try {
+        text = readFile('.ci-ignore')
+    } catch (Exception e) {
+        echo "WARNING: could not read .ci-ignore: ${e.message}; no CI-only skips applied"
+        return []
+    }
+    def patterns = []
+    text.split('\n').each { rawLine ->
+        def line = rawLine.replaceFirst(/\s*#.*$/, '').trim()
+        if (!line) return
+        def kind
+        if (line.endsWith('/')) {
+            kind = 'prefix'
+        } else if (line.contains('/')) {
+            kind = 'exact'
+        } else {
+            kind = 'basename'
+        }
+        patterns.add([kind: kind, value: line])
+    }
+    return patterns
+}
+
+/**
+ * Test a file path against parsed .ci-ignore patterns. Mirrors the
+ * matchesCiIgnore export in orchestrator-strategy.mjs.
+ */
+def matchesCiIgnore(String file, List patterns) {
+    for (p in patterns) {
+        if (p.kind == 'prefix') {
+            if (file.startsWith(p.value)) return true
+        } else if (p.kind == 'exact') {
+            if (file == p.value) return true
+        } else {
+            def slash = file.lastIndexOf('/')
+            def basename = slash >= 0 ? file.substring(slash + 1) : file
+            if (basename == p.value) return true
+        }
+    }
+    return false
+}
+
+/**
+ * Analyze the changeset to determine which files changed.
  *
  * Priority order:
  *   1. FORCE_COMMIT parameter (manual override)
@@ -302,18 +360,16 @@ def analyzeChangeset(storedGlobalBaseline = null) {
  */
 // DEPRECATED: advisory only, will be removed
 def analyzePipelineRequirements(changedFiles, pipelineBaselines = [:]) {
-    // CI config files/directories that shouldn't trigger source builds.
-    // NOTE: `genesis/orchestrator/` used to be here as a blanket pattern, but that
-    // conflated the orchestrator's own CI glue with actual deploy source (manifests
-    // and environment configs). Those now flow through pipeline-specific changePatterns
-    // (e.g., elohim-edge owns genesis/orchestrator/manifests/ and environments/).
-    def ciOnlyPatterns = ['.claude', '.github/', '.husky/']
-    def ciOnlyFiles = [
-        'CLAUDE.md',
-        'ROADMAP.md',
-        'genesis/orchestrator/Jenkinsfile',        // orchestrator's own pipeline (no PIPELINES entry)
-        'genesis/orchestrator/build-graph.groovy', // orchestrator helper library
-    ]
+    // Load CI-only patterns from repo-root .ci-ignore (gitignore-style).
+    // This is the single source of truth — orchestrator-strategy.mjs reads
+    // the same file. No mirror, no drift.
+    //
+    // Pattern shapes:
+    //   trailing '/'     → subtree prefix  (file.startsWith(value))
+    //   contains '/'     → exact path      (file == value)
+    //   no '/'           → basename match  (basename(file) == value)
+    def ciIgnorePatterns = loadCiIgnore()
+    def isCiIgnored = { String file -> matchesCiIgnore(file, ciIgnorePatterns) }
 
     // Build a reverse index: Jenkinsfile path -> owning pipeline name.
     // A pipeline's own Jenkinsfile is a trigger for that pipeline only (not for unrelated
@@ -366,9 +422,8 @@ def analyzePipelineRequirements(changedFiles, pipelineBaselines = [:]) {
         }
 
         filesToCheck.each { file ->
-            // Skip CI-only files (orchestrator glue, hooks, docs)
-            if (ciOnlyPatterns.any { pattern -> file.startsWith(pattern) } ||
-                ciOnlyFiles.contains(file)) {
+            // Skip CI-only files per repo-root .ci-ignore
+            if (isCiIgnored(file)) {
                 return  // skip this file
             }
 

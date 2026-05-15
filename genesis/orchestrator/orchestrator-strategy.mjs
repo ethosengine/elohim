@@ -13,9 +13,17 @@
  * NOT trigger node:test's auto-discovered `describe`/`it` suites as a
  * side effect.
  *
- * Keep in sync with genesis/orchestrator/Jenkinsfile. Drift detection
- * lives in orchestrator-strategy.test.mjs.
+ * Keep PIPELINES in sync with genesis/orchestrator/Jenkinsfile. Drift
+ * detection lives in orchestrator-strategy.test.mjs.
+ *
+ * CI-only file/path patterns are NOT defined in this module — they live
+ * in the repo-root `.ci-ignore` (gitignore-style), which both this
+ * module and the Jenkinsfile read at runtime.
  */
+
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 // ══════════════════════════════════════════════════════════════════
 // PIPELINES config — extracted from Jenkinsfile (keep in sync!)
@@ -107,13 +115,57 @@ export const PIPELINES = {
 // Pure functions — ported from Jenkinsfile Groovy
 // ══════════════════════════════════════════════════════════════════
 
-export const CI_ONLY_PATTERNS = ['.claude', '.github/', '.husky/'];
-export const CI_ONLY_FILES = [
-  'CLAUDE.md',
-  'ROADMAP.md',
-  'genesis/orchestrator/Jenkinsfile',
-  'genesis/orchestrator/build-graph.groovy',
-];
+// ══════════════════════════════════════════════════════════════════
+// .ci-ignore — gitignore-style patterns for files that NEVER trigger
+// source pipelines. Loaded from repo root; same file read by the
+// Jenkinsfile.
+// ══════════════════════════════════════════════════════════════════
+
+const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
+const CI_IGNORE_PATH = resolve(REPO_ROOT, '.ci-ignore');
+
+/**
+ * Parse .ci-ignore text into a list of pattern objects.
+ *
+ * Pattern shapes (gitignore-flavored):
+ *   - trailing '/'       → subtree prefix match
+ *   - contains '/'       → exact path match (anchored)
+ *   - no '/'             → basename match anywhere
+ *
+ * Returns array of `{ kind: 'prefix'|'exact'|'basename', value: string }`.
+ */
+export function parseCiIgnore(text) {
+  return text
+    .split('\n')
+    .map(line => line.replace(/\s*#.*$/, '').trim())
+    .filter(Boolean)
+    .map(value => {
+      if (value.endsWith('/')) return { kind: 'prefix', value };
+      if (value.includes('/')) return { kind: 'exact', value };
+      return { kind: 'basename', value };
+    });
+}
+
+/**
+ * Check a single file path against parsed .ci-ignore patterns.
+ * Mirrors the same logic in Jenkinsfile's isCiIgnored helper.
+ */
+export function matchesCiIgnore(file, patterns) {
+  for (const p of patterns) {
+    if (p.kind === 'prefix') {
+      if (file.startsWith(p.value)) return true;
+    } else if (p.kind === 'exact') {
+      if (file === p.value) return true;
+    } else {
+      const slash = file.lastIndexOf('/');
+      const basename = slash >= 0 ? file.slice(slash + 1) : file;
+      if (basename === p.value) return true;
+    }
+  }
+  return false;
+}
+
+export const CI_IGNORE_PATTERNS = parseCiIgnore(readFileSync(CI_IGNORE_PATH, 'utf8'));
 
 /**
  * Mirrors Jenkinsfile analyzePipelineRequirements() — changeset analysis.
@@ -136,9 +188,8 @@ export function analyzePipelineRequirements(changedFiles) {
     const matchedFiles = [];
 
     for (const file of changedFiles) {
-      // Skip CI-only files (orchestrator glue, hooks, docs)
-      if (CI_ONLY_PATTERNS.some(p => file.startsWith(p)) ||
-          CI_ONLY_FILES.includes(file)) {
+      // Skip CI-only files per repo-root .ci-ignore
+      if (matchesCiIgnore(file, CI_IGNORE_PATTERNS)) {
         continue;
       }
 

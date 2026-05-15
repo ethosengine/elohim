@@ -1,0 +1,33 @@
+# CI-only patterns — files/paths that NEVER trigger source pipelines.
+#
+# Shape is gitignore-style:
+#   - one pattern per line; blank lines and # comments are ignored
+#   - `foo/`               subtree prefix match  (matches foo/<anything>)
+#   - `path/to/file`       exact path match      (anchored)
+#   - `CLAUDE.md`          basename match anywhere in the tree
+#
+# This is the single source of truth. Consumed by:
+#   - genesis/orchestrator/Jenkinsfile         (auto-mode change detection)
+#   - genesis/orchestrator/orchestrator-strategy.mjs  (preview + tests)
+# Both load this file at runtime — no mirroring, no drift.
+#
+# Before adding a basename: verify NO project's build/storybook/test
+# pipeline reads the file by name as a real source input.
+
+# Orchestrator + IDE/agent glue (entire subtrees):
+.claude/
+.github/
+.husky/
+
+# Specific CI-only files (orchestrator self-hosting + meta-doc):
+ROADMAP.md
+genesis/orchestrator/Jenkinsfile
+genesis/orchestrator/build-graph.groovy
+
+# Agent-instruction files anywhere in the tree.
+# These live INSIDE product trees as developer guidance for AI coding
+# agents, but are never consumed by any build/test/storybook step.
+CLAUDE.md
+AGENTS.md
+GEMINI.md
+.no-claude.md

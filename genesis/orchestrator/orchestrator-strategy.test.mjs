@@ -24,8 +24,9 @@ import { loadManifests } from './manifest-utils.mjs';
 
 import {
   PIPELINES,
-  CI_ONLY_PATTERNS,
-  CI_ONLY_FILES,
+  CI_IGNORE_PATTERNS,
+  parseCiIgnore,
+  matchesCiIgnore,
   analyzePipelineRequirements,
   propagateDependencies,
   orderByDependencies,
@@ -184,6 +185,94 @@ describe('changeset routing', () => {
     });
     assert.ok(pipelines.includes('elohim-storybook'),
       'genesis/graphos/** should trigger elohim-storybook');
+  });
+
+  // ── Nested agent-instruction files (CLAUDE.md and friends) ─────
+  // These are agent-developer guidance, never consumed by any build process.
+  // A change touching ONLY a nested CLAUDE.md inside a product tree must not
+  // trigger that tree's pipeline — otherwise routine memory-housekeeping
+  // commits fan out into edge/app/storybook/genesis builds for no reason.
+  //
+  // Background: orchestrator dev #948 (2026-05-15) saw a memory-housekeeping
+  // commit trip elohim, elohim-edge, elohim-storybook, elohim-genesis because
+  // nested CLAUDE.md edits matched the broad product-tree prefixes.
+
+  it('nested CLAUDE.md inside app/elohim-app does NOT trigger elohim', () => {
+    const { pipelines } = simulate({
+      changedFiles: ['app/elohim-app/CLAUDE.md'],
+    });
+    assert.deepEqual(pipelines, [],
+      'nested CLAUDE.md is agent guidance, not Angular source');
+  });
+
+  it('nested CLAUDE.md inside elohim/elohim-storage does NOT trigger elohim-edge', () => {
+    const { pipelines } = simulate({
+      changedFiles: ['elohim/elohim-storage/CLAUDE.md'],
+    });
+    assert.deepEqual(pipelines, [],
+      'nested CLAUDE.md is agent guidance, not Rust storage source');
+  });
+
+  it('nested CLAUDE.md inside doorway/doorway-service does NOT trigger elohim-edge', () => {
+    const { pipelines } = simulate({
+      changedFiles: ['doorway/doorway-service/src/server/CLAUDE.md'],
+    });
+    assert.deepEqual(pipelines, [],
+      'deeply-nested CLAUDE.md still skipped');
+  });
+
+  it('nested CLAUDE.md inside genesis/a2o does NOT trigger elohim-genesis', () => {
+    const { pipelines } = simulate({
+      changedFiles: ['genesis/a2o/CLAUDE.md'],
+    });
+    assert.deepEqual(pipelines, [],
+      'genesis/ prefix is broad — nested CLAUDE.md must still skip');
+  });
+
+  it('AGENTS.md anywhere is skipped (emerging agent-instruction standard)', () => {
+    const { pipelines } = simulate({
+      changedFiles: ['app/elohim-app/AGENTS.md', 'elohim/elohim-storage/AGENTS.md'],
+    });
+    assert.deepEqual(pipelines, [],
+      'AGENTS.md is the OpenAI/multi-tool agent-instruction standard, not source');
+  });
+
+  it('GEMINI.md anywhere is skipped (Gemini CLI instruction standard)', () => {
+    const { pipelines } = simulate({
+      changedFiles: ['app/elohim-app/GEMINI.md'],
+    });
+    assert.deepEqual(pipelines, [],
+      'GEMINI.md is agent instructions for Gemini CLI, not source');
+  });
+
+  it('.no-claude.md opt-out marker is skipped', () => {
+    const { pipelines } = simulate({
+      changedFiles: ['genesis/graphos/design-assets/raw/project/preview/.no-claude.md'],
+    });
+    assert.deepEqual(pipelines, [],
+      '.no-claude.md is an opt-out marker, not source');
+  });
+
+  it('CLAUDE.md mixed with real source still triggers the real source pipelines', () => {
+    // Defensive: skipping CLAUDE.md must not mask a co-changed real source file.
+    const { pipelines } = simulate({
+      changedFiles: [
+        'app/elohim-app/CLAUDE.md',
+        'app/elohim-app/src/app/lamad/services/content.service.ts',
+      ],
+    });
+    assert.ok(pipelines.includes('elohim'),
+      'real source change still triggers its pipeline');
+  });
+
+  it('a real .md inside elohim-protocol content is NOT skipped (consumed by storybook)', () => {
+    // Regression guard: the basename skip must not over-broaden into actual
+    // content-tree .md files which storybook intentionally consumes.
+    const { pipelines } = simulate({
+      changedFiles: ['genesis/docs/content/elohim-protocol/manifesto.md'],
+    });
+    assert.ok(pipelines.includes('elohim-storybook'),
+      'manifesto.md is real content for storybook, not agent guidance');
   });
 });
 
@@ -430,6 +519,92 @@ describe('real-world scenarios', () => {
 });
 
 // ══════════════════════════════════════════════════════════════════
+// .ci-ignore parser / matcher
+// ══════════════════════════════════════════════════════════════════
+
+describe('parseCiIgnore', () => {
+  it('classifies trailing-slash patterns as prefix', () => {
+    const p = parseCiIgnore('.claude/\n.github/\n');
+    assert.deepEqual(p, [
+      { kind: 'prefix', value: '.claude/' },
+      { kind: 'prefix', value: '.github/' },
+    ]);
+  });
+
+  it('classifies path patterns (containing /) as exact', () => {
+    const p = parseCiIgnore('genesis/orchestrator/Jenkinsfile\n');
+    assert.deepEqual(p, [
+      { kind: 'exact', value: 'genesis/orchestrator/Jenkinsfile' },
+    ]);
+  });
+
+  it('classifies bare names as basename-anywhere', () => {
+    const p = parseCiIgnore('CLAUDE.md\nAGENTS.md\n');
+    assert.deepEqual(p, [
+      { kind: 'basename', value: 'CLAUDE.md' },
+      { kind: 'basename', value: 'AGENTS.md' },
+    ]);
+  });
+
+  it('strips comments and blank lines', () => {
+    const p = parseCiIgnore('# header\n\n.claude/  # trailing\n\nCLAUDE.md\n');
+    assert.deepEqual(p, [
+      { kind: 'prefix', value: '.claude/' },
+      { kind: 'basename', value: 'CLAUDE.md' },
+    ]);
+  });
+});
+
+describe('matchesCiIgnore', () => {
+  const patterns = [
+    { kind: 'prefix', value: '.claude/' },
+    { kind: 'exact', value: 'genesis/orchestrator/Jenkinsfile' },
+    { kind: 'basename', value: 'CLAUDE.md' },
+  ];
+
+  it('prefix matches files inside the subtree', () => {
+    assert.equal(matchesCiIgnore('.claude/memory/CLAUDE.md', patterns), true);
+    assert.equal(matchesCiIgnore('.claude/agents/foo.md', patterns), true);
+  });
+
+  it('exact matches only the precise path', () => {
+    assert.equal(matchesCiIgnore('genesis/orchestrator/Jenkinsfile', patterns), true);
+    // A different Jenkinsfile (owned by another pipeline) must not be skipped.
+    assert.equal(matchesCiIgnore('elohim/holochain/dna/Jenkinsfile', patterns), false);
+  });
+
+  it('basename matches anywhere in the tree', () => {
+    assert.equal(matchesCiIgnore('CLAUDE.md', patterns), true);
+    assert.equal(matchesCiIgnore('app/elohim-app/CLAUDE.md', patterns), true);
+    assert.equal(matchesCiIgnore('app/elohim-app/src/app/elohim/adapters/CLAUDE.md', patterns), true);
+  });
+
+  it('returns false for non-matching files', () => {
+    assert.equal(matchesCiIgnore('app/elohim-app/src/main.ts', patterns), false);
+    assert.equal(matchesCiIgnore('CLAUDE.txt', patterns), false);
+    assert.equal(matchesCiIgnore('not-claude.md', patterns), false);
+  });
+});
+
+describe('CI_IGNORE_PATTERNS (loaded from repo-root .ci-ignore)', () => {
+  it('includes the agent-instruction basenames', () => {
+    const basenames = CI_IGNORE_PATTERNS
+      .filter(p => p.kind === 'basename')
+      .map(p => p.value);
+    assert.ok(basenames.includes('CLAUDE.md'), '.ci-ignore must list CLAUDE.md');
+    assert.ok(basenames.includes('AGENTS.md'), '.ci-ignore must list AGENTS.md');
+    assert.ok(basenames.includes('GEMINI.md'), '.ci-ignore must list GEMINI.md');
+  });
+
+  it('includes the .claude/ subtree', () => {
+    const prefixes = CI_IGNORE_PATTERNS
+      .filter(p => p.kind === 'prefix')
+      .map(p => p.value);
+    assert.ok(prefixes.includes('.claude/'), '.ci-ignore must list .claude/');
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════
 // Drift detection — assert this mirror matches live Jenkinsfile
 // ══════════════════════════════════════════════════════════════════
 
@@ -530,23 +705,11 @@ function extractPipelineNames(source) {
 describe('drift detection: mirror vs live Jenkinsfile', () => {
   const source = readFileSync(JENKINSFILE_PATH, 'utf8');
 
-  it('CI_ONLY_PATTERNS in mirror matches ciOnlyPatterns in Jenkinsfile', () => {
-    const live = extractGroovyStringList(source, 'ciOnlyPatterns');
-    assert.ok(live && live.length > 0, 'failed to parse non-empty ciOnlyPatterns from Jenkinsfile');
-    assert.deepEqual([...CI_ONLY_PATTERNS].sort(), [...live].sort(),
-      `Mirror CI_ONLY_PATTERNS drifted from Jenkinsfile ciOnlyPatterns.\n` +
-      `Mirror: ${JSON.stringify(CI_ONLY_PATTERNS)}\n` +
-      `Live:   ${JSON.stringify(live)}`);
-  });
-
-  it('CI_ONLY_FILES in mirror matches ciOnlyFiles in Jenkinsfile', () => {
-    const live = extractGroovyStringList(source, 'ciOnlyFiles');
-    assert.ok(live && live.length > 0, 'failed to parse non-empty ciOnlyFiles from Jenkinsfile');
-    assert.deepEqual([...CI_ONLY_FILES].sort(), [...live].sort(),
-      `Mirror CI_ONLY_FILES drifted from Jenkinsfile ciOnlyFiles.\n` +
-      `Mirror: ${JSON.stringify(CI_ONLY_FILES)}\n` +
-      `Live:   ${JSON.stringify(live)}`);
-  });
+  // NOTE: there is no CI-only mirror/drift test in this file anymore.
+  // The CI-only pattern list lives in the repo-root .ci-ignore and is
+  // read at runtime by BOTH this module and the Jenkinsfile — there's
+  // no second list to drift against. If you're looking for what gets
+  // skipped, edit `.ci-ignore` at the repo root.
 
   it('PIPELINES keys in mirror match @Field def PIPELINES in Jenkinsfile', () => {
     const live = extractPipelineNames(source);
