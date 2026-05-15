@@ -46,7 +46,10 @@ pub enum PeerTopologyError {
 ///    keyed by `household_id` in a HashMap (online OR-roll, additive CID counts).
 /// 4. Compute `net_diff` per edge at fold time.
 /// 5. `reciprocation_count` = number of edges where `online == true`.
-/// 6. `resilience_cliffs` stubbed `vec![]` — TODO Phase 4 follow-up.
+/// 6. `resilience_cliffs` is computed via `compute_resilience_cliffs` (`:230`)
+///    on both the local-resolver path (`:185–189`) and the federation-aggregate
+///    path (`:71`). Returns sole-replica resilience cliffs derived from the
+///    quilt distribution projection.
 /// 7. `freshness`: `AllOffline` if no result has Live freshness; otherwise `Live`.
 pub async fn aggregate_peer_topology_view(
     pool: &DbPool,
@@ -64,11 +67,17 @@ pub async fn aggregate_peer_topology_view(
     };
 
     if bindings.is_empty() {
+        let resilience_cliffs = {
+            let mut conn = pool
+                .get()
+                .map_err(|e| PeerTopologyError::Pool(e.to_string()))?;
+            compute_resilience_cliffs(&mut conn, agent_cid).unwrap_or_default()
+        };
         return Ok(PeerTopologyView {
             agent_cid: agent_cid.to_string(),
             edges: vec![],
             reciprocation_count: 0,
-            resilience_cliffs: vec![],
+            resilience_cliffs,
             freshness: Freshness {
                 state: FreshnessState::Live,
                 stale_since_ms: None,
@@ -405,6 +414,7 @@ pub async fn build_local_slice(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::services::federator::Federator;
     use crate::test_util::test_pool;
     use libp2p::PeerId;
 
@@ -466,5 +476,72 @@ mod tests {
         edge.net_diff =
             Some(edge.their_cids_hosted_by_me as i64 - edge.my_cids_hosted_by_them as i64);
         assert_eq!(edge.net_diff, Some(-15));
+    }
+
+    /// federation-aggregate early-return path (bindings.is_empty()) must compute
+    /// real resilience_cliffs rather than returning vec![].
+    ///
+    /// Fixture: agent "agent-cliff-test" authored one blob ("blob-sole-001").
+    /// That blob has exactly one replica holder ("peer-sole-holder") in
+    /// peer_blob_inventory → sole replica → one ResilienceCliff entry.
+    ///
+    /// Since the pool has no peer_identity_bindings rows, `list_active_for_agent`
+    /// returns empty → the early-return path at line 71 is exercised.
+    ///
+    /// Before the fix: resilience_cliffs == vec![] (stub) → test FAILS.
+    /// After  the fix: resilience_cliffs == vec![ResilienceCliff { ... }] → PASSES.
+    #[tokio::test]
+    async fn federation_aggregate_resilience_cliffs_returns_real_values_not_empty() {
+        use crate::db::diesel_schema::{content, peer_blob_inventory};
+
+        let pool = test_pool();
+
+        // Seed: one content row authored by the agent with a sole-replica blob.
+        {
+            let mut conn = pool.get().expect("conn");
+            diesel::insert_into(content::table)
+                .values((
+                    content::id.eq("content-cliff-01"),
+                    content::h_app_id.eq("lamad"),
+                    content::title.eq("Cliff test content"),
+                    content::content_type.eq("concept"),
+                    content::content_format.eq("markdown"),
+                    content::blob_hash.eq(Some("blob-sole-001")),
+                    content::reach.eq("commons"),
+                    content::validation_status.eq("valid"),
+                    content::created_by.eq(Some("agent-cliff-test")),
+                    content::created_at.eq("2026-05-15T00:00:00Z"),
+                    content::updated_at.eq("2026-05-15T00:00:00Z"),
+                ))
+                .execute(&mut conn)
+                .expect("insert content");
+
+            // One sole replica holder.
+            diesel::insert_into(peer_blob_inventory::table)
+                .values((
+                    peer_blob_inventory::peer_id.eq("peer-sole-holder"),
+                    peer_blob_inventory::blob_hash.eq("blob-sole-001"),
+                    peer_blob_inventory::source.eq("gossip-snapshot"),
+                    peer_blob_inventory::sequence.eq(0i64),
+                    peer_blob_inventory::last_seen_at.eq("2026-05-15T00:00:00Z"),
+                ))
+                .execute(&mut conn)
+                .expect("insert peer_blob_inventory");
+        }
+
+        // No peer_identity_bindings rows → list_active_for_agent returns empty
+        // → aggregate_peer_topology_view hits the early-return path at line 71.
+        let p2p = crate::p2p::P2PHandle::for_testing();
+        let federator = Federator::new(p2p);
+
+        let view = aggregate_peer_topology_view(&pool, &federator, "agent-cliff-test")
+            .await
+            .expect("aggregate view");
+
+        assert!(
+            !view.resilience_cliffs.is_empty(),
+            "federation-aggregate resilience_cliffs should be computed via \
+             compute_resilience_cliffs, not returned as stub vec![]"
+        );
     }
 }
