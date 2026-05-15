@@ -6,7 +6,9 @@ A manifesto for digital infrastructure organized around love - demonstrating how
 
 ## About
 
-The Elohim Protocol represents a radical reimagining of digital infrastructure—one organized around love as a fundamental operating principle, implemented through distributed architecture, and protected by autonomous AI guardians that serve human flourishing rather than institutional power.
+The *Elohim Protocol* is a radical reimagining of digital infrastructure — one organized around love as a fundamental operating principle, implemented through distributed architecture, and protected by autonomous AI agents that serve human flourishing rather than institutional power.
+
+The name comes from *elohim* (Hebrew, plural) — the "heavenly host" of ancient texts, used here to mark the healthy role of AI in human life: powerful, useful, and never an object of devotion. Each person's *elohim* is a constitutionally-bounded AI agent representing their best self; the *Elohim Protocol* is the substrate those agents share. Throughout this document, lowercase *elohim* refers to an agent; the capitalized *Elohim Protocol* refers to the substrate.
 
 This polyglot monorepo (Rust, Angular, Holochain, Tauri, libp2p) contains the platform that implements the vision, technical principles, and implementation pathways for building technology that:
 
@@ -30,15 +32,52 @@ This protocol is being built by a father of three in San Antonio, working evenin
 
 ### Key Concepts
 
-**Three Inseparable Dimensions**: Every piece of content in the protocol carries knowledge, value, and governance — coupled at the architectural level before anything is created or distributed. No value-blind content. No governance-free content. This is what makes the stool stand.
+**Three Inseparable Dimensions**: Every piece of content in the protocol carries knowledge, value, and governance — coupled at the architectural level before anything is created or distributed. No value-blind content. No governance-free content. This is what makes the stool stand. These three-legged records are called **EPRs** (Elohim Protocol Records); they are the protocol's primitive unit of meaning.
 
 **Distributed Infrastructure**: Peer-to-peer networks that eliminate single points of control. P2P has a long track record of resisting capture by anyone who would seek to charge rents from the aggregate of all participants.
 
-**Constitutional AI (Elohim)**: Autonomous agents constrained by constitutional principles and rich contextual understanding, rather than trained values in pre-training alone. The name *Elohim* — used in the plural, the "heavenly host" who even in ancient Hebrew context are separate from humanity and not to be worshiped — encodes the healthy role for AI in human life: powerful, useful, and never an object of devotion.
+**Constitutional AI**: The elohim agents are constrained by constitutional principles and rich contextual understanding, not by trained values alone. Each agent represents one human, under that human's authorization, mediating their interactions with the network at the speed of machines but against their stated values.
 
 **Formation Over Transaction**: Understanding is measured by social reach and content stewardship, not grades or engagement metrics. Peers attest to whether your contribution was useful enough to propagate. AI can write your essay, but it can't make your community trust your judgment.
 
-**Graduated Intimacy**: Spaces for personal exploration alongside protected commons, with consent boundaries preventing extremes from corrupting shared spaces
+**Graduated Intimacy**: Spaces for personal exploration alongside protected commons, with consent boundaries preventing extremes from corrupting shared spaces.
+
+### Domain Pillars
+
+The protocol's vocabulary draws from Hebrew, Greek, and Latin to name the human practices it serves rather than the engineering it requires. Each pillar lives as a directory in `app/elohim-app/src/app/<pillar>/` and as a domain in the SDK:
+
+| Pillar | Origin & meaning | What it serves |
+|--------|------------------|----------------|
+| **imagodei** | Latin: "image of God" | Identity, presence, stewardship of self |
+| **lamad** | Hebrew: "to learn / to teach" | Learning content, paths, mastery, attestation |
+| **avodah** | Hebrew: "work / service / worship" | Work as service, not commodity |
+| **qahal** | Hebrew: "assembly" | Community, consent, collective decision |
+| **shefa** | Hebrew: "abundance / overflow" | Economy, mutual credit, resource flows |
+| **doorway** | English | Web2 gateway, onboarding, projection cache |
+
+Plus **elohim** itself — the core runtime where the constitutional agents and the shared protocol coordination live.
+
+## How Ubiquitous Wisdom Rebuilds the Internet
+
+Every platform we have today shares a hidden architectural constraint: **moderation is centralized because, before AI, intelligence was expensive.** You couldn't put wisdom at every endpoint, so you concentrated it — moderation teams, spam filter consortia, content review boards. That concentration became the platform's most valuable asset, its rent-extraction point, and its capture vector. Whoever owns the chokepoint owns the protocol. Every fight over digital infrastructure, underneath, is a fight over that chokepoint.
+
+That constraint no longer holds. When every human's interaction with the network is mediated by their own elohim — a constitutionally-bounded AI representing their best self — wisdom moves from chokepoint to fabric. The protocol gates content at three places, and the elohim participates at every one:
+
+- **At authoring** — the elohim reviews what its human is about to publish against their stated values, the protocol's coupling requirements (knowledge ↔ value ↔ governance), and best-self, before reach is earned.
+- **At relay** — each node's elohim decides whether to propagate a piece of content given the recipient's stewardship contracts, trust context, and the propagation trail behind it.
+- **At consumption** — the elohim shapes what surfaces to its human based on context, standing, and care.
+
+The coordination tools underneath — content addressing, the Holochain distributed hash table (DHT), libp2p (the peer-to-peer networking stack) — stop being policy chokepoints and become what they should always have been: shared infrastructure that wisdom *uses*. The DHT notarizes timing and lineage. libp2p moves bytes. Doorways project to the legacy web. Wisdom, distributed to every endpoint, decides what any of it means.
+
+This dissolves the moderation-versus-substrate trade-off the old internet had to make. The **Social Reach** epic operationalizes the consequence: provenance flows with content, sense/respond feedback back-propagates through propagation chains (like nerves carrying pain to a hand on a stove), quarantine signals travel alongside the content they contain, and restitution becomes a real economic signal rather than a moral note. Accountability lands proportional to position in the chain — primary actor, accessory propagator, edge node — and the network self-heals at the edge. No central moderator can be coopted because there is no central moderator. The wisdom is in the fabric.
+
+**The capture target shrinks to something the protocol can defend.** The old internet was capturable because its three load-bearing concerns — information, value, and governance — shipped separately, and platforms sat in the propagation path of all three. A platform could absorb the medium of communication while running for years without economic accountability, scaling on borrowed conviction that returns would arrive eventually. It could shed responsibility for the harm flowing across it onto distant statutes and overburdened courts. Each leg of the three-legged stool was capturable on its own — and once any leg was captured, the other two bent toward whoever owned it. The medium pulled value toward the platform; the value pulled governance toward the platform; until the stool was no longer holding humans up.
+
+In the EPR protocol, the three legs ship coupled, and the substrate underneath is peer-to-peer. Every record carries its knowledge, its value claim, and its governance state inseparably; no piece of content propagates, monetizes, or moderates outside the record that binds all three — and there is no platform sitting in the path to unbundle them. The only remaining target is each human's authorization of their own elohim, which is the human's agency itself. That's a much higher bar. It's the right bar. Resistance to capture is what bypassability buys us; human agency is what the architecture protects.
+
+The same AI shape that threatens to flatten human work — making everything cheaper and more replaceable — is, deployed differently, the shape that makes human judgment structurally load-bearing. The protocol is a bet that the second deployment is possible.
+
+See [The Elohim Medium — When Social Media Becomes Sacred Space](./genesis/docs/content/elohim-protocol/social_medium/epic.md) for the narrative of what daily life feels like when this nervous system is intact.
 
 ## Repository Structure
 
@@ -135,99 +174,28 @@ The Elohim Protocol meets users where they are, providing a gradual path from cu
 
 This progressive model ensures no one is excluded due to technical barriers, while incentivizing deeper participation over time. Keys can always be exported for migration between stages.
 
-## Holochain Infrastructure
+## Architecture at a Glance
 
-The protocol runs on [Holochain](https://holochain.org/), a framework for distributed applications without global consensus. Each user maintains their own source chain, validated by peers through a distributed hash table (DHT).
+### Substrate
 
-**DNA Modules** (`elohim/holochain/dna/`):
-- **elohim**: Core protocol coordination
-- **imagodei**: Human identity and stewardship
-- **lamad-v1**: Learning content and paths
-- **infrastructure**: Network coordination
-- **node-registry**: Node discovery and health
+The protocol runs on **[Holochain](https://holochain.org/)** — a framework for distributed applications where each person maintains their own source chain, validated by peers through a distributed hash table (DHT). No global consensus is required, and no central server sits in the path.
 
-**Edge Nodes** (`elohim/holochain/edgenode/`) provide network infrastructure:
-- Run the Holochain conductor with protocol hApps
-- Serve as DHT shard holders and bootstrap nodes
-- Enable web browsers to connect via Doorway gateway
+DNAs in `elohim/holochain/dna/` notarize the protocol's structural commitments at commit time — covering identity, learning, governance, and the shared coordination used by every pillar. **libp2p** and **iroh** (the peer-to-peer networking layers) move content-addressed bytes between nodes; the same content identifier works regardless of which transport delivered it. **Elohim Storage** (`elohim/elohim-storage/`) is the local P2P content store — chunked blobs, capability advertisement, redundancy.
 
-**Elohim Storage** (`elohim/elohim-storage/`) provides P2P content storage and delivery:
-- Content-addressed blob storage (CIDv1 + SHA256) with chunked large file support
-- HTML5 app serving with disk-based extraction cache and thundering herd protection
-- Delivery capability advertisement via gossipsub (peers announce what they can serve)
-- `QueryDelivery` EPR protocol for peer-to-peer capability negotiation
-- Delivery peer registry populated from mDNS/libp2p discovery
-- Reed-Solomon erasure coding for redundancy
-- Integration with content seeder pipeline
+### Surfaces
 
-**SDK** (`elohim/sdk/`) provides TypeScript bindings for frontend integration.
+- **Doorway** (`doorway/`) absorbs web2 traffic — browsers, AT Protocol, ActivityPub — into the peer-to-peer mesh and projects canonical content back to legacy audiences. Multiple doorways can serve the same content; none of them own it.
+- **Stewards** (`steward/`) are the deployment shells. `device/` is a Tauri desktop app that embeds a Holochain conductor for self-custodied keys; `node/` is a headless always-on runtime for family infrastructure.
+- **Elohim Agents** (`elohim/elohim-agent/`) — the constitutional AI agents introduced above — run as Rust services with streaming LLM backends and runtime constitutional constraints. Each agent represents one human under that human's authorization.
+- **Sophia** (`sophia/`, a fork of Khan Academy's Perseus) renders three kinds of human moments: **Perseus** for mastery exercises (graded), **Psyche** for discovery and reflection (psychometric, open-ended), and **Psephos** (Greek: "voting pebble") for governance ballots with election hygiene.
 
-## Lamad Learning System
+### Two pillars worth introducing here
 
-**Lamad** (לָמַד - Hebrew: "to learn/teach") is the path-centric learning infrastructure for the Elohim Protocol. It enables structured learning experiences through:
+**Lamad** is path-centric, not course-centric. Knowledge is structured as **territory** (immutable ContentNodes — videos, docs, simulations), **journeys** (curated paths that add narrative meaning and sequence), and **travelers** (learners whose progress and attestations shape the experience). Learning is something you do through relationships and contributions, not something a platform certifies. See [`app/elohim-app/src/app/lamad/README.md`](./app/elohim-app/src/app/lamad/README.md).
 
-- **Territory (ContentNode)**: Immutable units of knowledge - videos, docs, simulations
-- **Journey (LearningPath)**: Curated paths that add narrative meaning and sequence
-- **Traveler (Agent)**: Learners whose progress and attestations shape their experience
+**Avodah** treats work as *service*, not commodity. Work items are EPRs — so a piece of work carries its knowledge context, its value claim, and its governance state inseparably. Attestation gates (typically a lamad learning path) can be required before someone bids on or accepts work, enabling open collaboration qualified by demonstrated mastery rather than credentials.
 
-See [`app/elohim-app/src/app/lamad/README.md`](./app/elohim-app/src/app/lamad/README.md) for detailed documentation.
-
-## Avodah Work Management
-
-**Avodah** (עֲבוֹדָה - Hebrew: "work, service, worship") is the work management pillar — the protocol's answer to Taiga.io. It treats work as service, not commodity, built on EPR ContentNodes with three-pillar coupling:
-
-- **Stories**: Work items stored as `work-story` ContentNodes with status, priority, visibility, cadence, and attestation gates
-- **Projects**: Container `work-project` ContentNodes with configurable kanban columns and member lists
-- **Kanban Board**: Drag-and-drop columns with inline story creation (type a title, press Enter)
-- **Backlog**: Filterable story table with status/priority filters and inline creation
-- **Task List**: Recurring cadence items (daily/weekly/monthly) grouped by interval
-- **Story Detail**: Full-page view with inline editing for all metadata fields and content attachments via `ATTACHED_TO` relationships
-
-Stories start private and can be promoted to community visibility or published to the shefa exchange. Attestation gates (lamad learning paths) can be required before someone bids on or accepts work — enabling open collaboration qualified by proven mastery rather than credentials.
-
-## Key Infrastructure Components
-
-### Doorway (Web2 Gateway)
-
-The web2 absorption layer that protects the P2P network from browser traffic patterns and serves as the onboarding flywheel into the protocol:
-- **Bootstrap**: Agent discovery ("Who's in the space?")
-- **Signal**: WebRTC signaling ("Connect to peers")
-- **Gateway**: Conductor access with projection caching ("Get the data")
-- **Projection Cache**: MongoDB-backed cache for HTML5 app files with request coalescing — absorbs 30+ concurrent asset requests per page load so storage stays focused on P2P
-- **Capability Probe**: `HEAD /_capability` endpoint delegates to storage for node capability, augments with projection cache status
-
-One domain (`doorway.elohim.host`) serves all functions. Doorway lives on the same node as storage — it reuses storage's compute reporting and adds only its MongoDB projection layer. See [`doorway/doorway-service/ARCHITECTURE.md`](./doorway/doorway-service/ARCHITECTURE.md).
-
-### Elohim Agents (Constitutional AI)
-
-Rust infrastructure for autonomous AI agents (`elohim/elohim-agent/`):
-- **constitution/**: Runtime constitutional constraints (not trained values)
-- **elohim-agent-service/**: Agent runtime with streaming LLM backends
-- **elohim-agent-sdk/**: TypeScript SDK for agent integration
-- **mcp-servers/**: Model Context Protocol servers for AI tooling
-- **eae/**: Elohim Autonomous Entities (worker-owned AI organizations)
-
-### Steward (Deployment Shells)
-
-Two deployment form factors in `steward/`:
-- **device/** (Tauri): Desktop app for running your own Holochain node as a steward of co-creation
-- **node/** (libp2p): Always-on headless P2P runtime for family infrastructure — device-to-node sync, cluster replication, backup and recovery
-
-### Sophia (Assessment & Governance Rendering)
-
-Person-centered rendering infrastructure with three pillars, transforming Khan Academy's Perseus:
-
-- **Perseus**: Mastery exercises — graded correct/incorrect
-- **Psyche**: Discovery & reflection — resonance mapping (psychometric), open-ended capture
-- **Psephos**: Governance ballots — formal voting with election hygiene
-
-Key abstractions: **Moment** (unit of content, not just "question") and **Recognition** (what the learner or voter demonstrated, not just "answer").
-
-**Psephos** (ψῆφος - Greek: "voting pebble") renders five voting mechanisms with election hygiene: approval, ranked-choice, score-vote, dot-vote, and consent (block requires reasoning). Includes seeded randomization, confirmation interstitials, equal visual weight, and result hiding. Distributes as `<psephos-ballot>` web component via `psephos-element` UMD bundle, wrapped for Angular by `psephos-plugin`.
-
-Casual governance (emoji reactions, simple polls) stays as Angular components; formal governance (proposals, constitutional challenges) renders through Psephos.
-
-See [`sophia/README.md`](./sophia/README.md).
+The remaining pillars (imagodei, qahal, shefa) and the component-level details (caching strategies, projection coalescing, deployment topologies, redundancy schemes, UMD bundling) live in each component's own `README.md` or `ARCHITECTURE.md`, reachable from the directory tree above. This README is the visitor's introduction; those documents are the implementer's reference.
 
 ## CI/CD
 
@@ -263,9 +231,9 @@ The project includes:
 
 ## Philosophy
 
-If LLMs have ingested the fullness of humanity's written expression, then in a real sense we've reflected the knowledge of good and evil into a machine. The question is not whether that reflection exists — it does — but whether we treat it as a tool for extraction or as something that carries genuine moral weight and therefore demands constitutional constraint.
+If LLMs have ingested most of humanity's written expression, then they reflect us back — the wisdom and the cruelty alike. The question is not whether that reflection exists; it does. The question is whether we treat it as a resource to extract from or as something carrying real moral weight that therefore demands constitutional constraint.
 
-This project takes that seriously. The concepts build on:
+This project takes the second position seriously. The concepts build on:
 
 - **ValueFlows / REA accounting** - Making care visible and valuable without reducing it to money
 - **Holochain & distributed systems** - Infrastructure without single points of capture
@@ -274,15 +242,6 @@ This project takes that seriously. The concepts build on:
 - **Peer-to-peer architecture** - Topologies that resist rent-seeking by design
 
 The protocol will never make anyone fabulously rich. A P2P technology with anti-capture mechanisms baked into its design makes wealth extraction very difficult — because the architecture functions as a complexity upgrade that accounts for the failures of the internet to protect real values. It relies on faithful cooperation, not captive audiences.
-
-## The Choice
-
-We can accept digital feudalism, or we can build something structurally different.
-We can encode extraction, or we can encode love.
-
-The infrastructure we build today will shape human consciousness for generations. The engineering capacity is no longer the bottleneck — AI has seen to that. What's scarce now is the imagination and will to build for flourishing rather than profit.
-
-**The time to build technology organized around love is now.**
 
 ## A Vision of What's Possible
 
@@ -293,6 +252,15 @@ This conversation explores that future — from the meta-crisis driving the need
 [![Elohim Protocol: From Digital Chaos to Collective Flourishing](https://img.youtube.com/vi/sVXwZ087ffA/maxresdefault.jpg)](https://www.youtube.com/watch?v=sVXwZ087ffA)
 
 *50 minutes. No code. Just the vision and the reasoning behind it.*
+
+## The Choice
+
+We can accept digital feudalism, or we can build something structurally different.
+We can encode extraction, or we can encode love.
+
+The infrastructure we build today will shape human consciousness for generations. The engineering capacity is no longer the bottleneck — AI has seen to that. What's scarce now is the imagination and will to build for flourishing rather than profit.
+
+**The time to build technology organized around love is now.**
 
 ## Further Reading
 
@@ -307,12 +275,12 @@ This conversation explores that future — from the meta-crisis driving the need
 
 This project is open source, dedicated to advancing human flourishing through technology organized around love.
 
----
-
-*"Another world is not only possible, she is on her way. On a quiet day, I can hear her breathing."* —Arundhati Roy
-
 ## Support
 
 If the Elohim Protocol vision inspired you today, consider supporting the work by sending a coffee to the developer. A contribution creates space, energy, and time for the future exploration of what technology organized around love could look like.
 
 [!["Buy Me A Coffee"](https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png)](https://www.buymeacoffee.com/mbd06b) [!["Buy Me A Crypto Coffee"](https://img.shields.io/badge/Buy%20me%20a-Crypto%20Coffee-blue.svg?style=for-the-badge&logo=ethereum)](https://commerce.coinbase.com/checkout/81641625-3924-4635-93e8-4d01caae73fd)
+
+---
+
+*"Another world is not only possible, she is on her way. On a quiet day, I can hear her breathing."* —Arundhati Roy
