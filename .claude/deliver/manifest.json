@@ -22,6 +22,40 @@
       },
       "deliverables_cited": [],
       "verdict_note": "Bootstrap inventory pass. Feature file `stewarded-device-sync.feature` does not exist under `genesis/a2o/features/` (declared adjacent_features point at `lamad/learning-journey.feature` etc., but the canonical feature triple's slug has no on-disk `.feature`). Per SKILL.md step-2 existence gate: `delivery_status` cannot advance above `wip` when the canonical .feature is missing on disk. /deliver has no authority to write `wip`/`refined`/`backlog` (those are sprint/cartographer authority), and the substrate to confer `active.*`/`stable`/`regression` does not exist. Therefore: no story frontmatter mutation this run. Story remains at `undelivered` (deliver-bridge-floor). Surfacing backlog candidate for cartographer: author the canonical `stewarded-device-sync.feature` with visually-validated scenarios so a real /deliver run becomes possible. This is the first run of the manifest; the file is initialized here per skill schema. The pickup-queue auto-poller will see this verdict on next sweep and understand the gap is `feature_file_missing`, not `verdict_pending`."
+    },
+    {
+      "feature_path": "genesis/a2o/features/auth/recovery/recovery-shamir-optional.feature",
+      "feature_file_exists": true,
+      "story_slug": null,
+      "backlog_slug": null,
+      "delivery_status_at_inspection": "wip",
+      "delivery_status": "pending",
+      "regression_from": null,
+      "verdict": "pending-substrate-only-no-ui-falsifier",
+      "verdict_iteration": "iter0-recovery-m4-2026-05-15",
+      "verdict_timestamp": "2026-05-15T00:00:00Z",
+      "sprint_result_path": ".claude/shifts/2026-05-15-recovery-m4-deliver-pending.sprint-result.md",
+      "evidence": {
+        "gherkin_scenarios_passing": 0,
+        "gherkin_scenarios_failing": 0,
+        "visual_validation": {
+          "validated_passing": 0,
+          "validated_regressed": 0,
+          "pending_passing": 0,
+          "pending_failing": 0
+        },
+        "screenshot_path": null,
+        "fresh_trigger_confirmed": false,
+        "root_cause_path": null
+      },
+      "deliverables_cited": [
+        "T19-22: ShamirShareCodec swarm-wired, share-assembler + custody manifest landed (substrate-tier)",
+        "T23: optionality enforcement audit — recovery succeeds without Shamir custody",
+        "T24: Angular UX audit confirmed grandma-standard contracts (no seed material visible; no Path A/B selector; graceful degradation)",
+        "T26: recovery-shamir-optional.feature authored with 4 scenarios — all tagged @wip pending M5 step-def wiring",
+        "T28 step 1-4: sweettest + storage tests + schema codegen + zero TODO markers — operator-verified locally (1377/1377 storage tests pass)"
+      ],
+      "verdict_note": "Recovery M4 sprint is substrate-tier completion. The four scenarios in recovery-shamir-optional.feature are all tagged @wip — no step definitions exist (per find genesis/a2o/steps: only recovery-cross-stack.steps.ts present, nothing for shamir-share or custodian dial). Cucumber profile would skip all 4. visualValidation 2x2 matrix is empty. No @elohim-visually-validated tag on any scenario. The canonical promise is INVISIBILITY (T24 grandma-standard: 'the user never sees the choice and never sees raw key material') — there is no positive UI affordance to screenshot. Per SKILL step 3a tuple-to-state ladder: ambiguous → pending. /deliver cannot mint active.* on substrate-only work whose UI-falsifier is itself absence-of-UI. Two operator-gated next steps belong to the human: (a) T28 step 5 — push origin dev + watch orchestrator for SUCCESS×2 (substrate-correctness proof on CI); (b) M5 cycle — wire step-defs against the recovery-coordinator service so /deliver can run cucumber against rendered UX and mint a real verdict. The manifest entry is pending until M5 wiring lands; the auto-poller can read this as 'substrate-landed, awaiting UI integration'."
     }
   ]
 }
