@@ -1,3 +1,4 @@
+import { TestBed } from '@angular/core/testing';
 import { describe, it, expect, beforeEach } from 'vitest';
 
 import { CannedResponseService } from './canned-response.service';
@@ -6,7 +7,10 @@ describe('CannedResponseService', () => {
   let service: CannedResponseService;
 
   beforeEach(() => {
-    service = new CannedResponseService();
+    TestBed.configureTestingModule({
+      providers: [CannedResponseService],
+    });
+    service = TestBed.inject(CannedResponseService);
   });
 
   it('should respond to "what do you think" with reflection prompt', () => {
