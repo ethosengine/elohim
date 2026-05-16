@@ -98,6 +98,12 @@ Feature: EPR Cross-Peer Content Resolution
   # Gate condition: lifts when federation-epr.steps.ts ships with `peer "X" has content "Y" with reach "<level>"`, `human "Z" is a consented member of collective "W"`, and `human "Z" requests content "Y" from peer "X"` step verbs. The community-reach gate itself is enforced at elohim/elohim-storage/src/epr_service.rs:86–189 — substrate is ready; only the BDD glue is missing.
   @wip
   Scenario: Community-reach guide accessible only to consented collective members
+    # Matthew's collective ("local-church") authored a governance guide
+    # at community reach. Matthew is a consented member — the guide
+    # opens for him with the collective's authorship attestation visible.
+    # Frank is outside the collective; for him, the same URL surfaces a
+    # respectful "this content belongs to local-church, here's how to
+    # ask for membership" page rather than a hard 403 page.
     Given peer "alpha" has content "community-governance-guide" with reach "community"
     And human "Matthew" is a consented member of collective "local-church"
     And human "Frank" has no collective memberships
@@ -112,6 +118,9 @@ Feature: EPR Cross-Peer Content Resolution
   # Gate condition: lifts when federation-epr.steps.ts ships with `human "X" is a steward of "Y"`, `human "Z" has a "<reach-level>" relationship with human "X"` step verbs and the relationship fixture builder. Trusted-reach gate enforcement is live at epr_service.rs:86–189; substrate is ready.
   @wip
   Scenario: Trusted-reach content requires standing relationship with steward
+    # Some content is stewarded for a circle of trust — not for everyone
+    # in a collective, but for those the steward has explicitly extended
+    # trust to. The reach gate enforces that relationship structurally.
     Given peer "alpha" has content "advanced-theology" with reach "trusted"
     And human "Pete" is a steward of "advanced-theology"
     And human "Matthew" has a "trusted" relationship with human "Pete"
@@ -127,6 +136,11 @@ Feature: EPR Cross-Peer Content Resolution
   # Gate condition: lifts when federation-epr.steps.ts ships with `content "X" requires prerequisite mastery of "Y"`, `human "Z" has mastery of "Y"`, and `human "Z" requests the body of content "X"` step verbs and the mastery-attestation fixture builder. The attestation gate is enforced at epr_service.rs:133–177; substrate is ready.
   @wip
   Scenario: Attestation-gated content requires prerequisite mastery
+    # Calculus 201 only opens for learners who have demonstrated mastery
+    # of Calculus 101. The attestation is on the DHT (notarized);
+    # checking it is a graph traversal, not a database query at the
+    # publisher. Terrance sees a respectful "build prerequisites first"
+    # affordance pointing to the prerequisite path.
     Given peer "alpha" has content "calculus-201" with reach "public"
     And content "calculus-201" requires prerequisite mastery of "calculus-101"
     And human "Matthew" has mastery of "calculus-101"
@@ -142,6 +156,10 @@ Feature: EPR Cross-Peer Content Resolution
   # Gate condition: lifts when federation-epr.steps.ts ships with `peer "X" has content "Y" stewarded by "A" at N% and "B" at M%`, `peer "X" resolves "Y" via P2P from peer "Z"`, and `recognition events are created for steward "A" and steward "B"` step verbs. Recognition emission on P2P delivery is the substrate behaviour the test will assert; verify against epr_service path.
   @wip
   Scenario: Recognition distributes proportionally to stewards on P2P delivery
+    # Stewardship is real work and the protocol counts it. When peer
+    # "staging" fetches Pete and Terrance's co-stewarded content, both
+    # stewards receive recognition events proportional to their declared
+    # share. This is shefa — value flowing where work was done.
     Given peer "alpha" has content "economics-primer" stewarded by "Pete" at 60% and "Terrance" at 40%
     When peer "staging" resolves "economics-primer" via P2P from peer "alpha"
     Then recognition events are created for steward "Pete" and steward "Terrance"
@@ -154,6 +172,11 @@ Feature: EPR Cross-Peer Content Resolution
   # Gate condition: lifts when federation-epr.steps.ts ships with `human "X" has a device policy with reach_level_max of N` and the device-policy fixture builder. The policy-ceiling check is enforced at epr_service.rs:109–131; substrate is ready.
   @wip
   Scenario: Policy ceiling blocks content above the device's reach level max
+    # Terrance's device — a stewarded-child device — has a policy ceiling
+    # on reach level. Even when Terrance holds the structural standing to
+    # access "intimate" content, the device-side policy refuses, and the
+    # refusal is local + visible — no awkward attempt-and-deny round-trip
+    # to the server.
     Given peer "alpha" has content "intimate-journal" with reach "intimate"
     And human "Terrance" has a device policy with reach_level_max of 3
     When human "Terrance" requests content "intimate-journal" from peer "alpha"
@@ -167,6 +190,10 @@ Feature: EPR Cross-Peer Content Resolution
   # Gate condition: lifts when federation-epr.steps.ts ships with `Pete views his recognition feed on peer "X"`, `he sees a recognition event for "Y" delivered to peer "Z"`, and the cross-peer fetch event tracking helper. Substrate emits recognition events on delivery; the BDD layer needs to surface them.
   @wip
   Scenario: Steward sees recognition land for content delivered cross-peer
+    # Pete is on his own peer when Jessica's peer fetches his guide for
+    # a learner. Pete's recognition view should reflect the new event —
+    # not days later as a batch, not on next sync, but as it happens.
+    # Stewardship has to feel responsive or it doesn't compound.
     Given Pete stewards content "ecology-primer" on peer "shem-pete"
     And Jessica's peer "household-jessica" fetches "ecology-primer" via P2P
     When Pete views his recognition feed on peer "shem-pete"
@@ -179,6 +206,10 @@ Feature: EPR Cross-Peer Content Resolution
   # Gate condition: lifts when federation-epr.steps.ts ships with `peer "X" has content "Y" with multiple stewards`, `peer "X" disconnects mid-fetch before delivering the body`, and `the resolver attempts a different peer that holds the CID` step verbs, plus the disconnect simulator helper. The multi-steward failover behaviour belongs to doorway/storage; verify against the existing P2P fetch retry logic before authoring.
   @wip
   Scenario: Cross-peer fetch surfaces transient peer-offline as a soft state
+    # Mid-fetch, the source peer goes offline. The renderer should not
+    # blank the page or show a stack trace; it shows a "fetching from
+    # other stewards" affordance and tries another peer that holds the
+    # CID. The reader sees latency, not failure.
     Given peer "alpha" has content "module-X" with multiple stewards "Pete", "Jessica"
     And Terrance's peer "household-terrance" begins resolving "module-X"
     When peer "alpha" disconnects mid-fetch before delivering the body
@@ -192,6 +223,11 @@ Feature: EPR Cross-Peer Content Resolution
   # Gate condition: lifts when (a) iroh Phase 12 caller-identity is fully wired through the EPR-atom request-response codec end-to-end, and (b) federation-epr.steps.ts ships with `Matthew has an active AgentPeerBinding on peer "X"`, `peer "X" fetches "Y" via the EPR-atom protocol`, and `peer "Z" resolves the requesting peer to agent "A" via PeerIdentityMap` step verbs. The reach-gate accepting Matthew-as-steward is already substrate-live; the gap is the libp2p caller-identity threading + the BDD glue around it.
   @wip
   Scenario: Identity binding allows cross-peer fetches to attribute reach correctly
+    # Matthew's content with reach "trusted" is requested from peer
+    # "shem-pete" — but the requester is Matthew himself on his desktop.
+    # The cross-peer path needs to know "this fetch is on behalf of
+    # Matthew, who has standing here," not just "this is some peer asking."
+    # The identity binding (Phase 2B) is what makes that translation possible.
     Given Matthew has an active AgentPeerBinding on peer "household-matthew-desktop"
     And content "private-journal" with reach "intimate" is on peer "shem-pete" stewarded by Matthew
     When peer "household-matthew-desktop" fetches "private-journal" via the EPR-atom protocol
