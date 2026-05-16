@@ -41,7 +41,16 @@ async fn bootstrap_steward_is_configured() -> Result<()> {
 ///   `metadata_json`) must be present but the validator only checks `id`, `proposal_type`,
 ///   and `status` — empty-array / empty-object strings are sufficient.
 /// - No referential IDs (no `precedent_id`, no `challenge_id`) are required.
+///
+/// Stage F status: `get_proposal_by_id` was removed from the mishpat coordinator —
+/// proposals now live on the elohim DNA as `governance-action:proposal` Content entries.
+/// The read side is `elohim::content_store::get_proposal_by_id`, registered in the cache
+/// rules but not yet exposed as an `hdk_extern`. This test requires (a) that function to
+/// land and (b) the harness to install both the mishpat and elohim DNAs in the same app.
+/// Equivalent coverage will live in a cross-DNA sweettest once Stage F ships.
+/// See: elohim/holochain/dna/mishpat/zomes/mishpat/src/lib.rs:272.
 #[tokio::test(flavor = "multi_thread")]
+#[ignore = "Stage F: get_proposal_by_id removed from mishpat — proposals now live on elohim DNA; re-enable once elohim::content_store::get_proposal_by_id is exposed and harness installs both DNAs"]
 async fn proposal_round_trips_across_agents() -> Result<()> {
     let [(mut c1, a1), (mut c2, a2)] = two_agent_conductors().await?;
 
