@@ -1569,6 +1569,98 @@ async fn async_main(
             Some(bytes)
         };
 
+        // Graph engine init (graph-native feature). Opens CozoDB sled instance at
+        // storage_dir/graph.db, applies core schema, then applies any graph extensions
+        // declared in pillar manifest.json files. Failures are non-fatal — projection
+        // is skipped gracefully and the node continues serving relational views.
+        #[cfg(feature = "graph-native")]
+        let graph_engine_arc: Option<
+            std::sync::Arc<elohim_storage::graph::engine::GraphEngine>,
+        > = {
+            use elohim_storage::graph::engine::GraphEngine;
+            use elohim_storage::graph::registry::{apply_graph_extension, GraphExtension};
+            use elohim_storage::graph::schema::apply_core_schema;
+
+            let graph_db_path = config.storage_dir.join("graph.db");
+            match GraphEngine::open(&graph_db_path) {
+                Ok(eng) => {
+                    if let Err(e) = apply_core_schema(&eng) {
+                        tracing::warn!(
+                            error = %e,
+                            "graph schema apply failed; graph projection disabled"
+                        );
+                        None
+                    } else {
+                        // Apply graph extensions from pillar manifests on disk.
+                        // Same manifest_dir as write-through layer-1 loader.
+                        let manifest_dir = std::env::var("ELOHIM_PILLAR_MANIFEST_DIR")
+                            .map(std::path::PathBuf::from)
+                            .unwrap_or_else(|_| std::path::PathBuf::from("elohim/sdk/domains"));
+
+                        if let Ok(entries) = std::fs::read_dir(&manifest_dir) {
+                            for entry in entries.flatten() {
+                                let pillar_name = entry.file_name().to_string_lossy().to_string();
+                                let manifest_path = entry.path().join("manifest.json");
+                                if !manifest_path.exists() {
+                                    continue;
+                                }
+                                let Ok(body) = std::fs::read_to_string(&manifest_path) else {
+                                    continue;
+                                };
+                                let Ok(json) = serde_json::from_str::<serde_json::Value>(&body)
+                                else {
+                                    continue;
+                                };
+                                if let Some(graph_val) = json.get("graph") {
+                                    match serde_json::from_value::<GraphExtension>(
+                                        graph_val.clone(),
+                                    ) {
+                                        Ok(ext) => {
+                                            if let Err(e) =
+                                                apply_graph_extension(&eng, &pillar_name, &ext)
+                                            {
+                                                tracing::warn!(
+                                                    pillar = %pillar_name,
+                                                    error = %e,
+                                                    "graph extension apply failed; pillar rules skipped"
+                                                );
+                                            } else {
+                                                info!(
+                                                    pillar = %pillar_name,
+                                                    "graph extension applied from manifest"
+                                                );
+                                            }
+                                        }
+                                        Err(e) => {
+                                            tracing::warn!(
+                                                pillar = %pillar_name,
+                                                error = %e,
+                                                "graph extension parse failed; pillar rules skipped"
+                                            );
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        info!(
+                            path = ?graph_db_path,
+                            "graph-native: GraphEngine opened + core schema applied"
+                        );
+                        Some(std::sync::Arc::new(eng))
+                    }
+                }
+                Err(e) => {
+                    tracing::warn!(
+                        path = ?graph_db_path,
+                        error = %e,
+                        "graph engine open failed; graph projection disabled"
+                    );
+                    None
+                }
+            }
+        };
+
         let fan_out_ctx = Arc::new(EprFanOutCtx {
             manifest_registry,
             outbound_sink,
@@ -1578,10 +1670,8 @@ async fn async_main(
             local_peer_id: local_peer_id_opt,
             local_pubkey,
             standing_policy_cid,
-            // graph_engine is wired separately via with_graph_engine at startup
-            // once the graph-native feature is stable. None = projection skipped.
             #[cfg(feature = "graph-native")]
-            graph_engine: None,
+            graph_engine: graph_engine_arc,
         });
 
         http_server = http_server.with_fan_out_ctx(fan_out_ctx);

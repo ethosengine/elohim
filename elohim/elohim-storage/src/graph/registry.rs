@@ -267,7 +267,10 @@ pub fn apply_graph_extension(
         let script = if cols.is_empty() {
             format!(":create {rel_name} {{ cid: String }}")
         } else {
-            format!(":create {rel_name} {{ cid: String => {} }}", cols.join(", "))
+            format!(
+                ":create {rel_name} {{ cid: String => {} }}",
+                cols.join(", ")
+            )
         };
         // Idempotent — swallow already-exists errors
         let _ = engine.run_script(&script, &[]);
@@ -390,7 +393,10 @@ mod tests {
         let result = validate_graph_extension(&ext);
         assert!(result.is_err());
         let msg = format!("{:?}", result);
-        assert!(msg.contains("shadow") || msg.contains("Shadow"), "msg={msg}");
+        assert!(
+            msg.contains("shadow") || msg.contains("Shadow"),
+            "msg={msg}"
+        );
     }
 
     #[test]

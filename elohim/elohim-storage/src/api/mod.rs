@@ -30,8 +30,8 @@ pub mod exchange;
 pub mod flow_planning;
 pub mod gate;
 pub mod governance;
-pub mod graph_views;
 pub mod governance_actions;
+pub mod graph_views;
 pub mod hazards;
 pub mod identity;
 pub mod mastery;
@@ -174,7 +174,15 @@ pub async fn handle_api_request(
         // Note: the `/blob/` raw-bytes route is NOT under /api/v1/ (handled at
         // the outer http.rs dispatcher); this prefix is for blob-scoped views only.
         let resource_path = sub_path.strip_prefix("blob").unwrap_or("");
-        blob::handle(req, method, resource_path, &pool, &app_ctx, graph_engine_ref).await
+        blob::handle(
+            req,
+            method,
+            resource_path,
+            &pool,
+            &app_ctx,
+            graph_engine_ref,
+        )
+        .await
     } else if sub_path == "cluster" {
         // Phase 5 T30: GET /api/v1/cluster — agent-scoped cluster view.
         // Auth implicit (Holochain idiom): the calling agent's identity (resolved
@@ -211,7 +219,15 @@ pub async fn handle_api_request(
         weather::handle(req, method, resource_path, &pool, &app_ctx).await
     } else if sub_path.starts_with("resilience") {
         let resource_path = sub_path.strip_prefix("resilience").unwrap_or("");
-        resilience::handle(req, method, resource_path, &pool, &app_ctx, graph_engine_ref).await
+        resilience::handle(
+            req,
+            method,
+            resource_path,
+            &pool,
+            &app_ctx,
+            graph_engine_ref,
+        )
+        .await
     } else if sub_path.starts_with("risk") {
         let resource_path = sub_path.strip_prefix("risk").unwrap_or("");
         risk::handle(req, method, resource_path, &pool, &app_ctx).await
