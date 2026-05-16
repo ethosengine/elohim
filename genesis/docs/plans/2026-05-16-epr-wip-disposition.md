@@ -40,9 +40,9 @@ Key substrate findings that influenced multiple rows:
 
 | # | Scenario | Line | Step-def state | Disposition | Backlog destination | Rationale |
 |---|---|---|---|---|---|---|
-| 1 | EPR popover surfaces all three pillars when present | epr-content-addressing.feature:96 | SUBSYSTEM-MISSING | defer-with-evidence | graph-native | Existing popover steps cover title/type-badge/reach (lines 266–307 of `epr-content.steps.ts`), but `the popover shows the shefa stewardship summary` has no step-def AND requires shefa-context populated on fixtures + a `shefa stewardship summary` DOM slot in the popover renderer. Both are graph-native scope (the EPR popover surface is a graph-native UX deliverable). |
+| 1 | EPR popover surfaces all three pillars when present | epr-content-addressing.feature:96 | SUBSYSTEM-MISSING | defer-with-evidence | graph-native | Existing popover steps cover title/type-badge/reach (lines 266–307 of `epr-content.steps.ts`), but the gap is the step def for `the popover shows the shefa stewardship summary` + fixture Given for three-pillar context (`content "X" has lamad, qahal, AND shefa context populated`); the DOM slot (`[data-testid="epr-popover-shefa"]`) already exists at `epr-popover.component.ts:67–77`. Both the missing step-def and the fixture seam are graph-native scope (the EPR popover surface is a graph-native UX deliverable). |
 | 2 | Following an EPR link transfers reading context to the destination | epr-content-addressing.feature:113 | SUBSYSTEM-MISSING | defer-with-evidence | graph-native | `the destination ... renders with origin context "manifesto"` and `the destination shows a back-affordance to the originating manifesto step` are not in step-defs and have no DOM hooks today. Cross-path navigation works (scenario 1 in file), but origin-context propagation through the renderer is the experience-story/experience-moment territory of graph-native. |
-| 3 | EPR link to a versioned-since-authored CID degrades gracefully | epr-content-addressing.feature:128 | SUBSYSTEM-MISSING | defer-with-evidence | graph-native | The EPR codec carries supersedence references but the renderer does not yet display a "this version was superseded" notice. Requires both content-side supersedence wiring (which graph-native owns under the experience-story model) and a UI affordance pass. No step-defs match `the historical content body renders with a "this version was superseded" notice`. |
+| 3 | EPR link to a versioned-since-authored CID degrades gracefully | epr-content-addressing.feature:129 | SUBSYSTEM-MISSING | defer-with-evidence | graph-native | The EPR codec carries supersedence references but the renderer does not yet display a "this version was superseded" notice. Requires both content-side supersedence wiring (which graph-native owns under the experience-story model) and a UI affordance pass. No step-defs match `the historical content body renders with a "this version was superseded" notice`. |
 | 4 | EPR Head signature is verifiable end-to-end | epr-content-addressing.feature:145 | SUBSYSTEM-MISSING | defer-with-evidence | a2o-tooling (standalone) | The substrate signs (Phase 2B/EPR Head signing is live) — what's missing is the test-side DAG-CBOR decoder + Ed25519 verify wired into step-defs. No protocol gate; this is pure tooling work that can land independently of graph-native. Today's existing step (`epr-content.steps.ts:255–262`) only asserts content-type header is `dag-cbor`; it does not decode or verify. |
 | 5 | Community-reach guide accessible only to consented collective members | epr-cross-peer-resolution.feature:113 | SUBSYSTEM-MISSING | defer-with-evidence | doorway-full-facilitator | Substrate is ready: `handle_resolve` enforces reach tier with `agent_pubkey`. Gap is BDD federation glue + a `consented member of collective "X"` fixture helper (collective membership seeding). The 403-with-reason assertion shape matches what `EprResponse::AccessDenied` carries, but no step-def implements the `requests content ... from peer "X"` shape. Doorway-full-facilitator sprint will land the cross-peer HTTP edge that drives these. |
 | 6 | Trusted-reach content requires standing relationship with steward | epr-cross-peer-resolution.feature:129 | SUBSYSTEM-MISSING | defer-with-evidence | doorway-full-facilitator | Same shape as #5. Substrate gating works (`handle_resolve` reach check is trust-aware); gap is `human "X" has a "trusted" relationship with human "Y"` fixture helper + the federation step-def layer. |
@@ -64,10 +64,14 @@ Key substrate findings that influenced multiple rows:
 
 **Reasoning:**
 
-The 11 HTTP-VIA-DOORWAY classifications are mechanical. Scenarios 1–4 are
-all browser-renderer interactions whose body fetch is the existing
-`<content-renderer>` blob/markdown loader hitting `/api/v1/content/{cid}` or
-`/blob/{cid}` through doorway. Scenarios 5–11 are federation HTTP-edge
+The 11 HTTP-VIA-DOORWAY classifications are mechanical. Scenarios 1–3 are
+browser-renderer interactions whose body fetch is the existing
+`<content-renderer>` markdown loader hitting `/api/v1/content/{cid}` or
+`/blob/{cid}` through doorway. Scenario 4 is not a body-fetch scenario at
+all — it asserts that the EPR Head (which arrives over HTTP
+`/api/v1/epr/head/{cid}`) carries a verifiable Ed25519 signature; the gap
+is step-def-side CBOR decode + signature-verify library, with no libp2p
+document body fetch in scope. Scenarios 5–11 are federation HTTP-edge
 scenarios — the step verbs say `requests content "X" from peer "alpha"`,
 which is an HTTP request that doorway routes; the federation flow does an
 EPR Resolve via libp2p to find a custodian peer for the head, but the body
@@ -121,10 +125,17 @@ For Task 3 (`epr-cross-peer-resolution.feature`): the existing inline block
 at lines 70–110 already documents the unblock path well; update it to cite
 this disposition file and the per-row backlog destinations (7 →
 doorway-full-facilitator, 1 → iroh-phase-12-followon). All eight scenarios
-remain `@wip`. Optionally tighten the pre-existing accuracy concern in the
-inline block (lines 84–88) noting that the 5 "verified landed" foundational
-scenarios above run undefined-silently — that's outside Task 3's scope but
-worth flagging for follow-up.
+remain `@wip`.
+
+**Backlog (must-route, not optional):** the 5 "verified landed" scenarios
+above the @wip block in `epr-cross-peer-resolution.feature` (lines 70–110,
+per the inline block's own note) are running undefined-silently — they
+have no step-defs in `genesis/a2o/steps/`. Route to
+**doorway-full-facilitator sprint** (since that sprint must write
+`federation-epr.steps.ts` to satisfy scenarios 5–11 anyway, and the same
+step-def file will cover the 5 above-the-block scenarios as a side
+effect). Open as a one-line item on the doorway-full-facilitator backlog
+rather than addressing it in this sprint's Tasks 2 + 3.
 
 For Task 4 (iroh Phase 12): scenario 12 is the only scenario gated on
 Phase 12 substrate. If Phase 12 lands before doorway-full-facilitator picks
