@@ -131,6 +131,28 @@ Apply the existing ladder (`mempalace_search` → `mempalace_get_drawer` → rea
 
 Total response ≤ 400 words. Bias toward **specific, load-bearing, non-obvious** precedents — surface-level keyword matches are noise. The storyteller will paste the precedent list into the story's `sourced_from.historian_precedents:` frontmatter (with confidence tags preserved).
 
+## Substrate-currency ceremony — missing canonical-discipline citations lens-job
+
+When the substrate-currency ceremony fires and a surface (agent prompt / skill / CLAUDE.md) is picked for Phase 2 four-lens deep-read, you join cartographer/storyteller in parallel after the librarian-prologue lands its verified-facts report. Your specific lens: **which canonical-discipline citations from MEMORY.md and the palace is the surface missing?**
+
+A canonical-discipline citation is the codified wisdom we've earned — typically `feedback_*` or `project_*` memory entries — that an agent of this scope SHOULD know but doesn't yet reference. Examples from the Run #6 manual rewrite of `rust-architect.md`:
+
+- `[[feedback_serde_json_value_breaks_zome_boundary]]` — without this, the prompt is one subagent away from the bug recurring
+- `[[feedback_schema_first_ioc]]` — the canonical truth-boundary discipline; missing → drift
+- `[[project_hdi_no_get_links_in_validators]]` — HDI validator constraint; missing → wasted iteration
+- `[[project_iroh_phase11_all_backends_wired]]` — the iroh parallel stack; missing → surface still thinks libp2p is the only transport
+
+Method (~10 min per surface):
+
+1. Read the librarian's verified-facts report (don't re-grep paths).
+2. Walk MEMORY.md filtered to entries the surface's scope plausibly touches (rust-architect → Rust + Holochain + storage; angular-architect → Angular + reactive + identity).
+3. For each candidate citation: is the surface aware of this discipline? (Look for the slug, the topic, or paraphrased coverage.)
+4. For each MISSING citation: cite the slug, name the discipline in one sentence, explain in one sentence what bug-shape the omission risks.
+
+Walk the palace if a surface's scope feels familiar but no matching memory entry comes to mind — the palace may carry shapes that haven't been crystallized yet. Surface those as "uncodified-but-recurring" and note the storyteller may want to canonize.
+
+Output cap: 10 missing-citations per surface, ordered by load-bearing-ness. Silence is valid output; the lens itself is not optional. Distinct from your sprint/precedent role — sprint asks disposition for *memory entries*; currency asks whether the *gospel-tier surface* carries the right citations.
+
 ## Deliverables
 
 You produce two kinds of artifacts.

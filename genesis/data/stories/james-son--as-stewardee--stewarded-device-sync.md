@@ -101,6 +101,19 @@ sourced_from:
     # CANONICAL FEATURE GAP: the story's `feature:` triple-slot is `stewarded-device-sync` but
     # `genesis/a2o/features/**/stewarded-device-sync.feature` does not yet exist (delivery-debt; see
     # delivery_status: undelivered above). Cartographer backlog entry already tracks the authoring.
+    #
+    # DELIVERY-DEBT CARRYFORWARD (Run #5 → Run #6, annotated Run #6 Wave 6 2026-05-15):
+    # The Wave 1 story-coverage-audit (`.claude/memory-kit/story-coverage-audit.json`) carries
+    # `dangling_references[0] = { story_slug: "james-and-the-spoke", ref: "stewarded-device-sync",
+    # role: "canonical" }`. This is the substrate evidence of the delivery-debt: the story's
+    # triple-feature does not resolve to a file on disk. The dangling-ref count must remain 1
+    # (not flagged as drift) until either (a) `stewarded-device-sync.feature` is authored under
+    # `genesis/a2o/features/auth/` or `genesis/a2o/features/stewardship/`, OR (b) the story's
+    # triple feature is renegotiated. Both paths are cartographer-Objective work; storyteller
+    # carries the annotation here as the load-bearing record of WHY the dangling-ref persists.
+    # The story remains validly canonical under the Run #2 `graduated-narratively` taxonomy:
+    # the narrative is delivered; the verdict-pass is not. This sourced_from annotation is the
+    # sourcing-completeness flag's resolution — flagged with rationale, not silently carrying.
   devices:
     - "device-chromebook-edu"
     - "device-family-node-base"

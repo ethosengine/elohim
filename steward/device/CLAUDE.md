@@ -4,20 +4,7 @@ Tauri 2.x desktop application that runs the full Elohim P2P stack locally: crypt
 
 ## Role in the Protocol
 
-The Elohim Protocol builds toward **socially-resilient stewardship** - technology that helps humans understand the complex interdependencies of relationships that make thriving possible, and makes individual limits natural and intuitive. Progressive stewardship is the path through which users deepen their participation and responsibility within this relational fabric:
-
-```
-Visitor → Hosted User → App Steward → App + Node Steward → Doorway Host
-                             ▲
-                        YOU ARE HERE
-```
-
-- **Hosted User**: Doorway holds custodial keys, runs conductor on their behalf. The user learns and contributes, but the infrastructure is managed for them
-- **App Steward** (this app): Self-custodied keys, local conductor + storage. Full participation - the user is a complete peer in the network, validating others, holding DHT shards, contributing to shared resilience
-- **App + Node Steward**: Steward app + always-on elohim-node daemon. Both are peers stewarded by the same person, providing internal resilience - when the laptop closes, the node carries the load, and vice versa
-- **Doorway Host**: A node steward who goes above and beyond, running a federated gateway that provides Web 2.0 conveniences (HTTP access, custodial keys, bootstrap/signal, account recovery) for users still graduating - and a portal to recover when disaster happens
-
-The steward app is full participation on its own - it is a complete node. The practical reality is that laptops close. An elohim-node is a peer stewarded by the same person, not completing the steward but backing it up. A doorway is not a separate category; it's the most generous expression of node stewardship, offering on-ramps to the wider community.
+Stewardship progression: `Visitor → Hosted User → App Steward (here) → App + Node Steward → Doorway Host`. App Steward = self-custodied keys, local conductor + storage; the device is a full peer (validates others, holds DHT shards). A `+ Node` companion is a backup peer stewarded by the same person, because laptops close. A doorway is the most generous expression of node stewardship — running a federated gateway with web2 on-ramps (HTTP, custodial keys, bootstrap/signal, recovery).
 
 ---
 
@@ -101,7 +88,7 @@ Doorways are federated thin-client gateways - node stewards who provide Web 2.0 
    - POST /auth/login → JWT token
    - GET /auth/native-handoff → identity + network config + encrypted key bundle
    - Decrypt key bundle with password (Argon2id + ChaCha20)
-   - Save to doorway.json store (tauri-plugin-store)
+   - Save to tauri-plugin-store under the store key named doorway.json — defined as the const `DOORWAY_STORE` in `src-tauri/src/lib.rs`
 3. App restart required (conductor must reinit with new network config)
 4. setup() reads saved agentPubKey → installs hApp with doorway identity
 5. Both conductors (doorway + steward) share same DHT identity
@@ -145,7 +132,7 @@ Scheme: `elohim://auth/callback?code=...&state=...`
 
 ## Network Configuration Priority
 
-1. Saved doorway handoff data (runtime, from `doorway.json`)
+1. Saved doorway handoff data (runtime, from the tauri-plugin-store doorway.json key — `DOORWAY_STORE` in `src-tauri/src/lib.rs`)
 2. `ELOHIM_BOOTSTRAP_URL` / `ELOHIM_SIGNAL_URL` env vars (compile time)
 3. `ELOHIM_ENV=dev` selects alpha endpoints
 4. Default: production endpoints

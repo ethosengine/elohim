@@ -28,7 +28,8 @@ storage tier        .claude/memory/                      ← primary (in repo, g
                     .claude-config/.../memory  →  symlink to primary
 
 scripts (this dir)  cleanup-{scan,apply}.py              ← archive stale specs/plans/memory
-                    path-update-{scan,apply}.py          ← propagate renames into stale citations
+                    path-update-scan.py                  ← propagate renames into stale citations
+                    path-update-apply.py                 ← apply approved replacements
                     dedupe-memory-scan.py                ← surface merge candidates (TF-IDF)
                     memory-review.py                     ← MEMORY.md size/drift/growth/types
                     skill-audit.py                       ← always-loaded skill descriptions
@@ -83,7 +84,7 @@ reports / state     .claude/memory-kit/<YYYY-MM-DD>/     ← dated reports (oper
 1. `librarian` invoked → runs `memory-review.py` first (baseline)
 2. `librarian` checks drift store, decides scope (light vs full)
 3. Full pass: `cleanup-scan.py` → judgment subagent → `cleanup-apply.py`
-4. Then: `path-update-scan/apply.py`
+4. Then: `path-update-scan.py` → `path-update-apply.py`
 5. Then (monthly): `dedupe-memory-scan.py`, `skill-audit.py`, `claude-md-audit.py`
 6. Reports land in `.claude/memory-kit/<today>/`
 7. `cartographer` invoked → reads memkit reports → runs `converge-scan.py`

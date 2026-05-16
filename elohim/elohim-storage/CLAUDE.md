@@ -5,82 +5,18 @@ All data transformation happens here - TypeScript receives clean, ready-to-use o
 
 ## Core Principle
 
-**snake_case should NEVER leave the Rust boundary.**
-
-All transformations (JSON parsing, boolean coercion, camelCase conversion) happen in `views.rs`.
-TypeScript clients receive camelCase objects with properly typed fields - no parsing required.
-
----
+snake_case stays inside the Rust boundary; all transformations (JSON parsing, boolean coercion, camelCase conversion) happen in `views.rs`, because TypeScript clients should receive ready-to-use camelCase objects without parsing.
 
 ## Unified API for All Clients
 
-This HTTP API serves **both** deployment modes through a single codebase:
+A single HTTP surface (`http.rs` + `views.rs`) serves both deployment modes:
 
-```
-                    ┌─────────────────────────────────────┐
-                    │         elohim-storage              │
-                    │   (http.rs / views.rs unified API)  │
-                    │                                     │
-                    │  /db/content, /session, /blob/...   │
-                    │         camelCase boundary          │
-                    └─────────────────────────────────────┘
-                                    ▲
-                    ┌───────────────┴───────────────┐
-                    │                               │
-            ┌───────┴───────┐             ┌────────┴────────┐
-            │   Doorway     │             │  Tauri App      │
-            │  (proxy at    │             │ (direct HTTP    │
-            │  doorway.host)│             │  localhost:8090)│
-            └───────────────┘             └─────────────────┘
-```
+- **Browser/Doorway**: `Browser → Doorway → elohim-storage`. Doorway proxies `/db/*`; its projection cache at `/api/v1/cache/*` accelerates reads.
+- **Tauri/Direct**: `Tauri App → elohim-storage` on `localhost:8090`. No FFI, no SQLite bindings — same HTTP routes as the proxied path.
 
-### Browser/Doorway Mode
-- Request path: `Browser → Doorway → elohim-storage`
-- Doorway proxies `/db/*` requests to elohim-storage
-- Also has projection cache at `/api/v1/cache/*` for fast reads
+## Layer Stack
 
-### Tauri/Direct Mode
-- Request path: `Tauri App → elohim-storage (localhost:8090)`
-- Same HTTP endpoints, just different host
-- No proxy, direct connection to local sidecar
-
-**Key Insight**: Tauri does NOT use Rust FFI or direct SQLite bindings. It makes standard HTTP fetch calls to the same `http.rs` endpoints that doorway proxies to. This ensures a single API boundary with consistent behavior.
-
----
-
-## Architecture Layers
-
-```
-HTTP Request (camelCase JSON)
-       ↓
-┌─────────────────────────────────────────────────┐
-│  http.rs - Route handlers                       │
-│  - Deserialize → InputView types                │
-│  - Convert → DB Input types                     │
-│  - Call services                                │
-│  - Convert → View types for response            │
-└─────────────────────────────────────────────────┘
-       ↓                    ↑
-┌─────────────────────────────────────────────────┐
-│  views.rs - API BOUNDARY (transformation layer) │
-│  - InputView: camelCase → snake_case + String   │
-│  - View: snake_case + String → camelCase + Value│
-│  - ts-rs exports TypeScript types               │
-└─────────────────────────────────────────────────┘
-       ↓                    ↑
-┌─────────────────────────────────────────────────┐
-│  db/*.rs - Database operations                  │
-│  - Internal types (snake_case, String JSON)     │
-│  - Diesel ORM queries                           │
-│  - NEVER exposed to HTTP directly               │
-└─────────────────────────────────────────────────┘
-       ↓                    ↑
-┌─────────────────────────────────────────────────┐
-│  SQLite - Storage                               │
-│  - TEXT for JSON fields                         │
-│  - INTEGER for booleans (0/1)                   │
-└─────────────────────────────────────────────────┘
-```
+`HTTP (camelCase JSON) ↔ http.rs (handlers) ↔ views.rs (View/InputView transforms + ts-rs export) ↔ db/*.rs (Diesel, snake_case, String JSON) ↔ SQLite (TEXT for JSON, INTEGER 0/1 for booleans)`. The `db/*` layer is never exposed to HTTP directly.
 
 ---
 
@@ -173,37 +109,11 @@ When modifying a View struct:
 
 ---
 
-## Anti-Patterns (DO NOT DO)
+## Anti-Patterns
 
-### Wrong: Exposing DB types to HTTP
-
-```rust
-// BAD - exposes snake_case to clients
-fn get_content() -> Json<Content> { ... }
-
-// GOOD - uses View type
-fn get_content() -> Json<ContentView> { ... }
-```
-
-### Wrong: JSON parsing in TypeScript
-
-```typescript
-// BAD - parsing in TypeScript
-const metadata = JSON.parse(response.metadataJson);
-
-// GOOD - already parsed by Rust
-const metadata = response.metadata;  // Ready to use
-```
-
-### Wrong: Transformation functions in TypeScript
-
-```typescript
-// BAD - toWire/fromWire functions
-const wire = toWireCreateContent(input);
-
-// GOOD - direct object passing
-const response = await api.createContent(input);  // camelCase in, camelCase out
-```
+- **Exposing DB types to HTTP** — `fn get_content() -> Json<Content>` leaks snake_case; use `Json<ContentView>` instead.
+- **JSON parsing in TypeScript** — `JSON.parse(response.metadataJson)` is wrong; Rust already parsed it to `response.metadata`.
+- **Transformation functions in TypeScript** — `toWireCreateContent(input)` is wrong; pass camelCase objects through directly, since `views.rs` is the conversion site.
 
 ---
 

@@ -8,6 +8,8 @@ metadata:
 
 # libp2p Protocols Reference
 
+> **Parallel stack:** Every plane described here has an iroh-ALPN counterpart in `elohim-storage/src/p2p_iroh/` — same wire bytes (MessagePack/CBOR), different transport. Adding a new protocol means designing transport-neutral service + libp2p inline handler + iroh `ProtocolHandler` + `Backend` trait adapter. See `rust-architect.md` §"Truth in motion" for the design pattern and `project_iroh_alpn_handlers_one_stream_design.md` for the `loop { accept_bi }` handler discipline (single-stream-per-conn handlers deadlock under bench reuse). The linked iroh memory entries carry temporal phase/gate state.
+
 The Elohim Protocol defines three custom libp2p protocols for P2P communication.
 
 ## Protocol Identifiers

@@ -1,11 +1,22 @@
 ---
 name: memory-kit
-description: Hygiene script runner for MEMORY.md, CLAUDE.md surfaces, and the skill/agent catalogs. Provides seven deterministic tools (cleanup, path-update, dedupe-memory, memory-review, claude-md-audit, skill-audit, agent-audit) plus a PreToolUse injector and PostToolUse drift accumulators. Read-only by default; mutations are operator-gated. Use this when you want to run a single hygiene tool ad-hoc or chain a few together to produce inspection reports.
+description: Librarian-solo hygiene-sweep toolkit and cadence. Provides seven deterministic tools (cleanup, path-update, dedupe-memory, memory-review, claude-md-audit, skill-audit, agent-audit) plus a PreToolUse injector and PostToolUse drift accumulators for byte-budget enforcement, archive-ratio tracking, and dead-citation hygiene. Read-only by default; mutations are operator-gated. Sibling to /memory-ceremony (which is the four-lens substrate-currency rewrite ceremony). Use this when you want byte-budget enforcement, an audit-numbers pass, or to chain a few hygiene tools ad-hoc.
 ---
 
-# Memory Kit — Maintain the Auto-Memory Complement
+# Memory Kit — Hygiene-Sweep Cadence (Librarian-Solo)
 
 Project memory lives at **`/projects/elohim/.claude/memory/`** — git-tracked, team-shareable, recoverable from clone. The harness-conventional path at `/projects/.claude-config/projects/-projects-elohim/memory/` is a symlink to the primary (so auto-memory writes land in the repo). See `.claude/memory/project_memory_in_repo_two_tier.md` for the rationale. This kit tends that `MEMORY.md` index and its typed topic files, fixes drift, surfaces archive candidates, and audits the always-loaded surfaces. It does not replace native auto-memory; it complements it.
+
+## Relationship to /memory-ceremony
+
+The memory team has two distinct cadences. Confusing them is what made the old 6-wave ceremony bloat:
+
+| Cadence | Lead | Deliverable | Frequency |
+|---|---|---|---|
+| **`/hygiene-sweep` (this kit)** | librarian solo | byte budgets clean, dead citations fixed, archive cascades applied, audit numbers moved | weekly or signal-driven (drift-score accumulator) |
+| **`/memory-ceremony`** | four-agent team (librarian + historian + cartographer + storyteller) | 1-2 gospel-tier surfaces rewritten with substrate-grounded, citation-linked, paste-ready content | when substrate-currency-audit flags drift, or on substrate landing |
+
+Audit numbers (`CLAUDE.md OVER-BUDGET count`, `cleanup-scan flags`, `Surface:Archive ratio`, `MEMORY.md byte size`) move here, NOT in the ceremony. The ceremony's deliverable is a *rewrite*; this kit's deliverable is *hygiene*. They are sibling rhythms — one can run without the other.
 
 The frame, after Pawel Huryn's article ("How I Finally Sorted My Claude Code Memory"):
 
@@ -196,24 +207,34 @@ from _lib import paths, store  # noqa: E402
 
 **Discipline**: only extract when 3+ callers share the same pattern. Resist scope creep. New scripts use these from the start; older scripts migrate when touched.
 
-## Recommended Periodic Workflow
+## /hygiene-sweep cadence
 
-**Weekly hygiene (~15 minutes)**:
-1. `python3 .claude/scripts/memory-kit/cleanup-scan.py`
-2. Invoke this skill so cleanup's judgment-phase subagent runs
-3. `python3 .claude/scripts/memory-kit/path-update-scan.py`
-4. `python3 .claude/scripts/memory-kit/memory-review.py`
+This kit's primary periodic role. Librarian-solo (no four-agent ceremony, no operator gates beyond the apply-step approvals on cleanup/path-update). Designed to keep audit numbers from regressing so the substrate-currency ceremony can focus on rewrites, not byte-budget triage.
+
+**Weekly sweep (~15 minutes)** — the standard /hygiene-sweep rhythm:
+
+1. `python3 .claude/scripts/memory-kit/memory-review.py` — baseline + budget check
+2. `python3 .claude/scripts/memory-kit/cleanup-scan.py` — surface archive candidates
+3. Dispatch the cleanup-judge subagent over `cleanup-proposals.md`
+4. `python3 .claude/scripts/memory-kit/path-update-scan.py`
 5. Review the dated `.claude/memory-kit/<today>/` directory
 6. Mark `- [x] Accept` on cleanup and path-update entries you approve
 7. Run apply scripts: `cleanup-apply.py` → `path-update-apply.py`
+8. `genesis/scripts/memory-balance.sh` — log Surface:Archive ratio + budget deltas
 
 **Monthly deeper sweep (add to the weekly)**:
 - `python3 .claude/scripts/memory-kit/dedupe-memory-scan.py --threshold 0.30`
+- `python3 .claude/scripts/memory-kit/claude-md-audit.py` — byte-budget + drift across all CLAUDE.md
+- `python3 .claude/scripts/memory-kit/agent-audit.py`
 - `python3 .claude/scripts/memory-kit/skill-audit.py`
 
-**Before a major `/shift`**: at minimum run cleanup + path-update + memory-review.
+**Signal-driven trigger** (preferred over fixed cadence): when `.claude/memory-kit/claude-md-drift.json` accumulates `drift_score ≥ 3.0` on any file, or `memory-review.py` reports MEMORY.md at ≥90% of byte budget, the sweep is overdue.
 
-**Handoff to `/converge`**: if you want a "what's next?" menu after the hygiene sweep, invoke `/converge`. It reads memory-kit's reports from `.claude/memory-kit/<today>/` and produces the ranked next-actions menu at `.claude/memory-kit/<today>/next-actions.md`.
+**Before a major `/shift`**: at minimum run cleanup + path-update + memory-review. If MEMORY.md is near budget, also tighten the index (graduate or umbrella per `[[feedback_correct_reindex_grows_index]]`).
+
+**Handoff to `/converge`**: after a sweep, if the operator asks "what's next?", invoke `/converge`. It reads this kit's reports from `.claude/memory-kit/<today>/` and produces the ranked next-actions menu.
+
+**Handoff to `/memory-ceremony`**: if `substrate-currency-audit.py` (run as part of the sweep or separately) flags a gospel-tier surface as high-drift, the next ceremony picks it up. The hygiene sweep does NOT attempt rewrites — that's the ceremony's deliverable.
 
 ## Design Principles
 

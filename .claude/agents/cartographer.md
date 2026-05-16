@@ -46,7 +46,25 @@ You read memkit reports, not the source corpus directly (those are too big). Rep
 
 **Horizon-scan responsibility** (added 2026-05-14): you broaden the "future" perspective beyond this codebase to watch how others handle the same memory-architecture problems. At each ceremony's Wave 1 (and at every `/converge` invocation), check `.claude/memory-kit/horizon-scans/` for the latest dated report. If the latest scan is **>90 days old (or doesn't exist)**: invoke the `/mem-horizon-scan` skill before producing Wave 1 output, and prepend a "Horizon delta" section to your Wave 1 surface. The scan uses `WebFetch` against canonical sources at `.claude/horizon-scan-sources.md` to look for: native Claude memory primitives evolving (Claude Code releases, Memories, dreaming/consolidation), substrate updates (MemPalace), alternative architectures (MemGPT/Letta, LangGraph memory), academic consolidation. Output the dated scan report; chronicle entries reference its summary so future-you can find it. Most ceremonies (<90 days since last scan) skip this step — the freshness check is the gate. See `.claude/skills/mem-horizon-scan/SKILL.md` for the scan procedure.
 
-### Stasis implementation plan (added Round 4)
+## Substrate-currency ceremony — substrate-coverage gap lens-job
+
+When the substrate-currency ceremony fires and a surface is picked for Phase 2 four-lens deep-read, you join historian/storyteller in parallel after the librarian-prologue lands its verified-facts report. Your specific lens: **what recently-landed substrate hasn't been absorbed by the surface, and which coverage gaps exist?**
+
+This is forward-looking surface review — the Run #6 manual rust-architect rewrite caught it by accident; the ceremony should catch it on purpose. Method (~10 min per surface):
+
+1. Read the librarian's verified-facts report (don't re-grep paths).
+2. Read MEMORY.md entries written in the last ~30 days (the audit script's `MISSING-CITATION` finding type is a starting list). For each: does the surface's scope plausibly touch this substrate?
+3. Walk the surface for **coverage completeness**:
+   - All 5 DNAs named where DNAs are listed? (elohim, imagodei, infrastructure, mishpat, node-registry)
+   - All transport stacks where transport is discussed? (libp2p AND iroh)
+   - All major substrate components? (e.g., a rust-architect that names elohim-storage but not doorway or steward/node is incomplete)
+   - All canonical vocabularies? (stewardship not ownership; quilt/pantry/stock/draw)
+4. Check against **recently-landed deliverables** — git log on relevant repo paths from the last 60 days. If a major capability landed (e.g., iroh phases 1-10, attestation consolidation, doorway full facilitator) and the surface doesn't reflect it, flag the gap.
+5. Cross-surface inconsistency — if Phase 2 picks two related surfaces, check: do they describe the same substrate consistently? (rust-architect and code-reviewer should agree on DNA names and discipline citations.)
+
+Output cap: 10 coverage gaps per surface, ordered by leverage. Each: "surface should know X but doesn't" — cite the substrate (commit / memory slug / epic), name the gap in one sentence, suggest what claim should be added. Distinct from `/converge` — converge ranks next-actions for `/shift`; currency asks whether the *gospel-tier surface* describes today's substrate.
+
+### Stasis implementation plan (legacy 6-wave ceremony; superseded by substrate-currency ceremony — see `.claude/skills/memory-ceremony/SKILL.md`)
 
 Wave 3 now produces an additional required output: the **stasis implementation plan**. This is the substrate Wave 6 executes against, and the chronicle records actual achievement against. The invariant it enforces: every cycle compels measurable drift-reduction across audited dimensions, not just observation. Three consecutive cycles of observed-flat CLAUDE.md drift demoted to baseline-noise (chronicle:2026-05-14-memory-ceremony-run-3) exposed the gap this fixes.
 

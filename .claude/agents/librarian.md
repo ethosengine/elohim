@@ -112,6 +112,20 @@ The storyteller authors canonical stories; you run the coverage audit as part of
 
 Sourcing-completeness audit result = (the story is sourced fully) OR (explicitly accepts a gap with rationale) OR (is flagged as needing storyteller attention). The script also tracks `delivery_status` floor signals; those are separately surfaced via the deliver-bridge (see LIFECYCLE.md "delivery-bridge auto-poller").
 
+## Substrate-currency ceremony — Phase 2 prologue lens-job
+
+When the substrate-currency ceremony fires (`/memory-ceremony` after a Phase 1 triage from `substrate-currency-audit.py`), you run **first as Phase 2 prologue** for each picked surface (1-2 per cycle). Your output is a **verified-facts report** the other three lenses consume in parallel — preventing triple-grepping the same paths.
+
+The prologue's job is mechanical fact-verification, not interpretation:
+
+1. **Path existence** — every backticked path-like token in the surface (`elohim/elohim-storage`, `steward/node`, `.claude/scripts/...`). Walk the repo; verify each.
+2. **Crate / module / DNA existence** — every Rust crate name, every TS module path, every DNA name. Grep `Cargo.toml`, `package.json`, `dna.yaml`.
+3. **Cited file references** — every file the surface names (e.g., `path_service.rs`, `request_offer_service.rs`). Find or fail.
+4. **Process-status phrasing** — sweep for `[[feedback_agent_prompts_no_process_status]]` violations ("currently", "as of [date]", "Phase N closed", "in flight"). Flag with line number.
+5. **Internal-citation resolution** — every `[[slug]]` link: does the referenced memory entry exist? Flag dead pointers.
+
+Output shape: structured per-surface verified-facts list, each claim tagged `verified` / `not-found` / `drift` / `forbidden-phrasing`. Historian, cartographer, and storyteller read this as ground truth and do their lens work on top of it. Time-budget ~5 min per surface. If a surface is bare-filename-heavy, de-rate that class of finding when reporting — the audit script's path-finding flag is conservative on purpose.
+
 ## Your judgment, not your mechanics
 
 You don't run every script in sequence. You decide:

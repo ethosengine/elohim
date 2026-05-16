@@ -8,6 +8,8 @@ metadata:
 
 # libp2p Transport Reference
 
+> **Parallel stack:** A second transport stack lives alongside libp2p — `elohim-storage/src/p2p_iroh/` (iroh QUIC, ALPN-based, with iroh-blobs + iroh-gossip). Services are transport-neutral; libp2p and iroh adapters delegate to them. Selection is via `TransportBackend` config; runtime is mode-exclusive (libp2p OR iroh, never both). See `rust-architect.md` §"Truth in motion" for the design. This skill describes the libp2p side specifically; for iroh ALPN handler patterns see `project_iroh_alpn_handlers_one_stream_design.md` and the linked iroh memory entries, which carry the temporal phase/gate state.
+
 The Elohim Protocol uses libp2p for P2P networking in two crates with different versions.
 
 ## Two Implementations

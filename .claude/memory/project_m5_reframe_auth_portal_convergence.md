@@ -4,12 +4,12 @@ description: M5 pivots from full elohim-defender implementation to connecting ho
 type: project
 originSessionId: 4d20bf7b-4639-43d8-ad10-fccb514a7f0a
 ---
-The kickoff prompt at `genesis/docs/plans/2026-04-24-recovery-m5-elohim-defender-and-revocation-ux-kickoff-prompt.md` originally scoped M5 as defender backend + revocation UX. **2026-04-25 user reframe** changed scope:
+The original M5 kickoff prompt (recovery-m5-elohim-defender-and-revocation-ux, archived) scoped M5 as defender backend + revocation UX. **2026-04-25 user reframe** changed scope:
 
 **Defender — stub only.** Elohim calls remain stubbed in the design. Scaffold the specialist pattern (manifest, detection signal subscription, `submit_specialist_revocation` coordinator gate) but do NOT ship real detection logic. Real detection follows when elohim integration is actually ready.
 
 **The real M5 work — auth-portal convergence.** Two auth portals coexist:
-- Doorway (hosted) — `doorway/doorway-app/components/login/threshold-login.component.ts` + `components/account/doorway-account.component.ts`. Web2 portal for unsgraduated humans.
+- Doorway (hosted) — `doorway/doorway-app/src/app/components/login/threshold-login.component.ts` + `src/app/components/account/doorway-account.component.ts`. Web2 portal for unsgraduated humans.
 - Peer-native (steward) — supersedes doorway when a hosted human upgrades to have a peer-steward presence. EPR 2B Batch A landed the substrate: `AgentPeerBinding` entry, `/elohim/identity/handshake/1.0.0` libp2p protocol, `peer_identity_bindings` projection.
 
 M5 connects them via the **account management surface** in elohim-app (Surface 3 from `project_imagodei_three_surfaces`). The Security & sign-in pane is where:

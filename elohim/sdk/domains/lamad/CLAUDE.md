@@ -128,47 +128,12 @@ The manifest schema (`app-manifest.schema.json`) rejects content types without `
 
 ## Manifest Structure
 
-```json
-{
-  "id": "manifest-lamad",
-  "name": "lamad",
-  "version": "1.0.0",
-  "vocabulary": {
-    "contentTypes": {
-      "concept": {
-        "description": "...",
-        "metadataSchema": { "$ref": "./schemas/concept-metadata.schema.json" },
-        "coupling": {
-          "knowledge": { "relationships": { "CONTAINS": [...], "RELATES_TO": [...] } },
-          "value": {
-            "onConsume": { "action": "use", "resourceConformsTo": "learning-content" },
-            "onComplete": { "action": "produce", "resourceConformsTo": "mastery-attestation" }
-          },
-          "governance": {
-            "defaultReach": "commons",
-            "governanceModel": "steward-consent",
-            "signalTypes": ["learning-signal", "mastery-achieved"]
-          },
-          "claims": [{ "outcome": "learner-understands-concept", "contradictedBy": "retention-failure", ... }]
-        }
-      }
-    },
-    "contentFormats": {
-      "epr-composite": {
-        "renderer": "path-renderer",
-        "bodySchema": { "$ref": "./schemas/epr-composite-body.schema.json" }
-      }
-    },
-    "relationships": { "CONTAINS": { ... }, "RELATES_TO": { ... } },
-    "signals": { "learning-signal": { "substrateSignal": "attention", "economicAction": "use" } },
-    "observations": { "retention-check": { "polarity": "negative", "archetype": "retention-check" } }
-  },
-  "rendering": {
-    "markdown-renderer": { "component": "MarkdownRendererComponent", "formats": ["markdown"] },
-    "sophia-renderer": { "component": "SophiaRendererComponent", "formats": ["sophia-quiz-json"] }
-  }
-}
-```
+`manifest.json` carries `id`, `name`, `version`, and two top-level blocks:
+
+- **`vocabulary`** — `contentTypes` (each: `description`, `metadataSchema` $ref, `coupling.{knowledge,value,governance,claims}`), `contentFormats` (renderer + bodySchema $ref), `relationships` (CONTAINS/RELATES_TO definitions), `signals` (substrateSignal + economicAction), `observations` (polarity + archetype).
+- **`rendering`** — maps renderer ids to `{ component, formats[] }` (e.g. `markdown-renderer → MarkdownRendererComponent` for `["markdown"]`; `sophia-renderer → SophiaRendererComponent` for `["sophia-quiz-json"]`).
+
+See `manifest.json` for the canonical shape; the JSON schema at `elohim/sdk/schemas/v1/manifest/app-manifest.schema.json` enforces it.
 
 ## Content Pipeline (end to end)
 

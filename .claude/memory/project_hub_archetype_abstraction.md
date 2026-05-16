@@ -14,7 +14,7 @@ Shared `Hub` interface (substrate-level only):
 - WAN profile (fiber/cable/cellular/satellite/LoRa fallback)
 - inclusion role (does this hub carry external spokes?)
 
-**Constitutional rule (Elohim constitution candidate — to be ratified in follow-up brainstorm):** hub hardware MUST be made accessible to its stewards. Access path must be inspectable, modifiable, retrievable, and not depend on a third party who is not a steward. If access is denied or revoked by anyone other than a steward, the stewards retain the capability to **quarantine** (mark unusable, reassign duties, treat data as unrecoverable until access restored) or **evict** (remove from hub composition, halt routing through the device, notarize the eviction). This is a constitutional power, not an operational override — inaccessibility is a violation, not a normal failure mode. Scaffolded in `genesis/a2o/features/deployment/hub-topology.feature` under `@constitutional` scenarios.
+**Constitutional rule (Elohim constitution candidate — to be ratified in follow-up brainstorm):** hub hardware MUST be made accessible to its stewards. Access path must be inspectable, modifiable, retrievable, and not depend on a third party who is not a steward. If access is denied or revoked by anyone other than a steward, the stewards retain the capability to **quarantine** (mark unusable, reassign duties, treat data as unrecoverable until access restored) or **evict** (remove from hub composition, halt routing through the device, notarize the eviction). This is a constitutional power, not an operational override — inaccessibility is a violation, not a normal failure mode. (Substrate-not-yet-built: a `hub-topology.feature` under `@constitutional` scenarios is the planned home; @wip until simulation harness lands per the strategy below.)
 
 **Hubs need a stronger encryption story than individual devices — the encryption boundary terminates at the hub↔spoke edge.** A hub is an always-on, physically-present, centralized theft target. If a hub is stolen, you lose data for every steward and every spoke that syncs through it. This makes hub at-rest encryption + key custody load-bearing in a way that device-level OS custody on phones/laptops is not.
 
@@ -45,7 +45,7 @@ Realm-specific implementations:
 1. **`@wip` first** — declare hub archetypes as fixtures, write scenarios against them, tag unrunnable until substrate + simulation harness lands. Cheap, preserves design intent.
 2. **Simulation harness** as follow-up sprint — virtual hub processes (multiple `elohim-storage` instances per machine), simulated spokes (mock peers with declared connectivity profiles), simulated bandwidth/latency/availability per archetype.
 
-**Where it lives:** `genesis/data/hubs/hubs.json` parallel to `devices.json`; `HubArchetype` (abstract) + `HouseholdHub` / `CollectiveHub` types in `genesis/a2o/src/framework/fixtures/hubs.ts`; `getHub(name)` accessor parallel to `getDevice(name)`.
+**Where it lives (planned, not yet built):** `genesis/data/hubs/hubs.json` parallel to `devices.json`; `HubArchetype` (abstract) + `HouseholdHub` / `CollectiveHub` types in `genesis/a2o/src/framework/fixtures/hubs.ts`; `getHub(name)` accessor parallel to `getDevice(name)`. As of 2026-05-15 none of those files exist — the abstraction is design-staged.
 
 **How to apply:**
 - Use **stewards**, not "members," when referring to the humans with authority over a hub. Membership is a passive category; stewardship carries agency, accountability, and constitutional power including eviction.

@@ -16,7 +16,7 @@ slug: "the-coop-decides"
 version: 1
 written: "2026-05-14"
 author: "storyteller"
-status: "draft"                              # ceremony Run #5 Wave 6 author; operator flips at next Wave 4
+status: "canonical"                          # ceremony Run #5 Wave 6 author; operator flipped to canonical at Run #6 Wave 4 (2026-05-15) — no body changes per Wave 2 storyteller read
 
 # Delivery axis — orthogonal to author-status. Read-only to storyteller.
 # `collective-governance.feature` EXISTS at genesis/a2o/features/qahal/collective-governance.feature

@@ -26,14 +26,14 @@ Stories below are listed by `status` (author-axis) with `delivery_status` (subst
 
 ### ceremonial-ux
 - [james-and-the-spoke](epr:experience-story/james-son/as-stewardee/stewarded-device-sync) *(canonical / delivery_status: undelivered)*
-- [the-coop-decides](epr:experience-story/terrance-tutor/as-collective-steward/collective-governance) *(draft / delivery_status: undelivered)*
+- [the-coop-decides](epr:experience-story/terrance-tutor/as-collective-steward/collective-governance) *(canonical / delivery_status: undelivered)*
 
 ### graduated-authority
 - [james-and-the-spoke](epr:experience-story/james-son/as-stewardee/stewarded-device-sync) *(canonical / delivery_status: undelivered)*
 
 ### community-attestation
 - [james-and-the-spoke](epr:experience-story/james-son/as-stewardee/stewarded-device-sync) *(canonical / delivery_status: undelivered)*
-- [the-coop-decides](epr:experience-story/terrance-tutor/as-collective-steward/collective-governance) *(draft / delivery_status: undelivered)* — `(human-terrance-tutor, role-as-collective-steward, collective-governance)`
+- [the-coop-decides](epr:experience-story/terrance-tutor/as-collective-steward/collective-governance) *(canonical / delivery_status: undelivered)* — `(human-terrance-tutor, role-as-collective-steward, collective-governance)`
 
 ### household-fabric
 - [james-and-the-spoke](epr:experience-story/james-son/as-stewardee/stewarded-device-sync) *(canonical / delivery_status: undelivered)*
@@ -42,16 +42,16 @@ Stories below are listed by `status` (author-axis) with `delivery_status` (subst
 - [james-and-the-spoke](epr:experience-story/james-son/as-stewardee/stewarded-device-sync) *(canonical / delivery_status: undelivered)*
 
 ### governance
-- [the-coop-decides](epr:experience-story/terrance-tutor/as-collective-steward/collective-governance) *(draft / delivery_status: undelivered)* — six homeschool families rank a history curriculum by ranked-choice; the elohim casts proxy and justifies in plain language.
+- [the-coop-decides](epr:experience-story/terrance-tutor/as-collective-steward/collective-governance) *(canonical / delivery_status: undelivered)* — six homeschool families rank a history curriculum by ranked-choice; the elohim casts proxy and justifies in plain language.
 
 ### ranked-choice
-- [the-coop-decides](epr:experience-story/terrance-tutor/as-collective-steward/collective-governance) *(draft / delivery_status: undelivered)*
+- [the-coop-decides](epr:experience-story/terrance-tutor/as-collective-steward/collective-governance) *(canonical / delivery_status: undelivered)*
 
 ### collective-decision
-- [the-coop-decides](epr:experience-story/terrance-tutor/as-collective-steward/collective-governance) *(draft / delivery_status: undelivered)*
+- [the-coop-decides](epr:experience-story/terrance-tutor/as-collective-steward/collective-governance) *(canonical / delivery_status: undelivered)*
 
 ### elohim-justification
-- [the-coop-decides](epr:experience-story/terrance-tutor/as-collective-steward/collective-governance) *(draft / delivery_status: undelivered)*
+- [the-coop-decides](epr:experience-story/terrance-tutor/as-collective-steward/collective-governance) *(canonical / delivery_status: undelivered)*
 
 ---
 
@@ -61,7 +61,7 @@ Stories below are listed by `status` (author-axis) with `delivery_status` (subst
 - [james-and-the-spoke](epr:experience-story/james-son/as-stewardee/stewarded-device-sync) *(canonical / delivery_status: undelivered)* — protagonist; the stewarded child opening a spoke into the family ring.
 
 ### human-terrance-tutor (Terrance)
-- [the-coop-decides](epr:experience-story/terrance-tutor/as-collective-steward/collective-governance) *(draft / delivery_status: undelivered)* — protagonist; the facilitator whose curriculum disposition weights the coop's ranked-choice tally and whose attestation history the elohim references in proxy votes.
+- [the-coop-decides](epr:experience-story/terrance-tutor/as-collective-steward/collective-governance) *(canonical / delivery_status: undelivered)* — protagonist; the facilitator whose curriculum disposition weights the coop's ranked-choice tally and whose attestation history the elohim references in proxy votes.
 
 ### Additional characters (not the subject of their own story yet)
 
@@ -86,7 +86,7 @@ subjects of their own canonical stories — listed as coverage gaps below.
 > coverage gap; operator decision.
 
 ### @as-collective-steward
-- [the-coop-decides](epr:experience-story/terrance-tutor/as-collective-steward/collective-governance) *(draft / delivery_status: undelivered)*
+- [the-coop-decides](epr:experience-story/terrance-tutor/as-collective-steward/collective-governance) *(canonical / delivery_status: undelivered)*
 
 > Role record `role-as-collective-steward` **does not yet exist** in
 > `genesis/data/lamad/content/`. Distinct from `@as-stewardee` (an individual
@@ -103,7 +103,7 @@ subjects of their own canonical stories — listed as coverage gaps below.
 - [james-and-the-spoke](epr:experience-story/james-son/as-stewardee/stewarded-device-sync) *(canonical / delivery_status: undelivered)*
 
 ### collective-governance
-- [the-coop-decides](epr:experience-story/terrance-tutor/as-collective-steward/collective-governance) *(draft / delivery_status: undelivered)* — canonical feature exists at `genesis/a2o/features/qahal/collective-governance.feature` (one of the few stories whose canonical feature is already on disk). Anchors specifically to scenarios: "Community uses ranked-choice to pick a curriculum path" (lines 40-58), "Elohim builds governance disposition from voting history" (lines 240-247), and "Elohim votes as proxy when human hasn't engaged" (lines 249-256). Substrate-axis remains `undelivered` until `/deliver` mints a tier-3 verdict.
+- [the-coop-decides](epr:experience-story/terrance-tutor/as-collective-steward/collective-governance) *(canonical / delivery_status: undelivered)* — canonical feature exists at `genesis/a2o/features/qahal/collective-governance.feature` (one of the few stories whose canonical feature is already on disk). Anchors specifically to scenarios: "Community uses ranked-choice to pick a curriculum path" (lines 40-58), "Elohim builds governance disposition from voting history" (lines 240-247), and "Elohim votes as proxy when human hasn't engaged" (lines 249-256). Substrate-axis remains `undelivered` until `/deliver` mints a tier-3 verdict.
 
 > Feature file `genesis/a2o/features/.../stewarded-device-sync.feature`
 > **does not yet exist**. Adjacent features the story touches (declared in
@@ -137,10 +137,10 @@ subjects of their own canonical stories — listed as coverage gaps below.
 - [james-and-the-spoke](epr:experience-story/james-son/as-stewardee/stewarded-device-sync) *(canonical / delivery_status: undelivered)* — *epic body is `.gitkeep` only; story anchors here as the first concrete instantiation of a student's experience inside the educational governance layer.*
 
 ### social_medium/ (epic.md)
-- [the-coop-decides](epr:experience-story/terrance-tutor/as-collective-steward/collective-governance) *(draft / delivery_status: undelivered)* — anchors to the social_medium epic's "earned reach" and "attention as sacred" philosophical floor. The coop's decision instantiates the principle that *reach is negotiated BEFORE distribution*, applied to governance distribution rather than content distribution.
+- [the-coop-decides](epr:experience-story/terrance-tutor/as-collective-steward/collective-governance) *(canonical / delivery_status: undelivered)* — anchors to the social_medium epic's "earned reach" and "attention as sacred" philosophical floor. The coop's decision instantiates the principle that *reach is negotiated BEFORE distribution*, applied to governance distribution rather than content distribution.
 
 ### governance_layers/functional/qahal/ (acknowledged-gap)
-- [the-coop-decides](epr:experience-story/terrance-tutor/as-collective-steward/collective-governance) *(draft / delivery_status: undelivered)* — *the qahal functional governance layer has no epic body on disk; only the feature directory at `a2o/features/qahal/` and the elohim-app pillar exist. The story carries the philosophy until an epic body lands. Cartographer should rank "author governance_layers/functional/qahal/README.md" as a candidate Objective.*
+- [the-coop-decides](epr:experience-story/terrance-tutor/as-collective-steward/collective-governance) *(canonical / delivery_status: undelivered)* — *the qahal functional governance layer has no epic body on disk; only the feature directory at `a2o/features/qahal/` and the elohim-app pillar exist. The story carries the philosophy until an epic body lands. Cartographer should rank "author governance_layers/functional/qahal/README.md" as a candidate Objective.*
 
 ---
 
@@ -254,3 +254,14 @@ The corpus is brand new. Each row below is a candidate Tier 1 anchor.
   taxonomy this is `graduated-narratively`, and a `delivery-debt` flag
   (cartographer backlog: "author `stewarded-device-sync.feature` + run
   through `/deliver`") was attached. See [[feedback_story_delivery_status_axis]].
+- `terrance-tutor--as-collective-steward--coop-decides` (slug: `the-coop-decides`)
+  flipped from `draft` to `canonical` on 2026-05-15 (Run #6 Wave 4 operator
+  approval). No body changes — storyteller Wave 2 read surfaced no revision
+  dimension. No memory entries graduated/memorialized in this flip (the
+  `graduates_memory: []` and `memorializes: []` frontmatter blocks remain
+  empty by design; the story's lesson is governance-process, which the
+  current memory corpus does not yet hold as a discrete-archivable entry).
+  Substrate-axis remains `undelivered` (canonical feature `collective-
+  governance.feature` exists on disk but no `/deliver` tier-3 verdict has
+  been minted; per Run #2 taxonomy this is `graduated-narratively` for the
+  story, with delivery-debt carryforward on the verdict pass).

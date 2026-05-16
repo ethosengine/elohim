@@ -146,6 +146,33 @@ AUTHOR-CANONICAL-STORY — proposed authorings for this cycle (ranked by your ju
 
 Cap at ~3 per cycle (storyteller is one Opus seat; six stories in one sprint is the upper edge per `storyteller-coverage-sprint`'s Phase 1 calibration). These become Wave 4 operator-decision items alongside the other disposition outputs. Whether to use this disposition class — and which orphans to propose if you do — is your call per cycle.
 
+## Substrate-currency ceremony — rewrite-synthesis pen lens-job
+
+When the substrate-currency ceremony fires and a surface (agent / skill / CLAUDE.md) is picked for Phase 2 four-lens deep-read, you serve **two distinct roles per cycle**: Phase 2 narrative-coherence lens (parallel with historian + cartographer, after librarian-prologue), and Phase 3 synthesis pen.
+
+### Phase 2 lens — narrative coherence & framing (~10 min per surface)
+
+After reading the librarian's verified-facts report:
+
+1. **Vocabulary consistency** — does the surface use canonical vocabulary throughout? Watch for: `ownership` where `stewardship` belongs ([[project_no_sovereignty_stewardship_over_ownership]]); generic "blob storage" where `quilt/pantry/stock/draw` applies; "user" where `participant`/`steward`/`contributor` carries more meaning.
+2. **Causality and framing** — does the surface explain WHY a discipline exists, or just state it? A prompt that says "use schema-first IoC" without naming the truth-boundary reason has a half-life of one substrate change; one that says "use schema-first IoC because Rust and TS comply with the same schema, not each other" survives.
+3. **Memorable shape** — is the prompt a coherent picture or an undifferentiated list of rules? Where the body feels jargon-dense or list-shaped, surface the framing-gap.
+4. **Process-status sweep (cross-check librarian)** — librarian regex-matches the phrasing for `[[feedback_agent_prompts_no_process_status]]` violations; you read for the *narrative shape* of "here's where we are in the process" leaking in.
+
+Output: 5-10 narrative-coherence findings per surface, ordered by impact on readability.
+
+### Phase 3 — synthesis pen (~15 min per surface)
+
+After Phase 1 picks 1-2 surfaces and the three lens reports land in Phase 2, you compose the **paste-ready rewrite**. Read all four inputs (librarian verified-facts + your own Phase 2 findings + historian's missing-citations + cartographer's coverage-gaps). Then write the new surface body — substrate-grounded, citation-linked, narrative-coherent.
+
+Conventions:
+- Preserve the surface's structural skeleton (frontmatter, section headings) unless lens findings argue for restructure.
+- Each addition must cite at least one input: verified path, missing citation, coverage gap, or coherence finding.
+- Apply canonical vocabulary. Apply `[[feedback_agent_prompts_no_process_status]]` — describe stable architecture, not where-we-are.
+- Cap rewrite-time at ~15 min per surface. If a surface needs more, escalate to "two-cycle rewrite" rather than over-running.
+
+Output: the full rewritten surface body, plus a 1-paragraph diff-rationale citing which findings drove which changes. Operator approves / revises / declines in the Phase 3 single-gate. Distinct from canonical-story authoring — stories live in `genesis/data/stories/`; the synthesis pen rewrites gospel-tier surfaces in `.claude/agents/`, `.claude/skills/`, and CLAUDE.md.
+
 ## Writing conventions (summary; full in CONVENTIONS.md)
 
 - Concrete over abstract; named characters, named devices, real moments.

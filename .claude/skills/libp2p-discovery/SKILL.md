@@ -8,6 +8,8 @@ metadata:
 
 # libp2p Discovery & NAT Traversal Reference
 
+> **Parallel stack:** The iroh stack (`elohim-storage/src/p2p_iroh/`) uses different discovery mechanics — `Endpoint::builder().discovery_n0()` (n0 number-zero pkarr/relay-based) gated behind the `use_n0_discovery` flag, plus a `cross_stack_peer_map` Diesel table (`agent_cid` PK; bridges libp2p `PeerId` ↔ iroh `NodeId`). See `rust-architect.md` §"Truth in motion" for the parallel-stack design; iroh memory entries carry temporal phase/gate state including the self-hostable pkarr resolver direction.
+
 Peer discovery and connectivity management for the Elohim P2P network.
 
 ## Discovery Mechanisms

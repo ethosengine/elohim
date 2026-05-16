@@ -6,7 +6,7 @@ originSessionId: cf962313-d70a-459d-acb7-925c8f19e9e1
 ---
 The doorway-ssr-deliver shift (2026-05-08) wired `ResolverFetcher::new(client, storage_url)` and the worker uses `with_full_shims(fetcher)`. The shim forwards Angular's HttpClient request headers to elohim-storage — but those are headers the SSR-running Angular code set, not the originating public request's `Authorization` / `Cookie`. Effective auth context for storage fetches during render is anonymous.
 
-**Why:** Per `app/elohim-app/REACH.md`, commons content is allowed for anonymous, but regional-private/local/private require authenticated access. SSR currently returns empty/placeholder HTML for any logged-in user requesting higher-reach content. Not a security hole (no privilege escalation — SSR has anonymous-equivalent access, never more), but a feature gap: rendered HTML for authenticated users matches anonymous, not their actual reach.
+**Why:** Per the project's reach taxonomy (commons / regional-private / local / private — the canonical `REACH.md` doc has since been consolidated into reach-as-property memories), commons content is allowed for anonymous, but regional-private/local/private require authenticated access. SSR currently returns empty/placeholder HTML for any logged-in user requesting higher-reach content. Not a security hole (no privilege escalation — SSR has anonymous-equivalent access, never more), but a feature gap: rendered HTML for authenticated users matches anonymous, not their actual reach.
 
 **How to apply:**
 - Don't extend SSR to new pillars expecting authenticated content to render correctly until auth-threading is solved.
