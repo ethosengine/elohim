@@ -177,6 +177,11 @@ async function main() {
   );
   ajv.addSchema(pillarProjectionSchema, 'epr:pillar-projection.schema.json');
 
+  const observationKindSchema = await loadJson(
+    resolve(__dirname, '../v1/manifest/observation-kind.schema.json'),
+  );
+  ajv.addSchema(observationKindSchema, 'epr:observation-kind.schema.json');
+
   const schema = await loadJson(
     resolve(__dirname, '../v1/manifest/app-manifest.schema.json'),
   );

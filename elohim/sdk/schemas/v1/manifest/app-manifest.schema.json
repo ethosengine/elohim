@@ -70,6 +70,79 @@
         },
         "additionalProperties": false
       }
+    },
+    "graph": {
+      "type": "object",
+      "description": "Graph-native projection extension (per 2026-05-16 graph-native-projection-substrate spec). Declares domain-specific edge types, node augmentations, indexes, and named Datalog rules that extend the core EPR graph schema. Applied at manifest registration time by the Rust graph registry validator.",
+      "properties": {
+        "edges": {
+          "type": "array",
+          "description": "Domain edge type declarations. Each entry registers a new rel_type in epr_edge. Core rel_types (SUPERSEDES, etc.) are always available and need not be redeclared.",
+          "items": {
+            "type": "object",
+            "required": ["type", "from", "to"],
+            "properties": {
+              "type": { "type": "string", "minLength": 1, "description": "Relation type name (e.g. 'PREREQUISITE'). Must be uppercase by convention. Must not collide with rel_types declared by other manifests." },
+              "from": { "type": "string", "minLength": 1, "description": "Source node type (e.g. 'EprHead', 'ContributorDID', or a domain-declared node type)." },
+              "to": { "type": "string", "minLength": 1, "description": "Target node type." },
+              "indexed": { "type": "boolean", "default": false, "description": "Whether to create an epr_edge index for this rel_type at registration time." },
+              "directional": { "type": "boolean", "default": true, "description": "Whether the edge is directional. Bidirectional edges are stored as two directed edges." },
+              "weighted": { "type": "boolean", "default": false, "description": "Whether this edge carries a numeric weight (future; not applied in current engine)." },
+              "temporal": { "type": "boolean", "default": false, "description": "Whether this edge carries bitemporal validity semantics (future)." },
+              "description": { "type": "string", "description": "Human-readable description of what this edge type represents." }
+            },
+            "additionalProperties": false
+          }
+        },
+        "nodes": {
+          "type": "array",
+          "description": "Domain-specific node augmentation declarations. Creates a CozoDB relation named '{manifest_name}_{type}' holding domain-specific properties for EPR nodes.",
+          "items": {
+            "type": "object",
+            "required": ["type", "properties"],
+            "properties": {
+              "type": { "type": "string", "minLength": 1, "description": "Node type name (e.g. 'LearningPath'). Combined with manifest name as relation name." },
+              "properties": {
+                "type": "object",
+                "description": "Map of property name to CozoDB type string (e.g. 'String', 'Int', 'Float', 'Bool'). Keys become columns in the created relation.",
+                "additionalProperties": { "type": "string" },
+                "minProperties": 1
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "indexes": {
+          "type": "array",
+          "description": "Index declarations for domain edge types. Applied via CozoDB '::index create' at registration time. Only column-based indexes are supported (no partial/filtered indexes).",
+          "items": {
+            "type": "object",
+            "required": ["name", "on"],
+            "properties": {
+              "name": { "type": "string", "minLength": 1, "description": "Index name. Will be created as '{on}:{name}' in CozoDB." },
+              "on": { "type": "string", "minLength": 1, "description": "Relation to index (e.g. 'epr_edge')." },
+              "where": { "type": "string", "description": "Informational only — CozoDB does not support partial indexes. Stored for documentation." },
+              "order_by": { "type": "string", "description": "Informational only — column ordering is declared via the columns array. Stored for documentation." }
+            },
+            "additionalProperties": false
+          }
+        },
+        "rules": {
+          "type": "array",
+          "description": "Named Datalog rule declarations. Rules are stored in-memory by the graph registry and inlined into queries that invoke them. Rule names MUST NOT shadow core primitives: neighborhood, path, reach_filtered, version_chain.",
+          "items": {
+            "type": "object",
+            "required": ["name", "datalog"],
+            "properties": {
+              "name": { "type": "string", "minLength": 1, "description": "Rule name. Used as the Datalog rule head. Must be unique across all registered manifests." },
+              "description": { "type": "string", "description": "Human-readable description of what this rule computes." },
+              "datalog": { "type": "string", "minLength": 1, "description": "Datalog rule body. Variables in rule bodies use plain identifiers (no ? prefix); ? prefix is only valid in final query heads." }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
     }
   },
   "additionalProperties": false,
