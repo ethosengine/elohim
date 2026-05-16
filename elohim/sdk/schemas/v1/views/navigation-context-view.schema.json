@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "epr:schema:view:navigation-context-view",
+  "title": "NavigationContextView",
+  "description": "Graph-traversal contextual view for an EPR atom — includes the resolved atom, the navigation origin, and neighbourhood atoms reachable within 2 hops. Source of truth: CozoDB graph projection (Operational, Category C). Reconstructed per request from graph primitives (NEIGHBORHOOD rule).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["atom", "originContext"],
+  "properties": {
+    "atom": { "$ref": "resolved-atom-view.schema.json" },
+    "originContext": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["originCid", "originType"],
+      "properties": {
+        "originCid": { "type": "string", "description": "CID of the navigation origin atom." },
+        "originType": { "type": "string", "description": "EPR type of the origin (e.g. 'epr')." },
+        "originPath": { "type": ["string", "null"], "description": "Optional structured path from origin to this atom." }
+      }
+    },
+    "neighborhood": {
+      "type": "array",
+      "description": "Atoms reachable from this atom within max_hops edges.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["cid", "relType", "hops"],
+        "properties": {
+          "cid": { "type": "string" },
+          "relType": { "type": "string" },
+          "hops": { "type": "integer", "minimum": 1 }
+        }
+      }
+    }
+  }
+}

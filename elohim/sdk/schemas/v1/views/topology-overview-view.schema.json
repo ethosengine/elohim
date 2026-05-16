@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "epr:schema:view:topology-overview-view",
+  "title": "TopologyOverviewView",
+  "description": "Rolled-up topology for a single contributor DID — households, collectives, and inbound reciprocity. Source of truth: CozoDB graph projection via MEMBER_OF and RECIPROCATES_WITH edges (Operational, Category C). Reconstructed per request; not persisted.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["contributorDid", "households", "collectives"],
+  "properties": {
+    "contributorDid": { "type": "string", "description": "DID of the contributor this overview is scoped to." },
+    "households": {
+      "type": "array",
+      "description": "Households the contributor belongs to.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["householdCid"],
+        "properties": {
+          "householdCid": { "type": "string" },
+          "members": { "type": "array", "items": { "type": "string" }, "description": "Member DIDs in this household." },
+          "deviceCount": { "type": "integer", "minimum": 0 }
+        }
+      }
+    },
+    "collectives": {
+      "type": "array",
+      "description": "Collectives the contributor is a member of.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["collectiveCid"],
+        "properties": {
+          "collectiveCid": { "type": "string" },
+          "memberCount": { "type": "integer", "minimum": 0 }
+        }
+      }
+    },
+    "reciprocityInbound": {
+      "type": "array",
+      "description": "Contributors sending reciprocity flows to this contributor.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["fromDid", "weight"],
+        "properties": {
+          "fromDid": { "type": "string" },
+          "weight": { "type": "number", "minimum": 0 }
+        }
+      }
+    }
+  }
+}

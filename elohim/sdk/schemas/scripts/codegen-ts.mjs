@@ -101,6 +101,11 @@ const INTERFACE_FILES = [
   { src: 'views/peer-transport-manifest.ts', dest: 'peer-transport-manifest.ts' },
   // Cutover gate #3: dual-write blob upload response — Category C operational
   { src: 'views/put-blob-response.ts', dest: 'put-blob-response.ts' },
+  // Graph-native projection substrate — Phase 5 view schemas (Category C operational)
+  { src: 'views/resolved-atom-view.ts', dest: 'resolved-atom-view.ts' },
+  { src: 'views/navigation-context-view.ts', dest: 'navigation-context-view.ts' },
+  { src: 'views/atom-version-chain.ts', dest: 'atom-version-chain.ts' },
+  { src: 'views/topology-overview-view.ts', dest: 'topology-overview-view.ts' },
 ];
 
 /**

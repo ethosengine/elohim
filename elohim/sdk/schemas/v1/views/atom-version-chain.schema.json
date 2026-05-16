@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "epr:schema:view:atom-version-chain",
+  "title": "AtomVersionChain",
+  "description": "Ordered chain of EPR atom CIDs linked by SUPERSEDES edges, walked forward from the given start CID. Source of truth: CozoDB graph projection (Operational, Category C). Reconstructed per request by walking epr_edge SUPERSEDES arcs.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["currentCid", "chain"],
+  "properties": {
+    "currentCid": { "type": "string", "description": "The CID the walk starts from." },
+    "chain": {
+      "type": "array",
+      "description": "Ordered successor CIDs (each supersedes the previous).",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["cid", "version"],
+        "properties": {
+          "cid": { "type": "string" },
+          "version": { "type": "integer", "minimum": 1 },
+          "supersededAt": { "type": ["string", "null"], "description": "ISO-8601 timestamp when this entry was superseded." }
+        }
+      }
+    },
+    "canonicalCid": {
+      "type": ["string", "null"],
+      "description": "The final (most recent) CID in the chain; null when chain is empty."
+    }
+  }
+}
