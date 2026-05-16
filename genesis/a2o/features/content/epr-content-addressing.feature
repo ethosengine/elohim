@@ -88,10 +88,10 @@ Feature: EPR Content Addressing
 
   # --- New Wave 3 scenarios — dramatize the human moments the surface enables ---
 
-  # @wip retained: shefa-context population on content fixtures + popover shefa/lamad/qahal
-  # phrasing step-defs not yet implemented. The popover surface itself works (covered by
-  # scenario 5 above); this scenario asserts the three-pillar fan-out which requires
-  # shefa-context-populated fixtures.
+  # @wip retained: shefa-context propagation through popover renderer + three-pillar fixture Givens not yet built.
+  # Backlog destination: graph-native sprint
+  # Citation: 2026-05-16-epr-wip-disposition.md row 1
+  # Gate condition: lifts when (a) step-def for `the popover shows the shefa stewardship summary` is wired and (b) the Given `content "X" has lamad, qahal, AND shefa context populated` has a fixture builder. The DOM slot ([data-testid="epr-popover-shefa"]) already exists at app/elohim-app/src/app/elohim/components/epr-popover/epr-popover.component.ts:67–77 — only step-defs + fixtures are missing.
   @wip @browser-only
   Scenario: EPR popover surfaces all three pillars when present
     # When content carries shefa context (a stewardship commitment, an
@@ -105,10 +105,10 @@ Feature: EPR Content Addressing
     And the popover shows the qahal reach level
     And the popover shows the shefa stewardship summary
 
-  # @wip retained: origin-context-aware destination rendering + back-affordance UI not yet
-  # built in elohim-app. The cross-path navigation itself works (covered by scenario 1
-  # above); this scenario asserts the destination tailors its render based on origin —
-  # a substantial UX surface still in design.
+  # @wip retained: origin-context-aware destination rendering + back-affordance UI not yet built.
+  # Backlog destination: graph-native sprint
+  # Citation: 2026-05-16-epr-wip-disposition.md row 2
+  # Gate condition: lifts when the renderer carries an origin context through the EPR navigation event AND the destination view exposes a "you came from {origin}" back-affordance. Substantial UX surface still in design; substrate-side EPR Resolve already supports the navigation, only the renderer-layer context-transfer is missing.
   @wip @browser-only
   Scenario: Following an EPR link transfers reading context to the destination
     # The renderer at the destination should know Terrance arrived FROM
@@ -121,10 +121,10 @@ Feature: EPR Content Addressing
     Then the destination "rea-foundations" view renders with origin context "manifesto"
     And the destination shows a back-affordance to the originating manifesto step
 
-  # @wip retained: supersedence model + "historical version" UI affordance not yet built.
-  # The EPR codec supports supersedence references but the renderer does not yet display
-  # "this version was superseded" notices. Requires both content-side supersedence wiring
-  # and a UI affordance pass.
+  # @wip retained: supersedence model + "this version was superseded" UI affordance not yet built.
+  # Backlog destination: graph-native sprint
+  # Citation: 2026-05-16-epr-wip-disposition.md row 3
+  # Gate condition: lifts when (a) the EPR codec's supersedence reference is surfaced in the renderer and (b) a "historical version with link to canonical" UI affordance ships. The EPR codec already supports supersedence references; only the renderer affordance is missing.
   @wip @browser-only
   Scenario: EPR link to a versioned-since-authored CID degrades gracefully
     # An EPR reference points to a specific CID. If the content has been
@@ -137,10 +137,10 @@ Feature: EPR Content Addressing
     And the notice offers to navigate to the current canonical version
     And both versions remain content-addressable and verifiable
 
-  # @wip retained: DAG-CBOR decode + Ed25519 signature verification test infrastructure
-  # not yet wired in a2o steps. The existing EPR Head steps (scenario 4 above) assert
-  # response-shape only — verifying the signature end-to-end requires importing a CBOR
-  # decoder + signature-verify library into the step-defs.
+  # @wip retained: DAG-CBOR decode + Ed25519 signature verification harness not yet wired in a2o steps.
+  # Backlog destination: a2o-tooling (standalone — no protocol gate)
+  # Citation: 2026-05-16-epr-wip-disposition.md row 4
+  # Gate condition: lifts when the step-def file imports a CBOR decoder + Ed25519 verify library and asserts signature verification end-to-end. The Head request itself already lands over HTTP `/api/v1/epr/head/{cid}` with the right content-type — only the verify-side test infrastructure is missing.
   @wip
   Scenario: EPR Head signature is verifiable end-to-end
     # The Head isn't just metadata — it's a signed claim by a known
