@@ -227,7 +227,6 @@ fn translate_recovery_v2(signal: RecoveryV2Signal) -> Option<DnaSignal> {
     }
 }
 
-
 /// Translate an `ImagodeiSignal` into a `DnaSignal`, if the variant is
 /// consumed by the reconcile controller.
 ///

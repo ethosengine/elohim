@@ -230,9 +230,7 @@ type PendingShamirShareMap = Arc<
     tokio::sync::Mutex<
         std::collections::HashMap<
             request_response::OutboundRequestId,
-            oneshot::Sender<
-                Result<crate::p2p::shamir_transport::ShamirShareResponse, String>,
-            >,
+            oneshot::Sender<Result<crate::p2p::shamir_transport::ShamirShareResponse, String>>,
         >,
     >,
 >;
@@ -890,9 +888,7 @@ pub enum P2PCommand {
     RequestShamirShare {
         peer: libp2p::PeerId,
         request: crate::p2p::shamir_transport::ShamirShareRequest,
-        respond: oneshot::Sender<
-            Result<crate::p2p::shamir_transport::ShamirShareResponse, String>,
-        >,
+        respond: oneshot::Sender<Result<crate::p2p::shamir_transport::ShamirShareResponse, String>>,
     },
 }
 
@@ -4434,13 +4430,13 @@ impl P2PNode {
                     peer,
                     message:
                         request_response::Message::Request {
-                            request,
-                            channel,
-                            ..
+                            request, channel, ..
                         },
                 },
             ) => {
-                use crate::db::recovery_approval_gate::{check_share_authorization, ShareAuthDecision};
+                use crate::db::recovery_approval_gate::{
+                    check_share_authorization, ShareAuthDecision,
+                };
                 use crate::p2p::shamir_transport::ShamirShareResponse;
 
                 let local_agent_cid = self.identity.agent_pubkey().to_string();
@@ -4503,7 +4499,9 @@ impl P2PNode {
                         ShamirShareResponse::error(reason)
                     }
 
-                    Ok(ShareAuthDecision::Authorized { ref attestation_cid }) => {
+                    Ok(ShareAuthDecision::Authorized {
+                        ref attestation_cid,
+                    }) => {
                         // Auditable security event: authorization passed.
                         info!(
                             target: "elohim_storage::shamir_share",
@@ -4524,9 +4522,10 @@ impl P2PNode {
                         //   ‖ share_index.to_le_bytes()
                         //
                         // Consistent with `verify_share_response` in shamir_transport.rs.
-                        let share_result: Result<ShamirShareResponse, String> =
-                            if let Some(pool) = self.db_pool.as_ref() {
-                                pool.get()
+                        let share_result: Result<ShamirShareResponse, String> = if let Some(pool) =
+                            self.db_pool.as_ref()
+                        {
+                            pool.get()
                                     .map_err(|e| format!("T21: pool.get for share-store: {e}"))
                                     .and_then(|mut conn| {
                                         crate::db::custodian_shares::get_share_for_governance_action(
@@ -4595,9 +4594,9 @@ impl P2PNode {
                                             }
                                         }
                                     })
-                            } else {
-                                Err("T21: no DB pool on responder node".to_string())
-                            };
+                        } else {
+                            Err("T21: no DB pool on responder node".to_string())
+                        };
 
                         match share_result {
                             Ok(resp) => resp,
@@ -4608,9 +4607,7 @@ impl P2PNode {
                                     error = %e,
                                     "T21: share-store or signing error — sending error envelope"
                                 );
-                                ShamirShareResponse::error(format!(
-                                    "share-store error: {e}"
-                                ))
+                                ShamirShareResponse::error(format!("share-store error: {e}"))
                             }
                         }
                     }
@@ -4659,12 +4656,7 @@ impl P2PNode {
                     is_error = %response.is_error(),
                     "T20: shamir-share response received"
                 );
-                if let Some(respond) = self
-                    .pending_shamir_shares
-                    .lock()
-                    .await
-                    .remove(&request_id)
-                {
+                if let Some(respond) = self.pending_shamir_shares.lock().await.remove(&request_id) {
                     let _ = respond.send(Ok(response));
                 } else {
                     debug!(
@@ -4691,12 +4683,7 @@ impl P2PNode {
                     error = ?error,
                     "T20: shamir-share outbound failure — custodian unreachable or timed out"
                 );
-                if let Some(respond) = self
-                    .pending_shamir_shares
-                    .lock()
-                    .await
-                    .remove(&request_id)
-                {
+                if let Some(respond) = self.pending_shamir_shares.lock().await.remove(&request_id) {
                     use libp2p::request_response::OutboundFailure;
                     let reason = match &error {
                         OutboundFailure::Timeout => "timeout".to_string(),
@@ -4730,10 +4717,7 @@ impl P2PNode {
 
             // ── ResponseSent (responder-side acknowledgment) ──────────────
             behaviour::ElohimStorageBehaviourEvent::ShamirShare(
-                request_response::Event::ResponseSent {
-                    peer,
-                    request_id,
-                },
+                request_response::Event::ResponseSent { peer, request_id },
             ) => {
                 debug!(
                     target: "elohim_storage::shamir_share",

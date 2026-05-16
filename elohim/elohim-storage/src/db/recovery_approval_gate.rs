@@ -98,9 +98,7 @@ pub fn check_share_authorization(
     // Filter on the three cheapest predicates first (index-covered):
     //   parent_governance_action_cid, attestation_kind, revoked_at IS NULL.
     let candidates: Vec<AttestationRow> = attestations::table
-        .filter(
-            attestations::parent_governance_action_cid.eq(recovery_governance_action_cid),
-        )
+        .filter(attestations::parent_governance_action_cid.eq(recovery_governance_action_cid))
         .filter(attestations::attestation_kind.eq("attestation:recovery-approval"))
         .filter(attestations::revoked_at.is_null())
         .load::<AttestationRow>(conn)
@@ -195,8 +193,8 @@ pub fn resolve_custodian_peer_id(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::db::{init_pool_from_dir, run_migrations, DbPool};
     use crate::db::diesel_schema::{attestations, governance_actions};
+    use crate::db::{init_pool_from_dir, run_migrations, DbPool};
 
     fn test_pool() -> DbPool {
         let dir = tempfile::tempdir().expect("tempdir");
@@ -331,7 +329,14 @@ mod tests {
         insert_gov_action(&mut conn, "action-004");
 
         // Original approval (id = attest-004-original)
-        insert_attestation(&mut conn, "attest-004-original", "action-004", None, None, None);
+        insert_attestation(
+            &mut conn,
+            "attest-004-original",
+            "action-004",
+            None,
+            None,
+            None,
+        );
 
         // Replacement approval that supersedes the original
         diesel::replace_into(attestations::table)

@@ -680,7 +680,9 @@ async fn async_main(
                             );
                         });
                     } else {
-                        warn!("ElohimContentSignal subscriber disabled: shared DB pool unavailable");
+                        warn!(
+                            "ElohimContentSignal subscriber disabled: shared DB pool unavailable"
+                        );
                     }
                 } else {
                     warn!(

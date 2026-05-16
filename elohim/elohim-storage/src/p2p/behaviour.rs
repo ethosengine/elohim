@@ -20,11 +20,11 @@ use super::epr_protocol::{EprCodec, EprProtocol};
 use super::identity_binding_gossip::IDENTITY_BINDING_TOPIC;
 use super::identity_handshake::{IdentityHandshakeCodec, IdentityHandshakeProtocol};
 use super::recovery_invitation::RECOVERY_INVITATION_TOPIC;
-use super::shard_protocol::{ShardCodec, ShardProtocol};
-use super::sync_protocol::{SyncCodec, SyncProtocol};
 use super::shamir_transport::{
     ShamirShareCodec, ShamirShareProtocol, ShamirShareRequest, ShamirShareResponse,
 };
+use super::shard_protocol::{ShardCodec, ShardProtocol};
+use super::sync_protocol::{SyncCodec, SyncProtocol};
 use super::trust_protocol::{TrustCodec, TrustProtocol};
 use super::view_federation::{ViewFederationCodec, ViewFederationProtocol};
 use super::P2PConfig;

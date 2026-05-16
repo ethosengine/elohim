@@ -62,9 +62,7 @@ pub fn list_by_state(
         .order(recovery_flows::created_at.desc())
         .select(RecoveryFlowRow::as_select())
         .load(conn)
-        .map_err(|e| {
-            StorageError::Internal(format!("Failed to list recovery_flows by state: {e}"))
-        })
+        .map_err(|e| StorageError::Internal(format!("Failed to list recovery_flows by state: {e}")))
 }
 
 /// List all recovery flows for a subject human (most recent first).
@@ -78,9 +76,7 @@ pub fn list_for_subject(
         .select(RecoveryFlowRow::as_select())
         .load(conn)
         .map_err(|e| {
-            StorageError::Internal(format!(
-                "Failed to list recovery_flows for subject: {e}"
-            ))
+            StorageError::Internal(format!("Failed to list recovery_flows for subject: {e}"))
         })
 }
 

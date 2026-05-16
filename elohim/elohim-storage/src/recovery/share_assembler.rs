@@ -238,17 +238,14 @@ impl ShareTransport for LibP2PShareTransport {
             })
             .await
             .map_err(|_| {
-                "LibP2PShareTransport: swarm command channel closed (swarm task exited)"
-                    .to_string()
+                "LibP2PShareTransport: swarm command channel closed (swarm task exited)".to_string()
             })?;
 
         // ── Step 3: await response with timeout ───────────────────────────
         let response = tokio::time::timeout(self.request_timeout, rx)
             .await
             .map_err(|_| {
-                format!(
-                    "LibP2PShareTransport: timeout waiting for share from peer {peer_id_str}"
-                )
+                format!("LibP2PShareTransport: timeout waiting for share from peer {peer_id_str}")
             })?
             .map_err(|_| {
                 "LibP2PShareTransport: response oneshot dropped (swarm task exited)".to_string()
@@ -866,7 +863,11 @@ mod tests {
         let pool = test_pool();
         {
             let mut conn = pool.get().expect("conn");
-            insert_governance_action(&mut conn, "t21-action-001", r#"{"type":"shamir","m":3,"n":5}"#);
+            insert_governance_action(
+                &mut conn,
+                "t21-action-001",
+                r#"{"type":"shamir","m":3,"n":5}"#,
+            );
             for i in 1..=5usize {
                 let cust = format!("cust-{i}");
                 let att = format!("att-{i}");
@@ -893,7 +894,10 @@ mod tests {
 
         let transport = Arc::new(MockShareTransport::new(canned));
         let assembler = ShareAssembler::new(pool, transport);
-        let result = assembler.assemble("t21-action-001").await.expect("assemble");
+        let result = assembler
+            .assemble("t21-action-001")
+            .await
+            .expect("assemble");
 
         match result {
             AssemblyResult::ReconstructedSecret(recovered) => {
@@ -902,7 +906,10 @@ mod tests {
                     "reconstructed secret must match original"
                 );
             }
-            AssemblyResult::BelowThreshold { approvals_found, threshold } => {
+            AssemblyResult::BelowThreshold {
+                approvals_found,
+                threshold,
+            } => {
                 panic!(
                     "expected ReconstructedSecret, got BelowThreshold(found={}, threshold={})",
                     approvals_found, threshold
@@ -926,7 +933,11 @@ mod tests {
         let pool = test_pool();
         {
             let mut conn = pool.get().expect("conn");
-            insert_governance_action(&mut conn, "t21-action-002", r#"{"type":"shamir","m":3,"n":5}"#);
+            insert_governance_action(
+                &mut conn,
+                "t21-action-002",
+                r#"{"type":"shamir","m":3,"n":5}"#,
+            );
             for i in 1..=3usize {
                 insert_approval_attestation(
                     &mut conn,
@@ -959,7 +970,10 @@ mod tests {
 
         let transport = Arc::new(MockShareTransport::new(canned));
         let assembler = ShareAssembler::new(pool, transport);
-        let result = assembler.assemble("t21-action-002").await.expect("assemble");
+        let result = assembler
+            .assemble("t21-action-002")
+            .await
+            .expect("assemble");
 
         match result {
             AssemblyResult::BelowThreshold { threshold, .. } => {
@@ -983,7 +997,11 @@ mod tests {
         let pool = test_pool();
         {
             let mut conn = pool.get().expect("conn");
-            insert_governance_action(&mut conn, "t21-action-003", r#"{"type":"shamir","m":1,"n":3}"#);
+            insert_governance_action(
+                &mut conn,
+                "t21-action-003",
+                r#"{"type":"shamir","m":1,"n":3}"#,
+            );
             insert_approval_attestation(&mut conn, "att-corrupt", "t21-action-003", "cust-corrupt");
         }
 
@@ -1031,12 +1049,9 @@ mod tests {
         std::mem::forget(dir);
 
         let mut conn = pool.get().expect("conn");
-        let result = resolve_custodian_verifying_key(
-            &mut conn,
-            "no-such-agent-cid",
-            "2026-05-15T00:00:00Z",
-        )
-        .expect("query ok");
+        let result =
+            resolve_custodian_verifying_key(&mut conn, "no-such-agent-cid", "2026-05-15T00:00:00Z")
+                .expect("query ok");
         assert!(result.is_none(), "no binding → key must be None");
     }
 
@@ -1127,7 +1142,11 @@ mod tests {
         let pool = test_pool();
         {
             let mut conn = pool.get().expect("conn");
-            insert_governance_action(&mut conn, "t20-action-001", r#"{"type":"shamir","m":2,"n":3}"#);
+            insert_governance_action(
+                &mut conn,
+                "t20-action-001",
+                r#"{"type":"shamir","m":2,"n":3}"#,
+            );
             insert_approval_attestation(&mut conn, "t20-attest-A", "t20-action-001", "t20-custC-A");
             insert_approval_attestation(&mut conn, "t20-attest-B", "t20-action-001", "t20-custC-B");
         }
@@ -1135,21 +1154,34 @@ mod tests {
         let mut canned: HashMap<String, Result<ShamirShareResponse, String>> = HashMap::new();
         canned.insert(
             "t20-custC-A".to_string(),
-            Ok(ShamirShareResponse::error("authorization denied: no effective approval")),
+            Ok(ShamirShareResponse::error(
+                "authorization denied: no effective approval",
+            )),
         );
         canned.insert(
             "t20-custC-B".to_string(),
-            Ok(ShamirShareResponse::error("authorization denied: attestation revoked")),
+            Ok(ShamirShareResponse::error(
+                "authorization denied: attestation revoked",
+            )),
         );
 
         let transport = Arc::new(MockShareTransport::new(canned));
         let assembler = ShareAssembler::new(pool, transport);
-        let result = assembler.assemble("t20-action-001").await.expect("assemble");
+        let result = assembler
+            .assemble("t20-action-001")
+            .await
+            .expect("assemble");
 
         match result {
-            AssemblyResult::BelowThreshold { approvals_found, threshold } => {
+            AssemblyResult::BelowThreshold {
+                approvals_found,
+                threshold,
+            } => {
                 assert_eq!(threshold, 2);
-                assert_eq!(approvals_found, 0, "error envelopes must not count as shares");
+                assert_eq!(
+                    approvals_found, 0,
+                    "error envelopes must not count as shares"
+                );
             }
             AssemblyResult::ReconstructedSecret(_) => {
                 panic!("expected BelowThreshold when all responses are error envelopes");
@@ -1163,9 +1195,23 @@ mod tests {
         let pool = test_pool();
         {
             let mut conn = pool.get().expect("conn");
-            insert_governance_action(&mut conn, "t20-action-002", r#"{"type":"shamir","m":2,"n":3}"#);
-            insert_approval_attestation(&mut conn, "t20-attest-A2", "t20-action-002", "t20-custC-unreachable");
-            insert_approval_attestation(&mut conn, "t20-attest-B2", "t20-action-002", "t20-custC-reachable");
+            insert_governance_action(
+                &mut conn,
+                "t20-action-002",
+                r#"{"type":"shamir","m":2,"n":3}"#,
+            );
+            insert_approval_attestation(
+                &mut conn,
+                "t20-attest-A2",
+                "t20-action-002",
+                "t20-custC-unreachable",
+            );
+            insert_approval_attestation(
+                &mut conn,
+                "t20-attest-B2",
+                "t20-action-002",
+                "t20-custC-reachable",
+            );
         }
 
         let mut canned: HashMap<String, Result<ShamirShareResponse, String>> = HashMap::new();
@@ -1175,15 +1221,23 @@ mod tests {
         );
         canned.insert(
             "t20-custC-reachable".to_string(),
-            Ok(ShamirShareResponse::error("TODO(T21-share-store): share store not yet implemented")),
+            Ok(ShamirShareResponse::error(
+                "TODO(T21-share-store): share store not yet implemented",
+            )),
         );
 
         let transport = Arc::new(MockShareTransport::new(canned));
         let assembler = ShareAssembler::new(pool, transport);
-        let result = assembler.assemble("t20-action-002").await.expect("assemble");
+        let result = assembler
+            .assemble("t20-action-002")
+            .await
+            .expect("assemble");
 
         match result {
-            AssemblyResult::BelowThreshold { approvals_found, threshold } => {
+            AssemblyResult::BelowThreshold {
+                approvals_found,
+                threshold,
+            } => {
                 assert_eq!(threshold, 2);
                 assert_eq!(approvals_found, 0, "neither failure counts as a share");
             }
@@ -1244,7 +1298,10 @@ mod tests {
 
         let transport = Arc::new(MockShareTransport::new(canned));
         let assembler = ShareAssembler::new(pool, transport);
-        let result = assembler.assemble("t20-action-sig").await.expect("assemble");
+        let result = assembler
+            .assemble("t20-action-sig")
+            .await
+            .expect("assemble");
 
         // With no peer_identity_bindings row, key resolution returns None →
         // share is accepted on DHT attestation alone → threshold=1 → reconstruction
@@ -1254,7 +1311,10 @@ mod tests {
             AssemblyResult::ReconstructedSecret(_) => {
                 // Expected: no binding → no sig check → reconstruction succeeds.
             }
-            AssemblyResult::BelowThreshold { approvals_found, threshold } => {
+            AssemblyResult::BelowThreshold {
+                approvals_found,
+                threshold,
+            } => {
                 // Also acceptable if reconstruction failed for some other reason.
                 // As long as we don't panic, the assembler is resilient.
                 let _ = (approvals_found, threshold);
@@ -1280,13 +1340,20 @@ mod tests {
                 "t20-action-happy",
                 r#"{"type":"shamir","m":2,"n":3}"#,
             );
-            for (cust, att) in [("custH1", "attH1"), ("custH2", "attH2"), ("custH3", "attH3")] {
+            for (cust, att) in [
+                ("custH1", "attH1"),
+                ("custH2", "attH2"),
+                ("custH3", "attH3"),
+            ] {
                 insert_approval_attestation(&mut conn, att, "t20-action-happy", cust);
             }
         }
 
         let mut canned: HashMap<String, Result<ShamirShareResponse, String>> = HashMap::new();
-        for (i, (cust, att)) in [("custH1", "attH1"), ("custH2", "attH2")].iter().enumerate() {
+        for (i, (cust, att)) in [("custH1", "attH1"), ("custH2", "attH2")]
+            .iter()
+            .enumerate()
+        {
             canned.insert(
                 cust.to_string(),
                 Ok(ShamirShareResponse {
@@ -1305,13 +1372,19 @@ mod tests {
 
         let transport = Arc::new(MockShareTransport::new(canned));
         let assembler = ShareAssembler::new(pool, transport);
-        let result = assembler.assemble("t20-action-happy").await.expect("assemble");
+        let result = assembler
+            .assemble("t20-action-happy")
+            .await
+            .expect("assemble");
 
         match result {
             AssemblyResult::ReconstructedSecret(recovered) => {
                 assert_eq!(recovered, secret, "reconstructed bytes must match original");
             }
-            AssemblyResult::BelowThreshold { approvals_found, threshold } => {
+            AssemblyResult::BelowThreshold {
+                approvals_found,
+                threshold,
+            } => {
                 panic!(
                     "expected ReconstructedSecret, got BelowThreshold(found={}, threshold={})",
                     approvals_found, threshold

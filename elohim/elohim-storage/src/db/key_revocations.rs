@@ -122,9 +122,7 @@ pub fn list_for_human(
 }
 
 /// List all pending key revocations (threshold_reached = 0).
-pub fn list_pending(
-    conn: &mut SqliteConnection,
-) -> Result<Vec<KeyRevocationRow>, StorageError> {
+pub fn list_pending(conn: &mut SqliteConnection) -> Result<Vec<KeyRevocationRow>, StorageError> {
     key_revocations::table
         .filter(key_revocations::threshold_reached.eq(0))
         .order(key_revocations::created_at.desc())

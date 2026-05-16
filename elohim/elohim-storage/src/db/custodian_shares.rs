@@ -176,7 +176,9 @@ pub fn get_share_for_governance_action(
         .first::<CustodianShare>(conn)
         .optional()
         .map_err(|e| {
-            StorageError::Internal(format!("custodian_shares get_share_for_governance_action: {e}"))
+            StorageError::Internal(format!(
+                "custodian_shares get_share_for_governance_action: {e}"
+            ))
         })?;
 
     if let Some(ref share) = maybe {
@@ -245,13 +247,10 @@ mod tests {
 
         assert!(row_id > 0, "AUTOINCREMENT id should be positive");
 
-        let share = get_share_for_governance_action(
-            &mut conn,
-            "custodian-cid-A",
-            "governance-action-001",
-        )
-        .expect("get")
-        .expect("should be Some");
+        let share =
+            get_share_for_governance_action(&mut conn, "custodian-cid-A", "governance-action-001")
+                .expect("get")
+                .expect("should be Some");
 
         assert_eq!(share.share_data, share_bytes);
         assert_eq!(share.share_index, 1);
@@ -287,16 +286,16 @@ mod tests {
         .expect("second upsert");
 
         // Only the most recent active share is returned.
-        let active = get_share_for_governance_action(
-            &mut conn,
-            "custodian-cid-B",
-            "governance-action-002",
-        )
-        .expect("get")
-        .expect("should be Some");
+        let active =
+            get_share_for_governance_action(&mut conn, "custodian-cid-B", "governance-action-002")
+                .expect("get")
+                .expect("should be Some");
 
         assert_eq!(active.share_data, b"share-v2");
-        assert!(active.superseded_at.is_none(), "active share must not be superseded");
+        assert!(
+            active.superseded_at.is_none(),
+            "active share must not be superseded"
+        );
 
         // The superseded share still exists in the table (audit trail).
         let all: Vec<CustodianShare> = custodian_shares::table
@@ -360,12 +359,14 @@ mod tests {
         )
         .expect("upsert A v2");
 
-        let active = list_shares_for_custodian(&mut conn, "custodian-cid-C")
-            .expect("list");
+        let active = list_shares_for_custodian(&mut conn, "custodian-cid-C").expect("list");
 
         // Only 2 active shares: share-A-v2 and share-B.
         assert_eq!(active.len(), 2, "list must exclude superseded rows");
-        let cids: Vec<_> = active.iter().map(|s| s.governance_action_cid.as_str()).collect();
+        let cids: Vec<_> = active
+            .iter()
+            .map(|s| s.governance_action_cid.as_str())
+            .collect();
         assert!(cids.contains(&"governance-action-A"), "A must be present");
         assert!(cids.contains(&"governance-action-B"), "B must be present");
         let a_bytes: Vec<_> = active
@@ -393,18 +394,14 @@ mod tests {
 
         // Tamper with the share_data directly in SQLite to simulate corruption.
         diesel::update(
-            custodian_shares::table
-                .filter(custodian_shares::custodian_cid.eq("custodian-cid-D")),
+            custodian_shares::table.filter(custodian_shares::custodian_cid.eq("custodian-cid-D")),
         )
         .set(custodian_shares::share_data.eq(b"corrupted-bytes".to_vec()))
         .execute(&mut conn)
         .expect("tamper");
 
-        let result = get_share_for_governance_action(
-            &mut conn,
-            "custodian-cid-D",
-            "governance-action-003",
-        );
+        let result =
+            get_share_for_governance_action(&mut conn, "custodian-cid-D", "governance-action-003");
 
         assert!(
             result.is_err(),

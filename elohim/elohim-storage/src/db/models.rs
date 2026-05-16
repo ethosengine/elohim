@@ -15,17 +15,17 @@ use ts_rs::TS;
 use super::diesel_schema::{
     access_grants, agreements, appeals, apps, challenges, collective_participations, collectives,
     comments, content, content_attestations, content_mastery, content_tags, contributor_dashboards,
-    contributor_presences, custodian_metrics, custodian_shares, device_policies, discussions, economic_events,
-    enum_registry, governance_dispositions, governance_signals, governance_states, hazards,
-    human_relationships, humans, imagodei_observations, key_rotations,
-    knowledge_maps, local_sessions, node_stewardship, observation_diversity_summary,
-    observation_entries, observation_sessions, observations, peer_blob_inventory,
-    peer_identity_bindings, peer_inventory_cursor, placement_gaps, places, portal_hosts,
-    precedents, premium_gates, proposal_options, proposals, ranked_votes, rea_commitments,
-    recovery_requests, recovery_witnesses, relationships, responsibility_demand_configs,
-    revocation_votes, risk_alerts, schedules, shard_locations, shard_manifests, spatial_contexts,
-    statement_votes, statements, steward_credentials, stewarded_nodes, stewardship_allocations,
-    token_balances, token_decay_events, token_mint_events, token_transfers, votes,
+    contributor_presences, custodian_metrics, custodian_shares, device_policies, discussions,
+    economic_events, enum_registry, governance_dispositions, governance_signals, governance_states,
+    hazards, human_relationships, humans, imagodei_observations, key_rotations, knowledge_maps,
+    local_sessions, node_stewardship, observation_diversity_summary, observation_entries,
+    observation_sessions, observations, peer_blob_inventory, peer_identity_bindings,
+    peer_inventory_cursor, placement_gaps, places, portal_hosts, precedents, premium_gates,
+    proposal_options, proposals, ranked_votes, rea_commitments, recovery_requests,
+    recovery_witnesses, relationships, responsibility_demand_configs, revocation_votes,
+    risk_alerts, schedules, shard_locations, shard_manifests, spatial_contexts, statement_votes,
+    statements, steward_credentials, stewarded_nodes, stewardship_allocations, token_balances,
+    token_decay_events, token_mint_events, token_transfers, votes,
 };
 
 // ============================================================================

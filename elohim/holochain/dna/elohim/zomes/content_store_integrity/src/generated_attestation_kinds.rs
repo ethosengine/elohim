@@ -35,10 +35,12 @@ pub const GOVERNANCE_ACTION_KINDS: &[&str] = &[
     "governance-action:challenge",
     "governance-action:election",
     "governance-action:identity-challenge",
+    "governance-action:identity-freeze",
     "governance-action:key-revocation",
     "governance-action:proposal",
     "governance-action:recovery-request",
     "governance-action:renewal-request",
+    "governance-action:shamir-custody-setup",
 ];
 
 /// Maps an attestation subtype to the pillar manifest that declares it.
@@ -77,10 +79,12 @@ pub fn manifest_ref_for_governance_action_kind(kind: &str) -> Option<&'static st
         "governance-action:challenge" => Some("mishpat"),
         "governance-action:election" => Some("mishpat"),
         "governance-action:identity-challenge" => Some("imagodei"),
+        "governance-action:identity-freeze" => Some("imagodei"),
         "governance-action:key-revocation" => Some("imagodei"),
         "governance-action:proposal" => Some("mishpat"),
         "governance-action:recovery-request" => Some("imagodei"),
         "governance-action:renewal-request" => Some("imagodei"),
+        "governance-action:shamir-custody-setup" => Some("imagodei"),
         _ => None,
     }
 }
