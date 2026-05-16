@@ -5,18 +5,30 @@
   "description": "Economy domain — value accounting, stewardship, resource flows, and economic coupling. Shefa primarily wraps protocol REA primitives (EconomicEvent, Agreement, Commitment) with economic semantics rather than declaring many new content types.",
   "writeThrough": {
     "enabled": false,
-    "kinds": ["EconomicEvent"]
+    "kinds": [
+      "EconomicEvent"
+    ]
   },
   "vocabulary": {
     "contentTypes": {
       "stewardship-context": {
         "description": "Narrative context for a stewardship relationship — why this steward cares about this content, what curation work they have done, and how their standing was earned. Category A2 (derived via link from stewardship allocation).",
-        "metadataSchema": { "$ref": "./schemas/stewardship-metadata.schema.json" },
+        "metadataSchema": {
+          "$ref": "./schemas/stewardship-metadata.schema.json"
+        },
         "coupling": {
           "knowledge": {
             "relationships": {
-              "STEWARDS": ["concept", "lesson", "path", "article", "assessment"],
-              "RELATES_TO": ["stewardship-context"]
+              "STEWARDS": [
+                "concept",
+                "lesson",
+                "path",
+                "article",
+                "assessment"
+              ],
+              "RELATES_TO": [
+                "stewardship-context"
+              ]
             }
           },
           "value": {
@@ -30,7 +42,10 @@
             "defaultReach": "community",
             "minimumReach": "intimate",
             "governanceModel": "steward-consent",
-            "signalTypes": ["stewardship-allocated", "custodian-attestation"]
+            "signalTypes": [
+              "stewardship-allocated",
+              "custodian-attestation"
+            ]
           },
           "claims": [
             {
@@ -53,8 +68,12 @@
       "_comment": "Shefa does not own these types — they are protocol-level REA primitives. Shefa declares the domain-specific coupling: what signals they produce in the economy context, and what observations the protocol should make.",
       "economic-event": {
         "description": "An REA economic event — a concrete action that changes resource state. Protocol-level (CreateEconomicEventInput). Shefa declares the coupling semantics: every economic event carries value + governance + feedback dimensions.",
-        "metadataSchema": { "$ref": "./schemas/exchange-metadata.schema.json" },
-        "signals": ["economic-event-recorded"],
+        "metadataSchema": {
+          "$ref": "./schemas/exchange-metadata.schema.json"
+        },
+        "signals": [
+          "economic-event-recorded"
+        ],
         "coupling": {
           "value": {
             "onRecord": {
@@ -64,14 +83,20 @@
             }
           },
           "governance": {
-            "signalTypes": ["economic-event-recorded"]
+            "signalTypes": [
+              "economic-event-recorded"
+            ]
           }
         }
       },
       "agreement": {
         "description": "An REA agreement between parties — commitments exchanged. Protocol-level. Shefa declares metadata shape and coupling: agreements produce obligation tracking and fulfillment signals.",
-        "metadataSchema": { "$ref": "./schemas/agreement-metadata.schema.json" },
-        "signals": ["obligation-fulfilled"],
+        "metadataSchema": {
+          "$ref": "./schemas/agreement-metadata.schema.json"
+        },
+        "signals": [
+          "obligation-fulfilled"
+        ],
         "coupling": {
           "value": {
             "onFulfill": {
@@ -81,13 +106,17 @@
             }
           },
           "governance": {
-            "signalTypes": ["obligation-fulfilled"]
+            "signalTypes": [
+              "obligation-fulfilled"
+            ]
           }
         }
       },
       "commitment": {
         "description": "An REA commitment — a promise to perform a future economic event. Protocol-level. Shefa declares how commitments produce obligation signals and how unfulfilled commitments accumulate as negative observations.",
-        "signals": ["obligation-fulfilled"],
+        "signals": [
+          "obligation-fulfilled"
+        ],
         "coupling": {
           "value": {
             "onFulfill": {
@@ -97,13 +126,17 @@
             }
           },
           "governance": {
-            "signalTypes": ["obligation-fulfilled"]
+            "signalTypes": [
+              "obligation-fulfilled"
+            ]
           }
         }
       },
       "resource": {
         "description": "An REA resource — anything with economic value that can be produced, consumed, transferred, or stewarded. Protocol-level. Shefa declares resource nature dimensions (rivalry, excludability, depletability, fungibility, circularity).",
-        "signals": ["resource-transferred"],
+        "signals": [
+          "resource-transferred"
+        ],
         "coupling": {
           "value": {
             "onTransfer": {
@@ -113,7 +146,9 @@
             }
           },
           "governance": {
-            "signalTypes": ["resource-transferred"]
+            "signalTypes": [
+              "resource-transferred"
+            ]
           }
         }
       }
@@ -148,25 +183,55 @@
     "relationships": {
       "STEWARDS": {
         "description": "The source stewards the target — curates, maintains, reviews, and governs the target content. Stewardship is earned through mastery and sustained curation, not granted by credential.",
-        "sourceTypes": ["stewardship-context"],
-        "targetTypes": ["concept", "lesson", "path", "article", "assessment", "exercise", "module", "course-module"],
+        "sourceTypes": [
+          "stewardship-context"
+        ],
+        "targetTypes": [
+          "concept",
+          "lesson",
+          "path",
+          "article",
+          "assessment",
+          "exercise",
+          "module",
+          "course-module"
+        ],
         "inverse": "STEWARDED_BY"
       },
       "STEWARDED_BY": {
         "description": "Reverse of STEWARDS — the source content is stewarded by the target stewardship-context.",
-        "sourceTypes": ["concept", "lesson", "path", "article", "assessment", "exercise", "module", "course-module"],
-        "targetTypes": ["stewardship-context"],
+        "sourceTypes": [
+          "concept",
+          "lesson",
+          "path",
+          "article",
+          "assessment",
+          "exercise",
+          "module",
+          "course-module"
+        ],
+        "targetTypes": [
+          "stewardship-context"
+        ],
         "inverse": "STEWARDS"
       },
       "FUNDS": {
         "description": "Economic flow relationship — the source economic activity funds or sustains the target. Value flows from consumption to stewardship.",
-        "sourceTypes": ["stewardship-context"],
-        "targetTypes": ["stewardship-context"]
+        "sourceTypes": [
+          "stewardship-context"
+        ],
+        "targetTypes": [
+          "stewardship-context"
+        ]
       },
       "OBLIGATES": {
         "description": "The source creates an obligation on the target. Agreements and commitments obligate parties to future economic events.",
-        "sourceTypes": ["stewardship-context"],
-        "targetTypes": ["stewardship-context"]
+        "sourceTypes": [
+          "stewardship-context"
+        ],
+        "targetTypes": [
+          "stewardship-context"
+        ]
       }
     },
     "signals": {
@@ -256,7 +321,11 @@
     {
       "kind": "shefa:appreciation-emitted",
       "namespace": "elohim/observations/shefa",
-      "schema": { "recipient_cid": "Cid", "magnitude": "f32", "context_cid": "Cid" },
+      "schema": {
+        "recipient_cid": "Cid",
+        "magnitude": "f32",
+        "context_cid": "Cid"
+      },
       "retention_class": "archival",
       "reach": "community",
       "diversity_threshold": null,
@@ -289,5 +358,90 @@
         "verified_at": "$verifiedAt"
       }
     }
-  ]
+  ],
+  "graph": {
+    "edges": [
+      {
+        "type": "STEWARDS",
+        "from": "ContributorDID",
+        "to": "EprHead",
+        "weighted": true,
+        "temporal": true,
+        "description": "Contributor stewards this resource"
+      },
+      {
+        "type": "VALUE_FLOW",
+        "from": "EprHead",
+        "to": "EprHead",
+        "weighted": true,
+        "temporal": true,
+        "description": "Resource flows from A to B"
+      },
+      {
+        "type": "MEMBER_OF",
+        "from": "ContributorDID",
+        "to": "EprHead",
+        "indexed": true,
+        "description": "Contributor is a member of a household or collective"
+      },
+      {
+        "type": "RECIPROCATES_WITH",
+        "from": "ContributorDID",
+        "to": "ContributorDID",
+        "weighted": true,
+        "temporal": true,
+        "description": "Reciprocity flow between two contributors"
+      },
+      {
+        "type": "OPERATES_DEVICE",
+        "from": "ContributorDID",
+        "to": "EprHead",
+        "indexed": true,
+        "description": "Contributor operates this device"
+      }
+    ],
+    "nodes": [],
+    "indexes": [
+      {
+        "name": "stewards_by_resource",
+        "on": "epr_edge",
+        "where": "rel_type = 'STEWARDS'",
+        "order_by": "to_cid"
+      },
+      {
+        "name": "member_by_collective",
+        "on": "epr_edge",
+        "where": "rel_type = 'MEMBER_OF'",
+        "order_by": "to_cid"
+      },
+      {
+        "name": "reciprocity_to",
+        "on": "epr_edge",
+        "where": "rel_type = 'RECIPROCATES_WITH'",
+        "order_by": "to_cid"
+      }
+    ],
+    "rules": [
+      {
+        "name": "household_topology",
+        "description": "Members + their devices for a given household",
+        "datalog": "household_topology[member, device] := *epr_edge{from_cid: member, to_cid: $household, rel_type: 'MEMBER_OF'}, *epr_edge{from_cid: member, to_cid: device, rel_type: 'OPERATES_DEVICE'}"
+      },
+      {
+        "name": "collective_topology",
+        "description": "Members of a collective",
+        "datalog": "collective_topology[member] := *epr_edge{from_cid: member, to_cid: $collective, rel_type: 'MEMBER_OF'}"
+      },
+      {
+        "name": "reciprocity_flow_to",
+        "description": "Inbound reciprocity flows toward a contributor",
+        "datalog": "reciprocity_flow_to[from] := *epr_edge{from_cid: from, to_cid: $contributor, rel_type: 'RECIPROCATES_WITH'}"
+      },
+      {
+        "name": "value_flow_chain",
+        "description": "Multi-hop VALUE_FLOW traversal",
+        "datalog": "value_flow_chain[to, depth] := *epr_edge{from_cid: $start, to_cid: to, rel_type: 'VALUE_FLOW'}, depth = 1\nvalue_flow_chain[to, depth] := value_flow_chain[via, prev], *epr_edge{from_cid: via, to_cid: to, rel_type: 'VALUE_FLOW'}, depth = prev + 1, depth <= $max_depth"
+      }
+    ]
+  }
 }
