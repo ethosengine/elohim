@@ -229,8 +229,19 @@ pub fn propose_recovery_governance_action(
         content_hash: None,
     };
 
-    create_entry(&EntryTypes::Content(content.clone()))?;
+    let action_hash = create_entry(&EntryTypes::Content(content.clone()))?;
     let entry_hash = hash_entry(&EntryTypes::Content(content))?;
+
+    // Root A fix: write TypeToContent link so get_content_by_type /
+    // query_effective_* helpers can find this entry by governance_kind.
+    crate::create_type_to_content_link(&input.governance_kind, &action_hash)?;
+
+    // Root B fix (option a): write IdToContent link keyed on the entry_hash
+    // string. The entry_hash is the canonical CID returned to callers; imagodei
+    // cross-DNA bridge passes it as `id` to get_content_by_id. Both
+    // propose functions use this same convention ("Real CID is returned via
+    // entry_hash on the output", line 202 comment).
+    crate::create_id_to_content_link(&entry_hash.to_string(), &action_hash)?;
 
     // post_commit will emit `ContentCommitted`; the Task 10 prefix-routing
     // dispatcher consumes it and projects to recovery_flows / key_revocations.
@@ -302,8 +313,17 @@ pub fn propose_governance_action(
         content_hash: None,
     };
 
-    create_entry(&EntryTypes::Content(content.clone()))?;
+    let action_hash = create_entry(&EntryTypes::Content(content.clone()))?;
     let entry_hash = hash_entry(&EntryTypes::Content(content))?;
+
+    // Root A fix: write TypeToContent link so get_content_by_type can find
+    // this entry by governance_kind.
+    crate::create_type_to_content_link(&input.governance_kind, &action_hash)?;
+
+    // Root B fix (option a): write IdToContent link keyed on the entry_hash
+    // string — the canonical CID passed to imagodei cross-DNA bridge calls
+    // (get_content_by_id id = entry_hash.to_string()).
+    crate::create_id_to_content_link(&entry_hash.to_string(), &action_hash)?;
 
     Ok(GovernanceActionOutput {
         cid: entry_hash.to_string(),

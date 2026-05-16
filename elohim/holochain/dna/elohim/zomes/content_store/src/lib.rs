@@ -4422,8 +4422,9 @@ fn create_id_to_content_link(id: &str, target: &ActionHash) -> ExternResult<()> 
     Ok(())
 }
 
-/// TODO: Unused — intended for content-type index links (browse by type)?
-/// Review whether content discovery needs type-anchor links and complete integration.
+/// Creates a TypeToContent link from a content_type anchor to the given action_hash.
+/// Used by governance-action propose functions so get_content_by_type / query_effective_*
+/// gate readers can discover entries by kind.
 fn create_type_to_content_link(content_type: &str, target: &ActionHash) -> ExternResult<()> {
     let anchor = StringAnchor::new("content_type", content_type);
     let anchor_hash = hash_entry(&EntryTypes::StringAnchor(anchor))?;
