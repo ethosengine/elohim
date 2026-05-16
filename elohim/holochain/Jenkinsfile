@@ -406,6 +406,29 @@ def cleanupOrphanedHumans(List allHumans) {
 }
 
 /**
+ * Deploy all humans in parallel. Each branch runs deployHumanManifest
+ * (apply + rollout restart + `kubectl rollout status --timeout=600s`).
+ *
+ * Sequential deploy of N humans = N × ~10min worst case (rollout-status
+ * wait dominates on cold-start statefulsets). Parallel collapses to the
+ * slowest single human. This was the dominant factor in the 60min edge
+ * pipeline timeout that aborted #958, #962, #964.
+ *
+ * Localizes humanConfig per closure to avoid Groovy's capture-by-reference
+ * trap in loops.
+ */
+def deployHumansInParallel(List humans, String envFile, List allHumans) {
+    def branches = [:]
+    humans.each { humanConfig ->
+        def hc = humanConfig
+        branches["deploy-${hc.resourcePrefix}"] = {
+            deployHumanManifest(hc, envFile, allHumans)
+        }
+    }
+    parallel(branches)
+}
+
+/**
  * Deploy a human manifest with topology-aware placeholder substitution.
  * Uses | as sed delimiter because URLs contain /.
  */
@@ -1585,10 +1608,10 @@ AGENT_SDK_TAG=${AGENT_SDK_TAG}
                                     sh "kubectl apply -f ${manifest}"
                                 }
 
-                                // Deploy each human
-                                envHumans.each { humanConfig ->
-                                    deployHumanManifest(humanConfig, ec.envFile, allHumans)
-                                }
+                                // Deploy each human in parallel — see deployHumansInParallel
+                                // for rationale (rollout-status wait dominates; sequential =
+                                // ~30min for 3 humans, parallel = ~slowest single human).
+                                deployHumansInParallel(envHumans, ec.envFile, allHumans)
 
                                 // Deploy doorway with computed URLs
                                 deployDoorwayManifest(targetEnv, ec.envFile, allHumans)
@@ -1658,10 +1681,8 @@ AGENT_SDK_TAG=${AGENT_SDK_TAG}
                             sh "kubectl apply -f genesis/orchestrator/manifests/infra/staging-mongodb.yaml"
                             sh "kubectl apply -f genesis/orchestrator/manifests/infra/staging-nats.yaml"
 
-                            // Per-human manifests — topology-aware
-                            stagingHumans.each { humanConfig ->
-                                deployHumanManifest(humanConfig, envFile, allHumans)
-                            }
+                            // Per-human manifests — topology-aware, parallelized.
+                            deployHumansInParallel(stagingHumans, envFile, allHumans)
 
                             // Doorway + read replica — topology-aware
                             deployDoorwayManifest('staging', envFile, allHumans)
@@ -1766,10 +1787,8 @@ HAPP_TAG=${HAPP_TAG}
 AGENT_SDK_TAG=${AGENT_SDK_TAG}
 """
                             }
-                            // Per-human manifests — topology-aware
-                            prodHumans.each { humanConfig ->
-                                deployHumanManifest(humanConfig, envFile, allHumans)
-                            }
+                            // Per-human manifests — topology-aware, parallelized.
+                            deployHumansInParallel(prodHumans, envFile, allHumans)
 
                             // Doorway — topology-aware
                             deployDoorwayManifest('prod', envFile, allHumans)
