@@ -26,7 +26,6 @@
 - [Agent prompts carry no process status](feedback_agent_prompts_no_process_status.md) — gospel-tier surfaces describe stable architecture; temporal state lives in memory entries + chronicles; link forward.
 - [Cargo probes — resolution ≠ compilation](feedback_cargo_resolution_vs_compilation.md) — pre-release crates resolve but fail compile; cargo build before pinning.
 - [Subagent dep-conflict supervision + dev-branch integration](feedback_subagent_dep_conflict_supervision.md) — version-forbid + scope-creep-forbid; dev = local merge, PR review at dev→main only.
-- [EPR 2B ↔ Recovery M4 DNA signal stream](project_epr2b_recovery_m4_convergence.md) — shared dna-signal-stream.schema.json; coordinate PRs.
 - [Doorway as peer registration point](project_doorway_peer_registration.md) — peers register with doorway, not Holo's marketplace.
 - [P2P mesh is the hosting layer](project_p2p_is_hosting.md) — peer-sharding IS hosting; doorway is optional web2 projection.
 - [elohim DNA = SDK boundary](project_elohim_dna_as_sdk_boundary.md) — elohim DNA is the API/SDK contract; lamad is one implementation. Bridges target SDK role via constant; manifests conform; boundary leaks should fail at compile/validate time.
@@ -128,7 +127,6 @@
 - [Doorway full web2 facilitator + SSR floor](project_doorway_full_facilitator_sprint.md) — sprint candidate post-SSR; SSR pod ≥1Gi mem + startupProbe 120s (V8: 51MB→~200MB); see also project_doorway_ssr_pod_resource_floor.
 - [SSR is a compute-shape capability claim](project_ssr_is_compute_capability_claim.md) — feature-gate locally + advertise via compute-report; matchmaking ~ model-avail.
 - [SSR fetch shim has anonymous-only auth context](project_ssr_anonymous_auth_context.md) — higher-reach content renders empty in SSR; needs framework-agnostic auth threading.
-- [Attestation Consolidation Sprint (2026-05-11)](project_attestation_consolidation_sprint_state.md) — Stage A @a9ba7f080; B-G pending; worktree attestation-consolidation.
 - [No brittle commands in devfile postStart](feedback_no_brittle_commands_in_poststart.md) — postStart failures abort startup; new tooling → `commands:` only.
 - [Forgetting as design](project_forgetting_as_design.md) — storyteller decides graduate/memorialize/hold; meaningful re-emergence > omniscient recall.
 - [Prefer YAML config over CLI args](feedback_config_yaml_over_cli.md) — node config = declarative YAML; CLI args = dev/testing only.
@@ -145,17 +143,11 @@
 - [Views are served THROUGH a doorway, not OWNED](project_doorway_views_through_not_owned.md) — CDN-shape; any doorway serves canonical content; doorway-authored logic = anti-pattern.
 - [Hub-optional floor — laptop is full participant](project_hub_optional_floor.md) — design floor: one device, no hub; hubs are convenience, never gate participation.
 - [iroh ALPN handlers — one-stream-per-conn → loop](project_iroh_alpn_handlers_one_stream_design.md) — bench forced loop-on-accept_bi across Phase 5–10 handlers.
-- [First memory-team ceremony (2026-05-14)](feedback_first_memory_team_ceremony.md) — 6 waves; signal-driven; team contested; convergence-bias caveat.
-- [Self-reinforcing path bug class](feedback_self_reinforcing_path_bug_class.md) — walk-up-to-marker satisfies own buggy output; co-anchor (.claude/ + .git).
-- [Correct re-index grows the index](feedback_correct_reindex_grows_index.md) — folding orphans adds bytes; umbrella/graduate is real compression.
-- [Memory balance sheet pattern](feedback_memory_balance_sheet_pattern.md) — memory-balance.sh Wave 0 + 6; Surface:Archive ratio; JSON for diff.
 - [/memory-ceremony skill](../skills/memory-ceremony/SKILL.md) — 4-phase substrate-currency ceremony; deliverable is gospel-tier rewrite; /hygiene-sweep sibling cadence.
 - [Substrate-currency ceremony redesign (2026-05-15)](project_substrate_currency_ceremony_redesign.md) — 6-wave→4-phase; four-agent team operationalized; chronicle stays lightweight, not crutch.
-- [Routing-layer hygiene = librarian's scope](feedback_routing_layer_is_librarian_scope.md) — skill/agent-catalog drift → librarian, not general-purpose.
 - [Horizon scan 2026-05-14](../memory-kit/horizon-scans/2026-05-14.md) — bootstrap; 3-stage consolidation; SSGM governance; portable-agent-memory gap; next 2026-08-14.
 - [Story delivery_status axis](feedback_story_delivery_status_axis.md) — envisioned→backlog→refined→wip→active{a,b,latest}→stable + regression-sideways; unified lifecycle.
 - [Inline summary must echo frontmatter](feedback_inline_summary_must_echo_frontmatter.md) — story-as-authored is truth; frontmatter wins on divergence.
-- [Agent-audit drift-counter convergence](feedback_audit_convergence_evidence.md) — Run#2:6→Run#3:1; first cross-cycle convergence; post-deploy=baseline, delta=proof.
-- [/deliver paired verdicts — authority is attestable](project_deliver_authority_discipline_paired_verdicts.md) — May7 + 2026-05-14, opposite directions; falsifiability proof.
 - [W2 AgentPeerBinding deferred until Phase 12](project_w2_agent_peer_binding_deferred.md) — D5 gate not met; Phase 12 0/59 ticked. Single-wire after Phase 12 lands; mirror EPR T7 pattern.
 - [T6 legacy revocation path retired](project_t6_legacy_revocation_path_retired.md) — RecoveryV2Signal::KeyRevocationEffective consumer side fully retired; T18 envelope is sole consumer. M4 owes producer-side variant deletion.
+- [EPR foundation closure (2026-05-16)](project_epr_foundation_closure_2026_05_16.md) — 0/12 @wip lifted, 12 routed (3 graph-native / 7 doorway-full-fac / 1 iroh-p12 / 1 a2o-tool); D4 defer; AgentPeerBinding deferred (Phase 12 RED).
