@@ -1566,7 +1566,9 @@ Decision matrix:
 - **Phase 12 plan is ✅ LANDED on dev AND caller-identity API surface is present** → proceed to Step 2 (implement the AgentPeerBinding arm).
 - **Phase 12 plan is incomplete OR caller-identity API surface is absent** → STOP. Record the gate state in a follow-up memory entry (`feedback_w2_agent_peer_binding_deferred.md`) noting the date checked + the remaining gate. The arm is deferred to a follow-up Wave-2 mini-plan; this sprint closes without it.
 
-- [x] **Step 2 (conditional): Implement `AgentPeerBindingMessage` wire type + IntegrityNotify arm**
+- [ ] **Step 2 (conditional): Implement `AgentPeerBindingMessage` wire type + IntegrityNotify arm**
+
+**Skipped:** Phase 12 RED — Step 1 gate triggered STOP path; no implementation work performed. See `.claude/memory/project_epr_foundation_closure_2026_05_16.md` §"AgentPeerBinding arm" for evidence.
 
 If Step 1 said proceed, mirror Task 7 exactly with substitutions:
 - Wire-type file: `p2p/agent_peer_binding_message.rs` (struct `AgentPeerBindingMessage` with fields per the `agent-peer-binding.schema.json` contract at `elohim/sdk/schemas/v1/dna-signals/agent-peer-binding.schema.json` — read the schema first).
@@ -1575,7 +1577,9 @@ If Step 1 said proceed, mirror Task 7 exactly with substitutions:
 
 Follow the same TDD + clippy + commit shape as Task 7.
 
-- [x] **Step 3 (conditional): Run the full integrity-notify test set**
+- [ ] **Step 3 (conditional): Run the full integrity-notify test set**
+
+**Skipped:** Phase 12 RED — Step 1 gate triggered STOP path; no implementation work performed. See `.claude/memory/project_epr_foundation_closure_2026_05_16.md` §"AgentPeerBinding arm" for evidence.
 
 ```
 RUSTFLAGS='--cfg getrandom_backend="custom"' \
@@ -1585,7 +1589,9 @@ cargo test --lib epr_atom_service 2>&1 | tail -30
 
 Expected: all four `integrity_notify_*` arm-handler test pairs PASS (KeyRevocation, KeyRotation, RevocationAttestation, AgentPeerBinding), plus the unhandled-kind regression.
 
-- [x] **Step 4 (conditional): Commit**
+- [ ] **Step 4 (conditional): Commit**
+
+**Skipped:** Phase 12 RED — Step 1 gate triggered STOP path; no implementation work performed. See `.claude/memory/project_epr_foundation_closure_2026_05_16.md` §"AgentPeerBinding arm" for evidence.
 
 ```bash
 git add elohim/elohim-storage/src/p2p/agent_peer_binding_message.rs \
