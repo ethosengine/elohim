@@ -61,6 +61,10 @@ pub mod graduation; // Graduation evaluator — observations to attestations/eve
 #[cfg(feature = "graph-native")]
 pub mod graph;
 
+// Graph-native view builders — lamad + shefa domains (CozoDB projection; default-on)
+#[cfg(feature = "graph-native")]
+pub mod graph_views;
+
 pub mod happ_manager;
 pub mod hc_client;
 pub mod hc_client_registry;
