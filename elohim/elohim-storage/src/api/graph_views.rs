@@ -95,10 +95,8 @@ async fn handle_resolved_atom(
             None => return Ok(feature_unavailable("graph-native")),
         };
         match crate::graph_views::lamad::resolved_atom::build(engine, cid) {
-            Ok(view) => return Ok(response::ok(&view)),
-            Err(e) => {
-                return Ok(response::not_found(&format!("resolved_atom: {e}")));
-            }
+            Ok(view) => Ok(response::ok(&view)),
+            Err(e) => Ok(response::not_found(&format!("resolved_atom: {e}"))),
         }
     }
     #[cfg(not(feature = "graph-native"))]
@@ -124,10 +122,8 @@ async fn handle_navigation_context(
             None => return Ok(feature_unavailable("graph-native")),
         };
         match crate::graph_views::lamad::navigation_context::build(engine, cid, origin_cid) {
-            Ok(view) => return Ok(response::ok(&view)),
-            Err(e) => {
-                return Ok(response::not_found(&format!("navigation_context: {e}")));
-            }
+            Ok(view) => Ok(response::ok(&view)),
+            Err(e) => Ok(response::not_found(&format!("navigation_context: {e}"))),
         }
     }
     #[cfg(not(feature = "graph-native"))]
@@ -152,10 +148,8 @@ async fn handle_atom_version_chain(
             None => return Ok(feature_unavailable("graph-native")),
         };
         match crate::graph_views::lamad::atom_version_chain::build(engine, cid) {
-            Ok(view) => return Ok(response::ok(&view)),
-            Err(e) => {
-                return Ok(response::not_found(&format!("atom_version_chain: {e}")));
-            }
+            Ok(view) => Ok(response::ok(&view)),
+            Err(e) => Ok(response::not_found(&format!("atom_version_chain: {e}"))),
         }
     }
     #[cfg(not(feature = "graph-native"))]
@@ -193,12 +187,8 @@ async fn handle_topology_overview(
             None => return Ok(feature_unavailable("graph-native")),
         };
         match crate::graph_views::shefa::topology_overview::build(engine, contributor_did) {
-            Ok(view) => return Ok(response::ok(&view)),
-            Err(e) => {
-                return Ok(response::internal_error(&format!(
-                    "topology_overview: {e}"
-                )));
-            }
+            Ok(view) => Ok(response::ok(&view)),
+            Err(e) => Ok(response::internal_error(&format!("topology_overview: {e}"))),
         }
     }
     #[cfg(not(feature = "graph-native"))]

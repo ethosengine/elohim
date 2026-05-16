@@ -858,7 +858,7 @@ mod tests {
         let all_shares: Vec<Share> = dealer.take(5).collect();
 
         // Encode shares to wire bytes (sharks::Share → Vec<u8>).
-        let share_bytes: Vec<Vec<u8>> = all_shares.iter().map(|s| Vec::from(s)).collect();
+        let share_bytes: Vec<Vec<u8>> = all_shares.iter().map(Vec::from).collect();
 
         let pool = test_pool();
         {
@@ -928,7 +928,7 @@ mod tests {
         let shark = Sharks(3);
         let dealer = shark.dealer(secret);
         let all_shares: Vec<Share> = dealer.take(5).collect();
-        let share_bytes: Vec<Vec<u8>> = all_shares.iter().map(|s| Vec::from(s)).collect();
+        let share_bytes: Vec<Vec<u8>> = all_shares.iter().map(Vec::from).collect();
 
         let pool = test_pool();
         {
@@ -1330,7 +1330,7 @@ mod tests {
         let shark = Sharks(2);
         let dealer = shark.dealer(secret);
         let all_shares: Vec<Share> = dealer.take(3).collect();
-        let share_bytes: Vec<Vec<u8>> = all_shares.iter().map(|s| Vec::from(s)).collect();
+        let share_bytes: Vec<Vec<u8>> = all_shares.iter().map(Vec::from).collect();
 
         let pool = test_pool();
         {
