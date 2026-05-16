@@ -241,6 +241,12 @@ wiremock = "0.6"
 # re-exported through iroh) for SignedPacket / PublicKey types in the test.
 n0-future = "0.1"
 pkarr = { version = "3.10", default-features = false, features = ["signed_packet"] }
+# Benchmark harness for graph traversal (Task 34)
+criterion = { version = "0.5", features = ["html_reports"] }
+
+[[bench]]
+name = "graph_traversal"
+harness = false
 
 [[bin]]
 name = "elohim-storage"
