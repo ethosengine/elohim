@@ -56,6 +56,11 @@ pub mod epr_head;
 pub mod epr_service;
 pub mod error;
 pub mod graduation; // Graduation evaluator — observations to attestations/events
+
+// Graph-native projection substrate (CozoDB embedded; default-on)
+#[cfg(feature = "graph-native")]
+pub mod graph;
+
 pub mod happ_manager;
 pub mod hc_client;
 pub mod hc_client_registry;

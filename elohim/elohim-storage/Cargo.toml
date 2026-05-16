@@ -151,6 +151,15 @@ uuid = { version = "1", features = ["v4"] }
 # Reed-Solomon encoding for erasure coding
 reed-solomon-erasure = "6"
 
+# Graph-native projection substrate — CozoDB embedded
+# Gated under graph-native feature (default-on).
+# Using storage-sled backend to avoid sqlite3-src links conflict with
+# holochain_types -> rusqlite -> libsqlite3-sys (both declare links = "sqlite3").
+# sled 0.34.7 is already a direct dep; no new native lib conflict introduced.
+# rayon is an unconditional dep in cozo 0.7 core code (eval.rs); must be enabled
+# even without graph-algo. Avoiding graph (and graph_builder) which has rayon API breakage.
+cozo = { version = "0.7", default-features = false, features = ["storage-sled", "rayon"], optional = true }
+
 # Cross-platform filesystem free-space probe (peer-stewarded availability heartbeat)
 fs4 = "0.8"
 
@@ -209,8 +218,9 @@ rand = { version = "0.8", optional = true }
 lz4_flex = { version = "0.11", optional = true }
 
 [features]
-default = ["p2p"]
+default = ["p2p", "graph-native"]
 compression = ["lz4_flex"]
+graph-native = ["dep:cozo"]
 p2p = ["libp2p", "futures"]
 p2p-iroh = ["iroh", "iroh-blobs", "iroh-gossip", "rand", "futures"]
 ssr = ["dep:elohim-render"]
