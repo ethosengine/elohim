@@ -276,6 +276,21 @@ pub async fn handle_api_request(
             .unwrap_or("")
             .trim_start_matches('/');
         token::handle(req, method, resource_path, &pool, &app_ctx).await
+    } else if sub_path == "graphql" || sub_path == "graphql/" {
+        // Phase 7: GraphQL surface — Apollo Federation v2 subgraph.
+        // Hand-rolled hyper handler; reads body, executes against async-graphql schema,
+        // serializes response. Returns 503 when graph engine is not available.
+        #[cfg(feature = "graph-native")]
+        {
+            return crate::graphql::server::handle(req, method, graph_engine_ref).await;
+        }
+        #[cfg(not(feature = "graph-native"))]
+        {
+            return Ok(crate::services::response::json_response(
+                hyper::StatusCode::NOT_IMPLEMENTED,
+                &serde_json::json!({"error": "graph-native feature not enabled"}),
+            ));
+        }
     } else if sub_path.starts_with("graph") {
         // Phase 6 Task 26: graph-native view routes.
         // Routes register unconditionally — handlers return 501 when the feature is off.

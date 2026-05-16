@@ -160,6 +160,11 @@ reed-solomon-erasure = "6"
 # even without graph-algo. Avoiding graph (and graph_builder) which has rayon API breakage.
 cozo = { version = "0.7", default-features = false, features = ["storage-sled", "rayon"], optional = true }
 
+# GraphQL server for the /api/v1/graphql surface (Apollo Federation v2 subgraph SDL).
+# Gated under graph-native feature alongside CozoDB. No axum integration — we use
+# hyper directly and hand-roll the handler (read body → execute → serialize response).
+async-graphql = { version = "7", optional = true }
+
 # Cross-platform filesystem free-space probe (peer-stewarded availability heartbeat)
 fs4 = "0.8"
 
@@ -220,7 +225,7 @@ lz4_flex = { version = "0.11", optional = true }
 [features]
 default = ["p2p", "graph-native"]
 compression = ["lz4_flex"]
-graph-native = ["dep:cozo"]
+graph-native = ["dep:cozo", "dep:async-graphql"]
 p2p = ["libp2p", "futures"]
 p2p-iroh = ["iroh", "iroh-blobs", "iroh-gossip", "rand", "futures"]
 ssr = ["dep:elohim-render"]

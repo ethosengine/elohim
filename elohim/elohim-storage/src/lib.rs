@@ -65,6 +65,11 @@ pub mod graph;
 #[cfg(feature = "graph-native")]
 pub mod graph_views;
 
+// GraphQL surface — Apollo Federation v2 subgraph over the graph-native projection.
+// Hand-rolled hyper handler; no axum dependency.
+#[cfg(feature = "graph-native")]
+pub mod graphql;
+
 pub mod happ_manager;
 pub mod hc_client;
 pub mod hc_client_registry;
