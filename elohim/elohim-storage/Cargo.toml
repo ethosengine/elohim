@@ -64,6 +64,18 @@ reqwest = { version = "0.12", default-features = false, features = ["json", "rus
 # Content-addressed storage
 sha2 = "0.10"
 hex = "0.4"
+# Shamir Secret Sharing over GF(256) — Recovery M4 T21 share-reconstruction primitive.
+#
+# Crate choice rationale: `sharks 0.5` implements Shamir's Secret Sharing over
+# GF(256) with a clean split/combine API, no_std compatible, ~300 lines of
+# pure Rust, no heavy crypto deps beyond its own GF(256) arithmetic. It handles
+# arbitrary-length secrets by splitting each byte independently (standard SSS
+# approach). `vsss-rs` was also evaluated but adds verifiable-share machinery
+# (Feldman / Pedersen VSS), extra deps, and a more complex API; the verifiable
+# layer is out of scope here because the authorization chain is the DHT
+# attestation (the social proof), not the share itself. `sharks` is the
+# simpler, more auditable choice for a pure-SSS transport primitive.
+sharks = "0.5"
 base64 = "0.22"
 # Fast hash for pubkey fingerprints (verified_signer_fingerprint — Task A.7)
 blake3 = "1"
