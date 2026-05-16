@@ -10,8 +10,7 @@
 use crate::graph::engine::{GraphEngine, GraphError};
 use crate::graph_views::data_value::*;
 use crate::views::{
-    DistributionDetails, DistributionSummary, DiversityHint, FetchSource, ReachClass,
-    ReplicaHealth,
+    DistributionDetails, DistributionSummary, DiversityHint, FetchSource, ReachClass, ReplicaHealth,
 };
 use cozo::DataValue;
 
@@ -20,10 +19,7 @@ use cozo::DataValue;
 /// `replica_count` is derived from distinct STEWARDS edges. `reach_class` is
 /// derived from the qahal reach field of the atom. Byte-level and projector fields
 /// are zero-filled composition placeholders.
-pub fn build_summary(
-    engine: &GraphEngine,
-    cid: &str,
-) -> Result<DistributionSummary, GraphError> {
+pub fn build_summary(engine: &GraphEngine, cid: &str) -> Result<DistributionSummary, GraphError> {
     // Count stewards via STEWARDS edges.
     let steward_result = engine.run_script(
         r#"?[steward_cid] :=
@@ -59,7 +55,7 @@ pub fn build_summary(
         reach_class,
         diversity_hint: DiversityHint::None, // Composition placeholder — requires peer diversity data
         this_fetch_source: FetchSource::PeerDirect, // Default assumption
-        last_verified_seconds: 0, // Composition placeholder
+        last_verified_seconds: 0,            // Composition placeholder
         my_role: None,
         reciprocity_hint: None,
     })
@@ -69,10 +65,7 @@ pub fn build_summary(
 ///
 /// Wraps `build_summary` and provides empty replica/projector lists as composition
 /// placeholders (these require peer blob-inventory reads in a follow-on sprint).
-pub fn build_details(
-    engine: &GraphEngine,
-    cid: &str,
-) -> Result<DistributionDetails, GraphError> {
+pub fn build_details(engine: &GraphEngine, cid: &str) -> Result<DistributionDetails, GraphError> {
     let summary = build_summary(engine, cid)?;
 
     Ok(DistributionDetails {

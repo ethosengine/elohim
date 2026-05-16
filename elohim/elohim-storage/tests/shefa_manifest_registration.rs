@@ -23,10 +23,9 @@ fn open_engine() -> (GraphEngine, tempfile::TempDir) {
 }
 
 fn load_shefa_graph() -> GraphExtension {
-    let manifest_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../sdk/domains/shefa/manifest.json");
-    let manifest_json =
-        std::fs::read_to_string(&manifest_path).expect("read shefa manifest.json");
+    let manifest_path =
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../sdk/domains/shefa/manifest.json");
+    let manifest_json = std::fs::read_to_string(&manifest_path).expect("read shefa manifest.json");
     let parsed: serde_json::Value = serde_json::from_str(&manifest_json).unwrap();
     serde_json::from_value(parsed["graph"].clone()).expect("shefa graph section must parse")
 }
@@ -151,10 +150,7 @@ fn collective_topology_rule_body_syntax_valid() {
         .find(|r| r.name == "collective_topology")
         .unwrap();
 
-    let script = format!(
-        "{}\n?[member] := collective_topology[member]",
-        rule.datalog
-    );
+    let script = format!("{}\n?[member] := collective_topology[member]", rule.datalog);
     let res = engine.run_script(
         &script,
         &[("collective", cozo::DataValue::from("collective-1"))],
@@ -165,7 +161,11 @@ fn collective_topology_rule_body_syntax_valid() {
         res.err()
     );
     let rows = res.unwrap().rows;
-    assert_eq!(rows.len(), 2, "expected 2 collective members, got: {rows:?}");
+    assert_eq!(
+        rows.len(),
+        2,
+        "expected 2 collective members, got: {rows:?}"
+    );
 }
 
 #[test]
@@ -192,10 +192,7 @@ fn reciprocity_flow_to_rule_body_syntax_valid() {
         .find(|r| r.name == "reciprocity_flow_to")
         .unwrap();
 
-    let script = format!(
-        "{}\n?[from] := reciprocity_flow_to[from]",
-        rule.datalog
-    );
+    let script = format!("{}\n?[from] := reciprocity_flow_to[from]", rule.datalog);
     let res = engine.run_script(
         &script,
         &[("contributor", cozo::DataValue::from("contrib-target"))],
@@ -206,11 +203,7 @@ fn reciprocity_flow_to_rule_body_syntax_valid() {
         res.err()
     );
     let rows = res.unwrap().rows;
-    assert_eq!(
-        rows.len(),
-        2,
-        "expected 2 reciprocity flows, got: {rows:?}"
-    );
+    assert_eq!(rows.len(), 2, "expected 2 reciprocity flows, got: {rows:?}");
 }
 
 #[test]

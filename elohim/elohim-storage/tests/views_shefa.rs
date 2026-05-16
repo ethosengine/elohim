@@ -4,11 +4,11 @@
 //! STEWARDS, VALUE_FLOW) and asserts the view builders return expected shapes.
 #![cfg(feature = "graph-native")]
 
+use cozo::DataValue;
 use elohim_storage::graph::{engine::GraphEngine, schema::apply_core_schema};
 use elohim_storage::graph_views::shefa::{
     cluster, distribution, peer_topology, reciprocity, resilience_snapshot, topology_overview,
 };
-use cozo::DataValue;
 
 fn open_engine() -> (GraphEngine, tempfile::TempDir) {
     let tmp = tempfile::tempdir().unwrap();
@@ -151,8 +151,8 @@ fn resilience_snapshot_counts_steward_nodes() {
 fn resilience_snapshot_at_risk_when_no_stewards() {
     let (engine, _tmp) = open_engine();
 
-    let view =
-        resilience_snapshot::build(&engine, "content-no-stewards").expect("build resilience_snapshot");
+    let view = resilience_snapshot::build(&engine, "content-no-stewards")
+        .expect("build resilience_snapshot");
 
     assert_eq!(view.stewarding_collectives, 0);
     assert_eq!(view.protection_status, "at-risk");
@@ -208,7 +208,8 @@ fn distribution_details_wraps_summary() {
         )
         .unwrap();
 
-    let view = distribution::build_details(&engine, "content-d2").expect("build distribution details");
+    let view =
+        distribution::build_details(&engine, "content-d2").expect("build distribution details");
 
     assert_eq!(view.summary.replica_count, 0);
     assert!(view.replica_peers.is_empty());

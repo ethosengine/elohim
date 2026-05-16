@@ -77,11 +77,7 @@ pub fn build(
                 *epr_edge{from_cid: member_cid, to_cid: $household, rel_type: 'MEMBER_OF'}"#,
             &[("household", DataValue::from(household_cid.as_str()))],
         )?;
-        let members: Vec<String> = members_result
-            .rows
-            .iter()
-            .map(|r| str_at(r, 0))
-            .collect();
+        let members: Vec<String> = members_result.rows.iter().map(|r| str_at(r, 0)).collect();
 
         // Devices operated by any member in this household.
         let device_result = engine.run_script(
@@ -107,10 +103,8 @@ pub fn build(
         &[],
     )?;
 
-    let households_set: std::collections::HashSet<String> = households
-        .iter()
-        .map(|h| h.household_cid.clone())
-        .collect();
+    let households_set: std::collections::HashSet<String> =
+        households.iter().map(|h| h.household_cid.clone()).collect();
     let collectives: Vec<CollectiveEntry> = collective_result
         .rows
         .iter()

@@ -26,9 +26,7 @@ const RECIPROCITY_FLOW_TO: &str = r#"
 /// Byte-level fields are zero-filled (composition with REA economic events in follow-on sprint).
 pub fn build(engine: &GraphEngine, agent_cid: &str) -> Result<ReciprocityView, GraphError> {
     // Inbound: who reciprocates toward this agent (reciprocity_flow_to pattern).
-    let inflow_script = format!(
-        "{RECIPROCITY_FLOW_TO}\n?[from] := reciprocity_flow_to[from]"
-    );
+    let inflow_script = format!("{RECIPROCITY_FLOW_TO}\n?[from] := reciprocity_flow_to[from]");
     let inflow_result = engine.run_script(
         &inflow_script,
         &[("contributor", DataValue::from(agent_cid))],

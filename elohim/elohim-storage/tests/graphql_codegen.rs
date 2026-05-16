@@ -12,7 +12,10 @@ fn codegen_emits_core_types_and_lamad_subgraph() {
         sdl.contains("@key(fields: \"cid\")"),
         "missing EprHead @key directive"
     );
-    assert!(sdl.contains("type LamadContext"), "missing LamadContext type");
+    assert!(
+        sdl.contains("type LamadContext"),
+        "missing LamadContext type"
+    );
     assert!(
         sdl.contains("prerequisites"),
         "lamad rule not exposed as field"
@@ -33,7 +36,10 @@ fn codegen_with_only_lamad_omits_shefa_types() {
 #[test]
 fn codegen_with_only_shefa_omits_lamad_fields() {
     let sdl = generate_sdl_from_manifests(&["shefa"]);
-    assert!(sdl.contains("type Household"), "Household type must be present");
+    assert!(
+        sdl.contains("type Household"),
+        "Household type must be present"
+    );
     assert!(
         !sdl.contains("prerequisites"),
         "prerequisites must not appear without lamad manifest"

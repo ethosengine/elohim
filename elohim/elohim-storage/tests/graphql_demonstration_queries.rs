@@ -62,10 +62,7 @@ fn build_lamad_schema() -> AppSchema {
 
     // Seed concept-a (no prerequisites)
     projector
-        .project_head(
-            "bafyA",
-            &make_head("concept-a", "Concept A", vec![]),
-        )
+        .project_head("bafyA", &make_head("concept-a", "Concept A", vec![]))
         .unwrap();
 
     // Seed concept-b with a PREREQUISITE edge to concept-a
@@ -245,11 +242,10 @@ async fn shefa_household_topology_query_works() {
     );
 
     // Both members should appear (matthew and jessica both have MEMBER_OF → h1)
-    let members = household["members"].as_array().expect("members must be array");
-    let member_dids: Vec<&str> = members
-        .iter()
-        .filter_map(|m| m["did"].as_str())
-        .collect();
+    let members = household["members"]
+        .as_array()
+        .expect("members must be array");
+    let member_dids: Vec<&str> = members.iter().filter_map(|m| m["did"].as_str()).collect();
     assert!(
         member_dids.contains(&"did:test:matthew"),
         "matthew must appear as member; got: {:?}",
@@ -292,10 +288,7 @@ async fn shefa_reciprocity_inbound_query_works() {
         .expect("reciprocityInbound must be array");
 
     // jessica seeded a RECIPROCATES_WITH edge → matthew
-    let from_dids: Vec<&str> = flows
-        .iter()
-        .filter_map(|f| f["from"].as_str())
-        .collect();
+    let from_dids: Vec<&str> = flows.iter().filter_map(|f| f["from"].as_str()).collect();
     assert!(
         from_dids.contains(&"did:test:jessica"),
         "jessica must appear as inbound reciprocity source; got: {:?}",

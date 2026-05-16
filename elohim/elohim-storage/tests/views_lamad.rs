@@ -145,11 +145,7 @@ fn navigation_context_neighborhood_includes_teaches_target() {
 
     let has_b = view.neighborhood.iter().any(|n| n.cid == "bafyB");
     assert!(has_b, "neighbourhood of A must include B (TEACHES edge)");
-    let teaches_entry = view
-        .neighborhood
-        .iter()
-        .find(|n| n.cid == "bafyB")
-        .unwrap();
+    let teaches_entry = view.neighborhood.iter().find(|n| n.cid == "bafyB").unwrap();
     assert_eq!(teaches_entry.rel_type, "TEACHES");
     assert_eq!(teaches_entry.hops, 1);
 }

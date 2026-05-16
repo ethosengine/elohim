@@ -28,9 +28,7 @@ async fn graphql_endpoint_serves_introspection() {
     let engine = open_seeded_engine();
     let schema = build_schema(engine);
 
-    let result = schema
-        .execute("{ __schema { types { name } } }")
-        .await;
+    let result = schema.execute("{ __schema { types { name } } }").await;
 
     assert!(
         result.errors.is_empty(),
@@ -53,9 +51,7 @@ async fn graphql_schema_exposes_epr_head_and_contributor() {
     let engine = open_seeded_engine();
     let schema = build_schema(engine);
 
-    let result = schema
-        .execute("{ __schema { types { name } } }")
-        .await;
+    let result = schema.execute("{ __schema { types { name } } }").await;
     assert!(result.errors.is_empty(), "{:?}", result.errors);
 
     let json = serde_json::to_value(&result.data).unwrap();

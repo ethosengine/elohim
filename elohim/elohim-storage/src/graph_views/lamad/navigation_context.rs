@@ -59,9 +59,8 @@ pub fn build(
     )?;
 
     // Fetch 2-hop neighbourhood (all reachable within 2 hops).
-    let script = format!(
-        "{NEIGHBORHOOD}\n?[to, hops] := neighborhood[to, hops], hops <= $max_hops"
-    );
+    let script =
+        format!("{NEIGHBORHOOD}\n?[to, hops] := neighborhood[to, hops], hops <= $max_hops");
     let nb_result = engine.run_script(
         &script,
         &[

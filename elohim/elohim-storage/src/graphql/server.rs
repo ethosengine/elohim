@@ -96,10 +96,8 @@ async fn execute_graphql(
         .to_bytes();
 
     // Deserialize the GraphQL request.
-    let gql_req: async_graphql::Request =
-        serde_json::from_slice(&body_bytes).map_err(|e| {
-            StorageError::InvalidInput(format!("Invalid GraphQL request JSON: {}", e))
-        })?;
+    let gql_req: async_graphql::Request = serde_json::from_slice(&body_bytes)
+        .map_err(|e| StorageError::InvalidInput(format!("Invalid GraphQL request JSON: {}", e)))?;
 
     // Execute.
     let gql_response = schema.execute(gql_req).await;

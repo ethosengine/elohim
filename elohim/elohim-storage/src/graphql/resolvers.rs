@@ -77,9 +77,7 @@ impl EprHead {
             .iter()
             .filter_map(|r| r.first())
             .filter_map(|v| match v {
-                DataValue::Str(s) => Some(EprHead {
-                    cid: s.to_string(),
-                }),
+                DataValue::Str(s) => Some(EprHead { cid: s.to_string() }),
                 _ => None,
             })
             .collect())
@@ -97,9 +95,7 @@ impl EprHead {
             .iter()
             .filter_map(|r| r.first())
             .filter_map(|v| match v {
-                DataValue::Str(s) => Some(EprHead {
-                    cid: s.to_string(),
-                }),
+                DataValue::Str(s) => Some(EprHead { cid: s.to_string() }),
                 _ => None,
             })
             .collect())
@@ -152,18 +148,13 @@ impl Contributor {
             .first()
             .and_then(|r| r.first())
             .and_then(|v| match v {
-                DataValue::Str(s) => Some(Household {
-                    cid: s.to_string(),
-                }),
+                DataValue::Str(s) => Some(Household { cid: s.to_string() }),
                 _ => None,
             }))
     }
 
     /// Inbound reciprocity flows (RECIPROCATES_WITH edges pointing to this contributor).
-    async fn reciprocity_inbound(
-        &self,
-        ctx: &Context<'_>,
-    ) -> FieldResult<Vec<ReciprocityFlow>> {
+    async fn reciprocity_inbound(&self, ctx: &Context<'_>) -> FieldResult<Vec<ReciprocityFlow>> {
         let engine = ctx.data::<Arc<GraphEngine>>()?;
         let res = engine.run_script(
             r#"?[from_cid] := *epr_edge{from_cid: from_cid, to_cid: $did, rel_type: "RECIPROCATES_WITH"}"#,
@@ -202,9 +193,7 @@ impl Household {
             .iter()
             .filter_map(|r| r.first())
             .filter_map(|v| match v {
-                DataValue::Str(s) => Some(Contributor {
-                    did: s.to_string(),
-                }),
+                DataValue::Str(s) => Some(Contributor { did: s.to_string() }),
                 _ => None,
             })
             .collect())
@@ -225,9 +214,7 @@ impl Household {
             .iter()
             .filter_map(|r| r.first())
             .filter_map(|v| match v {
-                DataValue::Str(s) => Some(Device {
-                    id: s.to_string(),
-                }),
+                DataValue::Str(s) => Some(Device { id: s.to_string() }),
                 _ => None,
             })
             .collect())

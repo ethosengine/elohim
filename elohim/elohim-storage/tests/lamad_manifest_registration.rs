@@ -23,10 +23,9 @@ fn open_engine() -> (GraphEngine, tempfile::TempDir) {
 }
 
 fn load_lamad_graph() -> GraphExtension {
-    let manifest_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../sdk/domains/lamad/manifest.json");
-    let manifest_json =
-        std::fs::read_to_string(&manifest_path).expect("read lamad manifest.json");
+    let manifest_path =
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../sdk/domains/lamad/manifest.json");
+    let manifest_json = std::fs::read_to_string(&manifest_path).expect("read lamad manifest.json");
     let parsed: serde_json::Value = serde_json::from_str(&manifest_json).unwrap();
     serde_json::from_value(parsed["graph"].clone()).expect("lamad graph section must parse")
 }
@@ -90,10 +89,7 @@ fn prerequisite_chain_rule_body_syntax_valid() {
         "{}\n?[ancestor, node, depth] := prerequisite_chain[ancestor, node, depth], depth <= 2",
         prereq_rule.datalog
     );
-    let res = engine.run_script(
-        &script,
-        &[("max_depth", cozo::DataValue::from(2_i64))],
-    );
+    let res = engine.run_script(&script, &[("max_depth", cozo::DataValue::from(2_i64))]);
     assert!(
         res.is_ok(),
         "prerequisite_chain rule body has Datalog syntax error: {:?}",

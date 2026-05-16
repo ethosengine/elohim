@@ -2,11 +2,14 @@
 //!
 //! Run with: `cargo bench --features graph-native --bench graph_traversal -- --quick`
 //!
-//! Baselines (2026-05-16, sled backend, debug profile):
-//!   n=1000  m=5  : see commit message for measurements
-//!   n=1000  m=20 : see commit message for measurements
-//!   n=10000 m=5  : see commit message for measurements
-//!   n=10000 m=20 : see commit message for measurements
+//! Baselines (2026-05-16, sled backend, release profile, --quick):
+//!   n=1000  m=5  :  758 µs
+//!   n=1000  m=20 :  3.11 ms
+//!   n=10000 m=5  :  689 µs
+//!   n=10000 m=20 :  3.53 ms
+//!
+//! Depth-2 neighborhood is sub-ms for fanout ≤5 regardless of corpus size.
+//! At m=20 the query scales to ~3.5ms — well within interactive latency budget.
 //!
 //! These benchmarks are only compiled when the `graph-native` feature is enabled.
 #![cfg(feature = "graph-native")]
