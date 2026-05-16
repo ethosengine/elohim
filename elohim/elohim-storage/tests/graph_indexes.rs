@@ -14,7 +14,7 @@ fn core_indexes_present_and_used_by_planner() {
         .rows
         .iter()
         .filter_map(|row| {
-            row.get(0).and_then(|v| match v {
+            row.first().and_then(|v| match v {
                 cozo::DataValue::Str(s) => Some(s.to_string()),
                 _ => None,
             })

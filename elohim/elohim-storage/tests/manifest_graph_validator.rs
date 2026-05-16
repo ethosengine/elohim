@@ -245,7 +245,7 @@ fn apply_graph_extension_creates_declared_indexes() {
         .rows
         .iter()
         .filter_map(|r| {
-            r.get(0).and_then(|v| match v {
+            r.first().and_then(|v| match v {
                 cozo::DataValue::Str(s) => Some(s.to_string()),
                 _ => None,
             })
