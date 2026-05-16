@@ -61,6 +61,25 @@ pub mod graduation; // Graduation evaluator — observations to attestations/eve
 #[cfg(feature = "graph-native")]
 pub mod graph;
 
+// Thin-build stub: when graph-native is OFF, provide a zero-size GraphEngine
+// placeholder so handler signatures that accept `Option<&Arc<GraphEngine>>`
+// compile without the full CozoDB stack. The Option is always None in thin
+// builds; the stub type is never constructed at runtime.
+#[cfg(not(feature = "graph-native"))]
+pub mod graph {
+    pub mod engine {
+        /// Zero-size stub — never constructed; satisfies type signatures.
+        pub struct GraphEngine(std::convert::Infallible);
+    }
+    pub mod primitives {
+        pub mod scripts {}
+    }
+    pub mod projector {}
+    pub mod schema {}
+    pub mod registry {}
+    pub mod backfill {}
+}
+
 // Graph-native view builders — lamad + shefa domains (CozoDB projection; default-on)
 #[cfg(feature = "graph-native")]
 pub mod graph_views;
