@@ -1578,6 +1578,10 @@ async fn async_main(
             local_peer_id: local_peer_id_opt,
             local_pubkey,
             standing_policy_cid,
+            // graph_engine is wired separately via with_graph_engine at startup
+            // once the graph-native feature is stable. None = projection skipped.
+            #[cfg(feature = "graph-native")]
+            graph_engine: None,
         });
 
         http_server = http_server.with_fan_out_ctx(fan_out_ctx);

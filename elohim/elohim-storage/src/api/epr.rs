@@ -89,6 +89,14 @@ pub struct EprFanOutCtx {
     pub local_pubkey: Option<Vec<u8>>,
     /// CID of the active standing-policy manifest for standing projector provenance.
     pub standing_policy_cid: Option<String>,
+    /// Graph engine for post-put EprHead projection (graph-native feature).
+    ///
+    /// When `Some`, a successful `PUT /api/v1/epr` decodes the atom's canonical
+    /// bytes as an `EprHead` and calls `GraphProjector::project_head` after the
+    /// diesel transaction commits (sequential semantics per spec §6.2). Graph
+    /// errors are logged at `warn!` and never bubble to the HTTP response.
+    #[cfg(feature = "graph-native")]
+    pub graph_engine: Option<std::sync::Arc<crate::graph::engine::GraphEngine>>,
 }
 
 /// Private-key bundle for back_prop unsealing.
@@ -614,6 +622,48 @@ async fn put_epr(
     );
     let mut conn = get_conn(pool)?;
     let result = store.put(&mut conn, epr)?;
+
+    // Phase 2 graph-native fan-out: after diesel commits, project EprHead into CozoDB.
+    // Sequential semantics: diesel first, graph second (spec §6.2). Graph errors are
+    // non-fatal — logged at warn level and never bubbled to the HTTP response.
+    //
+    // EprHead is decoded from payload_bytes (Content-kind EPRs carry the EprHead JSON as
+    // payload). Other kinds (EconomicEvent, FeedbackSignal, etc.) have non-EprHead payloads
+    // and are silently skipped on decode failure — they don't belong in the content graph.
+    #[cfg(feature = "graph-native")]
+    if kind == EprKind::Content {
+        if let Some(engine) = fan_out_ctx.as_ref().and_then(|f| f.graph_engine.as_ref()) {
+            match crate::db::epr_atoms::fetch_atom_by_cid(&mut conn, &result.cid) {
+                Ok(Some(atom)) => {
+                    match crate::epr_codec::decode_epr_head(&atom.payload_bytes) {
+                        Ok(head) => {
+                            let projector = crate::graph::projector::GraphProjector::new(engine);
+                            if let Err(e) = projector.project_head(&result.cid, &head) {
+                                tracing::warn!(cid = %result.cid, err = %e, "put_epr: graph projection failed (non-fatal)");
+                            }
+                            // If this atom supersedes a predecessor, write the SUPERSEDES edge.
+                            if let Some(ref predecessor) = atom.supersedes {
+                                if let Err(e) =
+                                    projector.project_supersedence(predecessor, &result.cid)
+                                {
+                                    tracing::warn!(predecessor = %predecessor, successor = %result.cid, err = %e, "put_epr: graph supersedence edge failed (non-fatal)");
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            tracing::warn!(cid = %result.cid, err = %e, "put_epr: EprHead decode from payload_bytes failed (non-fatal)");
+                        }
+                    }
+                }
+                Ok(None) => {
+                    tracing::warn!(cid = %result.cid, "put_epr: atom not found after put — graph projection skipped");
+                }
+                Err(e) => {
+                    tracing::warn!(cid = %result.cid, err = %e, "put_epr: fetch for graph projection failed (non-fatal)");
+                }
+            }
+        }
+    }
 
     // T18 / T22 wiring landed: see p2p/mod.rs::handle_epr_atom_request —
     // Content-kind Announce ingests record sender PeerId via
