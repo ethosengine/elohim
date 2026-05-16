@@ -2,7 +2,7 @@
   "id": "manifest-lamad",
   "name": "lamad",
   "version": "1.0.0",
-  "description": "Learning and mastery platform \u2014 knowledge discovery, assessment, paths, and stewardship",
+  "description": "Learning and mastery platform — knowledge discovery, assessment, paths, and stewardship",
   "vocabulary": {
     "contentTypes": {
       "concept": {
@@ -231,7 +231,7 @@
         }
       },
       "experience-story": {
-        "description": "A durable narrative junction representing (subject, role, feature) \u2014 the persona's experience with a feature in a given role. Accumulates value via :story-point attestations over time.",
+        "description": "A durable narrative junction representing (subject, role, feature) — the persona's experience with a feature in a given role. Accumulates value via :story-point attestations over time.",
         "metadataSchema": {
           "$ref": "./schemas/experience-story-metadata.schema.json"
         },
@@ -304,7 +304,7 @@
         }
       },
       "reflection": {
-        "description": "An open-ended prompt for self-reflection and metacognition. Not graded \u2014 produces qualitative insight rather than scores.",
+        "description": "An open-ended prompt for self-reflection and metacognition. Not graded — produces qualitative insight rather than scores.",
         "coupling": {
           "knowledge": {
             "relationships": {
@@ -391,7 +391,7 @@
         }
       },
       "article": {
-        "description": "Long-form written content \u2014 essays, explainers, deep dives. The primary narrative format for knowledge sharing.",
+        "description": "Long-form written content — essays, explainers, deep dives. The primary narrative format for knowledge sharing.",
         "coupling": {
           "knowledge": {
             "relationships": {
@@ -447,7 +447,7 @@
         }
       },
       "path": {
-        "description": "A curated learning journey \u2014 an ordered sequence of steps through content. Paths are EPR composites that reference other content types.",
+        "description": "A curated learning journey — an ordered sequence of steps through content. Paths are EPR composites that reference other content types.",
         "metadataSchema": {
           "$ref": "./schemas/path-metadata.schema.json"
         },
@@ -565,7 +565,7 @@
         }
       },
       "scenario": {
-        "description": "A BDD scenario specifying observable behavior \u2014 Given/When/Then. Scenarios are executable specifications that validate learning outcomes.",
+        "description": "A BDD scenario specifying observable behavior — Given/When/Then. Scenarios are executable specifications that validate learning outcomes.",
         "coupling": {
           "knowledge": {
             "relationships": {
@@ -608,7 +608,7 @@
         }
       },
       "discovery-assessment": {
-        "description": "Self-discovery quiz (Enneagram, learning style, values inventory). Ungraded \u2014 produces psychometric insights rather than scores.",
+        "description": "Self-discovery quiz (Enneagram, learning style, values inventory). Ungraded — produces psychometric insights rather than scores.",
         "coupling": {
           "knowledge": {
             "relationships": {
@@ -653,7 +653,7 @@
         }
       },
       "instrument": {
-        "description": "A psychometric instrument definition \u2014 subscales, scoring rules, and display configuration for discovery assessments.",
+        "description": "A psychometric instrument definition — subscales, scoring rules, and display configuration for discovery assessments.",
         "coupling": {
           "knowledge": {
             "relationships": {
@@ -691,7 +691,7 @@
         }
       },
       "quiz": {
-        "description": "A lightweight graded question set \u2014 simpler than a full assessment, typically embedded within lessons or used for quick knowledge checks.",
+        "description": "A lightweight graded question set — simpler than a full assessment, typically embedded within lessons or used for quick knowledge checks.",
         "coupling": {
           "knowledge": {
             "relationships": {
@@ -803,7 +803,7 @@
         }
       },
       "module": {
-        "description": "A generic content module \u2014 a reusable, self-contained unit that can be composed into different paths and course structures.",
+        "description": "A generic content module — a reusable, self-contained unit that can be composed into different paths and course structures.",
         "coupling": {
           "knowledge": {
             "relationships": {
@@ -933,7 +933,7 @@
         }
       },
       "placeholder": {
-        "description": "A placeholder for missing or errored content. Shown when content cannot be loaded \u2014 ensures the graph remains navigable.",
+        "description": "A placeholder for missing or errored content. Shown when content cannot be loaded — ensures the graph remains navigable.",
         "coupling": {
           "value": {},
           "governance": {
@@ -1095,7 +1095,7 @@
         }
       },
       "gate-process-declaration": {
-        "description": "An app-manifest-declared gate-process DAG. Carries the step graph an elohim executes when a RelationalImpactEvent fires for a given content type. CID-addressed and inspectable (spec P3). See elohim/elohim-agent/spec/2026-04-18-gate-interface.md \u00a72.",
+        "description": "An app-manifest-declared gate-process DAG. Carries the step graph an elohim executes when a RelationalImpactEvent fires for a given content type. CID-addressed and inspectable (spec P3). See elohim/elohim-agent/spec/2026-04-18-gate-interface.md §2.",
         "metadataSchema": {
           "$ref": "./schemas/gate-process-declaration-metadata.schema.json"
         },
@@ -1130,7 +1130,7 @@
         }
       },
       "universal-band-declaration": {
-        "description": "Protocol-root universal-band DAG \u2014 the wisdom-as-system-auth layer that wraps every relational-impact invocation. Structurally identical to gate-process-declaration but protocol-reach governed. Referenced by a well-known constitutional pointer.",
+        "description": "Protocol-root universal-band DAG — the wisdom-as-system-auth layer that wraps every relational-impact invocation. Structurally identical to gate-process-declaration but protocol-reach governed. Referenced by a well-known constitutional pointer.",
         "metadataSchema": {
           "$ref": "./schemas/universal-band-declaration-metadata.schema.json"
         },
@@ -1306,7 +1306,7 @@
         ]
       },
       "epr-composite": {
-        "description": "EPR composite layout \u2014 a content node whose body references other EPRs. Used for paths, curated collections, and landing pages.",
+        "description": "EPR composite layout — a content node whose body references other EPRs. Used for paths, curated collections, and landing pages.",
         "renderer": "path-renderer",
         "bodySchema": {
           "$ref": "./schemas/epr-composite-body.schema.json"
@@ -1374,7 +1374,7 @@
         "inverse": "BELONGS_TO"
       },
       "BELONGS_TO": {
-        "description": "Reverse of CONTAINS \u2014 the source is a child of the target.",
+        "description": "Reverse of CONTAINS — the source is a child of the target.",
         "sourceTypes": [
           "concept",
           "lesson",
@@ -1512,7 +1512,7 @@
         ]
       },
       "FOLLOWS": {
-        "description": "Sequential ordering \u2014 the source comes after the target in a learning sequence. Suggests but does not require completion order.",
+        "description": "Sequential ordering — the source comes after the target in a learning sequence. Suggests but does not require completion order.",
         "sourceTypes": [
           "lesson",
           "path",
@@ -1525,7 +1525,7 @@
         ]
       },
       "ATTACHED_TO": {
-        "description": "Attachment link \u2014 the source is attached supplementary material for the target (e.g., a story with attached media).",
+        "description": "Attachment link — the source is attached supplementary material for the target (e.g., a story with attached media).",
         "sourceTypes": [
           "article",
           "simulation",
@@ -1541,7 +1541,7 @@
     },
     "signals": {
       "learning-signal": {
-        "description": "Emitted when a learner engages with content \u2014 views, reads, or interacts. The foundational attention signal for the learning economy.",
+        "description": "Emitted when a learner engages with content — views, reads, or interacts. The foundational attention signal for the learning economy.",
         "substrateSignal": "attention",
         "economicAction": "use",
         "resourceType": "learning"
@@ -1776,29 +1776,148 @@
   "attestations": {
     "attestation:mastery": {
       "description": "Public proof of an agent's mastery of a content node. Private progress (ContentMastery — Category B2) stays separate; this attestation is minted from that progress when policy fires.",
-      "subject_kinds": ["agent"],
-      "metadata_schema": { "$ref": "../../schemas/v1/attestation/subtypes/mastery-metadata.schema.json" },
+      "subject_kinds": [
+        "agent"
+      ],
+      "metadata_schema": {
+        "$ref": "../../schemas/v1/attestation/subtypes/mastery-metadata.schema.json"
+      },
       "uniqueness_anchor": "attestation:mastery:{subject_cid}:{concept_cid}:{issuer_cid}",
-      "revocable_by": ["issuer", "domain-steward"]
+      "revocable_by": [
+        "issuer",
+        "domain-steward"
+      ]
     },
     "attestation:content-quality": {
       "description": "Quality / reach-grant attestation on a content node. Replaces ContentAttestation entry type.",
-      "subject_kinds": ["content"],
-      "metadata_schema": { "$ref": "../../schemas/v1/attestation/subtypes/content-quality-metadata.schema.json" },
+      "subject_kinds": [
+        "content"
+      ],
+      "metadata_schema": {
+        "$ref": "../../schemas/v1/attestation/subtypes/content-quality-metadata.schema.json"
+      },
       "uniqueness_anchor": "attestation:content-quality:{subject_cid}:{issuer_cid}:{quality_dimension}",
-      "revocable_by": ["issuer", "domain-steward"]
+      "revocable_by": [
+        "issuer",
+        "domain-steward"
+      ]
     },
     "attestation:content-succession": {
       "description": "Declares that one content node supersedes another. Replaces ContentSuccession entry type.",
-      "subject_kinds": ["content"],
-      "metadata_schema": { "$ref": "../../schemas/v1/attestation/subtypes/content-succession-metadata.schema.json" },
-      "revocable_by": ["issuer"]
+      "subject_kinds": [
+        "content"
+      ],
+      "metadata_schema": {
+        "$ref": "../../schemas/v1/attestation/subtypes/content-succession-metadata.schema.json"
+      },
+      "revocable_by": [
+        "issuer"
+      ]
     },
     "attestation:custodian-commitment": {
       "description": "Commitment of custodianship over a content / digital presence. Replaces CustodianCommitment entry type.",
-      "subject_kinds": ["content", "agent"],
-      "metadata_schema": { "$ref": "../../schemas/v1/attestation/subtypes/custodian-commitment-metadata.schema.json" },
-      "revocable_by": ["issuer", "subject"]
+      "subject_kinds": [
+        "content",
+        "agent"
+      ],
+      "metadata_schema": {
+        "$ref": "../../schemas/v1/attestation/subtypes/custodian-commitment-metadata.schema.json"
+      },
+      "revocable_by": [
+        "issuer",
+        "subject"
+      ]
     }
+  },
+  "graph": {
+    "edges": [
+      {
+        "type": "PREREQUISITE",
+        "from": "EprHead",
+        "to": "EprHead",
+        "indexed": true,
+        "directional": true,
+        "description": "A must be mastered before B can be approached"
+      },
+      {
+        "type": "TEACHES",
+        "from": "EprHead",
+        "to": "EprHead",
+        "indexed": true,
+        "directional": true,
+        "description": "Content B teaches concept A"
+      },
+      {
+        "type": "CONTAINS",
+        "from": "EprHead",
+        "to": "EprHead",
+        "indexed": true,
+        "directional": true
+      },
+      {
+        "type": "REFERENCES",
+        "from": "EprHead",
+        "to": "EprHead",
+        "indexed": false,
+        "directional": true
+      },
+      {
+        "type": "MASTERY_OF",
+        "from": "ContributorDID",
+        "to": "EprHead",
+        "weighted": true,
+        "temporal": true,
+        "description": "Contributor has demonstrated mastery of this concept"
+      },
+      {
+        "type": "SUPERSEDES",
+        "from": "EprHead",
+        "to": "EprHead",
+        "indexed": true,
+        "directional": true,
+        "description": "Lamad-specific version chain for content (distinct from manifest supersedence)"
+      }
+    ],
+    "nodes": [
+      {
+        "type": "MasteryRecord",
+        "properties": {
+          "contributor_did": "String",
+          "concept_cid": "String",
+          "level": "String",
+          "attested_at": "Validity"
+        }
+      }
+    ],
+    "indexes": [
+      {
+        "name": "prereq_forward",
+        "on": "epr_edge",
+        "where": "rel_type = 'PREREQUISITE'"
+      },
+      {
+        "name": "prereq_backward",
+        "on": "epr_edge",
+        "where": "rel_type = 'PREREQUISITE'",
+        "order_by": "to_cid"
+      },
+      {
+        "name": "teaches_forward",
+        "on": "epr_edge",
+        "where": "rel_type = 'TEACHES'"
+      }
+    ],
+    "rules": [
+      {
+        "name": "prerequisite_chain",
+        "description": "All ancestors of a node via PREREQUISITE edges, up to max_depth",
+        "datalog": "prerequisite_chain[ancestor, node, depth] := *epr_edge{from_cid: ancestor, to_cid: node, rel_type: 'PREREQUISITE'}, depth = 1\nprerequisite_chain[ancestor, node, depth] := prerequisite_chain[ancestor, via, prev], *epr_edge{from_cid: via, to_cid: node, rel_type: 'PREREQUISITE'}, depth = prev + 1, depth <= $max_depth"
+      },
+      {
+        "name": "mastery_frontier",
+        "description": "Concepts a contributor could now approach — prereqs satisfied, target not yet mastered",
+        "datalog": "mastery_frontier[concept] := *epr_edge{from_cid: prereq, to_cid: concept, rel_type: 'PREREQUISITE'}, *epr_edge{from_cid: $contributor, to_cid: prereq, rel_type: 'MASTERY_OF'}, not *epr_edge{from_cid: $contributor, to_cid: concept, rel_type: 'MASTERY_OF'}"
+      }
+    ]
   }
 }
