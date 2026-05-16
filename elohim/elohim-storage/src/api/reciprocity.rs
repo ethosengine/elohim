@@ -28,15 +28,19 @@ use super::{account, get_conn};
 
 /// Dispatch `/api/v1/reciprocity` (no path tail in Phase 5 — only the
 /// agent-scoped self-view).
+///
+/// `graph_engine` is `None` when the `graph-native` feature is off or the engine
+/// failed to open at startup. When `Some`, the graph-backed path is preferred.
 pub async fn handle(
     req: Request<Incoming>,
     method: Method,
     pool: &DbPool,
+    graph_engine: Option<&std::sync::Arc<crate::graph::engine::GraphEngine>>,
 ) -> Result<Response<Full<Bytes>>, StorageError> {
     if method != Method::GET {
         return Ok(response::method_not_allowed());
     }
-    handle_reciprocity_self(req, pool).await
+    handle_reciprocity_self(req, pool, graph_engine).await
 }
 
 /// `GET /api/v1/reciprocity`
@@ -50,9 +54,14 @@ pub async fn handle(
 /// projection — no P2P federation required (each storage node owns its own
 /// commitment/event tables). This is the only Phase 5 self-view that does not
 /// gate on `p2p_handle`.
+///
+/// NOTE: graph-backed path returns graph-derived fields with placeholders
+/// for system_metrics / blob_inventory / REA event fields. Full composition
+/// lands in the follow-on sprint per Phase 5 architectural decision.
 async fn handle_reciprocity_self(
     req: Request<Incoming>,
     pool: &DbPool,
+    graph_engine: Option<&std::sync::Arc<crate::graph::engine::GraphEngine>>,
 ) -> Result<Response<Full<Bytes>>, StorageError> {
     let mut conn = get_conn(pool)?;
 
@@ -66,6 +75,19 @@ async fn handle_reciprocity_self(
         }
     };
 
+    // graph-native branch: derive reciprocity from RECIPROCATES_WITH edges.
+    #[cfg(feature = "graph-native")]
+    if let Some(engine) = graph_engine {
+        return match crate::graph_views::shefa::reciprocity::build(engine, &agent_cid) {
+            Ok(view) => Ok(response::ok(&view)),
+            Err(e) => Ok(response::internal_error(&format!(
+                "graph reciprocity build failed: {e}"
+            ))),
+        };
+    }
+
+    // Legacy local relational path.
+    let _ = graph_engine;
     let now_iso = chrono::Utc::now().to_rfc3339();
     let bindings = peer_identity_bindings::list_active_for_agent(&mut conn, &agent_cid, &now_iso)
         .map_err(|e| StorageError::Internal(format!("bindings lookup failed: {}", e)))?;

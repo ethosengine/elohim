@@ -33,12 +33,20 @@ use super::{account, get_conn};
 ///
 /// `resource_path` is the slice after the `blob` prefix: `/{hash}/distribution/details`,
 /// `/{hash}/distribution/summary`, etc.
+///
+/// `graph_engine` is `None` when the `graph-native` feature is off or the engine
+/// failed to open at startup. When `Some`, the graph-backed distribution path is preferred.
+///
+/// NOTE: graph-backed path returns graph-derived fields (steward counts, reach class)
+/// with placeholders for system_metrics / blob_inventory / REA event fields. Full
+/// composition lands in the follow-on sprint per Phase 5 architectural decision.
 pub async fn handle(
     req: Request<Incoming>,
     method: Method,
     resource_path: &str,
     pool: &DbPool,
     _ctx: &AppContext,
+    graph_engine: Option<&std::sync::Arc<crate::graph::engine::GraphEngine>>,
 ) -> Result<Response<Full<Bytes>>, StorageError> {
     // Strip query string; we don't accept query params on these endpoints.
     let (path_only, _) = resource_path.split_once('?').unwrap_or((resource_path, ""));
@@ -48,7 +56,7 @@ pub async fn handle(
 
     match (&method, parts.as_slice()) {
         (&Method::GET, [hash, "distribution", "details"]) if !hash.is_empty() => {
-            handle_distribution_details(req, pool, hash).await
+            handle_distribution_details(req, pool, hash, graph_engine).await
         }
         _ => Ok(response::not_found(&format!(
             "Unknown blob route: {} /api/v1/blob{}",
@@ -68,11 +76,28 @@ pub async fn handle(
 ///   - Header or session yields agent_cid AND non-empty bindings → Steward
 ///   - Header or session yields agent_cid but empty bindings → Visitor (the
 ///     caller is authed but has no peer bindings yet, so no role to attribute)
+///
+/// NOTE: graph-backed path returns graph-derived fields with placeholders
+/// for system_metrics / blob_inventory / REA event fields. Full composition
+/// lands in the follow-on sprint per Phase 5 architectural decision.
 async fn handle_distribution_details(
     req: Request<Incoming>,
     pool: &DbPool,
     hash: &str,
+    graph_engine: Option<&std::sync::Arc<crate::graph::engine::GraphEngine>>,
 ) -> Result<Response<Full<Bytes>>, StorageError> {
+    // graph-native branch: derive distribution details from STEWARDS + epr_qahal edges.
+    #[cfg(feature = "graph-native")]
+    if let Some(engine) = graph_engine {
+        return match crate::graph_views::shefa::distribution::build_details(engine, hash) {
+            Ok(view) => Ok(response::ok(&view)),
+            Err(e) => Ok(response::internal_error(&format!(
+                "graph distribution build_details failed: {e}"
+            ))),
+        };
+    }
+    let _ = graph_engine; // suppress unused warning on non-graph builds
+
     let mut conn = get_conn(pool)?;
 
     let agent_cid_opt = account::extract_agent_cid(&req, &mut conn)?;

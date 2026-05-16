@@ -2,6 +2,14 @@
 //!
 //! Routes: `/api/v1/resilience/{content_id}`
 //!         `/api/v1/resilience/{content_id}/verify`  (Sprint C)
+//!
+//! ## graph-native branch (Phase 6 Task 27)
+//!
+//! NOTE: graph-backed path returns a `ResilienceSnapshotView` (graph-derived
+//! stewarding collective counts) with placeholders for diversity_score /
+//! regional_distribution / placement_gaps fields requiring relational data.
+//! The legacy path returns the full `ResilienceView` shape. Full composition
+//! lands in the follow-on sprint per Phase 5 architectural decision.
 
 use bytes::Bytes;
 use http_body_util::Full;
@@ -20,6 +28,7 @@ pub async fn handle(
     resource_path: &str,
     pool: &DbPool,
     ctx: &AppContext,
+    graph_engine: Option<&std::sync::Arc<crate::graph::engine::GraphEngine>>,
 ) -> Result<Response<Full<Bytes>>, StorageError> {
     let path = resource_path.trim_start_matches('/');
 
@@ -36,7 +45,7 @@ pub async fn handle(
         }
         // GET /api/v1/resilience/{content_id}
         (&Method::GET, content_id) if !content_id.is_empty() && !content_id.contains('/') => {
-            handle_get_resilience(content_id, pool, ctx).await
+            handle_get_resilience(content_id, pool, ctx, graph_engine).await
         }
         _ => Ok(response::not_found(&format!(
             "Unknown resilience route: /api/v1/resilience/{}",
@@ -76,7 +85,22 @@ async fn handle_get_resilience(
     content_id: &str,
     pool: &DbPool,
     ctx: &AppContext,
+    graph_engine: Option<&std::sync::Arc<crate::graph::engine::GraphEngine>>,
 ) -> Result<Response<Full<Bytes>>, StorageError> {
+    // graph-native branch: derive resilience snapshot from STEWARDS + MEMBER_OF edges.
+    // Returns ResilienceSnapshotView (graph shape). Full composition with relational
+    // data (diversity, placement gaps) lands in the follow-on sprint.
+    #[cfg(feature = "graph-native")]
+    if let Some(engine) = graph_engine {
+        return match crate::graph_views::shefa::resilience_snapshot::build(engine, content_id) {
+            Ok(view) => Ok(response::ok(&view)),
+            Err(e) => Ok(response::internal_error(&format!(
+                "graph resilience_snapshot build failed: {e}"
+            ))),
+        };
+    }
+    let _ = graph_engine; // suppress unused warning on non-graph builds
+
     let mut conn = get_conn(pool)?;
 
     // 1. Get shard manifest

@@ -74,8 +74,14 @@ pub fn apply_core_schema(engine: &GraphEngine) -> Result<(), GraphError> {
     );
 
     // Core composite indexes for traversal performance
-    let _ = engine.run_script("::index create epr_edge:by_rel_type { rel_type, from_cid }", &[]);
-    let _ = engine.run_script("::index create epr_edge:by_target { to_cid, rel_type }", &[]);
+    let _ = engine.run_script(
+        "::index create epr_edge:by_rel_type { rel_type, from_cid }",
+        &[],
+    );
+    let _ = engine.run_script(
+        "::index create epr_edge:by_target { to_cid, rel_type }",
+        &[],
+    );
     let _ = engine.run_script("::index create epr_qahal:by_reach { reach }", &[]);
     let _ = engine.run_script("::index create epr_node:by_author { author_did }", &[]);
     let _ = engine.run_script("::index create epr_node:by_updated { updated_at }", &[]);

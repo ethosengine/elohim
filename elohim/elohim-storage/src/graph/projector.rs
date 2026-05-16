@@ -75,7 +75,10 @@ impl<'a> GraphProjector<'a> {
             &[
                 ("cid", DataValue::from(cid)),
                 ("title", DataValue::from(head.lamad.title.as_str())),
-                ("content_type", DataValue::from(head.lamad.content_type.as_str())),
+                (
+                    "content_type",
+                    DataValue::from(head.lamad.content_type.as_str()),
+                ),
                 (
                     "description",
                     head.lamad

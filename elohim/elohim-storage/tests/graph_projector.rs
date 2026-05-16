@@ -3,7 +3,9 @@
 use elohim_storage::epr_codec::{
     EprHead, EprLamadContext, EprQahalContext, EprRelationship, EprShefaContext,
 };
-use elohim_storage::graph::{engine::GraphEngine, projector::GraphProjector, schema::apply_core_schema};
+use elohim_storage::graph::{
+    engine::GraphEngine, projector::GraphProjector, schema::apply_core_schema,
+};
 
 fn sample_head() -> EprHead {
     EprHead {
@@ -106,7 +108,11 @@ fn project_head_writes_edges_even_when_target_absent() {
             &[],
         )
         .unwrap();
-    assert_eq!(edges.rows.len(), 1, "edge present even when target absent in epr_node");
+    assert_eq!(
+        edges.rows.len(),
+        1,
+        "edge present even when target absent in epr_node"
+    );
 }
 
 // ---------------------------------------------------------------------------

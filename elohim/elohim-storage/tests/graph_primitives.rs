@@ -41,7 +41,12 @@ fn neighborhood_walks_at_max_depth_2() {
         )
         .unwrap();
     // Expect: B at hops=1, C at hops=2 → 2 rows
-    assert_eq!(out.rows.len(), 2, "expected 2 neighbours, got: {:?}", out.rows);
+    assert_eq!(
+        out.rows.len(),
+        2,
+        "expected 2 neighbours, got: {:?}",
+        out.rows
+    );
 }
 
 #[test]
@@ -61,5 +66,10 @@ fn version_chain_walks_supersedes_edges() {
     let out = engine
         .run_script(&script, &[("start", cozo::DataValue::from("v1"))])
         .unwrap();
-    assert_eq!(out.rows.len(), 1, "expected v2 as successor, got: {:?}", out.rows);
+    assert_eq!(
+        out.rows.len(),
+        1,
+        "expected v2 as successor, got: {:?}",
+        out.rows
+    );
 }

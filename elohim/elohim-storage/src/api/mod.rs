@@ -30,6 +30,7 @@ pub mod exchange;
 pub mod flow_planning;
 pub mod gate;
 pub mod governance;
+pub mod graph_views;
 pub mod governance_actions;
 pub mod hazards;
 pub mod identity;
@@ -96,6 +97,15 @@ pub async fn handle_api_request(
     // Extract app context from X-App-Id header, default to "lamad".
     // D.7: populate local_libp2p_peer_id so epr routes can dedup self-reports.
     let app_ctx = extract_app_context(&req, local_peer_id);
+
+    // Extract graph_engine from fan-out context for graph-native route branches.
+    // Available when the graph-native feature is ON and the engine opened at startup.
+    #[cfg(feature = "graph-native")]
+    let graph_engine_ref = fan_out_ctx
+        .as_ref()
+        .and_then(|ctx| ctx.graph_engine.as_ref());
+    #[cfg(not(feature = "graph-native"))]
+    let graph_engine_ref: Option<&std::sync::Arc<crate::graph::engine::GraphEngine>> = None;
 
     // Dispatch to domain controllers
     if sub_path.starts_with("account") {
@@ -164,23 +174,23 @@ pub async fn handle_api_request(
         // Note: the `/blob/` raw-bytes route is NOT under /api/v1/ (handled at
         // the outer http.rs dispatcher); this prefix is for blob-scoped views only.
         let resource_path = sub_path.strip_prefix("blob").unwrap_or("");
-        blob::handle(req, method, resource_path, &pool, &app_ctx).await
+        blob::handle(req, method, resource_path, &pool, &app_ctx, graph_engine_ref).await
     } else if sub_path == "cluster" {
         // Phase 5 T30: GET /api/v1/cluster — agent-scoped cluster view.
         // Auth implicit (Holochain idiom): the calling agent's identity (resolved
         // via X-Agent-Cid or local_sessions) determines scope. Future hub variants
         // (`/cluster/household/{id}`, `/cluster/hub/{id}`) extend the path tree.
-        cluster::handle(req, method, &pool, p2p_handle.as_ref()).await
+        cluster::handle(req, method, &pool, p2p_handle.as_ref(), graph_engine_ref).await
     } else if sub_path == "peer-topology" {
         // Phase 5 T31: GET /api/v1/peer-topology — agent-scoped peer-household
         // topology view. Same auth-implicit pattern as `/cluster`; federated
         // through the swarm via Federator.
-        peer_topology::handle(req, method, &pool, p2p_handle.as_ref()).await
+        peer_topology::handle(req, method, &pool, p2p_handle.as_ref(), graph_engine_ref).await
     } else if sub_path == "reciprocity" {
         // Phase 5 T32: GET /api/v1/reciprocity — agent-scoped reciprocity ledger.
         // Local SQLite roll-up over the steward's REA projection (no federation),
         // so no `p2p_handle` plumbed. Auth-implicit identity determines scope.
-        reciprocity::handle(req, method, &pool).await
+        reciprocity::handle(req, method, &pool, graph_engine_ref).await
     } else if sub_path.starts_with("comments") {
         let resource_path = sub_path.strip_prefix("comments").unwrap_or("");
         comments::handle(req, method, resource_path, &pool, &app_ctx, services).await
@@ -201,7 +211,7 @@ pub async fn handle_api_request(
         weather::handle(req, method, resource_path, &pool, &app_ctx).await
     } else if sub_path.starts_with("resilience") {
         let resource_path = sub_path.strip_prefix("resilience").unwrap_or("");
-        resilience::handle(req, method, resource_path, &pool, &app_ctx).await
+        resilience::handle(req, method, resource_path, &pool, &app_ctx, graph_engine_ref).await
     } else if sub_path.starts_with("risk") {
         let resource_path = sub_path.strip_prefix("risk").unwrap_or("");
         risk::handle(req, method, resource_path, &pool, &app_ctx).await
@@ -266,6 +276,11 @@ pub async fn handle_api_request(
             .unwrap_or("")
             .trim_start_matches('/');
         token::handle(req, method, resource_path, &pool, &app_ctx).await
+    } else if sub_path.starts_with("graph") {
+        // Phase 6 Task 26: graph-native view routes.
+        // Routes register unconditionally — handlers return 501 when the feature is off.
+        let resource_path = sub_path.strip_prefix("graph").unwrap_or("");
+        graph_views::handle(req, method, resource_path, graph_engine_ref).await
     } else {
         Ok(response::not_found(&format!(
             "Unknown API route: /api/v1/{}",

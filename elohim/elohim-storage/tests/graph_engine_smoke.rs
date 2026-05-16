@@ -29,10 +29,7 @@ fn epr_node_relation_created_and_upserts_by_cid() {
         .unwrap();
 
     let out = engine
-        .run_script(
-            r#"?[slug] := *epr_node{cid: 'bafyreitest1', slug}"#,
-            &[],
-        )
+        .run_script(r#"?[slug] := *epr_node{cid: 'bafyreitest1', slug}"#, &[])
         .unwrap();
     assert_eq!(out.rows.len(), 1);
 }
@@ -119,10 +116,7 @@ fn epr_node_has_embedding_slot_for_future_hnsw() {
         .unwrap();
 
     let out = engine
-        .run_script(
-            r#"?[slug] := *epr_node{cid: 'bafyE', slug}"#,
-            &[],
-        )
+        .run_script(r#"?[slug] := *epr_node{cid: 'bafyE', slug}"#, &[])
         .unwrap();
     assert_eq!(out.rows.len(), 1);
 }
