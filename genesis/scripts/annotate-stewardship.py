@@ -6,7 +6,7 @@ Each human stewards content that matches their story:
 - Matthew: governance, protocol core, family learning
 - Jessica: family curriculum, relationship content
 - Pastor Pete: faith community, pastoral care
-- Timothy: tutorials, mentorship, learning paths
+- Terrance: tutorials, mentorship, learning paths
 - Frank: agriculture, supply chain, local economy
 
 Content with no matching rule defaults to Matthew (founder, backwards compat).
@@ -56,9 +56,9 @@ VALID_HUMAN_IDS = load_valid_human_ids()
 # A content node can match multiple rules — stewards accumulate.
 
 STEWARDSHIP_RULES: list[tuple[set[str], list[Steward]]] = [
-    # Assessments — Timothy (tutor) is primary, Jessica (homeschool) curates
+    # Assessments — Terrance (tutor) is primary, Jessica (homeschool) curates
     ({"assessment"}, [
-        {"humanId": "human-timothy-tutor", "affinity": 0.8, "role": "author"},
+        {"humanId": "human-terrance-tutor", "affinity": 0.8, "role": "author"},
         {"humanId": "human-jessica-spouse", "affinity": 0.5, "role": "curator"},
     ]),
 
@@ -97,9 +97,9 @@ STEWARDSHIP_RULES: list[tuple[set[str], list[Steward]]] = [
         {"humanId": "human-pete-pastor", "affinity": 0.4, "role": "endorser"},
     ]),
 
-    # Learning paths, education — Timothy primary
+    # Learning paths, education — Terrance primary
     ({"learning", "tutorial", "path", "education"}, [
-        {"humanId": "human-timothy-tutor", "affinity": 0.7, "role": "author"},
+        {"humanId": "human-terrance-tutor", "affinity": 0.7, "role": "author"},
     ]),
 
     # Elohim agent content — Matthew (protocol architect)

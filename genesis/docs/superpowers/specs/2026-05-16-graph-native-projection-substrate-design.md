@@ -557,7 +557,7 @@ Existing routes for peer-topology / reciprocity / cluster / resilience / distrib
 | Item | Lands in |
 |---|---|
 | Angular Apollo Client wiring | Frontend follow-on sprint |
-| 5 shefa topology @wip BDD scenarios (m1-matthew-timothy-delivery.feature) | Frontend follow-on sprint |
+| 5 shefa topology @wip BDD scenarios (m1-matthew-terrance-delivery.feature) | Frontend follow-on sprint |
 | 3 lamad @wip BDD scenarios (epr-content-addressing.feature:96/113/129) | Frontend follow-on sprint |
 | 11 shefa resilience @wip scenarios (human-resilience.feature) | Future sprint (needs more frontend than just substrate) |
 | Imagodei love-map manifest extension | After shefa+lamad land |

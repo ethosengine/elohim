@@ -3414,7 +3414,7 @@ Sprint landed: graph-native projection substrate per `genesis/docs/superpowers/s
 - 4 new REST routes + graph-backing for 5 existing shefa routes (feature-flagged)
 - async-graphql server; Apollo Federation v2 subgraph spec; manifest-driven SDL codegen; 2 demo queries
 
-**Followon (frontend sprint):** lift 3 lamad @wip scenarios (epr-content-addressing.feature) + 5 shefa topology @wip scenarios (m1-matthew-timothy-delivery.feature).
+**Followon (frontend sprint):** lift 3 lamad @wip scenarios (epr-content-addressing.feature) + 5 shefa topology @wip scenarios (m1-matthew-terrance-delivery.feature).
 
 **Spec relationship:** amends-by-extension 2026-04-21 master spec; §15 "no native graph query engine" reframed as Reading A (CozoDB is projection engine, not source-of-truth authority).
 

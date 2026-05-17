@@ -303,7 +303,7 @@ describe('reconcile — stageAnnotations pointers', () => {
               allUnready: false,
               ready: [],
               unready: [
-                { url: 'ws://elohim-timothy-alpha:4445', host: 'elohim-timothy-alpha', adminPort: 4444, reason: 'tcp-timeout-or-refused' },
+                { url: 'ws://elohim-terrance-alpha:4445', host: 'elohim-terrance-alpha', adminPort: 4444, reason: 'tcp-timeout-or-refused' },
               ],
             },
           },
@@ -314,8 +314,8 @@ describe('reconcile — stageAnnotations pointers', () => {
     const r = reconcile({ predicted, actual });
 
     assert.ok(
-      r.investigationPointers.some(p => p.includes('conductor-readiness') && p.includes('elohim-timothy-alpha')),
-      `expected conductor-readiness pointer naming timothy; got ${JSON.stringify(r.investigationPointers)}`,
+      r.investigationPointers.some(p => p.includes('conductor-readiness') && p.includes('elohim-terrance-alpha')),
+      `expected conductor-readiness pointer naming terrance; got ${JSON.stringify(r.investigationPointers)}`,
     );
   });
 
@@ -340,7 +340,7 @@ describe('reconcile — stageAnnotations pointers', () => {
               results: [
                 { humanId: 'human-matthew-manager', result: 'created' },
                 { humanId: 'human-jessica-spouse', result: 'created' },
-                { humanId: 'human-timothy-tutor', result: 'failed', error: 'admin WS timeout' },
+                { humanId: 'human-terrance-tutor', result: 'failed', error: 'admin WS timeout' },
               ],
             },
           },
@@ -351,8 +351,8 @@ describe('reconcile — stageAnnotations pointers', () => {
     const r = reconcile({ predicted, actual });
 
     assert.ok(
-      r.investigationPointers.some(p => p.includes('seed-conductor-identities') && p.includes('partial') && p.includes('human-timothy-tutor')),
-      `expected seed-conductor-identities partial pointer naming timothy; got ${JSON.stringify(r.investigationPointers)}`,
+      r.investigationPointers.some(p => p.includes('seed-conductor-identities') && p.includes('partial') && p.includes('human-terrance-tutor')),
+      `expected seed-conductor-identities partial pointer naming terrance; got ${JSON.stringify(r.investigationPointers)}`,
     );
   });
 
