@@ -399,9 +399,14 @@ run_gate() {
         rc=$?
         ;;
       elohim-epr)
-        cargo fmt --check 2>&1 && \
-        cargo clippy -p elohim-epr -- -D warnings 2>&1 && \
-        cargo test -p elohim-epr --all-targets 2>&1
+        # elohim-epr is a native crate; the system-wide RUSTFLAGS
+        # `--cfg getrandom_backend="custom"` (set for Holochain WASM in
+        # elohim-storage) breaks native linking here. Reset it for the
+        # gate. RUSTC_WRAPPER="" bypasses sccache if the cache is poisoned;
+        # safe to keep on as the build is fast enough either way.
+        RUSTFLAGS="" cargo fmt --check 2>&1 && \
+        RUSTFLAGS="" cargo clippy -p elohim-epr -- -D warnings 2>&1 && \
+        RUSTFLAGS="" cargo test -p elohim-epr --all-targets 2>&1
         TS_RC=$?
         # PROJECT_DIR is elohim/epr; sdk/epr-ts lives at elohim/sdk/epr-ts → go up one, then into sdk/epr-ts
         (cd ../sdk/epr-ts && pnpm test) 2>&1
