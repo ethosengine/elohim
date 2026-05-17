@@ -656,6 +656,35 @@ def loadPipelineBaselines() {
 }
 
 /**
+ * Record a triggerPipeline result: echo status, update baseline, and
+ * mark the build UNSTABLE on a SKIPPED outcome (Jenkins job missing in
+ * the multibranch tree even though strategy.mjs declares the pipeline).
+ *
+ * Extracted from Execute Builds' script {} body to keep it under the
+ * 11000-byte HARD limit (each script {} compiles to its own CPS method
+ * capped at 64KB JVM bytecode). Behaviour-preserving for the
+ * SUCCESS/UNSTABLE/ERROR cases that existed before iteration 1 of the
+ * 2026-05-17 rca-orchestrator-963 shift.
+ */
+def recordPipelineResult(String name, Map result, Map pipelineBaselines) {
+    if (result.success) {
+        if (result.skipped) {
+            echo "⏭️ ${name}: SKIPPED — Jenkins job not provisioned (${result.error})"
+            unstable("${name}: registered in strategy.mjs but Jenkins multibranch job missing — create it to restore full delivery")
+        } else if (result.unstable) {
+            echo "⚠️ ${name}: UNSTABLE (${result.duration / 1000}s)"
+            pipelineBaselines[name] = env.GIT_COMMIT_FULL
+        } else {
+            echo "✅ ${name}: SUCCESS (${result.duration / 1000}s)"
+            pipelineBaselines[name] = env.GIT_COMMIT_FULL
+        }
+    } else {
+        echo "❌ ${name}: ${result.result}"
+        if (result.error) echo "   Error: ${result.error}"
+    }
+}
+
+/**
  * Trigger a pipeline and wait for result
  */
 def triggerPipeline(String name, String branch, boolean wait = true) {
@@ -694,6 +723,24 @@ def triggerPipeline(String name, String branch, boolean wait = true) {
             buildNumber: result.number
         ]
     } catch (Exception e) {
+        // Distinguish "Jenkins job not provisioned" from a real build failure.
+        // When a pipeline is registered in PIPELINES (and orchestrator-strategy.mjs)
+        // but its multibranch job has not been created in Jenkins yet — a normal
+        // interim state during multi-step pipeline landings — the build(job:…) call
+        // throws hudson.AbortException with "No item named <X> found". Treat that
+        // as a soft skip: the orchestrator marks UNSTABLE-with-clear-warning at
+        // the call site (not FAILURE), other downstream pipelines still run, and
+        // the missing job is surfaced loudly so the operator provisions it.
+        // See .claude/shifts/2026-05-17T15-57-rca-orchestrator-963-graph-failure
+        // for the RCA that motivated this branch.
+        if (e.message?.contains('No item named')) {
+            return [
+                success: true,
+                skipped: true,
+                result: 'NOT_PROVISIONED',
+                error: e.message
+            ]
+        }
         return [
             success: false,
             result: 'ERROR',
@@ -1728,38 +1775,16 @@ spec:
                                     echo "🔨 Building: ${name}"
                                     def result = triggerPipeline(name, env.BRANCH_NAME, true)
                                     results[name] = result
-                                    if (result.success) {
-                                        if (result.unstable) {
-                                            echo "⚠️ ${name}: UNSTABLE (${result.duration / 1000}s)"
-                                        } else {
-                                            echo "✅ ${name}: SUCCESS (${result.duration / 1000}s)"
-                                        }
-                                        pipelineBaselines[name] = env.GIT_COMMIT_FULL
-                                    } else {
-                                        echo "❌ ${name}: ${result.result}"
-                                        if (result.error) echo "   Error: ${result.error}"
-                                    }
+                                    recordPipelineResult(name, result, pipelineBaselines)
                                 } else {
                                     def parallelBuilds = [:]
                                     level.each { name ->
                                         parallelBuilds[name] = {
-                                            // Nested stage gives Blue Ocean a named
-                                            // parallel branch with its own timing.
                                             stage(name) {
                                                 echo "🔨 Building: ${name}"
                                                 def result = triggerPipeline(name, env.BRANCH_NAME, true)
                                                 results[name] = result
-                                                if (result.success) {
-                                                    if (result.unstable) {
-                                                        echo "⚠️ ${name}: UNSTABLE (${result.duration / 1000}s)"
-                                                    } else {
-                                                        echo "✅ ${name}: SUCCESS (${result.duration / 1000}s)"
-                                                    }
-                                                    pipelineBaselines[name] = env.GIT_COMMIT_FULL
-                                                } else {
-                                                    echo "❌ ${name}: ${result.result}"
-                                                    if (result.error) echo "   Error: ${result.error}"
-                                                }
+                                                recordPipelineResult(name, result, pipelineBaselines)
                                             }
                                         }
                                     }
