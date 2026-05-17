@@ -1,0 +1,52 @@
+{
+  "manifestVersion": "1.0",
+  "pipeline": "elohim-epr",
+  "description": "Elohim EPR codec — canonical CBOR + CIDv1 + Ed25519 for the graph substrate (Rust crate + TS SDK)",
+  "steps": {
+    "rust-build-test": {
+      "description": "fmt + clippy + nextest for the elohim-epr Rust crate",
+      "inputs": {
+        "sources": [
+          "elohim/epr/**",
+          "elohim/Cargo.toml",
+          "elohim/Cargo.lock"
+        ],
+        "buildProcess": ["elohim/epr/Jenkinsfile"]
+      },
+      "outputs": {
+        "artifacts": ["elohim-epr-rlib"],
+        "verify": null
+      },
+      "depends": [],
+      "executor": {
+        "stage": "Rust — tests",
+        "function": null
+      }
+    },
+    "ts-test": {
+      "description": "Build and test the epr-ts SDK (TypeScript companion to the Rust codec)",
+      "inputs": {
+        "sources": [
+          "elohim/sdk/epr-ts/**"
+        ],
+        "buildProcess": ["elohim/epr/Jenkinsfile"]
+      },
+      "outputs": {
+        "artifacts": ["epr-ts-dist"],
+        "verify": null
+      },
+      "depends": ["rust-build-test"],
+      "executor": {
+        "stage": "TS — tests",
+        "function": null
+      }
+    }
+  },
+  "gate": {
+    "projects": {
+      "elohim-epr": { "dir": "elohim/epr", "steps": ["rust-build-test"] },
+      "epr-ts": { "dir": "elohim/sdk/epr-ts", "steps": ["ts-test"] }
+    }
+  },
+  "deployment": {}
+}
