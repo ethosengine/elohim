@@ -138,6 +138,7 @@
 - [Shells need explicit timeouts](feedback_shells_need_timeouts.md) — cargo/pnpm/just hang history; wrap in timeout + kill on overrun.
 - [cargo-nextest installed](feedback_cargo_nextest_installed.md) — 0.9.135; prefer `cargo nextest run` over `cargo test`; same filter syntax; faster on warm caches.
 - [Set CARGO_TARGET_DIR for native builds](feedback_cargo_target_dir_for_native_builds.md) — pool slot per workspace; legacy targets balloon to 30G if forgotten; WASM workspaces stay default.
+- [Dockerfile target-completeness invariant](feedback_dockerfile_target_completeness.md) — new `[[bin|bench|example]]` needs both Docker placeholder stage AND real-build COPY block; local pre-push gate won't catch this; also add pattern to build-manifest sources.
 - [/shift has two modes — bring-up vs integration-iteration](feedback_shift_integration_iteration_mode.md) — loop adapts to CI: single objective vs multi-class fix.
 - [Doorway + hub = symmetric projection edges](project_doorway_hub_sister_brother.md) — doorway out to web2, hub in to peers; same truth, different audience.
 - [Views are served THROUGH a doorway, not OWNED](project_doorway_views_through_not_owned.md) — CDN-shape; any doorway serves canonical content; doorway-authored logic = anti-pattern.
@@ -151,3 +152,4 @@
 - [W2 AgentPeerBinding deferred until Phase 12](project_w2_agent_peer_binding_deferred.md) — D5 gate not met; Phase 12 0/59 ticked. Single-wire after Phase 12 lands; mirror EPR T7 pattern.
 - [T6 legacy revocation path retired](project_t6_legacy_revocation_path_retired.md) — RecoveryV2Signal::KeyRevocationEffective consumer side fully retired; T18 envelope is sole consumer. M4 owes producer-side variant deletion.
 - [EPR foundation closure (2026-05-16)](project_epr_foundation_closure_2026_05_16.md) — 0/12 @wip lifted, 12 routed (3 graph-native / 7 doorway-full-fac / 1 iroh-p12 / 1 a2o-tool); D4 defer; AgentPeerBinding deferred (Phase 12 RED).
+- [Graph-native substrate landed 2026-05-16](project_graph_native_substrate_landed_2026_05_16.md) — CozoDB sled-backed projection + manifest "graph" extension + Apollo Federation v2 SDL; reading-A reframe (engine=projection, DHT=truth); 32 commits, thin-build deferred pending pre-existing p2p gating.
