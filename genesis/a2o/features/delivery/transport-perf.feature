@@ -139,8 +139,7 @@ Feature: Transport perf parity — what the dual-stack promise feels like
     minutes to notice. The fix is simple; the regression anchor is
     cheap; the value is preventing the same trap.
 
-    Given a single QUIC connection between two iroh peers on any custom ALPN
-      (sync, EPR, EPR-atom, shard, view-fed, identity-handshake, trust)
+    Given a single QUIC connection between two iroh peers on any custom ALPN (sync, EPR, EPR-atom, shard, view-fed, identity-handshake, trust)
     When the fetcher opens N bidi streams in sequence on that connection (N ≥ 2)
     Then every stream completes its request-response within 30 seconds
     # Anchor: if this regression ever fails, someone has reverted the

@@ -26,8 +26,7 @@ Feature: Recovery succeeds with or without Shamir share custody
 
   @wip
   Scenario: Recovery succeeds with Shamir custody (Path A + Path B)
-    Given Matthew has committed a governance-action:shamir-custody-setup
-      naming Jessica, Adam, and Abby as custodians with threshold (m=2, n=3)
+    Given Matthew has committed a governance-action:shamir-custody-setup naming Jessica, Adam, and Abby as custodians with threshold (m=2, n=3)
     And Jessica and Adam are online
     When Matthew initiates a recovery request
     And Jessica and Adam each submit a recovery-approval attestation
@@ -39,8 +38,7 @@ Feature: Recovery succeeds with or without Shamir share custody
 
   @wip
   Scenario: Recovery still succeeds when Shamir custodians are offline
-    Given Matthew has committed a governance-action:shamir-custody-setup
-      naming Jessica, Adam, and Abby as custodians with threshold (m=2, n=3)
+    Given Matthew has committed a governance-action:shamir-custody-setup naming Jessica, Adam, and Abby as custodians with threshold (m=2, n=3)
     But Jessica, Adam, and Abby are all offline at recovery time
     When Matthew initiates a recovery request
     And the social-threshold attestations arrive from a separate quorum
