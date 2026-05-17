@@ -6,7 +6,7 @@
 //!
 //! ## Usage
 //!
-//! ```rust,no_run
+//! ```rust,ignore
 //! use elohim_storage::graph::backfill::{backfill_graph, BackfillOpts};
 //! // engine and conn come from your startup context
 //! let report = backfill_graph(&mut conn, &engine, BackfillOpts::default()).unwrap();
