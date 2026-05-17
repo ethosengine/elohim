@@ -412,6 +412,15 @@ run_gate() {
         (cd ../sdk/epr-ts && pnpm test) 2>&1
         rc=$((TS_RC | $?))
         ;;
+      epr-ts)
+        # Sub-project gate for the epr-ts TypeScript SDK. When the manifest-driven
+        # path detects only TS-side changes (elohim/sdk/epr-ts/**) it emits
+        # 'epr-ts' as a standalone project (vs the combined 'elohim-epr' name the
+        # grep fallback uses); without this case the gate hit "Unknown project:
+        # epr-ts" and the push aborted. PROJECT_DIR is elohim/sdk/epr-ts.
+        pnpm test 2>&1
+        rc=$?
+        ;;
       elohim-library)
         pnpm exec eslint projects/elohim-service/src projects/lamad-ui/src projects/html5-app-plugin/src 2>&1 && \
         (cd projects/elohim-service && pnpm exec tsc --noEmit) 2>&1 && \
