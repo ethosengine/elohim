@@ -29,8 +29,11 @@
       "inputs": {
         "sources": [
           "elohim/elohim-storage/src/**",
+          "elohim/elohim-storage/benches/**",
+          "elohim/elohim-storage/migrations/**",
           "elohim/elohim-storage/Cargo.toml",
           "elohim/elohim-storage/Cargo.lock",
+          "elohim/elohim-storage/Dockerfile",
           "elohim/sdk/**"
         ],
         "buildProcess": ["elohim/holochain/Jenkinsfile"]

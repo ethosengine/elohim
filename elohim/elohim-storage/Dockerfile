@@ -82,10 +82,16 @@ RUN sed -i \
     -e 's|hex.workspace = true|hex = "0.4"|' \
     epr/Cargo.toml
 
-# Create dummy src to build dependencies
-RUN mkdir -p src && \
+# Create dummy src + bench placeholders to build dependencies.
+# Any `[[bin]]`, `[[bench]]`, or `[[example]]` entry declared in Cargo.toml
+# requires a matching file at manifest-parse time; the dep-cache stage builds
+# before the real sources are COPY'd, so we satisfy every declared target with
+# an empty placeholder. The cleanup step below removes them all before the
+# real COPY, so this layer only ever caches third-party crates.
+RUN mkdir -p src benches && \
     echo 'fn main() { println!("placeholder"); }' > src/main.rs && \
-    echo 'pub fn placeholder() {}' > src/lib.rs
+    echo 'pub fn placeholder() {}' > src/lib.rs && \
+    echo 'fn main() {}' > benches/graph_traversal.rs
 
 # Build dependencies (this layer gets cached)
 RUN RUSTFLAGS='--cfg getrandom_backend="custom"' cargo build --release
@@ -94,7 +100,7 @@ RUN RUSTFLAGS='--cfg getrandom_backend="custom"' cargo build --release
 # CRITICAL: build/ and .fingerprint/ contain embed_migrations! output from the
 # placeholder build (empty migrations dir). Without removing these, Cargo reuses
 # the cached proc-macro result and the real migrations are never embedded.
-RUN rm -rf src target/release/elohim-storage target/release/libelohim* \
+RUN rm -rf src benches target/release/elohim-storage target/release/libelohim* \
     target/release/deps/elohim* target/release/deps/libelohim* \
     target/release/build/diesel* target/release/.fingerprint/diesel* \
     target/release/build/elohim* target/release/.fingerprint/elohim*
