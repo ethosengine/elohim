@@ -403,7 +403,8 @@ run_gate() {
         cargo clippy -p elohim-epr -- -D warnings 2>&1 && \
         cargo test -p elohim-epr --all-targets 2>&1
         TS_RC=$?
-        (cd ../../sdk/epr-ts && pnpm test) 2>&1
+        # PROJECT_DIR is elohim/epr; sdk/epr-ts lives at elohim/sdk/epr-ts → go up one, then into sdk/epr-ts
+        (cd ../sdk/epr-ts && pnpm test) 2>&1
         rc=$((TS_RC | $?))
         ;;
       elohim-library)

@@ -29,11 +29,20 @@ fn required_coupling_per_kind() {
     assert!(c.contains(&CouplingLeg::Governance));
 
     // EconomicEvent requires value only
-    assert_eq!(EprKind::EconomicEvent.required_coupling(), &[CouplingLeg::Value]);
+    assert_eq!(
+        EprKind::EconomicEvent.required_coupling(),
+        &[CouplingLeg::Value]
+    );
 
     // Manifest requires governance only (self-describing)
-    assert_eq!(EprKind::Manifest.required_coupling(), &[CouplingLeg::Governance]);
+    assert_eq!(
+        EprKind::Manifest.required_coupling(),
+        &[CouplingLeg::Governance]
+    );
 
     // Agent requires governance only (self-describing)
-    assert_eq!(EprKind::Agent.required_coupling(), &[CouplingLeg::Governance]);
+    assert_eq!(
+        EprKind::Agent.required_coupling(),
+        &[CouplingLeg::Governance]
+    );
 }

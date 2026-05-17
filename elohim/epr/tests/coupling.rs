@@ -32,7 +32,11 @@ fn set_and_check_legs() {
 #[test]
 fn json_roundtrip() {
     let k = test_cid(9);
-    let c = Coupling { knowledge: Some(k), value: None, governance: None };
+    let c = Coupling {
+        knowledge: Some(k),
+        value: None,
+        governance: None,
+    };
     let s = serde_json::to_string(&c).unwrap();
     let c2: Coupling = serde_json::from_str(&s).unwrap();
     assert_eq!(c, c2);

@@ -13,9 +13,7 @@
 
 use chrono::{TimeZone, Utc};
 use elohim_epr::{
-    cid::compute_cid,
-    proof::AgentKeypair,
-    Coupling, CouplingLeg, Epr, EprKind, Reach, Signature,
+    cid::compute_cid, proof::AgentKeypair, Coupling, CouplingLeg, Epr, EprKind, Reach, Signature,
 };
 use serde_json::Value;
 use std::collections::HashMap;
@@ -47,8 +45,7 @@ fn load_ref_map() -> HashMap<String, Value> {
                 if path.extension().and_then(|e| e.to_str()) == Some("json") {
                     if let Ok(content) = fs::read_to_string(&path) {
                         if let Ok(schema) = serde_json::from_str::<Value>(&content) {
-                            let filename =
-                                path.file_name().unwrap().to_str().unwrap().to_string();
+                            let filename = path.file_name().unwrap().to_str().unwrap().to_string();
                             // Same-dir ref: "signature.schema.json"
                             refs.insert(filename.clone(), schema.clone());
                             // Same-dir ref with ./ prefix: "./signature.schema.json"
@@ -174,10 +171,7 @@ fn reach_values_conform() {
         Reach::Public,
         Reach::Commons,
     ] {
-        validate(
-            "enums/reach.schema.json",
-            &serde_json::to_value(r).unwrap(),
-        );
+        validate("enums/reach.schema.json", &serde_json::to_value(r).unwrap());
     }
 }
 

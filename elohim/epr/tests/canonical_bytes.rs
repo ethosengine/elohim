@@ -39,7 +39,10 @@ fn canonical_bytes_excludes_cid_proof_superseded_by() {
     let payload = b"hello";
     let ba = a.canonical_bytes(payload).unwrap();
     let bb = b.canonical_bytes(payload).unwrap();
-    assert_eq!(ba, bb, "cid/proof/supersededBy must not affect canonical bytes");
+    assert_eq!(
+        ba, bb,
+        "cid/proof/supersededBy must not affect canonical bytes"
+    );
 }
 
 #[test]
@@ -114,8 +117,7 @@ fn canonical_bytes_golden_vector() {
         );
     }
     assert_eq!(
-        hex_encoded,
-        EXPECTED_HEX,
+        hex_encoded, EXPECTED_HEX,
         "canonical_bytes encoding drifted — investigate before updating EXPECTED_HEX"
     );
 }
@@ -166,7 +168,12 @@ fn reach_canonical_strings_for_all_variants() {
     ] {
         e.reach = reach;
         let json = serde_json::to_string(&e).unwrap();
-        assert!(json.contains(expected_substring),
-            "reach {:?} did not produce expected substring {}: got {}", reach, expected_substring, json);
+        assert!(
+            json.contains(expected_substring),
+            "reach {:?} did not produce expected substring {}: got {}",
+            reach,
+            expected_substring,
+            json
+        );
     }
 }

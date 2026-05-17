@@ -1,8 +1,10 @@
-use cid::Cid;
 use chrono::{TimeZone, Utc};
+use cid::Cid;
 use elohim_epr::{cid::compute_cid, Coupling, Envelope, EprKind, Reach, Signature};
 
-fn test_cid(b: u8) -> Cid { compute_cid(&[b]) }
+fn test_cid(b: u8) -> Cid {
+    compute_cid(&[b])
+}
 
 fn sample_envelope() -> Envelope {
     Envelope {
@@ -36,8 +38,14 @@ fn envelope_json_roundtrip() {
 fn envelope_serializes_camelcase() {
     let env = sample_envelope();
     let s = serde_json::to_string(&env).unwrap();
-    assert!(s.contains("\"schemaRef\""), "expected camelCase schemaRef, got: {s}");
+    assert!(
+        s.contains("\"schemaRef\""),
+        "expected camelCase schemaRef, got: {s}"
+    );
     assert!(s.contains("\"schemaKey\""));
     assert!(s.contains("\"issuedAt\""));
-    assert!(!s.contains("\"schema_ref\""), "snake_case should not appear in wire: {s}");
+    assert!(
+        !s.contains("\"schema_ref\""),
+        "snake_case should not appear in wire: {s}"
+    );
 }

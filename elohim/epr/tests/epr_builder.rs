@@ -1,10 +1,6 @@
 use chrono::{TimeZone, Utc};
 use cid::Cid;
-use elohim_epr::{
-    cid::compute_cid,
-    proof::AgentKeypair,
-    Coupling, Epr, EprKind, Reach,
-};
+use elohim_epr::{cid::compute_cid, proof::AgentKeypair, Coupling, Epr, EprKind, Reach};
 
 fn cid(b: u8) -> Cid {
     compute_cid(&[b])

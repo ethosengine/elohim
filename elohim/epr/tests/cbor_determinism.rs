@@ -22,14 +22,20 @@ fn roundtrip_primitives() {
 fn deterministic_map_encoding() {
     // Two maps with different insertion order must encode identically
     let a: Ipld = Ipld::Map(
-        [("b".into(), Ipld::Integer(2)), ("a".into(), Ipld::Integer(1))]
-            .into_iter()
-            .collect(),
+        [
+            ("b".into(), Ipld::Integer(2)),
+            ("a".into(), Ipld::Integer(1)),
+        ]
+        .into_iter()
+        .collect(),
     );
     let b: Ipld = Ipld::Map(
-        [("a".into(), Ipld::Integer(1)), ("b".into(), Ipld::Integer(2))]
-            .into_iter()
-            .collect(),
+        [
+            ("a".into(), Ipld::Integer(1)),
+            ("b".into(), Ipld::Integer(2)),
+        ]
+        .into_iter()
+        .collect(),
     );
     let enc_a = cbor::encode(&a).unwrap();
     let enc_b = cbor::encode(&b).unwrap();

@@ -21,7 +21,11 @@ pub struct Signature {
 
 impl Signature {
     pub fn ed25519(signer: Cid, signature: Vec<u8>) -> Self {
-        Self { signer, algorithm: "ed25519".into(), signature }
+        Self {
+            signer,
+            algorithm: "ed25519".into(),
+            signature,
+        }
     }
 
     pub fn ed25519_checked(signer: Cid, signature: Vec<u8>) -> Result<Self> {
