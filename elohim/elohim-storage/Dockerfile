@@ -113,10 +113,13 @@ ARG GIT_COMMIT_FULL=unknown
 ARG BUILD_TIMESTAMP=unknown
 ARG RUSTC_VERSION=unknown
 
-# Copy actual source and migrations (embed_migrations! needs them at compile time)
-# Migrations must be present for diesel embed_migrations! proc macro
+# Copy actual source, migrations, and benches (every declared Cargo target
+# must have its files present at manifest-parse time; missing benches/ aborts
+# `cargo build` before the binary even compiles).
+# Migrations must be present for diesel embed_migrations! proc macro.
 COPY elohim/elohim-storage/migrations ./migrations
 COPY elohim/elohim-storage/src ./src
+COPY elohim/elohim-storage/benches ./benches
 
 # bootstrap_manifests.rs uses include_str!("../../../sdk/schemas/v1/manifests/...")
 # which resolves to /sdk/... in this WORKDIR /app layout (../../.. from
