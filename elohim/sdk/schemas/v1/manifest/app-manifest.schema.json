@@ -2,7 +2,7 @@
   "$id": "epr:schema:manifest:app-manifest",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "AppManifest",
-  "description": "Protocol-level schema for app manifests. An app manifest is an EPR (content-addressed, stewarded, governed) that declares an app's content types, formats, renderers, relationships, and signals. The protocol validates the SHAPE of manifests (three-leg coupling, substrate signal mapping); apps validate their own vocabulary.",
+  "description": "Protocol-level schema for app manifests. An app manifest is an EPR (content-addressed, stewarded, governed) that declares an app's content types, formats, renderers, relationships, and signals. The protocol validates the SHAPE of manifests (three-leg coupling, substrate signal mapping); apps validate their own vocabulary.\n\nManifest values MAY be inlined or referenced via { \"$ref\": \"./relative/path.json\" } pointers — the schema validator and the codegen loader both inline references during load. The recommended convention is to keep the shell manifest under 300 LOC and split each concern (contentTypes, signalKinds, projections, graph, etc.) into its own file under a sibling `manifest/` directory. See elohim/sdk/domains/lamad/ for the canonical example.",
   "type": "object",
   "required": ["id", "name", "version", "vocabulary"],
   "properties": {

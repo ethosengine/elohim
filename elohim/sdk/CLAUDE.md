@@ -94,3 +94,20 @@ Feedback is not a fourth coupling leg — it's information flowing through all t
 3. **Obligation accumulation** — REA-native: accumulated negative observations shorten validity, expired validity generates review obligations
 
 See `genesis/plans/2026-03-28-feedback-information-flows-design.md`.
+
+## Modular manifests (lamad pattern)
+
+For app manifests that exceed ~500 LOC, split each top-level concern into a sibling `manifest/` directory and reference via `$ref`:
+
+```
+elohim/sdk/domains/<app>/
+├── manifest.json                # shell — <300 LOC of identity + $refs
+└── manifest/
+    ├── content-types/<name>.json
+    ├── signal-kinds.json
+    ├── projections.json
+    ├── graph.json
+    └── rendering.json
+```
+
+The lamad manifest at `elohim/sdk/domains/lamad/manifest.json` is the canonical example (47 LOC shell + 9 concern files + 28 content-type files). Codegen at `elohim/sdk/domains/lamad/scripts/codegen.mjs` and validators resolve `$ref` transparently during load via the `resolveRefs` helper.
