@@ -22,11 +22,44 @@ fn open_engine() -> (GraphEngine, tempfile::TempDir) {
     (engine, tmp)
 }
 
+/// Recursively resolve relative-path `$ref` pointers in a JSON Value.
+///
+/// Mirrors the JS-side resolveRefs in `elohim/sdk/domains/lamad/scripts/codegen.mjs`:
+/// only `./manifest/...` and `../...` refs are inlined; `./schemas/...` refs (the
+/// existing metadataSchema references) are left opaque so consumers that handle
+/// those explicitly (codegen's loadSchema) keep working unchanged.
+fn resolve_refs(value: serde_json::Value, base_dir: &std::path::Path) -> serde_json::Value {
+    use serde_json::Value;
+    match value {
+        Value::Object(map) => {
+            if let Some(Value::String(ref_str)) = map.get("$ref") {
+                if map.len() == 1 && (ref_str.starts_with("./manifest/") || ref_str.starts_with("../")) {
+                    let ref_path = base_dir.join(ref_str);
+                    let raw = std::fs::read_to_string(&ref_path)
+                        .unwrap_or_else(|e| panic!("read {}: {e}", ref_path.display()));
+                    let parsed: Value = serde_json::from_str(&raw)
+                        .unwrap_or_else(|e| panic!("parse {}: {e}", ref_path.display()));
+                    return resolve_refs(parsed, ref_path.parent().unwrap());
+                }
+            }
+            Value::Object(
+                map.into_iter()
+                    .map(|(k, v)| (k, resolve_refs(v, base_dir)))
+                    .collect(),
+            )
+        }
+        Value::Array(arr) => Value::Array(arr.into_iter().map(|v| resolve_refs(v, base_dir)).collect()),
+        other => other,
+    }
+}
+
 fn load_lamad_graph() -> GraphExtension {
     let manifest_path =
         std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../sdk/domains/lamad/manifest.json");
+    let manifest_dir = manifest_path.parent().unwrap();
     let manifest_json = std::fs::read_to_string(&manifest_path).expect("read lamad manifest.json");
-    let parsed: serde_json::Value = serde_json::from_str(&manifest_json).unwrap();
+    let parsed_raw: serde_json::Value = serde_json::from_str(&manifest_json).unwrap();
+    let parsed = resolve_refs(parsed_raw, manifest_dir);
     serde_json::from_value(parsed["graph"].clone()).expect("lamad graph section must parse")
 }
 
