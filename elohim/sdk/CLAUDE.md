@@ -95,6 +95,22 @@ Feedback is not a fourth coupling leg — it's information flowing through all t
 
 See `genesis/plans/2026-03-28-feedback-information-flows-design.md`.
 
+## SDK Boundary
+
+The `elohim/sdk/` tree is the **TypeScript SDK** distributed to consumers (browser, doorway clients, future external integrators). Its boundary is:
+
+| Path | Role |
+|---|---|
+| `elohim/sdk/storage-client-ts/` | Generated wire types + HTTP client; pulled from `elohim/elohim-views` via ts-rs |
+| `elohim/sdk/epr-ts/` | Generated EPR codec types; pulled from `elohim-epr` via ts-rs |
+| `elohim/sdk/schemas/v1/` | JSON Schemas — the authoritative wire contract (drives both Rust and TS codegen) |
+| `elohim/sdk/domains/<app>/` | App manifests + companion schemas + per-app codegen scripts |
+| `elohim/sdk/src/` | Hand-written SDK helpers (connection management, type guards) |
+
+**Rule:** consumers import from `@elohim/storage-client` and `@elohim/epr-ts`. They do NOT reach into `elohim-storage` internal Rust types, and they do NOT bypass the generated types by reading raw JSON.
+
+For the Rust side of the SDK boundary, see `elohim/elohim-views/` (lightweight wire types) and `crates/elohim-sdk/` (consumer-friendly facade). The boundary is enforced by `deny.toml` at the repo root.
+
 ## Modular manifests (lamad pattern)
 
 For app manifests that exceed ~500 LOC, split each top-level concern into a sibling `manifest/` directory and reference via `$ref`:

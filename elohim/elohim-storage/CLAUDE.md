@@ -91,10 +91,10 @@ impl From<CreateContentInputView> for CreateContentInput {
 Follow this workflow:
 
 1. **db/models.rs** - Add Diesel model (snake_case, String JSON fields)
-2. **views.rs** - Add View type with `From<Model>` (camelCase, Value fields)
-3. **views.rs** - Add InputView type with `Into<DbInput>` (camelCase, Value fields)
-4. **http.rs** - Add routes using InputView/View types
-5. **Regenerate TS** - Run `cargo test export_bindings`
+2. **elohim/elohim-views/src/<domain>.rs** - Add View type with `#[derive(TS)]` + ts-rs export attribute (camelCase, Value fields)
+3. **elohim/elohim-views/src/inputs.rs** - Add InputView type with `Into<DbInput>` (camelCase, Value fields)
+4. **elohim/elohim-storage/src/http.rs** - Add routes using InputView/View types
+5. **Regenerate TS** - Run `cargo test export_bindings` from `elohim/elohim-views`
 
 ## Schema Contract (view validation)
 
@@ -137,10 +137,11 @@ Storage and distribution language — `quilt` (RS-encoded distribution of a cont
 
 | File | Purpose |
 |------|---------|
-| `elohim/elohim-storage/src/views.rs` | API boundary - all View/InputView types |
-| `elohim/elohim-storage/src/http.rs` | HTTP routes - uses View types |
-| `elohim/elohim-storage/src/db/models.rs` | Diesel models - internal snake_case |
-| `elohim/elohim-storage/src/db/*_diesel.rs` | CRUD operations - internal only |
+| `elohim/elohim-views/src/*.rs` | **Wire-shape View types** — ts-rs-anchored, per-domain modules |
+| `elohim/elohim-storage/src/views.rs` | Re-export shim + Wire→View `From` impls that touch DB types |
+| `elohim/elohim-storage/src/http.rs` | HTTP routes — uses View types via `use elohim_views::...` |
+| `elohim/elohim-storage/src/db/models.rs` | Diesel models — internal snake_case |
+| `elohim/elohim-storage/src/db/*_diesel.rs` | CRUD operations — internal only |
 | `elohim/elohim-storage/src/db/mod.rs` | DB module coordination |
 
 ---
