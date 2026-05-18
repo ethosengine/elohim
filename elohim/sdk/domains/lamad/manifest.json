@@ -5,70 +5,7 @@
   "description": "Learning and mastery platform — knowledge discovery, assessment, paths, and stewardship",
   "vocabulary": {
     "contentTypes": {
-      "concept": {
-        "description": "A fundamental idea or principle in the knowledge graph. Concepts are the atomic units of understanding that learners build mastery over.",
-        "metadataSchema": {
-          "$ref": "./schemas/concept-metadata.schema.json"
-        },
-        "coupling": {
-          "knowledge": {
-            "relationships": {
-              "CONTAINS": [
-                "concept",
-                "exercise",
-                "assessment"
-              ],
-              "RELATES_TO": [
-                "concept",
-                "lesson",
-                "article"
-              ],
-              "DEPENDS_ON": [
-                "concept"
-              ],
-              "REFERENCES": [
-                "article",
-                "book-chapter"
-              ]
-            }
-          },
-          "value": {
-            "onConsume": {
-              "action": "use",
-              "resourceConformsTo": "learning-content",
-              "recognition": "mastery-credit"
-            },
-            "onComplete": {
-              "action": "produce",
-              "resourceConformsTo": "mastery-attestation",
-              "recognition": "mastery-credit"
-            }
-          },
-          "governance": {
-            "defaultReach": "commons",
-            "minimumReach": "community",
-            "governanceModel": "steward-consent",
-            "signalTypes": [
-              "learning-signal",
-              "mastery-achieved"
-            ]
-          },
-          "claims": [
-            {
-              "asserts": "knowledge-retention",
-              "contradictedBy": "retention-failure",
-              "validityHorizon": "P30D",
-              "leg": "knowledge"
-            },
-            {
-              "asserts": "content-relevant",
-              "contradictedBy": "content-outdated",
-              "validityHorizon": "P180D",
-              "leg": "knowledge"
-            }
-          ]
-        }
-      },
+      "concept": { "$ref": "./manifest/content-types/concept.json" },
       "lesson": {
         "description": "A structured teaching unit that guides learners through a topic with explanations, examples, and practice opportunities.",
         "coupling": {
