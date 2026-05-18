@@ -1,245 +1,55 @@
 //! View types for HTTP API boundary
 //!
-//! These types use camelCase serialization for TypeScript clients.
-//! Wire types in models.rs use snake_case for database compatibility.
+//! These types use camelCase serialization for TypeScript clients. Wire types
+//! in `db/models.rs` use snake_case for database compatibility; conversion
+//! happens here (or — for the bulk of the converters — in `views_convert/`).
 //!
-//! Pattern:
-//! - Service layer returns Wire types (Content, Relationship, etc.)
-//! - HTTP layer converts to View types (ContentView, RelationshipView, etc.)
-//! - ts-rs generates camelCase TypeScript from View types
+//! ## Layout after Plan 3.A decomposition
 //!
-//! Design principles:
-//! - Boolean coercion: SQLite stores bools as i32. Views expose proper bools.
-//! - JSON parsing: Internal *_json strings are parsed to serde_json::Value.
-//!   This encapsulates storage format and provides typed objects to clients.
+//! - **Wire-shape View structs** live in the `elohim-views` crate
+//!   (`elohim_views::{shared,lamad,shefa,qahal,imagodei,infrastructure,epr,inputs}`)
+//!   and are re-exported at the bottom of this file so `crate::views::TypeName`
+//!   continues to resolve for in-tree callers. New code should import directly
+//!   from `elohim_views::*`.
+//! - **Wire→View `From` impls** that touch DB types live in
+//!   `crate::views_convert::<domain>` (one sibling-module per pillar).
+//! - **Observation Session response shapes** remain here as a transitional home
+//!   until they migrate to `elohim_views::infrastructure` — they're locally
+//!   composed and don't share the InputView contract with TypeScript clients.
 //!
-//! InputView types (suffix InputView):
-//! - Accept camelCase JSON from TypeScript with parsed Value objects
-//! - Convert to internal DB Input types (snake_case with String fields)
-//! - Encapsulate JSON serialization at the API boundary
-
-use std::collections::HashMap;
+//! Design principles preserved:
+//! - Boolean coercion: SQLite stores bools as i32; Views expose proper bools.
+//! - JSON parsing: internal `*_json` strings are parsed to `serde_json::Value`.
+//! - InputView types are camelCase-in, snake_case-out; conversion is encapsulated
+//!   at the API boundary.
 
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
-// ts_rs is used transitively via elohim-views; keep for any remaining #[derive(TS)] in this file
-#[allow(unused_imports)]
-use ts_rs::TS;
 
-// CustodianMetrics, ObservationEntry, Schedule → views_convert/infrastructure.rs
-
-// App / Content / Relationship / HumanRelationship → views_convert/lamad.rs
-pub use crate::views_convert::lamad::content_view_from_epr_head;
-
-// ContributorPresence, EconomicEvent, ReaCommitment, StewardshipAllocation,
-// ContentStewardship, TokenMintEvent, TokenBalance, TokenTransfer,
-// ResponsibilityDemandConfig, TokenDecayEvent, StewardCredential, PremiumGate,
-// AccessGrant, RevenueSummary→StewardRevenueSummaryView, ContributorDashboard,
-// ContributorImpactView, AgreementRow, StewardedNode, StewardAffinity,
-// node_stewardship_view_from_with_name → views_convert/shefa.rs
-pub use crate::views_convert::shefa::node_stewardship_view_from_with_name;
-
-// Collective, CollectiveParticipation, GovernanceState, Challenge, Appeal,
-// Proposal, Precedent, Discussion, ProposalOption, GovernanceSignal,
-// GovernanceDisposition, Statement, StatementVote, GateDecisionAttestation,
-// GateDecisionChallenge, ChallengeOutcome, GovernanceAction/Tally,
-// AttestationRow, vote_view_from_vote, ranked_vote_view_from_ranked_vote → views_convert/qahal.rs
-// ContentAttestation → views_convert/imagodei.rs (A.6)
-pub use crate::views_convert::qahal::vote_view_from_vote;
-pub use crate::views_convert::qahal::ranked_vote_view_from_ranked_vote;
-
-// Content Mastery → views_convert/lamad.rs
-
-// Comment → views_convert/lamad.rs
-
-// DevicePolicy, LocalSession, Human, RecoveryWitnessRow, KeyRevocationRow,
-// RevocationVoteRow, upsert_policy_to_db_input → views_convert/imagodei.rs
-pub use crate::views_convert::imagodei::upsert_policy_to_db_input;
-
-// All InputView → DbInput From impls → views_convert/inputs.rs
-// (CreateContentInputView, CreateRelationshipInputView, CreateHumanRelationshipInputView,
-//  CreateContributorPresenceInputView, InitiateClaimInputView, CreateEconomicEventInputView,
-//  CreateAllocationInputView, UpdateAllocationInputView, CreateMasteryInputView,
-//  CreateCollectiveInputView, CreateStewardedNodeInputView)
-
-// upsert_policy_to_db_input → views_convert/imagodei.rs (re-exported above)
-// TokenMintEvent, TokenBalance, TokenTransfer, ResponsibilityDemandConfig,
-// TokenDecayEvent → views_convert/shefa.rs
-
-// Collective, CollectiveParticipation → views_convert/qahal.rs
-// CreateCollectiveInputView → views_convert/inputs.rs
-
-// ============================================================================
-// Account Package Views (Import/Export)
-// ============================================================================
-
-
-
-
-
-
-
-
-
-
-
-// EprHeadInputView, EprLamadContextInputView, EprShefaContextInputView,
-// EprQahalContextInputView, EprRelationshipInputView, From<EprHeadInputView> for EprHead,
-// EprHeadView, From<EprHead> for EprHeadView → views_convert/epr.rs
+// Re-exports: free functions that callers reference via `crate::views::<name>` —
+// preserved here so the public surface from before A.3–A.9 still resolves.
 pub use crate::views_convert::epr::{
     EprHeadInputView, EprHeadView, EprLamadContextInputView, EprQahalContextInputView,
     EprRelationshipInputView, EprShefaContextInputView,
 };
-
-// Human → views_convert/imagodei.rs
-
-
-
-
-// ============================================================================
-// Custodian Metrics Views
-// ============================================================================
-
-
-
-
-
-
-
-
-
-
-// CustodianMetrics, report_custodian_metrics_into_upsert → views_convert/infrastructure.rs
-pub use crate::views_convert::infrastructure::report_custodian_metrics_into_upsert;
-
-
-// ============================================================================
-// Data Protection Views
-//
-// Read-only aggregation views — assembled from custodian commitment data
-// and DHT queries. No dedicated DB tables required.
-// ============================================================================
-
-
-
-
-
-// ============================================================================
-// Shefa Dashboard Views
-//
-// Read-only aggregation views assembled from multiple sources by the
-// compute handler. No dedicated DB tables.
-// ============================================================================
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-// GovernanceState, Challenge, Appeal → views_convert/qahal.rs
-// Proposal, Precedent, Discussion → views_convert/qahal.rs
-
-
-
-
-
-// ProposalOption, GovernanceSignal, GovernanceDisposition → views_convert/qahal.rs
-
-
-// ContentAttestation → views_convert/imagodei.rs (A.6)
-
-
-
-// StewardCredential, PremiumGate, AccessGrant, RevenueSummary,
-// ContributorDashboard, ContributorImpactView, AgreementRow, StewardedNode
-// → views_convert/shefa.rs
-
-// REA Commitment Input Views → views_convert/inputs.rs
-
-// Agreement Input Views → views_convert/inputs.rs
-
-// Stewarded Node Input Views → views_convert/inputs.rs
-
-
-
-
-
-// CreateNodeStewardshipInputView → views_convert/inputs.rs
-
-// Recognition Pipeline Views → views_convert/imagodei.rs
-// (StageTrace + RecognitionDistributionResult live in imagodei per A.6)
-
-// StewardAffinity, CreateStewardAffinityInputView → views_convert/shefa.rs + inputs.rs
-
-
-
-// ============================================================================
-// ElohimGate Views
-// ============================================================================
-
-
-
-
-
-// Statement, StatementVote → views_convert/qahal.rs
-
-
-
-
-
-
-
-// Schedule, SpatialContext, Place, Hazard, RiskAlert → views_convert/infrastructure.rs
-
-
-// ============================================================================
-// Schema Version Tests
-// ============================================================================
-
-// ============================================================================
-// Spatial Dashboard Views (Sprint 8 — Planet-Scale Governance Dashboard)
-// ============================================================================
-
-
-
-
-
-
-
-
-
-
-
-// ============================================================================
-
-// schema_version_tests → views_convert/inputs.rs
+pub use crate::views_convert::imagodei::upsert_policy_to_db_input;
+pub use crate::views_convert::infrastructure::{
+    build_peer_status_view, elohim_reputation_profile_view_from_result,
+    load_elohim_capability_from_env, load_render_capability_from_url,
+    load_render_capability_from_url_blocking, put_blob_response_view_from_manifest,
+    report_custodian_metrics_into_upsert,
+};
+pub use crate::views_convert::lamad::content_view_from_epr_head;
+pub use crate::views_convert::qahal::{ranked_vote_view_from_ranked_vote, vote_view_from_vote};
+pub use crate::views_convert::shefa::node_stewardship_view_from_with_name;
 
 // ============================================================================
 // Observation Sessions — Views
 // ============================================================================
+//
+// These shapes drive the `/observation` HTTP endpoint family. They are composed
+// per-request (no dedicated DB tables on the response side), so they live here
+// rather than in `elohim_views`. The corresponding `ObservationEntry` DB→View
+// conversion is the single `From` impl in this file.
 
 /// Input for beginning a new observation session.
 #[derive(Debug, Clone, Deserialize)]
@@ -251,7 +61,6 @@ pub struct BeginObservationInputView {
     #[serde(default)]
     pub metadata: Option<JsonVal>,
 }
-
 
 /// Response returned after beginning an observation session.
 #[derive(Debug, Clone, Serialize)]
@@ -279,7 +88,6 @@ pub struct ObservationEntryInputView {
     #[serde(default)]
     pub context: Option<JsonVal>,
 }
-
 
 /// A single observation entry as returned in a report.
 #[derive(Debug, Clone, Serialize)]
@@ -367,163 +175,6 @@ pub struct ObservationReportView {
     pub system_state: ObservationSystemStateView,
 }
 
-// =========================================================================
-// Resilience Views
-// =========================================================================
-
-
-
-
-
-
-
-
-
-// GateDecisionAttestation, GateDecisionChallenge, ChallengeOutcome → views_convert/qahal.rs
-
-// ============================================================================
-// Elohim Reputation Profile View
-// ============================================================================
-//
-// Source of truth: computed aggregation over the mishpat DNA DHT outcome graph
-// (GateDecisionAttestation + GateDecisionChallenge + ChallengeOutcome entries).
-// This is NOT a direct table projection — it is computed by
-// `crate::db::elohim_reputation::compute` at query time from the SQLite
-// projections of those DHT entries. If the projections and the DHT disagree,
-// the DHT wins.
-//
-// No scalar score is returned. Dimensions are raw counts; time-decay and
-// severity weighting are deferred to Phase 11+ and applied by consumers.
-// Wire format governed by:
-//   `elohim/sdk/schemas/v1/views/elohim-reputation-profile-view.schema.json`
-
-// PeerStatusRow, build_peer_status_view, load_elohim_capability_from_env,
-// load_render_capability_from_url, load_render_capability_from_url_blocking,
-// PlacementGapRow, CapabilityExtensions, ReputationResult usage,
-// elohim_reputation_profile_view_from_result, put_blob_response_view_from_manifest,
-// ObservationRow, ObservationDiversitySummaryRow → views_convert/infrastructure.rs
-pub use crate::views_convert::infrastructure::{
-    build_peer_status_view, load_elohim_capability_from_env, load_render_capability_from_url,
-    load_render_capability_from_url_blocking, elohim_reputation_profile_view_from_result,
-    put_blob_response_view_from_manifest,
-};
-
-// ============================================================================
-// Peer Status View
-// ============================================================================
-//
-// Source of truth: Holochain infrastructure DNA DHT (Notarized, Category A).
-// This view is a read-optimised SQLite projection populated by
-// `InfrastructureSignal::PeerStatusRecorded` post-commit projections.
-// If the projection and the DHT disagree, the DHT wins.
-//
-// Wire format governed by:
-//   `elohim/sdk/schemas/v1/views/peer-status-view.schema.json`
-//   `elohim/sdk/schemas/v1/views/elohim-capability-profile.schema.json`
-//
-// `elohimCapability` is operator-configured at startup (Phase 9). The field is
-// optional: a peer that does not run an elohim-agent omits it. Phase 10+ may
-// auto-detect capabilities from a live elohim-agent-service.
-
-
-
-// CapabilityExtensions → views_convert/infrastructure.rs (re-exported via elohim_views::infrastructure)
-
-
-
-// From<PeerStatusRow> → views_convert/infrastructure.rs
-
-// build_peer_status_view → views_convert/infrastructure.rs (re-exported above)
-// load_elohim_capability_from_env → views_convert/infrastructure.rs (re-exported above)
-// load_render_capability_from_url → views_convert/infrastructure.rs (re-exported above)
-// load_render_capability_from_url_blocking → views_convert/infrastructure.rs (re-exported above)
-
-
-
-
-
-
-
-
-// Placement Gap + Resilience Snapshot Views → views_convert/infrastructure.rs
-
-
-
-
-
-// RecoveryWitnessRow, KeyRevocationRow, RevocationVoteRow → views_convert/imagodei.rs
-
-// ============================================================================
-// EPR views (Phase 2a)
-// Source of truth: EPR atom (self-notarized via content-address + Ed25519).
-// ============================================================================
-
-
-
-
-
-
-
-
-
-
-// =============================================================================
-// Recovery Protocol Phase 2 — M5 Views
-// Auth Portal Convergence + Revocation UX + Stub Defender
-// =============================================================================
-
-
-
-
-
-
-
-
-
-
-
-
-// ───────────────────────────────────────────────────────────────────────────
-// Light-Up-Topology Phase 1 — operational distribution + cluster + reciprocity
-// ───────────────────────────────────────────────────────────────────────────
-//
-// Wire shapes for the light-up-topology epic. These are Operational (Category
-// C) projections — composed per request from rea_commitments + economic_events
-// + peer_identity_bindings + libp2p swarm state. None of them introduce a new
-// DHT entry type; none of them are persisted on the elohim-storage side.
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 #[cfg(test)]
 mod federation_canonical_tests {
     use super::*;
@@ -605,39 +256,18 @@ mod federation_canonical_tests {
 }
 
 // ============================================================================
-// Peer Transport Manifest View (Phase 12)
+// Wire-type re-exports
 // ============================================================================
 //
-// Source-of-truth pairing: peer_transport_manifest SQLite table,
-// populated by p2p_iroh::peer_map record_* fns.
+// `crate::views::TypeName` resolves to `elohim_views::*::TypeName` so existing
+// in-tree imports continue to work without churn. New code should import
+// directly from `elohim_views::*`.
 
-
-
-
-
-// ============================================================================
-
-// Observation Views
-// ============================================================================
-
-
-// From<ObservationRow> → views_convert/infrastructure.rs
-// From<ObservationDiversitySummaryRow> → views_convert/infrastructure.rs
-
-// AttestationRow, GovernanceActionRow, GovernanceActionTallyRow → views_convert/qahal.rs
-// vote_view_from_vote, ranked_vote_view_from_ranked_vote → views_convert/qahal.rs (re-exported above)
-// node_stewardship_view_from_with_name → views_convert/shefa.rs (re-exported above)
-
-// Re-export wire types from elohim-views so in-tree consumers' `crate::views::TypeName`
-// continues to resolve. New code should import directly from `elohim_views::*`.
-pub use elohim_views::shared::*;
-pub use elohim_views::lamad::*;
-pub use elohim_views::shefa::*;
-pub use elohim_views::qahal::*;
+pub use elohim_views::epr::*;
 pub use elohim_views::imagodei::*;
 pub use elohim_views::infrastructure::*;
-pub use elohim_views::epr::*;
 pub use elohim_views::inputs::*;
-
-// elohim_reputation_profile_view_from_result → views_convert/infrastructure.rs (re-exported above)
-// put_blob_response_view_from_manifest → views_convert/infrastructure.rs (re-exported above)
+pub use elohim_views::lamad::*;
+pub use elohim_views::qahal::*;
+pub use elohim_views::shared::*;
+pub use elohim_views::shefa::*;
