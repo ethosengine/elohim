@@ -1,6 +1,21 @@
-# Limit concurrent rustc processes to prevent RAM spikes during builds.
-# Default (nproc) spawns 24 parallel compilations, each ~100MB+, causing OOM
-# in 18GB containers when combined with rust-analyzer (~8.8GB).
-# 4 jobs keeps peak compilation RAM under ~400MB per project.
-[build]
-jobs = 4
+# .cargo/config.toml — Cargo client configuration for the Elohim Protocol monorepo.
+#
+# This config redirects ALL crates.io traffic through the Nexus group endpoint at
+# nexus.ethosengine.com/repository/cargo/, which caches upstream crates and also
+# serves our internal published crates (e.g. elohim-epr).
+#
+# Authentication: NEVER commit credentials. Use one of:
+#   1. Per-user file: $CARGO_HOME/credentials.toml (chmod 600) — see Task 5.
+#   2. CI env var: CARGO_REGISTRIES_ELOHIM_TOKEN="Bearer NpmToken.<rest>"
+#
+# Anonymous read is enabled on the group, so `cargo build` works without credentials.
+# Credentials are only needed for `cargo publish`.
+
+[registries.elohim]
+index = "sparse+https://nexus.ethosengine.com/repository/cargo/"
+
+[source.crates-io]
+replace-with = "elohim-mirror"
+
+[source.elohim-mirror]
+registry = "sparse+https://nexus.ethosengine.com/repository/cargo/"
