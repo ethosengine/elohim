@@ -26,6 +26,41 @@ const REPO_ROOT = resolve(__dirname, '../../../../../');
 
 const VERIFY = process.argv.includes('--verify');
 
+/**
+ * Recursively resolve $ref pointers in a JSON value.
+ * - $ref strings that look like relative paths into the modular manifest tree
+ *   ("./manifest/..." or "../...") are loaded from disk relative to `baseDir`
+ *   and recursively resolved.
+ * - $ref strings pointing at ./schemas/* (existing metadataSchema/bodySchema
+ *   refs) are left as-is — codegen's loadSchema() handles those explicitly.
+ * - $ref strings starting with "#" (JSON Pointer fragments) are left as-is —
+ *   the manifest schema validator handles those.
+ * - All other values are walked recursively.
+ *
+ * @param {*} value      Any JSON value
+ * @param {string} baseDir  Absolute directory the current document was loaded from
+ * @returns {Promise<*>} The value with modular-manifest $refs inlined
+ */
+async function resolveRefs(value, baseDir) {
+  if (value === null || typeof value !== 'object') return value;
+  if (Array.isArray(value)) {
+    return Promise.all(value.map((v) => resolveRefs(v, baseDir)));
+  }
+  if (
+    typeof value.$ref === 'string' &&
+    (value.$ref.startsWith('./manifest/') || value.$ref.startsWith('../'))
+  ) {
+    const refPath = resolve(baseDir, value.$ref);
+    const raw = JSON.parse(await readFile(refPath, 'utf8'));
+    return resolveRefs(raw, dirname(refPath));
+  }
+  const out = {};
+  for (const [k, v] of Object.entries(value)) {
+    out[k] = await resolveRefs(v, baseDir);
+  }
+  return out;
+}
+
 const MANIFEST_PATH = resolve(LAMAD_DIR, 'manifest.json');
 
 // Output locations (identical copies, except content-node-types.ts imports)
@@ -394,7 +429,8 @@ async function loadSchema(refPath) {
 }
 
 async function main() {
-  const manifest = JSON.parse(await readFile(MANIFEST_PATH, 'utf8'));
+  const manifestRaw = JSON.parse(await readFile(MANIFEST_PATH, 'utf8'));
+  const manifest = await resolveRefs(manifestRaw, dirname(MANIFEST_PATH));
   const contentTypes = manifest.vocabulary?.contentTypes || {};
   const contentFormats = manifest.vocabulary?.contentFormats || {};
 
