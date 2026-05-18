@@ -35,8 +35,9 @@ reqwest = { version = "0.11", default-features = false, features = ["json", "rus
 tokio = { version = "1", features = ["sync", "time"] }
 
 # Re-exported crates
-elohim-storage-client = { path = "../elohim-storage-client", optional = true }
 doorway-client = { path = "../doorway-client" }
+elohim-storage-client = { path = "../elohim-storage-client", optional = true }
+elohim-views = { path = "../../elohim/elohim-views" }
 
 # Sync support
 automerge = { version = "0.5", optional = true }

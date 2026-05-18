@@ -57,6 +57,15 @@ pub mod reach;
 // Error types
 pub mod error;
 
+/// View types — re-exported from `elohim-views` for the consumer-friendly facade.
+///
+/// Consumers should prefer `elohim_sdk::views::*` over depending on
+/// `elohim-views` directly — this insulates them from any future
+/// reorganization of the underlying types crate.
+pub mod views {
+    pub use elohim_views::*;
+}
+
 // Re-export core traits
 pub use traits::{ContentReadable, ContentWriteable, Syncable};
 
