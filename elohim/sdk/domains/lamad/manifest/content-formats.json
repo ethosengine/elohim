@@ -1,0 +1,99 @@
+{
+  "markdown": {
+    "description": "Markdown documents with optional YAML frontmatter. The primary narrative format for written content.",
+    "renderer": "markdown-renderer",
+    "mimeTypes": [
+      "text/markdown",
+      "text/x-markdown"
+    ],
+    "extensions": [
+      "md",
+      "markdown"
+    ]
+  },
+  "gherkin": {
+    "description": "Behavior-Driven Development feature files with Given/When/Then syntax. Executable specifications.",
+    "renderer": "gherkin-renderer",
+    "mimeTypes": [
+      "text/x-gherkin"
+    ],
+    "extensions": [
+      "feature"
+    ]
+  },
+  "sophia-quiz-json": {
+    "description": "Sophia psychometric assessment format for mastery quizzes, discovery assessments, and reflection prompts.",
+    "renderer": "sophia-renderer",
+    "mimeTypes": [
+      "application/vnd.sophia.assessment+json"
+    ],
+    "extensions": [
+      "sophia.json",
+      "sophia-quiz.json"
+    ],
+    "aliases": [
+      "sophia",
+      "perseus-quiz-json"
+    ]
+  },
+  "html5-app": {
+    "description": "Interactive HTML5 applications served from doorway. Content is extracted from zip archives and cached for iframe embedding.",
+    "renderer": "iframe-renderer",
+    "mimeTypes": [
+      "application/zip",
+      "application/x-zip-compressed"
+    ],
+    "extensions": [
+      "zip"
+    ]
+  },
+  "spa-bundle": {
+    "description": "Single-page application served as a doorway's root web surface. ZIP archive extracted and cached by doorway with SPA routing (unmatched paths serve index.html).",
+    "renderer": null,
+    "mimeTypes": [
+      "application/zip",
+      "application/x-zip-compressed"
+    ],
+    "extensions": [
+      "zip"
+    ]
+  },
+  "epr-composite": {
+    "description": "EPR composite layout — a content node whose body references other EPRs. Used for paths, curated collections, and landing pages.",
+    "renderer": "path-renderer",
+    "bodySchema": {
+      "$ref": "./schemas/epr-composite-body.schema.json"
+    }
+  },
+  "html": {
+    "description": "HTML content rendered directly. Falls back to the markdown renderer for consistent styling.",
+    "renderer": "markdown-renderer",
+    "mimeTypes": [
+      "text/html"
+    ],
+    "extensions": [
+      "html",
+      "htm"
+    ]
+  },
+  "plaintext": {
+    "description": "Plain text content with no formatting. Rendered through the markdown renderer for consistent layout.",
+    "renderer": "markdown-renderer",
+    "mimeTypes": [
+      "text/plain"
+    ],
+    "extensions": [
+      "txt"
+    ]
+  },
+  "video-embed": {
+    "description": "Embedded video content from external providers (YouTube, Vimeo). Rendered in an iframe with appropriate sizing.",
+    "renderer": "iframe-renderer",
+    "mimeTypes": [
+      "text/x-video-embed"
+    ]
+  },
+  "json": {
+    "description": "Raw JSON data format. Used for structured content that doesn't fit other format categories."
+  }
+}

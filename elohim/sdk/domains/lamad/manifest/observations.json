@@ -1,0 +1,77 @@
+{
+  "knowledge-retention": {
+    "description": "Learner can recall and apply concept after interval",
+    "instrument": "retention-check",
+    "polarity": "positive"
+  },
+  "retention-failure": {
+    "description": "Learner cannot recall or apply concept after interval",
+    "instrument": "retention-check",
+    "polarity": "negative"
+  },
+  "mastery-attestation-meaningful": {
+    "description": "Mastery-attested learners succeed in downstream prerequisites",
+    "instrument": "outcome-correlation",
+    "polarity": "positive"
+  },
+  "downstream-prerequisite-failure": {
+    "description": "Mastery-attested learners fail in downstream content they should be prepared for",
+    "instrument": "outcome-correlation",
+    "polarity": "negative"
+  },
+  "stewardship-distributed": {
+    "description": "Content domain has diverse steward participation",
+    "instrument": "distribution-health",
+    "polarity": "positive"
+  },
+  "stewardship-concentrated": {
+    "description": "Single steward controls disproportionate share of domain content",
+    "instrument": "distribution-health",
+    "polarity": "negative"
+  },
+  "content-relevant": {
+    "description": "Content is current and referenced by active learning paths",
+    "instrument": "outcome-correlation",
+    "polarity": "positive"
+  },
+  "content-outdated": {
+    "description": "Content no longer reflects current understanding (human-reported or instrument-detected)",
+    "instrument": "community-report",
+    "polarity": "negative"
+  },
+  "content-misleading": {
+    "description": "Content framing does not match substance (human-reported)",
+    "instrument": "community-report",
+    "polarity": "negative"
+  },
+  "learning-outcome-achieved": {
+    "description": "Learner demonstrates competence in the domain a path covers after completion",
+    "instrument": "outcome-correlation",
+    "polarity": "positive"
+  },
+  "path-completion-without-retention": {
+    "description": "Learner completed path but cannot demonstrate competence in its domain",
+    "instrument": "outcome-correlation",
+    "polarity": "negative"
+  },
+  "community-value-confirmed": {
+    "description": "Community contributions produce engagement and downstream learning",
+    "instrument": "outcome-correlation",
+    "polarity": "positive"
+  },
+  "engagement-decline": {
+    "description": "Community contributions are not producing engagement or downstream learning",
+    "instrument": "outcome-correlation",
+    "polarity": "negative"
+  },
+  "peer-review-verified": {
+    "description": "A gate-process-declaration or universal-band-declaration has been reviewed by qualified peers and accepted as sound constitutional logic",
+    "instrument": "community-report",
+    "polarity": "positive"
+  },
+  "manifest-challenged": {
+    "description": "A gate-process-declaration has been formally challenged (incorrectness, scope-creep, or jurisdiction overreach)",
+    "instrument": "community-report",
+    "polarity": "negative"
+  }
+}

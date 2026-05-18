@@ -1,0 +1,195 @@
+{
+  "CONTAINS": {
+    "description": "Parent-child hierarchical containment. The source contains the target as a sub-element.",
+    "sourceTypes": [
+      "path",
+      "epic",
+      "course-module",
+      "module",
+      "lesson",
+      "concept",
+      "community",
+      "feature"
+    ],
+    "targetTypes": [
+      "concept",
+      "lesson",
+      "assessment",
+      "exercise",
+      "reflection",
+      "discussion",
+      "article",
+      "scenario",
+      "quiz",
+      "simulation",
+      "feature",
+      "path"
+    ],
+    "inverse": "BELONGS_TO"
+  },
+  "BELONGS_TO": {
+    "description": "Reverse of CONTAINS — the source is a child of the target.",
+    "sourceTypes": [
+      "concept",
+      "lesson",
+      "assessment",
+      "exercise",
+      "reflection",
+      "discussion",
+      "scenario",
+      "quiz",
+      "simulation",
+      "feature",
+      "module"
+    ],
+    "targetTypes": [
+      "path",
+      "epic",
+      "course-module",
+      "module",
+      "lesson",
+      "community",
+      "feature"
+    ],
+    "inverse": "CONTAINS"
+  },
+  "DESCRIBES": {
+    "description": "High-level narrative describes a lower-level implementation. The source provides context or explanation for the target.",
+    "sourceTypes": [
+      "epic",
+      "article",
+      "instrument"
+    ],
+    "targetTypes": [
+      "concept",
+      "lesson",
+      "path",
+      "discovery-assessment"
+    ]
+  },
+  "IMPLEMENTS": {
+    "description": "Implementation realizes a narrative. The source concretely implements what the target describes.",
+    "sourceTypes": [
+      "scenario",
+      "feature",
+      "exercise"
+    ],
+    "targetTypes": [
+      "epic",
+      "concept"
+    ]
+  },
+  "VALIDATES": {
+    "description": "The source tests or verifies understanding of the target. Assessments validate concepts, scenarios validate features.",
+    "sourceTypes": [
+      "assessment",
+      "quiz",
+      "exercise",
+      "scenario",
+      "simulation",
+      "practice"
+    ],
+    "targetTypes": [
+      "concept",
+      "lesson",
+      "feature"
+    ]
+  },
+  "RELATES_TO": {
+    "description": "Generic bidirectional association between content. Used when a more specific relationship type does not apply.",
+    "sourceTypes": [
+      "concept",
+      "lesson",
+      "article",
+      "discussion",
+      "exercise",
+      "tool",
+      "module",
+      "community",
+      "discovery-assessment",
+      "instrument",
+      "simulation"
+    ],
+    "targetTypes": [
+      "concept",
+      "lesson",
+      "article",
+      "discussion",
+      "exercise",
+      "tool",
+      "module",
+      "community",
+      "epic",
+      "instrument"
+    ]
+  },
+  "REFERENCES": {
+    "description": "The source cites or references the target. A weaker form of RELATES_TO indicating directional citation.",
+    "sourceTypes": [
+      "article",
+      "lesson",
+      "concept",
+      "tool"
+    ],
+    "targetTypes": [
+      "article",
+      "book-chapter",
+      "concept"
+    ]
+  },
+  "DEPENDS_ON": {
+    "description": "The source depends on the target for correctness or completeness. Implies the target should exist for the source to be meaningful.",
+    "sourceTypes": [
+      "concept",
+      "lesson",
+      "assessment"
+    ],
+    "targetTypes": [
+      "concept",
+      "lesson"
+    ]
+  },
+  "REQUIRES": {
+    "description": "The source has a prerequisite relationship with the target. Learners must complete the target before the source.",
+    "sourceTypes": [
+      "lesson",
+      "assessment",
+      "path",
+      "course-module",
+      "practice"
+    ],
+    "targetTypes": [
+      "concept",
+      "lesson",
+      "path",
+      "course-module"
+    ]
+  },
+  "FOLLOWS": {
+    "description": "Sequential ordering — the source comes after the target in a learning sequence. Suggests but does not require completion order.",
+    "sourceTypes": [
+      "lesson",
+      "path",
+      "course-module"
+    ],
+    "targetTypes": [
+      "lesson",
+      "path",
+      "course-module"
+    ]
+  },
+  "ATTACHED_TO": {
+    "description": "Attachment link — the source is attached supplementary material for the target (e.g., a story with attached media).",
+    "sourceTypes": [
+      "article",
+      "simulation",
+      "exercise"
+    ],
+    "targetTypes": [
+      "lesson",
+      "concept",
+      "path",
+      "epic"
+    ]
+  }
+}

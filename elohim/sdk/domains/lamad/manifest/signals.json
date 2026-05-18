@@ -1,0 +1,50 @@
+{
+  "learning-signal": {
+    "description": "Emitted when a learner engages with content — views, reads, or interacts. The foundational attention signal for the learning economy.",
+    "substrateSignal": "attention",
+    "economicAction": "use",
+    "resourceType": "learning"
+  },
+  "mastery-achieved": {
+    "description": "Emitted when a learner levels up in mastery for a concept. Produces a mastery attestation that flows value to content stewards.",
+    "substrateSignal": "attention",
+    "economicAction": "produce",
+    "resourceType": "mastery-attestation"
+  },
+  "assessment-completed": {
+    "description": "Emitted when a learner completes an assessment or quiz. Triggers evaluation resource accounting and recognition flows.",
+    "substrateSignal": "compute",
+    "economicAction": "use",
+    "resourceType": "evaluation"
+  },
+  "path-completed": {
+    "description": "Emitted when a learner completes all steps in a learning path. A major milestone that produces path-completion attestation.",
+    "substrateSignal": "attention",
+    "economicAction": "produce",
+    "resourceType": "path-completion"
+  },
+  "practice-engagement": {
+    "description": "Emitted when a learner actively practices with exercises, simulations, or interactive content. Distinct from passive viewing.",
+    "substrateSignal": "attention",
+    "economicAction": "use",
+    "resourceType": "practice"
+  },
+  "contribution-created": {
+    "description": "Emitted when a steward creates, curates, or reviews content. Produces a contribution record that builds stewardship standing.",
+    "substrateSignal": "compute",
+    "economicAction": "produce",
+    "resourceType": "contribution"
+  },
+  "experience-attestation": {
+    "substrateSignal": "attention",
+    "economicAction": "produce",
+    "resourceType": "experience-attestation",
+    "description": "A :story-point attestation minted by the discernment gate when meaningful evidence is recognized. Emitted alongside the Holochain Link; dual-encoded as an EconomicEvent in shefa."
+  },
+  "peer-review-completed": {
+    "description": "Emitted when a peer review of content is completed. Produces a peer attestation that strengthens content trust and steward standing.",
+    "substrateSignal": "compute",
+    "economicAction": "produce",
+    "resourceType": "peer-attestation"
+  }
+}
