@@ -1,0 +1,52 @@
+# cargo-deny configuration for the Elohim Protocol repo.
+#
+# Primary purpose: enforce the elohim-views / elohim-sdk boundary.
+# - elohim-views: lightweight Wire-shape types crate (consumers depend here)
+# - elohim-sdk: re-export facade with client helpers (consumers depend here)
+# - elohim-storage: server-side implementation (only server crates depend here)
+#
+# Non-server consumers (elohim-storage-client, future third-party SDKs,
+# elohim-app build deps) must NOT depend on elohim-storage directly. They
+# depend on elohim-views or elohim-sdk instead.
+#
+# To check locally:  cargo deny --manifest-path elohim/Cargo.toml check bans
+
+[graph]
+all-features = false
+no-default-features = false
+
+[output]
+feature-depth = 1
+
+[bans]
+multiple-versions = "warn"
+wildcards = "deny"
+
+# elohim-storage is the implementation; only the server-side wrappers may
+# depend on it directly. Everything else uses elohim-views (or the elohim-sdk
+# facade that re-exports it).
+[[bans.deny]]
+name = "elohim-storage"
+wrappers = [
+    "doorway-service",      # server-side gateway
+    "steward-node",         # server-side node runtime
+    "elohim-node",          # server-side node deployment wrapper
+    "elohim-storage",       # self-reference (dev-deps, etc.)
+]
+
+[licenses]
+allow = [
+    "MIT", "Apache-2.0", "BSD-3-Clause", "BSD-2-Clause", "ISC",
+    "Unicode-DFS-2016", "CAL-1.0", "MPL-2.0", "Zlib", "OpenSSL",
+]
+exceptions = []
+unlicensed = "warn"
+
+[sources]
+unknown-registry = "warn"
+unknown-git = "warn"
+allow-registry = [
+    "https://github.com/rust-lang/crates.io-index",
+    "sparse+https://nexus.ethosengine.com/repository/cargo-internal/",
+    "sparse+https://nexus.ethosengine.com/repository/cargo/",
+]

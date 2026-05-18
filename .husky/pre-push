@@ -667,6 +667,18 @@ echo "  PRE-PUSH GATE: ALL CLEAR (${TOTAL_ELAPSED}s)"
 echo "============================================"
 echo ""
 
+# ── cargo-deny bans check ────────────────────────────────────────
+# Enforces the elohim-views/elohim-sdk boundary — see deny.toml for rules.
+if command -v cargo-deny >/dev/null 2>&1; then
+  echo ""
+  echo "── cargo deny check bans (elohim workspace) ───────────────────"
+  if ! (cd "$(git rev-parse --show-toplevel)" && cargo deny --manifest-path elohim/Cargo.toml check bans 2>&1 | tail -20); then
+    echo "✗ cargo-deny failed — boundary violation. See deny.toml for rules."
+    exit 1
+  fi
+  echo "── end cargo deny check ───────────────────────────────────────"
+fi
+
 # Stage 1a: advisory brit checks (never fail the push).
 brit_advisory
 
