@@ -128,6 +128,22 @@
       "edgenodeMemoryLimit": "1536Mi",
       "edgenodeCpuRequest": "250m",
       "edgenodeCpuLimit": "1000m"
+    },
+    {
+      "$comment": "Introduced 2026-05-18 alongside shem-return reshuffle. Gertrude formalizes the 'grandma standard' archetype that has shaped the resilience epic — the non-technical user who must be served well (memory: project_recovery_grandma_standard, project_subsume_g_f_a_via_it_just_works). She is the reciprocal-recovery counterparty for the Dowell household: gertrude ↔ matthew/jessica/james hold each other's Shamir-split shares for social-derived recovery (memory: project_socially_derived_security, project_graduated_recovery_authority). Dowell-side hub is matthew's device-family-node-base (on-prem family hub); gertrude is modeled here as her always-on hub-class device (device-home-nuc) — she also has a laptop in real life, but the per-human-multi-device topology isn't modeled in deployments yet; the hub holds the Shamir share so the backup relationship is exercisable from this one entry. We have not yet hit high-availability or fully-realized backup, but this single reciprocal relationship is enough to test the full recovery/sharding/login story surface. Structural schema for these stewardship agreements deferred — captured first in canonical stories under genesis/data/stories/ until the field shape crystallizes; humans.schema.json is protocol-law and any extension wants story-first justification.",
+      "name": "gertrude",
+      "role": "grandma",
+      "humanLabel": "gertrude-grandma",
+      "humanId": "human-gertrude-grandma",
+      "pattern": "consolidated",
+      "template": "genesis/orchestrator/manifests/humans/_edgenode-consolidated.template.yaml",
+      "deviceArchetype": "device-home-nuc",
+      "affinityComment": "Gertrude: separate household (household-gertrude, Sunset Acres) — remote-peer hub on shem; reciprocal-recovery counterparty for the Dowell family hub (matthew); always-on hub-class to hold Shamir share + serve backup/recovery flows; laptop second-device deferred until per-human-multi-device topology exists; large-text / simple-navigation accessibility needs; performance fallback to ethosengine.",
+      "nodeTypes": ["remote", "performance"],
+      "edgenodeMemoryRequest": "512Mi",
+      "edgenodeMemoryLimit": "1536Mi",
+      "edgenodeCpuRequest": "250m",
+      "edgenodeCpuLimit": "1000m"
     }
   ]
 }
