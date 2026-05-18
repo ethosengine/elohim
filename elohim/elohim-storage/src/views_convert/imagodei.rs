@@ -5,8 +5,9 @@
 
 use elohim_views::shared::parse_json;
 use elohim_views::{
-    DevicePolicyView, HumanView, KeyRevocationView, LocalSessionView, MonitoringRulesInput,
-    RecoveryWitnessView, RevocationVoteView, UpsertPolicyInputView,
+    DevicePolicyView, HumanView, JsonVal, KeyRevocationView, LocalSessionView, MonitoringRulesInput,
+    RecognitionDistributionResultView, RecoveryWitnessView, RevocationVoteView, StageTraceView,
+    UpsertPolicyInputView,
 };
 
 use crate::db::models::{DevicePolicy, Human, KeyRevocationRow, LocalSession, RevocationVoteRow};
@@ -206,5 +207,56 @@ pub fn upsert_policy_to_db_input(
         log_policy_events: monitoring.log_policy_events,
         retention_days: monitoring.retention_days,
         subject_can_view: monitoring.subject_can_view,
+    }
+}
+
+
+// ============================================================================
+// Recognition Pipeline Views
+// ============================================================================
+
+impl From<crate::services::recognition_pipeline_service::StageTrace> for StageTraceView {
+    fn from(t: crate::services::recognition_pipeline_service::StageTrace) -> Self {
+        Self {
+            steward_presence_id: t.steward_presence_id,
+            allocation_ratio: t.allocation_ratio,
+            stored_affinity: t.stored_affinity,
+            derived_affinity: t.derived_affinity,
+            effective_ratio: t.effective_ratio,
+            pre_limit_share: t.pre_limit_share,
+            final_share: t.final_share,
+            limit_reasons: t
+                .limit_reasons
+                .iter()
+                .map(|r| JsonVal(serde_json::to_value(r).unwrap_or_default()))
+                .collect(),
+            economic_event_id: t.economic_event_id.unwrap_or_default(),
+        }
+    }
+}
+
+impl From<crate::services::recognition_pipeline_service::RecognitionDistributionResult>
+    for RecognitionDistributionResultView
+{
+    fn from(
+        r: crate::services::recognition_pipeline_service::RecognitionDistributionResult,
+    ) -> Self {
+        Self {
+            content_id: r.content_id,
+            trigger_event_type: r.trigger_event_type,
+            raw_amount: r.raw_amount,
+            weighted_amount: r.weighted_amount,
+            distributions: r
+                .distributions
+                .into_iter()
+                .map(StageTraceView::from)
+                .collect(),
+            economic_event_ids: r.economic_event_ids,
+            limits_applied: r
+                .limits_applied
+                .iter()
+                .map(|l| JsonVal(serde_json::to_value(l).unwrap_or_default()))
+                .collect(),
+        }
     }
 }

@@ -5,12 +5,14 @@
 //! All From impls that were authored directly against DB input structs
 //! live here, organized by domain.
 
-use elohim_views::shared::serialize_json_opt;
+use elohim_views::shared::{parse_json_opt, serialize_json_opt};
 use elohim_views::{
-    CreateAllocationInputView, CreateCollectiveInputView, CreateContributorPresenceInputView,
-    CreateContentInputView, CreateEconomicEventInputView, CreateHumanRelationshipInputView,
-    CreateMasteryInputView, CreateRelationshipInputView, CreateStewardedNodeInputView,
-    InitiateClaimInputView, UpdateAllocationInputView,
+    CreateAgreementInputView, CreateAllocationInputView, CreateCollectiveInputView,
+    CreateContentInputView, CreateContributorPresenceInputView, CreateEconomicEventInputView,
+    CreateHumanRelationshipInputView, CreateMasteryInputView, CreateNodeStewardshipInputView,
+    CreateReaCommitmentInputView, CreateRelationshipInputView, CreateStewardAffinityInputView,
+    CreateStewardedNodeInputView, InitiateClaimInputView, RecognitionTriggerInputView,
+    UpdateAllocationInputView, UpdateReaCommitmentStateView,
 };
 
 use crate::db::collectives::CreateCollectiveInput;
@@ -19,9 +21,10 @@ use crate::db::content_mastery::CreateMasteryInput;
 use crate::db::contributor_presences::{CreateContributorPresenceInput, InitiateClaimInput};
 use crate::db::economic_events::CreateEconomicEventInput;
 use crate::db::human_relationships::CreateHumanRelationshipInput;
+use crate::db::rea_commitments::{CreateReaCommitmentInput, UpdateReaCommitmentState};
 use crate::db::relationships_diesel::CreateRelationshipInput;
-use crate::db::stewardship_allocations::{CreateAllocationInput, UpdateAllocationInput};
 use crate::db::stewarded_nodes::CreateStewardedNodeInput;
+use crate::db::stewardship_allocations::{CreateAllocationInput, UpdateAllocationInput};
 
 // ============================================================================
 // Content Input Views (lamad)
@@ -251,6 +254,109 @@ impl From<CreateStewardedNodeInputView> for CreateStewardedNodeInput {
             context_epr_id: v.context_epr_id,
             dht_anchor_hash: None,
             h_app_id: String::new(), // set by handler from AppContext
+        }
+    }
+}
+
+impl From<CreateNodeStewardshipInputView>
+    for crate::db::stewarded_nodes::CreateNodeStewardshipInput
+{
+    fn from(v: CreateNodeStewardshipInputView) -> Self {
+        Self {
+            node_id: v.node_id,
+            human_id: v.human_id,
+            affinity_score: v.affinity_score,
+            relationship: v.relationship,
+            context_epr_id: v.context_epr_id,
+        }
+    }
+}
+
+// ============================================================================
+// REA Commitment Input Views (shefa)
+// ============================================================================
+
+impl From<CreateReaCommitmentInputView> for CreateReaCommitmentInput {
+    fn from(v: CreateReaCommitmentInputView) -> Self {
+        Self {
+            id: v.id,
+            action: v.action,
+            provider: v.provider,
+            receiver: v.receiver,
+            resource_conforms_to: v.resource_conforms_to,
+            resource_classified_as: v
+                .resource_classified_as
+                .map(|v| serde_json::to_string(&v).unwrap_or_default()),
+            resource_quantity_value: v.resource_quantity.as_ref().map(|m| m.has_numerical_value),
+            resource_quantity_unit: v.resource_quantity.map(|m| m.has_unit),
+            effort_quantity_value: v.effort_quantity.as_ref().map(|m| m.has_numerical_value),
+            effort_quantity_unit: v.effort_quantity.map(|m| m.has_unit),
+            has_beginning: v.has_beginning,
+            has_end: v.has_end,
+            due: v.due,
+            clause_of: v.clause_of,
+            in_scope_of: v
+                .in_scope_of
+                .map(|v| serde_json::to_string(&v).unwrap_or_default()),
+            medium_of_exchange_id: v.medium_of_exchange_id,
+            note: v.note,
+            metadata_json: serialize_json_opt(&v.metadata),
+        }
+    }
+}
+
+impl From<UpdateReaCommitmentStateView> for UpdateReaCommitmentState {
+    fn from(v: UpdateReaCommitmentStateView) -> Self {
+        Self {
+            state: v.state,
+            finished: v.finished,
+        }
+    }
+}
+
+// ============================================================================
+// Agreement Input Views (shefa)
+// ============================================================================
+
+impl From<CreateAgreementInputView> for crate::db::agreements::CreateAgreementInput {
+    fn from(v: CreateAgreementInputView) -> Self {
+        Self {
+            id: v.id,
+            name: v.name,
+            note: v.note,
+            metadata_json: serialize_json_opt(&v.metadata),
+        }
+    }
+}
+
+// ============================================================================
+// Steward Affinity Input Views (imagodei)
+// ============================================================================
+
+impl From<CreateStewardAffinityInputView> for crate::db::steward_affinity::CreateAffinityInput {
+    fn from(v: CreateStewardAffinityInputView) -> Self {
+        Self {
+            steward_id: v.steward_id,
+            content_id: v.content_id,
+            affinity_score: v.affinity_score,
+            source: v.source.unwrap_or_else(|| "genesis_seed".to_string()),
+        }
+    }
+}
+
+// ============================================================================
+// Recognition Pipeline Input Views (imagodei)
+// ============================================================================
+
+impl From<RecognitionTriggerInputView>
+    for crate::services::recognition_pipeline_service::RecognitionTrigger
+{
+    fn from(v: RecognitionTriggerInputView) -> Self {
+        Self {
+            content_id: v.content_id,
+            event_type: v.event_type,
+            raw_amount: v.raw_amount,
+            triggered_by: v.triggered_by,
         }
     }
 }
